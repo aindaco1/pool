@@ -467,8 +467,8 @@ async function handleStart(request, env) {
 
   console.log('📥 /start called');
   const body = await request.json();
-  const { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty = 1, additionalTiers = [], customerName, phone, billingAddress } = body;
-  console.log('📥 /start payload:', { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty, additionalTiers });
+  const { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty = 1, additionalTiers = [], supportItems = [], customAmount = 0, customerName, phone, billingAddress } = body;
+  console.log('📥 /start payload:', { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty, additionalTiers, supportItems, customAmount });
 
   if (!orderId || !campaignSlug) {
     console.log('📥 /start: Missing required fields');
@@ -550,6 +550,12 @@ async function handleStart(request, env) {
     await env.PLEDGES.put(`pending-tiers:${orderId}`, JSON.stringify(additionalTiers), { expirationTtl: 3600 });
     console.log('📥 /start: Stored additional tiers for order:', orderId, additionalTiers);
   }
+  
+  // Store support items and custom amount in KV for webhook to use
+  if ((supportItems.length > 0 || customAmount > 0) && env.PLEDGES) {
+    await env.PLEDGES.put(`pending-extras:${orderId}`, JSON.stringify({ supportItems, customAmount }), { expirationTtl: 3600 });
+    console.log('📥 /start: Stored extras for order:', orderId, { supportItems, customAmount });
+  }
 
   const stripeKey = getStripeKey(env);
   console.log('📥 /start: Using Stripe key:', stripeKey ? 'present' : 'MISSING');
@@ -569,7 +575,8 @@ async function handleStart(request, env) {
         tierId: tierId || '',
         tierName: tierName || '',
         tierQty: String(tierQty || 1),
-        hasAdditionalTiers: additionalTiers.length > 0 ? 'true' : ''
+        hasAdditionalTiers: additionalTiers.length > 0 ? 'true' : '',
+        hasExtras: (supportItems.length > 0 || customAmount > 0) ? 'true' : ''
       }
     };
     
@@ -766,7 +773,7 @@ async function handleStripeWebhook(request, env) {
     const session = event.data.object;
     
     if (session.mode === 'setup') {
-      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, hasAdditionalTiers, isPaymentUpdate, snipcartPaymentSessionId, snipcartPublicToken } = session.metadata;
+      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, hasAdditionalTiers, hasExtras, isPaymentUpdate, snipcartPaymentSessionId, snipcartPublicToken } = session.metadata;
       const tierQtyNum = parseInt(tierQty) || 1;
       const email = session.customer_email || session.customer_details?.email;
       const customerId = session.customer;
@@ -780,6 +787,20 @@ async function handleStripeWebhook(request, env) {
           console.log('📨 Found additional tiers for order:', orderId, additionalTiers);
           // Clean up the temporary key
           await env.PLEDGES.delete(`pending-tiers:${orderId}`);
+        }
+      }
+      
+      // Fetch support items and custom amount from KV if present
+      let supportItems = [];
+      let customAmount = 0;
+      if (hasExtras === 'true' && env.PLEDGES) {
+        const extras = await env.PLEDGES.get(`pending-extras:${orderId}`, { type: 'json' });
+        if (extras) {
+          supportItems = extras.supportItems || [];
+          customAmount = extras.customAmount || 0;
+          console.log('📨 Found extras for order:', orderId, { supportItems, customAmount });
+          // Clean up the temporary key
+          await env.PLEDGES.delete(`pending-extras:${orderId}`);
         }
       }
 
@@ -924,6 +945,8 @@ async function handleStripeWebhook(request, env) {
             tierName: tierName || null,
             tierQty: tierQtyNum,
             additionalTiers: additionalTiers.length > 0 ? additionalTiers : undefined,
+            supportItems: supportItems.length > 0 ? supportItems : undefined,
+            customAmount: customAmount > 0 ? customAmount : undefined,
             subtotal,
             tax,
             amount: subtotal + tax,
@@ -942,6 +965,8 @@ async function handleStripeWebhook(request, env) {
               tierId: tierId || null,
               tierQty: tierQtyNum,
               additionalTiers: additionalTiers.length > 0 ? additionalTiers : undefined,
+              supportItems: supportItems.length > 0 ? supportItems : undefined,
+              customAmount: customAmount > 0 ? customAmount : undefined,
               at: now
             }]
           };
@@ -965,6 +990,17 @@ async function handleStripeWebhook(request, env) {
             additionalTiers
           });
           console.log('📊 Stats updated successfully');
+          
+          // Update support item stats if present (new pledges start with amount, currentAmount is 0)
+          if (supportItems.length > 0) {
+            const supportItemsForStats = supportItems.map(s => ({
+              id: s.id,
+              amount: s.amount,
+              currentAmount: 0
+            }));
+            await updateSupportItemStats(env, campaignSlug, supportItemsForStats);
+            console.log('📊 Support item stats updated:', supportItemsForStats.map(s => `${s.id}: $${s.amount}`).join(', '));
+          }
 
           // Check for milestone emails (async, don't block)
           triggerMilestoneEmails(env, campaignSlug).catch(err => {

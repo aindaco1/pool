@@ -165,6 +165,14 @@ export async function recalculateStats(env, campaignSlug) {
         stats.tierCounts[pledge.tierId] = (stats.tierCounts[pledge.tierId] || 0) + qty;
       }
       
+      // Count additional tiers
+      if (pledge.additionalTiers) {
+        for (const addTier of pledge.additionalTiers) {
+          const qty = addTier.qty || 1;
+          stats.tierCounts[addTier.id] = (stats.tierCounts[addTier.id] || 0) + qty;
+        }
+      }
+      
       // Sum support item contributions
       if (pledge.supportItems) {
         for (const item of pledge.supportItems) {

@@ -65,6 +65,18 @@ async function startPledgeFlow() {
     id: item.id?.split('__')[1] || item.id,
     qty: item.quantity || 1
   }));
+  
+  // Extract support items from cart (IDs like "{slug}__support__{itemId}")
+  const supportItems = items
+    .filter(item => item.id?.includes('__support__'))
+    .map(item => ({
+      id: item.id.split('__support__')[1],
+      amount: Math.round(item.price * (item.quantity || 1))
+    }));
+  
+  // Extract custom amount from cart (ID like "{slug}__custom-support")
+  const customItem = items.find(item => item.id?.includes('__custom-support'));
+  const customAmount = customItem ? Math.round(customItem.price * (customItem.quantity || 1)) : 0;
 
   // Calculate subtotal from cart (pre-tax for stats, Worker will add tax)
   const subtotalCents = Math.round((cart.subtotal || cart.total) * 100);
@@ -93,6 +105,8 @@ async function startPledgeFlow() {
       tierName,
       tierQty,
       additionalTiers: additionalTiers.length > 0 ? additionalTiers : undefined,
+      supportItems: supportItems.length > 0 ? supportItems : undefined,
+      customAmount: customAmount > 0 ? customAmount : undefined,
       customerName,
       phone,
       billingAddress: billing.address1 ? {

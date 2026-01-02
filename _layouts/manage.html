@@ -615,8 +615,20 @@
       const isCancelled = pledge.pledgeStatus === 'cancelled';
       const currentTierId = pledge.tierId?.split('__').pop();
       const tiers = campaign?.tiers || [];
-      const supportItems = campaign?.support_items?.filter(item => item.late_support) || [];
       const isSingleTier = campaign?.single_tier_only === true;
+      
+      // Use live stats for pledged_amount if available (needed for filtering logic)
+      const preStats = liveStats[pledge.campaignSlug];
+      const preLivePledgedAmount = preStats ? preStats.pledgedAmount / 100 : (campaign?.pledged_amount || 0);
+      const preCampaignFunded = campaign && preLivePledgedAmount >= campaign.goal_amount;
+      const preIsLive = (preStats?.state || campaign?.state) === 'live';
+      const preIsPost = (preStats?.state || campaign?.state) === 'post';
+      
+      // During live campaign: show ALL support items
+      // During post campaign: show only late_support items (and only if funded)
+      const supportItems = preIsLive 
+        ? (campaign?.support_items || [])
+        : (campaign?.support_items?.filter(item => item.late_support) || []);
       
       // Use live stats for pledged_amount if available
       const stats = liveStats[pledge.campaignSlug];
