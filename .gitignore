@@ -20,3 +20,19 @@ playwright/.cache/
 worker/.dev.vars
 worker/.wrangler/
 worker/node_modules/
+
+# Local config overrides
+_config.local.yml
+
+# Environment files
+.env
+.env.*
+*.local
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
