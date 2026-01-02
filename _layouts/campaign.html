@@ -10,7 +10,7 @@
 <body>
   {% include header.html %}
 
-  <main class="campaign-container" data-campaign-slug="{{ page.slug }}" data-single-tier-only="{{ page.single_tier_only | default: false }}">
+  <main class="campaign-container" data-campaign-slug="{{ page.slug }}" data-single-tier-only="{{ page.single_tier_only | default: false }}" data-state="{{ page.state }}">
     {% if page.campaign_background %}
     <div class="campaign-background" style="background-image: url('{{ page.campaign_background }}');"></div>
     {% endif %}

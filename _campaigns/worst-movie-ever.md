@@ -204,11 +204,7 @@ stretch_goals:
   - threshold: 3500
     title: Bad Sound Design
     description: More off-sync dialogue & random animal noises.
-    status: locked
-  - threshold: 5000
-    title: Scary Costume
-    description: 15s practical FX shot of something regrettable.
-    status: locked
+    status: hidden
 
 custom_late_support: true
 
@@ -225,17 +221,6 @@ support_items:
     late_support: true
 
 decisions:
-  - id: poster
-    type: vote
-    title: Official Poster
-    deadline: 2026-01-15
-    options:
-      - label: A
-        image: https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400
-      - label: B
-        image: https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400
-    eligible: backers
-    status: open
   - id: villain-name
     type: poll
     title: Main Villain's Name
@@ -246,31 +231,10 @@ decisions:
       - Susan
     eligible: backers
     status: open
-  - id: opening-song
-    type: poll
-    title: Opening Credits Song
-    deadline: 2025-12-15
-    options:
-      - Never Gonna Give You Up
-      - Yakety Sax
-      - Careless Whisper
-    eligible: backers
-    status: closed
-    winner: Yakety Sax
 
-diary:
-  - title: "Campaign page live!"
-    body: "We're officially launching The Worst Movie Ever crowdfunding campaign. This is either genius or a terrible mistake. Probably both."
-    date: 2026-01-15
-    phase: fundraising
+diary: []
 
-ongoing_items:
-  - label: Bad Wigs
-    remaining: 500
-  - label: Questionable Props
-    remaining: 800
-  - label: Regrettable Catering
-    remaining: 1200
+ongoing_items: []
 
 tiers:
   - id: frame

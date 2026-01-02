@@ -702,6 +702,47 @@
   box-shadow: 0 2px $space-xs rgba(0, 0, 0, 0.1);
 }
 
+// Improved readability for upcoming campaigns with background images
+.campaign-container[data-state="upcoming"]:has(.campaign-background) {
+  .sidebar-tiers {
+    background: rgba($color--white, 0.9);
+    border: 2px solid $color--primary;
+    border-radius: $radius--md;
+    padding: $space-lg;
+    box-shadow: 0 2px $space-xs rgba(0, 0, 0, 0.1);
+  }
+  
+  .tier-card {
+    background: rgba($color--white, 0.95);
+    border: 1px solid $color--light;
+    
+    button:disabled {
+      background: $color--secondary;
+      border-color: $color--secondary;
+      color: $color--white;
+    }
+  }
+  
+  .support-items {
+    background: rgba($color--white, 0.9);
+    border: 2px solid $color--primary;
+    border-radius: $radius--md;
+    padding: $space-lg;
+    box-shadow: 0 2px $space-xs rgba(0, 0, 0, 0.1);
+  }
+  
+  .support-item {
+    background: rgba($color--white, 0.95);
+    
+    &__btn:disabled,
+    &__input:disabled {
+      background: $color--secondary;
+      border-color: $color--secondary;
+      color: $color--white;
+    }
+  }
+}
+
 // Community Decisions on campaign page
 .community-decisions {
   margin-bottom: $space-3xl;
