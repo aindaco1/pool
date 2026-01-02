@@ -218,6 +218,36 @@ function initSnipcart() {
   
   observer.observe(document.body, { childList: true, subtree: true });
   
+  // Inject pledge notice into checkout/payment step
+  const checkoutObserver = new MutationObserver(() => {
+    const snipcartRoot = document.querySelector('#snipcart');
+    if (!snipcartRoot) return;
+    
+    // Look for payment step
+    const paymentSection = snipcartRoot.querySelector('.snipcart-payment, [class*="snipcart-payment"]');
+    if (!paymentSection) return;
+    
+    // Don't inject if already there
+    if (snipcartRoot.querySelector('.pledge-notice-checkout')) return;
+    
+    // Find the payment form or header to inject before
+    const paymentForm = paymentSection.querySelector('.snipcart-payment-form, [class*="payment-form"], form');
+    const header = paymentSection.querySelector('.snipcart__box--header, header');
+    const insertTarget = paymentForm || header?.nextElementSibling || paymentSection.firstChild;
+    
+    if (insertTarget) {
+      const notice = document.createElement('div');
+      notice.className = 'pledge-notice-checkout';
+      notice.style.cssText = 'margin: 16px; padding: 12px 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 13px; line-height: 1.5; color: #166534;';
+      notice.innerHTML = '<strong style="color: #15803d; display: inline;">🤔 How pledging works:</strong><br style="display: block;">' +
+        '<span style="display: inline;">Your card will be stored securely but </span><b style="display: inline;">not charged now</b><span style="display: inline;">.</span><br style="display: block;">' +
+        '<span style="display: inline;">You\'ll only be charged if the campaign reaches its goal.</span>';
+      insertTarget.parentNode.insertBefore(notice, insertTarget);
+    }
+  });
+  
+  checkoutObserver.observe(document.body, { childList: true, subtree: true });
+  
   processPendingCartItem();
 
   document.querySelectorAll('[data-redirect-url].snipcart-add-item').forEach(function(btn) {
