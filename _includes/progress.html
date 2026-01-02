@@ -8,6 +8,7 @@
 {% assign show_final_marker = false %}
 {% if stretch_goals %}
   {% for s in stretch_goals %}
+    {% if s.status == 'hidden' %}{% continue %}{% endif %}
     {% assign s_threshold = s.threshold | plus: 0 %}
     {% if s_threshold > max_threshold %}
       {% assign max_threshold = s_threshold %}
@@ -97,6 +98,7 @@
     {% if stretch_goals %}
       {% assign prev_met = goal_met %}
       {% for s in stretch_goals %}
+        {% if s.status == 'hidden' %}{% continue %}{% endif %}
         {% assign s_threshold = s.threshold | plus: 0 %}
         {% assign s_pct = s_threshold | times: 100 | divided_by: max_threshold | round: 0 %}
         {% assign s_achieved = false %}

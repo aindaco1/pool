@@ -198,13 +198,13 @@ long_content:
     alt: "Diagram showing the balance between chaos and coherence"
     caption: "The eternal struggle: your terrible ideas vs. our desperate attempts to make them work"
 featured_tier_id: frame
-stretch_hidden: false
+stretch_hidden: true
 
 stretch_goals:
   - threshold: 3500
     title: Bad Sound Design
     description: More off-sync dialogue & random animal noises.
-    status: hidden
+    status: locked
 
 custom_late_support: true
 
