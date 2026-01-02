@@ -1,0 +1,15 @@
+{% assign block = include.block %}
+<figure class="content-block content-block--audio">
+  <div class="audio-player">
+    {% if block.title %}
+      <span class="audio-player__title">{{ block.title }}</span>
+    {% endif %}
+    <audio controls preload="metadata">
+      <source src="{{ block.src }}" type="audio/mpeg">
+      Your browser does not support the audio element.
+    </audio>
+  </div>
+  {% if block.caption %}
+    <figcaption class="content-block__caption">{{ block.caption }}</figcaption>
+  {% endif %}
+</figure>

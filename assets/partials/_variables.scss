@@ -1,0 +1,101 @@
+// Design tokens from dust-wave-shop
+
+// Base spacing unit (8px grid system)
+$size--unit: 8px;
+
+// Spacing scale (multiples of $size--unit)
+$space-xxs: $size--unit * 0.5; // 4px
+$space-xs:  $size--unit;       // 8px
+$space-sm:  $size--unit * 1.5; // 12px
+$space-md:  $size--unit * 2;   // 16px
+$space-lg:  $size--unit * 2.5; // 20px
+$space-xl:  $size--unit * 3;   // 24px
+$space-2xl: $size--unit * 4;   // 32px
+$space-3xl: $size--unit * 6;   // 48px
+$space-4xl: $size--unit * 8;   // 64px
+
+// Colors - Base
+$color--default: #3a3a3a;
+$color--light: lighten($color--default, 65%);
+$color--primary: #000000;
+$color--secondary: #5a5a5a;
+$color--background: #f8faff;
+
+// Colors - Neutrals
+$color--white: #ffffff;
+$color--black: #000000;
+
+// Colors - Success (green)
+$color--success: #28a745;
+$color--success-dark: #155724;
+$color--success-bg: #d4edda;
+$color--success-notice-bg: #f0fdf4;
+$color--success-notice-border: #bbf7d0;
+
+// Colors - Danger (red)
+$color--danger: #dc3545;
+$color--danger-dark: #c82333;
+$color--danger-text: #721c24;
+$color--danger-bg: #f8d7da;
+
+// Colors - Warning (yellow)
+$color--warning-bg: #fff3cd;
+$color--warning-text: #856404;
+
+// Colors - Info (blue)
+$color--info-bg: #cce5ff;
+$color--info-text: #004085;
+
+// Accent colors
+$goback--bg: #888f91;
+$goback--accent: #f6e770;
+$goback--border: darken($goback--bg, 5%);
+
+// Snipcart
+$snipcart--accent: #000000;
+$snipcart--contrast: #ffffff;
+
+// Typography - Font sizes
+$font-size-xs:  12px;
+$font-size-sm:  13px;
+$font-size-md:  14px;
+$font-size-base: 16px;
+$font-size-lg:  18px;
+$font-size-xl:  20px;
+$font-size-2xl: 24px;
+$font-size-3xl: 32px;
+
+// Typography - Headings
+$h1--size: 56px;
+$product-title--size: 40px;
+$body-copy--size: 20px;
+$body-copy--leading: 28px;
+$btn--font-size: $font-size-xs;
+$btn--letter-spacing: 2px;
+
+// Layout
+$layout--max-width: 1000px;
+$container-vpad: $space-2xl;
+$header--mb: $space-3xl;
+$product-block-gap: 96px;
+
+// Border radius
+$radius--sm: 3px;
+$radius--chip: 4px;
+$radius--lg: 6px;
+$radius--md: 8px;
+
+// Shadows
+$shadow--soft: 0px 0px 10px rgba(58, 58, 58, 0.2);
+$shadow--success-glow: 0 0 8px rgba(40, 167, 69, 0.5);
+
+// Surface tints (subtle backgrounds)
+$surface-tint-softer: rgba($color--primary, 0.01);
+$surface-tint-soft: rgba($color--primary, 0.02);
+$surface-tint-medium: rgba($color--primary, 0.03);
+$surface-tint-hover: rgba($color--primary, 0.04);
+$surface-tint-strong: rgba($color--primary, 0.05);
+
+// Progress bar
+$progress--color: #000000;
+$progress--bg: lightgray;

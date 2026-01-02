@@ -1,0 +1,96 @@
+{% if include.support_items and include.campaign %}
+<div class="support-items" data-campaign-slug="{{ include.campaign.slug }}" data-goal="{{ include.campaign.goal_amount }}" data-progress-bg="{% if include.campaign.progress_background %}{{ include.campaign.progress_background }}{% endif %}">
+  <h5>Support a phase of the project</h5>
+  {% for item in include.support_items %}
+    {% assign current_amount = item.current | default: 0 | plus: 0 %}
+    {% assign remaining = item.target | minus: current_amount %}
+    {% assign percent = current_amount | times: 100 | divided_by: item.target %}
+    {% assign item_index = forloop.index %}
+    {% assign is_late_support_item = false %}
+    {% if include.campaign.state == "live" %}
+      {% assign item_disabled = false %}
+      {% assign item_disabled_reason = "" %}
+    {% elsif include.campaign.state == "post" %}
+      {% if item.late_support %}
+        {% assign is_late_support_item = true %}
+      {% endif %}
+      {% assign item_disabled = true %}
+      {% assign item_disabled_reason = "Campaign Ended" %}
+    {% elsif include.campaign.state == "upcoming" %}
+      {% assign item_disabled = true %}
+      {% assign item_disabled_reason = "Opens " | append: include.campaign.start_date | date: "%b %-d" %}
+    {% else %}
+      {% assign item_disabled = true %}
+      {% assign item_disabled_reason = "Unavailable" %}
+    {% endif %}
+    <div class="support-item" id="support-{{ item.id }}"{% if is_late_support_item %} data-late-support="true"{% endif %}>
+      <div class="support-item__info">
+        <div class="support-item__header">
+          <strong>{{ item.label }}</strong>
+          <span class="support-item__amount"><span data-live-current>{{ current_amount | money }}</span> / {{ item.target | money }}</span>
+        </div>
+        <div class="support-item__progress">
+          {% if include.campaign.progress_background %}
+          <img src="{{ include.campaign.progress_background }}" alt="" class="support-item__progress-bg" aria-hidden="true">
+          {% endif %}
+          <span style="width: {{ percent }}%"></span>
+        </div>
+        {% if item.need %}
+          <p class="support-item__need">{{ item.need }}</p>
+        {% endif %}
+      </div>
+      <div class="support-item__actions">
+        {% if remaining > 0 %}
+          <div class="support-item__input-wrap">
+            <span class="support-item__currency">$</span>
+            <input type="number" 
+                   id="support-input-{{ item.id }}" 
+                   class="support-item__input" 
+                   min="1" 
+                   max="{{ remaining }}"
+                   step="1" 
+                   placeholder="{{ remaining }}"
+                   {% if item_disabled %}disabled{% endif %}>
+          </div>
+        {% endif %}
+        <button
+          class="snipcart-add-item support-item__btn"
+          id="support-btn-{{ item.id }}"
+          {% if item_disabled or remaining <= 0 %}disabled aria-disabled="true"{% endif %}
+          data-item-id="{{ include.campaign.slug }}__support__{{ item.id }}"
+          data-item-name="{{ include.campaign.title }} — {{ item.label }}"
+          data-item-price="{{ remaining }}"
+          data-item-url="{{ site.url }}{{ include.campaign.url }}#support-{{ item.id }}"
+          data-item-description=""
+          data-item-max-quantity="1"
+          data-item-stackable="never"
+          data-item-custom1-name="_stackable"
+          data-item-custom1-type="hidden"
+          data-item-custom1-value="false">
+          {% if remaining <= 0 %}Funded{% elsif item_disabled %}{{ item_disabled_reason }}{% else %}Support{% endif %}
+        </button>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+<script>
+(function() {
+  {% for item in include.support_items %}
+  (function() {
+    var input = document.getElementById('support-input-{{ item.id }}');
+    var btn = document.getElementById('support-btn-{{ item.id }}');
+    if (input && btn) {
+      function updatePrice() {
+        var val = parseInt(input.value, 10);
+        if (val && val > 0) {
+          btn.setAttribute('data-item-price', val);
+        }
+      }
+      input.addEventListener('input', updatePrice);
+      input.addEventListener('change', updatePrice);
+    }
+  })();
+  {% endfor %}
+})();
+</script>
+{% endif %}

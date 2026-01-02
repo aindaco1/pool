@@ -1,0 +1,64 @@
+{% if include.phases and include.campaign %}
+<section class="production-phases" aria-label="Production phases">
+  <h3>Production Phases</h3>
+  
+  <div class="phase-tabs" role="tablist">
+    {% for phase in include.phases %}
+      {% assign tab_id = phase.name | slugify %}
+      <button class="phase-tab" role="tab" 
+              aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" 
+              data-tab="{{ tab_id }}">
+        {{ phase.name }}
+      </button>
+    {% endfor %}
+  </div>
+
+  {% for phase in include.phases %}
+    {% assign tab_id = phase.name | slugify %}
+    <div id="tab-{{ tab_id }}" 
+         class="phase-panel{% unless forloop.first %} hidden{% endunless %}" 
+         role="tabpanel"
+         aria-labelledby="{{ tab_id }}-tab">
+      
+      {% if phase.registry.size > 0 %}
+        <div class="registry-list">
+          {% for item in phase.registry %}
+            <article class="registry-item" data-item="{{ item.id }}">
+              <div class="registry-item__header">
+                <strong>{{ item.label }}</strong>
+                <span class="registry-item__amount">{{ item.current | money }} / {{ item.target | money }}</span>
+              </div>
+              
+              {% assign percent = item.current | times: 100 | divided_by: item.target %}
+              <div class="progress" aria-label="{{ item.label }} progress">
+                <i style="width: {{ percent }}%"></i>
+              </div>
+              
+              <div class="registry-item__footer">
+                <button class="btn btn--small snipcart-add-item"
+                        data-item-id="{{ include.campaign.slug }}__registry__{{ item.id }}"
+                        data-item-name="{{ item.label }}"
+                        data-item-price="{{ item.target | minus: item.current }}"
+                        data-item-url="{{ site.url }}{{ include.campaign.url }}"
+                        data-item-description="Fund {{ item.label }} — {{ item.need }}"
+                        data-item-max-quantity="1"
+                        data-item-stackable="never"
+                        data-item-custom1-name="_stackable"
+                        data-item-custom1-type="hidden"
+                        data-item-custom1-value="false">
+                  Fund this item
+                </button>
+                {% if item.need %}
+                  <span class="registry-item__need">Need: {{ item.need }}</span>
+                {% endif %}
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty-state">No active items yet. Coming soon.</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+</section>
+{% endif %}

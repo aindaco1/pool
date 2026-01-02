@@ -1,0 +1,44 @@
+---
+layout: default
+---
+{% if site.show_test_campaigns %}
+  {% assign filtered_campaigns = site.campaigns %}
+{% else %}
+  {% assign filtered_campaigns = site.campaigns | where_exp: "c", "c.test_only != true" %}
+{% endif %}
+{% assign live_campaigns = filtered_campaigns | where: "state", "live" | sort: "goal_deadline" %}
+{% assign upcoming_campaigns = filtered_campaigns | where: "state", "upcoming" | sort: "start_date" %}
+{% assign completed_campaigns = filtered_campaigns | where: "state", "post" | sort: "goal_deadline" | reverse %}
+
+{% if live_campaigns.size > 0 %}
+<section class="campaigns-section">
+  <h2>Active</h2>
+  <div class="campaigns">
+    {% for c in live_campaigns %}
+      {% include campaign-card.html campaign=c %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if upcoming_campaigns.size > 0 %}
+<section class="campaigns-section">
+  <h2>Upcoming</h2>
+  <div class="campaigns">
+    {% for c in upcoming_campaigns %}
+      {% include campaign-card.html campaign=c %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if completed_campaigns.size > 0 %}
+<section class="campaigns-section">
+  <h2>Completed</h2>
+  <div class="campaigns">
+    {% for c in completed_campaigns %}
+      {% include campaign-card.html campaign=c %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}

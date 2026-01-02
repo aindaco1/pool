@@ -1,0 +1,25 @@
+{% if include.diary_entries %}
+<section class="production-diary" id="production-diary">
+  <h3>Production Diary</h3>
+  
+  <div class="diary-list">
+    {% for entry in include.diary_entries limit:5 %}
+      <article class="diary-entry">
+        <h4 class="diary-entry__title">{{ entry.title }}</h4>
+        <p class="diary-entry__body">{{ entry.body }}</p>
+        {% if entry.date %}
+          <time class="diary-entry__date" datetime="{{ entry.date }}">
+            {{ entry.date | date: "%b %-d, %Y" }}
+          </time>
+        {% endif %}
+      </article>
+    {% endfor %}
+  </div>
+  
+  {% if include.diary_entries.size > 5 %}
+    <button class="btn btn--ghost" data-action="view-all-updates">
+      View all updates
+    </button>
+  {% endif %}
+</section>
+{% endif %}

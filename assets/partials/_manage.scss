@@ -1,0 +1,591 @@
+// Manage pledge page styles
+
+.manage-pledge {
+  @include fit-to-layout-and-center;
+  padding-top: 48px;
+  padding-bottom: 48px;
+  
+  h1 {
+    margin-bottom: 32px;
+    line-height: 1;
+  }
+  
+  &__loading {
+    text-align: center;
+    padding: 48px;
+    color: $color--secondary;
+  }
+  
+  &__error {
+    text-align: center;
+    padding: 48px;
+    
+    h2 {
+      margin-bottom: 16px;
+    }
+    
+    p {
+      color: $color--secondary;
+      margin-bottom: 24px;
+    }
+  }
+  
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+  
+  &__empty {
+    text-align: center;
+    padding: 48px;
+    color: $color--secondary;
+  }
+  
+  .tier-option {
+    padding: 10px 12px;
+  }
+  
+  .tier-options {
+    gap: 8px;
+  }
+}
+
+.pledge-card {
+  border: 1px solid $color--light;
+  border-radius: $radius--md;
+  overflow: hidden;
+  
+  &__header {
+    padding: 16px 20px;
+    background: rgba(0, 0, 0, 0.02);
+    border-bottom: 1px solid $color--light;
+  }
+  
+  &__header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  
+  &__campaign {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-decoration: none;
+    color: $color--primary;
+    
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  
+  &__custom-amount {
+    padding: 20px;
+    border-top: 1px solid $color--light;
+    background: rgba(0, 0, 0, 0.01);
+  }
+  
+  &__support {
+    padding: 20px;
+    border-top: 1px solid $color--light;
+    background: rgba(0, 0, 0, 0.01);
+    
+    h3 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+    }
+  }
+  
+  &__status {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 4px;
+    
+    &.status--active {
+      background: $color--success-bg;
+      color: $color--success-dark;
+    }
+    
+    &.status--cancelled {
+      background: $color--danger-bg;
+      color: $color--danger-text;
+    }
+    
+    &.status--charged {
+      background: $color--info-bg;
+      color: $color--info-text;
+    }
+    
+    &.status--failed {
+      background: $color--warning-bg;
+      color: $color--warning-text;
+    }
+  }
+  
+  &__body {
+    padding: 20px;
+    
+    > div {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px dashed $color--light;
+      
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+    
+    .label {
+      color: $color--secondary;
+      font-size: 14px;
+    }
+    
+    .value {
+      font-weight: 600;
+    }
+  }
+  
+  &__email-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    
+    .label {
+      color: $color--secondary;
+      font-size: 14px;
+    }
+    
+    .value {
+      font-weight: 600;
+    }
+  }
+  
+  &__columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid $color--light;
+    
+    @include xsm {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  &__column {
+    &--left {
+      border-right: 1px solid $color--light;
+      
+      @include xsm {
+        border-right: none;
+        border-bottom: 1px solid $color--light;
+      }
+      
+      .pledge-card__tiers {
+        border-top: none;
+      }
+    }
+    
+    &--right {
+      .pledge-card__support:first-child {
+        border-top: none;
+      }
+    }
+  }
+  
+  &__tiers {
+    padding: 20px;
+    border-top: 1px solid $color--light;
+    
+    h3 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+    }
+  }
+  
+  &__summary {
+    padding: 20px;
+    border-top: 1px solid $color--light;
+    background: rgba(0, 0, 0, 0.02);
+  }
+  
+  &__actions {
+    display: flex;
+    gap: 12px;
+    padding: 20px;
+    border-top: 1px solid $color--light;
+    
+    button {
+      flex: 1;
+    }
+  }
+  
+  &__error {
+    padding: 12px 20px;
+    background: $color--danger-bg;
+    color: $color--danger-text;
+    font-size: 14px;
+  }
+  
+  &__footer {
+    padding: 16px 20px;
+    background: rgba(0, 0, 0, 0.02);
+    border-top: 1px solid $color--light;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  
+  &__notice {
+    flex: 1;
+    background: $color--success-notice-bg;
+    border: 1px solid $color--success-notice-border;
+    border-radius: 6px;
+    padding: 12px 16px;
+    
+    p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: $color--success-dark;
+      
+      strong {
+        color: $color--success-dark;
+      }
+    }
+  }
+  
+  &__charged,
+  &__cancelled {
+    margin-top: 24px;
+    padding: 16px;
+    border-radius: $radius--sm;
+    text-align: center;
+    
+    p {
+      margin: 0;
+    }
+  }
+  
+  &__charged {
+    background: $color--success-bg;
+    color: $color--success-dark;
+    font-size: 14px;
+  }
+  
+  &__cancelled {
+    background: $color--danger-bg;
+    color: $color--danger-text;
+  }
+  
+  &__cancel-section {
+    padding: 20px;
+    border-top: 1px solid $color--light;
+    background: #fff8f8;
+  }
+}
+
+.pledge-summary {
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    
+    .label {
+      font-size: 13px;
+      color: $color--secondary;
+    }
+    
+    .value {
+      font-size: 14px;
+      color: $color--secondary;
+    }
+    
+    &--tax {
+      padding-bottom: 8px;
+      border-bottom: 1px dashed $color--light;
+      margin-bottom: 12px;
+      
+      .label {
+        font-size: 12px;
+      }
+      
+      .value {
+        font-size: 13px;
+      }
+    }
+  }
+  
+  &__total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    .label {
+      font-size: 14px;
+      font-weight: 600;
+      color: $color--primary;
+    }
+    
+    .value {
+      font-size: 28px;
+      font-weight: 700;
+    }
+  }
+  
+  &__change {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 14px;
+    
+    .change-up {
+      color: $color--success-dark;
+      font-weight: 600;
+    }
+    
+    .change-down {
+      color: $color--danger-text;
+      font-weight: 600;
+    }
+  }
+}
+
+.confirm-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid $color--light;
+  
+  span {
+    font-size: 13px;
+    color: $color--secondary;
+  }
+  
+  strong {
+    font-size: 16px;
+    margin-top: 4px;
+  }
+}
+
+.cancel-section {
+  &__warning {
+    margin-bottom: 16px;
+    
+    p {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: $color--danger-text;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+  }
+  
+  &__actions {
+    display: flex;
+    gap: 12px;
+    
+    button {
+      flex: 1;
+    }
+  }
+}
+
+.modify-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modify-price-summary {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: $radius--md;
+  padding: 16px;
+  margin-bottom: 16px;
+  
+  .price-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    padding: 4px 0;
+    
+    &--total {
+      border-top: 1px solid $color--light;
+      margin-top: 8px;
+      padding-top: 12px;
+      font-weight: 700;
+      font-size: 16px;
+    }
+  }
+  
+  &__notice {
+    font-size: 12px;
+    color: $color--secondary;
+    margin: 12px 0 0 0;
+    padding-top: 12px;
+    border-top: 1px solid $color--light;
+  }
+}
+
+// Pledge Success/Cancel Pages
+.pledge-result {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 64px 24px;
+  text-align: center;
+  
+  &__icon {
+    font-size: 64px;
+    margin-bottom: 24px;
+  }
+  
+  h1 {
+    margin-bottom: 16px;
+  }
+  
+  p {
+    color: $color--secondary;
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+  
+  .btn {
+    margin-top: 16px;
+  }
+}
+
+// Support Items (Manage Page)
+.support-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  
+  .support-option-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid $color--light;
+    border-radius: $radius--sm;
+    transition: all 0.2s;
+    overflow: hidden;
+    
+    &--active {
+      border-color: $color--primary;
+      background: rgba($color--primary, 0.02);
+    }
+    
+    &__info {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      
+      strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+    }
+    
+    &__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      
+      @include xsm {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      
+      strong {
+        margin-bottom: 0;
+      }
+    }
+    
+    &__amount {
+      font-size: 12px;
+      font-weight: 600;
+      color: $color--default;
+      white-space: nowrap;
+    }
+    
+    &__progress {
+      height: 8px;
+      background: $progress--bg;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 8px;
+      
+      span {
+        display: block;
+        height: 100%;
+        background: $progress--color;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+    }
+    
+    &__desc {
+      font-size: 13px;
+      color: $color--secondary;
+      margin: 0;
+      line-height: 1.3;
+    }
+    
+    &__current {
+      font-size: 12px;
+      color: $color--success;
+      font-weight: 600;
+      margin: 4px 0 0 0;
+    }
+    
+    &__input {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      
+      .input-prefix {
+        color: $color--secondary;
+        font-weight: 500;
+      }
+      
+      input {
+        width: 70px;
+        max-width: 70px;
+        height: 40px;
+        padding: 0 4px;
+        border: 1px solid $color--light;
+        border-radius: $radius--sm;
+        font-size: 16px;
+        text-align: right;
+        box-sizing: border-box;
+        
+        &:focus {
+          outline: none;
+          border-color: $color--primary;
+        }
+        
+        &::-webkit-outer-spin-button,
+        &::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+      }
+    }
+  }
+}

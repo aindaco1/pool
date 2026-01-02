@@ -1,0 +1,712 @@
+// Campaign page specific styles
+
+// Campaign page layout
+.campaign-container {
+  @include fit-to-layout-and-center;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $space-3xl;
+  padding-top: $container-vpad;
+  padding-bottom: $container-vpad;
+  
+  @include ms {
+    grid-template-columns: 2fr 1fr;
+  }
+  
+  @include xsm {
+    padding-top: $space-md;
+    padding-bottom: $space-md;
+  }
+}
+
+.campaign-background {
+  position: absolute;
+  top: calc(-1 * calc($header--mb / 2));
+  bottom: calc(-1 * $product-block-gap);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  background-size: 100% auto;
+  background-repeat: repeat-y;
+  background-position: top center;
+  opacity: 0.1;
+  z-index: -1;
+  pointer-events: none;
+  
+  @include xsm {
+    top: -10px;
+    bottom: 0;
+  }
+}
+
+.campaign-header {
+  position: relative;
+  z-index: 1;
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+  text-align: center;
+  
+  @include xsm {
+    margin-bottom: $space-md;
+  }
+  
+  h1 {
+    margin-bottom: calc($header--mb / 2);
+    
+    @include xsm {
+      font-size: $font-size-3xl;
+      margin-bottom: $space-md;
+    }
+  }
+  
+  &__cta.btn {
+    display: none;
+    
+    @include xsm {
+      display: inline-block;
+      margin-top: $space-xl;
+      margin-bottom: $space-xl;
+      padding: $space-md $space-2xl;
+    }
+  }
+}
+
+.campaign-blurb {
+  font-size: $font-size-xl;
+  line-height: 1.5;
+  color: $color--secondary;
+  margin: 0 auto;
+  max-width: 900px;
+  
+  @include xsm {
+    font-size: $font-size-base;
+    line-height: 1.4;
+  }
+}
+
+.campaign-content {
+  position: relative;
+  z-index: 1;
+  min-width: 0; // Prevents grid blowout
+}
+
+.campaign-sidebar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pledge-notice {
+  background: lighten($goback--accent, 40%);
+  border: 1px solid $goback--accent;
+  border-radius: $radius--md;
+  padding: $space-md;
+  margin-bottom: $space-xl;
+  
+  @include xsm {
+    margin-bottom: $space-md;
+  }
+  
+  h4 {
+    margin: 0 0 $space-sm 0;
+    font-size: $font-size-md;
+    font-weight: 700;
+    color: $color--primary;
+  }
+  
+  p {
+    font-size: $font-size-sm;
+    line-height: 1.5;
+    margin: 0 0 $space-xs 0;
+    color: $color--primary;
+    
+    &:last-of-type {
+      margin-bottom: 0;
+    }
+    
+    strong {
+      font-weight: 700;
+    }
+  }
+  
+  &__meta {
+    font-size: $font-size-xs;
+    color: $color--secondary;
+  }
+}
+
+.hero {
+  margin-bottom: $space-3xl;
+  overflow: visible;
+  
+  @include xsm {
+    margin-bottom: 0;
+  }
+  
+  h1 {
+    text-align: center;
+    margin-bottom: $space-xl;
+    line-height: 1.1;
+    
+    @include xsm {
+      font-size: $font-size-3xl;
+      margin-bottom: $space-lg;
+    }
+  }
+  
+  img {
+    width: 100%;
+    z-index: -9999;
+    object-fit: cover;
+    border-radius: $radius--md;
+    margin-bottom: $space-md;
+  }
+  
+  &__video {
+    width: 100%;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+    border-radius: $radius--md;
+    margin-bottom: $space-md;
+    background: $color--black;
+  }
+}
+
+.content {
+  margin-bottom: $space-3xl;
+  font-size: $font-size-base;
+  
+  p {
+    margin-bottom: $space-md;
+    line-height: 1.6;
+  }
+}
+
+.campaign-facts {
+  background: $surface-tint-soft;
+  border: 1px solid $color--light;
+  border-radius: $radius--md;
+  padding: $space-lg;
+  margin-bottom: $space-xl;
+  
+  h4 {
+    margin: 0 0 $space-md 0;
+    font-size: $font-size-md;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  &__creator {
+    display: flex;
+    align-items: center;
+    gap: $space-sm;
+    margin-bottom: $space-md;
+    
+    img {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    
+    span {
+      font-size: $font-size-md;
+      font-weight: 600;
+      color: $color--primary;
+    }
+  }
+  
+  dl {
+    margin: 0;
+    
+    dt {
+      font-size: $font-size-xs;
+      color: $color--secondary;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    dd {
+      margin: 0 0 $space-sm 0;
+      font-size: $font-size-md;
+      color: $color--primary;
+      font-weight: 600;
+      line-height: 1.5;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+  }
+  
+  &__pledge-meta {
+    font-size: $font-size-xs !important;
+    font-weight: 400 !important;
+    color: $color--secondary !important;
+  }
+}
+
+// Support items (phase funding)
+.support-items {
+  margin-bottom: $space-xl;
+  
+  h5 {
+    margin: 0 0 $space-sm 0;
+    font-size: $font-size-md;
+    font-weight: 600;
+  }
+}
+
+.support-item {
+  display: flex;
+  gap: $space-xl;
+  align-items: flex-start;
+  border: 1px solid $color--light;
+  border-radius: $radius--md;
+  padding: $space-md;
+  margin-bottom: $space-sm;
+  
+  @include xsm {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $space-md;
+    padding: $space-sm;
+  }
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+  
+  &__info {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    
+    @include xsm {
+      width: 100%;
+    }
+  }
+  
+  &__actions {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: $space-xs;
+    
+    @include xsm {
+      width: 100%;
+    }
+  }
+  
+  &__header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: $space-sm;
+    
+    strong {
+      font-size: 15px;
+      font-weight: 600;
+      color: $color--primary;
+      line-height: 1.2;
+      
+      @include xsm {
+        font-size: $font-size-md;
+      }
+    }
+  }
+  
+  &__amount {
+    font-size: $font-size-sm;
+    font-weight: 600;
+    color: $color--default;
+    
+    @include xsm {
+      font-size: $font-size-xs;
+    }
+  }
+  
+  &__progress {
+    position: relative;
+    height: 12px;
+    background: $progress--bg;
+    border-radius: $radius--lg;
+    border: 2px solid $color--white;
+    overflow: visible;
+    margin-bottom: $space-xs;
+    
+    span {
+      display: block;
+      height: 100%;
+      background: $progress--color;
+      border-radius: $radius--lg;
+      transition: width 0.3s ease;
+      position: relative;
+      z-index: 1;
+    }
+  }
+  
+  &__progress-bg {
+    position: absolute;
+    top: 6px;
+    left: 0;
+    width: 100%;
+    height: auto;
+    transform: translateY(-50%);
+    opacity: 0.25;
+    pointer-events: none;
+    z-index: 0;
+  }
+  
+  &__need {
+    font-size: $font-size-sm;
+    color: $color--black;
+    margin: 0;
+    line-height: 1.3;
+    text-transform: none;
+    
+    @include xsm {
+      font-size: $font-size-xs;
+    }
+  }
+  
+  &__input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  &__currency {
+    font-size: $font-size-md;
+    font-weight: 600;
+    color: $color--primary;
+  }
+  
+  &__input {
+    flex: 1;
+    padding: $space-xs 10px;
+    font-size: $font-size-md;
+    border: 1px solid $color--light;
+    border-radius: $radius--sm;
+    
+    &:focus {
+      outline: none;
+      border-color: $color--primary;
+    }
+  }
+  
+  &__btn {
+    @include btn-core($color--primary);
+    width: 100%;
+    font-size: $font-size-xs;
+    padding: $space-xs $space-sm;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+    
+    &:before {
+      display: none;
+    }
+    
+    &:hover {
+      background: $color--background;
+      border-color: $color--primary;
+      color: $color--primary;
+      text-shadow: none;
+      transform: scale(1.03);
+    }
+    
+    &:disabled {
+      background: $color--light;
+      border-color: $color--light;
+      cursor: not-allowed;
+      text-shadow: none;
+      
+      &:hover {
+        transform: none;
+      }
+    }
+  }
+}
+
+// Updates section
+.updates {
+  margin-top: $space-4xl;
+  padding-top: $space-2xl;
+  border-top: 1px solid $color--light;
+  
+  h2 {
+    margin-bottom: $space-xl;
+  }
+}
+
+// Production Phases
+.production-phases {
+  margin-bottom: $space-3xl;
+  
+  h3 {
+    margin-bottom: $space-xl;
+  }
+}
+
+.phase-tabs {
+  display: flex;
+  gap: $space-xs;
+  flex-wrap: wrap;
+  margin-bottom: $space-xl;
+  border-bottom: 1px solid $color--light;
+  padding-bottom: $space-xs;
+}
+
+.phase-tab {
+  @include btn-core($color--primary);
+  background: transparent;
+  border: 1px solid $color--light;
+  color: $color--secondary;
+  font-size: $font-size-md;
+  padding: $space-xs $space-md;
+  border-radius: 999px;
+  
+  &[aria-selected="true"] {
+    background: $color--primary;
+    color: $color--white;
+    border-color: $color--primary;
+  }
+  
+  &:hover:not([aria-selected="true"]) {
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
+
+.phase-panel {
+  &.hidden {
+    display: none;
+  }
+}
+
+.registry-list {
+  display: grid;
+  gap: $space-md;
+}
+
+.registry-item {
+  border: 1px solid $color--light;
+  border-radius: $radius--md;
+  padding: $space-md;
+  
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $space-sm;
+    
+    strong {
+      font-size: $font-size-base;
+      color: $color--primary;
+    }
+  }
+  
+  &__amount {
+    font-size: $font-size-md;
+    color: $color--secondary;
+  }
+  
+  &__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: $space-sm;
+  }
+  
+  &__need {
+    font-size: $font-size-md;
+    color: $color--secondary;
+  }
+}
+
+// Diary (consolidated updates + production diary with phase tabs)
+.diary {
+  margin-bottom: $space-3xl;
+  
+  h3 {
+    margin-bottom: $space-xl;
+  }
+}
+
+.diary-tabs {
+  display: flex;
+  gap: $space-xs;
+  flex-wrap: wrap;
+  margin-bottom: $space-xl;
+  border-bottom: 1px solid $color--light;
+  padding-bottom: $space-xs;
+}
+
+.diary-tab {
+  @include btn-core($color--primary);
+  background: transparent;
+  border: 1px solid $color--light;
+  color: $color--primary;
+  font-size: $font-size-md;
+  font-weight: 600;
+  padding: $space-xs $space-md;
+  border-radius: 999px;
+  text-shadow: none;
+  
+  &[aria-selected="true"] {
+    background: $color--primary;
+    color: $color--white;
+    border-color: $color--primary;
+  }
+  
+  &:hover:not([aria-selected="true"]) {
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
+
+// White background for diary tabs when campaign has a background image
+.campaign-container:has(.campaign-background) .diary-tab:not([aria-selected="true"]) {
+  background: $color--white;
+  
+  &:hover {
+    background: rgba($color--white, 0.8);
+    border-color: $color--secondary;
+  }
+}
+
+.diary-panel {
+  &.hidden {
+    display: none;
+  }
+}
+
+.production-diary {
+  margin-bottom: $space-3xl;
+  
+  h3 {
+    margin-bottom: $space-xl;
+  }
+}
+
+.diary-list {
+  display: grid;
+  gap: $space-md;
+  margin-bottom: $space-md;
+}
+
+.diary-entry {
+  border: 1px dashed $color--light;
+  border-radius: $radius--sm;
+  padding: $space-md;
+  
+  &__title {
+    font-size: $font-size-md;
+    font-weight: 700;
+    margin: 0 0 $space-xs 0;
+    color: $color--primary;
+  }
+  
+  &__body {
+    font-size: $font-size-md;
+    color: $color--secondary;
+    margin: 0 0 $space-xs 0;
+    line-height: 1.6;
+  }
+  
+  &__date {
+    font-size: $font-size-xs;
+    color: $color--secondary;
+    font-style: italic;
+  }
+}
+
+// Ongoing Funding
+.ongoing-funding {
+  background: $surface-tint-soft;
+  border: 1px solid $color--light;
+  border-radius: $radius--md;
+  padding: $space-lg;
+  margin-bottom: $space-xl;
+  
+  h4 {
+    margin: 0 0 $space-sm 0;
+    font-size: $font-size-md;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  &__intro {
+    font-size: $font-size-md;
+    color: $color--secondary;
+    margin-bottom: $space-md;
+    line-height: 1.5;
+  }
+}
+
+.ongoing-list {
+  list-style: none;
+  padding: 0;
+  margin: $space-md 0 0 0;
+  
+  li {
+    font-size: $font-size-md;
+    color: $color--secondary;
+    padding: 6px 0;
+    border-bottom: 1px dashed $color--light;
+    
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+// Community Teaser (on campaign page)
+.community-teaser {
+  background: linear-gradient(135deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.05) 100%);
+  border: 1px solid $color--light;
+  border-radius: $radius--md;
+  padding: $space-xl;
+  margin: $space-2xl 0;
+  text-align: center;
+  
+  h3 {
+    margin: 0 0 $space-xs 0;
+    font-size: $font-size-lg;
+  }
+  
+  p {
+    margin: 0 0 $space-md 0;
+    color: $color--secondary;
+    font-size: $font-size-md;
+  }
+  
+  .btn--locked {
+    opacity: 0.6;
+    cursor: default;
+    
+    &:hover {
+      opacity: 0.7;
+    }
+  }
+}
+
+// Stronger styling for community-teaser when campaign has a background image
+.campaign-container:has(.campaign-background) .community-teaser,
+.campaign-container:has(.campaign-background) .campaign-facts {
+  background: rgba($color--white, 0.9);
+  border: 2px solid $color--primary;
+  box-shadow: 0 2px $space-xs rgba(0, 0, 0, 0.1);
+}
+
+// Community Decisions on campaign page
+.community-decisions {
+  margin-bottom: $space-3xl;
+  
+  h3 {
+    margin-bottom: $space-xl;
+  }
+}

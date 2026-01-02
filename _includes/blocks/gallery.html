@@ -1,0 +1,20 @@
+{% assign block = include.block %}
+{% assign layout = block.layout | default: 'grid' %}
+<figure class="content-block content-block--gallery gallery--{{ layout }}">
+  <div class="gallery__container">
+    {% for img in block.images %}
+      <div class="gallery__item">
+        <img 
+          src="{{ img.src }}" 
+          alt="{{ img.alt | default: '' }}"
+          loading="lazy">
+        {% if img.caption %}
+          <span class="gallery__item-caption">{{ img.caption }}</span>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  {% if block.caption %}
+    <figcaption class="content-block__caption">{{ block.caption }}</figcaption>
+  {% endif %}
+</figure>

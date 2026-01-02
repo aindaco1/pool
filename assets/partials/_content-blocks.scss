@@ -1,0 +1,246 @@
+// Content blocks - long content, media, galleries, embeds
+
+// Long Content Blocks
+.long-content {
+  margin-bottom: $space-3xl;
+}
+
+.content-block {
+  margin-bottom: $space-2xl;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+  
+  &__caption {
+    display: block;
+    margin-top: $space-sm;
+    font-size: $font-size-md;
+    color: $color--secondary;
+    font-style: italic;
+    text-align: center;
+  }
+  
+  // Text block
+  &--text {
+    font-size: $font-size-base;
+    line-height: 1.7;
+    
+    p {
+      margin-bottom: $space-md;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+    
+    strong {
+      font-weight: 600;
+    }
+    
+    em {
+      font-style: italic;
+    }
+    
+    a {
+      color: $color--primary;
+      text-decoration: underline;
+      
+      &:hover {
+        text-decoration: none;
+      }
+    }
+    
+    ul, ol {
+      margin: 0 0 $space-md 0;
+      padding-left: $space-xl;
+      
+      li {
+        margin-bottom: $space-xs;
+      }
+    }
+  }
+  
+  // Video block
+  &--video {
+    margin: 0;
+  }
+  
+  // Image block
+  &--image {
+    margin: 0;
+    
+    img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: $radius--md;
+    }
+  }
+  
+  // Gallery block
+  &--gallery {
+    margin: 0;
+  }
+  
+  // Audio block
+  &--audio {
+    margin: 0;
+  }
+  
+  // Embed block
+  &--embed {
+    margin: 0;
+  }
+  
+  // Divider block
+  &--divider {
+    border: none;
+    border-top: 1.5px solid black;
+    margin: $space-3xl 0;
+  }
+  
+  // Quote block
+  &--quote {
+    margin: $space-2xl 0;
+    padding: $space-xl $space-2xl;
+    border-left: 4px solid $color--primary;
+    background: $surface-tint-soft;
+    font-size: $font-size-lg;
+    font-style: italic;
+    
+    p {
+      margin: 0;
+      line-height: 1.6;
+    }
+    
+    cite {
+      display: block;
+      margin-top: $space-sm;
+      font-size: $font-size-md;
+      font-style: normal;
+      color: $color--secondary;
+    }
+  }
+}
+
+// Video embed responsive container
+.video-embed {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; // 16:9 aspect ratio
+  background: $color--black;
+  border-radius: $radius--md;
+  overflow: hidden;
+  
+  iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+// Audio player
+.audio-player {
+  display: flex;
+  flex-direction: column;
+  gap: $space-xs;
+  padding: $space-md;
+  background: $surface-tint-soft;
+  border: 1px solid $color--light;
+  border-radius: $radius--md;
+  
+  &__title {
+    font-size: $font-size-md;
+    font-weight: 600;
+    color: $color--primary;
+  }
+  
+  audio {
+    width: 100%;
+    height: 40px;
+  }
+}
+
+// Gallery layouts
+.gallery {
+  &__container {
+    display: grid;
+    gap: $space-sm;
+  }
+  
+  &__item {
+    position: relative;
+    overflow: hidden;
+    border-radius: $radius--sm;
+    
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+  
+  &__item-caption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: $space-xs $space-sm;
+    background: linear-gradient(transparent, rgba($color--black, 0.7));
+    color: $color--white;
+    font-size: $font-size-xs;
+  }
+  
+  &--grid {
+    .gallery__container {
+      grid-template-columns: repeat(2, 1fr);
+      
+      @include xsm {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .gallery__item {
+      aspect-ratio: 4 / 3;
+    }
+  }
+  
+  &--carousel {
+    .gallery__container {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    }
+    
+    .gallery__item {
+      flex: 0 0 80%;
+      scroll-snap-align: start;
+      aspect-ratio: 16 / 9;
+      
+      @include xsm {
+        flex: 0 0 90%;
+      }
+    }
+  }
+}
+
+// Embed container
+.embed-container {
+  border-radius: $radius--md;
+  overflow: hidden;
+  
+  iframe {
+    display: block;
+    max-width: 100%;
+  }
+}

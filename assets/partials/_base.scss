@@ -1,0 +1,45 @@
+// Base styles - resets and typography
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+  margin: 0;
+  padding: 0;
+  color: $color--default;
+  background: $color--background;
+  font-size: $body-copy--size;
+  line-height: $body-copy--leading;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @include heading-font;
+  margin-top: 0;
+}
+
+h1 {
+  font-size: $h1--size;
+  margin-bottom: $header--mb * 1.5;
+  line-height: 1;
+  
+  @include xsm {
+    font-size: 40px;
+    margin-bottom: $header--mb;
+  }
+}
+
+h2 {
+  font-size: $product-title--size;
+  margin-bottom: 24px;
+  line-height: 1;
+  
+  @include xsm {
+    font-size: 32px;
+  }
+}
+
+td {
+  padding-right: 10px;
+}

@@ -1,0 +1,459 @@
+{% assign campaign = site.campaigns | where: "slug", page.campaign_slug | first %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="/assets/images/defaults/favicon.png">
+  {% include snipcart-head.html %}
+  <title>Community · {{ campaign.title }} · {{ site.title }}</title>
+</head>
+<body>
+  {% include header.html hide_cart=true %}
+
+  <main class="community-page">
+    <div class="community-page__container">
+      <!-- Loading state -->
+      <div id="community-loading" class="community-page__loading">
+        <p>Verifying your supporter access...</p>
+      </div>
+      
+      <!-- Access denied / CTA -->
+      <div id="community-denied" class="community-page__denied" hidden>
+        <h1>Join the {{ campaign.title }} Community</h1>
+        <p class="community-page__denied-intro">Supporters get exclusive access to vote on creative decisions and shape the project.</p>
+        
+        <div class="community-page__cta-box">
+          <h3>Become a Supporter</h3>
+          <p>Back <strong>{{ campaign.title }}</strong> at any tier to unlock community features including:</p>
+          <ul>
+            <li>Vote on key creative decisions</li>
+            <li>Help shape the final project</li>
+            <li>Connect with fellow supporters</li>
+          </ul>
+          <a href="{{ campaign.url }}#tiers" class="btn btn--primary">Support This Campaign →</a>
+        </div>
+        
+        <p class="community-page__already">Already a supporter? <a href="{{ campaign.url }}">Check your email</a> for your access link.</p>
+      </div>
+      
+      <!-- Supporter content -->
+      <div id="community-content" class="community-page__content" hidden>
+        <header class="community-page__header">
+          <a href="{{ campaign.url }}" class="community-page__back">← Back to Campaign</a>
+          <h1>{{ campaign.title }} Community</h1>
+          <p class="community-page__intro">As a supporter, you have a voice in shaping this project. Vote on key decisions below.</p>
+        </header>
+        
+        {{ content }}
+        
+        {% assign open_decisions = campaign.decisions | where: "status", "open" %}
+        {% assign closed_decisions = campaign.decisions | where: "status", "closed" %}
+        
+        {% if open_decisions.size > 0 %}
+        <section class="community-decisions">
+          <h2>Active Decisions</h2>
+          <div class="decisions-grid" id="decisions-grid">
+            {% for decision in open_decisions %}
+            <div class="decision-card{% if decision.options.first.image %} decision-card--has-images{% endif %}" data-decision-id="{{ decision.id }}" data-status="{{ decision.status }}"{% if decision.deadline %} data-deadline="{{ decision.deadline }}"{% endif %}>
+              <div class="decision-card__header">
+                <h3>{{ decision.title }}</h3>
+                <div class="decision-card__meta">
+                  <span class="decision-card__type">{{ decision.type | capitalize }}</span>
+                  {% if decision.deadline %}
+                  <span class="decision-card__deadline" data-deadline="{{ decision.deadline }}">
+                    Ends <time datetime="{{ decision.deadline }}">{{ decision.deadline | date: "%b %d" }}</time>
+                  </span>
+                  {% endif %}
+                </div>
+              </div>
+              
+              <!-- Voting form (shown when not yet voted) -->
+              <div class="decision-voting" data-view="voting">
+                <div class="decision-options{% if decision.options.first.image %} decision-options--images{% endif %}">
+                  {% for option in decision.options %}
+                  {% if option.label %}
+                  <label class="decision-option{% if option.image %} decision-option--has-image{% endif %}">
+                    <input type="radio" name="decision-{{ decision.id }}" value="{{ option.label }}">
+                    {% if option.image %}
+                    <img src="{{ option.image }}" alt="{{ option.label }}" class="decision-option__image">
+                    {% endif %}
+                    <span class="decision-option__label">{{ option.label }}</span>
+                  </label>
+                  {% else %}
+                  <label class="decision-option">
+                    <input type="radio" name="decision-{{ decision.id }}" value="{{ option }}">
+                    <span>{{ option }}</span>
+                  </label>
+                  {% endif %}
+                  {% endfor %}
+                </div>
+                
+                <div class="decision-card__footer">
+                  <button class="btn btn--small" data-action="submit-vote" data-decision="{{ decision.id }}">
+                    Submit Vote
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Results view (shown after voting) -->
+              <div class="decision-results" data-view="results" hidden>
+                <div class="results-bars{% if decision.options.first.image %} results-bars--images{% endif %}">
+                  {% for option in decision.options %}
+                  {% assign option_value = option.label | default: option %}
+                  <div class="result-bar" data-option="{{ option_value }}">
+                    {% if option.image %}
+                    <img src="{{ option.image }}" alt="{{ option_value }}" class="result-bar__image">
+                    {% endif %}
+                    <div class="result-bar__label">
+                      <span class="result-bar__option">{{ option_value }}</span>
+                      <span class="result-bar__percent">0%</span>
+                    </div>
+                    <div class="result-bar__track">
+                      <div class="result-bar__fill" style="width: 0%"></div>
+                    </div>
+                    <span class="result-bar__count">0 votes</span>
+                  </div>
+                  {% endfor %}
+                </div>
+                <div class="decision-card__footer">
+                  <span class="decision-card__voted">✓ You voted: <strong data-user-choice></strong></span>
+                  <span class="decision-card__total"><span data-total-votes>0</span> total votes</span>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+        
+        {% if closed_decisions.size > 0 %}
+        <section class="community-decisions community-decisions--closed">
+          <h2>Past Decisions</h2>
+          <div class="decisions-grid" id="decisions-grid-closed">
+            {% for decision in closed_decisions %}
+            <div class="decision-card decision-card--closed" data-decision-id="{{ decision.id }}" data-status="{{ decision.status }}"{% if decision.winner %} data-winner="{{ decision.winner }}"{% endif %}>
+              <div class="decision-card__header">
+                <h3>{{ decision.title }}</h3>
+                <div class="decision-card__meta">
+                  <span class="decision-card__type">{{ decision.type | capitalize }}</span>
+                  <span class="decision-card__status-closed">Closed</span>
+                </div>
+              </div>
+              
+              <div class="decision-closed">
+                <div class="decision-winner">
+                  <span class="decision-winner__label">Winner</span>
+                  <span class="decision-winner__value">{{ decision.winner }}</span>
+                </div>
+                <div class="decision-closed__results" data-decision-id="{{ decision.id }}">
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+        
+        {% if open_decisions.size == 0 and closed_decisions.size == 0 %}
+        <div class="community-page__empty">
+          <p>No decisions yet. Check back soon!</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__content">
+      <a href="/" class="site-footer__logo">
+        <img src="/assets/images/defaults/dust-wave-square.png" alt="Dust Wave">
+      </a>
+      <div class="site-footer__copyright">
+        <span>(ɔ) {{ 'now' | date: "%Y" }} DUST WAVE</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function() {
+      const WORKER_BASE = '{{ site.worker_base }}';
+      const CAMPAIGN_SLUG = '{{ campaign.slug }}';
+      const COOKIE_NAME = 'supporter_' + CAMPAIGN_SLUG;
+      
+      function getCookie(name) {
+        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+        return match ? match[2] : null;
+      }
+      
+      function setCookie(name, value, days) {
+        const expires = new Date(Date.now() + days * 864e5).toUTCString();
+        document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Lax';
+      }
+      
+      function showContent() {
+        document.getElementById('community-loading').hidden = true;
+        document.getElementById('community-content').hidden = false;
+      }
+      
+      function showDenied() {
+        document.getElementById('community-loading').hidden = true;
+        document.getElementById('community-denied').hidden = false;
+      }
+      
+      async function verifyAccess() {
+        const params = new URLSearchParams(window.location.search);
+        
+        // DEV MODE: ?dev=1 bypasses verification (local testing only)
+        if (params.get('dev') === '1' && window.location.hostname === '127.0.0.1') {
+          console.log('[DEV] Setting supporter cookie for testing');
+          setCookie(COOKIE_NAME, 'verified', 90);
+          // Set a dev token for voting API calls
+          userToken = 'dev-token-' + CAMPAIGN_SLUG;
+          setCookie('supporter_token_' + CAMPAIGN_SLUG, userToken, 90);
+          window.history.replaceState({}, '', window.location.pathname);
+          showContent();
+          return;
+        }
+        
+        // Check for existing supporter cookie
+        const existingCookie = getCookie(COOKIE_NAME);
+        if (existingCookie === 'verified') {
+          // Restore token from cookie for API calls
+          userToken = getCookie('supporter_token_' + CAMPAIGN_SLUG);
+          showContent();
+          return;
+        }
+        
+        // Check for token in URL
+        const token = params.get('t');
+        
+        if (!token) {
+          showDenied();
+          return;
+        }
+        
+        try {
+          // Verify token with Worker
+          console.log('[Community] Verifying token with:', WORKER_BASE + '/pledge?token=' + token.substring(0, 20) + '...');
+          const res = await fetch(WORKER_BASE + '/pledge?token=' + encodeURIComponent(token));
+          console.log('[Community] Response status:', res.status);
+          if (!res.ok) {
+            const errText = await res.text();
+            console.error('[Community] Verification failed:', errText);
+            showDenied();
+            return;
+          }
+          
+          const pledge = await res.json();
+          console.log('[Community] Pledge data:', { campaignSlug: pledge.campaignSlug, status: pledge.pledgeStatus, expected: CAMPAIGN_SLUG });
+          
+          // Check if pledge is for this campaign and is active/charged
+          if (pledge.campaignSlug !== CAMPAIGN_SLUG) {
+            console.error('[Community] Campaign mismatch:', pledge.campaignSlug, '!==', CAMPAIGN_SLUG);
+            showDenied();
+            return;
+          }
+          
+          if (pledge.pledgeStatus === 'cancelled') {
+            console.error('[Community] Pledge is cancelled');
+            showDenied();
+            return;
+          }
+          
+          // Valid supporter! Set cookie and show content
+          setCookie(COOKIE_NAME, 'verified', 90); // 90 days
+          
+          // Clean up URL (remove token)
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, '', cleanUrl);
+          
+          showContent();
+        } catch (err) {
+          console.error('Verification error:', err);
+          showDenied();
+        }
+      }
+      
+      // Toast for notifications
+      function toast(msg, isError = false) {
+        const t = document.createElement('div');
+        t.textContent = msg;
+        t.style.cssText = `position:fixed;bottom:20px;right:20px;background:${isError ? '#dc3545' : '#141821'};border:1px solid ${isError ? '#dc3545' : '#252c3a'};padding:12px 16px;border-radius:8px;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;font-size:14px;`;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 2500);
+      }
+      
+      // Store token for voting API
+      let userToken = null;
+      
+      // Show results for a decision
+      function showResults(card, { userChoice, results, totalVotes }) {
+        const votingView = card.querySelector('[data-view="voting"]');
+        const resultsView = card.querySelector('[data-view="results"]');
+        
+        if (!votingView || !resultsView) return;
+        
+        // Update result bars
+        const bars = resultsView.querySelectorAll('.result-bar');
+        bars.forEach(bar => {
+          const option = bar.dataset.option;
+          const count = results[option] || 0;
+          const percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+          
+          bar.querySelector('.result-bar__percent').textContent = percent + '%';
+          bar.querySelector('.result-bar__fill').style.width = percent + '%';
+          bar.querySelector('.result-bar__count').textContent = count + (count === 1 ? ' vote' : ' votes');
+          
+          // Highlight user's choice
+          if (option === userChoice) {
+            bar.classList.add('result-bar--selected');
+          }
+        });
+        
+        // Update footer
+        resultsView.querySelector('[data-user-choice]').textContent = userChoice;
+        resultsView.querySelector('[data-total-votes]').textContent = totalVotes;
+        
+        // Switch views
+        votingView.hidden = true;
+        resultsView.hidden = false;
+      }
+      
+      // Load existing vote status
+      async function loadVoteStatus() {
+        if (!userToken) return;
+        
+        const cards = document.querySelectorAll('.decision-card');
+        const decisionIds = Array.from(cards).map(c => c.dataset.decisionId).join(',');
+        
+        if (!decisionIds) return;
+        
+        try {
+          const res = await fetch(`${WORKER_BASE}/votes?token=${encodeURIComponent(userToken)}&decisions=${decisionIds}`);
+          if (!res.ok) return;
+          
+          const data = await res.json();
+          
+          // Update cards
+          for (const [decisionId, status] of Object.entries(data.decisions)) {
+            const card = document.querySelector(`[data-decision-id="${decisionId}"]`);
+            if (!card) continue;
+            
+            // Check if this is a closed decision
+            if (card.dataset.status === 'closed') {
+              showClosedResults(card, status);
+            } else if (status.hasVoted) {
+              showResults(card, status);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load vote status:', err);
+        }
+      }
+      
+      // Show results for closed decisions
+      function showClosedResults(card, { results, totalVotes }) {
+        const resultsContainer = card.querySelector('.decision-closed__results');
+        if (!resultsContainer || !results) return;
+        
+        const winner = card.dataset.winner;
+        const sortedOptions = Object.entries(results).sort((a, b) => b[1] - a[1]);
+        
+        let html = '<div class="closed-results">';
+        for (const [option, count] of sortedOptions) {
+          const percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+          const isWinner = option === winner;
+          html += `
+            <div class="closed-result${isWinner ? ' closed-result--winner' : ''}">
+              <span class="closed-result__option">${option}</span>
+              <span class="closed-result__stats">${percent}% (${count} votes)</span>
+            </div>
+          `;
+        }
+        html += `<div class="closed-results__total">${totalVotes} total votes</div>`;
+        html += '</div>';
+        
+        resultsContainer.innerHTML = html;
+      }
+      
+      // Vote handlers
+      document.addEventListener('click', async function(e) {
+        if (!e.target.matches('[data-action="submit-vote"]')) return;
+        
+        const btn = e.target;
+        const decisionId = btn.dataset.decision;
+        const card = btn.closest('.decision-card');
+        const selected = document.querySelector(`input[name="decision-${decisionId}"]:checked`);
+        
+        if (!selected) {
+          toast('Please select an option first.', true);
+          return;
+        }
+        
+        // Disable button
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
+        
+        try {
+          const res = await fetch(`${WORKER_BASE}/votes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: userToken,
+              decisionId,
+              option: selected.value
+            })
+          });
+          
+          const data = await res.json();
+          
+          if (!res.ok) {
+            if (data.userChoice) {
+              // Already voted - show results
+              toast('You already voted for "' + data.userChoice + '"');
+              showResults(card, { userChoice: data.userChoice, results: {}, totalVotes: 0 });
+            } else {
+              toast(data.error || 'Failed to submit vote', true);
+              btn.disabled = false;
+              btn.textContent = 'Submit Vote';
+            }
+            return;
+          }
+          
+          toast('Vote submitted for "' + data.userChoice + '". Thanks!');
+          showResults(card, data);
+        } catch (err) {
+          console.error('Vote error:', err);
+          toast('Failed to submit vote', true);
+          btn.disabled = false;
+          btn.textContent = 'Submit Vote';
+        }
+      });
+      
+      // Modified verifyAccess to store token and load votes
+      const originalShowContent = showContent;
+      showContent = function() {
+        originalShowContent();
+        loadVoteStatus();
+      };
+      
+      // Store token when verifying access
+      const originalVerifyAccess = verifyAccess;
+      verifyAccess = async function() {
+        const params = new URLSearchParams(window.location.search);
+        userToken = params.get('t') || getCookie('supporter_token_' + CAMPAIGN_SLUG);
+        
+        // Store token in cookie for future API calls
+        if (userToken && !getCookie('supporter_token_' + CAMPAIGN_SLUG)) {
+          setCookie('supporter_token_' + CAMPAIGN_SLUG, userToken, 90);
+        }
+        
+        await originalVerifyAccess();
+      };
+      
+      verifyAccess();
+    })();
+  </script>
+</body>
+</html>

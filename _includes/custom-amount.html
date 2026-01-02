@@ -1,0 +1,73 @@
+{% assign is_late_support_custom = false %}
+{% if include.campaign.state == "live" %}
+  {% assign disabled = false %}
+  {% assign disabled_reason = "" %}
+{% elsif include.campaign.state == "post" %}
+  {% if include.campaign.custom_late_support %}
+    {% assign is_late_support_custom = true %}
+  {% endif %}
+  {% assign disabled = true %}
+  {% capture disabled_reason %}{% include t.html key="states.ended" %}{% endcapture %}
+{% elsif include.campaign.state == "upcoming" %}
+  {% assign disabled = true %}
+  {% assign start_formatted = include.campaign.start_date | date: "%b %-d" %}
+  {% capture disabled_reason %}{% include t.html key="states.opens" date=start_formatted %}{% endcapture %}
+{% else %}
+  {% assign disabled = true %}
+  {% assign disabled_reason = "Unavailable" %}
+{% endif %}
+
+<div class="custom-amount" id="custom-amount" role="group" aria-labelledby="custom-amount-heading" data-campaign-slug="{{ include.campaign.slug }}"{% if is_late_support_custom %} data-late-support="true" data-goal="{{ include.campaign.goal_amount }}"{% endif %}>
+  <div class="custom-amount__info">
+    <h5 id="custom-amount-heading">Support at your discretion</h5>
+    <p id="custom-amount-desc">Contribute any amount — no reward attached.</p>
+  </div>
+  <div class="custom-amount__actions">
+    <div class="custom-amount__input-wrap">
+      <label for="custom-amount-input" class="sr-only">Custom pledge amount in dollars</label>
+      <span class="custom-amount__currency" aria-hidden="true">$</span>
+      <input type="number" 
+             id="custom-amount-input" 
+             class="custom-amount__input" 
+             min="1" 
+             step="1" 
+             placeholder="25"
+             aria-describedby="custom-amount-desc"
+             {% if disabled %}disabled aria-disabled="true"{% endif %}>
+    </div>
+    <button
+      class="snipcart-add-item custom-amount__btn"
+      id="custom-amount-btn"
+      type="button"
+      {% if disabled %}disabled aria-disabled="true"{% endif %}
+      data-item-id="{{ include.campaign.slug }}__custom-support"
+      data-item-name="{{ include.campaign.title }} — Custom Support"
+      data-item-price="25"
+      data-item-url="{{ site.url }}{{ include.campaign.url }}#custom-amount"
+      data-item-description="Pledge (charged only if funded) — No reward"
+      data-item-max-quantity="1"
+      data-item-stackable="never"
+      data-item-custom1-name="_stackable"
+      data-item-custom1-type="hidden"
+      data-item-custom1-value="false">
+      {% if disabled %}{{ disabled_reason }}{% else %}Support{% endif %}
+    </button>
+  </div>
+</div>
+<script>
+(function() {
+  var input = document.getElementById('custom-amount-input');
+  var btn = document.getElementById('custom-amount-btn');
+  var liveRegion = document.getElementById('aria-live-region');
+  if (input && btn) {
+    function updatePrice() {
+      var val = parseInt(input.value, 10);
+      if (val && val > 0) {
+        btn.setAttribute('data-item-price', val);
+      }
+    }
+    input.addEventListener('input', updatePrice);
+    input.addEventListener('change', updatePrice);
+  }
+})();
+</script>

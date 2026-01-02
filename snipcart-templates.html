@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Snipcart Templates</title>
+</head>
+<body>
+  <div id="snipcart-templates">
+    
+    <!-- Override the entire payment component to use our pledge flow -->
+    <payment>
+      <div class="snipcart-payment">
+        <header class="snipcart__box--header">
+          <div class="snipcart__font--subtitle">Payment</div>
+        </header>
+        
+        <div style="padding: 20px;">
+          <div class="pledge-notice pledge-notice--payment" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 16px; margin-bottom: 20px; color: #166534;">
+            <strong style="color: #15803d;">🤔 How pledging works:</strong><br>
+            Your card will be stored securely but <strong>not charged now</strong>. You'll only be charged if the campaign reaches its goal.
+          </div>
+          
+          <div style="margin-bottom: 20px;">
+            <snipcart-checkbox name="agree-terms" required></snipcart-checkbox>
+            <snipcart-label for="agree-terms">
+              I agree to the&nbsp;<a href="/terms/" target="_blank">Terms &amp; Creative Guidelines</a>
+            </snipcart-label>
+          </div>
+          
+          <button 
+            type="button"
+            id="pool-pledge-button"
+            class="snipcart-button-primary"
+            style="width: 100%; padding: 16px; font-size: 16px; font-weight: 600; background: #059669; border: none; border-radius: 8px; color: white; cursor: pointer;"
+          >
+            Save Card &amp; Pledge
+          </button>
+          
+          <p style="margin-top: 12px; font-size: 12px; color: #666; text-align: center;">
+            Securely processed by Stripe. Your card will only be charged if the campaign is fully funded.
+          </p>
+        </div>
+      </div>
+    </payment>
+    
+  </div>
+</body>
+</html>

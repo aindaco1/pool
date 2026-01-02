@@ -1,0 +1,125 @@
+# English translations (default)
+# Usage in templates: {% include t.html key="buttons.pledge" %}
+
+# Navigation
+nav:
+  home: "Home"
+  about: "About"
+  terms: "Terms"
+
+# Buttons
+buttons:
+  pledge: "Pledge"
+  pledge_amount: "Pledge $%{amount}"
+  add_to_cart: "Add to Cart"
+  cancel: "Cancel"
+  cancel_pledge: "Cancel Pledge"
+  modify: "Modify"
+  modify_pledge: "Modify Pledge"
+  update_payment: "Update Payment Method"
+  continue: "Continue"
+  back: "Back"
+  submit: "Submit"
+  vote: "Vote"
+  view_campaign: "View Campaign"
+  manage_pledge: "Manage Pledge"
+
+# Campaign states
+states:
+  upcoming: "Coming Soon"
+  live: "Live"
+  post: "Ended"
+  funded: "Funded"
+  not_funded: "Not Funded"
+  opens: "Opens %{date}"
+  ends: "Ends %{date}"
+  ended: "Campaign Ended"
+  charged: "Charged"
+
+# Progress & funding
+progress:
+  raised: "raised"
+  of_goal: "of %{goal} goal"
+  backers: "backers"
+  backer: "backer"
+  days_left: "days left"
+  day_left: "day left"
+  hours_left: "hours left"
+  funded_percent: "%{percent}% funded"
+  goal_reached: "Goal Reached!"
+  stretch_goal: "Stretch Goal"
+  unlocked: "Unlocked"
+  locked: "Locked"
+
+# Pledge flow
+pledge:
+  notice_title: "How pledging works"
+  notice_body: "You'll only be charged if this campaign reaches its goal by %{deadline}."
+  notice_meta: "You can update or cancel your pledge anytime before the deadline."
+  no_reward: "No reward"
+  custom_support: "Custom Support"
+  charged_only_if_funded: "Pledge (charged only if funded)"
+  tax_notice: "Tax will be calculated at checkout"
+
+# Manage pledge page
+manage:
+  title: "Manage Your Pledge"
+  loading: "Loading pledge details..."
+  error: "Unable to load pledge. Please check your link."
+  current_pledge: "Current Pledge"
+  pledge_amount: "Pledge Amount"
+  tier: "Tier"
+  status: "Status"
+  created: "Created"
+  cancel_confirm: "Are you sure you want to cancel this pledge?"
+  cancel_success: "Pledge cancelled successfully."
+  modify_success: "Pledge modified successfully."
+  payment_update_redirect: "Redirecting to update payment..."
+
+# Status labels
+status:
+  active: "Active"
+  cancelled: "Cancelled"
+  charged: "Charged"
+  payment_failed: "Payment Failed"
+
+# Community / voting
+community:
+  title: "Supporter Community"
+  access_required: "Supporter access required"
+  vote_cast: "Vote submitted!"
+  already_voted: "You've already voted"
+  voting_closed: "Voting closed"
+  results: "Results"
+
+# Tiers
+tiers:
+  sold_out: "Sold Out"
+  limited: "%{remaining} remaining"
+  unlimited: "Unlimited"
+  unlocked: "Unlocked!"
+  unlocks_at: "Unlocks at %{amount}"
+
+# Emails (used by Worker, reference only)
+email:
+  pledge_confirmed_subject: "Your pledge to %{campaign}"
+  charge_success_subject: "Payment confirmed for %{campaign}"
+  payment_failed_subject: "Action needed: Update your payment method"
+  milestone_subject: "%{campaign} reached %{milestone}!"
+
+# Dates & times
+dates:
+  date_format: "%b %-d, %Y"
+  time_format: "%I:%M %p"
+  datetime_format: "%b %-d, %Y at %I:%M %p"
+
+# Misc
+misc:
+  by: "by"
+  and: "and"
+  or: "or"
+  of: "of"
+  loading: "Loading..."
+  error: "Error"
+  success: "Success"
+  close: "Close"

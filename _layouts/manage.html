@@ -1,0 +1,1648 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="/assets/images/defaults/favicon.png">
+  {% include snipcart-head.html %}
+  <title>Manage Pledges · {{ site.title }}</title>
+</head>
+<body>
+  {% include header.html hide_cart=true %}
+
+  <main class="manage-pledge">
+    <div class="manage-pledge__container">
+      <h1>Manage Pledge</h1>
+      
+      <div id="pledge-loading" class="manage-pledge__loading">
+        <p>Loading your pledges...</p>
+      </div>
+      
+      <div id="pledge-error" class="manage-pledge__error" hidden>
+        <h2>Unable to load pledges</h2>
+        <p id="pledge-error-message">This link may have expired or is invalid.</p>
+        <a href="/" class="btn">Back to Campaigns</a>
+      </div>
+      
+      <div id="pledges-list" class="manage-pledge__list" hidden></div>
+      
+      <!-- Confirmation Modal -->
+      <div id="confirm-modal" class="modal" hidden>
+        <div class="modal__backdrop"></div>
+        <div class="modal__content">
+          <h3>Confirm Changes</h3>
+          <p id="confirm-modal-message">Are you sure you want to update your pledge?</p>
+          <div class="modal__details" id="confirm-modal-details"></div>
+          <div class="modal__actions">
+            <button class="btn btn--secondary" id="confirm-modal-cancel">Cancel</button>
+            <button class="btn" id="confirm-modal-confirm">Confirm Changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__content">
+      <a href="/" class="site-footer__logo">
+        <img src="/assets/images/defaults/dust-wave-square.png" alt="Dust Wave">
+      </a>
+      <div class="site-footer__copyright">
+        <span>(ɔ) {{ 'now' | date: "%Y" }} DUST WAVE</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const WORKER_BASE = '{{ site.worker_base }}';
+    const ABQ_TAX_RATE = 0.07875; // 7.875% ABQ tax
+    let allCampaigns = [];
+    let pledges = [];
+    let isDevMode = false;
+    let currentToken = null;
+    
+    function calculateTax(subtotalCents) {
+      return Math.round(subtotalCents * ABQ_TAX_RATE);
+    }
+    
+    function getSubtotalFromTotal(totalCents) {
+      // Reverse calculate: subtotal = total / (1 + taxRate)
+      return Math.round(totalCents / (1 + ABQ_TAX_RATE));
+    }
+    
+    function getPledgeSubtotal(pledge) {
+      // Use subtotal if available, otherwise derive from amount (backwards compatibility)
+      if (pledge.subtotal !== undefined) {
+        return pledge.subtotal;
+      }
+      // For older pledges where amount was stored without tax, just use amount
+      // For newer pledges where amount includes tax, we'd need to reverse calculate
+      // Since we're transitioning, assume older pledges have amount = subtotal
+      return pledge.amount;
+    }
+    
+    /**
+     * Merge pledges for the same campaign into a single view.
+     * When a user makes multiple pledges for the same campaign with the same email,
+     * we combine them so they appear as one card with all tiers merged.
+     */
+    function mergePledgesByCampaign(pledgeList) {
+      const byCampaign = {};
+      
+      for (const pledge of pledgeList) {
+        const key = pledge.campaignSlug;
+        
+        if (!byCampaign[key]) {
+          // First pledge for this campaign - clone it and convert to merged format
+          byCampaign[key] = {
+            ...pledge,
+            orderIds: [pledge.orderId], // Track all orderIds for cancel/modify
+            // Clone supportItems to avoid mutating original
+            supportItems: pledge.supportItems ? pledge.supportItems.map(s => ({ ...s })) : [],
+            // Convert main tier to additionalTiers format for easier merging
+            additionalTiers: []
+          };
+          
+          // Add main tier as first entry in additionalTiers
+          if (pledge.tierId) {
+            byCampaign[key].additionalTiers.push({
+              id: pledge.tierId.split('__').pop(),
+              qty: pledge.tierQty || 1,
+              orderId: pledge.orderId // Track which order this tier came from
+            });
+          }
+          
+          // Add any existing additional tiers
+          if (pledge.additionalTiers) {
+            for (const t of pledge.additionalTiers) {
+              byCampaign[key].additionalTiers.push({
+                ...t,
+                orderId: pledge.orderId
+              });
+            }
+          }
+        } else {
+          // Merge into existing
+          const merged = byCampaign[key];
+          merged.orderIds.push(pledge.orderId);
+          
+          // Combine amounts
+          merged.subtotal = (merged.subtotal || 0) + (pledge.subtotal || pledge.amount || 0);
+          merged.tax = (merged.tax || 0) + (pledge.tax || 0);
+          merged.amount = (merged.amount || 0) + (pledge.amount || 0);
+          
+          // Add this pledge's tier(s)
+          if (pledge.tierId) {
+            const tierId = pledge.tierId.split('__').pop();
+            const existingTier = merged.additionalTiers.find(t => t.id === tierId);
+            if (existingTier) {
+              existingTier.qty = (existingTier.qty || 1) + (pledge.tierQty || 1);
+            } else {
+              merged.additionalTiers.push({
+                id: tierId,
+                qty: pledge.tierQty || 1,
+                orderId: pledge.orderId
+              });
+            }
+          }
+          
+          // Merge additional tiers
+          if (pledge.additionalTiers) {
+            for (const t of pledge.additionalTiers) {
+              const existingTier = merged.additionalTiers.find(at => at.id === t.id);
+              if (existingTier) {
+                existingTier.qty = (existingTier.qty || 1) + (t.qty || 1);
+              } else {
+                merged.additionalTiers.push({
+                  ...t,
+                  orderId: pledge.orderId
+                });
+              }
+            }
+          }
+          
+          // Merge support items
+          if (pledge.supportItems) {
+            if (!merged.supportItems) merged.supportItems = [];
+            for (const item of pledge.supportItems) {
+              const existing = merged.supportItems.find(s => s.id === item.id);
+              if (existing) {
+                existing.amount = (existing.amount || 0) + (item.amount || 0);
+              } else {
+                merged.supportItems.push({ ...item });
+              }
+            }
+          }
+          
+          // Merge custom amounts
+          merged.customAmount = (merged.customAmount || 0) + (pledge.customAmount || 0);
+          
+          // Use the most restrictive pledge status
+          // Priority: cancelled > payment_failed > charged > active
+          const statusPriority = { cancelled: 0, payment_failed: 1, charged: 2, active: 3 };
+          if (statusPriority[pledge.pledgeStatus] < statusPriority[merged.pledgeStatus]) {
+            merged.pledgeStatus = pledge.pledgeStatus;
+          }
+          
+          // Merge modification permissions (all must be true)
+          merged.canModify = merged.canModify && pledge.canModify;
+          merged.canCancel = merged.canCancel && pledge.canCancel;
+          merged.canUpdatePaymentMethod = merged.canUpdatePaymentMethod && pledge.canUpdatePaymentMethod;
+        }
+      }
+      
+      // Convert merged pledges to proper format for rendering
+      const result = Object.values(byCampaign).map(merged => {
+        // Set tierId/tierQty from first tier for backwards compatibility with rendering
+        if (merged.additionalTiers.length > 0) {
+          merged.tierId = merged.additionalTiers[0].id;
+          merged.tierQty = merged.additionalTiers[0].qty;
+          // Keep remaining tiers as additionalTiers
+          merged.additionalTiers = merged.additionalTiers.slice(1);
+        }
+        return merged;
+      });
+      
+      return result;
+    }
+    
+    function formatTaxBreakdown(subtotalCents) {
+      const tax = calculateTax(subtotalCents);
+      const total = subtotalCents + tax;
+      return { subtotal: subtotalCents, tax, total };
+    }
+    
+    async function init() {
+      const params = new URLSearchParams(window.location.search);
+      currentToken = params.get('t');
+      isDevMode = params.has('dev');
+      
+      try {
+        // Load all campaign data first
+        const campaignsRes = await fetch('/api/campaigns.json');
+        if (campaignsRes.ok) {
+          const data = await campaignsRes.json();
+          allCampaigns = data.campaigns || [];
+        }
+        
+        if (isDevMode) {
+          console.log('DEV MODE: Using mock pledge data');
+          currentToken = 'dev-token';
+          // Mock pledges - includes duplicate campaign to test merge functionality
+          pledges = [
+            {
+              orderId: 'dev-order-1',
+              email: 'test@example.com',
+              campaignSlug: 'hand-relations',
+              pledgeStatus: 'active',
+              subtotal: 555,
+              tax: 44,
+              amount: 599,
+              tierId: 'frame-slot',
+              tierName: 'Buy 1 Frame',
+              tierQty: 2,
+              supportItems: [
+                { id: 'location-scouting', amount: 25 }
+              ],
+              customAmount: 30,
+              canModify: true,
+              canCancel: true,
+              canUpdatePaymentMethod: true
+            },
+            {
+              orderId: 'dev-order-1b',
+              email: 'test@example.com',
+              campaignSlug: 'hand-relations', // Same campaign - will be merged with dev-order-1
+              pledgeStatus: 'active',
+              subtotal: 300,
+              tax: 24,
+              amount: 324,
+              tierId: 'digital-download',
+              tierName: 'Digital Download',
+              tierQty: 1,
+              supportItems: [
+                { id: 'location-scouting', amount: 10 }
+              ],
+              customAmount: 5,
+              canModify: true,
+              canCancel: true,
+              canUpdatePaymentMethod: true
+            },
+            {
+              orderId: 'dev-order-2',
+              email: 'test@example.com',
+              campaignSlug: 'common-ground',
+              pledgeStatus: 'active',
+              subtotal: 4100,
+              tax: 323,
+              amount: 4423,
+              tierId: 'screening-ticket',
+              tierName: 'Community Screening',
+              tierQty: 2,
+              additionalTiers: [
+                { id: 'production-photo', qty: 1 }
+              ],
+              supportItems: [],
+              customAmount: 0,
+              canModify: true,
+              canCancel: true,
+              canUpdatePaymentMethod: true
+            }
+          ];
+        } else {
+          if (!currentToken) {
+            showError('No pledge token provided.');
+            return;
+          }
+          
+          const res = await fetch(`${WORKER_BASE}/pledges?token=${encodeURIComponent(currentToken)}`);
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to load pledges');
+          }
+          pledges = await res.json();
+        }
+        
+        // Merge pledges for the same campaign (when user made multiple pledges with same email)
+        pledges = mergePledgesByCampaign(pledges);
+        
+        renderPledges();
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+    
+    function getCampaignData(slug) {
+      return allCampaigns.find(c => c.slug === slug);
+    }
+    
+    // Live inventory cache
+    const liveInventory = {};
+    
+    // Live stats cache (includes support items)
+    const liveStats = {};
+    
+    async function fetchLiveStats(campaignSlug) {
+      if (liveStats[campaignSlug]) {
+        return liveStats[campaignSlug];
+      }
+      try {
+        const res = await fetch(`${WORKER_BASE}/stats/${campaignSlug}`);
+        if (res.ok) {
+          const data = await res.json();
+          liveStats[campaignSlug] = data;
+          return data;
+        }
+      } catch (e) {
+        console.error('Failed to fetch stats for', campaignSlug, e);
+      }
+      return {};
+    }
+    
+    async function fetchLiveInventory(campaignSlug) {
+      if (liveInventory[campaignSlug]) {
+        return liveInventory[campaignSlug];
+      }
+      try {
+        const res = await fetch(`${WORKER_BASE}/inventory/${campaignSlug}`);
+        if (res.ok) {
+          const data = await res.json();
+          liveInventory[campaignSlug] = data.tiers || {};
+          return liveInventory[campaignSlug];
+        }
+      } catch (e) {
+        console.error('Failed to fetch inventory for', campaignSlug, e);
+      }
+      return {};
+    }
+    
+    function getTierRemaining(campaignSlug, tierId, pledgedQty = 0) {
+      const inv = liveInventory[campaignSlug];
+      if (inv && inv[tierId]) {
+        // Add back the pledged qty since user already has those claimed
+        return inv[tierId].remaining + pledgedQty;
+      }
+      return Infinity; // No limit if not tracked
+    }
+    
+    function showError(message) {
+      document.getElementById('pledge-loading').hidden = true;
+      document.getElementById('pledge-error').hidden = false;
+      document.getElementById('pledge-error-message').textContent = message;
+    }
+    
+    function formatMoney(cents) {
+      return '$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    
+    function formatPrice(price) {
+      return '$' + Number(price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    
+    function formatMoneyShort(amount) {
+      if (amount >= 1000000) {
+        const val = amount / 1000000;
+        return '$' + (val === Math.floor(val) ? val.toFixed(0) : val.toFixed(1).replace(/\.0$/, '')) + 'M';
+      } else if (amount >= 1000) {
+        const val = amount / 1000;
+        return '$' + (val === Math.floor(val) ? val.toFixed(0) : val.toFixed(1).replace(/\.0$/, '')) + 'K';
+      }
+      return '$' + Math.floor(amount);
+    }
+    
+    function renderProgressBar(campaign) {
+      if (!campaign) return '';
+      const pledged = campaign.pledged_amount || 0;
+      const goal = campaign.goal_amount || 0;
+      const stretchGoals = campaign.stretch_goals || [];
+      const stretchHidden = campaign.stretch_hidden !== false;
+      
+      let maxThreshold = goal;
+      let showFinalMarker = false;
+      
+      if (stretchGoals.length > 0) {
+        stretchGoals.forEach(s => {
+          if (s.threshold > maxThreshold) maxThreshold = s.threshold;
+        });
+      } else if (pledged > goal) {
+        maxThreshold = pledged;
+        showFinalMarker = true;
+      }
+      
+      let pct = maxThreshold > 0 ? Math.round((pledged / maxThreshold) * 100) : 0;
+      let exceededMax = false;
+      if (pct > 100) {
+        exceededMax = true;
+        pct = 100;
+      }
+      
+      const goalPct = maxThreshold > 0 ? Math.round((goal / maxThreshold) * 100) : 100;
+      const goalMet = pledged >= goal;
+      
+      const oneThird = Math.floor(goal / 3);
+      const twoThirds = Math.floor((goal * 2) / 3);
+      const oneThirdPct = maxThreshold > 0 ? Math.round((oneThird / maxThreshold) * 100) : 0;
+      const twoThirdsPct = maxThreshold > 0 ? Math.round((twoThirds / maxThreshold) * 100) : 0;
+      const oneThirdMet = pledged >= oneThird;
+      const twoThirdsMet = pledged >= twoThirds;
+      
+      let stretchMarkersHtml = '';
+      if (stretchGoals.length > 0) {
+        let prevMet = goalMet;
+        stretchGoals.forEach(s => {
+          const sPct = maxThreshold > 0 ? Math.round((s.threshold / maxThreshold) * 100) : 0;
+          const sAchieved = pledged >= s.threshold;
+          const sUnlocked = !stretchHidden || prevMet;
+          stretchMarkersHtml += `
+            <div class="progress-marker progress-marker--stretch${sAchieved ? ' progress-marker--achieved' : ''}${!sUnlocked ? ' progress-marker--locked' : ''}" style="left: ${sPct}%">
+              <span class="progress-marker__dot"></span>
+              <span class="progress-marker__label">
+                <span class="progress-marker__amount">${formatMoneyShort(s.threshold)}</span>
+                <span class="progress-marker__desc">${sUnlocked ? s.title : '???'}</span>
+              </span>
+            </div>
+          `;
+          prevMet = sAchieved;
+        });
+      }
+      
+      return `
+        <div class="progress-wrap progress-wrap--compact">
+          <div class="progress-bar${exceededMax ? ' progress-bar--exceeded' : ''}">
+            <span style="width: ${pct}%"></span>
+            <div class="progress-marker progress-marker--milestone${oneThirdMet ? ' progress-marker--achieved' : ''}" style="left: ${oneThirdPct}%">
+              <span class="progress-marker__dot"></span>
+              <span class="progress-marker__label">
+                <span class="progress-marker__amount">${formatMoneyShort(oneThird)}</span>
+                <span class="progress-marker__desc">1/3</span>
+              </span>
+            </div>
+            <div class="progress-marker progress-marker--milestone${twoThirdsMet ? ' progress-marker--achieved' : ''}" style="left: ${twoThirdsPct}%">
+              <span class="progress-marker__dot"></span>
+              <span class="progress-marker__label">
+                <span class="progress-marker__amount">${formatMoneyShort(twoThirds)}</span>
+                <span class="progress-marker__desc">2/3</span>
+              </span>
+            </div>
+            <div class="progress-marker progress-marker--goal${goalMet ? ' progress-marker--achieved' : ''}" style="left: ${goalPct}%">
+              <span class="progress-marker__dot"></span>
+              <span class="progress-marker__label">
+                <span class="progress-marker__amount">${formatMoneyShort(goal)}</span>
+                <span class="progress-marker__desc">Goal!</span>
+              </span>
+            </div>
+            ${showFinalMarker ? `
+              <div class="progress-marker progress-marker--final progress-marker--achieved" style="left: 100%">
+                <span class="progress-marker__dot"></span>
+                <span class="progress-marker__label">
+                  <span class="progress-marker__amount">${formatMoneyShort(pledged)}</span>
+                  <span class="progress-marker__desc">Final</span>
+                </span>
+              </div>
+            ` : ''}
+            ${stretchMarkersHtml}
+          </div>
+          <div class="progress-meta">
+            <strong>${formatPrice(pledged)}</strong> of ${formatPrice(goal)}
+          </div>
+        </div>
+      `;
+    }
+    
+    function renderCountdown(campaign) {
+      if (!campaign || campaign.state === 'post') return '';
+      
+      const isUpcoming = campaign.state === 'upcoming';
+      const heading = isUpcoming ? 'Starts in' : 'Ends in';
+      const targetStr = isUpcoming ? campaign.start_date : campaign.goal_deadline;
+      if (!targetStr) return '';
+      
+      const id = `countdown-${campaign.slug}`;
+      
+      return `
+        <div class="pledge-countdown" id="${id}" data-deadline="${targetStr}" data-start="${campaign.start_date || ''}" data-state="${campaign.state}">
+          <span class="pledge-countdown__heading">${heading}</span>
+          <div class="pledge-countdown__timer">
+            <span class="pledge-countdown__unit" data-unit="days">00</span><span class="pledge-countdown__sep">:</span>
+            <span class="pledge-countdown__unit" data-unit="hours">00</span><span class="pledge-countdown__sep">:</span>
+            <span class="pledge-countdown__unit" data-unit="mins">00</span><span class="pledge-countdown__sep">:</span>
+            <span class="pledge-countdown__unit" data-unit="secs">00</span>
+          </div>
+        </div>
+      `;
+    }
+    
+    function initCountdown(campaignSlug) {
+      const el = document.getElementById(`countdown-${campaignSlug}`);
+      if (!el) return;
+      
+      const deadlineStr = el.dataset.deadline;
+      const startStr = el.dataset.start;
+      const state = el.dataset.state;
+      
+      let targetDate;
+      if (state === 'upcoming' && startStr) {
+        targetDate = new Date(startStr + 'T00:00:00');
+      } else {
+        targetDate = new Date(deadlineStr + 'T23:59:59');
+      }
+      
+      function update() {
+        const now = new Date();
+        const diff = targetDate - now;
+        
+        if (diff <= 0) {
+          el.innerHTML = state === 'upcoming' 
+            ? '<span class="pledge-countdown__ended">Campaign Live!</span>'
+            : '<span class="pledge-countdown__ended">Ended</span>';
+          return;
+        }
+        
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const secs = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        el.querySelector('[data-unit="days"]').textContent = String(days).padStart(2, '0');
+        el.querySelector('[data-unit="hours"]').textContent = String(hours).padStart(2, '0');
+        el.querySelector('[data-unit="mins"]').textContent = String(mins).padStart(2, '0');
+        el.querySelector('[data-unit="secs"]').textContent = String(secs).padStart(2, '0');
+        
+        setTimeout(update, 1000);
+      }
+      update();
+    }
+    
+    let pendingConfirmCallback = null;
+    
+    function showConfirmModal(message, details, onConfirm) {
+      const modal = document.getElementById('confirm-modal');
+      document.getElementById('confirm-modal-message').textContent = message;
+      document.getElementById('confirm-modal-details').innerHTML = details;
+      pendingConfirmCallback = onConfirm;
+      modal.hidden = false;
+    }
+    
+    function hideConfirmModal() {
+      document.getElementById('confirm-modal').hidden = true;
+      pendingConfirmCallback = null;
+    }
+    
+    document.getElementById('confirm-modal-cancel')?.addEventListener('click', hideConfirmModal);
+    document.getElementById('confirm-modal')?.querySelector('.modal__backdrop')?.addEventListener('click', hideConfirmModal);
+    document.getElementById('confirm-modal-confirm')?.addEventListener('click', () => {
+      if (pendingConfirmCallback) pendingConfirmCallback();
+      hideConfirmModal();
+    });
+    
+    async function renderPledges() {
+      document.getElementById('pledge-loading').hidden = true;
+      const container = document.getElementById('pledges-list');
+      container.hidden = false;
+      
+      if (pledges.length === 0) {
+        container.innerHTML = '<p class="manage-pledge__empty">No active pledges found.</p>';
+        return;
+      }
+      
+      // Fetch live inventory and stats for all campaigns first
+      const campaignSlugs = [...new Set(pledges.map(p => p.campaignSlug))];
+      await Promise.all([
+        ...campaignSlugs.map(slug => fetchLiveInventory(slug)),
+        ...campaignSlugs.map(slug => fetchLiveStats(slug))
+      ]);
+      
+      container.innerHTML = pledges.map((pledge, index) => {
+        const campaign = getCampaignData(pledge.campaignSlug);
+        return renderPledgeCard(pledge, campaign, index);
+      }).join('');
+      
+      // Setup event handlers and countdowns for each pledge
+      pledges.forEach((pledge, index) => {
+        const campaign = getCampaignData(pledge.campaignSlug);
+        if (campaign) {
+          initCountdown(campaign.slug);
+        }
+        if (pledge.pledgeStatus === 'active') {
+          setupPledgeActions(pledge, campaign, index);
+        }
+      });
+    }
+    
+    function renderPledgeCard(pledge, campaign, index) {
+      const isActive = pledge.pledgeStatus === 'active';
+      const isCharged = pledge.pledgeStatus === 'charged';
+      const isCancelled = pledge.pledgeStatus === 'cancelled';
+      const currentTierId = pledge.tierId?.split('__').pop();
+      const tiers = campaign?.tiers || [];
+      const supportItems = campaign?.support_items?.filter(item => item.late_support) || [];
+      const isSingleTier = campaign?.single_tier_only === true;
+      
+      // Use live stats for pledged_amount if available
+      const stats = liveStats[pledge.campaignSlug];
+      const livePledgedAmount = stats ? stats.pledgedAmount / 100 : (campaign?.pledged_amount || 0);
+      
+      // Create campaign object with live stats merged in for progress bar
+      const campaignWithLiveStats = campaign ? {
+        ...campaign,
+        pledged_amount: livePledgedAmount,
+        state: stats?.state || campaign.state
+      } : null;
+      
+      const campaignFunded = campaign && livePledgedAmount >= campaign.goal_amount;
+      const isLive = campaignWithLiveStats?.state === 'live';
+      const isPost = campaignWithLiveStats?.state === 'post';
+      const allowsCustomLateSupport = campaign?.custom_late_support === true;
+      
+      let tiersHtml = '';
+      let supportItemsHtml = '';
+      let customAmountHtml = '';
+      let actionsHtml = '';
+      let footerHtml = '';
+      
+      if (isActive && tiers.length > 0) {
+        if (isSingleTier) {
+          tiersHtml = `
+            <div class="pledge-card__tiers" id="tier-section-${index}">
+              <h2>Select Your Tier</h2>
+              <div class="tier-options">
+                ${tiers.map(tier => {
+                  const isCurrent = tier.id === currentTierId;
+                  const currentQty = isCurrent ? (pledge.tierQty || 1) : 1;
+                  // Use live inventory, add back pledged qty since user already has those claimed
+                  const liveRemaining = getTierRemaining(pledge.campaignSlug, tier.id, isCurrent ? currentQty : 0);
+                  const hasLimit = liveRemaining !== Infinity;
+                  const isDisabled = !isCurrent && (tier.sold_out || (hasLimit && liveRemaining <= 0));
+                  const isStackable = tier.stackable === true;
+                  const maxQty = hasLimit ? Math.min(liveRemaining, 10) : 10;
+                  return `
+                    <label class="tier-option ${isCurrent ? 'tier-option--selected' : ''} ${isDisabled ? 'tier-option--disabled' : ''}" data-tier-id="${tier.id}">
+                      <input type="radio" name="tier-${index}" value="${tier.id}" 
+                        data-price="${tier.price}"
+                        data-stackable="${isStackable}"
+                        ${isCurrent ? 'checked' : ''} 
+                        ${isDisabled ? 'disabled' : ''}>
+                      <div class="tier-option__content">
+                        <strong>${tier.name}</strong>
+                        <span class="tier-option__price">${formatPrice(tier.price)}${isStackable ? ' each' : ''}</span>
+                        ${tier.description ? `<p class="tier-option__desc">${tier.description}</p>` : ''}
+                        ${isDisabled ? '<span class="tier-option__badge tier-option__badge--soldout">Sold Out</span>' : ''}
+                        ${isStackable && !isDisabled ? `
+                          <div class="tier-option__quantity" data-tier="${tier.id}">
+                            <button type="button" class="qty-btn qty-minus" data-tier="${tier.id}">−</button>
+                            <input type="number" class="qty-input" data-tier="${tier.id}" value="${currentQty}" min="1" max="${maxQty}">
+                            <button type="button" class="qty-btn qty-plus" data-tier="${tier.id}">+</button>
+                          </div>
+                        ` : ''}
+                      </div>
+                    </label>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        } else {
+          // Get existing pledged tiers (main tier + any additional tiers)
+          const existingTiers = {};
+          if (currentTierId) {
+            existingTiers[currentTierId] = pledge.tierQty || 1;
+          }
+          if (pledge.additionalTiers) {
+            pledge.additionalTiers.forEach(t => {
+              existingTiers[t.id] = t.qty || 1;
+            });
+          }
+          
+          tiersHtml = `
+            <div class="pledge-card__tiers" id="tier-section-${index}">
+              <h2>Add More Tiers</h2>
+              <div class="tier-options">
+                ${tiers.map(tier => {
+                  const isPledged = existingTiers.hasOwnProperty(tier.id);
+                  const pledgedQty = existingTiers[tier.id] || 1;
+                  // Use live inventory, add back pledged qty since user already has those claimed
+                  const liveRemaining = getTierRemaining(pledge.campaignSlug, tier.id, isPledged ? pledgedQty : 0);
+                  const hasLimit = liveRemaining !== Infinity;
+                  const isDisabled = tier.sold_out || (hasLimit && liveRemaining <= 0 && !isPledged);
+                  const isStackable = tier.stackable === true;
+                  const maxQty = hasLimit ? Math.min(liveRemaining, 10) : 10;
+                  return `
+                    <label class="tier-option ${isPledged ? 'tier-option--selected' : ''} ${isDisabled && !isPledged ? 'tier-option--disabled' : ''}" data-tier-id="${tier.id}">
+                      <input type="checkbox" name="add-tier-${index}" value="${tier.id}" 
+                        data-price="${tier.price}"
+                        data-stackable="${isStackable}"
+                        data-pledged="${isPledged}"
+                        data-pledged-qty="${pledgedQty}"
+                        ${isPledged ? 'checked' : ''}
+                        ${isDisabled && !isPledged ? 'disabled' : ''}>
+                      <div class="tier-option__content">
+                        <strong>${tier.name}</strong>
+                        <span class="tier-option__price">${formatPrice(tier.price)}${isStackable ? ' each' : ''}</span>
+                        ${tier.description ? `<p class="tier-option__desc">${tier.description}</p>` : ''}
+                        ${isPledged ? '<span class="tier-option__badge">Pledged</span>' : ''}
+                        ${isDisabled && !isPledged ? '<span class="tier-option__badge tier-option__badge--soldout">Sold Out</span>' : ''}
+                        ${isStackable && !isDisabled ? `
+                          <div class="tier-option__quantity" data-tier="${tier.id}" ${!isPledged ? 'hidden' : ''}>
+                            <button type="button" class="qty-btn qty-minus" data-tier="${tier.id}">−</button>
+                            <input type="number" class="qty-input" data-tier="${tier.id}" value="${isPledged ? pledgedQty : 1}" min="1" max="${maxQty}" data-original-qty="${isPledged ? pledgedQty : 0}">
+                            <button type="button" class="qty-btn qty-plus" data-tier="${tier.id}">+</button>
+                          </div>
+                        ` : ''}
+                      </div>
+                    </label>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }
+      }
+      
+      if (isActive && supportItems.length > 0) {
+        const pledgedSupport = pledge.supportItems || [];
+        const stats = liveStats[pledge.campaignSlug] || {};
+        const liveSupportItems = stats.supportItems || {};
+        supportItemsHtml = `
+          <div class="pledge-card__support" id="support-section-${index}">
+            <h2>Support a Phase</h2>
+            <div class="support-options">
+              ${supportItems.map(item => {
+                // Use live stats if available, otherwise fall back to YAML current
+                const liveCurrentCents = liveSupportItems[item.id] || 0;
+                const liveCurrent = liveCurrentCents / 100;
+                const itemCurrent = liveCurrentCents > 0 ? liveCurrent : item.current;
+                const remaining = item.target - itemCurrent;
+                const currentAmount = pledgedSupport.find(s => s.id === item.id)?.amount || 0;
+                const progressPct = item.target > 0 ? Math.min(100, Math.round((itemCurrent / item.target) * 100)) : 0;
+                return `
+                  <div class="support-option-item ${currentAmount > 0 ? 'support-option-item--active' : ''}" data-support-id="${item.id}">
+                    <div class="support-option-item__info">
+                      <div class="support-option-item__header">
+                        <strong>${item.label}</strong>
+                        <span class="support-option-item__amount">${formatPrice(itemCurrent)} / ${formatPrice(item.target)}</span>
+                      </div>
+                      <div class="support-option-item__progress">
+                        <span style="width: ${progressPct}%"></span>
+                      </div>
+                      ${item.need ? `<p class="support-option-item__desc">${item.need}</p>` : ''}
+                    </div>
+                    <div class="support-option-item__input">
+                      <span class="input-prefix">$</span>
+                      <input type="number" 
+                        name="support-amount-${index}" 
+                        data-support-id="${item.id}"
+                        data-label="${item.label}"
+                        data-current="${currentAmount}"
+                        value="${currentAmount || ''}"
+                        placeholder="${remaining > 0 ? remaining : '0'}"
+                        min="0" 
+                        max="${remaining + currentAmount}"
+                        step="1"
+                        ${remaining <= 0 ? 'disabled' : ''}>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+      
+      // Custom amount / Support at your discretion
+      const currentCustomAmount = pledge.customAmount || 0;
+      if (isActive && (isLive || (isPost && allowsCustomLateSupport && campaignFunded))) {
+        customAmountHtml = `
+          <div class="pledge-card__support" id="custom-amount-section-${index}">
+            <h2>Support at Your Discretion</h2>
+            <div class="support-options">
+              <div class="support-option-item ${currentCustomAmount > 0 ? 'support-option-item--active' : ''}">
+                <div class="support-option-item__info">
+                  <p class="support-option-item__desc">Contribute any amount — no reward attached.</p>
+                </div>
+                <div class="support-option-item__input">
+                  <span class="input-prefix">$</span>
+                  <input type="number" 
+                    id="custom-amount-input-${index}" 
+                    name="custom-amount-${index}"
+                    data-current="${currentCustomAmount}"
+                    value="${currentCustomAmount || ''}"
+                    min="0" 
+                    step="1" 
+                    placeholder="25">
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      
+      if (isActive) {
+        actionsHtml = `
+          <div class="pledge-card__actions" id="actions-${index}">
+            <button class="btn btn--secondary" data-action="payment" data-index="${index}">Update Card</button>
+            <button class="btn" data-action="save" data-index="${index}" disabled>No Changes</button>
+          </div>
+          <div class="pledge-card__error" id="error-${index}" hidden></div>
+          <div class="pledge-card__footer" id="footer-${index}">
+            <div class="pledge-card__notice">
+              <p><strong>🤔 How pledging works:</strong> Your card will be stored securely but not charged now. You'll only be charged if the campaign reaches its goal.</p>
+            </div>
+            <button class="btn-text btn-text--danger" data-action="cancel" data-index="${index}">Cancel Pledge</button>
+          </div>
+          <div class="pledge-card__cancel-section" id="cancel-section-${index}" hidden>
+            <div class="cancel-section__warning">
+              <p><strong>Cancel your pledge?</strong></p>
+              <p>This action cannot be undone. Your payment method will not be charged.</p>
+            </div>
+            <div class="cancel-section__actions">
+              <button class="btn btn--secondary" data-action="cancel-back" data-index="${index}">Keep Pledge</button>
+              <button class="btn btn--danger" data-action="cancel-confirm" data-index="${index}">Confirm Cancellation</button>
+            </div>
+          </div>
+        `;
+      }
+      
+      let statusNotice = '';
+      if (isCharged) {
+        statusNotice = '<div class="pledge-card__charged"><p>This pledge has been successfully charged. Thank you for your support!</p></div>';
+      } else if (isCancelled) {
+        statusNotice = '<div class="pledge-card__cancelled"><p>This pledge has been cancelled.</p></div>';
+      }
+      
+      const hasLeftColumn = tiersHtml !== '';
+      const hasRightColumn = supportItemsHtml !== '' || customAmountHtml !== '';
+      const hasTwoColumns = hasLeftColumn && hasRightColumn;
+      
+      return `
+        <div class="pledge-card" data-pledge-index="${index}" data-original-amount="${pledge.amount}" data-current-tier="${currentTierId || ''}" data-current-tier-qty="${pledge.tierQty || 1}" data-campaign-slug="${campaign?.slug || pledge.campaignSlug}">
+          <div class="pledge-card__header">
+            <div class="pledge-card__header-top">
+              <a href="/campaigns/${pledge.campaignSlug}/" class="pledge-card__campaign">${campaign?.title || pledge.campaignSlug}</a>
+              <span class="pledge-card__status status--${pledge.pledgeStatus}">${pledge.pledgeStatus}</span>
+            </div>
+            ${renderCountdown(campaignWithLiveStats)}
+            ${renderProgressBar(campaignWithLiveStats)}
+          </div>
+          
+          ${hasTwoColumns ? `
+            <div class="pledge-card__columns">
+              <div class="pledge-card__column pledge-card__column--left">
+                ${tiersHtml}
+              </div>
+              <div class="pledge-card__column pledge-card__column--right">
+                ${supportItemsHtml}
+                ${customAmountHtml}
+              </div>
+            </div>
+          ` : `
+            ${tiersHtml}
+            ${supportItemsHtml}
+            ${customAmountHtml}
+          `}
+          
+          <div class="pledge-card__summary">
+            ${(() => {
+              const subtotal = getPledgeSubtotal(pledge);
+              const tax = calculateTax(subtotal);
+              const total = subtotal + tax;
+              return `
+                <div class="pledge-summary__row">
+                  <span class="label">Subtotal</span>
+                  <span class="value" id="subtotal-${index}">${formatMoney(subtotal)}</span>
+                </div>
+                <div class="pledge-summary__row pledge-summary__row--tax">
+                  <span class="label">ABQ Tax (7.875%)</span>
+                  <span class="value" id="tax-${index}">${formatMoney(tax)}</span>
+                </div>
+                <div class="pledge-summary__total">
+                  <span class="label">Total</span>
+                  <span class="value" id="amount-${index}">${formatMoney(total)}</span>
+                </div>
+              `;
+            })()}
+            <div class="pledge-summary__change" id="change-${index}" hidden>
+              <span id="change-direction-${index}"></span>
+              <span id="change-amount-${index}"></span>
+            </div>
+          </div>
+          
+          ${actionsHtml}
+          ${statusNotice}
+        </div>
+      `;
+    }
+    
+    function setupPledgeActions(pledge, campaign, index) {
+      const card = document.querySelector(`[data-pledge-index="${index}"]`);
+      if (!card) return;
+      
+      const isSingleTier = campaign?.single_tier_only === true;
+      const currentTierId = pledge.tierId?.split('__').pop();
+      const currentCustomAmountVal = pledge.customAmount || 0;
+      let selectedTierId = currentTierId;
+      let selectedSupportItems = [];
+      let selectedCustomAmount = currentCustomAmountVal;
+      
+      let selectedTierQty = pledge.tierQty || 1;
+      
+      // Initialize selectedAddTiers with currently pledged tiers (multi-tier mode)
+      // Track orderId for merged pledges so we know which order each tier came from
+      let selectedAddTiers = [];
+      const primaryOrderId = pledge.orderIds ? pledge.orderIds[0] : pledge.orderId;
+      
+      if (!isSingleTier) {
+        const tiers = campaign?.tiers || [];
+        // Add main tier if exists
+        if (currentTierId) {
+          const tier = tiers.find(t => t.id === currentTierId);
+          if (tier) {
+            selectedAddTiers.push({
+              id: currentTierId,
+              price: tier.price,
+              qty: pledge.tierQty || 1,
+              pledgedQty: pledge.tierQty || 1,
+              isPledged: true,
+              orderId: primaryOrderId // Main tier belongs to primary order
+            });
+          }
+        }
+        // Add additional tiers (may come from different orders in merged pledges)
+        if (pledge.additionalTiers) {
+          for (const addTier of pledge.additionalTiers) {
+            const tier = tiers.find(t => t.id === addTier.id);
+            if (tier) {
+              selectedAddTiers.push({
+                id: addTier.id,
+                price: tier.price,
+                qty: addTier.qty || 1,
+                pledgedQty: addTier.qty || 1,
+                isPledged: true,
+                orderId: addTier.orderId || primaryOrderId // Track which order this tier came from
+              });
+            }
+          }
+        }
+      }
+      
+      // Keep a copy of original tiers for comparison when saving
+      const originalTiers = selectedAddTiers.map(t => ({ ...t }));
+      
+      // Tier selection handlers
+      if (isSingleTier) {
+        card.querySelectorAll(`input[name="tier-${index}"]`).forEach(input => {
+          input.addEventListener('change', (e) => {
+            card.querySelectorAll('.tier-option').forEach(opt => {
+              if (opt.querySelector(`input[name="tier-${index}"]`)) {
+                opt.classList.remove('tier-option--selected');
+              }
+            });
+            e.target.closest('.tier-option').classList.add('tier-option--selected');
+            
+            selectedTierId = e.target.value;
+            // Reset qty to 1 when tier changes
+            const qtyInput = card.querySelector(`.qty-input[data-tier="${selectedTierId}"]`);
+            if (qtyInput) {
+              selectedTierQty = parseInt(qtyInput.value) || 1;
+            } else {
+              selectedTierQty = 1;
+            }
+            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount);
+          });
+        });
+        
+        // Auto-select tier when interacting with its quantity controls
+        function selectTierById(tierId) {
+          const radio = card.querySelector(`input[name="tier-${index}"][value="${tierId}"]`);
+          if (radio && !radio.checked && !radio.disabled) {
+            radio.checked = true;
+            card.querySelectorAll('.tier-option').forEach(opt => {
+              if (opt.querySelector(`input[name="tier-${index}"]`)) {
+                opt.classList.remove('tier-option--selected');
+              }
+            });
+            radio.closest('.tier-option').classList.add('tier-option--selected');
+            selectedTierId = tierId;
+          }
+        }
+        
+        // Quantity button handlers for single-tier mode
+        card.querySelectorAll('.qty-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const tierId = e.target.dataset.tier;
+            selectTierById(tierId);
+            
+            const input = card.querySelector(`.qty-input[data-tier="${tierId}"]`);
+            const max = parseInt(input.max) || 10;
+            let val = parseInt(input.value) || 1;
+            
+            if (e.target.classList.contains('qty-minus') && val > 1) {
+              input.value = val - 1;
+            } else if (e.target.classList.contains('qty-plus') && val < max) {
+              input.value = val + 1;
+            }
+            
+            selectedTierQty = parseInt(input.value) || 1;
+            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount);
+          });
+        });
+        
+        card.querySelectorAll('.qty-input').forEach(input => {
+          input.addEventListener('click', (e) => e.stopPropagation());
+          input.addEventListener('change', (e) => {
+            const tierId = e.target.dataset.tier;
+            const max = parseInt(e.target.max) || 10;
+            let val = parseInt(e.target.value) || 1;
+            
+            // Clamp value to valid range
+            if (val < 1) val = 1;
+            if (val > max) {
+              val = max;
+              alert(`Only ${max} available for this tier.`);
+            }
+            e.target.value = val;
+            
+            selectTierById(tierId);
+            selectedTierQty = val;
+            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount);
+          });
+        });
+      } else {
+        card.querySelectorAll(`input[name="add-tier-${index}"]:not(:disabled)`).forEach(input => {
+          input.addEventListener('change', (e) => {
+            const tierOption = e.target.closest('.tier-option');
+            const qtyContainer = tierOption.querySelector('.tier-option__quantity');
+            
+            if (e.target.checked) {
+              tierOption.classList.add('tier-option--selected');
+              if (qtyContainer) qtyContainer.hidden = false;
+            } else {
+              tierOption.classList.remove('tier-option--selected');
+              if (qtyContainer) qtyContainer.hidden = true;
+            }
+            
+            recalculateAddTiers();
+          });
+        });
+        
+        // Auto-check tier when quantity changes
+        function autoCheckTier(tierId) {
+          const checkbox = card.querySelector(`input[name="add-tier-${index}"][value="${tierId}"]`);
+          if (checkbox && !checkbox.checked) {
+            checkbox.checked = true;
+            checkbox.closest('.tier-option').classList.add('tier-option--selected');
+          }
+        }
+        
+        // Quantity button handlers
+        card.querySelectorAll('.qty-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const tierId = e.target.dataset.tier;
+            const input = card.querySelector(`.qty-input[data-tier="${tierId}"]`);
+            const max = parseInt(input.max) || 10;
+            let val = parseInt(input.value) || 1;
+            
+            if (e.target.classList.contains('qty-minus') && val > 1) {
+              input.value = val - 1;
+            } else if (e.target.classList.contains('qty-plus') && val < max) {
+              input.value = val + 1;
+            }
+            
+            autoCheckTier(tierId);
+            recalculateAddTiers();
+          });
+        });
+        
+        card.querySelectorAll('.qty-input').forEach(input => {
+          input.addEventListener('click', (e) => e.stopPropagation());
+          input.addEventListener('change', (e) => {
+            const tierId = e.target.dataset.tier;
+            const max = parseInt(e.target.max) || 10;
+            let val = parseInt(e.target.value) || 1;
+            
+            // Clamp value to valid range
+            if (val < 1) val = 1;
+            if (val > max) {
+              val = max;
+              alert(`Only ${max} available for this tier.`);
+            }
+            e.target.value = val;
+            
+            autoCheckTier(tierId);
+            recalculateAddTiers();
+          });
+        });
+        
+        function recalculateAddTiers() {
+          selectedAddTiers = Array.from(card.querySelectorAll(`input[name="add-tier-${index}"]:checked`))
+            .map(cb => {
+              const tierId = cb.value;
+              const price = parseFloat(cb.dataset.price);
+              const isStackable = cb.dataset.stackable === 'true';
+              const isPledged = cb.dataset.pledged === 'true';
+              const pledgedQty = parseInt(cb.dataset.pledgedQty) || 0;
+              let qty = 1;
+              if (isStackable) {
+                const qtyInput = card.querySelector(`.qty-input[data-tier="${tierId}"]`);
+                qty = qtyInput ? parseInt(qtyInput.value) || 1 : 1;
+              }
+              return { id: tierId, price, qty, pledgedQty, isPledged };
+            });
+          updatePledgeSummary(index, pledge, campaign, null, selectedAddTiers, selectedSupportItems, selectedCustomAmount);
+        }
+      }
+      
+      // Support item handlers - track changes from current amounts
+      card.querySelectorAll(`input[name="support-amount-${index}"]`).forEach(input => {
+        input.addEventListener('input', (e) => {
+          const newVal = parseFloat(e.target.value) || 0;
+          const currentVal = parseFloat(e.target.dataset.current) || 0;
+          
+          if (newVal > 0 || currentVal > 0) {
+            e.target.closest('.support-option-item').classList.add('support-option-item--active');
+          } else {
+            e.target.closest('.support-option-item').classList.remove('support-option-item--active');
+          }
+          
+          // Track all support items with changes (new amount differs from current)
+          selectedSupportItems = Array.from(card.querySelectorAll(`input[name="support-amount-${index}"]`))
+            .filter(inp => {
+              const newAmt = parseFloat(inp.value) || 0;
+              const curAmt = parseFloat(inp.dataset.current) || 0;
+              return newAmt !== curAmt && newAmt > 0;
+            })
+            .map(inp => ({ 
+              id: inp.dataset.supportId, 
+              label: inp.dataset.label, 
+              amount: parseFloat(inp.value),
+              currentAmount: parseFloat(inp.dataset.current) || 0
+            }));
+          
+          if (isSingleTier) {
+            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount);
+          } else {
+            updatePledgeSummary(index, pledge, campaign, null, selectedAddTiers, selectedSupportItems, selectedCustomAmount);
+          }
+        });
+      });
+      
+      // Custom amount handler - input value is the NEW total custom amount
+      const customAmountInput = card.querySelector(`input[name="custom-amount-${index}"]`);
+      if (customAmountInput) {
+        customAmountInput.addEventListener('input', (e) => {
+          const newVal = parseFloat(e.target.value) || 0;
+          selectedCustomAmount = newVal;
+          
+          // Update active state
+          if (newVal > 0 || currentCustomAmountVal > 0) {
+            e.target.closest('.support-option-item').classList.add('support-option-item--active');
+          } else {
+            e.target.closest('.support-option-item').classList.remove('support-option-item--active');
+          }
+          
+          if (isSingleTier) {
+            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal);
+          } else {
+            updatePledgeSummary(index, pledge, campaign, null, selectedAddTiers, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal);
+          }
+        });
+      }
+      
+      // Action button handlers
+      card.querySelector('[data-action="cancel"]')?.addEventListener('click', () => {
+        document.getElementById(`footer-${index}`).hidden = true;
+        document.getElementById(`actions-${index}`).hidden = true;
+        document.getElementById(`cancel-section-${index}`).hidden = false;
+      });
+      
+      card.querySelector('[data-action="cancel-back"]')?.addEventListener('click', () => {
+        document.getElementById(`cancel-section-${index}`).hidden = true;
+        document.getElementById(`footer-${index}`).hidden = false;
+        document.getElementById(`actions-${index}`).hidden = false;
+      });
+      
+      card.querySelector('[data-action="cancel-confirm"]')?.addEventListener('click', async (e) => {
+        const btn = e.target;
+        btn.disabled = true;
+        btn.textContent = 'Cancelling...';
+        
+        if (isDevMode) {
+          await new Promise(r => setTimeout(r, 500));
+          alert('DEV MODE: Pledge cancelled (simulated)');
+          window.location.reload();
+          return;
+        }
+        
+        try {
+          // Handle merged pledges with multiple orderIds
+          const orderIds = pledge.orderIds || [pledge.orderId];
+          
+          // Cancel all pledges in parallel
+          const results = await Promise.all(orderIds.map(orderId =>
+            fetch(`${WORKER_BASE}/pledge/cancel`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: currentToken, orderId })
+            })
+          ));
+          
+          const failed = results.filter(r => !r.ok);
+          if (failed.length > 0) throw new Error(`Failed to cancel ${failed.length} pledge(s)`);
+          
+          window.location.reload();
+        } catch (err) {
+          alert('Error: ' + err.message);
+          btn.disabled = false;
+          btn.textContent = 'Confirm Cancellation';
+        }
+      });
+      
+      card.querySelector('[data-action="payment"]')?.addEventListener('click', async () => {
+        if (isDevMode) {
+          alert('DEV MODE: Would redirect to payment update page');
+          return;
+        }
+        
+        try {
+          const res = await fetch(`${WORKER_BASE}/pledge/payment-method/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: currentToken })
+          });
+          if (!res.ok) throw new Error('Failed to start payment update');
+          const { url } = await res.json();
+          window.location.href = url;
+        } catch (err) {
+          alert('Error: ' + err.message);
+        }
+      });
+      
+      card.querySelector('[data-action="save"]')?.addEventListener('click', (e) => {
+        const btn = e.target;
+        const errorEl = document.getElementById(`error-${index}`);
+        const currentQty = pledge.tierQty || 1;
+        
+        // Build confirmation details
+        let detailsHtml = '';
+        // Use subtotal (pre-tax) as the base for calculations
+        const originalSubtotal = getPledgeSubtotal(pledge);
+        let newSubtotal = originalSubtotal;
+        
+        // Determine what's changing
+        const tierChanged = isSingleTier && selectedTierId !== currentTierId;
+        const qtyChanged = isSingleTier && selectedTierQty !== currentQty;
+        const hasAddedTiers = !isSingleTier && selectedAddTiers.length > 0;
+        const hasSupportChanges = selectedSupportItems.length > 0;
+        const hasCustomAmountChange = selectedCustomAmount !== currentCustomAmountVal;
+        
+        if (isSingleTier && (tierChanged || qtyChanged)) {
+          const newTier = campaign.tiers.find(t => t.id === selectedTierId);
+          const oldTier = campaign.tiers.find(t => t.id === currentTierId);
+          // Calculate the tier diff
+          const oldTierAmount = (oldTier?.price || 0) * currentQty * 100;
+          const newTierAmount = newTier.price * selectedTierQty * 100;
+          const tierDiff = newTierAmount - oldTierAmount;
+          newSubtotal = originalSubtotal + tierDiff;
+          
+          detailsHtml = `
+            <p><strong>Updating pledge</strong></p>
+            <p>From: ${oldTier?.name || 'Unknown'} × ${currentQty} (${formatMoney(oldTierAmount)})</p>
+            <p>To: ${newTier?.name} × ${selectedTierQty} (${formatMoney(newTierAmount)})</p>
+          `;
+        } else if (!isSingleTier) {
+          // Multi-tier mode: calculate diff from original pledged tiers
+          // Get all originally pledged tier IDs and quantities
+          const originalTiers = {};
+          if (currentTierId) {
+            originalTiers[currentTierId] = currentQty;
+          }
+          if (pledge.additionalTiers) {
+            pledge.additionalTiers.forEach(t => {
+              originalTiers[t.id] = t.qty || 1;
+            });
+          }
+          
+          // Calculate old total from original tiers
+          let oldTiersAmount = 0;
+          for (const [tierId, qty] of Object.entries(originalTiers)) {
+            const tier = campaign.tiers.find(t => t.id === tierId);
+            if (tier) oldTiersAmount += tier.price * qty * 100;
+          }
+          
+          // Calculate new total from selected tiers
+          const newTiersAmount = selectedAddTiers.reduce((sum, t) => sum + (t.price * (t.qty || 1) * 100), 0);
+          const tierDiff = newTiersAmount - oldTiersAmount;
+          newSubtotal = originalSubtotal + tierDiff;
+          
+          if (selectedAddTiers.length > 0) {
+            detailsHtml = `
+              <p><strong>Updated tiers</strong></p>
+              <ul>${selectedAddTiers.map(t => {
+                const tier = campaign.tiers.find(tier => tier.id === t.id);
+                return `<li>${tier?.name || t.id} × ${t.qty || 1} = ${formatMoney(t.price * (t.qty || 1) * 100)}</li>`;
+              }).join('')}</ul>
+            `;
+          } else {
+            detailsHtml = `<p><strong>All tiers removed</strong></p>`;
+          }
+        }
+        
+        if (hasSupportChanges) {
+          const supportDiff = selectedSupportItems.reduce((sum, s) => {
+            return sum + ((s.amount - (s.currentAmount || 0)) * 100);
+          }, 0);
+          newSubtotal += supportDiff;
+          detailsHtml += `
+            <p><strong>Support item changes</strong></p>
+            <ul>${selectedSupportItems.map(s => {
+              const diff = s.amount - (s.currentAmount || 0);
+              const diffStr = diff >= 0 ? `+${formatMoney(diff * 100)}` : formatMoney(diff * 100);
+              return `<li>${s.label}: ${formatMoney((s.currentAmount || 0) * 100)} → ${formatMoney(s.amount * 100)} (${diffStr})</li>`;
+            }).join('')}</ul>
+          `;
+        }
+        
+        if (hasCustomAmountChange) {
+          const customDiff = (selectedCustomAmount - currentCustomAmountVal) * 100;
+          newSubtotal += customDiff;
+          const customDiffStr = customDiff >= 0 ? `+${formatMoney(customDiff)}` : formatMoney(customDiff);
+          detailsHtml += `
+            <p><strong>Custom support</strong></p>
+            <p>${formatMoney(currentCustomAmountVal * 100)} → ${formatMoney(selectedCustomAmount * 100)} (${customDiffStr})</p>
+          `;
+        }
+        
+        const newTax = calculateTax(newSubtotal);
+        const newTotalWithTax = newSubtotal + newTax;
+        detailsHtml += `
+          <p class="confirm-totals">
+            <span>Subtotal: ${formatMoney(newSubtotal)}</span>
+            <span>ABQ Tax (7.875%): ${formatMoney(newTax)}</span>
+            <strong>Total: ${formatMoney(newTotalWithTax)}</strong>
+          </p>
+        `;
+        
+        showConfirmModal(
+          'Are you sure you want to update your pledge?',
+          detailsHtml,
+          async () => {
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            errorEl.hidden = true;
+            
+            if (isDevMode) {
+              await new Promise(r => setTimeout(r, 500));
+              // Update the pledge data in dev mode
+              pledge.subtotal = newSubtotal;
+              pledge.tax = newTax;
+              pledge.amount = newTotalWithTax;
+              if (isSingleTier) {
+                pledge.tierId = selectedTierId;
+                pledge.tierQty = selectedTierQty;
+              } else if (hasAddedTiers) {
+                // For multi-tier mode, update the main tier and additional tiers
+                // First tier becomes the main tier, rest become additionalTiers
+                const allTiers = selectedAddTiers.map(t => ({ id: t.id, qty: t.qty || 1 }));
+                if (allTiers.length > 0) {
+                  pledge.tierId = allTiers[0].id;
+                  pledge.tierQty = allTiers[0].qty;
+                  pledge.additionalTiers = allTiers.slice(1);
+                }
+              }
+              if (hasCustomAmountChange) {
+                pledge.customAmount = selectedCustomAmount;
+              }
+              if (hasSupportChanges) {
+                pledge.supportItems = selectedSupportItems.map(s => ({ id: s.id, amount: s.amount }));
+              }
+              alert('DEV MODE: Changes saved (simulated)\nNew total: ' + formatMoney(newTotalWithTax));
+              // Re-render instead of reload to show updated values
+              renderPledges();
+              return;
+            }
+            
+            try {
+              // For merged pledges, handle tiers from different orders
+              const primaryOrderId = pledge.orderIds ? pledge.orderIds[0] : pledge.orderId;
+              const isMergedPledge = pledge.orderIds && pledge.orderIds.length > 1;
+              
+              if (isMergedPledge && !isSingleTier) {
+                // Find which orders need to be cancelled (tiers completely removed from other orders)
+                // and which tiers go to the primary order
+                const selectedTierIds = new Set(selectedAddTiers.map(t => t.id));
+                const ordersToCancel = new Set();
+                const primaryTiers = [];
+                
+                // Check each original tier
+                for (const origTier of originalTiers) {
+                  const stillSelected = selectedAddTiers.find(t => t.id === origTier.id);
+                  
+                  if (!stillSelected) {
+                    // Tier was removed - if it's from another order, cancel that order
+                    if (origTier.orderId && origTier.orderId !== primaryOrderId) {
+                      ordersToCancel.add(origTier.orderId);
+                    }
+                  } else if (origTier.orderId === primaryOrderId || !origTier.orderId) {
+                    // Tier from primary order - include in modify request
+                    primaryTiers.push(stillSelected);
+                  } else {
+                    // Tier from another order that's still selected - keep it (no action needed)
+                    // But we also need to add it to primary if qty changed
+                    const qtyChanged = stillSelected.qty !== origTier.pledgedQty;
+                    if (qtyChanged) {
+                      // For now, quantity changes on non-primary tiers are complex
+                      // Just include it in primary order update
+                      primaryTiers.push(stillSelected);
+                    }
+                  }
+                }
+                
+                // Add any new tiers (not in originalTiers) to primary order
+                for (const selTier of selectedAddTiers) {
+                  const wasOriginal = originalTiers.find(t => t.id === selTier.id);
+                  if (!wasOriginal) {
+                    primaryTiers.push(selTier);
+                  }
+                }
+                
+                // Cancel orders that had tiers completely removed
+                if (ordersToCancel.size > 0) {
+                  const cancelResults = await Promise.all(
+                    [...ordersToCancel].map(orderId =>
+                      fetch(`${WORKER_BASE}/pledge/cancel`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token: currentToken, orderId })
+                      })
+                    )
+                  );
+                  const failed = cancelResults.filter(r => !r.ok);
+                  if (failed.length > 0) {
+                    throw new Error(`Failed to remove ${failed.length} tier(s)`);
+                  }
+                }
+                
+                // Always modify primary order to trigger the update email
+                // Even if only cancelling secondary orders, we want the user notified
+                const hasAnyChanges = primaryTiers.length > 0 || hasSupportChanges || hasCustomAmountChange || ordersToCancel.size > 0;
+                if (hasAnyChanges) {
+                  const res = await fetch(`${WORKER_BASE}/pledge/modify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                      token: currentToken, 
+                      orderId: primaryOrderId,
+                      addTiers: primaryTiers.length > 0 ? primaryTiers : null,
+                      supportItems: hasSupportChanges ? selectedSupportItems : null,
+                      customAmount: hasCustomAmountChange ? selectedCustomAmount : null
+                    })
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || 'Failed to update pledge');
+                }
+              } else {
+                // Single order or single-tier mode - simple modify
+                const res = await fetch(`${WORKER_BASE}/pledge/modify`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    token: currentToken, 
+                    orderId: primaryOrderId,
+                    newTierId: isSingleTier ? selectedTierId : null,
+                    newTierQty: isSingleTier ? selectedTierQty : null,
+                    addTiers: !isSingleTier ? selectedAddTiers : null,
+                    supportItems: hasSupportChanges ? selectedSupportItems : null,
+                    customAmount: hasCustomAmountChange ? selectedCustomAmount : null
+                  })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to update pledge');
+              }
+              
+              btn.textContent = 'Saved!';
+              setTimeout(() => window.location.reload(), 500);
+            } catch (err) {
+              errorEl.textContent = err.message;
+              errorEl.hidden = false;
+              btn.disabled = false;
+              btn.textContent = 'Save Changes';
+            }
+          }
+        );
+      });
+    }
+    
+    // For single-tier mode: tierIdOrAddedTiers is the selected tier ID, tierQtyOrSupportItems is the quantity
+    // For multi-tier mode: tierIdOrAddedTiers is null, tierQtyOrSupportItems is addedTiers array
+    function updatePledgeSummary(index, pledge, campaign, tierIdOrAddedTiers, tierQtyOrSupportItems, supportItems, customAmount = 0, currentCustomAmount = 0) {
+      const amountEl = document.getElementById(`amount-${index}`);
+      const changeEl = document.getElementById(`change-${index}`);
+      const directionEl = document.getElementById(`change-direction-${index}`);
+      const changeAmountEl = document.getElementById(`change-amount-${index}`);
+      const saveBtn = document.querySelector(`[data-action="save"][data-index="${index}"]`);
+      
+      // Use subtotal (without tax) as the baseline for calculations
+      const originalSubtotal = getPledgeSubtotal(pledge);
+      const currentTierId = pledge.tierId?.split('__').pop();
+      const currentTierQty = pledge.tierQty || 1;
+      const pledgeCurrentCustomAmount = pledge.customAmount || 0;
+      const isSingleTier = campaign?.single_tier_only === true;
+      const tiers = campaign?.tiers || [];
+      
+      let newSubtotal = originalSubtotal;
+      let hasChanges = false;
+      
+      if (isSingleTier) {
+        // Single-tier mode: tierIdOrAddedTiers = newTierId, tierQtyOrSupportItems = newQty
+        const newTierId = tierIdOrAddedTiers;
+        const newQty = tierQtyOrSupportItems || 1;
+        const newTier = tiers.find(t => t.id === newTierId);
+        const oldTier = tiers.find(t => t.id === currentTierId);
+        
+        if (newTierId !== currentTierId || newQty !== currentTierQty) {
+          // Calculate tier diff instead of replacing total
+          const oldTierAmount = (oldTier?.price || 0) * currentTierQty * 100;
+          const newTierAmount = (newTier?.price || 0) * newQty * 100;
+          const tierDiff = newTierAmount - oldTierAmount;
+          newSubtotal = originalSubtotal + tierDiff;
+          hasChanges = true;
+        }
+      } else {
+        // Multi-tier mode: tierIdOrAddedTiers = null, tierQtyOrSupportItems = addedTiers array
+        // Calculate diff from original pledged tiers
+        const addedTiers = Array.isArray(tierQtyOrSupportItems) ? tierQtyOrSupportItems : [];
+        let tierDiff = 0;
+        
+        // For each tier currently checked, calculate the diff from original pledged qty
+        for (const t of addedTiers) {
+          const newAmount = t.price * (t.qty || 1) * 100;
+          const originalAmount = t.isPledged ? t.price * t.pledgedQty * 100 : 0;
+          tierDiff += newAmount - originalAmount;
+        }
+        
+        // Also check for unchecked tiers that were originally pledged (removed tiers)
+        const allPledgedTierIds = [];
+        if (currentTierId) allPledgedTierIds.push(currentTierId);
+        if (pledge.additionalTiers) {
+          pledge.additionalTiers.forEach(t => allPledgedTierIds.push(t.id));
+        }
+        
+        for (const pledgedId of allPledgedTierIds) {
+          const stillChecked = addedTiers.find(t => t.id === pledgedId);
+          if (!stillChecked) {
+            // Tier was unchecked, subtract its original amount
+            const tier = tiers.find(t => t.id === pledgedId);
+            if (tier) {
+              const originalQty = pledgedId === currentTierId ? currentTierQty : 
+                (pledge.additionalTiers?.find(t => t.id === pledgedId)?.qty || 1);
+              tierDiff -= tier.price * originalQty * 100;
+            }
+          }
+        }
+        
+        if (tierDiff !== 0) {
+          newSubtotal = originalSubtotal + tierDiff;
+          hasChanges = true;
+        }
+      }
+      
+      // Support items - calculate diff from current amounts
+      if (supportItems && supportItems.length > 0) {
+        const supportDiff = supportItems.reduce((sum, s) => {
+          const newAmt = (s.amount || 0) * 100;
+          const curAmt = (s.currentAmount || 0) * 100;
+          return sum + (newAmt - curAmt);
+        }, 0);
+        newSubtotal += supportDiff;
+        hasChanges = true;
+      }
+      
+      // Custom amount support - calculate diff from current
+      const customDiff = (customAmount - pledgeCurrentCustomAmount) * 100;
+      if (customDiff !== 0) {
+        newSubtotal += customDiff;
+        hasChanges = true;
+      }
+      
+      // Update subtotal, tax, and total displays
+      const subtotalEl = document.getElementById(`subtotal-${index}`);
+      const taxEl = document.getElementById(`tax-${index}`);
+      const newTax = calculateTax(newSubtotal);
+      const newTotalWithTax = newSubtotal + newTax;
+      
+      subtotalEl.textContent = formatMoney(newSubtotal);
+      taxEl.textContent = formatMoney(newTax);
+      amountEl.textContent = formatMoney(newTotalWithTax);
+      
+      const diff = newSubtotal - originalSubtotal;
+      const diffWithTax = diff + calculateTax(diff);
+      if (diff > 0) {
+        changeEl.hidden = false;
+        directionEl.textContent = 'Increase:';
+        changeAmountEl.textContent = '+' + formatMoney(diffWithTax) + ' (incl. tax)';
+        changeAmountEl.className = 'change-up';
+      } else if (diff < 0) {
+        changeEl.hidden = false;
+        directionEl.textContent = 'Decrease:';
+        changeAmountEl.textContent = formatMoney(diffWithTax) + ' (incl. tax)';
+        changeAmountEl.className = 'change-down';
+      } else {
+        changeEl.hidden = true;
+        directionEl.textContent = '';
+        changeAmountEl.textContent = '';
+        changeAmountEl.className = '';
+      }
+      
+      saveBtn.disabled = !hasChanges;
+      saveBtn.textContent = hasChanges ? 'Save Changes' : 'No Changes';
+    }
+    
+    init();
+  </script>
+</body>
+</html>

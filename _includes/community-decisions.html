@@ -1,0 +1,37 @@
+{% if include.decisions %}
+<section class="community-decisions" id="community-decisions">
+  <h3>Community Decisions</h3>
+  
+  <div class="decisions-grid">
+    {% for decision in include.decisions %}
+      <form class="decision-card" data-decision="{{ decision.id }}">
+        <h4>{{ decision.type | capitalize }}: {{ decision.title }}</h4>
+        
+        <div class="decision-options">
+          {% for option in decision.options %}
+            <label class="decision-option">
+              <input type="radio" 
+                     name="{{ decision.id }}" 
+                     value="{{ option }}"
+                     {% if decision.status == 'closed' %}disabled{% endif %}>
+              <span>{{ option }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        
+        <button type="button" 
+                class="btn btn--block" 
+                data-action="submit-{{ decision.type }}"
+                {% if decision.status == 'closed' %}disabled{% endif %}>
+          Submit {{ decision.type | capitalize }}
+        </button>
+        
+        <p class="decision-meta">
+          {{ decision.eligible | capitalize }} only
+          {% if decision.status == 'closed' %} · Closed{% endif %}
+        </p>
+      </form>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}

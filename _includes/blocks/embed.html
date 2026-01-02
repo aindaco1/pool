@@ -1,0 +1,9 @@
+{% assign block = include.block %}
+<figure class="content-block content-block--embed">
+  <div class="embed-container">
+    {{ block.html }}
+  </div>
+  {% if block.caption %}
+    <figcaption class="content-block__caption">{{ block.caption }}</figcaption>
+  {% endif %}
+</figure>

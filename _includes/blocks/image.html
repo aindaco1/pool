@@ -1,0 +1,12 @@
+{% assign block = include.block %}
+<figure class="content-block content-block--image">
+  <img 
+    src="{{ block.src }}" 
+    alt="{{ block.alt | default: '' }}"
+    loading="lazy"
+    {% if block.width %}width="{{ block.width }}"{% endif %}
+    {% if block.height %}height="{{ block.height }}"{% endif %}>
+  {% if block.caption %}
+    <figcaption class="content-block__caption">{{ block.caption }}</figcaption>
+  {% endif %}
+</figure>

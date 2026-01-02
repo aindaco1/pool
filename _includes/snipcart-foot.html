@@ -1,0 +1,48 @@
+<script>
+  window.POOL_CONFIG = {
+    workerBase: '{{ site.worker_base }}'
+  };
+</script>
+<div hidden id="snipcart" data-api-key="{{ site.snipcart_api_key }}" data-config-modal-style="side">
+</div>
+<script async src="https://cdn.snipcart.com/themes/v3.6.1/default/snipcart.js"></script>
+<script>
+document.addEventListener('snipcart.ready', function() {
+  var style = document.createElement('style');
+  style.textContent = '.snipcart-cart-summary-expanded-item__custom-fields { display: none !important; }';
+  document.head.appendChild(style);
+  
+  // Mark non-stackable items with data-stackable="false" for CSS
+  function markStackableItems() {
+    var state = Snipcart.store.getState();
+    if (!state || !state.cart || !state.cart.items) return;
+    var items = state.cart.items.items || [];
+    
+    document.querySelectorAll('.snipcart-item-line').forEach(function(line) {
+      var titleEl = line.querySelector('.snipcart-item-line__title');
+      if (!titleEl) return;
+      
+      var itemName = titleEl.textContent.trim();
+      var item = items.find(function(i) { return i.name === itemName; });
+      if (!item) return;
+      
+      // Check _stackable custom field
+      var stackableField = (item.customFields || []).find(function(f) { 
+        return f.name === '_stackable'; 
+      });
+      var isStackable = stackableField ? stackableField.value === 'true' : true;
+      line.setAttribute('data-stackable', isStackable ? 'true' : 'false');
+    });
+  }
+  
+  // Run when cart content changes
+  Snipcart.store.subscribe(function() {
+    requestAnimationFrame(markStackableItems);
+  });
+});
+</script>
+<script src="/assets/js/snipcart-debug.js" defer></script>
+<script src="/assets/js/checkout-autofill.js" defer></script>
+<script src="/assets/js/cart.js" defer></script>
+<script src="/assets/js/buy-buttons.js" defer></script>
+<script src="/assets/js/campaign.js" defer></script>

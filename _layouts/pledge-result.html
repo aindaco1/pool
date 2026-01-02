@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="/assets/images/defaults/favicon.png">
+  {% include snipcart-head.html %}
+  <title>{{ page.title }} · {{ site.title }}</title>
+</head>
+<body>
+  {% include header.html hide_cart=true %}
+
+  <main class="pledge-result">
+    {{ content }}
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__content">
+      <a href="/" class="site-footer__logo">
+        <img src="/assets/images/defaults/dust-wave-square.png" alt="Dust Wave">
+      </a>
+      <div class="site-footer__copyright">
+        <span>(ɔ) {{ 'now' | date: "%Y" }} DUST WAVE</span>
+      </div>
+    </div>
+  </footer>
+
+  {% include snipcart-foot.html %}
+</body>
+</html>

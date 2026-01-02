@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="/assets/images/defaults/favicon.png">
+  {% include snipcart-head.html %}
+  <title>{{ page.title }} · {{ site.title }}</title>
+</head>
+<body>
+  {% include header.html %}
+
+  <main class="campaign-container" data-campaign-slug="{{ page.slug }}" data-single-tier-only="{{ page.single_tier_only | default: false }}">
+    {% if page.campaign_background %}
+    <div class="campaign-background" style="background-image: url('{{ page.campaign_background }}');"></div>
+    {% endif %}
+    <header class="campaign-header">
+      <h1>{{ page.title }}</h1>
+      {% if page.short_blurb %}
+        <p class="campaign-blurb">{{ page.short_blurb }}</p>
+      {% endif %}
+      {% if page.goal_deadline %}
+      {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
+      <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-state="{{ page.state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}">
+        <h2 class="campaign-countdown__heading">{% if page.state == "upcoming" %}Starts in{% elsif page.state == "live" %}Ends in{% endif %}</h2>
+        <div class="flip-countdown">
+          <div class="flip-countdown__group">
+            <div class="flip-card" data-unit="days">
+              <span class="flip-card__value">00</span>
+            </div>
+            <span class="flip-countdown__label">Days</span>
+          </div>
+          <div class="flip-countdown__separator">:</div>
+          <div class="flip-countdown__group">
+            <div class="flip-card" data-unit="hours">
+              <span class="flip-card__value">00</span>
+            </div>
+            <span class="flip-countdown__label">Hours</span>
+          </div>
+          <div class="flip-countdown__separator">:</div>
+          <div class="flip-countdown__group">
+            <div class="flip-card" data-unit="mins">
+              <span class="flip-card__value">00</span>
+            </div>
+            <span class="flip-countdown__label">Minutes</span>
+          </div>
+          <div class="flip-countdown__separator">:</div>
+          <div class="flip-countdown__group">
+            <div class="flip-card" data-unit="secs">
+              <span class="flip-card__value">00</span>
+            </div>
+            <span class="flip-countdown__label">Seconds</span>
+          </div>
+        </div>
+        <div class="campaign-countdown__message"></div>
+      </div>
+      <script>
+      (function() {
+        var el = document.getElementById('campaign-countdown');
+        if (!el) return;
+        var deadlineStr = el.getAttribute('data-deadline');
+        var startStr = el.getAttribute('data-start');
+        var state = el.getAttribute('data-state');
+        var goalMet = el.getAttribute('data-goal-met') === 'true';
+        var messageEl = el.querySelector('.campaign-countdown__message');
+        
+        // For upcoming: count to midnight START of start_date (00:00:00 MT)
+        // For live: count to end of deadline (23:59:59 MT)
+        // Mountain Time: UTC-7 (MST) or UTC-6 (MDT)
+        
+        function isMountainDST(date) {
+          var year = date.getFullYear();
+          // DST starts: 2nd Sunday in March at 2:00 AM
+          var mar1 = new Date(year, 2, 1);
+          var dstStart = new Date(year, 2, 8 + (7 - mar1.getDay()) % 7, 2, 0, 0);
+          // DST ends: 1st Sunday in November at 2:00 AM
+          var nov1 = new Date(year, 10, 1);
+          var dstEnd = new Date(year, 10, 1 + (7 - nov1.getDay()) % 7, 2, 0, 0);
+          return date >= dstStart && date < dstEnd;
+        }
+        
+        function getMTOffset(dateStr, timeStr) {
+          var testDate = new Date(dateStr + 'T' + timeStr + 'Z');
+          return isMountainDST(testDate) ? '-06:00' : '-07:00';
+        }
+        
+        var targetDate;
+        if (state === 'upcoming' && startStr) {
+          // Midnight MT start of start_date
+          var offset = getMTOffset(startStr, '07:00:00');
+          targetDate = new Date(startStr + 'T00:00:00' + offset);
+        } else {
+          // End of deadline day (23:59:59 MT)
+          var offset = getMTOffset(deadlineStr, '06:59:59');
+          targetDate = new Date(deadlineStr + 'T23:59:59' + offset);
+        }
+        
+        var flipCards = {};
+        var lastValues = {};
+        
+        ['days', 'hours', 'mins', 'secs'].forEach(function(unit) {
+          flipCards[unit] = el.querySelector('.flip-card[data-unit="' + unit + '"]');
+          lastValues[unit] = -1;
+        });
+        
+        function updateCard(unit, value) {
+          var card = flipCards[unit];
+          if (!card) return;
+          
+          var displayVal = String(value).padStart(2, '0');
+          var valueEl = card.querySelector('.flip-card__value');
+          
+          if (lastValues[unit] === -1) {
+            valueEl.textContent = displayVal;
+            lastValues[unit] = value;
+            return;
+          }
+          
+          if (lastValues[unit] === value) return;
+          lastValues[unit] = value;
+          
+          card.classList.add('flip');
+          
+          setTimeout(function() {
+            valueEl.textContent = displayVal;
+            card.classList.remove('flip');
+          }, 150);
+        }
+        
+        function update() {
+          var now = new Date();
+          var diff = targetDate - now;
+          
+          if (diff <= 0) {
+            el.classList.add('campaign-countdown--ended');
+            el.querySelector('.flip-countdown').style.display = 'none';
+            var headingEl = el.querySelector('.campaign-countdown__heading');
+            if (headingEl) headingEl.style.display = 'none';
+            if (state === 'upcoming') {
+              messageEl.innerHTML = '<h2>Campaign is now live!</h2>';
+              messageEl.classList.add('campaign-countdown__message--funded');
+            } else if (goalMet) {
+              messageEl.innerHTML = '<h2>Project Funded</h2>';
+              messageEl.classList.add('campaign-countdown__message--funded');
+            } else {
+              messageEl.innerHTML = '<h2>Project Ended</h2>';
+              messageEl.classList.add('campaign-countdown__message--not-funded');
+            }
+            return;
+          }
+          
+          var days = Math.floor(diff / (1000 * 60 * 60 * 24));
+          var hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          var mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          var secs = Math.floor((diff % (1000 * 60)) / 1000);
+          
+          updateCard('days', days);
+          updateCard('hours', hours);
+          updateCard('mins', mins);
+          updateCard('secs', secs);
+          
+          setTimeout(update, 1000);
+        }
+        update();
+      })();
+      </script>
+      {% endif %}
+      <button type="button" class="btn btn--primary campaign-header__cta" onclick="document.getElementById('campaign-tiers').scrollIntoView({behavior: 'smooth'})">Support!</button>
+    </header>
+
+    <div class="campaign-content">
+      <header class="hero">
+        {% if page.hero_video %}
+        <video class="hero__video" controls poster="{% if page.hero_image_wide %}{{ page.hero_image_wide }}{% else %}{{ page.hero_image }}{% endif %}">
+          <source src="{{ page.hero_video }}" type="video/webm">
+          Your browser does not support the video tag.
+        </video>
+        {% elsif page.hero_image_wide %}
+        <img src="{{ page.hero_image_wide }}" alt="{{ page.title }}">
+        {% elsif page.hero_image %}
+        <img src="{{ page.hero_image }}" alt="{{ page.title }}">
+        {% endif %}
+        {% assign progress_pledged = page.pledged_amount | default: 0 | plus: 0 %}
+        {% include progress.html campaign_slug=page.slug pledged=progress_pledged goal=page.goal_amount deadline=page.goal_deadline stretch_goals=page.stretch_goals stretch_hidden=page.stretch_hidden state=page.state progress_background=page.progress_background %}
+      </header>
+
+      <section class="content">
+        {% if page.long_content %}
+          {% include long-content.html blocks=page.long_content %}
+        {% endif %}
+      </section>
+
+    {% if page.decisions %}
+    <section class="community-teaser" id="community-teaser">
+      <h3>Supporter Community</h3>
+      <p class="teaser-locked">Backers of this campaign get exclusive access to vote on creative decisions.</p>
+      <p class="teaser-unlocked" style="display:none;">You have access! Join your fellow supporters to vote on creative decisions.</p>
+      <a href="/community/{{ page.slug }}/" class="btn btn--secondary btn--locked" id="community-btn">
+        <span class="locked-text">🔒 Supporters Only</span>
+        <span class="unlocked-text" style="display:none;">Access Community →</span>
+      </a>
+    </section>
+    <script>
+      (function() {
+        var cookie = document.cookie.match(/supporter_{{ page.slug }}=([^;]+)/);
+        if (cookie || new URLSearchParams(window.location.search).has('dev')) {
+          document.querySelector('.teaser-locked').style.display = 'none';
+          document.querySelector('.teaser-unlocked').style.display = '';
+          document.querySelector('.locked-text').style.display = 'none';
+          document.querySelector('.unlocked-text').style.display = '';
+          var btn = document.getElementById('community-btn');
+          btn.classList.remove('btn--locked', 'btn--secondary');
+          btn.classList.add('btn--primary');
+        }
+      })();
+    </script>
+    {% endif %}
+
+    {% if page.diary %}
+      {% include diary.html diary=page.diary %}
+    {% elsif page.diary_entries %}
+      {% include production-diary.html diary_entries=page.diary_entries %}
+    {% endif %}
+
+
+
+      {% unless page.diary or page.diary_entries %}
+        {% if content != "" %}
+        <section class="updates">
+          {{ content }}
+        </section>
+        {% endif %}
+      {% endunless %}
+    </div>
+
+    <aside class="campaign-sidebar">
+      <div class="campaign-facts">
+        {% if page.creator_image %}
+          <div class="campaign-facts__creator">
+            <img src="{{ page.creator_image }}" alt="{{ page.creator_name | default: 'Creator' }}">
+            <span>{{ page.creator_name | default: "Dust Wave" }}</span>
+          </div>
+        {% endif %}
+        <dl>
+          {% unless page.creator_image %}
+          <dt>Creator</dt>
+          <dd>{{ page.creator_name | default: "Dust Wave" }}</dd>
+          {% endunless %}
+          <dt>Category</dt>
+          <dd>{{ page.category | default: "Feature Film" }}</dd>
+          {% if page.state == 'live' %}
+          <dt>How Pledging Works</dt>
+          <dd>All-or-nothing: Your card is saved but not charged now. You'll only be charged if this campaign reaches its goal by {{ page.goal_deadline | date: "%b %-d, %Y" }}.</dd>
+          <dd class="campaign-facts__pledge-meta">You can update or cancel your pledge anytime before the deadline.</dd>
+          {% endif %}
+        </dl>
+      </div>
+
+
+
+      {% if page.tiers %}
+      <section class="sidebar-tiers" id="campaign-tiers">
+        <h4>Tiers</h4>
+        {% if page.state == "upcoming" %}
+          <p class="notice-small">Opens {{ page.start_date | date: "%b %-d" }}</p>
+        {% endif %}
+        
+        {% assign featured_tier = page.tiers | where: "id", page.featured_tier_id | first %}
+        {% if featured_tier %}
+          {% include tier-card.html campaign=page tier=featured_tier compact=true %}
+        {% endif %}
+        
+        {% assign other_tiers = page.tiers | where_exp: "t", "t.id != page.featured_tier_id" | sort: "price" %}
+        {% for t in other_tiers %}
+          {% include tier-card.html campaign=page tier=t compact=true %}
+        {% endfor %}
+
+        <div class="sidebar-tiers__no-reward">
+          <h4>No Reward</h4>
+          {% include custom-amount.html campaign=page %}
+          {% if page.support_items %}
+            {% include support-items.html support_items=page.support_items campaign=page %}
+          {% endif %}
+        </div>
+      </section>
+      {% endif %}
+
+    </aside>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__content">
+      <a href="/" class="site-footer__logo">
+        <img src="/assets/images/defaults/dust-wave-square.png" alt="Dust Wave">
+      </a>
+      <div class="site-footer__copyright">
+        <span>(ɔ) {{ 'now' | date: "%Y" }} DUST WAVE</span>
+      </div>
+    </div>
+  </footer>
+
+  {% include snipcart-foot.html %}
+  <script src="/assets/js/live-stats.js"></script>
+  <script src="/assets/js/campaign.js"></script>
+</body>
+</html>

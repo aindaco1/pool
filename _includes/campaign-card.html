@@ -1,0 +1,92 @@
+<article class="campaign-card" data-campaign-slug="{{ include.campaign.slug }}" data-goal="{{ include.campaign.goal_amount }}">
+  {% if include.campaign.campaign_background %}
+  <div class="campaign-card__background" style="background-image: url('{{ include.campaign.campaign_background }}');"></div>
+  {% endif %}
+  {% if include.campaign.hero_image %}
+  <a href="{{ include.campaign.url }}" class="campaign-card__image-link">
+    <img src="{{ include.campaign.hero_image }}" alt="{{ include.campaign.title }}">
+  </a>
+  {% endif %}
+  
+  <div class="campaign-card__content">
+    <h2><a href="{{ include.campaign.url }}">{{ include.campaign.title }}</a></h2>
+    <p class="campaign-card__blurb">{{ include.campaign.short_blurb }}</p>
+    {% include progress.html campaign_slug=include.campaign.slug pledged=0 goal=include.campaign.goal_amount deadline=include.campaign.goal_deadline start_date=include.campaign.start_date state=include.campaign.state progress_background=include.campaign.progress_background %}
+    
+    {% if include.campaign.featured_tier_id %}
+      {% assign featured = include.campaign.tiers | where: "id", include.campaign.featured_tier_id | first %}
+      {% if featured %}
+        {% assign show_button = false %}
+        {% assign is_late_support_featured = false %}
+        {% if include.campaign.state == "live" %}
+          {% assign show_button = true %}
+        {% elsif include.campaign.state == "post" and featured.late_support %}
+          {% assign is_late_support_featured = true %}
+        {% endif %}
+        
+        {% if show_button %}
+        <button class="campaign-card__featured-tier snipcart-add-item"
+                data-item-id="{{ include.campaign.slug }}__{{ featured.id }}"
+                data-item-name="{{ include.campaign.title }} — {{ featured.name }}"
+                data-item-price="{{ featured.price }}"
+                data-item-url="{{ site.url }}{{ include.campaign.url }}#tier-{{ featured.id }}"
+                data-item-description="Pledge (charged only if funded) — {{ featured.description | escape }}"
+                data-item-max-quantity="{% if featured.stackable %}{% if featured.max_per_person %}{{ featured.max_per_person }}{% else %}99{% endif %}{% else %}1{% endif %}"
+                data-item-stackable="{% if featured.stackable %}always{% else %}never{% endif %}"
+                data-item-shippable="{% if featured.category == 'physical' %}true{% else %}false{% endif %}"
+                data-redirect-url="{{ include.campaign.url }}"
+                data-item-custom1-name="_stackable"
+                data-item-custom1-type="hidden"
+                data-item-custom1-value="{% if featured.stackable %}true{% else %}false{% endif %}"
+                {% if featured.fields %}
+                {% for field in featured.fields %}
+                data-item-custom{{ forloop.index | plus: 1 }}-name="{{ field.name | slugify }}"
+                data-item-custom{{ forloop.index | plus: 1 }}-type="{{ field.type }}"
+                data-item-custom{{ forloop.index | plus: 1 }}-placeholder="{{ field.name }}"
+                {% if field.required %}data-item-custom{{ forloop.index | plus: 1 }}-required="true"{% endif %}
+                {% endfor %}
+                {% endif %}>
+          <div class="featured-tier__info">
+            <div class="featured-tier__name">{{ featured.name }}</div>
+            <p class="featured-tier__description">{{ featured.description }}</p>
+          </div>
+          <div class="featured-tier__price">{{ featured.price | money }}</div>
+        </button>
+        {% elsif is_late_support_featured %}
+        <button class="campaign-card__featured-tier campaign-card__featured-tier--disabled snipcart-add-item"
+                disabled
+                data-late-support="true"
+                data-item-id="{{ include.campaign.slug }}__{{ featured.id }}"
+                data-item-name="{{ include.campaign.title }} — {{ featured.name }}"
+                data-item-price="{{ featured.price }}"
+                data-item-url="{{ site.url }}{{ include.campaign.url }}#tier-{{ featured.id }}"
+                data-item-description="Late support — {{ featured.description | escape }}"
+                data-item-max-quantity="{% if featured.stackable %}{% if featured.max_per_person %}{{ featured.max_per_person }}{% else %}99{% endif %}{% else %}1{% endif %}"
+                data-item-stackable="{% if featured.stackable %}always{% else %}never{% endif %}"
+                data-item-shippable="{% if featured.category == 'physical' %}true{% else %}false{% endif %}"
+                data-item-custom1-name="_stackable"
+                data-item-custom1-type="hidden"
+                data-item-custom1-value="{% if featured.stackable %}true{% else %}false{% endif %}">
+          <div class="featured-tier__info">
+            <div class="featured-tier__name">{{ featured.name }}</div>
+            <p class="featured-tier__description">{{ featured.description }}</p>
+          </div>
+          <div class="featured-tier__price">{{ featured.price | money }}</div>
+        </button>
+        {% else %}
+        <a href="{{ include.campaign.url }}#tier-{{ featured.id }}" class="campaign-card__featured-tier campaign-card__featured-tier--disabled">
+          <div class="featured-tier__info">
+            <div class="featured-tier__name">{{ featured.name }}</div>
+            <p class="featured-tier__description">{{ featured.description }}</p>
+          </div>
+          <div class="featured-tier__price">{{ featured.price | money }}</div>
+        </a>
+        {% endif %}
+      {% endif %}
+    {% endif %}
+  </div>
+  
+  <div class="campaign-card__footer">
+    <a href="{{ include.campaign.url }}" class="btn btn--block">View Campaign</a>
+  </div>
+</article>

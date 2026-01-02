@@ -1,0 +1,55 @@
+---
+layout: null
+---
+{% if site.show_test_campaigns %}
+  {% assign filtered_campaigns = site.campaigns %}
+{% else %}
+  {% assign filtered_campaigns = site.campaigns | where_exp: "c", "c.test_only != true" %}
+{% endif %}
+{
+  "campaigns": [
+    {% for campaign in filtered_campaigns %}
+    {
+      "slug": {{ campaign.slug | jsonify }},
+      "title": {{ campaign.title | jsonify }},
+      "state": {{ campaign.state | jsonify }},
+      "goal_amount": {{ campaign.goal_amount | default: 0 }},
+      "pledged_amount": {{ campaign.pledged_amount | default: 0 }},
+      "goal_deadline": {{ campaign.goal_deadline | jsonify }},
+      "start_date": {{ campaign.start_date | jsonify }},
+      "charged": {{ campaign.charged | default: false }},
+      "single_tier_only": {{ campaign.single_tier_only | default: false }},
+      "custom_late_support": {{ campaign.custom_late_support | default: false }},
+      "stretch_goals": {{ campaign.stretch_goals | default: empty | jsonify }},
+      "stretch_hidden": {% if campaign.stretch_hidden == false %}false{% else %}true{% endif %},
+      "tiers": [
+        {% for tier in campaign.tiers %}
+        {
+          "id": {{ tier.id | jsonify }},
+          "name": {{ tier.name | jsonify }},
+          "price": {{ tier.price | default: 0 }},
+          "description": {{ tier.description | jsonify }},
+          "limit_total": {% if tier.limit_total %}{{ tier.limit_total }}{% else %}null{% endif %},
+          "remaining": {{ tier.remaining | default: tier.limit_total | default: 999 }},
+          "sold_out": {{ tier.sold_out | default: false }},
+          "stackable": {{ tier.stackable | default: false }}
+        }{% unless forloop.last %},{% endunless %}
+        {% endfor %}
+      ],
+      "support_items": [
+        {% for item in campaign.support_items %}
+        {
+          "id": {{ item.id | jsonify }},
+          "label": {{ item.label | jsonify }},
+          "need": {{ item.need | jsonify }},
+          "target": {{ item.target | default: 0 }},
+          "current": {{ item.current | default: 0 }},
+          "late_support": {{ item.late_support | default: false }}
+        }{% unless forloop.last %},{% endunless %}
+        {% endfor %}
+      ]
+    }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  ],
+  "generated_at": {{ site.time | date_to_xmlschema | jsonify }}
+}

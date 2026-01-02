@@ -1,0 +1,22 @@
+title: The Pool
+url: https://pool.dustwave.xyz
+markdown: kramdown
+permalink: pretty
+
+# Snipcart - replace with your public API key
+snipcart_api_key: "OGNlMDFkN2ItYmNhNi00OTFjLThjNWUtNDc0MjlmYzEyNGZmNjM4MjM2NzEzNTczODA3NTc0"
+
+# Pledge worker URL
+worker_base: "https://pledge.dustwave.xyz"
+
+sass:
+  sass_dir: assets/partials
+  style: compressed
+
+include:
+  - .well-known
+
+collections:
+  campaigns:
+    output: true
+    permalink: /campaigns/:slug/

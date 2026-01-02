@@ -1,0 +1,443 @@
+/**
+ * Resend Email Integration for The Pool
+ * 
+ * Sends supporter access emails with magic links for:
+ * - /manage/ — Pledge management (cancel, modify, update payment)
+ * - /community/:slug/ — Supporter-only voting/decisions
+ */
+
+/**
+ * Send supporter confirmation email after successful pledge
+ */
+export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amount, token }) {
+  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
+  
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <h1 style="margin: 0; font-size: 24px;">Thanks for backing ${campaignTitle}!</h1>
+  </div>
+  
+  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+    <p style="margin: 0 0 8px 0;"><strong>Pledge amount:</strong> $${(amount / 100).toFixed(0)}</p>
+    <p style="margin: 0; color: #666; font-size: 14px;">
+      <strong>Remember:</strong> Your card is saved but won't be charged unless this campaign reaches its goal.
+    </p>
+  </div>
+  
+  <div style="margin-bottom: 32px;">
+    <h2 style="font-size: 18px; margin: 0 0 16px 0;">Your Supporter Access</h2>
+    <p style="margin: 0 0 16px 0;">No account needed — these links are your keys:</p>
+    
+    <div style="margin-bottom: 12px;">
+      <a href="${manageUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+        Manage Your Pledge
+      </a>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Cancel, modify amount, or update payment method</p>
+    </div>
+    
+    <div style="margin-bottom: 12px;">
+      <a href="${communityUrl}" style="display: inline-block; background: #fff; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; border: 1px solid #000;">
+        Supporter Community
+      </a>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Vote on creative decisions for this project</p>
+    </div>
+  </div>
+  
+  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+    <p style="margin: 0 0 8px 0;"><strong>Save this email!</strong> You'll need these links to manage your pledge.</p>
+    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${env.SITE_BASE}" style="color: #000;">The Pool</a>.</p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: 'The Pool <pledges@pool.dustwave.xyz>',
+      to: email,
+      subject: `Your pledge to ${campaignTitle}`,
+      html
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Resend error:', error);
+    throw new Error(`Failed to send email: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Send pledge modification confirmation email
+ */
+export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campaignTitle, previousAmount, newAmount, token }) {
+  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const increased = newAmount > previousAmount;
+  const diff = Math.abs(newAmount - previousAmount);
+  
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <h1 style="margin: 0; font-size: 24px;">Pledge Updated</h1>
+  </div>
+  
+  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+    <p style="margin: 0 0 8px 0;"><strong>Campaign:</strong> ${campaignTitle}</p>
+    <p style="margin: 0 0 8px 0;"><strong>Previous pledge:</strong> $${(previousAmount / 100).toFixed(0)}</p>
+    <p style="margin: 0 0 8px 0;"><strong>New pledge:</strong> $${(newAmount / 100).toFixed(0)} (${increased ? '+' : '-'}$${(diff / 100).toFixed(0)})</p>
+    <p style="margin: 0; color: #666; font-size: 14px;">
+      <strong>Remember:</strong> Your card is saved but won't be charged unless this campaign reaches its goal.
+    </p>
+  </div>
+  
+  <div style="margin-bottom: 32px;">
+    <p style="margin: 0 0 16px 0;">Your pledge has been successfully updated. You can manage your pledge anytime using the link below:</p>
+    
+    <div style="margin-bottom: 12px;">
+      <a href="${manageUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+        Manage Your Pledge
+      </a>
+    </div>
+  </div>
+  
+  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${env.SITE_BASE}" style="color: #000;">The Pool</a>.</p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: 'The Pool <pledges@pool.dustwave.xyz>',
+      to: email,
+      subject: `Pledge updated for ${campaignTitle}`,
+      html
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Resend error:', error);
+    throw new Error(`Failed to send email: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Send payment failure notification
+ */
+export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaignTitle, token }) {
+  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <h1 style="margin: 0; font-size: 24px; color: #dc3545;">Action Required</h1>
+  </div>
+  
+  <div style="background: #fff3cd; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #ffc107;">
+    <p style="margin: 0;">
+      We tried to charge your card for your pledge to <strong>${campaignTitle}</strong>, but the payment failed.
+    </p>
+  </div>
+  
+  <p>The campaign has been funded and we're processing charges. Please update your payment method to complete your pledge:</p>
+  
+  <div style="text-align: center; margin: 24px 0;">
+    <a href="${manageUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+      Update Payment Method
+    </a>
+  </div>
+  
+  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+    <p style="margin: 0;">If you have questions, reply to this email.</p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: 'The Pool <pledges@pool.dustwave.xyz>',
+      to: email,
+      subject: `Action needed: Update payment for ${campaignTitle}`,
+      html
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Resend error:', error);
+    throw new Error(`Failed to send email: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Send charge success email after campaign settlement
+ */
+export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, amount, token }) {
+  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
+  
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <h1 style="margin: 0; font-size: 24px; color: #059669;">Payment Successful!</h1>
+  </div>
+  
+  <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #bbf7d0;">
+    <p style="margin: 0 0 8px 0;"><strong>${campaignTitle}</strong> has been fully funded!</p>
+    <p style="margin: 0;"><strong>Amount charged:</strong> $${(amount / 100).toFixed(2)}</p>
+  </div>
+  
+  <p>Your pledge has been successfully charged. Thank you for helping make this project happen!</p>
+  
+  <div style="margin-bottom: 32px;">
+    <div style="margin-bottom: 12px;">
+      <a href="${communityUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+        Supporter Community
+      </a>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Stay connected and vote on project decisions</p>
+    </div>
+    
+    <div style="margin-bottom: 12px;">
+      <a href="${manageUrl}" style="display: inline-block; background: #fff; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; border: 1px solid #000;">
+        View Your Pledge
+      </a>
+    </div>
+  </div>
+  
+  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${env.SITE_BASE}" style="color: #000;">The Pool</a>.</p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: 'The Pool <pledges@pool.dustwave.xyz>',
+      to: email,
+      subject: `Payment confirmed for ${campaignTitle}`,
+      html
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Resend error:', error);
+    throw new Error(`Failed to send email: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Send diary update notification to supporters
+ */
+export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, token }) {
+  const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
+  const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/`;
+  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <h1 style="margin: 0; font-size: 24px;">New Update: ${campaignTitle}</h1>
+  </div>
+  
+  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+    <h2 style="margin: 0 0 12px 0; font-size: 18px;">${diaryTitle}</h2>
+    ${diaryExcerpt ? `<p style="margin: 0; color: #666;">${diaryExcerpt}</p>` : ''}
+  </div>
+  
+  <div style="text-align: center; margin-bottom: 32px;">
+    <a href="${campaignUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+      Read Full Update
+    </a>
+  </div>
+  
+  <div style="margin-bottom: 24px;">
+    <p style="margin: 0 0 12px 0; font-size: 14px; color: #666;">Your supporter access:</p>
+    <a href="${communityUrl}" style="color: #000; text-decoration: underline;">Vote on Creative Decisions</a> · 
+    <a href="${manageUrl}" style="color: #000; text-decoration: underline;">Manage Your Pledge</a>
+  </div>
+  
+  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+    <p style="margin: 0;">You're receiving this because you backed ${campaignTitle}.</p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: 'The Pool <updates@pool.dustwave.xyz>',
+      to: email,
+      subject: `📝 ${diaryTitle} — ${campaignTitle}`,
+      html
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Resend error (diary):', error);
+    throw new Error(`Failed to send diary email: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Send goal milestone notification to supporters
+ * @param {string} milestone - 'one-third' | 'two-thirds' | 'goal' | 'stretch'
+ */
+export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTitle, milestone, pledgedAmount, goalAmount, stretchGoalName, token }) {
+  const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/`;
+  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  
+  const milestoneConfig = {
+    'one-third': {
+      emoji: '🚀',
+      heading: "We're 1/3 of the way there!",
+      message: `${campaignTitle} has reached 33% of its funding goal. Thanks for being part of this journey!`
+    },
+    'two-thirds': {
+      emoji: '🔥',
+      heading: "We're 2/3 funded!",
+      message: `${campaignTitle} is at 66% of its goal. The finish line is in sight!`
+    },
+    'goal': {
+      emoji: '🎉',
+      heading: 'Goal Reached!',
+      message: `${campaignTitle} has hit its funding goal! This project is happening. Your pledge will be charged soon.`
+    },
+    'stretch': {
+      emoji: '⭐',
+      heading: `Stretch Goal Unlocked: ${stretchGoalName || 'New Reward'}`,
+      message: `${campaignTitle} keeps growing! A new stretch goal has been unlocked.`
+    }
+  };
+  
+  const config = milestoneConfig[milestone] || milestoneConfig['goal'];
+  const percentFunded = Math.round((pledgedAmount / goalAmount) * 100);
+  
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <div style="font-size: 48px; margin-bottom: 16px;">${config.emoji}</div>
+    <h1 style="margin: 0; font-size: 24px;">${config.heading}</h1>
+  </div>
+  
+  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px; text-align: center;">
+    <div style="font-size: 36px; font-weight: bold; margin-bottom: 8px;">${percentFunded}%</div>
+    <p style="margin: 0; color: #666;">$${(pledgedAmount / 100).toLocaleString()} of $${(goalAmount / 100).toLocaleString()} goal</p>
+  </div>
+  
+  <p style="margin-bottom: 24px;">${config.message}</p>
+  
+  <div style="text-align: center; margin-bottom: 32px;">
+    <a href="${campaignUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+      View Campaign
+    </a>
+  </div>
+  
+  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+    <p style="margin: 0 0 8px 0;">You're receiving this because you backed ${campaignTitle}.</p>
+    <a href="${manageUrl}" style="color: #666;">Manage your pledge</a>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: 'The Pool <updates@pool.dustwave.xyz>',
+      to: email,
+      subject: `${config.emoji} ${config.heading} — ${campaignTitle}`,
+      html
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Resend error (milestone):', error);
+    throw new Error(`Failed to send milestone email: ${response.status}`);
+  }
+
+  return response.json();
+}

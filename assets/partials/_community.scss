@@ -1,0 +1,283 @@
+// Community page styles
+
+// Community Page
+.community-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: $space-3xl $space-xl;
+  
+  &__loading,
+  &__denied {
+    text-align: center;
+    padding: $space-4xl $space-xl;
+  }
+  
+  &__denied {
+    h1 {
+      margin-bottom: $space-md;
+      line-height: 1;
+    }
+    
+    p {
+      color: $color--secondary;
+      margin-bottom: $space-md;
+    }
+  }
+  
+  &__denied-intro {
+    font-size: $font-size-lg;
+    max-width: 500px;
+    margin: 0 auto $space-2xl;
+    
+    @include xsm {
+      font-size: $font-size-base;
+    }
+  }
+  
+  &__cta-box {
+    background: $color--white;
+    border: 2px solid $color--primary;
+    border-radius: $radius--md;
+    padding: $space-2xl;
+    max-width: 480px;
+    margin: 0 auto $space-2xl;
+    text-align: left;
+    
+    @include xsm {
+      padding: $space-xl;
+    }
+    
+    h3 {
+      margin: 0 0 $space-sm 0;
+      font-size: $font-size-xl;
+    }
+    
+    p {
+      margin: 0 0 $space-md 0;
+      font-size: 15px;
+    }
+    
+    ul {
+      margin: 0 0 $space-xl 0;
+      padding-left: 20px;
+      
+      li {
+        font-size: 15px;
+        color: $color--secondary;
+        margin-bottom: $space-xs;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+    
+    .btn {
+      width: 100%;
+    }
+  }
+  
+  &__already {
+    font-size: $font-size-md;
+    color: $color--secondary;
+    
+    a {
+      color: $color--primary;
+      
+      &:hover {
+        text-decoration: none;
+      }
+    }
+  }
+  
+  &__header {
+    margin-bottom: $space-3xl;
+    
+    h1 {
+      margin: $space-md 0;
+      line-height: 1.2;
+    }
+  }
+  
+  &__back {
+    font-size: $font-size-md;
+    color: $color--secondary;
+    text-decoration: none;
+    
+    &:hover {
+      color: $color--primary;
+    }
+  }
+  
+  &__intro {
+    color: $color--secondary;
+    font-size: $font-size-base;
+    line-height: 1.6;
+  }
+  
+  &__empty {
+    text-align: center;
+    padding: $space-3xl;
+    color: $color--secondary;
+  }
+}
+
+// Community Decisions (enhanced for community page)
+.community-page .community-decisions {
+  h2 {
+    margin-bottom: $space-xl;
+  }
+}
+
+.community-page .decision-card {
+  background: $color--white;
+  
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $space-md;
+    
+    h3 {
+      margin: 0;
+      font-size: $font-size-lg;
+    }
+  }
+  
+  &__type {
+    font-size: $font-size-xs;
+    text-transform: uppercase;
+    color: $color--secondary;
+    background: $surface-tint-strong;
+    padding: 4px $space-xs;
+    border-radius: $radius--chip;
+  }
+  
+  &__footer {
+    margin-top: $space-md;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: $space-sm;
+  }
+  
+  &__closed {
+    font-size: $font-size-md;
+    color: $color--secondary;
+  }
+  
+  &__voted {
+    font-size: $font-size-md;
+    color: $color--success-dark;
+  }
+  
+  &__total {
+    font-size: $font-size-xs;
+    color: $color--secondary;
+  }
+}
+
+// Vote results display
+.decision-results {
+  .results-bars {
+    display: flex;
+    flex-direction: column;
+    gap: $space-sm;
+  }
+}
+
+.result-bar {
+  &__label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  
+  &__option {
+    font-weight: 500;
+    font-size: $font-size-md;
+  }
+  
+  &__percent {
+    font-weight: 600;
+    font-size: $font-size-md;
+  }
+  
+  &__track {
+    height: $space-xs;
+    background: rgba($color--black, 0.1);
+    border-radius: $radius--chip;
+    overflow: hidden;
+  }
+  
+  &__fill {
+    height: 100%;
+    background: $color--primary;
+    border-radius: $radius--chip;
+    transition: width 0.3s ease;
+  }
+  
+  &__count {
+    font-size: $font-size-xs;
+    color: $color--secondary;
+    margin-top: 2px;
+    display: block;
+  }
+  
+  &--selected {
+    .result-bar__option {
+      color: $color--primary;
+    }
+    
+    .result-bar__fill {
+      background: $color--success;
+    }
+    
+    &::after {
+      content: '← Your vote';
+      font-size: 11px;
+      color: $color--success;
+      margin-left: $space-xs;
+    }
+  }
+}
+
+// Community redirect page
+.community-redirect {
+  text-align: center;
+  padding: $space-4xl $space-xl;
+  
+  h1 {
+    margin-bottom: $space-md;
+  }
+  
+  p {
+    color: $color--secondary;
+    margin-bottom: $space-2xl;
+  }
+}
+
+.campaigns-list {
+  display: flex;
+  flex-direction: column;
+  gap: $space-sm;
+  max-width: 400px;
+  margin: 0 auto;
+  
+  .campaign-link {
+    display: block;
+    padding: $space-md $space-xl;
+    background: $color--white;
+    border: 1px solid $color--light;
+    border-radius: $radius--md;
+    text-decoration: none;
+    color: $color--primary;
+    font-weight: 600;
+    transition: all 0.2s;
+    
+    &:hover {
+      border-color: $color--primary;
+      box-shadow: $shadow--soft;
+    }
+  }
+}

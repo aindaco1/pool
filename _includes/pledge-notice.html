@@ -1,0 +1,11 @@
+{% assign formatted_deadline = include.deadline | date: "%b %-d, %Y" %}
+<div class="pledge-notice">
+  <h4>{% include t.html key="pledge.notice_title" %}</h4>
+  <p>
+    <strong>All-or-nothing:</strong> Your card is saved but not charged now. 
+    {% include t.html key="pledge.notice_body" deadline=formatted_deadline %}
+  </p>
+  <p class="pledge-notice__meta">
+    {% include t.html key="pledge.notice_meta" %}
+  </p>
+</div>

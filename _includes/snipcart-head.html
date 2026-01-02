@@ -1,0 +1,20 @@
+<link rel="preconnect" href="https://app.snipcart.com">
+<link rel="preconnect" href="https://cdn.snipcart.com">
+<link rel="stylesheet" href="https://cdn.snipcart.com/themes/v3.6.1/default/snipcart.css">
+<link rel="stylesheet" href="/assets/main.css">
+{%- assign snipcart_mode = site.snipcart_mode | default: 'live' -%}
+<!-- Snipcart mode: {{ snipcart_mode }} -->
+<script>
+  window.SnipcartSettings = {
+    {% if snipcart_mode == 'test' and site.snipcart_test_key != "" %}
+    publicApiKey: "{{ site.snipcart_test_key }}",
+    {% else %}
+    publicApiKey: "{{ site.snipcart_api_key }}",
+    {% endif %}
+    loadStrategy: "on-user-interaction",
+    modalStyle: "side",
+    version: "3.6.1",
+    templatesUrl: "/snipcart-templates.html"
+  };
+  console.log('Snipcart mode: {{ snipcart_mode }}');
+</script>

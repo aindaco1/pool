@@ -1,0 +1,91 @@
+// Mixins from dust-wave-shop
+
+// Breakpoints
+@mixin xsm {
+  @media (max-width: 724px) { @content; }
+}
+
+@mixin sm {
+  @media (max-width: 1000px) { @content; }
+}
+
+@mixin ms {
+  @media (min-width: 1000px) { @content; }
+}
+
+// Layout
+@mixin fit-to-layout-and-center {
+  width: 100%;
+  max-width: $layout--max-width;
+  margin-left: auto;
+  margin-right: auto;
+  
+  @include sm {
+    padding-left: $space-xl;
+    padding-right: $space-xl;
+    gap: 0px;
+  }
+}
+
+// Typography
+@mixin heading-font {
+  font-family: "gambado-sans", sans-serif;
+}
+
+// Buttons
+@mixin btn-core($bg) {
+  all: unset;
+  cursor: pointer;
+  color: $color--white;
+  background-color: $bg;
+  border: 1px solid darken($bg, 3%);
+  text-shadow: 2px 2px 5px darken($bg, 3%);
+  border-radius: $radius--sm;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: $btn--font-size;
+  letter-spacing: $btn--letter-spacing;
+  padding: $space-sm $space-xl;
+  display: inline-block;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+@mixin button-hover($color) {
+  position: relative;
+  z-index: 2;
+  
+  &:hover {
+    transition: 0.2s all;
+    background-color: darken($color, 10%);
+    
+    &:before {
+      transform: scale(1.1, 1.5);
+    }
+  }
+  
+  &:before {
+    content: " ";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: $color;
+    opacity: 0.4;
+    z-index: -1;
+    border-radius: $radius--sm;
+    transform: scale(1);
+    transition: all 0.3s cubic-bezier(0.16, 0.8, 0.66, 1.54);
+  }
+}
+
+// Product image frame
+@mixin product-image-frame {
+  flex: 1;
+  height: 100%;
+  width: 100%;
+  max-width: 400px;
+  background-size: cover;
+  border-radius: $radius--md;
+}

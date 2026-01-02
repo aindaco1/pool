@@ -1,0 +1,106 @@
+// Button styles
+
+.btn {
+  @include btn-core($color--primary);
+  text-decoration: none;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+  
+  &:before {
+    display: none;
+  }
+  
+  &:hover {
+    background: $color--background;
+    border-color: $color--primary;
+    color: $color--primary;
+    text-shadow: none;
+    transform: scale(1.03);
+  }
+}
+
+// Button variants
+.btn--small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn--ghost {
+  background: transparent;
+  border: 1px solid $color--light;
+  color: $color--secondary;
+  
+  &:hover {
+    background: $surface-tint-strong;
+    border-color: $color--primary;
+    color: $color--primary;
+  }
+}
+
+.btn--block {
+  width: 100%;
+  display: block;
+}
+
+.btn--secondary {
+  background: $color--background;
+  border: 1px solid $color--secondary;
+  color: $color--primary;
+  font-weight: 600;
+  text-shadow: none;
+  
+  &:hover {
+    background: $color--primary;
+    border-color: $color--primary;
+    color: $color--background;
+    transform: scale(1.03);
+  }
+}
+
+.btn--danger {
+  background: $color--danger;
+  border-color: $color--danger;
+  color: $color--white;
+  
+  &:before {
+    display: none;
+  }
+  
+  &:hover {
+    background: $color--danger-dark;
+    border-color: $color--danger-dark;
+  }
+}
+
+.btn--danger-outline {
+  background: transparent;
+  border-color: $color--danger;
+  color: $color--danger;
+  text-shadow: none;
+  
+  &:before {
+    display: none;
+  }
+  
+  &:hover {
+    background: rgba($color--danger, 0.1);
+    border-color: $color--danger-dark;
+    color: $color--danger-dark;
+  }
+}
+
+.btn-text {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+  
+  &--danger {
+    color: $color--danger;
+    
+    &:hover {
+      color: $color--danger-dark;
+    }
+  }
+}

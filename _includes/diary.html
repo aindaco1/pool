@@ -1,0 +1,63 @@
+{% if include.diary or include.updates %}
+<section class="diary" id="diary">
+  <h3>Diary</h3>
+  
+  <div class="diary-tabs" role="tablist">
+    <button class="diary-tab" role="tab" aria-selected="true" data-tab="fundraising">Fundraising</button>
+    <button class="diary-tab" role="tab" aria-selected="false" data-tab="pre-production">Pre-Production</button>
+    <button class="diary-tab" role="tab" aria-selected="false" data-tab="production">Production</button>
+    <button class="diary-tab" role="tab" aria-selected="false" data-tab="post-production">Post-Production</button>
+    <button class="diary-tab" role="tab" aria-selected="false" data-tab="distribution">Distribution</button>
+  </div>
+
+  {% assign phases = "fundraising,pre-production,production,post-production,distribution" | split: "," %}
+  {% for phase in phases %}
+    {% assign is_first = false %}
+    {% if phase == "fundraising" %}{% assign is_first = true %}{% endif %}
+    
+    <div id="diary-{{ phase }}" 
+         class="diary-panel{% unless is_first %} hidden{% endunless %}" 
+         role="tabpanel"
+         aria-labelledby="{{ phase }}-tab">
+      
+      {% assign phase_entries = include.diary | where: "phase", phase %}
+      {% if phase_entries.size > 0 %}
+        <div class="diary-list">
+          {% for entry in phase_entries %}
+            <article class="diary-entry">
+              <h4 class="diary-entry__title">{{ entry.title }}</h4>
+              <p class="diary-entry__body">{{ entry.body }}</p>
+              {% if entry.date %}
+                <time class="diary-entry__date" datetime="{{ entry.date }}">
+                  {{ entry.date | date: "%b %-d, %Y" }}
+                </time>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty-state">No entries yet.</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+</section>
+
+<script>
+(function() {
+  var tabs = document.querySelectorAll('.diary-tab');
+  var panels = document.querySelectorAll('.diary-panel');
+  
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var targetId = 'diary-' + this.dataset.tab;
+      
+      tabs.forEach(function(t) { t.setAttribute('aria-selected', 'false'); });
+      panels.forEach(function(p) { p.classList.add('hidden'); });
+      
+      this.setAttribute('aria-selected', 'true');
+      document.getElementById(targetId).classList.remove('hidden');
+    });
+  });
+})();
+</script>
+{% endif %}

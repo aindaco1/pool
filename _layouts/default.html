@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="{{ site.lang | default: 'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="/assets/images/defaults/favicon.png">
+  {% include snipcart-head.html %}
+  <title>{% if page.title %}{{ page.title }} · {% endif %}{{ site.title }}</title>
+</head>
+<body>
+  <!-- Skip link for keyboard navigation -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  
+  {% include header.html %}
+
+  <main id="main-content" role="main" tabindex="-1">
+    {{ content }}
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="site-footer__content">
+      <a href="/" class="site-footer__logo" aria-label="Dust Wave home">
+        <img src="/assets/images/defaults/dust-wave-square.png" alt="">
+      </a>
+      <div class="site-footer__copyright">
+        <span>(ɔ) {{ 'now' | date: "%Y" }} DUST WAVE</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Live region for dynamic announcements -->
+  <div id="aria-live-region" class="aria-live" aria-live="polite" aria-atomic="true"></div>
+
+  {% include snipcart-foot.html %}
+  <script src="/assets/js/live-stats.js"></script>
+</body>
+</html>

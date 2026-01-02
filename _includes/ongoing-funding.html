@@ -1,0 +1,28 @@
+{% if include.ongoing_items and include.campaign %}
+<section class="ongoing-funding" id="ongoing-funding">
+  <h4>Production & Release Phase</h4>
+  <p class="ongoing-funding__intro">
+    Campaign reached initial goal. Ongoing support funds post-production, festivals, and screenings.
+  </p>
+  
+  <button class="btn btn--block snipcart-add-item"
+          data-item-id="{{ include.campaign.slug }}__ongoing__support"
+          data-item-name="Support Ongoing Work"
+          data-item-price="25"
+          data-item-url="{{ site.url }}{{ include.campaign.url }}"
+          data-item-description="Contribute to ongoing post-production and festival costs"
+          data-item-max-quantity="1"
+          data-item-stackable="never"
+          data-item-custom1-name="_stackable"
+          data-item-custom1-type="hidden"
+          data-item-custom1-value="false">
+    Support Ongoing Work
+  </button>
+  
+  <ul class="ongoing-list">
+    {% for item in include.ongoing_items %}
+      <li>{{ item.label }} — {{ item.remaining | money }} remaining</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

@@ -1,0 +1,82 @@
+name = "pledge-worker"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+workers_dev = false
+
+routes = [
+  { pattern = "pledge.dustwave.xyz/*", zone_name = "dustwave.xyz" }
+]
+
+# Cron trigger: Run at 7:00 AM UTC = midnight MST (Mountain Standard Time)
+# During MDT (daylight saving), this runs at 1:00 AM MT
+[triggers]
+crons = ["0 7 * * *"]
+
+[vars]
+SITE_BASE = "https://pool.dustwave.xyz"
+WORKER_BASE = "https://pledge.dustwave.xyz"
+SNIPCART_API_BASE = "https://app.snipcart.com/api"
+SNIPCART_MODE = "live"  # "test" or "live"
+
+# KV Namespaces - update IDs after running:
+#   wrangler kv:namespace create "VOTES"
+#   wrangler kv:namespace create "VOTES" --preview
+#   wrangler kv:namespace create "PLEDGES"
+#   wrangler kv:namespace create "PLEDGES" --preview
+#   wrangler kv:namespace create "RATELIMIT"
+#   wrangler kv:namespace create "RATELIMIT" --preview
+[[kv_namespaces]]
+binding = "VOTES"
+id = "9f11222dad2b4eb7bf80647f4361784a"
+preview_id = "1801ccfaf70344f49cb62ae0d58403c9"
+
+[[kv_namespaces]]
+binding = "PLEDGES"
+id = "2a2935911eef4a3d8e64ad83d7f7b1ee"
+preview_id = "384641ed237c465ca55eeba08f163d38"
+
+# SEC-005: Rate limiting KV (optional - rate limiting disabled if not configured)
+[[kv_namespaces]]
+binding = "RATELIMIT"
+id = "c55b47f5699244c5ac723018019e61e1"
+preview_id = "68f522d8316c49b6b2922767d67c9d8a"
+
+# Secrets (set via `wrangler secret put <NAME>`):
+# Required:
+# - STRIPE_SECRET_KEY          (Stripe secret key - used if _TEST/_LIVE not set)
+# - SNIPCART_SECRET            (Snipcart API key - used if _TEST/_LIVE not set)
+# - MAGIC_LINK_SECRET          (HMAC secret for token signing)
+# - RESEND_API_KEY             (Resend email API key)
+# - ADMIN_SECRET               (Admin API key for broadcast/rebuild endpoints)
+#
+# Optional (for separate test/live keys):
+# - STRIPE_SECRET_KEY_LIVE / STRIPE_SECRET_KEY_TEST
+# - STRIPE_WEBHOOK_SECRET_LIVE / STRIPE_WEBHOOK_SECRET_TEST
+# - SNIPCART_SECRET_LIVE / SNIPCART_SECRET_TEST
+# - STRIPE_WEBHOOK_SECRET      (webhook signing secret)
+# - SNIPCART_WEBHOOK_SECRET    (validate Snipcart webhooks)
+#
+# Optional (for GitHub rebuild trigger):
+# - GITHUB_TOKEN               (GitHub PAT with workflow scope)
+# - GITHUB_OWNER               (defaults to 'aindaco1')
+# - GITHUB_REPO                (defaults to 'pool')
+# - GITHUB_WORKFLOW            (defaults to 'deploy.yml')
+
+# Development overrides (uses test mode)
+[env.dev]
+vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "https://pledge.dustwave.xyz", SNIPCART_API_BASE = "https://app.snipcart.com/api", SNIPCART_MODE = "test" }
+
+[[env.dev.kv_namespaces]]
+binding = "VOTES"
+id = "9f11222dad2b4eb7bf80647f4361784a"
+preview_id = "1801ccfaf70344f49cb62ae0d58403c9"
+
+[[env.dev.kv_namespaces]]
+binding = "PLEDGES"
+id = "2a2935911eef4a3d8e64ad83d7f7b1ee"
+preview_id = "384641ed237c465ca55eeba08f163d38"
+
+[[env.dev.kv_namespaces]]
+binding = "RATELIMIT"
+id = "c55b47f5699244c5ac723018019e61e1"
+preview_id = "68f522d8316c49b6b2922767d67c9d8a"

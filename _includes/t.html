@@ -1,0 +1,57 @@
+{% comment %}
+  Translation helper - looks up a key from _data/i18n/{lang}.yml
+  
+  Usage:
+    {% include t.html key="buttons.pledge" %}
+    {% include t.html key="states.opens" date="Jan 15" %}
+    {% include t.html key="progress.of_goal" goal="$25,000" %}
+  
+  The lang defaults to site.lang or "en"
+  Interpolation: %{variable} in the translation string is replaced with the variable passed
+{% endcomment %}
+
+{%- assign lang = site.lang | default: "en" -%}
+{%- assign translations = site.data.i18n[lang] -%}
+
+{%- comment %} Parse the key path (e.g., "buttons.pledge" -> translations.buttons.pledge) {% endcomment -%}
+{%- assign key_parts = include.key | split: "." -%}
+{%- assign result = translations -%}
+
+{%- for part in key_parts -%}
+  {%- if result -%}
+    {%- assign result = result[part] -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{%- comment %} Fallback to key if translation not found {% endcomment -%}
+{%- unless result -%}
+  {%- assign result = include.key -%}
+{%- endunless -%}
+
+{%- comment %} Simple interpolation for common variables {% endcomment -%}
+{%- if include.amount -%}
+  {%- assign result = result | replace: "%{amount}", include.amount -%}
+{%- endif -%}
+{%- if include.date -%}
+  {%- assign result = result | replace: "%{date}", include.date -%}
+{%- endif -%}
+{%- if include.goal -%}
+  {%- assign result = result | replace: "%{goal}", include.goal -%}
+{%- endif -%}
+{%- if include.deadline -%}
+  {%- assign result = result | replace: "%{deadline}", include.deadline -%}
+{%- endif -%}
+{%- if include.campaign -%}
+  {%- assign result = result | replace: "%{campaign}", include.campaign -%}
+{%- endif -%}
+{%- if include.percent -%}
+  {%- assign result = result | replace: "%{percent}", include.percent -%}
+{%- endif -%}
+{%- if include.remaining -%}
+  {%- assign result = result | replace: "%{remaining}", include.remaining -%}
+{%- endif -%}
+{%- if include.milestone -%}
+  {%- assign result = result | replace: "%{milestone}", include.milestone -%}
+{%- endif -%}
+
+{{ result -}}

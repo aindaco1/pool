@@ -1,0 +1,68 @@
+{% assign is_late_support_tier = false %}
+{% if include.campaign.state == "live" %}
+  {% assign disabled = false %}
+  {% assign disabled_reason = "" %}
+{% elsif include.campaign.state == "post" %}
+  {% if include.tier.late_support %}
+    {% assign is_late_support_tier = true %}
+  {% endif %}
+  {% assign disabled = true %}
+  {% capture disabled_reason %}{% include t.html key="states.ended" %}{% endcapture %}
+{% elsif include.campaign.state == "upcoming" %}
+  {% assign disabled = true %}
+  {% assign start_formatted = include.campaign.start_date | date: "%b %-d" %}
+  {% capture disabled_reason %}{% include t.html key="states.opens" date=start_formatted %}{% endcapture %}
+{% else %}
+  {% assign disabled = true %}
+  {% assign disabled_reason = "Unavailable" %}
+{% endif %}
+
+{% assign tier_locked = false %}
+{% assign threshold_formatted = "" %}
+{% if include.tier.requires_threshold %}
+  {% assign tier_locked = true %}
+  {% assign disabled = true %}
+  {% assign threshold_formatted = include.tier.requires_threshold | money %}
+  {% capture disabled_reason %}{% include t.html key="tiers.unlocks_at" amount=threshold_formatted %}{% endcapture %}
+{% endif %}
+<div class="tier-card{% if include.compact %} compact{% endif %}{% if tier_locked %} tier-card--locked{% endif %}" id="tier-{{ include.tier.id }}" data-tier-id="{{ include.tier.id }}" data-campaign-slug="{{ include.campaign.slug }}"{% if include.tier.requires_threshold %} data-requires-threshold="{{ include.tier.requires_threshold }}"{% endif %}{% if is_late_support_tier %} data-late-support="true" data-goal="{{ include.campaign.goal_amount }}"{% endif %}>
+  {% if include.tier.requires_threshold %}
+  <div class="tier-card__unlock-badge" aria-live="polite">
+    <span class="sr-only">{% include t.html key="tiers.unlocked" %}</span>
+    <span aria-hidden="true">{% include t.html key="tiers.unlocked" %}</span>
+  </div>
+  {% endif %}
+  {% if include.tier.image %}
+    <img src="{{ include.tier.image }}" alt="{{ include.tier.name }}" class="tier-card__image">
+  {% endif %}
+  <h3>{{ include.tier.name }} — {{ include.tier.price | money }}</h3>
+  <p>{{ include.tier.description }}</p>
+  {% if include.tier.limit_total %}
+    <p class="limit">Limit: <span data-live-limit>{{ include.tier.limit_total }}</span> · Remaining: <span data-live-remaining>{{ include.tier.remaining }}</span></p>
+  {% endif %}
+
+  <button
+    class="snipcart-add-item"
+    {% if disabled %}disabled aria-disabled="true"{% endif %}
+    data-item-id="{{ include.campaign.slug }}__{{ include.tier.id }}"
+    data-item-name="{{ include.campaign.title }} — {{ include.tier.name }}"
+    data-item-price="{{ include.tier.price }}"
+    data-item-url="{{ site.url }}{{ include.campaign.url }}#tier-{{ include.tier.id }}"
+    data-item-description="{{ include.tier.description | escape }}"
+    data-item-max-quantity="{% if include.tier.stackable %}{% if include.tier.max_per_person %}{{ include.tier.max_per_person }}{% else %}99{% endif %}{% else %}1{% endif %}"
+    data-item-stackable="{% if include.tier.stackable %}always{% else %}never{% endif %}"
+    data-item-shippable="{% if include.tier.category == 'physical' %}true{% else %}false{% endif %}"
+    data-item-custom1-name="_stackable"
+    data-item-custom1-type="hidden"
+    data-item-custom1-value="{% if include.tier.stackable %}true{% else %}false{% endif %}"
+    {% if include.tier.fields %}
+    {% for field in include.tier.fields %}
+    data-item-custom{{ forloop.index | plus: 1 }}-name="{{ field.name }}"
+    data-item-custom{{ forloop.index | plus: 1 }}-type="{{ field.type }}"
+    data-item-custom{{ forloop.index | plus: 1 }}-placeholder="{{ field.name }}"
+    {% if field.required %}data-item-custom{{ forloop.index | plus: 1 }}-required="true"{% endif %}
+    {% endfor %}
+    {% endif %}>
+    {% if disabled %}{{ disabled_reason }}{% else %}{% include t.html key="buttons.pledge" %} {{ include.tier.price | money }}{% endif %}
+  </button>
+</div>
