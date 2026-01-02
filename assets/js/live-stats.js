@@ -2,9 +2,59 @@
  * Live Stats - Fetches and displays real-time pledge totals
  * 
  * Works on any page with progress bars that have [data-live-stats] and [data-campaign-slug]
+ * 
+ * Stats are cached in localStorage for 60 seconds to reduce API calls.
+ * Cache is invalidated when user makes a pledge (via invalidateStatsCache).
  */
 
 const WORKER_BASE = window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
+const STATS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+function getStatsCache(slug) {
+  try {
+    const cached = localStorage.getItem(`pool_stats_${slug}`);
+    if (!cached) return null;
+    const { data, timestamp } = JSON.parse(cached);
+    if (Date.now() - timestamp > STATS_CACHE_TTL_MS) {
+      localStorage.removeItem(`pool_stats_${slug}`);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function setStatsCache(slug, data) {
+  try {
+    localStorage.setItem(`pool_stats_${slug}`, JSON.stringify({
+      data,
+      timestamp: Date.now()
+    }));
+  } catch {
+    // localStorage may be full or disabled
+  }
+}
+
+/**
+ * Invalidate stats cache (call after pledge changes)
+ */
+window.invalidateStatsCache = function(campaignSlug) {
+  try {
+    if (campaignSlug) {
+      localStorage.removeItem(`pool_stats_${campaignSlug}`);
+    } else {
+      // Clear all stats caches
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('pool_stats_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
+  } catch {
+    // localStorage may be disabled
+  }
+};
 
 async function fetchAllLiveStats() {
   const progressBars = document.querySelectorAll('[data-live-stats][data-campaign-slug]');
@@ -13,22 +63,37 @@ async function fetchAllLiveStats() {
   // Get unique campaign slugs
   const slugs = [...new Set([...progressBars].map(el => el.dataset.campaignSlug))];
   
-  // Fetch stats for each campaign in parallel
-  const results = await Promise.allSettled(
-    slugs.map(async slug => {
-      const res = await fetch(`${WORKER_BASE}/stats/${slug}`);
-      if (!res.ok) throw new Error(`Failed to fetch stats for ${slug}`);
-      return res.json();
-    })
-  );
-
-  // Create a map of slug -> stats
+  // Check cache first, fetch only uncached slugs
   const statsMap = {};
-  results.forEach((result, i) => {
-    if (result.status === 'fulfilled') {
-      statsMap[slugs[i]] = result.value;
+  const uncachedSlugs = [];
+  
+  for (const slug of slugs) {
+    const cached = getStatsCache(slug);
+    if (cached) {
+      statsMap[slug] = cached;
+    } else {
+      uncachedSlugs.push(slug);
     }
-  });
+  }
+  
+  // Fetch uncached stats in parallel
+  if (uncachedSlugs.length > 0) {
+    const results = await Promise.allSettled(
+      uncachedSlugs.map(async slug => {
+        const res = await fetch(`${WORKER_BASE}/stats/${slug}`);
+        if (!res.ok) throw new Error(`Failed to fetch stats for ${slug}`);
+        return res.json();
+      })
+    );
+
+    results.forEach((result, i) => {
+      if (result.status === 'fulfilled') {
+        const slug = uncachedSlugs[i];
+        statsMap[slug] = result.value;
+        setStatsCache(slug, result.value);
+      }
+    });
+  }
 
   // Update each progress bar
   progressBars.forEach(wrap => {
@@ -146,7 +211,53 @@ function formatMoney(dollars) {
 
 /**
  * Live Inventory - Fetches and displays real-time tier remaining counts
+ * Cached in localStorage for 60 seconds.
  */
+const INVENTORY_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+function getInventoryCache(slug) {
+  try {
+    const cached = localStorage.getItem(`pool_inventory_${slug}`);
+    if (!cached) return null;
+    const { data, timestamp } = JSON.parse(cached);
+    if (Date.now() - timestamp > INVENTORY_CACHE_TTL_MS) {
+      localStorage.removeItem(`pool_inventory_${slug}`);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function setInventoryCache(slug, data) {
+  try {
+    localStorage.setItem(`pool_inventory_${slug}`, JSON.stringify({
+      data,
+      timestamp: Date.now()
+    }));
+  } catch {
+    // localStorage may be full or disabled
+  }
+}
+
+/**
+ * Invalidate inventory cache (call after pledge changes)
+ */
+window.invalidateInventoryCache = function(campaignSlug) {
+  try {
+    if (campaignSlug) {
+      localStorage.removeItem(`pool_inventory_${campaignSlug}`);
+    } else {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('pool_inventory_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
+  } catch {}
+};
+
 async function fetchLiveInventory() {
   const tierCards = document.querySelectorAll('[data-tier-id][data-campaign-slug]');
   if (tierCards.length === 0) return;
@@ -154,22 +265,37 @@ async function fetchLiveInventory() {
   // Get unique campaign slugs
   const slugs = [...new Set([...tierCards].map(el => el.dataset.campaignSlug))];
   
-  // Fetch inventory for each campaign in parallel
-  const results = await Promise.allSettled(
-    slugs.map(async slug => {
-      const res = await fetch(`${WORKER_BASE}/inventory/${slug}`);
-      if (!res.ok) return null;
-      return res.json();
-    })
-  );
-
-  // Create a map of slug -> inventory
+  // Check cache first
   const inventoryMap = {};
-  results.forEach((result, i) => {
-    if (result.status === 'fulfilled' && result.value) {
-      inventoryMap[slugs[i]] = result.value;
+  const uncachedSlugs = [];
+  
+  for (const slug of slugs) {
+    const cached = getInventoryCache(slug);
+    if (cached) {
+      inventoryMap[slug] = cached;
+    } else {
+      uncachedSlugs.push(slug);
     }
-  });
+  }
+  
+  // Fetch uncached inventory in parallel
+  if (uncachedSlugs.length > 0) {
+    const results = await Promise.allSettled(
+      uncachedSlugs.map(async slug => {
+        const res = await fetch(`${WORKER_BASE}/inventory/${slug}`);
+        if (!res.ok) return null;
+        return res.json();
+      })
+    );
+
+    results.forEach((result, i) => {
+      if (result.status === 'fulfilled' && result.value) {
+        const slug = uncachedSlugs[i];
+        inventoryMap[slug] = result.value;
+        setInventoryCache(slug, result.value);
+      }
+    });
+  }
 
   // Update each tier card
   tierCards.forEach(card => {

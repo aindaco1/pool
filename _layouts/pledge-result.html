@@ -26,5 +26,16 @@
   </footer>
 
   {% include snipcart-foot.html %}
+  
+  <script>
+    // Invalidate stats and inventory caches so data updates on next page
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('pool_stats_') || key.startsWith('pool_inventory_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch {}
+  </script>
 </body>
 </html>
