@@ -2,8 +2,8 @@
 layout: campaign
 title: "THE WORST MOVIE EVER"
 slug: worst-movie-ever
-start_date: 2025-12-01
-goal_deadline: 2026-02-14
+start_date: 2026-01-15
+goal_deadline: 2026-02-16
 goal_amount: 2500
 charged: false
 hero_image: /assets/images/campaigns/worst-movie-ever/revolver.png
