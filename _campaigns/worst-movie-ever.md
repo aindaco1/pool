@@ -224,7 +224,7 @@ decisions:
   - id: villain-name
     type: poll
     title: Main Villain's Name
-    deadline: 2026-01-20
+    deadline: 2026-02-01
     options:
       - Dr. Badguy McEvilface
       - The Dark Inconvenience
