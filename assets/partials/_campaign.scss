@@ -723,9 +723,19 @@
     }
   }
   
+  .custom-amount {
+    background: rgba($color--white, 0.95);
+    
+    &__btn:disabled {
+      background: $color--secondary;
+      border-color: $color--secondary;
+      color: $color--white;
+    }
+  }
+  
   .support-items {
     background: rgba($color--white, 0.9);
-    border: 2px solid $color--primary;
+    border: 1px solid $color--light;
     border-radius: $radius--md;
     padding: $space-lg;
     box-shadow: 0 2px $space-xs rgba(0, 0, 0, 0.1);
@@ -734,8 +744,7 @@
   .support-item {
     background: rgba($color--white, 0.95);
     
-    &__btn:disabled,
-    &__input:disabled {
+    &__btn:disabled {
       background: $color--secondary;
       border-color: $color--secondary;
       color: $color--white;

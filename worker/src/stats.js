@@ -55,7 +55,7 @@ export async function addPledgeToStats(env, { campaignSlug, amount, tierId, tier
 /**
  * Update stats when a pledge is cancelled
  */
-export async function removePledgeFromStats(env, { campaignSlug, amount, tierId, tierQty = 1 }) {
+export async function removePledgeFromStats(env, { campaignSlug, amount, tierId, tierQty = 1, supportItems = [], customAmount = 0 }) {
   if (!env.PLEDGES) return;
 
   const stats = await getCampaignStats(env, campaignSlug);
@@ -65,6 +65,21 @@ export async function removePledgeFromStats(env, { campaignSlug, amount, tierId,
   
   if (tierId && stats.tierCounts[tierId]) {
     stats.tierCounts[tierId] = Math.max(0, stats.tierCounts[tierId] - tierQty);
+  }
+  
+  // Remove support item amounts
+  if (supportItems && supportItems.length > 0 && stats.supportItems) {
+    for (const item of supportItems) {
+      if (item.id && stats.supportItems[item.id]) {
+        const amountCents = (item.amount || 0) * 100;
+        stats.supportItems[item.id] = Math.max(0, stats.supportItems[item.id] - amountCents);
+      }
+    }
+  }
+  
+  // Remove custom amount
+  if (customAmount > 0) {
+    stats.customAmount = Math.max(0, (stats.customAmount || 0) - customAmount * 100);
   }
   
   stats.updatedAt = new Date().toISOString();

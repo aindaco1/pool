@@ -1299,7 +1299,9 @@ async function handleCancelPledge(request, env) {
         campaignSlug: pledgeData.campaignSlug,
         amount: pledgeData.subtotal || pledgeData.amount || 0,
         tierId: pledgeData.tierId,
-        tierQty: pledgeData.tierQty || 1
+        tierQty: pledgeData.tierQty || 1,
+        supportItems: pledgeData.supportItems || [],
+        customAmount: pledgeData.customAmount || 0
       });
 
       // Release tier inventory
