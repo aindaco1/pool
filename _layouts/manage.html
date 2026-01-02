@@ -499,14 +499,39 @@
       
       const id = `countdown-${campaign.slug}`;
       
+      // Calculate initial values to avoid flash of "00 00 00 00"
+      let targetDate;
+      if (isUpcoming && campaign.start_date) {
+        targetDate = new Date(campaign.start_date + 'T00:00:00');
+      } else {
+        targetDate = new Date(targetStr + 'T23:59:59');
+      }
+      
+      const now = new Date();
+      const diff = Math.max(0, targetDate - now);
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      const pad = n => String(n).padStart(2, '0');
+      
+      if (diff <= 0) {
+        return `
+          <div class="pledge-countdown" id="${id}">
+            <span class="pledge-countdown__ended">${isUpcoming ? 'Campaign Live!' : 'Ended'}</span>
+          </div>
+        `;
+      }
+      
       return `
         <div class="pledge-countdown" id="${id}" data-deadline="${targetStr}" data-start="${campaign.start_date || ''}" data-state="${campaign.state}">
           <span class="pledge-countdown__heading">${heading}</span>
           <div class="pledge-countdown__timer">
-            <span class="pledge-countdown__unit" data-unit="days">00</span><span class="pledge-countdown__sep">:</span>
-            <span class="pledge-countdown__unit" data-unit="hours">00</span><span class="pledge-countdown__sep">:</span>
-            <span class="pledge-countdown__unit" data-unit="mins">00</span><span class="pledge-countdown__sep">:</span>
-            <span class="pledge-countdown__unit" data-unit="secs">00</span>
+            <span class="pledge-countdown__unit" data-unit="days">${pad(days)}</span><span class="pledge-countdown__sep">:</span>
+            <span class="pledge-countdown__unit" data-unit="hours">${pad(hours)}</span><span class="pledge-countdown__sep">:</span>
+            <span class="pledge-countdown__unit" data-unit="mins">${pad(mins)}</span><span class="pledge-countdown__sep">:</span>
+            <span class="pledge-countdown__unit" data-unit="secs">${pad(secs)}</span>
           </div>
         </div>
       `;

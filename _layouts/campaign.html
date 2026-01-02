@@ -23,31 +23,48 @@
       {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
       <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-state="{{ page.state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}">
         <h2 class="campaign-countdown__heading">{% if page.state == "upcoming" %}Starts in{% elsif page.state == "live" %}Ends in{% endif %}</h2>
+        {% assign target_date = page.goal_deadline %}
+        {% if page.state == "upcoming" %}{% assign target_date = page.start_date %}{% endif %}
+        {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
+        {% assign target_epoch = target_date | date: '%s' | plus: 0 %}
+        {% if page.state == "upcoming" %}
+          {% comment %}Target is midnight of start date{% endcomment %}
+        {% else %}
+          {% assign target_epoch = target_epoch | plus: 86399 %}{% comment %}End of day: +23:59:59{% endcomment %}
+        {% endif %}
+        {% assign diff_secs = target_epoch | minus: now_epoch %}
+        {% if diff_secs < 0 %}{% assign diff_secs = 0 %}{% endif %}
+        {% assign init_days = diff_secs | divided_by: 86400 %}
+        {% assign remainder = diff_secs | modulo: 86400 %}
+        {% assign init_hours = remainder | divided_by: 3600 %}
+        {% assign remainder = remainder | modulo: 3600 %}
+        {% assign init_mins = remainder | divided_by: 60 %}
+        {% assign init_secs = remainder | modulo: 60 %}
         <div class="flip-countdown">
           <div class="flip-countdown__group">
             <div class="flip-card" data-unit="days">
-              <span class="flip-card__value">00</span>
+              <span class="flip-card__value">{% if init_days < 10 %}0{% endif %}{{ init_days }}</span>
             </div>
             <span class="flip-countdown__label">Days</span>
           </div>
           <div class="flip-countdown__separator">:</div>
           <div class="flip-countdown__group">
             <div class="flip-card" data-unit="hours">
-              <span class="flip-card__value">00</span>
+              <span class="flip-card__value">{% if init_hours < 10 %}0{% endif %}{{ init_hours }}</span>
             </div>
             <span class="flip-countdown__label">Hours</span>
           </div>
           <div class="flip-countdown__separator">:</div>
           <div class="flip-countdown__group">
             <div class="flip-card" data-unit="mins">
-              <span class="flip-card__value">00</span>
+              <span class="flip-card__value">{% if init_mins < 10 %}0{% endif %}{{ init_mins }}</span>
             </div>
             <span class="flip-countdown__label">Minutes</span>
           </div>
           <div class="flip-countdown__separator">:</div>
           <div class="flip-countdown__group">
             <div class="flip-card" data-unit="secs">
-              <span class="flip-card__value">00</span>
+              <span class="flip-card__value">{% if init_secs < 10 %}0{% endif %}{{ init_secs }}</span>
             </div>
             <span class="flip-countdown__label">Seconds</span>
           </div>
