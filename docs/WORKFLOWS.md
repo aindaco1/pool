@@ -60,8 +60,9 @@ Pledges are stored in Cloudflare KV (not Snipcart). Key patterns:
 |-----|----------|
 | `pledge:{orderId}` | Full pledge data (email, amount, tier, Stripe IDs, status, history) |
 | `email:{email}` | Array of order IDs for that email |
-| `stats:{campaignSlug}` | Aggregated totals (pledgedAmount, pledgeCount, tierCounts) |
+| `stats:{campaignSlug}` | Aggregated totals (pledgedAmount, pledgeCount, tierCounts, supportItems) |
 | `tier-inventory:{campaignSlug}` | Claim counts for limited tiers |
+| `pending-extras:{orderId}` | Temporary storage for support items/custom amount during checkout |
 
 **Pledge record:**
 ```json
@@ -71,6 +72,9 @@ Pledges are stored in Cloudflare KV (not Snipcart). Key patterns:
   "campaignSlug": "hand-relations",
   "tierId": "producer-credit",
   "tierQty": 1,
+  "additionalTiers": [{ "id": "frame-slot", "qty": 2 }],
+  "supportItems": [{ "id": "location-scouting", "amount": 50 }],
+  "customAmount": 25,
   "subtotal": 5000,
   "tax": 394,
   "amount": 5394,
@@ -81,6 +85,11 @@ Pledges are stored in Cloudflare KV (not Snipcart). Key patterns:
   "history": [{ "type": "created", "at": "..." }]
 }
 ```
+
+**Support items and custom amounts:**
+- `supportItems` — Array of `{ id, amount }` for production phase contributions
+- `customAmount` — Integer (cents) for "no reward" pledge additions
+- `additionalTiers` — Array of `{ id, qty }` for multi-tier pledges (when `single_tier_only: false`)
 
 **Status values:** `active`, `cancelled`, `charged`, `payment_failed`
 
@@ -114,14 +123,33 @@ Stateless HMAC-signed tokens (no database needed):
 ### `POST /start`
 Create Stripe Checkout session (setup mode) after Snipcart order.
 
-**Request:** `{ orderId, campaignSlug }`  
+**Request:**
+```json
+{
+  "orderId": "pledge-123",
+  "campaignSlug": "hand-relations",
+  "tiers": [{ "id": "producer-credit", "qty": 1, "price": 50 }],
+  "supportItems": [{ "id": "location-scouting", "amount": 25 }],
+  "customAmount": 10,
+  "subtotal": 8500,
+  "tax": 669,
+  "billingAddress": { "name": "...", "email": "...", ... }
+}
+```
 **Response:** `{ url }` → Redirect to Stripe Checkout
 
+**Data flow:**
+1. Cart.js extracts tiers, support items, and custom amount from Snipcart cart
+2. Worker stores `supportItems` and `customAmount` in temp KV key (`pending-extras:{orderId}`)
+3. Worker sets `hasExtras` flag in Stripe Checkout metadata
+4. On webhook, Worker fetches extras from temp KV and merges into final pledge
+
 ### `POST /webhooks/stripe`
-Handle `setup_intent.succeeded`:
+Handle `checkout.session.completed`:
 - Extract `payment_method` and `customer` from SetupIntent
-- Store pledge in KV with status `active`
-- Update live stats (pledgedAmount, tierCounts)
+- Fetch `supportItems` and `customAmount` from temp KV (if `hasExtras` flag set)
+- Store pledge in KV with status `active` (includes support items and custom amount)
+- Update live stats (pledgedAmount, tierCounts, supportItems)
 - Claim tier inventory (for limited tiers)
 - Generate magic link token
 - Send supporter confirmation email

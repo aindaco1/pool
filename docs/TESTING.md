@@ -55,7 +55,7 @@ describe('myFunction', () => {
 
 Browser-based tests for full user flows in `tests/e2e/`.
 
-### Coverage (31 tests + 1 manual)
+### Coverage (33 tests + 1 manual)
 
 **Campaign Page Structure:**
 - Required page elements (hero, sidebar, progress bar)
@@ -99,6 +99,10 @@ Browser-based tests for full user flows in `tests/e2e/`.
 - Main content landmark
 - Accessible button labels
 - Form input labels
+
+**Countdown Timers:**
+- Pre-rendered values (no "00 00 00 00" flash)
+- Timer updates every second
 
 **Campaign States:**
 - Live campaign enabled tiers

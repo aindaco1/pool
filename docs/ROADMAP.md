@@ -41,10 +41,17 @@
 - [x] Tier gating by stretch goal with visual "Unlocked!" animations
 - [x] Unit test suite (Vitest) for live-stats.js functions
 - [x] E2E test suite (Playwright) for checkout flows
+- [x] Support items and custom amounts data flow (cart → Worker → KV → stats)
+- [x] Live support item stats tracking (`updateSupportItemStats()`)
+- [x] Countdown timer pre-rendering (Jekyll build-time calculation to avoid "00 00 00 00" flash)
+- [x] Manage page support items display (all items during live, late_support only during post)
+- [x] Multi-tier pledge support (`additionalTiers` in pledge records)
+- [x] Stats recalculation fix for `additionalTiers`
+- [x] Production campaign launch (Hand Relations)
 
 ## In Progress
 
-- [ ] Production campaign launch testing
+_(None currently)_
 
 ## Planned
 

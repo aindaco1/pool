@@ -11,7 +11,7 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 - **Checkout autofill** — Auto-selects country, enables password manager autofill for address fields
 - **Stretch goals** — Auto-unlock at funding thresholds
 - **Campaign lifecycle** — `pre` → `live` → `post` states with automatic transitions
-- **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection
+- **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement
 - **Production diary** — Creator update log
@@ -46,11 +46,13 @@ bundle exec jekyll serve --config _config.yml,_config_development.yml
 ## Testing
 
 ```bash
-npm run test:unit      # Unit tests (Vitest) — JS functions
-npm run test:e2e       # E2E tests (Playwright) — browser flows
+npm run test:unit      # Unit tests (Vitest) — 37 tests, ~700ms
+npm run test:e2e       # E2E tests (Playwright) — 33 tests + 1 manual
 npm run test:security  # Security tests — pen testing the Worker API
 npm test               # Run unit + e2e
 ```
+
+**Test coverage includes:** live-stats functions, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, and campaign states.
 
 See [TESTING.md](docs/TESTING.md) for full testing guide and [SECURITY.md](docs/SECURITY.md) for security architecture.
 
@@ -93,10 +95,11 @@ assets/
   │   ├── _utilities.scss     # Helper classes
   │   └── _snipcart-overrides.scss # Cart customization
   └── js/             # Client-side scripts
-      ├── cart.js             # Snipcart pledge flow
+      ├── cart.js             # Snipcart pledge flow (extracts tiers, support items, custom amounts)
       ├── campaign.js         # Phase tabs, toasts
       ├── buy-buttons.js      # Button handlers
       ├── checkout-autofill.js # Country/state autofill
+      ├── live-stats.js       # Real-time stats, inventory, tier unlocks, late support
       └── snipcart-debug.js   # Debug utilities
 worker/               # Cloudflare Worker (pledge.dustwave.xyz)
   └── src/            # Worker source (Stripe, email, voting, tokens)

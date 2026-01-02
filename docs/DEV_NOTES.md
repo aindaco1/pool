@@ -108,6 +108,19 @@ The timer automatically uses:
 
 DST transitions are calculated based on US rules (2nd Sunday in March, 1st Sunday in November).
 
+### Countdown Pre-Rendering
+
+To avoid a flash of "00 00 00 00" before JavaScript loads:
+
+**Campaign pages (`_layouts/campaign.html`):**
+- Jekyll calculates initial countdown values at build time using Liquid filters
+- Uses `date: '%s'` to get epoch timestamps, then `divided_by` and `modulo` for days/hours/mins/secs
+- Values are slightly stale (off by seconds since build) but JS corrects them immediately
+
+**Manage page (`_layouts/manage.html`):**
+- The `renderCountdown()` function calculates values inline when generating HTML
+- No "00" placeholders — values are computed before DOM insertion
+
 Quote strings with special characters to avoid YAML parsing issues.
 
 ### Media Fields
@@ -293,6 +306,24 @@ Key points:
 - Order IDs are generated client-side: `pledge-{timestamp}-{random}`
 - Billing info from Snipcart is passed to Stripe to pre-fill checkout
 - Tax is calculated server-side (ABQ rate: 7.875%)
+
+### Support Items & Custom Amounts
+
+The cart can include:
+- **Tiers** — Main pledge items with `{campaignSlug}__{tierId}` IDs
+- **Support items** — Production phase contributions with `{campaignSlug}__support__{itemId}` IDs
+- **Custom amount** — "No reward" pledge with `{campaignSlug}__custom` ID
+
+**Data flow:**
+1. `cart.js` extracts these from Snipcart cart items and sends to `/start`
+2. Worker stores `supportItems` and `customAmount` in temp KV (`pending-extras:{orderId}`)
+3. Worker sets `hasExtras: true` in Stripe Checkout metadata
+4. On webhook, Worker fetches extras from temp KV and merges into final pledge
+5. Worker calls `updateSupportItemStats()` to update live stats for support items
+
+**Manage page display:**
+- During **live** campaigns: ALL support items are shown for modification
+- During **post** campaigns: Only items with `late_support: true` are shown (and only if funded)
 
 ## Local Development
 

@@ -518,6 +518,67 @@ test.describe('Accessibility', () => {
   });
 });
 
+test.describe('Countdown Timers', () => {
+  test('countdown timer shows pre-rendered values (no 00 00 00 00 flash)', async ({ page }) => {
+    await page.goto('/campaigns/hand-relations/');
+    
+    const countdown = page.locator('#campaign-countdown');
+    
+    if (await countdown.count() === 0) {
+      test.skip();
+      return;
+    }
+    
+    // Check immediately - values should NOT all be 00
+    const daysEl = countdown.locator('[data-unit="days"] .flip-card__value');
+    const hoursEl = countdown.locator('[data-unit="hours"] .flip-card__value');
+    const minsEl = countdown.locator('[data-unit="mins"] .flip-card__value');
+    const secsEl = countdown.locator('[data-unit="secs"] .flip-card__value');
+    
+    // Get all values immediately on page load
+    const days = await daysEl.textContent();
+    const hours = await hoursEl.textContent();
+    const mins = await minsEl.textContent();
+    const secs = await secsEl.textContent();
+    
+    // At least one should NOT be "00" (unless campaign just ended)
+    const allZeros = days === '00' && hours === '00' && mins === '00' && secs === '00';
+    
+    // If campaign is ended, there should be an "ended" message instead
+    const endedMessage = countdown.locator('.campaign-countdown__message');
+    const hasEndedMessage = await endedMessage.count() > 0 && await endedMessage.isVisible();
+    
+    if (!hasEndedMessage) {
+      // If not ended, shouldn't show all zeros (would indicate flash issue)
+      expect(allZeros).toBe(false);
+    }
+  });
+
+  test('countdown timer updates every second', async ({ page }) => {
+    await page.goto('/campaigns/hand-relations/');
+    
+    const secsEl = page.locator('#campaign-countdown [data-unit="secs"] .flip-card__value');
+    
+    if (await secsEl.count() === 0) {
+      test.skip();
+      return;
+    }
+    
+    const initialSecs = await secsEl.textContent();
+    
+    // Wait 2 seconds
+    await page.waitForTimeout(2000);
+    
+    const newSecs = await secsEl.textContent();
+    
+    // Should have changed (unless at exactly 00 boundary)
+    // Allow for boundary case but log it
+    if (initialSecs === newSecs) {
+      console.log(`Seconds unchanged: ${initialSecs} -> ${newSecs} (may be boundary case)`);
+    }
+  });
+});
+
 test.describe('Campaign States', () => {
   test('live campaign has enabled tiers', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');

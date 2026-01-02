@@ -62,10 +62,14 @@ bundle exec jekyll clean
 - Cloudflare Worker (pledge storage, stats, inventory, emails)
 - Worker cron trigger for auto-settle (midnight MT)
 - Aggregated charging (one charge per supporter)
+- Support items and custom amounts data flow (cart → Worker → KV → stats)
+- Countdown timer pre-rendering (no "00 00 00 00" flash)
+- Multi-tier pledge support (`additionalTiers`)
+- Unit tests (Vitest) and E2E tests (Playwright)
+- Production campaign launch (Hand Relations)
 
 🚧 **In Progress:**
-- End-to-end Playwright tests
-- Production campaign launch testing
+_(None currently)_
 
 ---
 

@@ -17,12 +17,13 @@ This document outlines who does what for the **pool.dustwave.xyz** project.
 ### 3. Cloudflare Worker Maintainer
 - Maintains `pledge.dustwave.xyz` Worker.
 - Creates Stripe Checkout Sessions (setup mode) and handles Stripe webhooks.
-- Writes Stripe IDs (customer, payment_method) to Snipcart order metadata.
+- Stores pledges in Cloudflare KV (tiers, support items, custom amounts, Stripe IDs).
+- Manages live stats, tier inventory, and support item tracking.
+- Maintains Worker cron for auto-settle (charges pledges at midnight MT when funded).
 
 ### 4. GitHub Actions Maintainer
-- Manages scheduled cron workflow and `scripts/charge.js`.
-- Transitions campaign states (pre → live → post).
-- Charges saved payment methods off-session when campaigns are funded.
+- Manages deploy workflow for GitHub Pages.
+- Configures repository secrets for Worker deployment.
 
 ### 5. Content Editor
 - Creates/edits `_campaigns/<slug>.md`.
@@ -42,3 +43,5 @@ This document outlines who does what for the **pool.dustwave.xyz** project.
 - [ ] Stripe webhook configured for Worker endpoint.
 - [ ] GitHub Action secrets (`STRIPE_SECRET_KEY`, `SNIPCART_SECRET`) in place.
 - [ ] Successful $1 test pledge end-to-end in Stripe test mode.
+- [ ] Live stats updating correctly (`/stats/:slug`).
+- [ ] Support items and custom amounts tracked in KV.

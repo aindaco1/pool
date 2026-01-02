@@ -30,11 +30,11 @@ All code is versioned and auditable — no external DB or CMS needed.
 
 1. **Visitor pledges** through Snipcart → Worker launches Stripe Checkout in “setup” mode.  
 2. **Stripe** saves a card, returning IDs to the Worker.  
-3. Worker writes Stripe IDs into the **Snipcart order metadata**.  
-4. **Cron Action** runs daily:  
-   - Moves `live` → `post` when `goal_deadline` passes.  
-   - If funded, charges each pledge off-session using saved payment methods.  
-   - Commits updates (`charged: true`, etc.) back into `_campaigns/`.
+3. Worker stores pledge in **Cloudflare KV** (tiers, support items, custom amounts, Stripe IDs).  
+4. **Worker cron** runs daily at midnight MT:  
+   - Triggers site rebuild when `goal_deadline` passes (`live` → `post`).  
+   - If funded, charges pledges off-session (aggregated by email — one charge per supporter).  
+   - Updates pledge status to `charged` or `payment_failed` in KV.
 
 ---
 
@@ -105,6 +105,8 @@ All code is versioned and auditable — no external DB or CMS needed.
 2. **YAML strings**: Quote strings with special characters (colons, quotes) to avoid parsing errors.
 3. **Division by zero**: Always check denominators before division in Liquid templates.
 4. **Sass compilation**: Jekyll compiles `.scss` files automatically when `sass:` is configured in `_config.yml`.
+5. **Countdown pre-rendering**: Calculate initial values at build time (Jekyll) or render time (JS) to avoid "00 00 00 00" flash.
+6. **Support items data flow**: Cart.js extracts support items → Worker stores in temp KV → Webhook merges into final pledge.
 
 ---
 
