@@ -39,6 +39,20 @@ document.addEventListener('snipcart.ready', function() {
   Snipcart.store.subscribe(function() {
     requestAnimationFrame(markStackableItems);
   });
+  
+  // Also observe DOM for new item lines (cart reopening, navigation)
+  var snipcartRoot = document.getElementById('snipcart');
+  if (snipcartRoot) {
+    var observer = new MutationObserver(function(mutations) {
+      for (var i = 0; i < mutations.length; i++) {
+        if (mutations[i].addedNodes.length > 0) {
+          requestAnimationFrame(markStackableItems);
+          break;
+        }
+      }
+    });
+    observer.observe(snipcartRoot, { childList: true, subtree: true });
+  }
 });
 </script>
 <script src="/assets/js/snipcart-debug.js" defer></script>
