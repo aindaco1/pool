@@ -219,7 +219,8 @@ function initSnipcart() {
         price: parseFloat(this.getAttribute('data-item-price')),
         url: this.getAttribute('data-item-url'),
         description: this.getAttribute('data-item-description'),
-        stackable: isStackable
+        stackable: isStackable,
+        shippable: this.getAttribute('data-item-shippable') === 'true'
       };
       if (maxQty) {
         item.maxQuantity = parseInt(maxQty);
