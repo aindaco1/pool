@@ -278,9 +278,6 @@
       {% if page.tiers %}
       <section class="sidebar-tiers" id="campaign-tiers">
         <h4>Tiers</h4>
-        {% if page.state == "upcoming" %}
-          <p class="notice-small">Opens {{ page.start_date | date: "%b %-d" }}</p>
-        {% endif %}
         
         {% assign featured_tier = page.tiers | where: "id", page.featured_tier_id | first %}
         {% if featured_tier %}
