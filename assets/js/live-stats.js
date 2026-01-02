@@ -309,6 +309,14 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchLiveInventory();
 });
 
+// Refetch when navigating back (bfcache restore)
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    fetchAllLiveStats();
+    fetchLiveInventory();
+  }
+});
+
 // Export for manual refresh and inventory lookup
 window.refreshLiveStats = fetchAllLiveStats;
 window.refreshLiveInventory = fetchLiveInventory;

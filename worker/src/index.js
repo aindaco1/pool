@@ -1193,49 +1193,6 @@ async function handleGetPledges(request, env) {
     }
   }
 
-  if (pledges.length === 0) {
-    const snipcartSecret = getSnipcartSecret(env);
-    if (snipcartSecret) {
-      try {
-        const snipcart = createSnipcartClient(snipcartSecret);
-        const response = await snipcart.orders.list({ email: payload.email, limit: 50 });
-        const orders = response.items || [];
-        
-        for (const order of orders) {
-          if (order.status === 'Cancelled') continue;
-          
-          const pledge = extractPledgeFromOrder(order);
-          if (pledge) {
-            const cancelCheck = canCancelOrder(order);
-            const modifyCheck = canModifyOrder(order);
-            
-            // For Snipcart orders, check metadata for subtotal/tax or derive from amount
-            const subtotal = order.metadata?.subtotal || pledge.amount;
-            const tax = order.metadata?.tax || calculateTax(subtotal);
-            pledges.push({
-              orderId: order.token,
-              email: order.email,
-              campaignSlug: pledge.campaignSlug,
-              pledgeStatus: order.metadata?.pledgeStatus || 'active',
-              subtotal,
-              tax,
-              amount: order.metadata?.totalAmount || (subtotal + tax),
-              tierId: pledge.tierId,
-              tierName: pledge.tierName,
-              supportItems: pledge.supportItems || [],
-              customAmount: pledge.customAmount || 0,
-              canModify: modifyCheck.allowed,
-              canCancel: cancelCheck.allowed,
-              canUpdatePaymentMethod: !order.metadata?.charged
-            });
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch Snipcart orders:', err.message);
-      }
-    }
-  }
-
   return jsonResponse(pledges);
 }
 
@@ -1321,44 +1278,17 @@ async function handleCancelPledge(request, env) {
           console.log('📦 Additional tier inventory released:', addTier.id);
         }
       }
-    }
-  }
-
-  const snipcartSecret = getSnipcartSecret(env);
-  if (snipcartSecret) {
-    const snipcart = createSnipcartClient(snipcartSecret);
-
-    let order;
-    try {
-      order = await snipcart.orders.get(targetOrderId);
-    } catch (err) {
-      return jsonResponse({ error: 'Order not found' }, 404);
-    }
-
-    const cancelCheck = canCancelOrder(order);
-    if (!cancelCheck.allowed) {
-      return jsonResponse({ error: cancelCheck.reason }, 400);
-    }
-
-    try {
-      await snipcart.orders.update(targetOrderId, {
-        status: 'Cancelled',
-        metadata: {
-          ...order.metadata,
-          pledgeStatus: 'cancelled',
-          cancelledAt: new Date().toISOString()
-        }
+      
+      // KV pledge found and cancelled - we're done
+      return jsonResponse({
+        success: true,
+        message: 'Pledge cancelled'
       });
-    } catch (err) {
-      console.error('Failed to cancel order in Snipcart:', err.message);
-      return jsonResponse({ error: 'Failed to cancel pledge' }, 500);
     }
   }
 
-  return jsonResponse({
-    success: true,
-    message: 'Pledge cancelled'
-  });
+  // No KV pledge found - this shouldn't happen for new pledges
+  return jsonResponse({ error: 'Pledge not found' }, 404);
 }
 
 async function handleModifyPledge(request, env) {
