@@ -94,9 +94,9 @@ decisions:
     deadline: 2026-01-10
     options:
       - label: A
-        image: https://images.unsplash.com/photo-1509248961048-6d4e6912c458?w=400
+        image: /assets/images/campaigns/hand-relations/poster-a.jpg
       - label: B
-        image: https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=400
+        image: /assets/images/campaigns/hand-relations/poster-b.jpg
     eligible: backers
     status: open
   - id: festival
