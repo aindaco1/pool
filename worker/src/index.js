@@ -31,7 +31,7 @@
  */
 
 import { generateToken, verifyToken } from './token.js';
-import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail } from './email.js';
+import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail } from './email.js';
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, validateTier, getEffectiveState } from './campaigns.js';
@@ -1315,6 +1315,50 @@ async function handleCancelPledge(request, env) {
           await releaseTierInventory(env, pledgeData.campaignSlug, addTier.id, addTier.qty || 1);
           console.log('📦 Additional tier inventory released:', addTier.id);
         }
+      }
+      
+      // Update email mapping - check if user has other active pledges
+      const emailKey = `email:${pledgeData.email.toLowerCase()}`;
+      const existingOrders = await env.PLEDGES.get(emailKey, { type: 'json' }) || [];
+      
+      // Remove this order from the list
+      const updatedOrders = existingOrders.filter(id => id !== targetOrderId);
+      
+      // Check remaining orders for active pledges
+      let hasActivePledges = false;
+      for (const otherId of updatedOrders) {
+        const otherPledge = await env.PLEDGES.get(`pledge:${otherId}`, { type: 'json' });
+        if (otherPledge && otherPledge.pledgeStatus !== 'cancelled') {
+          hasActivePledges = true;
+          break;
+        }
+      }
+      
+      if (hasActivePledges) {
+        // Keep the email mapping but with updated order list
+        await env.PLEDGES.put(emailKey, JSON.stringify(updatedOrders));
+        console.log('📧 Email mapping updated (user has other active pledges):', emailKey);
+      } else {
+        // Remove email mapping entirely - user loses Community access
+        await env.PLEDGES.delete(emailKey);
+        console.log('📧 Email mapping removed (no active pledges):', emailKey);
+      }
+      
+      // Send cancellation confirmation email
+      const campaign = await getCampaign(env, pledgeData.campaignSlug);
+      const campaignTitle = campaign?.title || pledgeData.campaignSlug.replace(/-/g, ' ').toUpperCase();
+      
+      try {
+        await sendPledgeCancelledEmail(env, {
+          email: pledgeData.email,
+          campaignSlug: pledgeData.campaignSlug,
+          campaignTitle,
+          amount: pledgeData.subtotal || pledgeData.amount || 0
+        });
+        console.log('📧 Cancellation email sent to:', pledgeData.email);
+      } catch (emailErr) {
+        console.error('📧 Failed to send cancellation email:', emailErr.message);
+        // Don't fail the cancellation if email fails
       }
       
       // KV pledge found and cancelled - we're done

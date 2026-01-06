@@ -352,6 +352,70 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
 }
 
 /**
+ * Send pledge cancellation confirmation email
+ */
+export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campaignTitle, amount }) {
+  const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/`;
+  
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <h1 style="margin: 0; font-size: 24px;">Pledge Cancelled</h1>
+  </div>
+  
+  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+    <p style="margin: 0 0 8px 0;"><strong>Campaign:</strong> ${campaignTitle}</p>
+    <p style="margin: 0 0 8px 0;"><strong>Amount:</strong> $${(amount / 100).toFixed(0)}</p>
+    <p style="margin: 0; color: #666; font-size: 14px;">
+      Your card was never charged — this was just a pledge hold.
+    </p>
+  </div>
+  
+  <p style="margin-bottom: 24px;">Your pledge has been cancelled and you won't be charged. If you change your mind, you can always make a new pledge while the campaign is still live.</p>
+  
+  <div style="text-align: center; margin-bottom: 32px;">
+    <a href="${campaignUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+      View Campaign
+    </a>
+  </div>
+  
+  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+    <p style="margin: 0;">You've been removed from supporter updates for this campaign. Make a new pledge to rejoin.</p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: 'The Pool <pledges@pool.dustwave.xyz>',
+      to: email,
+      subject: `Pledge cancelled for ${campaignTitle}`,
+      html
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Resend error (cancelled):', error);
+    throw new Error(`Failed to send cancellation email: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
  * Send goal milestone notification to supporters
  * @param {string} milestone - 'one-third' | 'two-thirds' | 'goal' | 'stretch'
  */
