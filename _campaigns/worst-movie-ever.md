@@ -31,10 +31,12 @@ long_content:
 
   - type: divider
 
+  - type: image
+    src: /assets/images/campaigns/worst-movie-ever/what-is-this.png
+    alt: "What Is This?"
+
   - type: text
     body: |
-      ## What Is This?
-
       **Your Money, Your Movie, Our Problem!**
 
       _The Worst Movie Ever_ is an experimental film production with a dadaist, "exquisite corpse" approach. Each and every donor gets to contribute something that the filmmakers *have* to include in the film. Will they help us? Will they hurt us? They decide!
@@ -60,10 +62,12 @@ long_content:
 
   - type: divider
 
+  - type: image
+    src: /assets/images/campaigns/worst-movie-ever/who-are-we.png
+    alt: "Who Are We?"
+
   - type: text
     body: |
-      ## Who Are We?
-
       We are **The Worst Filmmakers**—and we're staying anonymous.
 
       Why? Because this isn't about us. It's about *you*. The mysterious, possibly antagonistic relationship between the filmmakers and the public is the point. We're here to be tripped up, challenged, and forced to make your terrible ideas work.
@@ -89,10 +93,12 @@ long_content:
 
   - type: divider
 
+  - type: image
+    src: /assets/images/campaigns/worst-movie-ever/whats-so-special.png
+    alt: "What's So Special About This?"
+
   - type: text
     body: |
-      ## What's So Special About This?
-
       Most crowdfunded films ask you to fund their vision. We're asking you to *destroy* ours.
 
       **The Tiers Are The Story.** Every pledge level gives you actual control over the film:
@@ -136,10 +142,12 @@ long_content:
 
   - type: divider
 
+  - type: image
+    src: /assets/images/campaigns/worst-movie-ever/what-is-dust-wave.png
+    alt: "What Is Dust Wave?"
+
   - type: text
     body: |
-      ## What Is Dust Wave?
-
       Since 2022, **Dust Wave** has been empowering creatives outside of the film industry to pursue their artistic endeavors by creating a community focused on mutual support.
 
       Since then, we have created **over 20 short films** and built a network of **more than 250 artists** spanning the southwest who share the same passion for independent cinema as we do.
@@ -158,9 +166,12 @@ long_content:
 
   - type: divider
 
+  - type: image
+    src: /assets/images/campaigns/worst-movie-ever/why-crowdfunding.png
+    alt: "Why Crowdfunding?"
+
   - type: text
     body: |
-      ## Why Crowdfunding?
 
       Traditional financing wanted us to make it... *good*? We refused.
 
@@ -174,10 +185,12 @@ long_content:
 
   - type: divider
 
+  - type: image
+    src: /assets/images/campaigns/worst-movie-ever/risks-and-challenges.png
+    alt: "Risks and Challenges"
+
   - type: text
     body: |
-      ## Risks and Challenges
-
       Let's be honest about what could go wrong:
 
       **The Obvious Risk:** You might submit something genuinely terrible. That's... kind of the point? But we do have limits.
