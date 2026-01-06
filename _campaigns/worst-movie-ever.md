@@ -17,6 +17,8 @@ campaign_background: /assets/images/campaigns/worst-movie-ever/background.png
 short_blurb: "A deliberately terrible film where backers control the chaos."
 show_ongoing: false
 single_tier_only: false
+stretch_hidden: true
+custom_late_support: true
 long_content:
   - type: text
     body: |
@@ -198,15 +200,12 @@ long_content:
     alt: "Diagram showing the balance between chaos and coherence"
     caption: "The eternal struggle: your terrible ideas vs. our desperate attempts to make them work"
 featured_tier_id: frame
-stretch_hidden: true
 
 stretch_goals:
   - threshold: 3500
     title: Bad Sound Design
     description: More off-sync dialogue & random animal noises.
     status: locked
-
-custom_late_support: true
 
 support_items:
   - id: feed-the-crew

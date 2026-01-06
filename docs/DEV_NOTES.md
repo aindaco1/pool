@@ -999,4 +999,44 @@ npm test  # Runs unit tests, then E2E tests
 
 ---
 
+## Clearing KV Data (Debugging)
+
+When debugging pledge flows, you may need to clear Worker KV data.
+
+### Local KV (wrangler dev)
+
+```bash
+# Nuclear option - delete all local KV state
+rm -rf worker/.wrangler/state/
+
+# Or list/delete specific keys
+cd worker
+npx wrangler kv key list --binding PLEDGES --local
+npx wrangler kv key delete --binding PLEDGES --local "pledge:example-key"
+```
+
+### Preview KV (remote dev namespace)
+
+```bash
+cd worker
+
+# List all keys
+npx wrangler kv key list --binding PLEDGES --preview
+
+# Delete all preview pledges
+npx wrangler kv key list --binding PLEDGES --preview | jq -r '.[].name' | while read key; do
+  yes | npx wrangler kv key delete --binding PLEDGES --preview "$key"
+done
+```
+
+### KV Bindings
+
+| Binding | Purpose |
+|---------|---------|
+| `PLEDGES` | Pledge records, stats, email mappings |
+| `VOTES` | Community voting data |
+| `RATELIMIT` | Rate limiting counters |
+
+---
+
 _Last updated: Jan 2026_

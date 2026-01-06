@@ -15,7 +15,9 @@ creator_name: "Dust Wave"
 category: "Feature Film"
 short_blurb: "Elevated horror where a corporate empathy campaign consumes bureaucracy."
 show_ongoing: false
-single_tier_only: true
+single_tier_only: false
+stretch_hidden: true
+custom_late_support: true
 long_content:
   - type: text
     body: |
@@ -167,12 +169,12 @@ tiers:
   - id: creature-cameo
     name: Creature Cameo
     price: 250
-    image: /assets/images/defaults/tier-sfx.png
+    image: /assets/images/defaults/tier-creature.gif
     description: Name the practical creature from the stretch goal insert shot.
     limit_total: 1
     remaining: 1
     stackable: false
     category: digital
     late_support: false
-    requires_threshold: 35000
+    requires_threshold: 50000
 ---
