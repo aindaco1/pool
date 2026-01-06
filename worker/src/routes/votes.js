@@ -40,6 +40,14 @@ export async function handleGetVotes(request, env) {
     }
     orderId = payload.orderId;
     campaignSlug = payload.campaignSlug;
+    
+    // Check if pledge is still active (not cancelled)
+    if (env.PLEDGES) {
+      const pledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+      if (pledge && pledge.pledgeStatus === 'cancelled') {
+        return jsonResponse({ error: 'Pledge has been cancelled' }, 403, env);
+      }
+    }
   }
   
   if (!decisionsParam) {
@@ -121,6 +129,14 @@ export async function handlePostVote(request, env) {
     }
     orderId = payload.orderId;
     campaignSlug = payload.campaignSlug;
+    
+    // Check if pledge is still active (not cancelled)
+    if (env.PLEDGES) {
+      const pledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+      if (pledge && pledge.pledgeStatus === 'cancelled') {
+        return jsonResponse({ error: 'Pledge has been cancelled' }, 403, env);
+      }
+    }
   }
   
   // Cast vote

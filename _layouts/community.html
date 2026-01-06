@@ -191,12 +191,19 @@
         document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Lax';
       }
       
+      function clearCookie(name) {
+        document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+      }
+      
       function showContent() {
         document.getElementById('community-loading').hidden = true;
         document.getElementById('community-content').hidden = false;
       }
       
       function showDenied() {
+        // Clear any stale supporter cookies
+        clearCookie(COOKIE_NAME);
+        clearCookie('supporter_token_' + CAMPAIGN_SLUG);
         document.getElementById('community-loading').hidden = true;
         document.getElementById('community-denied').hidden = false;
       }
@@ -216,17 +223,8 @@
           return;
         }
         
-        // Check for existing supporter cookie
-        const existingCookie = getCookie(COOKIE_NAME);
-        if (existingCookie === 'verified') {
-          // Restore token from cookie for API calls
-          userToken = getCookie('supporter_token_' + CAMPAIGN_SLUG);
-          showContent();
-          return;
-        }
-        
-        // Check for token in URL
-        const token = params.get('t');
+        // Check for token in URL or stored cookie
+        const token = params.get('t') || getCookie('supporter_token_' + CAMPAIGN_SLUG);
         
         if (!token) {
           showDenied();
@@ -234,7 +232,7 @@
         }
         
         try {
-          // Verify token with Worker
+          // Always verify with Worker (catches cancelled pledges)
           console.log('[Community] Verifying token with:', WORKER_BASE + '/pledge?token=' + token.substring(0, 20) + '...');
           const res = await fetch(WORKER_BASE + '/pledge?token=' + encodeURIComponent(token));
           console.log('[Community] Response status:', res.status);
@@ -261,12 +259,16 @@
             return;
           }
           
-          // Valid supporter! Set cookie and show content
+          // Valid supporter! Set/refresh cookies and show content
+          userToken = token;
           setCookie(COOKIE_NAME, 'verified', 90); // 90 days
+          setCookie('supporter_token_' + CAMPAIGN_SLUG, token, 90);
           
-          // Clean up URL (remove token)
-          const cleanUrl = window.location.pathname;
-          window.history.replaceState({}, '', cleanUrl);
+          // Clean up URL (remove token if present)
+          if (params.get('t')) {
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, '', cleanUrl);
+          }
           
           showContent();
         } catch (err) {
@@ -431,25 +433,11 @@
         }
       });
       
-      // Modified verifyAccess to store token and load votes
+      // Load vote status after showing content
       const originalShowContent = showContent;
       showContent = function() {
         originalShowContent();
         loadVoteStatus();
-      };
-      
-      // Store token when verifying access
-      const originalVerifyAccess = verifyAccess;
-      verifyAccess = async function() {
-        const params = new URLSearchParams(window.location.search);
-        userToken = params.get('t') || getCookie('supporter_token_' + CAMPAIGN_SLUG);
-        
-        // Store token in cookie for future API calls
-        if (userToken && !getCookie('supporter_token_' + CAMPAIGN_SLUG)) {
-          setCookie('supporter_token_' + CAMPAIGN_SLUG, userToken, 90);
-        }
-        
-        await originalVerifyAccess();
       };
       
       verifyAccess();
