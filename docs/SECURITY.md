@@ -441,7 +441,7 @@ If a checkout completes but the pledge doesn't appear (common in local dev):
 
 ## Security Contacts
 
-- **Primary:** [your-email@dustwave.xyz]
+- **Primary:** [alonso@dustwave.xyz]
 - **Stripe Security:** [stripe.com/docs/security](https://stripe.com/docs/security)
 - **Cloudflare Status:** [cloudflarestatus.com](https://www.cloudflarestatus.com)
 

@@ -175,7 +175,10 @@ Read pledge details for magic link management page.
 Cancel an active pledge.
 
 **Request:** `{ token }`  
-**Action:** Mark pledge as cancelled in KV, update stats, release tier inventory
+**Actions:**
+1. Mark pledge as cancelled in KV, update stats, release tier inventory
+2. Send cancellation confirmation email
+3. If no remaining active pledges for this email/campaign → clear `email:{email}` mapping from KV (revokes community access)
 
 ### `POST /pledge/modify`
 Change tier or amount.
@@ -260,10 +263,11 @@ Magic link landing page for pledge management:
 
 ### `/community/:slug/`
 Supporter-only community page:
-- Verifies `?t=...` token against Worker
-- Sets `supporter_{slug}` cookie (90 days) for future visits
+- Always verifies with Worker API (doesn't trust cookies alone)
+- On success: Sets `supporter_{slug}` cookie (90 days) for UX optimization
+- On failure (cancelled pledge, expired token): Clears cookies, shows access denied CTA
 - Shows voting/polling decisions exclusive to backers
-- Access denied page shown to non-supporters
+- `/votes` API returns 403 for cancelled pledges (double-checks access)
 
 ---
 
@@ -362,6 +366,11 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
 - Subject: "Action needed: Update your payment method"
 - Contains: Manage link to update card, deadline reminder
 
+**Pledge Cancelled** (sent when supporter cancels their pledge)
+- Subject: "Pledge cancelled for {Campaign Title}"
+- Contains: Amount, confirmation card wasn't charged, link to view campaign (can re-pledge)
+- Note: Supporter is removed from future campaign email updates
+
 ---
 
 ## Security Considerations
@@ -372,6 +381,8 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
 - All secrets in Cloudflare Worker environment variables
 - Stripe webhook signatures verified
 - All deadlines evaluated in Mountain Time
+- Community/voting access revoked immediately when pledge is cancelled
+- `/votes` API checks pledge status on every request (not just token validity)
 
 ---
 
@@ -393,4 +404,4 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
 
 ---
 
-_Last updated: Jan 2026_
+_Last updated: Jan 6, 2026_
