@@ -1084,10 +1084,12 @@ async function handleStripeWebhook(request, env) {
 async function handleSnipcartWebhook(request, env, ctx) {
   const body = await request.text();
   
-  // SEC-007: Fail closed if webhook secret not configured, use timing-safe comparison
+  // Pool bypasses Snipcart payment processing entirely - Stripe webhooks handle everything.
+  // This endpoint exists for compatibility but doesn't process any events.
+  // If webhook secret isn't configured, just acknowledge receipt to prevent retries.
   if (!env.SNIPCART_WEBHOOK_SECRET) {
-    console.error('CRITICAL: SNIPCART_WEBHOOK_SECRET not configured');
-    return jsonResponse({ error: 'Webhook not configured' }, 500);
+    console.log('Snipcart webhook received (ignored - no secret configured)');
+    return jsonResponse({ received: true });
   }
   
   const requestToken = request.headers.get('x-snipcart-requesttoken') || '';

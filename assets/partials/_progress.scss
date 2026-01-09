@@ -7,6 +7,10 @@
   padding-right: 60px;
   overflow: visible;
   
+  @include ms {
+    margin-top: 40px;
+  }
+  
   @include xsm {
     padding-right: 20px;
   }
