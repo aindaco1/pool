@@ -731,11 +731,12 @@ async function handleStripeWebhook(request, env) {
   const body = await request.text();
   const sig = request.headers.get('stripe-signature');
 
-  // SEC-002: Fail closed if webhook secret is not configured
+  // SEC-002: If webhook secret is not configured, acknowledge receipt but don't process
+  // This prevents Stripe from retrying indefinitely (e.g., test mode webhooks hitting prod worker)
   const webhookSecret = getStripeWebhookSecret(env);
   if (!webhookSecret) {
-    console.error('CRITICAL: Stripe webhook secret not configured');
-    return jsonResponse({ error: 'Webhook not configured' }, 500);
+    console.warn('Stripe webhook secret not configured for this mode, acknowledging receipt');
+    return jsonResponse({ received: true, skipped: 'webhook secret not configured' }, 200);
   }
 
   const { valid, error } = await verifyStripeSignature(body, sig, webhookSecret);
