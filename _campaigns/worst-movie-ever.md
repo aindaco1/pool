@@ -14,38 +14,38 @@ creator_name: "The Worst Filmmakers"
 category: "Short Film"
 progress_background: /assets/images/campaigns/worst-movie-ever/leg.png
 campaign_background: /assets/images/campaigns/worst-movie-ever/background.png
-short_blurb: "A deliberately terrible film where backers control the chaos."
+short_blurb: "A terrible movie <em>you</em> make ... to support a nonprofit."
 show_ongoing: false
 single_tier_only: false
-stretch_hidden: true
+stretch_hidden: false
 custom_late_support: true
 long_content:
+  - type: image
+    src: /assets/images/campaigns/worst-movie-ever/collage-style.png
+    alt: "Title Image"
+
   - type: text
     body: |
-      _THE WORST MOVIE EVER_ invites backers to actively sabotage—er, *enhance*—the film via limited "creative control" rewards. We retain creative discretion for coherence & safety. See **[Terms](/terms/)**.
-
-  - type: video
-    provider: youtube
-    video_id: "dQw4w9WgXcQ"
-    caption: "Concept teaser — final film will be worse"
+      We invite backers to actively sabotage -- er, *enhance* -- this film via limited "creative control" rewards. Of course (we're not completely stupid), we retain creative discretion for coherence & safety. See **[Terms](/terms/)**.
 
   - type: divider
 
   - type: image
-    src: /assets/images/campaigns/worst-movie-ever/what-is-this.png
-    alt: "What Is This?"
+    src: /assets/images/campaigns/worst-movie-ever/story.png
+    alt: "Your Money, Your Movie, Our Problem!"
 
   - type: text
     body: |
-      **Your Money, Your Movie, Our Problem!**
 
-      _The Worst Movie Ever_ is an experimental film production with a dadaist, "exquisite corpse" approach. Each and every donor gets to contribute something that the filmmakers *have* to include in the film. Will they help us? Will they hurt us? They decide!
+      _THE WORST MOVIE EVER_ is an experimental film production with a dadaist, "exquisite corpse" approach. **Each and every donor gets to contribute something** that the filmmakers *have* to include in the film. Will you help us? Will you hurt us? You decide!
 
-      This project is centered around the ideas of **collaboration**, **community**, and **chaos**—particularly with regard to the vibrant tapestry of Burqueño culture. It is a filmmaking exercise, an inversion of artistic authority, and a fundraiser for charity.
+      This project is centered around the ideas of **collaboration**, **community**, and **chaos** -- particularly with regard to the vibrant tapestry of Burque culture. It is **a filmmaking exercise, an inversion of artistic authority, and a fundraiser for [FUSION](https://www.fusionnm.org)**, all at once.
 
   - type: quote
-    text: "We're not making a bad movie by accident. We're making a bad movie with intention, precision, and your money."
-    author: "Director's statement"
+    text: "We're not making a bad movie by accident. We're making a terrible movie ... on purpose."
+    author: "The Worst Filmmakers"
+
+  - type: divider
 
   - type: text
     body: |
@@ -56,7 +56,7 @@ long_content:
       **You decide.**
 
   - type: image
-    src: https://images.unsplash.com/photo-1518732751612-2c0787ff5684?w=1200
+    src: /assets/images/campaigns/worst-movie-ever/jack.jpg
     alt: "Jack McLaughlin arriving in Albuquerque"
     caption: "Jack McLaughlin, moments before everything goes wrong"
 
@@ -68,28 +68,29 @@ long_content:
 
   - type: text
     body: |
-      We are **The Worst Filmmakers**—and we're staying anonymous.
+      We are **The Worst Filmmakers** -- and we're staying anonymous.
 
       Why? Because this isn't about us. It's about *you*. The mysterious, possibly antagonistic relationship between the filmmakers and the public is the point. We're here to be tripped up, challenged, and forced to make your terrible ideas work.
 
-      The director(s) will remain publicly anonymous. We're not hiding because we're ashamed (we will be later). We're hiding because the chaos is the star.
-
-  - type: quote
-    text: "The filmmakers are committed to making the film for a near-zero budget, with all profits going to charity. We're either geniuses or fools. Probably both."
-    author: "The Worst Filmmakers (anonymous)"
+      The director(s) will remain publicly anonymous. We're not hiding because we're ashamed (we will be later). We're hiding because _the chaos is the star_.
 
   - type: gallery
-    layout: grid
+    layout: logos
     images:
-      - src: https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=600
-        alt: "Anonymous filmmaker in disguise"
-      - src: https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=600
-        alt: "Abstract collage art"
-      - src: https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=600
-        alt: "The planning board - chaotic conspiracy style"
-      - src: https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=600
-        alt: "Exquisite corpse artistic inspiration"
-    caption: "The team behind the chaos (identities redacted for your protection)"
+      - src: /assets/images/campaigns/worst-movie-ever/dust-wave-square.png
+        alt: "Dust Wave"
+      - src: /assets/images/campaigns/worst-movie-ever/fusion.png
+        alt: "FUSION"
+
+  - type: text
+    body: |
+      We are gleefully partnered with **[Dust Wave](https://dustwave.xyz)** and **[FUSION](https://www.fusionnm.org)**. Since 2022, Dust Wave has been empowering creatives outside of the film industry to pursue their artistic endeavors, creating **over 30 short films** and building a network of **more than 250 artists** spanning the southwest. FUSION is a community-inspired creative space in Albuquerque, New Mexico, supporting local artists for 25 years.
+
+      **Dust Wave is helping with the fundraising campaign,** and **FUSION will be the recipient of all the profits raised from this campaign.**
+
+  - type: quote
+    text: "Do terrible things to us. Please."
+    author: "The Worst Filmmakers"
 
   - type: divider
 
@@ -101,68 +102,44 @@ long_content:
     body: |
       Most crowdfunded films ask you to fund their vision. We're asking you to *destroy* ours.
 
-      **The Tiers Are The Story.** Every pledge level gives you actual control over the film:
-      - Upload a frame
-      - Submit a sound effect
-      - Write dialogue an actor *must* say
-      - Design a costume someone *must* wear
-      - Force Jack to do *whatever you write*
+      **[The Tiers Are the Story.](/campaigns/worst-movie-ever/#campaign-tiers)** Every pledge level gives you actual control over the film:
+
+      - **$1** — 1 frame of your choice uploaded into the film
+      - **$5** — Writer credit (no writing required)
+      - **$20** — Upload a sound effect to be used in the film + writer credit
+      - **$50** — Write a line of dialogue to be said in the film + writer credit
+      - **$100** — Add a handheld prop to the story + writer credit
+      - **$150** — Add a costume to the story + writer credit
+      - **$250** — Add a character + executive producer credit + a special STONED director's commentary cut of the film
+      - **$500** — Jack does whatever you write + writer credit + a copy of the script + executive producer credit + a special STONED director's commentary cut of the film
+      - **$1000** — One scene in another language of your choice + writer credit + executive producer credit + STONED director's commentary
+      - **$5000** — Act in the movie + writer credit + executive producer credit + STONED director's commentary
 
       This is an **inversion of artistic authority**. The donors become the directors. The filmmakers become the executors of your collective madness.
 
-  - type: image
-    src: /assets/images/campaigns/worst-movie-ever/collage-style.png
-    alt: "Promotional material in chaotic collage style"
-    caption: "The hodgepodge aesthetic: collage meets conspiracy theory meets exquisite corpse"
+  - type: text
+    body: |
+      ### Stretch Goals
+
+      Every $500 after our $2,500 goal unlocks a new stretch goal—and you get to vote on who suffers: the directors, individually or together!
+
+      - **$3,000** — Directors must give all notes in a silly accent of your choice for an entire scene
+      - **$3,500** — Directors wear oven mitts for a day
+      - **$4,000** — Directors wear drunk goggles for a day
+      - **$4,500** — Directors wear shock collars for a day
+      - **$5,000** — Directors get a Worst Movie Ever tattoo
 
   - type: text
     body: |
-      ### The Promotional Campaign
+      ### Other Ways to Support
 
-      We're not just making a weird film—we're making a weird *experience*:
+      Don't want a reward? You can still help:
 
-      - **Trailers**: Professionally shot on telephoto lenses for a voyeuristic feel, featuring Jack in non-sequitur vignettes around Albuquerque
-      - **Reels**: 1-2 per week during the campaign—trend-focused, attention-grabbing chaos
-      - **Live Events**: A giant psychedelic leg appearing downtown. A masked man dancing around UNM campus. A scavenger hunt across the city.
+      - **[Support without a reward](/campaigns/worst-movie-ever/#custom-amount)** — Your contribution goes directly to FUSION, the nonprofit benefiting from this project.
+      - **[Feed the Crew](/campaigns/worst-movie-ever/#support-feed-the-crew)** — Help us keep the cast and crew fed during production.
+      - **[Buy an Outdoor Heater + Propane](/campaigns/worst-movie-ever/#support-outdoor-heater)** — April nights in Albuquerque get cold. Help us stay warm on set.
 
-      We're coming off your phones and into the real world.
-
-  - type: gallery
-    layout: grid
-    images:
-      - src: https://images.unsplash.com/photo-1590073242678-70ee3fc28e8e?w=600
-        alt: "Downtown Albuquerque location"
-      - src: https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=600
-        alt: "UNM campus location"
-      - src: https://images.unsplash.com/photo-1551887373-3c5bd224f6e2?w=600
-        alt: "The giant psychedelic leg concept"
-      - src: https://images.unsplash.com/photo-1508700929628-666bc8bd84ea?w=600
-        alt: "The masked dancer concept"
-    caption: "Locations and live event concepts around Albuquerque"
-
-  - type: divider
-
-  - type: image
-    src: /assets/images/campaigns/worst-movie-ever/what-is-dust-wave.png
-    alt: "What Is Dust Wave?"
-
-  - type: text
-    body: |
-      Since 2022, **Dust Wave** has been empowering creatives outside of the film industry to pursue their artistic endeavors by creating a community focused on mutual support.
-
-      Since then, we have created **over 20 short films** and built a network of **more than 250 artists** spanning the southwest who share the same passion for independent cinema as we do.
-
-      More information on who we are and what we're about: **[dustwave.xyz/about.html](https://dustwave.xyz/about.html)**
-
-  - type: image
-    src: https://images.unsplash.com/photo-1523908511403-7fc7b25592f4?w=1200
-    alt: "Dust Wave community of filmmakers"
-    caption: "The Dust Wave network — 250+ artists across the southwest"
-
-  - type: audio
-    src: https://upload.wikimedia.org/wikipedia/commons/5/50/Hypnotic_ambient_electronic_music_by_MusicLM.mp3
-    title: "Score concept by Someone's Nephew"
-    caption: "Early synth sketches (recorded on a broken Casio, naturally)"
+      Food and heater contributions go toward production costs. Everything else goes straight to FUSION.
 
   - type: divider
 
@@ -173,15 +150,37 @@ long_content:
   - type: text
     body: |
 
-      Traditional financing wanted us to make it... *good*? We refused.
+      Traditional financing wanted us to make it ... *good*? We refused.
 
-      This film needs to be terrible, and that means finding an audience who *gets it* before we shoot a single frame. Your pledge isn't just funding—it's a vote for the kind of cinema that embraces its own awfulness.
+      This film needs to be terrible, and that means finding an audience who *gets it* before we shoot a single frame. Your pledge isn't just funding -- it's a vote for the kind of cinema that embraces its own awfulness.
 
-      More importantly: **crowdfunding IS the concept**. The film cannot exist without donor contributions. You're not just funding a movie—you're *making* the movie. Every tier is a creative decision. Every backer is a collaborator.
+      More importantly: **crowdfunding IS the concept**. The film cannot exist without donor contributions. You're not just funding a movie -- you're *making* the movie. Every tier is a creative decision. Every backer is a collaborator.
 
   - type: quote
-    text: "We didn't want investors. We wanted accomplices."
+    text: "We don't want investors. We want accomplices."
     author: "The Worst Filmmakers"
+
+  - type: divider
+
+  - type: image
+    src: /assets/images/campaigns/worst-movie-ever/timeline.png
+    alt: "Project Timeline"
+
+  - type: text
+    body: |
+      ### The Timeline
+
+      - **Jan 15 – Feb 15, 2026**: This campaign!
+      - **Feb 16 - Mar 1, 2026**: Backers submit their earned contributions!
+      - **Mar 2026**: Writing and Pre-production (with regular updates to backers)
+      - **Apr 3 – 5, 2026**: Principal Photography; Donation made to FUSION
+      - **May – Aug 2026**: Post-Production (with regular updates to backers)
+      - **Sep 2026**: Pre-Release Marketing
+      - **Oct 2026**: Official Premiere
+
+      ### How Submissions Work
+
+      If the campaign is successful, you'll receive a form to submit your earned contributions. You'll have **two weeks after the campaign ends** to complete your submissions. After that, we start production -- and your terrible ideas become our problem.
 
   - type: divider
 
@@ -193,7 +192,7 @@ long_content:
     body: |
       Let's be honest about what could go wrong:
 
-      **The Obvious Risk:** You might submit something genuinely terrible. That's... kind of the point? But we do have limits.
+      **The Obvious Risk:** You might submit something genuinely terrible. That's ... kind of the point? But we do have limits.
 
       ### The Rules
 
@@ -206,18 +205,35 @@ long_content:
 
       **The Artistic Challenge:** Making a film that's *intentionally* bad but still *watchable* is harder than making a good film. We're walking a tightrope between chaos and coherence.
 
-      **The Promise:** All profits go to charity. The filmmakers get nothing but the satisfaction of surviving your ideas.
+      **The Promise:** All profits go to **[FUSION](https://www.fusionnm.org)** -- the filmmakers get nothing but the satisfaction of surviving your ideas.
 
-  - type: image
-    src: https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=1200
-    alt: "Diagram showing the balance between chaos and coherence"
-    caption: "The eternal struggle: your terrible ideas vs. our desperate attempts to make them work"
+  - type: text
+    body: |
+      ---
+
+      *Design by Stella Cole, Jason Cole, and local Albuquerque artists.*
 featured_tier_id: frame
 
 stretch_goals:
+  - threshold: 3000
+    title: Silly Accent
+    description: Directors must give all notes in a silly accent of your choice for an entire scene.
+    status: locked
   - threshold: 3500
-    title: Bad Sound Design
-    description: More off-sync dialogue & random animal noises.
+    title: Oven Mitts
+    description: Directors wear oven mitts for a day.
+    status: locked
+  - threshold: 4000
+    title: Drunk Goggles
+    description: Directors wear drunk goggles for a day.
+    status: locked
+  - threshold: 4500
+    title: Shock Collars
+    description: Directors wear shock collars for a day.
+    status: locked
+  - threshold: 5000
+    title: Tattoo
+    description: Directors get a Worst Movie Ever tattoo.
     status: locked
 
 support_items:
@@ -244,7 +260,11 @@ decisions:
     eligible: backers
     status: open
 
-diary: []
+diary:
+  - date: 2026-01-15
+    title: "Ummm ... we're doing it live!"
+    body: "Holy shit. We hope this works."
+    phase: fundraising
 
 ongoing_items: []
 

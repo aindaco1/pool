@@ -57,7 +57,7 @@ long_content:
 
       Your pledge isn't just funding—it's a vote for the kind of cinema that doesn't pull punches.
   - type: audio
-    src: /assets/audio/score-sample.mp3
+    src: https://upload.wikimedia.org/wikipedia/commons/5/50/Hypnotic_ambient_electronic_music_by_MusicLM.mp3
     title: "Score concept by Elena Voss"
     caption: "Early synth sketches for the main theme"
 featured_tier_id: frame-slot

@@ -209,6 +209,22 @@
     }
   }
   
+  &--logos {
+    .gallery__container {
+      grid-template-columns: repeat(2, 1fr);
+      align-items: center;
+    }
+    
+    .gallery__item {
+      aspect-ratio: auto;
+      
+      img {
+        object-fit: contain;
+        max-height: 200px;
+      }
+    }
+  }
+  
   &--carousel {
     .gallery__container {
       display: flex;
