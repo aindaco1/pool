@@ -29,7 +29,7 @@ pre → live → post
 
 | Component | Role |
 |-----------|------|
-| **Snipcart** | Cart UI only (collects billing info, no payment processing) |
+| **Snipcart** | Cart UI only (billing step auto-skipped, no payment processing) |
 | **Stripe** | SetupIntents (save cards) + PaymentIntents (charge later) |
 | **Cloudflare Worker** | Backend: checkout, webhooks, pledge storage (KV), stats, auto-settle cron |
 | **Jekyll** | Static pages + campaign markdown |
@@ -40,7 +40,7 @@ pre → live → post
 
 ```
 1. BROWSE     → Visitor views campaign, adds tier to Snipcart cart
-2. CHECKOUT   → User fills billing info → JS intercepts "Continue to payment"
+2. CHECKOUT   → Billing auto-filled → JS intercepts "Continue to Pledge"
 3. START      → Worker creates Stripe Checkout (setup mode)
 4. SAVE CARD  → Stripe Checkout saves payment method (no charge)
 5. CONFIRM    → Stripe webhook → Worker stores pledge in KV, sends magic link email
@@ -132,8 +132,7 @@ Create Stripe Checkout session (setup mode) after Snipcart order.
   "supportItems": [{ "id": "location-scouting", "amount": 25 }],
   "customAmount": 10,
   "subtotal": 8500,
-  "tax": 669,
-  "billingAddress": { "name": "...", "email": "...", ... }
+  "tax": 669
 }
 ```
 **Response:** `{ url }` → Redirect to Stripe Checkout

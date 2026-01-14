@@ -442,6 +442,8 @@ test.describe('Cart Flow', () => {
     expect(cartState.total).toBeGreaterThan(0);
     
     // Update cart with billing info via API
+    // Note: This API is used by cart.js to auto-fill billing info during checkout.
+    // The billing step is now hidden and auto-navigates to the Pledge step.
     const testEmail = `e2e-test+${Date.now()}@example.com`;
     
     await page.evaluate((email) => {
@@ -663,38 +665,20 @@ test.describe('Manual Checkout Flow', () => {
         console.log('✅ Pledge notice visible in cart');
       }
       
-      // 4. Click Checkout
+      // 4. Click Checkout - billing is auto-filled by cart.js and auto-skipped
       await page.locator('button:has-text("Checkout")').first().click();
       console.log('➡️  Clicked Checkout');
-      await page.waitForTimeout(2000);
       
-      // 5. Fill billing form
-      console.log('\n📝 Filling billing form...');
-      await page.locator('input[name="name"]').fill('E2E Test User');
-      await page.locator('input[name="email"]').fill('e2e-test@example.com');
-      await page.locator('input[name="address1"]').fill('123 Test Street');
-      await page.locator('input[name="city"]').fill('San Francisco');
-      await page.locator('select[name="country"]').selectOption('US');
-      await page.waitForTimeout(500);
+      // 5. Wait for auto-navigation to Pledge step (billing is auto-filled and skipped)
+      console.log('⏳ Waiting for auto-navigation to Pledge step...');
+      await page.waitForTimeout(3000);
       
-      const provinceSelect = page.locator('select[name="province"]');
-      if (await provinceSelect.count() > 0) {
-        await provinceSelect.selectOption('CA');
-      }
-      await page.locator('input[name="postalCode"]').fill('94102');
-      console.log('✅ Billing form filled');
-      
-      // 6. Continue to payment step
-      await page.locator('button:has-text("Continue")').first().click();
-      console.log('➡️  Clicked Continue to payment');
-      await page.waitForTimeout(2000);
-      
-      // 7. Should see custom payment template with pledge button
+      // 6. Should see custom pledge template with pledge button
       const pledgeButton = page.locator('#pool-pledge-button');
       await expect(pledgeButton).toBeVisible({ timeout: 10000 });
       console.log('✅ Custom pledge button visible');
       
-      // 8. Check terms checkbox
+      // 7. Check terms checkbox
       const termsCheckbox = page.locator('input[name="agree-terms"]');
       if (await termsCheckbox.count() > 0) {
         await termsCheckbox.check();

@@ -85,11 +85,17 @@ async function startPledgeFlow() {
   const tempOrderId = `pledge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   
   // Get customer info from Snipcart state
+  // Note: billing address is dummy data (for Snipcart internal use only)
+  // Real billing/email is collected by Stripe Checkout
   const billing = state.cart?.billingAddress || {};
-  const email = state.customer?.email || 
-                state.cart?.email || 
-                billing.email ||
-                '';
+  let email = state.customer?.email || 
+              state.cart?.email || 
+              billing.email ||
+              '';
+  // Don't send placeholder email to Stripe - let user enter real email there
+  if (email === 'placeholder@pool.local') {
+    email = '';
+  }
   const customerName = billing.fullName || billing.name || '';
   const phone = billing.phone || '';
   
@@ -108,15 +114,8 @@ async function startPledgeFlow() {
       supportItems: supportItems.length > 0 ? supportItems : undefined,
       customAmount: customAmount > 0 ? customAmount : undefined,
       customerName,
-      phone,
-      billingAddress: billing.address1 ? {
-        line1: billing.address1,
-        line2: billing.address2 || '',
-        city: billing.city,
-        state: billing.province,
-        postal_code: billing.postalCode,
-        country: billing.country
-      } : null
+      phone
+      // billingAddress removed - Stripe Checkout collects real billing info
     };
     console.log('Starting pledge flow...', payload);
     
@@ -148,8 +147,127 @@ async function startPledgeFlow() {
   }
 }
 
+async function autofillBilling() {
+  try {
+    // Wait for cart to be ready
+    const state = Snipcart.store.getState();
+    if (!state.cart || !state.cart.token) {
+      console.log('Pool: Cart not ready, skipping billing auto-fill');
+      return;
+    }
+    
+    await Snipcart.api.cart.update({
+      email: 'placeholder@pool.local',
+      billingAddress: {
+        name: 'Supporter',
+        address1: '123 Pool Lane',
+        city: 'Denver',
+        country: 'US',
+        province: 'CO',
+        postalCode: '80202'
+      }
+    });
+    console.log('Pool: Auto-filled billing (hidden step)');
+  } catch (err) {
+    console.log('Pool: Could not auto-fill billing:', err?.message || err);
+  }
+}
+
+// Hide billing step and change payment step number to "1"
+function setupBillingHider() {
+  const observer = new MutationObserver(() => {
+    const snipcartRoot = document.querySelector('#snipcart');
+    if (!snipcartRoot) return;
+    
+    // Find and hide billing step (look for step with "Billing" text or billing-related classes)
+    const allSteps = snipcartRoot.querySelectorAll('[class*="checkout-step"], [class*="snipcart-form"]');
+    allSteps.forEach(step => {
+      // Check if this is the billing step by looking for billing-related content
+      const text = step.textContent || '';
+      const classes = step.className || '';
+      if ((text.includes('Billing') || classes.includes('billing')) && 
+          !classes.includes('billing-completed') && 
+          !step.dataset.poolHidden) {
+        step.style.display = 'none';
+        step.dataset.poolHidden = 'true';
+        console.log('Pool: Hidden billing step');
+      }
+    });
+    
+    // Find payment step and change its number to 1
+    const stepNumbers = snipcartRoot.querySelectorAll('[class*="checkout-step"] [class*="__number"], .snipcart__box--badge');
+    stepNumbers.forEach(numEl => {
+      if (numEl.textContent.trim() === '2' && !numEl.dataset.poolRenumbered) {
+        // Check if this is in a payment context
+        const parent = numEl.closest('[class*="checkout-step"]') || numEl.closest('[class*="snipcart__box"]');
+        const parentText = parent?.textContent || '';
+        if (parentText.includes('Payment') || parentText.includes('Pledge')) {
+          numEl.textContent = '1';
+          numEl.dataset.poolRenumbered = 'true';
+          console.log('Pool: Renumbered payment step to 1');
+        }
+      }
+    });
+    
+    // Debug: check if disabled-checkout-step is showing
+    const disabledStep = snipcartRoot.querySelector('[class*="disabled-checkout-step"]');
+    if (disabledStep && !disabledStep.dataset.poolLogged) {
+      disabledStep.dataset.poolLogged = 'true';
+      console.log('Pool: Found disabled checkout step:', disabledStep.textContent?.substring(0, 100));
+    }
+  });
+  
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
 function initSnipcart() {
   console.log('Snipcart ready - Pool pledge mode');
+  
+  // Hide billing step and renumber payment to 1
+  setupBillingHider();
+  
+  // Auto-fill dummy billing on cart events
+  // This ensures Snipcart has valid billing before payment step
+  Snipcart.events.on('cart.created', autofillBilling);
+  Snipcart.events.on('item.added', autofillBilling);
+  
+  // Also try to fill if cart already exists
+  setTimeout(autofillBilling, 500);
+  
+  // Auto-navigate past billing step - always skip to payment
+  Snipcart.events.on('page.changed', async (routesChange) => {
+    // Skip billing step entirely
+    if (routesChange.to === '/checkout/billing' || routesChange.to === '/checkout') {
+      console.log('Pool: Detected billing/checkout page, auto-filling and skipping to payment...');
+      
+      // Fill billing and wait for it to be accepted
+      try {
+        const state = Snipcart.store.getState();
+        if (state.cart && state.cart.token) {
+          await Snipcart.api.cart.update({
+            email: 'placeholder@pool.local',
+            billingAddress: {
+              name: 'Supporter',
+              address1: '123 Pool Lane',
+              city: 'Denver',
+              country: 'US',
+              province: 'CO',
+              postalCode: '80202'
+            }
+          });
+          console.log('Pool: Billing filled before navigation');
+        }
+      } catch (e) {
+        console.log('Pool: Billing fill error:', e?.message || e);
+      }
+      
+      // Wait a bit for Snipcart to process, then navigate
+      setTimeout(() => {
+        console.log('Pool: Navigating to payment...');
+        Snipcart.api.theme.cart.navigate('/checkout/payment');
+      }, 200);
+    }
+  });
   
   // Clear cart if returning from successful pledge
   const pendingPledge = localStorage.getItem('pool_pending_pledge');

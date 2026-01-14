@@ -163,6 +163,11 @@ long_content:
         alt: "Still 1"
 ```
 
+**Gallery layouts:**
+- `grid` (default): 2-column grid, 4:3 aspect ratio (1 column on mobile)
+- `logos`: 2-column grid, auto aspect ratio with `object-fit: contain` (max 200px height) — ideal for sponsor/partner logos
+- `carousel`: Horizontal scroll with snap, 16:9 aspect ratio
+
 ### Stretch Goals
 
 ```yaml
@@ -240,6 +245,10 @@ ongoing_items:
 All money values must be integers (no cents).
 
 ## Snipcart Integration
+
+### Billing Step Auto-Skip
+
+The billing step is hidden from users in Snipcart checkout. `cart.js` auto-fills placeholder billing data for Snipcart's internal validation, then immediately advances to the "Pledge" step (renamed from "Payment"). Real billing info is collected by Stripe Checkout. The `billingAddress` is not sent to the Worker—Stripe handles actual billing collection.
 
 ### Stackable vs Non-Stackable Tiers
 

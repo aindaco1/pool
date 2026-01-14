@@ -92,7 +92,7 @@ Browser-based tests for full user flows in `tests/e2e/`.
 **Cart Flow:**
 - Navigation and add-to-cart
 - Cart state via Snipcart API
-- Billing info update
+- Billing auto-fill (placeholder data for Snipcart validation)
 
 **Accessibility:**
 - Skip link

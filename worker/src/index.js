@@ -467,7 +467,7 @@ async function handleStart(request, env) {
 
   console.log('📥 /start called');
   const body = await request.json();
-  const { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty = 1, additionalTiers = [], supportItems = [], customAmount = 0, customerName, phone, billingAddress } = body;
+  const { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty = 1, additionalTiers = [], supportItems = [], customAmount = 0, customerName, phone } = body;
   console.log('📥 /start payload:', { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty, additionalTiers, supportItems, customAmount });
 
   if (!orderId || !campaignSlug) {
@@ -580,20 +580,15 @@ async function handleStart(request, env) {
       }
     };
     
-    // Create or find a Stripe customer with billing info to pre-fill checkout
-    console.log('📥 /start: Billing data received:', { customerName, phone, billingAddress });
+    // Create Stripe customer with basic info (billing collected in Stripe Checkout)
+    console.log('📥 /start: Customer data received:', { customerName, phone });
     if (email) {
       try {
-        // Create customer with billing details
         const customerData = {
           email,
           name: customerName || undefined,
           phone: phone || undefined
         };
-        
-        if (billingAddress) {
-          customerData.address = billingAddress;
-        }
         
         console.log('📥 /start: Creating customer with:', JSON.stringify(customerData));
         const customer = await stripe.customers.create(customerData);
