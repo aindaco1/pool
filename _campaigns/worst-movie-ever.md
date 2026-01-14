@@ -8,7 +8,7 @@ goal_amount: 2500
 charged: false
 hero_image: /assets/images/campaigns/worst-movie-ever/revolver.png
 hero_image_wide: /assets/images/campaigns/worst-movie-ever/cutout.png
-hero_video: /assets/videos/defaults/hand-relations.webm
+hero_video: /assets/videos/campaigns/worst-movie-ever/intro.webm
 creator_image: /assets/images/campaigns/worst-movie-ever/wb.png
 creator_name: "The Worst Filmmakers"
 category: "Short Film"

@@ -194,10 +194,39 @@
     <div class="campaign-content">
       <header class="hero">
         {% if page.hero_video %}
-        <video class="hero__video" controls poster="{% if page.hero_image_wide %}{{ page.hero_image_wide }}{% else %}{{ page.hero_image }}{% endif %}">
-          <source src="{{ page.hero_video }}" type="video/webm">
-          Your browser does not support the video tag.
-        </video>
+          {% if page.hero_video contains "youtube.com" or page.hero_video contains "youtu.be" %}
+            {% assign yt_id = "" %}
+            {% if page.hero_video contains "youtu.be/" %}
+              {% assign yt_id = page.hero_video | split: "youtu.be/" | last | split: "?" | first %}
+            {% elsif page.hero_video contains "watch?v=" %}
+              {% assign yt_id = page.hero_video | split: "watch?v=" | last | split: "&" | first %}
+            {% elsif page.hero_video contains "/embed/" %}
+              {% assign yt_id = page.hero_video | split: "/embed/" | last | split: "?" | first %}
+            {% endif %}
+            <div class="hero__video hero__video--youtube">
+              <iframe src="https://www.youtube.com/embed/{{ yt_id }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
+          {% elsif page.hero_video contains "instagram.com" %}
+            <div class="hero__video hero__video--instagram">
+              <blockquote class="instagram-media" data-instgrm-permalink="{{ page.hero_video }}" data-instgrm-version="14"></blockquote>
+              <script async src="//www.instagram.com/embed.js"></script>
+            </div>
+          {% else %}
+            <video class="hero__video" id="hero-video" controls poster="{% if page.hero_image_wide %}{{ page.hero_image_wide }}{% else %}{{ page.hero_image }}{% endif %}">
+              <source src="{{ page.hero_video }}" type="video/webm">
+              Your browser does not support the video tag.
+            </video>
+            <script>
+            (function() {
+              var video = document.getElementById('hero-video');
+              if (!video) return;
+              video.addEventListener('loadedmetadata', function() {
+                video.style.aspectRatio = video.videoWidth + '/' + video.videoHeight;
+              });
+              video.load();
+            })();
+            </script>
+          {% endif %}
         {% elsif page.hero_image_wide %}
         <img src="{{ page.hero_image_wide }}" alt="{{ page.title }}">
         {% elsif page.hero_image %}
