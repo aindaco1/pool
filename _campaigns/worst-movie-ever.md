@@ -56,7 +56,7 @@ long_content:
       **You decide.**
 
   - type: image
-    src: /assets/images/campaigns/worst-movie-ever/jack.jpg
+    src: /assets/images/campaigns/worst-movie-ever/jack.png
     alt: "Jack McLaughlin arriving in Albuquerque"
     caption: "Jack McLaughlin, moments before everything goes wrong"
 
@@ -117,8 +117,13 @@ long_content:
 
       This is an **inversion of artistic authority**. The donors become the directors. The filmmakers become the executors of your collective madness.
 
+  - type: image
+    src: /assets/images/campaigns/worst-movie-ever/stretch.png
+    alt: "Stretch Goals"
+
   - type: text
     body: |
+    
       ### Stretch Goals
 
       Every $500 after our $2,500 goal unlocks a new stretch goal—and you get to vote on who suffers: the directors, individually or together!
@@ -200,6 +205,13 @@ long_content:
       - No pornographic images or prompts will be tolerated
       - We reserve the right to reject any submissions considered inappropriate
       - If your submission violates the rules, you'll have the opportunity to revise it. If you don't respond or elect not to revise, the submission will be cut and the donation will **NOT** be refunded
+
+  - type: image
+    src: /assets/images/campaigns/worst-movie-ever/lady.png
+    alt: "Challenges"
+
+  - type: text
+    body: |
 
       **The Logistical Challenge:** We're committed to making this film for a near-zero budget. That means creative problem-solving when someone requests "a scene on the moon" or "Jack fights a bear."
 
