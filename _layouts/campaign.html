@@ -6,6 +6,12 @@
   <link rel="icon" type="image/png" href="/assets/images/defaults/favicon.png">
   {% include snipcart-head.html %}
   <title>{{ page.title }} · {{ site.title }}</title>
+  <meta property="og:title" content="{{ page.title }} · {{ site.title }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ site.url }}{{ page.url }}">
+  {% if page.hero_image %}<meta property="og:image" content="{{ site.url }}{{ page.hero_image }}">{% endif %}
+  {% if page.short_blurb %}<meta property="og:description" content="{{ page.short_blurb | strip_html }}">{% endif %}
+  <meta name="twitter:card" content="summary_large_image">
 </head>
 <body>
   {% include header.html %}
