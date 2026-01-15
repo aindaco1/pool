@@ -42,6 +42,9 @@ import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedO
 
 const ABQ_TAX_RATE = 0.07875; // 7.875% ABQ tax
 
+// Rate limit delay for Resend API (2 req/sec limit)
+const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
+
 // SEC-006: Timing-safe string comparison to prevent timing attacks
 function timingSafeEqual(a, b) {
   if (!a || !b) return false;
@@ -231,7 +234,7 @@ export default {
       }
 
       if (path === '/webhooks/stripe' && method === 'POST') {
-        return handleStripeWebhook(request, env);
+        return handleStripeWebhook(request, env, ctx);
       }
 
       if (path === '/webhooks/snipcart' && method === 'POST') {
@@ -721,7 +724,7 @@ async function handleCheckout(request, env) {
   return Response.redirect(stripeSession.url, 302);
 }
 
-async function handleStripeWebhook(request, env) {
+async function handleStripeWebhook(request, env, ctx) {
   console.log('📨 Stripe webhook received');
   const body = await request.text();
   const sig = request.headers.get('stripe-signature');
@@ -998,10 +1001,12 @@ async function handleStripeWebhook(request, env) {
             console.log('📊 Support item stats updated:', supportItemsForStats.map(s => `${s.id}: $${s.amount}`).join(', '));
           }
 
-          // Check for milestone emails (async, don't block)
-          triggerMilestoneEmails(env, campaignSlug).catch(err => {
-            console.error('Milestone email trigger failed:', err.message);
-          });
+          // Check for milestone emails (async, don't block response but keep worker alive)
+          ctx.waitUntil(
+            triggerMilestoneEmails(env, campaignSlug).catch(err => {
+              console.error('Milestone email trigger failed:', err.message);
+            })
+          );
 
           // Claim tier inventory for limited tiers (auto-initializes if needed)
           if (tierId) {
@@ -2250,7 +2255,14 @@ async function triggerMilestoneEmails(env, campaignSlug) {
       let sent = 0;
       let failed = 0;
       
-      for (const supporter of supporters) {
+      for (let i = 0; i < supporters.length; i++) {
+        const supporter = supporters[i];
+        
+        // Rate limit: Resend allows 2 req/sec
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+        }
+        
         try {
           const token = await generateToken(env.MAGIC_LINK_SECRET, {
             orderId: supporter.orderId,
@@ -2316,7 +2328,14 @@ async function handleBroadcastDiary(request, env) {
 
   const results = { sent: 0, failed: 0, errors: [] };
 
-  for (const supporter of supporters) {
+  for (let i = 0; i < supporters.length; i++) {
+    const supporter = supporters[i];
+    
+    // Rate limit: Resend allows 2 req/sec
+    if (i > 0) {
+      await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+    }
+    
     try {
       const token = await generateToken(env.MAGIC_LINK_SECRET, {
         orderId: supporter.orderId,
@@ -2385,7 +2404,14 @@ async function handleBroadcastMilestone(request, env) {
 
   const results = { sent: 0, failed: 0, errors: [] };
 
-  for (const supporter of supporters) {
+  for (let i = 0; i < supporters.length; i++) {
+    const supporter = supporters[i];
+    
+    // Rate limit: Resend allows 2 req/sec
+    if (i > 0) {
+      await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+    }
+    
     try {
       const token = await generateToken(env.MAGIC_LINK_SECRET, {
         orderId: supporter.orderId,
@@ -2505,7 +2531,14 @@ async function handleMilestoneCheck(request, campaignSlug, env) {
     let mSent = 0;
     let mFailed = 0;
 
-    for (const supporter of supporters) {
+    for (let i = 0; i < supporters.length; i++) {
+      const supporter = supporters[i];
+      
+      // Rate limit: Resend allows 2 req/sec
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+      }
+      
       try {
         const token = await generateToken(env.MAGIC_LINK_SECRET, {
           orderId: supporter.orderId,
