@@ -26,6 +26,7 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | Module | Functions Tested |
 |--------|-----------------|
 | `live-stats.js` | `formatMoney`, `updateProgressBar`, `updateMarkerState`, `checkTierUnlocks`, `checkLateSupport`, `updateSupportItems`, `updateTierInventory` |
+| `settlement` | Charge aggregation, payment success/failure, retry flow, dry-run mode, edge cases |
 
 ### Running
 

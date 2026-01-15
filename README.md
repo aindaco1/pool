@@ -52,7 +52,7 @@ npm run test:security  # Security tests — pen testing the Worker API
 npm test               # Run unit + e2e
 ```
 
-**Test coverage includes:** live-stats functions, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, and campaign states.
+**Test coverage includes:** live-stats functions, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, and settlement/charging logic.
 
 See [TESTING.md](docs/TESTING.md) for full testing guide and [SECURITY.md](docs/SECURITY.md) for security architecture.
 

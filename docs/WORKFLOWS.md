@@ -306,6 +306,20 @@ crons = ["0 7 * * *"]
 - Multiple pledges from same email = one aggregated charge
 - Uses the most recently updated payment method for each supporter
 - Can also be triggered manually via `POST /admin/settle/:slug`
+- Supports dry-run mode: `POST /admin/settle/:slug?dryRun=true`
+
+### Payment Failure & Retry
+
+When a charge fails during settlement:
+
+1. **Pledge marked `payment_failed`** with error message stored
+2. **Email sent** with "Update Payment Method" button linking to manage page
+3. **Supporter updates card** via `/pledge/payment-method/start`
+4. **Auto-retry charge** happens immediately after successful payment method update
+5. If retry succeeds: pledge marked `charged`, success email sent
+6. If retry fails again: pledge stays `payment_failed`, can retry again
+
+This allows supporters to fix expired/declined cards without manual admin intervention.
 
 ---
 
@@ -403,4 +417,4 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
 
 ---
 
-_Last updated: Jan 6, 2026_
+_Last updated: Jan 15, 2026_

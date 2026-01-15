@@ -1944,6 +1944,26 @@ async function settleCampaign(campaignSlug, env, options = {}) {
         pledge.updatedAt = new Date().toISOString();
         await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
       }
+
+      // Send payment failed email so supporter can update their payment method
+      try {
+        const token = await generateToken(env.MAGIC_LINK_SECRET, {
+          orderId: supporter.pledges[0].orderId,
+          email: supporter.email,
+          campaignSlug
+        });
+
+        await sendPaymentFailedEmail(env, {
+          email: supporter.email,
+          campaignSlug,
+          campaignTitle,
+          amount: supporter.totalAmount,
+          token
+        });
+        console.log('📧 Sent payment failed email to:', supporter.email);
+      } catch (emailErr) {
+        console.error('Failed to send payment failed email:', emailErr.message);
+      }
     }
   }
 

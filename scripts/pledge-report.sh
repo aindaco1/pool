@@ -50,7 +50,7 @@ cd "$(dirname "$0")/../worker"
 echo "Fetching pledges from KV${KV_FLAGS:+ (dev preview)}..." >&2
 
 # Get all pledge keys
-KEYS=$(wrangler kv key list --binding PLEDGES --prefix "pledge:" $KV_FLAGS 2>/dev/null | \
+KEYS=$(wrangler kv key list --binding PLEDGES --prefix "pledge:" --remote $KV_FLAGS 2>/dev/null | \
   python3 -c "
 import sys, json
 try:
@@ -78,7 +78,7 @@ PROCESSED=0
 echo "$KEYS" | while read -r KEY; do
   if [[ -z "$KEY" ]]; then continue; fi
   
-  PLEDGE=$(wrangler kv key get "$KEY" --binding PLEDGES $KV_FLAGS 2>/dev/null)
+  PLEDGE=$(wrangler kv key get "$KEY" --binding PLEDGES --remote $KV_FLAGS 2>/dev/null)
   
   if [[ -z "$PLEDGE" ]]; then continue; fi
   

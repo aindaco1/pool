@@ -52,7 +52,7 @@ cd "$(dirname "$0")/../worker"
 echo "Fetching pledges for fulfillment report..." >&2
 
 # Get all pledge keys
-KEYS=$(wrangler kv key list --binding PLEDGES --prefix "pledge:" $KV_FLAGS 2>/dev/null | \
+KEYS=$(wrangler kv key list --binding PLEDGES --prefix "pledge:" --remote $KV_FLAGS 2>/dev/null | \
   python3 -c "
 import sys, json
 try:
@@ -78,7 +78,7 @@ trap "rm -f $TMPFILE" EXIT
 
 while read -r KEY; do
   if [[ -z "$KEY" ]]; then continue; fi
-  wrangler kv key get "$KEY" --binding PLEDGES $KV_FLAGS 2>/dev/null >> "$TMPFILE"
+  wrangler kv key get "$KEY" --binding PLEDGES --remote $KV_FLAGS 2>/dev/null >> "$TMPFILE"
   echo "" >> "$TMPFILE"  # Ensure newline after JSON
   echo "---PLEDGE_DELIMITER---" >> "$TMPFILE"
 done <<< "$KEYS"
