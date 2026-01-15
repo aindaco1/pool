@@ -240,7 +240,7 @@ long_content:
     body: |
       ---
 
-      *Design by Stella Cole, Jason Cole, Zoey Scott and other local Albuquerque artists.*
+      *Design by Stella Cole, Jason Cole, Katherine Zoey Scott and other local Albuquerque artists.*
 featured_tier_id: frame
 
 stretch_goals:
