@@ -3,7 +3,7 @@ layout: campaign
 title: "THE WORST MOVIE EVER"
 slug: worst-movie-ever
 start_date: 2026-01-15
-goal_deadline: 2026-02-16
+goal_deadline: 2026-02-15
 goal_amount: 2500
 charged: false
 hero_image: /assets/images/campaigns/worst-movie-ever/revolver.png
@@ -187,6 +187,23 @@ long_content:
 
       If the campaign is successful, you'll receive a form to submit your earned contributions. You'll have **two weeks after the campaign ends** to complete your submissions. After that, we start production -- and your terrible ideas become our problem.
 
+  - type: image
+    src: /assets/images/campaigns/worst-movie-ever/community.png
+    alt: "Supporter Community"
+
+  - type: text
+    body: |
+      ### The Supporter Community
+
+      **Any pledge -- yes, even $1 -- gets you into the [Supporter Community](/campaigns/worst-movie-ever/#community-teaser).**
+
+      What's that? It's where the *real* chaos happens. Once you've backed the project, you'll receive a magic link in your confirmation email that unlocks access to our private community page. There, you'll find:
+
+      - **Polls on creative decisions** — Should the villain be named "Dr. Badguy McEvilface" or just "Susan"? You decide.
+      - **Other exclusive votes** — Help steer this disaster toward maximum absurdity.
+
+      Think of it as a front-row seat to a trainwreck -- except you're also throwing things at the train.
+
   - type: divider
 
   - type: image
@@ -223,7 +240,7 @@ long_content:
     body: |
       ---
 
-      *Design by Stella Cole, Jason Cole, and local Albuquerque artists.*
+      *Design by Stella Cole, Jason Cole, Zoey Scott and other local Albuquerque artists.*
 featured_tier_id: frame
 
 stretch_goals:
