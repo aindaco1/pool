@@ -47,6 +47,16 @@ layout: null
           "late_support": {{ item.late_support | default: false }}
         }{% unless forloop.last %},{% endunless %}
         {% endfor %}
+      ],
+      "instagram": {{ campaign.instagram | jsonify }},
+      "diary": [
+        {% for entry in campaign.diary %}
+        {
+          "date": {{ entry.date | date_to_xmlschema | jsonify }},
+          "title": {{ entry.title | jsonify }},
+          "phase": {{ entry.phase | jsonify }}
+        }{% unless forloop.last %},{% endunless %}
+        {% endfor %}
       ]
     }{% unless forloop.last %},{% endunless %}
     {% endfor %}
