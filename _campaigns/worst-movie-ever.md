@@ -2,6 +2,7 @@
 layout: campaign
 title: "THE WORST MOVIE EVER"
 slug: worst-movie-ever
+instagram: "https://www.instagram.com/worstmovie.evermade/"
 start_date: 2026-01-15
 goal_deadline: 2026-02-15
 goal_amount: 2500
@@ -290,10 +291,32 @@ decisions:
     status: open
 
 diary:
-  - date: 2026-01-15
+  - date: 2026-01-15T09:00:00-07:00
     title: "Ummm ... we're doing it live!"
-    body: "Holy shit. We hope this works."
     phase: fundraising
+    content:
+      - type: text
+        body: |
+          Holy shit. We hope this works.
+
+  - date: 2026-01-15T18:30:00-07:00
+    title: "We hit $1K!"
+    phase: fundraising
+    content:
+      - type: text
+        body: |
+          **What a first day!** Thanks to all our backers for your support! **We've already reached the $1000 mark**, and we couldn't be more pleased to have you on board!
+
+          Also, we have some really cool stuff to show you soon. Here's a little preview:
+
+      - type: image
+        src: /assets/images/campaigns/worst-movie-ever/sculpture.jpg 
+        alt: "Leg sculpture"
+        caption: "A taste of what's to come ..."
+
+      - type: text
+        body: |
+          Do us a favor, would you? Check out our [Instagram](https://www.instagram.com/worstmovie.evermade/) and spread the good word! We're on a mission to make the worst movie ever, and we need the world to know about it!
 
 ongoing_items: []
 

@@ -77,9 +77,12 @@ decisions:
 
 diary:
   - title: "Lead cast!"
-    body: "Found our lead. She's perfect — equal parts curiosity and dread."
-    date: 2025-10-20
+    date: 2025-10-20T15:00:00-06:00
     phase: pre-production
+    content:
+      - type: text
+        body: |
+          Found our lead. She's perfect — equal parts curiosity and dread.
 
 tiers:
   - id: digital-copy

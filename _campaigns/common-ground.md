@@ -76,13 +76,19 @@ support_items:
 
 diary:
   - title: "Post-production complete!"
-    body: "Festival submissions underway."
-    date: 2025-10-15
-    phase: post
+    date: 2025-10-15T16:00:00-06:00
+    phase: post-production
+    content:
+      - type: text
+        body: |
+          Festival submissions underway.
   - title: "Campaign FUNDED!"
-    body: "Thank you all."
-    date: 2025-09-30
+    date: 2025-09-30T11:00:00-06:00
     phase: fundraising
+    content:
+      - type: text
+        body: |
+          Thank you all.
 
 tiers:
   - id: screening-ticket

@@ -67,9 +67,12 @@ stretch_goals:
 
 diary:
   - title: "Campaign launches Feb 2026!"
-    body: "We're gearing up for our crowdfunding launch in February."
-    date: 2025-10-27
+    date: 2025-10-27T10:00:00-06:00
     phase: pre-production
+    content:
+      - type: text
+        body: |
+          We're gearing up for our crowdfunding launch in February.
 
 tiers:
   - id: digital-screener

@@ -6,12 +6,30 @@
  * - /community/:slug/ — Supporter-only voting/decisions
  */
 
+// Instagram CTA block for emails (when campaign has instagram field)
+function getInstagramCTA(instagramUrl) {
+  if (!instagramUrl) return '';
+  
+  // Instagram logo as inline SVG data URI (works in most email clients)
+  const instagramIcon = `<img src="https://cdn-icons-png.flaticon.com/512/174/174855.png" alt="Instagram" width="24" height="24" style="vertical-align: middle; margin-right: 8px;">`;
+  
+  return `
+  <div style="background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); border-radius: 8px; padding: 16px 20px; margin: 24px 0; text-align: center;">
+    <a href="${instagramUrl}" style="color: #fff; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;">
+      ${instagramIcon}
+      <span>Share to your Story!</span>
+    </a>
+    <p style="margin: 8px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.9);">Help spread the word on Instagram</p>
+  </div>`;
+}
+
 /**
  * Send supporter confirmation email after successful pledge
  */
-export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amount, token }) {
+export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amount, token, instagramUrl }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
+  const instagramCTA = getInstagramCTA(instagramUrl);
   
   const html = `
 <!DOCTYPE html>
@@ -50,6 +68,8 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
       <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Vote on creative decisions for this project</p>
     </div>
   </div>
+  
+  ${instagramCTA}
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
     <p style="margin: 0 0 8px 0;"><strong>Save this email!</strong> You'll need these links to manage your pledge.</p>
@@ -287,10 +307,11 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
 /**
  * Send diary update notification to supporters
  */
-export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, token }) {
+export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, token, instagramUrl }) {
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
   const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/`;
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const instagramCTA = getInstagramCTA(instagramUrl);
   
   const html = `
 <!DOCTYPE html>
@@ -320,6 +341,8 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
     <a href="${communityUrl}" style="color: #000; text-decoration: underline;">Vote on Creative Decisions</a> · 
     <a href="${manageUrl}" style="color: #000; text-decoration: underline;">Manage Your Pledge</a>
   </div>
+  
+  ${instagramCTA}
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
     <p style="margin: 0;">You're receiving this because you backed ${campaignTitle}.</p>
@@ -419,9 +442,10 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
  * Send goal milestone notification to supporters
  * @param {string} milestone - 'one-third' | 'two-thirds' | 'goal' | 'stretch'
  */
-export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTitle, milestone, pledgedAmount, goalAmount, stretchGoalName, token }) {
+export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTitle, milestone, pledgedAmount, goalAmount, stretchGoalName, token, instagramUrl }) {
   const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/`;
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const instagramCTA = getInstagramCTA(instagramUrl);
   
   const milestoneConfig = {
     'one-third': {
@@ -474,6 +498,8 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
       View Campaign
     </a>
   </div>
+  
+  ${instagramCTA}
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
     <p style="margin: 0 0 8px 0;">You're receiving this because you backed ${campaignTitle}.</p>

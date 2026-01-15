@@ -156,6 +156,29 @@ Send diary update notification to all campaign supporters. Requires `x-admin-key
 }
 ```
 
+### POST /admin/diary/check
+Check all campaigns for new diary entries and broadcast them automatically. Called by GitHub Actions after deploy. Requires `Authorization: Bearer {ADMIN_SECRET}` header.
+
+```json
+{
+  "dryRun": true  // Optional: preview without sending
+}
+```
+
+Returns:
+```json
+{
+  "success": true,
+  "checked": 2,
+  "newEntries": [
+    { "campaignSlug": "...", "campaignTitle": "...", "date": "2026-01-15", "title": "..." }
+  ],
+  "sent": 10,
+  "failed": 0,
+  "errors": []
+}
+```
+
 ### POST /admin/broadcast/milestone
 Send milestone notification to all campaign supporters. Requires `x-admin-key` header.
 
@@ -196,6 +219,7 @@ Valid types:
 | `SITE_BASE` | Base URL of the Jekyll site |
 | `SNIPCART_API_BASE` | Snipcart API base URL |
 | `SNIPCART_MODE` | `"test"` or `"live"` - determines which API keys to use |
+| `RESEND_RATE_LIMIT_DELAY` | Delay between emails in ms (default: 600ms to stay under Resend's 2 req/sec limit) |
 
 ## Data Flow
 
@@ -237,3 +261,14 @@ The `--env dev` flag:
 - Points `SITE_BASE` to localhost
 
 Add `?dev` to the manage page URL for mock data: `http://127.0.0.1:4000/manage/?dev`
+
+## Automated Diary Broadcasts
+
+Diary entries are automatically broadcast to supporters when deployed:
+
+1. When a new diary entry is added and the site is deployed, the `deploy.yml` GitHub Action calls `POST /admin/diary/check`
+2. The worker fetches campaign data and compares diary entries against what's been sent
+3. New entries are broadcast to all campaign supporters via email
+4. Sent entries are tracked in KV (`diary-sent:{campaignSlug}`) to prevent duplicate emails
+
+**Setup:** Ensure `ADMIN_SECRET` is set as a GitHub repository secret for the deploy action to authenticate.

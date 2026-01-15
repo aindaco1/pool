@@ -374,6 +374,35 @@ export async function recalculateTierInventory(env, campaignSlug, tiers) {
 }
 
 /**
+ * Diary Tracking - Track which diary entries have been broadcast
+ * Key format: diary-sent:{campaignSlug}
+ * Value: array of diary dates (YYYY-MM-DD strings)
+ */
+
+/**
+ * Get list of diary entry dates that have been broadcast for a campaign
+ */
+export async function getSentDiaryEntries(env, campaignSlug) {
+  if (!env.PLEDGES) return [];
+  
+  const sent = await env.PLEDGES.get(`diary-sent:${campaignSlug}`, { type: 'json' });
+  return sent || [];
+}
+
+/**
+ * Mark a diary entry as sent (by date)
+ */
+export async function markDiarySent(env, campaignSlug, diaryDate) {
+  if (!env.PLEDGES) return;
+  
+  const sent = await getSentDiaryEntries(env, campaignSlug);
+  if (!sent.includes(diaryDate)) {
+    sent.push(diaryDate);
+    await env.PLEDGES.put(`diary-sent:${campaignSlug}`, JSON.stringify(sent));
+  }
+}
+
+/**
  * Milestone Tracking - Track which milestone emails have been sent
  * Key format: milestones:{campaignSlug}
  */

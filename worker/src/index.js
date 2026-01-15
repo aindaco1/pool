@@ -21,6 +21,7 @@
  *   POST /admin/inventory/init-all    - Initialize inventory for all campaigns (admin)
  *   POST /admin/rebuild      - Trigger GitHub Pages rebuild (admin)
  *   POST /admin/broadcast/diary     - Send diary update to all campaign supporters
+ *   POST /admin/diary/check         - Check all campaigns for new diary entries and broadcast
  *   POST /admin/broadcast/milestone - Send milestone notification to all campaign supporters
  *   POST /admin/milestone-check/:slug - Check and trigger any pending milestones for a campaign
  *   POST /admin/settle/:slug        - Settle campaign: charge pledges if funded + deadline passed
@@ -36,7 +37,7 @@ import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, validateTier, getEffectiveState } from './campaigns.js';
 import { createSnipcartClient, extractPledgeFromOrder, canCancelOrder, canModifyOrder } from './snipcart.js';
-import { getCampaignStats, addPledgeToStats, removePledgeFromStats, modifyPledgeInStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, adjustTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats } from './stats.js';
+import { getCampaignStats, addPledgeToStats, removePledgeFromStats, modifyPledgeInStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, adjustTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent } from './stats.js';
 import { triggerSiteRebuild } from './github.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 
@@ -44,6 +45,39 @@ const ABQ_TAX_RATE = 0.07875; // 7.875% ABQ tax
 
 // Rate limit delay for Resend API (2 req/sec limit)
 const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
+
+// Extract plain text excerpt from diary entry (supports both legacy body and content blocks)
+function getDiaryExcerpt(entry, maxLength = 200) {
+  // Legacy: plain text body
+  if (entry.body && typeof entry.body === 'string') {
+    return entry.body.slice(0, maxLength);
+  }
+  
+  // New: content blocks array
+  if (entry.content && Array.isArray(entry.content)) {
+    const textParts = [];
+    for (const block of entry.content) {
+      if (block.type === 'text' && block.body) {
+        // Strip basic markdown formatting for email excerpt
+        const plainText = block.body
+          .replace(/\*\*([^*]+)\*\*/g, '$1')  // bold
+          .replace(/\*([^*]+)\*/g, '$1')       // italic
+          .replace(/_([^_]+)_/g, '$1')         // italic
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // links
+          .replace(/^#+\s*/gm, '')              // headers
+          .replace(/\n+/g, ' ')                 // newlines to spaces
+          .trim();
+        textParts.push(plainText);
+      } else if (block.type === 'quote' && block.text) {
+        textParts.push(`"${block.text}"`);
+      }
+    }
+    const combined = textParts.join(' ').trim();
+    return combined.slice(0, maxLength);
+  }
+  
+  return '';
+}
 
 // SEC-006: Timing-safe string comparison to prevent timing attacks
 function timingSafeEqual(a, b) {
@@ -303,6 +337,12 @@ export default {
         const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
         if (!rl.allowed) return rl.response;
         return handleBroadcastDiary(request, env);
+      }
+
+      if (path === '/admin/diary/check' && method === 'POST') {
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
+        return handleDiaryCheck(request, env);
       }
 
       if (path === '/admin/broadcast/milestone' && method === 'POST') {
@@ -1037,7 +1077,8 @@ async function handleStripeWebhook(request, env, ctx) {
             campaignSlug,
             campaignTitle,
             amount: parseInt(amountCents) || 0,
-            token
+            token,
+            instagramUrl: campaign?.instagram
           });
 
           console.log('Pledge confirmed:', { orderId, email, campaignSlug });
@@ -2278,7 +2319,8 @@ async function triggerMilestoneEmails(env, campaignSlug) {
             pledgedAmount: stats.pledgedAmount,
             goalAmount: goalAmountCents,
             stretchGoalName,
-            token
+            token,
+            instagramUrl: campaign.instagram
           });
           sent++;
         } catch (err) {
@@ -2367,6 +2409,106 @@ async function handleBroadcastDiary(request, env) {
 }
 
 /**
+ * Admin: Check all campaigns for new diary entries and broadcast them
+ * Called automatically after deploy via GitHub Action
+ */
+async function handleDiaryCheck(request, env) {
+  const auth = requireAdmin(request, env);
+  if (!auth.ok) return auth.response;
+
+  const body = await request.json().catch(() => ({}));
+  const { dryRun } = body;
+
+  const campaignsData = await getCampaigns(env);
+  const campaigns = campaignsData.campaigns || campaignsData;
+  
+  const results = {
+    checked: 0,
+    newEntries: [],
+    sent: 0,
+    failed: 0,
+    errors: []
+  };
+
+  for (const campaign of campaigns) {
+    results.checked++;
+    
+    if (!campaign.diary || !Array.isArray(campaign.diary) || campaign.diary.length === 0) {
+      continue;
+    }
+
+    const sentDates = await getSentDiaryEntries(env, campaign.slug);
+    
+    for (const entry of campaign.diary) {
+      if (!entry.date || !entry.title) continue;
+      
+      if (sentDates.includes(entry.date)) continue;
+      
+      results.newEntries.push({
+        campaignSlug: campaign.slug,
+        campaignTitle: campaign.title,
+        date: entry.date,
+        title: entry.title
+      });
+
+      if (dryRun) continue;
+
+      const supporters = await getCampaignSupporters(env, campaign.slug);
+      
+      if (supporters.length === 0) {
+        await markDiarySent(env, campaign.slug, entry.date);
+        continue;
+      }
+
+      console.log(`📝 Broadcasting diary entry "${entry.title}" to ${supporters.length} supporters of ${campaign.slug}`);
+
+      for (let i = 0; i < supporters.length; i++) {
+        const supporter = supporters[i];
+        
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+        }
+        
+        try {
+          const token = await generateToken(env.MAGIC_LINK_SECRET, {
+            orderId: supporter.orderId,
+            email: supporter.email,
+            campaignSlug: campaign.slug
+          });
+
+          await sendDiaryUpdateEmail(env, {
+            email: supporter.email,
+            campaignSlug: campaign.slug,
+            campaignTitle: campaign.title,
+            diaryTitle: entry.title,
+            diaryExcerpt: getDiaryExcerpt(entry),
+            token,
+            instagramUrl: campaign.instagram
+          });
+          results.sent++;
+        } catch (err) {
+          results.failed++;
+          results.errors.push({ 
+            campaignSlug: campaign.slug,
+            diaryDate: entry.date,
+            email: supporter.email, 
+            error: err.message 
+          });
+        }
+      }
+
+      await markDiarySent(env, campaign.slug, entry.date);
+    }
+  }
+
+  return jsonResponse({
+    success: true,
+    dryRun: !!dryRun,
+    ...results
+  });
+}
+
+/**
  * Admin: Broadcast milestone notification to all campaign supporters
  */
 async function handleBroadcastMilestone(request, env) {
@@ -2427,7 +2569,8 @@ async function handleBroadcastMilestone(request, env) {
         pledgedAmount: campaign.pledged_amount || 0,
         goalAmount: campaign.goal_amount || 100000,
         stretchGoalName,
-        token
+        token,
+        instagramUrl: campaign.instagram
       });
       results.sent++;
     } catch (err) {
@@ -2554,7 +2697,8 @@ async function handleMilestoneCheck(request, campaignSlug, env) {
           pledgedAmount: stats.pledgedAmount,
           goalAmount: goalAmountCents,
           stretchGoalName,
-          token
+          token,
+          instagramUrl: campaign.instagram
         });
         mSent++;
         results.sent++;

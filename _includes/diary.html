@@ -20,17 +20,49 @@
          role="tabpanel"
          aria-labelledby="{{ phase }}-tab">
       
-      {% assign phase_entries = include.diary | where: "phase", phase %}
+      {% assign phase_entries = include.diary | where: "phase", phase | sort: "date" | reverse %}
       {% if phase_entries.size > 0 %}
         <div class="diary-list">
           {% for entry in phase_entries %}
             <article class="diary-entry">
               <h4 class="diary-entry__title">{{ entry.title }}</h4>
-              <p class="diary-entry__body">{{ entry.body }}</p>
               {% if entry.date %}
-                <time class="diary-entry__date" datetime="{{ entry.date }}">
-                  {{ entry.date | date: "%b %-d, %Y" }}
+                <time class="diary-entry__date" datetime="{{ entry.date | date_to_xmlschema }}">
+                  {% assign date_str = entry.date | date: "%Y-%m-%dT%H:%M" %}
+                  {% if date_str contains "T00:00" %}
+                    {{ entry.date | date: "%b %-d, %Y" }}
+                  {% else %}
+                    {{ entry.date | date: "%b %-d, %Y · %-I:%M %p" }}
+                  {% endif %}
                 </time>
+              {% endif %}
+              
+              {% comment %} Support both legacy body (string) and new content (blocks array) {% endcomment %}
+              {% if entry.content %}
+                <div class="diary-entry__content">
+                  {% for block in entry.content %}
+                    {% case block.type %}
+                      {% when 'text' %}
+                        {% include blocks/text.html block=block %}
+                      {% when 'video' %}
+                        {% include blocks/video.html block=block %}
+                      {% when 'image' %}
+                        {% include blocks/image.html block=block %}
+                      {% when 'gallery' %}
+                        {% include blocks/gallery.html block=block %}
+                      {% when 'audio' %}
+                        {% include blocks/audio.html block=block %}
+                      {% when 'embed' %}
+                        {% include blocks/embed.html block=block %}
+                      {% when 'divider' %}
+                        {% include blocks/divider.html block=block %}
+                      {% when 'quote' %}
+                        {% include blocks/quote.html block=block %}
+                    {% endcase %}
+                  {% endfor %}
+                </div>
+              {% elsif entry.body %}
+                <p class="diary-entry__body">{{ entry.body }}</p>
               {% endif %}
             </article>
           {% endfor %}

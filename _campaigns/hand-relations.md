@@ -112,17 +112,26 @@ decisions:
 
 diary:
   - title: "Campaign page live!"
-    body: "We're officially launching the Hand Relations crowdfunding campaign."
-    date: 2025-10-18
+    date: 2025-10-18T12:00:00-06:00
     phase: fundraising
+    content:
+      - type: text
+        body: |
+          We're officially launching the Hand Relations crowdfunding campaign.
   - title: "Day 14 — Principal Photography"
-    body: "Desert wrap. Wind, dust, and a miraculous sunset. Footage looks unreal."
-    date: 2025-10-27
+    date: 2025-10-27T19:00:00-06:00
     phase: production
+    content:
+      - type: text
+        body: |
+          Desert wrap. Wind, dust, and a miraculous sunset. Footage looks unreal.
   - title: "Day 7 — Equipment Woes"
-    body: "Batteries mutinied. We borrowed from crew and kept rolling."
-    date: 2025-10-20
+    date: 2025-10-20T14:30:00-06:00
     phase: production
+    content:
+      - type: text
+        body: |
+          Batteries mutinied. We borrowed from crew and kept rolling.
 
 ongoing_items:
   - label: Color Grade

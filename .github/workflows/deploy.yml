@@ -65,3 +65,13 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Check for new diary entries
+        if: success()
+        run: |
+          sleep 10  # Wait for CDN propagation
+          curl -sf -X POST \
+            -H "Authorization: Bearer ${{ secrets.ADMIN_SECRET }}" \
+            -H "Content-Type: application/json" \
+            https://pledge.dustwave.xyz/admin/diary/check \
+            || echo "Diary check failed (non-fatal)"
