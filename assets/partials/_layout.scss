@@ -45,11 +45,34 @@
     @include heading-font;
     font-weight: 700;
     font-size: 48px;
-    color: $color--primary;
     white-space: nowrap;
+    position: relative;
+    padding: 0.1em 0;
+    background: linear-gradient(
+      90deg,
+      $color--primary 0%,
+      lighten($color--primary, 45%) 25%,
+      $color--primary 50%,
+      lighten($color--primary, 45%) 75%,
+      $color--primary 100%
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: water-shimmer 4s ease-in-out infinite;
     
     @include xsm {
       font-size: 32px;
+    }
+  }
+  
+  @keyframes water-shimmer {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
     }
   }
   
