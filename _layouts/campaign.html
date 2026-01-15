@@ -212,17 +212,113 @@
               <script async src="//www.instagram.com/embed.js"></script>
             </div>
           {% else %}
-            <video class="hero__video" id="hero-video" controls poster="{% if page.hero_image_wide %}{{ page.hero_image_wide }}{% else %}{{ page.hero_image }}{% endif %}">
-              <source src="{{ page.hero_video }}" type="video/webm">
-              Your browser does not support the video tag.
-            </video>
+            <div class="hero__video-wrapper" id="hero-video-wrapper">
+              <video class="hero__video" id="hero-video" controls preload="metadata" playsinline poster="{% if page.hero_image_wide %}{{ page.hero_image_wide }}{% else %}{{ page.hero_image }}{% endif %}">
+                <source src="{{ page.hero_video }}" type="video/webm">
+                Your browser does not support the video tag.
+              </video>
+              <div class="hero__video-overlay" id="hero-video-overlay">
+                <button class="hero__video-play" id="hero-video-play" aria-label="Play video">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <div class="hero__video-loading" id="hero-video-loading">
+                  <div class="hero__video-spinner"></div>
+                  <span class="hero__video-loading-text">Loading...</span>
+                </div>
+              </div>
+              <div class="hero__video-buffer" id="hero-video-buffer">
+                <div class="hero__video-buffer-bar"></div>
+              </div>
+            </div>
             <script>
             (function() {
+              var wrapper = document.getElementById('hero-video-wrapper');
               var video = document.getElementById('hero-video');
+              var overlay = document.getElementById('hero-video-overlay');
+              var playBtn = document.getElementById('hero-video-play');
+              var loading = document.getElementById('hero-video-loading');
+              var bufferEl = document.getElementById('hero-video-buffer');
+              var bufferBar = bufferEl.querySelector('.hero__video-buffer-bar');
               if (!video) return;
+
+              var isWaiting = false;
+              var hasStarted = false;
+
+              function updateBuffer() {
+                if (video.buffered.length > 0 && video.duration > 0) {
+                  var bufferedEnd = video.buffered.end(video.buffered.length - 1);
+                  var percent = (bufferedEnd / video.duration) * 100;
+                  bufferBar.style.width = percent + '%';
+                }
+              }
+
+              function showLoading() {
+                isWaiting = true;
+                playBtn.style.display = 'none';
+                loading.style.display = 'flex';
+                overlay.style.display = 'flex';
+              }
+
+              function hideLoading() {
+                isWaiting = false;
+                loading.style.display = 'none';
+                if (hasStarted) {
+                  overlay.style.display = 'none';
+                } else {
+                  playBtn.style.display = 'flex';
+                }
+              }
+
               video.addEventListener('loadedmetadata', function() {
-                video.style.aspectRatio = video.videoWidth + '/' + video.videoHeight;
+                wrapper.style.aspectRatio = video.videoWidth + '/' + video.videoHeight;
+                updateBuffer();
               });
+
+              video.addEventListener('progress', updateBuffer);
+
+              video.addEventListener('waiting', showLoading);
+              video.addEventListener('stalled', showLoading);
+
+              video.addEventListener('canplay', function() {
+                if (!hasStarted) hideLoading();
+              });
+
+              video.addEventListener('canplaythrough', hideLoading);
+              video.addEventListener('playing', function() {
+                hasStarted = true;
+                hideLoading();
+                bufferEl.classList.add('hero__video-buffer--playing');
+              });
+
+              video.addEventListener('pause', function() {
+                if (!video.ended) {
+                  overlay.style.display = 'flex';
+                  playBtn.style.display = 'flex';
+                }
+              });
+
+              video.addEventListener('ended', function() {
+                hasStarted = false;
+                overlay.style.display = 'flex';
+                playBtn.style.display = 'flex';
+                bufferEl.classList.remove('hero__video-buffer--playing');
+              });
+
+              playBtn.addEventListener('click', function() {
+                showLoading();
+                video.play().then(function() {
+                  hideLoading();
+                }).catch(function() {
+                  hideLoading();
+                });
+              });
+
+              overlay.addEventListener('click', function(e) {
+                if (e.target === overlay && hasStarted && !isWaiting) {
+                  video.play();
+                }
+              });
+
               video.load();
             })();
             </script>
