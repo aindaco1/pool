@@ -307,9 +307,10 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
 /**
  * Send diary update notification to supporters
  */
-export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, token, instagramUrl }) {
+export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, diaryPhase, token, instagramUrl }) {
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
-  const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/`;
+  const diaryAnchor = diaryPhase ? `#diary-${diaryPhase}` : '#diary';
+  const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/${diaryAnchor}`;
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
   const instagramCTA = getInstagramCTA(instagramUrl);
   

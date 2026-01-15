@@ -2482,6 +2482,7 @@ async function handleDiaryCheck(request, env) {
             campaignTitle: campaign.title,
             diaryTitle: entry.title,
             diaryExcerpt: getDiaryExcerpt(entry),
+            diaryPhase: entry.phase,
             token,
             instagramUrl: campaign.instagram
           });

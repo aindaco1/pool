@@ -14,7 +14,8 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement
-- **Production diary** — Creator update log
+- **Production diary** — Rich content updates with auto-broadcast emails to supporters
+- **Instagram integration** — Optional social CTA in supporter emails
 - **Ongoing funding** — Post-campaign support section
 
 ## Architecture

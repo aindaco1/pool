@@ -225,12 +225,43 @@ decisions:
 
 ### Production Diary
 
+Diary entries support rich content blocks (same as `long_content`):
+
 ```yaml
-diary_entries:
-  - title: "Day 14 — Principal Photography"
-    body: "Desert wrap. Wind, dust, and a miraculous sunset."
-    date: 2025-10-27
+diary:
+  - date: 2026-01-15T09:00:00-07:00  # ISO 8601 with timezone (MT)
+    title: "Day 14 — Principal Photography"
+    phase: production  # fundraising | pre-production | production | post-production | distribution
+    content:
+      - type: text
+        body: |
+          Desert wrap. Wind, dust, and a miraculous sunset.
+          
+          **The footage looks unreal.**
+      - type: image
+        src: /assets/images/campaigns/my-film/bts-sunset.jpg
+        alt: "Behind the scenes sunset shot"
+      - type: quote
+        text: "This is the one."
+        author: "The Director"
 ```
+
+**Date format:** Use ISO 8601 with timezone offset for proper sorting:
+- MST (winter): `2026-01-15T09:00:00-07:00`
+- MDT (summer): `2025-10-15T14:00:00-06:00`
+
+Entries without a time component (`2026-01-15`) display date only. Entries with time display "Jan 15, 2026 · 9:00 AM".
+
+**Legacy format:** Plain `body` strings are still supported for backward compatibility:
+```yaml
+diary:
+  - date: 2025-10-27
+    title: "Quick update"
+    phase: production
+    body: "Simple text without rich content."
+```
+
+**Email broadcasts:** When diary entries are added and deployed, the GitHub Action triggers `/admin/diary/check` which sends update emails to all campaign supporters. The email excerpt is auto-extracted from text blocks (first 200 chars, markdown stripped).
 
 ### Ongoing Funding (Post-Campaign)
 

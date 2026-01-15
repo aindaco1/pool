@@ -114,6 +114,128 @@ async function checkMilestones(
 // Rate limit constant (mirrors worker/src/index.js)
 const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
 
+// Inline implementation of getDiaryExcerpt (mirrors worker/src/index.js)
+function getDiaryExcerpt(entry: { body?: string; content?: Array<{ type: string; body?: string; text?: string }> }, maxLength = 200): string {
+  // Legacy: plain text body
+  if (entry.body && typeof entry.body === 'string') {
+    return entry.body.slice(0, maxLength);
+  }
+  
+  // New: content blocks array
+  if (entry.content && Array.isArray(entry.content)) {
+    const textParts: string[] = [];
+    for (const block of entry.content) {
+      if (block.type === 'text' && block.body) {
+        // Strip basic markdown formatting for email excerpt
+        const plainText = block.body
+          .replace(/\*\*([^*]+)\*\*/g, '$1')  // bold
+          .replace(/\*([^*]+)\*/g, '$1')       // italic
+          .replace(/_([^_]+)_/g, '$1')         // italic
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // links
+          .replace(/^#+\s*/gm, '')              // headers
+          .replace(/\n+/g, ' ')                 // newlines to spaces
+          .trim();
+        textParts.push(plainText);
+      } else if (block.type === 'quote' && block.text) {
+        textParts.push(`"${block.text}"`);
+      }
+    }
+    const combined = textParts.join(' ').trim();
+    return combined.slice(0, maxLength);
+  }
+  
+  return '';
+}
+
+// =============================================================================
+// Diary Excerpt Extraction
+// =============================================================================
+
+describe('getDiaryExcerpt', () => {
+  it('extracts plain text from legacy body field', () => {
+    const entry = { body: 'This is a simple update.' };
+    expect(getDiaryExcerpt(entry)).toBe('This is a simple update.');
+  });
+
+  it('truncates legacy body to maxLength', () => {
+    const entry = { body: 'A'.repeat(300) };
+    expect(getDiaryExcerpt(entry, 200)).toBe('A'.repeat(200));
+  });
+
+  it('extracts text from content blocks', () => {
+    const entry = {
+      content: [
+        { type: 'text', body: 'First paragraph.' },
+        { type: 'text', body: 'Second paragraph.' }
+      ]
+    };
+    expect(getDiaryExcerpt(entry)).toBe('First paragraph. Second paragraph.');
+  });
+
+  it('strips markdown bold formatting', () => {
+    const entry = {
+      content: [{ type: 'text', body: 'This is **bold** text.' }]
+    };
+    expect(getDiaryExcerpt(entry)).toBe('This is bold text.');
+  });
+
+  it('strips markdown italic formatting', () => {
+    const entry = {
+      content: [{ type: 'text', body: 'This is *italic* and _also italic_ text.' }]
+    };
+    expect(getDiaryExcerpt(entry)).toBe('This is italic and also italic text.');
+  });
+
+  it('strips markdown links', () => {
+    const entry = {
+      content: [{ type: 'text', body: 'Check out [our site](https://example.com) for more.' }]
+    };
+    expect(getDiaryExcerpt(entry)).toBe('Check out our site for more.');
+  });
+
+  it('strips markdown headers', () => {
+    const entry = {
+      content: [{ type: 'text', body: '### The Update\nHere is the news.' }]
+    };
+    expect(getDiaryExcerpt(entry)).toBe('The Update Here is the news.');
+  });
+
+  it('includes quote blocks with quotation marks', () => {
+    const entry = {
+      content: [
+        { type: 'text', body: 'Some intro.' },
+        { type: 'quote', text: 'A memorable quote.' }
+      ]
+    };
+    expect(getDiaryExcerpt(entry)).toBe('Some intro. "A memorable quote."');
+  });
+
+  it('ignores non-text blocks like images', () => {
+    const entry = {
+      content: [
+        { type: 'text', body: 'Before image.' },
+        { type: 'image', src: '/path/to/image.jpg' } as any,
+        { type: 'text', body: 'After image.' }
+      ]
+    };
+    expect(getDiaryExcerpt(entry)).toBe('Before image. After image.');
+  });
+
+  it('returns empty string for empty entry', () => {
+    expect(getDiaryExcerpt({})).toBe('');
+    expect(getDiaryExcerpt({ content: [] })).toBe('');
+  });
+
+  it('prefers content blocks over body when both present', () => {
+    const entry = {
+      body: 'Legacy body',
+      content: [{ type: 'text', body: 'New content.' }]
+    };
+    // body is checked first, so it takes precedence
+    expect(getDiaryExcerpt(entry)).toBe('Legacy body');
+  });
+});
+
 // =============================================================================
 // Diary Tracking Helpers
 // =============================================================================
