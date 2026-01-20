@@ -769,6 +769,28 @@ async function handleStripeWebhook(request, env, ctx) {
   const body = await request.text();
   const sig = request.headers.get('stripe-signature');
 
+  // SEC-002: Early mode detection from raw payload to avoid signature mismatch
+  // When prod worker (live mode) receives test events, the signature won't verify
+  // because test events are signed with a different secret. Parse livemode early
+  // and acknowledge if it doesn't match our environment.
+  try {
+    const parsed = JSON.parse(body);
+    const isLiveEvent = parsed.livemode === true;
+    const isLiveMode = env.SNIPCART_MODE === 'live';
+    if (isLiveEvent !== isLiveMode) {
+      console.log('📨 Skipping event (mode mismatch, pre-verification):', { 
+        eventId: parsed.id, 
+        eventType: parsed.type,
+        isLiveEvent, 
+        isLiveMode 
+      });
+      return jsonResponse({ received: true, skipped: 'mode mismatch' }, 200);
+    }
+  } catch (parseErr) {
+    console.error('📨 Failed to parse webhook body for mode check:', parseErr.message);
+    // Continue to signature verification which will fail properly
+  }
+
   // SEC-002: If webhook secret is not configured, acknowledge receipt but don't process
   // This prevents Stripe from retrying indefinitely (e.g., test mode webhooks hitting prod worker)
   const webhookSecret = getStripeWebhookSecret(env);
@@ -785,16 +807,6 @@ async function handleStripeWebhook(request, env, ctx) {
 
   const event = JSON.parse(body);
   console.log('📨 Event type:', event.type);
-
-  // Mode check: only process events that match our environment
-  // - Production (SNIPCART_MODE=live) only processes live events
-  // - Dev (SNIPCART_MODE=test) only processes test events
-  const isLiveEvent = event.livemode === true;
-  const isLiveMode = env.SNIPCART_MODE === 'live';
-  if (isLiveEvent !== isLiveMode) {
-    console.log('📨 Skipping event (mode mismatch):', { eventId: event.id, isLiveEvent, isLiveMode });
-    return jsonResponse({ received: true });
-  }
 
   // Idempotency: skip if we've already processed this event
   if (env.PLEDGES) {
