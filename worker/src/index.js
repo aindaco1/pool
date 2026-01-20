@@ -258,9 +258,12 @@ export default {
     }
 
     try {
-      // SEC-003: Block test endpoints in production mode
+      // SEC-003: Block test endpoints in production mode (unless admin-authenticated)
       if (path.startsWith('/test/') && env.SNIPCART_MODE !== 'test') {
-        return jsonResponse({ error: 'Not found' }, 404);
+        const auth = requireAdmin(request, env);
+        if (!auth.ok) {
+          return jsonResponse({ error: 'Not found' }, 404);
+        }
       }
 
       if (path === '/start' && method === 'POST') {
@@ -2746,8 +2749,12 @@ async function handleMilestoneCheck(request, campaignSlug, env) {
  * Test endpoint: Send individual test emails (test mode only)
  */
 async function handleTestEmail(request, env) {
+  // Allow in test mode, or in production with admin auth
   if (env.SNIPCART_MODE !== 'test') {
-    return jsonResponse({ error: 'Test endpoints only available in test mode' }, 403);
+    const auth = requireAdmin(request, env);
+    if (!auth.ok) {
+      return jsonResponse({ error: 'Test endpoints require admin auth in production' }, 403);
+    }
   }
 
   const body = await request.json();
@@ -2759,6 +2766,7 @@ async function handleTestEmail(request, env) {
 
   const campaign = await getCampaign(env, campaignSlug || 'hand-relations');
   const campaignTitle = campaign?.title || 'Test Campaign';
+  const instagramUrl = campaign?.instagram || 'https://instagram.com/thepool';
   
   // Use the test order ID created by /test/setup so manage links work
   const testOrderId = 'test-order-active-1';
@@ -2777,7 +2785,8 @@ async function handleTestEmail(request, env) {
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
           amount: 5000,
-          token
+          token,
+          instagramUrl
         });
         break;
 
@@ -2808,7 +2817,8 @@ async function handleTestEmail(request, env) {
           campaignTitle,
           diaryTitle: 'Test Diary Entry',
           diaryExcerpt: 'This is a test diary update to verify the email template is working correctly.',
-          token
+          token,
+          instagramUrl
         });
         break;
 
@@ -2820,7 +2830,8 @@ async function handleTestEmail(request, env) {
           milestone: 'one-third',
           pledgedAmount: 3333,
           goalAmount: 10000,
-          token
+          token,
+          instagramUrl
         });
         break;
 
@@ -2832,7 +2843,8 @@ async function handleTestEmail(request, env) {
           milestone: 'two-thirds',
           pledgedAmount: 6666,
           goalAmount: 10000,
-          token
+          token,
+          instagramUrl
         });
         break;
 
@@ -2844,7 +2856,8 @@ async function handleTestEmail(request, env) {
           milestone: 'goal',
           pledgedAmount: 10000,
           goalAmount: 10000,
-          token
+          token,
+          instagramUrl
         });
         break;
 
@@ -2857,7 +2870,8 @@ async function handleTestEmail(request, env) {
           pledgedAmount: 15000,
           goalAmount: 10000,
           stretchGoalName: 'Director\'s Commentary',
-          token
+          token,
+          instagramUrl
         });
         break;
 
