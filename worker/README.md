@@ -117,15 +117,20 @@ Cancel an active pledge.
 ```
 
 ### POST /pledge/modify
-Change the tier of an active pledge.
+Change tiers, quantity, or custom support for an active pledge.
 
 ```json
 {
   "token": "magic-link-token",
   "orderId": "snipcart-order-token",
-  "newTierId": "sfx-slot"
+  "newTierId": "sfx-slot",
+  "newTierQty": 2,
+  "addTiers": [{ "id": "frame", "qty": 5 }],
+  "customAmount": 25
 }
 ```
+
+All fields except `token` are optional. Changes are tracked in the pledge's `history` array with `type: "modified"` entries that include tier state and `customAmount`.
 
 ### POST /pledge/payment-method/start
 Start a Stripe session to update payment method.

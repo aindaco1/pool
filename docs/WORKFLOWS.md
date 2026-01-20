@@ -82,14 +82,26 @@ Pledges are stored in Cloudflare KV (not Snipcart). Key patterns:
   "stripePaymentMethodId": "pm_xxx",
   "pledgeStatus": "active",
   "charged": false,
-  "history": [{ "type": "created", "at": "..." }]
+  "history": [
+    { "type": "created", "subtotal": 5000, "tax": 394, "amount": 5394, "tierId": "producer-credit", "tierQty": 1, "customAmount": 25, "at": "2026-01-15T12:00:00Z" }
+  ]
 }
 ```
 
 **Support items and custom amounts:**
 - `supportItems` — Array of `{ id, amount }` for production phase contributions
-- `customAmount` — Integer (cents) for "no reward" pledge additions
+- `customAmount` — Dollar amount for "no reward" custom support additions
 - `additionalTiers` — Array of `{ id, qty }` for multi-tier pledges (when `single_tier_only: false`)
+
+**History entries:**
+Each history entry tracks a pledge event with full context:
+- `type` — `created`, `modified`, or `cancelled`
+- `subtotal` / `subtotalDelta` — Pre-tax amount (or delta for modifications)
+- `tax` / `taxDelta` — Tax amount (or delta)
+- `amount` / `amountDelta` — Total with tax (or delta)
+- `tierId`, `tierQty`, `additionalTiers` — Tier state after this event
+- `customAmount` — Custom support amount (if present)
+- `at` — ISO timestamp
 
 **Status values:** `active`, `cancelled`, `charged`, `payment_failed`
 

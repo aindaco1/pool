@@ -569,11 +569,22 @@ Pledges include a `history` array tracking all changes:
 ```json
 {
   "history": [
-    { "type": "created", "subtotal": 10000, "tax": 788, "amount": 10788, "tierId": "prop", "tierQty": 1, "at": "..." },
-    { "type": "modified", "subtotalDelta": -5000, "taxDelta": -394, "amountDelta": -5394, "tierId": "dialogue", "tierQty": 1, "at": "..." }
+    { "type": "created", "subtotal": 10000, "tax": 788, "amount": 10788, "tierId": "prop", "tierQty": 1, "customAmount": 5, "at": "..." },
+    { "type": "modified", "subtotalDelta": -5000, "taxDelta": -394, "amountDelta": -5394, "tierId": "dialogue", "tierQty": 1, "customAmount": 10, "at": "..." }
   ]
 }
 ```
+
+History entry fields:
+- `type` — Event type: `created`, `modified`, or `cancelled`
+- `subtotal` / `subtotalDelta` — Pre-tax amount (full for created, delta for modified/cancelled)
+- `tax` / `taxDelta` — Tax amount (full or delta)
+- `amount` / `amountDelta` — Total with tax (full or delta)
+- `tierId` — Current tier ID after this event
+- `tierQty` — Current tier quantity after this event
+- `additionalTiers` — Array of additional tiers (multi-tier mode)
+- `customAmount` — Custom support amount in dollars (if present)
+- `at` — ISO timestamp
 
 History types:
 - `created` — Initial pledge with full amounts
@@ -615,11 +626,15 @@ Generate CSV reports of pledges from Cloudflare KV:
 
 **Modified row items format:**
 ```
-(modified) +Line of Dialogue; -Writer Credit x2
+(modified) +Line of Dialogue; -Writer Credit x2; +Custom Support $5.00
 ```
 - `+Tier` or `+Tier xN` — Tier was added (or quantity increased)
 - `-Tier` or `-Tier xN` — Tier was removed (or quantity decreased)
+- `+Custom Support $X` or `-Custom Support $X` — Custom support was added/removed
 - Unchanged tiers don't appear in the diff
+
+**Custom Support in items:**
+When a pledge includes custom support, it appears as `Custom Support $X.XX` in the items column (e.g., `Line of Dialogue; Custom Support $25.00`).
 
 **Cancelled row format:**
 Cancelled rows show negative amounts (subtotal, tax, total) so that summing all rows gives the correct campaign total. Items are prefixed with `-` to indicate removal.
@@ -655,13 +670,14 @@ Generate aggregated reports showing the **current state** of each backer's pledg
 - Shows **current tier state** (not history)
 - **Aggregates** multiple pledges per backer into one row
 - **Excludes** cancelled pledges
+- **Excludes** custom support (only shows deliverable items)
 - **No** status, created_at, or order_id columns
 - Items show final quantities (e.g., if backer modified from frame→dialogue, only dialogue appears)
 
 **Use cases:**
-- Fulfillment spreadsheets (what to send each backer)
+- Fulfillment spreadsheets (what rewards to deliver to each backer)
 - Backer counts by tier
-- Revenue summaries
+- Deliverable tracking
 
 ## Checkout Autofill
 
