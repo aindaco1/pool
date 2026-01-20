@@ -104,7 +104,7 @@ TIER_NAMES = {
 def get_tier_name(tier_id, fallback=''):
     return TIER_NAMES.get(tier_id, fallback or tier_id or '')
 
-def build_items_str(tier_id, tier_qty, additional_tiers, is_negative=False):
+def build_items_str(tier_id, tier_qty, additional_tiers, is_negative=False, custom_amount=0):
     items = []
     tier_name = get_tier_name(tier_id)
     if tier_name:
@@ -124,6 +124,9 @@ def build_items_str(tier_id, tier_qty, additional_tiers, is_negative=False):
                 items.append(f'{prefix}{add_name} x{add_qty}')
             else:
                 items.append(f'{prefix}{add_name}')
+    
+    if custom_amount and custom_amount > 0:
+        items.append(f'Custom Support \${custom_amount:.2f}')
     
     return '; '.join(items) if items else ''
 
@@ -186,6 +189,7 @@ try:
     if history:
         # Output one row per history entry
         prev_counts = {}
+        prev_custom = 0
         for entry in history:
             entry_type = entry.get('type', '')
             timestamp = entry.get('at', '')
@@ -194,12 +198,17 @@ try:
                 subtotal = entry.get('subtotal', 0) / 100
                 tax = entry.get('tax', 0) / 100
                 total = entry.get('amount', 0) / 100
+                # Only show customAmount on created if it's in the entry itself
+                # (not from current pledge state which may have been added later)
+                custom_amt = entry.get('customAmount', 0) or 0
                 items_str = build_items_str(
                     entry.get('tierId'),
                     entry.get('tierQty', 1),
-                    entry.get('additionalTiers')
+                    entry.get('additionalTiers'),
+                    custom_amount=custom_amt
                 )
                 prev_counts = get_tier_counts(entry)
+                prev_custom = custom_amt
                 write_row(email, campaign, items_str, subtotal, tax, total, 'created', charged, timestamp, order_id)
             
             elif entry_type == 'modified':
@@ -207,12 +216,24 @@ try:
                 tax = entry.get('taxDelta', 0) / 100
                 total = entry.get('amountDelta', 0) / 100
                 new_counts = get_tier_counts(entry)
+                new_custom = entry.get('customAmount', 0) or 0
                 items_str = build_diff_items_str(prev_counts, new_counts)
+                
+                # Add custom amount change if present
+                if new_custom != prev_custom:
+                    custom_diff = new_custom - prev_custom
+                    if custom_diff > 0:
+                        custom_str = f'+Custom Support \${custom_diff:.2f}'
+                    else:
+                        custom_str = f'-Custom Support \${abs(custom_diff):.2f}'
+                    items_str = f'{items_str}; {custom_str}' if items_str else custom_str
+                
                 if items_str:
                     items_str = f'(modified) {items_str}'
                 else:
                     items_str = '(modified)'
                 prev_counts = new_counts
+                prev_custom = new_custom
                 write_row(email, campaign, items_str, subtotal, tax, total, 'modified', charged, timestamp, order_id)
             
             elif entry_type == 'cancelled':
@@ -224,7 +245,8 @@ try:
                     data.get('tierId'),
                     data.get('tierQty', 1),
                     data.get('additionalTiers'),
-                    is_negative=True
+                    is_negative=True,
+                    custom_amount=data.get('customAmount', 0) or 0
                 )
                 write_row(email, campaign, items_str, subtotal, tax, total, 'cancelled', charged, timestamp, order_id)
     else:
@@ -252,7 +274,8 @@ try:
             data.get('tierId'),
             data.get('tierQty', 1),
             data.get('additionalTiers'),
-            is_negative=is_cancelled
+            is_negative=is_cancelled,
+            custom_amount=data.get('customAmount', 0) or 0
         )
         
         write_row(email, campaign, items_str, subtotal, tax, total, status, charged, data.get('createdAt', ''), order_id)

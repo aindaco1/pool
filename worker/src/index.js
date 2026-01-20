@@ -1325,6 +1325,7 @@ async function handleCancelPledge(request, env) {
           tierId: pledgeData.tierId,
           tierQty: pledgeData.tierQty || 1,
           additionalTiers: pledgeData.additionalTiers,
+          customAmount: pledgeData.customAmount || undefined,
           at: pledgeData.createdAt
         }];
       }
@@ -1333,6 +1334,7 @@ async function handleCancelPledge(request, env) {
         subtotalDelta: -cancelSubtotal,
         taxDelta: -cancelTax,
         amountDelta: -cancelAmount,
+        customAmount: pledgeData.customAmount || undefined,
         at: now
       });
       
@@ -1579,6 +1581,11 @@ async function handleModifyPledge(request, env) {
           pledgeData.tierId = addTiers[0].id;
           pledgeData.tierQty = addTiers[0].qty || 1;
           pledgeData.additionalTiers = addTiers.slice(1).map(t => ({ id: t.id, qty: t.qty || 1 }));
+          // Look up tier name for the new primary tier
+          const primaryTierValidation = await validateTier(env, campaignSlug, addTiers[0].id, 0);
+          if (primaryTierValidation.valid) {
+            pledgeData.tierName = primaryTierValidation.tier.name;
+          }
         } else {
           // All tiers removed
           pledgeData.tierId = null;
@@ -1616,6 +1623,7 @@ async function handleModifyPledge(request, env) {
           tierId: oldTierId,
           tierQty: oldTierQty,
           additionalTiers: currentPledge?.additionalTiers,
+          customAmount: currentPledge?.customAmount || undefined,
           at: pledgeData.createdAt
         }];
       }
@@ -1627,6 +1635,7 @@ async function handleModifyPledge(request, env) {
         tierId: pledgeData.tierId,
         tierQty: pledgeData.tierQty,
         additionalTiers: pledgeData.additionalTiers?.length > 0 ? pledgeData.additionalTiers : undefined,
+        customAmount: pledgeData.customAmount || undefined,
         at: now
       });
       
