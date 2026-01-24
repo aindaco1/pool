@@ -337,10 +337,22 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
     </a>
   </div>
   
-  <div style="margin-bottom: 24px;">
-    <p style="margin: 0 0 12px 0; font-size: 14px; color: #666;">Your supporter access:</p>
-    <a href="${communityUrl}" style="color: #000; text-decoration: underline;">Vote on Creative Decisions</a> · 
-    <a href="${manageUrl}" style="color: #000; text-decoration: underline;">Manage Your Pledge</a>
+  <div style="margin-bottom: 32px;">
+    <h2 style="font-size: 18px; margin: 0 0 16px 0;">Your Supporter Access</h2>
+    
+    <div style="margin-bottom: 12px;">
+      <a href="${communityUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+        Supporter Community
+      </a>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Vote on creative decisions for this project</p>
+    </div>
+    
+    <div style="margin-bottom: 12px;">
+      <a href="${manageUrl}" style="display: inline-block; background: #fff; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; border: 1px solid #000;">
+        Manage Your Pledge
+      </a>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Cancel, modify amount, or update payment method</p>
+    </div>
   </div>
   
   ${instagramCTA}
