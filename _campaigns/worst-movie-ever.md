@@ -318,6 +318,40 @@ diary:
         body: |
           Do us a favor, would you? Check out our [Instagram](https://www.instagram.com/worstmovie.evermade/) and spread the good word! We're on a mission to make the worst movie ever, and we need the world to know about it!
 
+  - date: 2026-01-24T12:00:00-07:00
+    title: "WE MADE OUR GOAL!"
+    phase: fundraising
+    content:
+      - type: text
+        body: |
+          **IT'S HAPPENING.** You absolute legends. You chaotic geniuses. You beautiful disasters.
+
+          **We hit $2,500!** This movie is officially getting made, and it's going to be *terrible* -- thanks to YOU.
+
+      - type: image
+        src: /assets/images/defaults/celebration.gif 
+        alt: "Dude dancing in celebration"
+
+      - type: text
+        body: |
+          But wait -- why stop at terrible when we can go **catastrophic**?
+
+          ### Stretch Goal Unlocked: SILLY ACCENT at $3,000
+
+          Just **$500 more** and the directors must give all notes in a **silly accent of your choice** for an entire scene. Want us to direct in a bad British accent? A cartoon pirate voice? Whatever cursed thing you come up with?
+
+          **You get to pick.**
+
+      - type: image
+        src: /assets/images/defaults/epic.gif 
+        alt: "Do you have it in you to make it epic?"
+
+      - type: text
+        body: |
+          Speaking of which, if you're a supporter of this campaign, you have access to our [community vote page!](/community/worst-movie-ever/) -- just use the magic link in your pledge email. If you haven't yet, **go vote on our main villain's name.** -- and if we make the first stretch goal, **you'll get to vote on the accent too!**
+
+          And keep spreading the word! Share on [Instagram](https://www.instagram.com/worstmovie.evermade/), tell your family, your friends, your enemies -- **everyone deserves a chance to make this film worse!**
+
 ongoing_items: []
 
 tiers:
