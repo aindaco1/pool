@@ -26,13 +26,14 @@ export async function handleGetVotes(request, env) {
   }
   
   // Dev mode bypass for local testing (SEC-001: Only allow in test mode)
-  let orderId, campaignSlug;
+  let orderId, campaignSlug, email;
   if (token.startsWith('dev-token-')) {
     if (env.SNIPCART_MODE !== 'test') {
       return jsonResponse({ error: 'Invalid or expired token' }, 401, env);
     }
     campaignSlug = token.replace('dev-token-', '');
     orderId = 'dev-order-1'; // Fixed ID for consistent dev user
+    email = 'dev@test.com';
   } else {
     const payload = await verifyToken(env.MAGIC_LINK_SECRET, token);
     if (!payload) {
@@ -40,6 +41,7 @@ export async function handleGetVotes(request, env) {
     }
     orderId = payload.orderId;
     campaignSlug = payload.campaignSlug;
+    email = payload.email;
     
     // Check if pledge is still active (not cancelled)
     if (env.PLEDGES) {
@@ -74,7 +76,7 @@ export async function handleGetVotes(request, env) {
   const results = await getCampaignResults(env, {
     campaignSlug,
     decisionIds,
-    orderId
+    email
   });
   
   return jsonResponse({
@@ -115,13 +117,14 @@ export async function handlePostVote(request, env) {
   }
   
   // Dev mode bypass for local testing (SEC-001: Only allow in test mode)
-  let orderId, campaignSlug;
+  let orderId, campaignSlug, email;
   if (token.startsWith('dev-token-')) {
     if (env.SNIPCART_MODE !== 'test') {
       return jsonResponse({ error: 'Invalid or expired token' }, 401, env);
     }
     campaignSlug = token.replace('dev-token-', '');
     orderId = 'dev-order-1'; // Fixed ID for consistent dev user
+    email = 'dev@test.com';
   } else {
     const payload = await verifyToken(env.MAGIC_LINK_SECRET, token);
     if (!payload) {
@@ -129,6 +132,7 @@ export async function handlePostVote(request, env) {
     }
     orderId = payload.orderId;
     campaignSlug = payload.campaignSlug;
+    email = payload.email;
     
     // Check if pledge is still active (not cancelled)
     if (env.PLEDGES) {
@@ -143,7 +147,7 @@ export async function handlePostVote(request, env) {
   const result = await castVote(env, {
     campaignSlug,
     decisionId,
-    orderId,
+    email,
     option
   });
   

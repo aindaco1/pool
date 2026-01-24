@@ -4,15 +4,18 @@
  * KV Binding: VOTES (configure in wrangler.toml)
  * 
  * Keys:
- *   vote:{campaignSlug}:{decisionId}:{oderId} → selected option string
- *   results:{campaignSlug}:{decisionId}       → JSON { optionA: count, optionB: count, ... }
+ *   vote:{campaignSlug}:{decisionId}:{email} → selected option string
+ *   results:{campaignSlug}:{decisionId}      → JSON { optionA: count, optionB: count, ... }
+ * 
+ * Note: Votes are keyed by email (not orderId) to prevent multiple votes from
+ * the same person who has multiple pledges.
  */
 
 /**
  * Check if user has voted and get current results
  */
-export async function getVoteStatus(env, { campaignSlug, decisionId, orderId }) {
-  const voteKey = `vote:${campaignSlug}:${decisionId}:${orderId}`;
+export async function getVoteStatus(env, { campaignSlug, decisionId, email }) {
+  const voteKey = `vote:${campaignSlug}:${decisionId}:${email}`;
   const resultsKey = `results:${campaignSlug}:${decisionId}`;
   
   const [userVote, resultsJson] = await Promise.all([
@@ -34,8 +37,8 @@ export async function getVoteStatus(env, { campaignSlug, decisionId, orderId }) 
 /**
  * Cast a vote
  */
-export async function castVote(env, { campaignSlug, decisionId, orderId, option }) {
-  const voteKey = `vote:${campaignSlug}:${decisionId}:${orderId}`;
+export async function castVote(env, { campaignSlug, decisionId, email, option }) {
+  const voteKey = `vote:${campaignSlug}:${decisionId}:${email}`;
   const resultsKey = `results:${campaignSlug}:${decisionId}`;
   
   // Check if already voted
@@ -74,9 +77,9 @@ export async function castVote(env, { campaignSlug, decisionId, orderId, option 
 /**
  * Get results for all decisions in a campaign
  */
-export async function getCampaignResults(env, { campaignSlug, decisionIds, orderId }) {
+export async function getCampaignResults(env, { campaignSlug, decisionIds, email }) {
   const statusPromises = decisionIds.map(decisionId => 
-    getVoteStatus(env, { campaignSlug, decisionId, orderId })
+    getVoteStatus(env, { campaignSlug, decisionId, email })
       .then(status => ({ decisionId, ...status }))
   );
   
