@@ -231,7 +231,7 @@ content:
           
           - name: divider
             label: Divider
-            description: "No fields needed — just adds a horizontal line"
+            type: object
       
       # --- Tiers ---
       - name: tiers
@@ -387,10 +387,12 @@ content:
         description: "Updates to share with backers"
         fields:
           - name: date
-            label: Date & Time
-            type: string
+            label: Date
+            type: date
             required: true
-            description: "ISO format: 2026-01-15T09:00:00-07:00"
+            options:
+              time: true
+              format: "yyyy-MM-dd'T'HH:mm:ssXXX"
           
           - name: title
             label: Entry Title
