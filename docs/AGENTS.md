@@ -27,9 +27,10 @@ This document outlines who does what for the **pool.dustwave.xyz** project.
 - Ensures `ADMIN_SECRET` is set for automated diary email broadcasts.
 
 ### 5. Content Editor
-- Creates/edits `_campaigns/<slug>.md`.
-- Updates goals, stretch goals, and tier info.
-- Publishes Markdown updates and manages image assets.
+- Creates/edits campaigns via [Pages CMS](https://app.pagescms.org) or directly in `_campaigns/<slug>.md`.
+- Updates goals, stretch goals, tiers, diary entries, and community decisions.
+- Uploads images to `assets/images/campaigns/<slug>/`.
+- See [CMS.md](CMS.md) for the visual editing guide.
 
 ### 6. Security/Compliance Steward
 - Rotates and audits secrets (Stripe, Snipcart).
@@ -46,3 +47,4 @@ This document outlines who does what for the **pool.dustwave.xyz** project.
 - [ ] Successful $1 test pledge end-to-end in Stripe test mode.
 - [ ] Live stats updating correctly (`/stats/:slug`).
 - [ ] Support items and custom amounts tracked in KV.
+- [ ] Pages CMS access granted (via [app.pagescms.org](https://app.pagescms.org)).

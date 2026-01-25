@@ -7,6 +7,7 @@
 - **Cloudflare Worker** — Backend API, pledge storage (KV), email sending
 - **Stripe** — SetupIntents (save card), PaymentIntents (charge later)
 - **Resend** — Transactional emails (supporter confirmation, milestones, failures)
+- **Pages CMS** — Visual campaign editing via [app.pagescms.org](https://app.pagescms.org)
 
 ## Design System
 
@@ -66,6 +67,57 @@ Jekyll compiles `main.scss` → `main.css` automatically.
 ```
 
 This applies to ALL include parameters. Without `include.`, Jekyll can't properly resolve the variables.
+
+## Pages CMS Configuration
+
+The CMS is configured in `.pages.yml` at the repo root. It defines:
+
+- **Media paths** — Where uploads go (`assets/images/campaigns/`)
+- **Collections** — Content types (campaigns, pages)
+- **Fields** — Form fields for each content type
+
+### Adding a New Campaign Field
+
+1. Edit `.pages.yml`
+2. Find the `campaigns` collection
+3. Add a new field to the `fields` array:
+
+```yaml
+- name: my_new_field
+  label: My New Field
+  type: string
+  description: "Help text for editors"
+```
+
+4. Commit and push — Pages CMS will reload the config
+
+### Field Types
+
+| Type | Use For |
+|------|---------|
+| `string` | Short text |
+| `number` | Integers or decimals |
+| `boolean` | Toggles (true/false) |
+| `date` | Date picker |
+| `select` | Dropdown with options |
+| `image` | Image upload |
+| `rich-text` | Markdown editor |
+| `object` | Nested fields |
+| `object` + `list: true` | Repeatable items (tiers, diary entries) |
+
+### Per-Field Media Paths
+
+Override the global media path for specific fields:
+
+```yaml
+- name: hero_image
+  type: image
+  media:
+    input: assets/images/campaigns
+    output: /assets/images/campaigns
+```
+
+See [CMS.md](CMS.md) for the full editing guide.
 
 ## Campaign Content Model
 

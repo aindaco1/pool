@@ -17,6 +17,7 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
 - **Instagram integration** — Optional social CTA in supporter emails
 - **Ongoing funding** — Post-campaign support section
+- **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
 ## Architecture
 
@@ -68,10 +69,12 @@ See [`docs/`](docs/) for full documentation:
 - [TESTING.md](docs/TESTING.md) — Full testing guide & secrets reference
 - [SECURITY.md](docs/SECURITY.md) — Security architecture, rate limiting & pen testing
 - [ROADMAP.md](docs/ROADMAP.md) — Planned features
+- [CMS.md](docs/CMS.md) — Pages CMS setup & campaign editing guide
 
 ## Key Directories
 
 ```
+.pages.yml            # Pages CMS configuration
 _campaigns/           # Markdown campaign files
 _layouts/             # Page templates (campaign, community, manage, etc.)
 _includes/            # Reusable components

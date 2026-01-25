@@ -29,6 +29,7 @@ bundle exec jekyll clean
 4. `docs/DEV_NOTES.md` — Integration notes, content model & gotchas
 5. `docs/TESTING.md` — Full testing guide (includes secrets setup)
 6. `docs/ROADMAP.md` — Planned features
+7. `docs/CMS.md` — Pages CMS setup & campaign editing
 
 ### GitHub Pages Setup
 
@@ -67,6 +68,7 @@ bundle exec jekyll clean
 - Multi-tier pledge support (`additionalTiers`)
 - Unit tests (Vitest) and E2E tests (Playwright)
 - Production campaign launch (Hand Relations)
+- Pages CMS integration for visual campaign editing
 
 🚧 **In Progress:**
 _(None currently)_

@@ -1,0 +1,559 @@
+# Pages CMS Configuration for Pool Crowdfunding
+# https://pagescms.org/docs/configuration/
+#
+# PERMISSIONS NOTE: Pages CMS does not yet support per-user permissions.
+# All collaborators have equal access. For campaign-specific access, 
+# consider separate repos per campaign or wait for Pages CMS permissions feature.
+
+media:
+  input: assets/images
+  output: /assets/images
+
+content:
+  # ============================================================
+  # CAMPAIGNS - Core content type
+  # ============================================================
+  - name: campaigns
+    label: Campaigns
+    path: _campaigns
+    type: collection
+    view:
+      fields: [title, category, goal_amount, goal_deadline]
+      primary: title
+      sort: [goal_deadline, desc]
+    fields:
+      # --- Core Identity ---
+      - name: layout
+        label: Layout
+        type: string
+        default: campaign
+        hidden: true
+      
+      - name: title
+        label: Campaign Title
+        type: string
+        required: true
+        description: "The main title displayed everywhere (e.g., 'TECOLOTE · Short Film')"
+      
+      - name: slug
+        label: URL Slug
+        type: string
+        required: true
+        description: "Lowercase, hyphens only. This becomes the URL: pool.dustwave.xyz/campaigns/[slug]"
+        pattern: "^[a-z0-9-]+$"
+      
+      - name: test_only
+        label: Test Campaign
+        type: boolean
+        default: false
+        description: "Hide from production site (visible only with show_test_campaigns flag)"
+      
+      # --- Creator Info ---
+      - name: creator_name
+        label: Creator Name
+        type: string
+        required: true
+        description: "Person or team name (e.g., 'MAÍZ', 'Dust Wave')"
+      
+      - name: creator_image
+        label: Creator Photo
+        type: image
+        description: "Square photo of creator/team (recommended: 400×400px)"
+        media:
+          input: assets/images/campaigns
+          output: /assets/images/campaigns
+      
+      - name: category
+        label: Category
+        type: select
+        required: true
+        options:
+          - label: Short Film
+            value: Short Film
+          - label: Feature Film
+            value: Feature Film
+          - label: Documentary
+            value: Documentary
+          - label: Web Series
+            value: Web Series
+          - label: Music Video
+            value: Music Video
+          - label: Album
+            value: Album
+          - label: Other
+            value: Other
+      
+      # --- Campaign Images ---
+      - name: hero_image
+        label: Hero Image (Square)
+        type: image
+        required: true
+        description: "Main campaign image, square format (recommended: 1000×1000px, <400KB)"
+        media:
+          input: assets/images/campaigns
+          output: /assets/images/campaigns
+      
+      - name: hero_image_wide
+        label: Hero Image (Wide)
+        type: image
+        description: "Optional 16:9 version for campaign page header (recommended: 1600×900px, <400KB)"
+        media:
+          input: assets/images/campaigns
+          output: /assets/images/campaigns
+      
+      - name: hero_video
+        label: Hero Video URL
+        type: string
+        description: "YouTube, Instagram, or direct video URL. Overrides hero image on campaign page."
+      
+      - name: campaign_background
+        label: Background Image
+        type: image
+        description: "Optional decorative background for campaign page"
+        media:
+          input: assets/images/campaigns
+          output: /assets/images/campaigns
+      
+      - name: progress_background
+        label: Progress Bar Background
+        type: image
+        description: "Optional image behind progress bar"
+        media:
+          input: assets/images/campaigns
+          output: /assets/images/campaigns
+      
+      # --- Funding Details ---
+      - name: goal_amount
+        label: Goal Amount ($)
+        type: number
+        required: true
+        description: "Funding target in dollars"
+      
+      - name: start_date
+        label: Start Date
+        type: date
+        required: true
+        description: "Campaign goes live at midnight MT on this date"
+      
+      - name: goal_deadline
+        label: End Date
+        type: date
+        required: true
+        description: "Campaign ends at 11:59 PM MT on this date"
+      
+      - name: charged
+        label: Charged
+        type: boolean
+        default: false
+        description: "Set to true after backers have been charged (post-campaign)"
+      
+      # --- Content ---
+      - name: short_blurb
+        label: Short Blurb
+        type: string
+        required: true
+        description: "One-sentence hook (max 160 chars). Used in cards and meta descriptions."
+      
+      - name: long_content
+        label: Campaign Description
+        type: object
+        list: true
+        description: "Rich content blocks for the main campaign description"
+        fields:
+          - name: type
+            label: Block Type
+            type: select
+            required: true
+            options:
+              - { label: Text (Markdown), value: text }
+              - { label: Image, value: image }
+              - { label: Quote, value: quote }
+              - { label: Gallery, value: gallery }
+              - { label: Divider, value: divider }
+          
+          - name: body
+            label: Text Content
+            type: rich-text
+            description: "Markdown text (for 'text' type)"
+          
+          - name: src
+            label: Image Source
+            type: image
+            description: "Image path (for 'image' type)"
+            media:
+              input: assets/images/campaigns
+              output: /assets/images/campaigns
+          
+          - name: alt
+            label: Alt Text
+            type: string
+            description: "Image description for accessibility"
+          
+          - name: caption
+            label: Caption
+            type: string
+            description: "Optional caption below image or gallery"
+          
+          - name: text
+            label: Quote Text
+            type: string
+            description: "The quote text (for 'quote' type)"
+          
+          - name: author
+            label: Quote Author
+            type: string
+            description: "Who said it"
+          
+          - name: layout
+            label: Gallery Layout
+            type: select
+            description: "For 'gallery' type"
+            options:
+              - { label: Carousel, value: carousel }
+              - { label: Grid, value: grid }
+          
+          - name: images
+            label: Gallery Images
+            type: object
+            list: true
+            description: "For 'gallery' type"
+            fields:
+              - name: src
+                label: Image
+                type: image
+                media:
+                  input: assets/images/campaigns
+                  output: /assets/images/campaigns
+              - name: alt
+                label: Alt Text
+                type: string
+      
+      # --- Tiers ---
+      - name: tiers
+        label: Reward Tiers
+        type: object
+        list: true
+        description: "Pledge tiers with rewards"
+        fields:
+          - name: id
+            label: Tier ID
+            type: string
+            required: true
+            description: "Unique ID, lowercase with hyphens (e.g., 'digital-screener')"
+            pattern: "^[a-z0-9-]+$"
+          
+          - name: name
+            label: Tier Name
+            type: string
+            required: true
+            description: "Display name (e.g., 'Digital Screener')"
+          
+          - name: price
+            label: Price ($)
+            type: number
+            required: true
+          
+          - name: description
+            label: Description
+            type: string
+            required: true
+            description: "What the backer gets"
+          
+          - name: category
+            label: Reward Type
+            type: select
+            options:
+              - { label: Digital (no shipping), value: digital }
+              - { label: Physical (requires shipping), value: physical }
+          
+          - name: stackable
+            label: Stackable
+            type: boolean
+            default: true
+            description: "Can backers pledge multiple quantities?"
+          
+          - name: limit_total
+            label: Total Limit
+            type: number
+            description: "Max available (leave empty for unlimited)"
+          
+          - name: requires_threshold
+            label: Unlock Threshold ($)
+            type: number
+            description: "Only visible after campaign reaches this amount"
+          
+          - name: late_support
+            label: Late Support
+            type: boolean
+            default: false
+            description: "Available after campaign ends (if funded)"
+      
+      - name: featured_tier_id
+        label: Featured Tier
+        type: string
+        description: "Tier ID to highlight at top of tier list"
+      
+      - name: single_tier_only
+        label: Single Tier Mode
+        type: boolean
+        default: false
+        description: "Restrict to one tier per pledge"
+      
+      # --- Stretch Goals ---
+      - name: stretch_goals
+        label: Stretch Goals
+        type: object
+        list: true
+        fields:
+          - name: threshold
+            label: Threshold ($)
+            type: number
+            required: true
+            description: "Amount at which this goal unlocks"
+          
+          - name: title
+            label: Title
+            type: string
+            required: true
+          
+          - name: description
+            label: Description
+            type: string
+          
+          - name: status
+            label: Status
+            type: select
+            options:
+              - { label: Locked (hidden until previous met), value: locked }
+              - { label: Unlocked (visible), value: unlocked }
+              - { label: Achieved, value: achieved }
+              - { label: Hidden, value: hidden }
+      
+      - name: stretch_hidden
+        label: Hide Locked Stretch Goals
+        type: boolean
+        default: true
+        description: "Show ??? until previous threshold met"
+      
+      # --- Support Items (Production Phases) ---
+      - name: support_items
+        label: Support Items
+        type: object
+        list: true
+        description: "Named funding buckets (e.g., 'Festival Submissions')"
+        fields:
+          - name: id
+            label: Item ID
+            type: string
+            required: true
+            pattern: "^[a-z0-9-]+$"
+          
+          - name: label
+            label: Display Label
+            type: string
+            required: true
+          
+          - name: target
+            label: Target Amount ($)
+            type: number
+            required: true
+          
+          - name: need
+            label: Description
+            type: string
+            description: "What this funding covers"
+          
+          - name: late_support
+            label: Late Support
+            type: boolean
+            default: false
+      
+      - name: custom_late_support
+        label: Enable Custom Late Support
+        type: boolean
+        default: false
+        description: "Allow custom amount donations after campaign ends"
+      
+      # --- Production Diary ---
+      - name: diary
+        label: Production Diary
+        type: object
+        list: true
+        description: "Updates to share with backers"
+        fields:
+          - name: title
+            label: Entry Title
+            type: string
+            required: true
+          
+          - name: date
+            label: Date
+            type: date
+            required: true
+          
+          - name: phase
+            label: Production Phase
+            type: select
+            options:
+              - { label: Fundraising, value: fundraising }
+              - { label: Pre-Production, value: pre-production }
+              - { label: Production, value: production }
+              - { label: Post-Production, value: post-production }
+              - { label: Distribution, value: distribution }
+          
+          - name: content
+            label: Entry Content
+            type: object
+            list: true
+            fields:
+              - name: type
+                label: Block Type
+                type: select
+                options:
+                  - { label: Text, value: text }
+                  - { label: Image, value: image }
+              - name: body
+                label: Text Content
+                type: rich-text
+              - name: src
+                label: Image
+                type: image
+                media:
+                  input: assets/images/campaigns
+                  output: /assets/images/campaigns
+              - name: alt
+                label: Alt Text
+                type: string
+              - name: caption
+                label: Caption
+                type: string
+      
+      # --- Community Decisions ---
+      - name: decisions
+        label: Community Decisions
+        type: object
+        list: true
+        description: "Polls for backers to vote on"
+        fields:
+          - name: id
+            label: Decision ID
+            type: string
+            required: true
+            pattern: "^[a-z0-9-]+$"
+          
+          - name: title
+            label: Question
+            type: string
+            required: true
+          
+          - name: description
+            label: Context
+            type: string
+          
+          - name: status
+            label: Status
+            type: select
+            options:
+              - { label: Open, value: open }
+              - { label: Closed, value: closed }
+          
+          - name: options
+            label: Options
+            type: object
+            list: true
+            fields:
+              - name: id
+                label: Option ID
+                type: string
+                required: true
+              - name: label
+                label: Option Label
+                type: string
+                required: true
+              - name: description
+                label: Option Description
+                type: string
+      
+      # --- Ongoing Support (Post-Campaign) ---
+      - name: show_ongoing
+        label: Show Ongoing Section
+        type: boolean
+        default: false
+        description: "Display ongoing support section after campaign ends"
+      
+      - name: ongoing_items
+        label: Ongoing Items
+        type: object
+        list: true
+        fields:
+          - name: id
+            label: Item ID
+            type: string
+            required: true
+          - name: name
+            label: Name
+            type: string
+            required: true
+          - name: price
+            label: Price ($)
+            type: number
+            required: true
+          - name: description
+            label: Description
+            type: string
+
+  # ============================================================
+  # PAGES - Static site content
+  # ============================================================
+  - name: about
+    label: About Page
+    path: about.md
+    type: file
+    fields:
+      - name: layout
+        type: string
+        hidden: true
+        default: default
+      - name: title
+        label: Page Title
+        type: string
+      - name: body
+        label: Content
+        type: rich-text
+
+  - name: terms
+    label: Terms Page
+    path: terms.md
+    type: file
+    fields:
+      - name: layout
+        type: string
+        hidden: true
+        default: default
+      - name: title
+        label: Page Title
+        type: string
+      - name: body
+        label: Content
+        type: rich-text
+
+  # ============================================================
+  # SITE SETTINGS
+  # ============================================================
+  - name: config
+    label: Site Settings
+    path: _config.yml
+    type: file
+    fields:
+      - name: title
+        label: Site Title
+        type: string
+      - name: tagline
+        label: Tagline
+        type: string
+      - name: description
+        label: Site Description
+        type: string
+      - name: url
+        label: Site URL
+        type: string
