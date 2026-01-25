@@ -159,7 +159,7 @@ content:
         label: Campaign Description
         type: object
         list: true
-        description: "Rich content blocks for the main campaign description"
+        description: "Add content blocks. Only fill fields for your chosen type — ignore the rest."
         fields:
           - name: type
             label: Block Type
@@ -173,53 +173,57 @@ content:
                 - { label: Gallery, value: gallery }
                 - { label: Divider, value: divider }
           
+          # --- TEXT BLOCK ---
           - name: body
-            label: Text Content
+            label: "📝 Text Content"
             type: rich-text
-            description: "Markdown text (for 'text' type)"
+            description: "TEXT ONLY — Markdown content"
           
+          # --- IMAGE BLOCK ---
           - name: src
-            label: Image Source
+            label: "🖼️ Image Source"
             type: image
-            description: "Image path (for 'image' type)"
+            description: "IMAGE ONLY — The image file"
             media:
               input: assets/images/campaigns
               output: /assets/images/campaigns
           
           - name: alt
-            label: Alt Text
+            label: "🖼️ Alt Text"
             type: string
-            description: "Image description for accessibility"
+            description: "IMAGE/GALLERY — Description for accessibility"
           
           - name: caption
-            label: Caption
+            label: "🖼️ Caption"
             type: string
-            description: "Optional caption below image or gallery"
+            description: "IMAGE/GALLERY — Optional caption below"
           
+          # --- QUOTE BLOCK ---
           - name: text
-            label: Quote Text
+            label: "💬 Quote Text"
             type: string
-            description: "The quote text (for 'quote' type)"
+            description: "QUOTE ONLY — The quote itself"
           
           - name: author
-            label: Quote Author
+            label: "💬 Quote Author"
             type: string
-            description: "Who said it"
+            description: "QUOTE ONLY — Attribution"
           
+          # --- GALLERY BLOCK ---
           - name: layout
-            label: Gallery Layout
+            label: "🎞️ Gallery Layout"
             type: select
-            description: "For 'gallery' type"
+            description: "GALLERY ONLY — Carousel or grid"
             options:
               values:
                 - { label: Carousel, value: carousel }
                 - { label: Grid, value: grid }
           
           - name: images
-            label: Gallery Images
+            label: "🎞️ Gallery Images"
             type: object
             list: true
-            description: "For 'gallery' type"
+            description: "GALLERY ONLY — Add multiple images"
             fields:
               - name: src
                 label: Image
