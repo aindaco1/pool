@@ -5,6 +5,10 @@
 # All collaborators have equal access. For campaign-specific access, 
 # consider separate repos per campaign or wait for Pages CMS permissions feature.
 
+settings:
+  content:
+    merge: true
+
 media:
   input: assets/images
   output: /assets/images
