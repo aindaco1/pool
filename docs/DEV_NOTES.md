@@ -263,6 +263,8 @@ diary:
 
 **Email broadcasts:** When diary entries are added and deployed, the GitHub Action triggers `/admin/diary/check` which sends update emails to all campaign supporters. The email excerpt is auto-extracted from text blocks (first 200 chars, markdown stripped).
 
+**Required setup:** Add `ADMIN_SECRET` as a GitHub repository secret (Settings → Secrets → Actions). This must match the Worker's `ADMIN_SECRET`. Without it, diary email broadcasts will silently fail.
+
 ### Ongoing Funding (Post-Campaign)
 
 ```yaml
@@ -494,6 +496,14 @@ If a Stripe checkout completes but the pledge doesn't appear:
      -H 'Content-Type: application/json' \
      -d '{"sessionId": "cs_test_..."}'
    ```
+
+**Troubleshooting: Stripe Webhook Errors (Mode Mismatch)**
+
+If Stripe shows webhook failures ("other errors") for the production endpoint:
+- The production Worker receives **test mode** webhooks but can't verify them (different signing secrets)
+- The Worker now performs **early mode detection** — it parses the event's `livemode` field before signature verification
+- Test events sent to a live Worker (or vice versa) are acknowledged with `200 OK` and skipped, preventing signature errors
+- No configuration needed; this is handled automatically
 
 ### 6. Test the Pledge Flow
 
@@ -775,6 +785,18 @@ Secrets live in Cloudflare Worker environment variables. Never commit:
 | `ADMIN_SECRET` | Protect admin endpoints (settle, rebuild, etc.) |
 
 Snipcart public API keys are domain-restricted (visible in source is fine).
+
+## Email Best Practices
+
+### Image Hosting
+
+**Always host email images on your own domain** (e.g., `pool.dustwave.xyz/assets/images/`). Third-party CDNs trigger Gmail spam filters and cause images to be blocked with "images below are from unknown senders" warnings.
+
+The Instagram CTA icon is hosted at `/assets/images/instagram-white.png`.
+
+### Inline SVG
+
+Gmail does not render inline SVG in emails. Use PNG/JPEG images instead.
 
 ## Mobile UI Patterns
 
@@ -1090,8 +1112,12 @@ done
 | Binding | Purpose |
 |---------|---------|
 | `PLEDGES` | Pledge records, stats, email mappings |
-| `VOTES` | Community voting data |
+| `VOTES` | Community voting data (keyed by email to prevent multi-pledge vote abuse) |
 | `RATELIMIT` | Rate limiting counters |
+
+**Vote KV Keys:**
+- `vote:{campaignSlug}:{decisionId}:{email}` — User's vote choice
+- `results:{campaignSlug}:{decisionId}` — Aggregate vote tallies
 
 ---
 

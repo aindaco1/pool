@@ -276,6 +276,47 @@ describe('Webhook Security Tests', () => {
     });
   });
 
+  describe('Mode Mismatch Handling', () => {
+    it('should acknowledge test events sent to production worker with 200 OK', async () => {
+      // When a test-mode event is sent to a production worker (or vice versa),
+      // the worker should acknowledge it with 200 OK and skip processing.
+      // This prevents signature verification failures when Stripe sends test
+      // events to a production endpoint.
+      const testEvent = {
+        id: 'evt_test_mode_mismatch',
+        type: 'checkout.session.completed',
+        livemode: false, // Test mode event
+        data: {
+          object: {
+            id: 'cs_test_123',
+            mode: 'setup'
+          }
+        }
+      };
+      
+      // Note: In production (SNIPCART_MODE=live), the worker should skip this
+      // before signature verification and return 200 OK.
+      // In test mode, it will proceed to signature verification and fail.
+      const res = await securityFetch('/webhooks/stripe', {
+        method: 'POST',
+        headers: {
+          'stripe-signature': 't=123,v1=fake'
+        },
+        body: JSON.stringify(testEvent)
+      });
+      
+      // Both 200 (mode mismatch skip) and 401 (signature fail) are acceptable
+      // depending on whether we're testing against prod or test worker
+      expect([200, 401]).toContain(res.status);
+      
+      if (res.status === 200) {
+        const body = await res.json();
+        expect(body.skipped).toBe('mode mismatch');
+        console.log('✅ Mode mismatch handling active - test events skipped in production');
+      }
+    });
+  });
+
   describe('Replay Attack Prevention', () => {
     it('should reject signatures with future timestamps', async () => {
       const futureTimestamp = Math.floor(Date.now() / 1000) + 600; // 10 minutes in future

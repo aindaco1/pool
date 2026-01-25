@@ -24,6 +24,7 @@ This document outlines who does what for the **pool.dustwave.xyz** project.
 ### 4. GitHub Actions Maintainer
 - Manages deploy workflow for GitHub Pages.
 - Configures repository secrets for Worker deployment.
+- Ensures `ADMIN_SECRET` is set for automated diary email broadcasts.
 
 ### 5. Content Editor
 - Creates/edits `_campaigns/<slug>.md`.
@@ -41,7 +42,7 @@ This document outlines who does what for the **pool.dustwave.xyz** project.
 - [ ] Snipcart public key configured in `_includes/snipcart-foot.html`.
 - [ ] Cloudflare Worker deployed (`pledge.dustwave.xyz`) with secrets set.
 - [ ] Stripe webhook configured for Worker endpoint.
-- [ ] GitHub Action secrets (`STRIPE_SECRET_KEY`, `SNIPCART_SECRET`) in place.
+- [ ] GitHub Action secrets (`ADMIN_SECRET`) in place for diary broadcasts.
 - [ ] Successful $1 test pledge end-to-end in Stripe test mode.
 - [ ] Live stats updating correctly (`/stats/:slug`).
 - [ ] Support items and custom amounts tracked in KV.

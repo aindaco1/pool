@@ -429,8 +429,51 @@ function enableLateSupportElement(element, type) {
   }
 }
 
-// Fetch on page load
+/**
+ * Apply cached stats immediately to avoid $0 flash
+ * Called before fetch to show last known values instantly
+ */
+function applyCachedStats() {
+  const progressBars = document.querySelectorAll('[data-live-stats][data-campaign-slug]');
+  if (progressBars.length === 0) return;
+
+  progressBars.forEach(wrap => {
+    const slug = wrap.dataset.campaignSlug;
+    const cached = getStatsCache(slug);
+    if (cached) {
+      updateProgressBar(wrap, cached);
+    }
+  });
+}
+
+/**
+ * Apply cached inventory immediately to avoid flash
+ */
+function applyCachedInventory() {
+  const tierCards = document.querySelectorAll('[data-tier-id][data-campaign-slug]');
+  if (tierCards.length === 0) return;
+
+  const slugs = [...new Set([...tierCards].map(el => el.dataset.campaignSlug))];
+  
+  for (const slug of slugs) {
+    const cached = getInventoryCache(slug);
+    if (cached) {
+      tierCards.forEach(card => {
+        if (card.dataset.campaignSlug === slug) {
+          const tierId = card.dataset.tierId;
+          if (cached.tiers?.[tierId]) {
+            updateTierInventory(card, cached.tiers[tierId]);
+          }
+        }
+      });
+    }
+  }
+}
+
+// Fetch on page load - apply cached first, then fetch fresh
 document.addEventListener('DOMContentLoaded', () => {
+  applyCachedStats();
+  applyCachedInventory();
   fetchAllLiveStats();
   fetchLiveInventory();
 });

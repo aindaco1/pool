@@ -23,7 +23,7 @@ This document covers the security architecture, known risks, hardening recommend
 | `stats:{slug}` | PLEDGES | Aggregate totals | **Low** - public |
 | `inventory:{slug}` | PLEDGES | Tier claim counts | **Low** - public |
 | `stripe-event:{id}` | PLEDGES | "processed" flag | **Low** - idempotency |
-| `vote:{slug}:{decision}:{orderId}` | VOTES | Vote choice | **Medium** - links supporter to vote |
+| `vote:{slug}:{decision}:{email}` | VOTES | Vote choice | **Medium** - links supporter to vote |
 | `results:{slug}:{decision}` | VOTES | Vote tallies | **Low** - semi-public |
 | `rl:{endpoint}:{ip}` | RATELIMIT | Request count + reset time | **Low** - ephemeral |
 
@@ -82,8 +82,11 @@ if (token.startsWith('dev-token-')) {
   }
   campaignSlug = token.replace('dev-token-', '');
   orderId = 'dev-order-1';
+  email = 'dev@test.com';
 }
 ```
+
+**Note:** Votes are keyed by **email** (not orderId) to prevent supporters with multiple pledges from voting multiple times.
 
 ---
 
