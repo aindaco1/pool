@@ -110,7 +110,7 @@ content:
       - name: campaign_background
         label: Background Image
         type: image
-        description: "Optional decorative background for campaign page"
+        description: "Optional decorative background for campaign page (recommended: 1920×1080px, <500KB, subtle/dark works best)"
         media:
           input: assets/images/campaigns
           output: /assets/images/campaigns
@@ -118,7 +118,7 @@ content:
       - name: progress_background
         label: Progress Bar Background
         type: image
-        description: "Optional image behind progress bar"
+        description: "Optional image behind progress bar (recommended: 800×200px, <100KB, horizontal/landscape format)"
         media:
           input: assets/images/campaigns
           output: /assets/images/campaigns
@@ -153,7 +153,7 @@ content:
         label: Short Blurb
         type: string
         required: true
-        description: "One-sentence hook (max 160 chars). Used in cards and meta descriptions."
+        description: "One-sentence hook (max 160 chars). Supports HTML: <em>, <strong>, <br>. Used in cards and meta descriptions."
       
       - name: long_content
         label: Campaign Description
@@ -265,6 +265,14 @@ content:
             type: string
             required: true
             description: "What the backer gets"
+          
+          - name: image
+            label: Tier Image
+            type: image
+            description: "Optional wide image shown above tier name"
+            media:
+              input: assets/images/campaigns
+              output: /assets/images/campaigns
           
           - name: category
             label: Reward Type
@@ -390,14 +398,15 @@ content:
         list: true
         description: "Updates to share with backers"
         fields:
+          - name: date
+            label: Date & Time
+            type: string
+            required: true
+            description: "ISO format: 2026-01-15T09:00:00-07:00"
+          
           - name: title
             label: Entry Title
             type: string
-            required: true
-          
-          - name: date
-            label: Date
-            type: date
             required: true
           
           - name: phase
@@ -452,6 +461,14 @@ content:
             required: true
             pattern: "^[a-z0-9-]+$"
           
+          - name: type
+            label: Decision Type
+            type: select
+            options:
+              values:
+                - { label: Vote, value: vote }
+                - { label: Poll, value: poll }
+          
           - name: title
             label: Question
             type: string
@@ -460,6 +477,18 @@ content:
           - name: description
             label: Context
             type: string
+          
+          - name: deadline
+            label: Deadline
+            type: date
+          
+          - name: eligible
+            label: Who Can Vote
+            type: select
+            options:
+              values:
+                - { label: Backers Only, value: backers }
+                - { label: Public, value: public }
           
           - name: status
             label: Status
@@ -471,20 +500,9 @@ content:
           
           - name: options
             label: Options
-            type: object
+            type: string
             list: true
-            fields:
-              - name: id
-                label: Option ID
-                type: string
-                required: true
-              - name: label
-                label: Option Label
-                type: string
-                required: true
-              - name: description
-                label: Option Description
-                type: string
+            description: "One option per line"
       
       # --- Ongoing Support (Post-Campaign) ---
       - name: show_ongoing
