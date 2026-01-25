@@ -369,6 +369,7 @@ tiers:
     image: /assets/images/campaigns/worst-movie-ever/tier-writer-credit.png
     description: Get a writer credit. No writing required.
     limit_total: 500
+    stackable: false
     category: digital
 
   - id: sound-effect
@@ -413,6 +414,7 @@ tiers:
     image: /assets/images/campaigns/worst-movie-ever/tier-character.png
     description: Add a character + Executive Producer credit + Stoned Director's Commentary Cut.
     limit_total: 15
+    stackable: false
     category: digital
 
   - id: jack-does
@@ -421,6 +423,7 @@ tiers:
     image: /assets/images/campaigns/worst-movie-ever/tier-jack-does.png
     description: Jack does whatever you write + copy of the script + EP credit + Stoned Director's Commentary Cut.
     limit_total: 10
+    stackable: false
     category: digital
 
   - id: language
@@ -429,6 +432,7 @@ tiers:
     image: /assets/images/campaigns/worst-movie-ever/tier-language.png
     description: One scene in another language of your choice + EP credit + Stoned Director's Commentary Cut.
     limit_total: 5
+    stackable: false
     category: digital
 
   - id: act
@@ -437,5 +441,6 @@ tiers:
     image: /assets/images/campaigns/worst-movie-ever/tier-act.png
     description: Act in the movie + Executive Producer credit + Stoned Director's Commentary Cut.
     limit_total: 3
-    category: physical
+    stackable: false
+    category: digital
 ---
