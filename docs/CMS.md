@@ -56,15 +56,17 @@ Pages CMS commits the new file to GitHub, triggering a site rebuild.
 
 ### Content Blocks
 
-The `long_content` field supports rich content blocks:
+The `long_content` field uses **block-based editing** — each block type shows only its relevant fields:
 
-| Type | Use For |
-|------|---------|
-| **text** | Markdown paragraphs, headers, lists |
-| **image** | Single image with alt text and caption |
-| **quote** | Pull quote with author attribution |
-| **gallery** | Multiple images (carousel or grid) |
-| **divider** | Visual separator |
+| Type | Fields Shown |
+|------|--------------|
+| **Text** | Markdown content editor |
+| **Image** | Image upload, alt text, caption |
+| **Quote** | Quote text, author |
+| **Gallery** | Layout selector, image list, caption |
+| **Divider** | None (just adds a horizontal line) |
+
+The same block system is used for **Production Diary** entries.
 
 ### Adding Tiers
 
@@ -75,8 +77,9 @@ Each tier needs:
 - **Description** — What the backer gets
 
 Optional tier settings:
+- **Image** — Wide image shown above tier name
 - **Category** — `digital` or `physical` (for shipping)
-- **Stackable** — Can backers buy multiple?
+- **Multiple Quantities?** — Can backers add more than one?
 - **Limit** — Max available (leave empty for unlimited)
 - **Unlock Threshold** — Only visible after campaign reaches $X
 - **Late Support** — Available after campaign ends
@@ -86,8 +89,11 @@ Optional tier settings:
 1. Open a campaign
 2. Scroll to **Production Diary**
 3. Click **Add Item**
-4. Fill in title, date, phase
-5. Add content blocks (text, images)
+4. Fill in:
+   - **Date** — Datetime picker (stored with timezone)
+   - **Title** — Entry headline
+   - **Phase** — Production phase (fundraising, pre-production, etc.)
+5. Add content blocks (text, images) — same block system as Campaign Description
 6. Save
 
 New diary entries trigger email broadcasts to supporters (via Worker cron).
@@ -156,6 +162,18 @@ To add a new field to campaigns, edit `.pages.yml` and add to the `fields` array
 - Required fields must have values
 - Pattern-validated fields (slug, IDs) must match format
 - Check browser console for errors
+
+### Sections Show Empty (Despite Having Data)
+
+This usually means invalid YAML in the campaign file. Common causes:
+
+- **`---` in content** — A line with just `---` inside a multiline text field will break YAML parsing (it's interpreted as a document separator). Remove or replace with a different separator.
+- **Unescaped special characters** — Colons, quotes, or brackets in text may need escaping.
+
+Test your campaign file locally:
+```bash
+python3 -c "import yaml; print(yaml.safe_load(open('_campaigns/your-campaign.md').read().split('---')[1]))"
+```
 
 ## Future: Per-Campaign Permissions
 

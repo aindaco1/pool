@@ -48,6 +48,11 @@
 - [x] Multi-tier pledge support (`additionalTiers` in pledge records)
 - [x] Stats recalculation fix for `additionalTiers`
 - [x] Production campaign launch (Hand Relations)
+- [x] Pages CMS integration for visual campaign editing
+  - Block-based content editing (text, image, quote, gallery, divider)
+  - Polymorphic fields with `type: block` and `blockKey`
+  - Datetime picker for diary entries
+  - Full campaign schema (tiers, stretch goals, support items, diary, decisions)
 
 ## In Progress
 
@@ -56,7 +61,7 @@ _(None currently)_
 ## Planned
 
 - [ ] Admin dashboard page (read-only) from KV data
-- [ ] Decap CMS config for editing campaigns via GitHub UI
+- [ ] Pages CMS per-campaign permissions (waiting on Pages CMS roadmap)
 
 ## Known Issues
 

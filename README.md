@@ -31,6 +31,7 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 | Frontend | GitHub Pages | Jekyll + Sass + Snipcart v3 |
 | Payments | Stripe | SetupIntents + off-session charges |
 | API | Cloudflare Worker | Stripe checkout, webhook, stats, auto-settle |
+| CMS | Pages CMS | Visual campaign editing (commits to GitHub) |
 
 ## Quick Start
 
