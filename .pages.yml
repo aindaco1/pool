@@ -161,83 +161,77 @@ content:
       
       - name: long_content
         label: Campaign Description
-        type: object
+        type: block
         list: true
-        description: "Add content blocks. Only fill fields for your chosen type — ignore the rest."
-        fields:
-          - name: type
-            label: Block Type
-            type: select
-            required: true
-            options:
-              values:
-                - { label: Text (Markdown), value: text }
-                - { label: Image, value: image }
-                - { label: Quote, value: quote }
-                - { label: Gallery, value: gallery }
-                - { label: Divider, value: divider }
-          
-          # --- TEXT BLOCK ---
-          - name: body
-            label: "📝 Text Content"
-            type: rich-text
-            description: "TEXT ONLY — Markdown content"
-          
-          # --- IMAGE BLOCK ---
-          - name: src
-            label: "🖼️ Image Source"
-            type: image
-            description: "IMAGE ONLY — The image file"
-            media:
-              input: assets/images/campaigns
-              output: /assets/images/campaigns
-          
-          - name: alt
-            label: "🖼️ Alt Text"
-            type: string
-            description: "IMAGE/GALLERY — Description for accessibility"
-          
-          - name: caption
-            label: "🖼️ Caption"
-            type: string
-            description: "IMAGE/GALLERY — Optional caption below"
-          
-          # --- QUOTE BLOCK ---
+        blockKey: type
+        blocks:
           - name: text
-            label: "💬 Quote Text"
-            type: string
-            description: "QUOTE ONLY — The quote itself"
+            label: Text (Markdown)
+            fields:
+              - name: body
+                label: Content
+                type: rich-text
           
-          - name: author
-            label: "💬 Quote Author"
-            type: string
-            description: "QUOTE ONLY — Attribution"
-          
-          # --- GALLERY BLOCK ---
-          - name: layout
-            label: "🎞️ Gallery Layout"
-            type: select
-            description: "GALLERY ONLY — Carousel or grid"
-            options:
-              values:
-                - { label: Carousel, value: carousel }
-                - { label: Grid, value: grid }
-          
-          - name: images
-            label: "🎞️ Gallery Images"
-            type: object
-            list: true
-            description: "GALLERY ONLY — Add multiple images"
+          - name: image
+            label: Image
             fields:
               - name: src
                 label: Image
                 type: image
+                required: true
                 media:
                   input: assets/images/campaigns
                   output: /assets/images/campaigns
               - name: alt
                 label: Alt Text
                 type: string
+              - name: caption
+                label: Caption
+                type: string
+          
+          - name: quote
+            label: Quote
+            fields:
+              - name: text
+                label: Quote Text
+                type: string
+                required: true
+              - name: author
+                label: Author
+                type: string
+          
+          - name: gallery
+            label: Gallery
+            fields:
+              - name: layout
+                label: Layout
+                type: select
+                options:
+                  values:
+                    - { label: Carousel, value: carousel }
+                    - { label: Grid, value: grid }
+                    - { label: Logos, value: logos }
+              - name: images
+                label: Images
+                type: object
+                list: true
+                fields:
+                  - name: src
+                    label: Image
+                    type: image
+                    media:
+                      input: assets/images/campaigns
+                      output: /assets/images/campaigns
+                  - name: alt
+                    label: Alt Text
+                    type: string
+              - name: caption
+                label: Caption
+                type: string
+          
+          - name: divider
+            label: Divider
+            fields: []
       
       # --- Tiers ---
       - name: tiers
@@ -426,31 +420,31 @@ content:
           
           - name: content
             label: Entry Content
-            type: object
+            type: block
             list: true
-            fields:
-              - name: type
-                label: Block Type
-                type: select
-                options:
-                  values:
-                    - { label: Text, value: text }
-                    - { label: Image, value: image }
-              - name: body
-                label: Text Content
-                type: rich-text
-              - name: src
+            blockKey: type
+            blocks:
+              - name: text
+                label: Text
+                fields:
+                  - name: body
+                    label: Content
+                    type: rich-text
+              - name: image
                 label: Image
-                type: image
-                media:
-                  input: assets/images/campaigns
-                  output: /assets/images/campaigns
-              - name: alt
-                label: Alt Text
-                type: string
-              - name: caption
-                label: Caption
-                type: string
+                fields:
+                  - name: src
+                    label: Image
+                    type: image
+                    media:
+                      input: assets/images/campaigns
+                      output: /assets/images/campaigns
+                  - name: alt
+                    label: Alt Text
+                    type: string
+                  - name: caption
+                    label: Caption
+                    type: string
       
       # --- Community Decisions ---
       - name: decisions
