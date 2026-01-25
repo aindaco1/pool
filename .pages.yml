@@ -231,7 +231,6 @@ content:
           
           - name: divider
             label: Divider
-            fields: []
       
       # --- Tiers ---
       - name: tiers
