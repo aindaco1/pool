@@ -231,6 +231,7 @@ content:
           
           - name: divider
             label: Divider
+            description: "No fields needed — just adds a horizontal line"
       
       # --- Tiers ---
       - name: tiers
@@ -280,10 +281,10 @@ content:
                 - { label: Physical (requires shipping), value: physical }
           
           - name: stackable
-            label: Stackable
+            label: Multiple Quantities?
             type: boolean
             default: true
-            description: "Can backers pledge multiple quantities?"
+            description: "Can backers add more than one of this tier?"
           
           - name: limit_total
             label: Total Limit
@@ -332,16 +333,6 @@ content:
           - name: description
             label: Description
             type: string
-          
-          - name: status
-            label: Status
-            type: select
-            options:
-              values:
-                - { label: Locked (hidden until previous met), value: locked }
-                - { label: Unlocked (visible), value: unlocked }
-                - { label: Achieved, value: achieved }
-                - { label: Hidden, value: hidden }
       
       - name: stretch_hidden
         label: Hide Locked Stretch Goals
@@ -478,14 +469,6 @@ content:
           - name: deadline
             label: Deadline
             type: date
-          
-          - name: eligible
-            label: Who Can Vote
-            type: select
-            options:
-              values:
-                - { label: Backers Only, value: backers }
-                - { label: Public, value: public }
           
           - name: status
             label: Status
