@@ -56,6 +56,19 @@
   border-radius: $radius--md;
   overflow: hidden;
   
+  // Subtle muted treatment for completed/charged pledges
+  &--charged {
+    opacity: 0.85;
+    
+    .pledge-card__header {
+      background: rgba(0, 0, 0, 0.04);
+    }
+    
+    .pledge-card__summary {
+      background: rgba(0, 0, 0, 0.03);
+    }
+  }
+  
   &__header {
     padding: 16px 20px;
     background: rgba(0, 0, 0, 0.02);
@@ -257,10 +270,24 @@
         color: $color--success-dark;
       }
     }
+    
+    &--deadline {
+      background: $color--warning-bg;
+      border-color: $color--warning-border;
+      
+      p {
+        color: $color--warning-text;
+        
+        strong {
+          color: $color--warning-text;
+        }
+      }
+    }
   }
   
   &__charged,
-  &__cancelled {
+  &__cancelled,
+  &__payment-failed {
     margin-top: 24px;
     padding: 16px;
     border-radius: $radius--sm;
@@ -280,6 +307,25 @@
   &__cancelled {
     background: $color--danger-bg;
     color: $color--danger-text;
+  }
+  
+  &__payment-failed {
+    background: $color--warning-bg;
+    border: 1px solid $color--warning-border;
+    color: $color--warning-text;
+    
+    p {
+      margin-bottom: 12px;
+    }
+    
+    .btn {
+      margin-top: 8px;
+    }
+  }
+  
+  // Card modifier for payment failed state
+  &--payment-failed {
+    border-color: $color--warning-border;
   }
   
   &__cancel-section {

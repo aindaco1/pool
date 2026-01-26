@@ -188,6 +188,9 @@
           merged.canModify = merged.canModify && pledge.canModify;
           merged.canCancel = merged.canCancel && pledge.canCancel;
           merged.canUpdatePaymentMethod = merged.canUpdatePaymentMethod && pledge.canUpdatePaymentMethod;
+          
+          // Merge deadlinePassed (if any pledge has deadline passed, merged has it too)
+          merged.deadlinePassed = merged.deadlinePassed || pledge.deadlinePassed;
         }
       }
       
@@ -247,7 +250,8 @@
               customAmount: 30,
               canModify: true,
               canCancel: true,
-              canUpdatePaymentMethod: true
+              canUpdatePaymentMethod: true,
+              deadlinePassed: false
             },
             {
               orderId: 'dev-order-1b',
@@ -266,7 +270,8 @@
               customAmount: 5,
               canModify: true,
               canCancel: true,
-              canUpdatePaymentMethod: true
+              canUpdatePaymentMethod: true,
+              deadlinePassed: false
             },
             {
               orderId: 'dev-order-2',
@@ -286,7 +291,68 @@
               customAmount: 0,
               canModify: true,
               canCancel: true,
-              canUpdatePaymentMethod: true
+              canUpdatePaymentMethod: true,
+              deadlinePassed: false
+            },
+            // Test case: Campaign with deadline passed (should show locked state)
+            // This verifies that deadline-passed pledges don't block other campaigns
+            {
+              orderId: 'dev-order-3',
+              email: 'test@example.com',
+              campaignSlug: 'test-deadline-passed', // Fake campaign to test deadline-passed UI
+              pledgeStatus: 'active',
+              subtotal: 2500,
+              tax: 197,
+              amount: 2697,
+              tierId: 'test-tier',
+              tierName: 'Test Tier',
+              tierQty: 1,
+              supportItems: [],
+              customAmount: 0,
+              canModify: false,
+              canCancel: false,
+              canUpdatePaymentMethod: true,
+              deadlinePassed: true
+            },
+            // Test case: Successfully charged pledge (historical record)
+            {
+              orderId: 'dev-order-4',
+              email: 'test@example.com',
+              campaignSlug: 'test-completed-campaign',
+              pledgeStatus: 'charged',
+              subtotal: 5000,
+              tax: 394,
+              amount: 5394,
+              tierId: 'producer-credit',
+              tierName: 'Producer Credit',
+              tierQty: 1,
+              supportItems: [],
+              customAmount: 0,
+              canModify: false,
+              canCancel: false,
+              canUpdatePaymentMethod: false,
+              deadlinePassed: true,
+              chargedAt: '2025-12-15T07:00:00Z'
+            },
+            // Test case: Payment failed pledge (needs card update)
+            {
+              orderId: 'dev-order-5',
+              email: 'test@example.com',
+              campaignSlug: 'test-payment-failed',
+              pledgeStatus: 'payment_failed',
+              subtotal: 3000,
+              tax: 236,
+              amount: 3236,
+              tierId: 'digital-download',
+              tierName: 'Digital Download',
+              tierQty: 1,
+              supportItems: [],
+              customAmount: 0,
+              canModify: false,
+              canCancel: false,
+              canUpdatePaymentMethod: true,
+              deadlinePassed: true,
+              lastPaymentError: 'Your card was declined.'
             }
           ];
         } else {
@@ -630,6 +696,9 @@
         }
         if (pledge.pledgeStatus === 'active') {
           setupPledgeActions(pledge, campaign, index);
+        } else if (pledge.pledgeStatus === 'payment_failed') {
+          // For failed payments, just set up the payment button
+          setupPaymentFailedActions(pledge, index);
         }
       });
     }
@@ -638,6 +707,7 @@
       const isActive = pledge.pledgeStatus === 'active';
       const isCharged = pledge.pledgeStatus === 'charged';
       const isCancelled = pledge.pledgeStatus === 'cancelled';
+      const isPaymentFailed = pledge.pledgeStatus === 'payment_failed';
       const currentTierId = pledge.tierId?.split('__').pop();
       const tiers = campaign?.tiers || [];
       const isSingleTier = campaign?.single_tier_only === true;
@@ -854,34 +924,67 @@
       }
       
       if (isActive) {
-        actionsHtml = `
-          <div class="pledge-card__actions" id="actions-${index}">
-            <button class="btn btn--secondary" data-action="payment" data-index="${index}">Update Card</button>
-            <button class="btn" data-action="save" data-index="${index}" disabled>No Changes</button>
-          </div>
-          <div class="pledge-card__error" id="error-${index}" hidden></div>
-          <div class="pledge-card__footer" id="footer-${index}">
-            <div class="pledge-card__notice">
-              <p><strong>🤔 How pledging works:</strong> Your card will be stored securely but not charged now. You'll only be charged if the campaign reaches its goal.</p>
+        const deadlinePassed = pledge.deadlinePassed === true;
+        const canModifyPledge = pledge.canModify !== false && !deadlinePassed;
+        const canCancelPledge = pledge.canCancel !== false && !deadlinePassed;
+        
+        if (deadlinePassed) {
+          actionsHtml = `
+            <div class="pledge-card__actions" id="actions-${index}">
+              <button class="btn btn--secondary" data-action="payment" data-index="${index}">Update Card</button>
             </div>
-            <button class="btn-text btn-text--danger" data-action="cancel" data-index="${index}">Cancel Pledge</button>
-          </div>
-          <div class="pledge-card__cancel-section" id="cancel-section-${index}" hidden>
-            <div class="cancel-section__warning">
-              <p><strong>Cancel your pledge?</strong></p>
-              <p>This action cannot be undone. Your payment method will not be charged.</p>
+            <div class="pledge-card__footer" id="footer-${index}">
+              <div class="pledge-card__notice pledge-card__notice--deadline">
+                <p><strong>⏰ Campaign deadline has passed.</strong> Your pledge is locked and will be charged if the campaign reaches its goal. You can still update your payment method if needed.</p>
+              </div>
             </div>
-            <div class="cancel-section__actions">
-              <button class="btn btn--secondary" data-action="cancel-back" data-index="${index}">Keep Pledge</button>
-              <button class="btn btn--danger" data-action="cancel-confirm" data-index="${index}">Confirm Cancellation</button>
+          `;
+        } else {
+          actionsHtml = `
+            <div class="pledge-card__actions" id="actions-${index}">
+              <button class="btn btn--secondary" data-action="payment" data-index="${index}">Update Card</button>
+              ${canModifyPledge ? `<button class="btn" data-action="save" data-index="${index}" disabled>No Changes</button>` : ''}
             </div>
-          </div>
-        `;
+            <div class="pledge-card__error" id="error-${index}" hidden></div>
+            <div class="pledge-card__footer" id="footer-${index}">
+              <div class="pledge-card__notice">
+                <p><strong>🤔 How pledging works:</strong> Your card will be stored securely but not charged now. You'll only be charged if the campaign reaches its goal.</p>
+              </div>
+              ${canCancelPledge ? `<button class="btn-text btn-text--danger" data-action="cancel" data-index="${index}">Cancel Pledge</button>` : ''}
+            </div>
+            ${canCancelPledge ? `
+            <div class="pledge-card__cancel-section" id="cancel-section-${index}" hidden>
+              <div class="cancel-section__warning">
+                <p><strong>Cancel your pledge?</strong></p>
+                <p>This action cannot be undone. Your payment method will not be charged.</p>
+              </div>
+              <div class="cancel-section__actions">
+                <button class="btn btn--secondary" data-action="cancel-back" data-index="${index}">Keep Pledge</button>
+                <button class="btn btn--danger" data-action="cancel-confirm" data-index="${index}">Confirm Cancellation</button>
+              </div>
+            </div>
+            ` : ''}
+          `;
+        }
       }
       
       let statusNotice = '';
       if (isCharged) {
-        statusNotice = '<div class="pledge-card__charged"><p>This pledge has been successfully charged. Thank you for your support!</p></div>';
+        const chargedDate = pledge.chargedAt ? new Date(pledge.chargedAt).toLocaleDateString('en-US', { 
+          year: 'numeric', month: 'short', day: 'numeric' 
+        }) : null;
+        statusNotice = `
+          <div class="pledge-card__charged">
+            <p>✓ Successfully charged${chargedDate ? ` on ${chargedDate}` : ''}. Thank you for your support!</p>
+          </div>
+        `;
+      } else if (isPaymentFailed) {
+        statusNotice = `
+          <div class="pledge-card__payment-failed">
+            <p><strong>⚠️ Payment failed.</strong> Please update your payment method to complete your pledge.</p>
+            <button class="btn btn--small" data-action="payment" data-index="${index}">Update Payment Method</button>
+          </div>
+        `;
       } else if (isCancelled) {
         statusNotice = '<div class="pledge-card__cancelled"><p>This pledge has been cancelled.</p></div>';
       }
@@ -890,8 +993,13 @@
       const hasRightColumn = supportItemsHtml !== '' || customAmountHtml !== '';
       const hasTwoColumns = hasLeftColumn && hasRightColumn;
       
+      const cardClasses = ['pledge-card'];
+      if (isCharged) cardClasses.push('pledge-card--charged');
+      if (isCancelled) cardClasses.push('pledge-card--cancelled');
+      if (isPaymentFailed) cardClasses.push('pledge-card--payment-failed');
+      
       return `
-        <div class="pledge-card" data-pledge-index="${index}" data-original-amount="${pledge.amount}" data-current-tier="${currentTierId || ''}" data-current-tier-qty="${pledge.tierQty || 1}" data-campaign-slug="${campaign?.slug || pledge.campaignSlug}">
+        <div class="${cardClasses.join(' ')}" data-pledge-index="${index}" data-original-amount="${pledge.amount}" data-current-tier="${currentTierId || ''}" data-current-tier-qty="${pledge.tierQty || 1}" data-campaign-slug="${campaign?.slug || pledge.campaignSlug}">
           <div class="pledge-card__header">
             <div class="pledge-card__header-top">
               <a href="/campaigns/${pledge.campaignSlug}/" class="pledge-card__campaign">${campaign?.title || pledge.campaignSlug}</a>
@@ -947,6 +1055,34 @@
           ${statusNotice}
         </div>
       `;
+    }
+    
+    function setupPaymentFailedActions(pledge, index) {
+      const card = document.querySelector(`[data-pledge-index="${index}"]`);
+      if (!card) return;
+      
+      // Set up all payment buttons (there may be one in the status notice)
+      card.querySelectorAll('[data-action="payment"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (isDevMode) {
+            alert('DEV MODE: Would redirect to payment update page');
+            return;
+          }
+          
+          try {
+            const res = await fetch(`${WORKER_BASE}/pledge/payment-method/start`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: currentToken })
+            });
+            if (!res.ok) throw new Error('Failed to start payment update');
+            const { url } = await res.json();
+            window.location.href = url;
+          } catch (err) {
+            alert('Error: ' + err.message);
+          }
+        });
+      });
     }
     
     function setupPledgeActions(pledge, campaign, index) {

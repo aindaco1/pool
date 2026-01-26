@@ -1190,6 +1190,11 @@ async function handleGetPledge(request, env) {
   if (env.PLEDGES) {
     const pledgeData = await env.PLEDGES.get(`pledge:${payload.orderId}`, { type: 'json' });
     if (pledgeData) {
+      // Check if campaign deadline has passed
+      const campaign = await getCampaign(env, pledgeData.campaignSlug);
+      const deadlinePassed = campaign?.goal_deadline && isDeadlinePassed(campaign.goal_deadline);
+      const canChange = pledgeData.pledgeStatus === 'active' && !pledgeData.charged && !deadlinePassed;
+      
       return jsonResponse({
         orderId: pledgeData.orderId,
         email: pledgeData.email,
@@ -1198,9 +1203,10 @@ async function handleGetPledge(request, env) {
         amount: pledgeData.amount,
         tierId: pledgeData.tierId,
         tierName: pledgeData.tierName,
-        canModify: pledgeData.pledgeStatus === 'active' && !pledgeData.charged,
-        canCancel: pledgeData.pledgeStatus === 'active' && !pledgeData.charged,
-        canUpdatePaymentMethod: !pledgeData.charged
+        canModify: canChange,
+        canCancel: canChange,
+        canUpdatePaymentMethod: !pledgeData.charged,
+        deadlinePassed
       });
     }
   }
@@ -1266,6 +1272,11 @@ async function handleGetPledges(request, env) {
     for (const orderId of orderIds) {
       const pledgeData = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
       if (pledgeData && pledgeData.pledgeStatus !== 'cancelled') {
+        // Check if campaign deadline has passed
+        const campaign = await getCampaign(env, pledgeData.campaignSlug);
+        const deadlinePassed = campaign?.goal_deadline && isDeadlinePassed(campaign.goal_deadline);
+        const canChange = pledgeData.pledgeStatus === 'active' && !pledgeData.charged && !deadlinePassed;
+        
         pledges.push({
           orderId: pledgeData.orderId,
           email: pledgeData.email,
@@ -1280,9 +1291,10 @@ async function handleGetPledges(request, env) {
           additionalTiers: pledgeData.additionalTiers || [],
           supportItems: pledgeData.supportItems || [],
           customAmount: pledgeData.customAmount || 0,
-          canModify: pledgeData.pledgeStatus === 'active' && !pledgeData.charged,
-          canCancel: pledgeData.pledgeStatus === 'active' && !pledgeData.charged,
-          canUpdatePaymentMethod: !pledgeData.charged
+          canModify: canChange,
+          canCancel: canChange,
+          canUpdatePaymentMethod: !pledgeData.charged,
+          deadlinePassed
         });
       }
     }
@@ -1317,6 +1329,12 @@ async function handleCancelPledge(request, env) {
       
       if (pledgeData.charged) {
         return jsonResponse({ error: 'Cannot cancel - pledge has been charged' }, 400);
+      }
+      
+      // Check if campaign deadline has passed
+      const campaign = await getCampaign(env, pledgeData.campaignSlug);
+      if (campaign?.goal_deadline && isDeadlinePassed(campaign.goal_deadline)) {
+        return jsonResponse({ error: 'Cannot cancel - campaign deadline has passed' }, 400);
       }
       
       // Store for stats update
@@ -1405,8 +1423,7 @@ async function handleCancelPledge(request, env) {
         console.log('📧 Email mapping removed (no active pledges):', emailKey);
       }
       
-      // Send cancellation confirmation email
-      const campaign = await getCampaign(env, pledgeData.campaignSlug);
+      // Send cancellation confirmation email (reuse campaign from deadline check)
       const campaignTitle = campaign?.title || pledgeData.campaignSlug.replace(/-/g, ' ').toUpperCase();
       
       try {

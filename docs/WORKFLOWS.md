@@ -178,14 +178,27 @@ Read pledge details for magic link management page.
   "tierId": "producer-credit",
   "pledgeStatus": "active",
   "canModify": true,
-  "canCancel": true
+  "canCancel": true,
+  "canUpdatePaymentMethod": true,
+  "deadlinePassed": false
 }
 ```
+
+**Status values:** `active`, `cancelled`, `charged`, `payment_failed`
+
+**Flag logic:**
+- `canModify` / `canCancel`: `true` only if `pledgeStatus === 'active'` AND `!charged` AND deadline not passed
+- `canUpdatePaymentMethod`: `true` if `!charged` (allowed even after deadline for failed payment recovery)
+- `deadlinePassed`: `true` if campaign deadline has passed (Mountain Time)
 
 ### `POST /pledge/cancel`
 Cancel an active pledge.
 
 **Request:** `{ token }`  
+**Validation:**
+- Rejects if pledge is charged
+- Rejects if campaign deadline has passed
+
 **Actions:**
 1. Mark pledge as cancelled in KV, update stats, release tier inventory
 2. Send cancellation confirmation email
@@ -195,6 +208,10 @@ Cancel an active pledge.
 Change tier or amount.
 
 **Request:** `{ token, newTierId, newAmount }`  
+**Validation:**
+- Rejects if pledge is charged
+- Rejects if campaign deadline has passed (via `isCampaignLive` check)
+
 **Action:** Update pledge in KV, adjust stats delta, swap tier inventory
 
 ### `POST /pledge/payment-method/start`
@@ -270,7 +287,19 @@ User cancelled Stripe Checkout (not the pledge itself)
 Magic link landing page for pledge management:
 - Reads `?t=...` token
 - Fetches pledge details from Worker
-- Shows cancel/modify/update-card buttons
+- Shows pledge cards with state-dependent UI
+
+**Pledge card states:**
+
+| Status | UI Treatment |
+|--------|-------------|
+| `active` | Full edit controls (tier selection, support items, cancel button) |
+| `active` + deadline passed | Locked notice, "Update Card" only |
+| `charged` | Muted card, "✓ Successfully charged on {date}" notice |
+| `payment_failed` | Warning notice with "Update Payment Method" button |
+| `cancelled` | "This pledge has been cancelled" notice |
+
+**Dev mode:** Add `?dev` to URL for mock pledge data testing
 
 ### `/community/:slug/`
 Supporter-only community page:
@@ -415,9 +444,12 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
 ## Race Condition Handling
 
 - `/pledge/cancel` and `/pledge/modify` reject if pledge `charged: true`
+- `/pledge/cancel` and `/pledge/modify` reject if campaign deadline has passed (Mountain Time)
 - Cron checks `pledgeStatus === 'active'` and `!charged` before charging
 - `pledgeStatus` and `charged` flags prevent double-charging
 - Aggregation by email ensures one charge per supporter even with multiple pledges
+- Manage page shows deadline-passed notice and hides cancel/modify buttons once deadline passes
+- Payment method updates remain available after deadline (for failed payment recovery)
 
 ---
 
@@ -430,4 +462,4 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
 
 ---
 
-_Last updated: Jan 15, 2026_
+_Last updated: Jan 26, 2026_
