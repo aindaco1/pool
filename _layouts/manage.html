@@ -761,7 +761,7 @@
                   const hasLimit = liveRemaining !== Infinity;
                   const isDisabled = !isCurrent && (tier.sold_out || (hasLimit && liveRemaining <= 0));
                   const isStackable = tier.stackable === true;
-                  const maxQty = hasLimit ? Math.min(liveRemaining, 10) : 10;
+                  const maxQty = hasLimit ? liveRemaining : 99;
                   return `
                     <label class="tier-option ${isCurrent ? 'tier-option--selected' : ''} ${isDisabled ? 'tier-option--disabled' : ''}" data-tier-id="${tier.id}">
                       <input type="radio" name="tier-${index}" value="${tier.id}" 
@@ -812,7 +812,7 @@
                   const hasLimit = liveRemaining !== Infinity;
                   const isDisabled = tier.sold_out || (hasLimit && liveRemaining <= 0 && !isPledged);
                   const isStackable = tier.stackable === true;
-                  const maxQty = hasLimit ? Math.min(liveRemaining, 10) : 10;
+                  const maxQty = hasLimit ? liveRemaining : 99;
                   return `
                     <label class="tier-option ${isPledged ? 'tier-option--selected' : ''} ${isDisabled && !isPledged ? 'tier-option--disabled' : ''}" data-tier-id="${tier.id}">
                       <input type="checkbox" name="add-tier-${index}" value="${tier.id}" 

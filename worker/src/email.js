@@ -23,13 +23,55 @@ function getInstagramCTA(instagramUrl, siteBase = 'https://pool.dustwave.xyz') {
   </div>`;
 }
 
+// Render pledge items (tiers, support items, custom amount) for email display
+function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportItems = [], customAmount = 0 }) {
+  const items = [];
+  
+  // Main tier
+  if (tierName) {
+    const qtyText = tierQty > 1 ? ` × ${tierQty}` : '';
+    items.push(`<li style="margin: 4px 0;">${tierName}${qtyText}</li>`);
+  }
+  
+  // Additional tiers
+  for (const tier of additionalTiers) {
+    if (tier.name) {
+      const qtyText = tier.qty > 1 ? ` × ${tier.qty}` : '';
+      items.push(`<li style="margin: 4px 0;">${tier.name}${qtyText}</li>`);
+    }
+  }
+  
+  // Support items
+  for (const item of supportItems) {
+    if (item.label && item.amount > 0) {
+      items.push(`<li style="margin: 4px 0;">${item.label}: $${item.amount.toFixed(2)}</li>`);
+    }
+  }
+  
+  // Custom amount
+  if (customAmount > 0) {
+    items.push(`<li style="margin: 4px 0;">Additional support: $${customAmount.toFixed(2)}</li>`);
+  }
+  
+  if (items.length === 0) return '';
+  
+  return `
+  <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e5e5;">
+    <p style="margin: 0 0 8px 0; font-weight: 600; font-size: 14px;">Your pledge includes:</p>
+    <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #555;">
+      ${items.join('\n      ')}
+    </ul>
+  </div>`;
+}
+
 /**
  * Send supporter confirmation email after successful pledge
  */
-export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amount, token, instagramUrl }) {
+export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amount, token, instagramUrl, pledgeItems }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
+  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
   
   const html = `
 <!DOCTYPE html>
@@ -44,9 +86,10 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
   </div>
   
   <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-    <p style="margin: 0 0 8px 0;"><strong>Pledge amount:</strong> $${(amount / 100).toFixed(0)}</p>
-    <p style="margin: 0; color: #666; font-size: 14px;">
-      <strong>Remember:</strong> Your card is saved but won't be charged unless this campaign reaches its goal.
+    <p style="margin: 0 0 8px 0;"><strong>Pledge amount:</strong> $${(amount / 100).toFixed(2)}</p>
+    ${pledgeItemsHtml}
+    <p style="margin: 12px 0 0 0; color: #666; font-size: 14px;">
+      <strong>Remember:</strong> Your card is saved but won't be charged unless this campaign reaches its goal. Tax will be added at time of charge.
     </p>
   </div>
   
@@ -105,10 +148,12 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
 /**
  * Send pledge modification confirmation email
  */
-export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campaignTitle, previousAmount, newAmount, token }) {
+export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campaignTitle, previousSubtotal, newSubtotal, token, instagramUrl, pledgeItems }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
-  const increased = newAmount > previousAmount;
-  const diff = Math.abs(newAmount - previousAmount);
+  const increased = newSubtotal > previousSubtotal;
+  const diff = Math.abs(newSubtotal - previousSubtotal);
+  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
+  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
   
   const html = `
 <!DOCTYPE html>
@@ -124,10 +169,11 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   
   <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
     <p style="margin: 0 0 8px 0;"><strong>Campaign:</strong> ${campaignTitle}</p>
-    <p style="margin: 0 0 8px 0;"><strong>Previous pledge:</strong> $${(previousAmount / 100).toFixed(0)}</p>
-    <p style="margin: 0 0 8px 0;"><strong>New pledge:</strong> $${(newAmount / 100).toFixed(0)} (${increased ? '+' : '-'}$${(diff / 100).toFixed(0)})</p>
-    <p style="margin: 0; color: #666; font-size: 14px;">
-      <strong>Remember:</strong> Your card is saved but won't be charged unless this campaign reaches its goal.
+    <p style="margin: 0 0 8px 0;"><strong>Previous pledge:</strong> $${(previousSubtotal / 100).toFixed(2)}</p>
+    <p style="margin: 0 0 8px 0;"><strong>New pledge:</strong> $${(newSubtotal / 100).toFixed(2)} (${increased ? '+' : '-'}$${(diff / 100).toFixed(2)})</p>
+    ${pledgeItemsHtml}
+    <p style="margin: 12px 0 0 0; color: #666; font-size: 14px;">
+      <strong>Remember:</strong> Your card is saved but won't be charged unless this campaign reaches its goal. Tax will be added at time of charge.
     </p>
   </div>
   
@@ -140,6 +186,8 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
       </a>
     </div>
   </div>
+  
+  ${instagramCTA}
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
     <p style="margin: 0;">Questions? Reply to this email or visit <a href="${env.SITE_BASE}" style="color: #000;">The Pool</a>.</p>
@@ -174,8 +222,9 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
 /**
  * Send payment failure notification
  */
-export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaignTitle, token }) {
+export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, amount, token, pledgeItems }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
   
   const html = `
 <!DOCTYPE html>
@@ -190,9 +239,13 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
   </div>
   
   <div style="background: #fff3cd; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #ffc107;">
-    <p style="margin: 0;">
+    <p style="margin: 0 0 12px 0;">
       We tried to charge your card for your pledge to <strong>${campaignTitle}</strong>, but the payment failed.
     </p>
+    <p style="margin: 0 0 4px 0;">Subtotal: $${(subtotal / 100).toFixed(2)}</p>
+    <p style="margin: 0 0 4px 0;">Tax (7.875%): $${(tax / 100).toFixed(2)}</p>
+    <p style="margin: 0;"><strong>Amount due: $${(amount / 100).toFixed(2)}</strong></p>
+    ${pledgeItemsHtml}
   </div>
   
   <p>The campaign has been funded and we're processing charges. Please update your payment method to complete your pledge:</p>
@@ -236,9 +289,10 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
 /**
  * Send charge success email after campaign settlement
  */
-export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, amount, token }) {
+export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, amount, token, pledgeItems }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
+  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
   
   const html = `
 <!DOCTYPE html>
@@ -253,8 +307,11 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   </div>
   
   <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #bbf7d0;">
-    <p style="margin: 0 0 8px 0;"><strong>${campaignTitle}</strong> has been fully funded!</p>
-    <p style="margin: 0;"><strong>Amount charged:</strong> $${(amount / 100).toFixed(2)}</p>
+    <p style="margin: 0 0 12px 0;"><strong>${campaignTitle}</strong> has been fully funded!</p>
+    <p style="margin: 0 0 4px 0;">Subtotal: $${(subtotal / 100).toFixed(2)}</p>
+    <p style="margin: 0 0 4px 0;">Tax (7.875%): $${(tax / 100).toFixed(2)}</p>
+    <p style="margin: 0;"><strong>Amount charged: $${(amount / 100).toFixed(2)}</strong></p>
+    ${pledgeItemsHtml}
   </div>
   
   <p>Your pledge has been successfully charged. Thank you for helping make this project happen!</p>

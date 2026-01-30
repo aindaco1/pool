@@ -956,12 +956,32 @@ async function handleStripeWebhook(request, env, ctx) {
                         campaignSlug: existingPledge.campaignSlug
                       });
 
+                      // Build pledge items for email
+                      const chargeCampaignTiers = pledgeCampaign?.tiers || [];
+                      const chargeAdditionalTiers = (existingPledge.additionalTiers || []).map(t => {
+                        const tierData = chargeCampaignTiers.find(ct => ct.id === t.id);
+                        return { ...t, name: tierData?.name || t.id };
+                      });
+                      const chargeSupportItems = (existingPledge.supportItems || []).map(s => {
+                        const itemData = pledgeCampaign?.support_items?.find(si => si.id === s.id);
+                        return { ...s, label: itemData?.label || s.id };
+                      });
+
                       await sendChargeSuccessEmail(env, {
                         email: existingPledge.email,
                         campaignSlug: existingPledge.campaignSlug,
                         campaignTitle: pledgeCampaign.title || existingPledge.campaignSlug,
+                        subtotal: existingPledge.subtotal || existingPledge.amount,
+                        tax: existingPledge.tax || 0,
                         amount: existingPledge.amount,
-                        token: chargeToken
+                        token: chargeToken,
+                        pledgeItems: {
+                          tierName: existingPledge.tierName || null,
+                          tierQty: existingPledge.tierQty || 1,
+                          additionalTiers: chargeAdditionalTiers,
+                          supportItems: chargeSupportItems,
+                          customAmount: existingPledge.customAmount || 0
+                        }
                       });
                       console.log('✅ Auto-retry charge succeeded:', orderId);
                     } else {
@@ -1087,13 +1107,31 @@ async function handleStripeWebhook(request, env, ctx) {
             campaignSlug
           });
 
+          // Build pledge items for email display
+          const campaignTiers = campaign?.tiers || [];
+          const additionalTiersWithNames = additionalTiers.map(t => {
+            const tierData = campaignTiers.find(ct => ct.id === t.id);
+            return { ...t, name: tierData?.name || t.id };
+          });
+          const supportItemsWithLabels = supportItems.map(s => {
+            const itemData = campaign?.support_items?.find(si => si.id === s.id);
+            return { ...s, label: itemData?.label || s.id };
+          });
+
           await sendSupporterEmail(env, {
             email,
             campaignSlug,
             campaignTitle,
             amount: parseInt(amountCents) || 0,
             token,
-            instagramUrl: campaign?.instagram
+            instagramUrl: campaign?.instagram,
+            pledgeItems: {
+              tierName: tierName || null,
+              tierQty: tierQtyNum,
+              additionalTiers: additionalTiersWithNames,
+              supportItems: supportItemsWithLabels,
+              customAmount
+            }
           });
 
           console.log('Pledge confirmed:', { orderId, email, campaignSlug });
@@ -1110,27 +1148,55 @@ async function handleStripeWebhook(request, env, ctx) {
       const campaign = await getCampaign(env, campaignSlug);
       const campaignTitle = campaign?.title || campaignSlug?.replace(/-/g, ' ').toUpperCase() || 'Unknown Campaign';
       
+      // Get pledge data first for email content
+      let pledgeData = null;
+      if (env.PLEDGES) {
+        pledgeData = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+      }
+      
       const token = await generateToken(env.MAGIC_LINK_SECRET, {
         orderId,
         email,
         campaignSlug
       });
 
+      // Build pledge items for email
+      let pledgeItemsForEmail = null;
+      if (pledgeData) {
+        const failedCampaignTiers = campaign?.tiers || [];
+        const failedAdditionalTiers = (pledgeData.additionalTiers || []).map(t => {
+          const tierData = failedCampaignTiers.find(ct => ct.id === t.id);
+          return { ...t, name: tierData?.name || t.id };
+        });
+        const failedSupportItems = (pledgeData.supportItems || []).map(s => {
+          const itemData = campaign?.support_items?.find(si => si.id === s.id);
+          return { ...s, label: itemData?.label || s.id };
+        });
+        pledgeItemsForEmail = {
+          tierName: pledgeData.tierName || null,
+          tierQty: pledgeData.tierQty || 1,
+          additionalTiers: failedAdditionalTiers,
+          supportItems: failedSupportItems,
+          customAmount: pledgeData.customAmount || 0
+        };
+      }
+
       await sendPaymentFailedEmail(env, {
         email,
         campaignSlug,
         campaignTitle,
-        token
+        subtotal: pledgeData?.subtotal || pledgeData?.amount || 0,
+        tax: pledgeData?.tax || 0,
+        amount: pledgeData?.amount || 0,
+        token,
+        pledgeItems: pledgeItemsForEmail
       });
 
-      if (env.PLEDGES) {
-        const pledgeData = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
-        if (pledgeData) {
-          pledgeData.pledgeStatus = 'payment_failed';
-          pledgeData.lastPaymentError = paymentIntent.last_payment_error?.message || 'Unknown error';
-          pledgeData.updatedAt = new Date().toISOString();
-          await env.PLEDGES.put(`pledge:${orderId}`, JSON.stringify(pledgeData));
-        }
+      if (pledgeData) {
+        pledgeData.pledgeStatus = 'payment_failed';
+        pledgeData.lastPaymentError = paymentIntent.last_payment_error?.message || 'Unknown error';
+        pledgeData.updatedAt = new Date().toISOString();
+        await env.PLEDGES.put(`pledge:${orderId}`, JSON.stringify(pledgeData));
       }
     }
   }
@@ -1586,6 +1652,9 @@ async function handleModifyPledge(request, env) {
   const newTax = calculateTax(newAmount);
   const newAmountWithTax = newAmount + newTax;
 
+  // Track updated pledge data for email
+  let updatedPledgeData = null;
+
   // Update in KV
   if (env.PLEDGES) {
     const pledgeData = await env.PLEDGES.get(`pledge:${targetOrderId}`, { type: 'json' });
@@ -1736,6 +1805,9 @@ async function handleModifyPledge(request, env) {
           console.log('📦 Tier inventory adjusted:', { oldTierId, oldTierQty, newTierId: newTierIdForInventory, newTierQty: newTierQtyForInventory });
         }
       }
+      
+      // Save for email
+      updatedPledgeData = pledgeData;
     }
   }
 
@@ -1760,9 +1832,9 @@ async function handleModifyPledge(request, env) {
     }
   }
 
-  // Send confirmation email (use amounts with tax for user-facing totals)
-  const previousAmountWithTax = currentPledge?.amount || 0;
-  if (previousAmountWithTax !== newAmountWithTax) {
+  // Send confirmation email (use subtotals without tax for clarity)
+  const previousSubtotal = currentPledge?.subtotal ?? currentPledge?.amount ?? 0;
+  if (previousSubtotal !== newAmount) {
     try {
       const campaignTitle = campaign?.title || campaignSlug.replace(/-/g, ' ').toUpperCase();
       const emailToken = await generateToken(env.MAGIC_LINK_SECRET, {
@@ -1771,13 +1843,36 @@ async function handleModifyPledge(request, env) {
         campaignSlug
       });
 
+      // Build pledge items for email display
+      let pledgeItemsForEmail = null;
+      if (updatedPledgeData) {
+        const campaignTiers = campaign?.tiers || [];
+        const additionalTiersWithNames = (updatedPledgeData.additionalTiers || []).map(t => {
+          const tierData = campaignTiers.find(ct => ct.id === t.id);
+          return { ...t, name: tierData?.name || t.id };
+        });
+        const supportItemsWithLabels = (updatedPledgeData.supportItems || []).map(s => {
+          const itemData = campaign?.support_items?.find(si => si.id === s.id);
+          return { ...s, label: itemData?.label || s.id };
+        });
+        pledgeItemsForEmail = {
+          tierName: updatedPledgeData.tierName || null,
+          tierQty: updatedPledgeData.tierQty || 1,
+          additionalTiers: additionalTiersWithNames,
+          supportItems: supportItemsWithLabels,
+          customAmount: updatedPledgeData.customAmount || 0
+        };
+      }
+
       await sendPledgeModifiedEmail(env, {
         email: payload.email,
         campaignSlug,
         campaignTitle,
-        previousAmount: previousAmountWithTax,
-        newAmount: newAmountWithTax,
-        token: emailToken
+        previousSubtotal,
+        newSubtotal: newAmount,
+        token: emailToken,
+        instagramUrl: campaign?.instagram,
+        pledgeItems: pledgeItemsForEmail
       });
     } catch (err) {
       console.error('Failed to send modification email:', err.message);
@@ -1997,12 +2092,70 @@ async function settleCampaign(campaignSlug, env, options = {}) {
             campaignSlug
           });
 
+          // Calculate combined subtotal and tax from all pledges
+          let combinedSubtotal = 0;
+          let combinedTax = 0;
+          const combinedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
+          
+          for (const pledge of supporter.pledges) {
+            combinedSubtotal += pledge.subtotal || pledge.amount || 0;
+            combinedTax += pledge.tax || 0;
+            
+            // Merge tier items
+            if (pledge.tierName) {
+              if (!combinedItems.tierName) {
+                combinedItems.tierName = pledge.tierName;
+                combinedItems.tierQty = pledge.tierQty || 1;
+              } else if (combinedItems.tierName === pledge.tierName) {
+                combinedItems.tierQty += pledge.tierQty || 1;
+              } else {
+                // Different main tier - add as additional
+                const existingTier = combinedItems.additionalTiers.find(t => t.name === pledge.tierName);
+                if (existingTier) {
+                  existingTier.qty += pledge.tierQty || 1;
+                } else {
+                  combinedItems.additionalTiers.push({ name: pledge.tierName, qty: pledge.tierQty || 1 });
+                }
+              }
+            }
+            
+            // Merge additional tiers
+            for (const addTier of (pledge.additionalTiers || [])) {
+              const tierData = campaign?.tiers?.find(t => t.id === addTier.id);
+              const tierName = tierData?.name || addTier.id;
+              const existingTier = combinedItems.additionalTiers.find(t => t.name === tierName);
+              if (existingTier) {
+                existingTier.qty += addTier.qty || 1;
+              } else {
+                combinedItems.additionalTiers.push({ name: tierName, qty: addTier.qty || 1 });
+              }
+            }
+            
+            // Merge support items
+            for (const supportItem of (pledge.supportItems || [])) {
+              const itemData = campaign?.support_items?.find(si => si.id === supportItem.id);
+              const label = itemData?.label || supportItem.id;
+              const existingItem = combinedItems.supportItems.find(s => s.label === label);
+              if (existingItem) {
+                existingItem.amount += supportItem.amount || 0;
+              } else {
+                combinedItems.supportItems.push({ label, amount: supportItem.amount || 0 });
+              }
+            }
+            
+            // Sum custom amounts
+            combinedItems.customAmount += pledge.customAmount || 0;
+          }
+
           await sendChargeSuccessEmail(env, {
             email: supporter.email,
             campaignSlug,
             campaignTitle,
+            subtotal: combinedSubtotal,
+            tax: combinedTax,
             amount: supporter.totalAmount,
-            token
+            token,
+            pledgeItems: combinedItems
           });
         } catch (emailErr) {
           console.error('Failed to send charge success email:', emailErr.message);
@@ -2040,12 +2193,65 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           campaignSlug
         });
 
+        // Calculate combined subtotal, tax, and items for failed payment email
+        let failedSubtotal = 0;
+        let failedTax = 0;
+        const failedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
+        
+        for (const pledge of supporter.pledges) {
+          failedSubtotal += pledge.subtotal || pledge.amount || 0;
+          failedTax += pledge.tax || 0;
+          
+          if (pledge.tierName) {
+            if (!failedItems.tierName) {
+              failedItems.tierName = pledge.tierName;
+              failedItems.tierQty = pledge.tierQty || 1;
+            } else if (failedItems.tierName === pledge.tierName) {
+              failedItems.tierQty += pledge.tierQty || 1;
+            } else {
+              const existingTier = failedItems.additionalTiers.find(t => t.name === pledge.tierName);
+              if (existingTier) {
+                existingTier.qty += pledge.tierQty || 1;
+              } else {
+                failedItems.additionalTiers.push({ name: pledge.tierName, qty: pledge.tierQty || 1 });
+              }
+            }
+          }
+          
+          for (const addTier of (pledge.additionalTiers || [])) {
+            const tierData = campaign?.tiers?.find(t => t.id === addTier.id);
+            const tierName = tierData?.name || addTier.id;
+            const existingTier = failedItems.additionalTiers.find(t => t.name === tierName);
+            if (existingTier) {
+              existingTier.qty += addTier.qty || 1;
+            } else {
+              failedItems.additionalTiers.push({ name: tierName, qty: addTier.qty || 1 });
+            }
+          }
+          
+          for (const supportItem of (pledge.supportItems || [])) {
+            const itemData = campaign?.support_items?.find(si => si.id === supportItem.id);
+            const label = itemData?.label || supportItem.id;
+            const existingItem = failedItems.supportItems.find(s => s.label === label);
+            if (existingItem) {
+              existingItem.amount += supportItem.amount || 0;
+            } else {
+              failedItems.supportItems.push({ label, amount: supportItem.amount || 0 });
+            }
+          }
+          
+          failedItems.customAmount += pledge.customAmount || 0;
+        }
+
         await sendPaymentFailedEmail(env, {
           email: supporter.email,
           campaignSlug,
           campaignTitle,
+          subtotal: failedSubtotal,
+          tax: failedTax,
           amount: supporter.totalAmount,
-          token
+          token,
+          pledgeItems: failedItems
         });
         console.log('📧 Sent payment failed email to:', supporter.email);
       } catch (emailErr) {
@@ -2803,7 +3009,14 @@ async function handleTestEmail(request, env) {
           campaignTitle,
           amount: 5000,
           token,
-          instagramUrl
+          instagramUrl,
+          pledgeItems: {
+            tierName: 'Test Tier',
+            tierQty: 2,
+            additionalTiers: [],
+            supportItems: [{ label: 'Location Scouting', amount: 10 }],
+            customAmount: 5
+          }
         });
         break;
 
@@ -2812,9 +3025,17 @@ async function handleTestEmail(request, env) {
           email,
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
-          previousAmount: 5000,
-          newAmount: 10000,
-          token
+          previousSubtotal: 5000,
+          newSubtotal: 10000,
+          token,
+          instagramUrl,
+          pledgeItems: {
+            tierName: 'Test Tier',
+            tierQty: 3,
+            additionalTiers: [{ name: 'Digital Download', qty: 1 }],
+            supportItems: [{ label: 'Location Scouting', amount: 15 }],
+            customAmount: 10
+          }
         });
         break;
 
@@ -2823,7 +3044,17 @@ async function handleTestEmail(request, env) {
           email,
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
-          token
+          subtotal: 10000,  // $100.00
+          tax: 788,         // $7.88
+          amount: 10788,    // $107.88 total
+          token,
+          pledgeItems: {
+            tierName: 'Test Tier',
+            tierQty: 2,
+            additionalTiers: [{ name: 'Digital Download', qty: 1 }],
+            supportItems: [{ label: 'Location Scouting', amount: 15 }],
+            customAmount: 10
+          }
         });
         break;
 
@@ -2892,9 +3123,28 @@ async function handleTestEmail(request, env) {
         });
         break;
 
+      case 'charge-success':
+        await sendChargeSuccessEmail(env, {
+          email,
+          campaignSlug: campaignSlug || 'hand-relations',
+          campaignTitle,
+          subtotal: 10000,  // $100.00
+          tax: 788,         // $7.88
+          amount: 10788,    // $107.88 total
+          token,
+          pledgeItems: {
+            tierName: 'Test Tier',
+            tierQty: 2,
+            additionalTiers: [{ name: 'Digital Download', qty: 1 }],
+            supportItems: [{ label: 'Location Scouting', amount: 15 }],
+            customAmount: 10
+          }
+        });
+        break;
+
       default:
         return jsonResponse({ 
-          error: 'Invalid type. Valid types: supporter, modified, payment-failed, diary, milestone-one-third, milestone-two-thirds, milestone-goal, milestone-stretch' 
+          error: 'Invalid type. Valid types: supporter, modified, payment-failed, diary, milestone-one-third, milestone-two-thirds, milestone-goal, milestone-stretch, charge-success' 
         }, 400);
     }
 
