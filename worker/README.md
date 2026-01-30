@@ -196,26 +196,35 @@ Send milestone notification to all campaign supporters. Requires `x-admin-key` h
 }
 ```
 
-### POST /test/email (test mode only)
-Send a test email of any type. Only available when `SNIPCART_MODE=test`.
+### POST /test/email
+Send a test email of any type. In test mode (`SNIPCART_MODE=test`), no auth required. In production, requires `x-admin-key` header.
 
 ```json
 {
-  "type": "diary",  // See types below
+  "type": "supporter",  // See types below
   "email": "test@example.com",
   "campaignSlug": "hand-relations"
 }
 ```
 
 Valid types:
-- `supporter` - Pledge confirmation
-- `modified` - Pledge modification
-- `payment-failed` - Payment failure
+- `supporter` - Pledge confirmation (with sample pledge items)
+- `modified` - Pledge modification (with sample pledge items)
+- `payment-failed` - Payment failure (with subtotal/tax breakdown and pledge items)
+- `charge-success` - Charge success (with subtotal/tax breakdown and pledge items)
 - `diary` - Diary update notification
 - `milestone-one-third` - 1/3 goal milestone
 - `milestone-two-thirds` - 2/3 goal milestone
 - `milestone-goal` - Goal reached
 - `milestone-stretch` - Stretch goal unlocked
+
+**Production usage:**
+```bash
+curl -X POST https://pledge.dustwave.xyz/test/email \
+  -H "Content-Type: application/json" \
+  -H "x-admin-key: YOUR_ADMIN_SECRET" \
+  -d '{"email": "test@example.com", "type": "supporter", "campaignSlug": "hand-relations"}'
+```
 
 ## Environment Variables
 

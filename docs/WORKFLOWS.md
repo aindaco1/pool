@@ -412,14 +412,29 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
 
 ### Email Templates
 
+All emails show exact amounts with 2 decimal places (no rounding).
+
 **Pledge Confirmation** (sent after Stripe SetupIntent success)
 - Subject: "Your pledge to {Campaign Title}"
-- Contains: Amount, all-or-nothing reminder, manage link, community link
-- Note: "No account needed — these links are your keys"
+- Contains: Subtotal (pre-tax), pledge items (tiers × qty, support items, custom amount), manage link, community link
+- Includes: Instagram CTA (if campaign has Instagram URL)
+- Note: "Tax will be added at time of charge"
 
-**Failed Charge** (sent when off-session charge fails)
-- Subject: "Action needed: Update your payment method"
-- Contains: Manage link to update card, deadline reminder
+**Pledge Modified** (sent when supporter changes their pledge)
+- Subject: "Pledge updated for {Campaign Title}"
+- Contains: Previous subtotal, new subtotal, change amount (+/-), updated pledge items
+- Includes: Instagram CTA (if campaign has Instagram URL)
+- Note: "Tax will be added at time of charge"
+
+**Charge Success** (sent when pledge is charged at settlement)
+- Subject: "Payment confirmed for {Campaign Title}"
+- Contains: Full breakdown (subtotal + tax + total charged), pledge items
+- Note: No Instagram CTA (campaign is over)
+
+**Payment Failed** (sent when off-session charge fails)
+- Subject: "Action needed: Update payment for {Campaign Title}"
+- Contains: Full breakdown (subtotal + tax + amount due), pledge items, manage link to update card
+- Note: No Instagram CTA (campaign is over)
 
 **Pledge Cancelled** (sent when supporter cancels their pledge)
 - Subject: "Pledge cancelled for {Campaign Title}"
@@ -462,4 +477,4 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
 
 ---
 
-_Last updated: Jan 26, 2026_
+_Last updated: Jan 30, 2026_

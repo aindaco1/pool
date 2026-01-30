@@ -1889,7 +1889,7 @@ async function handleModifyPledge(request, env) {
     } : null,
     tierQty,
     previousSubtotal: currentPledge?.subtotal || currentPledge?.amount,
-    previousAmount: previousAmountWithTax,
+    previousAmount: currentPledge?.amount || 0,
     subtotal: newAmount,
     tax: newTax,
     newAmount: newAmountWithTax,
