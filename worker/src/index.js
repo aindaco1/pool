@@ -2540,6 +2540,11 @@ async function triggerMilestoneEmails(env, campaignSlug) {
       const milestoneId = isStretch ? milestoneItem.id : milestoneItem;
       const stretchGoalName = isStretch ? milestoneItem.name : undefined;
       
+      // Mark milestone as sent BEFORE sending emails to prevent race condition
+      // If two pledges trigger simultaneously, only the first will proceed
+      await markMilestoneSent(env, campaignSlug, milestoneId);
+      console.log(`🎯 Milestone ${milestoneId} marked as sent, starting email broadcast...`);
+      
       let sent = 0;
       let failed = 0;
       
@@ -2576,7 +2581,6 @@ async function triggerMilestoneEmails(env, campaignSlug) {
         }
       }
       
-      await markMilestoneSent(env, campaignSlug, milestoneId);
       console.log(`🎯 Milestone ${milestoneId} emails sent: ${sent}, failed: ${failed}`);
     }
   } catch (err) {
@@ -2782,14 +2786,33 @@ async function handleBroadcastMilestone(request, env) {
 
   const supporters = await getCampaignSupporters(env, campaignSlug);
   
+  // Build milestone ID for tracking (matches format used by checkMilestones)
+  // For stretch goals, caller should provide stretchThreshold to form the ID
+  const url = new URL(request.url);
+  const stretchThreshold = url.searchParams.get('stretchThreshold');
+  const milestoneId = milestone === 'stretch' && stretchThreshold 
+    ? `stretch:${stretchThreshold}` 
+    : milestone;
+  
+  // Check if already sent (prevent duplicates)
+  const sentMilestones = await getSentMilestones(env, campaignSlug);
+  const alreadySent = sentMilestones.includes(milestoneId);
+  
   if (dryRun) {
     return jsonResponse({
       dryRun: true,
       campaignSlug,
       milestone,
+      milestoneId,
+      alreadySent,
       recipientCount: supporters.length,
       recipients: supporters.map(s => s.email)
     });
+  }
+  
+  // Warn but don't block if already sent (admin may want to resend intentionally)
+  if (alreadySent) {
+    console.warn(`⚠️ Milestone ${milestoneId} already sent for ${campaignSlug}, proceeding anyway (manual broadcast)`);
   }
 
   const results = { sent: 0, failed: 0, errors: [] };
@@ -2826,11 +2849,15 @@ async function handleBroadcastMilestone(request, env) {
       results.errors.push({ email: supporter.email, error: err.message });
     }
   }
+  
+  // Mark milestone as sent (prevents auto-trigger from sending again)
+  await markMilestoneSent(env, campaignSlug, milestoneId);
 
   return jsonResponse({
     success: true,
     campaignSlug,
     milestone,
+    milestoneId,
     ...results
   });
 }
