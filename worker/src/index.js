@@ -2946,6 +2946,9 @@ async function handleMilestoneCheck(request, campaignSlug, env) {
     const milestoneId = isStretch ? milestoneItem.id : milestoneItem;
     const stretchGoalName = isStretch ? milestoneItem.name : undefined;
 
+    // Mark milestone as sent BEFORE sending emails to prevent race condition
+    await markMilestoneSent(env, campaignSlug, milestoneId);
+    
     let mSent = 0;
     let mFailed = 0;
 
@@ -2983,7 +2986,6 @@ async function handleMilestoneCheck(request, campaignSlug, env) {
       }
     }
 
-    await markMilestoneSent(env, campaignSlug, milestoneId);
     results.milestones.push({ milestone: milestoneId, sent: mSent, failed: mFailed });
   }
 
