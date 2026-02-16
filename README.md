@@ -2,7 +2,7 @@
 
 **Dust Wave's Snipcart-powered crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Backers pledge through Snipcart, then save their card via Stripe (handled by a Cloudflare Worker). Cards aren't charged until the campaign deadline — if funded, a GitHub Action charges all pledges off-session.
+A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Backers pledge through Snipcart, then save their card via Stripe (handled by a Cloudflare Worker). Cards aren't charged until the campaign deadline — if funded, a Worker cron dispatches batched settlement, charging all pledges off-session.
 
 ## Features
 
@@ -10,7 +10,7 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 - **All-or-nothing pledging** — Cards saved now, charged only if goal is met
 - **Checkout autofill** — Auto-selects country, enables password manager autofill for address fields
 - **Stretch goals** — Auto-unlock at funding thresholds
-- **Campaign lifecycle** — `pre` → `live` → `post` states with automatic transitions
+- **Campaign lifecycle** — `pre` → `live` → `post` states with automatic transitions + Cloudflare cache purge
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement
@@ -30,7 +30,7 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 |-------|----------|------|
 | Frontend | GitHub Pages | Jekyll + Sass + Snipcart v3 |
 | Payments | Stripe | SetupIntents + off-session charges |
-| API | Cloudflare Worker | Stripe checkout, webhook, stats, auto-settle |
+| API | Cloudflare Worker | Stripe checkout, webhook, stats, auto-settle, cache purge |
 | CMS | Pages CMS | Visual campaign editing (commits to GitHub) |
 
 ## Quick Start
@@ -80,7 +80,7 @@ _campaigns/           # Markdown campaign files
 _layouts/             # Page templates (campaign, community, manage, etc.)
 _includes/            # Reusable components
   └── blocks/         # Content block renderers (text, image, video, gallery, etc.)
-_plugins/             # Jekyll plugins (money filter)
+_plugins/             # Jekyll plugins (money filter, campaign state)
 assets/
   ├── main.scss       # Sass entry point
   ├── partials/       # Modular Sass (15 focused partials)

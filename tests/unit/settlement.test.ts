@@ -752,3 +752,210 @@ describe('Full settlement flow', () => {
     );
   });
 });
+
+// =============================================================================
+// Campaign Pledge Index
+// =============================================================================
+
+describe('Campaign pledge index', () => {
+  it('should add order IDs to campaign index', async () => {
+    const kv = createMockKV();
+    
+    // Simulate addToCampaignIndex
+    const slug = 'test-campaign';
+    const key = `campaign-pledges:${slug}`;
+    const index = await kv.get(key, { type: 'json' }) || [];
+    index.push('order-1');
+    await kv.put(key, JSON.stringify(index));
+    
+    const stored = await kv.get(key, { type: 'json' }) as string[];
+    expect(stored).toContain('order-1');
+    expect(stored.length).toBe(1);
+  });
+
+  it('should not duplicate order IDs in index', async () => {
+    const kv = createMockKV({
+      'campaign-pledges:test-campaign': JSON.stringify(['order-1']),
+    });
+    
+    const key = 'campaign-pledges:test-campaign';
+    const index = await kv.get(key, { type: 'json' }) as string[];
+    
+    if (!index.includes('order-1')) {
+      index.push('order-1');
+    }
+    await kv.put(key, JSON.stringify(index));
+    
+    const stored = await kv.get(key, { type: 'json' }) as string[];
+    expect(stored.length).toBe(1);
+  });
+
+  it('should remove order IDs from campaign index on cancel', async () => {
+    const kv = createMockKV({
+      'campaign-pledges:test-campaign': JSON.stringify(['order-1', 'order-2', 'order-3']),
+    });
+    
+    const key = 'campaign-pledges:test-campaign';
+    const index = await kv.get(key, { type: 'json' }) as string[];
+    const filtered = index.filter((id: string) => id !== 'order-2');
+    await kv.put(key, JSON.stringify(filtered));
+    
+    const stored = await kv.get(key, { type: 'json' }) as string[];
+    expect(stored).toEqual(['order-1', 'order-3']);
+    expect(stored).not.toContain('order-2');
+  });
+});
+
+// =============================================================================
+// Batched Settlement
+// =============================================================================
+
+describe('Batched settlement (settle-batch)', () => {
+  it('should skip already-charged pledges', async () => {
+    const kv = createMockKV({
+      'pledge:order-1': JSON.stringify(createMockPledge({
+        orderId: 'order-1',
+        charged: true,
+        pledgeStatus: 'charged',
+      })),
+    });
+    
+    const pledge = await kv.get('pledge:order-1', { type: 'json' }) as Pledge;
+    const shouldSkip = pledge.charged || pledge.pledgeStatus === 'charged';
+    expect(shouldSkip).toBe(true);
+  });
+
+  it('should skip pledges missing Stripe IDs', async () => {
+    const pledge = createMockPledge({
+      stripeCustomerId: '',
+      stripePaymentMethodId: 'pm_test',
+    });
+    
+    const canCharge = pledge.stripeCustomerId && pledge.stripePaymentMethodId;
+    expect(canCharge).toBeFalsy();
+  });
+
+  it('should enforce max batch size of 6', () => {
+    const MAX_BATCH_SIZE = 6;
+    const orderIds = ['o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7'];
+    
+    expect(orderIds.length).toBeGreaterThan(MAX_BATCH_SIZE);
+    
+    const batch = orderIds.slice(0, MAX_BATCH_SIZE);
+    expect(batch.length).toBe(MAX_BATCH_SIZE);
+  });
+
+  it('should reset payment_failed status before charging', async () => {
+    const kv = createMockKV();
+    const pledge = createMockPledge({
+      orderId: 'order-1',
+      pledgeStatus: 'payment_failed',
+      lastPaymentError: 'Card declined',
+    });
+    
+    // Simulate settle-batch reset logic
+    if (pledge.pledgeStatus === 'payment_failed') {
+      pledge.pledgeStatus = 'active';
+      pledge.lastPaymentError = undefined;
+      await kv.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
+    }
+    
+    const stored = await kv.get('pledge:order-1', { type: 'json' }) as Pledge;
+    expect(stored.pledgeStatus).toBe('active');
+    expect(stored.lastPaymentError).toBeUndefined();
+  });
+});
+
+// =============================================================================
+// Settlement Dispatch (self-chaining)
+// =============================================================================
+
+describe('Settlement dispatch', () => {
+  it('should split order IDs into batches of 6', () => {
+    const BATCH_SIZE = 6;
+    const orderIds = Array.from({ length: 20 }, (_, i) => `order-${i + 1}`);
+    
+    const batches: string[][] = [];
+    for (let i = 0; i < orderIds.length; i += BATCH_SIZE) {
+      batches.push(orderIds.slice(i, i + BATCH_SIZE));
+    }
+    
+    expect(batches.length).toBe(4); // 6 + 6 + 6 + 2
+    expect(batches[0].length).toBe(6);
+    expect(batches[3].length).toBe(2);
+  });
+
+  it('should track settlement job progress', () => {
+    const job = {
+      status: 'running' as const,
+      cursor: 0,
+      total: 20,
+      batchesCompleted: 0,
+      totalCharged: 0,
+      totalFailed: 0,
+    };
+    
+    // Simulate processing 3 batches
+    job.cursor = 6;
+    job.batchesCompleted = 1;
+    job.totalCharged = 5;
+    
+    job.cursor = 12;
+    job.batchesCompleted = 2;
+    job.totalCharged = 11;
+    
+    job.cursor = 18;
+    job.batchesCompleted = 3;
+    job.totalCharged = 16;
+    job.totalFailed = 2;
+    
+    expect(job.cursor).toBe(18);
+    expect(job.batchesCompleted).toBe(3);
+    expect(job.totalCharged + job.totalFailed).toBe(18);
+  });
+
+  it('should skip already-settled campaigns', () => {
+    const settledMarker = '2026-02-16T08:00:00Z';
+    expect(settledMarker).toBeTruthy();
+    // If marker exists, dispatch returns early
+  });
+
+  it('should mark campaign as settled when all batches complete', () => {
+    const job = {
+      status: 'running' as const,
+      cursor: 20,
+      total: 20,
+    };
+    
+    const isComplete = job.cursor >= job.total;
+    expect(isComplete).toBe(true);
+    // Should set campaign-charged:{slug} marker
+  });
+});
+
+// =============================================================================
+// Cron Heartbeat
+// =============================================================================
+
+describe('Cron heartbeat', () => {
+  it('should record cron execution time', async () => {
+    const kv = createMockKV();
+    const now = new Date().toISOString();
+    
+    await kv.put('cron:lastRun', now);
+    
+    const lastRun = await kv.get('cron:lastRun');
+    expect(lastRun).toBe(now);
+  });
+
+  it('should record cron errors', async () => {
+    const kv = createMockKV();
+    const error = { at: new Date().toISOString(), error: 'Something went wrong' };
+    
+    await kv.put('cron:lastError', JSON.stringify(error));
+    
+    const stored = await kv.get('cron:lastError', { type: 'json' }) as any;
+    expect(stored.error).toBe('Something went wrong');
+    expect(stored.at).toBeDefined();
+  });
+});

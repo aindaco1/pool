@@ -324,31 +324,39 @@ crons = ["0 7 * * *"]
 
 **What it does:**
 
-1. Lists all campaigns with `goal_deadline` and `goal_amount`
-2. For each campaign where deadline has passed (in MT) and goal is met:
-   - Checks if there are any uncharged active pledges
-   - If so, runs the settle logic
-3. **Aggregates pledges by email** — each supporter gets ONE charge:
-   ```js
-   // For each unique email:
-   stripe.paymentIntents.create({
-     amount: totalAmountForThisSupporter,
-     currency: 'usd',
-     customer: mostRecentCustomerId,
-     payment_method: mostRecentPaymentMethodId,
-     off_session: true,
-     confirm: true
-   })
-   ```
-4. Updates all underlying pledges as `charged` or `payment_failed`
-5. Sends ONE confirmation email per supporter
+1. Records a heartbeat (`cron:lastRun` in KV)
+2. Lists all campaigns with `goal_deadline` and `goal_amount`
+3. For each campaign where deadline has passed (in MT), goal is met, and `campaign-charged:{slug}` is not set:
+   - Dispatches batched settlement via `POST /admin/settle-dispatch/:slug`
+4. Triggers GitHub Pages rebuild if any campaign state transitions detected
+
+**Settlement dispatch (self-chaining batches):**
+
+The `settle-dispatch` endpoint handles the actual charging in batches to stay within CF Worker's 50 subrequest limit:
+
+1. Reads the campaign pledge index (`campaign-pledges:{slug}` in KV)
+2. Initializes a settlement job (`settlement-job:{slug}`) tracking progress
+3. Processes 6 pledges per batch via `POST /admin/settle-batch`
+4. Self-invokes for the next batch until all pledges are processed
+5. Each batch is a separate Worker invocation with its own subrequest budget
+6. **Aggregates pledges by email** — each supporter gets ONE charge
+7. On completion, sets `campaign-charged:{slug}` marker to prevent re-settlement
+
+**Campaign pledge index:**
+
+A per-campaign array of order IDs (`campaign-pledges:{slug}`) is maintained automatically:
+- Added on pledge creation (webhook) and recovery (`/admin/recover-checkout`)
+- Removed on pledge cancellation
+- Can be rebuilt: `POST /admin/campaign-index/rebuild/:slug`
 
 **Key behaviors:**
 - Cancelled pledges are never charged
 - Multiple pledges from same email = one aggregated charge
 - Uses the most recently updated payment method for each supporter
-- Can also be triggered manually via `POST /admin/settle/:slug`
-- Supports dry-run mode: `POST /admin/settle/:slug?dryRun=true`
+- Already-charged pledges are safely skipped (idempotent)
+- Can be triggered manually via `POST /admin/settle-dispatch/:slug`
+- Legacy monolithic settle still available: `POST /admin/settle/:slug` (use settle-dispatch for large campaigns)
+- Cron heartbeat: check via `GET /admin/cron/status`
 
 ### Payment Failure & Retry
 
@@ -418,17 +426,20 @@ All emails show exact amounts with 2 decimal places (no rounding).
 - Subject: "Your pledge to {Campaign Title}"
 - Contains: Subtotal (pre-tax), pledge items (tiers × qty, support items, custom amount), manage link, community link
 - Includes: Instagram CTA (if campaign has Instagram URL)
+- Community link shown only if campaign has active decisions
 - Note: "Tax will be added at time of charge"
 
 **Pledge Modified** (sent when supporter changes their pledge)
 - Subject: "Pledge updated for {Campaign Title}"
 - Contains: Previous subtotal, new subtotal, change amount (+/-), updated pledge items
 - Includes: Instagram CTA (if campaign has Instagram URL)
+- Community link shown only if campaign has active decisions
 - Note: "Tax will be added at time of charge"
 
 **Charge Success** (sent when pledge is charged at settlement)
 - Subject: "Payment confirmed for {Campaign Title}"
 - Contains: Full breakdown (subtotal + tax + total charged), pledge items
+- Community link shown only if campaign has active decisions
 - Note: No Instagram CTA (campaign is over)
 
 **Payment Failed** (sent when off-session charge fails)
@@ -477,4 +488,4 @@ All emails show exact amounts with 2 decimal places (no rounding).
 
 ---
 
-_Last updated: Jan 30, 2026_
+_Last updated: Feb 16, 2026_

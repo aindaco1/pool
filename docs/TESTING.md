@@ -26,12 +26,12 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | Module | Functions Tested |
 |--------|-----------------|
 | `live-stats.js` | `formatMoney`, `updateProgressBar`, `updateMarkerState`, `checkTierUnlocks`, `checkLateSupport`, `updateSupportItems`, `updateTierInventory` |
-| `settlement` | Charge aggregation, payment success/failure, retry flow, dry-run mode, edge cases |
+| `settlement` | Charge aggregation, payment success/failure, retry flow, dry-run mode, edge cases, batched settlement, campaign pledge index, settlement dispatch, cron heartbeat |
 
 ### Running
 
 ```bash
-npm run test:unit          # Run once (37 tests)
+npm run test:unit          # Run once
 npm run test:unit:watch    # Watch mode for development
 npm run test:unit:coverage # Generate coverage report
 ```

@@ -18,7 +18,7 @@ Creators define campaigns in Markdown; backers pledge through Snipcart; cards ar
 | **Frontend** | GitHub Pages (Jekyll + Sass + Snipcart v3) | Campaign pages, cart, UX |
 | **Payments** | Stripe (Setup Intents + off-session charges) | Store then charge cards |
 | **API/Glue** | Cloudflare Worker (`pledge.dustwave.xyz`) | Handles Stripe checkout + webhook |
-| **Automation** | GitHub Action (cron) | Flips states & triggers charges |
+| **Automation** | Worker cron + GitHub Action | Auto-settle (batched) + state transitions |
 | **Storage** | Markdown / YAML | Campaign definitions & state |
 | **Styling** | Sass (15 modular partials) | Design system matching dust-wave-shop |
 
@@ -32,9 +32,13 @@ All code is versioned and auditable — no external DB or CMS needed.
 2. **Stripe** saves a card, returning IDs to the Worker.  
 3. Worker stores pledge in **Cloudflare KV** (tiers, support items, custom amounts, Stripe IDs).  
 4. **Worker cron** runs daily at midnight MT:  
+   - Records heartbeat (`cron:lastRun` in KV) for monitoring.
    - Triggers site rebuild when `goal_deadline` passes (`live` → `post`).  
-   - If funded, charges pledges off-session (aggregated by email — one charge per supporter).  
+   - If funded, dispatches batched settlement via self-chaining `/admin/settle-dispatch`.
+   - Each batch (6 pledges) runs in a separate Worker invocation to stay within subrequest limits.
+   - Charges are aggregated by email — one charge per supporter.
    - Updates pledge status to `charged` or `payment_failed` in KV.
+   - Triggers GitHub Pages rebuild and Cloudflare cache purge on state transitions.
 
 ---
 
@@ -72,7 +76,7 @@ All code is versioned and auditable — no external DB or CMS needed.
 │   └── js/               # Cart, campaign, checkout-autofill scripts
 ├── worker/               # Cloudflare Worker (pledge.dustwave.xyz)
 │   └── src/              # Stripe setup, webhooks, email, voting, tokens
-├── scripts/charge.js     # Cron logic for charging pledges
+├── scripts/              # Automation & reporting scripts
 ├── tests/e2e/            # Playwright end-to-end tests
 └── .github/workflows/    # Deploy action
 ```
@@ -86,8 +90,9 @@ All code is versioned and auditable — no external DB or CMS needed.
 3. ✅ Cloudflare Worker deployed (`pledge.dustwave.xyz`) with Stripe + Snipcart secrets.  
 4. ✅ Stripe webhook configured → Worker `/webhooks/stripe`.  
 5. ✅ Repo secrets set: `STRIPE_SECRET_KEY`, `SNIPCART_SECRET`.  
-6. ✅ Hourly cron Action enabled.  
-7. ✅ Test campaign runs end-to-end in Stripe test mode.
+6. ✅ Daily Worker cron enabled (7 AM UTC / midnight MST) — check via `GET /admin/cron/status`.  
+7. ✅ Cloudflare cache purge configured (requires CLOUDFLARE_ZONE, CLOUDFLARE_EMAIL, CLOUDFLARE_KEY secrets + CLOUDFLARE_ENABLED variable).  
+8. ✅ Test campaign runs end-to-end in Stripe test mode.
 
 ---
 
@@ -110,4 +115,4 @@ All code is versioned and auditable — no external DB or CMS needed.
 
 ---
 
-_Last updated: Jan 2026_
+_Last updated: Feb 16, 2026_

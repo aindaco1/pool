@@ -23,6 +23,10 @@ This document covers the security architecture, known risks, hardening recommend
 | `stats:{slug}` | PLEDGES | Aggregate totals | **Low** - public |
 | `inventory:{slug}` | PLEDGES | Tier claim counts | **Low** - public |
 | `stripe-event:{id}` | PLEDGES | "processed" flag | **Low** - idempotency |
+| `campaign-pledges:{slug}` | PLEDGES | Array of order IDs per campaign | **Low** - index |
+| `campaign-charged:{slug}` | PLEDGES | Settlement completion timestamp | **Low** - flag |
+| `settlement-job:{slug}` | PLEDGES | Settlement batch progress | **Low** - ephemeral |
+| `cron:lastRun` | PLEDGES | Last cron execution timestamp | **Low** - monitoring |
 | `vote:{slug}:{decision}:{email}` | VOTES | Vote choice | **Medium** - links supporter to vote |
 | `results:{slug}:{decision}` | VOTES | Vote tallies | **Low** - semi-public |
 | `rl:{endpoint}:{ip}` | RATELIMIT | Request count + reset time | **Low** - ephemeral |
@@ -450,4 +454,4 @@ If a checkout completes but the pledge doesn't appear (common in local dev):
 
 ---
 
-_Last updated: Jan 2026_
+_Last updated: Feb 2026_

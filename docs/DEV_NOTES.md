@@ -68,6 +68,26 @@ Jekyll compiles `main.scss` → `main.css` automatically.
 
 This applies to ALL include parameters. Without `include.`, Jekyll can't properly resolve the variables.
 
+## Liquid Empty Array Gotcha
+
+**IMPORTANT**: In Jekyll, an empty YAML array `[]` is truthy! Always add a `.size > 0` check.
+
+❌ **Wrong**:
+```liquid
+{% if page.support_items %}
+  <!-- Renders even when support_items: [] -->
+{% endif %}
+```
+
+✅ **Correct**:
+```liquid
+{% if page.support_items and page.support_items.size > 0 %}
+  <!-- Only renders when there are actual items -->
+{% endif %}
+```
+
+This applies to `support_items`, `decisions`, `stretch_goals`, `diary`, and any other array field.
+
 ## Pages CMS Configuration
 
 The CMS is configured in `.pages.yml` at the repo root. It defines:
@@ -147,6 +167,8 @@ long_content:
 - After `goal_deadline` → `post` (campaign closed)
 
 The `_plugins/campaign_state.rb` plugin sets state at build time. The Worker cron triggers a site rebuild when dates cross midnight MT.
+
+**Mountain Time enforcement**: The Jekyll plugin converts UTC to Mountain Time (UTC-7) before comparing dates, so campaigns don't end early on UTC-based CI servers. The Worker cron and GitHub Actions cron both run at 7 AM UTC (midnight MST) to trigger state transitions.
 
 ### Countdown Timer Timezone
 
@@ -1171,6 +1193,42 @@ done
 - `vote:{campaignSlug}:{decisionId}:{email}` — User's vote choice
 - `results:{campaignSlug}:{decisionId}` — Aggregate vote tallies
 
+## Settlement Architecture
+
+The settlement flow uses **self-chaining batched invocations** to stay within Cloudflare Worker's 50 subrequest limit:
+
+1. **Cron** (`scheduled()`) runs daily at midnight MT, dispatches to `/admin/settle-dispatch/:slug`
+2. **Dispatch** reads campaign pledge index, processes 6 pledges per batch via `/admin/settle-batch`
+3. **Each batch** is a separate Worker invocation with its own subrequest budget
+4. **Self-chains** until all pledges are processed, then sets `campaign-charged:{slug}` marker
+
+**KV keys used by settlement:**
+
+| Key | Purpose |
+|-----|---------|
+| `campaign-pledges:{slug}` | Per-campaign array of order IDs (maintained on create/cancel) |
+| `settlement-job:{slug}` | Batch progress tracking (cursor, totals) |
+| `campaign-charged:{slug}` | Settlement completion marker (prevents re-settle) |
+| `cron:lastRun` | Heartbeat — last cron execution timestamp |
+| `cron:lastError` | Last cron error details (7-day TTL) |
+
+**Admin endpoints for settlement:**
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /admin/settle-dispatch/:slug` | Start/resume batched settlement |
+| `POST /admin/settle-batch` | Charge specific pledges (max 6 per call) |
+| `POST /admin/settle/:slug` | Legacy monolithic settle (may hit subrequest limits) |
+| `POST /admin/campaign-index/rebuild/:slug` | Rebuild campaign pledge index from KV |
+| `POST /admin/backfill-customers/:slug` | Create Stripe customers for pledges missing them |
+| `GET /admin/cron/status` | Check cron heartbeat |
+
+**Checking cron health:**
+```bash
+curl -s https://pledge.dustwave.xyz/admin/cron/status \
+  -H 'Authorization: Bearer YOUR_ADMIN_SECRET'
+```
+
 ---
 
-_Last updated: Jan 2026_
+_Last updated: Feb 2026_

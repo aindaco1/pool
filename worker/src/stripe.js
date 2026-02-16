@@ -124,7 +124,8 @@ export function createStripeClient(secretKey) {
       update: (id, data) => request('POST', `/customers/${id}`, data)
     },
     paymentMethods: {
-      attach: (id, data) => request('POST', `/payment_methods/${id}/attach`, data)
+      attach: (id, data) => request('POST', `/payment_methods/${id}/attach`, data),
+      retrieve: (id) => request('GET', `/payment_methods/${id}`)
     }
   };
 }
