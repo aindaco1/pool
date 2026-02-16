@@ -338,7 +338,7 @@
         {% endif %}
       </section>
 
-    {% if page.decisions %}
+    {% if page.decisions and page.decisions.size > 0 %}
     <section class="community-teaser" id="community-teaser">
       <h3>Supporter Community</h3>
       <p class="teaser-locked">Backers of this campaign get exclusive access to vote on creative decisions.</p>
@@ -423,7 +423,7 @@
         <div class="sidebar-tiers__no-reward">
           <h4>No Reward</h4>
           {% include custom-amount.html campaign=page %}
-          {% if page.support_items %}
+          {% if page.support_items and page.support_items.size > 0 %}
             {% include support-items.html support_items=page.support_items campaign=page %}
           {% endif %}
         </div>

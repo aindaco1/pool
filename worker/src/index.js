@@ -975,6 +975,7 @@ async function handleStripeWebhook(request, env, ctx) {
                         tax: existingPledge.tax || 0,
                         amount: existingPledge.amount,
                         token: chargeToken,
+                        hasDecisions: pledgeCampaign?.has_decisions === true,
                         pledgeItems: {
                           tierName: existingPledge.tierName || null,
                           tierQty: existingPledge.tierQty || 1,
@@ -1125,6 +1126,7 @@ async function handleStripeWebhook(request, env, ctx) {
             amount: parseInt(amountCents) || 0,
             token,
             instagramUrl: campaign?.instagram,
+            hasDecisions: campaign?.has_decisions === true,
             pledgeItems: {
               tierName: tierName || null,
               tierQty: tierQtyNum,
@@ -2155,6 +2157,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
             tax: combinedTax,
             amount: supporter.totalAmount,
             token,
+            hasDecisions: campaign?.has_decisions === true,
             pledgeItems: combinedItems
           });
         } catch (emailErr) {
@@ -2642,7 +2645,8 @@ async function handleBroadcastDiary(request, env) {
         campaignTitle: campaign.title,
         diaryTitle,
         diaryExcerpt,
-        token
+        token,
+        hasDecisions: campaign?.has_decisions === true
       });
       results.sent++;
     } catch (err) {
@@ -2735,7 +2739,8 @@ async function handleDiaryCheck(request, env) {
             diaryExcerpt: getDiaryExcerpt(entry),
             diaryPhase: entry.phase,
             token,
-            instagramUrl: campaign.instagram
+            instagramUrl: campaign.instagram,
+            hasDecisions: campaign?.has_decisions === true
           });
           results.sent++;
         } catch (err) {
@@ -3039,6 +3044,7 @@ async function handleTestEmail(request, env) {
           amount: 5000,
           token,
           instagramUrl,
+          hasDecisions: campaign?.has_decisions === true,
           pledgeItems: {
             tierName: 'Test Tier',
             tierQty: 2,
@@ -3095,7 +3101,8 @@ async function handleTestEmail(request, env) {
           diaryTitle: 'Test Diary Entry',
           diaryExcerpt: 'This is a test diary update to verify the email template is working correctly.',
           token,
-          instagramUrl
+          instagramUrl,
+          hasDecisions: campaign?.has_decisions === true
         });
         break;
 
@@ -3161,6 +3168,7 @@ async function handleTestEmail(request, env) {
           tax: 788,         // $7.88
           amount: 10788,    // $107.88 total
           token,
+          hasDecisions: campaign?.has_decisions === true,
           pledgeItems: {
             tierName: 'Test Tier',
             tierQty: 2,
@@ -3555,7 +3563,8 @@ async function handleRecoverCheckout(request, env) {
           tierId,
           tierName,
           tierQty,
-          manageUrl
+          manageUrl,
+          hasDecisions: campaign?.has_decisions === true
         });
         pledge.emailSent = true;
       } catch (emailErr) {

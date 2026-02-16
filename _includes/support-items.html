@@ -1,4 +1,4 @@
-{% if include.support_items and include.campaign %}
+{% if include.support_items and include.support_items.size > 0 and include.campaign %}
 <div class="support-items" data-campaign-slug="{{ include.campaign.slug }}" data-goal="{{ include.campaign.goal_amount }}" data-progress-bg="{% if include.campaign.progress_background %}{{ include.campaign.progress_background }}{% endif %}">
   <h5>Support a phase of the project</h5>
   {% for item in include.support_items %}

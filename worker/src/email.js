@@ -67,7 +67,7 @@ function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportIte
 /**
  * Send supporter confirmation email after successful pledge
  */
-export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amount, token, instagramUrl, pledgeItems }) {
+export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amount, token, instagramUrl, pledgeItems, hasDecisions }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
@@ -104,12 +104,12 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
       <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Cancel, modify amount, or update payment method</p>
     </div>
     
-    <div style="margin-bottom: 12px;">
+    ${hasDecisions !== false ? `<div style="margin-bottom: 12px;">
       <a href="${communityUrl}" style="display: inline-block; background: #fff; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; border: 1px solid #000;">
         Supporter Community
       </a>
       <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Vote on creative decisions for this project</p>
-    </div>
+    </div>` : ''}
   </div>
   
   ${instagramCTA}
@@ -289,7 +289,7 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
 /**
  * Send charge success email after campaign settlement
  */
-export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, amount, token, pledgeItems }) {
+export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, amount, token, pledgeItems, hasDecisions }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
@@ -317,12 +317,12 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   <p>Your pledge has been successfully charged. Thank you for helping make this project happen!</p>
   
   <div style="margin-bottom: 32px;">
-    <div style="margin-bottom: 12px;">
+    ${hasDecisions !== false ? `<div style="margin-bottom: 12px;">
       <a href="${communityUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
         Supporter Community
       </a>
       <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Stay connected and vote on project decisions</p>
-    </div>
+    </div>` : ''}
     
     <div style="margin-bottom: 12px;">
       <a href="${manageUrl}" style="display: inline-block; background: #fff; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; border: 1px solid #000;">
@@ -364,7 +364,7 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
 /**
  * Send diary update notification to supporters
  */
-export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, diaryPhase, token, instagramUrl }) {
+export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, diaryPhase, token, instagramUrl, hasDecisions }) {
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
   const diaryAnchor = diaryPhase ? `#diary-${diaryPhase}` : '#diary';
   const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/${diaryAnchor}`;
@@ -397,12 +397,12 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
   <div style="margin-bottom: 32px;">
     <h2 style="font-size: 18px; margin: 0 0 16px 0;">Your Supporter Access</h2>
     
-    <div style="margin-bottom: 12px;">
+    ${hasDecisions !== false ? `<div style="margin-bottom: 12px;">
       <a href="${communityUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
         Supporter Community
       </a>
       <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Vote on creative decisions for this project</p>
-    </div>
+    </div>` : ''}
     
     <div style="margin-bottom: 12px;">
       <a href="${manageUrl}" style="display: inline-block; background: #fff; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; border: 1px solid #000;">
