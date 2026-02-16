@@ -112,6 +112,20 @@ function updateProgressBar(wrap, stats) {
   
   checkTierUnlocks(wrap.dataset.campaignSlug, pledgedDollars);
   checkLateSupport(wrap.dataset.campaignSlug, pledgedDollars, goal);
+  
+  // Update countdown message if goal is now met (build-time data may be stale)
+  if (pledgedDollars >= goal && goal > 0) {
+    var countdown = document.getElementById('campaign-countdown');
+    if (countdown) {
+      countdown.setAttribute('data-goal-met', 'true');
+      var msg = countdown.querySelector('.campaign-countdown__message');
+      if (msg && msg.classList.contains('campaign-countdown__message--not-funded')) {
+        msg.innerHTML = '<h2>Project Funded</h2>';
+        msg.classList.remove('campaign-countdown__message--not-funded');
+        msg.classList.add('campaign-countdown__message--funded');
+      }
+    }
+  }
 
   // Update the progress bar fill
   const bar = wrap.querySelector('.progress-bar span');
