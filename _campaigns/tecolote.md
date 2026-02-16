@@ -158,7 +158,7 @@ tiers:
   - id: poster
     name: TECOLOTE Poster
     price: 40
-    image: /assets/images/campaigns/tecolote/auteur.png
+    image: /assets/images/campaigns/tecolote/poster.png
     description: 11"x17" poster signed by the crew.
     stackable: true
     category: physical
