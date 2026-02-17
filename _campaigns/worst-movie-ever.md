@@ -351,6 +351,42 @@ diary:
 
           And keep spreading the word! Share on [Instagram](https://www.instagram.com/worstmovie.evermade/), tell your family, your friends, your enemies -- **everyone deserves a chance to make this film worse!**
 
+  - date: 2026-02-16T12:00:00-07:00
+    title: "WE DID IT! Now it's your turn."
+    phase: fundraising
+    content:
+      - type: text
+        body: |
+          **The campaign is officially complete!** And we could not have done it without every single one of you.
+
+          From the bottom of our hearts -- **thank you.** Thank you for believing in something this unhinged. Thank you for pledging, sharing, voting, and committing acts of creative chaos alongside us. This community showed up in a big way, and we're genuinely blown away.
+
+          A massive shoutout to **[FUSION](https://www.fusionnm.org)** for being an incredible partner throughout this entire journey. Everything we've raised goes to supporting their mission, and we couldn't be prouder to be working with them.
+
+      - type: image
+        src: /assets/images/campaigns/worst-movie-ever/leg-2.png 
+        alt: "Leg sculpture"
+        caption: "The Leg Sculpture at FUSION"
+
+
+      - type: text
+        body: |
+          ### Time to Submit Your Rewards
+
+          **Now comes the fun part -- YOUR part.**
+
+          If you backed a reward tier, it's time to submit your frames, sound effects, dialogue, props, costumes, characters, and whatever else you've been cooking up. Head to the **reward intake form** here:
+
+          **👉 [Submit Your Reward](https://dustwave.notion.site/30a86545942d80ed9949e60649fd8704?pvs=105)**
+
+          Not sure what you owe us? **Check your Payment Confirmed email** -- it'll have the details of which tier(s) you backed. We're running this on the **honor system**, so please submit whatever corresponds to your pledge.
+
+          **⏰ Deadline: March 6, 11:59pm.**
+
+          After that, we lock the doors and start making your terrible ideas a reality. No extensions, no exceptions -- we've got a movie to ruin.
+
+          Let's make this the worst movie ever. *Together.*
+
 ongoing_items: []
 
 tiers:
