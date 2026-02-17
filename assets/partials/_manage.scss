@@ -353,10 +353,6 @@
     }
     
     &--tax {
-      padding-bottom: 8px;
-      border-bottom: 1px dashed $color--light;
-      margin-bottom: 12px;
-      
       .label {
         font-size: 12px;
       }
@@ -371,6 +367,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding-top: 12px;
+    border-top: 1px dashed $color--light;
+    margin-top: 4px;
     
     .label {
       font-size: 14px;

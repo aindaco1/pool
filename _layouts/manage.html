@@ -56,6 +56,7 @@
   <script>
     const WORKER_BASE = '{{ site.worker_base }}';
     const ABQ_TAX_RATE = 0.07875; // 7.875% ABQ tax
+    const FLAT_SHIPPING_FEE = 300; // $3 flat rate USPS shipping for physical items
     let allCampaigns = [];
     let pledges = [];
     let isDevMode = false;
@@ -126,10 +127,13 @@
           const merged = byCampaign[key];
           merged.orderIds.push(pledge.orderId);
           
-          // Combine amounts
+          // Combine amounts — shipping is a flat fee, not additive
           merged.subtotal = (merged.subtotal || 0) + (pledge.subtotal || pledge.amount || 0);
           merged.tax = (merged.tax || 0) + (pledge.tax || 0);
-          merged.amount = (merged.amount || 0) + (pledge.amount || 0);
+          const prevShipping = merged.shipping || 0;
+          merged.shipping = Math.max(prevShipping, pledge.shipping || 0);
+          // Sum amounts but subtract duplicate shipping (flat fee only counted once)
+          merged.amount = (merged.amount || 0) + (pledge.amount || 0) - prevShipping - (pledge.shipping || 0) + merged.shipping;
           
           // Add this pledge's tier(s)
           if (pledge.tierId) {
@@ -1028,8 +1032,9 @@
           <div class="pledge-card__summary">
             ${(() => {
               const subtotal = getPledgeSubtotal(pledge);
+              const shipping = pledge.shipping || 0;
               const tax = calculateTax(subtotal);
-              const total = subtotal + tax;
+              const total = subtotal + tax + shipping;
               return `
                 <div class="pledge-summary__row">
                   <span class="label">Subtotal</span>
@@ -1038,6 +1043,10 @@
                 <div class="pledge-summary__row pledge-summary__row--tax">
                   <span class="label">ABQ Tax (7.875%)</span>
                   <span class="value" id="tax-${index}">${formatMoney(tax)}</span>
+                </div>
+                <div class="pledge-summary__row pledge-summary__row--shipping" id="shipping-row-${index}" ${shipping > 0 ? '' : 'hidden'}>
+                  <span class="label">Shipping (USPS)</span>
+                  <span class="value" id="shipping-${index}">${formatMoney(shipping)}</span>
                 </div>
                 <div class="pledge-summary__total">
                   <span class="label">Total</span>
@@ -1530,12 +1539,27 @@
           `;
         }
         
+        // Determine if new selection includes physical items
+        const campaignTiers = campaign?.tiers || [];
+        let confirmHasPhysical = false;
+        if (isSingleTier) {
+          const selTier = campaignTiers.find(t => t.id === selectedTierId);
+          confirmHasPhysical = selTier?.category === 'physical';
+        } else {
+          confirmHasPhysical = selectedAddTiers.some(st => {
+            const tier = campaignTiers.find(t => t.id === st.id);
+            return tier?.category === 'physical';
+          });
+        }
+        const confirmShipping = confirmHasPhysical ? FLAT_SHIPPING_FEE : 0;
+        
         const newTax = calculateTax(newSubtotal);
-        const newTotalWithTax = newSubtotal + newTax;
+        const newTotalWithTax = newSubtotal + newTax + confirmShipping;
         detailsHtml += `
           <p class="confirm-totals">
             <span>Subtotal: ${formatMoney(newSubtotal)}</span>
             <span>ABQ Tax (7.875%): ${formatMoney(newTax)}</span>
+            ${confirmShipping > 0 ? `<span>Shipping (USPS): ${formatMoney(confirmShipping)}</span>` : ''}
             <strong>Total: ${formatMoney(newTotalWithTax)}</strong>
           </p>
         `;
@@ -1553,6 +1577,7 @@
               // Update the pledge data in dev mode
               pledge.subtotal = newSubtotal;
               pledge.tax = newTax;
+              pledge.shipping = confirmShipping;
               pledge.amount = newTotalWithTax;
               if (isSingleTier) {
                 pledge.tierId = selectedTierId;
@@ -1782,14 +1807,34 @@
         hasChanges = true;
       }
       
-      // Update subtotal, tax, and total displays
+      // Determine if selected tiers include any physical items
+      let hasPhysical = false;
+      if (isSingleTier) {
+        const selectedTier = tiers.find(t => t.id === tierIdOrAddedTiers);
+        hasPhysical = selectedTier?.category === 'physical';
+      } else {
+        const selectedTierList = Array.isArray(tierQtyOrSupportItems) ? tierQtyOrSupportItems : [];
+        hasPhysical = selectedTierList.some(st => {
+          const tier = tiers.find(t => t.id === st.id);
+          return tier?.category === 'physical';
+        });
+      }
+      const newShipping = hasPhysical ? FLAT_SHIPPING_FEE : 0;
+      
+      // Update subtotal, tax, shipping, and total displays
       const subtotalEl = document.getElementById(`subtotal-${index}`);
       const taxEl = document.getElementById(`tax-${index}`);
+      const shippingEl = document.getElementById(`shipping-${index}`);
+      const shippingRow = document.getElementById(`shipping-row-${index}`);
       const newTax = calculateTax(newSubtotal);
-      const newTotalWithTax = newSubtotal + newTax;
+      const newTotalWithTax = newSubtotal + newTax + newShipping;
       
       subtotalEl.textContent = formatMoney(newSubtotal);
       taxEl.textContent = formatMoney(newTax);
+      if (shippingRow) {
+        shippingRow.hidden = newShipping === 0;
+        shippingEl.textContent = formatMoney(newShipping);
+      }
       amountEl.textContent = formatMoney(newTotalWithTax);
       
       const diff = newSubtotal - originalSubtotal;

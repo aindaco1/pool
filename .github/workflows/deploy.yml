@@ -77,7 +77,7 @@ jobs:
       - name: Check for new diary entries
         if: success()
         run: |
-          sleep 10  # Wait for CDN propagation
+          sleep 30  # Wait for CDN propagation after cache purge
           curl -sf -X POST \
             -H "Authorization: Bearer ${{ secrets.ADMIN_SECRET }}" \
             -H "Content-Type: application/json" \

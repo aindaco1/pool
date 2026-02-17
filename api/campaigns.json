@@ -32,7 +32,8 @@ layout: null
           "limit_total": {% if tier.limit_total %}{{ tier.limit_total }}{% else %}null{% endif %},
           "remaining": {{ tier.remaining | default: tier.limit_total | default: 999 }},
           "sold_out": {{ tier.sold_out | default: false }},
-          "stackable": {{ tier.stackable | default: false }}
+          "stackable": {{ tier.stackable | default: false }},
+          "category": {{ tier.category | default: "digital" | jsonify }}
         }{% unless forloop.last %},{% endunless %}
         {% endfor %}
       ],

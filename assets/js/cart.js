@@ -21,6 +21,74 @@ function isSingleTierOnly() {
   return container?.dataset.singleTierOnly === 'true';
 }
 
+function cartHasPhysicalItems() {
+  const state = Snipcart.store.getState();
+  const items = state.cart.items.items || [];
+  // Snipcart may store shippable as boolean true or string "true"
+  return items.some(item => item.shippable === true || item.shippable === 'true');
+}
+
+const FLAT_SHIPPING_FEE = 300; // $3 flat rate, must match worker
+
+let _injectingFees = false;
+let _feeDebounce = null;
+
+function scheduleFeeInjection() {
+  if (_feeDebounce) clearTimeout(_feeDebounce);
+  _feeDebounce = setTimeout(injectSummaryFees, 100);
+}
+
+function injectSummaryFees() {
+  if (_injectingFees) return;
+  _injectingFees = true;
+  
+  try {
+    const snipcartRoot = document.querySelector('#snipcart');
+    if (!snipcartRoot) return;
+    
+    const hasPhysical = cartHasPhysicalItems();
+    
+    // Clean up all existing injections
+    snipcartRoot.querySelectorAll('.pool-shipping-line').forEach(el => el.remove());
+    
+    // Update header cart price to include shipping
+    const headerPrice = document.querySelector('.snipcart-total-price');
+    if (headerPrice) {
+      const state = Snipcart.store.getState();
+      const snipcartTotal = state.cart.total || 0;
+      const adjustedTotal = hasPhysical ? snipcartTotal + FLAT_SHIPPING_FEE / 100 : snipcartTotal;
+      headerPrice.textContent = '$' + adjustedTotal.toFixed(2);
+    }
+    
+    if (!hasPhysical) return;
+    
+    const shippingAmt = '$' + (FLAT_SHIPPING_FEE / 100).toFixed(2);
+    
+    // Find every summary-fees total row (cart sidebar + checkout summary)
+    // and inject shipping line before it + update the total
+    const totalRows = snipcartRoot.querySelectorAll('.snipcart-summary-fees__total');
+    
+    for (const totalRow of totalRows) {
+      const line = document.createElement('div');
+      line.className = 'pool-shipping-line snipcart-summary-fees__item snipcart__font--slim';
+      line.innerHTML = '<span class="snipcart-summary-fees__title">Shipping</span>' +
+        '<span class="snipcart-summary-fees__amount">' + shippingAmt + '</span>';
+      totalRow.parentNode.insertBefore(line, totalRow);
+      
+      // Update the total display to include shipping (read from state, not DOM)
+      const totalAmountEl = totalRow.querySelector('.snipcart-summary-fees__amount');
+      if (totalAmountEl) {
+        const state = Snipcart.store.getState();
+        const snipcartTotal = state.cart.total || 0;
+        const newTotal = snipcartTotal + FLAT_SHIPPING_FEE / 100;
+        totalAmountEl.textContent = '$' + newTotal.toFixed(2);
+      }
+    }
+  } finally {
+    _injectingFees = false;
+  }
+}
+
 function processPendingCartItem() {
   var pendingItem = localStorage.getItem('pendingCartItem');
   if (pendingItem) {
@@ -114,8 +182,8 @@ async function startPledgeFlow() {
       supportItems: supportItems.length > 0 ? supportItems : undefined,
       customAmount: customAmount > 0 ? customAmount : undefined,
       customerName,
-      phone
-      // billingAddress removed - Stripe Checkout collects real billing info
+      phone,
+      hasPhysical: cartHasPhysicalItems()
     };
     console.log('Starting pledge flow...', payload);
     
@@ -173,7 +241,7 @@ async function autofillBilling() {
   }
 }
 
-// Hide billing step and change payment step number to "1"
+// Hide billing step, hide step number circles, and clear shipping pre-fill
 function setupBillingHider() {
   const observer = new MutationObserver(() => {
     const snipcartRoot = document.querySelector('#snipcart');
@@ -194,26 +262,36 @@ function setupBillingHider() {
       }
     });
     
-    // Find payment step and change its number to 1
+    // Hide all step number circles/badges
     const stepNumbers = snipcartRoot.querySelectorAll('[class*="checkout-step"] [class*="__number"], .snipcart__box--badge');
     stepNumbers.forEach(numEl => {
-      if (numEl.textContent.trim() === '2' && !numEl.dataset.poolRenumbered) {
-        // Check if this is in a payment context
-        const parent = numEl.closest('[class*="checkout-step"]') || numEl.closest('[class*="snipcart__box"]');
-        const parentText = parent?.textContent || '';
-        if (parentText.includes('Payment') || parentText.includes('Pledge')) {
-          numEl.textContent = '1';
-          numEl.dataset.poolRenumbered = 'true';
-          console.log('Pool: Renumbered payment step to 1');
-        }
+      if (!numEl.dataset.poolHidden) {
+        numEl.style.display = 'none';
+        numEl.dataset.poolHidden = 'true';
+        console.log('Pool: Hidden step number', numEl.textContent.trim());
       }
     });
-    
-    // Debug: check if disabled-checkout-step is showing
-    const disabledStep = snipcartRoot.querySelector('[class*="disabled-checkout-step"]');
-    if (disabledStep && !disabledStep.dataset.poolLogged) {
-      disabledStep.dataset.poolLogged = 'true';
-      console.log('Pool: Found disabled checkout step:', disabledStep.textContent?.substring(0, 100));
+
+    // Clear shipping form fields that Snipcart pre-fills from billing dummy data
+    const shippingStep = Array.from(allSteps).find(step => {
+      const text = step.textContent || '';
+      const classes = step.className || '';
+      return (text.includes('Shipping') || classes.includes('shipping')) && !step.dataset.poolShippingCleared;
+    });
+    if (shippingStep) {
+      shippingStep.dataset.poolShippingCleared = 'true';
+      const inputs = shippingStep.querySelectorAll('input[type="text"], input[type="tel"], input[type="email"]');
+      inputs.forEach(input => {
+        const name = input.name || input.id || '';
+        // Don't clear the country field (US hack is handled by checkout-autofill.js)
+        if (name.includes('country')) return;
+        if (input.value) {
+          input.value = '';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+      console.log('Pool: Cleared shipping form pre-filled data');
     }
   });
   
@@ -223,7 +301,7 @@ function setupBillingHider() {
 function initSnipcart() {
   console.log('Snipcart ready - Pool pledge mode');
   
-  // Hide billing step and renumber payment to 1
+  // Hide billing step, step numbers, and clear shipping pre-fill
   setupBillingHider();
   
   // Auto-fill dummy billing on cart events
@@ -234,11 +312,12 @@ function initSnipcart() {
   // Also try to fill if cart already exists
   setTimeout(autofillBilling, 500);
   
-  // Auto-navigate past billing step - always skip to payment
+  // Auto-navigate past billing step
+  // If cart has physical items, go to shipping first; otherwise skip straight to payment
   Snipcart.events.on('page.changed', async (routesChange) => {
     // Skip billing step entirely
     if (routesChange.to === '/checkout/billing' || routesChange.to === '/checkout') {
-      console.log('Pool: Detected billing/checkout page, auto-filling and skipping to payment...');
+      console.log('Pool: Detected billing/checkout page, auto-filling and skipping...');
       
       // Fill billing and wait for it to be accepted
       try {
@@ -262,9 +341,11 @@ function initSnipcart() {
       }
       
       // Wait a bit for Snipcart to process, then navigate
+      const hasPhysical = cartHasPhysicalItems();
+      const nextStep = hasPhysical ? '/checkout/shipping' : '/checkout/payment';
       setTimeout(() => {
-        console.log('Pool: Navigating to payment...');
-        Snipcart.api.theme.cart.navigate('/checkout/payment');
+        console.log('Pool: Navigating to', nextStep, '(hasPhysical:', hasPhysical, ')');
+        Snipcart.api.theme.cart.navigate(nextStep);
       }, 200);
     }
   });
@@ -332,11 +413,40 @@ function initSnipcart() {
         break;
       }
     }
+    
+    // Also inject fee summary into side cart
+    scheduleFeeInjection();
   });
   
   observer.observe(document.body, { childList: true, subtree: true });
   
-  // Inject pledge notice into checkout/payment step
+  // Refresh fee summary when cart items change
+  Snipcart.events.on('item.added', scheduleFeeInjection);
+  Snipcart.events.on('item.updated', scheduleFeeInjection);
+  Snipcart.events.on('item.removed', scheduleFeeInjection);
+  
+  // Update header price immediately on load and on every state change
+  function updateHeaderPrice() {
+    const state = Snipcart.store.getState();
+    const snipcartTotal = state.cart.total || 0;
+    const count = state.cart.items.count || 0;
+    const hasPhysical = cartHasPhysicalItems();
+    const adjustedTotal = hasPhysical ? snipcartTotal + FLAT_SHIPPING_FEE / 100 : snipcartTotal;
+    
+    const headerPrice = document.querySelector('.snipcart-total-price');
+    if (headerPrice) {
+      headerPrice.textContent = '$' + adjustedTotal.toFixed(2);
+    }
+    
+    // Cache adjusted total so cart-icon.html can show it before Snipcart loads
+    try {
+      localStorage.setItem('pool_cart_cache', JSON.stringify({ total: adjustedTotal, count }));
+    } catch (e) {}
+  }
+  updateHeaderPrice();
+  Snipcart.store.subscribe(updateHeaderPrice);
+  
+  // Inject pledge notice and order summary into checkout/payment step
   const checkoutObserver = new MutationObserver(() => {
     const snipcartRoot = document.querySelector('#snipcart');
     if (!snipcartRoot) return;
@@ -362,6 +472,9 @@ function initSnipcart() {
         '<span style="display: inline;">You\'ll only be charged if the campaign reaches its goal.</span>';
       insertTarget.parentNode.insertBefore(notice, insertTarget);
     }
+    
+    // Inject shipping/tax rows into Snipcart's existing sidebar summary
+    scheduleFeeInjection();
   });
   
   checkoutObserver.observe(document.body, { childList: true, subtree: true });

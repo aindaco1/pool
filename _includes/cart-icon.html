@@ -26,22 +26,9 @@
     }
   } catch (e) {}
   
-  // Update cache when Snipcart loads and on cart changes
+  // Cache is now updated by cart.js updateHeaderPrice() which includes shipping
   document.addEventListener('snipcart.ready', function() {
     btn.classList.add('is-loaded');
-    
-    function updateCache() {
-      var state = Snipcart.store.getState();
-      var cart = state.cart;
-      if (cart) {
-        var total = cart.total || 0;
-        var count = cart.items.count || 0;
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ total: total, count: count }));
-      }
-    }
-    
-    updateCache();
-    Snipcart.store.subscribe(updateCache);
   });
 })();
 </script>

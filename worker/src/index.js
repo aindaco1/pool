@@ -47,6 +47,7 @@ import { triggerSiteRebuild } from './github.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 
 const ABQ_TAX_RATE = 0.07875; // 7.875% ABQ tax
+const FLAT_SHIPPING_FEE = 300; // $3 flat rate USPS shipping for physical items
 
 // Rate limit delay for Resend API (2 req/sec limit)
 const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
@@ -575,7 +576,7 @@ async function handleStart(request, env) {
 
   console.log('📥 /start called');
   const body = await request.json();
-  const { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty = 1, additionalTiers = [], supportItems = [], customAmount = 0, customerName, phone } = body;
+  const { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty = 1, additionalTiers = [], supportItems = [], customAmount = 0, customerName, phone, hasPhysical = false } = body;
   console.log('📥 /start payload:', { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty, additionalTiers, supportItems, customAmount });
 
   if (!orderId || !campaignSlug) {
@@ -684,7 +685,8 @@ async function handleStart(request, env) {
         tierName: tierName || '',
         tierQty: String(tierQty || 1),
         hasAdditionalTiers: additionalTiers.length > 0 ? 'true' : '',
-        hasExtras: (supportItems.length > 0 || customAmount > 0) ? 'true' : ''
+        hasExtras: (supportItems.length > 0 || customAmount > 0) ? 'true' : '',
+        hasPhysical: hasPhysical ? 'true' : ''
       }
     };
     
@@ -868,7 +870,7 @@ async function handleStripeWebhook(request, env, ctx) {
     const session = event.data.object;
     
     if (session.mode === 'setup') {
-      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, hasAdditionalTiers, hasExtras, isPaymentUpdate, snipcartPaymentSessionId, snipcartPublicToken } = session.metadata;
+      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, hasAdditionalTiers, hasExtras, hasPhysical, isPaymentUpdate, snipcartPaymentSessionId, snipcartPublicToken } = session.metadata;
       const tierQtyNum = parseInt(tierQty) || 1;
       const email = session.customer_email || session.customer_details?.email;
       let customerId = session.customer;
@@ -1035,6 +1037,7 @@ async function handleStripeWebhook(request, env, ctx) {
                         campaignTitle: pledgeCampaign.title || existingPledge.campaignSlug,
                         subtotal: existingPledge.subtotal || existingPledge.amount,
                         tax: existingPledge.tax || 0,
+                        shipping: existingPledge.shipping || 0,
                         amount: existingPledge.amount,
                         token: chargeToken,
                         hasDecisions: pledgeCampaign?.has_decisions === true,
@@ -1072,6 +1075,7 @@ async function handleStripeWebhook(request, env, ctx) {
           
           // New pledge - process it
           const subtotal = parseInt(amountCents) || 0;
+          const shipping = hasPhysical === 'true' ? FLAT_SHIPPING_FEE : 0;
           const tax = calculateTax(subtotal);
           const now = new Date().toISOString();
           const pledgeData = {
@@ -1086,7 +1090,8 @@ async function handleStripeWebhook(request, env, ctx) {
             customAmount: customAmount > 0 ? customAmount : undefined,
             subtotal,
             tax,
-            amount: subtotal + tax,
+            shipping,
+            amount: subtotal + tax + shipping,
             stripeCustomerId: customerId,
             stripePaymentMethodId: paymentMethodId,
             stripeSetupIntentId: setupIntentId,
@@ -1098,7 +1103,8 @@ async function handleStripeWebhook(request, env, ctx) {
               type: 'created',
               subtotal,
               tax,
-              amount: subtotal + tax,
+              shipping,
+              amount: subtotal + tax + shipping,
               tierId: tierId || null,
               tierQty: tierQtyNum,
               additionalTiers: additionalTiers.length > 0 ? additionalTiers : undefined,
@@ -1188,6 +1194,8 @@ async function handleStripeWebhook(request, env, ctx) {
             campaignSlug,
             campaignTitle,
             amount: parseInt(amountCents) || 0,
+            tax,
+            shipping: shipping || 0,
             token,
             instagramUrl: campaign?.instagram,
             hasDecisions: campaign?.has_decisions === true,
@@ -1253,6 +1261,7 @@ async function handleStripeWebhook(request, env, ctx) {
         campaignTitle,
         subtotal: pledgeData?.subtotal || pledgeData?.amount || 0,
         tax: pledgeData?.tax || 0,
+        shipping: pledgeData?.shipping || 0,
         amount: pledgeData?.amount || 0,
         token,
         pledgeItems: pledgeItemsForEmail
@@ -1416,6 +1425,7 @@ async function handleGetPledges(request, env) {
           pledgeStatus: pledgeData.pledgeStatus,
           subtotal: pledgeData.subtotal,
           tax: pledgeData.tax,
+          shipping: pledgeData.shipping || 0,
           amount: pledgeData.amount,
           tierId: pledgeData.tierId,
           tierName: pledgeData.tierName,
@@ -1716,9 +1726,29 @@ async function handleModifyPledge(request, env) {
     }
   }
 
-  // Calculate tax on new subtotal
+  // Recalculate shipping based on whether new tier selection includes physical items
+  const campaignTiers = campaign?.tiers || [];
+  let newHasPhysical = false;
+  if (hasAddTiersPayload && addTiers.length > 0) {
+    newHasPhysical = addTiers.some(t => {
+      const tierData = campaignTiers.find(ct => ct.id === t.id);
+      return tierData?.category === 'physical';
+    });
+  } else if (hasTierChange && newTier) {
+    newHasPhysical = newTier.category === 'physical';
+  } else {
+    // No tier change — check current tiers
+    const currentTierIds = [];
+    if (currentPledge?.tierId) currentTierIds.push(currentPledge.tierId);
+    if (currentPledge?.additionalTiers) currentPledge.additionalTiers.forEach(t => currentTierIds.push(t.id));
+    newHasPhysical = currentTierIds.some(id => {
+      const tierData = campaignTiers.find(ct => ct.id === id);
+      return tierData?.category === 'physical';
+    });
+  }
+  const newShipping = newHasPhysical ? FLAT_SHIPPING_FEE : 0;
   const newTax = calculateTax(newAmount);
-  const newAmountWithTax = newAmount + newTax;
+  const newAmountWithTax = newAmount + newTax + newShipping;
 
   // Track updated pledge data for email
   let updatedPledgeData = null;
@@ -1778,6 +1808,7 @@ async function handleModifyPledge(request, env) {
       const now = new Date().toISOString();
       pledgeData.subtotal = newAmount;
       pledgeData.tax = newTax;
+      pledgeData.shipping = newShipping;
       pledgeData.amount = newAmountWithTax;
       pledgeData.modifiedAt = now;
       pledgeData.updatedAt = now;
@@ -1938,6 +1969,8 @@ async function handleModifyPledge(request, env) {
         campaignTitle,
         previousSubtotal,
         newSubtotal: newAmount,
+        tax: newTax,
+        shipping: newShipping,
         token: emailToken,
         instagramUrl: campaign?.instagram,
         pledgeItems: pledgeItemsForEmail
@@ -2178,11 +2211,13 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           // Calculate combined subtotal and tax from all pledges
           let combinedSubtotal = 0;
           let combinedTax = 0;
+          let combinedShipping = 0;
           const combinedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
           
           for (const pledge of supporter.pledges) {
             combinedSubtotal += pledge.subtotal || pledge.amount || 0;
             combinedTax += pledge.tax || 0;
+            combinedShipping += pledge.shipping || 0;
             
             // Merge tier items
             if (pledge.tierName) {
@@ -2236,6 +2271,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
             campaignTitle,
             subtotal: combinedSubtotal,
             tax: combinedTax,
+            shipping: combinedShipping,
             amount: supporter.totalAmount,
             token,
             hasDecisions: campaign?.has_decisions === true,
@@ -2280,11 +2316,13 @@ async function settleCampaign(campaignSlug, env, options = {}) {
         // Calculate combined subtotal, tax, and items for failed payment email
         let failedSubtotal = 0;
         let failedTax = 0;
+        let failedShipping = 0;
         const failedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
         
         for (const pledge of supporter.pledges) {
           failedSubtotal += pledge.subtotal || pledge.amount || 0;
           failedTax += pledge.tax || 0;
+          failedShipping += pledge.shipping || 0;
           
           if (pledge.tierName) {
             if (!failedItems.tierName) {
@@ -2333,6 +2371,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           campaignTitle,
           subtotal: failedSubtotal,
           tax: failedTax,
+          shipping: failedShipping,
           amount: supporter.totalAmount,
           token,
           pledgeItems: failedItems
@@ -2687,10 +2726,12 @@ async function handleSettleBatch(request, env) {
 
           let combinedSubtotal = 0;
           let combinedTax = 0;
+          let combinedShipping = 0;
           const combinedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
           for (const pledge of data.pledges) {
             combinedSubtotal += pledge.subtotal || pledge.amount || 0;
             combinedTax += pledge.tax || 0;
+            combinedShipping += pledge.shipping || 0;
             if (pledge.tierName) {
               if (!combinedItems.tierName) {
                 combinedItems.tierName = pledge.tierName;
@@ -2712,7 +2753,7 @@ async function handleSettleBatch(request, env) {
 
           await sendChargeSuccessEmail(env, {
             email, campaignSlug, campaignTitle,
-            subtotal: combinedSubtotal, tax: combinedTax, amount: data.totalAmount,
+            subtotal: combinedSubtotal, tax: combinedTax, shipping: combinedShipping, amount: data.totalAmount,
             token,
             hasDecisions: campaign?.has_decisions === true,
             pledgeItems: combinedItems
@@ -2912,7 +2953,8 @@ async function handleTestSetup(request, env) {
       tierQty: firstTierQty,
       subtotal: subtotal,
       tax: tax,
-      amount: subtotal + tax,
+      shipping: 300,
+      amount: subtotal + tax + 300,
       customAmount: 0,
       supportItems: [],
       additionalTiers,
@@ -3568,6 +3610,8 @@ async function handleTestEmail(request, env) {
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
           amount: 5000,
+          tax: 394,
+          shipping: 300,
           token,
           instagramUrl,
           hasDecisions: campaign?.has_decisions === true,
@@ -3588,6 +3632,8 @@ async function handleTestEmail(request, env) {
           campaignTitle,
           previousSubtotal: 5000,
           newSubtotal: 10000,
+          tax: 788,
+          shipping: 300,
           token,
           instagramUrl,
           pledgeItems: {
@@ -3607,7 +3653,8 @@ async function handleTestEmail(request, env) {
           campaignTitle,
           subtotal: 10000,  // $100.00
           tax: 788,         // $7.88
-          amount: 10788,    // $107.88 total
+          shipping: 300,    // $3.00
+          amount: 11088,    // $110.88 total
           token,
           pledgeItems: {
             tierName: 'Test Tier',
@@ -3692,7 +3739,8 @@ async function handleTestEmail(request, env) {
           campaignTitle,
           subtotal: 10000,  // $100.00
           tax: 788,         // $7.88
-          amount: 10788,    // $107.88 total
+          shipping: 300,    // $3.00
+          amount: 11088,    // $110.88 total
           token,
           hasDecisions: campaign?.has_decisions === true,
           pledgeItems: {
@@ -4008,10 +4056,12 @@ async function handleRecoverCheckout(request, env) {
     const campaign = await getCampaign(env, campaignSlug);
     const campaignTitle = campaign?.title || campaignSlug;
 
-    // Calculate tax
+    // Calculate tax and shipping
+    const hasPhysical = metadata.hasPhysical === 'true';
     const subtotal = amountCents;
+    const shipping = hasPhysical ? FLAT_SHIPPING_FEE : 0;
     const tax = calculateTax(subtotal);
-    const amount = subtotal + tax;
+    const amount = subtotal + tax + shipping;
 
     // Fetch additional tiers if any
     let additionalTiers = [];
@@ -4030,6 +4080,7 @@ async function handleRecoverCheckout(request, env) {
       additionalTiers: additionalTiers.length > 0 ? additionalTiers : undefined,
       subtotal,
       tax,
+      shipping,
       amount,
       stripeCustomerId: customerId,
       stripePaymentMethodId: paymentMethodId,
@@ -4088,11 +4139,15 @@ async function handleRecoverCheckout(request, env) {
           campaignTitle,
           campaignSlug,
           amount: subtotal,
-          tierId,
-          tierName,
-          tierQty,
-          manageUrl,
-          hasDecisions: campaign?.has_decisions === true
+          tax,
+          shipping: shipping || 0,
+          token,
+          instagramUrl: campaign?.instagram,
+          hasDecisions: campaign?.has_decisions === true,
+          pledgeItems: {
+            tierName: tierName || null,
+            tierQty: tierQty || 1
+          }
         });
         pledge.emailSent = true;
       } catch (emailErr) {
