@@ -18,8 +18,11 @@ title: Terms & Creative Guidelines
 - Your card is saved securely by **Stripe** — we never see or store your payment details. No charge is made until the campaign succeeds.
 - If a campaign is funded, all pledges from the same email are combined into a single charge.
 - A 7.875% tax (ABQ rate) is applied to all pledges.
+- Physical product tiers include a flat $3 USPS shipping fee, collected at checkout. Your shipping address is securely collected via Stripe.
 
 ## Creative Control & Submissions
+
+This section applies only to campaigns that explicitly solicit creative submissions (e.g., naming rights, story ideas, custom messages). If a campaign does not include submission-based tiers, this section does not apply to your pledge.
 
 - You grant us a broad, irrevocable license to use submitted media/text in the production.
 - We retain creative discretion; unsafe, illegal, defamatory or unworkable instructions will be rejected.
@@ -31,7 +34,7 @@ title: Terms & Creative Guidelines
 - Fulfillment timing may adjust with production realities.
 - We will provide regular updates on production progress and delivery timelines.
 - Digital rewards will be delivered via email to the address provided during pledge.
-- Physical rewards (if applicable) will be shipped to the address you provide after the campaign succeeds.
+- Physical rewards are shipped to the address collected during checkout via USPS. A flat $3 shipping fee is included in your pledge total.
 
 ## Refunds & Cancellations
 
@@ -42,8 +45,8 @@ title: Terms & Creative Guidelines
 
 ## Privacy & Data
 
-- We collect only the information necessary to process pledges and fulfill rewards: email, name, and payment details.
-- Your payment information is stored securely by Stripe and is never accessible to us.
+- We collect only the information necessary to process pledges and fulfill rewards: email, name, and payment details. For physical product tiers, we also collect a shipping address via Stripe.
+- Your payment information and shipping address are stored securely by Stripe and are never accessible to us.
 - Email addresses are stored in our system for pledge management, confirmations, campaign updates, and reward fulfillment.
 - We do not sell or share your information with third parties except as necessary for payment processing and email delivery.
 
@@ -52,8 +55,9 @@ title: Terms & Creative Guidelines
 The Pool is an [open-source crowdfunding platform](https://github.com/aindaco1/pool) built with:
 
 - **Jekyll** — Static site generation, hosted on GitHub Pages
-- **Stripe** — Secure card storage and payment processing
-- **Cloudflare Workers** — Backend API for pledge storage, stats, and automated campaign settlement
+- **Snipcart v3** — Cart management and checkout experience
+- **Stripe** — Secure card storage, payment processing, and shipping address collection
+- **Cloudflare Workers** — Backend API for pledge storage, live stats, and automated campaign settlement
 - **Resend** — Transactional emails (confirmations, updates, charge notifications)
 
 Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project.
@@ -64,4 +68,4 @@ For questions about these terms or your pledge, email us at support@dustwave.xyz
 
 ---
 
-_Last updated: January 2026_
+_Last updated: February 2026_

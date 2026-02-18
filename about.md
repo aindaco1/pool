@@ -25,7 +25,7 @@ Just save that email. Those links are your keys.
 ## How It Works
 
 1. **Browse** — Find a project you want to support
-2. **Pledge** — Add tiers to your cart and complete checkout
+2. **Pledge** — Add tiers to your cart and complete checkout (physical items include a flat $3 USPS shipping fee)
 3. **Save card** — Stripe securely saves your payment method (no charge yet)
 4. **Wait** — Campaign runs until its deadline (all times in Mountain Time)
 5. **Result** — If funded, you're charged. If not, nothing happens.
@@ -36,6 +36,7 @@ Multiple pledges from the same email are combined into a single charge when the 
 
 The Pool is designed for filmmakers and creative projects with features like:
 
+- **Physical & digital tiers** — Offer tangible rewards with automatic shipping address collection and flat-rate USPS shipping
 - **Production phases** — Break your budget into phases supporters can fund directly
 - **Stretch goals** — Unlock additional creative possibilities as funding grows
 - **Community decisions** — Let your backers vote on creative choices
@@ -49,8 +50,9 @@ The Pool runs on a modern static architecture:
 | Layer | Platform | Role |
 |-------|----------|------|
 | Frontend | GitHub Pages | Jekyll static site |
-| Payments | Stripe | Card storage + off-session charges |
-| Backend | Cloudflare Worker | Pledge storage, stats, settlement |
+| Cart | Snipcart v3 | Cart management + checkout |
+| Payments | Stripe | Card storage, off-session charges, shipping address collection |
+| Backend | Cloudflare Worker | Pledge storage, live stats, settlement |
 | Email | Resend | Confirmations, updates, notifications |
 
 No database servers. No monthly hosting fees. Version-controlled and transparent.
