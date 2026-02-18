@@ -91,30 +91,30 @@
         // For live: count to end of deadline (23:59:59 MT)
         // Mountain Time: UTC-7 (MST) or UTC-6 (MDT)
         
-        function isMountainDST(date) {
-          var year = date.getFullYear();
-          // DST starts: 2nd Sunday in March at 2:00 AM
-          var mar1 = new Date(year, 2, 1);
-          var dstStart = new Date(year, 2, 8 + (7 - mar1.getDay()) % 7, 2, 0, 0);
-          // DST ends: 1st Sunday in November at 2:00 AM
-          var nov1 = new Date(year, 10, 1);
-          var dstEnd = new Date(year, 10, 1 + (7 - nov1.getDay()) % 7, 2, 0, 0);
-          return date >= dstStart && date < dstEnd;
-        }
-        
-        function getMTOffset(dateStr, timeStr) {
-          var testDate = new Date(dateStr + 'T' + timeStr + 'Z');
-          return isMountainDST(testDate) ? '-06:00' : '-07:00';
+        function getMTOffset(dateStr) {
+          // Use Intl to reliably determine MST vs MDT for any date
+          var parts = dateStr.split('-');
+          var y = parseInt(parts[0]), m = parseInt(parts[1]), d = parseInt(parts[2]);
+          var fmt = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Denver',
+            timeZoneName: 'short'
+          });
+          var tzParts = fmt.formatToParts(new Date(Date.UTC(y, m - 1, d, 19, 0, 0)));
+          var tz = '';
+          for (var i = 0; i < tzParts.length; i++) {
+            if (tzParts[i].type === 'timeZoneName') { tz = tzParts[i].value; break; }
+          }
+          return tz === 'MDT' ? '-06:00' : '-07:00';
         }
         
         var targetDate;
         if (state === 'upcoming' && startStr) {
           // Midnight MT start of start_date
-          var offset = getMTOffset(startStr, '07:00:00');
+          var offset = getMTOffset(startStr);
           targetDate = new Date(startStr + 'T00:00:00' + offset);
         } else {
           // End of deadline day (23:59:59 MT)
-          var offset = getMTOffset(deadlineStr, '06:59:59');
+          var offset = getMTOffset(deadlineStr);
           targetDate = new Date(deadlineStr + 'T23:59:59' + offset);
         }
         

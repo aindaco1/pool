@@ -30,7 +30,7 @@ All code is versioned and auditable — no external DB or CMS needed.
 
 1. **Visitor pledges** through Snipcart → Worker launches Stripe Checkout in “setup” mode.  
 2. **Stripe** saves a card, returning IDs to the Worker.  
-3. Worker stores pledge in **Cloudflare KV** (tiers, support items, custom amounts, Stripe IDs).  
+3. Worker stores pledge in **Cloudflare KV** (tiers, support items, custom amounts, shipping address, Stripe IDs).  
 4. **Worker cron** runs daily at midnight MT:  
    - Records heartbeat (`cron:lastRun` in KV) for monitoring.
    - Triggers site rebuild when `goal_deadline` passes (`live` → `post`).  
@@ -90,7 +90,7 @@ All code is versioned and auditable — no external DB or CMS needed.
 3. ✅ Cloudflare Worker deployed (`pledge.dustwave.xyz`) with Stripe + Snipcart secrets.  
 4. ✅ Stripe webhook configured → Worker `/webhooks/stripe`.  
 5. ✅ Repo secrets set: `STRIPE_SECRET_KEY`, `SNIPCART_SECRET`.  
-6. ✅ Daily Worker cron enabled (7 AM UTC / midnight MST) — check via `GET /admin/cron/status`.  
+6. ✅ Daily Worker cron enabled (7 AM UTC / midnight MT) — check via `GET /admin/cron/status`.  
 7. ✅ Cloudflare cache purge configured (requires CLOUDFLARE_ZONE, CLOUDFLARE_EMAIL, CLOUDFLARE_KEY secrets + CLOUDFLARE_ENABLED variable).  
 8. ✅ Test campaign runs end-to-end in Stripe test mode.
 
@@ -112,7 +112,8 @@ All code is versioned and auditable — no external DB or CMS needed.
 4. **Sass compilation**: Jekyll compiles `.scss` files automatically when `sass:` is configured in `_config.yml`.
 5. **Countdown pre-rendering**: Calculate initial values at build time (Jekyll) or render time (JS) to avoid "00 00 00 00" flash.
 6. **Support items data flow**: Cart.js extracts support items → Worker stores in temp KV → Webhook merges into final pledge.
+7. **DST-aware timezone handling**: All deadline logic (frontend countdown, Worker settlement, campaign state transitions) uses `Intl.DateTimeFormat` with `timeZone: 'America/Denver'` to detect MST vs MDT — never hardcode UTC offsets.
 
 ---
 
-_Last updated: Feb 16, 2026_
+_Last updated: Feb 17, 2026_

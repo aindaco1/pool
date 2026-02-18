@@ -9,6 +9,7 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 - **No accounts required** — Backers manage pledges via email magic links
 - **All-or-nothing pledging** — Cards saved now, charged only if goal is met
 - **Checkout autofill** — Auto-selects country, enables password manager autofill for address fields
+- **Physical & digital tiers** — Physical items trigger Stripe shipping address collection + $3 flat USPS fee
 - **Stretch goals** — Auto-unlock at funding thresholds
 - **Campaign lifecycle** — `pre` → `live` → `post` states with automatic transitions + Cloudflare cache purge
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
@@ -100,7 +101,7 @@ assets/
   │   ├── _utilities.scss     # Helper classes
   │   └── _snipcart-overrides.scss # Cart customization
   └── js/             # Client-side scripts
-      ├── cart.js             # Snipcart pledge flow (extracts tiers, support items, custom amounts)
+      ├── cart.js             # Snipcart pledge flow (tiers, support items, shipping detection)
       ├── campaign.js         # Phase tabs, toasts
       ├── buy-buttons.js      # Button handlers
       ├── checkout-autofill.js # Country/state autofill

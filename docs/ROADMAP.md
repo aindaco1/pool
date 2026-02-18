@@ -29,7 +29,11 @@
 - [x] Cloudflare Worker deployment (pledge storage, stats, inventory, emails)
 - [x] Worker cron trigger for auto-settle (midnight MT)
 - [x] Aggregated charging (one charge per supporter, not per pledge)
-- [x] Mountain Time deadline handling
+- [x] Mountain Time deadline handling (DST-aware via `Intl.DateTimeFormat` across frontend + Worker)
+- [x] Physical tier shipping ($3 flat USPS fee, address collection via Stripe Checkout)
+- [x] Snipcart shipping bypass (all items `shippable="false"`, `_category` custom field for physical detection)
+- [x] Email templates with full breakdown (subtotal, tax, shipping, total)
+- [x] Shipping in pledge reports (fulfillment + ledger CSVs)
 - [x] Live stats API (`/stats/:slug`)
 - [x] Tier inventory tracking (limited tiers)
 - [x] Milestone email notifications (1/3, 2/3, goal, stretch goals)

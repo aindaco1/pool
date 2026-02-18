@@ -8,6 +8,19 @@ let cachedCampaigns = null;
 let cacheTime = 0;
 const CACHE_TTL = 60 * 1000; // 1 minute
 
+// DST-aware Mountain Time deadline: end of day (23:59:59) on the given date
+function getDeadlineMT(dateString) {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Denver',
+    timeZoneName: 'short'
+  });
+  const parts = fmt.formatToParts(new Date(Date.UTC(year, month - 1, day, 19, 0, 0)));
+  const tzName = parts.find(p => p.type === 'timeZoneName')?.value;
+  const offset = tzName === 'MDT' ? 6 : 7;
+  return new Date(Date.UTC(year, month - 1, day, 23 + offset, 59, 59));
+}
+
 /**
  * Fetch campaigns from the site
  */
@@ -63,12 +76,9 @@ export function getEffectiveState(campaign) {
     }
   }
   
-  // Auto-transition live → post if deadline has passed (uses MT via deadline helper)
-  // Note: This is a simple check; the actual MT logic is in index.js
+  // Auto-transition live → post if deadline has passed (DST-aware Mountain Time)
   if (effectiveState === 'live' && campaign.goal_deadline) {
-    const deadline = new Date(campaign.goal_deadline + 'T23:59:59');
-    // Add 7 hours for MST (conservative)
-    deadline.setHours(deadline.getHours() + 7);
+    const deadline = getDeadlineMT(campaign.goal_deadline);
     if (now > deadline) {
       effectiveState = 'post';
     }
@@ -97,11 +107,9 @@ export async function isCampaignLive(env, slug) {
     return { valid: false, error: 'Campaign has already been charged' };
   }
 
-  // Check if deadline passed (in MT)
+  // Check if deadline passed (DST-aware Mountain Time)
   if (campaign.goal_deadline) {
-    const deadline = new Date(campaign.goal_deadline + 'T23:59:59');
-    // Add 7 hours for MST
-    deadline.setHours(deadline.getHours() + 7);
+    const deadline = getDeadlineMT(campaign.goal_deadline);
     if (new Date() > deadline) {
       return { valid: false, error: 'Campaign deadline has passed' };
     }

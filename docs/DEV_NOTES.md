@@ -39,10 +39,11 @@ assets/
 │   ├── _utilities.scss    # Helper classes
 │   └── _snipcart-overrides.scss  # Cart customization
 └── js/
-    ├── cart.js            # Pledge flow integration
+    ├── cart.js            # Pledge flow integration (shipping detection, fee injection)
     ├── checkout-autofill.js  # Country/state autofill for password managers
     ├── buy-buttons.js     # Button event handlers
     ├── campaign.js        # Phase tabs, toasts, interactive elements
+    ├── live-stats.js      # Real-time stats, inventory, tier unlocks, late support
     └── snipcart-debug.js  # Debug utilities
 ```
 
@@ -168,7 +169,7 @@ long_content:
 
 The `_plugins/campaign_state.rb` plugin sets state at build time. The Worker cron triggers a site rebuild when dates cross midnight MT.
 
-**Mountain Time enforcement**: The Jekyll plugin converts UTC to Mountain Time (UTC-7) before comparing dates, so campaigns don't end early on UTC-based CI servers. The Worker cron and GitHub Actions cron both run at 7 AM UTC (midnight MST) to trigger state transitions.
+**Mountain Time enforcement**: The Jekyll plugin converts UTC to Mountain Time before comparing dates, so campaigns don't end early on UTC-based CI servers. The Worker cron and GitHub Actions cron both run at 7 AM UTC (midnight MT) to trigger state transitions.
 
 ### Countdown Timer Timezone
 
@@ -176,11 +177,9 @@ The campaign page countdown timer uses **Mountain Time (MT)** with automatic DST
 - **Upcoming campaigns**: Count down to midnight MT (00:00:00) on the `start_date`
 - **Live campaigns**: Count down to 11:59:59 PM MT on the `goal_deadline`
 
-The timer automatically uses:
-- **MST (UTC-7)**: November → March
-- **MDT (UTC-6)**: March → November
+The timer uses `Intl.DateTimeFormat` with `timeZone: 'America/Denver'` and `timeZoneName: 'short'` to detect whether each date falls in MST (UTC-7) or MDT (UTC-6), then applies the correct offset. This approach works from any user timezone and automatically follows US DST rules without hardcoding transition dates.
 
-DST transitions are calculated based on US rules (2nd Sunday in March, 1st Sunday in November).
+The Worker (`worker/src/index.js` and `worker/src/campaigns.js`) uses the same `Intl`-based approach for deadline enforcement and settlement timing.
 
 ### Countdown Pre-Rendering
 
@@ -260,6 +259,7 @@ tiers:
     name: Buy 1 Frame
     price: 5
     description: Sponsor a frame.
+    category: physical       # physical | digital (default: digital)
     fields:
       - { name: "Preferred frame number", type: "text", required: true }
 
@@ -271,6 +271,8 @@ tiers:
 ```
 
 **Tier gating**: Add `requires_threshold` (integer, dollars) to lock a tier until the campaign reaches that funding level. When live stats update and `pledgedAmount >= requires_threshold`, the tier animates to "Unlocked!" state with a badge. The animation respects `prefers-reduced-motion`.
+
+**Physical tiers**: Set `category: physical` to trigger shipping address collection via Stripe Checkout and add a $3 flat shipping fee (USPS). The `_category` custom field is passed through Snipcart as a hidden field. All items are set to `shippable="false"` in Snipcart to bypass its native shipping — address collection is handled entirely by Stripe.
 
 ### Production Phases
 
@@ -440,6 +442,8 @@ The cart can include:
 **Manage page display:**
 - During **live** campaigns: ALL support items are shown for modification
 - During **post** campaigns: Only items with `late_support: true` are shown (and only if funded)
+- Pledge summary shows full breakdown: subtotal, tax, shipping (if physical tier), total
+- Modifying tiers dynamically recalculates shipping based on tier `category` (physical → $3 fee, digital → no fee)
 
 ## Local Development
 
@@ -698,7 +702,7 @@ Generate CSV reports of pledges from Cloudflare KV:
 - Modified pledges: 2+ rows (created + modification deltas)
 - Cancelled pledges: 2 rows (created + cancellation with negative amounts)
 
-**Output columns:** email, campaign, items, subtotal, tax, total, status, charged, created_at, order_id
+**Output columns:** email, campaign, items, subtotal, tax, shipping, total, status, charged, created_at, order_id
 
 **Status values:**
 - `created` — Initial pledge creation (items show full tier list)
@@ -748,7 +752,7 @@ Generate aggregated reports showing the **current state** of each backer's pledg
 
 **Output format:** One row per unique email + campaign combination. Multiple pledges from the same backer are aggregated.
 
-**Output columns:** email, campaign, items, subtotal, tax, total
+**Output columns:** email, campaign, items, subtotal, tax, shipping, total, shipping_address
 
 **Key differences from pledge-report.sh:**
 - Shows **current tier state** (not history)
@@ -757,6 +761,7 @@ Generate aggregated reports showing the **current state** of each backer's pledg
 - **Excludes** custom support (only shows deliverable items)
 - **No** status, created_at, or order_id columns
 - Items show final quantities (e.g., if backer modified from frame→dialogue, only dialogue appears)
+- Includes `shipping_address` for physical tier fulfillment
 
 **Use cases:**
 - Fulfillment spreadsheets (what rewards to deliver to each backer)
@@ -1231,4 +1236,4 @@ curl -s https://pledge.dustwave.xyz/admin/cron/status \
 
 ---
 
-_Last updated: Feb 2026_
+_Last updated: Feb 17, 2026_

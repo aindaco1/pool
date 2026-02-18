@@ -77,13 +77,15 @@ Pledges are stored in Cloudflare KV (not Snipcart). Key patterns:
   "customAmount": 25,
   "subtotal": 5000,
   "tax": 394,
-  "amount": 5394,
+  "shipping": 300,
+  "amount": 5694,
+  "shippingAddress": { "name": "Jane Doe", "address1": "123 Main St", "city": "Albuquerque", "province": "NM", "postalCode": "87101", "country": "US" },
   "stripeCustomerId": "cus_xxx",
   "stripePaymentMethodId": "pm_xxx",
   "pledgeStatus": "active",
   "charged": false,
   "history": [
-    { "type": "created", "subtotal": 5000, "tax": 394, "amount": 5394, "tierId": "producer-credit", "tierQty": 1, "customAmount": 25, "at": "2026-01-15T12:00:00Z" }
+    { "type": "created", "subtotal": 5000, "tax": 394, "shipping": 300, "amount": 5694, "tierId": "producer-credit", "tierQty": 1, "customAmount": 25, "at": "2026-01-15T12:00:00Z" }
   ]
 }
 ```
@@ -98,7 +100,8 @@ Each history entry tracks a pledge event with full context:
 - `type` — `created`, `modified`, or `cancelled`
 - `subtotal` / `subtotalDelta` — Pre-tax amount (or delta for modifications)
 - `tax` / `taxDelta` — Tax amount (or delta)
-- `amount` / `amountDelta` — Total with tax (or delta)
+- `amount` / `amountDelta` — Total with tax + shipping (or delta)
+- `shipping` / `shippingDelta` — Flat shipping fee (or delta, for tier category changes)
 - `tierId`, `tierQty`, `additionalTiers` — Tier state after this event
 - `customAmount` — Custom support amount (if present)
 - `at` — ISO timestamp
@@ -143,6 +146,7 @@ Create Stripe Checkout session (setup mode) after Snipcart order.
   "tiers": [{ "id": "producer-credit", "qty": 1, "price": 50 }],
   "supportItems": [{ "id": "location-scouting", "amount": 25 }],
   "customAmount": 10,
+  "hasPhysical": true,
   "subtotal": 8500,
   "tax": 669
 }
@@ -150,16 +154,17 @@ Create Stripe Checkout session (setup mode) after Snipcart order.
 **Response:** `{ url }` → Redirect to Stripe Checkout
 
 **Data flow:**
-1. Cart.js extracts tiers, support items, and custom amount from Snipcart cart
+1. Cart.js extracts tiers, support items, custom amount, and physical item flag from Snipcart cart
 2. Worker stores `supportItems` and `customAmount` in temp KV key (`pending-extras:{orderId}`)
-3. Worker sets `hasExtras` flag in Stripe Checkout metadata
-4. On webhook, Worker fetches extras from temp KV and merges into final pledge
+3. Worker sets `hasExtras` and `hasPhysical` flags in Stripe Checkout metadata
+4. If `hasPhysical`, Stripe Checkout collects shipping address via `shipping_address_collection`
+5. On webhook, Worker fetches extras from temp KV, extracts shipping address from Stripe session, and merges into final pledge
 
 ### `POST /webhooks/stripe`
 Handle `checkout.session.completed`:
 - Extract `payment_method` and `customer` from SetupIntent
 - Fetch `supportItems` and `customAmount` from temp KV (if `hasExtras` flag set)
-- Store pledge in KV with status `active` (includes support items and custom amount)
+- Store pledge in KV with status `active` (includes support items, custom amount, shipping fee, and shipping address)
 - Update live stats (pledgedAmount, tierCounts, supportItems)
 - Claim tier inventory (for limited tiers)
 - Generate magic link token
@@ -288,6 +293,7 @@ Magic link landing page for pledge management:
 - Reads `?t=...` token
 - Fetches pledge details from Worker
 - Shows pledge cards with state-dependent UI
+- Displays full breakdown: subtotal, tax (7.875%), shipping ($3 if physical), total
 
 **Pledge card states:**
 
@@ -298,6 +304,8 @@ Magic link landing page for pledge management:
 | `charged` | Muted card, "✓ Successfully charged on {date}" notice |
 | `payment_failed` | Warning notice with "Update Payment Method" button |
 | `cancelled` | "This pledge has been cancelled" notice |
+
+**Shipping in modify flow:** When a supporter changes tiers, the manage page dynamically recalculates shipping — if the new tier selection includes any `category: physical` tier, the $3 shipping fee is shown; otherwise it's hidden. The confirmation modal shows the updated total before the user confirms.
 
 **Dev mode:** Add `?dev` to URL for mock pledge data testing
 
@@ -314,7 +322,7 @@ Supporter-only community page:
 
 ## Charging Flow (Worker Cron)
 
-The Worker has a scheduled trigger that runs daily at **7:00 AM UTC** (midnight Mountain Standard Time):
+The Worker has a scheduled trigger that runs daily at **7:00 AM UTC** (midnight Mountain Time):
 
 ```toml
 # wrangler.toml
@@ -351,7 +359,7 @@ A per-campaign array of order IDs (`campaign-pledges:{slug}`) is maintained auto
 
 **Key behaviors:**
 - Cancelled pledges are never charged
-- Multiple pledges from same email = one aggregated charge
+- Multiple pledges from same email = one aggregated charge (subtotals + shipping summed)
 - Uses the most recently updated payment method for each supporter
 - Already-charged pledges are safely skipped (idempotent)
 - Can be triggered manually via `POST /admin/settle-dispatch/:slug`
@@ -424,27 +432,25 @@ All emails show exact amounts with 2 decimal places (no rounding).
 
 **Pledge Confirmation** (sent after Stripe SetupIntent success)
 - Subject: "Your pledge to {Campaign Title}"
-- Contains: Subtotal (pre-tax), pledge items (tiers × qty, support items, custom amount), manage link, community link
+- Contains: Full breakdown (subtotal, tax, shipping if physical, total), pledge items, manage link, community link
 - Includes: Instagram CTA (if campaign has Instagram URL)
 - Community link shown only if campaign has active decisions
-- Note: "Tax will be added at time of charge"
 
 **Pledge Modified** (sent when supporter changes their pledge)
 - Subject: "Pledge updated for {Campaign Title}"
-- Contains: Previous subtotal, new subtotal, change amount (+/-), updated pledge items
+- Contains: Previous subtotal, new subtotal, change amount (+/-), tax, shipping (if physical), new total, updated pledge items
 - Includes: Instagram CTA (if campaign has Instagram URL)
 - Community link shown only if campaign has active decisions
-- Note: "Tax will be added at time of charge"
 
 **Charge Success** (sent when pledge is charged at settlement)
 - Subject: "Payment confirmed for {Campaign Title}"
-- Contains: Full breakdown (subtotal + tax + total charged), pledge items
+- Contains: Full breakdown (subtotal + tax + shipping + total charged), pledge items
 - Community link shown only if campaign has active decisions
 - Note: No Instagram CTA (campaign is over)
 
 **Payment Failed** (sent when off-session charge fails)
 - Subject: "Action needed: Update payment for {Campaign Title}"
-- Contains: Full breakdown (subtotal + tax + amount due), pledge items, manage link to update card
+- Contains: Full breakdown (subtotal + tax + shipping + amount due), pledge items, manage link to update card
 - Note: No Instagram CTA (campaign is over)
 
 **Pledge Cancelled** (sent when supporter cancels their pledge)
@@ -488,4 +494,4 @@ All emails show exact amounts with 2 decimal places (no rounding).
 
 ---
 
-_Last updated: Feb 16, 2026_
+_Last updated: Feb 17, 2026_

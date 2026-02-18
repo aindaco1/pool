@@ -218,14 +218,25 @@ function requireAdmin(request, env) {
 }
 
 // Mountain Time offset: -7 hours (MST) or -6 hours (MDT)
-// Returns deadline as end of day (23:59:59) in Mountain Time
-function getDeadlineMT(dateString) {
-  // Parse date as YYYY-MM-DD and treat as Mountain Time
-  // Add 7 hours to convert MT midnight to UTC (conservative: uses MST year-round)
+// Returns deadline as end of day (23:59:59) in Mountain Time, DST-aware
+function getMTOffset(dateString) {
+  // Use Intl to determine if a date falls in MST (-7) or MDT (-6)
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Denver',
+    timeZoneName: 'short'
+  });
+  // Check the target date at noon to avoid edge cases
   const [year, month, day] = dateString.split('-').map(Number);
-  // End of day in MT = 23:59:59 MT = next day 06:59:59 UTC (MST) or 05:59:59 UTC (MDT)
-  // Using MST (UTC-7) to be conservative - campaigns end at 11:59:59 PM MST
-  return new Date(Date.UTC(year, month - 1, day, 23 + 7, 59, 59));
+  const parts = fmt.formatToParts(new Date(Date.UTC(year, month - 1, day, 19, 0, 0))); // noon MT ≈ 19:00 UTC
+  const tzName = parts.find(p => p.type === 'timeZoneName')?.value;
+  return tzName === 'MDT' ? 6 : 7;
+}
+
+function getDeadlineMT(dateString) {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const offset = getMTOffset(dateString);
+  // End of day in MT = 23:59:59 MT = next day (23+offset):59:59 UTC
+  return new Date(Date.UTC(year, month - 1, day, 23 + offset, 59, 59));
 }
 
 // Check if we're past the deadline in Mountain Time
