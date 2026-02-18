@@ -36,7 +36,8 @@ describe('Webhook Security Tests', () => {
             campaignSlug: TEST_CAMPAIGNS.valid,
             amountCents: '9999999', // Attacker tries to create huge pledge
             tierId: 'frame',
-            tierName: 'Malicious Tier'
+            tierName: 'Malicious Tier',
+            hasPhysical: 'true'
           }
         }
       }
@@ -227,6 +228,56 @@ describe('Webhook Security Tests', () => {
       if (PROD_MODE) {
         expect([401, 500]).toContain(res.status);
       }
+    });
+  });
+
+  describe('Shipping Address Injection via Webhook', () => {
+    it('should reject forged webhook with malicious shipping_details', async () => {
+      const eventWithShipping = {
+        id: 'evt_fake_shipping_123',
+        type: 'checkout.session.completed',
+        livemode: false,
+        data: {
+          object: {
+            id: 'cs_fake_shipping',
+            mode: 'setup',
+            customer: 'cus_fake',
+            customer_email: 'attacker@evil.com',
+            setup_intent: 'seti_fake',
+            shipping_details: {
+              name: '<script>alert(1)</script>',
+              address: {
+                line1: "'; DROP TABLE pledges; --",
+                line2: '{{constructor.constructor("alert(1)")()}}',
+                city: '../../../etc/passwd',
+                state: 'NM',
+                postal_code: '87101',
+                country: 'US'
+              }
+            },
+            metadata: {
+              orderId: 'malicious-shipping-order',
+              campaignSlug: TEST_CAMPAIGNS.valid,
+              amountCents: '500',
+              tierId: 'owl-sticker',
+              tierName: 'Owl Sticker',
+              hasPhysical: 'true'
+            }
+          }
+        }
+      };
+
+      const payload = JSON.stringify(eventWithShipping);
+      const res = await securityFetch('/webhooks/stripe', {
+        method: 'POST',
+        headers: {
+          'stripe-signature': generateFakeStripeSignature(payload)
+        },
+        body: payload
+      });
+
+      // Should fail signature verification - no shipping address stored
+      expect(res.status).toBe(401);
     });
   });
 

@@ -19,6 +19,16 @@ interface Pledge {
   amount: number;
   subtotal: number;
   tax: number;
+  shipping: number;
+  shippingAddress?: {
+    name: string;
+    address1: string;
+    address2: string;
+    city: string;
+    province: string;
+    postalCode: string;
+    country: string;
+  };
   pledgeStatus: 'active' | 'cancelled' | 'charged' | 'payment_failed';
   charged: boolean;
   chargedAt?: string;
@@ -63,6 +73,7 @@ function createMockPledge(overrides: Partial<Pledge> = {}): Pledge {
     amount: 10800, // $100 + tax
     subtotal: 10000,
     tax: 800,
+    shipping: 0,
     pledgeStatus: 'active',
     charged: false,
     stripeCustomerId: 'cus_test123',
@@ -673,7 +684,17 @@ describe('Full settlement flow', () => {
       createMockPledge({
         orderId: 'order-3',
         email: 'bob@test.com',
-        amount: 26900,
+        amount: 27200, // $250 + tax + shipping
+        shipping: 300,
+        shippingAddress: {
+          name: 'Bob Smith',
+          address1: '456 Oak Ave',
+          address2: 'Suite 200',
+          city: 'Denver',
+          province: 'CO',
+          postalCode: '80202',
+          country: 'US',
+        },
         campaignSlug: 'funded-campaign',
       }),
     ];
@@ -732,7 +753,7 @@ describe('Full settlement flow', () => {
     // Verify results
     expect(results.supportersCharged).toBe(2); // Alice and Bob
     expect(results.pledgesCharged).toBe(3); // 2 from Alice, 1 from Bob
-    expect(results.totalCharged).toBe(43100); // $100 + $50 + $250 + tax
+    expect(results.totalCharged).toBe(43400); // $100 + $50 + $250 + tax + shipping
     
     // Verify Stripe was called correctly
     expect(stripe.paymentIntents.create).toHaveBeenCalledTimes(2);
@@ -747,9 +768,138 @@ describe('Full settlement flow', () => {
     // Bob's charge
     expect(stripe.paymentIntents.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        amount: 26900, // $250 + tax
+        amount: 27200, // $250 + tax + shipping
       })
     );
+  });
+});
+
+// =============================================================================
+// Shipping in Settlement
+// =============================================================================
+
+describe('Shipping in settlement', () => {
+  it('should aggregate shipping fees when charging multiple pledges per supporter', async () => {
+    const email = 'supporter@example.com';
+    const kv = createMockKV({
+      'pledge:order-1': JSON.stringify(createMockPledge({
+        orderId: 'order-1',
+        email,
+        amount: 11100, // $100 + tax + shipping ($3)
+        shipping: 300,
+        campaignSlug: 'test-campaign',
+      })),
+      'pledge:order-2': JSON.stringify(createMockPledge({
+        orderId: 'order-2',
+        email,
+        amount: 5400, // $50 + tax, no shipping
+        shipping: 0,
+        campaignSlug: 'test-campaign',
+      })),
+    });
+
+    const list = await kv.list({ prefix: 'pledge:' });
+    const pledgesByEmail: Record<string, { pledges: Pledge[]; totalAmount: number }> = {};
+
+    for (const key of list.keys) {
+      const pledge = await kv.get(key.name, { type: 'json' }) as Pledge;
+      if (pledge.pledgeStatus === 'active' && !pledge.charged) {
+        const normalizedEmail = pledge.email.toLowerCase();
+        if (!pledgesByEmail[normalizedEmail]) {
+          pledgesByEmail[normalizedEmail] = { pledges: [], totalAmount: 0 };
+        }
+        pledgesByEmail[normalizedEmail].pledges.push(pledge);
+        pledgesByEmail[normalizedEmail].totalAmount += pledge.amount;
+      }
+    }
+
+    expect(Object.keys(pledgesByEmail).length).toBe(1);
+    expect(pledgesByEmail[email].pledges.length).toBe(2);
+    expect(pledgesByEmail[email].totalAmount).toBe(16500); // 11100 + 5400
+  });
+
+  it('should include shipping address in pledge record', async () => {
+    const kv = createMockKV();
+    const shippingAddress = {
+      name: 'Jane Doe',
+      address1: '123 Main St',
+      address2: 'Apt 4B',
+      city: 'Boulder',
+      province: 'CO',
+      postalCode: '80301',
+      country: 'US',
+    };
+
+    const pledge = createMockPledge({
+      orderId: 'order-ship-1',
+      shipping: 300,
+      shippingAddress,
+    });
+    await kv.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
+
+    const stored = await kv.get('pledge:order-ship-1', { type: 'json' }) as Pledge;
+    expect(stored.shippingAddress).toBeDefined();
+    expect(stored.shippingAddress!.name).toBe('Jane Doe');
+    expect(stored.shippingAddress!.address1).toBe('123 Main St');
+    expect(stored.shippingAddress!.address2).toBe('Apt 4B');
+    expect(stored.shippingAddress!.city).toBe('Boulder');
+    expect(stored.shippingAddress!.province).toBe('CO');
+    expect(stored.shippingAddress!.postalCode).toBe('80301');
+    expect(stored.shippingAddress!.country).toBe('US');
+  });
+
+  it('should handle pledge with no shipping (digital only)', async () => {
+    const email = 'digital@example.com';
+    const kv = createMockKV({
+      'pledge:order-d1': JSON.stringify(createMockPledge({
+        orderId: 'order-d1',
+        email,
+        amount: 10800,
+        shipping: 0,
+        campaignSlug: 'test-campaign',
+      })),
+    });
+
+    const list = await kv.list({ prefix: 'pledge:' });
+    const pledgesByEmail: Record<string, { pledges: Pledge[]; totalAmount: number }> = {};
+
+    for (const key of list.keys) {
+      const pledge = await kv.get(key.name, { type: 'json' }) as Pledge;
+      if (pledge.pledgeStatus === 'active' && !pledge.charged) {
+        const normalizedEmail = pledge.email.toLowerCase();
+        if (!pledgesByEmail[normalizedEmail]) {
+          pledgesByEmail[normalizedEmail] = { pledges: [], totalAmount: 0 };
+        }
+        pledgesByEmail[normalizedEmail].pledges.push(pledge);
+        pledgesByEmail[normalizedEmail].totalAmount += pledge.amount;
+      }
+    }
+
+    expect(pledgesByEmail[email].pledges.length).toBe(1);
+    expect(pledgesByEmail[email].pledges[0].shipping).toBe(0);
+    expect(pledgesByEmail[email].pledges[0].shippingAddress).toBeUndefined();
+    expect(pledgesByEmail[email].totalAmount).toBe(10800);
+  });
+
+  it('should correctly calculate total for physical pledge: subtotal + tax + shipping', () => {
+    const subtotal = 2500; // $25
+    const tax = Math.round(subtotal * 0.07875); // 197
+    const shipping = 300; // $3
+    const amount = subtotal + tax + shipping; // 2997
+
+    expect(tax).toBe(197);
+    expect(amount).toBe(2997);
+
+    const pledge = createMockPledge({
+      orderId: 'order-phys-1',
+      subtotal,
+      tax,
+      shipping,
+      amount,
+    });
+
+    expect(pledge.amount).toBe(pledge.subtotal + pledge.tax + pledge.shipping);
+    expect(pledge.amount).toBe(2997);
   });
 });
 

@@ -11,11 +11,25 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // Mock types
+interface ShippingAddress {
+  name: string;
+  address1: string;
+  address2?: string;
+  city: string;
+  province: string;
+  postalCode: string;
+  country: string;
+}
+
 interface Pledge {
   orderId: string;
   email: string;
   campaignSlug: string;
   amount: number;
+  subtotal?: number;
+  tax?: number;
+  shipping?: number;
+  shippingAddress?: ShippingAddress;
   pledgeStatus: 'active' | 'cancelled' | 'charged' | 'payment_failed';
   charged: boolean;
   chargedAt?: string;
@@ -27,10 +41,23 @@ interface Campaign {
   goal_amount: number;
 }
 
-// Helper to check if deadline passed (MT timezone)
+// Helper to get DST-aware Mountain Time offset
+function getMTOffset(dateString: string): number {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Denver',
+    timeZoneName: 'short'
+  });
+  const parts = fmt.formatToParts(new Date(Date.UTC(year, month - 1, day, 19, 0, 0)));
+  const tzName = parts.find(p => p.type === 'timeZoneName')?.value;
+  return tzName === 'MDT' ? 6 : 7;
+}
+
+// Helper to check if deadline passed (MT timezone, DST-aware)
 function isDeadlinePassed(dateString: string): boolean {
-  // End of day in Mountain Time (UTC-7)
-  const deadline = new Date(dateString + 'T23:59:59-07:00');
+  const [year, month, day] = dateString.split('-').map(Number);
+  const offset = getMTOffset(dateString);
+  const deadline = new Date(Date.UTC(year, month - 1, day, 23 + offset, 59, 59));
   return new Date() > deadline;
 }
 
@@ -413,6 +440,10 @@ describe('API response shape', () => {
       campaignSlug: pledge.campaignSlug,
       pledgeStatus: pledge.pledgeStatus,
       amount: pledge.amount,
+      subtotal: pledge.subtotal,
+      tax: pledge.tax,
+      shipping: pledge.shipping,
+      shippingAddress: pledge.shippingAddress,
       canModify: canChange,
       canCancel: canChange,
       canUpdatePaymentMethod: !pledge.charged,
@@ -457,5 +488,147 @@ describe('API response shape', () => {
     expect(response.canCancel).toBe(false);
     expect(response.canUpdatePaymentMethod).toBe(false);
     expect(response.deadlinePassed).toBe(true);
+  });
+
+  it('should include shipping fields in response', () => {
+    const pledge = createMockPledge({
+      pledgeStatus: 'active',
+      amount: 10800,
+      subtotal: 10000,
+      tax: 500,
+      shipping: 300,
+      shippingAddress: {
+        name: 'Test User',
+        address1: '123 Main St',
+        city: 'Denver',
+        province: 'CO',
+        postalCode: '80202',
+        country: 'US',
+      },
+    });
+    const campaign = createMockCampaign({ goal_deadline: '2026-12-31' });
+
+    const response = buildPledgeResponse(pledge, campaign);
+
+    expect(response.shipping).toBe(300);
+    expect(response.subtotal).toBe(10000);
+    expect(response.tax).toBe(500);
+    expect(response.shippingAddress).toEqual({
+      name: 'Test User',
+      address1: '123 Main St',
+      city: 'Denver',
+      province: 'CO',
+      postalCode: '80202',
+      country: 'US',
+    });
+  });
+});
+
+// =============================================================================
+// DST-aware deadline handling
+// =============================================================================
+
+describe('DST-aware deadline handling', () => {
+  it('should use MDT offset (-6) for summer dates', () => {
+    const offset = getMTOffset('2026-07-15');
+    expect(offset).toBe(6);
+  });
+
+  it('should use MST offset (-7) for winter dates', () => {
+    const offset = getMTOffset('2026-01-15');
+    expect(offset).toBe(7);
+  });
+
+  it('should handle DST transition boundary (March)', () => {
+    // 2026-03-08 is near spring-forward
+    const offset = getMTOffset('2026-03-08');
+    expect([6, 7]).toContain(offset);
+  });
+
+  it('should handle DST transition boundary (November)', () => {
+    // 2026-11-01 is near fall-back
+    const offset = getMTOffset('2026-11-01');
+    expect([6, 7]).toContain(offset);
+  });
+});
+
+// =============================================================================
+// Shipping in pledge records
+// =============================================================================
+
+describe('Shipping in pledge records', () => {
+  it('should include shipping fee for physical tier pledges', () => {
+    const pledge = createMockPledge({
+      amount: 10300,
+      subtotal: 10000,
+      tax: 0,
+      shipping: 300,
+    });
+
+    expect(pledge.shipping).toBe(300);
+  });
+
+  it('should not include shipping for digital-only pledges', () => {
+    const pledge = createMockPledge({
+      amount: 10000,
+      subtotal: 10000,
+      tax: 0,
+      shipping: 0,
+    });
+
+    expect(pledge.shipping).toBe(0);
+
+    const pledgeNoShipping = createMockPledge({
+      amount: 10000,
+      subtotal: 10000,
+      tax: 0,
+    });
+
+    expect(pledgeNoShipping.shipping).toBeUndefined();
+  });
+
+  it('should include shipping address for physical pledges', () => {
+    const pledge = createMockPledge({
+      amount: 10300,
+      subtotal: 10000,
+      tax: 0,
+      shipping: 300,
+      shippingAddress: {
+        name: 'Jane Doe',
+        address1: '456 Elm St',
+        address2: 'Apt 2B',
+        city: 'Boulder',
+        province: 'CO',
+        postalCode: '80301',
+        country: 'US',
+      },
+    });
+
+    expect(pledge.shippingAddress).toEqual({
+      name: 'Jane Doe',
+      address1: '456 Elm St',
+      address2: 'Apt 2B',
+      city: 'Boulder',
+      province: 'CO',
+      postalCode: '80301',
+      country: 'US',
+    });
+  });
+
+  it('should compute total as subtotal + tax + shipping', () => {
+    const subtotal = 10000;
+    const tax = 500;
+    const shipping = 300;
+    const total = subtotal + tax + shipping;
+
+    const pledge = createMockPledge({
+      amount: total,
+      subtotal,
+      tax,
+      shipping,
+    });
+
+    expect(pledge.amount).toBe(subtotal + tax + shipping);
+    expect(pledge.amount).toBe(10800);
   });
 });

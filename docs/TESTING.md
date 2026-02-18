@@ -26,7 +26,10 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | Module | Functions Tested |
 |--------|-----------------|
 | `live-stats.js` | `formatMoney`, `updateProgressBar`, `updateMarkerState`, `checkTierUnlocks`, `checkLateSupport`, `updateSupportItems`, `updateTierInventory` |
-| `settlement` | Charge aggregation, payment success/failure, retry flow, dry-run mode, edge cases, batched settlement, campaign pledge index, settlement dispatch, cron heartbeat |
+| `pledge-management` | DST-aware deadline enforcement (MST/MDT via Intl), cancel/modify/payment-method validation, pledge status transitions, multi-campaign independence, shipping in pledge records, API response shape |
+| `settlement` | Charge aggregation (including shipping fees), payment success/failure, retry flow, dry-run mode, edge cases, batched settlement, campaign pledge index, settlement dispatch, shipping in settlement, cron heartbeat |
+| `email-broadcasts` | Diary excerpt extraction, diary/milestone tracking helpers, milestone checking logic, rate limiting |
+| `votes` | Email-based vote storage/dedup, vote status retrieval, campaign results, result aggregation |
 
 ### Running
 
@@ -56,7 +59,7 @@ describe('myFunction', () => {
 
 Browser-based tests for full user flows in `tests/e2e/`.
 
-### Coverage (33 tests + 1 manual)
+### Coverage (36 tests + 1 manual)
 
 **Campaign Page Structure:**
 - Required page elements (hero, sidebar, progress bar)
@@ -69,6 +72,11 @@ Browser-based tests for full user flows in `tests/e2e/`.
 - Inventory display for limited tiers
 - Gated tier locked state and unlock badge
 - Disabled states on non-live campaigns
+
+**Physical Products & Shipping:**
+- `_category` custom field (physical/digital) on tier buttons
+- Physical tier buttons set `shippable="false"` (Snipcart bypass)
+- Digital-only campaigns have no physical category tiers
 
 **Support Items:**
 - Structure (amount, progress, input, button)
@@ -147,9 +155,9 @@ Penetration tests for the Worker API. Located in `tests/security/`.
 | Category | Tests |
 |----------|-------|
 | Auth Bypass | Dev-token bypass, token validation, expiry, tampering |
-| Webhook Security | Stripe signature verification, replay attacks |
+| Webhook Security | Stripe signature verification, replay attacks, shipping address injection |
 | Authorization | Admin endpoints, cross-user access, test endpoint guards |
-| Input Validation | XSS, injection, overflow, malformed input |
+| Input Validation | XSS, injection, overflow, malformed input, hasPhysical flag abuse, shipping fee manipulation, additionalTiers/supportItems injection |
 | Rate Limiting | Burst requests, DoS resilience |
 
 ### Running

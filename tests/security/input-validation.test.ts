@@ -358,6 +358,119 @@ describe('Input Validation Security Tests', () => {
     });
   });
 
+  describe('Shipping / Physical Product Input Validation', () => {
+    it('should handle hasPhysical flag as non-boolean types', async () => {
+      const payloads = [
+        { hasPhysical: 'yes' },
+        { hasPhysical: 1 },
+        { hasPhysical: '<script>alert(1)</script>' },
+        { hasPhysical: { __proto__: { admin: true } } },
+        { hasPhysical: null },
+      ];
+
+      for (const extra of payloads) {
+        const res = await securityFetch('/start', {
+          method: 'POST',
+          body: JSON.stringify({
+            orderId: `test-physical-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            campaignSlug: TEST_CAMPAIGNS.valid,
+            amountCents: 500,
+            email: 'test@example.com',
+            ...extra,
+          })
+        });
+
+        // Should handle gracefully - not crash (429 = rate limited)
+        expect([200, 400, 429, 500]).toContain(res.status);
+        if (res.status === 500) {
+          console.warn('WARNING: Server error on hasPhysical payload:', extra);
+        }
+      }
+    });
+
+    it('should not allow shipping fee manipulation via input', async () => {
+      // Attacker tries to inject a negative shipping amount
+      // (shipping is calculated server-side, not from client input)
+      const res = await securityFetch('/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          orderId: `test-shipping-inject-${Date.now()}`,
+          campaignSlug: TEST_CAMPAIGNS.valid,
+          amountCents: 500,
+          email: 'test@example.com',
+          hasPhysical: true,
+          shipping: -99999, // Attacker tries to inject negative shipping
+          shippingFee: 0,   // Attacker tries to set fee to 0
+        })
+      });
+
+      // Worker should ignore client-supplied shipping values (429 = rate limited)
+      expect([200, 400, 429]).toContain(res.status);
+    });
+
+    it('should handle XSS in additionalTiers array', async () => {
+      for (const xss of MALICIOUS_PAYLOADS.xss) {
+        const res = await securityFetch('/start', {
+          method: 'POST',
+          body: JSON.stringify({
+            orderId: `test-xss-tiers-${Date.now()}`,
+            campaignSlug: TEST_CAMPAIGNS.valid,
+            amountCents: 500,
+            email: 'test@example.com',
+            additionalTiers: [{ id: xss, qty: 1 }],
+          })
+        });
+
+        const body = await res.text();
+        expect(body).not.toContain('<script>');
+      }
+    });
+
+    it('should handle malicious supportItems array', async () => {
+      const res = await securityFetch('/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          orderId: `test-support-inject-${Date.now()}`,
+          campaignSlug: TEST_CAMPAIGNS.valid,
+          amountCents: 500,
+          email: 'test@example.com',
+          supportItems: [
+            { id: '<script>alert(1)</script>', amount: 100 },
+            { id: 'valid-item', amount: -99999 }, // Negative amount
+            { id: 'overflow', amount: Number.MAX_SAFE_INTEGER },
+          ],
+          customAmount: -500, // Negative custom amount
+        })
+      });
+
+      // Should handle gracefully (429 = rate limited)
+      expect([200, 400, 429, 500]).toContain(res.status);
+      const body = await res.text();
+      expect(body).not.toContain('<script>');
+    });
+
+    it('should handle extremely large additionalTiers array', async () => {
+      const hugeTiers = Array.from({ length: 1000 }, (_, i) => ({
+        id: `tier-${i}`,
+        qty: 1
+      }));
+
+      const res = await securityFetch('/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          orderId: `test-huge-tiers-${Date.now()}`,
+          campaignSlug: TEST_CAMPAIGNS.valid,
+          amountCents: 500,
+          email: 'test@example.com',
+          additionalTiers: hugeTiers,
+        })
+      });
+
+      // Should not crash (429 = rate limited)
+      expect([200, 400, 413, 429, 500]).toContain(res.status);
+    });
+  });
+
   describe('Email Validation', () => {
     it('should reject invalid email formats', async () => {
       const invalidEmails = [

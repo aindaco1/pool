@@ -130,6 +130,58 @@ test.describe('Tier Cards', () => {
   });
 });
 
+test.describe('Physical Products & Shipping', () => {
+  test('tier cards include _category custom field', async ({ page }) => {
+    await page.goto('/campaigns/tecolote/');
+    
+    const tierButtons = page.locator('.tier-card button.snipcart-add-item');
+    const count = await tierButtons.count();
+    expect(count).toBeGreaterThan(0);
+    
+    let hasPhysical = false;
+    let hasDigital = false;
+    
+    for (let i = 0; i < count; i++) {
+      const btn = tierButtons.nth(i);
+      const categoryValue = await btn.getAttribute('data-item-custom2-value');
+      
+      if (categoryValue === 'physical') hasPhysical = true;
+      if (categoryValue === 'digital') hasDigital = true;
+    }
+    
+    expect(hasPhysical).toBe(true);
+    expect(hasDigital).toBe(true);
+  });
+
+  test('physical tier buttons set shippable to false', async ({ page }) => {
+    await page.goto('/campaigns/tecolote/');
+    
+    const physicalTier = page.locator('.tier-card button.snipcart-add-item[data-item-custom2-value="physical"]').first();
+    
+    if (await physicalTier.count() > 0) {
+      await expect(physicalTier).toHaveAttribute('data-item-shippable', 'false');
+    }
+  });
+
+  test('campaign with all digital tiers has no physical category', async ({ page }) => {
+    await page.goto('/campaigns/hand-relations/');
+    
+    const tierButtons = page.locator('.tier-card button.snipcart-add-item');
+    const count = await tierButtons.count();
+    expect(count).toBeGreaterThan(0);
+    
+    for (let i = 0; i < count; i++) {
+      const btn = tierButtons.nth(i);
+      const categoryValue = await btn.getAttribute('data-item-custom2-value');
+      
+      // Should be 'digital' or not have the attribute (defaults to digital)
+      if (categoryValue) {
+        expect(categoryValue).toBe('digital');
+      }
+    }
+  });
+});
+
 test.describe('Support Items', () => {
   test('support items have correct structure', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
