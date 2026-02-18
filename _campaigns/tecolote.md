@@ -35,7 +35,7 @@ long_content:
   - type: image
     src: /assets/images/campaigns/tecolote/still-7.png
     alt: "A young man stares in shock by lamplight"
-    caption: "Joe Manuel Gallegos Jr. as Don Arcadio.<br>\"Bartender\" on HBO Max's Duster."
+    caption: "Joe Manuel Gallegos Jr. as Don Arcadio.<br>\"Pathologist Jerry\" on AMC+ Dark Winds & on \"Conquistador Bartender\" on Max’s Duster."
 
   - type: text
     body: |
@@ -85,7 +85,7 @@ long_content:
     body: |
       TECOLOTE is my most ambitious project to date. It's also been my most laborious. *Why go through the trouble of making art?*
 
-      My stories are vignettes of Hispanic cataclysm, and I intend them to be well-crafted, well-told movies of rich, but neglected histories I have inherited. I am proud of TECOLOTE as a homespun New Mexican thriller that has been inspired by the landscape, local history, and folklore, as well as being a movie that has been given a voice by a New Mexico cast and crew. With TECOLOTE, I intend to bring my communities together so we may enjoy these stories and grow from them.
+      My stories are vignettes of Hispanic cataclysm, and I intend them to be well-crafted, well-told movies of rich histories I have inherited. I am proud of TECOLOTE as a homespun New Mexican thriller that has been inspired by the landscape, local history, and folklore, as well as being a movie that has been given a voice by a New Mexico cast and crew. With TECOLOTE, I intend to bring my communities together so we may enjoy these stories and grow from them.
 
   - type: divider
 
@@ -122,7 +122,7 @@ tiers:
 
   - id: special-thanks
     name: Special Thanks!
-    price: 5
+    price: 7
     image: /assets/images/campaigns/tecolote/special-thanks.png
     description: Exclusive on-screen credit! Also from the bottom of our hearts.
     stackable: true
@@ -162,7 +162,7 @@ tiers:
 
   - id: exclusive-tshirt
     name: EXCLUSIVE T-Shirt
-    price: 50
+    price: 60
     image: /assets/images/campaigns/tecolote/t-shirt-exclusive.png
     description: Limited-edition, signed T-shirt with poster design.
     stackable: true
@@ -170,7 +170,7 @@ tiers:
 
   - id: auteur
     name: Auteur Tier
-    price: 100
+    price: 120
     image: /assets/images/campaigns/tecolote/auteur.png
     description: For the hardcore TECOLOTE fans. Every previous reward in one package.
     stackable: true
@@ -178,9 +178,17 @@ tiers:
 
   - id: executive-producer
     name: EXECUTIVE PRODUCER Tier
-    price: 500
+    price: 1000
     image: /assets/images/campaigns/tecolote/executive-producer.png
     description: The BEST. Every previous reward plus EXECUTIVE PRODUCER credit.
+    limit_total: 5
+    category: physical
+
+  - id: nata-baldguilar
+    name: Nata Baldguilar Tier
+    price: 2000
+    image: /assets/images/campaigns/tecolote/baldguilar.gif
+    description: The VERY BEST. Every previous reward plus writer/director Nata Aguilar will livestream the shaving of his head. Yup.
     limit_total: 1
     category: physical
 ---
