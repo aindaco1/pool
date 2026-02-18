@@ -35,6 +35,7 @@ long_content:
   - type: image
     src: /assets/images/campaigns/tecolote/still-7.png
     alt: "A young man stares in shock by lamplight"
+    caption: "Joe Manuel Gallegos Jr. as Don Arcadio.<br>\"Bartender\" on HBO Max's Duster."
 
   - type: text
     body: |
@@ -65,7 +66,6 @@ long_content:
   - type: image
     src: /assets/images/campaigns/tecolote/still-2.png
     alt: "Vidal screams under the brim of his hat"
-    caption: "Joe Manuel Gallegos Jr. as Don Arcadio.<br>\"Bartender\" on HBO Max's Duster."
 
   - type: divider
 
