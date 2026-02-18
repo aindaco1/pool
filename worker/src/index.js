@@ -695,6 +695,13 @@ async function handleStart(request, env) {
       sessionParams.customer_email = email;
     }
     
+    // Collect shipping address via Stripe Checkout for physical items
+    if (hasPhysical) {
+      sessionParams.shipping_address_collection = {
+        allowed_countries: ['US']
+      };
+    }
+    
     const session = await stripe.checkout.sessions.create(sessionParams);
     
     console.log('📥 /start: Stripe session created, URL:', session.url ? 'present' : 'missing');
@@ -901,6 +908,22 @@ async function handleStripeWebhook(request, env, ctx) {
         }
       }
 
+      // Extract shipping address from Stripe Checkout session (collected via shipping_address_collection)
+      let shippingAddress = null;
+      if (hasPhysical === 'true' && session.shipping_details) {
+        const sd = session.shipping_details;
+        shippingAddress = {
+          name: sd.name || '',
+          address1: sd.address?.line1 || '',
+          address2: sd.address?.line2 || '',
+          city: sd.address?.city || '',
+          province: sd.address?.state || '',
+          postalCode: sd.address?.postal_code || '',
+          country: sd.address?.country || ''
+        };
+        console.log('📨 Captured shipping address from Stripe session:', orderId);
+      }
+
       const stripe = createStripeClient(getStripeKey(env));
       const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
       const paymentMethodId = setupIntent.payment_method;
@@ -1088,6 +1111,7 @@ async function handleStripeWebhook(request, env, ctx) {
             additionalTiers: additionalTiers.length > 0 ? additionalTiers : undefined,
             supportItems: supportItems.length > 0 ? supportItems : undefined,
             customAmount: customAmount > 0 ? customAmount : undefined,
+            shippingAddress: shippingAddress || undefined,
             subtotal,
             tax,
             shipping,
@@ -1433,6 +1457,7 @@ async function handleGetPledges(request, env) {
           additionalTiers: pledgeData.additionalTiers || [],
           supportItems: pledgeData.supportItems || [],
           customAmount: pledgeData.customAmount || 0,
+          shippingAddress: pledgeData.shippingAddress || null,
           canModify: canChange,
           canCancel: canChange,
           canUpdatePaymentMethod: !pledgeData.charged,

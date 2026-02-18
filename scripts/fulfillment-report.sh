@@ -112,7 +112,7 @@ campaign_filter = '$CAMPAIGN_FILTER'
 
 # Aggregate by (email, campaign)
 # Structure: { (email, campaign): { 'subtotal': 0, 'tax': 0, 'total': 0, 'items': { tier_name: qty } } }
-aggregated = defaultdict(lambda: {'subtotal': 0.0, 'tax': 0.0, 'total': 0.0, 'items': defaultdict(int)})
+aggregated = defaultdict(lambda: {'subtotal': 0.0, 'tax': 0.0, 'shipping': 0.0, 'total': 0.0, 'items': defaultdict(int), 'shipping_address': ''})
 
 # Read pledges separated by delimiter
 pledge_data = ''
@@ -149,6 +149,19 @@ for line in sys.stdin:
                 aggregated[key]['tax'] += tax
                 aggregated[key]['total'] += total
                 
+                # Capture shipping fee (flat fee, take max across merged pledges)
+                shipping = (data.get('shipping') or 0) / 100
+                if shipping > aggregated[key]['shipping']:
+                    aggregated[key]['shipping'] = shipping
+                
+                # Capture shipping address (use most recent non-empty)
+                addr = data.get('shippingAddress')
+                if addr and not aggregated[key]['shipping_address']:
+                    parts = [addr.get('name', ''), addr.get('address1', ''), addr.get('address2', ''),
+                             addr.get('city', ''), addr.get('province', ''), addr.get('postalCode', ''),
+                             addr.get('country', '')]
+                    aggregated[key]['shipping_address'] = ', '.join(p for p in parts if p)
+                
                 # Add current tier
                 tier_id = data.get('tierId')
                 if tier_id:
@@ -175,7 +188,7 @@ for line in sys.stdin:
 # Output aggregated CSV
 output = StringIO()
 writer = csv.writer(output)
-writer.writerow(['email', 'campaign', 'items', 'subtotal', 'tax', 'total'])
+writer.writerow(['email', 'campaign', 'items', 'subtotal', 'tax', 'shipping', 'total', 'shipping_address'])
 
 for (email, campaign), data in sorted(aggregated.items()):
     # Skip if no items or zero total
@@ -199,7 +212,9 @@ for (email, campaign), data in sorted(aggregated.items()):
         items_str,
         f\"{data['subtotal']:.2f}\",
         f\"{data['tax']:.2f}\",
-        f\"{data['total']:.2f}\"
+        f\"{data['shipping']:.2f}\",
+        f\"{data['total']:.2f}\",
+        data['shipping_address']
     ])
 
 print(output.getvalue().strip())

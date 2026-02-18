@@ -24,8 +24,12 @@ function isSingleTierOnly() {
 function cartHasPhysicalItems() {
   const state = Snipcart.store.getState();
   const items = state.cart.items.items || [];
-  // Snipcart may store shippable as boolean true or string "true"
-  return items.some(item => item.shippable === true || item.shippable === 'true');
+  // Check _category custom field (items are shippable=false to bypass Snipcart shipping)
+  return items.some(item => {
+    const fields = item.customFields || [];
+    const cat = fields.find(f => f.name === '_category');
+    return cat && cat.value === 'physical';
+  });
 }
 
 const FLAT_SHIPPING_FEE = 300; // $3 flat rate, must match worker
@@ -272,27 +276,6 @@ function setupBillingHider() {
       }
     });
 
-    // Clear shipping form fields that Snipcart pre-fills from billing dummy data
-    const shippingStep = Array.from(allSteps).find(step => {
-      const text = step.textContent || '';
-      const classes = step.className || '';
-      return (text.includes('Shipping') || classes.includes('shipping')) && !step.dataset.poolShippingCleared;
-    });
-    if (shippingStep) {
-      shippingStep.dataset.poolShippingCleared = 'true';
-      const inputs = shippingStep.querySelectorAll('input[type="text"], input[type="tel"], input[type="email"]');
-      inputs.forEach(input => {
-        const name = input.name || input.id || '';
-        // Don't clear the country field (US hack is handled by checkout-autofill.js)
-        if (name.includes('country')) return;
-        if (input.value) {
-          input.value = '';
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      });
-      console.log('Pool: Cleared shipping form pre-filled data');
-    }
   });
   
   observer.observe(document.body, { childList: true, subtree: true });
@@ -312,14 +295,12 @@ function initSnipcart() {
   // Also try to fill if cart already exists
   setTimeout(autofillBilling, 500);
   
-  // Auto-navigate past billing step
-  // If cart has physical items, go to shipping first; otherwise skip straight to payment
+  // Auto-navigate past billing step straight to payment
+  // (Snipcart shipping is bypassed — Stripe Checkout collects shipping address)
   Snipcart.events.on('page.changed', async (routesChange) => {
-    // Skip billing step entirely
     if (routesChange.to === '/checkout/billing' || routesChange.to === '/checkout') {
       console.log('Pool: Detected billing/checkout page, auto-filling and skipping...');
       
-      // Fill billing and wait for it to be accepted
       try {
         const state = Snipcart.store.getState();
         if (state.cart && state.cart.token) {
@@ -340,12 +321,9 @@ function initSnipcart() {
         console.log('Pool: Billing fill error:', e?.message || e);
       }
       
-      // Wait a bit for Snipcart to process, then navigate
-      const hasPhysical = cartHasPhysicalItems();
-      const nextStep = hasPhysical ? '/checkout/shipping' : '/checkout/payment';
       setTimeout(() => {
-        console.log('Pool: Navigating to', nextStep, '(hasPhysical:', hasPhysical, ')');
-        Snipcart.api.theme.cart.navigate(nextStep);
+        console.log('Pool: Navigating to /checkout/payment');
+        Snipcart.api.theme.cart.navigate('/checkout/payment');
       }, 200);
     }
   });
@@ -495,7 +473,7 @@ function initSnipcart() {
         url: this.getAttribute('data-item-url'),
         description: this.getAttribute('data-item-description'),
         stackable: isStackable,
-        shippable: this.getAttribute('data-item-shippable') === 'true'
+        shippable: false
       };
       if (maxQty) {
         item.maxQuantity = parseInt(maxQty);

@@ -71,7 +71,7 @@ KEY_COUNT=$(echo "$KEYS" | wc -l | tr -d ' ')
 echo "Found $KEY_COUNT pledges. Fetching details..." >&2
 
 # CSV header
-echo "email,campaign,items,subtotal,tax,total,status,charged,created_at,order_id"
+echo "email,campaign,items,subtotal,tax,shipping,total,status,charged,created_at,order_id"
 
 # Fetch each pledge and output as CSV row
 PROCESSED=0
@@ -130,12 +130,12 @@ def build_items_str(tier_id, tier_qty, additional_tiers, is_negative=False, cust
     
     return '; '.join(items) if items else ''
 
-def write_row(email, campaign, items_str, subtotal, tax, total, status, charged, timestamp, order_id):
+def write_row(email, campaign, items_str, subtotal, tax, shipping, total, status, charged, timestamp, order_id):
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow([
         email, campaign, items_str,
-        f'{subtotal:.2f}', f'{tax:.2f}', f'{total:.2f}',
+        f'{subtotal:.2f}', f'{tax:.2f}', f'{shipping:.2f}', f'{total:.2f}',
         status, 'yes' if charged else 'no', timestamp, order_id
     ])
     print(output.getvalue().strip())
@@ -197,6 +197,7 @@ try:
             if entry_type == 'created':
                 subtotal = entry.get('subtotal', 0) / 100
                 tax = entry.get('tax', 0) / 100
+                shipping = entry.get('shipping', 0) / 100
                 total = entry.get('amount', 0) / 100
                 # Only show customAmount on created if it's in the entry itself
                 # (not from current pledge state which may have been added later)
@@ -209,11 +210,12 @@ try:
                 )
                 prev_counts = get_tier_counts(entry)
                 prev_custom = custom_amt
-                write_row(email, campaign, items_str, subtotal, tax, total, 'created', charged, timestamp, order_id)
+                write_row(email, campaign, items_str, subtotal, tax, shipping, total, 'created', charged, timestamp, order_id)
             
             elif entry_type == 'modified':
                 subtotal = entry.get('subtotalDelta', 0) / 100
                 tax = entry.get('taxDelta', 0) / 100
+                shipping_delta = entry.get('shippingDelta', 0) / 100
                 total = entry.get('amountDelta', 0) / 100
                 new_counts = get_tier_counts(entry)
                 new_custom = entry.get('customAmount', 0) or 0
@@ -234,11 +236,12 @@ try:
                     items_str = '(modified)'
                 prev_counts = new_counts
                 prev_custom = new_custom
-                write_row(email, campaign, items_str, subtotal, tax, total, 'modified', charged, timestamp, order_id)
+                write_row(email, campaign, items_str, subtotal, tax, shipping_delta, total, 'modified', charged, timestamp, order_id)
             
             elif entry_type == 'cancelled':
                 subtotal = entry.get('subtotalDelta', 0) / 100
                 tax = entry.get('taxDelta', 0) / 100
+                shipping_delta = entry.get('shippingDelta', 0) / 100
                 total = entry.get('amountDelta', 0) / 100
                 # Get items from the pledge itself (the cancelled items)
                 items_str = build_items_str(
@@ -248,7 +251,7 @@ try:
                     is_negative=True,
                     custom_amount=data.get('customAmount', 0) or 0
                 )
-                write_row(email, campaign, items_str, subtotal, tax, total, 'cancelled', charged, timestamp, order_id)
+                write_row(email, campaign, items_str, subtotal, tax, shipping_delta, total, 'cancelled', charged, timestamp, order_id)
     else:
         # Legacy pledge without history - output single row with current state
         pledge_status = data.get('pledgeStatus', 'unknown')
@@ -268,6 +271,7 @@ try:
         
         subtotal = sign * data.get('subtotal', data.get('amount', 0)) / 100
         tax = sign * data.get('tax', 0) / 100
+        shipping = sign * data.get('shipping', 0) / 100
         total = sign * data.get('amount', 0) / 100
         
         items_str = build_items_str(
@@ -278,7 +282,7 @@ try:
             custom_amount=data.get('customAmount', 0) or 0
         )
         
-        write_row(email, campaign, items_str, subtotal, tax, total, status, charged, data.get('createdAt', ''), order_id)
+        write_row(email, campaign, items_str, subtotal, tax, shipping, total, status, charged, data.get('createdAt', ''), order_id)
 
 except json.JSONDecodeError:
     pass
