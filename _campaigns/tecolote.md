@@ -107,7 +107,24 @@ support_items: []
 
 decisions: []
 
-diary: []
+diary:
+  - date: 2026-02-25T12:00:00-07:00
+    title: "Thank you -- now help us spread the word!"
+    phase: fundraising
+    content:
+      - type: image
+        src: /assets/images/campaigns/tecolote/campaign2.gif
+        alt: "TECOLOTE campaign update"
+
+      - type: text
+        body: |
+          **To everyone who has pledged so far -- thank you.** Seriously. Every single pledge means the world to us and brings TECOLOTE closer to the finish line.
+
+          We have until **March 20th** to hit our goal, and we need your help to get there. If you believe in this project, the best thing you can do right now is **share the campaign on your Instagram story.** Tag us, tell people why you're backing TECOLOTE, and help us get the word out -- [here's a post ready to share!](https://www.instagram.com/p/DVImDRJgOpF/)
+
+          Every share counts. Let's bring this thing home.
+
+          **-- The MAIZ Team**
 
 ongoing_items: []
 
