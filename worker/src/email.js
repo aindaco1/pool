@@ -611,3 +611,86 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
 
   return response.json();
 }
+
+/**
+ * Send announcement email to supporters with optional highlighted CTA link
+ */
+export async function sendAnnouncementEmail(env, { email, campaignSlug, campaignTitle, subject, heading, body, ctaLabel, ctaUrl, token, instagramUrl, hasDecisions }) {
+  const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
+  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
+  
+  const ctaBlock = ctaLabel && ctaUrl ? `
+  <div style="text-align: center; margin: 24px 0 32px 0;">
+    <a href="${ctaUrl}" style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+      ${ctaLabel}
+    </a>
+  </div>` : '';
+  
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <h1 style="margin: 0; font-size: 24px;">${heading || subject}</h1>
+  </div>
+  
+  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+    <p style="margin: 0; font-size: 15px; color: #333;">${body}</p>
+  </div>
+  
+  ${ctaBlock}
+  
+  <div style="margin-bottom: 32px;">
+    <h2 style="font-size: 18px; margin: 0 0 16px 0;">Your Supporter Access</h2>
+    
+    ${hasDecisions !== false ? `<div style="margin-bottom: 12px;">
+      <a href="${communityUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+        Supporter Community
+      </a>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Vote on creative decisions for this project</p>
+    </div>` : ''}
+    
+    <div style="margin-bottom: 12px;">
+      <a href="${manageUrl}" style="display: inline-block; background: #fff; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; border: 1px solid #000;">
+        Manage Your Pledge
+      </a>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">Cancel, modify amount, or update payment method</p>
+    </div>
+  </div>
+  
+  ${instagramCTA}
+  
+  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+    <p style="margin: 0;">You're receiving this because you backed ${campaignTitle}.</p>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: 'The Pool <updates@pool.dustwave.xyz>',
+      to: email,
+      subject: `📢 ${subject} — ${campaignTitle}`,
+      html
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Resend error (announcement):', error);
+    throw new Error(`Failed to send announcement email: ${response.status}`);
+  }
+
+  return response.json();
+}

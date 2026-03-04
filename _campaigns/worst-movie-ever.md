@@ -387,6 +387,28 @@ diary:
 
           Let's make this the worst movie ever. *Together.*
 
+  - date: 2026-03-04T12:00:00-07:00
+    title: "⏰ Two days left to submit!"
+    phase: fundraising
+    content:
+      - type: text
+        body: |
+          **This is your 48-hour warning.**
+
+          The deadline for submitting your contributions is **Thursday, March 6th at 11:59 PM Mountain Time.** After that, the doors close and we start production with whatever we've got.
+
+          Backed a tier? Frames, sound effects, dialogue, props, costumes, characters, scenes -- whatever you earned, **now is the time to send it in.** Don't let your terrible ideas die in your head. They deserve to be on screen.
+
+      - type: text
+        body: |
+          **👉 [Submit Your Reward](https://dustwave.notion.site/30a86545942d80ed9949e60649fd8704?pvs=105)**
+
+          Not sure what you owe us? Check your **Payment Confirmed email** for the details of which tier(s) you backed.
+
+          **No extensions. No exceptions.** We've got a movie to ruin and a timeline to keep.
+
+          So do your worst. We're begging you.
+
 ongoing_items: []
 
 tiers:

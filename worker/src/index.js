@@ -20,6 +20,7 @@
  *   POST /inventory/:slug/recalculate - Recalculate tier inventory from pledges (admin)
  *   POST /admin/inventory/init-all    - Initialize inventory for all campaigns (admin)
  *   POST /admin/rebuild      - Trigger GitHub Pages rebuild (admin)
+ *   POST /admin/broadcast/announcement - Send announcement with CTA link to campaign supporters
  *   POST /admin/broadcast/diary     - Send diary update to all campaign supporters
  *   POST /admin/diary/check         - Check all campaigns for new diary entries and broadcast
  *   POST /admin/broadcast/milestone - Send milestone notification to all campaign supporters
@@ -37,7 +38,7 @@
  */
 
 import { generateToken, verifyToken } from './token.js';
-import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail } from './email.js';
+import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail } from './email.js';
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, validateTier, getEffectiveState } from './campaigns.js';
@@ -79,7 +80,10 @@ function getDiaryExcerpt(entry, maxLength = 200) {
       }
     }
     const combined = textParts.join(' ').trim();
-    return combined.slice(0, maxLength);
+    if (combined.length > maxLength) {
+      return combined.slice(0, maxLength) + '…';
+    }
+    return combined;
   }
   
   return '';
@@ -370,6 +374,12 @@ export default {
         const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
         if (!rl.allowed) return rl.response;
         return handleAdminRebuild(request, env);
+      }
+
+      if (path === '/admin/broadcast/announcement' && method === 'POST') {
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
+        return handleBroadcastAnnouncement(request, env);
       }
 
       if (path === '/admin/broadcast/diary' && method === 'POST') {
@@ -3193,6 +3203,83 @@ async function triggerMilestoneEmails(env, campaignSlug) {
   } catch (err) {
     console.error('Error triggering milestone emails:', err.message);
   }
+}
+
+/**
+ * Admin: Broadcast announcement with optional CTA link to all campaign supporters
+ */
+async function handleBroadcastAnnouncement(request, env) {
+  const auth = requireAdmin(request, env);
+  if (!auth.ok) return auth.response;
+
+  const body = await request.json();
+  const { campaignSlug, subject, heading, body: messageBody, ctaLabel, ctaUrl, dryRun } = body;
+
+  if (!campaignSlug || !subject || !messageBody) {
+    return jsonResponse({ error: 'Missing campaignSlug, subject, or body' }, 400);
+  }
+
+  const campaign = await getCampaign(env, campaignSlug);
+  if (!campaign) {
+    return jsonResponse({ error: 'Campaign not found' }, 404);
+  }
+
+  const supporters = await getCampaignSupporters(env, campaignSlug);
+  
+  if (dryRun) {
+    return jsonResponse({
+      dryRun: true,
+      campaignSlug,
+      subject,
+      ctaLabel,
+      ctaUrl,
+      recipientCount: supporters.length,
+      recipients: supporters.map(s => s.email)
+    });
+  }
+
+  const results = { sent: 0, failed: 0, errors: [] };
+
+  for (let i = 0; i < supporters.length; i++) {
+    const supporter = supporters[i];
+    
+    if (i > 0) {
+      await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+    }
+    
+    try {
+      const token = await generateToken(env.MAGIC_LINK_SECRET, {
+        orderId: supporter.orderId,
+        email: supporter.email,
+        campaignSlug
+      });
+
+      await sendAnnouncementEmail(env, {
+        email: supporter.email,
+        campaignSlug,
+        campaignTitle: campaign.title,
+        subject,
+        heading,
+        body: messageBody,
+        ctaLabel,
+        ctaUrl,
+        token,
+        instagramUrl: campaign.instagram,
+        hasDecisions: campaign?.has_decisions === true
+      });
+      results.sent++;
+    } catch (err) {
+      results.failed++;
+      results.errors.push({ email: supporter.email, error: err.message });
+    }
+  }
+
+  return jsonResponse({
+    success: true,
+    campaignSlug,
+    subject,
+    ...results
+  });
 }
 
 /**
