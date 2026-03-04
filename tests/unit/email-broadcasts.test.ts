@@ -2,6 +2,7 @@
  * Unit tests for email broadcast functionality
  * 
  * Tests cover:
+ * - Diary excerpt extraction with ellipsis truncation
  * - Diary tracking helpers (getSentDiaryEntries, markDiarySent)
  * - Milestone tracking helpers (getSentMilestones, markMilestoneSent, checkMilestones)
  * - Rate limiting between email sends
@@ -141,7 +142,10 @@ function getDiaryExcerpt(entry: { body?: string; content?: Array<{ type: string;
       }
     }
     const combined = textParts.join(' ').trim();
-    return combined.slice(0, maxLength);
+    if (combined.length > maxLength) {
+      return combined.slice(0, maxLength) + '…';
+    }
+    return combined;
   }
   
   return '';
@@ -160,6 +164,20 @@ describe('getDiaryExcerpt', () => {
   it('truncates legacy body to maxLength', () => {
     const entry = { body: 'A'.repeat(300) };
     expect(getDiaryExcerpt(entry, 200)).toBe('A'.repeat(200));
+  });
+
+  it('adds ellipsis when content blocks are truncated', () => {
+    const entry = {
+      content: [{ type: 'text', body: 'A'.repeat(300) }]
+    };
+    expect(getDiaryExcerpt(entry, 200)).toBe('A'.repeat(200) + '…');
+  });
+
+  it('does not add ellipsis when content fits within maxLength', () => {
+    const entry = {
+      content: [{ type: 'text', body: 'Short text.' }]
+    };
+    expect(getDiaryExcerpt(entry)).toBe('Short text.');
   });
 
   it('extracts text from content blocks', () => {

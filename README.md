@@ -16,6 +16,7 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
+- **Announcements** — Admin broadcast emails with custom CTA links to supporters
 - **Instagram integration** — Optional social CTA in supporter emails
 - **Ongoing funding** — Post-campaign support section
 - **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing

@@ -28,7 +28,7 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | `live-stats.js` | `formatMoney`, `updateProgressBar`, `updateMarkerState`, `checkTierUnlocks`, `checkLateSupport`, `updateSupportItems`, `updateTierInventory` |
 | `pledge-management` | DST-aware deadline enforcement (MST/MDT via Intl), cancel/modify/payment-method validation, pledge status transitions, multi-campaign independence, shipping in pledge records, API response shape |
 | `settlement` | Charge aggregation (including shipping fees), payment success/failure, retry flow, dry-run mode, edge cases, batched settlement, campaign pledge index, settlement dispatch, shipping in settlement, cron heartbeat |
-| `email-broadcasts` | Diary excerpt extraction, diary/milestone tracking helpers, milestone checking logic, rate limiting |
+| `email-broadcasts` | Diary excerpt extraction (with ellipsis truncation), diary/milestone tracking helpers, milestone checking logic, rate limiting |
 | `votes` | Email-based vote storage/dedup, vote status retrieval, campaign results, result aggregation |
 
 ### Running

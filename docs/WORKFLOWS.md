@@ -252,6 +252,31 @@ Trigger a GitHub Pages rebuild (for state transitions).
 **Headers:** `Authorization: Bearer ADMIN_SECRET`  
 **Request:** `{ "reason": "campaign-state-change" }` (optional)
 
+### `POST /admin/broadcast/announcement`
+Send a custom announcement email with optional CTA link to all campaign supporters.
+
+**Headers:** `Authorization: Bearer ADMIN_SECRET`  
+**Request:**
+```json
+{
+  "campaignSlug": "worst-movie-ever",
+  "subject": "Submissions close March 6th!",
+  "heading": "Last call for submissions!",
+  "body": "The deadline is this Thursday at midnight MT.",
+  "ctaLabel": "Submit Your Reward",
+  "ctaUrl": "https://example.com/submit",
+  "dryRun": true
+}
+```
+**Response:** `{ success, campaignSlug, subject, sent, failed, errors }`
+
+**Fields:**
+- `subject` (required) — Email subject line (prefixed with 📢 emoji)
+- `heading` (optional) — Email heading (defaults to subject if omitted)
+- `body` (required) — Message body text
+- `ctaLabel` + `ctaUrl` (optional) — Adds a prominent button linking to the URL
+- `dryRun` (optional) — Returns recipient list without sending
+
 ### `POST /admin/recover-checkout`
 Recover a missed Stripe webhook by manually creating a pledge from a completed checkout session.
 
@@ -385,7 +410,7 @@ This allows supporters to fix expired/declined cards without manual admin interv
 
 | Provider | Purpose |
 |----------|---------|
-| **Resend** | All supporter emails (confirmation, milestones, charge success, payment failed) |
+| **Resend** | All supporter emails (confirmation, milestones, diary updates, announcements, charge success, payment failed) |
 
 Note: Snipcart emails are disabled — the Worker handles all pledge-related email via Resend.
 
@@ -458,6 +483,18 @@ All emails show exact amounts with 2 decimal places (no rounding).
 - Contains: Amount, confirmation card wasn't charged, link to view campaign (can re-pledge)
 - Note: Supporter is removed from future campaign email updates
 
+**Diary Update** (sent when new diary entry is added to campaign)
+- Subject: "📝 {Diary Title} — {Campaign Title}"
+- Contains: Diary title, plain-text excerpt (200 chars + ellipsis), "Read Full Update" button linking to campaign diary
+- Includes: Supporter access links (community + manage), Instagram CTA (if campaign has Instagram URL)
+- Note: Excerpts strip markdown formatting; the full content is on the campaign page
+
+**Announcement** (sent via admin broadcast with optional CTA link)
+- Subject: "📢 {Subject} — {Campaign Title}"
+- Contains: Custom heading, message body, optional highlighted CTA button (custom label + URL)
+- Includes: Supporter access links (community + manage), Instagram CTA (if campaign has Instagram URL)
+- Endpoint: `POST /admin/broadcast/announcement`
+
 ---
 
 ## Security Considerations
@@ -494,4 +531,4 @@ All emails show exact amounts with 2 decimal places (no rounding).
 
 ---
 
-_Last updated: Feb 17, 2026_
+_Last updated: Mar 4, 2026_
