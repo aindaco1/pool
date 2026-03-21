@@ -542,26 +542,26 @@ export default {
           continue;
         }
         
-        // Dispatch batched settlement via self-invocation (each batch gets its own subrequest budget)
-        console.log(`⏰ Dispatching settlement for campaign: ${campaign.slug}`);
+        // Settle directly to avoid self-invocation 522 timeouts
+        console.log(`⏰ Settling campaign: ${campaign.slug}`);
         try {
-          ctx.waitUntil(
-            fetch(`${env.WORKER_BASE}/admin/settle-dispatch/${campaign.slug}`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${env.ADMIN_SECRET}`,
-                'Content-Type': 'application/json'
-              }
-            }).then(res => res.json()).then(r => {
-              console.log(`⏰ Settlement dispatch response for ${campaign.slug}:`, JSON.stringify(r));
-            }).catch(err => {
-              console.error(`⏰ Settlement dispatch failed for ${campaign.slug}:`, err.message);
-            })
-          );
+          const settleResult = await settleCampaign(campaign.slug, env);
+          console.log(`✅ Settlement complete for ${campaign.slug}:`, JSON.stringify({
+            supportersCharged: settleResult.supportersCharged,
+            supportersFailed: settleResult.supportersFailed,
+            pledgesCharged: settleResult.pledgesCharged,
+            totalCharged: settleResult.totalCharged
+          }));
+          
+          // Mark campaign as charged
+          if (settleResult.supportersCharged > 0) {
+            await env.PLEDGES.put(`campaign-charged:${campaign.slug}`, new Date().toISOString());
+          }
+          
           results.settlementDispatched++;
-        } catch (dispatchErr) {
-          results.errors.push({ campaign: campaign.slug, error: dispatchErr.message });
-          console.error(`❌ Failed to dispatch settlement for ${campaign.slug}:`, dispatchErr.message);
+        } catch (settleErr) {
+          results.errors.push({ campaign: campaign.slug, error: settleErr.message });
+          console.error(`❌ Settlement failed for ${campaign.slug}:`, settleErr.message);
         }
       }
       
@@ -2481,6 +2481,11 @@ async function handleSettleCampaign(request, campaignSlug, env) {
     
     if (dryRun) {
       return jsonResponse(results);
+    }
+    
+    // Mark campaign as charged if any supporters were charged
+    if (results.supportersCharged > 0 && env.PLEDGES) {
+      await env.PLEDGES.put(`campaign-charged:${campaignSlug}`, new Date().toISOString());
     }
     
     return jsonResponse({
