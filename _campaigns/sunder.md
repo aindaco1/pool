@@ -11,7 +11,7 @@ hero_image: /assets/images/campaigns/sunder/wide-alt.png
 hero_image_wide: /assets/images/campaigns/sunder/wide.png
 hero_video: /assets/videos/campaigns/sunder/video.webm
 creator_image: /assets/images/campaigns/sunder/logo.png
-creator_name: "Darling Film Company"
+creator_name: "Darling Film Co. & Soft Boiled Pics"
 category: "Short Film"
 progress_background: /assets/images/campaigns/sunder/progress.png
 campaign_background: /assets/images/campaigns/sunder/background.png
