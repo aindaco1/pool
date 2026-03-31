@@ -17,6 +17,8 @@ title: Terms & Creative Guidelines
 
 - Your card is saved securely by **Stripe** — we never see or store your payment details. No charge is made until the campaign succeeds.
 - If a campaign is funded, all pledges from the same email are combined into a single charge.
+- You may add an **optional platform tip** from 0% to 15% during checkout. The default tip is 5%.
+- Optional platform tips support maintenance of The Pool and are included in your pledge total, but **do not count toward a campaign's funding goal**.
 - A 7.875% tax (ABQ rate) is applied to all pledges.
 - Physical product tiers include a flat $3 USPS shipping fee, collected at checkout. Your shipping address is securely collected via Stripe.
 
@@ -60,7 +62,7 @@ The Pool is an [open-source crowdfunding platform](https://github.com/aindaco1/p
 - **Cloudflare Workers** — Backend API for pledge storage, live stats, and automated campaign settlement
 - **Resend** — Transactional emails (confirmations, updates, charge notifications)
 
-Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project.
+Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project, with optional platform tips helping cover maintenance of The Pool itself.
 
 ## Questions
 
@@ -68,4 +70,4 @@ For questions about these terms or your pledge, email us at support@dustwave.xyz
 
 ---
 
-_Last updated: February 2026_
+_Last updated: March 2026_

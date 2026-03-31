@@ -25,12 +25,12 @@ Just save that email. Those links are your keys.
 ## How It Works
 
 1. **Browse** — Find a project you want to support
-2. **Pledge** — Add tiers to your cart and complete checkout (physical items include a flat $3 USPS shipping fee)
+2. **Pledge** — Add tiers to your cart, optionally add a 0% to 15% tip for platform upkeep, and complete checkout (physical items include a flat $3 USPS shipping fee)
 3. **Save card** — Stripe securely saves your payment method (no charge yet)
 4. **Wait** — Campaign runs until its deadline (all times in Mountain Time)
 5. **Result** — If funded, you're charged. If not, nothing happens.
 
-Multiple pledges from the same email are combined into a single charge when the campaign succeeds.
+Multiple pledges from the same email are combined into a single charge when the campaign succeeds. Optional platform tips go to Dust Wave to help maintain The Pool and do not count toward a project's funding goal.
 
 ## For Creators
 
