@@ -17,6 +17,17 @@ trap cleanup EXIT
 echo "==> Pre-merge regression checks"
 echo ""
 
+export SITE_BASE="${SITE_BASE:-http://127.0.0.1:4000}"
+export WORKER_BASE="${WORKER_BASE:-http://127.0.0.1:8787}"
+export WORKER_URL="${WORKER_URL:-http://127.0.0.1:8787}"
+export SNIPCART_MODE="${SNIPCART_MODE:-test}"
+export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-sk_test_smoke}"
+export STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET:-whsec_smoke}"
+export ADMIN_SECRET="${ADMIN_SECRET:-test-admin-secret}"
+export MAGIC_LINK_SECRET="${MAGIC_LINK_SECRET:-test-magic-link-secret}"
+export RESEND_API_KEY="${RESEND_API_KEY:-re_test_smoke}"
+export SNIPCART_WEBHOOK_SECRET="${SNIPCART_WEBHOOK_SECRET:-snipcart_test_secret}"
+
 echo "1. Syntax checks"
 node --check worker/src/index.js
 node --check worker/src/stats.js

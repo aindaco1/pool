@@ -65,6 +65,8 @@ This runs:
 - Security suite via `npm run test:security` against an auto-started local Worker
 - Playwright headless E2E via `npm run test:e2e:headless`
 
+On GitHub, the same gate runs automatically in the `Merge Smoke` workflow for pull requests targeting `main`.
+
 ### Main Branch Comparison
 
 Run the same automated gate on `main` in a clean worktree so the baseline and the patch branch are directly comparable. If `main` predates `test:premerge`, run the equivalent syntax, unit, security, and E2E commands manually there.
