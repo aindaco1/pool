@@ -322,6 +322,9 @@ function isCheckoutViewActive(snipcartRoot) {
 
 function restoreCheckoutSummaryUI(snipcartRoot) {
   if (!snipcartRoot) return;
+  snipcartRoot.querySelectorAll('.pool-checkout-summary-preview').forEach(section => {
+    section.remove();
+  });
   snipcartRoot.querySelectorAll('.snipcart-summary-fees[data-pool-checkout-summary="true"]').forEach(section => {
     const original = section.dataset.poolOriginalHtml;
     if (original) {
@@ -330,6 +333,50 @@ function restoreCheckoutSummaryUI(snipcartRoot) {
     delete section.dataset.poolCheckoutSummary;
     delete section.dataset.poolOriginalHtml;
   });
+}
+
+function getCheckoutSummaryMarkup(pricing, classPrefix = 'snipcart-summary-fees') {
+  return `
+    <div class="${classPrefix}__item snipcart__font--slim">
+      <span class="${classPrefix}__title">Subtotal</span>
+      <span class="${classPrefix}__amount">${formatCents(pricing.subtotalCents)}</span>
+    </div>
+    ${pricing.tipAmountCents > 0 ? `
+      <div class="${classPrefix}__item snipcart__font--slim">
+        <span class="${classPrefix}__title">Dust Wave tip (${pricing.tipPercent}%)</span>
+        <span class="${classPrefix}__amount">${formatCents(pricing.tipAmountCents)}</span>
+      </div>
+    ` : ''}
+    ${pricing.shippingCents > 0 ? `
+      <div class="${classPrefix}__item snipcart__font--slim">
+        <span class="${classPrefix}__title">Shipping</span>
+        <span class="${classPrefix}__amount">${formatCents(pricing.shippingCents)}</span>
+      </div>
+    ` : ''}
+    <div class="${classPrefix}__item snipcart__font--slim">
+      <span class="${classPrefix}__title">Taxes</span>
+      <span class="${classPrefix}__amount">${formatCents(pricing.taxCents)}</span>
+    </div>
+    <div class="${classPrefix}__item ${classPrefix}__total snipcart__font--bold snipcart__font--secondary">
+      <span class="${classPrefix}__title ${classPrefix}__title--highlight snipcart__font--large">Cart total</span>
+      <span class="${classPrefix}__amount ${classPrefix}__amount--highlight snipcart__font--large">${formatCents(pricing.totalCents)}</span>
+    </div>
+  `;
+}
+
+function ensureCheckoutSummaryPreview(visibleSummary, pricing) {
+  if (!visibleSummary) return;
+  const totalsContainer = visibleSummary.querySelector('.snipcart-cart-summary__totals');
+  if (!totalsContainer) return;
+
+  let preview = totalsContainer.querySelector('.pool-checkout-summary-preview');
+  if (!preview) {
+    preview = document.createElement('div');
+    preview.className = 'pool-checkout-summary-preview snipcart-summary-fees';
+    totalsContainer.appendChild(preview);
+  }
+
+  preview.innerHTML = getCheckoutSummaryMarkup(pricing, 'snipcart-summary-fees');
 }
 
 function ensureCartTipUI() {
@@ -410,38 +457,24 @@ function ensureCheckoutTipUI() {
     hasFeeSection: !!feeSection,
     pricing
   });
-  if (!feeSection) return;
+  if (!feeSection) {
+    ensureCheckoutSummaryPreview(visibleSummary, pricing);
+    debugCartUI('ensureCheckoutTipUI:preview', {
+      hasVisibleSummary: !!visibleSummary,
+      pricing
+    });
+    return;
+  }
+
+  visibleSummary?.querySelectorAll('.pool-checkout-summary-preview').forEach(section => {
+    section.remove();
+  });
 
   if (!feeSection.dataset.poolOriginalHtml) {
     feeSection.dataset.poolOriginalHtml = feeSection.innerHTML;
   }
   feeSection.dataset.poolCheckoutSummary = 'true';
-  feeSection.innerHTML = `
-    <div class="snipcart-summary-fees__item snipcart__font--slim">
-      <span class="snipcart-summary-fees__title">Subtotal</span>
-      <span class="snipcart-summary-fees__amount">${formatCents(pricing.subtotalCents)}</span>
-    </div>
-    ${pricing.tipAmountCents > 0 ? `
-      <div class="snipcart-summary-fees__item snipcart__font--slim">
-        <span class="snipcart-summary-fees__title">Dust Wave tip (${pricing.tipPercent}%)</span>
-        <span class="snipcart-summary-fees__amount">${formatCents(pricing.tipAmountCents)}</span>
-      </div>
-    ` : ''}
-    ${pricing.shippingCents > 0 ? `
-      <div class="snipcart-summary-fees__item snipcart__font--slim">
-        <span class="snipcart-summary-fees__title">Shipping</span>
-        <span class="snipcart-summary-fees__amount">${formatCents(pricing.shippingCents)}</span>
-      </div>
-    ` : ''}
-    <div class="snipcart-summary-fees__item snipcart__font--slim">
-      <span class="snipcart-summary-fees__title">Taxes</span>
-      <span class="snipcart-summary-fees__amount">${formatCents(pricing.taxCents)}</span>
-    </div>
-    <div class="snipcart-summary-fees__item snipcart-summary-fees__total snipcart__font--bold snipcart__font--secondary">
-      <span class="snipcart-summary-fees__title snipcart-summary-fees__title--highlight snipcart__font--large">Cart total</span>
-      <span class="snipcart-summary-fees__amount snipcart-summary-fees__amount--highlight snipcart__font--large">${formatCents(pricing.totalCents)}</span>
-    </div>
-  `;
+  feeSection.innerHTML = getCheckoutSummaryMarkup(pricing, 'snipcart-summary-fees');
 }
 
 function renderTipUI() {
@@ -735,8 +768,10 @@ function initSnipcart() {
   if (snipcartRoot) {
     let checkoutSummaryDebounce = null;
     const checkoutSummaryObserver = new MutationObserver(() => {
+      renderTipUI();
+      requestAnimationFrame(renderTipUI);
       if (checkoutSummaryDebounce) clearTimeout(checkoutSummaryDebounce);
-      checkoutSummaryDebounce = setTimeout(renderTipUI, 50);
+      checkoutSummaryDebounce = setTimeout(renderTipUI, 16);
     });
     checkoutSummaryObserver.observe(snipcartRoot, {
       childList: true,
@@ -779,7 +814,9 @@ function initSnipcart() {
       }, 200);
     }
 
-    setTimeout(renderTipUI, 0);
+    renderTipUI();
+    requestAnimationFrame(renderTipUI);
+    setTimeout(renderTipUI, 16);
   }
 
   // Auto-navigate past billing step straight to payment
