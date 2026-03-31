@@ -3,7 +3,7 @@ layout: campaign
 title: "sunder"
 slug: sunder
 instagram: "https://www.instagram.com/darling.film.co/"
-start_date: 2026-03-20
+start_date: 2026-04-01
 goal_deadline: 2026-05-01
 goal_amount: 2500
 charged: false
