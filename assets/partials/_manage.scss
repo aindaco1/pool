@@ -33,7 +33,46 @@
   &__list {
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: 36px;
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  &__section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid $color--light;
+
+    h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    span {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: $color--secondary;
+    }
+  }
+
+  &__grid {
+    display: grid;
+    gap: 28px;
+    grid-template-columns: 1fr;
+
+    @include ms {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
   }
   
   &__empty {
@@ -55,6 +94,11 @@
   border: 1px solid $color--light;
   border-radius: $radius--md;
   overflow: hidden;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.04);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   
   // Subtle muted treatment for completed/charged pledges
   &--charged {
@@ -112,7 +156,7 @@
   }
 
   &__tip {
-    padding: 20px;
+    padding: 16px 20px 18px;
     border-top: 1px solid $color--light;
     background: #faf7f2;
   }
@@ -121,29 +165,35 @@
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    align-items: center;
-    margin-bottom: 8px;
+    align-items: baseline;
+    margin-bottom: 6px;
 
-    h2 {
+    h3 {
       margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+      letter-spacing: 0.01em;
+      text-transform: uppercase;
     }
   }
 
   &__tip-amount,
   &__tip-percent {
     font-weight: 700;
+    font-size: 15px;
   }
 
   &__tip-copy {
-    margin: 0 0 12px 0;
-    font-size: 14px;
+    margin: 0 0 10px 0;
+    font-size: 13px;
+    line-height: 1.45;
     color: $color--secondary;
   }
 
   &__tip-controls {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 12px;
+    gap: 10px;
     align-items: center;
 
     input[type="range"] {
@@ -161,6 +211,11 @@
     &.status--active {
       background: $color--success-bg;
       color: $color--success-dark;
+    }
+
+    &.status--locked {
+      background: $color--warning-bg;
+      color: $color--warning-text;
     }
     
     &.status--cancelled {
@@ -264,6 +319,10 @@
     border-top: 1px solid $color--light;
     background: rgba(0, 0, 0, 0.02);
   }
+
+  &__financials {
+    margin-top: auto;
+  }
   
   &__actions {
     display: flex;
@@ -328,7 +387,6 @@
   &__charged,
   &__cancelled,
   &__payment-failed {
-    margin-top: 24px;
     padding: 16px;
     border-radius: $radius--sm;
     text-align: center;
