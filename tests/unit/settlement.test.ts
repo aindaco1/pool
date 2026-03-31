@@ -18,6 +18,8 @@ interface Pledge {
   campaignSlug: string;
   amount: number;
   subtotal: number;
+  tipAmount?: number;
+  tipPercent?: number;
   tax: number;
   shipping: number;
   shippingAddress?: {
@@ -72,6 +74,8 @@ function createMockPledge(overrides: Partial<Pledge> = {}): Pledge {
     campaignSlug: 'test-campaign',
     amount: 10800, // $100 + tax
     subtotal: 10000,
+    tipAmount: 0,
+    tipPercent: 0,
     tax: 800,
     shipping: 0,
     pledgeStatus: 'active',
@@ -260,6 +264,51 @@ describe('Charge aggregation per supporter', () => {
     expect(Object.keys(pledgesByEmail).length).toBe(1); // One email
     expect(pledgesByEmail[email].pledges.length).toBe(2); // Two pledges
     expect(pledgesByEmail[email].totalAmount).toBe(16200); // $50 + $100 + tax
+  });
+
+  it('should aggregate platform tips into the final supporter charge', async () => {
+    const email = 'supporter@example.com';
+    const kv = createMockKV({
+      'pledge:order-1': JSON.stringify(createMockPledge({
+        orderId: 'order-1',
+        email,
+        amount: 5944,
+        subtotal: 5000,
+        tipAmount: 250,
+        tipPercent: 5,
+        tax: 394,
+        shipping: 300,
+      })),
+      'pledge:order-2': JSON.stringify(createMockPledge({
+        orderId: 'order-2',
+        email,
+        amount: 2148,
+        subtotal: 2000,
+        tipAmount: 100,
+        tipPercent: 5,
+        tax: 48,
+        shipping: 0,
+      })),
+    });
+
+    const list = await kv.list({ prefix: 'pledge:' });
+    const pledgesByEmail: Record<string, { pledges: Pledge[]; totalAmount: number; totalTipAmount: number }> = {};
+
+    for (const key of list.keys) {
+      const pledge = await kv.get(key.name, { type: 'json' }) as Pledge;
+      if (pledge.pledgeStatus === 'active' && !pledge.charged) {
+        const normalizedEmail = pledge.email.toLowerCase();
+        if (!pledgesByEmail[normalizedEmail]) {
+          pledgesByEmail[normalizedEmail] = { pledges: [], totalAmount: 0, totalTipAmount: 0 };
+        }
+        pledgesByEmail[normalizedEmail].pledges.push(pledge);
+        pledgesByEmail[normalizedEmail].totalAmount += pledge.amount;
+        pledgesByEmail[normalizedEmail].totalTipAmount += pledge.tipAmount || 0;
+      }
+    }
+
+    expect(pledgesByEmail[email].totalTipAmount).toBe(350);
+    expect(pledgesByEmail[email].totalAmount).toBe(8092);
   });
 
   it('should use most recently updated payment method', async () => {
@@ -881,25 +930,28 @@ describe('Shipping in settlement', () => {
     expect(pledgesByEmail[email].totalAmount).toBe(10800);
   });
 
-  it('should correctly calculate total for physical pledge: subtotal + tax + shipping', () => {
+  it('should correctly calculate total for physical pledge: subtotal + tip + tax + shipping', () => {
     const subtotal = 2500; // $25
+    const tipAmount = 125; // 5%
     const tax = Math.round(subtotal * 0.07875); // 197
     const shipping = 300; // $3
-    const amount = subtotal + tax + shipping; // 2997
+    const amount = subtotal + tipAmount + tax + shipping; // 3122
 
     expect(tax).toBe(197);
-    expect(amount).toBe(2997);
+    expect(amount).toBe(3122);
 
     const pledge = createMockPledge({
       orderId: 'order-phys-1',
       subtotal,
+      tipPercent: 5,
+      tipAmount,
       tax,
       shipping,
       amount,
     });
 
-    expect(pledge.amount).toBe(pledge.subtotal + pledge.tax + pledge.shipping);
-    expect(pledge.amount).toBe(2997);
+    expect(pledge.amount).toBe(pledge.subtotal + (pledge.tipAmount || 0) + pledge.tax + pledge.shipping);
+    expect(pledge.amount).toBe(3122);
   });
 });
 

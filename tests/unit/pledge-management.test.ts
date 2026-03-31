@@ -27,6 +27,8 @@ interface Pledge {
   campaignSlug: string;
   amount: number;
   subtotal?: number;
+  tipPercent?: number;
+  tipAmount?: number;
   tax?: number;
   shipping?: number;
   shippingAddress?: ShippingAddress;
@@ -441,6 +443,8 @@ describe('API response shape', () => {
       pledgeStatus: pledge.pledgeStatus,
       amount: pledge.amount,
       subtotal: pledge.subtotal,
+      tipPercent: pledge.tipPercent,
+      tipAmount: pledge.tipAmount,
       tax: pledge.tax,
       shipping: pledge.shipping,
       shippingAddress: pledge.shippingAddress,
@@ -521,6 +525,25 @@ describe('API response shape', () => {
       postalCode: '80202',
       country: 'US',
     });
+  });
+
+  it('should include tip fields in response', () => {
+    const pledge = createMockPledge({
+      pledgeStatus: 'active',
+      amount: 4286,
+      subtotal: 3500,
+      tipPercent: 6,
+      tipAmount: 210,
+      tax: 276,
+      shipping: 300,
+    });
+    const campaign = createMockCampaign({ goal_deadline: '2026-12-31' });
+
+    const response = buildPledgeResponse(pledge, campaign);
+
+    expect(response.tipPercent).toBe(6);
+    expect(response.tipAmount).toBe(210);
+    expect(response.amount).toBe(4286);
   });
 });
 
@@ -615,20 +638,23 @@ describe('Shipping in pledge records', () => {
     });
   });
 
-  it('should compute total as subtotal + tax + shipping', () => {
+  it('should compute total as subtotal + tip + tax + shipping', () => {
     const subtotal = 10000;
+    const tipAmount = 500;
     const tax = 500;
     const shipping = 300;
-    const total = subtotal + tax + shipping;
+    const total = subtotal + tipAmount + tax + shipping;
 
     const pledge = createMockPledge({
       amount: total,
       subtotal,
+      tipPercent: 5,
+      tipAmount,
       tax,
       shipping,
     });
 
-    expect(pledge.amount).toBe(subtotal + tax + shipping);
-    expect(pledge.amount).toBe(10800);
+    expect(pledge.amount).toBe(subtotal + tipAmount + tax + shipping);
+    expect(pledge.amount).toBe(11300);
   });
 });

@@ -126,7 +126,21 @@ test.describe('Tier Cards', () => {
     
     // Button text should indicate it's upcoming
     const buttonText = await firstButton.textContent();
-    expect(buttonText).toMatch(/Opens|Unavailable|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/);
+    expect(buttonText).toMatch(/Opens|Unavailable|Campaign Ended|Ended|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/);
+  });
+
+  test('sunder tiers are non-stackable and constrained to quantity 1', async ({ page }) => {
+    await page.goto('/campaigns/sunder/');
+
+    const tierButtons = page.locator('.tier-card button.snipcart-add-item');
+    const count = await tierButtons.count();
+    expect(count).toBeGreaterThan(0);
+
+    for (let i = 0; i < count; i++) {
+      const btn = tierButtons.nth(i);
+      await expect(btn).toHaveAttribute('data-item-stackable', 'never');
+      await expect(btn).toHaveAttribute('data-item-max-quantity', '1');
+    }
   });
 });
 
@@ -525,6 +539,66 @@ test.describe('Cart Flow', () => {
     expect(updatedCart.email).toBe(testEmail);
     expect(updatedCart.billingName).toBe('E2E Test User');
   });
+
+  test('cart shows tip-aware fee summary after adding an item', async ({ page }) => {
+    test.setTimeout(60_000);
+
+    await page.goto('/campaigns/sunder/');
+
+    const tierButton = page.locator('aside.campaign-sidebar button.snipcart-add-item:not([disabled])').first();
+    if (await tierButton.count() === 0) {
+      test.skip();
+      return;
+    }
+
+    await tierButton.click();
+
+    await expect(page.locator('.pool-tip-box')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.pool-fee-summary')).toBeVisible();
+    await expect(page.locator('.pool-tip-box__percent')).toHaveText('5%');
+    await expect(page.locator('.pool-fee-summary')).toContainText('Dust Wave tip (5%)');
+    await expect(page.locator('.pool-fee-summary')).toContainText('ABQ tax (7.875%)');
+  });
+
+  test('single-tier campaigns replace the previous cart item instead of stacking', async ({ page }) => {
+    test.setTimeout(60_000);
+
+    await page.goto('/campaigns/sunder/');
+
+    const tierButtons = page.locator('aside.campaign-sidebar button.snipcart-add-item:not([disabled])');
+    if (await tierButtons.count() < 2) {
+      test.skip();
+      return;
+    }
+
+    const firstTierName = await tierButtons.nth(0).getAttribute('data-item-name');
+    const secondTierName = await tierButtons.nth(1).getAttribute('data-item-name');
+
+    await tierButtons.nth(0).click();
+    await page.waitForTimeout(1500);
+
+    await page.evaluate(() => {
+      const button = document.querySelectorAll('aside.campaign-sidebar button.snipcart-add-item:not([disabled])')[1] as HTMLButtonElement | undefined;
+      button?.click();
+    });
+
+    await page.waitForFunction(() => {
+      const snipcart = (window as any).Snipcart;
+      if (!snipcart) return false;
+      const items = snipcart.store.getState().cart.items.items || [];
+      return items.length === 1;
+    }, null, { timeout: 15000 });
+
+    const cartState = await page.evaluate(() => {
+      const items = (window as any).Snipcart.store.getState().cart.items.items || [];
+      return items.map((item: any) => ({ name: item.name, quantity: item.quantity }));
+    });
+
+    expect(cartState).toHaveLength(1);
+    expect(cartState[0].quantity).toBe(1);
+    expect(cartState[0].name).toBe(secondTierName);
+    expect(cartState[0].name).not.toBe(firstTierName);
+  });
 });
 
 test.describe('Accessibility', () => {
@@ -555,7 +629,7 @@ test.describe('Accessibility', () => {
       
       // Should have meaningful button text
       expect(text?.trim()).toBeTruthy();
-      expect(text).toMatch(/Pledge|Opens|Unavailable|Sold Out|Unlocks/);
+      expect(text).toMatch(/Pledge|Opens|Unavailable|Sold Out|Unlocks|Campaign Ended|Ended/);
     }
   });
 

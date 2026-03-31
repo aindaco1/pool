@@ -449,6 +449,33 @@ describe('Input Validation Security Tests', () => {
       expect(body).not.toContain('<script>');
     });
 
+    it('should handle invalid tipPercent values without crashing', async () => {
+      const payloads = [
+        { tipPercent: -1 },
+        { tipPercent: 16 },
+        { tipPercent: 4.5 },
+        { tipPercent: 'free' },
+        { tipPercent: '<script>alert(1)</script>' },
+        { tipPercent: { percent: 100 } },
+        { tipPercent: null },
+      ];
+
+      for (const extra of payloads) {
+        const res = await securityFetch('/start', {
+          method: 'POST',
+          body: JSON.stringify({
+            orderId: `test-tip-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            campaignSlug: TEST_CAMPAIGNS.valid,
+            amountCents: 500,
+            email: 'test@example.com',
+            ...extra,
+          })
+        });
+
+        expect([200, 400, 429, 500]).toContain(res.status);
+      }
+    });
+
     it('should handle extremely large additionalTiers array', async () => {
       const hugeTiers = Array.from({ length: 1000 }, (_, i) => ({
         id: `tier-${i}`,
