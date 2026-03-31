@@ -41,9 +41,9 @@ import { generateToken, verifyToken } from './token.js';
 import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail } from './email.js';
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
-import { isCampaignLive, getCampaign, getCampaigns, validateTier, getEffectiveState } from './campaigns.js';
-import { createSnipcartClient, extractPledgeFromOrder, canCancelOrder, canModifyOrder } from './snipcart.js';
-import { getCampaignStats, addPledgeToStats, removePledgeFromStats, modifyPledgeInStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, adjustTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent } from './stats.js';
+import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
+import { createSnipcartClient, extractPledgeFromOrder, extractCartFromSnipcartItems, canCancelOrder, canModifyOrder } from './snipcart.js';
+import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent } from './stats.js';
 import { triggerSiteRebuild } from './github.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { DEFAULT_PLATFORM_TIP_PERCENT, calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
@@ -118,6 +118,40 @@ function timingSafeEqual(a, b) {
   const index = await env.PLEDGES.get(key, { type: 'json' }) || [];
   const filtered = index.filter(id => id !== orderId);
   await env.PLEDGES.put(key, JSON.stringify(filtered));
+  }
+
+  async function listAllPledgeKeys(env) {
+  if (!env.PLEDGES) return [];
+  const keys = [];
+  let cursor = undefined;
+  do {
+    const page = await env.PLEDGES.list({ prefix: 'pledge:', cursor });
+    keys.push(...(page.keys || []));
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return keys;
+  }
+
+  function getSettlementNeedsAttention(batchResult = {}) {
+  const details = Array.isArray(batchResult.details) ? batchResult.details : [];
+  const skippedNeedingAttention = details.filter(detail =>
+    detail?.status === 'not_found' || detail?.status === 'missing_stripe_ids'
+  ).length;
+  return {
+    skippedNeedingAttention,
+    unresolved: (batchResult.failed || 0) + skippedNeedingAttention
+  };
+  }
+
+  async function finalizeSettlementDispatch(env, campaignSlug, jobKey, job) {
+  const needsAttention = (job.totalNeedsAttention || 0) > 0;
+  job.status = needsAttention ? 'needs_attention' : 'done';
+  job.completedAt = Date.now();
+  await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: 604800 });
+  if (!needsAttention) {
+    await env.PLEDGES.put(`campaign-charged:${campaignSlug}`, new Date().toISOString());
+  }
+  return { needsAttention };
   }
 
   // SEC-005: Rate limiting helper
@@ -286,6 +320,640 @@ function buildPledgeTotals(subtotalCents, { shipping = 0, tipPercent = DEFAULT_P
     tipAmount,
     amount: normalizedSubtotal + tax + normalizedShipping + tipAmount
   };
+}
+
+function normalizeTierId(rawTierId) {
+  if (typeof rawTierId !== 'string' || rawTierId.length === 0) return null;
+  return rawTierId.split('__').pop();
+}
+
+function isNonNegativeInteger(value) {
+  return Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveInteger(value) {
+  return Number.isInteger(value) && value > 0;
+}
+
+function buildSupportItemDefinitionMap(campaign) {
+  return new Map((campaign?.support_items || []).map(item => [item.id, item]));
+}
+
+function getSupportItemsWithLabels(campaign, supportItems = []) {
+  const supportItemMap = buildSupportItemDefinitionMap(campaign);
+  return supportItems.map(item => ({
+    ...item,
+    label: supportItemMap.get(item.id)?.label || item.id
+  }));
+}
+
+function getPledgeTierSelections(pledge, campaign) {
+  const selectedTiers = [];
+  const allTiers = [];
+
+  if (pledge?.tierId) {
+    allTiers.push({ id: pledge.tierId, qty: pledge.tierQty || 1 });
+  }
+
+  for (const addTier of pledge?.additionalTiers || []) {
+    allTiers.push({ id: addTier.id, qty: addTier.qty || 1 });
+  }
+
+  const seen = new Set();
+  for (const tierItem of allTiers) {
+    const canonicalTierId = normalizeTierId(tierItem.id);
+    if (!canonicalTierId || seen.has(canonicalTierId)) continue;
+
+    const tier = campaign?.tiers?.find(entry => entry.id === canonicalTierId);
+    if (!tier) {
+      return { valid: false, error: `Tier "${canonicalTierId}" not found` };
+    }
+
+    const qty = tierItem.qty || 1;
+    if (!isPositiveInteger(qty)) {
+      return { valid: false, error: `Invalid quantity for tier "${canonicalTierId}"` };
+    }
+
+    selectedTiers.push({ id: canonicalTierId, qty, tier });
+    seen.add(canonicalTierId);
+  }
+
+  return finalizeTierSelection(selectedTiers);
+}
+
+function finalizeTierSelection(selectedTiers) {
+  const normalizedSelections = selectedTiers.map(entry => ({
+    id: normalizeTierId(entry.id),
+    qty: entry.qty,
+    tier: entry.tier
+  }));
+
+  if (normalizedSelections.length === 0) {
+    return {
+      valid: true,
+      selectedTiers: [],
+      tierId: null,
+      tierName: null,
+      tierQty: 0,
+      additionalTiers: [],
+      hasPhysical: false
+    };
+  }
+
+  const [primaryTier, ...additionalTierSelections] = normalizedSelections;
+  return {
+    valid: true,
+    selectedTiers: normalizedSelections,
+    tierId: primaryTier.id,
+    tierName: primaryTier.tier.name,
+    tierQty: primaryTier.qty,
+    additionalTiers: additionalTierSelections.map(entry => ({ id: entry.id, qty: entry.qty })),
+    hasPhysical: normalizedSelections.some(entry => entry.tier?.category === 'physical')
+  };
+}
+
+function enforceSingleTierSelection(campaign, selectedTiers) {
+  if (campaign?.single_tier_only === true && selectedTiers.length > 1) {
+    return { valid: false, error: 'This campaign only allows one tier per pledge' };
+  }
+  return null;
+}
+
+function getCampaignPledgedAmountCents(campaign, stats) {
+  if (Number.isFinite(stats?.pledgedAmount)) {
+    return stats.pledgedAmount;
+  }
+  const pledgedAmount = Number(campaign?.pledged_amount || 0);
+  return Number.isFinite(pledgedAmount) ? pledgedAmount * 100 : 0;
+}
+
+function buildTierCountMapFromSelections(selections = []) {
+  const counts = {};
+  for (const entry of selections || []) {
+    if (!entry?.id) continue;
+    counts[entry.id] = (counts[entry.id] || 0) + (entry.qty || 1);
+  }
+  return counts;
+}
+
+function buildSupportItemAmountMap(items = []) {
+  const amounts = {};
+  for (const item of items || []) {
+    if (!item?.id) continue;
+    amounts[item.id] = (amounts[item.id] || 0) + (item.amount || 0);
+  }
+  return amounts;
+}
+
+function compareCartShapeToContribution(orderCart, canonicalContribution) {
+  const requestedTierCounts = buildTierCountMapFromSelections(canonicalContribution.selectedTiers);
+  const orderTierCounts = buildTierCountMapFromSelections(orderCart.tierSelections);
+  const requestedTierIds = Object.keys(requestedTierCounts).sort();
+  const orderTierIds = Object.keys(orderTierCounts).sort();
+
+  if (requestedTierIds.length !== orderTierIds.length) {
+    return { valid: false, error: 'Order contents mismatch' };
+  }
+
+  for (const tierId of requestedTierIds) {
+    if (requestedTierCounts[tierId] !== orderTierCounts[tierId]) {
+      return { valid: false, error: 'Order contents mismatch' };
+    }
+  }
+
+  const requestedSupportItems = buildSupportItemAmountMap(canonicalContribution.supportItems);
+  const orderSupportItems = buildSupportItemAmountMap(orderCart.supportItems);
+  const requestedSupportIds = Object.keys(requestedSupportItems).sort();
+  const orderSupportIds = Object.keys(orderSupportItems).sort();
+  if (requestedSupportIds.length !== orderSupportIds.length) {
+    return { valid: false, error: 'Order contents mismatch' };
+  }
+
+  for (const itemId of requestedSupportIds) {
+    if (requestedSupportItems[itemId] !== orderSupportItems[itemId]) {
+      return { valid: false, error: 'Order contents mismatch' };
+    }
+  }
+
+  if ((canonicalContribution.customAmount || 0) !== (orderCart.customAmount || 0)) {
+    return { valid: false, error: 'Order contents mismatch' };
+  }
+
+  return { valid: true };
+}
+
+function validateTierSelection(campaign, rawTierId, rawQty, seenTierIds) {
+  const tierId = normalizeTierId(rawTierId);
+  if (!tierId) {
+    return { valid: false, error: 'Invalid tier selection' };
+  }
+
+  if (seenTierIds.has(tierId)) {
+    return { valid: false, error: `Duplicate tier "${tierId}" is not allowed` };
+  }
+
+  const tier = campaign?.tiers?.find(entry => entry.id === tierId);
+  if (!tier) {
+    return { valid: false, error: `Tier "${tierId}" not found` };
+  }
+
+  if (tier.sold_out || (tier.remaining !== undefined && tier.remaining <= 0)) {
+    return { valid: false, error: `Tier "${tierId}" is sold out` };
+  }
+
+  const qty = Number(rawQty ?? 1);
+  if (!isPositiveInteger(qty)) {
+    return { valid: false, error: `Invalid quantity for tier "${tierId}"` };
+  }
+
+  if (tier.stackable !== true && qty !== 1) {
+    return { valid: false, error: `Tier "${tierId}" does not support multiple quantities` };
+  }
+
+  seenTierIds.add(tierId);
+  return { valid: true, selection: { id: tierId, qty, tier } };
+}
+
+function buildTierSelectionFromStartRequest(campaign, { tierId, tierQty = 1, additionalTiers = [] }) {
+  const seenTierIds = new Set();
+  const selectedTiers = [];
+
+  if (tierId) {
+    const primaryTier = validateTierSelection(campaign, tierId, tierQty, seenTierIds);
+    if (!primaryTier.valid) return primaryTier;
+    selectedTiers.push(primaryTier.selection);
+  }
+
+  if (additionalTiers !== undefined && !Array.isArray(additionalTiers)) {
+    return { valid: false, error: 'Invalid additional tier selection' };
+  }
+
+  for (const tierItem of additionalTiers || []) {
+    const result = validateTierSelection(campaign, tierItem?.id, tierItem?.qty ?? 1, seenTierIds);
+    if (!result.valid) return result;
+    selectedTiers.push(result.selection);
+  }
+
+  const singleTierViolation = enforceSingleTierSelection(campaign, selectedTiers);
+  if (singleTierViolation) return singleTierViolation;
+
+  return finalizeTierSelection(selectedTiers);
+}
+
+function buildTierSelectionFromModifyRequest(campaign, currentPledge, { newTierId, newTierQty, addTiers }) {
+  if (Array.isArray(addTiers)) {
+    const seenTierIds = new Set();
+    const selectedTiers = [];
+    for (const tierItem of addTiers) {
+      const result = validateTierSelection(campaign, tierItem?.id, tierItem?.qty ?? 1, seenTierIds);
+      if (!result.valid) return result;
+      selectedTiers.push(result.selection);
+    }
+    const singleTierViolation = enforceSingleTierSelection(campaign, selectedTiers);
+    if (singleTierViolation) return singleTierViolation;
+    return finalizeTierSelection(selectedTiers);
+  }
+
+  const currentSelection = getPledgeTierSelections(currentPledge, campaign);
+  if (!currentSelection.valid) return currentSelection;
+
+  if (!currentSelection.selectedTiers.length) {
+    if (newTierId !== null && newTierId !== undefined) {
+      return buildTierSelectionFromStartRequest(campaign, {
+        tierId: newTierId,
+        tierQty: newTierQty ?? 1,
+        additionalTiers: []
+      });
+    }
+    return currentSelection;
+  }
+
+  const selectedTiers = [...currentSelection.selectedTiers];
+  if (newTierId !== null && newTierId !== undefined) {
+    const updatedPrimary = validateTierSelection(campaign, newTierId, newTierQty ?? selectedTiers[0].qty, new Set());
+    if (!updatedPrimary.valid) return updatedPrimary;
+    selectedTiers[0] = updatedPrimary.selection;
+  } else if (newTierQty !== null && newTierQty !== undefined) {
+    const currentPrimaryTier = selectedTiers[0];
+    const updatedPrimary = validateTierSelection(campaign, currentPrimaryTier.id, newTierQty, new Set());
+    if (!updatedPrimary.valid) return updatedPrimary;
+    selectedTiers[0] = updatedPrimary.selection;
+  }
+
+  return finalizeTierSelection(selectedTiers);
+}
+
+function buildDesiredSupportItems(campaign, currentSupportItems = [], requestedSupportItems) {
+  const supportItemDefinitions = buildSupportItemDefinitionMap(campaign);
+  const mergedSupportItems = new Map();
+
+  for (const item of currentSupportItems || []) {
+    if (item?.id && Number.isFinite(item.amount) && item.amount > 0) {
+      mergedSupportItems.set(item.id, item.amount);
+    }
+  }
+
+  if (requestedSupportItems === null || requestedSupportItems === undefined) {
+    return {
+      valid: true,
+      supportItems: Array.from(mergedSupportItems, ([id, amount]) => ({ id, amount }))
+    };
+  }
+
+  if (!Array.isArray(requestedSupportItems)) {
+    return { valid: false, error: 'Invalid support item selection' };
+  }
+
+  const seenSupportItemIds = new Set();
+  for (const item of requestedSupportItems) {
+    const supportItemId = typeof item?.id === 'string' ? item.id : null;
+    if (!supportItemId || !supportItemDefinitions.has(supportItemId)) {
+      return { valid: false, error: 'Invalid support item selection' };
+    }
+
+    if (seenSupportItemIds.has(supportItemId)) {
+      return { valid: false, error: `Duplicate support item "${supportItemId}" is not allowed` };
+    }
+    seenSupportItemIds.add(supportItemId);
+
+    const amount = Number(item.amount);
+    if (!isNonNegativeInteger(amount) || !isValidAmount(amount * 100)) {
+      return { valid: false, error: `Invalid amount for support item "${supportItemId}"` };
+    }
+
+    if (amount === 0) {
+      mergedSupportItems.delete(supportItemId);
+    } else {
+      mergedSupportItems.set(supportItemId, amount);
+    }
+  }
+
+  return {
+    valid: true,
+    supportItems: Array.from(mergedSupportItems, ([id, amount]) => ({ id, amount }))
+  };
+}
+
+function buildCanonicalContribution(campaign, { tierSelection, supportItems = [], customAmount = 0, tipPercent = DEFAULT_PLATFORM_TIP_PERCENT }) {
+  const normalizedCustomAmount = Number(customAmount);
+  if (!isNonNegativeInteger(normalizedCustomAmount) || !isValidAmount(normalizedCustomAmount * 100)) {
+    return { valid: false, error: 'Invalid custom support amount' };
+  }
+
+  let subtotal = normalizedCustomAmount * 100;
+  for (const tierItem of tierSelection.selectedTiers) {
+    subtotal += (tierItem.tier.price || 0) * tierItem.qty * 100;
+  }
+
+  for (const supportItem of supportItems) {
+    subtotal += supportItem.amount * 100;
+  }
+
+  if (!isValidAmount(subtotal)) {
+    return { valid: false, error: 'Invalid pledge amount' };
+  }
+
+  if (subtotal <= 0) {
+    return { valid: false, error: 'Pledge must include at least one contribution' };
+  }
+
+  return {
+    valid: true,
+    ...tierSelection,
+    supportItems,
+    customAmount: normalizedCustomAmount,
+    totals: buildPledgeTotals(subtotal, {
+      shipping: tierSelection.hasPhysical ? FLAT_SHIPPING_FEE : 0,
+      tipPercent
+    })
+  };
+}
+
+async function validateTierThresholdSelection(env, campaignSlug, campaign, selectedTiers = [], existingSelectedTiers = []) {
+  const thresholdTiers = selectedTiers.filter(tierItem => Number(tierItem.tier?.requires_threshold) > 0);
+  if (thresholdTiers.length === 0) {
+    return { valid: true };
+  }
+
+  const stats = await getCampaignStats(env, campaignSlug);
+  const pledgedAmountCents = getCampaignPledgedAmountCents(campaign, stats);
+  const existingTierCounts = getTierQuantityMap(existingSelectedTiers);
+
+  for (const tierItem of thresholdTiers) {
+    const requiredThresholdCents = Number(tierItem.tier.requires_threshold) * 100;
+    const existingQty = existingTierCounts[tierItem.id] || 0;
+
+    if (tierItem.qty <= existingQty) {
+      continue;
+    }
+
+    if (pledgedAmountCents < requiredThresholdCents) {
+      return {
+        valid: false,
+        error: `Tier "${tierItem.id}" unlocks at $${Number(tierItem.tier.requires_threshold).toLocaleString()}`
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
+function getTierQuantityMap(selectedTiers = []) {
+  const counts = {};
+  for (const tierItem of selectedTiers) {
+    counts[tierItem.id] = (counts[tierItem.id] || 0) + (tierItem.qty || 1);
+  }
+  return counts;
+}
+
+async function ensureTierAvailability(env, campaignSlug, campaign, selectedTiers = [], existingTierCounts = {}, excludedReservationOrderId = null) {
+  if (!env.PLEDGES) return { valid: true };
+
+  let inventory = await getTierInventory(env, campaignSlug);
+  if (Object.keys(inventory).length === 0 && campaign?.tiers?.some(tier => tier.limit_total)) {
+    inventory = await recalculateTierInventory(env, campaignSlug, campaign.tiers) || {};
+  }
+
+  const reservedCounts = await getReservedTierCounts(env, campaignSlug, excludedReservationOrderId);
+
+  for (const tierItem of selectedTiers) {
+    if (!tierItem.tier?.limit_total) continue;
+
+    const tierInventory = inventory[tierItem.id] || {
+      limit: tierItem.tier.limit_total,
+      claimed: 0
+    };
+    const available = tierInventory.limit
+      - tierInventory.claimed
+      - (reservedCounts[tierItem.id] || 0)
+      + (existingTierCounts[tierItem.id] || 0);
+    if (tierItem.qty > available) {
+      return {
+        valid: false,
+        error: available <= 0
+          ? `Tier "${tierItem.id}" is sold out`
+          : `Only ${available} remaining for tier "${tierItem.id}"`,
+        remaining: Math.max(0, available)
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
+function getTierReservationKey(campaignSlug, orderId) {
+  return `tier-reservation:${campaignSlug}:${orderId}`;
+}
+
+async function getReservedTierCounts(env, campaignSlug, excludedOrderId = null) {
+  if (!env.PLEDGES) return {};
+
+  const reservedCounts = {};
+  let cursor = undefined;
+  let listComplete = false;
+
+  while (!listComplete) {
+    const reservationList = await env.PLEDGES.list({
+      prefix: `tier-reservation:${campaignSlug}:`,
+      cursor
+    });
+
+    for (const key of reservationList.keys || []) {
+      const reservationOrderId = key.name.split(':').pop();
+      if (excludedOrderId && reservationOrderId === excludedOrderId) continue;
+
+      const reservation = await env.PLEDGES.get(key.name, { type: 'json' });
+      for (const tierItem of reservation || []) {
+        if (!tierItem?.id) continue;
+        reservedCounts[tierItem.id] = (reservedCounts[tierItem.id] || 0) + (tierItem.qty || 1);
+      }
+    }
+
+    listComplete = reservationList.list_complete !== false;
+    cursor = reservationList.cursor;
+  }
+
+  return reservedCounts;
+}
+
+function resolveAuthorizedOrderId(payload, requestedOrderId = null) {
+  if (!payload?.orderId) {
+    return { valid: false, error: 'Invalid token scope' };
+  }
+
+  if (requestedOrderId && requestedOrderId !== payload.orderId) {
+    return { valid: false, error: 'Unauthorized' };
+  }
+
+  return { valid: true, orderId: payload.orderId };
+}
+
+async function saveTierReservation(env, campaignSlug, orderId, selectedTiers = []) {
+  if (!env.PLEDGES || !orderId) return;
+
+  const limitedTiers = selectedTiers
+    .filter(tierItem => tierItem.tier?.limit_total)
+    .map(tierItem => ({ id: tierItem.id, qty: tierItem.qty }));
+
+  if (limitedTiers.length === 0) {
+    await env.PLEDGES.delete(getTierReservationKey(campaignSlug, orderId));
+    return;
+  }
+
+  await env.PLEDGES.put(
+    getTierReservationKey(campaignSlug, orderId),
+    JSON.stringify(limitedTiers),
+    { expirationTtl: 3600 }
+  );
+}
+
+async function clearTierReservation(env, campaignSlug, orderId) {
+  if (!env.PLEDGES || !orderId) return;
+  await env.PLEDGES.delete(getTierReservationKey(campaignSlug, orderId));
+}
+
+async function claimSelectedTierInventory(env, campaignSlug, selectedTiers = [], campaign) {
+  const claimedTiers = [];
+
+  try {
+    for (const tierItem of selectedTiers) {
+      const claimResult = await claimTierInventory(env, campaignSlug, tierItem.id, tierItem.qty, campaign);
+      if (!claimResult.success) {
+        throw new Error(claimResult.error || `Failed to claim inventory for tier "${tierItem.id}"`);
+      }
+      claimedTiers.push({ id: tierItem.id, qty: tierItem.qty });
+    }
+    return { success: true, claimedTiers };
+  } catch (err) {
+    for (const claimedTier of claimedTiers) {
+      await releaseTierInventory(env, campaignSlug, claimedTier.id, claimedTier.qty);
+    }
+    return { success: false, error: err.message };
+  }
+}
+
+async function applyTierInventoryChanges(env, campaignSlug, campaign, previousSelection = [], nextSelection = []) {
+  const previousCounts = getTierQuantityMap(previousSelection);
+  const nextCounts = getTierQuantityMap(nextSelection);
+  const claimedAdditions = [];
+
+  try {
+    for (const [tierId, nextQty] of Object.entries(nextCounts)) {
+      const previousQty = previousCounts[tierId] || 0;
+      if (nextQty > previousQty) {
+        const delta = nextQty - previousQty;
+        const claimResult = await claimTierInventory(env, campaignSlug, tierId, delta, campaign);
+        if (!claimResult.success) {
+          throw new Error(claimResult.error || `Failed to claim inventory for tier "${tierId}"`);
+        }
+        claimedAdditions.push({ id: tierId, qty: delta });
+      }
+    }
+
+    for (const [tierId, previousQty] of Object.entries(previousCounts)) {
+      const nextQty = nextCounts[tierId] || 0;
+      if (nextQty < previousQty) {
+        await releaseTierInventory(env, campaignSlug, tierId, previousQty - nextQty);
+      }
+    }
+
+    return { success: true };
+  } catch (err) {
+    for (const claimedTier of claimedAdditions) {
+      await releaseTierInventory(env, campaignSlug, claimedTier.id, claimedTier.qty);
+    }
+    return { success: false, error: err.message };
+  }
+}
+
+async function persistNewPledge(env, {
+  campaign,
+  campaignSlug,
+  pledgeData,
+  supportItems = [],
+  selectedTiers = []
+}) {
+  if (!env.PLEDGES) {
+    return { success: false, error: 'PLEDGES KV not configured' };
+  }
+
+  const inventoryClaim = await claimSelectedTierInventory(env, campaignSlug, selectedTiers, campaign);
+  if (!inventoryClaim.success) {
+    return inventoryClaim;
+  }
+
+  let emailIndexed = false;
+  let campaignIndexed = false;
+  let statsUpdated = false;
+  let supportStatsUpdated = false;
+
+  try {
+    await env.PLEDGES.put(`pledge:${pledgeData.orderId}`, JSON.stringify(pledgeData));
+
+    const emailKey = `email:${pledgeData.email.toLowerCase()}`;
+    const existingOrders = await env.PLEDGES.get(emailKey, { type: 'json' }) || [];
+    if (!existingOrders.includes(pledgeData.orderId)) {
+      existingOrders.push(pledgeData.orderId);
+      await env.PLEDGES.put(emailKey, JSON.stringify(existingOrders));
+    }
+    emailIndexed = true;
+
+    await addToCampaignIndex(env, campaignSlug, pledgeData.orderId);
+    campaignIndexed = true;
+
+    await addPledgeToStats(env, {
+      campaignSlug,
+      amount: pledgeData.subtotal,
+      tierId: pledgeData.tierId,
+      tierQty: pledgeData.tierQty,
+      additionalTiers: pledgeData.additionalTiers || []
+    });
+    statsUpdated = true;
+
+    if (supportItems.length > 0) {
+      await updateSupportItemStats(env, campaignSlug, [], supportItems);
+      supportStatsUpdated = true;
+    }
+
+    await clearTierReservation(env, campaignSlug, pledgeData.orderId);
+
+    return { success: true };
+  } catch (err) {
+    await env.PLEDGES.delete(`pledge:${pledgeData.orderId}`);
+
+    if (emailIndexed) {
+      const emailKey = `email:${pledgeData.email.toLowerCase()}`;
+      const existingOrders = await env.PLEDGES.get(emailKey, { type: 'json' }) || [];
+      const filteredOrders = existingOrders.filter(id => id !== pledgeData.orderId);
+      await env.PLEDGES.put(emailKey, JSON.stringify(filteredOrders));
+    }
+
+    if (campaignIndexed) {
+      await removeFromCampaignIndex(env, campaignSlug, pledgeData.orderId);
+    }
+
+    if (supportStatsUpdated) {
+      await updateSupportItemStats(env, campaignSlug, supportItems, []);
+    }
+
+    if (statsUpdated) {
+      await removePledgeFromStats(env, {
+        campaignSlug,
+        amount: pledgeData.subtotal,
+        tierId: pledgeData.tierId,
+        tierQty: pledgeData.tierQty,
+        additionalTiers: pledgeData.additionalTiers || [],
+        supportItems,
+        customAmount: pledgeData.customAmount || 0
+      });
+    }
+
+    for (const claimedTier of inventoryClaim.claimedTiers || []) {
+      await releaseTierInventory(env, campaignSlug, claimedTier.id, claimedTier.qty);
+    }
+
+    return { success: false, error: err.message };
+  }
 }
 
 function getStripeKey(env) {
@@ -584,8 +1252,12 @@ export default {
             totalCharged: settleResult.totalCharged
           }));
           
-          // Mark campaign as charged
-          if (settleResult.supportersCharged > 0) {
+          // Only mark campaigns settled when every active pledge was chargeable.
+          if (
+            settleResult.supportersCharged > 0 &&
+            settleResult.supportersFailed === 0 &&
+            (settleResult.skippedNoCustomer || 0) === 0
+          ) {
             await env.PLEDGES.put(`campaign-charged:${campaign.slug}`, new Date().toISOString());
           }
           
@@ -628,17 +1300,16 @@ async function handleStart(request, env) {
 
   console.log('📥 /start called');
   const body = await request.json();
-  const { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty = 1, additionalTiers = [], supportItems = [], customAmount = 0, customerName, phone, hasPhysical = false, tipPercent } = body;
+  const { publicToken, campaignSlug, email, tipPercent } = body;
   const normalizedTipPercent = sanitizePlatformTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
-  console.log('📥 /start payload:', { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty, additionalTiers, supportItems, customAmount, tipPercent: normalizedTipPercent });
+  console.log('📥 /start payload:', { publicToken: publicToken ? '[present]' : '[missing]', campaignSlug, email, tipPercent: normalizedTipPercent });
 
-  if (!orderId || !campaignSlug) {
+  if (!publicToken) {
     console.log('📥 /start: Missing required fields');
-    return jsonResponse({ error: 'Missing required fields' }, 400);
+    return jsonResponse({ error: 'Missing checkout token' }, 400);
   }
 
-  // SEC-011: Validate inputs before processing
-  if (!isValidSlug(campaignSlug)) {
+  if (campaignSlug && !isValidSlug(campaignSlug)) {
     console.log('📥 /start: Invalid campaign slug format');
     return jsonResponse({ error: 'Invalid campaign slug format' }, 400);
   }
@@ -648,75 +1319,104 @@ async function handleStart(request, env) {
     return jsonResponse({ error: 'Invalid email format' }, 400);
   }
 
-  if (amountCents !== undefined && !isValidAmount(amountCents)) {
-    console.log('📥 /start: Invalid amount');
-    return jsonResponse({ error: 'Invalid amount' }, 400);
+  let paymentSession;
+  try {
+    const sessionRes = await fetch(
+      `https://payment.snipcart.com/api/public/custom-payment-gateway/payment-session?publicToken=${encodeURIComponent(publicToken)}`
+    );
+    if (!sessionRes.ok) {
+      console.error('📥 /start: Failed to fetch payment session:', sessionRes.status);
+      return jsonResponse({ error: 'Invalid checkout token' }, 400);
+    }
+    paymentSession = await sessionRes.json();
+  } catch (err) {
+    console.error('📥 /start: Payment session verification failed:', err.message);
+    return jsonResponse({ error: 'Unable to verify checkout session' }, 502);
   }
 
-  const { valid, error, campaign } = await isCampaignLive(env, campaignSlug);
+  const invoice = paymentSession?.invoice;
+  const orderCart = extractCartFromSnipcartItems(invoice?.items || []);
+  const resolvedCampaignSlug = orderCart.campaignSlug || campaignSlug;
+  if (!resolvedCampaignSlug) {
+    return jsonResponse({ error: 'Could not determine campaign from checkout session' }, 400);
+  }
+  if (campaignSlug && resolvedCampaignSlug !== campaignSlug) {
+    return jsonResponse({ error: 'Checkout session campaign mismatch' }, 400);
+  }
+
+  const { valid, error, campaign } = await isCampaignLive(env, resolvedCampaignSlug);
   console.log('📥 /start: Campaign check:', { valid, error });
   if (!valid) {
     return jsonResponse({ error: error || 'Campaign not accepting pledges' }, 400);
   }
 
-  // Check tier inventory before creating Stripe session
-  const inventory = await getTierInventory(env, campaignSlug);
-  
-  // Check main tier
-  if (tierId && inventory[tierId]) {
-    const remaining = inventory[tierId].limit - inventory[tierId].claimed;
-    console.log('📥 /start: Tier inventory check:', { tierId, tierQty, remaining });
-    if (tierQty > remaining) {
-      return jsonResponse({ 
-        error: remaining === 0 
-          ? 'This tier is sold out' 
-          : `Only ${remaining} remaining for this tier`,
-        remaining 
-      }, 400);
-    }
-  }
-  
-  // Check additional tiers
-  for (const addTier of additionalTiers) {
-    if (inventory[addTier.id]) {
-      const remaining = inventory[addTier.id].limit - inventory[addTier.id].claimed;
-      const qty = addTier.qty || 1;
-      console.log('📥 /start: Additional tier inventory check:', { tierId: addTier.id, qty, remaining });
-      if (qty > remaining) {
-        return jsonResponse({ 
-          error: remaining === 0 
-            ? `Tier "${addTier.id}" is sold out` 
-            : `Only ${remaining} remaining for tier "${addTier.id}"`,
-          remaining 
-        }, 400);
-      }
-    }
+  const tierSelection = buildTierSelectionFromStartRequest(campaign, {
+    tierId: orderCart.tierSelections[0]?.id || null,
+    tierQty: orderCart.tierSelections[0]?.qty || 1,
+    additionalTiers: orderCart.tierSelections.slice(1)
+  });
+  if (!tierSelection.valid) {
+    return jsonResponse({ error: tierSelection.error }, 400);
   }
 
-  const snipcartSecret = getSnipcartSecret(env);
-  if (snipcartSecret) {
-    try {
-      const snipcart = createSnipcartClient(snipcartSecret);
-      const order = await snipcart.orders.get(orderId);
-      
-      if (extractPledgeFromOrder(order)?.campaignSlug !== campaignSlug) {
-        console.warn('Order campaign mismatch:', { orderId, campaignSlug });
-      }
-    } catch (err) {
-      console.error('Snipcart order verification failed:', err.message);
-    }
+  const desiredSupportItems = buildDesiredSupportItems(campaign, [], orderCart.supportItems);
+  if (!desiredSupportItems.valid) {
+    return jsonResponse({ error: desiredSupportItems.error }, 400);
+  }
+
+  const canonicalContribution = buildCanonicalContribution(campaign, {
+    tierSelection,
+    supportItems: desiredSupportItems.supportItems,
+    customAmount: orderCart.customAmount,
+    tipPercent: normalizedTipPercent
+  });
+  if (!canonicalContribution.valid) {
+    return jsonResponse({ error: canonicalContribution.error }, 400);
+  }
+
+  const sessionShape = compareCartShapeToContribution(orderCart, canonicalContribution);
+  if (!sessionShape.valid) {
+    return jsonResponse({ error: sessionShape.error }, 400);
+  }
+
+  const orderId = `pool-${paymentSession.id}`;
+
+  const thresholdValidation = await validateTierThresholdSelection(
+    env,
+    resolvedCampaignSlug,
+    campaign,
+    canonicalContribution.selectedTiers
+  );
+  if (!thresholdValidation.valid) {
+    return jsonResponse({ error: thresholdValidation.error }, 400);
+  }
+
+  const availability = await ensureTierAvailability(
+    env,
+    resolvedCampaignSlug,
+    campaign,
+    canonicalContribution.selectedTiers
+  );
+  if (!availability.valid) {
+    return jsonResponse({ error: availability.error, remaining: availability.remaining }, 400);
   }
 
   // Store additional tiers in KV for webhook to use (Stripe metadata has 500 char limit)
-  if (additionalTiers.length > 0 && env.PLEDGES) {
-    await env.PLEDGES.put(`pending-tiers:${orderId}`, JSON.stringify(additionalTiers), { expirationTtl: 3600 });
-    console.log('📥 /start: Stored additional tiers for order:', orderId, additionalTiers);
+  if (canonicalContribution.additionalTiers.length > 0 && env.PLEDGES) {
+    await env.PLEDGES.put(`pending-tiers:${orderId}`, JSON.stringify(canonicalContribution.additionalTiers), { expirationTtl: 3600 });
+    console.log('📥 /start: Stored additional tiers for order:', orderId, canonicalContribution.additionalTiers);
   }
   
   // Store support items and custom amount in KV for webhook to use
-  if ((supportItems.length > 0 || customAmount > 0) && env.PLEDGES) {
-    await env.PLEDGES.put(`pending-extras:${orderId}`, JSON.stringify({ supportItems, customAmount }), { expirationTtl: 3600 });
-    console.log('📥 /start: Stored extras for order:', orderId, { supportItems, customAmount });
+  if ((canonicalContribution.supportItems.length > 0 || canonicalContribution.customAmount > 0) && env.PLEDGES) {
+    await env.PLEDGES.put(`pending-extras:${orderId}`, JSON.stringify({
+      supportItems: canonicalContribution.supportItems,
+      customAmount: canonicalContribution.customAmount
+    }), { expirationTtl: 3600 });
+    console.log('📥 /start: Stored extras for order:', orderId, {
+      supportItems: canonicalContribution.supportItems,
+      customAmount: canonicalContribution.customAmount
+    });
   }
 
   const stripeKey = getStripeKey(env);
@@ -725,6 +1425,7 @@ async function handleStart(request, env) {
   const stripe = createStripeClient(stripeKey);
   
   try {
+    const customerEmail = email || (invoice?.email && invoice.email !== 'placeholder@pool.local' ? invoice.email : '');
     const sessionParams = {
       mode: 'setup',
       payment_method_types: ['card'],
@@ -732,25 +1433,27 @@ async function handleStart(request, env) {
       cancel_url: `${env.SITE_BASE}/pledge-cancelled/`,
       metadata: {
         orderId,
-        campaignSlug,
-        amountCents: String(amountCents || 0),
-        tierId: tierId || '',
-        tierName: tierName || '',
-        tierQty: String(tierQty || 1),
+        campaignSlug: resolvedCampaignSlug,
+        amountCents: String(canonicalContribution.totals.subtotal),
+        tierId: canonicalContribution.tierId || '',
+        tierName: canonicalContribution.tierName || '',
+        tierQty: String(canonicalContribution.tierQty || 1),
         tipPercent: String(normalizedTipPercent),
-        hasAdditionalTiers: additionalTiers.length > 0 ? 'true' : '',
-        hasExtras: (supportItems.length > 0 || customAmount > 0) ? 'true' : '',
-        hasPhysical: hasPhysical ? 'true' : ''
+        hasAdditionalTiers: canonicalContribution.additionalTiers.length > 0 ? 'true' : '',
+        hasExtras: (canonicalContribution.supportItems.length > 0 || canonicalContribution.customAmount > 0) ? 'true' : '',
+        hasPhysical: canonicalContribution.hasPhysical ? 'true' : '',
+        snipcartPaymentSessionId: paymentSession.id || '',
+        snipcartPublicToken: publicToken
       }
     };
     
     // Let Stripe Checkout create the customer — more reliable than pre-creating
-    if (email) {
-      sessionParams.customer_email = email;
+    if (customerEmail) {
+      sessionParams.customer_email = customerEmail;
     }
     
     // Collect shipping address via Stripe Checkout for physical items
-    if (hasPhysical) {
+    if (canonicalContribution.hasPhysical) {
       sessionParams.shipping_address_collection = {
         allowed_countries: ['US']
       };
@@ -761,6 +1464,10 @@ async function handleStart(request, env) {
     console.log('📥 /start: Stripe session created, URL:', session.url ? 'present' : 'missing');
     return jsonResponse({ url: session.url });
   } catch (stripeErr) {
+    if (env.PLEDGES) {
+      await env.PLEDGES.delete(`pending-tiers:${orderId}`);
+      await env.PLEDGES.delete(`pending-extras:${orderId}`);
+    }
     console.error('📥 /start: Stripe error:', stripeErr.message);
     return jsonResponse({ error: 'Failed to create checkout session: ' + stripeErr.message }, 500);
   }
@@ -786,89 +1493,7 @@ async function handlePaymentMethods(request, env) {
  * User lands here after selecting "Pledge" - we redirect to Stripe SetupIntent
  */
 async function handleCheckout(request, env) {
-  const url = new URL(request.url);
-  const publicToken = url.searchParams.get('publicToken');
-
-  if (!publicToken) {
-    return new Response('Missing publicToken', { status: 400 });
-  }
-
-  // Fetch the payment session from Snipcart
-  const sessionRes = await fetch(
-    `https://payment.snipcart.com/api/public/custom-payment-gateway/payment-session?publicToken=${publicToken}`
-  );
-
-  if (!sessionRes.ok) {
-    console.error('Failed to fetch payment session:', sessionRes.status);
-    return new Response('Invalid payment session', { status: 400 });
-  }
-
-  const session = await sessionRes.json();
-  const invoice = session.invoice;
-  const paymentSessionId = session.id;
-
-  // Extract campaign info from items
-  const items = invoice?.items || [];
-  const firstItem = items.find(i => i.type === 'Physical' || i.type === 'Digital');
-  
-  // Try to extract campaign slug from item URL or name
-  let campaignSlug = null;
-  for (const item of items) {
-    if (item.url) {
-      const match = item.url.match(/\/campaigns\/([^\/]+)/);
-      if (match) {
-        campaignSlug = match[1];
-        break;
-      }
-    }
-  }
-
-  if (!campaignSlug) {
-    console.error('Could not determine campaign from items:', items);
-    return new Response('Could not determine campaign', { status: 400 });
-  }
-
-  // Validate campaign is live
-  const { valid, error } = await isCampaignLive(env, campaignSlug);
-  if (!valid) {
-    return new Response(error || 'Campaign not accepting pledges', { status: 400 });
-  }
-
-  // Extract tier info
-  const tierItem = items.find(item => 
-    item.name?.includes('__') || item.id?.includes('__')
-  );
-  const tierId = tierItem?.id?.split('__')[1] || null;
-  const tierName = tierItem?.name?.split(' — ')[1] || tierItem?.name || null;
-
-  // Amount in cents
-  const amountCents = Math.round((invoice.amount || 0) * 100);
-
-  // Create Stripe Checkout session in setup mode
-  const stripe = createStripeClient(getStripeKey(env));
-  
-  // Generate a unique order ID that includes the Snipcart payment session
-  const orderId = `pool-${paymentSessionId}`;
-
-  const stripeSession = await stripe.checkout.sessions.create({
-    mode: 'setup',
-    payment_method_types: ['card'],
-    customer_email: invoice.email,
-    success_url: `${env.SITE_BASE}/pledge-success/?orderId=${orderId}&publicToken=${publicToken}&sessionId=${paymentSessionId}`,
-    cancel_url: `${env.SITE_BASE}/pledge-cancelled/`,
-    metadata: {
-      orderId,
-      campaignSlug,
-      amountCents: String(amountCents),
-      tierId: tierId || '',
-      tierName: tierName || '',
-      snipcartPaymentSessionId: paymentSessionId,
-      snipcartPublicToken: publicToken
-    }
-  });
-
-  // Redirect to Stripe
-  return Response.redirect(stripeSession.url, 302);
+  return new Response('Legacy checkout flow disabled; use /start', { status: 410 });
 }
 
 async function handleStripeWebhook(request, env, ctx) {
@@ -915,16 +1540,20 @@ async function handleStripeWebhook(request, env, ctx) {
   const event = JSON.parse(body);
   console.log('📨 Event type:', event.type);
 
+  const eventKey = env.PLEDGES ? `stripe-event:${event.id}` : null;
+  const markStripeEventProcessed = async () => {
+    if (env.PLEDGES && eventKey) {
+      await env.PLEDGES.put(eventKey, 'processed', { expirationTtl: 86400 });
+    }
+  };
+
   // Idempotency: skip if we've already processed this event
-  if (env.PLEDGES) {
-    const eventKey = `stripe-event:${event.id}`;
+  if (env.PLEDGES && eventKey) {
     const alreadyProcessed = await env.PLEDGES.get(eventKey);
     if (alreadyProcessed) {
       console.log('📨 Skipping duplicate event:', event.id);
       return jsonResponse({ received: true });
     }
-    // Mark event as processed (expires in 24 hours)
-    await env.PLEDGES.put(eventKey, 'processed', { expirationTtl: 86400 });
   }
 
   if (event.type === 'checkout.session.completed') {
@@ -946,8 +1575,6 @@ async function handleStripeWebhook(request, env, ctx) {
         additionalTiers = await env.PLEDGES.get(`pending-tiers:${orderId}`, { type: 'json' }) || [];
         if (additionalTiers.length > 0) {
           console.log('📨 Found additional tiers for order:', orderId, additionalTiers);
-          // Clean up the temporary key
-          await env.PLEDGES.delete(`pending-tiers:${orderId}`);
         }
       }
       
@@ -960,8 +1587,6 @@ async function handleStripeWebhook(request, env, ctx) {
           supportItems = extras.supportItems || [];
           customAmount = extras.customAmount || 0;
           console.log('📨 Found extras for order:', orderId, { supportItems, customAmount });
-          // Clean up the temporary key
-          await env.PLEDGES.delete(`pending-extras:${orderId}`);
         }
       }
 
@@ -1150,36 +1775,84 @@ async function handleStripeWebhook(request, env, ctx) {
           // New pledge: check if already exists (webhook may be retried by Stripe)
           const existingPledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
           if (existingPledge) {
+            await clearTierReservation(env, campaignSlug, orderId);
+            await env.PLEDGES.delete(`pending-tiers:${orderId}`);
+            await env.PLEDGES.delete(`pending-extras:${orderId}`);
             // Duplicate webhook - pledge already processed
             console.log('📝 Pledge already exists, skipping duplicate webhook:', orderId);
+            await markStripeEventProcessed();
             return jsonResponse({ received: true });
           }
           
-          // New pledge - process it
-          const subtotal = parseInt(amountCents) || 0;
-          const shipping = hasPhysical === 'true' ? FLAT_SHIPPING_FEE : 0;
-          const totals = buildPledgeTotals(subtotal, {
-            shipping,
+          const tierSelection = buildTierSelectionFromStartRequest(campaign, {
+            tierId,
+            tierQty: tierQtyNum,
+            additionalTiers
+          });
+          if (!tierSelection.valid) {
+            console.error('📝 Invalid tier selection in webhook metadata:', tierSelection.error);
+            return jsonResponse({ error: tierSelection.error }, 409);
+          }
+
+          const thresholdValidation = await validateTierThresholdSelection(
+            env,
+            campaignSlug,
+            campaign,
+            tierSelection.selectedTiers
+          );
+          if (!thresholdValidation.valid) {
+            console.error('📝 Threshold-gated tier rejected during webhook processing:', thresholdValidation.error);
+            return jsonResponse({ error: thresholdValidation.error }, 409);
+          }
+
+          const desiredSupportItems = buildDesiredSupportItems(campaign, [], supportItems);
+          if (!desiredSupportItems.valid) {
+            console.error('📝 Invalid support items in webhook metadata:', desiredSupportItems.error);
+            return jsonResponse({ error: desiredSupportItems.error }, 409);
+          }
+
+          const canonicalContribution = buildCanonicalContribution(campaign, {
+            tierSelection,
+            supportItems: desiredSupportItems.supportItems,
+            customAmount,
             tipPercent: normalizedTipPercent
           });
+          if (!canonicalContribution.valid) {
+            console.error('📝 Invalid pledge contribution in webhook metadata:', canonicalContribution.error);
+            return jsonResponse({ error: canonicalContribution.error }, 409);
+          }
+
+          const availability = await ensureTierAvailability(
+            env,
+            campaignSlug,
+            campaign,
+            canonicalContribution.selectedTiers,
+            {},
+            orderId
+          );
+          if (!availability.valid) {
+            console.warn('📝 Inventory unavailable during webhook processing:', availability.error);
+            return jsonResponse({ error: availability.error }, 409);
+          }
+
           const now = new Date().toISOString();
           const pledgeData = {
             orderId,
             email,
             campaignSlug,
-            tierId: tierId || null,
-            tierName: tierName || null,
-            tierQty: tierQtyNum,
-            additionalTiers: additionalTiers.length > 0 ? additionalTiers : undefined,
-            supportItems: supportItems.length > 0 ? supportItems : undefined,
-            customAmount: customAmount > 0 ? customAmount : undefined,
+            tierId: canonicalContribution.tierId,
+            tierName: canonicalContribution.tierName,
+            tierQty: canonicalContribution.tierQty,
+            additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
+            supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
+            customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
             shippingAddress: shippingAddress || undefined,
-            subtotal: totals.subtotal,
-            tax: totals.tax,
-            shipping: totals.shipping,
-            tipPercent: totals.tipPercent,
-            tipAmount: totals.tipAmount,
-            amount: totals.amount,
+            subtotal: canonicalContribution.totals.subtotal,
+            tax: canonicalContribution.totals.tax,
+            shipping: canonicalContribution.totals.shipping,
+            tipPercent: canonicalContribution.totals.tipPercent,
+            tipAmount: canonicalContribution.totals.tipAmount,
+            amount: canonicalContribution.totals.amount,
             stripeCustomerId: customerId,
             stripePaymentMethodId: paymentMethodId,
             stripeSetupIntentId: setupIntentId,
@@ -1189,53 +1862,35 @@ async function handleStripeWebhook(request, env, ctx) {
             updatedAt: now,
             history: [{
               type: 'created',
-              subtotal: totals.subtotal,
-              tax: totals.tax,
-              shipping: totals.shipping,
-              tipPercent: totals.tipPercent,
-              tipAmount: totals.tipAmount,
-              amount: totals.amount,
-              tierId: tierId || null,
-              tierQty: tierQtyNum,
-              additionalTiers: additionalTiers.length > 0 ? additionalTiers : undefined,
-              supportItems: supportItems.length > 0 ? supportItems : undefined,
-              customAmount: customAmount > 0 ? customAmount : undefined,
+              subtotal: canonicalContribution.totals.subtotal,
+              tax: canonicalContribution.totals.tax,
+              shipping: canonicalContribution.totals.shipping,
+              tipPercent: canonicalContribution.totals.tipPercent,
+              tipAmount: canonicalContribution.totals.tipAmount,
+              amount: canonicalContribution.totals.amount,
+              tierId: canonicalContribution.tierId,
+              tierQty: canonicalContribution.tierQty,
+              additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
+              supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
+              customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
               at: now
             }]
           };
 
-          await env.PLEDGES.put(`pledge:${orderId}`, JSON.stringify(pledgeData));
-          
-          const emailKey = `email:${email.toLowerCase()}`;
-          const existingOrders = await env.PLEDGES.get(emailKey, { type: 'json' }) || [];
-          if (!existingOrders.includes(orderId)) {
-            existingOrders.push(orderId);
-            await env.PLEDGES.put(emailKey, JSON.stringify(existingOrders));
-          }
-
-          await addToCampaignIndex(env, campaignSlug, orderId);
-
-          // Update live stats (use subtotal for goal progress tracking)
-          console.log('📊 Updating stats for campaign:', campaignSlug, 'subtotal:', subtotal);
-          await addPledgeToStats(env, {
+          const persisted = await persistNewPledge(env, {
+            campaign,
             campaignSlug,
-            amount: totals.subtotal,
-            tierId: tierId || null,
-            tierQty: tierQtyNum,
-            additionalTiers
+            pledgeData,
+            supportItems: canonicalContribution.supportItems,
+            selectedTiers: canonicalContribution.selectedTiers
           });
-          console.log('📊 Stats updated successfully');
-          
-          // Update support item stats if present (new pledges start with amount, currentAmount is 0)
-          if (supportItems.length > 0) {
-            const supportItemsForStats = supportItems.map(s => ({
-              id: s.id,
-              amount: s.amount,
-              currentAmount: 0
-            }));
-            await updateSupportItemStats(env, campaignSlug, supportItemsForStats);
-            console.log('📊 Support item stats updated:', supportItemsForStats.map(s => `${s.id}: $${s.amount}`).join(', '));
+          if (!persisted.success) {
+            console.error('📝 Failed to persist pledge after webhook:', persisted.error);
+            return jsonResponse({ error: persisted.error }, 409);
           }
+
+          await env.PLEDGES.delete(`pending-tiers:${orderId}`);
+          await env.PLEDGES.delete(`pending-extras:${orderId}`);
 
           // Check for milestone emails (async, don't block response but keep worker alive)
           ctx.waitUntil(
@@ -1244,23 +1899,6 @@ async function handleStripeWebhook(request, env, ctx) {
             })
           );
 
-          // Claim tier inventory for limited tiers (auto-initializes if needed)
-          if (tierId) {
-            const inventoryClaim = await claimTierInventory(env, campaignSlug, tierId, tierQtyNum, campaign);
-            if (inventoryClaim.success) {
-              console.log('📦 Tier inventory claimed:', tierId, 'qty:', tierQtyNum, 'remaining:', inventoryClaim.remaining);
-            }
-          }
-          
-          // Claim inventory for additional tiers
-          for (const addTier of additionalTiers) {
-            const qty = addTier.qty || 1;
-            const inventoryClaim = await claimTierInventory(env, campaignSlug, addTier.id, qty, campaign);
-            if (inventoryClaim.success) {
-              console.log('📦 Additional tier inventory claimed:', addTier.id, 'qty:', qty, 'remaining:', inventoryClaim.remaining);
-            }
-          }
-
           // Send supporter confirmation email
           const token = await generateToken(env.MAGIC_LINK_SECRET, {
             orderId,
@@ -1268,35 +1906,30 @@ async function handleStripeWebhook(request, env, ctx) {
             campaignSlug
           });
 
-          // Build pledge items for email display
-          const campaignTiers = campaign?.tiers || [];
-          const additionalTiersWithNames = additionalTiers.map(t => {
-            const tierData = campaignTiers.find(ct => ct.id === t.id);
+          const additionalTiersWithNames = canonicalContribution.additionalTiers.map(t => {
+            const tierData = campaign?.tiers?.find(ct => ct.id === t.id);
             return { ...t, name: tierData?.name || t.id };
           });
-          const supportItemsWithLabels = supportItems.map(s => {
-            const itemData = campaign?.support_items?.find(si => si.id === s.id);
-            return { ...s, label: itemData?.label || s.id };
-          });
+          const supportItemsWithLabels = getSupportItemsWithLabels(campaign, canonicalContribution.supportItems);
 
           await sendSupporterEmail(env, {
             email,
             campaignSlug,
             campaignTitle,
-            subtotal: totals.subtotal,
-            tax: totals.tax,
-            shipping: totals.shipping,
-            tipAmount: totals.tipAmount,
-            tipPercent: totals.tipPercent,
+            subtotal: canonicalContribution.totals.subtotal,
+            tax: canonicalContribution.totals.tax,
+            shipping: canonicalContribution.totals.shipping,
+            tipAmount: canonicalContribution.totals.tipAmount,
+            tipPercent: canonicalContribution.totals.tipPercent,
             token,
             instagramUrl: campaign?.instagram,
             hasDecisions: campaign?.has_decisions === true,
             pledgeItems: {
-              tierName: tierName || null,
-              tierQty: tierQtyNum,
+              tierName: canonicalContribution.tierName,
+              tierQty: canonicalContribution.tierQty,
               additionalTiers: additionalTiersWithNames,
               supportItems: supportItemsWithLabels,
-              customAmount
+              customAmount: canonicalContribution.customAmount
             }
           });
 
@@ -1370,6 +2003,7 @@ async function handleStripeWebhook(request, env, ctx) {
     }
   }
 
+  await markStripeEventProcessed();
   return jsonResponse({ received: true });
 }
 
@@ -1513,44 +2147,43 @@ async function handleGetPledges(request, env) {
     return jsonResponse({ error: 'Invalid or expired token' }, 401);
   }
 
+  const authorizedOrder = resolveAuthorizedOrderId(payload);
+  if (!authorizedOrder.valid) {
+    return jsonResponse({ error: authorizedOrder.error }, 403);
+  }
+
   const pledges = [];
 
   if (env.PLEDGES) {
-    const emailKey = `email:${payload.email.toLowerCase()}`;
-    const orderIds = await env.PLEDGES.get(emailKey, { type: 'json' }) || [];
-    
-    for (const orderId of orderIds) {
-      const pledgeData = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
-      if (pledgeData && pledgeData.pledgeStatus !== 'cancelled') {
-        // Check if campaign deadline has passed
-        const campaign = await getCampaign(env, pledgeData.campaignSlug);
-        const deadlinePassed = campaign?.goal_deadline && isDeadlinePassed(campaign.goal_deadline);
-        const canChange = pledgeData.pledgeStatus === 'active' && !pledgeData.charged && !deadlinePassed;
-        
-        pledges.push({
-          orderId: pledgeData.orderId,
-          email: pledgeData.email,
-          campaignSlug: pledgeData.campaignSlug,
-          pledgeStatus: pledgeData.pledgeStatus,
-          subtotal: pledgeData.subtotal,
-          tax: pledgeData.tax,
-          shipping: pledgeData.shipping || 0,
-          tipPercent: getStoredTipPercent(pledgeData, 0),
-          tipAmount: getStoredTipAmount(pledgeData),
-          amount: pledgeData.amount,
-          tierId: pledgeData.tierId,
-          tierName: pledgeData.tierName,
-          tierQty: pledgeData.tierQty || 1,
-          additionalTiers: pledgeData.additionalTiers || [],
-          supportItems: pledgeData.supportItems || [],
-          customAmount: pledgeData.customAmount || 0,
-          shippingAddress: pledgeData.shippingAddress || null,
-          canModify: canChange,
-          canCancel: canChange,
-          canUpdatePaymentMethod: !pledgeData.charged,
-          deadlinePassed
-        });
-      }
+    const pledgeData = await env.PLEDGES.get(`pledge:${authorizedOrder.orderId}`, { type: 'json' });
+    if (pledgeData && pledgeData.pledgeStatus !== 'cancelled') {
+      const campaign = await getCampaign(env, pledgeData.campaignSlug);
+      const deadlinePassed = campaign?.goal_deadline && isDeadlinePassed(campaign.goal_deadline);
+      const canChange = pledgeData.pledgeStatus === 'active' && !pledgeData.charged && !deadlinePassed;
+
+      pledges.push({
+        orderId: pledgeData.orderId,
+        email: pledgeData.email,
+        campaignSlug: pledgeData.campaignSlug,
+        pledgeStatus: pledgeData.pledgeStatus,
+        subtotal: pledgeData.subtotal,
+        tax: pledgeData.tax,
+        shipping: pledgeData.shipping || 0,
+        tipPercent: getStoredTipPercent(pledgeData, 0),
+        tipAmount: getStoredTipAmount(pledgeData),
+        amount: pledgeData.amount,
+        tierId: pledgeData.tierId,
+        tierName: pledgeData.tierName,
+        tierQty: pledgeData.tierQty || 1,
+        additionalTiers: pledgeData.additionalTiers || [],
+        supportItems: pledgeData.supportItems || [],
+        customAmount: pledgeData.customAmount || 0,
+        shippingAddress: pledgeData.shippingAddress || null,
+        canModify: canChange,
+        canCancel: canChange,
+        canUpdatePaymentMethod: !pledgeData.charged,
+        deadlinePassed
+      });
     }
   }
 
@@ -1570,7 +2203,11 @@ async function handleCancelPledge(request, env) {
     return jsonResponse({ error: 'Invalid or expired token' }, 401);
   }
 
-  const targetOrderId = orderId || payload.orderId;
+  const authorizedOrder = resolveAuthorizedOrderId(payload, orderId);
+  if (!authorizedOrder.valid) {
+    return jsonResponse({ error: authorizedOrder.error }, 403);
+  }
+  const targetOrderId = authorizedOrder.orderId;
 
   let cancelledPledgeData = null;
   
@@ -1644,6 +2281,7 @@ async function handleCancelPledge(request, env) {
         amount: pledgeData.subtotal || pledgeData.amount || 0,
         tierId: pledgeData.tierId,
         tierQty: pledgeData.tierQty || 1,
+        additionalTiers: pledgeData.additionalTiers || [],
         supportItems: pledgeData.supportItems || [],
         customAmount: pledgeData.customAmount || 0
       });
@@ -1733,8 +2371,7 @@ async function handleModifyPledge(request, env) {
   const hasTierChange = newTierId !== null && newTierId !== undefined;
   const hasQtyChange = newTierQty !== null && newTierQty !== undefined;
   const hasAddTiersPayload = Array.isArray(addTiers); // addTiers was passed (even if empty = tier removal)
-  const hasAddTiers = addTiers && addTiers.length > 0;
-  const hasSupportChange = supportItems && supportItems.length > 0;
+  const hasSupportChange = Array.isArray(supportItems) && supportItems.length > 0;
   const hasCustomAmountChange = customAmount !== null && customAmount !== undefined;
   const hasTipChange = tipPercent !== null && tipPercent !== undefined;
 
@@ -1747,7 +2384,11 @@ async function handleModifyPledge(request, env) {
     return jsonResponse({ error: 'Invalid or expired token' }, 401);
   }
 
-  const targetOrderId = orderId || payload.orderId;
+  const authorizedOrder = resolveAuthorizedOrderId(payload, orderId);
+  if (!authorizedOrder.valid) {
+    return jsonResponse({ error: authorizedOrder.error }, 403);
+  }
+  const targetOrderId = authorizedOrder.orderId;
   let currentPledge = null;
   let campaignSlug = payload.campaignSlug;
   let currentTipPercent = 0;
@@ -1774,115 +2415,67 @@ async function handleModifyPledge(request, env) {
     return jsonResponse({ error: error || 'Campaign no longer accepting pledges' }, 400);
   }
 
-  let newTier = null;
-  const tierQty = newTierQty || 1;
+  if (!currentPledge) {
+    return jsonResponse({ error: 'Pledge not found' }, 404);
+  }
+
   const normalizedTipPercent = hasTipChange
     ? sanitizePlatformTipPercent(tipPercent, currentTipPercent)
     : currentTipPercent;
-
-  // Validate tier change if specified
-  if (hasTierChange) {
-    const tierValidation = await validateTier(env, campaignSlug, newTierId, 0);
-    if (!tierValidation.valid) {
-      return jsonResponse({ error: tierValidation.error }, 400);
-    }
-    newTier = tierValidation.tier;
+  const currentTierSelection = getPledgeTierSelections(currentPledge, campaign);
+  if (!currentTierSelection.valid) {
+    return jsonResponse({ error: currentTierSelection.error }, 400);
   }
 
-  // Calculate new subtotal using diffs to preserve other components (custom, support items)
-  // Use subtotal (pre-tax) as the base, falling back to amount for older pledges without subtotal
-  let newAmount = currentPledge?.subtotal ?? currentPledge?.amount ?? 0;
-  
-  if (newTier || hasQtyChange) {
-    // Calculate tier diff instead of replacing
-    const currentTierIdRaw = currentPledge?.tierId?.split('__').pop() || currentPledge?.tierId;
-    const currentQty = currentPledge?.tierQty || 1;
-    
-    let oldTierPrice = 0;
-    if (currentTierIdRaw) {
-      const oldTierValidation = await validateTier(env, campaignSlug, currentTierIdRaw, 0);
-      if (oldTierValidation.valid) {
-        oldTierPrice = oldTierValidation.tier.price;
-      }
-    }
-    
-    const newTierPrice = newTier ? newTier.price : oldTierPrice;
-    const oldTierAmount = oldTierPrice * currentQty * 100;
-    const newTierAmount = newTierPrice * tierQty * 100;
-    const tierDiff = newTierAmount - oldTierAmount;
-    
-    newAmount += tierDiff;
+  const desiredTierSelection = buildTierSelectionFromModifyRequest(campaign, currentPledge, {
+    newTierId,
+    newTierQty,
+    addTiers
+  });
+  if (!desiredTierSelection.valid) {
+    return jsonResponse({ error: desiredTierSelection.error }, 400);
   }
 
-  // Add support item changes
-  if (hasSupportChange) {
-    for (const item of supportItems) {
-      const diff = (item.amount - (item.currentAmount || 0)) * 100;
-      newAmount += diff;
-    }
+  const thresholdValidation = await validateTierThresholdSelection(
+    env,
+    campaignSlug,
+    campaign,
+    desiredTierSelection.selectedTiers,
+    currentTierSelection.selectedTiers
+  );
+  if (!thresholdValidation.valid) {
+    return jsonResponse({ error: thresholdValidation.error }, 400);
   }
 
-  // Add custom amount changes
-  if (hasCustomAmountChange) {
-    const currentCustom = currentPledge?.customAmount || 0;
-    const customDiff = (customAmount - currentCustom) * 100;
-    newAmount += customDiff;
+  const desiredSupportItems = buildDesiredSupportItems(
+    campaign,
+    currentPledge.supportItems || [],
+    hasSupportChange ? supportItems : null
+  );
+  if (!desiredSupportItems.valid) {
+    return jsonResponse({ error: desiredSupportItems.error }, 400);
   }
 
-  // Handle tier changes in multi-tier mode
-  if (hasAddTiersPayload) {
-    // Calculate diff: new tiers vs current tiers
-    const currentTierIds = new Set();
-    if (currentPledge?.tierId) currentTierIds.add(currentPledge.tierId);
-    if (currentPledge?.additionalTiers) {
-      currentPledge.additionalTiers.forEach(t => currentTierIds.add(t.id));
-    }
-    
-    // Subtract all current tier amounts
-    for (const tierId of currentTierIds) {
-      const tierValidation = await validateTier(env, campaignSlug, tierId, 0);
-      if (tierValidation.valid) {
-        const qty = tierId === currentPledge?.tierId 
-          ? (currentPledge?.tierQty || 1)
-          : (currentPledge?.additionalTiers?.find(t => t.id === tierId)?.qty || 1);
-        newAmount -= tierValidation.tier.price * qty * 100;
-      }
-    }
-    
-    // Add all new tier amounts
-    for (const tierItem of addTiers) {
-      const tierValidation = await validateTier(env, campaignSlug, tierItem.id, 0);
-      if (tierValidation.valid) {
-        newAmount += tierValidation.tier.price * (tierItem.qty || 1) * 100;
-      }
-    }
-  }
-
-  // Recalculate shipping based on whether new tier selection includes physical items
-  const campaignTiers = campaign?.tiers || [];
-  let newHasPhysical = false;
-  if (hasAddTiersPayload && addTiers.length > 0) {
-    newHasPhysical = addTiers.some(t => {
-      const tierData = campaignTiers.find(ct => ct.id === t.id);
-      return tierData?.category === 'physical';
-    });
-  } else if (hasTierChange && newTier) {
-    newHasPhysical = newTier.category === 'physical';
-  } else {
-    // No tier change — check current tiers
-    const currentTierIds = [];
-    if (currentPledge?.tierId) currentTierIds.push(currentPledge.tierId);
-    if (currentPledge?.additionalTiers) currentPledge.additionalTiers.forEach(t => currentTierIds.push(t.id));
-    newHasPhysical = currentTierIds.some(id => {
-      const tierData = campaignTiers.find(ct => ct.id === id);
-      return tierData?.category === 'physical';
-    });
-  }
-  const newShipping = newHasPhysical ? FLAT_SHIPPING_FEE : 0;
-  const totals = buildPledgeTotals(newAmount, {
-    shipping: newShipping,
+  const canonicalContribution = buildCanonicalContribution(campaign, {
+    tierSelection: desiredTierSelection,
+    supportItems: desiredSupportItems.supportItems,
+    customAmount: hasCustomAmountChange ? customAmount : (currentPledge.customAmount || 0),
     tipPercent: normalizedTipPercent
   });
+  if (!canonicalContribution.valid) {
+    return jsonResponse({ error: canonicalContribution.error }, 400);
+  }
+
+  const availability = await ensureTierAvailability(
+    env,
+    campaignSlug,
+    campaign,
+    canonicalContribution.selectedTiers,
+    getTierQuantityMap(currentTierSelection.selectedTiers)
+  );
+  if (!availability.valid) {
+    return jsonResponse({ error: availability.error, remaining: availability.remaining }, 400);
+  }
 
   // Track updated pledge data for email
   let updatedPledgeData = null;
@@ -1891,169 +2484,169 @@ async function handleModifyPledge(request, env) {
   if (env.PLEDGES) {
     const pledgeData = await env.PLEDGES.get(`pledge:${targetOrderId}`, { type: 'json' });
     if (pledgeData) {
-      // Capture old values BEFORE any mutations for stats update
-      const oldAmount = pledgeData.amount || 0;
-      const oldTierId = pledgeData.tierId;
-      const oldTierQty = pledgeData.tierQty || 1;
+      const originalPledgeData = JSON.parse(JSON.stringify(pledgeData));
+      const inventoryUpdate = await applyTierInventoryChanges(
+        env,
+        campaignSlug,
+        campaign,
+        currentTierSelection.selectedTiers,
+        canonicalContribution.selectedTiers
+      );
+      if (!inventoryUpdate.success) {
+        return jsonResponse({ error: inventoryUpdate.error }, 409);
+      }
 
-      if (newTier) {
-        pledgeData.previousTierId = pledgeData.tierId;
-        pledgeData.tierId = newTierId;
-        pledgeData.tierName = newTier.name;
-      }
-      if (hasQtyChange) {
-        pledgeData.tierQty = tierQty;
-      }
-      if (hasSupportChange) {
-        pledgeData.supportItems = supportItems.map(s => ({ id: s.id, amount: s.amount }));
-      }
-      if (hasAddTiersPayload) {
-        // In multi-tier mode, addTiers contains ALL selected tiers
-        // First one becomes the main tier, rest become additionalTiers
-        if (addTiers.length > 0) {
-          pledgeData.tierId = addTiers[0].id;
-          pledgeData.tierQty = addTiers[0].qty || 1;
-          pledgeData.additionalTiers = addTiers.slice(1).map(t => ({ id: t.id, qty: t.qty || 1 }));
-          // Look up tier name for the new primary tier
-          const primaryTierValidation = await validateTier(env, campaignSlug, addTiers[0].id, 0);
-          if (primaryTierValidation.valid) {
-            pledgeData.tierName = primaryTierValidation.tier.name;
-          }
-        } else {
-          // All tiers removed
-          pledgeData.tierId = null;
-          pledgeData.tierName = null;
-          pledgeData.tierQty = 0;
-          pledgeData.additionalTiers = [];
-        }
-      }
-      if (hasCustomAmountChange) {
-        pledgeData.customAmount = customAmount;
-      }
-      
-      // Calculate deltas for history
-      const oldSubtotalForHistory = currentPledge?.subtotal ?? currentPledge?.amount ?? 0;
-      const oldTaxForHistory = currentPledge?.tax ?? 0;
-      const oldShippingForHistory = currentPledge?.shipping ?? 0;
-      const oldTipAmountForHistory = getStoredTipAmount(currentPledge);
-      const oldAmountForHistory = currentPledge?.amount ?? 0;
-      const subtotalDelta = totals.subtotal - oldSubtotalForHistory;
-      const taxDelta = totals.tax - oldTaxForHistory;
-      const shippingDelta = totals.shipping - oldShippingForHistory;
-      const tipAmountDelta = totals.tipAmount - oldTipAmountForHistory;
-      const amountDelta = totals.amount - oldAmountForHistory;
-      
       const now = new Date().toISOString();
-      pledgeData.subtotal = totals.subtotal;
-      pledgeData.tax = totals.tax;
-      pledgeData.shipping = totals.shipping;
-      pledgeData.tipPercent = totals.tipPercent;
-      pledgeData.tipAmount = totals.tipAmount;
-      pledgeData.amount = totals.amount;
-      pledgeData.modifiedAt = now;
-      pledgeData.updatedAt = now;
-      
-      // Append to history (initialize if missing for legacy pledges)
-      if (!pledgeData.history) {
-        pledgeData.history = [{
+      const nextPledgeData = {
+        ...pledgeData,
+        previousTierId: hasTierChange ? pledgeData.tierId : pledgeData.previousTierId,
+        tierId: canonicalContribution.tierId,
+        tierName: canonicalContribution.tierName,
+        tierQty: canonicalContribution.tierQty,
+        additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : [],
+        supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : [],
+        customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : 0,
+        subtotal: canonicalContribution.totals.subtotal,
+        tax: canonicalContribution.totals.tax,
+        shipping: canonicalContribution.totals.shipping,
+        tipPercent: canonicalContribution.totals.tipPercent,
+        tipAmount: canonicalContribution.totals.tipAmount,
+        amount: canonicalContribution.totals.amount,
+        modifiedAt: now,
+        updatedAt: now
+      };
+
+      const previousSubtotal = currentPledge?.subtotal ?? currentPledge?.amount ?? 0;
+      const previousTax = currentPledge?.tax ?? 0;
+      const previousShipping = currentPledge?.shipping ?? 0;
+      const previousTipAmount = getStoredTipAmount(currentPledge);
+      const previousAmount = currentPledge?.amount ?? 0;
+
+      if (!nextPledgeData.history) {
+        nextPledgeData.history = [{
           type: 'created',
-          subtotal: oldSubtotalForHistory,
-          tax: oldTaxForHistory,
-          shipping: oldShippingForHistory,
+          subtotal: previousSubtotal,
+          tax: previousTax,
+          shipping: previousShipping,
           tipPercent: currentTipPercent,
-          tipAmount: oldTipAmountForHistory,
-          amount: oldAmountForHistory,
-          tierId: oldTierId,
-          tierQty: oldTierQty,
-          additionalTiers: currentPledge?.additionalTiers,
-          customAmount: currentPledge?.customAmount || undefined,
-          at: pledgeData.createdAt
+          tipAmount: previousTipAmount,
+          amount: previousAmount,
+          tierId: originalPledgeData.tierId,
+          tierQty: originalPledgeData.tierQty || 1,
+          additionalTiers: originalPledgeData.additionalTiers?.length > 0 ? originalPledgeData.additionalTiers : undefined,
+          customAmount: originalPledgeData.customAmount || undefined,
+          at: originalPledgeData.createdAt
         }];
       }
-      pledgeData.history.push({
+
+      nextPledgeData.history.push({
         type: 'modified',
-        subtotalDelta,
-        taxDelta,
-        shippingDelta,
-        tipPercent: totals.tipPercent,
-        tipAmount: totals.tipAmount,
-        tipAmountDelta,
-        amountDelta,
-        tierId: pledgeData.tierId,
-        tierQty: pledgeData.tierQty,
-        additionalTiers: pledgeData.additionalTiers?.length > 0 ? pledgeData.additionalTiers : undefined,
-        customAmount: pledgeData.customAmount || undefined,
+        subtotalDelta: canonicalContribution.totals.subtotal - previousSubtotal,
+        taxDelta: canonicalContribution.totals.tax - previousTax,
+        shippingDelta: canonicalContribution.totals.shipping - previousShipping,
+        tipPercent: canonicalContribution.totals.tipPercent,
+        tipAmount: canonicalContribution.totals.tipAmount,
+        tipAmountDelta: canonicalContribution.totals.tipAmount - previousTipAmount,
+        amountDelta: canonicalContribution.totals.amount - previousAmount,
+        tierId: nextPledgeData.tierId,
+        tierQty: nextPledgeData.tierQty,
+        additionalTiers: nextPledgeData.additionalTiers.length > 0 ? nextPledgeData.additionalTiers : undefined,
+        customAmount: nextPledgeData.customAmount || undefined,
         at: now
       });
-      
-      await env.PLEDGES.put(`pledge:${targetOrderId}`, JSON.stringify(pledgeData));
 
-      // Update live stats (use subtotals for goal tracking, not amounts with tax)
-      const oldSubtotal = currentPledge?.subtotal ?? oldAmount;
-      await modifyPledgeInStats(env, {
-        campaignSlug,
-        oldAmount: oldSubtotal,
-        newAmount: newAmount,
-        oldTierId,
-        newTierId: pledgeData.tierId,
-        oldTierQty,
-        newTierQty: pledgeData.tierQty || 1
-      });
+      let pledgeStored = false;
+      let oldStatsRemoved = false;
+      let newStatsAdded = false;
+      let supportStatsSynced = false;
 
-      // Update support item stats if changed
-      if (hasSupportChange && supportItems && supportItems.length > 0) {
-        await updateSupportItemStats(env, campaignSlug, supportItems);
-        console.log('📊 Support item stats updated:', supportItems.map(s => `${s.id}: ${s.currentAmount || 0} → ${s.amount}`).join(', '));
-      }
+      try {
+        await env.PLEDGES.put(`pledge:${targetOrderId}`, JSON.stringify(nextPledgeData));
+        pledgeStored = true;
 
-      // Adjust tier inventory if tier or quantity changed
-      if (hasAddTiersPayload) {
-        // Multi-tier mode: compare old vs new tier sets and adjust inventory
-        const oldTiers = {};
-        if (oldTierId) oldTiers[oldTierId] = oldTierQty;
-        if (currentPledge?.additionalTiers) {
-          currentPledge.additionalTiers.forEach(t => {
-            oldTiers[t.id] = t.qty || 1;
+        await removePledgeFromStats(env, {
+          campaignSlug,
+          amount: originalPledgeData.subtotal ?? originalPledgeData.amount ?? 0,
+          tierId: originalPledgeData.tierId,
+          tierQty: originalPledgeData.tierQty || 1,
+          additionalTiers: originalPledgeData.additionalTiers || [],
+          supportItems: [],
+          customAmount: 0
+        });
+        oldStatsRemoved = true;
+
+        await addPledgeToStats(env, {
+          campaignSlug,
+          amount: canonicalContribution.totals.subtotal,
+          tierId: nextPledgeData.tierId,
+          tierQty: nextPledgeData.tierQty || 1,
+          additionalTiers: nextPledgeData.additionalTiers || []
+        });
+        newStatsAdded = true;
+
+        await updateSupportItemStats(
+          env,
+          campaignSlug,
+          originalPledgeData.supportItems || [],
+          nextPledgeData.supportItems || []
+        );
+        supportStatsSynced = true;
+
+        updatedPledgeData = nextPledgeData;
+      } catch (err) {
+        console.error('Failed to persist pledge modification:', err.message);
+
+        if (pledgeStored) {
+          await env.PLEDGES.put(`pledge:${targetOrderId}`, JSON.stringify(originalPledgeData));
+        }
+
+        if (supportStatsSynced) {
+          await updateSupportItemStats(
+            env,
+            campaignSlug,
+            nextPledgeData.supportItems || [],
+            originalPledgeData.supportItems || []
+          );
+        }
+
+        if (newStatsAdded) {
+          await removePledgeFromStats(env, {
+            campaignSlug,
+            amount: canonicalContribution.totals.subtotal,
+            tierId: nextPledgeData.tierId,
+            tierQty: nextPledgeData.tierQty || 1,
+            additionalTiers: nextPledgeData.additionalTiers || [],
+            supportItems: [],
+            customAmount: 0
           });
         }
-        
-        const newTiers = {};
-        if (pledgeData.tierId) newTiers[pledgeData.tierId] = pledgeData.tierQty || 1;
-        if (pledgeData.additionalTiers) {
-          pledgeData.additionalTiers.forEach(t => {
-            newTiers[t.id] = t.qty || 1;
+
+        if (oldStatsRemoved) {
+          await addPledgeToStats(env, {
+            campaignSlug,
+            amount: originalPledgeData.subtotal ?? originalPledgeData.amount ?? 0,
+            tierId: originalPledgeData.tierId,
+            tierQty: originalPledgeData.tierQty || 1,
+            additionalTiers: originalPledgeData.additionalTiers || []
           });
+          await updateSupportItemStats(
+            env,
+            campaignSlug,
+            [],
+            originalPledgeData.supportItems || []
+          );
         }
-        
-        // Release inventory for tiers that were removed or had qty reduced
-        for (const [tierId, oldQty] of Object.entries(oldTiers)) {
-          const newQty = newTiers[tierId] || 0;
-          if (newQty < oldQty) {
-            await releaseTierInventory(env, campaignSlug, tierId, oldQty - newQty);
-            console.log('📦 Tier inventory released:', tierId, 'qty:', oldQty - newQty);
-          }
-        }
-        
-        // Claim inventory for tiers that were added or had qty increased
-        for (const [tierId, newQty] of Object.entries(newTiers)) {
-          const oldQty = oldTiers[tierId] || 0;
-          if (newQty > oldQty) {
-            await claimTierInventory(env, campaignSlug, tierId, newQty - oldQty, campaign);
-            console.log('📦 Tier inventory claimed:', tierId, 'qty:', newQty - oldQty);
-          }
-        }
-      } else {
-        // Single-tier mode: use simpler adjustTierInventory
-        const newTierIdForInventory = pledgeData.tierId;
-        const newTierQtyForInventory = pledgeData.tierQty || 1;
-        if (oldTierId !== newTierIdForInventory || oldTierQty !== newTierQtyForInventory) {
-          await adjustTierInventory(env, campaignSlug, oldTierId, oldTierQty, newTierIdForInventory, newTierQtyForInventory);
-          console.log('📦 Tier inventory adjusted:', { oldTierId, oldTierQty, newTierId: newTierIdForInventory, newTierQty: newTierQtyForInventory });
-        }
+
+        await applyTierInventoryChanges(
+          env,
+          campaignSlug,
+          campaign,
+          canonicalContribution.selectedTiers,
+          currentTierSelection.selectedTiers
+        );
+
+        return jsonResponse({ error: 'Failed to modify pledge' }, 500);
       }
-      
-      // Save for email
-      updatedPledgeData = pledgeData;
     }
   }
 
@@ -2064,14 +2657,14 @@ async function handleModifyPledge(request, env) {
       const snipcart = createSnipcartClient(snipcartSecret);
       await snipcart.orders.update(targetOrderId, {
         metadata: {
-          subtotal: newAmount,
-          tax: totals.tax,
-          tipPercent: totals.tipPercent,
-          tipAmount: totals.tipAmount,
-          totalAmount: totals.amount,
-          tierId: newTier ? newTierId : undefined,
-          tierName: newTier ? newTier.name : undefined,
-          tierQty: hasQtyChange ? tierQty : undefined,
+          subtotal: canonicalContribution.totals.subtotal,
+          tax: canonicalContribution.totals.tax,
+          tipPercent: canonicalContribution.totals.tipPercent,
+          tipAmount: canonicalContribution.totals.tipAmount,
+          totalAmount: canonicalContribution.totals.amount,
+          tierId: canonicalContribution.tierId || undefined,
+          tierName: canonicalContribution.tierName || undefined,
+          tierQty: canonicalContribution.tierQty || undefined,
           modifiedAt: new Date().toISOString()
         }
       });
@@ -2085,7 +2678,12 @@ async function handleModifyPledge(request, env) {
   const previousTax = currentPledge?.tax ?? 0;
   const previousShipping = currentPledge?.shipping ?? 0;
   const previousTipAmount = getStoredTipAmount(currentPledge);
-  if (previousSubtotal !== totals.subtotal || previousTax !== totals.tax || previousShipping !== totals.shipping || previousTipAmount !== totals.tipAmount) {
+  if (
+    previousSubtotal !== canonicalContribution.totals.subtotal ||
+    previousTax !== canonicalContribution.totals.tax ||
+    previousShipping !== canonicalContribution.totals.shipping ||
+    previousTipAmount !== canonicalContribution.totals.tipAmount
+  ) {
     try {
       const campaignTitle = campaign?.title || campaignSlug.replace(/-/g, ' ').toUpperCase();
       const emailToken = await generateToken(env.MAGIC_LINK_SECRET, {
@@ -2097,15 +2695,11 @@ async function handleModifyPledge(request, env) {
       // Build pledge items for email display
       let pledgeItemsForEmail = null;
       if (updatedPledgeData) {
-        const campaignTiers = campaign?.tiers || [];
         const additionalTiersWithNames = (updatedPledgeData.additionalTiers || []).map(t => {
-          const tierData = campaignTiers.find(ct => ct.id === t.id);
+          const tierData = campaign?.tiers?.find(ct => ct.id === t.id);
           return { ...t, name: tierData?.name || t.id };
         });
-        const supportItemsWithLabels = (updatedPledgeData.supportItems || []).map(s => {
-          const itemData = campaign?.support_items?.find(si => si.id === s.id);
-          return { ...s, label: itemData?.label || s.id };
-        });
+        const supportItemsWithLabels = getSupportItemsWithLabels(campaign, updatedPledgeData.supportItems || []);
         pledgeItemsForEmail = {
           tierName: updatedPledgeData.tierName || null,
           tierQty: updatedPledgeData.tierQty || 1,
@@ -2123,11 +2717,11 @@ async function handleModifyPledge(request, env) {
         previousTax,
         previousShipping,
         previousTipAmount,
-        newSubtotal: totals.subtotal,
-        tax: totals.tax,
-        shipping: totals.shipping,
-        tipAmount: totals.tipAmount,
-        tipPercent: totals.tipPercent,
+        newSubtotal: canonicalContribution.totals.subtotal,
+        tax: canonicalContribution.totals.tax,
+        shipping: canonicalContribution.totals.shipping,
+        tipAmount: canonicalContribution.totals.tipAmount,
+        tipPercent: canonicalContribution.totals.tipPercent,
         token: emailToken,
         instagramUrl: campaign?.instagram,
         pledgeItems: pledgeItemsForEmail
@@ -2140,21 +2734,21 @@ async function handleModifyPledge(request, env) {
   return jsonResponse({
     success: true,
     message: 'Pledge modified',
-    newTier: newTier ? {
-      id: newTier.id,
-      name: newTier.name,
-      price: newTier.price
+    newTier: canonicalContribution.tierId ? {
+      id: canonicalContribution.tierId,
+      name: canonicalContribution.tierName,
+      price: campaign?.tiers?.find(tier => tier.id === canonicalContribution.tierId)?.price || 0
     } : null,
-    tierQty,
+    tierQty: canonicalContribution.tierQty,
     previousSubtotal: currentPledge?.subtotal || currentPledge?.amount,
     previousAmount: currentPledge?.amount || 0,
     previousTipAmount,
-    subtotal: totals.subtotal,
-    tax: totals.tax,
-    shipping: totals.shipping,
-    tipPercent: totals.tipPercent,
-    tipAmount: totals.tipAmount,
-    newAmount: totals.amount,
+    subtotal: canonicalContribution.totals.subtotal,
+    tax: canonicalContribution.totals.tax,
+    shipping: canonicalContribution.totals.shipping,
+    tipPercent: canonicalContribution.totals.tipPercent,
+    tipAmount: canonicalContribution.totals.tipAmount,
+    newAmount: canonicalContribution.totals.amount,
     campaignSlug
   });
 }
@@ -2325,6 +2919,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
     campaignSlug,
     supportersCharged: 0,
     supportersFailed: 0,
+    skippedNoCustomer,
     pledgesCharged: 0, 
     errors: [],
     totalCharged: 0
@@ -2606,8 +3201,13 @@ async function handleSettleCampaign(request, campaignSlug, env) {
       return jsonResponse(results);
     }
     
-    // Mark campaign as charged if any supporters were charged
-    if (results.supportersCharged > 0 && env.PLEDGES) {
+    // Only mark settlement complete if every active pledge was chargeable.
+    if (
+      results.supportersCharged > 0 &&
+      results.supportersFailed === 0 &&
+      (results.skippedNoCustomer || 0) === 0 &&
+      env.PLEDGES
+    ) {
       await env.PLEDGES.put(`campaign-charged:${campaignSlug}`, new Date().toISOString());
     }
     
@@ -2646,7 +3246,7 @@ async function handleSettleDispatch(request, campaignSlug, env) {
   const jobKey = `settlement-job:${campaignSlug}`;
   let job = await env.PLEDGES.get(jobKey, { type: 'json' });
 
-  if (!job || job.status === 'done') {
+  if (!job || job.status !== 'running') {
     // Initialize: read campaign pledge index
     let orderIds = await env.PLEDGES.get(`campaign-pledges:${campaignSlug}`, { type: 'json' });
 
@@ -2677,17 +3277,19 @@ async function handleSettleDispatch(request, campaignSlug, env) {
       lastBatchAt: null,
       batchesCompleted: 0,
       totalCharged: 0,
-      totalFailed: 0
+      totalFailed: 0,
+      totalSkipped: 0,
+      totalNeedsAttention: 0
     };
   }
 
   if (job.cursor >= job.total) {
-    // All batches dispatched — mark as done
-    job.status = 'done';
-    await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: 604800 });
-    await env.PLEDGES.put(`campaign-charged:${campaignSlug}`, new Date().toISOString());
-    console.log(`✅ Settlement complete for ${campaignSlug}:`, JSON.stringify(job));
-    return jsonResponse({ message: 'Settlement complete', ...job });
+    const finalized = await finalizeSettlementDispatch(env, campaignSlug, jobKey, job);
+    console.log(`${finalized.needsAttention ? '⚠️' : '✅'} Settlement complete for ${campaignSlug}:`, JSON.stringify(job));
+    return jsonResponse({
+      message: finalized.needsAttention ? 'Settlement completed with unresolved pledges' : 'Settlement complete',
+      ...job
+    });
   }
 
   // Process one batch
@@ -2710,6 +3312,9 @@ async function handleSettleDispatch(request, campaignSlug, env) {
     job.batchesCompleted++;
     job.totalCharged += batchResult.charged || 0;
     job.totalFailed += batchResult.failed || 0;
+    job.totalSkipped += batchResult.skipped || 0;
+    const needsAttention = getSettlementNeedsAttention(batchResult);
+    job.totalNeedsAttention += needsAttention.unresolved;
 
     // Save progress
     await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: 604800 });
@@ -2730,10 +3335,8 @@ async function handleSettleDispatch(request, campaignSlug, env) {
       await nextFetch;
     } else {
       // Final batch done
-      job.status = 'done';
-      await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: 604800 });
-      await env.PLEDGES.put(`campaign-charged:${campaignSlug}`, new Date().toISOString());
-      console.log(`✅ Settlement complete for ${campaignSlug}:`, JSON.stringify(job));
+      const finalized = await finalizeSettlementDispatch(env, campaignSlug, jobKey, job);
+      console.log(`${finalized.needsAttention ? '⚠️' : '✅'} Settlement complete for ${campaignSlug}:`, JSON.stringify(job));
     }
 
     return jsonResponse({
@@ -3005,10 +3608,11 @@ async function handleBackfillCustomers(request, campaignSlug, env) {
   const dryRun = body.dryRun === true;
 
   // Find pledges missing stripeCustomerId
-  const list = await env.PLEDGES.list({ prefix: 'pledge:' });
   const needsBackfill = [];
 
-  for (const key of list.keys) {
+  const pledgeKeys = await listAllPledgeKeys(env);
+
+  for (const key of pledgeKeys) {
     const pledge = await env.PLEDGES.get(key.name, { type: 'json' });
     if (pledge &&
         pledge.campaignSlug === campaignSlug &&
@@ -3223,10 +3827,10 @@ async function getCampaignSupporters(env, campaignSlug) {
   
   const supporters = [];
   const seenEmails = new Set();
-  
-  const list = await env.PLEDGES.list({ prefix: 'pledge:' });
-  
-  for (const key of list.keys) {
+
+  const pledgeKeys = await listAllPledgeKeys(env);
+
+  for (const key of pledgeKeys) {
     const pledgeData = await env.PLEDGES.get(key.name, { type: 'json' });
     if (!pledgeData) continue;
     if (pledgeData.campaignSlug !== campaignSlug) continue;
@@ -3285,19 +3889,23 @@ async function triggerMilestoneEmails(env, campaignSlug) {
       }
     }
     
-    const supporters = await getCampaignSupporters(env, campaignSlug);
-    
     for (const milestoneItem of newMilestones) {
       // Handle both string milestones and stretch goal objects
       const isStretch = typeof milestoneItem === 'object' && milestoneItem.type === 'stretch';
       const milestoneType = isStretch ? 'stretch' : milestoneItem;
       const milestoneId = isStretch ? milestoneItem.id : milestoneItem;
       const stretchGoalName = isStretch ? milestoneItem.name : undefined;
-      
-      // Mark milestone as sent BEFORE sending emails to prevent race condition
-      // If two pledges trigger simultaneously, only the first will proceed
+      const latestSentMilestones = await getSentMilestones(env, campaignSlug);
+
+      if (latestSentMilestones.includes(milestoneId)) {
+        console.log(`🎯 Skipping already-sent milestone ${milestoneId} for ${campaignSlug}`);
+        continue;
+      }
+
       await markMilestoneSent(env, campaignSlug, milestoneId);
-      console.log(`🎯 Milestone ${milestoneId} marked as sent, starting email broadcast...`);
+      const supporters = await getCampaignSupporters(env, campaignSlug);
+
+      console.log(`🎯 Starting milestone ${milestoneId} email broadcast...`);
       
       let sent = 0;
       let failed = 0;
@@ -3768,8 +4376,6 @@ async function handleMilestoneCheck(request, campaignSlug, env) {
     }
   }
 
-  // Trigger the milestones
-  const supporters = await getCampaignSupporters(env, campaignSlug);
   const results = { sent: 0, failed: 0, milestones: [], skippedMilestones };
 
   for (const milestoneItem of newMilestones) {
@@ -3778,10 +4384,16 @@ async function handleMilestoneCheck(request, campaignSlug, env) {
     const milestoneType = isStretch ? 'stretch' : milestoneItem;
     const milestoneId = isStretch ? milestoneItem.id : milestoneItem;
     const stretchGoalName = isStretch ? milestoneItem.name : undefined;
+    const latestSentMilestones = await getSentMilestones(env, campaignSlug);
 
-    // Mark milestone as sent BEFORE sending emails to prevent race condition
+    if (latestSentMilestones.includes(milestoneId)) {
+      results.milestones.push({ milestone: milestoneId, sent: 0, failed: 0, skipped: true });
+      continue;
+    }
+
     await markMilestoneSent(env, campaignSlug, milestoneId);
-    
+    const supporters = await getCampaignSupporters(env, campaignSlug);
+
     let mSent = 0;
     let mFailed = 0;
 
@@ -4302,6 +4914,7 @@ async function handleRecoverCheckout(request, env) {
     if (env.PLEDGES) {
       const existing = await env.PLEDGES.get(`pledge:${pledgeOrderId}`, { type: 'json' });
       if (existing) {
+        await clearTierReservation(env, metadata.campaignSlug, pledgeOrderId);
         return jsonResponse({ 
           error: 'Pledge already exists',
           orderId: pledgeOrderId,
@@ -4323,40 +4936,90 @@ async function handleRecoverCheckout(request, env) {
     const tierName = metadata.tierName || null;
     const tierQty = parseInt(metadata.tierQty) || 1;
 
-    // Get campaign for title
     const campaign = await getCampaign(env, campaignSlug);
     const campaignTitle = campaign?.title || campaignSlug;
 
-    // Calculate tax and shipping
-    const hasPhysical = metadata.hasPhysical === 'true';
-    const subtotal = amountCents;
-    const shipping = hasPhysical ? FLAT_SHIPPING_FEE : 0;
     const tipPercent = metadata.tipPercent === undefined || metadata.tipPercent === null || metadata.tipPercent === ''
       ? 0
       : sanitizePlatformTipPercent(metadata.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
-    const totals = buildPledgeTotals(subtotal, { shipping, tipPercent });
 
-    // Fetch additional tiers if any
     let additionalTiers = [];
     if (metadata.hasAdditionalTiers === 'true' && env.PLEDGES) {
       additionalTiers = await env.PLEDGES.get(`pending-tiers:${pledgeOrderId}`, { type: 'json' }) || [];
     }
 
-    // Create pledge
+    let supportItems = [];
+    let customAmount = 0;
+    if (metadata.hasExtras === 'true' && env.PLEDGES) {
+      const extras = await env.PLEDGES.get(`pending-extras:${pledgeOrderId}`, { type: 'json' });
+      if (extras) {
+        supportItems = extras.supportItems || [];
+        customAmount = extras.customAmount || 0;
+      }
+    }
+
+    const tierSelection = buildTierSelectionFromStartRequest(campaign, {
+      tierId,
+      tierQty,
+      additionalTiers
+    });
+    if (!tierSelection.valid) {
+      return jsonResponse({ error: tierSelection.error }, 409);
+    }
+
+    const thresholdValidation = await validateTierThresholdSelection(
+      env,
+      campaignSlug,
+      campaign,
+      tierSelection.selectedTiers
+    );
+    if (!thresholdValidation.valid) {
+      return jsonResponse({ error: thresholdValidation.error }, 409);
+    }
+
+    const desiredSupportItems = buildDesiredSupportItems(campaign, [], supportItems);
+    if (!desiredSupportItems.valid) {
+      return jsonResponse({ error: desiredSupportItems.error }, 409);
+    }
+
+    const canonicalContribution = buildCanonicalContribution(campaign, {
+      tierSelection,
+      supportItems: desiredSupportItems.supportItems,
+      customAmount,
+      tipPercent
+    });
+    if (!canonicalContribution.valid) {
+      return jsonResponse({ error: canonicalContribution.error }, 409);
+    }
+
+    const availability = await ensureTierAvailability(
+      env,
+      campaignSlug,
+      campaign,
+      canonicalContribution.selectedTiers,
+      {},
+      pledgeOrderId
+    );
+    if (!availability.valid) {
+      return jsonResponse({ error: availability.error }, 409);
+    }
+
     const pledge = {
       orderId: pledgeOrderId,
       email,
       campaignSlug,
-      tierId,
-      tierName,
-      tierQty,
-      additionalTiers: additionalTiers.length > 0 ? additionalTiers : undefined,
-      subtotal: totals.subtotal,
-      tax: totals.tax,
-      shipping: totals.shipping,
-      tipPercent: totals.tipPercent,
-      tipAmount: totals.tipAmount,
-      amount: totals.amount,
+      tierId: canonicalContribution.tierId,
+      tierName: canonicalContribution.tierName,
+      tierQty: canonicalContribution.tierQty,
+      additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
+      supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
+      customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
+      subtotal: canonicalContribution.totals.subtotal,
+      tax: canonicalContribution.totals.tax,
+      shipping: canonicalContribution.totals.shipping,
+      tipPercent: canonicalContribution.totals.tipPercent,
+      tipAmount: canonicalContribution.totals.tipAmount,
+      amount: canonicalContribution.totals.amount,
       stripeCustomerId: customerId,
       stripePaymentMethodId: paymentMethodId,
       stripeSetupIntentId: setupIntentId,
@@ -4368,33 +5031,15 @@ async function handleRecoverCheckout(request, env) {
     };
 
     if (env.PLEDGES) {
-      await env.PLEDGES.put(`pledge:${pledgeOrderId}`, JSON.stringify(pledge));
-      
-      // Update email index
-      const emailKey = `email:${email}`;
-      const existingOrders = await env.PLEDGES.get(emailKey, { type: 'json' }) || [];
-      if (!existingOrders.includes(pledgeOrderId)) {
-        existingOrders.push(pledgeOrderId);
-        await env.PLEDGES.put(emailKey, JSON.stringify(existingOrders));
-      }
-
-      await addToCampaignIndex(env, campaignSlug, pledgeOrderId);
-      
-      // Update stats
-      await addPledgeToStats(env, { 
-        campaignSlug, 
-        amount: totals.subtotal, 
-        tierId, 
-        tierQty,
-        additionalTiers
+      const persisted = await persistNewPledge(env, {
+        campaign,
+        campaignSlug,
+        pledgeData: pledge,
+        supportItems: canonicalContribution.supportItems,
+        selectedTiers: canonicalContribution.selectedTiers
       });
-      
-      // Claim tier inventory
-      if (tierId) {
-        await claimTierInventory(env, campaignSlug, tierId, tierQty, campaign);
-      }
-      for (const addTier of additionalTiers) {
-        await claimTierInventory(env, campaignSlug, addTier.id, addTier.qty || 1, campaign);
+      if (!persisted.success) {
+        return jsonResponse({ error: persisted.error }, 409);
       }
     }
 
@@ -4413,17 +5058,23 @@ async function handleRecoverCheckout(request, env) {
           email,
           campaignTitle,
           campaignSlug,
-          subtotal: totals.subtotal,
-          tax: totals.tax,
-          shipping: totals.shipping,
-          tipAmount: totals.tipAmount,
-          tipPercent: totals.tipPercent,
+          subtotal: canonicalContribution.totals.subtotal,
+          tax: canonicalContribution.totals.tax,
+          shipping: canonicalContribution.totals.shipping,
+          tipAmount: canonicalContribution.totals.tipAmount,
+          tipPercent: canonicalContribution.totals.tipPercent,
           token,
           instagramUrl: campaign?.instagram,
           hasDecisions: campaign?.has_decisions === true,
           pledgeItems: {
-            tierName: tierName || null,
-            tierQty: tierQty || 1
+            tierName: canonicalContribution.tierName || null,
+            tierQty: canonicalContribution.tierQty || 1,
+            additionalTiers: canonicalContribution.additionalTiers.map(t => ({
+              ...t,
+              name: campaign?.tiers?.find(ct => ct.id === t.id)?.name || t.id
+            })),
+            supportItems: getSupportItemsWithLabels(campaign, canonicalContribution.supportItems),
+            customAmount: canonicalContribution.customAmount
           }
         });
         pledge.emailSent = true;

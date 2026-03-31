@@ -1,0 +1,477 @@
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockStripeClient = {
+  checkout: {
+    sessions: {
+      create: vi.fn(),
+      retrieve: vi.fn(),
+      list: vi.fn()
+    }
+  },
+  setupIntents: {
+    retrieve: vi.fn()
+  },
+  customers: {
+    create: vi.fn()
+  },
+  paymentMethods: {
+    attach: vi.fn()
+  },
+  paymentIntents: {
+    create: vi.fn()
+  }
+};
+
+const mockSendAnnouncementEmail = vi.fn(async () => {});
+const mockSendMilestoneEmail = vi.fn(async () => {});
+
+vi.mock('../../worker/src/stripe.js', () => ({
+  verifyStripeSignature: vi.fn(async () => ({ valid: true })),
+  createStripeClient: vi.fn(() => mockStripeClient)
+}));
+
+vi.mock('../../worker/src/token.js', () => ({
+  generateToken: vi.fn(async () => 'token'),
+  verifyToken: vi.fn(async () => null)
+}));
+
+vi.mock('../../worker/src/email.js', () => ({
+  sendSupporterEmail: vi.fn(async () => {}),
+  sendPaymentFailedEmail: vi.fn(async () => {}),
+  sendPledgeModifiedEmail: vi.fn(async () => {}),
+  sendPledgeCancelledEmail: vi.fn(async () => {}),
+  sendDiaryUpdateEmail: vi.fn(async () => {}),
+  sendMilestoneEmail: mockSendMilestoneEmail,
+  sendChargeSuccessEmail: vi.fn(async () => {}),
+  sendAnnouncementEmail: mockSendAnnouncementEmail
+}));
+
+vi.mock('../../worker/src/github.js', () => ({
+  triggerSiteRebuild: vi.fn(async () => {})
+}));
+
+vi.mock('../../worker/src/snipcart.js', () => ({
+  createSnipcartClient: vi.fn(() => ({ orders: { get: vi.fn() } })),
+  extractPledgeFromOrder: vi.fn(() => null),
+  extractCartFromSnipcartItems: vi.fn(() => ({ campaignSlug: null, tierSelections: [], supportItems: [], customAmount: 0 })),
+  canCancelOrder: vi.fn(() => ({ allowed: true })),
+  canModifyOrder: vi.fn(() => ({ allowed: true }))
+}));
+
+class PaginatedKVNamespace {
+  store = new Map<string, string>();
+  pageSize: number;
+
+  constructor(pageSize = 2) {
+    this.pageSize = pageSize;
+  }
+
+  async get(key: string, options?: { type?: string }) {
+    if (!this.store.has(key)) return null;
+    const value = this.store.get(key) as string;
+    if (options?.type === 'json') {
+      return JSON.parse(value);
+    }
+    return value;
+  }
+
+  async put(key: string, value: string) {
+    this.store.set(key, value);
+  }
+
+  async delete(key: string) {
+    this.store.delete(key);
+  }
+
+  async list({ prefix = '', cursor }: { prefix?: string; cursor?: string } = {}) {
+    const matchingKeys = Array.from(this.store.keys())
+      .filter(key => key.startsWith(prefix))
+      .sort();
+    const startIndex = cursor ? Number(cursor) : 0;
+    const page = matchingKeys.slice(startIndex, startIndex + this.pageSize);
+    const nextIndex = startIndex + this.pageSize;
+
+    return {
+      keys: page.map(name => ({ name })),
+      list_complete: nextIndex >= matchingKeys.length,
+      cursor: nextIndex >= matchingKeys.length ? undefined : String(nextIndex)
+    };
+  }
+}
+
+const campaignFixture = {
+  slug: 'hand-relations',
+  title: 'Hand Relations',
+  state: 'live',
+  goal_amount: 25000,
+  pledged_amount: 0,
+  goal_deadline: '2026-12-31',
+  start_date: '2026-01-01',
+  charged: false,
+  single_tier_only: false,
+  custom_late_support: true,
+  tiers: [
+    {
+      id: 'frame-slot',
+      name: 'Buy 1 Frame',
+      price: 5,
+      limit_total: 1000,
+      remaining: 1000,
+      sold_out: false,
+      stackable: true,
+      category: 'digital'
+    }
+  ],
+  support_items: [
+    {
+      id: 'location-scouting',
+      label: 'Location Scouting',
+      target: 1000,
+      current: 0
+    }
+  ],
+  has_decisions: false,
+  instagram: null,
+  diary: []
+};
+
+function jsonResponse(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+function createEnv(overrides: Record<string, unknown> = {}) {
+  return {
+    SITE_BASE: 'https://pool.test',
+    WORKER_BASE: 'https://pool.test',
+    SNIPCART_MODE: 'test',
+    STRIPE_SECRET_KEY_TEST: 'sk_test_123',
+    STRIPE_WEBHOOK_SECRET_TEST: 'whsec_test_123',
+    MAGIC_LINK_SECRET: 'secret',
+    ADMIN_SECRET: 'admin-secret',
+    PLEDGES: new PaginatedKVNamespace(2),
+    ...overrides
+  };
+}
+
+let worker: {
+  fetch: (request: Request, env: Record<string, unknown>, ctx: { waitUntil: (promise: Promise<unknown>) => void }) => Promise<Response>;
+  scheduled: (controller: unknown, env: Record<string, unknown>, ctx: { waitUntil: (promise: Promise<unknown>) => void }) => Promise<void>;
+};
+
+beforeAll(async () => {
+  ({ default: worker } = await import('../../worker/src/index.js'));
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockStripeClient.customers.create.mockImplementation(async ({ email }: { email: string }) => ({ id: `cus_${email}` }));
+  mockStripeClient.paymentMethods.attach.mockResolvedValue({});
+  mockStripeClient.paymentIntents.create.mockResolvedValue({ id: 'pi_test', status: 'succeeded' });
+
+  global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    if (url === 'https://pool.test/api/campaigns.json') {
+      return jsonResponse({ campaigns: [campaignFixture] });
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  }) as typeof fetch;
+});
+
+describe('worker operational integrity', () => {
+  it('does not mark direct settlement complete when active pledges are skipped for missing customers', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('pledge:order-direct-settle-1', JSON.stringify({
+      orderId: 'order-direct-settle-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      amount: 3000000,
+      subtotal: 3000000,
+      tax: 0,
+      shipping: 0,
+      pledgeStatus: 'active',
+      charged: false,
+      stripePaymentMethodId: 'pm_missing_customer',
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 3000000,
+      pledgeCount: 1,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [
+            {
+              ...campaignFixture,
+              goal_deadline: '2020-01-01'
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/settle/hand-relations', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer admin-secret',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.skippedNoCustomer).toBe(1);
+    expect(body.supportersCharged).toBe(0);
+    expect(await kv.get('campaign-charged:hand-relations')).toBeNull();
+  });
+
+  it('does not mark scheduled settlement complete when active pledges are skipped for missing customers', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('pledge:order-scheduled-settle-1', JSON.stringify({
+      orderId: 'order-scheduled-settle-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      amount: 3000000,
+      subtotal: 3000000,
+      tax: 0,
+      shipping: 0,
+      pledgeStatus: 'active',
+      charged: false,
+      stripePaymentMethodId: 'pm_missing_customer',
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 3000000,
+      pledgeCount: 1,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [
+            {
+              ...campaignFixture,
+              goal_deadline: '2020-01-01'
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    await worker.scheduled({}, env, { waitUntil: () => {} });
+
+    expect(await kv.get('campaign-charged:hand-relations')).toBeNull();
+  });
+
+  it('does not mark a campaign settled when dispatch finishes with unresolved pledges', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-settle-1']));
+    await kv.put('pledge:order-settle-1', JSON.stringify({
+      orderId: 'order-settle-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      amount: 10000,
+      subtotal: 10000,
+      tax: 0,
+      shipping: 0,
+      pledgeStatus: 'active',
+      charged: false,
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture] });
+      }
+      if (url === 'https://pool.test/admin/settle-batch') {
+        return worker.fetch(
+          new Request(url, {
+            method: init?.method || 'POST',
+            headers: init?.headers,
+            body: init?.body as BodyInit | null | undefined
+          }),
+          env,
+          { waitUntil: () => {} }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/settle-dispatch/hand-relations', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer admin-secret',
+          'Content-Type': 'application/json'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.status).toBe('needs_attention');
+    expect(await kv.get('campaign-charged:hand-relations')).toBeNull();
+    const job = await kv.get('settlement-job:hand-relations', { type: 'json' });
+    expect(job.totalNeedsAttention).toBeGreaterThan(0);
+  });
+
+  it('backfills customers across paginated pledge KV pages', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    for (let index = 1; index <= 3; index++) {
+      await kv.put(`pledge:order-backfill-${index}`, JSON.stringify({
+        orderId: `order-backfill-${index}`,
+        email: `buyer${index}@example.com`,
+        campaignSlug: 'hand-relations',
+        pledgeStatus: 'active',
+        charged: false,
+        stripePaymentMethodId: `pm_${index}`,
+        updatedAt: '2026-03-31T00:00:00.000Z'
+      }));
+    }
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/backfill-customers/hand-relations', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer admin-secret',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.processed).toBe(3);
+    expect(body.failed).toBe(0);
+
+    const finalPledge = await kv.get('pledge:order-backfill-3', { type: 'json' });
+    expect(finalPledge.stripeCustomerId).toBe('cus_buyer3@example.com');
+  });
+
+  it('enumerates paginated supporters for admin broadcasts', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    for (let index = 1; index <= 3; index++) {
+      await kv.put(`pledge:order-supporter-${index}`, JSON.stringify({
+        orderId: `order-supporter-${index}`,
+        email: `supporter${index}@example.com`,
+        campaignSlug: 'hand-relations',
+        pledgeStatus: 'active',
+        charged: false
+      }));
+    }
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/broadcast/announcement', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer admin-secret',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          subject: 'Update',
+          body: 'Hello supporters',
+          dryRun: true
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.recipientCount).toBe(3);
+    expect(body.recipients).toContain('supporter3@example.com');
+  });
+
+  it('pre-marks milestone sends so nested milestone checks do not duplicate broadcasts', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+    let nestedTriggered = false;
+
+    await kv.put('pledge:order-milestone-1', JSON.stringify({
+      orderId: 'order-milestone-1',
+      email: 'supporter@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'active',
+      charged: false
+    }));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 1000000,
+      pledgeCount: 1,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    mockSendMilestoneEmail.mockImplementation(async () => {
+      if (nestedTriggered) return;
+      nestedTriggered = true;
+      const nestedResponse = await worker.fetch(
+        new Request('https://pool.test/admin/milestone-check/hand-relations', {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer admin-secret'
+          }
+        }),
+        env,
+        { waitUntil: () => {} }
+      );
+      expect(nestedResponse.status).toBe(200);
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/milestone-check/hand-relations', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer admin-secret'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSendMilestoneEmail).toHaveBeenCalledTimes(1);
+    const sentMilestones = await kv.get('milestones:hand-relations', { type: 'json' });
+    expect(sentMilestones).toContain('one-third');
+  });
+});

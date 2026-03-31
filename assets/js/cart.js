@@ -620,9 +620,12 @@ async function startPledgeFlow() {
   // Calculate subtotal from cart (pre-tax for stats, Worker will add tax)
   const subtotalCents = Math.round((cart.subtotal || cart.total) * 100);
   const selectedTipPercent = getStoredTipPercent(state);
-  
-  // Generate a temporary order ID (will be replaced by Snipcart's if we create an order later)
-  const tempOrderId = `pledge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const publicToken = state.cart?.token;
+  if (!publicToken) {
+    console.error('Missing Snipcart checkout token');
+    alert('There was an error starting your pledge: missing checkout token.');
+    return false;
+  }
   
   // Get customer info from Snipcart state
   // Note: billing address is dummy data (for Snipcart internal use only)
@@ -643,7 +646,7 @@ async function startPledgeFlow() {
 
   try {
     const payload = {
-      orderId: tempOrderId,
+      publicToken,
       campaignSlug,
       amountCents: subtotalCents,
       email,

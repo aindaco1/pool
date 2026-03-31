@@ -8,6 +8,7 @@ This guide covers the test suites and manual testing setup.
 npm run test:unit          # Unit tests (Vitest) — ~700ms
 npm run test:unit:watch    # Watch mode
 npm run test:unit:coverage # With coverage report
+npm run test:premerge      # Merge-readiness checks for changed Worker logic
 npm run test:e2e           # E2E tests (Playwright) — starts Jekyll
 npm run test:e2e:headless  # CI mode
 npm run test:security      # Security pen tests (Worker must be running)
@@ -40,6 +41,70 @@ npm run test:unit          # Run once
 npm run test:unit:watch    # Watch mode for development
 npm run test:unit:coverage # Generate coverage report
 ```
+
+---
+
+## Pre-Merge Regression Runbook
+
+Use this before merging branches that touch checkout, Worker business logic, fulfillment, or broadcast flows.
+
+### Automated Gate
+
+```bash
+npm run test:premerge
+```
+
+This runs:
+
+- `node --check` for the changed Worker entrypoints
+- Focused regression suites:
+  - `tests/unit/worker-business-logic.test.ts`
+  - `tests/unit/worker-ops-integrity.test.ts`
+  - `tests/unit/stats-pagination.test.ts`
+- Full unit suite via `npm run test:unit`
+- Security suite via `npm run test:security` against an auto-started local Worker
+- Playwright headless E2E via `npm run test:e2e:headless`
+
+### Main Branch Comparison
+
+Run the same automated gate on `main` in a clean worktree so the baseline and the patch branch are directly comparable. If `main` predates `test:premerge`, run the equivalent syntax, unit, security, and E2E commands manually there.
+
+```bash
+git worktree add ../pool-main-check main
+ln -s "$(pwd)/node_modules" ../pool-main-check/node_modules
+cd ../pool-main-check
+npm run test:premerge
+```
+
+If you create the temporary worktree, remove it after comparison:
+
+```bash
+cd -
+git worktree remove ../pool-main-check
+```
+
+### Manual Smoke Checklist
+
+Run these in test/staging before merge when the branch changes end-to-end behavior:
+
+1. Start a new checkout on a live test campaign and confirm `/start` returns a Stripe Checkout URL.
+2. Complete a pledge and verify the webhook stores the pledge, stats update, and confirmation email path stays healthy.
+3. Modify a pledge with tier/support/custom amount changes and verify totals, history, and inventory update correctly.
+4. Cancel an uncharged pledge and verify stats and inventory are released correctly.
+5. Run settlement dry-run and live-run on seeded pledges, confirming campaigns only mark settled when nothing needs attention.
+6. Trigger diary, announcement, and milestone broadcasts on a campaign large enough to cross pagination boundaries.
+
+This manual staging smoke pass is required before merge for branches that change checkout or Worker business logic.
+
+For an operator-ready version with exact commands and expected results, use [docs/MERGE_SMOKE_CHECKLIST.md](./MERGE_SMOKE_CHECKLIST.md).
+
+### Intentional Behavior Changes
+
+When reviewing results, do not flag these as regressions:
+
+- Magic links are now order-scoped instead of email-scoped.
+- `/start` no longer reserves limited inventory before checkout completion.
+- Legacy `GET /checkout` is intentionally disabled.
 
 ### Adding Tests
 
