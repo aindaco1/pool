@@ -7,6 +7,8 @@ The Pool uses a **no-account, email-based pledge management system**. Backers sa
 - **No accounts** — Email + payment info only (no registration)
 - **Magic link management** — Cancel, modify, or update payment method via email link
 - **All-or-nothing** — Cards saved now, charged only if goal is met
+- **Optional platform tip** — 0% to 15% Dust Wave tip (default 5%) added to totals but excluded from campaign progress
+- **Worker-owned email** — Snipcart emails stay disabled; all supporter email comes from Resend
 - **Film-focused** — Designed for creative crowdfunding
 
 ---
@@ -39,7 +41,7 @@ upcoming → live → post
 ## Pledge Lifecycle
 
 ```
-1. BROWSE     → Visitor views campaign, adds tier to Snipcart cart
+1. BROWSE     → Visitor views campaign, adds tier to Snipcart cart, adjusts optional tip
 2. CHECKOUT   → Billing auto-filled → JS intercepts "Continue to Pledge"
 3. START      → Worker creates Stripe Checkout (setup mode)
 4. SAVE CARD  → Stripe Checkout saves payment method (no charge)
@@ -75,17 +77,19 @@ Pledges are stored in Cloudflare KV (not Snipcart). Key patterns:
   "additionalTiers": [{ "id": "frame-slot", "qty": 2 }],
   "supportItems": [{ "id": "location-scouting", "amount": 50 }],
   "customAmount": 25,
+  "tipPercent": 5,
+  "tipAmount": 250,
   "subtotal": 5000,
   "tax": 394,
   "shipping": 300,
-  "amount": 5694,
+  "amount": 5944,
   "shippingAddress": { "name": "Jane Doe", "address1": "123 Main St", "city": "Albuquerque", "province": "NM", "postalCode": "87101", "country": "US" },
   "stripeCustomerId": "cus_xxx",
   "stripePaymentMethodId": "pm_xxx",
   "pledgeStatus": "active",
   "charged": false,
   "history": [
-    { "type": "created", "subtotal": 5000, "tax": 394, "shipping": 300, "amount": 5694, "tierId": "producer-credit", "tierQty": 1, "customAmount": 25, "at": "2026-01-15T12:00:00Z" }
+    { "type": "created", "subtotal": 5000, "tax": 394, "shipping": 300, "tipPercent": 5, "tipAmount": 250, "amount": 5944, "tierId": "producer-credit", "tierQty": 1, "customAmount": 25, "at": "2026-01-15T12:00:00Z" }
   ]
 }
 ```
@@ -94,13 +98,16 @@ Pledges are stored in Cloudflare KV (not Snipcart). Key patterns:
 - `supportItems` — Array of `{ id, amount }` for production phase contributions
 - `customAmount` — Dollar amount for "no reward" custom support additions
 - `additionalTiers` — Array of `{ id, qty }` for multi-tier pledges (when `single_tier_only: false`)
+- `tipPercent` / `tipAmount` — Optional Dust Wave platform tip stored separately from campaign subtotal
 
 **History entries:**
 Each history entry tracks a pledge event with full context:
 - `type` — `created`, `modified`, or `cancelled`
 - `subtotal` / `subtotalDelta` — Pre-tax amount (or delta for modifications)
+- `tipAmount` / `tipAmountDelta` — Platform tip amount (or delta)
+- `tipPercent` — Selected tip percentage after this event
 - `tax` / `taxDelta` — Tax amount (or delta)
-- `amount` / `amountDelta` — Total with tax + shipping (or delta)
+- `amount` / `amountDelta` — Total with tax + shipping + tip (or delta)
 - `shipping` / `shippingDelta` — Flat shipping fee (or delta, for tier category changes)
 - `tierId`, `tierQty`, `additionalTiers` — Tier state after this event
 - `customAmount` — Custom support amount (if present)
@@ -143,28 +150,32 @@ Create Stripe Checkout session (setup mode) after Snipcart order.
 {
   "orderId": "pledge-123",
   "campaignSlug": "hand-relations",
-  "tiers": [{ "id": "producer-credit", "qty": 1, "price": 50 }],
+  "amountCents": 8500,
+  "email": "backer@example.com",
+  "tierId": "producer-credit",
+  "tierName": "Producer Credit",
+  "tierQty": 1,
+  "additionalTiers": [{ "id": "frame-slot", "qty": 2, "price": 500 }],
   "supportItems": [{ "id": "location-scouting", "amount": 25 }],
   "customAmount": 10,
   "hasPhysical": true,
-  "subtotal": 8500,
-  "tax": 669
+  "tipPercent": 5
 }
 ```
 **Response:** `{ url }` → Redirect to Stripe Checkout
 
 **Data flow:**
-1. Cart.js extracts tiers, support items, custom amount, and physical item flag from Snipcart cart
+1. Cart.js extracts tiers, support items, custom amount, physical item flag, and selected tip percent from Snipcart cart
 2. Worker stores `supportItems` and `customAmount` in temp KV key (`pending-extras:{orderId}`)
-3. Worker sets `hasExtras` and `hasPhysical` flags in Stripe Checkout metadata
+3. Worker sets `hasExtras`, `hasPhysical`, and `tipPercent` in Stripe Checkout metadata
 4. If `hasPhysical`, Stripe Checkout collects shipping address via `shipping_address_collection`
-5. On webhook, Worker fetches extras from temp KV, extracts shipping address from Stripe session, and merges into final pledge
+5. On webhook, Worker fetches extras from temp KV, extracts shipping address from Stripe session, computes `subtotal + tax + shipping + tip`, and merges into final pledge
 
 ### `POST /webhooks/stripe`
 Handle `checkout.session.completed`:
 - Extract `payment_method` and `customer` from SetupIntent
 - Fetch `supportItems` and `customAmount` from temp KV (if `hasExtras` flag set)
-- Store pledge in KV with status `active` (includes support items, custom amount, shipping fee, and shipping address)
+- Store pledge in KV with status `active` (includes support items, custom amount, shipping fee, tip, and shipping address)
 - Update live stats (pledgedAmount, tierCounts, supportItems)
 - Claim tier inventory (for limited tiers)
 - Generate magic link token
@@ -318,19 +329,23 @@ Magic link landing page for pledge management:
 - Reads `?t=...` token
 - Fetches pledge details from Worker
 - Shows pledge cards with state-dependent UI
-- Displays full breakdown: subtotal, tax (7.875%), shipping ($3 if physical), total
+- Groups projects into **Active** and **Closed** sections
+- Sorts active cards with the most recent campaigns first
+- Displays full breakdown: subtotal, optional Dust Wave tip, tax (7.875%), shipping ($3 if physical), total
 
 **Pledge card states:**
 
 | Status | UI Treatment |
 |--------|-------------|
 | `active` | Full edit controls (tier selection, support items, cancel button) |
-| `active` + deadline passed | Locked notice, "Update Card" only |
+| `active` + deadline passed | Locked badge + locked notice, read-only pledge controls, "Update Card" only |
 | `charged` | Muted card, "✓ Successfully charged on {date}" notice |
 | `payment_failed` | Warning notice with "Update Payment Method" button |
 | `cancelled` | "This pledge has been cancelled" notice |
 
 **Shipping in modify flow:** When a supporter changes tiers, the manage page dynamically recalculates shipping — if the new tier selection includes any `category: physical` tier, the $3 shipping fee is shown; otherwise it's hidden. The confirmation modal shows the updated total before the user confirms.
+
+**Tip in modify flow:** The manage page exposes the same 0% to 15% tip slider. During live campaigns, supporters can adjust it and see subtotal / tip / tax / shipping / total update immediately. Once the deadline passes, the tip slider becomes read-only along with the rest of the pledge controls.
 
 **Dev mode:** Add `?dev` to URL for mock pledge data testing
 
@@ -384,7 +399,7 @@ A per-campaign array of order IDs (`campaign-pledges:{slug}`) is maintained auto
 
 **Key behaviors:**
 - Cancelled pledges are never charged
-- Multiple pledges from same email = one aggregated charge (subtotals + shipping summed)
+- Multiple pledges from same email = one aggregated charge (subtotals + shipping + tax + tip summed)
 - Uses the most recently updated payment method for each supporter
 - Already-charged pledges are safely skipped (idempotent)
 - Can be triggered manually via `POST /admin/settle-dispatch/:slug`
@@ -457,30 +472,30 @@ All emails show exact amounts with 2 decimal places (no rounding).
 
 **Pledge Confirmation** (sent after Stripe SetupIntent success)
 - Subject: "Your pledge to {Campaign Title}"
-- Contains: Full breakdown (subtotal, tax, shipping if physical, total), pledge items, manage link, community link
+- Contains: Full breakdown (subtotal, optional Dust Wave tip, tax, shipping if physical, total), pledge items, manage link, community link
 - Includes: Instagram CTA (if campaign has Instagram URL)
 - Community link shown only if campaign has active decisions
 
 **Pledge Modified** (sent when supporter changes their pledge)
 - Subject: "Pledge updated for {Campaign Title}"
-- Contains: Previous subtotal, new subtotal, change amount (+/-), tax, shipping (if physical), new total, updated pledge items
+- Contains: Previous subtotal, new subtotal, change amount (+/-), optional Dust Wave tip, tax, shipping (if physical), new total, updated pledge items
 - Includes: Instagram CTA (if campaign has Instagram URL)
 - Community link shown only if campaign has active decisions
 
 **Charge Success** (sent when pledge is charged at settlement)
 - Subject: "Payment confirmed for {Campaign Title}"
-- Contains: Full breakdown (subtotal + tax + shipping + total charged), pledge items
+- Contains: Full breakdown (subtotal + tip + tax + shipping + total charged), pledge items
 - Community link shown only if campaign has active decisions
 - Note: No Instagram CTA (campaign is over)
 
 **Payment Failed** (sent when off-session charge fails)
 - Subject: "Action needed: Update payment for {Campaign Title}"
-- Contains: Full breakdown (subtotal + tax + shipping + amount due), pledge items, manage link to update card
+- Contains: Full breakdown (subtotal + tip + tax + shipping + amount due), pledge items, manage link to update card
 - Note: No Instagram CTA (campaign is over)
 
 **Pledge Cancelled** (sent when supporter cancels their pledge)
 - Subject: "Pledge cancelled for {Campaign Title}"
-- Contains: Amount, confirmation card wasn't charged, link to view campaign (can re-pledge)
+- Contains: Breakdown including optional tip, confirmation card wasn't charged, link to view campaign (can re-pledge)
 - Note: Supporter is removed from future campaign email updates
 
 **Diary Update** (sent when new diary entry is added to campaign)
@@ -517,7 +532,7 @@ All emails show exact amounts with 2 decimal places (no rounding).
 - Cron checks `pledgeStatus === 'active'` and `!charged` before charging
 - `pledgeStatus` and `charged` flags prevent double-charging
 - Aggregation by email ensures one charge per supporter even with multiple pledges
-- Manage page shows deadline-passed notice and hides cancel/modify buttons once deadline passes
+- Manage page shows deadline-passed notice, locked badge, and read-only pledge controls once deadline passes
 - Payment method updates remain available after deadline (for failed payment recovery)
 
 ---
@@ -531,4 +546,4 @@ All emails show exact amounts with 2 decimal places (no rounding).
 
 ---
 
-_Last updated: Mar 4, 2026_
+_Last updated: Mar 31, 2026_

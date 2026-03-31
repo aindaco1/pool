@@ -2,7 +2,7 @@
 
 **Goal:**  
 Enable creative crowdfunding with true *all-or-nothing* logic using static hosting.  
-Creators define campaigns in Markdown; backers pledge through Snipcart; cards are charged automatically only if the campaign is funded.
+Creators define campaigns in Markdown; backers pledge through Snipcart; cards are charged automatically only if the campaign is funded. Backers can optionally add a 0% to 15% Dust Wave platform tip (default 5%) that is included in the final charge but excluded from campaign progress.
 
 **Branding:**  
 - Platform name: **The Pool**
@@ -17,7 +17,7 @@ Creators define campaigns in Markdown; backers pledge through Snipcart; cards ar
 |-------|-----------|------|
 | **Frontend** | GitHub Pages (Jekyll + Sass + Snipcart v3) | Campaign pages, cart, UX |
 | **Payments** | Stripe (Setup Intents + off-session charges) | Store then charge cards |
-| **API/Glue** | Cloudflare Worker (`pledge.dustwave.xyz`) | Handles Stripe checkout + webhook |
+| **API/Glue** | Cloudflare Worker (`pledge.dustwave.xyz`) | Handles Stripe checkout, webhooks, tip-aware totals, and reporting data |
 | **Automation** | Worker cron + GitHub Action | Auto-settle (batched) + state transitions |
 | **Storage** | Markdown / YAML | Campaign definitions & state |
 | **Styling** | Sass (15 modular partials) | Design system matching dust-wave-shop |
@@ -28,9 +28,9 @@ All code is versioned and auditable — no external DB or CMS needed.
 
 ## Funding Flow
 
-1. **Visitor pledges** through Snipcart → Worker launches Stripe Checkout in “setup” mode.  
+1. **Visitor pledges** through Snipcart → Worker launches Stripe Checkout in “setup” mode. Cart and checkout show subtotal, shipping, tax, and optional Dust Wave tip from a shared pricing model.  
 2. **Stripe** saves a card, returning IDs to the Worker.  
-3. Worker stores pledge in **Cloudflare KV** (tiers, support items, custom amounts, shipping address, Stripe IDs).  
+3. Worker stores pledge in **Cloudflare KV** (tiers, support items, custom amounts, shipping address, tip percent/amount, Stripe IDs).  
 4. **Worker cron** runs daily at midnight MT:  
    - Records heartbeat (`cron:lastRun` in KV) for monitoring.
    - Triggers site rebuild when `goal_deadline` passes (`live` → `post`).  
@@ -39,6 +39,11 @@ All code is versioned and auditable — no external DB or CMS needed.
    - Charges are aggregated by email — one charge per supporter.
    - Updates pledge status to `charged` or `payment_failed` in KV.
    - Triggers GitHub Pages rebuild and Cloudflare cache purge on state transitions.
+
+**Pricing rules:**
+- Campaign progress uses subtotal only.
+- Dust Wave platform tips are optional, default to 5%, and are capped at 15%.
+- Final stored / charged totals are `subtotal + shipping + tax + tip`.
 
 ---
 
@@ -75,7 +80,7 @@ All code is versioned and auditable — no external DB or CMS needed.
 │   ├── partials/         # 15 modular Sass partials (variables, mixins, components)
 │   └── js/               # Cart, campaign, checkout-autofill scripts
 ├── worker/               # Cloudflare Worker (pledge.dustwave.xyz)
-│   └── src/              # Stripe setup, webhooks, email, voting, tokens
+│   └── src/              # Stripe setup, webhooks, email, votes, tokens, tip-aware totals
 ├── scripts/              # Automation & reporting scripts
 ├── tests/e2e/            # Playwright end-to-end tests
 └── .github/workflows/    # Deploy action
@@ -116,4 +121,4 @@ All code is versioned and auditable — no external DB or CMS needed.
 
 ---
 
-_Last updated: Feb 17, 2026_
+_Last updated: Mar 31, 2026_

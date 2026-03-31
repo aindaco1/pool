@@ -26,6 +26,7 @@ This document covers the security architecture, known risks, hardening recommend
 | `campaign-pledges:{slug}` | PLEDGES | Array of order IDs per campaign | **Low** - index |
 | `campaign-charged:{slug}` | PLEDGES | Settlement completion timestamp | **Low** - flag |
 | `settlement-job:{slug}` | PLEDGES | Settlement batch progress | **Low** - ephemeral |
+| `pending-extras:{orderId}` | PLEDGES | Temporary support item / custom amount checkout extras | **Low** - ephemeral |
 | `cron:lastRun` | PLEDGES | Last cron execution timestamp | **Low** - monitoring |
 | `vote:{slug}:{decision}:{email}` | VOTES | Vote choice | **Medium** - links supporter to vote |
 | `results:{slug}:{decision}` | VOTES | Vote tallies | **Low** - semi-public |
@@ -440,8 +441,8 @@ If a checkout completes but the pledge doesn't appear (common in local dev):
 
 **Prevention:**
 - Use `scripts/dev.sh` which runs the Worker with local KV simulation
-- Ensure `stripe listen --forward-to localhost:8787/webhooks/stripe` is running
-- Verify `STRIPE_WEBHOOK_SECRET` in `.dev.vars` matches `stripe listen --print-secret`
+- `scripts/dev.sh` starts a single Stripe listener, forwards events to `localhost:8787/webhooks/stripe`, and writes that same listener's `whsec_...` secret into `worker/.dev.vars`
+- If you start Stripe manually, use the same listener instance for forwarding and for the secret you copy into local config
 - For testing with seeded data, run `./scripts/seed-all-campaigns.sh` after starting the worker
 
 ---
@@ -454,4 +455,4 @@ If a checkout completes but the pledge doesn't appear (common in local dev):
 
 ---
 
-_Last updated: Feb 2026_
+_Last updated: Mar 2026_

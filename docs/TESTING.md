@@ -26,9 +26,11 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | Module | Functions Tested |
 |--------|-----------------|
 | `live-stats.js` | `formatMoney`, `updateProgressBar`, `updateMarkerState`, `checkTierUnlocks`, `checkLateSupport`, `updateSupportItems`, `updateTierInventory` |
+| `platform-tip` | Tip sanitization, tip percent derivation, tip amount calculation |
 | `pledge-management` | DST-aware deadline enforcement (MST/MDT via Intl), cancel/modify/payment-method validation, pledge status transitions, multi-campaign independence, shipping in pledge records, API response shape |
 | `settlement` | Charge aggregation (including shipping fees), payment success/failure, retry flow, dry-run mode, edge cases, batched settlement, campaign pledge index, settlement dispatch, shipping in settlement, cron heartbeat |
 | `email-broadcasts` | Diary excerpt extraction (with ellipsis truncation), diary/milestone tracking helpers, milestone checking logic, rate limiting |
+| `email-tip` | Tip-aware supporter email breakdowns across confirmation / modified / cancelled / failed / charged emails |
 | `votes` | Email-based vote storage/dedup, vote status retrieval, campaign results, result aggregation |
 
 ### Running
@@ -102,6 +104,8 @@ Browser-based tests for full user flows in `tests/e2e/`.
 - Navigation and add-to-cart
 - Cart state via Snipcart API
 - Billing auto-fill (placeholder data for Snipcart validation)
+- Tip slider updates cart totals immediately
+- Single-tier campaigns replace the previous tier immediately when a new tier is selected
 
 **Accessibility:**
 - Skip link
@@ -120,6 +124,7 @@ Browser-based tests for full user flows in `tests/e2e/`.
 
 **Manual Checkout (skipped in CI):**
 - Full pledge flow: Snipcart → billing → custom payment template → Stripe Checkout → success page
+- Verify checkout order summary preview appears immediately and resolves to tip-aware totals
 - Worker API integration test (automated, checks `/stats` endpoint)
 
 ### Running
@@ -363,6 +368,16 @@ stripe login
 
 ### Forward Webhooks to Local Worker
 
+Preferred option for local end-to-end testing:
+
+```bash
+./scripts/dev.sh
+```
+
+This starts Jekyll, the Worker, Stripe CLI forwarding, and writes the matching `STRIPE_WEBHOOK_SECRET` into `worker/.dev.vars`.
+
+Manual fallback:
+
 ```bash
 # Forward Stripe webhooks to your local Worker
 stripe listen --forward-to localhost:8787/webhooks/stripe
@@ -381,31 +396,30 @@ wrangler secret put STRIPE_WEBHOOK_SECRET
 
 ### Start All Services
 
+Preferred:
+
+```bash
+./scripts/dev.sh
+```
+
+Manual fallback:
+
 Terminal 1 - Jekyll:
 ```bash
-bundle exec jekyll serve --config _config.yml,_config_development.yml
+bundle exec jekyll serve --config _config.yml,_config.local.yml
 # Site at http://127.0.0.1:4000
 ```
 
 Terminal 2 - Worker:
 ```bash
 cd worker
-wrangler dev
+wrangler dev --env dev
 # Worker at http://localhost:8787
 ```
 
 Terminal 3 - Stripe CLI:
 ```bash
 stripe listen --forward-to localhost:8787/webhooks/stripe
-```
-
-### Update cart.js for Local Testing
-
-Temporarily change the Worker URL in `assets/js/cart.js`:
-
-```js
-// For local testing:
-const response = await fetch('http://localhost:8787/start', {
 ```
 
 ### Test the Flow
@@ -418,6 +432,8 @@ const response = await fetch('http://localhost:8787/start', {
    - Fill in test billing info
    - Use Stripe test card: `4242 4242 4242 4242`
    - Any future expiry, any CVC
+   - Verify the cart shows subtotal + tip + tax + shipping immediately
+   - Verify checkout order summary shows the same breakdown without a delayed blank state
 
 3. **Stripe Setup**: After Snipcart checkout, you're redirected to Stripe
    - Card is saved (not charged)
@@ -537,15 +553,14 @@ wrangler kv:key get "results:hand-relations:poster" --binding VOTES --preview
 
 1. **Ensure Stripe CLI is forwarding webhooks:**
    ```bash
-   stripe listen --forward-to localhost:8787/webhooks/stripe
-   # Note the whsec_... secret it outputs
+   ./scripts/dev.sh
+   # Or, manually: stripe listen --forward-to localhost:8787/webhooks/stripe
    ```
 
 2. **Set the webhook secret:**
    ```bash
-   cd worker
-   wrangler secret put STRIPE_WEBHOOK_SECRET
-   # Paste: whsec_...
+   # scripts/dev.sh does this automatically for worker/.dev.vars
+   # Manual setup only if you are not using scripts/dev.sh
    ```
 
 3. **Trigger a test webhook:**

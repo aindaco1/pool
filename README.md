@@ -8,6 +8,7 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 
 - **No accounts required** — Backers manage pledges via email magic links
 - **All-or-nothing pledging** — Cards saved now, charged only if goal is met
+- **Optional platform tip** — 0% to 15% Dust Wave tip (default 5%) included in totals but excluded from campaign progress
 - **Checkout autofill** — Auto-selects country, enables password manager autofill for address fields
 - **Physical & digital tiers** — Physical items trigger Stripe shipping address collection + $3 flat USPS fee
 - **Stretch goals** — Auto-unlock at funding thresholds
@@ -19,12 +20,13 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 - **Announcements** — Admin broadcast emails with custom CTA links to supporters
 - **Instagram integration** — Optional social CTA in supporter emails
 - **Ongoing funding** — Post-campaign support section
+- **Manage Pledge dashboard** — Desktop-friendly Active / Closed sections with locked-state read-only controls after deadline
 - **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
 ## Architecture
 
 ```
-[Visitor] → GitHub Pages (Jekyll + Snipcart v3)
+[Visitor] → GitHub Pages (Jekyll + Snipcart v3 cart / checkout UI)
           → Cloudflare Worker (Stripe SetupIntent + webhook + cron)
 ```
 
@@ -32,7 +34,7 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 |-------|----------|------|
 | Frontend | GitHub Pages | Jekyll + Sass + Snipcart v3 |
 | Payments | Stripe | SetupIntents + off-session charges |
-| API | Cloudflare Worker | Stripe checkout, webhook, stats, auto-settle, cache purge |
+| API | Cloudflare Worker | Stripe checkout, webhook, tip-aware totals, stats, auto-settle, cache purge |
 | CMS | Pages CMS | Visual campaign editing (commits to GitHub) |
 
 ## Quick Start
@@ -45,7 +47,7 @@ bundle exec jekyll serve
 
 For development with local URL overrides:
 ```bash
-bundle exec jekyll serve --config _config.yml,_config_development.yml
+bundle exec jekyll serve --config _config.yml,_config.local.yml
 ```
 
 ## Testing
@@ -57,7 +59,7 @@ npm run test:security  # Security tests — pen testing the Worker API
 npm test               # Run unit + e2e
 ```
 
-**Test coverage includes:** live-stats functions, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, and settlement/charging logic.
+**Test coverage includes:** live-stats functions, platform tip helpers, supporter email tip breakdowns, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, and settlement/charging logic.
 
 See [TESTING.md](docs/TESTING.md) for full testing guide and [SECURITY.md](docs/SECURITY.md) for security architecture.
 
@@ -102,7 +104,7 @@ assets/
   │   ├── _utilities.scss     # Helper classes
   │   └── _snipcart-overrides.scss # Cart customization
   └── js/             # Client-side scripts
-      ├── cart.js             # Snipcart pledge flow (tiers, support items, shipping detection)
+      ├── cart.js             # Snipcart pledge flow (tiers, support items, tip UI, shipping detection)
       ├── campaign.js         # Phase tabs, toasts
       ├── buy-buttons.js      # Button handlers
       ├── checkout-autofill.js # Country/state autofill
@@ -111,9 +113,9 @@ assets/
 worker/               # Cloudflare Worker (pledge.dustwave.xyz)
   └── src/            # Worker source (Stripe, email, voting, tokens)
 scripts/              # Automation & reporting
-  ├── dev.sh               # Start all dev services (Jekyll, Worker, Stripe CLI)
-  ├── pledge-report.sh     # Ledger-style CSV report (history entries)
-  ├── fulfillment-report.sh # Aggregated CSV report (current state by backer)
+  ├── dev.sh               # Start all dev services (Jekyll, Worker, Stripe CLI with matched webhook secret)
+  ├── pledge-report.sh     # Ledger-style CSV report (history entries incl. tip columns)
+  ├── fulfillment-report.sh # Aggregated CSV report (current state by backer, total incl. tip)
   └── seed-all-campaigns.sh # Seed test pledges for all campaigns (local KV)
 tests/                # Test suites
   ├── unit/               # Vitest unit tests (JS functions)

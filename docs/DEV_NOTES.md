@@ -39,7 +39,7 @@ assets/
 │   ├── _utilities.scss    # Helper classes
 │   └── _snipcart-overrides.scss  # Cart customization
 └── js/
-    ├── cart.js            # Pledge flow integration (shipping detection, fee injection)
+    ├── cart.js            # Pledge flow integration (tip UI, shipping/tax totals, checkout summary preview)
     ├── checkout-autofill.js  # Country/state autofill for password managers
     ├── buy-buttons.js     # Button event handlers
     ├── campaign.js        # Phase tabs, toasts, interactive elements
@@ -413,7 +413,7 @@ The pledge flow bypasses Snipcart's payment processing entirely:
 
 1. **User adds tier to cart** → Snipcart handles cart UI
 2. **User fills billing info** → Snipcart collects name, email, address
-3. **User clicks "Continue to payment"** → Custom JS intercepts (see `assets/js/cart.js`)
+3. **User clicks "Continue to Pledge"** → Custom JS intercepts (see `assets/js/cart.js`)
 4. **JS calls Worker `/start`** → Sends cart data, billing info, generates temp order ID
 5. **Worker creates Stripe Checkout (setup mode)** → Saves card without charging
 6. **User completes Stripe Checkout** → Redirected to `/pledge-success/`
@@ -424,6 +424,8 @@ Key points:
 - Order IDs are generated client-side: `pledge-{timestamp}-{random}`
 - Billing info from Snipcart is passed to Stripe to pre-fill checkout
 - Tax is calculated server-side (ABQ rate: 7.875%)
+- Optional Dust Wave tip defaults to 5%, can be set from 0% to 15%, and is included in final charge totals but excluded from campaign funding progress
+- Checkout order-summary timing uses an immediate preview + native summary patching rather than waiting for Snipcart to fully mount fee rows
 
 ### Support Items & Custom Amounts
 
@@ -433,17 +435,18 @@ The cart can include:
 - **Custom amount** — "No reward" pledge with `{campaignSlug}__custom` ID
 
 **Data flow:**
-1. `cart.js` extracts these from Snipcart cart items and sends to `/start`
+1. `cart.js` extracts these from Snipcart cart items, along with the selected tip percent, and sends them to `/start`
 2. Worker stores `supportItems` and `customAmount` in temp KV (`pending-extras:{orderId}`)
-3. Worker sets `hasExtras: true` in Stripe Checkout metadata
+3. Worker stores `tipPercent` in Stripe metadata and computes final totals server-side
 4. On webhook, Worker fetches extras from temp KV and merges into final pledge
 5. Worker calls `updateSupportItemStats()` to update live stats for support items
 
 **Manage page display:**
 - During **live** campaigns: ALL support items are shown for modification
 - During **post** campaigns: Only items with `late_support: true` are shown (and only if funded)
-- Pledge summary shows full breakdown: subtotal, tax, shipping (if physical tier), total
+- Pledge summary shows full breakdown: subtotal, optional Dust Wave tip, tax, shipping (if physical tier), total
 - Modifying tiers dynamically recalculates shipping based on tier `category` (physical → $3 fee, digital → no fee)
+- Active pledges are grouped separately from Closed pledges; deadline-passed active pledges render as locked and become read-only except for "Update Card"
 
 ## Local Development
 
@@ -547,6 +550,7 @@ This starts:
 - **ngrok** tunnel (if installed) for Snipcart product validation
 
 The script auto-updates `worker/.dev.vars` with the Stripe CLI webhook secret.
+It uses the same Stripe listener instance for both forwarding and secret capture, which avoids the local webhook mismatch that can happen if you start one listener to print a secret and another to forward events.
 
 > **Note:** Local KV simulation is used by default for fast iteration and compatibility with `scripts/seed-all-campaigns.sh`. KV data resets when the worker restarts. Use `--remote` if you need persistent data or to see real pledges.
 
@@ -587,7 +591,7 @@ If Stripe shows webhook failures ("other errors") for the production endpoint:
 
 1. Visit http://127.0.0.1:4000
 2. Click a campaign → Add a tier to cart
-3. Fill billing info → Click "Continue to payment"
+3. Fill billing info → Click "Continue to Pledge"
 4. Complete Stripe Checkout with test card: `4242 4242 4242 4242`
 5. Check Worker logs for pledge confirmation
 6. Check email (if Resend configured)
@@ -702,7 +706,7 @@ Generate CSV reports of pledges from Cloudflare KV:
 - Modified pledges: 2+ rows (created + modification deltas)
 - Cancelled pledges: 2 rows (created + cancellation with negative amounts)
 
-**Output columns:** email, campaign, items, subtotal, tax, shipping, total, status, charged, created_at, order_id
+**Output columns:** email, campaign, items, subtotal, tip_percent, tip, tax, shipping, total, status, charged, created_at, order_id
 
 **Status values:**
 - `created` — Initial pledge creation (items show full tier list)
@@ -725,12 +729,12 @@ Generate CSV reports of pledges from Cloudflare KV:
 When a pledge includes custom support, it appears as `Custom Support $X.XX` in the items column (e.g., `Line of Dialogue; Custom Support $25.00`).
 
 **Cancelled row format:**
-Cancelled rows show negative amounts (subtotal, tax, total) so that summing all rows gives the correct campaign total. Items are prefixed with `-` to indicate removal.
+Cancelled rows show negative amounts (subtotal, tip, tax, shipping, total) so that summing all rows gives the correct campaign total. Items are prefixed with `-` to indicate removal.
 
 **Tier name mapping:**
 The report converts tier IDs to human-readable names (e.g., `frame` → `One Frame`, `dialogue` → `Line of Dialogue`).
 
-**Summing subtotals** gives you the current pledged amount (modifications and cancellations are reflected as deltas).
+**Summing subtotals** gives you the campaign-progress amount (modifications and cancellations are reflected as deltas). **Summing totals** gives the tip-inclusive amount that will actually be charged.
 
 ## Fulfillment Reports
 
@@ -752,7 +756,7 @@ Generate aggregated reports showing the **current state** of each backer's pledg
 
 **Output format:** One row per unique email + campaign combination. Multiple pledges from the same backer are aggregated.
 
-**Output columns:** email, campaign, items, subtotal, tax, shipping, total, shipping_address
+**Output columns:** email, campaign, items, subtotal, tip_percent, tip, tax, shipping, total, shipping_address
 
 **Key differences from pledge-report.sh:**
 - Shows **current tier state** (not history)
@@ -762,6 +766,7 @@ Generate aggregated reports showing the **current state** of each backer's pledg
 - **No** status, created_at, or order_id columns
 - Items show final quantities (e.g., if backer modified from frame→dialogue, only dialogue appears)
 - Includes `shipping_address` for physical tier fulfillment
+- `total` is the final charge amount including optional Dust Wave tip
 
 **Use cases:**
 - Fulfillment spreadsheets (what rewards to deliver to each backer)
@@ -1236,4 +1241,4 @@ curl -s https://pledge.dustwave.xyz/admin/cron/status \
 
 ---
 
-_Last updated: Feb 17, 2026_
+_Last updated: Mar 31, 2026_
