@@ -2,13 +2,14 @@
 
 **Dust Wave's Snipcart-powered crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Backers pledge through Snipcart, then save their card via Stripe (handled by a Cloudflare Worker). Cards aren't charged until the campaign deadline — if funded, a Worker cron dispatches batched settlement, charging all pledges off-session.
+A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Backers pledge through Snipcart, then save their card via Stripe (handled by a Cloudflare Worker). Cards are not charged until the campaign deadline. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a Dust Wave platform tip, manage pledges through magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
 ## Features
 
 - **No accounts required** — Backers manage pledges via email magic links
 - **All-or-nothing pledging** — Cards saved now, charged only if goal is met
 - **Optional platform tip** — 0% to 15% Dust Wave tip (default 5%) included in totals but excluded from campaign progress
+- **Tip-aware cart + checkout** — Shared pricing logic keeps subtotal, tip, tax, shipping, and total in sync across cart, checkout, Worker, reports, and emails
 - **Checkout autofill** — Auto-selects country, enables password manager autofill for address fields
 - **Physical & digital tiers** — Physical items trigger Stripe shipping address collection + $3 flat USPS fee
 - **Stretch goals** — Auto-unlock at funding thresholds
@@ -21,6 +22,7 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 - **Instagram integration** — Optional social CTA in supporter emails
 - **Ongoing funding** — Post-campaign support section
 - **Manage Pledge dashboard** — Desktop-friendly Active / Closed sections with locked-state read-only controls after deadline
+- **Tip-aware emails + reports** — Supporter emails, pledge reports, and fulfillment exports all include the platform tip when present
 - **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
 ## Architecture
@@ -50,16 +52,27 @@ For development with local URL overrides:
 bundle exec jekyll serve --config _config.yml,_config.local.yml
 ```
 
+For full local development with Jekyll, the Worker, Stripe CLI webhook forwarding, and automatic local webhook-secret sync:
+```bash
+./scripts/dev.sh
+```
+
 ## Testing
 
 ```bash
-npm run test:unit      # Unit tests (Vitest) — 37 tests, ~700ms
-npm run test:e2e       # E2E tests (Playwright) — 33 tests + 1 manual
+npm run test:unit      # Unit tests (Vitest) — currently 177 tests
+npm run test:e2e       # E2E tests (Playwright) — automated + manual checkout coverage
+npm run test:e2e:headless # CI-style automated browser suite
 npm run test:security  # Security tests — pen testing the Worker API
 npm test               # Run unit + e2e
 ```
 
-**Test coverage includes:** live-stats functions, platform tip helpers, supporter email tip breakdowns, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, and settlement/charging logic.
+**Current full-suite baseline:**
+- Unit tests: 177 passed
+- Headless E2E: 35 passed, 5 skipped
+- Security tests: 128 passed
+
+**Test coverage includes:** live-stats functions, platform tip helpers, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, and security hardening around `/start` and webhook handling.
 
 See [TESTING.md](docs/TESTING.md) for full testing guide and [SECURITY.md](docs/SECURITY.md) for security architecture.
 
@@ -111,7 +124,7 @@ assets/
       ├── live-stats.js       # Real-time stats, inventory, tier unlocks, late support
       └── snipcart-debug.js   # Debug utilities
 worker/               # Cloudflare Worker (pledge.dustwave.xyz)
-  └── src/            # Worker source (Stripe, email, voting, tokens)
+  └── src/            # Worker source (Stripe, email, voting, tokens, tip-aware totals)
 scripts/              # Automation & reporting
   ├── dev.sh               # Start all dev services (Jekyll, Worker, Stripe CLI with matched webhook secret)
   ├── pledge-report.sh     # Ledger-style CSV report (history entries incl. tip columns)
@@ -119,8 +132,30 @@ scripts/              # Automation & reporting
   └── seed-all-campaigns.sh # Seed test pledges for all campaigns (local KV)
 tests/                # Test suites
   ├── unit/               # Vitest unit tests (JS functions)
-  └── e2e/                # Playwright E2E tests (browser flows)
+  ├── e2e/                # Playwright E2E tests (browser flows)
+  └── security/           # Vitest security / abuse-path coverage for the Worker
 ```
+
+## Deployment
+
+Push the site to GitHub Pages:
+```bash
+git push origin main
+```
+
+Deploy the Worker from the repo's production Wrangler config:
+```bash
+cd worker
+wrangler deploy
+```
+
+The Worker powers:
+- Stripe Checkout session creation in setup mode
+- webhook processing and pledge persistence
+- tip-aware total calculation
+- supporter email delivery via Resend
+- batched settlement and retry flows
+- admin recovery and reporting endpoints
 
 ---
 
