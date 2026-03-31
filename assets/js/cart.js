@@ -153,7 +153,8 @@ let _feeDebounce = null;
 
 function scheduleFeeInjection() {
   if (_feeDebounce) clearTimeout(_feeDebounce);
-  _feeDebounce = setTimeout(injectSummaryFees, 100);
+  injectSummaryFees();
+  _feeDebounce = setTimeout(injectSummaryFees, 16);
 }
 
 function injectSummaryFees() {
@@ -467,6 +468,76 @@ function processPendingCartItem() {
   }
 }
 
+function getButtonCustomFieldDefinitions(button) {
+  const definitions = [];
+  for (let index = 1; index <= 10; index++) {
+    const name = button.getAttribute(`data-item-custom${index}-name`);
+    if (!name) continue;
+    definitions.push({
+      name,
+      type: button.getAttribute(`data-item-custom${index}-type`) || 'text',
+      value: button.getAttribute(`data-item-custom${index}-value`) || '',
+      placeholder: button.getAttribute(`data-item-custom${index}-placeholder`) || '',
+      required: button.getAttribute(`data-item-custom${index}-required`) === 'true'
+    });
+  }
+  return definitions;
+}
+
+function hasInteractiveCustomFields(button) {
+  return getButtonCustomFieldDefinitions(button).some(field => field.type !== 'hidden');
+}
+
+function buildCartItemFromButton(button) {
+  const isStackable = button.getAttribute('data-item-stackable') === 'true' ||
+    button.getAttribute('data-item-stackable') === 'always';
+  const maxQty = button.getAttribute('data-item-max-quantity');
+  const item = {
+    id: button.getAttribute('data-item-id'),
+    name: button.getAttribute('data-item-name'),
+    price: parseFloat(button.getAttribute('data-item-price')),
+    url: button.getAttribute('data-item-url'),
+    description: button.getAttribute('data-item-description'),
+    stackable: isStackable,
+    shippable: button.getAttribute('data-item-shippable') === 'true'
+  };
+
+  if (maxQty) {
+    item.maxQuantity = parseInt(maxQty, 10);
+  } else if (!isStackable) {
+    item.maxQuantity = 1;
+  }
+
+  const customFields = getButtonCustomFieldDefinitions(button);
+  if (customFields.length > 0) {
+    item.customFields = customFields;
+  }
+
+  return item;
+}
+
+async function replaceSingleTierCartItem(button) {
+  const state = Snipcart.store.getState();
+  const nextItemId = button.getAttribute('data-item-id');
+  const tierItems = (state.cart.items.items || []).filter(item => isTierItem(item.id));
+  const removals = tierItems
+    .filter(item => item.id !== nextItemId)
+    .map(item => Snipcart.api.cart.items.remove(item.uniqueId));
+
+  if (removals.length > 0) {
+    await Promise.allSettled(removals);
+  }
+
+  const alreadySelected = (Snipcart.store.getState().cart.items.items || []).some(item => item.id === nextItemId);
+  if (!alreadySelected) {
+    await Snipcart.api.cart.items.add(buildCartItemFromButton(button));
+  }
+
+  Snipcart.api.theme.cart.open();
+  renderTipUI();
+  requestAnimationFrame(renderTipUI);
+}
+
 /**
  * Redirect to our Stripe SetupIntent flow instead of Snipcart's payment
  */
@@ -752,10 +823,10 @@ function initSnipcart() {
   }
   
 function refreshTipPresentation() {
-    setTimeout(renderTipUI, 0);
-    setTimeout(renderTipUI, 120);
-    setTimeout(renderTipUI, 300);
-    setTimeout(renderTipUI, 600);
+    renderTipUI();
+    requestAnimationFrame(renderTipUI);
+    setTimeout(renderTipUI, 50);
+    setTimeout(renderTipUI, 150);
   }
 
   // Refresh fee summary when cart items change
@@ -783,8 +854,9 @@ function refreshTipPresentation() {
   let storeRenderDebounce = null;
   Snipcart.store.subscribe(() => {
     updateHeaderPrice();
+    renderTipUI();
     if (storeRenderDebounce) clearTimeout(storeRenderDebounce);
-    storeRenderDebounce = setTimeout(renderTipUI, 50);
+    storeRenderDebounce = setTimeout(renderTipUI, 16);
   });
   setTimeout(renderTipUI, 250);
   Snipcart.events.on('summary.checkout_clicked', () => {
@@ -794,6 +866,26 @@ function refreshTipPresentation() {
   });
   
   processPendingCartItem();
+
+  document.querySelectorAll('.snipcart-add-item:not([data-redirect-url])').forEach(function(btn) {
+    btn.addEventListener('click', async function(e) {
+      if (!isSingleTierOnly()) return;
+      if (btn.disabled) return;
+
+      const itemId = btn.getAttribute('data-item-id');
+      if (!isTierItem(itemId)) return;
+      if (hasInteractiveCustomFields(btn)) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      try {
+        await replaceSingleTierCartItem(btn);
+      } catch (err) {
+        console.error('Pool: Failed to replace single-tier cart item:', err);
+      }
+    });
+  });
 
   document.querySelectorAll('[data-redirect-url].snipcart-add-item').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
