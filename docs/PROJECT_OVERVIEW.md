@@ -46,7 +46,7 @@ All code is versioned and auditable — no external DB or CMS needed.
 
 | State | Meaning | Visible UX |
 |--------|----------|------------|
-| `pre` | Scheduled / not yet live | Buttons disabled, “coming soon” message |
+| `upcoming` | Scheduled / not yet live | Buttons disabled, “coming soon” message |
 | `live` | Accepting pledges | Cart active, progress bar updating |
 | `post` | Finished | Displays funded or not-funded outcome |
 | `charged` | (flag) | True after successful billing |

@@ -57,6 +57,8 @@
     const WORKER_BASE = '{{ site.worker_base }}';
     const ABQ_TAX_RATE = 0.07875; // 7.875% ABQ tax
     const FLAT_SHIPPING_FEE = 300; // $3 flat rate USPS shipping for physical items
+    const DEFAULT_PLATFORM_TIP_PERCENT = 5;
+    const MAX_PLATFORM_TIP_PERCENT = 15;
     let allCampaigns = [];
     let pledges = [];
     let isDevMode = false;
@@ -64,6 +66,35 @@
     
     function calculateTax(subtotalCents) {
       return Math.round(subtotalCents * ABQ_TAX_RATE);
+    }
+
+    function sanitizeTipPercent(value, fallback = DEFAULT_PLATFORM_TIP_PERCENT) {
+      const parsed = Number(value);
+      if (Number.isInteger(parsed) && parsed >= 0 && parsed <= MAX_PLATFORM_TIP_PERCENT) {
+        return parsed;
+      }
+      return fallback;
+    }
+
+    function calculatePlatformTip(subtotalCents, tipPercent) {
+      return Math.round((Math.max(0, subtotalCents || 0) * sanitizeTipPercent(tipPercent, 0)) / 100);
+    }
+
+    function getPledgeTipAmount(pledge) {
+      if (pledge.tipAmount !== undefined && pledge.tipAmount !== null) {
+        return pledge.tipAmount;
+      }
+      return calculatePlatformTip(getPledgeSubtotal(pledge), pledge.tipPercent || 0);
+    }
+
+    function getPledgeTipPercent(pledge) {
+      if (pledge.tipPercent !== undefined && pledge.tipPercent !== null) {
+        return sanitizeTipPercent(pledge.tipPercent, 0);
+      }
+      const subtotal = getPledgeSubtotal(pledge);
+      const tipAmount = getPledgeTipAmount(pledge);
+      if (subtotal <= 0 || tipAmount <= 0) return 0;
+      return sanitizeTipPercent(Math.round((tipAmount / subtotal) * 100), 0);
     }
     
     function getSubtotalFromTotal(totalCents) {
@@ -130,6 +161,7 @@
           // Combine amounts — shipping is a flat fee, not additive
           merged.subtotal = (merged.subtotal || 0) + (pledge.subtotal || pledge.amount || 0);
           merged.tax = (merged.tax || 0) + (pledge.tax || 0);
+          merged.tipAmount = (merged.tipAmount || 0) + getPledgeTipAmount(pledge);
           const prevShipping = merged.shipping || 0;
           merged.shipping = Math.max(prevShipping, pledge.shipping || 0);
           // Sum amounts but subtract duplicate shipping (flat fee only counted once)
@@ -207,6 +239,10 @@
           // Keep remaining tiers as additionalTiers
           merged.additionalTiers = merged.additionalTiers.slice(1);
         }
+        merged.tipPercent = getPledgeTipPercent({
+          subtotal: merged.subtotal || 0,
+          tipAmount: merged.tipAmount || 0
+        });
         return merged;
       });
       
@@ -748,6 +784,7 @@
       let tiersHtml = '';
       let supportItemsHtml = '';
       let customAmountHtml = '';
+      let tipHtml = '';
       let actionsHtml = '';
       let footerHtml = '';
       
@@ -926,6 +963,23 @@
           </div>
         `;
       }
+
+      const currentTipPercent = getPledgeTipPercent(pledge);
+      if (isActive) {
+        tipHtml = `
+          <div class="pledge-card__tip" id="tip-section-${index}">
+            <div class="pledge-card__tip-header">
+              <h2>Tip Dust Wave</h2>
+              <span class="pledge-card__tip-amount" id="tip-amount-label-${index}">${formatMoney(getPledgeTipAmount(pledge))}</span>
+            </div>
+            <p class="pledge-card__tip-copy">Optional support for platform maintenance. This does not count toward the campaign goal.</p>
+            <div class="pledge-card__tip-controls">
+              <input type="range" min="0" max="${MAX_PLATFORM_TIP_PERCENT}" step="1" value="${currentTipPercent}" id="tip-percent-${index}" data-current="${currentTipPercent}">
+              <span class="pledge-card__tip-percent" id="tip-percent-label-${index}">${currentTipPercent}%</span>
+            </div>
+          </div>
+        `;
+      }
       
       if (isActive) {
         const deadlinePassed = pledge.deadlinePassed === true;
@@ -1029,16 +1083,23 @@
             ${customAmountHtml}
           `}
           
+          ${tipHtml}
           <div class="pledge-card__summary">
             ${(() => {
               const subtotal = getPledgeSubtotal(pledge);
+              const tipAmount = getPledgeTipAmount(pledge);
+              const tipPercent = getPledgeTipPercent(pledge);
               const shipping = pledge.shipping || 0;
               const tax = calculateTax(subtotal);
-              const total = subtotal + tax + shipping;
+              const total = subtotal + tax + shipping + tipAmount;
               return `
                 <div class="pledge-summary__row">
                   <span class="label">Subtotal</span>
                   <span class="value" id="subtotal-${index}">${formatMoney(subtotal)}</span>
+                </div>
+                <div class="pledge-summary__row pledge-summary__row--tip" id="tip-row-${index}" ${tipAmount > 0 ? '' : 'hidden'}>
+                  <span class="label">Dust Wave tip (<span id="tip-row-percent-${index}">${tipPercent}</span>%)</span>
+                  <span class="value" id="tip-${index}">${formatMoney(tipAmount)}</span>
                 </div>
                 <div class="pledge-summary__row pledge-summary__row--tax">
                   <span class="label">ABQ Tax (7.875%)</span>
@@ -1101,9 +1162,11 @@
       const isSingleTier = campaign?.single_tier_only === true;
       const currentTierId = pledge.tierId?.split('__').pop();
       const currentCustomAmountVal = pledge.customAmount || 0;
+      const currentTipPercent = getPledgeTipPercent(pledge);
       let selectedTierId = currentTierId;
       let selectedSupportItems = [];
       let selectedCustomAmount = currentCustomAmountVal;
+      let selectedTipPercent = currentTipPercent;
       
       let selectedTierQty = pledge.tierQty || 1;
       
@@ -1168,7 +1231,7 @@
             } else {
               selectedTierQty = 1;
             }
-            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount);
+            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal, selectedTipPercent);
           });
         });
         
@@ -1207,7 +1270,7 @@
             }
             
             selectedTierQty = parseInt(input.value) || 1;
-            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount);
+            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal, selectedTipPercent);
           });
         });
         
@@ -1228,7 +1291,7 @@
             
             selectTierById(tierId);
             selectedTierQty = val;
-            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount);
+            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal, selectedTipPercent);
           });
         });
       } else {
@@ -1315,7 +1378,7 @@
               }
               return { id: tierId, price, qty, pledgedQty, isPledged };
             });
-          updatePledgeSummary(index, pledge, campaign, null, selectedAddTiers, selectedSupportItems, selectedCustomAmount);
+          updatePledgeSummary(index, pledge, campaign, null, selectedAddTiers, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal, selectedTipPercent);
         }
       }
       
@@ -1346,9 +1409,9 @@
             }));
           
           if (isSingleTier) {
-            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount);
+            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal, selectedTipPercent);
           } else {
-            updatePledgeSummary(index, pledge, campaign, null, selectedAddTiers, selectedSupportItems, selectedCustomAmount);
+            updatePledgeSummary(index, pledge, campaign, null, selectedAddTiers, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal, selectedTipPercent);
           }
         });
       });
@@ -1368,9 +1431,25 @@
           }
           
           if (isSingleTier) {
-            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal);
+            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal, selectedTipPercent);
           } else {
-            updatePledgeSummary(index, pledge, campaign, null, selectedAddTiers, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal);
+            updatePledgeSummary(index, pledge, campaign, null, selectedAddTiers, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal, selectedTipPercent);
+          }
+        });
+      }
+
+      const tipInput = card.querySelector(`#tip-percent-${index}`);
+      if (tipInput) {
+        tipInput.addEventListener('input', (e) => {
+          selectedTipPercent = parseInt(e.target.value, 10) || 0;
+          const tipPercentLabel = document.getElementById(`tip-percent-label-${index}`);
+          if (tipPercentLabel) {
+            tipPercentLabel.textContent = `${selectedTipPercent}%`;
+          }
+          if (isSingleTier) {
+            updatePledgeSummary(index, pledge, campaign, selectedTierId, selectedTierQty, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal, selectedTipPercent);
+          } else {
+            updatePledgeSummary(index, pledge, campaign, null, selectedAddTiers, selectedSupportItems, selectedCustomAmount, currentCustomAmountVal, selectedTipPercent);
           }
         });
       }
@@ -1461,6 +1540,7 @@
         const hasAddedTiers = !isSingleTier && selectedAddTiers.length > 0;
         const hasSupportChanges = selectedSupportItems.length > 0;
         const hasCustomAmountChange = selectedCustomAmount !== currentCustomAmountVal;
+        const hasTipChange = selectedTipPercent !== currentTipPercent;
         
         if (isSingleTier && (tierChanged || qtyChanged)) {
           const newTier = campaign.tiers.find(t => t.id === selectedTierId);
@@ -1553,11 +1633,13 @@
         }
         const confirmShipping = confirmHasPhysical ? FLAT_SHIPPING_FEE : 0;
         
+        const newTipAmount = calculatePlatformTip(newSubtotal, selectedTipPercent);
         const newTax = calculateTax(newSubtotal);
-        const newTotalWithTax = newSubtotal + newTax + confirmShipping;
+        const newTotalWithTax = newSubtotal + newTax + confirmShipping + newTipAmount;
         detailsHtml += `
           <p class="confirm-totals">
             <span>Subtotal: ${formatMoney(newSubtotal)}</span>
+            ${newTipAmount > 0 ? `<span>Dust Wave tip (${selectedTipPercent}%): ${formatMoney(newTipAmount)}</span>` : ''}
             <span>ABQ Tax (7.875%): ${formatMoney(newTax)}</span>
             ${confirmShipping > 0 ? `<span>Shipping (USPS): ${formatMoney(confirmShipping)}</span>` : ''}
             <strong>Total: ${formatMoney(newTotalWithTax)}</strong>
@@ -1578,6 +1660,8 @@
               pledge.subtotal = newSubtotal;
               pledge.tax = newTax;
               pledge.shipping = confirmShipping;
+              pledge.tipPercent = selectedTipPercent;
+              pledge.tipAmount = newTipAmount;
               pledge.amount = newTotalWithTax;
               if (isSingleTier) {
                 pledge.tierId = selectedTierId;
@@ -1667,7 +1751,9 @@
                 
                 // Always modify primary order to trigger the update email
                 // Even if only cancelling secondary orders, we want the user notified
-                const hasAnyChanges = primaryTiers.length > 0 || hasSupportChanges || hasCustomAmountChange || ordersToCancel.size > 0;
+                const hasAnyChanges = primaryTiers.length > 0 || hasSupportChanges || hasCustomAmountChange || hasTipChange || ordersToCancel.size > 0;
+                const retainedSecondaryOrderIds = (pledge.orderIds || [])
+                  .filter(orderId => orderId !== primaryOrderId && !ordersToCancel.has(orderId));
                 if (hasAnyChanges) {
                   const res = await fetch(`${WORKER_BASE}/pledge/modify`, {
                     method: 'POST',
@@ -1677,11 +1763,29 @@
                       orderId: primaryOrderId,
                       addTiers: primaryTiers.length > 0 ? primaryTiers : null,
                       supportItems: hasSupportChanges ? selectedSupportItems : null,
-                      customAmount: hasCustomAmountChange ? selectedCustomAmount : null
+                      customAmount: hasCustomAmountChange ? selectedCustomAmount : null,
+                      tipPercent: hasTipChange ? selectedTipPercent : null
                     })
                   });
                   const data = await res.json();
                   if (!res.ok) throw new Error(data.error || 'Failed to update pledge');
+                }
+                if (hasTipChange && retainedSecondaryOrderIds.length > 0) {
+                  const tipUpdates = await Promise.all(retainedSecondaryOrderIds.map(orderId =>
+                    fetch(`${WORKER_BASE}/pledge/modify`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        token: currentToken,
+                        orderId,
+                        tipPercent: selectedTipPercent
+                      })
+                    })
+                  ));
+                  const failedTipUpdates = tipUpdates.filter(r => !r.ok);
+                  if (failedTipUpdates.length > 0) {
+                    throw new Error(`Failed to update tip on ${failedTipUpdates.length} linked pledge(s)`);
+                  }
                 }
               } else {
                 // Single order or single-tier mode - simple modify
@@ -1695,11 +1799,30 @@
                     newTierQty: isSingleTier ? selectedTierQty : null,
                     addTiers: !isSingleTier ? selectedAddTiers : null,
                     supportItems: hasSupportChanges ? selectedSupportItems : null,
-                    customAmount: hasCustomAmountChange ? selectedCustomAmount : null
+                    customAmount: hasCustomAmountChange ? selectedCustomAmount : null,
+                    tipPercent: hasTipChange ? selectedTipPercent : null
                   })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to update pledge');
+                if (hasTipChange && pledge.orderIds && pledge.orderIds.length > 1) {
+                  const secondaryOrderIds = pledge.orderIds.slice(1);
+                  const tipUpdates = await Promise.all(secondaryOrderIds.map(orderId =>
+                    fetch(`${WORKER_BASE}/pledge/modify`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        token: currentToken,
+                        orderId,
+                        tipPercent: selectedTipPercent
+                      })
+                    })
+                  ));
+                  const failedTipUpdates = tipUpdates.filter(r => !r.ok);
+                  if (failedTipUpdates.length > 0) {
+                    throw new Error(`Failed to update tip on ${failedTipUpdates.length} linked pledge(s)`);
+                  }
+                }
               }
               
               btn.textContent = 'Saved!';
@@ -1717,7 +1840,7 @@
     
     // For single-tier mode: tierIdOrAddedTiers is the selected tier ID, tierQtyOrSupportItems is the quantity
     // For multi-tier mode: tierIdOrAddedTiers is null, tierQtyOrSupportItems is addedTiers array
-    function updatePledgeSummary(index, pledge, campaign, tierIdOrAddedTiers, tierQtyOrSupportItems, supportItems, customAmount = 0, currentCustomAmount = 0) {
+    function updatePledgeSummary(index, pledge, campaign, tierIdOrAddedTiers, tierQtyOrSupportItems, supportItems, customAmount = 0, currentCustomAmount = 0, tipPercent = getPledgeTipPercent(pledge)) {
       const amountEl = document.getElementById(`amount-${index}`);
       const changeEl = document.getElementById(`change-${index}`);
       const directionEl = document.getElementById(`change-direction-${index}`);
@@ -1726,6 +1849,10 @@
       
       // Use subtotal (without tax) as the baseline for calculations
       const originalSubtotal = getPledgeSubtotal(pledge);
+      const originalTax = calculateTax(originalSubtotal);
+      const originalShipping = pledge.shipping || 0;
+      const originalTipAmount = getPledgeTipAmount(pledge);
+      const originalTotal = originalSubtotal + originalTax + originalShipping + originalTipAmount;
       const currentTierId = pledge.tierId?.split('__').pop();
       const currentTierQty = pledge.tierQty || 1;
       const pledgeCurrentCustomAmount = pledge.customAmount || 0;
@@ -1806,6 +1933,10 @@
         newSubtotal += customDiff;
         hasChanges = true;
       }
+
+      if (tipPercent !== getPledgeTipPercent(pledge)) {
+        hasChanges = true;
+      }
       
       // Determine if selected tiers include any physical items
       let hasPhysical = false;
@@ -1823,13 +1954,30 @@
       
       // Update subtotal, tax, shipping, and total displays
       const subtotalEl = document.getElementById(`subtotal-${index}`);
+      const tipEl = document.getElementById(`tip-${index}`);
+      const tipRow = document.getElementById(`tip-row-${index}`);
+      const tipRowPercent = document.getElementById(`tip-row-percent-${index}`);
+      const tipAmountLabel = document.getElementById(`tip-amount-label-${index}`);
       const taxEl = document.getElementById(`tax-${index}`);
       const shippingEl = document.getElementById(`shipping-${index}`);
       const shippingRow = document.getElementById(`shipping-row-${index}`);
+      const newTipAmount = calculatePlatformTip(newSubtotal, tipPercent);
       const newTax = calculateTax(newSubtotal);
-      const newTotalWithTax = newSubtotal + newTax + newShipping;
+      const newTotalWithTax = newSubtotal + newTax + newShipping + newTipAmount;
       
       subtotalEl.textContent = formatMoney(newSubtotal);
+      if (tipRow) {
+        tipRow.hidden = newTipAmount === 0;
+      }
+      if (tipEl) {
+        tipEl.textContent = formatMoney(newTipAmount);
+      }
+      if (tipRowPercent) {
+        tipRowPercent.textContent = String(tipPercent);
+      }
+      if (tipAmountLabel) {
+        tipAmountLabel.textContent = formatMoney(newTipAmount);
+      }
       taxEl.textContent = formatMoney(newTax);
       if (shippingRow) {
         shippingRow.hidden = newShipping === 0;
@@ -1837,17 +1985,16 @@
       }
       amountEl.textContent = formatMoney(newTotalWithTax);
       
-      const diff = newSubtotal - originalSubtotal;
-      const diffWithTax = diff + calculateTax(diff);
-      if (diff > 0) {
+      const totalDiff = newTotalWithTax - originalTotal;
+      if (totalDiff > 0) {
         changeEl.hidden = false;
         directionEl.textContent = 'Increase:';
-        changeAmountEl.textContent = '+' + formatMoney(diffWithTax) + ' (incl. tax)';
+        changeAmountEl.textContent = '+' + formatMoney(totalDiff);
         changeAmountEl.className = 'change-up';
-      } else if (diff < 0) {
+      } else if (totalDiff < 0) {
         changeEl.hidden = false;
         directionEl.textContent = 'Decrease:';
-        changeAmountEl.textContent = formatMoney(diffWithTax) + ' (incl. tax)';
+        changeAmountEl.textContent = formatMoney(totalDiff);
         changeAmountEl.className = 'change-down';
       } else {
         changeEl.hidden = true;

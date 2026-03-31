@@ -112,7 +112,7 @@ campaign_filter = '$CAMPAIGN_FILTER'
 
 # Aggregate by (email, campaign)
 # Structure: { (email, campaign): { 'subtotal': 0, 'tax': 0, 'total': 0, 'items': { tier_name: qty } } }
-aggregated = defaultdict(lambda: {'subtotal': 0.0, 'tax': 0.0, 'shipping': 0.0, 'total': 0.0, 'items': defaultdict(int), 'shipping_address': ''})
+aggregated = defaultdict(lambda: {'subtotal': 0.0, 'tip': 0.0, 'tip_percent': 0, 'tax': 0.0, 'shipping': 0.0, 'total': 0.0, 'items': defaultdict(int), 'shipping_address': ''})
 
 # Read pledges separated by delimiter
 pledge_data = ''
@@ -142,12 +142,16 @@ for line in sys.stdin:
                 
                 # Add current amounts
                 subtotal = (data.get('subtotal') or data.get('amount') or 0) / 100
+                tip = (data.get('tipAmount') or 0) / 100
                 tax = (data.get('tax') or 0) / 100
                 total = (data.get('amount') or 0) / 100
                 
                 aggregated[key]['subtotal'] += subtotal
+                aggregated[key]['tip'] += tip
                 aggregated[key]['tax'] += tax
                 aggregated[key]['total'] += total
+                if aggregated[key]['subtotal'] > 0 and aggregated[key]['tip'] > 0:
+                    aggregated[key]['tip_percent'] = round((aggregated[key]['tip'] / aggregated[key]['subtotal']) * 100)
                 
                 # Capture shipping fee (flat fee, take max across merged pledges)
                 shipping = (data.get('shipping') or 0) / 100
@@ -188,7 +192,7 @@ for line in sys.stdin:
 # Output aggregated CSV
 output = StringIO()
 writer = csv.writer(output)
-writer.writerow(['email', 'campaign', 'items', 'subtotal', 'tax', 'shipping', 'total', 'shipping_address'])
+writer.writerow(['email', 'campaign', 'items', 'subtotal', 'tip_percent', 'tip', 'tax', 'shipping', 'total', 'shipping_address'])
 
 for (email, campaign), data in sorted(aggregated.items()):
     # Skip if no items or zero total
@@ -211,6 +215,8 @@ for (email, campaign), data in sorted(aggregated.items()):
         campaign,
         items_str,
         f\"{data['subtotal']:.2f}\",
+        str(data['tip_percent']),
+        f\"{data['tip']:.2f}\",
         f\"{data['tax']:.2f}\",
         f\"{data['shipping']:.2f}\",
         f\"{data['total']:.2f}\",

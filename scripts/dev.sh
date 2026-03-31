@@ -39,10 +39,25 @@ echo "⚡ Starting Wrangler (local KV)..."
 
 # Stripe CLI (forward webhooks to local worker)
 if [ "$SKIP_STRIPE" != "true" ]; then
-  echo "💳 Getting Stripe webhook secret..."
-  STRIPE_SECRET=$(stripe listen --print-secret 2>/dev/null)
+  echo "💳 Starting Stripe webhook forwarding..."
+  STRIPE_LOG="/tmp/pool-stripe-listen.log"
+  rm -f "$STRIPE_LOG"
+  stripe listen --forward-to localhost:8787/webhooks/stripe > "$STRIPE_LOG" 2>&1 &
+  STRIPE_LISTEN_PID=$!
+
+  echo "💳 Waiting for Stripe webhook secret..."
+  STRIPE_SECRET=""
+  for _ in $(seq 1 20); do
+    if [ -f "$STRIPE_LOG" ]; then
+      STRIPE_SECRET=$(grep -Eo 'whsec_[A-Za-z0-9_]+' "$STRIPE_LOG" | head -1)
+      if [ -n "$STRIPE_SECRET" ]; then
+        break
+      fi
+    fi
+    sleep 1
+  done
+
   if [ -n "$STRIPE_SECRET" ]; then
-    # Update .dev.vars with the CLI webhook secret
     DEV_VARS="worker/.dev.vars"
     if [ -f "$DEV_VARS" ]; then
       if grep -q "^STRIPE_WEBHOOK_SECRET=" "$DEV_VARS"; then
@@ -50,11 +65,12 @@ if [ "$SKIP_STRIPE" != "true" ]; then
       else
         echo "STRIPE_WEBHOOK_SECRET=$STRIPE_SECRET" >> "$DEV_VARS"
       fi
-      echo "   Updated $DEV_VARS with CLI webhook secret"
+      echo "   Updated $DEV_VARS with Stripe listener secret"
     fi
+  else
+    echo "⚠️  Could not detect Stripe webhook secret from listener output"
+    echo "   Check $STRIPE_LOG and update worker/.dev.vars manually if needed"
   fi
-  echo "💳 Starting Stripe webhook forwarding..."
-  stripe listen --forward-to localhost:8787/webhooks/stripe &
 else
   echo "⏭️  Skipping Stripe webhook forwarding"
 fi

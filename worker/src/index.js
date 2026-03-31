@@ -46,6 +46,7 @@ import { createSnipcartClient, extractPledgeFromOrder, canCancelOrder, canModify
 import { getCampaignStats, addPledgeToStats, removePledgeFromStats, modifyPledgeInStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, adjustTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent } from './stats.js';
 import { triggerSiteRebuild } from './github.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
+import { DEFAULT_PLATFORM_TIP_PERCENT, calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
 
 const ABQ_TAX_RATE = 0.07875; // 7.875% ABQ tax
 const FLAT_SHIPPING_FEE = 300; // $3 flat rate USPS shipping for physical items
@@ -255,6 +256,36 @@ function calculateTax(subtotalCents) {
 
 function calculateTotalWithTax(subtotalCents) {
   return subtotalCents + calculateTax(subtotalCents);
+}
+
+function getStoredTipPercent(pledgeData, fallback = 0) {
+  if (!pledgeData) return fallback;
+  return sanitizePlatformTipPercent(pledgeData.tipPercent, fallback);
+}
+
+function getStoredTipAmount(pledgeData) {
+  if (!pledgeData) return 0;
+  if (typeof pledgeData.tipAmount === 'number') {
+    return pledgeData.tipAmount;
+  }
+  const subtotal = pledgeData.subtotal ?? pledgeData.amount ?? 0;
+  return calculatePlatformTip(subtotal, getStoredTipPercent(pledgeData, 0));
+}
+
+function buildPledgeTotals(subtotalCents, { shipping = 0, tipPercent = DEFAULT_PLATFORM_TIP_PERCENT } = {}) {
+  const normalizedSubtotal = Math.max(0, Number(subtotalCents) || 0);
+  const normalizedShipping = Math.max(0, Number(shipping) || 0);
+  const normalizedTipPercent = sanitizePlatformTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+  const tax = calculateTax(normalizedSubtotal);
+  const tipAmount = calculatePlatformTip(normalizedSubtotal, normalizedTipPercent);
+  return {
+    subtotal: normalizedSubtotal,
+    tax,
+    shipping: normalizedShipping,
+    tipPercent: normalizedTipPercent,
+    tipAmount,
+    amount: normalizedSubtotal + tax + normalizedShipping + tipAmount
+  };
 }
 
 function getStripeKey(env) {
@@ -597,8 +628,9 @@ async function handleStart(request, env) {
 
   console.log('📥 /start called');
   const body = await request.json();
-  const { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty = 1, additionalTiers = [], supportItems = [], customAmount = 0, customerName, phone, hasPhysical = false } = body;
-  console.log('📥 /start payload:', { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty, additionalTiers, supportItems, customAmount });
+  const { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty = 1, additionalTiers = [], supportItems = [], customAmount = 0, customerName, phone, hasPhysical = false, tipPercent } = body;
+  const normalizedTipPercent = sanitizePlatformTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+  console.log('📥 /start payload:', { orderId, campaignSlug, amountCents, email, tierId, tierName, tierQty, additionalTiers, supportItems, customAmount, tipPercent: normalizedTipPercent });
 
   if (!orderId || !campaignSlug) {
     console.log('📥 /start: Missing required fields');
@@ -705,6 +737,7 @@ async function handleStart(request, env) {
         tierId: tierId || '',
         tierName: tierName || '',
         tierQty: String(tierQty || 1),
+        tipPercent: String(normalizedTipPercent),
         hasAdditionalTiers: additionalTiers.length > 0 ? 'true' : '',
         hasExtras: (supportItems.length > 0 || customAmount > 0) ? 'true' : '',
         hasPhysical: hasPhysical ? 'true' : ''
@@ -898,8 +931,11 @@ async function handleStripeWebhook(request, env, ctx) {
     const session = event.data.object;
     
     if (session.mode === 'setup') {
-      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, hasAdditionalTiers, hasExtras, hasPhysical, isPaymentUpdate, snipcartPaymentSessionId, snipcartPublicToken } = session.metadata;
+      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, tipPercent, hasAdditionalTiers, hasExtras, hasPhysical, isPaymentUpdate, snipcartPaymentSessionId, snipcartPublicToken } = session.metadata;
       const tierQtyNum = parseInt(tierQty) || 1;
+      const normalizedTipPercent = tipPercent === undefined || tipPercent === null || tipPercent === ''
+        ? 0
+        : sanitizePlatformTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
       const email = session.customer_email || session.customer_details?.email;
       let customerId = session.customer;
       const setupIntentId = session.setup_intent;
@@ -1082,6 +1118,8 @@ async function handleStripeWebhook(request, env, ctx) {
                         subtotal: existingPledge.subtotal || existingPledge.amount,
                         tax: existingPledge.tax || 0,
                         shipping: existingPledge.shipping || 0,
+                        tipAmount: getStoredTipAmount(existingPledge),
+                        tipPercent: getStoredTipPercent(existingPledge, 0),
                         amount: existingPledge.amount,
                         token: chargeToken,
                         hasDecisions: pledgeCampaign?.has_decisions === true,
@@ -1120,7 +1158,10 @@ async function handleStripeWebhook(request, env, ctx) {
           // New pledge - process it
           const subtotal = parseInt(amountCents) || 0;
           const shipping = hasPhysical === 'true' ? FLAT_SHIPPING_FEE : 0;
-          const tax = calculateTax(subtotal);
+          const totals = buildPledgeTotals(subtotal, {
+            shipping,
+            tipPercent: normalizedTipPercent
+          });
           const now = new Date().toISOString();
           const pledgeData = {
             orderId,
@@ -1133,10 +1174,12 @@ async function handleStripeWebhook(request, env, ctx) {
             supportItems: supportItems.length > 0 ? supportItems : undefined,
             customAmount: customAmount > 0 ? customAmount : undefined,
             shippingAddress: shippingAddress || undefined,
-            subtotal,
-            tax,
-            shipping,
-            amount: subtotal + tax + shipping,
+            subtotal: totals.subtotal,
+            tax: totals.tax,
+            shipping: totals.shipping,
+            tipPercent: totals.tipPercent,
+            tipAmount: totals.tipAmount,
+            amount: totals.amount,
             stripeCustomerId: customerId,
             stripePaymentMethodId: paymentMethodId,
             stripeSetupIntentId: setupIntentId,
@@ -1146,10 +1189,12 @@ async function handleStripeWebhook(request, env, ctx) {
             updatedAt: now,
             history: [{
               type: 'created',
-              subtotal,
-              tax,
-              shipping,
-              amount: subtotal + tax + shipping,
+              subtotal: totals.subtotal,
+              tax: totals.tax,
+              shipping: totals.shipping,
+              tipPercent: totals.tipPercent,
+              tipAmount: totals.tipAmount,
+              amount: totals.amount,
               tierId: tierId || null,
               tierQty: tierQtyNum,
               additionalTiers: additionalTiers.length > 0 ? additionalTiers : undefined,
@@ -1174,7 +1219,7 @@ async function handleStripeWebhook(request, env, ctx) {
           console.log('📊 Updating stats for campaign:', campaignSlug, 'subtotal:', subtotal);
           await addPledgeToStats(env, {
             campaignSlug,
-            amount: subtotal,
+            amount: totals.subtotal,
             tierId: tierId || null,
             tierQty: tierQtyNum,
             additionalTiers
@@ -1238,9 +1283,11 @@ async function handleStripeWebhook(request, env, ctx) {
             email,
             campaignSlug,
             campaignTitle,
-            amount: parseInt(amountCents) || 0,
-            tax,
-            shipping: shipping || 0,
+            subtotal: totals.subtotal,
+            tax: totals.tax,
+            shipping: totals.shipping,
+            tipAmount: totals.tipAmount,
+            tipPercent: totals.tipPercent,
             token,
             instagramUrl: campaign?.instagram,
             hasDecisions: campaign?.has_decisions === true,
@@ -1307,6 +1354,8 @@ async function handleStripeWebhook(request, env, ctx) {
         subtotal: pledgeData?.subtotal || pledgeData?.amount || 0,
         tax: pledgeData?.tax || 0,
         shipping: pledgeData?.shipping || 0,
+        tipAmount: getStoredTipAmount(pledgeData),
+        tipPercent: getStoredTipPercent(pledgeData, 0),
         amount: pledgeData?.amount || 0,
         token,
         pledgeItems: pledgeItemsForEmail
@@ -1386,6 +1435,11 @@ async function handleGetPledge(request, env) {
         email: pledgeData.email,
         campaignSlug: pledgeData.campaignSlug,
         pledgeStatus: pledgeData.pledgeStatus,
+        subtotal: pledgeData.subtotal,
+        tax: pledgeData.tax,
+        shipping: pledgeData.shipping || 0,
+        tipPercent: getStoredTipPercent(pledgeData, 0),
+        tipAmount: getStoredTipAmount(pledgeData),
         amount: pledgeData.amount,
         tierId: pledgeData.tierId,
         tierName: pledgeData.tierName,
@@ -1411,6 +1465,11 @@ async function handleGetPledge(request, env) {
         email: order.email,
         campaignSlug: pledge?.campaignSlug || payload.campaignSlug,
         pledgeStatus: order.metadata?.pledgeStatus || 'active',
+        subtotal: pledge?.subtotal || 0,
+        tax: pledge?.tax || 0,
+        shipping: pledge?.shipping || 0,
+        tipPercent: pledge?.tipPercent || 0,
+        tipAmount: pledge?.tipAmount || 0,
         amount: pledge?.amount || 0,
         tierId: pledge?.tierId || null,
         tierName: pledge?.tierName || null,
@@ -1428,6 +1487,11 @@ async function handleGetPledge(request, env) {
     email: payload.email,
     campaignSlug: payload.campaignSlug,
     pledgeStatus: 'active',
+    subtotal: 0,
+    tax: 0,
+    shipping: 0,
+    tipPercent: 0,
+    tipAmount: 0,
     amount: 0,
     tierId: null,
     canModify: true,
@@ -1471,6 +1535,8 @@ async function handleGetPledges(request, env) {
           subtotal: pledgeData.subtotal,
           tax: pledgeData.tax,
           shipping: pledgeData.shipping || 0,
+          tipPercent: getStoredTipPercent(pledgeData, 0),
+          tipAmount: getStoredTipAmount(pledgeData),
           amount: pledgeData.amount,
           tierId: pledgeData.tierId,
           tierName: pledgeData.tierName,
@@ -1536,12 +1602,18 @@ async function handleCancelPledge(request, env) {
       // Append cancellation to history
       const cancelSubtotal = pledgeData.subtotal || pledgeData.amount || 0;
       const cancelTax = pledgeData.tax || 0;
+      const cancelShipping = pledgeData.shipping || 0;
+      const cancelTipPercent = getStoredTipPercent(pledgeData, 0);
+      const cancelTipAmount = getStoredTipAmount(pledgeData);
       const cancelAmount = pledgeData.amount || 0;
       if (!pledgeData.history) {
         pledgeData.history = [{
           type: 'created',
           subtotal: cancelSubtotal,
           tax: cancelTax,
+          shipping: cancelShipping,
+          tipPercent: cancelTipPercent,
+          tipAmount: cancelTipAmount,
           amount: cancelAmount,
           tierId: pledgeData.tierId,
           tierQty: pledgeData.tierQty || 1,
@@ -1554,6 +1626,9 @@ async function handleCancelPledge(request, env) {
         type: 'cancelled',
         subtotalDelta: -cancelSubtotal,
         taxDelta: -cancelTax,
+        shippingDelta: -cancelShipping,
+        tipPercent: cancelTipPercent,
+        tipAmountDelta: -cancelTipAmount,
         amountDelta: -cancelAmount,
         customAmount: pledgeData.customAmount || undefined,
         at: now
@@ -1621,7 +1696,12 @@ async function handleCancelPledge(request, env) {
           email: pledgeData.email,
           campaignSlug: pledgeData.campaignSlug,
           campaignTitle,
-          amount: pledgeData.subtotal || pledgeData.amount || 0
+          subtotal: cancelSubtotal,
+          tax: cancelTax,
+          shipping: cancelShipping,
+          tipAmount: cancelTipAmount,
+          tipPercent: cancelTipPercent,
+          amount: cancelAmount
         });
         console.log('📧 Cancellation email sent to:', pledgeData.email);
       } catch (emailErr) {
@@ -1643,7 +1723,7 @@ async function handleCancelPledge(request, env) {
 
 async function handleModifyPledge(request, env) {
   const body = await request.json();
-  const { token, orderId, newTierId, newTierQty, addTiers, supportItems, customAmount } = body;
+  const { token, orderId, newTierId, newTierQty, addTiers, supportItems, customAmount, tipPercent } = body;
 
   if (!token) {
     return jsonResponse({ error: 'Missing token' }, 400);
@@ -1656,8 +1736,9 @@ async function handleModifyPledge(request, env) {
   const hasAddTiers = addTiers && addTiers.length > 0;
   const hasSupportChange = supportItems && supportItems.length > 0;
   const hasCustomAmountChange = customAmount !== null && customAmount !== undefined;
+  const hasTipChange = tipPercent !== null && tipPercent !== undefined;
 
-  if (!hasTierChange && !hasQtyChange && !hasAddTiersPayload && !hasSupportChange && !hasCustomAmountChange) {
+  if (!hasTierChange && !hasQtyChange && !hasAddTiersPayload && !hasSupportChange && !hasCustomAmountChange && !hasTipChange) {
     return jsonResponse({ error: 'No changes specified' }, 400);
   }
 
@@ -1669,6 +1750,7 @@ async function handleModifyPledge(request, env) {
   const targetOrderId = orderId || payload.orderId;
   let currentPledge = null;
   let campaignSlug = payload.campaignSlug;
+  let currentTipPercent = 0;
 
   if (env.PLEDGES) {
     const pledgeData = await env.PLEDGES.get(`pledge:${targetOrderId}`, { type: 'json' });
@@ -1683,6 +1765,7 @@ async function handleModifyPledge(request, env) {
       
       currentPledge = pledgeData;
       campaignSlug = pledgeData.campaignSlug || campaignSlug;
+      currentTipPercent = getStoredTipPercent(pledgeData, 0);
     }
   }
 
@@ -1693,6 +1776,9 @@ async function handleModifyPledge(request, env) {
 
   let newTier = null;
   const tierQty = newTierQty || 1;
+  const normalizedTipPercent = hasTipChange
+    ? sanitizePlatformTipPercent(tipPercent, currentTipPercent)
+    : currentTipPercent;
 
   // Validate tier change if specified
   if (hasTierChange) {
@@ -1793,8 +1879,10 @@ async function handleModifyPledge(request, env) {
     });
   }
   const newShipping = newHasPhysical ? FLAT_SHIPPING_FEE : 0;
-  const newTax = calculateTax(newAmount);
-  const newAmountWithTax = newAmount + newTax + newShipping;
+  const totals = buildPledgeTotals(newAmount, {
+    shipping: newShipping,
+    tipPercent: normalizedTipPercent
+  });
 
   // Track updated pledge data for email
   let updatedPledgeData = null;
@@ -1846,16 +1934,22 @@ async function handleModifyPledge(request, env) {
       // Calculate deltas for history
       const oldSubtotalForHistory = currentPledge?.subtotal ?? currentPledge?.amount ?? 0;
       const oldTaxForHistory = currentPledge?.tax ?? 0;
+      const oldShippingForHistory = currentPledge?.shipping ?? 0;
+      const oldTipAmountForHistory = getStoredTipAmount(currentPledge);
       const oldAmountForHistory = currentPledge?.amount ?? 0;
-      const subtotalDelta = newAmount - oldSubtotalForHistory;
-      const taxDelta = newTax - oldTaxForHistory;
-      const amountDelta = newAmountWithTax - oldAmountForHistory;
+      const subtotalDelta = totals.subtotal - oldSubtotalForHistory;
+      const taxDelta = totals.tax - oldTaxForHistory;
+      const shippingDelta = totals.shipping - oldShippingForHistory;
+      const tipAmountDelta = totals.tipAmount - oldTipAmountForHistory;
+      const amountDelta = totals.amount - oldAmountForHistory;
       
       const now = new Date().toISOString();
-      pledgeData.subtotal = newAmount;
-      pledgeData.tax = newTax;
-      pledgeData.shipping = newShipping;
-      pledgeData.amount = newAmountWithTax;
+      pledgeData.subtotal = totals.subtotal;
+      pledgeData.tax = totals.tax;
+      pledgeData.shipping = totals.shipping;
+      pledgeData.tipPercent = totals.tipPercent;
+      pledgeData.tipAmount = totals.tipAmount;
+      pledgeData.amount = totals.amount;
       pledgeData.modifiedAt = now;
       pledgeData.updatedAt = now;
       
@@ -1865,6 +1959,9 @@ async function handleModifyPledge(request, env) {
           type: 'created',
           subtotal: oldSubtotalForHistory,
           tax: oldTaxForHistory,
+          shipping: oldShippingForHistory,
+          tipPercent: currentTipPercent,
+          tipAmount: oldTipAmountForHistory,
           amount: oldAmountForHistory,
           tierId: oldTierId,
           tierQty: oldTierQty,
@@ -1877,6 +1974,10 @@ async function handleModifyPledge(request, env) {
         type: 'modified',
         subtotalDelta,
         taxDelta,
+        shippingDelta,
+        tipPercent: totals.tipPercent,
+        tipAmount: totals.tipAmount,
+        tipAmountDelta,
         amountDelta,
         tierId: pledgeData.tierId,
         tierQty: pledgeData.tierQty,
@@ -1964,8 +2065,10 @@ async function handleModifyPledge(request, env) {
       await snipcart.orders.update(targetOrderId, {
         metadata: {
           subtotal: newAmount,
-          tax: newTax,
-          totalAmount: newAmountWithTax,
+          tax: totals.tax,
+          tipPercent: totals.tipPercent,
+          tipAmount: totals.tipAmount,
+          totalAmount: totals.amount,
           tierId: newTier ? newTierId : undefined,
           tierName: newTier ? newTier.name : undefined,
           tierQty: hasQtyChange ? tierQty : undefined,
@@ -1979,7 +2082,10 @@ async function handleModifyPledge(request, env) {
 
   // Send confirmation email (use subtotals without tax for clarity)
   const previousSubtotal = currentPledge?.subtotal ?? currentPledge?.amount ?? 0;
-  if (previousSubtotal !== newAmount) {
+  const previousTax = currentPledge?.tax ?? 0;
+  const previousShipping = currentPledge?.shipping ?? 0;
+  const previousTipAmount = getStoredTipAmount(currentPledge);
+  if (previousSubtotal !== totals.subtotal || previousTax !== totals.tax || previousShipping !== totals.shipping || previousTipAmount !== totals.tipAmount) {
     try {
       const campaignTitle = campaign?.title || campaignSlug.replace(/-/g, ' ').toUpperCase();
       const emailToken = await generateToken(env.MAGIC_LINK_SECRET, {
@@ -2014,9 +2120,14 @@ async function handleModifyPledge(request, env) {
         campaignSlug,
         campaignTitle,
         previousSubtotal,
-        newSubtotal: newAmount,
-        tax: newTax,
-        shipping: newShipping,
+        previousTax,
+        previousShipping,
+        previousTipAmount,
+        newSubtotal: totals.subtotal,
+        tax: totals.tax,
+        shipping: totals.shipping,
+        tipAmount: totals.tipAmount,
+        tipPercent: totals.tipPercent,
         token: emailToken,
         instagramUrl: campaign?.instagram,
         pledgeItems: pledgeItemsForEmail
@@ -2037,9 +2148,13 @@ async function handleModifyPledge(request, env) {
     tierQty,
     previousSubtotal: currentPledge?.subtotal || currentPledge?.amount,
     previousAmount: currentPledge?.amount || 0,
-    subtotal: newAmount,
-    tax: newTax,
-    newAmount: newAmountWithTax,
+    previousTipAmount,
+    subtotal: totals.subtotal,
+    tax: totals.tax,
+    shipping: totals.shipping,
+    tipPercent: totals.tipPercent,
+    tipAmount: totals.tipAmount,
+    newAmount: totals.amount,
     campaignSlug
   });
 }
@@ -2258,12 +2373,14 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           let combinedSubtotal = 0;
           let combinedTax = 0;
           let combinedShipping = 0;
+          let combinedTipAmount = 0;
           const combinedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
           
           for (const pledge of supporter.pledges) {
             combinedSubtotal += pledge.subtotal || pledge.amount || 0;
             combinedTax += pledge.tax || 0;
             combinedShipping += pledge.shipping || 0;
+            combinedTipAmount += getStoredTipAmount(pledge);
             
             // Merge tier items
             if (pledge.tierName) {
@@ -2318,6 +2435,8 @@ async function settleCampaign(campaignSlug, env, options = {}) {
             subtotal: combinedSubtotal,
             tax: combinedTax,
             shipping: combinedShipping,
+            tipAmount: combinedTipAmount,
+            tipPercent: derivePlatformTipPercent(combinedSubtotal, combinedTipAmount, 0),
             amount: supporter.totalAmount,
             token,
             hasDecisions: campaign?.has_decisions === true,
@@ -2363,12 +2482,14 @@ async function settleCampaign(campaignSlug, env, options = {}) {
         let failedSubtotal = 0;
         let failedTax = 0;
         let failedShipping = 0;
+        let failedTipAmount = 0;
         const failedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
         
         for (const pledge of supporter.pledges) {
           failedSubtotal += pledge.subtotal || pledge.amount || 0;
           failedTax += pledge.tax || 0;
           failedShipping += pledge.shipping || 0;
+          failedTipAmount += getStoredTipAmount(pledge);
           
           if (pledge.tierName) {
             if (!failedItems.tierName) {
@@ -2418,6 +2539,8 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           subtotal: failedSubtotal,
           tax: failedTax,
           shipping: failedShipping,
+          tipAmount: failedTipAmount,
+          tipPercent: derivePlatformTipPercent(failedSubtotal, failedTipAmount, 0),
           amount: supporter.totalAmount,
           token,
           pledgeItems: failedItems
@@ -2778,11 +2901,13 @@ async function handleSettleBatch(request, env) {
           let combinedSubtotal = 0;
           let combinedTax = 0;
           let combinedShipping = 0;
+          let combinedTipAmount = 0;
           const combinedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
           for (const pledge of data.pledges) {
             combinedSubtotal += pledge.subtotal || pledge.amount || 0;
             combinedTax += pledge.tax || 0;
             combinedShipping += pledge.shipping || 0;
+            combinedTipAmount += getStoredTipAmount(pledge);
             if (pledge.tierName) {
               if (!combinedItems.tierName) {
                 combinedItems.tierName = pledge.tierName;
@@ -2804,7 +2929,7 @@ async function handleSettleBatch(request, env) {
 
           await sendChargeSuccessEmail(env, {
             email, campaignSlug, campaignTitle,
-            subtotal: combinedSubtotal, tax: combinedTax, shipping: combinedShipping, amount: data.totalAmount,
+            subtotal: combinedSubtotal, tax: combinedTax, shipping: combinedShipping, tipAmount: combinedTipAmount, tipPercent: derivePlatformTipPercent(combinedSubtotal, combinedTipAmount, 0), amount: data.totalAmount,
             token,
             hasDecisions: campaign?.has_decisions === true,
             pledgeItems: combinedItems
@@ -2981,7 +3106,10 @@ async function handleTestSetup(request, env) {
       additionalTiers = [{ id: secondTier.id, qty: secondTierQty }];
     }
   }
-  const tax = calculateTax(subtotal);
+  const totals = buildPledgeTotals(subtotal, {
+    shipping: 300,
+    tipPercent: DEFAULT_PLATFORM_TIP_PERCENT
+  });
 
   // Create a real Stripe test customer so payment method updates work
   let stripeCustomerId = null;
@@ -3002,10 +3130,12 @@ async function handleTestSetup(request, env) {
       tierId: firstTier?.id || 'frame',
       tierName: firstTier?.name || 'Test Tier',
       tierQty: firstTierQty,
-      subtotal: subtotal,
-      tax: tax,
-      shipping: 300,
-      amount: subtotal + tax + 300,
+      subtotal: totals.subtotal,
+      tax: totals.tax,
+      shipping: totals.shipping,
+      tipPercent: totals.tipPercent,
+      tipAmount: totals.tipAmount,
+      amount: totals.amount,
       customAmount: 0,
       supportItems: [],
       additionalTiers,
@@ -3047,6 +3177,8 @@ async function handleTestSetup(request, env) {
       additionalTiers: p.additionalTiers,
       subtotal: p.subtotal,
       tax: p.tax,
+      tipPercent: p.tipPercent,
+      tipAmount: p.tipAmount,
       amount: p.amount
     })),
     token,
@@ -3737,9 +3869,11 @@ async function handleTestEmail(request, env) {
           email,
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
-          amount: 5000,
+          subtotal: 5000,
           tax: 394,
           shipping: 300,
+          tipAmount: 250,
+          tipPercent: 5,
           token,
           instagramUrl,
           hasDecisions: campaign?.has_decisions === true,
@@ -3759,9 +3893,14 @@ async function handleTestEmail(request, env) {
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
           previousSubtotal: 5000,
+          previousTax: 394,
+          previousShipping: 300,
+          previousTipAmount: 250,
           newSubtotal: 10000,
           tax: 788,
           shipping: 300,
+          tipAmount: 500,
+          tipPercent: 5,
           token,
           instagramUrl,
           pledgeItems: {
@@ -3782,7 +3921,9 @@ async function handleTestEmail(request, env) {
           subtotal: 10000,  // $100.00
           tax: 788,         // $7.88
           shipping: 300,    // $3.00
-          amount: 11088,    // $110.88 total
+          tipAmount: 500,   // $5.00
+          tipPercent: 5,
+          amount: 11588,    // $115.88 total
           token,
           pledgeItems: {
             tierName: 'Test Tier',
@@ -3868,7 +4009,9 @@ async function handleTestEmail(request, env) {
           subtotal: 10000,  // $100.00
           tax: 788,         // $7.88
           shipping: 300,    // $3.00
-          amount: 11088,    // $110.88 total
+          tipAmount: 500,   // $5.00
+          tipPercent: 5,
+          amount: 11588,    // $115.88 total
           token,
           hasDecisions: campaign?.has_decisions === true,
           pledgeItems: {
@@ -4188,8 +4331,10 @@ async function handleRecoverCheckout(request, env) {
     const hasPhysical = metadata.hasPhysical === 'true';
     const subtotal = amountCents;
     const shipping = hasPhysical ? FLAT_SHIPPING_FEE : 0;
-    const tax = calculateTax(subtotal);
-    const amount = subtotal + tax + shipping;
+    const tipPercent = metadata.tipPercent === undefined || metadata.tipPercent === null || metadata.tipPercent === ''
+      ? 0
+      : sanitizePlatformTipPercent(metadata.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+    const totals = buildPledgeTotals(subtotal, { shipping, tipPercent });
 
     // Fetch additional tiers if any
     let additionalTiers = [];
@@ -4206,10 +4351,12 @@ async function handleRecoverCheckout(request, env) {
       tierName,
       tierQty,
       additionalTiers: additionalTiers.length > 0 ? additionalTiers : undefined,
-      subtotal,
-      tax,
-      shipping,
-      amount,
+      subtotal: totals.subtotal,
+      tax: totals.tax,
+      shipping: totals.shipping,
+      tipPercent: totals.tipPercent,
+      tipAmount: totals.tipAmount,
+      amount: totals.amount,
       stripeCustomerId: customerId,
       stripePaymentMethodId: paymentMethodId,
       stripeSetupIntentId: setupIntentId,
@@ -4236,7 +4383,7 @@ async function handleRecoverCheckout(request, env) {
       // Update stats
       await addPledgeToStats(env, { 
         campaignSlug, 
-        amount: subtotal, 
+        amount: totals.subtotal, 
         tierId, 
         tierQty,
         additionalTiers
@@ -4266,9 +4413,11 @@ async function handleRecoverCheckout(request, env) {
           email,
           campaignTitle,
           campaignSlug,
-          amount: subtotal,
-          tax,
-          shipping: shipping || 0,
+          subtotal: totals.subtotal,
+          tax: totals.tax,
+          shipping: totals.shipping,
+          tipAmount: totals.tipAmount,
+          tipPercent: totals.tipPercent,
           token,
           instagramUrl: campaign?.instagram,
           hasDecisions: campaign?.has_decisions === true,

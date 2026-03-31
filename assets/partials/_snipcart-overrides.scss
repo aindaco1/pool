@@ -98,6 +98,14 @@
   padding-right: 24px !important;
 }
 
+.snipcart-item-line--cart-edit .snipcart-item-quantity__quantity-price-container {
+  justify-content: flex-start !important;
+}
+
+.snipcart-item-line--cart-edit .snipcart-item-quantity__quantity-price-container > :not(.snipcart-item-quantity__quantity) {
+  display: none !important;
+}
+
 // Hide quantity controls for non-stackable items
 // JS adds data-stackable attribute based on _stackable custom field
 .snipcart-item-line[data-stackable="false"] {
@@ -134,5 +142,91 @@
     strong {
       color: #15803d;
     }
+  }
+}
+
+.pool-tip-box {
+  margin: 16px;
+  padding: 14px 16px;
+  border: 1px solid #d7d2c8;
+  border-radius: 8px;
+  background: #faf7f2;
+  color: #2f2419;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  &__amount {
+    font-weight: 700;
+  }
+
+  &__copy {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #5b4c3c;
+  }
+
+  &__controls {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+  }
+
+  &__slider {
+    width: 100%;
+    accent-color: $snipcart--accent;
+  }
+
+  &__percent {
+    min-width: 3ch;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  &--checkout {
+    margin: 0 0 16px;
+  }
+}
+
+.pool-fee-summary {
+  margin: 0 16px 16px;
+  padding: 12px 16px;
+  border: 1px solid #e6e0d6;
+  border-radius: 8px;
+  background: #fffdf9;
+  color: #3a2e21;
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  &__row + &__row {
+    margin-top: 6px;
+  }
+
+  &__row--total {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e6e0d6;
+    font-weight: 700;
+  }
+
+  &--checkout {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
   }
 }

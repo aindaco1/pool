@@ -11,7 +11,7 @@ A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Bac
 - **Checkout autofill** — Auto-selects country, enables password manager autofill for address fields
 - **Physical & digital tiers** — Physical items trigger Stripe shipping address collection + $3 flat USPS fee
 - **Stretch goals** — Auto-unlock at funding thresholds
-- **Campaign lifecycle** — `pre` → `live` → `post` states with automatic transitions + Cloudflare cache purge
+- **Campaign lifecycle** — `upcoming` → `live` → `post` states with automatic transitions + Cloudflare cache purge
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement

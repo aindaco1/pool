@@ -64,15 +64,33 @@ function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportIte
   </div>`;
 }
 
+function renderAmountBreakdown({ subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, totalLabel, totalAmount }) {
+  const resolvedTotal = totalAmount ?? (subtotal + tax + shipping + tipAmount);
+  return `
+    <p style="margin: 0 0 4px 0;">Subtotal: $${(subtotal / 100).toFixed(2)}</p>
+    ${tipAmount > 0 ? `<p style="margin: 0 0 4px 0;">Dust Wave tip${tipPercent > 0 ? ` (${tipPercent}%)` : ''}: $${(tipAmount / 100).toFixed(2)}</p>` : ''}
+    <p style="margin: 0 0 4px 0;">Tax (7.875%): $${(tax / 100).toFixed(2)}</p>
+    ${shipping > 0 ? `<p style="margin: 0 0 4px 0;">Shipping: $${(shipping / 100).toFixed(2)}</p>` : ''}
+    <p style="margin: 0 0 8px 0;"><strong>${totalLabel}: $${(resolvedTotal / 100).toFixed(2)}</strong></p>
+  `.trim();
+}
+
 /**
  * Send supporter confirmation email after successful pledge
  */
-export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amount, tax = 0, shipping = 0, token, instagramUrl, pledgeItems, hasDecisions }) {
+export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems, hasDecisions }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
-  const total = amount + tax + shipping;
+  const amountBreakdownHtml = renderAmountBreakdown({
+    subtotal,
+    tax,
+    shipping,
+    tipAmount,
+    tipPercent,
+    totalLabel: 'Total (if funded)'
+  });
   
   const html = `
 <!DOCTYPE html>
@@ -87,10 +105,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
   </div>
   
   <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-    <p style="margin: 0 0 4px 0;">Subtotal: $${(amount / 100).toFixed(2)}</p>
-    <p style="margin: 0 0 4px 0;">Tax (7.875%): $${(tax / 100).toFixed(2)}</p>
-    ${shipping > 0 ? `<p style="margin: 0 0 4px 0;">Shipping: $${(shipping / 100).toFixed(2)}</p>` : ''}
-    <p style="margin: 0 0 8px 0;"><strong>Total (if funded): $${(total / 100).toFixed(2)}</strong></p>
+    ${amountBreakdownHtml}
     ${pledgeItemsHtml}
     <p style="margin: 12px 0 0 0; color: #666; font-size: 14px;">
       <strong>Remember:</strong> Your card is saved but won't be charged unless this campaign reaches its goal.
@@ -152,13 +167,23 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
 /**
  * Send pledge modification confirmation email
  */
-export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campaignTitle, previousSubtotal, newSubtotal, tax = 0, shipping = 0, token, instagramUrl, pledgeItems }) {
+export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campaignTitle, previousSubtotal, previousTax = 0, previousShipping = 0, previousTipAmount = 0, newSubtotal, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
-  const increased = newSubtotal > previousSubtotal;
-  const diff = Math.abs(newSubtotal - previousSubtotal);
-  const total = newSubtotal + tax + shipping;
+  const previousTotal = previousSubtotal + previousTax + previousShipping + previousTipAmount;
+  const newTotal = newSubtotal + tax + shipping + tipAmount;
+  const increased = newTotal > previousTotal;
+  const diff = Math.abs(newTotal - previousTotal);
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
+  const amountBreakdownHtml = renderAmountBreakdown({
+    subtotal: newSubtotal,
+    tax,
+    shipping,
+    tipAmount,
+    tipPercent,
+    totalLabel: 'New total (if funded)',
+    totalAmount: newTotal
+  });
   
   const html = `
 <!DOCTYPE html>
@@ -174,11 +199,9 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   
   <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
     <p style="margin: 0 0 8px 0;"><strong>Campaign:</strong> ${campaignTitle}</p>
-    <p style="margin: 0 0 8px 0;"><strong>Previous pledge:</strong> $${(previousSubtotal / 100).toFixed(2)}</p>
-    <p style="margin: 0 0 4px 0;"><strong>New pledge:</strong> $${(newSubtotal / 100).toFixed(2)} (${increased ? '+' : '-'}$${(diff / 100).toFixed(2)})</p>
-    <p style="margin: 0 0 4px 0;">Tax (7.875%): $${(tax / 100).toFixed(2)}</p>
-    ${shipping > 0 ? '<p style="margin: 0 0 4px 0;">Shipping: $' + (shipping / 100).toFixed(2) + '</p>' : ''}
-    <p style="margin: 0 0 8px 0;"><strong>New total (if funded): $${(total / 100).toFixed(2)}</strong></p>
+    <p style="margin: 0 0 8px 0;"><strong>Previous total (if funded):</strong> $${(previousTotal / 100).toFixed(2)}</p>
+    <p style="margin: 0 0 8px 0;"><strong>Updated total (if funded):</strong> $${(newTotal / 100).toFixed(2)} (${increased ? '+' : '-'}$${(diff / 100).toFixed(2)})</p>
+    ${amountBreakdownHtml}
     ${pledgeItemsHtml}
     <p style="margin: 12px 0 0 0; color: #666; font-size: 14px;">
       <strong>Remember:</strong> Your card is saved but won't be charged unless this campaign reaches its goal.
@@ -230,9 +253,18 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
 /**
  * Send payment failure notification
  */
-export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, amount, token, pledgeItems }) {
+export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
+  const amountBreakdownHtml = renderAmountBreakdown({
+    subtotal,
+    tax,
+    shipping,
+    tipAmount,
+    tipPercent,
+    totalLabel: 'Amount due',
+    totalAmount: amount
+  });
   
   const html = `
 <!DOCTYPE html>
@@ -250,10 +282,7 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
     <p style="margin: 0 0 12px 0;">
       We tried to charge your card for your pledge to <strong>${campaignTitle}</strong>, but the payment failed.
     </p>
-    <p style="margin: 0 0 4px 0;">Subtotal: $${(subtotal / 100).toFixed(2)}</p>
-    <p style="margin: 0 0 4px 0;">Tax (7.875%): $${(tax / 100).toFixed(2)}</p>
-    ${shipping > 0 ? '<p style="margin: 0 0 4px 0;">Shipping: $' + (shipping / 100).toFixed(2) + '</p>' : ''}
-    <p style="margin: 0;"><strong>Amount due: $${(amount / 100).toFixed(2)}</strong></p>
+    ${amountBreakdownHtml}
     ${pledgeItemsHtml}
   </div>
   
@@ -298,10 +327,19 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
 /**
  * Send charge success email after campaign settlement
  */
-export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, amount, token, pledgeItems, hasDecisions }) {
+export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems, hasDecisions }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
+  const amountBreakdownHtml = renderAmountBreakdown({
+    subtotal,
+    tax,
+    shipping,
+    tipAmount,
+    tipPercent,
+    totalLabel: 'Amount charged',
+    totalAmount: amount
+  });
   
   const html = `
 <!DOCTYPE html>
@@ -317,10 +355,7 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   
   <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #bbf7d0;">
     <p style="margin: 0 0 12px 0;"><strong>${campaignTitle}</strong> has been fully funded!</p>
-    <p style="margin: 0 0 4px 0;">Subtotal: $${(subtotal / 100).toFixed(2)}</p>
-    <p style="margin: 0 0 4px 0;">Tax (7.875%): $${(tax / 100).toFixed(2)}</p>
-    ${shipping > 0 ? '<p style="margin: 0 0 4px 0;">Shipping: $' + (shipping / 100).toFixed(2) + '</p>' : ''}
-    <p style="margin: 0;"><strong>Amount charged: $${(amount / 100).toFixed(2)}</strong></p>
+    ${amountBreakdownHtml}
     ${pledgeItemsHtml}
   </div>
   
@@ -457,8 +492,17 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
 /**
  * Send pledge cancellation confirmation email
  */
-export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campaignTitle, amount }) {
+export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campaignTitle, subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, amount }) {
   const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/`;
+  const amountBreakdownHtml = renderAmountBreakdown({
+    subtotal,
+    tax,
+    shipping,
+    tipAmount,
+    tipPercent,
+    totalLabel: 'Released total',
+    totalAmount: amount
+  });
   
   const html = `
 <!DOCTYPE html>
@@ -474,7 +518,7 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
   
   <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
     <p style="margin: 0 0 8px 0;"><strong>Campaign:</strong> ${campaignTitle}</p>
-    <p style="margin: 0 0 8px 0;"><strong>Amount:</strong> $${(amount / 100).toFixed(0)}</p>
+    ${amountBreakdownHtml}
     <p style="margin: 0; color: #666; font-size: 14px;">
       Your card was never charged — this was just a pledge hold.
     </p>

@@ -110,6 +110,46 @@
       font-size: 16px;
     }
   }
+
+  &__tip {
+    padding: 20px;
+    border-top: 1px solid $color--light;
+    background: #faf7f2;
+  }
+
+  &__tip-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 8px;
+
+    h2 {
+      margin: 0;
+    }
+  }
+
+  &__tip-amount,
+  &__tip-percent {
+    font-weight: 700;
+  }
+
+  &__tip-copy {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: $color--secondary;
+  }
+
+  &__tip-controls {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+
+    input[type="range"] {
+      width: 100%;
+    }
+  }
   
   &__status {
     font-size: 12px;

@@ -14,12 +14,12 @@ The Pool uses a **no-account, email-based pledge management system**. Backers sa
 ## Campaign State Machine
 
 ```
-pre → live → post
+upcoming → live → post
 ```
 
 | State | UX | Actions |
 |-------|-----|---------|
-| `pre` | Buttons disabled, "Coming soon" | Countdown to launch |
+| `upcoming` | Buttons disabled, "Coming soon" | Countdown to launch |
 | `live` | Pledge buttons active | Cards saved via Stripe SetupIntent |
 | `post` | Campaign closed | Charges processed (if funded) |
 

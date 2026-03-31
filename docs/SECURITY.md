@@ -21,7 +21,7 @@ This document covers the security architecture, known risks, hardening recommend
 | `pledge:{orderId}` | PLEDGES | Email, amount, Stripe IDs, status | **High** - PII + payment data |
 | `email:{email}` | PLEDGES | Array of order IDs | **Medium** - links email to pledges |
 | `stats:{slug}` | PLEDGES | Aggregate totals | **Low** - public |
-| `inventory:{slug}` | PLEDGES | Tier claim counts | **Low** - public |
+| `tier-inventory:{slug}` | PLEDGES | Tier claim counts | **Low** - public |
 | `stripe-event:{id}` | PLEDGES | "processed" flag | **Low** - idempotency |
 | `campaign-pledges:{slug}` | PLEDGES | Array of order IDs per campaign | **Low** - index |
 | `campaign-charged:{slug}` | PLEDGES | Settlement completion timestamp | **Low** - flag |

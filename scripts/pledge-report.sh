@@ -71,7 +71,7 @@ KEY_COUNT=$(echo "$KEYS" | wc -l | tr -d ' ')
 echo "Found $KEY_COUNT pledges. Fetching details..." >&2
 
 # CSV header
-echo "email,campaign,items,subtotal,tax,shipping,total,status,charged,created_at,order_id"
+echo "email,campaign,items,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id"
 
 # Fetch each pledge and output as CSV row
 PROCESSED=0
@@ -130,12 +130,12 @@ def build_items_str(tier_id, tier_qty, additional_tiers, is_negative=False, cust
     
     return '; '.join(items) if items else ''
 
-def write_row(email, campaign, items_str, subtotal, tax, shipping, total, status, charged, timestamp, order_id):
+def write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping, total, status, charged, timestamp, order_id):
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow([
         email, campaign, items_str,
-        f'{subtotal:.2f}', f'{tax:.2f}', f'{shipping:.2f}', f'{total:.2f}',
+        f'{subtotal:.2f}', str(tip_percent), f'{tip:.2f}', f'{tax:.2f}', f'{shipping:.2f}', f'{total:.2f}',
         status, 'yes' if charged else 'no', timestamp, order_id
     ])
     print(output.getvalue().strip())
@@ -196,6 +196,8 @@ try:
             
             if entry_type == 'created':
                 subtotal = entry.get('subtotal', 0) / 100
+                tip_percent = entry.get('tipPercent', data.get('tipPercent', 0) or 0)
+                tip = entry.get('tipAmount', data.get('tipAmount', 0) or 0) / 100
                 tax = entry.get('tax', 0) / 100
                 shipping = entry.get('shipping', 0) / 100
                 total = entry.get('amount', 0) / 100
@@ -210,10 +212,12 @@ try:
                 )
                 prev_counts = get_tier_counts(entry)
                 prev_custom = custom_amt
-                write_row(email, campaign, items_str, subtotal, tax, shipping, total, 'created', charged, timestamp, order_id)
+                write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping, total, 'created', charged, timestamp, order_id)
             
             elif entry_type == 'modified':
                 subtotal = entry.get('subtotalDelta', 0) / 100
+                tip_percent = entry.get('tipPercent', data.get('tipPercent', 0) or 0)
+                tip = entry.get('tipAmountDelta', 0) / 100
                 tax = entry.get('taxDelta', 0) / 100
                 shipping_delta = entry.get('shippingDelta', 0) / 100
                 total = entry.get('amountDelta', 0) / 100
@@ -236,10 +240,12 @@ try:
                     items_str = '(modified)'
                 prev_counts = new_counts
                 prev_custom = new_custom
-                write_row(email, campaign, items_str, subtotal, tax, shipping_delta, total, 'modified', charged, timestamp, order_id)
+                write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping_delta, total, 'modified', charged, timestamp, order_id)
             
             elif entry_type == 'cancelled':
                 subtotal = entry.get('subtotalDelta', 0) / 100
+                tip_percent = entry.get('tipPercent', data.get('tipPercent', 0) or 0)
+                tip = entry.get('tipAmountDelta', 0) / 100
                 tax = entry.get('taxDelta', 0) / 100
                 shipping_delta = entry.get('shippingDelta', 0) / 100
                 total = entry.get('amountDelta', 0) / 100
@@ -251,7 +257,7 @@ try:
                     is_negative=True,
                     custom_amount=data.get('customAmount', 0) or 0
                 )
-                write_row(email, campaign, items_str, subtotal, tax, shipping_delta, total, 'cancelled', charged, timestamp, order_id)
+                write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping_delta, total, 'cancelled', charged, timestamp, order_id)
     else:
         # Legacy pledge without history - output single row with current state
         pledge_status = data.get('pledgeStatus', 'unknown')
@@ -270,6 +276,8 @@ try:
         sign = -1 if is_cancelled else 1
         
         subtotal = sign * data.get('subtotal', data.get('amount', 0)) / 100
+        tip_percent = data.get('tipPercent', 0) or 0
+        tip = sign * (data.get('tipAmount', 0) or 0) / 100
         tax = sign * data.get('tax', 0) / 100
         shipping = sign * data.get('shipping', 0) / 100
         total = sign * data.get('amount', 0) / 100
@@ -282,7 +290,7 @@ try:
             custom_amount=data.get('customAmount', 0) or 0
         )
         
-        write_row(email, campaign, items_str, subtotal, tax, shipping, total, status, charged, data.get('createdAt', ''), order_id)
+        write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping, total, status, charged, data.get('createdAt', ''), order_id)
 
 except json.JSONDecodeError:
     pass

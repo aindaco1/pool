@@ -2,6 +2,16 @@
 'use strict';
 
 const WORKER_BASE = window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
+const DEFAULT_PLATFORM_TIP_PERCENT = 5;
+const MAX_PLATFORM_TIP_PERCENT = 15;
+const FLAT_SHIPPING_FEE = 300; // $3 flat rate, must match worker
+const ABQ_TAX_RATE = 0.07875; // must match worker
+const tipSelections = new Map();
+let currentSnipcartRoute = null;
+
+function debugCartUI(...args) {
+  console.log('[Pool cart]', ...args);
+}
 
 function isTierItem(itemId) {
   if (!itemId) return false;
@@ -24,15 +34,119 @@ function isSingleTierOnly() {
 function cartHasPhysicalItems() {
   const state = Snipcart.store.getState();
   const items = state.cart.items.items || [];
-  // Check _category custom field (items are shippable=false to bypass Snipcart shipping)
   return items.some(item => {
     const fields = item.customFields || [];
     const cat = fields.find(f => f.name === '_category');
-    return cat && cat.value === 'physical';
+    if (cat && cat.value === 'physical') return true;
+
+    // Checkout summary state can be slimmer than cart-edit state; keep a fallback.
+    const text = `${item.name || ''} ${item.id || ''} ${item.description || ''}`.toLowerCase();
+    return text.includes('physical');
   });
 }
 
-const FLAT_SHIPPING_FEE = 300; // $3 flat rate, must match worker
+function sanitizeTipPercent(value, fallback) {
+  const parsed = Number(value);
+  if (Number.isInteger(parsed) && parsed >= 0 && parsed <= MAX_PLATFORM_TIP_PERCENT) {
+    return parsed;
+  }
+  return fallback;
+}
+
+function getCartCampaignSlug(state) {
+  const items = state?.cart?.items?.items || [];
+  const firstItem = items[0];
+  return firstItem?.url?.split('/campaigns/')[1]?.split('/')[0] || 'default';
+}
+
+function calculateTax(subtotalCents) {
+  return Math.round((Math.max(0, subtotalCents || 0)) * ABQ_TAX_RATE);
+}
+
+function getStoredTipPercent(state) {
+  const campaignSlug = getCartCampaignSlug(state || Snipcart.store.getState());
+  if (!tipSelections.has(campaignSlug)) {
+    tipSelections.set(campaignSlug, DEFAULT_PLATFORM_TIP_PERCENT);
+  }
+  return tipSelections.get(campaignSlug);
+}
+
+function setStoredTipPercent(percent, state) {
+  const resolvedState = state || Snipcart.store.getState();
+  const campaignSlug = getCartCampaignSlug(resolvedState);
+  tipSelections.set(campaignSlug, sanitizeTipPercent(percent, DEFAULT_PLATFORM_TIP_PERCENT));
+}
+
+function getCartSubtotalCents(state) {
+  const subtotal = state?.cart?.subtotal || state?.cart?.total || 0;
+  return Math.round(subtotal * 100);
+}
+
+function cartHasItems(state) {
+  return (state?.cart?.items?.count || 0) > 0;
+}
+
+function calculatePlatformTip(subtotalCents, tipPercent) {
+  return Math.round((Math.max(0, subtotalCents) * sanitizeTipPercent(tipPercent, 0)) / 100);
+}
+
+function getCartTipAmountCents(state) {
+  return calculatePlatformTip(getCartSubtotalCents(state), getStoredTipPercent(state));
+}
+
+function formatCents(cents) {
+  return '$' + (cents / 100).toFixed(2);
+}
+
+function buildCartPricing(state) {
+  const subtotalCents = getCartSubtotalCents(state);
+  const tipPercent = getStoredTipPercent(state);
+  const tipAmountCents = calculatePlatformTip(subtotalCents, tipPercent);
+  const taxCents = calculateTax(subtotalCents);
+  const shippingCents = cartHasPhysicalItems() ? FLAT_SHIPPING_FEE : 0;
+
+  return {
+    subtotalCents,
+    tipPercent,
+    tipAmountCents,
+    taxCents,
+    shippingCents,
+    totalCents: subtotalCents + tipAmountCents + taxCents + shippingCents
+  };
+}
+
+function getCartInsertionTarget(cartOpen) {
+  const header = cartOpen.querySelector(
+    '.snipcart-cart-header, .snipcart-cart__header, [class*="cart-header"], [class*="secondary-header"]'
+  );
+
+  if (header && header.parentNode) {
+    return {
+      parent: header.parentNode,
+      beforeNode: header.nextSibling || null
+    };
+  }
+
+  return {
+    parent: cartOpen,
+    beforeNode: cartOpen.firstChild || null
+  };
+}
+
+function getCartFooterInsertionTarget(cartOpen) {
+  const footer = cartOpen.querySelector(
+    '.snipcart-cart__footer, .snipcart-cart-footer, [class*="cart__footer"], [class*="cart-footer"]'
+  );
+
+  if (footer && footer.parentNode) {
+    return {
+      parent: footer.parentNode,
+      beforeNode: footer
+    };
+  }
+
+  return getCartInsertionTarget(cartOpen);
+}
 
 let _injectingFees = false;
 let _feeDebounce = null;
@@ -50,47 +164,296 @@ function injectSummaryFees() {
     const snipcartRoot = document.querySelector('#snipcart');
     if (!snipcartRoot) return;
     
-    const hasPhysical = cartHasPhysicalItems();
+    const state = Snipcart.store.getState();
+    const pricing = buildCartPricing(state);
     
-    // Clean up all existing injections
-    snipcartRoot.querySelectorAll('.pool-shipping-line').forEach(el => el.remove());
-    
-    // Update header cart price to include shipping
+    // Update cart icon price with the same breakdown the Worker will use.
     const headerPrice = document.querySelector('.snipcart-total-price');
     if (headerPrice) {
-      const state = Snipcart.store.getState();
-      const snipcartTotal = state.cart.total || 0;
-      const adjustedTotal = hasPhysical ? snipcartTotal + FLAT_SHIPPING_FEE / 100 : snipcartTotal;
-      headerPrice.textContent = '$' + adjustedTotal.toFixed(2);
-    }
-    
-    if (!hasPhysical) return;
-    
-    const shippingAmt = '$' + (FLAT_SHIPPING_FEE / 100).toFixed(2);
-    
-    // Find every summary-fees total row (cart sidebar + checkout summary)
-    // and inject shipping line before it + update the total
-    const totalRows = snipcartRoot.querySelectorAll('.snipcart-summary-fees__total');
-    
-    for (const totalRow of totalRows) {
-      const line = document.createElement('div');
-      line.className = 'pool-shipping-line snipcart-summary-fees__item snipcart__font--slim';
-      line.innerHTML = '<span class="snipcart-summary-fees__title">Shipping</span>' +
-        '<span class="snipcart-summary-fees__amount">' + shippingAmt + '</span>';
-      totalRow.parentNode.insertBefore(line, totalRow);
-      
-      // Update the total display to include shipping (read from state, not DOM)
-      const totalAmountEl = totalRow.querySelector('.snipcart-summary-fees__amount');
-      if (totalAmountEl) {
-        const state = Snipcart.store.getState();
-        const snipcartTotal = state.cart.total || 0;
-        const newTotal = snipcartTotal + FLAT_SHIPPING_FEE / 100;
-        totalAmountEl.textContent = '$' + newTotal.toFixed(2);
-      }
+      headerPrice.textContent = formatCents(pricing.totalCents);
     }
   } finally {
     _injectingFees = false;
   }
+}
+
+function syncFeeSummaryBoxes() {
+  document.querySelectorAll('.pool-fee-summary').forEach(updateFeeSummaryBox);
+}
+
+function hideLegacyFeeSummaries() {
+  const snipcartRoot = document.querySelector('#snipcart');
+  if (!snipcartRoot) return;
+
+  const cartOpen = findVisibleCartSidebar(snipcartRoot);
+  const paymentSection = findVisible(snipcartRoot, '.snipcart-payment, [class*="snipcart-payment"]');
+  const state = Snipcart.store.getState();
+  debugCartUI('hideLegacyFeeSummaries', {
+    route: currentSnipcartRoute,
+    hasVisibleCart: !!cartOpen,
+    hasVisiblePayment: !!paymentSection,
+    hasItems: cartHasItems(state)
+  });
+  if (!cartOpen || paymentSection || !cartHasItems(state)) return;
+
+  cartOpen.querySelectorAll(
+    '.snipcart-summary-fees, .snipcart-cart-summary-fees, [class*="summary-fees"]'
+  ).forEach(section => {
+    if (section.closest('.pool-fee-summary')) return;
+    if (section.dataset.poolCheckoutSummary === 'true') return;
+    section.dataset.poolLegacyFeesHidden = 'true';
+    section.style.display = 'none';
+  });
+}
+
+function syncTipControls() {
+  const state = Snipcart.store.getState();
+  const subtotalCents = getCartSubtotalCents(state);
+  const tipPercent = getStoredTipPercent(state);
+  const tipAmountCents = calculatePlatformTip(subtotalCents, tipPercent);
+
+  document.querySelectorAll('.pool-tip-box').forEach(box => {
+    const range = box.querySelector('.pool-tip-box__slider');
+    const percent = box.querySelector('.pool-tip-box__percent');
+    const amount = box.querySelector('.pool-tip-box__amount');
+    if (range) range.value = String(tipPercent);
+    if (percent) percent.textContent = tipPercent + '%';
+    if (amount) amount.textContent = formatCents(tipAmountCents);
+  });
+}
+
+function bindTipControl(box) {
+  const slider = box.querySelector('.pool-tip-box__slider');
+  if (!slider || slider.dataset.poolBound) return;
+  slider.dataset.poolBound = 'true';
+  slider.addEventListener('input', (event) => {
+    setStoredTipPercent(event.target.value);
+    syncTipControls();
+    syncFeeSummaryBoxes();
+    scheduleFeeInjection();
+  });
+}
+
+function createTipBox(contextClass) {
+  const state = Snipcart.store.getState();
+  const tipPercent = getStoredTipPercent(state);
+  const tipAmountCents = getCartTipAmountCents(state);
+  const box = document.createElement('div');
+  box.className = `pool-tip-box ${contextClass}`;
+  box.innerHTML = `
+    <div class="pool-tip-box__header">
+      <strong>Tip Dust Wave for platform maintenance</strong>
+      <span class="pool-tip-box__amount">${formatCents(tipAmountCents)}</span>
+    </div>
+    <p class="pool-tip-box__copy">Adjust your optional tip from 0% to 15%. This helps cover platform upkeep without changing your checkout flow.</p>
+    <div class="pool-tip-box__controls">
+      <input class="pool-tip-box__slider" type="range" min="0" max="${MAX_PLATFORM_TIP_PERCENT}" step="1" value="${tipPercent}" aria-label="Platform tip percentage">
+      <span class="pool-tip-box__percent">${tipPercent}%</span>
+    </div>
+  `;
+  bindTipControl(box);
+  return box;
+}
+
+function createFeeSummaryBox(contextClass) {
+  const box = document.createElement('div');
+  box.className = `pool-fee-summary ${contextClass}`;
+  return box;
+}
+
+function getFeeSummaryMarkup(pricing) {
+  return `
+    <div class="pool-fee-summary__row">
+      <span>Subtotal</span>
+      <span>${formatCents(pricing.subtotalCents)}</span>
+    </div>
+    ${pricing.tipAmountCents > 0 ? `<div class="pool-fee-summary__row"><span>Dust Wave tip (${pricing.tipPercent}%)</span><span>${formatCents(pricing.tipAmountCents)}</span></div>` : ''}
+    <div class="pool-fee-summary__row"><span>ABQ tax (7.875%)</span><span>${formatCents(pricing.taxCents)}</span></div>
+    ${pricing.shippingCents > 0 ? `<div class="pool-fee-summary__row"><span>Shipping</span><span>${formatCents(pricing.shippingCents)}</span></div>` : ''}
+    <div class="pool-fee-summary__row pool-fee-summary__row--total">
+      <span>Cart total</span>
+      <span>${formatCents(pricing.totalCents)}</span>
+    </div>
+  `;
+}
+
+function updateFeeSummaryBox(box) {
+  const state = Snipcart.store.getState();
+  const pricing = buildCartPricing(state);
+  box.innerHTML = getFeeSummaryMarkup(pricing);
+}
+
+function removeCartTipUI(snipcartRoot) {
+  if (!snipcartRoot) return;
+  snipcartRoot.querySelectorAll('.pledge-notice-cart, .pool-tip-box--cart, .pool-fee-summary--cart').forEach(node => {
+    node.remove();
+  });
+}
+
+function isVisibleElement(element) {
+  return !!element && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden';
+}
+
+function findVisible(root, selector) {
+  if (!root) return null;
+  return Array.from(root.querySelectorAll(selector)).find(isVisibleElement) || null;
+}
+
+function findVisibleCartSidebar(root) {
+  return findVisible(
+    root,
+    '.snipcart-cart-summary-side, .snipcart-modal__container.snipcart-cart-summary--edit'
+  );
+}
+
+function routeLooksLikeCheckout(route) {
+  return typeof route === 'string' && route.startsWith('/checkout');
+}
+
+function isCheckoutViewActive(snipcartRoot) {
+  if (routeLooksLikeCheckout(currentSnipcartRoute)) return true;
+  if (currentSnipcartRoute && !routeLooksLikeCheckout(currentSnipcartRoute)) return false;
+  return !!findVisible(
+    snipcartRoot,
+    '[class*="snipcart-checkout"], [class*="snipcart-payment"], .snipcart-billing-completed'
+  );
+}
+
+function restoreCheckoutSummaryUI(snipcartRoot) {
+  if (!snipcartRoot) return;
+  snipcartRoot.querySelectorAll('.snipcart-summary-fees[data-pool-checkout-summary="true"]').forEach(section => {
+    const original = section.dataset.poolOriginalHtml;
+    if (original) {
+      section.innerHTML = original;
+    }
+    delete section.dataset.poolCheckoutSummary;
+    delete section.dataset.poolOriginalHtml;
+  });
+}
+
+function ensureCartTipUI() {
+  const snipcartRoot = document.querySelector('#snipcart');
+  if (!snipcartRoot) return;
+
+  const cartOpen = findVisibleCartSidebar(snipcartRoot);
+  const isCheckout = isCheckoutViewActive(snipcartRoot);
+  const state = Snipcart.store.getState();
+  debugCartUI('ensureCartTipUI', {
+    route: currentSnipcartRoute,
+    hasVisibleCart: !!cartOpen,
+    isCheckout,
+    hasItems: cartHasItems(state),
+    cartClasses: cartOpen?.className || null
+  });
+  if (!cartOpen || isCheckout || !cartHasItems(state)) {
+    removeCartTipUI(snipcartRoot);
+    return;
+  }
+
+  const { parent: headerTarget, beforeNode: headerBeforeNode } = getCartInsertionTarget(cartOpen);
+  const { parent: footerTarget, beforeNode: footerBeforeNode } = getCartFooterInsertionTarget(cartOpen);
+
+  if (!snipcartRoot.querySelector('.pledge-notice-cart') && headerTarget) {
+    const notice = document.createElement('div');
+    notice.className = 'pledge-notice-cart';
+    notice.style.cssText = 'margin: 16px; padding: 12px 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 13px; line-height: 1.5; color: #166534;';
+    notice.innerHTML = '<strong style="color: #15803d;">🤔 How pledging works:</strong> <br>Your card will be stored securely but not charged now. You\'ll only be charged if the campaign reaches its goal.';
+    headerTarget.insertBefore(notice, headerBeforeNode);
+  }
+
+  if (!snipcartRoot.querySelector('.pool-tip-box--cart') && footerTarget) {
+    const tipBox = createTipBox('pool-tip-box--cart');
+    tipBox.dataset.poolInjected = 'true';
+    footerTarget.insertBefore(tipBox, footerBeforeNode);
+  }
+
+  let feeSummary = snipcartRoot.querySelector('.pool-fee-summary--cart');
+  if (!feeSummary && footerTarget) {
+    feeSummary = createFeeSummaryBox('pool-fee-summary--cart');
+    feeSummary.dataset.poolInjected = 'true';
+    const tipBox = snipcartRoot.querySelector('.pool-tip-box--cart');
+    footerTarget.insertBefore(feeSummary, tipBox ? tipBox.nextSibling : footerBeforeNode);
+  }
+  if (feeSummary) updateFeeSummaryBox(feeSummary);
+}
+
+function ensureCheckoutTipUI() {
+  const snipcartRoot = document.querySelector('#snipcart');
+  if (!snipcartRoot) return;
+
+  const state = Snipcart.store.getState();
+  debugCartUI('ensureCheckoutTipUI:precheck', {
+    route: currentSnipcartRoute,
+    isCheckout: isCheckoutViewActive(snipcartRoot),
+    hasItems: cartHasItems(state)
+  });
+  if (!isCheckoutViewActive(snipcartRoot) || !cartHasItems(state)) {
+    restoreCheckoutSummaryUI(snipcartRoot);
+    return;
+  }
+
+  const paymentSection = findVisible(snipcartRoot, '.snipcart-payment, [class*="snipcart-payment"]');
+  debugCartUI('ensureCheckoutTipUI:payment', {
+    hasVisiblePayment: !!paymentSection,
+    paymentClasses: paymentSection?.className || null
+  });
+  if (!paymentSection) return;
+
+  const pricing = buildCartPricing(state);
+  const visibleSummary = Array.from(snipcartRoot.querySelectorAll('.snipcart-cart-summary, [class*="cart-summary"]'))
+    .find(isVisibleElement);
+  const feeSection = visibleSummary?.querySelector('.snipcart-summary-fees');
+  debugCartUI('ensureCheckoutTipUI:summary', {
+    hasVisibleSummary: !!visibleSummary,
+    summaryClasses: visibleSummary?.className || null,
+    hasFeeSection: !!feeSection,
+    pricing
+  });
+  if (!feeSection) return;
+
+  if (!feeSection.dataset.poolOriginalHtml) {
+    feeSection.dataset.poolOriginalHtml = feeSection.innerHTML;
+  }
+  feeSection.dataset.poolCheckoutSummary = 'true';
+  feeSection.innerHTML = `
+    <div class="snipcart-summary-fees__item snipcart__font--slim">
+      <span class="snipcart-summary-fees__title">Subtotal</span>
+      <span class="snipcart-summary-fees__amount">${formatCents(pricing.subtotalCents)}</span>
+    </div>
+    ${pricing.tipAmountCents > 0 ? `
+      <div class="snipcart-summary-fees__item snipcart__font--slim">
+        <span class="snipcart-summary-fees__title">Dust Wave tip (${pricing.tipPercent}%)</span>
+        <span class="snipcart-summary-fees__amount">${formatCents(pricing.tipAmountCents)}</span>
+      </div>
+    ` : ''}
+    ${pricing.shippingCents > 0 ? `
+      <div class="snipcart-summary-fees__item snipcart__font--slim">
+        <span class="snipcart-summary-fees__title">Shipping</span>
+        <span class="snipcart-summary-fees__amount">${formatCents(pricing.shippingCents)}</span>
+      </div>
+    ` : ''}
+    <div class="snipcart-summary-fees__item snipcart__font--slim">
+      <span class="snipcart-summary-fees__title">Taxes</span>
+      <span class="snipcart-summary-fees__amount">${formatCents(pricing.taxCents)}</span>
+    </div>
+    <div class="snipcart-summary-fees__item snipcart-summary-fees__total snipcart__font--bold snipcart__font--secondary">
+      <span class="snipcart-summary-fees__title snipcart-summary-fees__title--highlight snipcart__font--large">Cart total</span>
+      <span class="snipcart-summary-fees__amount snipcart-summary-fees__amount--highlight snipcart__font--large">${formatCents(pricing.totalCents)}</span>
+    </div>
+  `;
+}
+
+function renderTipUI() {
+  debugCartUI('renderTipUI:start', {
+    route: currentSnipcartRoute,
+    itemCount: Snipcart.store.getState()?.cart?.items?.count || 0
+  });
+  ensureCartTipUI();
+  ensureCheckoutTipUI();
+  syncTipControls();
+  syncFeeSummaryBoxes();
+  hideLegacyFeeSummaries();
+  scheduleFeeInjection();
 }
 
 function processPendingCartItem() {
@@ -152,6 +515,7 @@ async function startPledgeFlow() {
 
   // Calculate subtotal from cart (pre-tax for stats, Worker will add tax)
   const subtotalCents = Math.round((cart.subtotal || cart.total) * 100);
+  const selectedTipPercent = getStoredTipPercent(state);
   
   // Generate a temporary order ID (will be replaced by Snipcart's if we create an order later)
   const tempOrderId = `pledge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -187,7 +551,8 @@ async function startPledgeFlow() {
       customAmount: customAmount > 0 ? customAmount : undefined,
       customerName,
       phone,
-      hasPhysical: cartHasPhysicalItems()
+      hasPhysical: cartHasPhysicalItems(),
+      tipPercent: selectedTipPercent
     };
     console.log('Starting pledge flow...', payload);
     
@@ -294,11 +659,27 @@ function initSnipcart() {
   
   // Also try to fill if cart already exists
   setTimeout(autofillBilling, 500);
+
+  const snipcartRoot = document.getElementById('snipcart');
+  if (snipcartRoot) {
+    let checkoutSummaryDebounce = null;
+    const checkoutSummaryObserver = new MutationObserver(() => {
+      if (checkoutSummaryDebounce) clearTimeout(checkoutSummaryDebounce);
+      checkoutSummaryDebounce = setTimeout(renderTipUI, 50);
+    });
+    checkoutSummaryObserver.observe(snipcartRoot, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
+  }
   
-  // Auto-navigate past billing step straight to payment
-  // (Snipcart shipping is bypassed — Stripe Checkout collects shipping address)
-  Snipcart.events.on('page.changed', async (routesChange) => {
-    if (routesChange.to === '/checkout/billing' || routesChange.to === '/checkout') {
+  async function handleSnipcartRouteChange(routesChange, source) {
+    currentSnipcartRoute = routesChange?.to || null;
+    debugCartUI(source, routesChange);
+
+    if (routesChange?.to === '/checkout/billing' || routesChange?.to === '/checkout') {
       console.log('Pool: Detected billing/checkout page, auto-filling and skipping...');
       
       try {
@@ -326,6 +707,14 @@ function initSnipcart() {
         Snipcart.api.theme.cart.navigate('/checkout/payment');
       }, 200);
     }
+
+    setTimeout(renderTipUI, 0);
+  }
+
+  // Auto-navigate past billing step straight to payment
+  // (Snipcart shipping is bypassed — Stripe Checkout collects shipping address)
+  Snipcart.events.on('theme.routechanged', (routesChange) => {
+    handleSnipcartRouteChange(routesChange, 'theme.routechanged');
   });
   
   // Clear cart if returning from successful pledge
@@ -362,100 +751,47 @@ function initSnipcart() {
     }, 2000);
   }
   
-  // Inject pledge notice into side cart using MutationObserver
-  const observer = new MutationObserver((mutations) => {
-    const snipcartRoot = document.querySelector('#snipcart');
-    if (!snipcartRoot) return;
-    
-    // Look for the cart being open (but not checkout)
-    const cartOpen = snipcartRoot.querySelector('[class*="snipcart-cart"]');
-    const isCheckout = snipcartRoot.querySelector('[class*="snipcart-checkout"], [class*="snipcart-payment"], .snipcart-billing-completed');
-    if (!cartOpen || isCheckout) return;
-    
-    // Find a place to inject - try various selectors
-    const targets = [
-      '.snipcart-item-list',
-      '[class*="item-list"]',
-      '[class*="cart-content"]',
-      '[class*="snipcart-cart"] > div'
-    ];
-    
-    for (const selector of targets) {
-      const target = snipcartRoot.querySelector(selector);
-      if (target && !snipcartRoot.querySelector('.pledge-notice-cart')) {
-        const notice = document.createElement('div');
-        notice.className = 'pledge-notice-cart';
-        notice.style.cssText = 'margin: 16px; padding: 12px 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 13px; line-height: 1.5; color: #166534;';
-        notice.innerHTML = '<strong style="color: #15803d;">🤔 How pledging works:</strong> <br>Your card will be stored securely but not charged now. You\'ll only be charged if the campaign reaches its goal.';
-        target.parentNode.insertBefore(notice, target.nextSibling);
-        break;
-      }
-    }
-    
-    // Also inject fee summary into side cart
-    scheduleFeeInjection();
-  });
-  
-  observer.observe(document.body, { childList: true, subtree: true });
-  
+function refreshTipPresentation() {
+    setTimeout(renderTipUI, 0);
+    setTimeout(renderTipUI, 120);
+    setTimeout(renderTipUI, 300);
+    setTimeout(renderTipUI, 600);
+  }
+
   // Refresh fee summary when cart items change
-  Snipcart.events.on('item.added', scheduleFeeInjection);
-  Snipcart.events.on('item.updated', scheduleFeeInjection);
-  Snipcart.events.on('item.removed', scheduleFeeInjection);
+  Snipcart.events.on('item.added', refreshTipPresentation);
+  Snipcart.events.on('item.updated', refreshTipPresentation);
+  Snipcart.events.on('item.removed', refreshTipPresentation);
   
   // Update header price immediately on load and on every state change
   function updateHeaderPrice() {
     const state = Snipcart.store.getState();
-    const snipcartTotal = state.cart.total || 0;
     const count = state.cart.items.count || 0;
-    const hasPhysical = cartHasPhysicalItems();
-    const adjustedTotal = hasPhysical ? snipcartTotal + FLAT_SHIPPING_FEE / 100 : snipcartTotal;
+    const pricing = buildCartPricing(state);
     
     const headerPrice = document.querySelector('.snipcart-total-price');
     if (headerPrice) {
-      headerPrice.textContent = '$' + adjustedTotal.toFixed(2);
+      headerPrice.textContent = formatCents(pricing.totalCents);
     }
     
     // Cache adjusted total so cart-icon.html can show it before Snipcart loads
     try {
-      localStorage.setItem('pool_cart_cache', JSON.stringify({ total: adjustedTotal, count }));
+      localStorage.setItem('pool_cart_cache', JSON.stringify({ total: pricing.totalCents / 100, count }));
     } catch (e) {}
   }
   updateHeaderPrice();
-  Snipcart.store.subscribe(updateHeaderPrice);
-  
-  // Inject pledge notice and order summary into checkout/payment step
-  const checkoutObserver = new MutationObserver(() => {
-    const snipcartRoot = document.querySelector('#snipcart');
-    if (!snipcartRoot) return;
-    
-    // Look for payment step
-    const paymentSection = snipcartRoot.querySelector('.snipcart-payment, [class*="snipcart-payment"]');
-    if (!paymentSection) return;
-    
-    // Don't inject if already there
-    if (snipcartRoot.querySelector('.pledge-notice-checkout')) return;
-    
-    // Find the payment form or header to inject before
-    const paymentForm = paymentSection.querySelector('.snipcart-payment-form, [class*="payment-form"], form');
-    const header = paymentSection.querySelector('.snipcart__box--header, header');
-    const insertTarget = paymentForm || header?.nextElementSibling || paymentSection.firstChild;
-    
-    if (insertTarget) {
-      const notice = document.createElement('div');
-      notice.className = 'pledge-notice-checkout';
-      notice.style.cssText = 'margin: 16px; padding: 12px 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 13px; line-height: 1.5; color: #166534;';
-      notice.innerHTML = '<strong style="color: #15803d; display: inline;">🤔 How pledging works:</strong><br style="display: block;">' +
-        '<span style="display: inline;">Your card will be stored securely but </span><b style="display: inline;">not charged now</b><span style="display: inline;">.</span><br style="display: block;">' +
-        '<span style="display: inline;">You\'ll only be charged if the campaign reaches its goal.</span>';
-      insertTarget.parentNode.insertBefore(notice, insertTarget);
-    }
-    
-    // Inject shipping/tax rows into Snipcart's existing sidebar summary
-    scheduleFeeInjection();
+  let storeRenderDebounce = null;
+  Snipcart.store.subscribe(() => {
+    updateHeaderPrice();
+    if (storeRenderDebounce) clearTimeout(storeRenderDebounce);
+    storeRenderDebounce = setTimeout(renderTipUI, 50);
   });
-  
-  checkoutObserver.observe(document.body, { childList: true, subtree: true });
+  setTimeout(renderTipUI, 250);
+  Snipcart.events.on('summary.checkout_clicked', () => {
+    currentSnipcartRoute = '/cart';
+    debugCartUI('summary.checkout_clicked');
+    refreshTipPresentation();
+  });
   
   processPendingCartItem();
 

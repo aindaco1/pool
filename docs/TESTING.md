@@ -677,7 +677,7 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 ### Snipcart Dashboard
 - **Public API key** → in `_includes/snipcart-foot.html`
 - **Allowed domains** → include `pool.dustwave.xyz`
-- **Email templates** (optional) → mention "pledge (charged later if funded)"
+- **Email templates** → disabled for pledge flows; supporter email is sent by the Worker via Resend
 
 ### Stripe Dashboard
 - Webhook endpoint = `https://pledge.dustwave.xyz/webhooks/stripe`
@@ -687,5 +687,5 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 ### Resend Dashboard
 - **Domain**: Verify `dustwave.xyz` for sending from `pledges@dustwave.xyz`
 - **API Key**: Create key with "Sending access" permission
-- Used for: Supporter access emails (magic links to /manage/ and /community/)
-- Snipcart handles: Order confirmations, receipts, transactional emails
+- Used for: All supporter-facing pledge email (confirmation, manage/community access, diary updates, announcements, charge success, payment failure, cancellations)
+- Snipcart transactional pledge emails are disabled

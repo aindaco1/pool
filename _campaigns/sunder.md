@@ -3,7 +3,7 @@ layout: campaign
 title: "sunder"
 slug: sunder
 instagram: "https://www.instagram.com/darling.film.co/"
-start_date: 2026-03-30
+start_date: 2026-03-20
 goal_deadline: 2026-05-01
 goal_amount: 2500
 charged: false
@@ -116,7 +116,7 @@ tiers:
     price: 10
     image: /assets/images/campaigns/sunder/screw-goodies.png
     description: special thanks in the credits and via social media.
-    stackable: true
+    stackable: false
     category: digital
 
   - id: some-goodies
@@ -124,7 +124,7 @@ tiers:
     price: 20
     image: /assets/images/campaigns/sunder/some-goodies.png
     description: access to the film's storyboards, concept art, and a digital copy of the blooper reel.
-    stackable: true
+    stackable: false
     category: digital
 
   - id: physical-media
@@ -132,7 +132,7 @@ tiers:
     price: 35
     image: /assets/images/campaigns/sunder/physical-media.png
     description: everything in the $20 tier and a dvd copy of the film or cd of the film's original soundtrack.
-    stackable: true
+    stackable: false
     category: physical
 
   - id: fan
@@ -140,7 +140,7 @@ tiers:
     price: 50
     image: /assets/images/campaigns/sunder/fan.png
     description: everything in the $35 tier and a poster pack.
-    stackable: true
+    stackable: false
     category: physical
 
   - id: super-fan
@@ -148,7 +148,7 @@ tiers:
     price: 100
     image: /assets/images/campaigns/sunder/super-fan.png
     description: everything in the $50 tier and bts footage.
-    stackable: true
+    stackable: false
     category: physical
 
   - id: ultra-fan
@@ -156,6 +156,6 @@ tiers:
     price: 250
     image: /assets/images/campaigns/sunder/ultra-fan.png
     description: everything in the $100 tier and two free tickets to the premiere.
-    stackable: true
+    stackable: false
     category: physical
 ---

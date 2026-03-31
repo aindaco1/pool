@@ -923,7 +923,7 @@ Cloudflare KV (not Snipcart). Key patterns:
 - `pledge:{orderId}` — Full pledge data (email, amount, tier, Stripe IDs, status)
 - `email:{email}` — Array of order IDs for that email
 - `stats:{campaignSlug}` — Aggregated totals (pledgedAmount, pledgeCount, tierCounts)
-- `inventory:{campaignSlug}` — Tier claim counts for limited tiers
+- `tier-inventory:{campaignSlug}` — Tier claim counts for limited tiers
 
 **What role does Snipcart play?**  
 Cart UI only. Snipcart provides the shopping cart experience and collects billing info, but pledge data is stored in KV, not Snipcart order metadata.
