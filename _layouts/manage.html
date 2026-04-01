@@ -1484,7 +1484,7 @@
             .filter(inp => {
               const newAmt = parseFloat(inp.value) || 0;
               const curAmt = parseFloat(inp.dataset.current) || 0;
-              return newAmt !== curAmt && newAmt > 0;
+              return newAmt !== curAmt;
             })
             .map(inp => ({ 
               id: inp.dataset.supportId, 

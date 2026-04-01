@@ -26,6 +26,23 @@ export async function getCampaignStats(env, campaignSlug) {
   };
 }
 
+async function listAllKeys(env, prefix) {
+  if (!env.PLEDGES) return [];
+
+  const keys = [];
+  let cursor = undefined;
+  let listComplete = false;
+
+  while (!listComplete) {
+    const page = await env.PLEDGES.list({ prefix, cursor });
+    keys.push(...(page.keys || []));
+    listComplete = page.list_complete !== false;
+    cursor = page.cursor;
+  }
+
+  return keys;
+}
+
 /**
  * Update stats when a pledge is created
  */
@@ -55,7 +72,7 @@ export async function addPledgeToStats(env, { campaignSlug, amount, tierId, tier
 /**
  * Update stats when a pledge is cancelled
  */
-export async function removePledgeFromStats(env, { campaignSlug, amount, tierId, tierQty = 1, supportItems = [], customAmount = 0 }) {
+export async function removePledgeFromStats(env, { campaignSlug, amount, tierId, tierQty = 1, additionalTiers = [], supportItems = [], customAmount = 0 }) {
   if (!env.PLEDGES) return;
 
   const stats = await getCampaignStats(env, campaignSlug);
@@ -65,6 +82,13 @@ export async function removePledgeFromStats(env, { campaignSlug, amount, tierId,
   
   if (tierId && stats.tierCounts[tierId]) {
     stats.tierCounts[tierId] = Math.max(0, stats.tierCounts[tierId] - tierQty);
+  }
+
+  for (const addTier of additionalTiers) {
+    if (addTier?.id && stats.tierCounts[addTier.id]) {
+      const qty = addTier.qty || 1;
+      stats.tierCounts[addTier.id] = Math.max(0, stats.tierCounts[addTier.id] - qty);
+    }
   }
   
   // Remove support item amounts
@@ -120,27 +144,42 @@ export async function modifyPledgeInStats(env, {
 }
 
 /**
- * Update support item totals in stats
- * @param {Object} supportItems - Array of { id, amount, currentAmount } for items that changed
+ * Replace support item totals in stats using the previous and next pledge state.
  */
-export async function updateSupportItemStats(env, campaignSlug, supportItems) {
-  if (!env.PLEDGES || !supportItems || supportItems.length === 0) return;
+export async function updateSupportItemStats(env, campaignSlug, previousItems = [], nextItems = []) {
+  if (!env.PLEDGES) return;
   
   const stats = await getCampaignStats(env, campaignSlug);
   
   if (!stats.supportItems) {
     stats.supportItems = {};
   }
-  
-  for (const item of supportItems) {
-    const oldAmount = item.currentAmount || 0;
-    const newAmount = item.amount || 0;
-    const diff = (newAmount - oldAmount) * 100; // Convert to cents
-    
-    stats.supportItems[item.id] = (stats.supportItems[item.id] || 0) + diff;
-    // Ensure non-negative
-    if (stats.supportItems[item.id] < 0) {
-      stats.supportItems[item.id] = 0;
+
+  const previousMap = new Map();
+  const nextMap = new Map();
+
+  for (const item of previousItems || []) {
+    if (item?.id) {
+      previousMap.set(item.id, item.amount || 0);
+    }
+  }
+
+  for (const item of nextItems || []) {
+    if (item?.id) {
+      nextMap.set(item.id, item.amount || 0);
+    }
+  }
+
+  const itemIds = new Set([...previousMap.keys(), ...nextMap.keys()]);
+  for (const itemId of itemIds) {
+    const oldAmount = previousMap.get(itemId) || 0;
+    const newAmount = nextMap.get(itemId) || 0;
+    const diff = (newAmount - oldAmount) * 100;
+    if (diff === 0) continue;
+
+    stats.supportItems[itemId] = (stats.supportItems[itemId] || 0) + diff;
+    if (stats.supportItems[itemId] < 0) {
+      stats.supportItems[itemId] = 0;
     }
   }
   
@@ -164,9 +203,9 @@ export async function recalculateStats(env, campaignSlug) {
   };
 
   // List all pledge keys and sum active ones
-  const list = await env.PLEDGES.list({ prefix: 'pledge:' });
+  const pledgeKeys = await listAllKeys(env, 'pledge:');
   
-  for (const key of list.keys) {
+  for (const key of pledgeKeys) {
     const pledge = await env.PLEDGES.get(key.name, { type: 'json' });
     if (pledge && 
         pledge.campaignSlug === campaignSlug && 
@@ -248,28 +287,21 @@ export async function claimTierInventory(env, campaignSlug, tierId, qty = 1, cam
   if (!env.PLEDGES || !tierId) return { success: true };
   
   let inventory = await getTierInventory(env, campaignSlug);
-  
-  // Auto-initialize if inventory doesn't exist or is empty
+  const campaignTier = campaign?.tiers?.find(t => t.id === tierId) || null;
+
+  // Rebuild from active pledges if inventory is missing for a limited campaign.
   if (Object.keys(inventory).length === 0 && campaign?.tiers) {
-    console.log('📦 Auto-initializing tier inventory for:', campaignSlug);
-    inventory = {};
-    for (const tier of campaign.tiers) {
-      if (tier.limit_total) {
-        inventory[tier.id] = {
-          limit: tier.limit_total,
-          claimed: 0
-        };
-        console.log('📦 Initialized tier:', tier.id, 'limit:', tier.limit_total);
-      }
-    }
-    await env.PLEDGES.put(`tier-inventory:${campaignSlug}`, JSON.stringify(inventory));
-    console.log('📦 Inventory after init:', JSON.stringify(inventory));
+    console.log('📦 Recalculating missing tier inventory for:', campaignSlug);
+    inventory = await recalculateTierInventory(env, campaignSlug, campaign.tiers) || {};
   }
   
-  // If tier has no limit, always allow
-  console.log('📦 Looking up tierId:', tierId, 'in inventory keys:', Object.keys(inventory));
   if (!inventory[tierId]) {
-    console.log('📦 Tier not in inventory, treating as unlimited');
+    if (campaignTier?.limit_total) {
+      return {
+        success: false,
+        error: 'Limited tier inventory is unavailable'
+      };
+    }
     return { success: true };
   }
   
@@ -310,7 +342,7 @@ export async function releaseTierInventory(env, campaignSlug, tierId, qty = 1) {
 /**
  * Adjust tier inventory when pledge is modified (tier or qty change)
  */
-export async function adjustTierInventory(env, campaignSlug, oldTierId, oldQty, newTierId, newQty) {
+export async function adjustTierInventory(env, campaignSlug, oldTierId, oldQty, newTierId, newQty, campaign = null) {
   if (!env.PLEDGES) return { success: true };
   
   // Release old tier inventory
@@ -320,7 +352,7 @@ export async function adjustTierInventory(env, campaignSlug, oldTierId, oldQty, 
   
   // Claim new tier inventory
   if (newTierId) {
-    return await claimTierInventory(env, campaignSlug, newTierId, newQty);
+    return await claimTierInventory(env, campaignSlug, newTierId, newQty, campaign);
   }
   
   return { success: true };
@@ -344,9 +376,9 @@ export async function recalculateTierInventory(env, campaignSlug, tiers) {
   }
   
   // Count claimed from active pledges
-  const list = await env.PLEDGES.list({ prefix: 'pledge:' });
+  const pledgeKeys = await listAllKeys(env, 'pledge:');
   
-  for (const key of list.keys) {
+  for (const key of pledgeKeys) {
     const pledge = await env.PLEDGES.get(key.name, { type: 'json' });
     if (pledge && 
         pledge.campaignSlug === campaignSlug && 

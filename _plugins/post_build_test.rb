@@ -11,13 +11,13 @@ Jekyll::Hooks.register :site, :post_write do |site|
   worker_script = File.join(site.source, 'scripts', 'test-worker.sh')
   if File.exist?(worker_script)
     puts "\n>>> Running Worker tests..."
-    system(worker_script)
+    system('bash', worker_script)
   end
 
   # Optional E2E tests (run with RUN_E2E=1)
   e2e_script = File.join(site.source, 'scripts', 'test-e2e.sh')
   if ENV['RUN_E2E'] == '1' && File.exist?(e2e_script)
     puts "\n>>> Running E2E tests..."
-    system(e2e_script)
+    system('bash', e2e_script)
   end
 end

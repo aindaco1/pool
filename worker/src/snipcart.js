@@ -79,6 +79,8 @@ export function extractPledgeFromOrder(order) {
     return null;
   }
 
+  const cart = extractCartFromSnipcartItems(order.items);
+
   // Get the first item (pledge tier)
   const item = order.items[0];
   
@@ -104,9 +106,68 @@ export function extractPledgeFromOrder(order) {
     tierId: item.id,
     tierName: item.name,
     amount: Math.round(order.finalGrandTotal * 100), // Convert to cents
+    tierSelections: cart.tierSelections,
+    supportItems: cart.supportItems,
+    customAmount: cart.customAmount,
     metadata: order.metadata || {},
     createdAt: order.creationDate,
     modifiedAt: order.modificationDate
+  };
+}
+
+export function extractCartFromSnipcartItems(items = []) {
+  const tierSelections = [];
+  const supportItems = [];
+  let customAmount = 0;
+  let campaignSlug = null;
+
+  for (const item of items || []) {
+    if (!campaignSlug && item?.url) {
+      const match = item.url.match(/\/campaigns\/([^/]+)/);
+      if (match) {
+        campaignSlug = match[1];
+      }
+    }
+
+    const itemId = typeof item?.id === 'string' ? item.id : '';
+    const quantity = Number(item?.quantity || 1);
+
+    if (itemId.includes('__support__')) {
+      supportItems.push({
+        id: itemId.split('__support__')[1],
+        amount: Math.round(Number(item?.price || 0) * quantity)
+      });
+      continue;
+    }
+
+    if (itemId.includes('__custom-support')) {
+      customAmount += Math.round(Number(item?.price || 0) * quantity);
+      continue;
+    }
+
+    if (!itemId.includes('__')) {
+      continue;
+    }
+
+    const tierId = itemId.split('__')[1];
+    if (!tierId) continue;
+
+    const existingTier = tierSelections.find(entry => entry.id === tierId);
+    if (existingTier) {
+      existingTier.qty += quantity;
+    } else {
+      tierSelections.push({
+        id: tierId,
+        qty: quantity
+      });
+    }
+  }
+
+  return {
+    campaignSlug,
+    tierSelections,
+    supportItems,
+    customAmount
   };
 }
 

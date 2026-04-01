@@ -11,6 +11,7 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:unit:coverage": "vitest run --coverage",
+    "test:premerge": "./scripts/pre-merge-regression.sh",
     "test:e2e": "./scripts/test-e2e.sh",
     "test:e2e:quick": "playwright test --headed",
     "test:e2e:headless": "CI=1 playwright test",
