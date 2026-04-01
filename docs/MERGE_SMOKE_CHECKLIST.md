@@ -2,7 +2,7 @@
 
 Use this checklist before merging branches that change checkout, webhook persistence, pledge management, inventory, settlement, or supporter broadcasts.
 
-This version is tuned for the current business-logic hardening branch.
+This version is tuned for the current checkout and Worker business-logic behavior on `main`.
 
 ## Scope For This Branch
 
@@ -25,9 +25,19 @@ export ADMIN_SECRET="..."
 
 If the staging site and Worker share the same domain pattern in your setup, use the real staging URLs instead of the placeholders above.
 
-## Optional Local Rehearsal
+If no staging environment exists, point these variables at local dev instead:
 
-Before the required staging pass, you can rehearse most of the flow locally with:
+```bash
+export STAGING_SITE_URL="http://127.0.0.1:4000"
+export STAGING_WORKER_URL="http://127.0.0.1:8787"
+export ADMIN_SECRET="..."
+```
+
+In that case, run `./scripts/dev.sh` first and record in the sign-off that merge relied on the automated gate plus local smoke coverage because no staging environment exists.
+
+## Local Rehearsal
+
+Before a staging pass, or instead of one when no staging exists, you can rehearse most of the flow locally with:
 
 ```bash
 ./scripts/dev.sh
@@ -241,7 +251,7 @@ curl -s -X POST \
 Record the smoke result in the PR or release notes:
 
 ```md
-Staging smoke completed on <date>.
+Smoke completed on <date> in <staging|local>.
 
 - Checkout start/completion: pass
 - Magic link scope: pass
@@ -255,4 +265,5 @@ Staging smoke completed on <date>.
 Notes:
 - <any intentional behavior observed>
 - <any non-blocking staging caveats>
+- <note that no staging environment exists, if applicable>
 ```

@@ -2,16 +2,18 @@
 
 **Dust Wave's Snipcart-powered crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Backers pledge through Snipcart, then save their card via Stripe (handled by a Cloudflare Worker). Cards are not charged until the campaign deadline. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a Dust Wave platform tip, manage pledges through magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
+A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Backers build a pledge in Snipcart, the Cloudflare Worker re-verifies the checkout session and creates a Stripe setup-mode Checkout session, and cards are only charged after a successful campaign reaches its deadline. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a Dust Wave platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
 ## Features
 
 - **No accounts required** — Backers manage pledges via email magic links
+- **Server-verified checkout** — The Worker rebuilds pledge shape from the verified Snipcart payment session instead of trusting browser-submitted totals
 - **All-or-nothing pledging** — Cards saved now, charged only if goal is met
 - **Optional platform tip** — 0% to 15% Dust Wave tip (default 5%) included in totals but excluded from campaign progress
 - **Tip-aware cart + checkout** — Shared pricing logic keeps subtotal, tip, tax, shipping, and total in sync across cart, checkout, Worker, reports, and emails
 - **Checkout autofill** — Auto-selects country, enables password manager autofill for address fields
 - **Physical & digital tiers** — Physical items trigger Stripe shipping address collection + $3 flat USPS fee
+- **Order-scoped magic links** — Each supporter link only manages its own pledge/order
 - **Stretch goals** — Auto-unlock at funding thresholds
 - **Campaign lifecycle** — `upcoming` → `live` → `post` states with automatic transitions + Cloudflare cache purge
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
@@ -60,7 +62,8 @@ For full local development with Jekyll, the Worker, Stripe CLI webhook forwardin
 ## Testing
 
 ```bash
-npm run test:unit      # Unit tests (Vitest) — currently 177 tests
+npm run test:premerge  # Syntax + focused regressions + full unit + security + headless E2E
+npm run test:unit      # Unit tests (Vitest) — currently 198 tests
 npm run test:e2e       # E2E tests (Playwright) — automated + manual checkout coverage
 npm run test:e2e:headless # CI-style automated browser suite
 npm run test:security  # Security tests — pen testing the Worker API
@@ -68,11 +71,18 @@ npm test               # Run unit + e2e
 ```
 
 **Current full-suite baseline:**
-- Unit tests: 177 passed
+- Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow
+- Unit tests: 198 passed
 - Headless E2E: 35 passed, 5 skipped
 - Security tests: 128 passed
 
-**Test coverage includes:** live-stats functions, platform tip helpers, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, and security hardening around `/start` and webhook handling.
+**Test coverage includes:** live-stats functions, platform tip helpers, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, and hardening around `/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
+
+For local merge smoke on mutable pledges, use:
+
+```bash
+./scripts/smoke-pledge-management.sh
+```
 
 See [TESTING.md](docs/TESTING.md) for full testing guide and [SECURITY.md](docs/SECURITY.md) for security architecture.
 
@@ -129,6 +139,7 @@ scripts/              # Automation & reporting
   ├── dev.sh               # Start all dev services (Jekyll, Worker, Stripe CLI with matched webhook secret)
   ├── pledge-report.sh     # Ledger-style CSV report (history entries incl. tip columns)
   ├── fulfillment-report.sh # Aggregated CSV report (current state by backer, total incl. tip)
+  ├── smoke-pledge-management.sh # Local end-to-end modify/cancel smoke on the test-only campaign
   └── seed-all-campaigns.sh # Seed test pledges for all campaigns (local KV)
 tests/                # Test suites
   ├── unit/               # Vitest unit tests (JS functions)

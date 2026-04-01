@@ -12,7 +12,7 @@ npm run test:premerge      # Merge-readiness checks for changed Worker logic
 npm run test:e2e           # E2E tests (Playwright) — starts Jekyll
 npm run test:e2e:headless  # CI mode
 npm run test:security      # Security pen tests (Worker must be running)
-npm run test:security:staging  # Security tests against staging
+npm run test:security:staging  # Security tests against a staging worker, if you maintain one
 npm test                   # Run all tests
 ```
 
@@ -87,7 +87,7 @@ git worktree remove ../pool-main-check
 
 ### Manual Smoke Checklist
 
-Run these in test/staging before merge when the branch changes end-to-end behavior:
+Run these against staging before merge when a staging environment exists. If no staging environment exists for The Pool, run the same checklist locally with `./scripts/dev.sh` and record that exception in the PR/release notes.
 
 1. Start a new checkout on a live test campaign and confirm `/start` returns a Stripe Checkout URL.
 2. Complete a pledge and verify the webhook stores the pledge, stats update, and confirmation email path stays healthy.
@@ -96,7 +96,14 @@ Run these in test/staging before merge when the branch changes end-to-end behavi
 5. Run settlement dry-run and live-run on seeded pledges, confirming campaigns only mark settled when nothing needs attention.
 6. Trigger diary, announcement, and milestone broadcasts on a campaign large enough to cross pagination boundaries.
 
-This manual staging smoke pass is required before merge for branches that change checkout or Worker business logic.
+For checkout or Worker business-logic changes, a smoke pass is still required before merge:
+
+- Prefer staging when available.
+- If no staging exists, use the stronger local path:
+  - `./scripts/dev.sh`
+  - `./scripts/smoke-pledge-management.sh`
+  - the operator checklist in [docs/MERGE_SMOKE_CHECKLIST.md](./MERGE_SMOKE_CHECKLIST.md)
+  - a PR note explicitly stating that no staging environment exists
 
 For an operator-ready version with exact commands and expected results, use [docs/MERGE_SMOKE_CHECKLIST.md](./MERGE_SMOKE_CHECKLIST.md).
 
@@ -136,7 +143,7 @@ describe('myFunction', () => {
 
 Browser-based tests for full user flows in `tests/e2e/`.
 
-### Coverage (36 tests + 1 manual)
+### Coverage (40 tests total; 35 run in CI and 5 are skipped/manual/local-only)
 
 **Campaign Page Structure:**
 - Required page elements (hero, sidebar, progress bar)
@@ -249,7 +256,7 @@ cd worker && wrangler dev
 # In another terminal:
 npm run test:security                # Against localhost:8787
 
-# Against staging:
+# Against staging, if you maintain one:
 npm run test:security:staging
 
 # Against production (read-only tests):

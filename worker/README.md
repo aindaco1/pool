@@ -1,6 +1,6 @@
 # The Pool - Pledge Worker
 
-Cloudflare Worker handling pledge management, Stripe/Snipcart integration, and supporter authentication.
+Cloudflare Worker handling pledge management, Stripe/Snipcart integration, and order-scoped supporter authentication.
 
 ## Setup
 
@@ -83,25 +83,25 @@ wrangler deploy
 ## API Endpoints
 
 ### POST /start
-Create a Stripe SetupIntent session for a new pledge.
+Verify a Snipcart payment session and create a Stripe setup-mode Checkout session for a new pledge.
 
 ```json
 {
-  "orderId": "snipcart-order-token",
+  "publicToken": "snipcart-public-payment-session-token",
   "campaignSlug": "hand-relations",
-  "amountCents": 500,
   "email": "supporter@example.com",
-  "tierId": "frame-slot",
-  "tierName": "Buy 1 Frame"
+  "tipPercent": 5
 }
 ```
 
 Returns: `{ "url": "https://checkout.stripe.com/..." }`
 
-### GET /pledges?token={token}
-Get all pledges for a user (by magic link token).
+The Worker rebuilds tier, add-on, custom-support, shipping, and subtotal state from the verified Snipcart payment session. It does not trust browser-submitted money fields, and it only claims limited inventory after the pledge is actually persisted.
 
-Returns array of pledge objects.
+### GET /pledges?token={token}
+Get the pledge(s) authorized by a magic link token.
+
+Current behavior: the token returns only its own authorized order.
 
 ### GET /pledge?token={token}
 Get single pledge details (legacy endpoint).
@@ -131,6 +131,8 @@ Change tiers, quantity, or custom support for an active pledge.
 ```
 
 All fields except `token` are optional. Changes are tracked in the pledge's `history` array with `type: "modified"` entries that include tier state and `customAmount`.
+
+The Worker validates the requested order against the token payload and recalculates totals from stored pledge state plus campaign definitions.
 
 ### POST /pledge/payment-method/start
 Start a Stripe session to update payment method.
@@ -244,11 +246,13 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 
 2. **Stripe webhook: checkout.session.completed**
    - Extract payment method and customer from SetupIntent
-   - Store pledge data in KV and Snipcart metadata
-   - Send confirmation email with magic link
+   - Persist pledge data in KV and update stats/inventory
+   - Commit webhook idempotency only after successful persistence
+   - Send confirmation email with an order-scoped magic link
 
 3. **User manages pledge via /manage/?t={token}**
-   - Frontend calls GET `/pledges` to list all pledges
+   - Frontend calls GET `/pledges`
+   - The token can read/modify only its own authorized order
    - User can modify tier, cancel, or update payment method
 
 4. **Campaign reaches goal**

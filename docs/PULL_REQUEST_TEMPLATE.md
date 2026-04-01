@@ -13,7 +13,7 @@
 ## Test Plan
 - [ ] `npm run test:premerge`
 - [ ] Same pre-merge gate run against `main` in a clean worktree when Worker or checkout logic changed
-- [ ] Manual staging smoke checklist completed for changed checkout / Worker flows
+- [ ] Manual smoke checklist completed for changed checkout / Worker flows (staging when available, otherwise documented local smoke fallback)
 - [ ] Local Jekyll build ok
 - [ ] Snipcart cart opens, no console errors
 - [ ] Worker `/start` returns Stripe Checkout URL (test mode)

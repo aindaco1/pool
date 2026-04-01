@@ -398,7 +398,7 @@ See [tests/security/README.md](../tests/security/README.md) for the pen test sui
 Run security tests:
 ```bash
 npm run test:security           # Against local Worker
-npm run test:security:staging   # Against staging (pledge-staging.dustwave.xyz)
+npm run test:security:staging   # Against a staging worker, if you maintain one
 ```
 
 ---
@@ -409,7 +409,7 @@ npm run test:security:staging   # Against staging (pledge-staging.dustwave.xyz)
 
 If a magic link token is compromised:
 1. The token is tied to a specific orderId/email/campaign
-2. It can only access/modify that user's pledges
+2. It can only access/modify that one authorized order
 3. To invalidate: delete the pledge from KV (orderId will no longer exist)
 4. Optionally: regenerate MAGIC_LINK_SECRET (invalidates ALL tokens)
 

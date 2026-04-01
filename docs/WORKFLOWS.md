@@ -1,11 +1,11 @@
 # Workflows
 
-The Pool uses a **no-account, email-based pledge management system**. Backers save their card via Stripe, manage pledges via magic links, and are only charged if the campaign is funded.
+The Pool uses a **no-account, email-based pledge management system**. Backers save their card via Stripe, manage pledges via order-scoped magic links, and are only charged if the campaign is funded.
 
 ## Key Differentiators
 
 - **No accounts** — Email + payment info only (no registration)
-- **Magic link management** — Cancel, modify, or update payment method via email link
+- **Magic link management** — Cancel, modify, or update payment method via an order-scoped email link
 - **All-or-nothing** — Cards saved now, charged only if goal is met
 - **Optional platform tip** — 0% to 15% Dust Wave tip (default 5%) added to totals but excluded from campaign progress
 - **Worker-owned email** — Snipcart emails stay disabled; all supporter email comes from Resend
@@ -31,7 +31,7 @@ upcoming → live → post
 
 | Component | Role |
 |-----------|------|
-| **Snipcart** | Cart UI only (billing step auto-skipped, no payment processing) |
+| **Snipcart** | Cart UI and payment-session source of truth for the pledge shape |
 | **Stripe** | SetupIntents (save cards) + PaymentIntents (charge later) |
 | **Cloudflare Worker** | Backend: checkout, webhooks, pledge storage (KV), stats, auto-settle cron |
 | **Jekyll** | Static pages + campaign markdown |
@@ -43,7 +43,7 @@ upcoming → live → post
 ```
 1. BROWSE     → Visitor views campaign, adds tier to Snipcart cart, adjusts optional tip
 2. CHECKOUT   → Billing auto-filled → JS intercepts "Continue to Pledge"
-3. START      → Worker creates Stripe Checkout (setup mode)
+3. START      → Worker verifies the Snipcart payment session and creates Stripe Checkout (setup mode)
 4. SAVE CARD  → Stripe Checkout saves payment method (no charge)
 5. CONFIRM    → Stripe webhook → Worker stores pledge in KV, sends magic link email
 6. MANAGE     → Backer uses magic link to cancel/modify/update card
@@ -65,6 +65,7 @@ Pledges are stored in Cloudflare KV (not Snipcart). Key patterns:
 | `stats:{campaignSlug}` | Aggregated totals (pledgedAmount, pledgeCount, tierCounts, supportItems) |
 | `tier-inventory:{campaignSlug}` | Claim counts for limited tiers |
 | `pending-extras:{orderId}` | Temporary storage for support items/custom amount during checkout |
+| `pending-tiers:{orderId}` | Temporary storage for additional tiers when Stripe metadata would be too large |
 
 **Pledge record:**
 ```json
@@ -136,7 +137,10 @@ Stateless HMAC-signed tokens (no database needed):
 **Verification:**
 1. Decode and verify signature
 2. Check expiry
-3. Fetch pledge from KV and cross-check email + campaign
+3. Resolve the authorized `orderId`
+4. Fetch pledge from KV and cross-check email + campaign
+
+Each token only authorizes its own order. A valid link no longer grants email-wide access to every pledge on the same address.
 
 ---
 
@@ -148,38 +152,40 @@ Create Stripe Checkout session (setup mode) after Snipcart order.
 **Request:**
 ```json
 {
-  "orderId": "pledge-123",
+  "publicToken": "snipcart-public-payment-session-token",
   "campaignSlug": "hand-relations",
-  "amountCents": 8500,
   "email": "backer@example.com",
-  "tierId": "producer-credit",
-  "tierName": "Producer Credit",
-  "tierQty": 1,
-  "additionalTiers": [{ "id": "frame-slot", "qty": 2, "price": 500 }],
-  "supportItems": [{ "id": "location-scouting", "amount": 25 }],
-  "customAmount": 10,
-  "hasPhysical": true,
   "tipPercent": 5
 }
 ```
 **Response:** `{ url }` → Redirect to Stripe Checkout
 
 **Data flow:**
-1. Cart.js extracts tiers, support items, custom amount, physical item flag, and selected tip percent from Snipcart cart
-2. Worker stores `supportItems` and `customAmount` in temp KV key (`pending-extras:{orderId}`)
-3. Worker sets `hasExtras`, `hasPhysical`, and `tipPercent` in Stripe Checkout metadata
-4. If `hasPhysical`, Stripe Checkout collects shipping address via `shipping_address_collection`
-5. On webhook, Worker fetches extras from temp KV, extracts shipping address from Stripe session, computes `subtotal + tax + shipping + tip`, and merges into final pledge
+1. Cart.js passes Snipcart's `publicToken` and the selected tip percent
+2. Worker fetches the Snipcart payment session and reconstructs the cart shape from verified session items
+3. Worker validates campaign state, single-tier rules, threshold gates, and limited inventory availability
+4. Worker stores any overflow tier/support-item metadata in temp KV (`pending-tiers:*`, `pending-extras:*`) and creates a setup-mode Stripe Checkout session
+5. If the pledge contains physical items, Stripe Checkout collects shipping address via `shipping_address_collection`
+6. On webhook, Worker fetches any temp metadata, extracts shipping address from Stripe, computes `subtotal + tax + shipping + tip`, persists the pledge, and then claims inventory
+
+The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`, and `/start` does not reserve limited inventory before checkout completion.
 
 ### `POST /webhooks/stripe`
 Handle `checkout.session.completed`:
 - Extract `payment_method` and `customer` from SetupIntent
-- Fetch `supportItems` and `customAmount` from temp KV (if `hasExtras` flag set)
+- Fetch `supportItems`, `customAmount`, and additional tiers from temp KV when needed
 - Store pledge in KV with status `active` (includes support items, custom amount, shipping fee, tip, and shipping address)
 - Update live stats (pledgedAmount, tierCounts, supportItems)
-- Claim tier inventory (for limited tiers)
+- Claim tier inventory (for limited tiers) at persistence time
 - Generate magic link token
 - Send supporter confirmation email
+
+Webhook idempotency is committed only after successful pledge persistence so transient failures can retry safely.
+
+### `GET /pledges?token=...`
+Read the pledge collection available to a magic link session.
+
+**Current behavior:** a token returns only its own authorized order.
 
 ### `GET /pledge?token=...`
 Read pledge details for magic link management page.
@@ -223,10 +229,12 @@ Cancel an active pledge.
 ### `POST /pledge/modify`
 Change tier or amount.
 
-**Request:** `{ token, newTierId, newAmount }`  
+**Request:** `{ token, orderId, ...changes }`
 **Validation:**
 - Rejects if pledge is charged
 - Rejects if campaign deadline has passed (via `isCampaignLive` check)
+- Rejects if `orderId` does not match the token's authorized order
+- Rebuilds totals from stored pledge state plus campaign definitions instead of trusting client money fields
 
 **Action:** Update pledge in KV, adjust stats delta, swap tier inventory
 
@@ -388,7 +396,7 @@ The `settle-dispatch` endpoint handles the actual charging in batches to stay wi
 4. Self-invokes for the next batch until all pledges are processed
 5. Each batch is a separate Worker invocation with its own subrequest budget
 6. **Aggregates pledges by email** — each supporter gets ONE charge
-7. On completion, sets `campaign-charged:{slug}` marker to prevent re-settlement
+7. On completion, sets `campaign-charged:{slug}` only when no active pledge still needs attention
 
 **Campaign pledge index:**
 
