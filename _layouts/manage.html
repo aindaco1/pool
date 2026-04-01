@@ -45,7 +45,7 @@
   <footer class="site-footer">
     <div class="site-footer__content">
       <a href="/" class="site-footer__logo">
-        <img src="/assets/images/defaults/dust-wave-square.png" alt="Dust Wave">
+        <img src="/assets/images/defaults/dust-wave-square.png" alt="{{ site.author }}">
       </a>
       <div class="site-footer__copyright">
         <span>(ɔ) {{ 'now' | date: "%Y" }} DUST WAVE</span>
@@ -55,6 +55,7 @@
 
   <script>
     const WORKER_BASE = '{{ site.worker_base }}';
+    const PLATFORM_NAME = {{ site.author | jsonify }};
     const ABQ_TAX_RATE = 0.07875; // 7.875% ABQ tax
     const FLAT_SHIPPING_FEE = 300; // $3 flat rate USPS shipping for physical items
     const DEFAULT_PLATFORM_TIP_PERCENT = 5;
@@ -1055,11 +1056,11 @@
       const currentTipPercent = getPledgeTipPercent(pledge);
       if (isActive) {
         tipHtml = `
-          <div class="pledge-card__tip" id="tip-section-${index}">
-            <div class="pledge-card__tip-header">
-              <h3>Tip Dust Wave</h3>
-              <span class="pledge-card__tip-amount" id="tip-amount-label-${index}">${formatMoney(getPledgeTipAmount(pledge))}</span>
-            </div>
+              <div class="pledge-card__tip" id="tip-section-${index}">
+                <div class="pledge-card__tip-header">
+                  <h3>Tip ${PLATFORM_NAME}</h3>
+                  <span class="pledge-card__tip-amount" id="tip-amount-label-${index}">${formatMoney(getPledgeTipAmount(pledge))}</span>
+                </div>
             <p class="pledge-card__tip-copy">Optional support for platform maintenance. This does not count toward the campaign goal.</p>
             <div class="pledge-card__tip-controls">
               <input type="range" min="0" max="${MAX_PLATFORM_TIP_PERCENT}" step="1" value="${currentTipPercent}" id="tip-percent-${index}" data-current="${currentTipPercent}">
@@ -1170,7 +1171,7 @@
                     <span class="value" id="subtotal-${index}">${formatMoney(subtotal)}</span>
                   </div>
                   <div class="pledge-summary__row pledge-summary__row--tip" id="tip-row-${index}" ${tipAmount > 0 ? '' : 'hidden'}>
-                    <span class="label">Dust Wave tip (<span id="tip-row-percent-${index}">${tipPercent}</span>%)</span>
+                    <span class="label">${PLATFORM_NAME} tip (<span id="tip-row-percent-${index}">${tipPercent}</span>%)</span>
                     <span class="value" id="tip-${index}">${formatMoney(tipAmount)}</span>
                   </div>
                   <div class="pledge-summary__row pledge-summary__row--tax">
@@ -1724,7 +1725,7 @@
         detailsHtml += `
           <p class="confirm-totals">
             <span>Subtotal: ${formatMoney(newSubtotal)}</span>
-            ${newTipAmount > 0 ? `<span>Dust Wave tip (${selectedTipPercent}%): ${formatMoney(newTipAmount)}</span>` : ''}
+            ${newTipAmount > 0 ? `<span>${PLATFORM_NAME} tip (${selectedTipPercent}%): ${formatMoney(newTipAmount)}</span>` : ''}
             <span>ABQ Tax (7.875%): ${formatMoney(newTax)}</span>
             ${confirmShipping > 0 ? `<span>Shipping (USPS): ${formatMoney(confirmShipping)}</span>` : ''}
             <strong>Total: ${formatMoney(newTotalWithTax)}</strong>

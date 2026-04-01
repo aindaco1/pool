@@ -556,7 +556,7 @@ test.describe('Cart Flow', () => {
     await expect(page.locator('.pool-tip-box')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.pool-fee-summary')).toBeVisible();
     await expect(page.locator('.pool-tip-box__percent')).toHaveText('5%');
-    await expect(page.locator('.pool-fee-summary')).toContainText('Dust Wave tip (5%)');
+    await expect(page.locator('.pool-fee-summary')).toContainText('tip (5%)');
     await expect(page.locator('.pool-fee-summary')).toContainText('ABQ tax (7.875%)');
   });
 

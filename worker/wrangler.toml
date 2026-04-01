@@ -17,6 +17,7 @@ SITE_BASE = "https://pool.dustwave.xyz"
 WORKER_BASE = "https://pledge.dustwave.xyz"
 SNIPCART_API_BASE = "https://app.snipcart.com/api"
 SNIPCART_MODE = "live"  # "test" or "live"
+PLATFORM_AUTHOR = "Dust Wave"
 
 # KV Namespaces - update IDs after running:
 #   wrangler kv:namespace create "VOTES"
@@ -64,7 +65,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 
 # Development overrides (uses test mode)
 [env.dev]
-vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "https://pledge.dustwave.xyz", SNIPCART_API_BASE = "https://app.snipcart.com/api", SNIPCART_MODE = "test" }
+vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "https://pledge.dustwave.xyz", SNIPCART_API_BASE = "https://app.snipcart.com/api", SNIPCART_MODE = "test", PLATFORM_AUTHOR = "Dust Wave" }
 
 [[env.dev.kv_namespaces]]
 binding = "VOTES"

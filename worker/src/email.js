@@ -23,6 +23,10 @@ function getInstagramCTA(instagramUrl, siteBase = 'https://pool.dustwave.xyz') {
   </div>`;
 }
 
+function getPlatformAuthor(env) {
+  return env.PLATFORM_AUTHOR || 'Dust Wave';
+}
+
 // Render pledge items (tiers, support items, custom amount) for email display
 function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportItems = [], customAmount = 0 }) {
   const items = [];
@@ -64,11 +68,12 @@ function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportIte
   </div>`;
 }
 
-function renderAmountBreakdown({ subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, totalLabel, totalAmount }) {
+function renderAmountBreakdown(env, { subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, totalLabel, totalAmount }) {
   const resolvedTotal = totalAmount ?? (subtotal + tax + shipping + tipAmount);
+  const platformAuthor = getPlatformAuthor(env);
   return `
     <p style="margin: 0 0 4px 0;">Subtotal: $${(subtotal / 100).toFixed(2)}</p>
-    ${tipAmount > 0 ? `<p style="margin: 0 0 4px 0;">Dust Wave tip${tipPercent > 0 ? ` (${tipPercent}%)` : ''}: $${(tipAmount / 100).toFixed(2)}</p>` : ''}
+    ${tipAmount > 0 ? `<p style="margin: 0 0 4px 0;">${platformAuthor} tip${tipPercent > 0 ? ` (${tipPercent}%)` : ''}: $${(tipAmount / 100).toFixed(2)}</p>` : ''}
     <p style="margin: 0 0 4px 0;">Tax (7.875%): $${(tax / 100).toFixed(2)}</p>
     ${shipping > 0 ? `<p style="margin: 0 0 4px 0;">Shipping: $${(shipping / 100).toFixed(2)}</p>` : ''}
     <p style="margin: 0 0 8px 0;"><strong>${totalLabel}: $${(resolvedTotal / 100).toFixed(2)}</strong></p>
@@ -83,7 +88,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
-  const amountBreakdownHtml = renderAmountBreakdown({
+  const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
     shipping,
@@ -175,7 +180,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   const diff = Math.abs(newTotal - previousTotal);
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
-  const amountBreakdownHtml = renderAmountBreakdown({
+  const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal: newSubtotal,
     tax,
     shipping,
@@ -256,7 +261,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
 export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems }) {
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
-  const amountBreakdownHtml = renderAmountBreakdown({
+  const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
     shipping,
@@ -331,7 +336,7 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
   const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
-  const amountBreakdownHtml = renderAmountBreakdown({
+  const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
     shipping,
@@ -494,7 +499,7 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
  */
 export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campaignTitle, subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, amount }) {
   const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/`;
-  const amountBreakdownHtml = renderAmountBreakdown({
+  const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
     shipping,

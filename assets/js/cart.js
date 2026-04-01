@@ -2,6 +2,7 @@
 'use strict';
 
 const WORKER_BASE = window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
+const PLATFORM_NAME = window.POOL_CONFIG?.platformName || 'The Pool';
 const DEFAULT_PLATFORM_TIP_PERCENT = 5;
 const MAX_PLATFORM_TIP_PERCENT = 15;
 const FLAT_SHIPPING_FEE = 300; // $3 flat rate, must match worker
@@ -243,10 +244,10 @@ function createTipBox(contextClass) {
   box.className = `pool-tip-box ${contextClass}`;
   box.innerHTML = `
     <div class="pool-tip-box__header">
-      <strong>Tip Dust Wave for platform maintenance</strong>
+      <strong>Tip ${PLATFORM_NAME} for platform maintenance.</strong>
       <span class="pool-tip-box__amount">${formatCents(tipAmountCents)}</span>
     </div>
-    <p class="pool-tip-box__copy">Adjust your optional tip from 0% to 15%. This helps cover platform upkeep without changing your checkout flow.</p>
+    <p class="pool-tip-box__copy">${PLATFORM_NAME} has a 0% platform fee for organizers. Thanks to generous donors who tip an optional amount, ${PLATFORM_NAME} can continue to offer this platform to creators.</p>
     <div class="pool-tip-box__controls">
       <input class="pool-tip-box__slider" type="range" min="0" max="${MAX_PLATFORM_TIP_PERCENT}" step="1" value="${tipPercent}" aria-label="Platform tip percentage">
       <span class="pool-tip-box__percent">${tipPercent}%</span>
@@ -268,7 +269,7 @@ function getFeeSummaryMarkup(pricing) {
       <span>Subtotal</span>
       <span>${formatCents(pricing.subtotalCents)}</span>
     </div>
-    ${pricing.tipAmountCents > 0 ? `<div class="pool-fee-summary__row"><span>Dust Wave tip (${pricing.tipPercent}%)</span><span>${formatCents(pricing.tipAmountCents)}</span></div>` : ''}
+    ${pricing.tipAmountCents > 0 ? `<div class="pool-fee-summary__row"><span>${PLATFORM_NAME} tip (${pricing.tipPercent}%)</span><span>${formatCents(pricing.tipAmountCents)}</span></div>` : ''}
     <div class="pool-fee-summary__row"><span>ABQ tax (7.875%)</span><span>${formatCents(pricing.taxCents)}</span></div>
     ${pricing.shippingCents > 0 ? `<div class="pool-fee-summary__row"><span>Shipping</span><span>${formatCents(pricing.shippingCents)}</span></div>` : ''}
     <div class="pool-fee-summary__row pool-fee-summary__row--total">
@@ -343,7 +344,7 @@ function getCheckoutSummaryMarkup(pricing, classPrefix = 'snipcart-summary-fees'
     </div>
     ${pricing.tipAmountCents > 0 ? `
       <div class="${classPrefix}__item snipcart__font--slim">
-        <span class="${classPrefix}__title">Dust Wave tip (${pricing.tipPercent}%)</span>
+        <span class="${classPrefix}__title">${PLATFORM_NAME} tip (${pricing.tipPercent}%)</span>
         <span class="${classPrefix}__amount">${formatCents(pricing.tipAmountCents)}</span>
       </div>
     ` : ''}

@@ -1,6 +1,7 @@
 <script>
   window.POOL_CONFIG = {
-    workerBase: '{{ site.worker_base }}'
+    workerBase: '{{ site.worker_base }}',
+    platformName: {{ site.author | jsonify }}
   };
 </script>
 <div hidden id="snipcart" data-api-key="{{ site.snipcart_api_key }}" data-config-modal-style="side">

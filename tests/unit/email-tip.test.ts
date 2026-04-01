@@ -10,8 +10,11 @@ import {
 
 const env = {
   RESEND_API_KEY: 'test_resend_key',
-  SITE_BASE: 'https://pool.test'
+  SITE_BASE: 'https://pool.test',
+  PLATFORM_AUTHOR: 'Dust Wave'
 };
+
+const PLATFORM_TIP_LINE = `${env.PLATFORM_AUTHOR} tip (6%): $2.10`;
 
 function mockResend() {
   const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => ({
@@ -37,7 +40,7 @@ describe('supporter email tip breakdowns', () => {
     vi.restoreAllMocks();
   });
 
-  it('includes the Dust Wave tip line in supporter confirmation emails', async () => {
+  it('includes the platform tip line in supporter confirmation emails', async () => {
     const fetchMock = mockResend();
 
     await sendSupporterEmail(env, {
@@ -53,11 +56,11 @@ describe('supporter email tip breakdowns', () => {
     });
 
     const payload = getEmailPayload(fetchMock);
-    expect(payload.html).toContain('Dust Wave tip (6%): $2.10');
+    expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Total (if funded): $42.86');
   });
 
-  it('includes the Dust Wave tip line in pledge modified emails', async () => {
+  it('includes the platform tip line in pledge modified emails', async () => {
     const fetchMock = mockResend();
 
     await sendPledgeModifiedEmail(env, {
@@ -77,11 +80,11 @@ describe('supporter email tip breakdowns', () => {
     });
 
     const payload = getEmailPayload(fetchMock);
-    expect(payload.html).toContain('Dust Wave tip (6%): $2.10');
+    expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('New total (if funded): $42.86');
   });
 
-  it('includes the Dust Wave tip line in payment failed emails', async () => {
+  it('includes the platform tip line in payment failed emails', async () => {
     const fetchMock = mockResend();
 
     await sendPaymentFailedEmail(env, {
@@ -98,11 +101,11 @@ describe('supporter email tip breakdowns', () => {
     });
 
     const payload = getEmailPayload(fetchMock);
-    expect(payload.html).toContain('Dust Wave tip (6%): $2.10');
+    expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Amount due: $42.86');
   });
 
-  it('includes the Dust Wave tip line in charge success emails', async () => {
+  it('includes the platform tip line in charge success emails', async () => {
     const fetchMock = mockResend();
 
     await sendChargeSuccessEmail(env, {
@@ -119,11 +122,11 @@ describe('supporter email tip breakdowns', () => {
     });
 
     const payload = getEmailPayload(fetchMock);
-    expect(payload.html).toContain('Dust Wave tip (6%): $2.10');
+    expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Amount charged: $42.86');
   });
 
-  it('includes the Dust Wave tip line in cancellation emails', async () => {
+  it('includes the platform tip line in cancellation emails', async () => {
     const fetchMock = mockResend();
 
     await sendPledgeCancelledEmail(env, {
@@ -139,7 +142,7 @@ describe('supporter email tip breakdowns', () => {
     });
 
     const payload = getEmailPayload(fetchMock);
-    expect(payload.html).toContain('Dust Wave tip (6%): $2.10');
+    expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Released total: $42.86');
   });
 });
