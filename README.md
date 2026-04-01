@@ -1,15 +1,15 @@
 # The Pool
 
-**Dust Wave's Snipcart-powered crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
+**Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Backers build a pledge in Snipcart, the Cloudflare Worker re-verifies the checkout state from either a Snipcart custom-gateway payment-session token or the active cart token and creates a Stripe setup-mode Checkout session, and cards are only charged after a successful campaign reaches its deadline. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a Dust Wave platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
+A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Backers build a pledge in Snipcart, the Cloudflare Worker re-verifies the checkout state from either a Snipcart custom-gateway payment-session token or the active cart token and creates a Stripe setup-mode Checkout session, and cards are only charged after a successful campaign reaches its deadline. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
 ## Features
 
 - **No accounts required** — Backers manage pledges via email magic links
 - **Server-verified checkout** — The Worker rebuilds pledge shape from verified Snipcart checkout data instead of trusting browser-submitted totals
 - **All-or-nothing pledging** — Cards saved now, charged only if goal is met
-- **Optional platform tip** — 0% to 15% Dust Wave tip (default 5%) included in totals but excluded from campaign progress
+- **Optional platform tip** — 0% to 15% tip (default 5%) included in totals but excluded from campaign progress
 - **Tip-aware cart + checkout** — Shared pricing logic keeps subtotal, tip, tax, shipping, and total in sync across cart, checkout, Worker, reports, and emails
 - **Checkout autofill** — Auto-selects country, enables password manager autofill for address fields
 - **Physical & digital tiers** — Physical items trigger Stripe shipping address collection + $3 flat USPS fee
@@ -191,4 +191,4 @@ The Worker powers:
 
 ---
 
-*© Dust Wave*
+*🄯 Dust Wave*
