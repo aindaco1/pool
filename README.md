@@ -2,12 +2,12 @@
 
 **Dust Wave's Snipcart-powered crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Backers build a pledge in Snipcart, the Cloudflare Worker re-verifies the checkout session and creates a Stripe setup-mode Checkout session, and cards are only charged after a successful campaign reaches its deadline. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a Dust Wave platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
+A static Jekyll + Snipcart v3 site for all-or-nothing creative crowdfunding. Backers build a pledge in Snipcart, the Cloudflare Worker re-verifies the checkout state from either a Snipcart custom-gateway payment-session token or the active cart token and creates a Stripe setup-mode Checkout session, and cards are only charged after a successful campaign reaches its deadline. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a Dust Wave platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
 ## Features
 
 - **No accounts required** — Backers manage pledges via email magic links
-- **Server-verified checkout** — The Worker rebuilds pledge shape from the verified Snipcart payment session instead of trusting browser-submitted totals
+- **Server-verified checkout** — The Worker rebuilds pledge shape from verified Snipcart checkout data instead of trusting browser-submitted totals
 - **All-or-nothing pledging** — Cards saved now, charged only if goal is met
 - **Optional platform tip** — 0% to 15% Dust Wave tip (default 5%) included in totals but excluded from campaign progress
 - **Tip-aware cart + checkout** — Shared pricing logic keeps subtotal, tip, tax, shipping, and total in sync across cart, checkout, Worker, reports, and emails
@@ -64,7 +64,7 @@ For full local development with Jekyll, the Worker, Stripe CLI webhook forwardin
 ```bash
 npm run test:premerge  # Syntax + focused regressions + local smoke + full unit + security + headless E2E
 npm run test:secrets   # Secret exposure audit against local env files, tracked files, and git history
-npm run test:unit      # Unit tests (Vitest) — currently 203 tests
+npm run test:unit      # Unit tests (Vitest) — currently 205 tests
 npm run test:e2e       # E2E tests (Playwright) — automated + manual checkout coverage
 npm run test:e2e:headless # CI-style automated browser suite
 npm run test:security  # Security tests — pen testing the Worker API
@@ -73,11 +73,11 @@ npm test               # Run unit + e2e
 
 **Current full-suite baseline:**
 - Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow
-- Unit tests: 203 passed
+- Unit tests: 205 passed
 - Headless E2E: 35 passed, 5 skipped
 - Security tests: 128 passed
 
-**Test coverage includes:** live-stats functions, platform tip helpers, Snipcart cart parsing, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, secret exposure auditing, and hardening around `/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
+**Test coverage includes:** live-stats functions, platform tip helpers, Snipcart cart parsing, frontend `/start` token payload wiring, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, secret exposure auditing, and hardening around `/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
 
 For local merge smoke on mutable pledges, use:
 

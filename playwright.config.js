@@ -11,7 +11,7 @@ module.exports = defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'bundle exec jekyll serve --port 4000',
+    command: 'bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000',
     port: 4000,
     timeout: 120_000,
     reuseExistingServer: true,

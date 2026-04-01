@@ -20,7 +20,7 @@ NGROK_URL="https://cole-unelapsed-patrice.ngrok-free.dev"
 
 # Build with localhost for fast automated tests
 sed -i.bak "s|^url:.*|url: $LOCAL_URL|" _config.local.yml
-bundle exec jekyll serve --port 4000 > /tmp/jekyll.log 2>&1 &
+bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000 > /tmp/jekyll.log 2>&1 &
 JEKYLL_PID=$!
 
 # Wait for Jekyll
@@ -62,7 +62,7 @@ sed -i '' "s|^url:.*|url: $NGROK_URL|" _config.local.yml
 kill $JEKYLL_PID 2>/dev/null || true
 sleep 1
 rm -rf _site .jekyll-cache
-bundle exec jekyll serve --port 4000 > /tmp/jekyll.log 2>&1 &
+bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000 > /tmp/jekyll.log 2>&1 &
 JEKYLL_PID=$!
 
 # Wait for Jekyll

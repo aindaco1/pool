@@ -88,11 +88,12 @@ On GitHub, pushes to `main` also deploy the Worker automatically through `.githu
 ## API Endpoints
 
 ### POST /start
-Verify a Snipcart payment session and create a Stripe setup-mode Checkout session for a new pledge.
+Verify the current Snipcart checkout state and create a Stripe setup-mode Checkout session for a new pledge.
 
 ```json
 {
   "publicToken": "snipcart-public-payment-session-token",
+  "cartToken": "snipcart-cart-token",
   "campaignSlug": "hand-relations",
   "email": "supporter@example.com",
   "tipPercent": 5
@@ -101,7 +102,7 @@ Verify a Snipcart payment session and create a Stripe setup-mode Checkout sessio
 
 Returns: `{ "url": "https://checkout.stripe.com/..." }`
 
-The Worker rebuilds tier, add-on, custom-support, shipping, and subtotal state from the verified Snipcart payment session. It does not trust browser-submitted money fields, and it only claims limited inventory after the pledge is actually persisted.
+The Worker supports either a verified Snipcart custom-gateway `publicToken` or a verified in-progress `cartToken`. It rebuilds tier, add-on, custom-support, shipping, and subtotal state from the verified Snipcart checkout data, does not trust browser-submitted money fields, and only claims limited inventory after the pledge is actually persisted.
 
 ### GET /pledges?token={token}
 Get the pledge(s) authorized by a magic link token.

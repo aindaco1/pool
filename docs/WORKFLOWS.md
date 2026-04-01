@@ -43,7 +43,7 @@ upcoming → live → post
 ```
 1. BROWSE     → Visitor views campaign, adds tier to Snipcart cart, adjusts optional tip
 2. CHECKOUT   → Billing auto-filled → JS intercepts "Continue to Pledge"
-3. START      → Worker verifies the Snipcart payment session and creates Stripe Checkout (setup mode)
+3. START      → Worker verifies the Snipcart checkout state and creates Stripe Checkout (setup mode)
 4. SAVE CARD  → Stripe Checkout saves payment method (no charge)
 5. CONFIRM    → Stripe webhook → Worker stores pledge in KV, sends magic link email
 6. MANAGE     → Backer uses magic link to cancel/modify/update card
@@ -153,6 +153,7 @@ Create Stripe Checkout session (setup mode) after Snipcart order.
 ```json
 {
   "publicToken": "snipcart-public-payment-session-token",
+  "cartToken": "snipcart-cart-token",
   "campaignSlug": "hand-relations",
   "email": "backer@example.com",
   "tipPercent": 5
@@ -161,8 +162,8 @@ Create Stripe Checkout session (setup mode) after Snipcart order.
 **Response:** `{ url }` → Redirect to Stripe Checkout
 
 **Data flow:**
-1. Cart.js passes Snipcart's `publicToken` and the selected tip percent
-2. Worker fetches the Snipcart payment session and reconstructs the cart shape from verified session items
+1. Cart.js passes the selected tip percent plus either Snipcart's custom-gateway `publicToken` or the current `cartToken`
+2. Worker verifies the checkout state from Snipcart and reconstructs the cart shape from the verified cart/session items
 3. Worker validates campaign state, single-tier rules, threshold gates, and limited inventory availability
 4. Worker stores any overflow tier/support-item metadata in temp KV (`pending-tiers:*`, `pending-extras:*`) and creates a setup-mode Stripe Checkout session
 5. If the pledge contains physical items, Stripe Checkout collects shipping address via `shipping_address_collection`

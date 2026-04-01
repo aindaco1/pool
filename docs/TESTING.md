@@ -61,6 +61,7 @@ This runs:
 - `node --check` for the changed Worker entrypoints
 - Focused regression suites:
   - `tests/unit/worker-business-logic.test.ts`
+  - `tests/unit/cart-start-token.test.ts`
   - `tests/unit/snipcart-parsing.test.ts`
   - `tests/unit/worker-ops-integrity.test.ts`
   - `tests/unit/stats-pagination.test.ts`
@@ -71,7 +72,9 @@ This runs:
 - Security suite via `npm run test:security` against an auto-started local Worker
 - Playwright headless E2E via `npm run test:e2e:headless`
 
-The pre-merge script now auto-starts Jekyll with `_config.yml,_config.local.yml` when needed so the local-only `smoke-editable` campaign is available during merge gating.
+The pre-merge script now auto-starts Jekyll with `_config.yml,_config.local.yml` when needed so the local-only `smoke-editable` campaign is available during merge gating, and the Playwright harness uses the same combined config locally.
+
+The dedicated `tests/unit/cart-start-token.test.ts` regression runs the real checkout browser code in jsdom and asserts that the pledge button sends `cartToken` to `/start` when Snipcart does not expose a custom-gateway `publicToken`.
 
 On GitHub, the same gate runs automatically in the `Merge Smoke` workflow for pull requests targeting `main`.
 
