@@ -76,9 +76,14 @@ wrangler secret put SNIPCART_WEBHOOK_SECRET
 # Development (uses test mode APIs)
 wrangler dev --env dev
 
-# Production
+# Production from worker/
 wrangler deploy
+
+# Production from repo root
+npm run deploy:worker
 ```
+
+On GitHub, pushes to `main` also deploy the Worker automatically through `.github/workflows/deploy.yml`. That automation requires repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 
 ## API Endpoints
 

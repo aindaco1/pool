@@ -156,15 +156,23 @@ tests/                # Test suites
 
 ## Deployment
 
-Push the site to GitHub Pages:
+Push `main` to deploy production:
 ```bash
 git push origin main
 ```
 
-Deploy the Worker from the repo's production Wrangler config:
+That GitHub Actions workflow now deploys both:
+- the GitHub Pages site
+- the Cloudflare Worker from `worker/wrangler.toml`
+
+Required GitHub repository secrets for automatic Worker deployment:
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `ADMIN_SECRET` for the post-deploy diary check
+
+Manual Worker fallback from the repo root:
 ```bash
-cd worker
-wrangler deploy
+npm run deploy:worker
 ```
 
 The Worker powers:
