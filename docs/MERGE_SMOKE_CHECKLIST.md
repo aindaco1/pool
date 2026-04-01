@@ -42,6 +42,22 @@ That script starts:
 
 Use local rehearsal to sanity-check checkout, webhook delivery, manage-link behavior, and admin endpoints before running the same flow against staging.
 
+For local-only pledge management checks, use the `smoke-editable` campaign. It is defined as `test_only: true`, so it shows up in local development when `_config.local.yml` enables `show_test_campaigns`, while staying excluded from the production homepage and production `/api/campaigns.json`.
+
+Recommended local setup for modify/cancel smoke:
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/test/setup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"smoke-local@example.com","campaignSlug":"smoke-editable"}' | jq
+```
+
+Or run the end-to-end local mutate/cancel check directly:
+
+```bash
+./scripts/smoke-pledge-management.sh
+```
+
 ## Test Data Setup
 
 Prepare or identify:

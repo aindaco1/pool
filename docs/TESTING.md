@@ -100,6 +100,14 @@ This manual staging smoke pass is required before merge for branches that change
 
 For an operator-ready version with exact commands and expected results, use [docs/MERGE_SMOKE_CHECKLIST.md](./MERGE_SMOKE_CHECKLIST.md).
 
+For local rehearsal of pledge management, prefer the `smoke-editable` campaign. It is local-only via `test_only: true`, stays live well past the normal smoke window, and gives `/test/setup` a stable target for modify/cancel coverage.
+
+You can exercise that path end to end with:
+
+```bash
+./scripts/smoke-pledge-management.sh
+```
+
 ### Intentional Behavior Changes
 
 When reviewing results, do not flag these as regressions:

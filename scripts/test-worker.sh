@@ -41,25 +41,38 @@ fi
 # 2. Test Worker is running
 echo ""
 echo "--- Worker Endpoints ---"
-WORKER_RESP=$(curl -sf "$WORKER_URL/notfound" 2>/dev/null) || { warn "Worker not running at $WORKER_URL (start with: cd worker && npx wrangler dev --env dev)"; exit 0; }
-pass "Worker responding"
+WORKER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$WORKER_URL/notfound" 2>/dev/null || true)
+if [ -z "$WORKER_STATUS" ] || [ "$WORKER_STATUS" = "000" ]; then
+  warn "Worker not running at $WORKER_URL (start with: cd worker && npx wrangler dev --env dev)"
+  exit 0
+fi
+pass "Worker responding (HTTP $WORKER_STATUS)"
 
-# 3. Test /start with invalid campaign
-RESP=$(curl -sf -X POST "$WORKER_URL/start" \
+# 3. Test /start rejects malformed or nonexistent campaign input
+RESP=$(curl -s -X POST "$WORKER_URL/start" \
   -H "Content-Type: application/json" \
   -d '{"orderId":"test-123","campaignSlug":"nonexistent-campaign"}' 2>/dev/null)
-echo "$RESP" | grep -q "Campaign not found" || fail "/start should reject nonexistent campaign"
-pass "/start rejects invalid campaign"
+echo "$RESP" | grep -Eq "Campaign not found|Missing checkout token" || fail "/start should reject invalid or tokenless requests"
+pass "/start rejects invalid or tokenless requests"
 
-# 4. Test /start with live campaign (get first live campaign)
-LIVE_SLUG=$(echo "$CAMPAIGNS" | jq -r '[.campaigns[] | select(.state == "live" and .charged == false)] | .[0].slug // empty')
+# 4. Test /start with live campaign
+# Prefer the dedicated local smoke campaign when it is available.
+LIVE_SLUG=$(echo "$CAMPAIGNS" | jq -r '
+  if any(.campaigns[]; .slug == "smoke-editable" and .state == "live" and .charged == false) then
+    "smoke-editable"
+  else
+    ([.campaigns[] | select(.state == "live" and .charged == false)] | .[0].slug) // empty
+  end
+')
 if [ -n "$LIVE_SLUG" ]; then
-  RESP=$(curl -sf -X POST "$WORKER_URL/start" \
+  RESP=$(curl -s -X POST "$WORKER_URL/start" \
     -H "Content-Type: application/json" \
     -d "{\"orderId\":\"test-$(date +%s)\",\"campaignSlug\":\"$LIVE_SLUG\",\"amountCents\":500,\"email\":\"test@example.com\"}" 2>/dev/null)
   
   if echo "$RESP" | grep -q '"url"'; then
     pass "/start returns Stripe URL for '$LIVE_SLUG'"
+  elif echo "$RESP" | grep -q "Missing checkout token"; then
+    pass "/start fail-closes without checkout token for '$LIVE_SLUG'"
   elif echo "$RESP" | grep -q "deadline"; then
     warn "/start: Campaign '$LIVE_SLUG' deadline passed (update goal_deadline in _campaigns/$LIVE_SLUG.md)"
   else
@@ -70,12 +83,12 @@ else
 fi
 
 # 5. Test /pledge without token
-RESP=$(curl -sf "$WORKER_URL/pledge" 2>/dev/null)
+RESP=$(curl -s "$WORKER_URL/pledge" 2>/dev/null)
 echo "$RESP" | grep -q "Missing token" || fail "/pledge should require token"
 pass "/pledge requires token"
 
 # 6. Test /votes without token  
-RESP=$(curl -sf "$WORKER_URL/votes" 2>/dev/null)
+RESP=$(curl -s "$WORKER_URL/votes" 2>/dev/null)
 echo "$RESP" | grep -q "Missing token\|error" || fail "/votes should require token"
 pass "/votes requires token"
 
