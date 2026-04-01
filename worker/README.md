@@ -83,7 +83,7 @@ wrangler deploy
 npm run deploy:worker
 ```
 
-On GitHub, pushes to `main` also deploy the Worker automatically through `.github/workflows/deploy.yml`. That automation requires repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+On GitHub, pushes to `main` also deploy the Worker automatically through `.github/workflows/deploy.yml`. The preferred setup uses repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. As a temporary fallback, the workflow also accepts legacy Cloudflare auth via `CLOUDFLARE_EMAIL` and `CLOUDFLARE_KEY`.
 
 ## API Endpoints
 

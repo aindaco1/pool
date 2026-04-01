@@ -170,6 +170,12 @@ Required GitHub repository secrets for automatic Worker deployment:
 - `CLOUDFLARE_ACCOUNT_ID`
 - `ADMIN_SECRET` for the post-deploy diary check
 
+Temporary fallback: the workflow also supports legacy Cloudflare auth via
+- `CLOUDFLARE_EMAIL`
+- `CLOUDFLARE_KEY`
+
+The token + account ID path is still the recommended long-term setup.
+
 Manual Worker fallback from the repo root:
 ```bash
 npm run deploy:worker
