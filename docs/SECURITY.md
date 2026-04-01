@@ -446,7 +446,7 @@ If a checkout completes but the pledge doesn't appear (common in local dev):
 
 **Prevention:**
 - Use `scripts/dev.sh` which runs the Worker with local KV simulation
-- `scripts/dev.sh` starts a single Stripe listener, forwards events to `localhost:8787/webhooks/stripe`, and writes that same listener's `whsec_...` secret into `worker/.dev.vars`
+- `scripts/dev.sh` starts a single Stripe listener, forwards events to `127.0.0.1:8787/webhooks/stripe`, writes that same listener's `whsec_...` secret into `worker/.dev.vars`, and clears stale local processes on the standard dev ports before startup
 - If you start Stripe manually, use the same listener instance for forwarding and for the secret you copy into local config
 - For testing with seeded data, run `./scripts/seed-all-campaigns.sh` after starting the worker
 

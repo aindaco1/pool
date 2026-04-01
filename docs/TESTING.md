@@ -481,19 +481,20 @@ Preferred option for local end-to-end testing:
 ```
 
 This starts Jekyll, the Worker, Stripe CLI forwarding, and writes the matching `STRIPE_WEBHOOK_SECRET` into `worker/.dev.vars`.
+It also clears stale processes on ports `4000`, `8787`, and `4040` so the local stack matches the automated smoke/test harness.
 
 Manual fallback:
 
 ```bash
 # Forward Stripe webhooks to your local Worker
-stripe listen --forward-to localhost:8787/webhooks/stripe
+stripe listen --forward-to 127.0.0.1:8787/webhooks/stripe
 # Note the webhook signing secret it outputs (whsec_...)
 ```
 
-Add the webhook secret to your Worker:
+Add the webhook secret to your local Worker config:
 ```bash
-wrangler secret put STRIPE_WEBHOOK_SECRET
-# Paste: whsec_...
+printf '\nSTRIPE_WEBHOOK_SECRET=whsec_...\n' >> worker/.dev.vars
+# Or edit worker/.dev.vars and replace the existing STRIPE_WEBHOOK_SECRET value
 ```
 
 ---
@@ -512,20 +513,20 @@ Manual fallback:
 
 Terminal 1 - Jekyll:
 ```bash
-bundle exec jekyll serve --config _config.yml,_config.local.yml
+bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000
 # Site at http://127.0.0.1:4000
 ```
 
 Terminal 2 - Worker:
 ```bash
 cd worker
-wrangler dev --env dev
-# Worker at http://localhost:8787
+npx wrangler dev --env dev --port 8787
+# Worker at http://127.0.0.1:8787
 ```
 
 Terminal 3 - Stripe CLI:
 ```bash
-stripe listen --forward-to localhost:8787/webhooks/stripe
+stripe listen --forward-to 127.0.0.1:8787/webhooks/stripe
 ```
 
 ### Test the Flow

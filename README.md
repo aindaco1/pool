@@ -54,7 +54,7 @@ For development with local URL overrides:
 bundle exec jekyll serve --config _config.yml,_config.local.yml
 ```
 
-For full local development with Jekyll, the Worker, Stripe CLI webhook forwarding, and automatic local webhook-secret sync:
+For full local development with Jekyll, the Worker, Stripe CLI webhook forwarding, automatic local webhook-secret sync, and stale port cleanup on the standard local ports:
 ```bash
 ./scripts/dev.sh
 ```

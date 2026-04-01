@@ -545,12 +545,13 @@ Update `worker/wrangler.toml` with the returned IDs.
 
 This starts:
 - **Jekyll** at http://127.0.0.1:4000 (with `_config.local.yml` overrides)
-- **Worker** at http://127.0.0.1:8787 (via `wrangler dev --env dev` with local KV simulation)
+- **Worker** at http://127.0.0.1:8787 (via `npx wrangler dev --env dev --port 8787` with local KV simulation)
 - **Stripe CLI** forwarding webhooks to the local Worker
 - **ngrok** tunnel (if installed) for Snipcart product validation
 
 The script auto-updates `worker/.dev.vars` with the Stripe CLI webhook secret.
 It uses the same Stripe listener instance for both forwarding and secret capture, which avoids the local webhook mismatch that can happen if you start one listener to print a secret and another to forward events.
+It also clears stale Jekyll, Worker, and ngrok inspector processes on the standard local ports before starting, so the local stack matches the automated smoke/test harness.
 
 > **Note:** Local KV simulation is used by default for fast iteration and compatibility with `scripts/seed-all-campaigns.sh`. KV data resets when the worker restarts. Use `--remote` if you need persistent data or to see real pledges.
 
@@ -558,13 +559,13 @@ It uses the same Stripe listener instance for both forwarding and secret capture
 
 ```bash
 # Terminal 1: Jekyll
-bundle exec jekyll serve --config _config.yml,_config.local.yml
+bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000
 
 # Terminal 2: Worker (local KV simulation)
-cd worker && wrangler dev --env dev
+cd worker && npx wrangler dev --env dev --port 8787
 
 # Terminal 3: Stripe webhooks
-stripe listen --forward-to localhost:8787/webhooks/stripe
+stripe listen --forward-to 127.0.0.1:8787/webhooks/stripe
 ```
 
 **Troubleshooting: Missing Pledges**
@@ -573,11 +574,19 @@ If a Stripe checkout completes but the pledge doesn't appear:
 1. Check Stripe CLI output — did it forward the webhook?
 2. Use the recovery endpoint to manually create the pledge:
    ```bash
-   curl -X POST http://localhost:8787/admin/recover-checkout \
+   curl -X POST http://127.0.0.1:8787/admin/recover-checkout \
      -H 'Authorization: Bearer YOUR_ADMIN_SECRET' \
      -H 'Content-Type: application/json' \
      -d '{"sessionId": "cs_test_..."}'
    ```
+
+**Useful local checks after startup**
+
+```bash
+npm run test:secrets
+./scripts/test-worker.sh
+./scripts/smoke-pledge-management.sh
+```
 
 **Troubleshooting: Stripe Webhook Errors (Mode Mismatch)**
 
