@@ -621,8 +621,9 @@ async function startPledgeFlow() {
   // Calculate subtotal from cart (pre-tax for stats, Worker will add tax)
   const subtotalCents = Math.round((cart.subtotal || cart.total) * 100);
   const selectedTipPercent = getStoredTipPercent(state);
-  const publicToken = state.cart?.token;
-  if (!publicToken) {
+  const publicToken = state.cart?.paymentSession?.publicToken || null;
+  const cartToken = state.cart?.token || null;
+  if (!publicToken && !cartToken) {
     console.error('Missing Snipcart checkout token');
     alert('There was an error starting your pledge: missing checkout token.');
     return false;
@@ -648,6 +649,7 @@ async function startPledgeFlow() {
   try {
     const payload = {
       publicToken,
+      cartToken,
       campaignSlug,
       amountCents: subtotalCents,
       email,

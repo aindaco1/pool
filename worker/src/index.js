@@ -1300,11 +1300,17 @@ async function handleStart(request, env) {
 
   console.log('📥 /start called');
   const body = await request.json();
-  const { publicToken, campaignSlug, email, tipPercent } = body;
+  const { publicToken, cartToken, campaignSlug, email, tipPercent } = body;
   const normalizedTipPercent = sanitizePlatformTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
-  console.log('📥 /start payload:', { publicToken: publicToken ? '[present]' : '[missing]', campaignSlug, email, tipPercent: normalizedTipPercent });
+  console.log('📥 /start payload:', {
+    publicToken: publicToken ? '[present]' : '[missing]',
+    cartToken: cartToken ? '[present]' : '[missing]',
+    campaignSlug,
+    email,
+    tipPercent: normalizedTipPercent
+  });
 
-  if (!publicToken) {
+  if (!publicToken && !cartToken) {
     console.log('📥 /start: Missing required fields');
     return jsonResponse({ error: 'Missing checkout token' }, 400);
   }
@@ -1319,23 +1325,60 @@ async function handleStart(request, env) {
     return jsonResponse({ error: 'Invalid email format' }, 400);
   }
 
-  let paymentSession;
-  try {
-    const sessionRes = await fetch(
-      `https://payment.snipcart.com/api/public/custom-payment-gateway/payment-session?publicToken=${encodeURIComponent(publicToken)}`
-    );
-    if (!sessionRes.ok) {
-      console.error('📥 /start: Failed to fetch payment session:', sessionRes.status);
-      return jsonResponse({ error: 'Invalid checkout token' }, 400);
+  let paymentSession = null;
+  let invoice = null;
+  let orderCart = null;
+  let verifiedCustomerEmail = '';
+  let verifiedPaymentSessionId = '';
+
+  if (publicToken) {
+    try {
+      const sessionRes = await fetch(
+        `https://payment.snipcart.com/api/public/custom-payment-gateway/payment-session?publicToken=${encodeURIComponent(publicToken)}`
+      );
+      if (!sessionRes.ok) {
+        console.error('📥 /start: Failed to fetch payment session:', sessionRes.status);
+        return jsonResponse({ error: 'Invalid checkout token' }, 400);
+      }
+      paymentSession = await sessionRes.json();
+    } catch (err) {
+      console.error('📥 /start: Payment session verification failed:', err.message);
+      return jsonResponse({ error: 'Unable to verify checkout session' }, 502);
     }
-    paymentSession = await sessionRes.json();
-  } catch (err) {
-    console.error('📥 /start: Payment session verification failed:', err.message);
-    return jsonResponse({ error: 'Unable to verify checkout session' }, 502);
+
+    invoice = paymentSession?.invoice || null;
+    orderCart = extractCartFromSnipcartItems(invoice?.items || []);
+    verifiedCustomerEmail = invoice?.email && invoice.email !== 'placeholder@pool.local' ? invoice.email : '';
+    verifiedPaymentSessionId = paymentSession?.id || '';
+  } else {
+    const snipcartSecret = getSnipcartSecret(env);
+    if (!snipcartSecret) {
+      return jsonResponse({ error: 'Checkout verification unavailable' }, 503);
+    }
+
+    try {
+      const snipcart = createSnipcartClient(snipcartSecret, env.SNIPCART_API_BASE);
+      const abandonedCart = await snipcart.carts.getAbandoned(cartToken);
+      if (!abandonedCart || abandonedCart.status !== 'InProgress') {
+        return jsonResponse({ error: 'Invalid checkout token' }, 400);
+      }
+
+      invoice = {
+        email: abandonedCart.email,
+        billingAddress: abandonedCart.billingAddress,
+        shippingAddress: abandonedCart.shippingAddress
+      };
+      orderCart = extractCartFromSnipcartItems(abandonedCart.items || []);
+      verifiedCustomerEmail = abandonedCart.email && abandonedCart.email !== 'placeholder@pool.local' ? abandonedCart.email : '';
+    } catch (err) {
+      console.error('📥 /start: Abandoned cart verification failed:', err.message);
+      if (String(err.message || '').includes('404')) {
+        return jsonResponse({ error: 'Invalid checkout token' }, 400);
+      }
+      return jsonResponse({ error: 'Unable to verify checkout session' }, 502);
+    }
   }
 
-  const invoice = paymentSession?.invoice;
-  const orderCart = extractCartFromSnipcartItems(invoice?.items || []);
   const resolvedCampaignSlug = orderCart.campaignSlug || campaignSlug;
   if (!resolvedCampaignSlug) {
     return jsonResponse({ error: 'Could not determine campaign from checkout session' }, 400);
@@ -1379,7 +1422,7 @@ async function handleStart(request, env) {
     return jsonResponse({ error: sessionShape.error }, 400);
   }
 
-  const orderId = `pool-${paymentSession.id}`;
+  const orderId = verifiedPaymentSessionId ? `pool-${verifiedPaymentSessionId}` : `pool-cart-${cartToken}`;
 
   const thresholdValidation = await validateTierThresholdSelection(
     env,
@@ -1425,7 +1468,7 @@ async function handleStart(request, env) {
   const stripe = createStripeClient(stripeKey);
   
   try {
-    const customerEmail = email || (invoice?.email && invoice.email !== 'placeholder@pool.local' ? invoice.email : '');
+    const customerEmail = email || verifiedCustomerEmail;
     const sessionParams = {
       mode: 'setup',
       payment_method_types: ['card'],
@@ -1442,7 +1485,7 @@ async function handleStart(request, env) {
         hasAdditionalTiers: canonicalContribution.additionalTiers.length > 0 ? 'true' : '',
         hasExtras: (canonicalContribution.supportItems.length > 0 || canonicalContribution.customAmount > 0) ? 'true' : '',
         hasPhysical: canonicalContribution.hasPhysical ? 'true' : '',
-        snipcartPaymentSessionId: paymentSession.id || '',
+        snipcartPaymentSessionId: verifiedPaymentSessionId,
         snipcartPublicToken: publicToken
       }
     };

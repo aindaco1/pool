@@ -36,6 +36,12 @@ export function createSnipcartClient(apiKey, baseUrl = 'https://app.snipcart.com
   }
 
   return {
+    carts: {
+      /**
+       * Get an in-progress/abandoned cart by token
+       */
+      getAbandoned: (token) => request('GET', `/carts/abandoned/${token}`)
+    },
     orders: {
       /**
        * Get order by token

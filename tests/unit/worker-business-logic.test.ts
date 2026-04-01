@@ -20,6 +20,9 @@ const mockStripeClient = {
 };
 
 const mockSnipcartClient = {
+  carts: {
+    getAbandoned: vi.fn()
+  },
   orders: {
     get: vi.fn()
   }
@@ -276,6 +279,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockStripeClient.checkout.sessions.create.mockResolvedValue({ url: 'https://stripe.test/checkout' });
   mockStripeClient.setupIntents.retrieve.mockResolvedValue({ payment_method: 'pm_123', customer: 'cus_123' });
+  mockSnipcartClient.carts.getAbandoned.mockResolvedValue({
+    token: 'cart_default',
+    email: 'placeholder@pool.local',
+    status: 'InProgress',
+    items: []
+  });
   mockSnipcartClient.orders.get.mockResolvedValue({
     pledge: { campaignSlug: 'hand-relations' }
   });
@@ -403,6 +412,47 @@ describe('Worker business logic hardening', () => {
     expect(sessionPayload.metadata.tierId).toBe('vip-pass');
     expect(sessionPayload.metadata.tierName).toBe('VIP Pass');
     expect(sessionPayload.metadata.orderId).toBe('pool-session_token-vip');
+  });
+
+  it('rebuilds checkout pricing on /start from a verified abandoned cart token', async () => {
+    const env = createEnv({ SNIPCART_SECRET_TEST: 'snipcart_test_secret' });
+    mockSnipcartClient.carts.getAbandoned.mockResolvedValue({
+      token: 'cart_live_123',
+      email: 'buyer@example.com',
+      status: 'InProgress',
+      items: [
+        {
+          id: 'hand-relations__vip-pass',
+          name: 'Hand Relations — VIP Pass',
+          price: 100,
+          quantity: 1,
+          type: 'Digital',
+          url: 'https://pool.test/campaigns/hand-relations/'
+        }
+      ]
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cartToken: 'cart_live_123',
+          campaignSlug: 'hand-relations',
+          email: 'buyer@example.com'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSnipcartClient.carts.getAbandoned).toHaveBeenCalledWith('cart_live_123');
+
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    expect(sessionPayload.metadata.amountCents).toBe('10000');
+    expect(sessionPayload.metadata.orderId).toBe('pool-cart-cart_live_123');
+    expect(sessionPayload.metadata.snipcartPaymentSessionId).toBe('');
   });
 
   it('derives support-item deltas from stored pledge state during modify', async () => {
