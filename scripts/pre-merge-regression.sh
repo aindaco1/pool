@@ -4,11 +4,19 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 WORKER_PID=""
+TEMP_DEV_VARS=""
+ORIGINAL_DEV_VARS_BACKUP=""
 
 cleanup() {
   if [[ -n "${WORKER_PID}" ]]; then
     kill "${WORKER_PID}" 2>/dev/null || true
     wait "${WORKER_PID}" 2>/dev/null || true
+  fi
+  if [[ -n "${TEMP_DEV_VARS}" && -f "${TEMP_DEV_VARS}" ]]; then
+    rm -f "${TEMP_DEV_VARS}"
+  fi
+  if [[ -n "${ORIGINAL_DEV_VARS_BACKUP}" && -f "${ORIGINAL_DEV_VARS_BACKUP}" ]]; then
+    mv "${ORIGINAL_DEV_VARS_BACKUP}" worker/.dev.vars
   fi
 }
 
@@ -51,6 +59,17 @@ if [[ -f worker/.dev.vars ]]; then
   # shellcheck disable=SC1091
   source worker/.dev.vars
   set +a
+else
+  TEMP_DEV_VARS="worker/.dev.vars"
+  cat > "${TEMP_DEV_VARS}" <<EOF
+STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+SITE_BASE=${SITE_BASE}
+ADMIN_SECRET=${ADMIN_SECRET}
+RESEND_API_KEY=${RESEND_API_KEY}
+MAGIC_LINK_SECRET=${MAGIC_LINK_SECRET}
+STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+SNIPCART_WEBHOOK_SECRET=${SNIPCART_WEBHOOK_SECRET}
+EOF
 fi
 
 (cd worker && npx wrangler dev --env dev --port 8787 >/tmp/pool-premerge-worker.log 2>&1) &
