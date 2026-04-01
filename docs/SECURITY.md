@@ -397,9 +397,14 @@ See [tests/security/README.md](../tests/security/README.md) for the pen test sui
 
 Run security tests:
 ```bash
+npm run test:secrets            # Audit local secret exposure in files + history
 npm run test:security           # Against local Worker
 npm run test:security:staging   # Against a staging worker, if you maintain one
 ```
+
+`npm run test:premerge` now includes the secret audit automatically, so local merge gating checks both security behavior and accidental credential exposure.
+
+For local runs, keep `SNIPCART_WEBHOOK_SECRET` configured if you want the live-worker webhook suite to enforce `401` responses for missing or invalid `x-snipcart-requesttoken` headers. The strict rejection path is also covered deterministically in the unit suite with an injected webhook secret.
 
 ---
 

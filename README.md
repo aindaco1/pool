@@ -62,8 +62,9 @@ For full local development with Jekyll, the Worker, Stripe CLI webhook forwardin
 ## Testing
 
 ```bash
-npm run test:premerge  # Syntax + focused regressions + full unit + security + headless E2E
-npm run test:unit      # Unit tests (Vitest) — currently 198 tests
+npm run test:premerge  # Syntax + focused regressions + local smoke + full unit + security + headless E2E
+npm run test:secrets   # Secret exposure audit against local env files, tracked files, and git history
+npm run test:unit      # Unit tests (Vitest) — currently 203 tests
 npm run test:e2e       # E2E tests (Playwright) — automated + manual checkout coverage
 npm run test:e2e:headless # CI-style automated browser suite
 npm run test:security  # Security tests — pen testing the Worker API
@@ -72,16 +73,22 @@ npm test               # Run unit + e2e
 
 **Current full-suite baseline:**
 - Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow
-- Unit tests: 198 passed
+- Unit tests: 203 passed
 - Headless E2E: 35 passed, 5 skipped
 - Security tests: 128 passed
 
-**Test coverage includes:** live-stats functions, platform tip helpers, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, and hardening around `/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
+**Test coverage includes:** live-stats functions, platform tip helpers, Snipcart cart parsing, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, secret exposure auditing, and hardening around `/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
 
 For local merge smoke on mutable pledges, use:
 
 ```bash
 ./scripts/smoke-pledge-management.sh
+```
+
+For the lighter site/Worker contract smoke, including `/start` fail-closed checks without a real Snipcart session, use:
+
+```bash
+./scripts/test-worker.sh
 ```
 
 See [TESTING.md](docs/TESTING.md) for full testing guide and [SECURITY.md](docs/SECURITY.md) for security architecture.

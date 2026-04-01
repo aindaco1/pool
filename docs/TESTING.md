@@ -8,6 +8,7 @@ This guide covers the test suites and manual testing setup.
 npm run test:unit          # Unit tests (Vitest) — ~700ms
 npm run test:unit:watch    # Watch mode
 npm run test:unit:coverage # With coverage report
+npm run test:secrets       # Secret exposure audit for local env files
 npm run test:premerge      # Merge-readiness checks for changed Worker logic
 npm run test:e2e           # E2E tests (Playwright) — starts Jekyll
 npm run test:e2e:headless  # CI mode
@@ -56,16 +57,39 @@ npm run test:premerge
 
 This runs:
 
+- `npm run test:secrets` to verify local env files stay ignored and their secret values do not appear in tracked files or git history
 - `node --check` for the changed Worker entrypoints
 - Focused regression suites:
   - `tests/unit/worker-business-logic.test.ts`
+  - `tests/unit/snipcart-parsing.test.ts`
   - `tests/unit/worker-ops-integrity.test.ts`
   - `tests/unit/stats-pagination.test.ts`
+- Local smoke scripts against the test-only mutable campaign:
+  - `scripts/test-worker.sh` for site/Worker contract checks and `/start` fail-closed verification without a real Snipcart session
+  - `scripts/smoke-pledge-management.sh` for successful modify/cancel coverage on the local-only mutable campaign
 - Full unit suite via `npm run test:unit`
 - Security suite via `npm run test:security` against an auto-started local Worker
 - Playwright headless E2E via `npm run test:e2e:headless`
 
+The pre-merge script now auto-starts Jekyll with `_config.yml,_config.local.yml` when needed so the local-only `smoke-editable` campaign is available during merge gating.
+
 On GitHub, the same gate runs automatically in the `Merge Smoke` workflow for pull requests targeting `main`.
+
+### Secret Audit
+
+Run this before pushing when local secrets have changed, or let `npm run test:premerge` run it automatically:
+
+```bash
+npm run test:secrets
+```
+
+The audit checks:
+
+- `worker/.dev.vars` remains gitignored and untracked
+- non-allowlisted secret values from local env files do not appear in tracked or untracked repo files
+- those values do not appear in git history
+
+CI remains safe when `worker/.dev.vars` does not exist; in that case the audit still verifies ignore rules and skips the local value scan.
 
 ### Main Branch Comparison
 
@@ -242,7 +266,7 @@ Penetration tests for the Worker API. Located in `tests/security/`.
 | Category | Tests |
 |----------|-------|
 | Auth Bypass | Dev-token bypass, token validation, expiry, tampering |
-| Webhook Security | Stripe signature verification, replay attacks, shipping address injection |
+| Webhook Security | Stripe signature verification, duplicate-event handling, shipping address injection, Snipcart request-token verification |
 | Authorization | Admin endpoints, cross-user access, test endpoint guards |
 | Input Validation | XSS, injection, overflow, malformed input, hasPhysical flag abuse, shipping fee manipulation, additionalTiers/supportItems injection |
 | Rate Limiting | Burst requests, DoS resilience |

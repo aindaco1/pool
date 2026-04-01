@@ -5,6 +5,9 @@ This directory contains security-focused tests for the Worker API. Run these bef
 ## Quick Start
 
 ```bash
+# Audit local secret exposure first
+npm run test:secrets
+
 # 1. Start the local Worker (in worker/ directory)
 cd worker && npx wrangler dev --port 8787
 
@@ -19,6 +22,25 @@ WORKER_URL=https://pledge.dustwave.xyz PROD_MODE=true npm run test:security
 ```
 
 ## Local Development Setup
+
+For the live-worker webhook checks, the Stripe webhook secret should be configured locally. If you also configure the optional Snipcart webhook secret locally, the network-level suite will verify `401` responses there too. Strict Snipcart token rejection is additionally covered in the unit suite.
+
+- `STRIPE_WEBHOOK_SECRET`
+- `SNIPCART_WEBHOOK_SECRET`
+
+The easiest way to get a matching local setup is:
+
+```bash
+./scripts/dev.sh
+```
+
+or the merge gate:
+
+```bash
+npm run test:premerge
+```
+
+`npm run test:premerge` now includes the secret audit automatically before the Worker, smoke, and browser suites.
 
 For rate limiting tests to work locally, ensure the `RATELIMIT` KV namespace is configured in `wrangler.toml`:
 

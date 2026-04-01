@@ -1,7 +1,30 @@
 #!/bin/bash
 # Start all dev services in parallel
 
+set -euo pipefail
+
 trap 'kill 0' EXIT
+
+JEKYLL_PORT=4000
+WORKER_PORT=8787
+NGROK_API_PORT=4040
+STRIPE_LOG="/tmp/pool-stripe-listen.log"
+
+kill_port_if_busy() {
+  local port="$1"
+  local label="$2"
+  if command -v lsof >/dev/null 2>&1; then
+    local pids
+    pids=$(lsof -ti tcp:"$port" || true)
+    if [ -n "$pids" ]; then
+      echo "🔄 Clearing existing $label process(es) on port $port..."
+      while IFS= read -r pid; do
+        [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+      done <<< "$pids"
+      sleep 1
+    fi
+  fi
+}
 
 echo "🚀 Starting development environment..."
 
@@ -28,21 +51,31 @@ else
   fi
 fi
 
+# Clear stale local services so the dev environment matches the test harness ports.
+kill_port_if_busy "$JEKYLL_PORT" "Jekyll"
+kill_port_if_busy "$WORKER_PORT" "Worker"
+kill_port_if_busy "$NGROK_API_PORT" "ngrok inspector"
+
 # Jekyll (without livereload - causes issues with iCloud Drive sync)
 echo "📦 Starting Jekyll..."
-bundle exec jekyll serve --config _config.yml,_config.local.yml &
+bundle exec jekyll serve --config _config.yml,_config.local.yml --port "$JEKYLL_PORT" &
 
 # Wrangler (worker) - use local simulation for KV (faster, works with seed-all-campaigns.sh)
 # Note: Real pledges from Stripe go to remote KV. Use --remote flag if you need them.
 echo "⚡ Starting Wrangler (local KV)..."
-(cd worker && source ~/.nvm/nvm.sh && nvm use 20 && wrangler dev --env dev) &
+(cd worker && {
+  if [ -f "$HOME/.nvm/nvm.sh" ]; then
+    source "$HOME/.nvm/nvm.sh"
+    nvm use 20 >/dev/null
+  fi
+  npx wrangler dev --env dev --port "$WORKER_PORT"
+}) &
 
 # Stripe CLI (forward webhooks to local worker)
 if [ "$SKIP_STRIPE" != "true" ]; then
   echo "💳 Starting Stripe webhook forwarding..."
-  STRIPE_LOG="/tmp/pool-stripe-listen.log"
   rm -f "$STRIPE_LOG"
-  stripe listen --forward-to localhost:8787/webhooks/stripe > "$STRIPE_LOG" 2>&1 &
+  stripe listen --forward-to "127.0.0.1:$WORKER_PORT/webhooks/stripe" > "$STRIPE_LOG" 2>&1 &
   STRIPE_LISTEN_PID=$!
 
   echo "💳 Waiting for Stripe webhook secret..."
@@ -81,14 +114,14 @@ if [ "$SKIP_NGROK" != "true" ]; then
   echo "🌐 Starting ngrok tunnel for Jekyll (Snipcart product crawling)..."
   sleep 2  # Wait for Jekyll to start
   
-  ngrok http 4000 --log=stdout > /tmp/ngrok.log 2>&1 &
+  ngrok http "$JEKYLL_PORT" --log=stdout > /tmp/ngrok.log 2>&1 &
   NGROK_PID=$!
   
   # Wait for ngrok to start
   sleep 4
   
   # Extract URL from ngrok API
-  NGROK_URL=$(curl -s http://localhost:4040/api/tunnels 2>/dev/null | python3 -c "
+  NGROK_URL=$(curl -s "http://127.0.0.1:$NGROK_API_PORT/api/tunnels" 2>/dev/null | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -112,7 +145,7 @@ except: pass
     echo "   https://pledge.dustwave.xyz/webhooks/snipcart"
     echo ""
   else
-    echo "⚠️  Could not get ngrok URL. Check http://localhost:4040"
+    echo "⚠️  Could not get ngrok URL. Check http://127.0.0.1:$NGROK_API_PORT"
     echo "   Log: /tmp/ngrok.log"
     cat /tmp/ngrok.log | tail -5
   fi
@@ -122,11 +155,11 @@ fi
 
 echo ""
 echo "✅ All services starting..."
-echo "   Jekyll:   http://127.0.0.1:4000"
-echo "   Worker:   http://127.0.0.1:8787"
+echo "   Jekyll:   http://127.0.0.1:$JEKYLL_PORT"
+echo "   Worker:   http://127.0.0.1:$WORKER_PORT"
 echo "   Stripe:   forwarding to worker"
 if [ "$SKIP_NGROK" != "true" ]; then
-  echo "   ngrok:    http://localhost:4040 (inspect tunnels)"
+  echo "   ngrok:    http://127.0.0.1:$NGROK_API_PORT (inspect tunnels)"
 fi
 echo ""
 echo "💡 TROUBLESHOOTING:"
@@ -138,6 +171,11 @@ echo "      curl -X POST http://localhost:8787/admin/recover-checkout \\"
 echo "        -H 'Authorization: Bearer YOUR_ADMIN_SECRET' \\"
 echo "        -H 'Content-Type: application/json' \\"
 echo "        -d '{\"sessionId\": \"cs_test_...\"}'"
+echo ""
+echo "🧪 USEFUL CHECKS:"
+echo "   npm run test:secrets"
+echo "   ./scripts/test-worker.sh"
+echo "   ./scripts/smoke-pledge-management.sh"
 echo ""
 echo "Press Ctrl+C to stop all services"
 

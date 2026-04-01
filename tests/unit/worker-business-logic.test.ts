@@ -27,6 +27,14 @@ const mockSnipcartClient = {
 
 const mockVerifyStripeSignature = vi.fn(async () => ({ valid: true }));
 const mockVerifyToken = vi.fn(async () => null);
+const mockSendSupporterEmail = vi.fn(async () => {});
+const mockSendPaymentFailedEmail = vi.fn(async () => {});
+const mockSendPledgeModifiedEmail = vi.fn(async () => {});
+const mockSendPledgeCancelledEmail = vi.fn(async () => {});
+const mockSendDiaryUpdateEmail = vi.fn(async () => {});
+const mockSendMilestoneEmail = vi.fn(async () => {});
+const mockSendChargeSuccessEmail = vi.fn(async () => {});
+const mockSendAnnouncementEmail = vi.fn(async () => {});
 
 vi.mock('../../worker/src/stripe.js', () => ({
   verifyStripeSignature: mockVerifyStripeSignature,
@@ -39,14 +47,14 @@ vi.mock('../../worker/src/token.js', () => ({
 }));
 
 vi.mock('../../worker/src/email.js', () => ({
-  sendSupporterEmail: vi.fn(async () => {}),
-  sendPaymentFailedEmail: vi.fn(async () => {}),
-  sendPledgeModifiedEmail: vi.fn(async () => {}),
-  sendPledgeCancelledEmail: vi.fn(async () => {}),
-  sendDiaryUpdateEmail: vi.fn(async () => {}),
-  sendMilestoneEmail: vi.fn(async () => {}),
-  sendChargeSuccessEmail: vi.fn(async () => {}),
-  sendAnnouncementEmail: vi.fn(async () => {})
+  sendSupporterEmail: mockSendSupporterEmail,
+  sendPaymentFailedEmail: mockSendPaymentFailedEmail,
+  sendPledgeModifiedEmail: mockSendPledgeModifiedEmail,
+  sendPledgeCancelledEmail: mockSendPledgeCancelledEmail,
+  sendDiaryUpdateEmail: mockSendDiaryUpdateEmail,
+  sendMilestoneEmail: mockSendMilestoneEmail,
+  sendChargeSuccessEmail: mockSendChargeSuccessEmail,
+  sendAnnouncementEmail: mockSendAnnouncementEmail
 }));
 
 vi.mock('../../worker/src/github.js', () => ({
@@ -753,6 +761,52 @@ describe('Worker business logic hardening', () => {
     expect(response.status).toBe(403);
   });
 
+  it('rejects invalid Snipcart webhook tokens when the webhook secret is configured', async () => {
+    const env = createEnv({
+      SNIPCART_WEBHOOK_SECRET: 'snipcart_test_secret'
+    });
+
+    const missingTokenResponse = await worker.fetch(
+      new Request('https://pool.test/webhooks/snipcart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventName: 'order.completed', content: { token: 'order-1' } })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    const invalidTokenResponse = await worker.fetch(
+      new Request('https://pool.test/webhooks/snipcart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-snipcart-requesttoken': 'wrong-secret'
+        },
+        body: JSON.stringify({ eventName: 'order.completed', content: { token: 'order-1' } })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    const validTokenResponse = await worker.fetch(
+      new Request('https://pool.test/webhooks/snipcart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-snipcart-requesttoken': 'snipcart_test_secret'
+        },
+        body: JSON.stringify({ eventName: 'order.completed', content: { token: 'order-1' } })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(missingTokenResponse.status).toBe(401);
+    expect(invalidTokenResponse.status).toBe(401);
+    expect(validTokenResponse.status).toBe(200);
+  });
+
   it('does not mark webhook events processed before a failed pledge persistence can retry', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as MockKVNamespace;
@@ -846,6 +900,96 @@ describe('Worker business logic hardening', () => {
     });
     expect(await kv.get('pending-tiers:order-webhook-retry-1')).toBeNull();
     expect(await kv.get('pending-extras:order-webhook-retry-1')).toBeNull();
+  });
+
+  it('skips duplicate webhook deliveries after successful persistence without duplicating side effects', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    await kv.put('pending-tiers:order-webhook-duplicate-1', JSON.stringify([{ id: 'vip-pass', qty: 1 }]));
+    await kv.put('pending-extras:order-webhook-duplicate-1', JSON.stringify({
+      supportItems: [{ id: 'location-scouting', amount: 10 }],
+      customAmount: 5
+    }));
+    await kv.put('tier-reservation:hand-relations:order-webhook-duplicate-1', JSON.stringify([{ id: 'vip-pass', qty: 1 }]));
+
+    const webhookEvent = {
+      id: 'evt_duplicate_checkout_success',
+      type: 'checkout.session.completed',
+      livemode: false,
+      data: {
+        object: {
+          mode: 'setup',
+          customer_email: 'buyer@example.com',
+          customer: 'cus_123',
+          setup_intent: 'seti_123',
+          metadata: {
+            orderId: 'order-webhook-duplicate-1',
+            campaignSlug: 'hand-relations',
+            amountCents: '12000',
+            tierId: 'frame-slot',
+            tierName: 'Buy 1 Frame',
+            tierQty: '1',
+            tipPercent: '5',
+            hasAdditionalTiers: 'true',
+            hasExtras: 'true',
+            hasPhysical: '',
+            isPaymentUpdate: ''
+          }
+        }
+      }
+    };
+
+    const firstResponse = await worker.fetch(
+      new Request('https://pool.test/webhooks/stripe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Stripe-Signature': 'sig_test'
+        },
+        body: JSON.stringify(webhookEvent)
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(firstResponse.status).toBe(200);
+    expect(await kv.get('stripe-event:evt_duplicate_checkout_success')).toBe('processed');
+    expect(mockSendSupporterEmail).toHaveBeenCalledTimes(1);
+
+    const firstStoredStats = await kv.get('stats:hand-relations', { type: 'json' });
+    expect(firstStoredStats).toMatchObject({
+      pledgeCount: 1,
+      pledgedAmount: 12000
+    });
+
+    const secondResponse = await worker.fetch(
+      new Request('https://pool.test/webhooks/stripe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Stripe-Signature': 'sig_test'
+        },
+        body: JSON.stringify(webhookEvent)
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(secondResponse.status).toBe(200);
+    expect(mockSendSupporterEmail).toHaveBeenCalledTimes(1);
+    expect(await kv.get('pending-tiers:order-webhook-duplicate-1')).toBeNull();
+    expect(await kv.get('pending-extras:order-webhook-duplicate-1')).toBeNull();
+
+    const secondStoredStats = await kv.get('stats:hand-relations', { type: 'json' });
+    expect(secondStoredStats).toEqual(firstStoredStats);
+    expect(await kv.get('pledge:order-webhook-duplicate-1', { type: 'json' })).toMatchObject({
+      orderId: 'order-webhook-duplicate-1',
+      tierId: 'frame-slot',
+      additionalTiers: [{ id: 'vip-pass', qty: 1 }],
+      supportItems: [{ id: 'location-scouting', amount: 10 }],
+      customAmount: 5
+    });
   });
 
   it('disables the legacy /checkout flow', async () => {
