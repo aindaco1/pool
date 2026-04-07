@@ -1,8 +1,40 @@
 {% assign block = include.block %}
+{% assign provider = block.provider | downcase %}
 <figure class="content-block content-block--embed">
-  <div class="embed-container">
-    {{ block.html }}
-  </div>
+  {% if provider == 'spotify' and block.src and block.src contains 'https://open.spotify.com/embed/' %}
+    <div class="embed-container embed-container--spotify">
+      <iframe
+        src="{{ block.src | escape }}"
+        width="100%"
+        height="{{ block.height | default: 152 }}"
+        frameborder="0"
+        allowfullscreen
+        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        loading="lazy"
+        title="{{ block.title | default: block.caption | default: 'Embedded content' | escape }}">
+      </iframe>
+    </div>
+  {% elsif provider == 'youtube' and block.src and block.src contains 'https://www.youtube.com/embed/' or provider == 'youtube' and block.src and block.src contains 'https://www.youtube-nocookie.com/embed/' %}
+    <div class="embed-container embed-container--video">
+      <iframe
+        src="{{ block.src | escape }}"
+        allowfullscreen
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        loading="lazy"
+        title="{{ block.title | default: block.caption | default: 'Embedded video' | escape }}">
+      </iframe>
+    </div>
+  {% elsif provider == 'vimeo' and block.src and block.src contains 'https://player.vimeo.com/video/' %}
+    <div class="embed-container embed-container--video">
+      <iframe
+        src="{{ block.src | escape }}"
+        allowfullscreen
+        allow="autoplay; fullscreen; picture-in-picture"
+        loading="lazy"
+        title="{{ block.title | default: block.caption | default: 'Embedded video' | escape }}">
+      </iframe>
+    </div>
+  {% endif %}
   {% if block.caption %}
     <figcaption class="content-block__caption">{{ block.caption }}</figcaption>
   {% endif %}

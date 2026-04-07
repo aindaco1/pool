@@ -74,22 +74,5 @@
   {% endfor %}
 </section>
 
-<script>
-(function() {
-  var tabs = document.querySelectorAll('.diary-tab');
-  var panels = document.querySelectorAll('.diary-panel');
-  
-  tabs.forEach(function(tab) {
-    tab.addEventListener('click', function() {
-      var targetId = 'diary-' + this.dataset.tab;
-      
-      tabs.forEach(function(t) { t.setAttribute('aria-selected', 'false'); });
-      panels.forEach(function(p) { p.classList.add('hidden'); });
-      
-      this.setAttribute('aria-selected', 'true');
-      document.getElementById(targetId).classList.remove('hidden');
-    });
-  });
-})();
-</script>
+<script src="/assets/js/diary-tabs.js" defer></script>
 {% endif %}

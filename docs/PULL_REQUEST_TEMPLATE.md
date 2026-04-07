@@ -15,8 +15,8 @@
 - [ ] Same pre-merge gate run against `main` in a clean worktree when Worker or checkout logic changed
 - [ ] Manual smoke checklist completed for changed checkout / Worker flows (staging when available, otherwise documented local smoke fallback)
 - [ ] Local Jekyll build ok
-- [ ] Snipcart cart opens, no console errors
-- [ ] Worker `/start` returns Stripe Checkout URL (test mode)
+- [ ] First-party cart opens, no console errors
+- [ ] Worker `/checkout-intent/start` returns Stripe Checkout URL (test mode)
 - [ ] Webhook stores pledge with tiers, support items, custom amount
 - [ ] Live stats update correctly (`/stats/:slug`)
 - [ ] Countdown timers show correct values on page load (no "00 00 00 00" flash)

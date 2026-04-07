@@ -3,6 +3,20 @@
 
 const WORKER_BASE = window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
 
+function getCartProvider() {
+  return window.PoolCartProvider || null;
+}
+
+async function waitForCartProvider() {
+  const provider = getCartProvider();
+  if (!provider?.whenReady) {
+    return null;
+  }
+
+  await provider.whenReady();
+  return provider;
+}
+
 // Tab switching for production phases
 document.addEventListener('DOMContentLoaded', () => {
   const phaseTabs = document.querySelectorAll('.phase-tab');
@@ -80,7 +94,7 @@ async function handleTierChangeFlow() {
   
   history.replaceState({}, '', window.location.pathname);
   
-  const tierButton = document.querySelector(`[data-item-id$="__${changeTierId}"].snipcart-add-item`);
+  const tierButton = document.querySelector(`[data-item-id$="__${changeTierId}"].poolcart-add-item`);
   if (!tierButton) {
     console.error('Tier button not found for:', changeTierId);
     showTierChangeToast('Tier not found. Please select manually.', 'error');
@@ -103,7 +117,7 @@ async function handleTierChangeFlow() {
     
     showTierChangeToast('Adding new tier to cart...', 'info');
     
-    await waitForSnipcart();
+    await waitForCartProvider();
     
     tierButton.click();
     
@@ -115,16 +129,6 @@ async function handleTierChangeFlow() {
     console.error('Tier change error:', err);
     showTierChangeToast(err.message, 'error');
   }
-}
-
-function waitForSnipcart() {
-  return new Promise((resolve) => {
-    if (window.Snipcart) {
-      resolve(window.Snipcart);
-    } else {
-      document.addEventListener('snipcart.ready', () => resolve(window.Snipcart));
-    }
-  });
 }
 
 async function handleAddTiersFlow() {
@@ -153,11 +157,11 @@ async function handleAddTiersFlow() {
   showTierChangeToast('Adding items to cart...', 'info');
   
   try {
-    await waitForSnipcart();
+    const cartProvider = await waitForCartProvider();
     
     // Add tier items
     for (const tierItem of tierItems) {
-      const tierButton = document.querySelector(`[data-item-id$="__${tierItem.id}"].snipcart-add-item`);
+      const tierButton = document.querySelector(`[data-item-id$="__${tierItem.id}"].poolcart-add-item`);
       if (tierButton && !tierButton.disabled) {
         // For stackable items with qty > 1, click multiple times
         for (let i = 0; i < tierItem.qty; i++) {
@@ -170,7 +174,7 @@ async function handleAddTiersFlow() {
     // Add support items (custom amounts)
     for (const supportItem of supportItems) {
       // Support items use a custom price button with data-item-price attribute
-      const supportButton = document.querySelector(`[data-item-id$="__${supportItem.id}"].snipcart-add-item`);
+      const supportButton = document.querySelector(`[data-item-id$="__${supportItem.id}"].poolcart-add-item`);
       if (supportButton) {
         // Create a clone with the custom price
         const customButton = supportButton.cloneNode(true);
@@ -187,7 +191,7 @@ async function handleAddTiersFlow() {
     
     setTimeout(() => {
       showTierChangeToast(`Added ${totalItems} item${totalItems > 1 ? 's' : ''} to cart!`, 'success');
-      Snipcart.api.theme.cart.open();
+      cartProvider?.getApi?.()?.api?.theme?.cart?.open?.();
     }, 1000);
     
   } catch (err) {

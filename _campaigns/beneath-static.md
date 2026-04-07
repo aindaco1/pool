@@ -48,7 +48,10 @@ long_content:
 
       The goal: make your smart speaker feel slightly less trustworthy.
   - type: embed
-    html: '<iframe style="border-radius:12px" src="https://open.spotify.com/embed/playlist/37i9dQZF1DX4PP3DA4J0N8?utm_source=generator" width="100%" height="152" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>'
+    provider: spotify
+    src: https://open.spotify.com/embed/playlist/37i9dQZF1DX4PP3DA4J0N8?utm_source=generator
+    height: 152
+    title: Mood playlist
     caption: "Mood playlist for the edit"
 featured_tier_id: digital-copy
 single_tier_only: false

@@ -5,7 +5,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="/assets/images/defaults/favicon.png">
-  {% include snipcart-head.html %}
+  {% if site.cart_runtime == 'first_party' and site.checkout_provider == 'first_party' %}
+  {% include first-party-community-csp.html %}
+  {% endif %}
+  {% include cart-head.html %}
   <title>Community · {{ campaign.title }} · {{ site.title }}</title>
 </head>
 <body>
@@ -110,7 +113,7 @@
                       <span class="result-bar__percent">0%</span>
                     </div>
                     <div class="result-bar__track">
-                      <div class="result-bar__fill" style="width: 0%"></div>
+                      <div class="result-bar__fill"></div>
                     </div>
                     <span class="result-bar__count">0 votes</span>
                   </div>
@@ -174,274 +177,11 @@
       </div>
     </div>
   </footer>
-
-  <script>
-    (function() {
-      const WORKER_BASE = '{{ site.worker_base }}';
-      const CAMPAIGN_SLUG = '{{ campaign.slug }}';
-      const COOKIE_NAME = 'supporter_' + CAMPAIGN_SLUG;
-      
-      function getCookie(name) {
-        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-        return match ? match[2] : null;
-      }
-      
-      function setCookie(name, value, days) {
-        const expires = new Date(Date.now() + days * 864e5).toUTCString();
-        document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Lax';
-      }
-      
-      function clearCookie(name) {
-        document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-      }
-      
-      function showContent() {
-        document.getElementById('community-loading').hidden = true;
-        document.getElementById('community-content').hidden = false;
-      }
-      
-      function showDenied() {
-        // Clear any stale supporter cookies
-        clearCookie(COOKIE_NAME);
-        clearCookie('supporter_token_' + CAMPAIGN_SLUG);
-        document.getElementById('community-loading').hidden = true;
-        document.getElementById('community-denied').hidden = false;
-      }
-      
-      async function verifyAccess() {
-        const params = new URLSearchParams(window.location.search);
-        
-        // DEV MODE: ?dev=1 bypasses verification (local testing only)
-        if (params.get('dev') === '1' && window.location.hostname === '127.0.0.1') {
-          console.log('[DEV] Setting supporter cookie for testing');
-          setCookie(COOKIE_NAME, 'verified', 90);
-          // Set a dev token for voting API calls
-          userToken = 'dev-token-' + CAMPAIGN_SLUG;
-          setCookie('supporter_token_' + CAMPAIGN_SLUG, userToken, 90);
-          window.history.replaceState({}, '', window.location.pathname);
-          showContent();
-          return;
-        }
-        
-        // Check for token in URL or stored cookie
-        const token = params.get('t') || getCookie('supporter_token_' + CAMPAIGN_SLUG);
-        
-        if (!token) {
-          showDenied();
-          return;
-        }
-        
-        try {
-          // Always verify with Worker (catches cancelled pledges)
-          console.log('[Community] Verifying token with:', WORKER_BASE + '/pledge?token=' + token.substring(0, 20) + '...');
-          const res = await fetch(WORKER_BASE + '/pledge?token=' + encodeURIComponent(token));
-          console.log('[Community] Response status:', res.status);
-          if (!res.ok) {
-            const errText = await res.text();
-            console.error('[Community] Verification failed:', errText);
-            showDenied();
-            return;
-          }
-          
-          const pledge = await res.json();
-          console.log('[Community] Pledge data:', { campaignSlug: pledge.campaignSlug, status: pledge.pledgeStatus, expected: CAMPAIGN_SLUG });
-          
-          // Check if pledge is for this campaign and is active/charged
-          if (pledge.campaignSlug !== CAMPAIGN_SLUG) {
-            console.error('[Community] Campaign mismatch:', pledge.campaignSlug, '!==', CAMPAIGN_SLUG);
-            showDenied();
-            return;
-          }
-          
-          if (pledge.pledgeStatus === 'cancelled') {
-            console.error('[Community] Pledge is cancelled');
-            showDenied();
-            return;
-          }
-          
-          // Valid supporter! Set/refresh cookies and show content
-          userToken = token;
-          setCookie(COOKIE_NAME, 'verified', 90); // 90 days
-          setCookie('supporter_token_' + CAMPAIGN_SLUG, token, 90);
-          
-          // Clean up URL (remove token if present)
-          if (params.get('t')) {
-            const cleanUrl = window.location.pathname;
-            window.history.replaceState({}, '', cleanUrl);
-          }
-          
-          showContent();
-        } catch (err) {
-          console.error('Verification error:', err);
-          showDenied();
-        }
-      }
-      
-      // Toast for notifications
-      function toast(msg, isError = false) {
-        const t = document.createElement('div');
-        t.textContent = msg;
-        t.style.cssText = `position:fixed;bottom:20px;right:20px;background:${isError ? '#dc3545' : '#141821'};border:1px solid ${isError ? '#dc3545' : '#252c3a'};padding:12px 16px;border-radius:8px;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;font-size:14px;`;
-        document.body.appendChild(t);
-        setTimeout(() => t.remove(), 2500);
-      }
-      
-      // Store token for voting API
-      let userToken = null;
-      
-      // Show results for a decision
-      function showResults(card, { userChoice, results, totalVotes }) {
-        const votingView = card.querySelector('[data-view="voting"]');
-        const resultsView = card.querySelector('[data-view="results"]');
-        
-        if (!votingView || !resultsView) return;
-        
-        // Update result bars
-        const bars = resultsView.querySelectorAll('.result-bar');
-        bars.forEach(bar => {
-          const option = bar.dataset.option;
-          const count = results[option] || 0;
-          const percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
-          
-          bar.querySelector('.result-bar__percent').textContent = percent + '%';
-          bar.querySelector('.result-bar__fill').style.width = percent + '%';
-          bar.querySelector('.result-bar__count').textContent = count + (count === 1 ? ' vote' : ' votes');
-          
-          // Highlight user's choice
-          if (option === userChoice) {
-            bar.classList.add('result-bar--selected');
-          }
-        });
-        
-        // Update footer
-        resultsView.querySelector('[data-user-choice]').textContent = userChoice;
-        resultsView.querySelector('[data-total-votes]').textContent = totalVotes;
-        
-        // Switch views
-        votingView.hidden = true;
-        resultsView.hidden = false;
-      }
-      
-      // Load existing vote status
-      async function loadVoteStatus() {
-        if (!userToken) return;
-        
-        const cards = document.querySelectorAll('.decision-card');
-        const decisionIds = Array.from(cards).map(c => c.dataset.decisionId).join(',');
-        
-        if (!decisionIds) return;
-        
-        try {
-          const res = await fetch(`${WORKER_BASE}/votes?token=${encodeURIComponent(userToken)}&decisions=${decisionIds}`);
-          if (!res.ok) return;
-          
-          const data = await res.json();
-          
-          // Update cards
-          for (const [decisionId, status] of Object.entries(data.decisions)) {
-            const card = document.querySelector(`[data-decision-id="${decisionId}"]`);
-            if (!card) continue;
-            
-            // Check if this is a closed decision
-            if (card.dataset.status === 'closed') {
-              showClosedResults(card, status);
-            } else if (status.hasVoted) {
-              showResults(card, status);
-            }
-          }
-        } catch (err) {
-          console.error('Failed to load vote status:', err);
-        }
-      }
-      
-      // Show results for closed decisions
-      function showClosedResults(card, { results, totalVotes }) {
-        const resultsContainer = card.querySelector('.decision-closed__results');
-        if (!resultsContainer || !results) return;
-        
-        const winner = card.dataset.winner;
-        const sortedOptions = Object.entries(results).sort((a, b) => b[1] - a[1]);
-        
-        let html = '<div class="closed-results">';
-        for (const [option, count] of sortedOptions) {
-          const percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
-          const isWinner = option === winner;
-          html += `
-            <div class="closed-result${isWinner ? ' closed-result--winner' : ''}">
-              <span class="closed-result__option">${option}</span>
-              <span class="closed-result__stats">${percent}% (${count} votes)</span>
-            </div>
-          `;
-        }
-        html += `<div class="closed-results__total">${totalVotes} total votes</div>`;
-        html += '</div>';
-        
-        resultsContainer.innerHTML = html;
-      }
-      
-      // Vote handlers
-      document.addEventListener('click', async function(e) {
-        if (!e.target.matches('[data-action="submit-vote"]')) return;
-        
-        const btn = e.target;
-        const decisionId = btn.dataset.decision;
-        const card = btn.closest('.decision-card');
-        const selected = document.querySelector(`input[name="decision-${decisionId}"]:checked`);
-        
-        if (!selected) {
-          toast('Please select an option first.', true);
-          return;
-        }
-        
-        // Disable button
-        btn.disabled = true;
-        btn.textContent = 'Submitting...';
-        
-        try {
-          const res = await fetch(`${WORKER_BASE}/votes`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              token: userToken,
-              decisionId,
-              option: selected.value
-            })
-          });
-          
-          const data = await res.json();
-          
-          if (!res.ok) {
-            if (data.userChoice) {
-              // Already voted - show results
-              toast('You already voted for "' + data.userChoice + '"');
-              showResults(card, { userChoice: data.userChoice, results: {}, totalVotes: 0 });
-            } else {
-              toast(data.error || 'Failed to submit vote', true);
-              btn.disabled = false;
-              btn.textContent = 'Submit Vote';
-            }
-            return;
-          }
-          
-          toast('Vote submitted for "' + data.userChoice + '". Thanks!');
-          showResults(card, data);
-        } catch (err) {
-          console.error('Vote error:', err);
-          toast('Failed to submit vote', true);
-          btn.disabled = false;
-          btn.textContent = 'Submit Vote';
-        }
-      });
-      
-      // Load vote status after showing content
-      const originalShowContent = showContent;
-      showContent = function() {
-        originalShowContent();
-        loadVoteStatus();
-      };
-      
-      verifyAccess();
-    })();
-  </script>
+  <script
+    src="/assets/js/community-page.js"
+    defer
+    data-community-page-script="true"
+    data-worker-base="{{ site.worker_base }}"
+    data-campaign-slug="{{ campaign.slug }}"></script>
 </body>
 </html>

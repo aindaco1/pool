@@ -9,7 +9,7 @@ This version is tuned for the current checkout and Worker business-logic behavio
 These behaviors changed intentionally and should **not** be treated as regressions during smoke testing:
 
 - Magic links are order-scoped instead of email-scoped.
-- `/start` no longer reserves limited inventory before checkout completion.
+- `/checkout-intent/start` no longer reserves limited inventory before checkout completion.
 - Legacy `GET /checkout` is disabled.
 - Settlement only marks a campaign fully settled when no active pledges were skipped.
 
@@ -48,7 +48,7 @@ That script starts:
 - Jekyll on `http://127.0.0.1:4000`
 - the Worker on `http://127.0.0.1:8787`
 - Stripe CLI webhook forwarding to the local Worker
-- an ngrok tunnel for Snipcart product crawling when available
+- optional ngrok for external-device testing when available
 
 Use local rehearsal to sanity-check checkout, webhook delivery, manage-link behavior, and admin endpoints before running the same flow against staging.
 

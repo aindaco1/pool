@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="/assets/images/defaults/favicon.png">
-  {% include snipcart-head.html %}
+  {% if site.cart_runtime == 'first_party' and site.checkout_provider == 'first_party' %}
+  {% include first-party-campaign-csp-strict.html %}
+  {% endif %}
+  {% include cart-head.html %}
   <title>{{ page.title }} · {{ site.title }}</title>
   <meta property="og:title" content="{{ page.title }} · {{ site.title }}">
   <meta property="og:type" content="website">
@@ -18,7 +21,9 @@
 
   <main class="campaign-container" data-campaign-slug="{{ page.slug }}" data-single-tier-only="{{ page.single_tier_only | default: false }}" data-state="{{ page.state }}">
     {% if page.campaign_background %}
-    <div class="campaign-background" style="background-image: url('{{ page.campaign_background }}');"></div>
+    <div class="campaign-background" aria-hidden="true">
+      <img src="{{ page.campaign_background }}" alt="" class="campaign-background__image">
+    </div>
     {% endif %}
     <header class="campaign-header">
       <h1>{{ page.title }}</h1>
@@ -77,118 +82,8 @@
         </div>
         <div class="campaign-countdown__message"></div>
       </div>
-      <script>
-      (function() {
-        var el = document.getElementById('campaign-countdown');
-        if (!el) return;
-        var deadlineStr = el.getAttribute('data-deadline');
-        var startStr = el.getAttribute('data-start');
-        var state = el.getAttribute('data-state');
-        var goalMet = el.getAttribute('data-goal-met') === 'true';
-        var messageEl = el.querySelector('.campaign-countdown__message');
-        
-        // For upcoming: count to midnight START of start_date (00:00:00 MT)
-        // For live: count to end of deadline (23:59:59 MT)
-        // Mountain Time: UTC-7 (MST) or UTC-6 (MDT)
-        
-        function getMTOffset(dateStr) {
-          // Use Intl to reliably determine MST vs MDT for any date
-          var parts = dateStr.split('-');
-          var y = parseInt(parts[0]), m = parseInt(parts[1]), d = parseInt(parts[2]);
-          var fmt = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Denver',
-            timeZoneName: 'short'
-          });
-          var tzParts = fmt.formatToParts(new Date(Date.UTC(y, m - 1, d, 19, 0, 0)));
-          var tz = '';
-          for (var i = 0; i < tzParts.length; i++) {
-            if (tzParts[i].type === 'timeZoneName') { tz = tzParts[i].value; break; }
-          }
-          return tz === 'MDT' ? '-06:00' : '-07:00';
-        }
-        
-        var targetDate;
-        if (state === 'upcoming' && startStr) {
-          // Midnight MT start of start_date
-          var offset = getMTOffset(startStr);
-          targetDate = new Date(startStr + 'T00:00:00' + offset);
-        } else {
-          // End of deadline day (23:59:59 MT)
-          var offset = getMTOffset(deadlineStr);
-          targetDate = new Date(deadlineStr + 'T23:59:59' + offset);
-        }
-        
-        var flipCards = {};
-        var lastValues = {};
-        
-        ['days', 'hours', 'mins', 'secs'].forEach(function(unit) {
-          flipCards[unit] = el.querySelector('.flip-card[data-unit="' + unit + '"]');
-          lastValues[unit] = -1;
-        });
-        
-        function updateCard(unit, value) {
-          var card = flipCards[unit];
-          if (!card) return;
-          
-          var displayVal = String(value).padStart(2, '0');
-          var valueEl = card.querySelector('.flip-card__value');
-          
-          if (lastValues[unit] === -1) {
-            valueEl.textContent = displayVal;
-            lastValues[unit] = value;
-            return;
-          }
-          
-          if (lastValues[unit] === value) return;
-          lastValues[unit] = value;
-          
-          card.classList.add('flip');
-          
-          setTimeout(function() {
-            valueEl.textContent = displayVal;
-            card.classList.remove('flip');
-          }, 150);
-        }
-        
-        function update() {
-          var now = new Date();
-          var diff = targetDate - now;
-          
-          if (diff <= 0) {
-            el.classList.add('campaign-countdown--ended');
-            el.querySelector('.flip-countdown').style.display = 'none';
-            var headingEl = el.querySelector('.campaign-countdown__heading');
-            if (headingEl) headingEl.style.display = 'none';
-            if (state === 'upcoming') {
-              messageEl.innerHTML = '<h2>Campaign is now live!</h2>';
-              messageEl.classList.add('campaign-countdown__message--funded');
-            } else if (goalMet) {
-              messageEl.innerHTML = '<h2>Project Funded</h2>';
-              messageEl.classList.add('campaign-countdown__message--funded');
-            } else {
-              messageEl.innerHTML = '<h2>Campaign Ended</h2>';
-              messageEl.classList.add('campaign-countdown__message--not-funded');
-            }
-            return;
-          }
-          
-          var days = Math.floor(diff / (1000 * 60 * 60 * 24));
-          var hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-          var mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-          var secs = Math.floor((diff % (1000 * 60)) / 1000);
-          
-          updateCard('days', days);
-          updateCard('hours', hours);
-          updateCard('mins', mins);
-          updateCard('secs', secs);
-          
-          setTimeout(update, 1000);
-        }
-        update();
-      })();
-      </script>
       {% endif %}
-      <button type="button" class="btn btn--primary campaign-header__cta" onclick="document.getElementById('campaign-tiers').scrollIntoView({behavior: 'smooth'})">Support!</button>
+      <button type="button" class="btn btn--primary campaign-header__cta" data-scroll-target="campaign-tiers">Support!</button>
     </header>
 
     <div class="campaign-content">
@@ -221,7 +116,7 @@
                 <button class="hero__video-play" id="hero-video-play" aria-label="Play video">
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                 </button>
-                <div class="hero__video-loading" id="hero-video-loading">
+                <div class="hero__video-loading" id="hero-video-loading" hidden>
                   <div class="hero__video-spinner"></div>
                   <span class="hero__video-loading-text">Loading...</span>
                 </div>
@@ -230,98 +125,6 @@
                 <div class="hero__video-buffer-bar"></div>
               </div>
             </div>
-            <script>
-            (function() {
-              var wrapper = document.getElementById('hero-video-wrapper');
-              var video = document.getElementById('hero-video');
-              var overlay = document.getElementById('hero-video-overlay');
-              var playBtn = document.getElementById('hero-video-play');
-              var loading = document.getElementById('hero-video-loading');
-              var bufferEl = document.getElementById('hero-video-buffer');
-              var bufferBar = bufferEl.querySelector('.hero__video-buffer-bar');
-              if (!video) return;
-
-              var isWaiting = false;
-              var hasStarted = false;
-
-              function updateBuffer() {
-                if (video.buffered.length > 0 && video.duration > 0) {
-                  var bufferedEnd = video.buffered.end(video.buffered.length - 1);
-                  var percent = (bufferedEnd / video.duration) * 100;
-                  bufferBar.style.width = percent + '%';
-                }
-              }
-
-              function showLoading() {
-                isWaiting = true;
-                playBtn.style.display = 'none';
-                loading.style.display = 'flex';
-                overlay.style.display = 'flex';
-              }
-
-              function hideLoading() {
-                isWaiting = false;
-                loading.style.display = 'none';
-                if (hasStarted) {
-                  overlay.style.display = 'none';
-                } else {
-                  playBtn.style.display = 'flex';
-                }
-              }
-
-              video.addEventListener('loadedmetadata', function() {
-                wrapper.style.aspectRatio = video.videoWidth + '/' + video.videoHeight;
-                updateBuffer();
-              });
-
-              video.addEventListener('progress', updateBuffer);
-
-              video.addEventListener('waiting', showLoading);
-              video.addEventListener('stalled', showLoading);
-
-              video.addEventListener('canplay', function() {
-                if (!hasStarted) hideLoading();
-              });
-
-              video.addEventListener('canplaythrough', hideLoading);
-              video.addEventListener('playing', function() {
-                hasStarted = true;
-                hideLoading();
-                bufferEl.classList.add('hero__video-buffer--playing');
-              });
-
-              video.addEventListener('pause', function() {
-                if (!video.ended) {
-                  overlay.style.display = 'flex';
-                  playBtn.style.display = 'flex';
-                }
-              });
-
-              video.addEventListener('ended', function() {
-                hasStarted = false;
-                overlay.style.display = 'flex';
-                playBtn.style.display = 'flex';
-                bufferEl.classList.remove('hero__video-buffer--playing');
-              });
-
-              playBtn.addEventListener('click', function() {
-                showLoading();
-                video.play().then(function() {
-                  hideLoading();
-                }).catch(function() {
-                  hideLoading();
-                });
-              });
-
-              overlay.addEventListener('click', function(e) {
-                if (e.target === overlay && hasStarted && !isWaiting) {
-                  video.play();
-                }
-              });
-
-              video.load();
-            })();
-            </script>
           {% endif %}
         {% elsif page.hero_image_wide %}
         <img src="{{ page.hero_image_wide }}" alt="{{ page.title }}">
@@ -342,26 +145,12 @@
     <section class="community-teaser" id="community-teaser">
       <h3>Supporter Community</h3>
       <p class="teaser-locked">Backers of this campaign get exclusive access to vote on creative decisions.</p>
-      <p class="teaser-unlocked" style="display:none;">You have access! Join your fellow supporters to vote on creative decisions.</p>
+      <p class="teaser-unlocked" hidden>You have access! Join your fellow supporters to vote on creative decisions.</p>
       <a href="/community/{{ page.slug }}/" class="btn btn--secondary btn--locked" id="community-btn">
         <span class="locked-text">🔒 Supporters Only</span>
-        <span class="unlocked-text" style="display:none;">Access Community →</span>
+        <span class="unlocked-text" hidden>Access Community →</span>
       </a>
     </section>
-    <script>
-      (function() {
-        var cookie = document.cookie.match(/supporter_{{ page.slug }}=([^;]+)/);
-        if (cookie || new URLSearchParams(window.location.search).has('dev')) {
-          document.querySelector('.teaser-locked').style.display = 'none';
-          document.querySelector('.teaser-unlocked').style.display = '';
-          document.querySelector('.locked-text').style.display = 'none';
-          document.querySelector('.unlocked-text').style.display = '';
-          var btn = document.getElementById('community-btn');
-          btn.classList.remove('btn--locked', 'btn--secondary');
-          btn.classList.add('btn--primary');
-        }
-      })();
-    </script>
     {% endif %}
 
     {% if page.diary %}
@@ -444,8 +233,13 @@
     </div>
   </footer>
 
-  {% include snipcart-foot.html %}
+  {% include cart-foot.html %}
   <script src="/assets/js/live-stats.js"></script>
   <script src="/assets/js/campaign.js"></script>
+  <script
+    src="/assets/js/campaign-page.js"
+    defer
+    data-campaign-page-script="true"
+    data-campaign-slug="{{ page.slug }}"></script>
 </body>
 </html>

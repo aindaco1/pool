@@ -58,7 +58,7 @@ function createProgressWrap(options: {
     const bar = document.createElement('div');
     bar.className = 'progress-bar';
     const span = document.createElement('span');
-    span.style.width = '0%';
+    span.dataset.progressWidth = '0';
     bar.appendChild(span);
     wrap.appendChild(bar);
   }
@@ -131,7 +131,7 @@ function createTierCard(options: {
   }
 
   const btn = document.createElement('button');
-  btn.className = 'snipcart-add-item';
+  btn.className = 'poolcart-add-item';
   btn.dataset.itemPrice = String(price);
   if (disabled) {
     btn.disabled = true;
@@ -184,7 +184,7 @@ function createSupportItem(options: {
   const progressBar = document.createElement('div');
   progressBar.className = 'support-item__progress';
   const progressSpan = document.createElement('span');
-  progressSpan.style.width = '0%';
+  progressSpan.dataset.progressWidth = '0';
   progressBar.appendChild(progressSpan);
   item.appendChild(progressBar);
 
@@ -337,10 +337,73 @@ describe('updateMarkerState', () => {
 });
 
 // ============================================================================
+// Declarative Style Hydration Tests
+// ============================================================================
+
+describe('applyDeclarativeStyles', () => {
+  const WIDTH_PERCENT_CLASS_PREFIX = 'u-width-pct-';
+  const LEFT_PERCENT_CLASS_PREFIX = 'u-left-pct-';
+
+  function applyPercentClass(node: Element, prefix: string, percent: number) {
+    const clampedPercent = Math.max(0, Math.min(100, Math.round(percent)));
+    Array.from(node.classList).forEach((className) => {
+      if (className.indexOf(prefix) === 0) {
+        node.classList.remove(className);
+      }
+    });
+    node.classList.add(prefix + clampedPercent);
+  }
+
+  function applyDeclarativeStyles(root: ParentNode = document) {
+    root.querySelectorAll('[data-progress-width]').forEach((node) => {
+      const width = node.getAttribute('data-progress-width');
+      if (!width) return;
+      applyPercentClass(node, WIDTH_PERCENT_CLASS_PREFIX, parseFloat(width));
+    });
+
+    root.querySelectorAll('[data-progress-left]').forEach((node) => {
+      const left = node.getAttribute('data-progress-left');
+      if (!left) return;
+      applyPercentClass(node, LEFT_PERCENT_CLASS_PREFIX, parseFloat(left));
+    });
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('hydrates width and left utility classes from data attributes', () => {
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <span data-progress-width="42"></span>
+      <div class="progress-marker" data-progress-left="67"></div>
+    `;
+    document.body.appendChild(root);
+
+    applyDeclarativeStyles(root);
+
+    expect((root.querySelector('[data-progress-width]') as HTMLElement).classList.contains('u-width-pct-42')).toBe(true);
+    expect((root.querySelector('[data-progress-left]') as HTMLElement).classList.contains('u-left-pct-67')).toBe(true);
+  });
+});
+
+// ============================================================================
 // Progress Bar Update Tests
 // ============================================================================
 
 describe('updateProgressBar', () => {
+  const WIDTH_PERCENT_CLASS_PREFIX = 'u-width-pct-';
+
+  function applyPercentClass(node: Element, prefix: string, percent: number) {
+    const clampedPercent = Math.max(0, Math.min(100, Math.round(percent)));
+    Array.from(node.classList).forEach((className) => {
+      if (className.indexOf(prefix) === 0) {
+        node.classList.remove(className);
+      }
+    });
+    node.classList.add(prefix + clampedPercent);
+  }
+
   function updateProgressBar(wrap: Element, stats: { pledgedAmount: number; supportItems?: Record<string, number> }) {
     const goal = parseInt(wrap.getAttribute('data-goal') || '0', 10);
     const maxThreshold = parseInt(wrap.getAttribute('data-max-threshold') || String(goal), 10);
@@ -351,7 +414,7 @@ describe('updateProgressBar', () => {
     const bar = wrap.querySelector('.progress-bar span') as HTMLElement | null;
     if (bar && maxThreshold > 0) {
       const pct = Math.min(100, Math.round((pledgedDollars / maxThreshold) * 100));
-      bar.style.width = `${pct}%`;
+      applyPercentClass(bar, WIDTH_PERCENT_CLASS_PREFIX, pct);
     }
 
     // Update the pledged amount text
@@ -375,7 +438,7 @@ describe('updateProgressBar', () => {
 
     updateProgressBar(wrap, { pledgedAmount: 500000 }); // $5,000 in cents
     const bar = wrap.querySelector('.progress-bar span') as HTMLElement;
-    expect(bar.style.width).toBe('50%');
+    expect(bar.classList.contains('u-width-pct-50')).toBe(true);
   });
 
   it('caps progress bar at 100%', () => {
@@ -384,7 +447,7 @@ describe('updateProgressBar', () => {
 
     updateProgressBar(wrap, { pledgedAmount: 2000000 }); // $20,000 (double the goal)
     const bar = wrap.querySelector('.progress-bar span') as HTMLElement;
-    expect(bar.style.width).toBe('100%');
+    expect(bar.classList.contains('u-width-pct-100')).toBe(true);
   });
 
   it('updates pledged text with formatted amount', () => {
@@ -402,7 +465,7 @@ describe('updateProgressBar', () => {
 
     updateProgressBar(wrap, { pledgedAmount: 500000 }); // $5,000
     const bar = wrap.querySelector('.progress-bar span') as HTMLElement;
-    expect(bar.style.width).toBe('25%'); // 5k / 20k = 25%
+    expect(bar.classList.contains('u-width-pct-25')).toBe(true); // 5k / 20k = 25%
   });
 });
 
@@ -417,7 +480,7 @@ describe('checkTierUnlocks', () => {
     card.classList.remove('tier-card--locked');
     card.classList.add('tier-card--unlocked');
 
-    const btn = card.querySelector('.snipcart-add-item') as HTMLButtonElement | null;
+    const btn = card.querySelector('.poolcart-add-item') as HTMLButtonElement | null;
     if (btn) {
       btn.disabled = false;
       btn.removeAttribute('aria-disabled');
@@ -648,6 +711,18 @@ describe('checkLateSupport', () => {
 // ============================================================================
 
 describe('updateSupportItems', () => {
+  const WIDTH_PERCENT_CLASS_PREFIX = 'u-width-pct-';
+
+  function applyPercentClass(node: Element, prefix: string, percent: number) {
+    const clampedPercent = Math.max(0, Math.min(100, Math.round(percent)));
+    Array.from(node.classList).forEach((className) => {
+      if (className.indexOf(prefix) === 0) {
+        node.classList.remove(className);
+      }
+    });
+    node.classList.add(prefix + clampedPercent);
+  }
+
   function updateSupportItems(supportItems: Record<string, number>) {
     document.querySelectorAll('.support-item[id^="support-"]').forEach((item) => {
       const itemId = item.id.replace('support-', '');
@@ -664,7 +739,7 @@ describe('updateSupportItems', () => {
           const progressBar = item.querySelector('.support-item__progress span') as HTMLElement | null;
           if (progressBar && target > 0) {
             const pct = Math.min(100, Math.round((currentDollars / target) * 100));
-            progressBar.style.width = `${pct}%`;
+            applyPercentClass(progressBar, WIDTH_PERCENT_CLASS_PREFIX, pct);
           }
 
           const input = item.querySelector('.support-item__input') as HTMLInputElement | null;
@@ -701,7 +776,7 @@ describe('updateSupportItems', () => {
     expect(amountEl?.textContent).toBe('$500 / $1,000');
 
     const progressBar = item.querySelector('.support-item__progress span') as HTMLElement;
-    expect(progressBar.style.width).toBe('50%');
+    expect(progressBar.classList.contains('u-width-pct-50')).toBe(true);
   });
 
   it('disables fully funded support items', () => {
@@ -743,8 +818,8 @@ describe('updateSupportItems', () => {
     const progress1 = item1.querySelector('.support-item__progress span') as HTMLElement;
     const progress2 = item2.querySelector('.support-item__progress span') as HTMLElement;
 
-    expect(progress1.style.width).toBe('50%');
-    expect(progress2.style.width).toBe('75%');
+    expect(progress1.classList.contains('u-width-pct-50')).toBe(true);
+    expect(progress2.classList.contains('u-width-pct-75')).toBe(true);
   });
 });
 
@@ -765,7 +840,7 @@ describe('updateTierInventory', () => {
     }
 
     if (tierInv.remaining <= 0) {
-      const btn = card.querySelector('.snipcart-add-item') as HTMLButtonElement | null;
+      const btn = card.querySelector('.poolcart-add-item') as HTMLButtonElement | null;
       if (btn) {
         btn.disabled = true;
         btn.textContent = 'Sold Out';
@@ -1084,7 +1159,7 @@ describe('full update flow', () => {
     const bar = wrap.querySelector('.progress-bar span') as HTMLElement;
     const maxThreshold = parseInt(wrap.dataset.maxThreshold || '25000', 10);
     const pct = Math.min(100, Math.round((pledgedDollars / maxThreshold) * 100));
-    bar.style.width = `${pct}%`;
+    bar.classList.add(`u-width-pct-${pct}`);
 
     // Update pledged text
     const pledgedEl = wrap.querySelector('[data-live-pledged]');
@@ -1093,7 +1168,7 @@ describe('full update flow', () => {
     }
 
     // Check results
-    expect(bar.style.width).toBe('86%'); // 30k / 35k ≈ 86%
+    expect(bar.classList.contains('u-width-pct-86')).toBe(true); // 30k / 35k ≈ 86%
     expect(pledgedEl?.textContent).toBe('$30k');
     expect(tier2.classList.contains('tier-card--locked')).toBe(true); // Still locked (needs 35k)
   });

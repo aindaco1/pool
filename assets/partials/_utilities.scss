@@ -17,3 +17,13 @@
   color: $color--secondary;
   font-size: 14px;
 }
+
+@for $i from 0 through 100 {
+  .u-width-pct-#{$i} {
+    width: $i * 1%;
+  }
+
+  .u-left-pct-#{$i} {
+    left: $i * 1%;
+  }
+}

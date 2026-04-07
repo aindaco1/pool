@@ -11,8 +11,8 @@ This document outlines the major responsibilities for the **pool.dustwave.xyz** 
 
 ### 2. Implementation Lead
 - Builds and maintains Jekyll templates and Sass styling (15 modular partials).
-- Integrates Snipcart v3 and Dust Wave custom JS.
-- Connects front-end pledge flow to the Worker `/start` endpoint.
+- Maintains the first-party cart runtime and Dust Wave custom JS.
+- Connects front-end pledge flow to the Worker `/checkout-intent/start` endpoint.
 - Maintains cart, checkout, and manage-page UX for tip-aware totals and locked pledge states.
 
 ### 3. Cloudflare Worker Maintainer
@@ -36,14 +36,14 @@ This document outlines the major responsibilities for the **pool.dustwave.xyz** 
 - See [CMS.md](CMS.md) for the visual editing guide.
 
 ### 6. Security/Compliance Steward
-- Rotates and audits secrets (Stripe, Snipcart).
+- Rotates and audits secrets (Stripe, Worker signing, admin, email).
 - Verifies webhook signing and domain allowlists.
 - Reviews Terms & Creative Guidelines for compliance.
 
 ## Handoff Checklist
 - [ ] Repo access and Pages enabled.
 - [ ] CNAME set to `pool.dustwave.xyz`.
-- [ ] Snipcart public key configured in `_includes/snipcart-foot.html`.
+- [ ] First-party cart runtime loads and opens from campaign pages without console errors.
 - [ ] Cloudflare Worker deployed (`pledge.dustwave.xyz`) with secrets set.
 - [ ] Stripe webhook configured for Worker endpoint.
 - [ ] GitHub Action secrets (`ADMIN_SECRET`) in place for diary broadcasts.

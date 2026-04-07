@@ -1,11 +1,12 @@
 {% if include.ongoing_items and include.campaign %}
+{% assign cart_add_item_classes = "poolcart-add-item" %}
 <section class="ongoing-funding" id="ongoing-funding">
   <h4>Production & Release Phase</h4>
   <p class="ongoing-funding__intro">
     Campaign reached initial goal. Ongoing support funds post-production, festivals, and screenings.
   </p>
   
-  <button class="btn btn--block snipcart-add-item"
+  <button class="btn btn--block {{ cart_add_item_classes }}"
           data-item-id="{{ include.campaign.slug }}__ongoing__support"
           data-item-name="Support Ongoing Work"
           data-item-price="25"

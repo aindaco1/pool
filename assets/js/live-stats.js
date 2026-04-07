@@ -7,8 +7,13 @@
  * Cache is invalidated when user makes a pledge (via invalidateStatsCache).
  */
 
-const WORKER_BASE = window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
 const STATS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+const WIDTH_PERCENT_CLASS_PREFIX = 'u-width-pct-';
+const LEFT_PERCENT_CLASS_PREFIX = 'u-left-pct-';
+
+function getWorkerBase() {
+  return window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
+}
 
 function getStatsCache(slug) {
   try {
@@ -36,6 +41,17 @@ function setStatsCache(slug, data) {
   }
 }
 
+function applyPercentClass(node, prefix, percent) {
+  if (!node) return;
+  const clampedPercent = Math.max(0, Math.min(100, Math.round(percent)));
+  Array.from(node.classList).forEach((className) => {
+    if (className.indexOf(prefix) === 0) {
+      node.classList.remove(className);
+    }
+  });
+  node.classList.add(prefix + clampedPercent);
+}
+
 /**
  * Invalidate stats cache (call after pledge changes)
  */
@@ -55,6 +71,20 @@ window.invalidateStatsCache = function(campaignSlug) {
     // localStorage may be disabled
   }
 };
+
+function applyDeclarativeStyles(root = document) {
+  root.querySelectorAll('[data-progress-width]').forEach((node) => {
+    const width = node.getAttribute('data-progress-width');
+    if (!width) return;
+    applyPercentClass(node, WIDTH_PERCENT_CLASS_PREFIX, parseFloat(width));
+  });
+
+  root.querySelectorAll('[data-progress-left]').forEach((node) => {
+    const left = node.getAttribute('data-progress-left');
+    if (!left) return;
+    applyPercentClass(node, LEFT_PERCENT_CLASS_PREFIX, parseFloat(left));
+  });
+}
 
 async function fetchAllLiveStats() {
   const progressBars = document.querySelectorAll('[data-live-stats][data-campaign-slug]');
@@ -80,7 +110,7 @@ async function fetchAllLiveStats() {
   if (uncachedSlugs.length > 0) {
     const results = await Promise.allSettled(
       uncachedSlugs.map(async slug => {
-        const res = await fetch(`${WORKER_BASE}/stats/${slug}`);
+        const res = await fetch(`${getWorkerBase()}/stats/${slug}`);
         if (!res.ok) throw new Error(`Failed to fetch stats for ${slug}`);
         return res.json();
       })
@@ -131,7 +161,7 @@ function updateProgressBar(wrap, stats) {
   const bar = wrap.querySelector('.progress-bar span');
   if (bar && maxThreshold > 0) {
     const pct = Math.min(100, Math.round((pledgedDollars / maxThreshold) * 100));
-    bar.style.width = `${pct}%`;
+    applyPercentClass(bar, WIDTH_PERCENT_CLASS_PREFIX, pct);
   }
 
   // Update the pledged amount text
@@ -180,7 +210,7 @@ function updateSupportItems(supportItems) {
         const progressBar = item.querySelector('.support-item__progress span');
         if (progressBar && target > 0) {
           const pct = Math.min(100, Math.round((currentDollars / target) * 100));
-          progressBar.style.width = `${pct}%`;
+          applyPercentClass(progressBar, WIDTH_PERCENT_CLASS_PREFIX, pct);
         }
         
         // Update remaining in input max and placeholder
@@ -296,7 +326,7 @@ async function fetchLiveInventory() {
   if (uncachedSlugs.length > 0) {
     const results = await Promise.allSettled(
       uncachedSlugs.map(async slug => {
-        const res = await fetch(`${WORKER_BASE}/inventory/${slug}`);
+        const res = await fetch(`${getWorkerBase()}/inventory/${slug}`);
         if (!res.ok) return null;
         return res.json();
       })
@@ -339,7 +369,7 @@ function updateTierInventory(card, tierInv) {
 
   // Disable button if sold out
   if (tierInv.remaining <= 0) {
-    const btn = card.querySelector('.snipcart-add-item');
+    const btn = card.querySelector('.poolcart-add-item');
     if (btn) {
       btn.disabled = true;
       btn.textContent = 'Sold Out';
@@ -374,7 +404,7 @@ function unlockTier(card) {
   card.classList.remove('tier-card--locked');
   card.classList.add('tier-card--unlocked');
   
-  const btn = card.querySelector('.snipcart-add-item');
+  const btn = card.querySelector('.poolcart-add-item');
   if (btn) {
     btn.disabled = false;
     btn.removeAttribute('aria-disabled');
@@ -486,6 +516,7 @@ function applyCachedInventory() {
 
 // Fetch on page load - apply cached first, then fetch fresh
 document.addEventListener('DOMContentLoaded', () => {
+  applyDeclarativeStyles();
   applyCachedStats();
   applyCachedInventory();
   fetchAllLiveStats();
@@ -503,6 +534,7 @@ window.addEventListener('pageshow', (event) => {
 // Export for manual refresh and inventory lookup
 window.refreshLiveStats = fetchAllLiveStats;
 window.refreshLiveInventory = fetchLiveInventory;
+window.applyDeclarativeStyles = applyDeclarativeStyles;
 
 // Cache for inventory data (used by cart validation)
 window.POOL_INVENTORY_CACHE = {};
@@ -513,7 +545,7 @@ window.POOL_INVENTORY_CACHE = {};
 window.getTierInventory = async function(campaignSlug, tierId) {
   if (!window.POOL_INVENTORY_CACHE[campaignSlug]) {
     try {
-      const res = await fetch(`${WORKER_BASE}/inventory/${campaignSlug}`);
+      const res = await fetch(`${getWorkerBase()}/inventory/${campaignSlug}`);
       if (res.ok) {
         window.POOL_INVENTORY_CACHE[campaignSlug] = await res.json();
       }

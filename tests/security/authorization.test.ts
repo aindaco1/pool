@@ -235,18 +235,18 @@ describe('Authorization Security Tests', () => {
   });
 
   describe('Campaign Slug Validation', () => {
-    it('should reject /start with non-existent campaign', async () => {
-      const res = await securityFetch('/start', {
+    it('should reject checkout start with non-existent campaign', async () => {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-order-123',
           campaignSlug: TEST_CAMPAIGNS.invalid,
-          amountCents: 500,
-          email: 'test@example.com'
+          items: [
+            { id: `${TEST_CAMPAIGNS.invalid}__frame`, quantity: 1 }
+          ],
+          tipPercent: 5
         })
       });
       
-      // 400 = invalid campaign, 429 = rate limited (both acceptable)
       expect([400, 429]).toContain(res.status);
       if (res.status === 400) {
         const body = await res.json();
@@ -254,18 +254,18 @@ describe('Authorization Security Tests', () => {
       }
     });
 
-    it('should reject /start with path traversal in campaign slug', async () => {
-      const res = await securityFetch('/start', {
+    it('should reject checkout start with path traversal in campaign slug', async () => {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-order-123',
           campaignSlug: TEST_CAMPAIGNS.malicious,
-          amountCents: 500,
-          email: 'test@example.com'
+          items: [
+            { id: `${TEST_CAMPAIGNS.malicious}__frame`, quantity: 1 }
+          ],
+          tipPercent: 5
         })
       });
       
-      // Should fail validation, not cause path traversal (429 = rate limited)
       expect([400, 404, 429]).toContain(res.status);
     });
 
@@ -284,7 +284,7 @@ describe('Authorization Security Tests', () => {
 
   describe('HTTP Method Enforcement', () => {
     it('should reject GET on POST-only endpoints', async () => {
-      const endpoints = ['/start', '/pledge/cancel', '/pledge/modify', '/admin/rebuild'];
+      const endpoints = ['/checkout-intent/start', '/pledge/cancel', '/pledge/modify', '/admin/rebuild'];
       
       for (const endpoint of endpoints) {
         const res = await securityFetch(endpoint, { method: 'GET' });

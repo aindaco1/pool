@@ -19,6 +19,7 @@
 
 {% assign tier_locked = false %}
 {% assign threshold_formatted = "" %}
+{% assign cart_add_item_classes = "poolcart-add-item" %}
 {% if include.tier.requires_threshold %}
   {% assign tier_locked = true %}
   {% assign disabled = true %}
@@ -42,7 +43,7 @@
   {% endif %}
 
   <button
-    class="snipcart-add-item"
+    class="{{ cart_add_item_classes }}"
     {% if disabled %}disabled aria-disabled="true"{% endif %}
     data-item-id="{{ include.campaign.slug }}__{{ include.tier.id }}"
     data-item-name="{{ include.campaign.title }} — {{ include.tier.name }}"

@@ -1,6 +1,6 @@
 # The Pool - Pledge Worker
 
-Cloudflare Worker handling pledge management, Stripe/Snipcart integration, and order-scoped supporter authentication.
+Cloudflare Worker handling first-party checkout canonicalization, Stripe integration, pledge management, and order-scoped supporter authentication.
 
 ## Setup
 
@@ -9,11 +9,8 @@ Cloudflare Worker handling pledge management, Stripe/Snipcart integration, and o
 ```bash
 cd worker
 
-# Create VOTES namespace (if not already done)
 wrangler kv:namespace create "VOTES"
 wrangler kv:namespace create "VOTES" --preview
-
-# Create PLEDGES namespace
 wrangler kv:namespace create "PLEDGES"
 wrangler kv:namespace create "PLEDGES" --preview
 ```
@@ -22,37 +19,29 @@ Update `wrangler.toml` with the returned IDs.
 
 ### 2. Configure Secrets
 
-Set all required secrets:
-
 ```bash
-# Stripe API Keys (get from https://dashboard.stripe.com/apikeys)
-wrangler secret put STRIPE_SECRET_KEY_LIVE  # sk_live_...
-wrangler secret put STRIPE_SECRET_KEY_TEST  # sk_test_...
+# Stripe API Keys
+wrangler secret put STRIPE_SECRET_KEY_LIVE
+wrangler secret put STRIPE_SECRET_KEY_TEST
 
-# Stripe Webhook Secrets (get from https://dashboard.stripe.com/webhooks)
-wrangler secret put STRIPE_WEBHOOK_SECRET_LIVE  # whsec_...
-wrangler secret put STRIPE_WEBHOOK_SECRET_TEST  # whsec_...
+# Stripe Webhook Secrets
+wrangler secret put STRIPE_WEBHOOK_SECRET_LIVE
+wrangler secret put STRIPE_WEBHOOK_SECRET_TEST
 
-# Snipcart API Keys (get from https://app.snipcart.com/dashboard/account/credentials)
-wrangler secret put SNIPCART_SECRET_LIVE  # prod API key
-wrangler secret put SNIPCART_SECRET_TEST  # test API key
+# First-party checkout intent signing secret
+wrangler secret put CHECKOUT_INTENT_SECRET
 
-# Magic Link Token Secret (generate a random 32+ character string)
+# Magic link token secret
 wrangler secret put MAGIC_LINK_SECRET
 
-# Resend API Key (get from https://resend.com/api-keys)
+# Email delivery
 wrangler secret put RESEND_API_KEY
 
-# Admin Secret (for broadcast endpoints - generate a random 32+ character string)
+# Admin endpoints
 wrangler secret put ADMIN_SECRET
-
-# Optional: Snipcart Webhook Validation
-wrangler secret put SNIPCART_WEBHOOK_SECRET
 ```
 
-### 3. Configure Webhooks
-
-#### Stripe Webhooks
+### 3. Configure Stripe Webhooks
 
 1. Go to [Stripe Webhooks](https://dashboard.stripe.com/webhooks)
 2. Add endpoint: `https://pledge.dustwave.xyz/webhooks/stripe`
@@ -62,24 +51,11 @@ wrangler secret put SNIPCART_WEBHOOK_SECRET
 4. Copy the signing secret to `STRIPE_WEBHOOK_SECRET_LIVE`
 5. Repeat for test mode with `STRIPE_WEBHOOK_SECRET_TEST`
 
-#### Snipcart Webhooks
-
-1. Go to [Snipcart Webhooks](https://app.snipcart.com/dashboard/webhooks)
-2. Add endpoint: `https://pledge.dustwave.xyz/webhooks/snipcart`
-3. Select events:
-   - `order.completed`
-4. Optionally set a request token for `SNIPCART_WEBHOOK_SECRET`
-
 ### 4. Deploy
 
 ```bash
-# Development (uses test mode APIs)
 wrangler dev --env dev
-
-# Production from worker/
 wrangler deploy
-
-# Production from repo root
 npm run deploy:worker
 ```
 
@@ -87,14 +63,16 @@ On GitHub, pushes to `main` also deploy the Worker automatically through `.githu
 
 ## API Endpoints
 
-### POST /start
-Verify the current Snipcart checkout state and create a Stripe setup-mode Checkout session for a new pledge.
+### POST /checkout-intent/start
+Canonicalize the first-party cart payload and create a Stripe setup-mode Checkout session for a new pledge.
 
 ```json
 {
-  "publicToken": "snipcart-public-payment-session-token",
-  "cartToken": "snipcart-cart-token",
   "campaignSlug": "hand-relations",
+  "items": [
+    { "id": "hand-relations__producer-credit", "quantity": 1 }
+  ],
+  "customAmount": 0,
   "email": "supporter@example.com",
   "tipPercent": 5
 }
@@ -102,7 +80,7 @@ Verify the current Snipcart checkout state and create a Stripe setup-mode Checko
 
 Returns: `{ "url": "https://checkout.stripe.com/..." }`
 
-The Worker supports either a verified Snipcart custom-gateway `publicToken` or a verified in-progress `cartToken`. It rebuilds tier, add-on, custom-support, shipping, and subtotal state from the verified Snipcart checkout data, does not trust browser-submitted money fields, and only claims limited inventory after the pledge is actually persisted.
+The Worker rebuilds tier, add-on, custom-support, shipping, and subtotal state from first-party cart items, validates campaign state and inventory, signs a short-lived checkout snapshot, and only claims limited inventory after the pledge is actually persisted.
 
 ### GET /pledges?token={token}
 Get the pledge(s) authorized by a magic link token.
@@ -118,7 +96,7 @@ Cancel an active pledge.
 ```json
 {
   "token": "magic-link-token",
-  "orderId": "snipcart-order-token"
+  "orderId": "pool-intent-abc123"
 }
 ```
 
@@ -128,7 +106,7 @@ Change tiers, quantity, or custom support for an active pledge.
 ```json
 {
   "token": "magic-link-token",
-  "orderId": "snipcart-order-token",
+  "orderId": "pool-intent-abc123",
   "newTierId": "sfx-slot",
   "newTierQty": 2,
   "addTiers": [{ "id": "frame", "qty": 5 }],
@@ -153,9 +131,6 @@ Returns: `{ "url": "https://checkout.stripe.com/..." }`
 
 ### POST /webhooks/stripe
 Stripe webhook endpoint (signature verified).
-
-### POST /webhooks/snipcart
-Snipcart webhook endpoint.
 
 ### POST /admin/broadcast/diary
 Send diary update notification to all campaign supporters. Requires `x-admin-key` header.
@@ -205,7 +180,7 @@ Send milestone notification to all campaign supporters. Requires `x-admin-key` h
 ```
 
 ### POST /test/email
-Send a test email of any type. In test mode (`SNIPCART_MODE=test`), no auth required. In production, requires `x-admin-key` header.
+Send a test email of any type. In test mode (`APP_MODE=test`), no auth required. In production, requires `x-admin-key` header.
 
 ```json
 {
@@ -239,15 +214,14 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | Variable | Description |
 |----------|-------------|
 | `SITE_BASE` | Base URL of the Jekyll site |
-| `SNIPCART_API_BASE` | Snipcart API base URL |
-| `SNIPCART_MODE` | `"test"` or `"live"` - determines which API keys to use |
+| `APP_MODE` | `"test"` or `"live"` - determines which API keys to use |
 | `RESEND_RATE_LIMIT_DELAY` | Delay between emails in ms (default: 600ms to stay under Resend's 2 req/sec limit) |
 
 ## Data Flow
 
 1. **User pledges on campaign page**
-   - Snipcart cart created with tier item
-   - After Snipcart checkout, POST to `/start` creates Stripe SetupIntent
+   - first-party cart created with tier item
+   - `POST /checkout-intent/start` creates Stripe SetupIntent
    - User redirected to Stripe Checkout to save card
 
 2. **Stripe webhook: checkout.session.completed**
@@ -280,8 +254,8 @@ wrangler dev --env dev
 ```
 
 The `--env dev` flag:
-- Sets `SNIPCART_MODE=test`
-- Uses `STRIPE_SECRET_KEY_TEST` and `SNIPCART_SECRET_TEST`
+- Sets `APP_MODE=test`
+- Uses `STRIPE_SECRET_KEY_TEST`
 - Points `SITE_BASE` to localhost
 
 Add `?dev` to the manage page URL for mock data: `http://127.0.0.1:4000/manage/?dev`

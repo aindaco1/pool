@@ -1,0 +1,15 @@
+<script
+  src="/assets/js/pool-config.js"
+  defer
+  data-pool-config-script="true"
+  data-worker-base="{{ site.worker_base }}"
+  data-platform-name="{{ site.author | escape }}"
+  data-sales-tax-rate="{{ site.sales_tax_rate | default: 0.07875 }}"
+  data-flat-shipping-rate="{{ site.flat_shipping_rate | default: 3.00 }}"
+  data-cart-runtime="{{ site.cart_runtime | default: 'first_party' }}"
+  data-checkout-provider="{{ site.checkout_provider | default: 'first_party' }}"></script>
+<div hidden data-pool-cart-root="true"></div>
+<script src="/assets/js/cart-provider.js" defer></script>
+<script src="/assets/js/cart.js" defer></script>
+<script src="/assets/js/buy-buttons.js" defer></script>
+<script src="/assets/js/campaign.js" defer></script>

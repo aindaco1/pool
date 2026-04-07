@@ -17,7 +17,10 @@ stop_worker() {
 }
 
 start_worker() {
-  (cd worker && npx wrangler dev --env dev --port 8787 >/tmp/pool-premerge-worker.log 2>&1) &
+  (
+    export PATH="$HOME/.nvm/versions/node/v20.19.6/bin:$PATH"
+    cd worker && npx wrangler dev --env dev --port 8787 >/tmp/pool-premerge-worker.log 2>&1
+  ) &
   WORKER_PID=$!
 
   for _ in {1..60}; do
@@ -53,13 +56,12 @@ echo ""
 export SITE_BASE="${SITE_BASE:-http://127.0.0.1:4000}"
 export WORKER_BASE="${WORKER_BASE:-http://127.0.0.1:8787}"
 export WORKER_URL="${WORKER_URL:-http://127.0.0.1:8787}"
-export SNIPCART_MODE="${SNIPCART_MODE:-test}"
+export APP_MODE="${APP_MODE:-test}"
 export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-sk_test_smoke}"
 export STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET:-whsec_smoke}"
 export ADMIN_SECRET="${ADMIN_SECRET:-test-admin-secret}"
 export MAGIC_LINK_SECRET="${MAGIC_LINK_SECRET:-test-magic-link-secret}"
 export RESEND_API_KEY="${RESEND_API_KEY:-re_test_smoke}"
-export SNIPCART_WEBHOOK_SECRET="${SNIPCART_WEBHOOK_SECRET:-snipcart_test_secret}"
 SMOKE_ADMIN_SECRET="${ADMIN_SECRET}"
 
 if [[ -f worker/.dev.vars ]]; then
@@ -76,13 +78,11 @@ echo ""
 echo "2. Syntax checks"
 node --check worker/src/index.js
 node --check worker/src/stats.js
-node --check worker/src/snipcart.js
 echo ""
 
 echo "3. Focused regression suites"
 npx vitest run \
   tests/unit/worker-business-logic.test.ts \
-  tests/unit/snipcart-parsing.test.ts \
   tests/unit/worker-ops-integrity.test.ts \
   tests/unit/stats-pagination.test.ts
 echo ""
@@ -91,7 +91,16 @@ echo "4. Full unit suite"
 npm run test:unit
 echo ""
 
-echo "5. Security suite"
+echo "5. First-party build artifact checks"
+bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
+
+if ! rg -n '\.pool-first-party-cart__panel' _site/assets/main.css >/dev/null; then
+  echo "main.css is missing expected first-party cart UI styles"
+  exit 1
+fi
+echo ""
+
+echo "6. Security suite"
 if command -v lsof >/dev/null 2>&1; then
   EXISTING_WORKER_PIDS="$(lsof -ti tcp:8787 || true)"
   if [[ -n "${EXISTING_WORKER_PIDS}" ]]; then
@@ -114,7 +123,6 @@ if [[ -f worker/.dev.vars ]]; then
     grep -q '^RESEND_API_KEY=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "RESEND_API_KEY=${RESEND_API_KEY}"
     grep -q '^MAGIC_LINK_SECRET=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "MAGIC_LINK_SECRET=${MAGIC_LINK_SECRET}"
     grep -q '^STRIPE_WEBHOOK_SECRET=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}"
-    grep -q '^SNIPCART_WEBHOOK_SECRET=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "SNIPCART_WEBHOOK_SECRET=${SNIPCART_WEBHOOK_SECRET}"
   } > worker/.dev.vars
 else
   TEMP_DEV_VARS="worker/.dev.vars"
@@ -125,7 +133,6 @@ ADMIN_SECRET=${ADMIN_SECRET}
 RESEND_API_KEY=${RESEND_API_KEY}
 MAGIC_LINK_SECRET=${MAGIC_LINK_SECRET}
 STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-SNIPCART_WEBHOOK_SECRET=${SNIPCART_WEBHOOK_SECRET}
 EOF
 fi
 
@@ -134,7 +141,7 @@ start_worker || exit 1
 npm run test:security
 echo ""
 
-echo "6. Local mutable-pledge smoke"
+echo "7. Local mutable-pledge smoke"
 stop_worker
 start_worker || exit 1
 
@@ -159,7 +166,7 @@ SITE_URL=http://127.0.0.1:4000 WORKER_URL=http://127.0.0.1:8787 ./scripts/test-w
 WORKER_URL=http://127.0.0.1:8787 ADMIN_SECRET="${SMOKE_ADMIN_SECRET}" ./scripts/smoke-pledge-management.sh
 echo ""
 
-echo "7. E2E suite"
+echo "8. E2E suite"
 npm run test:e2e:headless
 echo ""
 

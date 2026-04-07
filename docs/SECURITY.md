@@ -10,9 +10,8 @@ This document covers the security architecture, known risks, hardening recommend
 |-----------|-----------|-------------|
 | **Magic Link Tokens** | `/pledge*`, `/pledges`, `/votes` | HMAC-SHA256 signed tokens with 90-day expiry |
 | **Stripe Webhook Signature** | `/webhooks/stripe` | HMAC-SHA256 verification per Stripe spec |
-| **Snipcart Webhook Token** | `/webhooks/snipcart` | `x-snipcart-requesttoken` header verification |
 | **Admin Secret** | `/admin/*` | `Authorization: Bearer <secret>` or `x-admin-key` header |
-| **Test Mode Guard** | `/test/*` | `SNIPCART_MODE === 'test'` environment check |
+| **Test Mode Guard** | `/test/*` | `APP_MODE === 'test'` environment check |
 
 ### Data Storage (Cloudflare KV)
 
@@ -51,7 +50,7 @@ This document covers the security architecture, known risks, hardening recommend
 | SEC-004 | CORS `Access-Control-Allow-Origin: *` on all endpoints | **Medium** | ✅ Fixed |
 | SEC-005 | No rate limiting on expensive endpoints | **Medium** | ✅ Fixed |
 | SEC-006 | Admin secret not timing-safe compared | **Medium** | ✅ Fixed |
-| SEC-007 | Snipcart webhook verification may be incomplete | **Medium** | ✅ Fixed |
+| SEC-007 | Legacy hosted-cart webhook surface remained reachable | **Medium** | ✅ Fixed |
 
 ### Low Priority
 
@@ -60,7 +59,7 @@ This document covers the security architecture, known risks, hardening recommend
 | SEC-008 | Magic link tokens long-lived (90 days) | **Low** | Acceptable |
 | SEC-009 | Input validation on votes could be stricter | **Low** | ✅ Fixed |
 | SEC-010 | Tokens in query strings (Referer leakage risk) | **Low** | Acceptable |
-| SEC-011 | Input validation on /start (slug, email, amount) | **Low** | ✅ Fixed |
+| SEC-011 | Input validation on checkout-start payloads | **Low** | ✅ Fixed |
 | SEC-012 | Missing security response headers | **Low** | ✅ Fixed |
 
 ---
@@ -82,7 +81,7 @@ if (token.startsWith('dev-token-')) {
 **Fixed:**
 ```javascript
 if (token.startsWith('dev-token-')) {
-  if (env.SNIPCART_MODE !== 'test') {
+  if (env.APP_MODE !== 'test') {
     return jsonResponse({ error: 'Invalid token' }, 401);
   }
   campaignSlug = token.replace('dev-token-', '');
@@ -131,7 +130,7 @@ Add centralized guard before test endpoint routing:
 
 ```javascript
 // Block test endpoints in production
-if (path.startsWith('/test/') && env.SNIPCART_MODE !== 'test') {
+if (path.startsWith('/test/') && env.APP_MODE !== 'test') {
   return jsonResponse({ error: 'Not found' }, 404);
 }
 ```
@@ -139,7 +138,7 @@ if (path.startsWith('/test/') && env.SNIPCART_MODE !== 'test') {
 Each handler should also verify (defense in depth):
 ```javascript
 async function handleTestSetup(request, env) {
-  if (env.SNIPCART_MODE !== 'test') {
+  if (env.APP_MODE !== 'test') {
     return jsonResponse({ error: 'Not found' }, 404);
   }
   // ...
@@ -181,7 +180,7 @@ In-Worker rate limiting is now implemented using KV storage with per-IP tracking
 
 | Endpoint | Limit | Window | Notes |
 |----------|-------|--------|-------|
-| `/start` | 20 requests | 1 minute | Pledge creation |
+| `/checkout-intent/start` | 20 requests | 1 minute | Pledge creation |
 | `/votes` | 30 requests | 1 minute | Voting endpoints |
 | `/admin/*` | 5 requests | 1 minute | Admin operations |
 | `/pledge/*` | 20 requests | 1 minute | Pledge management |
@@ -191,7 +190,7 @@ In-Worker rate limiting is now implemented using KV storage with per-IP tracking
 
 - Rate limits are tracked **per IP address** using `CF-Connecting-IP` header
 - Each IP gets its own bucket, so 100 different users won't interfere with each other
-- The 20/min `/start` limit accommodates shared NAT environments (offices, universities)
+- The 20/min `/checkout-intent/start` limit accommodates shared NAT environments (offices, universities)
 
 **Setup:**
 
@@ -277,27 +276,11 @@ function requireAdmin(request, env) {
 
 ---
 
-### SEC-007: Verify Snipcart Webhook Token
+### SEC-007: Remove Legacy Hosted-Cart Webhook Surface (✅ FIXED)
 
-**File:** `worker/src/index.js` (handleSnipcartWebhook)
+**File:** `worker/src/index.js`
 
-Current implementation looks correct but ensure fail-closed:
-```javascript
-async function handleSnipcartWebhook(request, env, ctx) {
-  if (env.SNIPCART_WEBHOOK_SECRET) {
-    const requestToken = request.headers.get('x-snipcart-requesttoken');
-    if (!timingSafeEqual(requestToken, env.SNIPCART_WEBHOOK_SECRET)) {
-      console.error('Invalid Snipcart webhook token');
-      return jsonResponse({ error: 'Invalid token' }, 401);
-    }
-  } else {
-    // Fail closed if secret not configured
-    console.error('SNIPCART_WEBHOOK_SECRET not configured');
-    return jsonResponse({ error: 'Webhook not configured' }, 500);
-  }
-  // ...
-}
-```
+The Worker no longer exposes the removed third-party checkout webhook path at all, which eliminates an unnecessary callback surface the live flow no longer needs.
 
 ---
 
@@ -328,14 +311,15 @@ if (!isValidVoteOption(option)) {
 
 ---
 
-### SEC-011: Input Validation on /start (✅ FIXED)
+### SEC-011: Input Validation on Checkout Start (✅ FIXED)
 
 **File:** `worker/src/index.js`, `worker/src/validation.js`
 
-The `/start` endpoint now validates:
+The `/checkout-intent/start` path now validates:
 - Campaign slugs: max 100 chars, alphanumeric + hyphens only (prevents injection/traversal)
 - Email addresses: RFC-compliant format, max 254 chars
-- Amount: positive integer, max $1M (100,000,000 cents)
+- Cart item IDs and quantities
+- Support/custom amount inputs through canonical contribution rebuilding
 
 ```javascript
 if (!isValidSlug(campaignSlug)) {
@@ -346,8 +330,8 @@ if (email && !isValidEmail(email)) {
   return jsonResponse({ error: 'Invalid email format' }, 400);
 }
 
-if (amountCents !== undefined && !isValidAmount(amountCents)) {
-  return jsonResponse({ error: 'Invalid amount' }, 400);
+if (!parsedCart.valid) {
+  return jsonResponse({ error: parsedCart.error }, 400);
 }
 ```
 
@@ -378,8 +362,7 @@ Before deploying to production, verify these secrets are set:
 |--------|---------------------|------------|
 | Stripe API Key | `STRIPE_SECRET_KEY_LIVE` | N/A |
 | Stripe Webhook Secret | `STRIPE_WEBHOOK_SECRET_LIVE` | 32+ chars |
-| Snipcart Secret | `SNIPCART_SECRET_LIVE` | N/A |
-| Snipcart Webhook Token | `SNIPCART_WEBHOOK_SECRET` | 32+ chars |
+| Checkout Intent Secret | `CHECKOUT_INTENT_SECRET` | 32+ chars |
 | Magic Link Secret | `MAGIC_LINK_SECRET` | 32+ chars |
 | Admin Secret | `ADMIN_SECRET` | 32+ chars |
 | Resend API Key | `RESEND_API_KEY` | N/A |
@@ -404,7 +387,7 @@ npm run test:security:staging   # Against a staging worker, if you maintain one
 
 `npm run test:premerge` now includes the secret audit automatically, so local merge gating checks both security behavior and accidental credential exposure.
 
-For local runs, keep `SNIPCART_WEBHOOK_SECRET` configured if you want the live-worker webhook suite to enforce `401` responses for missing or invalid `x-snipcart-requesttoken` headers. The strict rejection path is also covered deterministically in the unit suite with an injected webhook secret.
+For local runs, keep `CHECKOUT_INTENT_SECRET` configured if you want the live-worker checkout-start suite to exercise the real first-party signing path.
 
 ---
 

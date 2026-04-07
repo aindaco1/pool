@@ -25,13 +25,13 @@
 - [x] Sass refactor (15 modular partials from single 3,500-line file)
 - [x] Documentation consolidation (15 → 7 focused docs)
 - [x] Non-stackable tier support (hide quantity controls for `stackable: false` tiers)
-- [x] Mobile hamburger/Snipcart overlay z-index fix
+- [x] Mobile hamburger/cart overlay z-index fix
 - [x] Cloudflare Worker deployment (pledge storage, stats, inventory, emails)
 - [x] Worker cron trigger for auto-settle (midnight MT)
-- [x] Aggregated charging (one charge per supporter, not per pledge)
+- [x] Aggregated charging (one charge per supporter per campaign, not per pledge row)
 - [x] Mountain Time deadline handling (DST-aware via `Intl.DateTimeFormat` across frontend + Worker)
-- [x] Physical tier shipping ($3 flat USPS fee, address collection via Stripe Checkout)
-- [x] Snipcart shipping bypass (all items `shippable="false"`, `_category` custom field for physical detection)
+- [x] Physical tier shipping ($3 per campaign with physical rewards, address collection via Stripe Checkout)
+- [x] First-party physical-item detection (`category: physical` / `shippable` cart metadata)
 - [x] Tip Jar / platform tip feature (0% to 15%, default 5%, excluded from campaign progress)
 - [x] Email templates with full breakdown (subtotal, optional tip, tax, shipping, total)
 - [x] Shipping in pledge reports (fulfillment + ledger CSVs)
@@ -70,6 +70,6 @@ _(None currently)_
 
 ## Known Issues
 
-**Snipcart Custom Field Validation on Localhost**: Required custom fields may fail validation locally because Snipcart can't crawl `127.0.0.1`. Workaround: make fields optional for local testing, or test on deployed site.
+**Legacy note removed**: Local checkout no longer depends on hosted-cart crawling behavior.
 
 **Credit Card Autofill**: CC number, expiry, and CVV fields are inside Stripe's iframe for PCI compliance — not accessible to our autofill scripts.

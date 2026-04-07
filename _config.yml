@@ -4,11 +4,12 @@ url: https://pool.dustwave.xyz
 markdown: kramdown
 permalink: pretty
 
-# Snipcart - replace with your public API key
-snipcart_api_key: "OGNlMDFkN2ItYmNhNi00OTFjLThjNWUtNDc0MjlmYzEyNGZmNjM4MjM2NzEzNTczODA3NTc0"
-
 # Pledge worker URL
 worker_base: "https://pledge.dustwave.xyz"
+cart_runtime: first_party
+checkout_provider: first_party
+sales_tax_rate: 0.07875
+flat_shipping_rate: 3.00
 
 sass:
   sass_dir: assets/partials

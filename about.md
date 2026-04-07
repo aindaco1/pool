@@ -15,28 +15,28 @@ This protects both backers and creators: you only pay for projects that can actu
 
 ## No Account Required
 
-Unlike other platforms, The Pool doesn't require you to create an account. When you pledge, you receive an email with magic links to:
+Unlike other platforms, The Pool doesn't require you to create an account. When you pledge, you receive email links to:
 
 - **Manage your pledge** — cancel, modify amount, or update your payment method
 - **Access the supporter community** — vote on creative decisions and see exclusive updates
 
-Just save that email. Those links are your keys.
+If your checkout includes more than one campaign, you may receive separate confirmation emails and manage links for each campaign. Just save those emails. They are your keys.
 
 ## How It Works
 
 1. **Browse** — Find a project you want to support
-2. **Pledge** — Add tiers to your cart, optionally add a 0% to 15% tip for platform upkeep, and complete checkout (physical items include a flat $3 USPS shipping fee)
+2. **Pledge** — Add one or more campaigns to your cart, optionally add a 0% to 15% tip for platform upkeep, and continue into Stripe's secure checkout. Physical rewards add a flat shipping fee per campaign that includes physical items.
 3. **Save card** — Stripe securely saves your payment method (no charge yet)
 4. **Wait** — Campaign runs until its deadline (all times in Mountain Time)
-5. **Result** — If funded, you're charged. If not, nothing happens.
+5. **Result** — If a campaign is funded, your pledge for that campaign is charged. If it isn't, nothing happens.
 
-Multiple pledges from the same email are combined into a single charge when the campaign succeeds. Optional platform tips go to Dust Wave to help maintain The Pool and do not count toward a project's funding goal.
+Multiple pledges from the same email are combined into a single charge when the same campaign succeeds. Optional platform tips go to Dust Wave to help maintain The Pool and do not count toward a project's funding goal.
 
 ## For Creators
 
 The Pool is designed for filmmakers and creative projects with features like:
 
-- **Physical & digital tiers** — Offer tangible rewards with automatic shipping address collection and flat-rate USPS shipping
+- **Physical & digital tiers** — Offer tangible rewards with automatic shipping address collection and configurable flat-rate shipping
 - **Production phases** — Break your budget into phases supporters can fund directly
 - **Stretch goals** — Unlock additional creative possibilities as funding grows
 - **Community decisions** — Let your backers vote on creative choices
@@ -50,12 +50,14 @@ The Pool runs on a modern static architecture:
 | Layer | Platform | Role |
 |-------|----------|------|
 | Frontend | GitHub Pages | Jekyll static site |
-| Cart | Snipcart v3 | Cart management + checkout |
+| Cart | The Pool cart runtime | First-party cart, pledge review, and checkout handoff |
 | Payments | Stripe | Card storage, off-session charges, shipping address collection |
-| Backend | Cloudflare Worker | Pledge storage, live stats, settlement |
+| Backend | Cloudflare Worker | Canonical pricing, pledge storage, live stats, fulfillment data, settlement |
 | Email | Resend | Confirmations, updates, notifications |
 
 No database servers. No monthly hosting fees. Version-controlled and transparent.
+
+For teams forking The Pool, tax and shipping settings live in site config and mirrored Worker env so local UI, checkout, reports, and emails all stay aligned.
 
 ## Open Source
 

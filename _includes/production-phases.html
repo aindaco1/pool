@@ -1,4 +1,5 @@
 {% if include.phases and include.campaign %}
+{% assign cart_add_item_classes = "poolcart-add-item" %}
 <section class="production-phases" aria-label="Production phases">
   <h3>Production Phases</h3>
   
@@ -31,11 +32,11 @@
               
               {% assign percent = item.current | times: 100 | divided_by: item.target %}
               <div class="progress" aria-label="{{ item.label }} progress">
-                <i style="width: {{ percent }}%"></i>
+                <i data-progress-width="{{ percent }}"></i>
               </div>
               
               <div class="registry-item__footer">
-                <button class="btn btn--small snipcart-add-item"
+                <button class="btn btn--small {{ cart_add_item_classes }}"
                         data-item-id="{{ include.campaign.slug }}__registry__{{ item.id }}"
                         data-item-name="{{ item.label }}"
                         data-item-price="{{ item.target | minus: item.current }}"

@@ -9,6 +9,12 @@ import { verifyToken } from '../token.js';
 import { getVoteStatus, castVote, getCampaignResults } from '../votes.js';
 import { isValidVoteOption, isValidDecisionId, isValidSlug, jsonResponse } from '../validation.js';
 
+function getAppMode(env = {}) {
+  return String(env.APP_MODE || env.SNIPCART_MODE || 'live').trim().toLowerCase() === 'test'
+    ? 'test'
+    : 'live';
+}
+
 /**
  * GET /votes - Get voting status for decisions
  * 
@@ -28,7 +34,7 @@ export async function handleGetVotes(request, env) {
   // Dev mode bypass for local testing (SEC-001: Only allow in test mode)
   let orderId, campaignSlug, email;
   if (token.startsWith('dev-token-')) {
-    if (env.SNIPCART_MODE !== 'test') {
+    if (getAppMode(env) !== 'test') {
       return jsonResponse({ error: 'Invalid or expired token' }, 401, env);
     }
     campaignSlug = token.replace('dev-token-', '');
@@ -119,7 +125,7 @@ export async function handlePostVote(request, env) {
   // Dev mode bypass for local testing (SEC-001: Only allow in test mode)
   let orderId, campaignSlug, email;
   if (token.startsWith('dev-token-')) {
-    if (env.SNIPCART_MODE !== 'test') {
+    if (getAppMode(env) !== 'test') {
       return jsonResponse({ error: 'Invalid or expired token' }, 401, env);
     }
     campaignSlug = token.replace('dev-token-', '');

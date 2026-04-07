@@ -23,10 +23,9 @@ WORKER_URL=https://pledge.dustwave.xyz PROD_MODE=true npm run test:security
 
 ## Local Development Setup
 
-For the live-worker webhook checks, the Stripe webhook secret should be configured locally. If you also configure the optional Snipcart webhook secret locally, the network-level suite will verify `401` responses there too. Strict Snipcart token rejection is additionally covered in the unit suite.
+For the live-worker webhook checks, the Stripe webhook secret should be configured locally.
 
 - `STRIPE_WEBHOOK_SECRET`
-- `SNIPCART_WEBHOOK_SECRET`
 
 The easiest way to get a matching local setup is:
 
@@ -73,7 +72,7 @@ preview_id = "YOUR_RATELIMIT_PREVIEW_ID"
 - Replay attacks (same event ID)
 - Malformed webhook payloads
 - Missing signature headers
-- Snipcart token verification
+- Stripe webhook surface requires valid signatures
 
 ### 3. Authorization (`authorization.test.ts`)
 - Cross-user pledge access attempts
@@ -87,7 +86,7 @@ preview_id = "YOUR_RATELIMIT_PREVIEW_ID"
 - XSS payloads in user fields
 
 ### 5. Rate Limiting (`rate-limiting.test.ts`)
-- Burst requests to `/start` (20 req/min limit)
+- Burst requests to `/checkout-intent/start` should fail closed cleanly
 - Vote spam attempts (30 req/min limit)
 - Admin brute force simulation (5 req/min limit)
 - DoS resilience and resource exhaustion prevention

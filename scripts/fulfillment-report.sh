@@ -5,13 +5,14 @@
 # of each pledge for fulfillment purposes.
 #
 # Usage:
-#   ./scripts/fulfillment-report.sh [campaign-slug] [--env dev]
+#   ./scripts/fulfillment-report.sh [campaign-slug] [--env dev] [--local]
 #
 # Examples:
 #   ./scripts/fulfillment-report.sh                           # All, production
 #   ./scripts/fulfillment-report.sh worst-movie-ever          # Single campaign
 #   ./scripts/fulfillment-report.sh --env dev                 # Dev preview KV
-#   ./scripts/fulfillment-report.sh worst-movie-ever --env dev
+#   ./scripts/fulfillment-report.sh --local                   # Local Wrangler KV
+#   ./scripts/fulfillment-report.sh worst-movie-ever --local
 #
 # Output to file:
 #   ./scripts/fulfillment-report.sh worst-movie-ever > fulfillment.csv
@@ -25,19 +26,27 @@ if [ -f "$HOME/.nvm/nvm.sh" ]; then
 fi
 
 CAMPAIGN_FILTER=""
-KV_FLAGS=""
+KV_SCOPE_FLAGS=""
+WRANGLER_ENV_FLAGS=""
+LOCAL_PERSIST_FLAGS=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
     --env)
       if [[ "$2" == "dev" ]]; then
-        KV_FLAGS="--env dev --preview"
+        WRANGLER_ENV_FLAGS="--env dev"
+        KV_SCOPE_FLAGS="--preview"
       fi
       shift 2
       ;;
     --remote)
-      KV_FLAGS=""
+      KV_SCOPE_FLAGS=""
+      shift
+      ;;
+    --local)
+      KV_SCOPE_FLAGS="--local"
+      LOCAL_PERSIST_FLAGS="--persist-to .wrangler/state"
       shift
       ;;
     *)
@@ -49,10 +58,185 @@ done
 
 cd "$(dirname "$0")/../worker"
 
-echo "Fetching pledges for fulfillment report..." >&2
+if [[ -n "${WRANGLER_BIN:-}" ]]; then
+  WRANGLER_CMD=(${WRANGLER_BIN})
+elif [[ -n "${MOCK_WRANGLER_DATA:-}" ]] && command -v wrangler >/dev/null 2>&1; then
+  WRANGLER_CMD=(wrangler)
+else
+  WRANGLER_CMD=(npx wrangler)
+fi
+
+if [[ "$KV_SCOPE_FLAGS" == *"--local"* ]]; then
+  echo "Fetching pledges for fulfillment report from local Wrangler KV..." >&2
+else
+  echo "Fetching pledges for fulfillment report..." >&2
+fi
+
+if [[ "$KV_SCOPE_FLAGS" == *"--local"* ]]; then
+  python3 -c "
+import sys
+import json
+import csv
+import sqlite3
+from collections import defaultdict
+from io import StringIO
+from pathlib import Path
+
+# Tier ID to human-readable name mapping
+TIER_NAMES = {
+    'frame': 'One Frame',
+    'writer-credit': 'Writer Credit',
+    'sound-effect': 'Sound Effect',
+    'dialogue': 'Line of Dialogue',
+    'prop': 'Handheld Prop',
+    'costume': 'Costume',
+    'character': 'Add a Character',
+    'jack-does': 'Jack Does Whatever You Write',
+    'language': 'Scene in Another Language',
+    'act': 'Act in the Movie',
+}
+
+def get_tier_name(tier_id, fallback=''):
+    return TIER_NAMES.get(tier_id, fallback or tier_id or '')
+
+campaign_filter = '$CAMPAIGN_FILTER'
+
+root = Path('.wrangler/state/v3')
+db_paths = sorted((root / 'kv' / 'miniflare-KVNamespaceObject').glob('*.sqlite'))
+blob_dirs = sorted((root / 'kv').glob('*/blobs'))
+
+def resolve_entries():
+    for db_path in db_paths:
+        try:
+            conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
+            rows = conn.execute(\"select key, blob_id from _mf_entries where key like 'pledge:%'\").fetchall()
+            conn.close()
+        except Exception:
+            continue
+        if not rows:
+            continue
+        sample_blob = rows[0][1]
+        matched_blob_dir = None
+        for blob_dir in blob_dirs:
+            if (blob_dir / sample_blob).exists():
+                matched_blob_dir = blob_dir
+                break
+        if matched_blob_dir is None:
+            continue
+        return rows, matched_blob_dir
+    return [], None
+
+rows, blob_dir = resolve_entries()
+if not rows or blob_dir is None:
+    print('No pledges found.', file=sys.stderr)
+    sys.exit(0)
+
+print(f'Found {len(rows)} pledges. Processing...', file=sys.stderr)
+
+# Aggregate by (email, campaign)
+# Structure: { (email, campaign): { 'subtotal': 0, 'tax': 0, 'total': 0, 'items': { tier_name: qty } } }
+aggregated = defaultdict(lambda: {'subtotal': 0.0, 'tip': 0.0, 'tip_percent': 0, 'tax': 0.0, 'shipping': 0.0, 'total': 0.0, 'items': defaultdict(int), 'shipping_address': ''})
+
+for _, blob_id in rows:
+    blob_path = blob_dir / blob_id
+    if not blob_path.exists():
+        continue
+    try:
+        data = json.loads(blob_path.read_text())
+    except Exception:
+        continue
+
+    campaign = data.get('campaignSlug', '')
+    if campaign_filter and campaign != campaign_filter:
+        continue
+    if data.get('pledgeStatus') == 'cancelled':
+        continue
+
+    email = data.get('email', '')
+    key = (email, campaign)
+
+    subtotal = (data.get('subtotal') or data.get('amount') or 0) / 100
+    tip = (data.get('tipAmount') or 0) / 100
+    tax = (data.get('tax') or 0) / 100
+    total = (data.get('amount') or 0) / 100
+
+    aggregated[key]['subtotal'] += subtotal
+    aggregated[key]['tip'] += tip
+    aggregated[key]['tax'] += tax
+    aggregated[key]['total'] += total
+    if aggregated[key]['subtotal'] > 0 and aggregated[key]['tip'] > 0:
+        aggregated[key]['tip_percent'] = round((aggregated[key]['tip'] / aggregated[key]['subtotal']) * 100)
+
+    shipping = (data.get('shipping') or 0) / 100
+    if shipping > aggregated[key]['shipping']:
+        aggregated[key]['shipping'] = shipping
+
+    addr = data.get('shippingAddress')
+    if addr and not aggregated[key]['shipping_address']:
+        parts = [addr.get('name', ''), addr.get('address1', ''), addr.get('address2', ''),
+                 addr.get('city', ''), addr.get('province', ''), addr.get('postalCode', ''),
+                 addr.get('country', '')]
+        aggregated[key]['shipping_address'] = ', '.join(p for p in parts if p)
+
+    tier_id = data.get('tierId')
+    if tier_id:
+        tier_name = get_tier_name(tier_id, data.get('tierName'))
+        tier_qty = data.get('tierQty', 1) or 1
+        aggregated[key]['items'][tier_name] += tier_qty
+
+    for add_tier in data.get('additionalTiers', []) or []:
+        add_id = add_tier.get('id', '')
+        add_name = get_tier_name(add_id, add_tier.get('name'))
+        add_qty = add_tier.get('qty', 1) or 1
+        if add_name:
+            aggregated[key]['items'][add_name] += add_qty
+
+# Output aggregated CSV
+output = StringIO()
+writer = csv.writer(output)
+writer.writerow(['email', 'campaign', 'items', 'subtotal', 'tip_percent', 'tip', 'tax', 'shipping', 'total', 'shipping_address'])
+
+for (email, campaign), data in sorted(aggregated.items()):
+    # Skip if no items or zero total
+    if not data['items'] or data['total'] <= 0:
+        continue
+    
+    # Build items string
+    items_list = []
+    for item_name, qty in sorted(data['items'].items()):
+        if qty > 0:
+            if qty > 1:
+                items_list.append(f'{item_name} x{qty}')
+            else:
+                items_list.append(item_name)
+    
+    items_str = '; '.join(items_list)
+    
+    writer.writerow([
+        email,
+        campaign,
+        items_str,
+        f\"{data['subtotal']:.2f}\",
+        str(data['tip_percent']),
+        f\"{data['tip']:.2f}\",
+        f\"{data['tax']:.2f}\",
+        f\"{data['shipping']:.2f}\",
+        f\"{data['total']:.2f}\",
+        data['shipping_address']
+    ])
+
+print(output.getvalue().strip())
+"
+  exit 0
+fi
 
 # Get all pledge keys
-KEYS=$(wrangler kv key list --binding PLEDGES --prefix "pledge:" --remote $KV_FLAGS 2>/dev/null | \
+KEY_LIST_OUTPUT=$("${WRANGLER_CMD[@]}" kv key list --binding PLEDGES --prefix "pledge:" $WRANGLER_ENV_FLAGS $KV_SCOPE_FLAGS $LOCAL_PERSIST_FLAGS 2>&1) || {
+  echo "$KEY_LIST_OUTPUT" >&2
+  exit 1
+}
+
+KEYS=$(printf "%s" "$KEY_LIST_OUTPUT" | \
   python3 -c "
 import sys, json
 try:
@@ -78,7 +262,7 @@ trap "rm -f $TMPFILE" EXIT
 
 while read -r KEY; do
   if [[ -z "$KEY" ]]; then continue; fi
-  wrangler kv key get "$KEY" --binding PLEDGES --remote $KV_FLAGS 2>/dev/null >> "$TMPFILE"
+  "${WRANGLER_CMD[@]}" kv key get "$KEY" --binding PLEDGES $WRANGLER_ENV_FLAGS $KV_SCOPE_FLAGS $LOCAL_PERSIST_FLAGS 2>/dev/null >> "$TMPFILE"
   echo "" >> "$TMPFILE"  # Ensure newline after JSON
   echo "---PLEDGE_DELIMITER---" >> "$TMPFILE"
 done <<< "$KEYS"
@@ -120,67 +304,48 @@ for line in sys.stdin:
     if line.strip() == '---PLEDGE_DELIMITER---':
         if pledge_data.strip():
             try:
-                # Clean up any newlines within the JSON (corrupted data)
                 cleaned = pledge_data.replace('\\n', '').strip()
-                # Also handle literal newlines that break JSON
                 cleaned = ' '.join(cleaned.split())
                 data = json.loads(cleaned)
                 campaign = data.get('campaignSlug', '')
-                
-                # Filter by campaign if specified
                 if campaign_filter and campaign != campaign_filter:
                     pledge_data = ''
                     continue
-                
-                # Skip cancelled pledges
                 if data.get('pledgeStatus') == 'cancelled':
                     pledge_data = ''
                     continue
-                
                 email = data.get('email', '')
                 key = (email, campaign)
-                
-                # Add current amounts
                 subtotal = (data.get('subtotal') or data.get('amount') or 0) / 100
                 tip = (data.get('tipAmount') or 0) / 100
                 tax = (data.get('tax') or 0) / 100
                 total = (data.get('amount') or 0) / 100
-                
                 aggregated[key]['subtotal'] += subtotal
                 aggregated[key]['tip'] += tip
                 aggregated[key]['tax'] += tax
                 aggregated[key]['total'] += total
                 if aggregated[key]['subtotal'] > 0 and aggregated[key]['tip'] > 0:
                     aggregated[key]['tip_percent'] = round((aggregated[key]['tip'] / aggregated[key]['subtotal']) * 100)
-                
-                # Capture shipping fee (flat fee, take max across merged pledges)
                 shipping = (data.get('shipping') or 0) / 100
                 if shipping > aggregated[key]['shipping']:
                     aggregated[key]['shipping'] = shipping
-                
-                # Capture shipping address (use most recent non-empty)
                 addr = data.get('shippingAddress')
                 if addr and not aggregated[key]['shipping_address']:
                     parts = [addr.get('name', ''), addr.get('address1', ''), addr.get('address2', ''),
                              addr.get('city', ''), addr.get('province', ''), addr.get('postalCode', ''),
                              addr.get('country', '')]
                     aggregated[key]['shipping_address'] = ', '.join(p for p in parts if p)
-                
-                # Add current tier
                 tier_id = data.get('tierId')
                 if tier_id:
                     tier_name = get_tier_name(tier_id, data.get('tierName'))
                     tier_qty = data.get('tierQty', 1) or 1
                     aggregated[key]['items'][tier_name] += tier_qty
-                
-                # Add additional tiers
                 for add_tier in data.get('additionalTiers', []) or []:
                     add_id = add_tier.get('id', '')
                     add_name = get_tier_name(add_id, add_tier.get('name'))
                     add_qty = add_tier.get('qty', 1) or 1
                     if add_name:
                         aggregated[key]['items'][add_name] += add_qty
-                
             except json.JSONDecodeError:
                 pass
             except Exception as e:
@@ -195,21 +360,13 @@ writer = csv.writer(output)
 writer.writerow(['email', 'campaign', 'items', 'subtotal', 'tip_percent', 'tip', 'tax', 'shipping', 'total', 'shipping_address'])
 
 for (email, campaign), data in sorted(aggregated.items()):
-    # Skip if no items or zero total
     if not data['items'] or data['total'] <= 0:
         continue
-    
-    # Build items string
     items_list = []
     for item_name, qty in sorted(data['items'].items()):
         if qty > 0:
-            if qty > 1:
-                items_list.append(f'{item_name} x{qty}')
-            else:
-                items_list.append(item_name)
-    
+            items_list.append(f'{item_name} x{qty}' if qty > 1 else item_name)
     items_str = '; '.join(items_list)
-    
     writer.writerow([
         email,
         campaign,
@@ -225,5 +382,4 @@ for (email, campaign), data in sorted(aggregated.items()):
 
 print(output.getvalue().strip())
 "
-
 echo "Done." >&2

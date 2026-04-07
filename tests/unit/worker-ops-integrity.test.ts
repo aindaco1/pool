@@ -50,14 +50,6 @@ vi.mock('../../worker/src/github.js', () => ({
   triggerSiteRebuild: vi.fn(async () => {})
 }));
 
-vi.mock('../../worker/src/snipcart.js', () => ({
-  createSnipcartClient: vi.fn(() => ({ orders: { get: vi.fn() } })),
-  extractPledgeFromOrder: vi.fn(() => null),
-  extractCartFromSnipcartItems: vi.fn(() => ({ campaignSlug: null, tierSelections: [], supportItems: [], customAmount: 0 })),
-  canCancelOrder: vi.fn(() => ({ allowed: true })),
-  canModifyOrder: vi.fn(() => ({ allowed: true }))
-}));
-
 class PaginatedKVNamespace {
   store = new Map<string, string>();
   pageSize: number;
@@ -146,7 +138,7 @@ function createEnv(overrides: Record<string, unknown> = {}) {
   return {
     SITE_BASE: 'https://pool.test',
     WORKER_BASE: 'https://pool.test',
-    SNIPCART_MODE: 'test',
+    APP_MODE: 'test',
     STRIPE_SECRET_KEY_TEST: 'sk_test_123',
     STRIPE_WEBHOOK_SECRET_TEST: 'whsec_test_123',
     MAGIC_LINK_SECRET: 'secret',

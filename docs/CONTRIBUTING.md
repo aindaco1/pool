@@ -42,27 +42,27 @@ bundle exec jekyll clean
 | CNAME | pool | `<username>.github.io` |
 
 4. Enable HTTPS in repo settings
-5. Snipcart dashboard: allow domain and set Public API key
-6. Verify cart loads and campaigns render
+5. Verify the first-party cart loads and campaigns render
+6. Verify Worker-backed checkout boot config is present
 
 ---
 
 ## Current Status (Jan 2026)
 
 ✅ **Completed:**
-- Jekyll + Snipcart v3 site structure
+- Jekyll + first-party cart site structure
 - Sass styling system (15 modular partials, 8px grid)
 - Money formatting plugin (`$3,800` style)
 - Campaign cards, two-column layout, hero variants
 - Production phases, community decisions, production diary
-- Pledge UX, cart icon, checkout autofill
+- Pledge UX, cart icon, first-party checkout review
 - No-account pledge management (magic links, `/manage/` page)
 - Supporter-only community page with voting
 - Non-stackable tier support (hide quantity controls in cart)
-- Mobile hamburger/Snipcart overlay z-index handling
+- Mobile hamburger/cart overlay handling
 - Cloudflare Worker (pledge storage, stats, inventory, emails)
 - Worker cron trigger for auto-settle (midnight MT)
-- Aggregated charging (one charge per supporter)
+- Aggregated charging (one charge per supporter per campaign)
 - Support items and custom amounts data flow (cart → Worker → KV → stats)
 - Countdown timer pre-rendering (no "00 00 00 00" flash)
 - Multi-tier pledge support (`additionalTiers`)
@@ -96,7 +96,7 @@ _(None currently)_
 ## First Contribution Checklist
 
 - [ ] Clone repo, run `bundle exec jekyll serve` to preview
-- [ ] Skim `_layouts/` & `_includes/` to see Snipcart integration
+- [ ] Skim `_layouts/` & `_includes/` to see first-party cart integration
 - [ ] Review `assets/js/` cart & pledge scripts
 - [ ] Read `worker/src/` to understand the backend (pledge storage, stats, charging)
 - [ ] Verify `CNAME` is set to `pool.dustwave.xyz`
@@ -105,9 +105,8 @@ _(None currently)_
 
 ## Secrets & Config (Test Mode First)
 
-- **GitHub Actions**: Add test `STRIPE_SECRET_KEY` + `SNIPCART_SECRET`
+- **GitHub Actions**: Add test `STRIPE_SECRET_KEY` + `CHECKOUT_INTENT_SECRET`
 - **Cloudflare Worker**: Same secrets as env vars; set `SITE_BASE`
-- **Snipcart dashboard**: Allow `pool.dustwave.xyz` + localhost for testing
 - **Stripe**: Create webhook to `https://pledge.dustwave.xyz/webhooks/stripe`
 
 See [TESTING.md](TESTING.md) for full secrets reference.
@@ -118,7 +117,6 @@ See [TESTING.md](TESTING.md) for full secrets reference.
 
 - Secrets live only in GitHub Actions + Cloudflare vars; never in repo
 - Validate Stripe webhook signatures
-- Restrict Snipcart allowed domains to `pool.dustwave.xyz`
 - Never commit API keys or tokens
 
 ---

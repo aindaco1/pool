@@ -8,7 +8,7 @@ The Pool uses a **no-account, email-based pledge management system**. Backers sa
 - **Magic link management** — Cancel, modify, or update payment method via an order-scoped email link
 - **All-or-nothing** — Cards saved now, charged only if goal is met
 - **Optional platform tip** — 0% to 15% Dust Wave tip (default 5%) added to totals but excluded from campaign progress
-- **Worker-owned email** — Snipcart emails stay disabled; all supporter email comes from Resend
+- **Worker-owned email** — All supporter email comes from Resend
 - **Film-focused** — Designed for creative crowdfunding
 
 ---
@@ -31,7 +31,7 @@ upcoming → live → post
 
 | Component | Role |
 |-----------|------|
-| **Snipcart** | Cart UI and payment-session source of truth for the pledge shape |
+| **First-party cart** | Browser-owned cart UI and checkout review state |
 | **Stripe** | SetupIntents (save cards) + PaymentIntents (charge later) |
 | **Cloudflare Worker** | Backend: checkout, webhooks, pledge storage (KV), stats, auto-settle cron |
 | **Jekyll** | Static pages + campaign markdown |
@@ -41,14 +41,14 @@ upcoming → live → post
 ## Pledge Lifecycle
 
 ```
-1. BROWSE     → Visitor views campaign, adds tier to Snipcart cart, adjusts optional tip
-2. CHECKOUT   → Billing auto-filled → JS intercepts "Continue to Pledge"
-3. START      → Worker verifies the Snipcart checkout state and creates Stripe Checkout (setup mode)
+1. BROWSE     → Visitor views campaign, adds tier to the first-party cart, adjusts optional tip
+2. REVIEW     → First-party cart drawer shows pledge review, tip state, and immediate pricing
+3. START      → Worker canonicalizes the cart via `/checkout-intent/start` and creates Stripe Checkout (setup mode)
 4. SAVE CARD  → Stripe Checkout saves payment method (no charge)
-5. CONFIRM    → Stripe webhook → Worker stores pledge in KV, sends magic link email
+5. CONFIRM    → Stripe webhook → Worker stores one pledge per campaign in KV and sends campaign-specific supporter email(s)
 6. MANAGE     → Backer uses magic link to cancel/modify/update card
 7. DEADLINE   → Worker cron (midnight MT) checks campaigns
-8. CHARGE     → If funded + deadline passed: aggregate by email, charge once per supporter
+8. CHARGE     → If funded + deadline passed: aggregate by email within each campaign, charge once per supporter per campaign
 9. COMPLETE   → Update pledge_status to 'charged' or 'payment_failed'
 ```
 
@@ -56,7 +56,7 @@ upcoming → live → post
 
 ## Pledge Storage (Cloudflare KV)
 
-Pledges are stored in Cloudflare KV (not Snipcart). Key patterns:
+Pledges are stored in Cloudflare KV. Key patterns:
 
 | Key | Contents |
 |-----|----------|
@@ -66,6 +66,7 @@ Pledges are stored in Cloudflare KV (not Snipcart). Key patterns:
 | `tier-inventory:{campaignSlug}` | Claim counts for limited tiers |
 | `pending-extras:{orderId}` | Temporary storage for support items/custom amount during checkout |
 | `pending-tiers:{orderId}` | Temporary storage for additional tiers when Stripe metadata would be too large |
+| `checkout-intent:{orderId}` | Canonicalized checkout payload used to fan bundled checkout into campaign-scoped pledges |
 
 **Pledge record:**
 ```json
@@ -100,6 +101,7 @@ Pledges are stored in Cloudflare KV (not Snipcart). Key patterns:
 - `customAmount` — Dollar amount for "no reward" custom support additions
 - `additionalTiers` — Array of `{ id, qty }` for multi-tier pledges (when `single_tier_only: false`)
 - `tipPercent` / `tipAmount` — Optional Dust Wave platform tip stored separately from campaign subtotal
+- Bundled multi-campaign checkouts are persisted as separate pledge records, one per campaign
 
 **History entries:**
 Each history entry tracks a pledge event with full context:
@@ -125,7 +127,7 @@ Stateless HMAC-signed tokens (no database needed):
 **Payload:**
 ```json
 {
-  "orderId": "snipcart-order-token",
+  "orderId": "pool-intent-abc123",
   "email": "backer@example.com",
   "campaignSlug": "hand-relations",
   "exp": 1754000000
@@ -146,40 +148,40 @@ Each token only authorizes its own order. A valid link no longer grants email-wi
 
 ## Worker API Routes
 
-### `POST /start`
-Create Stripe Checkout session (setup mode) after Snipcart order.
+### `POST /checkout-intent/start`
+Create Stripe Checkout session (setup mode) from the first-party cart state.
 
 **Request:**
 ```json
 {
-  "publicToken": "snipcart-public-payment-session-token",
-  "cartToken": "snipcart-cart-token",
   "campaignSlug": "hand-relations",
-  "email": "backer@example.com",
+  "items": [
+    { "id": "hand-relations__producer-credit", "quantity": 1 }
+  ],
   "tipPercent": 5
 }
 ```
 **Response:** `{ url }` → Redirect to Stripe Checkout
 
 **Data flow:**
-1. Cart.js passes the selected tip percent plus either Snipcart's custom-gateway `publicToken` or the current `cartToken`
-2. Worker verifies the checkout state from Snipcart and reconstructs the cart shape from the verified cart/session items
+1. Cart.js passes the selected tip percent plus the current first-party cart items
+2. Worker reconstructs the cart shape from first-party items and canonical campaign rules
 3. Worker validates campaign state, single-tier rules, threshold gates, and limited inventory availability
 4. Worker stores any overflow tier/support-item metadata in temp KV (`pending-tiers:*`, `pending-extras:*`) and creates a setup-mode Stripe Checkout session
 5. If the pledge contains physical items, Stripe Checkout collects shipping address via `shipping_address_collection`
-6. On webhook, Worker fetches any temp metadata, extracts shipping address from Stripe, computes `subtotal + tax + shipping + tip`, persists the pledge, and then claims inventory
+6. On webhook, Worker fetches any temp metadata, extracts shipping address from Stripe, computes `subtotal + tax + shipping + tip`, persists one pledge per campaign, and then claims inventory
 
-The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`, and `/start` does not reserve limited inventory before checkout completion.
+The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`, and `/checkout-intent/start` does not reserve limited inventory before checkout completion.
 
 ### `POST /webhooks/stripe`
 Handle `checkout.session.completed`:
 - Extract `payment_method` and `customer` from SetupIntent
 - Fetch `supportItems`, `customAmount`, and additional tiers from temp KV when needed
-- Store pledge in KV with status `active` (includes support items, custom amount, shipping fee, tip, and shipping address)
+- Store one pledge per campaign in KV with status `active` (includes support items, custom amount, shipping fee, tip, and shipping address)
 - Update live stats (pledgedAmount, tierCounts, supportItems)
 - Claim tier inventory (for limited tiers) at persistence time
 - Generate magic link token
-- Send supporter confirmation email
+- Send campaign-specific supporter confirmation email(s)
 
 Webhook idempotency is committed only after successful pledge persistence so transient failures can retry safely.
 
@@ -325,7 +327,7 @@ curl -X POST http://localhost:8787/admin/recover-checkout \
 ## Front-End Pages
 
 ### `/campaigns/:slug/`
-Campaign detail with tier buttons → Snipcart cart
+Campaign detail with tier buttons → first-party cart drawer
 
 ### `/campaigns/:slug/pledge-success/`
 Post-Stripe success page with confirmation + manage link
@@ -340,7 +342,8 @@ Magic link landing page for pledge management:
 - Shows pledge cards with state-dependent UI
 - Groups projects into **Active** and **Closed** sections
 - Sorts active cards with the most recent campaigns first
-- Displays full breakdown: subtotal, optional Dust Wave tip, tax (7.875%), shipping ($3 if physical), total
+- Displays full breakdown: subtotal, optional Dust Wave tip, configured sales tax, configured flat shipping per physical campaign, total
+- Reads pricing labels and rates from shared config so cart UI, Worker totals, emails, and reports stay aligned for forks
 
 **Pledge card states:**
 
@@ -436,7 +439,7 @@ This allows supporters to fix expired/declined cards without manual admin interv
 |----------|---------|
 | **Resend** | All supporter emails (confirmation, milestones, diary updates, announcements, charge success, payment failed) |
 
-Note: Snipcart emails are disabled — the Worker handles all pledge-related email via Resend.
+The Worker handles all pledge-related email via Resend.
 
 ### Resend Integration (Worker)
 
@@ -540,7 +543,7 @@ All emails show exact amounts with 2 decimal places (no rounding).
 - `/pledge/cancel` and `/pledge/modify` reject if campaign deadline has passed (Mountain Time)
 - Cron checks `pledgeStatus === 'active'` and `!charged` before charging
 - `pledgeStatus` and `charged` flags prevent double-charging
-- Aggregation by email ensures one charge per supporter even with multiple pledges
+- Aggregation by email ensures one charge per supporter per campaign even with multiple pledge rows
 - Manage page shows deadline-passed notice, locked badge, and read-only pledge controls once deadline passes
 - Payment method updates remain available after deadline (for failed payment recovery)
 

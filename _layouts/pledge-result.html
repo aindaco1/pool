@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="/assets/images/defaults/favicon.png">
-  {% include snipcart-head.html %}
+  {% include pledge-result-csp.html %}
+  {% include cart-head.html %}
   <title>{{ page.title }} · {{ site.title }}</title>
 </head>
 <body>
@@ -25,17 +26,8 @@
     </div>
   </footer>
 
-  {% include snipcart-foot.html %}
+  {% include cart-foot.html %}
   
-  <script>
-    // Invalidate stats and inventory caches so data updates on next page
-    try {
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('pool_stats_') || key.startsWith('pool_inventory_')) {
-          localStorage.removeItem(key);
-        }
-      });
-    } catch {}
-  </script>
+  <script src="/assets/js/pledge-result.js" defer></script>
 </body>
 </html>

@@ -15,9 +15,20 @@ crons = ["0 7 * * *"]
 [vars]
 SITE_BASE = "https://pool.dustwave.xyz"
 WORKER_BASE = "https://pledge.dustwave.xyz"
-SNIPCART_API_BASE = "https://app.snipcart.com/api"
-SNIPCART_MODE = "live"  # "test" or "live"
+APP_MODE = "live"  # "test" or "live"
 PLATFORM_AUTHOR = "Dust Wave"
+CHECKOUT_PROVIDER = "first_party"
+CART_RUNTIME = "first_party"
+SALES_TAX_RATE = "0.07875"
+FLAT_SHIPPING_RATE = "3.00"
+
+[[durable_objects.bindings]]
+name = "CHECKOUT_INTENTS"
+class_name = "CheckoutIntentNonceCoordinator"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["CheckoutIntentNonceCoordinator"]
 
 # KV Namespaces - update IDs after running:
 #   wrangler kv:namespace create "VOTES"
@@ -45,17 +56,15 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # Secrets (set via `wrangler secret put <NAME>`):
 # Required:
 # - STRIPE_SECRET_KEY          (Stripe secret key - used if _TEST/_LIVE not set)
-# - SNIPCART_SECRET            (Snipcart API key - used if _TEST/_LIVE not set)
 # - MAGIC_LINK_SECRET          (HMAC secret for token signing)
+# - CHECKOUT_INTENT_SECRET     (HMAC secret for first-party checkout intent signing)
 # - RESEND_API_KEY             (Resend email API key)
 # - ADMIN_SECRET               (Admin API key for broadcast/rebuild endpoints)
 #
 # Optional (for separate test/live keys):
 # - STRIPE_SECRET_KEY_LIVE / STRIPE_SECRET_KEY_TEST
 # - STRIPE_WEBHOOK_SECRET_LIVE / STRIPE_WEBHOOK_SECRET_TEST
-# - SNIPCART_SECRET_LIVE / SNIPCART_SECRET_TEST
 # - STRIPE_WEBHOOK_SECRET      (webhook signing secret)
-# - SNIPCART_WEBHOOK_SECRET    (validate Snipcart webhooks)
 #
 # Optional (for GitHub rebuild trigger):
 # - GITHUB_TOKEN               (GitHub PAT with workflow scope)
@@ -63,9 +72,16 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - GITHUB_REPO                (defaults to 'pool')
 # - GITHUB_WORKFLOW            (defaults to 'deploy.yml')
 
-# Development overrides (uses test mode)
+# Development overrides
+# Keep local Worker defaults aligned with `_config.local.yml` so local
+# checkout exercises the first-party path end to end without changing
+# production defaults.
 [env.dev]
-vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "https://pledge.dustwave.xyz", SNIPCART_API_BASE = "https://app.snipcart.com/api", SNIPCART_MODE = "test", PLATFORM_AUTHOR = "Dust Wave" }
+vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "http://127.0.0.1:8787", APP_MODE = "test", PLATFORM_AUTHOR = "Dust Wave", CHECKOUT_PROVIDER = "first_party", CART_RUNTIME = "first_party", SALES_TAX_RATE = "0.07875", FLAT_SHIPPING_RATE = "3.00" }
+
+[[env.dev.durable_objects.bindings]]
+name = "CHECKOUT_INTENTS"
+class_name = "CheckoutIntentNonceCoordinator"
 
 [[env.dev.kv_namespaces]]
 binding = "VOTES"

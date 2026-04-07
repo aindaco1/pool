@@ -71,10 +71,11 @@ function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportIte
 function renderAmountBreakdown(env, { subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, totalLabel, totalAmount }) {
   const resolvedTotal = totalAmount ?? (subtotal + tax + shipping + tipAmount);
   const platformAuthor = getPlatformAuthor(env);
+  const salesTaxLabel = formatSalesTaxLabel(env);
   return `
     <p style="margin: 0 0 4px 0;">Subtotal: $${(subtotal / 100).toFixed(2)}</p>
     ${tipAmount > 0 ? `<p style="margin: 0 0 4px 0;">${platformAuthor} tip${tipPercent > 0 ? ` (${tipPercent}%)` : ''}: $${(tipAmount / 100).toFixed(2)}</p>` : ''}
-    <p style="margin: 0 0 4px 0;">Tax (7.875%): $${(tax / 100).toFixed(2)}</p>
+    <p style="margin: 0 0 4px 0;">${salesTaxLabel}: $${(tax / 100).toFixed(2)}</p>
     ${shipping > 0 ? `<p style="margin: 0 0 4px 0;">Shipping: $${(shipping / 100).toFixed(2)}</p>` : ''}
     <p style="margin: 0 0 8px 0;"><strong>${totalLabel}: $${(resolvedTotal / 100).toFixed(2)}</strong></p>
   `.trim();
@@ -743,3 +744,4 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
 
   return response.json();
 }
+import { formatSalesTaxLabel } from './provider-config.js';

@@ -1,7 +1,7 @@
 /**
  * Webhook Security Tests
  * 
- * Tests for Stripe and Snipcart webhook signature verification.
+ * Tests for Stripe webhook signature verification.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -171,58 +171,6 @@ describe('Webhook Security Tests', () => {
     });
   });
 
-  describe('Snipcart Webhook Security', () => {
-    const fakeSnipcartEvent = {
-      eventName: 'order.completed',
-      mode: 'Test',
-      content: {
-        token: 'snipcart-order-fake-123',
-        email: 'attacker@evil.com',
-        items: [{
-          id: `${TEST_CAMPAIGNS.valid}__frame`,
-          name: 'Test Tier',
-          price: 5,
-          quantity: 1
-        }]
-      }
-    };
-
-    it('should reject webhook without request token', async () => {
-      const res = await securityFetch('/webhooks/snipcart', {
-        method: 'POST',
-        body: JSON.stringify(fakeSnipcartEvent)
-      });
-
-      // Local/staging workers may run without the optional Snipcart webhook secret.
-      // Strict token enforcement is covered in the unit suite where the secret is injected.
-      expect([200, 401]).toContain(res.status);
-    });
-
-    it('should reject webhook with invalid request token', async () => {
-      const res = await securityFetch('/webhooks/snipcart', {
-        method: 'POST',
-        headers: {
-          'x-snipcart-requesttoken': 'invalid_token_attempt'
-        },
-        body: JSON.stringify(fakeSnipcartEvent)
-      });
-
-      expect([200, 401]).toContain(res.status);
-    });
-
-    it('should reject webhook with empty request token', async () => {
-      const res = await securityFetch('/webhooks/snipcart', {
-        method: 'POST',
-        headers: {
-          'x-snipcart-requesttoken': ''
-        },
-        body: JSON.stringify(fakeSnipcartEvent)
-      });
-
-      expect([200, 401]).toContain(res.status);
-    });
-  });
-
   describe('Shipping Address Injection via Webhook', () => {
     it('should reject forged webhook with malicious shipping_details', async () => {
       const eventWithShipping = {
@@ -337,7 +285,7 @@ describe('Webhook Security Tests', () => {
         }
       };
       
-      // Note: In production (SNIPCART_MODE=live), the worker should skip this
+      // Note: In production (APP_MODE=live), the worker should skip this
       // before signature verification and return 200 OK.
       // In test mode, it will proceed to signature verification and fail.
       const res = await securityFetch('/webhooks/stripe', {

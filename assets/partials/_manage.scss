@@ -43,24 +43,11 @@
   }
 
   &__section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 16px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid $color--light;
+    display: block;
 
     h2 {
       margin: 0;
       font-size: 20px;
-    }
-
-    span {
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: $color--secondary;
     }
   }
 

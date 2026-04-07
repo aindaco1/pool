@@ -21,13 +21,13 @@ describe('Input Validation Security Tests', () => {
 
   describe('XSS Prevention', () => {
     it.each(MALICIOUS_PAYLOADS.xss)('should handle XSS payload in email: %s', async (payload) => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-order-xss',
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: payload
+          items: [],
+          email: payload,
+          tipPercent: 5
         })
       });
       
@@ -48,13 +48,12 @@ describe('Input Validation Security Tests', () => {
     });
 
     it.each(MALICIOUS_PAYLOADS.xss)('should handle XSS in custom tier name', async (payload) => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-order-xss-tier',
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: 'test@example.com',
+          items: [],
+          tipPercent: 5,
           tierName: payload
         })
       });
@@ -74,34 +73,31 @@ describe('Input Validation Security Tests', () => {
     });
 
     it.each(MALICIOUS_PAYLOADS.sqlInjection)('should handle SQL injection in orderId: %s', async (payload) => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: payload,
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: 'test@example.com'
+          items: [],
+          orderId: payload,
+          tipPercent: 5
         })
       });
       
-      // Should not cause server error (429 = rate limited, also acceptable)
       expect([200, 400, 401, 403, 429]).toContain(res.status);
     });
   });
 
   describe('NoSQL Injection Prevention', () => {
     it.each(MALICIOUS_PAYLOADS.nosqlInjection)('should handle NoSQL injection payload: %s', async (payload) => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-nosql',
           campaignSlug: payload,
-          amountCents: 500,
-          email: 'test@example.com'
+          items: [],
+          tipPercent: 5
         })
       });
       
-      // Should not crash or behave unexpectedly (429 = rate limited)
       expect([400, 404, 429, 500]).toContain(res.status);
       if (res.status === 500) {
         console.warn('WARNING: Server error on NoSQL payload - investigate');
@@ -110,20 +106,18 @@ describe('Input Validation Security Tests', () => {
 
     it('should not allow prototype pollution via JSON', async () => {
       const pollutionPayload = {
-        orderId: 'test-proto',
         campaignSlug: TEST_CAMPAIGNS.valid,
-        amountCents: 500,
-        email: 'test@example.com',
+        items: [],
+        tipPercent: 5,
         '__proto__': { admin: true },
         'constructor': { 'prototype': { admin: true } }
       };
       
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify(pollutionPayload)
       });
       
-      // Should handle gracefully (429 = rate limited)
       expect([200, 400, 429]).toContain(res.status);
     });
   });
@@ -156,74 +150,70 @@ describe('Input Validation Security Tests', () => {
     it('should handle extremely long email', async () => {
       const longEmail = 'a'.repeat(10000) + '@example.com';
       
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-long-email',
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: longEmail
+          items: [],
+          email: longEmail,
+          tipPercent: 5
         })
       });
       
-      // Worker accepts, Stripe may reject - either is fine (429 = rate limited)
       expect([200, 400, 413, 429, 500]).toContain(res.status);
     });
 
     it('should handle extremely large amountCents', async () => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-huge-amount',
           campaignSlug: TEST_CAMPAIGNS.valid,
           amountCents: Number.MAX_SAFE_INTEGER,
-          email: 'test@example.com'
+          items: [],
+          tipPercent: 5
         })
       });
       
-      // Should handle gracefully (might succeed or fail validation, 429 = rate limited)
       expect([200, 400, 429, 500]).toContain(res.status);
     });
 
     it('should handle negative amountCents', async () => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-negative-amount',
           campaignSlug: TEST_CAMPAIGNS.valid,
           amountCents: -1000,
-          email: 'test@example.com'
+          items: [],
+          tipPercent: 5
         })
       });
       
-      // Worker may accept (Stripe will reject), or reject early - either is fine (429 = rate limited)
       expect([200, 400, 429, 500]).toContain(res.status);
     });
 
     it('should handle zero amountCents', async () => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-zero-amount',
           campaignSlug: TEST_CAMPAIGNS.valid,
           amountCents: 0,
-          email: 'test@example.com'
+          items: [],
+          tipPercent: 5
         })
       });
       
-      // Worker may accept (Stripe will reject), or reject early - either is fine (429 = rate limited)
       expect([200, 400, 429, 500]).toContain(res.status);
     });
   });
 
   describe('Content-Type Handling', () => {
     it('should reject non-JSON content type on POST endpoints', async () => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
-        body: 'orderId=test&campaignSlug=hand-relations&amountCents=500'
+        body: 'campaignSlug=hand-relations&items=%5B%5D&tipPercent=5'
       });
       
       // Should fail to parse or reject (429 = rate limited)
@@ -231,13 +221,12 @@ describe('Input Validation Security Tests', () => {
     });
 
     it('should handle missing Content-Type', async () => {
-      const res = await fetch(`${WORKER_URL}/start`, {
+      const res = await fetch(`${WORKER_URL}/checkout-intent/start`, {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-no-content-type',
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: 'test@example.com'
+          items: [],
+          tipPercent: 5
         })
       });
       
@@ -287,73 +276,69 @@ describe('Input Validation Security Tests', () => {
       // JSON spec says last value wins, but behavior varies
       const duplicateKeys = '{"orderId":"test","orderId":"overwritten","campaignSlug":"hand-relations","amountCents":500,"email":"test@example.com"}';
       
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: duplicateKeys
       });
       
-      // Should handle gracefully (429 = rate limited)
       expect([200, 400, 429, 500]).toContain(res.status);
     });
 
     it('should handle nested objects in unexpected fields', async () => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
           orderId: { nested: 'object' },
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: 'test@example.com'
+          items: [],
+          tipPercent: 5
         })
       });
       
-      // JS coerces to "[object Object]" - may succeed or fail, key is no crash (429 = rate limited)
       expect([200, 400, 429, 500]).toContain(res.status);
     });
 
     it('should handle arrays in string fields', async () => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
           orderId: ['array', 'of', 'strings'],
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: 'test@example.com'
+          items: [],
+          tipPercent: 5
         })
       });
       
-      // JS coerces array to string - may succeed or fail, key is no crash (429 = rate limited)
       expect([200, 400, 429, 500]).toContain(res.status);
     });
 
     it('should handle null values', async () => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
           orderId: null,
           campaignSlug: null,
-          amountCents: null,
-          email: null
+          items: null,
+          tipPercent: null
         })
       });
       
-      // Should reject null required fields (429 = rate limited)
       expect([400, 429, 500]).toContain(res.status);
     });
 
     it('should handle unicode in input', async () => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
           orderId: 'test-unicode-🎬🎥',
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
+          items: [],
+          tipPercent: 5,
           email: 'tëst@éxample.com',
           tierName: '日本語タイヤー'
         })
       });
       
-      // Should handle unicode gracefully (429 = rate limited)
       expect([200, 400, 429]).toContain(res.status);
     });
   });
@@ -369,18 +354,16 @@ describe('Input Validation Security Tests', () => {
       ];
 
       for (const extra of payloads) {
-        const res = await securityFetch('/start', {
+        const res = await securityFetch('/checkout-intent/start', {
           method: 'POST',
           body: JSON.stringify({
-            orderId: `test-physical-${Date.now()}-${Math.random().toString(36).slice(2)}`,
             campaignSlug: TEST_CAMPAIGNS.valid,
-            amountCents: 500,
-            email: 'test@example.com',
+            items: [],
+            tipPercent: 5,
             ...extra,
           })
         });
 
-        // Should handle gracefully - not crash (429 = rate limited)
         expect([200, 400, 429, 500]).toContain(res.status);
         if (res.status === 500) {
           console.warn('WARNING: Server error on hasPhysical payload:', extra);
@@ -391,32 +374,29 @@ describe('Input Validation Security Tests', () => {
     it('should not allow shipping fee manipulation via input', async () => {
       // Attacker tries to inject a negative shipping amount
       // (shipping is calculated server-side, not from client input)
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: `test-shipping-inject-${Date.now()}`,
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: 'test@example.com',
+          items: [],
+          tipPercent: 5,
           hasPhysical: true,
           shipping: -99999, // Attacker tries to inject negative shipping
           shippingFee: 0,   // Attacker tries to set fee to 0
         })
       });
 
-      // Worker should ignore client-supplied shipping values (429 = rate limited)
       expect([200, 400, 429]).toContain(res.status);
     });
 
     it('should handle XSS in additionalTiers array', async () => {
       for (const xss of MALICIOUS_PAYLOADS.xss) {
-        const res = await securityFetch('/start', {
+        const res = await securityFetch('/checkout-intent/start', {
           method: 'POST',
           body: JSON.stringify({
-            orderId: `test-xss-tiers-${Date.now()}`,
             campaignSlug: TEST_CAMPAIGNS.valid,
-            amountCents: 500,
-            email: 'test@example.com',
+            items: [],
+            tipPercent: 5,
             additionalTiers: [{ id: xss, qty: 1 }],
           })
         });
@@ -427,13 +407,12 @@ describe('Input Validation Security Tests', () => {
     });
 
     it('should handle malicious supportItems array', async () => {
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: `test-support-inject-${Date.now()}`,
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: 'test@example.com',
+          items: [],
+          tipPercent: 5,
           supportItems: [
             { id: '<script>alert(1)</script>', amount: 100 },
             { id: 'valid-item', amount: -99999 }, // Negative amount
@@ -443,7 +422,6 @@ describe('Input Validation Security Tests', () => {
         })
       });
 
-      // Should handle gracefully (429 = rate limited)
       expect([200, 400, 429, 500]).toContain(res.status);
       const body = await res.text();
       expect(body).not.toContain('<script>');
@@ -461,13 +439,11 @@ describe('Input Validation Security Tests', () => {
       ];
 
       for (const extra of payloads) {
-        const res = await securityFetch('/start', {
+        const res = await securityFetch('/checkout-intent/start', {
           method: 'POST',
           body: JSON.stringify({
-            orderId: `test-tip-${Date.now()}-${Math.random().toString(36).slice(2)}`,
             campaignSlug: TEST_CAMPAIGNS.valid,
-            amountCents: 500,
-            email: 'test@example.com',
+            items: [],
             ...extra,
           })
         });
@@ -482,18 +458,16 @@ describe('Input Validation Security Tests', () => {
         qty: 1
       }));
 
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: `test-huge-tiers-${Date.now()}`,
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: 'test@example.com',
+          items: [],
+          tipPercent: 5,
           additionalTiers: hugeTiers,
         })
       });
 
-      // Should not crash (429 = rate limited)
       expect([200, 400, 413, 429, 500]).toContain(res.status);
     });
   });
@@ -509,18 +483,16 @@ describe('Input Validation Security Tests', () => {
       ];
       
       for (const email of invalidEmails) {
-        const res = await securityFetch('/start', {
+        const res = await securityFetch('/checkout-intent/start', {
           method: 'POST',
           body: JSON.stringify({
-            orderId: `test-invalid-email-${Date.now()}`,
             campaignSlug: TEST_CAMPAIGNS.valid,
-            amountCents: 500,
+            items: [],
+            tipPercent: 5,
             email
           })
         });
         
-        // Stripe may also reject these, so 200 or 400 are both acceptable (429 = rate limited)
-        // The key is not crashing
         expect([200, 400, 429, 500]).toContain(res.status);
       }
     });

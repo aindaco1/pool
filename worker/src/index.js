@@ -2,11 +2,10 @@
  * The Pool - Pledge Worker
  * 
  * Routes:
- *   POST /start              - Create Stripe SetupIntent session
+ *   POST /checkout-intent/start - Create Stripe Checkout from first-party cart state
+ *   GET  /checkout-intent/summary - Fetch first-party success summary data
+ *   GET  /checkout-intent/recovery - Fetch campaign recovery state for cancelled result flow
  *   POST /webhooks/stripe    - Handle Stripe webhooks
- *   POST /webhooks/snipcart  - Handle Snipcart webhooks
- *   POST /payment-methods    - Snipcart custom payment gateway: return available methods
- *   GET  /checkout           - Custom payment gateway checkout page
  *   GET  /pledge             - Get single pledge details (legacy)
  *   GET  /pledges            - Get all pledges for user
  *   POST /pledge/cancel      - Cancel a pledge
@@ -42,14 +41,13 @@ import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, se
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
-import { createSnipcartClient, extractPledgeFromOrder, extractCartFromSnipcartItems, canCancelOrder, canModifyOrder } from './snipcart.js';
 import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent } from './stats.js';
 import { triggerSiteRebuild } from './github.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { DEFAULT_PLATFORM_TIP_PERCENT, calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
-
-const ABQ_TAX_RATE = 0.07875; // 7.875% ABQ tax
-const FLAT_SHIPPING_FEE = 300; // $3 flat rate USPS shipping for physical items
+import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput, CHECKOUT_INTENT_VERSION, DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
+import { getCheckoutProvider, getFlatShippingFeeCents, getSalesTaxRate } from './provider-config.js';
+export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 
 // Rate limit delay for Resend API (2 req/sec limit)
 const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
@@ -132,7 +130,7 @@ function timingSafeEqual(a, b) {
   return keys;
   }
 
-  function getSettlementNeedsAttention(batchResult = {}) {
+function getSettlementNeedsAttention(batchResult = {}) {
   const details = Array.isArray(batchResult.details) ? batchResult.details : [];
   const skippedNeedingAttention = details.filter(detail =>
     detail?.status === 'not_found' || detail?.status === 'missing_stripe_ids'
@@ -142,6 +140,12 @@ function timingSafeEqual(a, b) {
     unresolved: (batchResult.failed || 0) + skippedNeedingAttention
   };
   }
+
+function getAppMode(env = {}) {
+  return String(env.APP_MODE || env.SNIPCART_MODE || 'live').trim().toLowerCase() === 'test'
+    ? 'test'
+    : 'live';
+}
 
   async function finalizeSettlementDispatch(env, campaignSlug, jobKey, job) {
   const needsAttention = (job.totalNeedsAttention || 0) > 0;
@@ -284,12 +288,12 @@ function isDeadlinePassed(dateString) {
   return new Date() > deadline;
 }
 
-function calculateTax(subtotalCents) {
-  return Math.round(subtotalCents * ABQ_TAX_RATE);
+function calculateTax(env, subtotalCents) {
+  return Math.round(subtotalCents * getSalesTaxRate(env));
 }
 
-function calculateTotalWithTax(subtotalCents) {
-  return subtotalCents + calculateTax(subtotalCents);
+function calculateTotalWithTax(env, subtotalCents) {
+  return subtotalCents + calculateTax(env, subtotalCents);
 }
 
 function getStoredTipPercent(pledgeData, fallback = 0) {
@@ -306,11 +310,11 @@ function getStoredTipAmount(pledgeData) {
   return calculatePlatformTip(subtotal, getStoredTipPercent(pledgeData, 0));
 }
 
-function buildPledgeTotals(subtotalCents, { shipping = 0, tipPercent = DEFAULT_PLATFORM_TIP_PERCENT } = {}) {
+function buildPledgeTotals(env, subtotalCents, { shipping = 0, tipPercent = DEFAULT_PLATFORM_TIP_PERCENT } = {}) {
   const normalizedSubtotal = Math.max(0, Number(subtotalCents) || 0);
   const normalizedShipping = Math.max(0, Number(shipping) || 0);
   const normalizedTipPercent = sanitizePlatformTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
-  const tax = calculateTax(normalizedSubtotal);
+  const tax = calculateTax(env, normalizedSubtotal);
   const tipAmount = calculatePlatformTip(normalizedSubtotal, normalizedTipPercent);
   return {
     subtotal: normalizedSubtotal,
@@ -482,6 +486,91 @@ function compareCartShapeToContribution(orderCart, canonicalContribution) {
   return { valid: true };
 }
 
+function extractCampaignCartsFromFirstPartyItems(items = [], customAmount = 0, campaignSlug = null) {
+  if (!Array.isArray(items)) {
+    return { valid: false, error: 'Invalid cart items' };
+  }
+
+  const normalizedCampaignSlug = typeof campaignSlug === 'string' && campaignSlug ? campaignSlug : null;
+  const campaignCarts = new Map();
+
+  function getCampaignCart(itemCampaignSlug) {
+    if (!campaignCarts.has(itemCampaignSlug)) {
+      campaignCarts.set(itemCampaignSlug, {
+        campaignSlug: itemCampaignSlug,
+        tierCounts: new Map(),
+        supportItems: [],
+        customAmount: 0
+      });
+    }
+    return campaignCarts.get(itemCampaignSlug);
+  }
+
+  for (const item of items) {
+    const itemId = typeof item?.id === 'string' ? item.id : '';
+    if (!itemId.includes('__')) {
+      return { valid: false, error: 'Invalid cart item id' };
+    }
+
+    const [itemCampaignSlug] = itemId.split('__');
+    if (normalizedCampaignSlug && !campaignCarts.has(itemCampaignSlug) && campaignCarts.size === 0 && itemCampaignSlug !== normalizedCampaignSlug) {
+      // Accept item-derived campaign slugs as the source of truth; campaignSlug is only a hint.
+    }
+    const cart = getCampaignCart(itemCampaignSlug);
+
+    if (itemId.includes('__support__')) {
+      const supportItemId = itemId.split('__support__')[1];
+      const amount = Number(item?.amount);
+      if (!supportItemId || !isNonNegativeInteger(amount)) {
+        return { valid: false, error: 'Invalid support item selection' };
+      }
+      if (amount > 0) {
+        cart.supportItems.push({ id: supportItemId, amount });
+      }
+      continue;
+    }
+
+    if (itemId.includes('__custom-support')) {
+      const amount = Number(item?.amount ?? item?.price ?? 0);
+      if (!isNonNegativeInteger(amount)) {
+        return { valid: false, error: 'Invalid custom support amount' };
+      }
+      cart.customAmount += amount;
+      continue;
+    }
+
+    const tierId = itemId.split('__')[1];
+    const quantity = Number(item?.quantity ?? 1);
+    if (!tierId || !isPositiveInteger(quantity)) {
+      return { valid: false, error: 'Invalid tier selection' };
+    }
+    cart.tierCounts.set(tierId, (cart.tierCounts.get(tierId) || 0) + quantity);
+  }
+
+  const carts = Array.from(campaignCarts.values())
+    .map((cart) => ({
+      campaignSlug: cart.campaignSlug,
+      tierSelections: Array.from(cart.tierCounts, ([id, qty]) => ({ id, qty })),
+      supportItems: cart.supportItems,
+      customAmount: Number(cart.customAmount) || 0
+    }))
+    .filter((cart) => cart.tierSelections.length > 0 || cart.supportItems.length > 0 || cart.customAmount > 0)
+    .sort((a, b) => a.campaignSlug.localeCompare(b.campaignSlug));
+
+  return {
+    valid: true,
+    carts
+  };
+}
+
+function buildBundleOrderId(baseOrderId, campaignSlug) {
+  return `${baseOrderId}-${campaignSlug}`;
+}
+
+function getCheckoutBundleStorageKey(orderId) {
+  return `pending-checkout:${orderId}`;
+}
+
 function validateTierSelection(campaign, rawTierId, rawQty, seenTierIds) {
   const tierId = normalizeTierId(rawTierId);
   if (!tierId) {
@@ -634,7 +723,7 @@ function buildDesiredSupportItems(campaign, currentSupportItems = [], requestedS
   };
 }
 
-function buildCanonicalContribution(campaign, { tierSelection, supportItems = [], customAmount = 0, tipPercent = DEFAULT_PLATFORM_TIP_PERCENT }) {
+function buildCanonicalContribution(env, campaign, { tierSelection, supportItems = [], customAmount = 0, tipPercent = DEFAULT_PLATFORM_TIP_PERCENT }) {
   const normalizedCustomAmount = Number(customAmount);
   if (!isNonNegativeInteger(normalizedCustomAmount) || !isValidAmount(normalizedCustomAmount * 100)) {
     return { valid: false, error: 'Invalid custom support amount' };
@@ -662,8 +751,8 @@ function buildCanonicalContribution(campaign, { tierSelection, supportItems = []
     ...tierSelection,
     supportItems,
     customAmount: normalizedCustomAmount,
-    totals: buildPledgeTotals(subtotal, {
-      shipping: tierSelection.hasPhysical ? FLAT_SHIPPING_FEE : 0,
+    totals: buildPledgeTotals(env, subtotal, {
+      shipping: tierSelection.hasPhysical ? getFlatShippingFeeCents(env) : 0,
       tipPercent
     })
   };
@@ -957,33 +1046,23 @@ async function persistNewPledge(env, {
 }
 
 function getStripeKey(env) {
-  if (env.SNIPCART_MODE === 'test' && env.STRIPE_SECRET_KEY_TEST) {
+  if (getAppMode(env) === 'test' && env.STRIPE_SECRET_KEY_TEST) {
     return env.STRIPE_SECRET_KEY_TEST;
   }
-  if (env.SNIPCART_MODE === 'live' && env.STRIPE_SECRET_KEY_LIVE) {
+  if (getAppMode(env) === 'live' && env.STRIPE_SECRET_KEY_LIVE) {
     return env.STRIPE_SECRET_KEY_LIVE;
   }
   return env.STRIPE_SECRET_KEY;
 }
 
 function getStripeWebhookSecret(env) {
-  if (env.SNIPCART_MODE === 'test' && env.STRIPE_WEBHOOK_SECRET_TEST) {
+  if (getAppMode(env) === 'test' && env.STRIPE_WEBHOOK_SECRET_TEST) {
     return env.STRIPE_WEBHOOK_SECRET_TEST;
   }
-  if (env.SNIPCART_MODE === 'live' && env.STRIPE_WEBHOOK_SECRET_LIVE) {
+  if (getAppMode(env) === 'live' && env.STRIPE_WEBHOOK_SECRET_LIVE) {
     return env.STRIPE_WEBHOOK_SECRET_LIVE;
   }
   return env.STRIPE_WEBHOOK_SECRET;
-}
-
-function getSnipcartSecret(env) {
-  if (env.SNIPCART_MODE === 'test' && env.SNIPCART_SECRET_TEST) {
-    return env.SNIPCART_SECRET_TEST;
-  }
-  if (env.SNIPCART_MODE === 'live' && env.SNIPCART_SECRET_LIVE) {
-    return env.SNIPCART_SECRET_LIVE;
-  }
-  return env.SNIPCART_SECRET;
 }
 
 export default {
@@ -998,32 +1077,27 @@ export default {
 
     try {
       // SEC-003: Block test endpoints in production mode (unless admin-authenticated)
-      if (path.startsWith('/test/') && env.SNIPCART_MODE !== 'test') {
+      if (path.startsWith('/test/') && getAppMode(env) !== 'test') {
         const auth = requireAdmin(request, env);
         if (!auth.ok) {
           return jsonResponse({ error: 'Not found' }, 404);
         }
       }
 
-      if (path === '/start' && method === 'POST') {
-        return handleStart(request, env);
+      if (path === '/checkout-intent/start' && method === 'POST') {
+        return handleFirstPartyCheckoutStart(request, env);
+      }
+
+      if (path === '/checkout-intent/summary' && method === 'GET') {
+        return handleFirstPartyCheckoutSummary(request, env);
+      }
+
+      if (path === '/checkout-intent/recovery' && method === 'GET') {
+        return handleFirstPartyCheckoutRecovery(request, env);
       }
 
       if (path === '/webhooks/stripe' && method === 'POST') {
         return handleStripeWebhook(request, env, ctx);
-      }
-
-      if (path === '/webhooks/snipcart' && method === 'POST') {
-        return handleSnipcartWebhook(request, env, ctx);
-      }
-
-      // Snipcart Custom Payment Gateway endpoints
-      if (path === '/payment-methods' && method === 'POST') {
-        return handlePaymentMethods(request, env);
-      }
-
-      if (path === '/checkout' && method === 'GET') {
-        return handleCheckout(request, env);
       }
 
       if (path === '/pledge' && method === 'GET') {
@@ -1293,182 +1367,219 @@ export default {
   }
 };
 
-async function handleStart(request, env) {
-  // SEC-005: Rate limit pledge creation
+function getCheckoutIntentCoordinator(env) {
+  const namespace = env.CHECKOUT_INTENTS;
+  if (!namespace || typeof namespace.idFromName !== 'function' || typeof namespace.get !== 'function') {
+    return null;
+  }
+  const id = namespace.idFromName('checkout-intent-nonce-coordinator');
+  return namespace.get(id);
+}
+
+async function consumeCheckoutIntentNonce(env, { nonce, cartHash, exp }) {
+  const coordinator = getCheckoutIntentCoordinator(env);
+  if (!coordinator) {
+    return { ok: false, status: 503, error: 'Checkout intent coordinator unavailable' };
+  }
+
+  const response = await coordinator.fetch('https://checkout-intents.internal/consume', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nonce, cartHash, exp })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.ok !== true) {
+    return {
+      ok: false,
+      status: response.status || 503,
+      error: payload.error || 'Checkout intent nonce rejected'
+    };
+  }
+
+  return { ok: true };
+}
+
+function createCheckoutNonce() {
+  if (typeof crypto?.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function isFirstPartyOrderId(orderId) {
+  return /^pool-intent-[a-z0-9_-]+$/i.test(String(orderId || ''));
+}
+
+async function handleFirstPartyCheckoutStart(request, env) {
+  if (getCheckoutProvider(env) !== 'first_party') {
+    return jsonResponse({ error: 'Not found' }, 404);
+  }
+
   const rateLimit = await checkRateLimit(request, env, RATE_LIMITS.start);
   if (!rateLimit.allowed) return rateLimit.response;
 
-  console.log('📥 /start called');
   const body = await request.json();
-  const { publicToken, cartToken, campaignSlug, email, tipPercent } = body;
+  const { campaignSlug, items, customAmount = 0, email, tipPercent } = body || {};
   const normalizedTipPercent = sanitizePlatformTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
-  console.log('📥 /start payload:', {
-    publicToken: publicToken ? '[present]' : '[missing]',
-    cartToken: cartToken ? '[present]' : '[missing]',
-    campaignSlug,
-    email,
-    tipPercent: normalizedTipPercent
-  });
-
-  if (!publicToken && !cartToken) {
-    console.log('📥 /start: Missing required fields');
-    return jsonResponse({ error: 'Missing checkout token' }, 400);
-  }
-
   if (campaignSlug && !isValidSlug(campaignSlug)) {
-    console.log('📥 /start: Invalid campaign slug format');
     return jsonResponse({ error: 'Invalid campaign slug format' }, 400);
   }
 
   if (email && !isValidEmail(email)) {
-    console.log('📥 /start: Invalid email format');
     return jsonResponse({ error: 'Invalid email format' }, 400);
   }
 
-  let paymentSession = null;
-  let invoice = null;
-  let orderCart = null;
-  let verifiedCustomerEmail = '';
-  let verifiedPaymentSessionId = '';
+  const parsedCart = extractCampaignCartsFromFirstPartyItems(items, customAmount, campaignSlug);
+  if (!parsedCart.valid) {
+    return jsonResponse({ error: parsedCart.error }, 400);
+  }
 
-  if (publicToken) {
-    try {
-      const sessionRes = await fetch(
-        `https://payment.snipcart.com/api/public/custom-payment-gateway/payment-session?publicToken=${encodeURIComponent(publicToken)}`
-      );
-      if (!sessionRes.ok) {
-        console.error('📥 /start: Failed to fetch payment session:', sessionRes.status);
-        return jsonResponse({ error: 'Invalid checkout token' }, 400);
-      }
-      paymentSession = await sessionRes.json();
-    } catch (err) {
-      console.error('📥 /start: Payment session verification failed:', err.message);
-      return jsonResponse({ error: 'Unable to verify checkout session' }, 502);
+  const orderCarts = parsedCart.carts || [];
+  if (orderCarts.length === 0) {
+    return jsonResponse({ error: 'Your cart is empty.' }, 400);
+  }
+
+  const checkoutGroups = [];
+  for (const orderCart of orderCarts) {
+    if (!orderCart.campaignSlug) {
+      return jsonResponse({ error: 'Could not determine campaign from cart contents' }, 400);
     }
 
-    invoice = paymentSession?.invoice || null;
-    orderCart = extractCartFromSnipcartItems(invoice?.items || []);
-    verifiedCustomerEmail = invoice?.email && invoice.email !== 'placeholder@pool.local' ? invoice.email : '';
-    verifiedPaymentSessionId = paymentSession?.id || '';
-  } else {
-    const snipcartSecret = getSnipcartSecret(env);
-    if (!snipcartSecret) {
-      return jsonResponse({ error: 'Checkout verification unavailable' }, 503);
+    const { valid, error, campaign } = await isCampaignLive(env, orderCart.campaignSlug);
+    if (!valid) {
+      return jsonResponse({ error: error || 'Campaign not accepting pledges' }, 400);
     }
 
-    try {
-      const snipcart = createSnipcartClient(snipcartSecret, env.SNIPCART_API_BASE);
-      const abandonedCart = await snipcart.carts.getAbandoned(cartToken);
-      if (!abandonedCart || abandonedCart.status !== 'InProgress') {
-        return jsonResponse({ error: 'Invalid checkout token' }, 400);
-      }
-
-      invoice = {
-        email: abandonedCart.email,
-        billingAddress: abandonedCart.billingAddress,
-        shippingAddress: abandonedCart.shippingAddress
-      };
-      orderCart = extractCartFromSnipcartItems(abandonedCart.items || []);
-      verifiedCustomerEmail = abandonedCart.email && abandonedCart.email !== 'placeholder@pool.local' ? abandonedCart.email : '';
-    } catch (err) {
-      console.error('📥 /start: Abandoned cart verification failed:', err.message);
-      if (String(err.message || '').includes('404')) {
-        return jsonResponse({ error: 'Invalid checkout token' }, 400);
-      }
-      return jsonResponse({ error: 'Unable to verify checkout session' }, 502);
+    const tierSelection = buildTierSelectionFromStartRequest(campaign, {
+      tierId: orderCart.tierSelections[0]?.id || null,
+      tierQty: orderCart.tierSelections[0]?.qty || 1,
+      additionalTiers: orderCart.tierSelections.slice(1)
+    });
+    if (!tierSelection.valid) {
+      return jsonResponse({ error: tierSelection.error }, 400);
     }
-  }
 
-  const resolvedCampaignSlug = orderCart.campaignSlug || campaignSlug;
-  if (!resolvedCampaignSlug) {
-    return jsonResponse({ error: 'Could not determine campaign from checkout session' }, 400);
-  }
-  if (campaignSlug && resolvedCampaignSlug !== campaignSlug) {
-    return jsonResponse({ error: 'Checkout session campaign mismatch' }, 400);
-  }
+    const desiredSupportItems = buildDesiredSupportItems(campaign, [], orderCart.supportItems);
+    if (!desiredSupportItems.valid) {
+      return jsonResponse({ error: desiredSupportItems.error }, 400);
+    }
 
-  const { valid, error, campaign } = await isCampaignLive(env, resolvedCampaignSlug);
-  console.log('📥 /start: Campaign check:', { valid, error });
-  if (!valid) {
-    return jsonResponse({ error: error || 'Campaign not accepting pledges' }, 400);
-  }
+    const canonicalContribution = buildCanonicalContribution(env, campaign, {
+      tierSelection,
+      supportItems: desiredSupportItems.supportItems,
+      customAmount: orderCart.customAmount,
+      tipPercent: normalizedTipPercent
+    });
+    if (!canonicalContribution.valid) {
+      return jsonResponse({ error: canonicalContribution.error }, 400);
+    }
 
-  const tierSelection = buildTierSelectionFromStartRequest(campaign, {
-    tierId: orderCart.tierSelections[0]?.id || null,
-    tierQty: orderCart.tierSelections[0]?.qty || 1,
-    additionalTiers: orderCart.tierSelections.slice(1)
-  });
-  if (!tierSelection.valid) {
-    return jsonResponse({ error: tierSelection.error }, 400);
-  }
+    const sessionShape = compareCartShapeToContribution(orderCart, canonicalContribution);
+    if (!sessionShape.valid) {
+      return jsonResponse({ error: sessionShape.error }, 400);
+    }
 
-  const desiredSupportItems = buildDesiredSupportItems(campaign, [], orderCart.supportItems);
-  if (!desiredSupportItems.valid) {
-    return jsonResponse({ error: desiredSupportItems.error }, 400);
-  }
+    const thresholdValidation = await validateTierThresholdSelection(
+      env,
+      orderCart.campaignSlug,
+      campaign,
+      canonicalContribution.selectedTiers
+    );
+    if (!thresholdValidation.valid) {
+      return jsonResponse({ error: thresholdValidation.error }, 400);
+    }
 
-  const canonicalContribution = buildCanonicalContribution(campaign, {
-    tierSelection,
-    supportItems: desiredSupportItems.supportItems,
-    customAmount: orderCart.customAmount,
-    tipPercent: normalizedTipPercent
-  });
-  if (!canonicalContribution.valid) {
-    return jsonResponse({ error: canonicalContribution.error }, 400);
-  }
+    const availability = await ensureTierAvailability(
+      env,
+      orderCart.campaignSlug,
+      campaign,
+      canonicalContribution.selectedTiers
+    );
+    if (!availability.valid) {
+      return jsonResponse({ error: availability.error, remaining: availability.remaining }, 400);
+    }
 
-  const sessionShape = compareCartShapeToContribution(orderCart, canonicalContribution);
-  if (!sessionShape.valid) {
-    return jsonResponse({ error: sessionShape.error }, 400);
-  }
-
-  const orderId = verifiedPaymentSessionId ? `pool-${verifiedPaymentSessionId}` : `pool-cart-${cartToken}`;
-
-  const thresholdValidation = await validateTierThresholdSelection(
-    env,
-    resolvedCampaignSlug,
-    campaign,
-    canonicalContribution.selectedTiers
-  );
-  if (!thresholdValidation.valid) {
-    return jsonResponse({ error: thresholdValidation.error }, 400);
-  }
-
-  const availability = await ensureTierAvailability(
-    env,
-    resolvedCampaignSlug,
-    campaign,
-    canonicalContribution.selectedTiers
-  );
-  if (!availability.valid) {
-    return jsonResponse({ error: availability.error, remaining: availability.remaining }, 400);
-  }
-
-  // Store additional tiers in KV for webhook to use (Stripe metadata has 500 char limit)
-  if (canonicalContribution.additionalTiers.length > 0 && env.PLEDGES) {
-    await env.PLEDGES.put(`pending-tiers:${orderId}`, JSON.stringify(canonicalContribution.additionalTiers), { expirationTtl: 3600 });
-    console.log('📥 /start: Stored additional tiers for order:', orderId, canonicalContribution.additionalTiers);
-  }
-  
-  // Store support items and custom amount in KV for webhook to use
-  if ((canonicalContribution.supportItems.length > 0 || canonicalContribution.customAmount > 0) && env.PLEDGES) {
-    await env.PLEDGES.put(`pending-extras:${orderId}`, JSON.stringify({
-      supportItems: canonicalContribution.supportItems,
-      customAmount: canonicalContribution.customAmount
-    }), { expirationTtl: 3600 });
-    console.log('📥 /start: Stored extras for order:', orderId, {
-      supportItems: canonicalContribution.supportItems,
-      customAmount: canonicalContribution.customAmount
+    checkoutGroups.push({
+      campaign,
+      campaignSlug: orderCart.campaignSlug,
+      canonicalContribution
     });
   }
 
-  const stripeKey = getStripeKey(env);
-  console.log('📥 /start: Using Stripe key:', stripeKey ? 'present' : 'MISSING');
-  
-  const stripe = createStripeClient(stripeKey);
-  
+  if (!env.CHECKOUT_INTENT_SECRET) {
+    return jsonResponse({ error: 'Checkout intent signing unavailable' }, 503);
+  }
+
+  const bundleTotals = checkoutGroups.reduce((totals, group) => ({
+    subtotal: totals.subtotal + (group.canonicalContribution.totals.subtotal || 0),
+    tax: totals.tax + (group.canonicalContribution.totals.tax || 0),
+    shipping: totals.shipping + (group.canonicalContribution.totals.shipping || 0),
+    tipAmount: totals.tipAmount + (group.canonicalContribution.totals.tipAmount || 0),
+    amount: totals.amount + (group.canonicalContribution.totals.amount || 0)
+  }), {
+    subtotal: 0,
+    tax: 0,
+    shipping: 0,
+    tipAmount: 0,
+    amount: 0
+  });
+
+  const nonce = createCheckoutNonce();
+  const checkoutIntentExp = Math.floor(Date.now() / 1000) + DEFAULT_CHECKOUT_INTENT_TTL_SECONDS;
+  const checkoutHashInput = buildCheckoutBundleHashInput({
+    contributions: checkoutGroups.map((group) => ({
+      campaignSlug: group.campaignSlug,
+      canonicalContribution: group.canonicalContribution,
+      tipPercent: normalizedTipPercent
+    }))
+  });
+  const checkoutCartHash = await hashCheckoutBundle(checkoutHashInput);
+
+  const nonceResult = await consumeCheckoutIntentNonce(env, {
+    nonce,
+    cartHash: checkoutCartHash,
+    exp: checkoutIntentExp
+  });
+  if (!nonceResult.ok) {
+    return jsonResponse({ error: nonceResult.error }, nonceResult.status);
+  }
+
+  const orderId = `pool-intent-${nonce}`;
+  const bundleManifest = {
+    orderId,
+    checkoutProvider: 'first_party',
+    campaignCount: checkoutGroups.length,
+    tipPercent: normalizedTipPercent,
+    totals: bundleTotals,
+    campaigns: checkoutGroups.map((group) => ({
+      orderId: checkoutGroups.length === 1 ? orderId : buildBundleOrderId(orderId, group.campaignSlug),
+      campaignSlug: group.campaignSlug,
+      tierId: group.canonicalContribution.tierId || '',
+      tierName: group.canonicalContribution.tierName || '',
+      tierQty: group.canonicalContribution.tierQty || 1,
+      additionalTiers: group.canonicalContribution.additionalTiers || [],
+      supportItems: group.canonicalContribution.supportItems || [],
+      customAmount: group.canonicalContribution.customAmount || 0,
+      hasPhysical: group.canonicalContribution.hasPhysical === true,
+      totals: group.canonicalContribution.totals
+    }))
+  };
+
+  if (env.PLEDGES) {
+    await env.PLEDGES.put(
+      getCheckoutBundleStorageKey(orderId),
+      JSON.stringify(bundleManifest),
+      { expirationTtl: 86400 }
+    );
+  }
+
+  const stripe = createStripeClient(getStripeKey(env));
+
   try {
-    const customerEmail = email || verifiedCustomerEmail;
     const sessionParams = {
       mode: 'setup',
       payment_method_types: ['card'],
@@ -1476,67 +1587,385 @@ async function handleStart(request, env) {
       cancel_url: `${env.SITE_BASE}/pledge-cancelled/`,
       metadata: {
         orderId,
-        campaignSlug: resolvedCampaignSlug,
-        amountCents: String(canonicalContribution.totals.subtotal),
-        tierId: canonicalContribution.tierId || '',
-        tierName: canonicalContribution.tierName || '',
-        tierQty: String(canonicalContribution.tierQty || 1),
+        campaignSlug: checkoutGroups[0].campaignSlug,
+        amountCents: String(bundleTotals.subtotal),
+        tierId: checkoutGroups.length === 1 ? (checkoutGroups[0].canonicalContribution.tierId || '') : '',
+        tierName: checkoutGroups.length === 1 ? (checkoutGroups[0].canonicalContribution.tierName || '') : '',
+        tierQty: String(checkoutGroups.length === 1 ? (checkoutGroups[0].canonicalContribution.tierQty || 1) : 0),
         tipPercent: String(normalizedTipPercent),
-        hasAdditionalTiers: canonicalContribution.additionalTiers.length > 0 ? 'true' : '',
-        hasExtras: (canonicalContribution.supportItems.length > 0 || canonicalContribution.customAmount > 0) ? 'true' : '',
-        hasPhysical: canonicalContribution.hasPhysical ? 'true' : '',
-        snipcartPaymentSessionId: verifiedPaymentSessionId,
-        snipcartPublicToken: publicToken
+        hasAdditionalTiers: checkoutGroups.some((group) => group.canonicalContribution.additionalTiers.length > 0) ? 'true' : '',
+        hasExtras: checkoutGroups.some((group) => group.canonicalContribution.supportItems.length > 0 || group.canonicalContribution.customAmount > 0) ? 'true' : '',
+        hasPhysical: checkoutGroups.some((group) => group.canonicalContribution.hasPhysical) ? 'true' : '',
+        checkoutBundleMode: checkoutGroups.length > 1 ? 'true' : '',
+        checkoutBundleCount: String(checkoutGroups.length),
+        checkoutProvider: 'first_party',
+        checkoutNonce: nonce,
+        checkoutCartHash,
+        checkoutSnapshotVersion: String(CHECKOUT_INTENT_VERSION)
       }
     };
-    
-    // Let Stripe Checkout create the customer — more reliable than pre-creating
-    if (customerEmail) {
-      sessionParams.customer_email = customerEmail;
+
+    if (email) {
+      sessionParams.customer_email = email;
     }
-    
-    // Collect shipping address via Stripe Checkout for physical items
-    if (canonicalContribution.hasPhysical) {
+
+    if (checkoutGroups.some((group) => group.canonicalContribution.hasPhysical)) {
       sessionParams.shipping_address_collection = {
         allowed_countries: ['US']
       };
     }
-    
+
     const session = await stripe.checkout.sessions.create(sessionParams);
-    
-    console.log('📥 /start: Stripe session created, URL:', session.url ? 'present' : 'missing');
     return jsonResponse({ url: session.url });
   } catch (stripeErr) {
     if (env.PLEDGES) {
-      await env.PLEDGES.delete(`pending-tiers:${orderId}`);
-      await env.PLEDGES.delete(`pending-extras:${orderId}`);
+      await env.PLEDGES.delete(getCheckoutBundleStorageKey(orderId));
     }
-    console.error('📥 /start: Stripe error:', stripeErr.message);
     return jsonResponse({ error: 'Failed to create checkout session: ' + stripeErr.message }, 500);
   }
 }
 
-/**
- * Snipcart Custom Payment Gateway: Return available payment methods
- * Returns empty array to disable - we use custom template override with /start instead
- */
-async function handlePaymentMethods(request, env) {
-  const body = await request.json();
-  const { publicToken, mode } = body;
+async function handleFirstPartyCheckoutSummary(request, env) {
+  if (getCheckoutProvider(env) !== 'first_party') {
+    return jsonResponse({ error: 'Not found' }, 404);
+  }
 
-  console.log('📦 Payment methods request (disabled - using template override):', { publicToken: publicToken?.slice(0, 10) + '...', mode });
+  if (!env.PLEDGES) {
+    return jsonResponse({ error: 'Pledge storage unavailable' }, 503);
+  }
 
-  // Return empty array - Pool uses custom payment template that calls /start directly
-  // This prevents duplicate checkout sessions and emails
-  return jsonResponse([]);
+  const url = new URL(request.url);
+  const orderId = url.searchParams.get('orderId');
+
+  if (!isFirstPartyOrderId(orderId)) {
+    return jsonResponse({ error: 'Invalid orderId' }, 400);
+  }
+
+  const pledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+  if (!pledge) {
+    const bundle = await env.PLEDGES.get(getCheckoutBundleStorageKey(orderId), { type: 'json' });
+    if (bundle?.campaigns?.length) {
+      const campaignTitles = [];
+      for (const entry of bundle.campaigns) {
+        const campaign = await getCampaign(env, entry.campaignSlug);
+        campaignTitles.push(campaign?.title || entry.campaignSlug);
+      }
+
+      const shippingCollected = bundle.campaigns.some((entry) => entry.hasPhysical === true);
+
+      return jsonResponse({
+        orderId: bundle.orderId || orderId,
+        campaignSlug: bundle.campaigns[0]?.campaignSlug || null,
+        campaignTitle: campaignTitles.length === 1 ? campaignTitles[0] : null,
+        campaignTitles,
+        pledgeStatus: 'active',
+        createdAt: null,
+        shippingCollected,
+        totals: {
+          subtotal: Number(bundle?.totals?.subtotal || 0),
+          tax: Number(bundle?.totals?.tax || 0),
+          shipping: Number(bundle?.totals?.shipping || 0),
+          tipAmount: Number(bundle?.totals?.tipAmount || 0),
+          amount: Number(bundle?.totals?.amount || 0)
+        }
+      }, 200, env);
+    }
+
+    return jsonResponse({ error: 'Not found' }, 404);
+  }
+
+  const campaign = await getCampaign(env, pledge.campaignSlug);
+
+  const shippingCollected = Boolean(
+    pledge?.shippingAddress?.name ||
+    pledge?.shippingAddress?.address1 ||
+    pledge?.shippingAddress?.city ||
+    pledge?.shippingAddress?.postalCode ||
+    pledge?.shippingAddress?.country
+  );
+
+  return jsonResponse({
+    orderId: pledge.orderId,
+    campaignSlug: pledge.campaignSlug,
+    campaignTitle: campaign?.title || null,
+    pledgeStatus: pledge.pledgeStatus || 'active',
+    createdAt: pledge.createdAt || null,
+    shippingCollected,
+    totals: {
+      subtotal: Number(pledge?.subtotal || 0),
+      tax: Number(pledge?.tax || 0),
+      shipping: Number(pledge?.shipping || 0),
+      tipAmount: Number(pledge?.tipAmount || 0),
+      amount: Number(pledge?.amount || 0)
+    }
+  }, 200, env);
 }
 
-/**
- * Custom Payment Gateway: Checkout page
- * User lands here after selecting "Pledge" - we redirect to Stripe SetupIntent
- */
-async function handleCheckout(request, env) {
-  return new Response('Legacy checkout flow disabled; use /start', { status: 410 });
+async function handleFirstPartyCheckoutRecovery(request, env) {
+  if (getCheckoutProvider(env) !== 'first_party') {
+    return jsonResponse({ error: 'Not found' }, 404);
+  }
+
+  const url = new URL(request.url);
+  const campaignSlug = url.searchParams.get('campaignSlug');
+
+  if (!campaignSlug || !isValidSlug(campaignSlug)) {
+    return jsonResponse({ error: 'Invalid campaign slug format' }, 400);
+  }
+
+  const campaign = await getCampaign(env, campaignSlug);
+  if (!campaign) {
+    return jsonResponse({ error: 'Campaign not found' }, 404);
+  }
+
+  const liveCheck = await isCampaignLive(env, campaignSlug);
+  const campaignTitle = campaign.title || campaignSlug;
+  const acceptingPledges = liveCheck.valid === true;
+
+  return jsonResponse({
+    campaignSlug,
+    campaignTitle,
+    effectiveState: getEffectiveState(campaign),
+    acceptingPledges,
+    statusMessage: acceptingPledges
+      ? `${campaignTitle} is still accepting pledges.`
+      : (liveCheck.error || 'Campaign not accepting pledges')
+  }, 200, env);
+}
+
+async function loadCheckoutBundleManifest(env, orderId) {
+  if (!env.PLEDGES || !orderId) return null;
+  return env.PLEDGES.get(getCheckoutBundleStorageKey(orderId), { type: 'json' });
+}
+
+async function persistCheckoutBundleManifest(env, orderId, manifest) {
+  if (!env.PLEDGES || !orderId || !manifest) return;
+  await env.PLEDGES.put(getCheckoutBundleStorageKey(orderId), JSON.stringify(manifest), { expirationTtl: 86400 });
+}
+
+async function processFirstPartyCheckoutBundle({
+  env,
+  ctx,
+  stripe,
+  session,
+  orderId,
+  email,
+  customerId,
+  paymentMethodId,
+  setupIntentId,
+  shippingAddress,
+  normalizedTipPercent,
+  checkoutCartHash,
+  checkoutSnapshotVersion,
+  bundleManifest,
+  markStripeEventProcessed
+}) {
+  if (!bundleManifest?.campaigns?.length) {
+    return jsonResponse({ error: 'Missing checkout bundle data' }, 409);
+  }
+
+  if (String(checkoutSnapshotVersion || '') !== String(CHECKOUT_INTENT_VERSION)) {
+    console.error('📝 Invalid first-party checkout snapshot version:', checkoutSnapshotVersion);
+    return jsonResponse({ error: 'Invalid checkout snapshot version' }, 409);
+  }
+
+  const bundleHashInput = buildCheckoutBundleHashInput({
+    contributions: bundleManifest.campaigns.map((entry) => ({
+      campaignSlug: entry.campaignSlug,
+      canonicalContribution: {
+        selectedTiers: [
+          ...(entry.tierId ? [{ id: entry.tierId, qty: entry.tierQty || 1 }] : []),
+          ...(entry.additionalTiers || [])
+        ],
+        supportItems: entry.supportItems || [],
+        customAmount: entry.customAmount || 0,
+        hasPhysical: entry.hasPhysical === true,
+        totals: entry.totals || {}
+      },
+      tipPercent: normalizedTipPercent
+    }))
+  });
+  const recomputedCheckoutCartHash = await hashCheckoutBundle(bundleHashInput);
+  if (recomputedCheckoutCartHash !== checkoutCartHash) {
+    console.error('📝 First-party checkout cart hash mismatch:', {
+      orderId,
+      expectedHashPrefix: String(checkoutCartHash).slice(0, 12),
+      actualHashPrefix: recomputedCheckoutCartHash.slice(0, 12)
+    });
+    return jsonResponse({ error: 'Checkout integrity verification failed' }, 409);
+  }
+
+  const processedCampaigns = [];
+  const confirmedCampaigns = [];
+
+  for (const entry of bundleManifest.campaigns) {
+    const campaignSlug = entry.campaignSlug;
+    const campaign = await getCampaign(env, campaignSlug);
+    const campaignTitle = campaign?.title || campaignSlug.replace(/-/g, ' ').toUpperCase();
+    const pledgeOrderId = entry.orderId || buildBundleOrderId(orderId, campaignSlug);
+
+    const existingPledge = await env.PLEDGES.get(`pledge:${pledgeOrderId}`, { type: 'json' });
+    if (existingPledge) {
+      processedCampaigns.push({ orderId: pledgeOrderId, campaignSlug });
+      confirmedCampaigns.push({ orderId: pledgeOrderId, campaignSlug, campaignTitle });
+      continue;
+    }
+
+    const tierSelection = buildTierSelectionFromStartRequest(campaign, {
+      tierId: entry.tierId || null,
+      tierQty: entry.tierQty || 1,
+      additionalTiers: entry.additionalTiers || []
+    });
+    if (!tierSelection.valid) {
+      console.error('📝 Invalid tier selection in webhook bundle:', tierSelection.error);
+      return jsonResponse({ error: tierSelection.error }, 409);
+    }
+
+    const thresholdValidation = await validateTierThresholdSelection(
+      env,
+      campaignSlug,
+      campaign,
+      tierSelection.selectedTiers
+    );
+    if (!thresholdValidation.valid) {
+      console.error('📝 Threshold-gated tier rejected during bundle webhook processing:', thresholdValidation.error);
+      return jsonResponse({ error: thresholdValidation.error }, 409);
+    }
+
+    const desiredSupportItems = buildDesiredSupportItems(campaign, [], entry.supportItems || []);
+    if (!desiredSupportItems.valid) {
+      console.error('📝 Invalid support items in webhook bundle:', desiredSupportItems.error);
+      return jsonResponse({ error: desiredSupportItems.error }, 409);
+    }
+
+    const canonicalContribution = buildCanonicalContribution(env, campaign, {
+      tierSelection,
+      supportItems: desiredSupportItems.supportItems,
+      customAmount: entry.customAmount || 0,
+      tipPercent: normalizedTipPercent
+    });
+    if (!canonicalContribution.valid) {
+      console.error('📝 Invalid pledge contribution in webhook bundle:', canonicalContribution.error);
+      return jsonResponse({ error: canonicalContribution.error }, 409);
+    }
+
+    const availability = await ensureTierAvailability(
+      env,
+      campaignSlug,
+      campaign,
+      canonicalContribution.selectedTiers,
+      {},
+      pledgeOrderId
+    );
+    if (!availability.valid) {
+      console.warn('📝 Inventory unavailable during bundle webhook processing:', availability.error);
+      return jsonResponse({ error: availability.error }, 409);
+    }
+
+    const now = new Date().toISOString();
+    const pledgeData = {
+      orderId: pledgeOrderId,
+      email,
+      campaignSlug,
+      tierId: canonicalContribution.tierId,
+      tierName: canonicalContribution.tierName,
+      tierQty: canonicalContribution.tierQty,
+      additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
+      supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
+      customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
+      shippingAddress: canonicalContribution.hasPhysical ? (shippingAddress || undefined) : undefined,
+      subtotal: canonicalContribution.totals.subtotal,
+      tax: canonicalContribution.totals.tax,
+      shipping: canonicalContribution.totals.shipping,
+      tipPercent: canonicalContribution.totals.tipPercent,
+      tipAmount: canonicalContribution.totals.tipAmount,
+      amount: canonicalContribution.totals.amount,
+      stripeCustomerId: customerId,
+      stripePaymentMethodId: paymentMethodId,
+      stripeSetupIntentId: setupIntentId,
+      pledgeStatus: 'active',
+      charged: false,
+      createdAt: now,
+      updatedAt: now,
+      history: [{
+        type: 'created',
+        subtotal: canonicalContribution.totals.subtotal,
+        tax: canonicalContribution.totals.tax,
+        shipping: canonicalContribution.totals.shipping,
+        tipPercent: canonicalContribution.totals.tipPercent,
+        tipAmount: canonicalContribution.totals.tipAmount,
+        amount: canonicalContribution.totals.amount,
+        tierId: canonicalContribution.tierId,
+        tierQty: canonicalContribution.tierQty,
+        additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
+        supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
+        customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
+        at: now
+      }]
+    };
+
+    const persisted = await persistNewPledge(env, {
+      campaign,
+      campaignSlug,
+      pledgeData,
+      supportItems: canonicalContribution.supportItems,
+      selectedTiers: canonicalContribution.selectedTiers
+    });
+    if (!persisted.success) {
+      console.error('📝 Failed to persist bundle pledge after webhook:', persisted.error);
+      return jsonResponse({ error: persisted.error }, 409);
+    }
+
+    processedCampaigns.push({ orderId: pledgeOrderId, campaignSlug });
+    confirmedCampaigns.push({ orderId: pledgeOrderId, campaignSlug, campaignTitle });
+
+    ctx.waitUntil(
+      triggerMilestoneEmails(env, campaignSlug).catch(err => {
+        console.error('Milestone email trigger failed:', err.message);
+      })
+    );
+
+    const token = await generateToken(env.MAGIC_LINK_SECRET, {
+      orderId: pledgeOrderId,
+      email,
+      campaignSlug
+    });
+
+    const additionalTiersWithNames = canonicalContribution.additionalTiers.map(t => {
+      const tierData = campaign?.tiers?.find(ct => ct.id === t.id);
+      return { ...t, name: tierData?.name || t.id };
+    });
+    const supportItemsWithLabels = getSupportItemsWithLabels(campaign, canonicalContribution.supportItems);
+
+    await sendSupporterEmail(env, {
+      email,
+      campaignSlug,
+      campaignTitle,
+      subtotal: canonicalContribution.totals.subtotal,
+      tax: canonicalContribution.totals.tax,
+      shipping: canonicalContribution.totals.shipping,
+      tipAmount: canonicalContribution.totals.tipAmount,
+      tipPercent: canonicalContribution.totals.tipPercent,
+      token,
+      instagramUrl: campaign?.instagram,
+      hasDecisions: campaign?.has_decisions === true,
+      pledgeItems: {
+        tierName: canonicalContribution.tierName,
+        tierQty: canonicalContribution.tierQty,
+        additionalTiers: additionalTiersWithNames,
+        supportItems: supportItemsWithLabels,
+        customAmount: canonicalContribution.customAmount
+      }
+    });
+  }
+
+  await persistCheckoutBundleManifest(env, orderId, {
+    ...bundleManifest,
+    confirmedAt: new Date().toISOString(),
+    confirmedCampaigns
+  });
+  await markStripeEventProcessed();
+  return jsonResponse({ received: true, bundled: true, pledges: processedCampaigns });
 }
 
 async function handleStripeWebhook(request, env, ctx) {
@@ -1551,7 +1980,7 @@ async function handleStripeWebhook(request, env, ctx) {
   try {
     const parsed = JSON.parse(body);
     const isLiveEvent = parsed.livemode === true;
-    const isLiveMode = env.SNIPCART_MODE === 'live';
+    const isLiveMode = getAppMode(env) === 'live';
     if (isLiveEvent !== isLiveMode) {
       console.log('📨 Skipping event (mode mismatch, pre-verification):', { 
         eventId: parsed.id, 
@@ -1603,7 +2032,7 @@ async function handleStripeWebhook(request, env, ctx) {
     const session = event.data.object;
     
     if (session.mode === 'setup') {
-      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, tipPercent, hasAdditionalTiers, hasExtras, hasPhysical, isPaymentUpdate, snipcartPaymentSessionId, snipcartPublicToken } = session.metadata;
+      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, tipPercent, hasAdditionalTiers, hasExtras, hasPhysical, isPaymentUpdate, checkoutProvider, checkoutNonce, checkoutCartHash, checkoutSnapshotVersion } = session.metadata;
       const tierQtyNum = parseInt(tierQty) || 1;
       const normalizedTipPercent = tipPercent === undefined || tipPercent === null || tipPercent === ''
         ? 0
@@ -1612,24 +2041,33 @@ async function handleStripeWebhook(request, env, ctx) {
       let customerId = session.customer;
       const setupIntentId = session.setup_intent;
 
+      const bundleManifest = checkoutProvider === 'first_party'
+        ? await loadCheckoutBundleManifest(env, orderId)
+        : null;
+
       // Fetch additional tiers from KV if present
       let additionalTiers = [];
-      if (hasAdditionalTiers === 'true' && env.PLEDGES) {
-        additionalTiers = await env.PLEDGES.get(`pending-tiers:${orderId}`, { type: 'json' }) || [];
-        if (additionalTiers.length > 0) {
-          console.log('📨 Found additional tiers for order:', orderId, additionalTiers);
-        }
-      }
-      
-      // Fetch support items and custom amount from KV if present
       let supportItems = [];
       let customAmount = 0;
-      if (hasExtras === 'true' && env.PLEDGES) {
-        const extras = await env.PLEDGES.get(`pending-extras:${orderId}`, { type: 'json' });
-        if (extras) {
-          supportItems = extras.supportItems || [];
-          customAmount = extras.customAmount || 0;
-          console.log('📨 Found extras for order:', orderId, { supportItems, customAmount });
+      if (checkoutProvider === 'first_party' && bundleManifest?.campaigns?.length === 1) {
+        additionalTiers = bundleManifest.campaigns[0].additionalTiers || [];
+        supportItems = bundleManifest.campaigns[0].supportItems || [];
+        customAmount = bundleManifest.campaigns[0].customAmount || 0;
+      } else {
+        if (hasAdditionalTiers === 'true' && env.PLEDGES) {
+          additionalTiers = await env.PLEDGES.get(`pending-tiers:${orderId}`, { type: 'json' }) || [];
+          if (additionalTiers.length > 0) {
+            console.log('📨 Found additional tiers for order:', orderId, additionalTiers);
+          }
+        }
+
+        if (hasExtras === 'true' && env.PLEDGES) {
+          const extras = await env.PLEDGES.get(`pending-extras:${orderId}`, { type: 'json' });
+          if (extras) {
+            supportItems = extras.supportItems || [];
+            customAmount = extras.customAmount || 0;
+            console.log('📨 Found extras for order:', orderId, { supportItems, customAmount });
+          }
         }
       }
 
@@ -1674,39 +2112,28 @@ async function handleStripeWebhook(request, env, ctx) {
         }
       }
 
+      if (checkoutProvider === 'first_party' && bundleManifest?.campaigns?.length > 1 && isPaymentUpdate !== 'true') {
+        return processFirstPartyCheckoutBundle({
+          env,
+          ctx,
+          stripe,
+          session,
+          orderId,
+          email,
+          customerId,
+          paymentMethodId,
+          setupIntentId,
+          shippingAddress,
+          normalizedTipPercent,
+          checkoutCartHash,
+          checkoutSnapshotVersion,
+          bundleManifest,
+          markStripeEventProcessed
+        });
+      }
+
       const campaign = await getCampaign(env, campaignSlug);
       const campaignTitle = campaign?.title || campaignSlug.replace(/-/g, ' ').toUpperCase();
-
-      // If this came from Snipcart custom payment gateway, confirm the payment
-      if (snipcartPaymentSessionId) {
-        console.log('📦 Confirming Snipcart payment session:', snipcartPaymentSessionId);
-        const snipcartSecret = getSnipcartSecret(env);
-        if (snipcartSecret) {
-          try {
-            const confirmRes = await fetch('https://payment.snipcart.com/api/private/custom-payment-gateway/payment', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${snipcartSecret}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                paymentSessionId: snipcartPaymentSessionId,
-                state: 'processed',
-                transactionId: setupIntentId,
-                instructions: 'Your card has been saved. You will only be charged if the campaign reaches its funding goal.',
-                suppressOrderConfirmationEmail: true
-              })
-            });
-            if (!confirmRes.ok) {
-              console.error('Failed to confirm Snipcart payment:', await confirmRes.text());
-            } else {
-              console.log('📦 Snipcart payment confirmed successfully');
-            }
-          } catch (err) {
-            console.error('Error confirming Snipcart payment:', err);
-          }
-        }
-      }
 
       if (env.PLEDGES) {
         if (isPaymentUpdate === 'true') {
@@ -1821,6 +2248,7 @@ async function handleStripeWebhook(request, env, ctx) {
             await clearTierReservation(env, campaignSlug, orderId);
             await env.PLEDGES.delete(`pending-tiers:${orderId}`);
             await env.PLEDGES.delete(`pending-extras:${orderId}`);
+            await env.PLEDGES.delete(getCheckoutBundleStorageKey(orderId));
             // Duplicate webhook - pledge already processed
             console.log('📝 Pledge already exists, skipping duplicate webhook:', orderId);
             await markStripeEventProcessed();
@@ -1854,7 +2282,7 @@ async function handleStripeWebhook(request, env, ctx) {
             return jsonResponse({ error: desiredSupportItems.error }, 409);
           }
 
-          const canonicalContribution = buildCanonicalContribution(campaign, {
+          const canonicalContribution = buildCanonicalContribution(env, campaign, {
             tierSelection,
             supportItems: desiredSupportItems.supportItems,
             customAmount,
@@ -1863,6 +2291,42 @@ async function handleStripeWebhook(request, env, ctx) {
           if (!canonicalContribution.valid) {
             console.error('📝 Invalid pledge contribution in webhook metadata:', canonicalContribution.error);
             return jsonResponse({ error: canonicalContribution.error }, 409);
+          }
+
+          if (checkoutProvider === 'first_party') {
+            if (String(checkoutSnapshotVersion || '') !== String(CHECKOUT_INTENT_VERSION)) {
+              console.error('📝 Invalid first-party checkout snapshot version:', checkoutSnapshotVersion);
+              return jsonResponse({ error: 'Invalid checkout snapshot version' }, 409);
+            }
+
+            if (!checkoutNonce || !checkoutCartHash) {
+              console.error('📝 Missing first-party checkout integrity metadata');
+              return jsonResponse({ error: 'Missing checkout integrity metadata' }, 409);
+            }
+
+            const recomputedCheckoutCartHash = bundleManifest?.campaigns?.length === 1
+              ? await hashCheckoutBundle(buildCheckoutBundleHashInput({
+                  contributions: [{
+                    campaignSlug,
+                    canonicalContribution,
+                    tipPercent: normalizedTipPercent
+                  }]
+                }))
+              : await hashCheckoutContribution(buildCheckoutHashInput({
+                  campaignSlug,
+                  canonicalContribution,
+                  tipPercent: normalizedTipPercent
+                }));
+
+            if (recomputedCheckoutCartHash !== checkoutCartHash) {
+              console.error('📝 First-party checkout cart hash mismatch:', {
+                orderId,
+                checkoutNonce,
+                expectedHashPrefix: String(checkoutCartHash).slice(0, 12),
+                actualHashPrefix: recomputedCheckoutCartHash.slice(0, 12)
+              });
+              return jsonResponse({ error: 'Checkout integrity verification failed' }, 409);
+            }
           }
 
           const availability = await ensureTierAvailability(
@@ -1934,6 +2398,13 @@ async function handleStripeWebhook(request, env, ctx) {
 
           await env.PLEDGES.delete(`pending-tiers:${orderId}`);
           await env.PLEDGES.delete(`pending-extras:${orderId}`);
+          if (bundleManifest?.campaigns?.length === 1) {
+            await persistCheckoutBundleManifest(env, orderId, {
+              ...bundleManifest,
+              confirmedAt: new Date().toISOString(),
+              confirmedCampaigns: [{ orderId, campaignSlug, campaignTitle }]
+            });
+          }
 
           // Check for milestone emails (async, don't block response but keep worker alive)
           ctx.waitUntil(
@@ -2050,42 +2521,6 @@ async function handleStripeWebhook(request, env, ctx) {
   return jsonResponse({ received: true });
 }
 
-async function handleSnipcartWebhook(request, env, ctx) {
-  const body = await request.text();
-  
-  // Pool bypasses Snipcart payment processing entirely - Stripe webhooks handle everything.
-  // This endpoint exists for compatibility but doesn't process any events.
-  // If webhook secret isn't configured, just acknowledge receipt to prevent retries.
-  if (!env.SNIPCART_WEBHOOK_SECRET) {
-    console.log('Snipcart webhook received (ignored - no secret configured)');
-    return jsonResponse({ received: true });
-  }
-  
-  const requestToken = request.headers.get('x-snipcart-requesttoken') || '';
-  if (!timingSafeEqual(requestToken, env.SNIPCART_WEBHOOK_SECRET)) {
-    console.error('Invalid Snipcart webhook token');
-    return jsonResponse({ error: 'Invalid token' }, 401);
-  }
-
-  const event = JSON.parse(body);
-  console.log('Snipcart webhook received:', event.eventName);
-
-  // Pool uses custom template override that calls /start directly, bypassing Snipcart payments.
-  // The Stripe webhook handles all pledge creation, stats, emails, and milestones.
-  // This webhook is kept for potential future use but does not process order.completed events
-  // to avoid duplicate pledges, stats, and emails.
-  
-  if (event.eventName === 'order.completed') {
-    const order = event.content;
-    console.log('Snipcart order.completed received (ignored - handled by Stripe webhook):', { 
-      orderId: order.token, 
-      email: order.email 
-    });
-  }
-
-  return jsonResponse({ received: true });
-}
-
 async function handleGetPledge(request, env) {
   const url = new URL(request.url);
   const token = url.searchParams.get('token');
@@ -2125,37 +2560,6 @@ async function handleGetPledge(request, env) {
         canUpdatePaymentMethod: !pledgeData.charged,
         deadlinePassed
       });
-    }
-  }
-
-  const snipcartSecret = getSnipcartSecret(env);
-  if (snipcartSecret) {
-    try {
-      const snipcart = createSnipcartClient(snipcartSecret);
-      const order = await snipcart.orders.get(payload.orderId);
-      const pledge = extractPledgeFromOrder(order);
-      const cancelCheck = canCancelOrder(order);
-      const modifyCheck = canModifyOrder(order);
-
-      return jsonResponse({
-        orderId: order.token,
-        email: order.email,
-        campaignSlug: pledge?.campaignSlug || payload.campaignSlug,
-        pledgeStatus: order.metadata?.pledgeStatus || 'active',
-        subtotal: pledge?.subtotal || 0,
-        tax: pledge?.tax || 0,
-        shipping: pledge?.shipping || 0,
-        tipPercent: pledge?.tipPercent || 0,
-        tipAmount: pledge?.tipAmount || 0,
-        amount: pledge?.amount || 0,
-        tierId: pledge?.tierId || null,
-        tierName: pledge?.tierName || null,
-        canModify: modifyCheck.allowed,
-        canCancel: cancelCheck.allowed,
-        canUpdatePaymentMethod: !order.metadata?.charged
-      });
-    } catch (err) {
-      console.error('Failed to fetch Snipcart order:', err.message);
     }
   }
 
@@ -2499,7 +2903,7 @@ async function handleModifyPledge(request, env) {
     return jsonResponse({ error: desiredSupportItems.error }, 400);
   }
 
-  const canonicalContribution = buildCanonicalContribution(campaign, {
+  const canonicalContribution = buildCanonicalContribution(env, campaign, {
     tierSelection: desiredTierSelection,
     supportItems: desiredSupportItems.supportItems,
     customAmount: hasCustomAmountChange ? customAmount : (currentPledge.customAmount || 0),
@@ -2602,6 +3006,7 @@ async function handleModifyPledge(request, env) {
       let oldStatsRemoved = false;
       let newStatsAdded = false;
       let supportStatsSynced = false;
+      let statsReconciled = false;
 
       try {
         await env.PLEDGES.put(`pledge:${targetOrderId}`, JSON.stringify(nextPledgeData));
@@ -2634,6 +3039,9 @@ async function handleModifyPledge(request, env) {
           nextPledgeData.supportItems || []
         );
         supportStatsSynced = true;
+
+        await recalculateStats(env, campaignSlug);
+        statsReconciled = true;
 
         updatedPledgeData = nextPledgeData;
       } catch (err) {
@@ -2680,6 +3088,10 @@ async function handleModifyPledge(request, env) {
           );
         }
 
+        if (pledgeStored || oldStatsRemoved || newStatsAdded || supportStatsSynced || statsReconciled) {
+          await recalculateStats(env, campaignSlug);
+        }
+
         await applyTierInventoryChanges(
           env,
           campaignSlug,
@@ -2690,29 +3102,6 @@ async function handleModifyPledge(request, env) {
 
         return jsonResponse({ error: 'Failed to modify pledge' }, 500);
       }
-    }
-  }
-
-  // Sync with Snipcart
-  const snipcartSecret = getSnipcartSecret(env);
-  if (snipcartSecret) {
-    try {
-      const snipcart = createSnipcartClient(snipcartSecret);
-      await snipcart.orders.update(targetOrderId, {
-        metadata: {
-          subtotal: canonicalContribution.totals.subtotal,
-          tax: canonicalContribution.totals.tax,
-          tipPercent: canonicalContribution.totals.tipPercent,
-          tipAmount: canonicalContribution.totals.tipAmount,
-          totalAmount: canonicalContribution.totals.amount,
-          tierId: canonicalContribution.tierId || undefined,
-          tierName: canonicalContribution.tierName || undefined,
-          tierQty: canonicalContribution.tierQty || undefined,
-          modifiedAt: new Date().toISOString()
-        }
-      });
-    } catch (err) {
-      console.error('Failed to sync pledge modification with Snipcart:', err.message);
     }
   }
 
@@ -3717,7 +4106,7 @@ async function handleBackfillCustomers(request, campaignSlug, env) {
 }
 
 async function handleTestSetup(request, env) {
-  if (env.SNIPCART_MODE !== 'test') {
+  if (getAppMode(env) !== 'test') {
     return jsonResponse({ error: 'Test endpoints only available in test mode' }, 403);
   }
 
@@ -3753,8 +4142,8 @@ async function handleTestSetup(request, env) {
       additionalTiers = [{ id: secondTier.id, qty: secondTierQty }];
     }
   }
-  const totals = buildPledgeTotals(subtotal, {
-    shipping: 300,
+  const totals = buildPledgeTotals(env, subtotal, {
+    shipping: getFlatShippingFeeCents(env),
     tipPercent: DEFAULT_PLATFORM_TIP_PERCENT
   });
 
@@ -3834,7 +4223,7 @@ async function handleTestSetup(request, env) {
 }
 
 async function handleTestCleanup(request, env) {
-  if (env.SNIPCART_MODE !== 'test') {
+  if (getAppMode(env) !== 'test') {
     return jsonResponse({ error: 'Test endpoints only available in test mode' }, 403);
   }
 
@@ -4490,7 +4879,7 @@ async function handleMilestoneCheck(request, campaignSlug, env) {
  */
 async function handleTestEmail(request, env) {
   // Allow in test mode, or in production with admin auth
-  if (env.SNIPCART_MODE !== 'test') {
+  if (getAppMode(env) !== 'test') {
     const auth = requireAdmin(request, env);
     if (!auth.ok) {
       return jsonResponse({ error: 'Test endpoints require admin auth in production' }, 403);
@@ -4700,7 +5089,7 @@ async function handleTestEmail(request, env) {
 }
 
 async function handleTestVotes(request, env) {
-  if (env.SNIPCART_MODE !== 'test') {
+  if (getAppMode(env) !== 'test') {
     return jsonResponse({ error: 'Test endpoints only available in test mode' }, 403);
   }
 
@@ -5025,7 +5414,7 @@ async function handleRecoverCheckout(request, env) {
       return jsonResponse({ error: desiredSupportItems.error }, 409);
     }
 
-    const canonicalContribution = buildCanonicalContribution(campaign, {
+    const canonicalContribution = buildCanonicalContribution(env, campaign, {
       tierSelection,
       supportItems: desiredSupportItems.supportItems,
       customAmount,

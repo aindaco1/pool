@@ -1,0 +1,5 @@
+{%- if page.layout == 'pledge-result' and site.cart_runtime == 'first_party' and site.checkout_provider == 'first_party' -%}
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; style-src 'self' https://fonts.googleapis.com https://use.typekit.net https://p.typekit.net; font-src 'self' data: https://fonts.gstatic.com https://use.typekit.net https://p.typekit.net; script-src 'self'; connect-src 'self' {{ site.worker_base }}; media-src 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'">
+{%- endif -%}

@@ -1,5 +1,76 @@
 import { test, expect } from '@playwright/test';
 
+const CART_BUTTON_SELECTOR = 'button.poolcart-add-item';
+const TIER_CARD_BUTTON_SELECTOR = '.tier-card button.poolcart-add-item';
+const SIDEBAR_CART_BUTTON_SELECTOR = 'aside.campaign-sidebar button.poolcart-add-item';
+const ENABLED_TIER_CARD_BUTTON_SELECTOR = '.tier-card button.poolcart-add-item:not([disabled])';
+const ENABLED_SIDEBAR_CART_BUTTON_SELECTOR = 'aside.campaign-sidebar button.poolcart-add-item:not([disabled])';
+const FEATURED_CARD_BUTTON_SELECTOR = '.campaign-card__featured-tier.poolcart-add-item';
+const CART_ROOT_SELECTOR = '[data-pool-cart-root]';
+
+async function getCartSnapshot(page: any) {
+  return page.evaluate(async () => {
+    const provider = (window as any).PoolCartProvider;
+    if (provider?.whenReady) {
+      await provider.whenReady();
+    }
+
+    const client = provider?.getApi?.();
+    const state = provider?.store?.getState?.() || client?.store?.getState?.();
+    const items = state?.cart?.items?.items || [];
+
+    return {
+      runtime: provider?.activeRuntime || (window as any).POOL_CONFIG?.cartRuntime || 'first_party',
+      itemCount: state?.cart?.items?.count || 0,
+      total: state?.cart?.total || 0,
+      email: state?.cart?.email || '',
+      billingName: state?.cart?.billingAddress?.name || '',
+      items: items.map((item: any) => ({
+        name: item.name,
+        price: item.price,
+        id: item.id,
+        quantity: item.quantity
+      }))
+    };
+  });
+}
+
+async function updateCartViaClient(page: any, payload: Record<string, any>) {
+  return page.evaluate(async (nextPayload) => {
+    const provider = (window as any).PoolCartProvider;
+    if (provider?.whenReady) {
+      await provider.whenReady();
+    }
+
+    const client = provider?.getApi?.();
+    await client?.api?.cart?.update?.(nextPayload);
+
+    const state = provider?.store?.getState?.() || client?.store?.getState?.();
+    return {
+      email: state?.cart?.email || '',
+      billingName: state?.cart?.billingAddress?.name || ''
+    };
+  }, payload);
+}
+
+async function openCartViaClient(page: any) {
+  await page.evaluate(async () => {
+    const provider = (window as any).PoolCartProvider;
+    if (provider?.whenReady) {
+      await provider.whenReady();
+    }
+
+    const client = provider?.getApi?.();
+    await client?.api?.theme?.cart?.open?.();
+  });
+}
+
+async function getActiveRuntime(page: any) {
+  return page.evaluate(() => {
+    return (window as any).PoolCartProvider?.activeRuntime || (window as any).POOL_CONFIG?.cartRuntime || 'first_party';
+  });
+}
+
 test.describe('Campaign Page Structure', () => {
   test('campaign page has required elements', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
@@ -58,10 +129,10 @@ test.describe('Campaign Page Structure', () => {
 });
 
 test.describe('Tier Cards', () => {
-  test('tier cards have required Snipcart attributes', async ({ page }) => {
+  test('tier cards have required cart item attributes', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
     
-    const tierButtons = page.locator('.tier-card button.snipcart-add-item');
+    const tierButtons = page.locator(TIER_CARD_BUTTON_SELECTOR);
     const count = await tierButtons.count();
     expect(count).toBeGreaterThan(0);
     
@@ -106,7 +177,7 @@ test.describe('Tier Cards', () => {
       await expect(gatedTier.first()).toHaveClass(/tier-card--locked/);
       
       // Button should be disabled
-      const btn = gatedTier.first().locator('button.snipcart-add-item');
+      const btn = gatedTier.first().locator(CART_BUTTON_SELECTOR);
       await expect(btn).toBeDisabled();
       
       // Unlock badge exists but is hidden (display: none) until unlocked
@@ -119,7 +190,7 @@ test.describe('Tier Cards', () => {
     await page.goto('/campaigns/night-work/');
     
     // All tier buttons should be disabled
-    const tierButtons = page.locator('.tier-card button.snipcart-add-item');
+    const tierButtons = page.locator(TIER_CARD_BUTTON_SELECTOR);
     const firstButton = tierButtons.first();
     
     await expect(firstButton).toBeDisabled();
@@ -132,7 +203,7 @@ test.describe('Tier Cards', () => {
   test('sunder tiers are non-stackable and constrained to quantity 1', async ({ page }) => {
     await page.goto('/campaigns/sunder/');
 
-    const tierButtons = page.locator('.tier-card button.snipcart-add-item');
+    const tierButtons = page.locator(TIER_CARD_BUTTON_SELECTOR);
     const count = await tierButtons.count();
     expect(count).toBeGreaterThan(0);
 
@@ -148,7 +219,7 @@ test.describe('Physical Products & Shipping', () => {
   test('tier cards include _category custom field', async ({ page }) => {
     await page.goto('/campaigns/tecolote/');
     
-    const tierButtons = page.locator('.tier-card button.snipcart-add-item');
+    const tierButtons = page.locator(TIER_CARD_BUTTON_SELECTOR);
     const count = await tierButtons.count();
     expect(count).toBeGreaterThan(0);
     
@@ -170,7 +241,7 @@ test.describe('Physical Products & Shipping', () => {
   test('physical tier buttons set shippable to false', async ({ page }) => {
     await page.goto('/campaigns/tecolote/');
     
-    const physicalTier = page.locator('.tier-card button.snipcart-add-item[data-item-custom2-value="physical"]').first();
+    const physicalTier = page.locator('.tier-card button.poolcart-add-item[data-item-custom2-value="physical"]').first();
     
     if (await physicalTier.count() > 0) {
       await expect(physicalTier).toHaveAttribute('data-item-shippable', 'false');
@@ -180,7 +251,7 @@ test.describe('Physical Products & Shipping', () => {
   test('campaign with all digital tiers has no physical category', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
     
-    const tierButtons = page.locator('.tier-card button.snipcart-add-item');
+    const tierButtons = page.locator(TIER_CARD_BUTTON_SELECTOR);
     const count = await tierButtons.count();
     expect(count).toBeGreaterThan(0);
     
@@ -225,7 +296,7 @@ test.describe('Support Items', () => {
     }
   });
 
-  test('support item input updates Snipcart data-item-price', async ({ page }) => {
+  test('support item input updates cart data-item-price', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
     
     const supportInput = page.locator('#support-input-location-scouting');
@@ -282,7 +353,7 @@ test.describe('Custom Amount', () => {
     }
   });
 
-  test('custom amount input updates Snipcart data-item-price', async ({ page }) => {
+  test('custom amount input updates cart data-item-price', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
     
     const customInput = page.locator('#custom-amount-input');
@@ -360,11 +431,11 @@ test.describe('Homepage & Campaign Cards', () => {
     }
   });
 
-  test('featured tier button on campaign card has Snipcart attributes', async ({ page }) => {
+  test('featured tier button on campaign card has cart item attributes', async ({ page }) => {
     await page.goto('/');
     
     // Find a campaign card with a featured tier button
-    const featuredBtn = page.locator('.campaign-card__featured-tier.snipcart-add-item');
+    const featuredBtn = page.locator(FEATURED_CARD_BUTTON_SELECTOR);
     
     if (await featuredBtn.count() > 0) {
       const btn = featuredBtn.first();
@@ -376,17 +447,29 @@ test.describe('Homepage & Campaign Cards', () => {
   });
 });
 
-test.describe('Snipcart Integration', () => {
-  test('Snipcart script configuration is loaded', async ({ page }) => {
+test.describe('Cart Integration', () => {
+  test('cart runtime bootstrap is loaded', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
     
-    const snipcartSettings = await page.evaluate(() => {
-      return (window as any).SnipcartSettings;
+    const bootstrap = await page.evaluate(() => {
+      const cartRoot = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+      return {
+        poolConfig: (window as any).POOL_CONFIG,
+        hasProvider: Boolean((window as any).PoolCartProvider),
+        hasCartRoot: Boolean(cartRoot),
+        cartRootId: cartRoot?.id || null,
+        hasVendorConfigAttributes: Boolean(
+          cartRoot?.hasAttribute('data-api-key') ||
+          cartRoot?.hasAttribute('data-config-modal-style')
+        )
+      };
     });
     
-    expect(snipcartSettings).toBeDefined();
-    expect(snipcartSettings.publicApiKey).toBeTruthy();
-    expect(snipcartSettings.loadStrategy).toBe('on-user-interaction');
+    expect(bootstrap.poolConfig).toBeDefined();
+    expect(bootstrap.hasProvider).toBe(true);
+    expect(bootstrap.hasCartRoot).toBe(true);
+    expect(bootstrap.cartRootId).toBeNull();
+    expect(bootstrap.hasVendorConfigAttributes).toBe(false);
   });
 
   test('POOL_CONFIG is set for live-stats.js', async ({ page }) => {
@@ -438,7 +521,7 @@ test.describe('Cart Flow', () => {
     await expect(page.locator('.campaign-container')).toBeVisible();
     
     // Find an enabled tier button in the sidebar
-    const tierButton = page.locator('aside.campaign-sidebar button.snipcart-add-item:not([disabled])').first();
+    const tierButton = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR).first();
     
     if (await tierButton.count() === 0) {
       console.log('No enabled tiers found - campaign may not be live');
@@ -454,12 +537,11 @@ test.describe('Cart Flow', () => {
     // Click the tier button to add to cart
     await tierButton.click();
     
-    // Wait for Snipcart to load
+    // Wait for the cart runtime to react
     await page.waitForTimeout(2000);
     
-    // Snipcart container should exist
-    const snipcartContainer = page.locator('#snipcart');
-    await expect(snipcartContainer).toBeAttached();
+    const cartContainer = page.locator(CART_ROOT_SELECTOR);
+    await expect(cartContainer).toBeAttached();
   });
 
   test('add item to cart and verify cart state via API', async ({ page }) => {
@@ -467,7 +549,7 @@ test.describe('Cart Flow', () => {
     
     await page.goto('/campaigns/hand-relations/');
     
-    const tierButton = page.locator('aside.campaign-sidebar button.snipcart-add-item:not([disabled])').first();
+    const tierButton = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR).first();
     if (await tierButton.count() === 0) {
       console.log('No enabled tiers - skipping');
       return;
@@ -476,33 +558,7 @@ test.describe('Cart Flow', () => {
     await tierButton.click();
     await page.waitForTimeout(3000);
     
-    // Verify cart via Snipcart JavaScript API
-    const cartState = await page.evaluate(async () => {
-      const waitForSnipcart = () => new Promise<any>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Snipcart timeout')), 10000);
-        if ((window as any).Snipcart) {
-          clearTimeout(timeout);
-          resolve((window as any).Snipcart);
-        } else {
-          document.addEventListener('snipcart.ready', () => {
-            clearTimeout(timeout);
-            resolve((window as any).Snipcart);
-          });
-        }
-      });
-      
-      const Snipcart = await waitForSnipcart();
-      const state = Snipcart.store.getState();
-      return {
-        itemCount: state.cart.items.count,
-        total: state.cart.total,
-        items: state.cart.items.items.map((i: any) => ({ 
-          name: i.name, 
-          price: i.price,
-          id: i.id 
-        }))
-      };
-    });
+    const cartState = await getCartSnapshot(page);
     
     expect(cartState.itemCount).toBeGreaterThan(0);
     expect(cartState.total).toBeGreaterThan(0);
@@ -512,29 +568,21 @@ test.describe('Cart Flow', () => {
     // The billing step is now hidden and auto-navigates to the Pledge step.
     const testEmail = `e2e-test+${Date.now()}@example.com`;
     
-    await page.evaluate((email) => {
-      (window as any).Snipcart.api.cart.update({
-        email: email,
-        billingAddress: {
-          name: 'E2E Test User',
-          address1: '123 Test Street',
-          city: 'San Francisco',
-          country: 'US',
-          province: 'CA',
-          postalCode: '94102'
-        }
-      });
-    }, testEmail);
+    await updateCartViaClient(page, {
+      email: testEmail,
+      billingAddress: {
+        name: 'E2E Test User',
+        address1: '123 Test Street',
+        city: 'San Francisco',
+        country: 'US',
+        province: 'CA',
+        postalCode: '94102'
+      }
+    });
     
     await page.waitForTimeout(500);
     
-    const updatedCart = await page.evaluate(() => {
-      const state = (window as any).Snipcart.store.getState();
-      return {
-        email: state.cart.email,
-        billingName: state.cart.billingAddress?.name
-      };
-    });
+    const updatedCart = await getCartSnapshot(page);
     
     expect(updatedCart.email).toBe(testEmail);
     expect(updatedCart.billingName).toBe('E2E Test User');
@@ -545,19 +593,109 @@ test.describe('Cart Flow', () => {
 
     await page.goto('/campaigns/sunder/');
 
-    const tierButton = page.locator('aside.campaign-sidebar button.snipcart-add-item:not([disabled])').first();
+    const tierButton = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR).first();
     if (await tierButton.count() === 0) {
       test.skip();
       return;
     }
 
     await tierButton.click();
+    await openCartViaClient(page);
+
+    const cartRuntime = await page.evaluate(() => {
+      return (window as any).PoolCartProvider?.activeRuntime || (window as any).POOL_CONFIG?.cartRuntime || 'first_party';
+    });
+
+    if (cartRuntime === 'first_party') {
+      await expect(page.locator('.pool-first-party-cart__tip-box')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('.pool-first-party-cart__checkout-summary')).toBeVisible();
+      await expect(page.locator('.pool-first-party-cart__tip-percent')).toHaveText('5%');
+      await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('tip (5%)');
+      await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('Sales tax (7.875%)');
+      await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('Pledge total');
+      return;
+    }
 
     await expect(page.locator('.pool-tip-box')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.pool-fee-summary')).toBeVisible();
     await expect(page.locator('.pool-tip-box__percent')).toHaveText('5%');
     await expect(page.locator('.pool-fee-summary')).toContainText('tip (5%)');
-    await expect(page.locator('.pool-fee-summary')).toContainText('ABQ tax (7.875%)');
+    await expect(page.locator('.pool-fee-summary')).toContainText('Sales tax (7.875%)');
+  });
+
+  test('first-party checkout preview posts canonical payload to /checkout-intent/start', async ({ page }) => {
+    test.setTimeout(60_000);
+
+    await page.goto('/campaigns/smoke-editable/');
+
+    const cartRuntime = await page.evaluate(() => {
+      return (window as any).PoolCartProvider?.activeRuntime || (window as any).POOL_CONFIG?.cartRuntime || 'first_party';
+    });
+
+    if (cartRuntime !== 'first_party') {
+      test.skip();
+      return;
+    }
+
+    const workerBase = await page.evaluate(() => {
+      return (window as any).POOL_CONFIG?.workerBase;
+    });
+
+    expect(workerBase).toBeTruthy();
+
+    let capturedPayload: any = null;
+    await page.route(`${workerBase}/checkout-intent/start`, async (route) => {
+      capturedPayload = JSON.parse(route.request().postData() || '{}');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ url: '/campaigns/smoke-editable/#checkout-redirected' })
+      });
+    });
+
+    const tierButton = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR).first();
+    if (await tierButton.count() === 0) {
+      test.skip();
+      return;
+    }
+
+    const tierId = await tierButton.getAttribute('data-item-id');
+    const campaignSlug = await page.locator('.campaign-container').getAttribute('data-campaign-slug');
+
+    expect(tierId).toBeTruthy();
+    expect(campaignSlug).toBeTruthy();
+
+    await tierButton.click();
+    await openCartViaClient(page);
+
+    const tipSlider = page.locator('[data-cart-tip]');
+    await expect(tipSlider).toBeVisible();
+    await tipSlider.fill('6');
+    await page.locator('[data-cart-continue]').click();
+    await expect(page.locator('[data-cart-email]')).toHaveCount(0);
+    await expect(page.locator('[data-cart-tip]')).toHaveCount(0);
+
+    await expect(page.locator('[data-cart-start-checkout]')).toBeVisible();
+    await page.evaluate(() => {
+      const button = document.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
+      button?.click();
+    });
+    await page.waitForURL('**/campaigns/smoke-editable/#checkout-redirected');
+
+    expect(capturedPayload).toMatchObject({
+      campaignSlug,
+      tipPercent: 6,
+      items: [
+        {
+          id: tierId,
+          quantity: 1
+        }
+      ],
+      customAmount: 0
+    });
+
+    const pendingPledge = await page.evaluate(() => localStorage.getItem('pool_pending_pledge'));
+    expect(pendingPledge).toBe('true');
   });
 
   test('single-tier campaigns replace the previous cart item instead of stacking', async ({ page }) => {
@@ -565,39 +703,218 @@ test.describe('Cart Flow', () => {
 
     await page.goto('/campaigns/sunder/');
 
-    const tierButtons = page.locator('aside.campaign-sidebar button.snipcart-add-item:not([disabled])');
+    const tierButtons = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR);
     if (await tierButtons.count() < 2) {
       test.skip();
       return;
     }
 
+    const firstTierId = await tierButtons.nth(0).getAttribute('data-item-id');
+    const secondTierId = await tierButtons.nth(1).getAttribute('data-item-id');
     const firstTierName = await tierButtons.nth(0).getAttribute('data-item-name');
     const secondTierName = await tierButtons.nth(1).getAttribute('data-item-name');
+
+    expect(firstTierId).toBeTruthy();
+    expect(secondTierId).toBeTruthy();
 
     await tierButtons.nth(0).click();
     await page.waitForTimeout(1500);
 
-    await page.evaluate(() => {
-      const button = document.querySelectorAll('aside.campaign-sidebar button.snipcart-add-item:not([disabled])')[1] as HTMLButtonElement | undefined;
-      button?.click();
-    });
+    await page.evaluate(async (itemId) => {
+      const button = document.querySelector(`aside.campaign-sidebar button[data-item-id="${itemId}"]`) as HTMLButtonElement | null;
+      const provider = (window as any).PoolCartProvider;
+      if (provider?.whenReady) {
+        await provider.whenReady();
+      }
+
+      const client = provider?.getApi?.();
+      if (!button || !client?.api?.cart?.items?.add) return;
+
+      await client.api.cart.items.add({
+        id: button.dataset.itemId,
+        name: button.dataset.itemName,
+        price: Number(button.dataset.itemPrice || '0'),
+        url: button.dataset.itemUrl,
+        description: button.dataset.itemDescription || '',
+        stackable: button.dataset.itemStackable === 'always',
+        shippable: button.dataset.itemShippable === 'true',
+        maxQuantity: Number(button.dataset.itemMaxQuantity || '99')
+      });
+    }, secondTierId);
 
     await page.waitForFunction(() => {
-      const snipcart = (window as any).Snipcart;
-      if (!snipcart) return false;
-      const items = snipcart.store.getState().cart.items.items || [];
+      const provider = (window as any).PoolCartProvider;
+      const client = provider?.getApi?.();
+      const state = provider?.store?.getState?.() || client?.store?.getState?.();
+      const items = state?.cart?.items?.items || [];
       return items.length === 1;
     }, null, { timeout: 15000 });
 
-    const cartState = await page.evaluate(() => {
-      const items = (window as any).Snipcart.store.getState().cart.items.items || [];
-      return items.map((item: any) => ({ name: item.name, quantity: item.quantity }));
-    });
+    const cartState = (await getCartSnapshot(page)).items.map((item: any) => ({
+      name: item.name,
+      quantity: item.quantity
+    }));
 
     expect(cartState).toHaveLength(1);
     expect(cartState[0].quantity).toBe(1);
     expect(cartState[0].name).toBe(secondTierName);
     expect(cartState[0].name).not.toBe(firstTierName);
+  });
+
+  test('single-tier replacement keeps tier items from other campaigns in the cart', async ({ page }) => {
+    test.setTimeout(60_000);
+
+    await page.goto('/campaigns/smoke-editable/');
+
+    const otherCampaignButton = page.locator(ENABLED_TIER_CARD_BUTTON_SELECTOR).first();
+    if (await otherCampaignButton.count() === 0) {
+      test.skip();
+      return;
+    }
+
+    const otherCampaignId = await otherCampaignButton.getAttribute('data-item-id');
+    const otherCampaignName = await otherCampaignButton.getAttribute('data-item-name');
+    expect(otherCampaignId).toBeTruthy();
+    expect(otherCampaignName).toBeTruthy();
+    await otherCampaignButton.click();
+
+    await page.goto('/campaigns/sunder/');
+
+    const sunderButton = page
+      .locator(`${ENABLED_SIDEBAR_CART_BUTTON_SELECTOR}, ${ENABLED_TIER_CARD_BUTTON_SELECTOR}`)
+      .first();
+    if (await sunderButton.count() === 0) {
+      test.skip();
+      return;
+    }
+
+    const secondTierId = await sunderButton.getAttribute('data-item-id');
+    const secondTierName = await sunderButton.getAttribute('data-item-name');
+    expect(secondTierId).toBeTruthy();
+    expect(secondTierName).toBeTruthy();
+    await sunderButton.click();
+
+    const cartItems = page.locator('.pool-first-party-cart__item');
+    await expect(cartItems).toHaveCount(2, { timeout: 15000 });
+
+    const cartState = (await getCartSnapshot(page)).items.map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity
+    }));
+
+    expect(cartState).toHaveLength(2);
+    expect(cartState.some((item: any) => item.id === otherCampaignId)).toBe(true);
+    expect(cartState.some((item: any) => item.id === secondTierId && item.quantity === 1)).toBe(true);
+  });
+});
+
+test.describe('First-Party Result Pages', () => {
+  test('cancelled pledge page restores a saved first-party checkout', async ({ page }) => {
+    await page.addInitScript((snapshot) => {
+      window.localStorage.setItem('pool_first_party_checkout_snapshot', JSON.stringify(snapshot));
+    }, {
+      cart: {
+        email: 'supporter@example.com',
+        tipPercent: 6,
+        items: [
+          {
+            id: 'demo__featured-tier',
+            name: 'Demo Featured Tier',
+            price: 25,
+            quantity: 2,
+            url: '/campaigns/demo/',
+            description: 'Featured support tier',
+            stackable: false,
+            shippable: false,
+            maxQuantity: 1
+          }
+        ]
+      },
+      campaignUrl: '/campaigns/demo/',
+      savedAt: Date.now()
+    });
+
+    await page.route('**/checkout-intent/recovery?campaignSlug=demo', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          campaignSlug: 'demo',
+          campaignTitle: 'Demo Campaign',
+          effectiveState: 'live',
+          acceptingPledges: true,
+          statusMessage: 'Demo Campaign is still accepting pledges.'
+        })
+      });
+    });
+
+    await page.goto('/pledge-cancelled/');
+
+    if (await getActiveRuntime(page) !== 'first_party') {
+      test.skip();
+      return;
+    }
+
+    const recoveryCard = page.locator('[data-first-party-recovery]');
+    await expect(recoveryCard).toBeVisible();
+    await expect(recoveryCard).toContainText('Your saved pledge is still here.');
+    await expect(recoveryCard).toContainText('Campaign: Demo Campaign');
+    await expect(recoveryCard).toContainText('Demo Campaign is still accepting pledges.');
+
+    await expect.poll(async () => {
+      return page.evaluate(() => {
+        return (window as any).PoolCartProvider?.store?.getState?.()?.cart?.items?.count || 0;
+      });
+    }).toBe(1);
+    await page.locator('[data-resume-first-party-pledge]').click();
+
+    await expect(page.locator(CART_ROOT_SELECTOR)).toContainText('Checkout');
+    await expect(page.locator(CART_ROOT_SELECTOR)).not.toContainText('Review your pledge');
+    await expect(page.locator(CART_ROOT_SELECTOR)).toContainText('Demo Featured Tier');
+  });
+
+  test('success page hydrates backend-confirmed first-party pledge details', async ({ page }) => {
+    await page.addInitScript((snapshot) => {
+      window.localStorage.setItem('pool_first_party_checkout_snapshot', JSON.stringify(snapshot));
+    }, {
+      cart: {
+        email: 'supporter@example.com',
+        tipPercent: 6,
+        items: [
+          {
+            id: 'demo__featured-tier',
+            name: 'Demo Featured Tier',
+            price: 25,
+            quantity: 2,
+            url: '/campaigns/demo/'
+          },
+          {
+            id: 'demo__support__travel',
+            name: 'Travel Support',
+            price: 10,
+            quantity: 1,
+            url: '/campaigns/demo/'
+          }
+        ]
+      },
+      campaignUrl: '/campaigns/demo/',
+      savedAt: Date.now()
+    });
+
+    await page.goto('/pledge-success/?orderId=pool-intent-demo123');
+
+    if (await getActiveRuntime(page) !== 'first_party') {
+      test.skip();
+      return;
+    }
+
+    const summaryCard = page.locator('[data-first-party-success-summary]');
+    await expect(summaryCard).toHaveCount(0);
+
+    await expect.poll(async () => {
+      return page.evaluate(() => window.localStorage.getItem('pool_first_party_checkout_snapshot'));
+    }).toBeNull();
   });
 });
 
@@ -620,7 +937,7 @@ test.describe('Accessibility', () => {
   test('tier buttons have accessible labels', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
     
-    const tierButtons = page.locator('.tier-card button.snipcart-add-item');
+    const tierButtons = page.locator(TIER_CARD_BUTTON_SELECTOR);
     const count = await tierButtons.count();
     
     for (let i = 0; i < Math.min(count, 3); i++) {
@@ -712,7 +1029,7 @@ test.describe('Campaign States', () => {
     await page.goto('/campaigns/hand-relations/');
     
     // At least one tier should be enabled
-    const enabledTiers = page.locator('.tier-card button.snipcart-add-item:not([disabled])');
+    const enabledTiers = page.locator(ENABLED_TIER_CARD_BUTTON_SELECTOR);
     
     // If campaign is live, should have enabled tiers (except gated ones)
     const count = await enabledTiers.count();
@@ -723,7 +1040,7 @@ test.describe('Campaign States', () => {
   test('upcoming campaign has all tiers disabled', async ({ page }) => {
     await page.goto('/campaigns/night-work/');
     
-    const tierButtons = page.locator('.tier-card button.snipcart-add-item');
+    const tierButtons = page.locator(TIER_CARD_BUTTON_SELECTOR);
     const count = await tierButtons.count();
     
     if (count > 0) {
@@ -750,7 +1067,7 @@ test.describe('Campaign States', () => {
 });
 
 test.describe('Manual Checkout Flow', () => {
-  test('manual pledge flow - Snipcart to Stripe', async ({ page }) => {
+  test('manual pledge flow - cart to Stripe', async ({ page }) => {
     // Skip in CI - requires manual interaction and running Worker
     test.skip(!!process.env.CI, 'Skipped in CI - requires manual interaction');
     
@@ -764,7 +1081,7 @@ test.describe('Manual Checkout Flow', () => {
       console.log('\n📍 Navigated to Hand Relations campaign');
       
       // 2. Add tier to cart
-      const tierButton = page.locator('aside.campaign-sidebar button.snipcart-add-item:not([disabled])').first();
+      const tierButton = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR).first();
       if (await tierButton.count() === 0) {
         console.log('❌ No enabled tiers - campaign may not be live');
         return;
@@ -777,11 +1094,9 @@ test.describe('Manual Checkout Flow', () => {
       await tierButton.click();
       console.log('🛒 Added tier to cart');
       
-      // 3. Wait for Snipcart and open cart
+      // 3. Wait for cart runtime and open cart
       await page.waitForTimeout(2000);
-      await page.evaluate(() => {
-        (window as any).Snipcart.api.theme.cart.open();
-      });
+      await openCartViaClient(page);
       console.log('🛒 Cart opened');
       
       // Should see pledge notice in cart

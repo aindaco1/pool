@@ -3,7 +3,7 @@
 ## Stack
 
 - **GitHub Pages** — Jekyll 4.4.1 + Sass static site
-- **Snipcart v3** — Cart UI only (no payment processing)
+- **Legacy hosted cart runtime** — Cart UI only (no payment processing)
 - **Cloudflare Worker** — Backend API, pledge storage (KV), email sending
 - **Stripe** — SetupIntents (save card), PaymentIntents (charge later)
 - **Resend** — Transactional emails (supporter confirmation, milestones, failures)
@@ -37,14 +37,12 @@ assets/
 │   ├── _manage.scss       # Pledge management page
 │   ├── _content-blocks.scss # Rich content rendering
 │   ├── _utilities.scss    # Helper classes
-│   └── _snipcart-overrides.scss  # Cart customization
 └── js/
     ├── cart.js            # Pledge flow integration (tip UI, shipping/tax totals, checkout summary preview)
-    ├── checkout-autofill.js  # Country/state autofill for password managers
     ├── buy-buttons.js     # Button event handlers
     ├── campaign.js        # Phase tabs, toasts, interactive elements
     ├── live-stats.js      # Real-time stats, inventory, tier unlocks, late support
-    └── snipcart-debug.js  # Debug utilities
+    └── cart-provider.js   # First-party cart/runtime provider
 ```
 
 Jekyll compiles `main.scss` → `main.css` automatically.
@@ -272,7 +270,7 @@ tiers:
 
 **Tier gating**: Add `requires_threshold` (integer, dollars) to lock a tier until the campaign reaches that funding level. When live stats update and `pledgedAmount >= requires_threshold`, the tier animates to "Unlocked!" state with a badge. The animation respects `prefers-reduced-motion`.
 
-**Physical tiers**: Set `category: physical` to trigger shipping address collection via Stripe Checkout and add a $3 flat shipping fee (USPS). The `_category` custom field is passed through Snipcart as a hidden field. All items are set to `shippable="false"` in Snipcart to bypass its native shipping — address collection is handled entirely by Stripe.
+**Physical tiers**: Set `category: physical` to trigger shipping address collection via Stripe Checkout and add a $3 shipping fee for each campaign that contains physical rewards. The first-party cart carries that category through the checkout-intent payload, and Stripe handles address collection directly.
 
 ### Production Phases
 
@@ -353,175 +351,123 @@ ongoing_items:
 
 All money values must be integers (no cents).
 
-## Snipcart Integration
+## First-Party Cart Integration
 
-### Billing Step Auto-Skip
+### Cart Runtime
 
-The billing step is hidden from users in Snipcart checkout. `cart.js` auto-fills placeholder billing data for Snipcart's internal validation, then immediately advances to the "Pledge" step (renamed from "Payment"). Real billing info is collected by Stripe Checkout. The `billingAddress` is not sent to the Worker—Stripe handles actual billing collection.
+The site now uses a first-party cart runtime exposed through `window.PoolCartProvider`. Shared UI code talks to that provider instead of directly depending on a hosted-cart global.
+
+Key files:
+- `assets/js/cart-provider.js` — browser-owned cart state, drawer rendering, checkout preview, success/cancel recovery
+- `assets/js/cart.js` — shared pledge flow bootstrapping and page-level cart behaviors
+- `_includes/cart-runtime-head.html` / `_includes/cart-runtime-foot.html` — first-party runtime boot
 
 ### Stackable vs Non-Stackable Tiers
 
-Tiers can be marked as `stackable: false` to prevent quantity adjustments in the cart (e.g., one-time credits, unique rewards).
+Tiers can be marked as `stackable: false` to prevent quantity adjustments in the cart.
 
-**How it works:**
+How it works now:
+1. Buy buttons carry the tier/cart metadata through `poolcart-*` hooks and item IDs like `{campaignSlug}__{tierId}`.
+2. The first-party provider merges repeat adds only for stackable tiers.
+3. Non-stackable enforcement happens in first-party cart state, not through hosted-cart DOM patches.
 
-1. **Frontend data attribute**: All buy buttons include a hidden `_stackable` custom field:
-   ```html
-   data-item-custom1-name="_stackable"
-   data-item-custom1-type="hidden"
-   data-item-custom1-value="{{ tier.stackable | default: true }}"
-   ```
-
-2. **JavaScript detection** (`snipcart-foot.html`): On cart changes, reads `_stackable` from item custom fields and sets `data-stackable="false"` on the `.snipcart-item-line` element.
-
-3. **CSS override** (`_snipcart-overrides.scss`): Hides quantity controls for non-stackable items:
-   ```scss
-   .snipcart-item-line[data-stackable="false"] {
-     .snipcart-item-quantity__label,
-     .snipcart-item-quantity__quantity {
-       display: none !important;
-     }
-   }
-   ```
-
-**Files involved:**
-- `_includes/tier-card.html` — Tier buy buttons
-- `_includes/campaign-card.html` — Featured tier on home page
-- `_includes/support-items.html`, `_includes/ongoing-funding.html`, `_includes/production-phases.html` — Other buy buttons
-- `_includes/snipcart-foot.html` — JS to mark items
-- `assets/partials/_snipcart-overrides.scss` — CSS to hide controls
-
-Include in layout:
-
-```html
-<div hidden id="snipcart" data-api-key="YOUR_PUBLIC_KEY">
-  <payment section="top">
-    <div>
-      <snipcart-checkbox name="agree-terms" required></snipcart-checkbox>
-      <snipcart-label for="agree-terms">
-        I agree to <a href="/terms/">Terms</a>
-      </snipcart-label>
-    </div>
-  </payment>
-</div>
-<script async src="https://cdn.snipcart.com/themes/v3.6.0/default/snipcart.js"></script>
-```
+Files involved:
+- `_includes/tier-card.html`
+- `_includes/campaign-card.html`
+- `_includes/support-items.html`
+- `_includes/ongoing-funding.html`
+- `_includes/production-phases.html`
 
 ## Pledge Flow
 
-The pledge flow bypasses Snipcart's payment processing entirely:
+The pledge flow is now first-party end to end until Stripe:
 
-1. **User adds tier to cart** → Snipcart handles cart UI
-2. **User fills billing info** → Snipcart collects name, email, address
-3. **User clicks "Continue to Pledge"** → Custom JS intercepts (see `assets/js/cart.js`)
-4. **JS calls Worker `/start`** → Sends cart data, billing info, generates temp order ID
-5. **Worker creates Stripe Checkout (setup mode)** → Saves card without charging
-6. **User completes Stripe Checkout** → Redirected to `/pledge-success/`
-7. **Stripe webhook fires** → Worker stores pledge in KV, updates stats, sends email
+1. **User adds tier to cart** → first-party cart drawer opens
+2. **User reviews pledge** → drawer shows tiers, support items, custom support, tip, and immediate pricing
+3. **User clicks "Continue to Pledge"** → `cart-provider.js` posts canonical cart items to Worker `/checkout-intent/start`
+4. **Worker creates Stripe Checkout (setup mode)** → saves card without charging
+5. **User completes Stripe Checkout** → redirected to `/pledge-success/`
+6. **Stripe webhook fires** → Worker stores one pledge per campaign in KV, updates stats, sends supporter email(s)
 
 Key points:
-- Snipcart orders are never created (cart is cleared after redirect)
-- Order IDs are generated client-side: `pledge-{timestamp}-{random}`
-- Billing info from Snipcart is passed to Stripe to pre-fill checkout
-- Tax is calculated server-side (ABQ rate: 7.875%)
-- Optional Dust Wave tip defaults to 5%, can be set from 0% to 15%, and is included in final charge totals but excluded from campaign funding progress
-- Checkout order-summary timing uses an immediate preview + native summary patching rather than waiting for Snipcart to fully mount fee rows
+- hosted-cart orders are not part of the runtime anymore
+- order IDs are Worker-issued `pool-intent-*` values tied to the checkout nonce
+- Stripe collects real payment and shipping details
+- tax is calculated server-side from the configured `sales_tax_rate` in `_config.yml` and mirrored Worker env
+- optional Dust Wave tip defaults to 5%, can be set from 0% to 15%, and is included in final charge totals but excluded from campaign funding progress
+- checkout preview totals are rendered immediately from shared pricing logic
 
 ### Support Items & Custom Amounts
 
 The cart can include:
-- **Tiers** — Main pledge items with `{campaignSlug}__{tierId}` IDs
-- **Support items** — Production phase contributions with `{campaignSlug}__support__{itemId}` IDs
-- **Custom amount** — "No reward" pledge with `{campaignSlug}__custom` ID
+- **Tiers** — `{campaignSlug}__{tierId}`
+- **Support items** — `{campaignSlug}__support__{itemId}`
+- **Custom amount** — browser-owned custom support state that becomes `customAmount`
 
-**Data flow:**
-1. `cart.js` extracts these from Snipcart cart items, along with the selected tip percent, and sends them to `/start`
-2. Worker stores `supportItems` and `customAmount` in temp KV (`pending-extras:{orderId}`)
-3. Worker stores `tipPercent` in Stripe metadata and computes final totals server-side
-4. On webhook, Worker fetches extras from temp KV and merges into final pledge
+Data flow:
+1. `cart-provider.js` builds the first-party cart payload and POSTs it to `/checkout-intent/start`
+2. Worker canonicalizes the contribution and stores overflow metadata in temp KV (`pending-extras:{orderId}`, `pending-tiers:{orderId}`)
+3. Worker stores `tipPercent` and integrity metadata in Stripe session metadata
+4. On webhook, Worker fetches extras from temp KV and merges them into the final pledge
 5. Worker calls `updateSupportItemStats()` to update live stats for support items
 
-**Manage page display:**
-- During **live** campaigns: ALL support items are shown for modification
-- During **post** campaigns: Only items with `late_support: true` are shown (and only if funded)
-- Pledge summary shows full breakdown: subtotal, optional Dust Wave tip, tax, shipping (if physical tier), total
-- Modifying tiers dynamically recalculates shipping based on tier `category` (physical → $3 fee, digital → no fee)
+Manage page display:
+- During **live** campaigns: all support items are shown for modification
+- During **post** campaigns: only items with `late_support: true` are shown (and only if funded)
+- Pledge summary shows subtotal, optional Dust Wave tip, tax, shipping, and total
+- Modifying tiers dynamically recalculates shipping based on tier `category`
 - Active pledges are grouped separately from Closed pledges; deadline-passed active pledges render as locked and become read-only except for "Update Card"
 
 ## Local Development
 
 ### Prerequisites
 
-**Required accounts:**
-- [Stripe](https://dashboard.stripe.com) — For payment processing (use test mode)
-- [Snipcart](https://app.snipcart.com) — For cart UI (use test mode)
-- [Cloudflare](https://dash.cloudflare.com) — For Worker + KV storage
-- [Resend](https://resend.com) — For transactional emails (free tier: 3k/month)
+Required accounts:
+- [Stripe](https://dashboard.stripe.com) — payment processing (test mode)
+- [Cloudflare](https://dash.cloudflare.com) — Worker + KV storage
+- [Resend](https://resend.com) — transactional email (free tier goes a long way)
 
-**Required tools:**
+Required tools:
 ```bash
-# Ruby + Bundler (for Jekyll)
-ruby --version  # 3.x recommended
-
-# Node.js (for Wrangler + Playwright tests)
-node --version  # 20.x recommended
-
-# Wrangler CLI (Cloudflare Workers)
+ruby --version   # 3.x recommended
+node --version   # 20.x recommended
 npm install -g wrangler
 wrangler login
-
-# Stripe CLI (webhook testing)
 brew install stripe/stripe-cli/stripe
 stripe login
+```
 
-# Optional: ngrok (for Snipcart product crawling)
+Optional:
+```bash
 brew install ngrok
 ```
 
 ### 1. Install Dependencies
 
 ```bash
-# Jekyll dependencies
 bundle install
-
-# Node dependencies (for Playwright tests)
 npm install
 ```
 
-### 2. Configure Snipcart
-
-1. Go to [Snipcart Dashboard](https://app.snipcart.com) → **Account** → **API Keys**
-2. Copy your **Public Test API Key**
-3. Go to **Domains & URLs** → Add allowed domains:
-   - `127.0.0.1:4000` (local dev)
-   - Your ngrok URL (if using)
-   - `pool.dustwave.xyz` (production)
-
-Update `_config.local.yml` with your test key:
-```yaml
-snipcart_test_key: "YOUR_PUBLIC_TEST_API_KEY"
-```
-
-### 3. Configure Worker Secrets
+### 2. Configure Worker Secrets
 
 Create `worker/.dev.vars` for local development:
 
 ```bash
-# worker/.dev.vars (gitignored)
 STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...  # From Stripe CLI
-SNIPCART_SECRET=your_snipcart_secret_api_key
+STRIPE_WEBHOOK_SECRET=whsec_...
+CHECKOUT_INTENT_SECRET=random-32-char-string-for-hmac
 MAGIC_LINK_SECRET=random-32-char-string-for-hmac
 RESEND_API_KEY=re_...
 ADMIN_SECRET=local-admin-secret
 ```
 
-Generate a random MAGIC_LINK_SECRET:
+Generate secrets:
 ```bash
 openssl rand -base64 32
 ```
 
-### 4. Set Up KV Namespaces
+### 3. Set Up KV Namespaces
 
 If you haven't created KV namespaces yet:
 
@@ -547,7 +493,7 @@ This starts:
 - **Jekyll** at http://127.0.0.1:4000 (with `_config.local.yml` overrides)
 - **Worker** at http://127.0.0.1:8787 (via `npx wrangler dev --env dev --port 8787` with local KV simulation)
 - **Stripe CLI** forwarding webhooks to the local Worker
-- **ngrok** tunnel (if installed) for Snipcart product validation
+- **ngrok** tunnel (if installed) for optional external-device testing
 
 The script auto-updates `worker/.dev.vars` with the Stripe CLI webhook secret.
 It uses the same Stripe listener instance for both forwarding and secret capture, which avoids the local webhook mismatch that can happen if you start one listener to print a secret and another to forward events.
@@ -600,7 +546,7 @@ If Stripe shows webhook failures ("other errors") for the production endpoint:
 
 1. Visit http://127.0.0.1:4000
 2. Click a campaign → Add a tier to cart
-3. Fill billing info → Click "Continue to Pledge"
+3. Review the first-party checkout preview → Click "Continue to Pledge"
 4. Complete Stripe Checkout with test card: `4242 4242 4242 4242`
 5. Check Worker logs for pledge confirmation
 6. Check email (if Resend configured)
@@ -620,9 +566,9 @@ If styles don't update:
 bundle exec jekyll clean
 ```
 
-### ngrok for Snipcart Product Crawling
+### ngrok for External-Device Testing
 
-Snipcart validates products by crawling your site. For this to work locally:
+If you want to test a local branch from another device on your network:
 
 ```bash
 ngrok http 4000
@@ -782,19 +728,9 @@ Generate aggregated reports showing the **current state** of each backer's pledg
 - Backer counts by tier
 - Deliverable tracking
 
-## Checkout Autofill
+## Legacy Browser Path
 
-`checkout-autofill.js` improves password manager compatibility:
-
-1. **Auto-selects United States** — Triggers on checkout route, finds country label, types "United States", clicks dropdown option
-2. **State/Province proxy input** — Creates a hidden input with `autocomplete="address-level1"` that password managers can fill
-3. **State abbreviation conversion** — Converts "CA" → "California" automatically
-4. **Fallback polling** — Checks every 500ms for password managers that don't fire events
-
-**How it works:**
-- Proxy input is briefly visible (500ms) for password manager detection
-- When filled, it transfers the value to Snipcart's typeahead and clicks the matching option
-- Works with Bitwarden, 1Password, Proton Pass, browser autofill
+The branch no longer ships the old hosted-cart helper assets as separate browser files. The browser path now boots only the first-party cart runtime.
 
 **Limitations:**
 - Credit card fields (number, expiry, CVV) are in Stripe's iframe — not accessible for security reasons
@@ -805,23 +741,25 @@ The Cloudflare Worker (`worker/src/`) is the backend for The Pool:
 
 ```
 worker/src/
-├── index.js        # Route handlers (main entry point)
-├── campaigns.js    # Fetch/validate campaigns from Jekyll API
-├── email.js        # Resend email templates (supporter, milestone, failed, etc.)
-├── github.js       # Trigger GitHub Pages rebuilds
-├── snipcart.js     # Snipcart API client (used for order verification only)
-├── stats.js        # KV-based stats, inventory, milestones
-├── stripe.js       # Stripe API client + webhook signature verification
-├── token.js        # HMAC magic link token generation/verification
+├── index.js              # Route handlers (main entry point)
+├── campaigns.js          # Fetch/validate campaigns from Jekyll API
+├── checkout-intent.js    # Checkout snapshot hashing/signing helpers
+├── checkout-intent-do.js # Durable Object nonce coordinator
+├── email.js              # Resend email templates
+├── github.js             # Trigger GitHub Pages rebuilds
+├── provider-config.js    # Runtime/provider flags
+├── stats.js              # KV-based stats, inventory, milestones
+├── stripe.js             # Stripe API client + webhook signature verification
+├── token.js              # HMAC magic link token generation/verification
 └── routes/
-    └── votes.js    # Community voting endpoints
+    └── votes.js          # Community voting endpoints
 ```
 
 ### Key Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /start` | Create Stripe Checkout (setup mode) for new pledge |
+| `POST /checkout-intent/start` | Create Stripe Checkout (setup mode) for new pledge |
 | `POST /webhooks/stripe` | Handle Stripe events, store pledge, send emails |
 | `GET /pledge?token=...` | Get pledge details for manage page |
 | `POST /pledge/cancel` | Cancel an active pledge |
@@ -844,8 +782,8 @@ crons = ["0 7 * * *"]
 2. For each campaign where the deadline has passed (in MT) and the goal is met:
    - Checks if there are any uncharged active pledges
    - If so, runs the same settle logic as `/admin/settle/:slug`
-3. Aggregates pledges by email so each supporter gets ONE charge
-4. Sends confirmation emails
+3. Aggregates pledges by email within each campaign so each supporter gets ONE charge per campaign
+4. Sends charge-success / payment-failed emails as appropriate
 
 **Timezone note:** During daylight saving time (MDT), the cron runs at 1:00 AM MT instead of midnight.
 
@@ -872,12 +810,10 @@ Secrets live in Cloudflare Worker environment variables. Never commit:
 |--------|---------|
 | `STRIPE_SECRET_KEY` | Stripe API (or `_TEST`/`_LIVE` variants) |
 | `STRIPE_WEBHOOK_SECRET` | Verify Stripe webhook signatures |
-| `SNIPCART_SECRET` | Snipcart API (order verification, optional) |
+| `CHECKOUT_INTENT_SECRET` | Sign first-party checkout snapshots |
 | `MAGIC_LINK_SECRET` | HMAC signing for pledge management tokens |
 | `RESEND_API_KEY` | Send supporter/milestone/failed emails |
 | `ADMIN_SECRET` | Protect admin endpoints (settle, rebuild, etc.) |
-
-Snipcart public API keys are domain-restricted (visible in source is fine).
 
 ## Email Best Practices
 
@@ -893,9 +829,9 @@ Gmail does not render inline SVG in emails. Use PNG/JPEG images instead.
 
 ## Mobile UI Patterns
 
-### Hamburger Menu vs Snipcart Overlay
+### Hamburger Menu vs Cart Overlay
 
-The mobile hamburger menu toggle needs careful z-index handling to avoid overlapping with the Snipcart cart modal.
+The mobile hamburger menu toggle needs careful z-index handling to avoid overlapping with the cart drawer/modal.
 
 **Pattern**: Only apply elevated z-index when the menu is actually open:
 
@@ -904,7 +840,7 @@ The mobile hamburger menu toggle needs careful z-index handling to avoid overlap
 &__menu-toggle {
   @include xsm {
     position: relative;
-    // No z-index here — Snipcart overlay (~10000+) covers it naturally
+    // No z-index here — cart overlay covers it naturally
   }
 }
 
@@ -915,7 +851,7 @@ The mobile hamburger menu toggle needs careful z-index handling to avoid overlap
 ```
 
 **Why this works:**
-- When menu is closed: No z-index, so Snipcart's high z-index overlay covers the button
+- When menu is closed: No z-index, so the cart overlay covers the button
 - When menu is open: z-index: 101 puts the button above the nav overlay for the X icon
 
 **Files involved:**
@@ -933,14 +869,14 @@ Stripe SetupIntents + webhooks require server-side secrets and an HTTPS endpoint
 No. The Worker handles Stripe checkout sessions, webhook processing, pledge storage (KV), live stats, tier inventory, milestone emails, and campaign settlement. It's the core backend.
 
 **Where is pledge data stored?**  
-Cloudflare KV (not Snipcart). Key patterns:
+Cloudflare KV. Key patterns:
 - `pledge:{orderId}` — Full pledge data (email, amount, tier, Stripe IDs, status)
 - `email:{email}` — Array of order IDs for that email
 - `stats:{campaignSlug}` — Aggregated totals (pledgedAmount, pledgeCount, tierCounts)
 - `tier-inventory:{campaignSlug}` — Tier claim counts for limited tiers
 
-**What role does Snipcart play?**  
-Cart UI only. Snipcart provides the shopping cart experience and collects billing info, but pledge data is stored in KV, not Snipcart order metadata.
+**What role does the browser cart play?**  
+The first-party cart provides pledge review and checkout handoff state in the browser. Final pledge data is stored in KV after Stripe webhook confirmation.
 
 **Does this store PII?**  
 Email addresses are stored in KV for pledge management. Stripe stores card data; we store Stripe customer/payment method IDs.
@@ -953,10 +889,10 @@ Stripe SetupIntents (saved payment methods) don't expire like 7-day card holds, 
 
 **How are campaigns charged when funded?**  
 The Worker automatically settles campaigns via a daily cron trigger (runs at midnight MT). When a campaign's deadline passes and it has met its goal, the Worker:
-1. Aggregates all active pledges **by email** (one charge per supporter, not per order)
+1. Aggregates all active pledges **by email within a campaign** (one charge per supporter per campaign, not per pledge row)
 2. Uses the most recently updated payment method for each supporter
-3. Creates one Stripe PaymentIntent per supporter for their total amount
-4. Sends one confirmation email per supporter
+3. Creates one Stripe PaymentIntent per supporter for their campaign total amount
+4. Sends one charge email per supporter for that campaign
 5. Marks all underlying pledges as `charged`
 
 Cancelled pledges are never charged. You can also manually trigger settlement via `POST /admin/settle/:slug`.
@@ -1151,10 +1087,10 @@ npm run test:e2e:ui        # Interactive UI mode
 
 **Test coverage includes:**
 - Campaign navigation and tier buttons
-- Custom amount input → Snipcart price sync
-- Support item input → Snipcart price sync
+- Custom amount input → first-party cart price sync
+- Support item input → first-party cart price sync
 - Disabled states on non-live campaigns
-- Snipcart integration (attributes, script loading)
+- first-party cart/runtime integration
 
 ### Running All Tests
 

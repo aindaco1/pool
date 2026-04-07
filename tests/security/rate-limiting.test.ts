@@ -41,35 +41,38 @@ describe('Rate Limiting Security Tests', () => {
       }
     });
 
-    it('should potentially rate limit burst requests to /start', async () => {
+    it('should handle burst requests to checkout start without crashing', async () => {
       if (PROD_MODE) {
-        console.log('Skipping /start burst test in production to avoid Stripe API spam');
+        console.log('Skipping checkout-intent/start burst test in production to avoid Stripe API spam');
         return;
       }
       
-      const requests = () => securityFetch('/start', {
+      const requests = () => securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: `test-rate-limit-${Date.now()}-${Math.random()}`,
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: 'ratelimit-test@example.com'
+          items: [],
+          tipPercent: 5
         })
       });
       
       // Send 5 concurrent requests
       const responses = await burstRequests(requests, 5);
       
-      // Check for rate limiting (429) or success (200) or validation errors
+      // Check for rate limiting (429) or validation responses (400)
       const statuses = responses.map(r => r.status);
-      console.log('/start burst response statuses:', statuses);
+      console.log('/checkout-intent/start burst response statuses:', statuses);
       
       const rateLimited = responses.filter(r => r.status === 429);
+      const invalid = responses.filter(r => r.status === 400);
       if (rateLimited.length > 0) {
-        console.log('✅ Rate limiting is active on /start');
+        console.log('✅ Rate limiting is active on /checkout-intent/start');
         expect(rateLimited.length).toBeGreaterThan(0);
+      } else if (invalid.length > 0) {
+        console.log('✅ Checkout start validation is failing closed');
+        expect(invalid.length).toBeGreaterThan(0);
       } else {
-        console.log('⚠️ No rate limiting detected on /start - consider adding');
+        console.log('⚠️ No rate limiting detected on /checkout-intent/start - consider adding');
       }
     });
 
@@ -146,7 +149,7 @@ describe('Rate Limiting Security Tests', () => {
     });
 
     it('should not crash under rapid OPTIONS requests', async () => {
-      const requests = () => securityFetch('/start', { method: 'OPTIONS' });
+      const requests = () => securityFetch('/checkout-intent/start', { method: 'OPTIONS' });
       
       const responses = await burstRequests(requests, 20);
       
@@ -166,12 +169,12 @@ describe('Rate Limiting Security Tests', () => {
         padding: 'x'.repeat(1000000) // 1MB of padding
       });
       
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: largeBody
       });
       
-      // Should reject large body or handle gracefully (429 = rate limited)
+      // Should reject large body or fail closed gracefully
       // Cloudflare has a 100MB limit, but smaller limits are good
       expect([200, 400, 413, 429, 500]).toContain(res.status);
     });
@@ -183,13 +186,12 @@ describe('Rate Limiting Security Tests', () => {
         nested = { nested };
       }
       
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-deep-nesting',
           campaignSlug: TEST_CAMPAIGNS.valid,
-          amountCents: 500,
-          email: 'test@example.com',
+          items: [],
+          tipPercent: 5,
           extra: nested
         })
       });
@@ -214,13 +216,14 @@ describe('Rate Limiting Security Tests', () => {
       // even for invalid requests
       const startTime = performance.now();
       
-      const res = await securityFetch('/start', {
+      const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
         body: JSON.stringify({
-          orderId: 'test-timeout',
           campaignSlug: 'nonexistent-campaign-that-will-fail-lookup',
-          amountCents: 500,
-          email: 'test@example.com'
+          items: [
+            { id: 'nonexistent-campaign-that-will-fail-lookup__frame', quantity: 1 }
+          ],
+          tipPercent: 5
         })
       });
       

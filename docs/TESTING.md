@@ -12,6 +12,7 @@ npm run test:secrets       # Secret exposure audit for local env files
 npm run test:premerge      # Merge-readiness checks for changed Worker logic
 npm run test:e2e           # E2E tests (Playwright) — starts Jekyll
 npm run test:e2e:headless  # CI mode
+npm run test:e2e:parity    # First-party critical-path browser flows
 npm run test:security      # Security pen tests (Worker must be running)
 npm run test:security:staging  # Security tests against a staging worker, if you maintain one
 npm test                   # Run all tests
@@ -61,12 +62,10 @@ This runs:
 - `node --check` for the changed Worker entrypoints
 - Focused regression suites:
   - `tests/unit/worker-business-logic.test.ts`
-  - `tests/unit/cart-start-token.test.ts`
-  - `tests/unit/snipcart-parsing.test.ts`
   - `tests/unit/worker-ops-integrity.test.ts`
   - `tests/unit/stats-pagination.test.ts`
 - Local smoke scripts against the test-only mutable campaign:
-  - `scripts/test-worker.sh` for site/Worker contract checks and `/start` fail-closed verification without a real Snipcart session
+  - `scripts/test-worker.sh` for site/Worker contract checks and malformed `/checkout-intent/start` verification
   - `scripts/smoke-pledge-management.sh` for successful modify/cancel coverage on the local-only mutable campaign
 - Full unit suite via `npm run test:unit`
 - Security suite via `npm run test:security` against an auto-started local Worker
@@ -74,7 +73,11 @@ This runs:
 
 The pre-merge script now auto-starts Jekyll with `_config.yml,_config.local.yml` when needed so the local-only `smoke-editable` campaign is available during merge gating, and the Playwright harness uses the same combined config locally.
 
-The dedicated `tests/unit/cart-start-token.test.ts` regression runs the real checkout browser code in jsdom and asserts that the pledge button sends `cartToken` to `/start` when Snipcart does not expose a custom-gateway `publicToken`.
+This branch now defaults to the first-party cart/runtime path in both `_config.yml` and `_config.local.yml`, and the browser path no longer supports the old hosted-cart runtime.
+
+The local Worker defaults in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) now match that first-party setup. `./scripts/dev.sh` now auto-generates a local `CHECKOUT_INTENT_SECRET` in `worker/.dev.vars` if it is missing, so fresh local checkout starts do not fail closed on an uninitialized dev secret.
+
+If you change `sales_tax_rate` or `flat_shipping_rate` in the Jekyll config, update the mirrored Worker env vars in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) too and restart `./scripts/dev.sh` before testing checkout math.
 
 On GitHub, the same gate runs automatically in the `Merge Smoke` workflow for pull requests targeting `main`.
 
@@ -116,7 +119,7 @@ git worktree remove ../pool-main-check
 
 Run these against staging before merge when a staging environment exists. If no staging environment exists for The Pool, run the same checklist locally with `./scripts/dev.sh` and record that exception in the PR/release notes.
 
-1. Start a new checkout on a live test campaign and confirm `/start` returns a Stripe Checkout URL.
+1. Start a new checkout on a live test campaign and confirm `/checkout-intent/start` returns a Stripe Checkout URL.
 2. Complete a pledge and verify the webhook stores the pledge, stats update, and confirmation email path stays healthy.
 3. Modify a pledge with tier/support/custom amount changes and verify totals, history, and inventory update correctly.
 4. Cancel an uncharged pledge and verify stats and inventory are released correctly.
@@ -142,12 +145,19 @@ You can exercise that path end to end with:
 ./scripts/smoke-pledge-management.sh
 ```
 
+For local CSV verification against your actual local Worker state, use:
+
+```bash
+./scripts/pledge-report.sh --local
+./scripts/fulfillment-report.sh --local
+```
+
 ### Intentional Behavior Changes
 
 When reviewing results, do not flag these as regressions:
 
 - Magic links are now order-scoped instead of email-scoped.
-- `/start` no longer reserves limited inventory before checkout completion.
+- `/checkout-intent/start` no longer reserves limited inventory before checkout completion.
 - Legacy `GET /checkout` is intentionally disabled.
 
 ### Adding Tests
@@ -170,7 +180,7 @@ describe('myFunction', () => {
 
 Browser-based tests for full user flows in `tests/e2e/`.
 
-### Coverage (40 tests total; 35 run in CI and 5 are skipped/manual/local-only)
+### Coverage (47 tests total; 44 run in CI and 3 are skipped/manual/local-only)
 
 **Campaign Page Structure:**
 - Required page elements (hero, sidebar, progress bar)
@@ -179,24 +189,24 @@ Browser-based tests for full user flows in `tests/e2e/`.
 - Stretch goal markers
 
 **Tier Cards:**
-- Snipcart attributes (id, name, price, url, description)
+- First-party cart item attributes and hooks
 - Inventory display for limited tiers
 - Gated tier locked state and unlock badge
 - Disabled states on non-live campaigns
 
 **Physical Products & Shipping:**
 - `_category` custom field (physical/digital) on tier buttons
-- Physical tier buttons set `shippable="false"` (Snipcart bypass)
+- Physical tiers trigger first-party shipping expectation state before Stripe collection
 - Digital-only campaigns have no physical category tiers
 
 **Support Items:**
 - Structure (amount, progress, input, button)
-- Input → Snipcart price sync
+- Input → first-party cart price sync
 - Late support data attributes
 
 **Custom Amount:**
 - Structure and data attributes
-- Input → Snipcart price sync
+- Input → first-party cart price sync
 - Late support attributes
 
 **Homepage & Campaign Cards:**
@@ -204,17 +214,25 @@ Browser-based tests for full user flows in `tests/e2e/`.
 - Valid campaign links
 - Featured tier button attributes
 
-**Snipcart Integration:**
-- Script configuration
+**Cart Runtime Integration:**
+- Runtime bootstrap and neutral cart root
 - POOL_CONFIG for live-stats.js
 - Global functions (refreshLiveStats, getTierInventory)
 
 **Cart Flow:**
 - Navigation and add-to-cart
-- Cart state via Snipcart API
-- Billing auto-fill (placeholder data for Snipcart validation)
+- Cart state via PoolCartProvider
+- Billing auto-fill / provider-driven checkout state
 - Tip slider updates cart totals immediately
 - Single-tier campaigns replace the previous tier immediately when a new tier is selected
+- First-party checkout preview posts canonical payloads to `/checkout-intent/start`
+- First-party cancelled/success result pages restore or hydrate saved pledge state
+
+**Manage Flow:**
+- Token-backed pledge loading on `/manage/`
+- Payment-method update start for active and `payment_failed` pledges
+- Cancel confirmation posts to `/pledge/cancel`
+- Modify confirmation posts to `/pledge/modify`
 
 **Accessibility:**
 - Skip link
@@ -232,7 +250,7 @@ Browser-based tests for full user flows in `tests/e2e/`.
 - State indicators in progress meta
 
 **Manual Checkout (skipped in CI):**
-- Full pledge flow: Snipcart → billing → custom payment template → Stripe Checkout → success page
+- Full pledge flow: cart runtime → pledge review → Stripe Checkout → success page
 - Verify checkout order summary preview appears immediately and resolves to tip-aware totals
 - Worker API integration test (automated, checks `/stats` endpoint)
 
@@ -242,6 +260,7 @@ Browser-based tests for full user flows in `tests/e2e/`.
 npm run test:e2e           # Full suite (auto-starts Jekyll)
 npm run test:e2e:quick     # Headed mode (requires running server)
 npm run test:e2e:headless  # CI mode (headless)
+npm run test:e2e:parity    # Critical cart/manage browser regressions
 npm run test:e2e:ui        # Interactive UI mode
 ```
 
@@ -269,7 +288,7 @@ Penetration tests for the Worker API. Located in `tests/security/`.
 | Category | Tests |
 |----------|-------|
 | Auth Bypass | Dev-token bypass, token validation, expiry, tampering |
-| Webhook Security | Stripe signature verification, duplicate-event handling, shipping address injection, Snipcart request-token verification |
+| Webhook Security | Stripe signature verification, duplicate-event handling, shipping address injection, removed legacy webhook handling |
 | Authorization | Admin endpoints, cross-user access, test endpoint guards |
 | Input Validation | XSS, injection, overflow, malformed input, hasPhysical flag abuse, shipping fee manipulation, additionalTiers/supportItems injection |
 | Rate Limiting | Burst requests, DoS resilience |
@@ -307,7 +326,6 @@ See [tests/security/README.md](../tests/security/README.md) for details.
 
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (`npm install -g wrangler`)
 - [Stripe CLI](https://stripe.com/docs/stripe-cli) for webhook testing
-- Snipcart account (test mode)
 - Stripe account (test mode)
 - Resend account (free tier: 3,000 emails/month)
 
@@ -315,77 +333,43 @@ See [tests/security/README.md](../tests/security/README.md) for details.
 
 ## 1. Cloudflare Worker Setup
 
-### Create KV Namespace
+### Create KV Namespaces
 
 ```bash
-# Login to Cloudflare
 wrangler login
-
-# Create KV namespace for votes
 wrangler kv:namespace create "VOTES"
-# Note the ID it outputs
-
-# For local dev, create a preview namespace
 wrangler kv:namespace create "VOTES" --preview
-```
-
-### Configure wrangler.toml
-
-Create `worker/wrangler.toml`:
-
-```toml
-name = "pledge-worker"
-main = "src/index.js"
-compatibility_date = "2024-01-01"
-
-[vars]
-SITE_BASE = "https://pool.dustwave.xyz"
-SNIPCART_API_BASE = "https://app.snipcart.com/api"
-
-# KV binding
-[[kv_namespaces]]
-binding = "VOTES"
-id = "your-production-kv-id"
-preview_id = "your-preview-kv-id"
-
-# Secrets (set via wrangler secret put)
-# STRIPE_SECRET_KEY
-# SNIPCART_SECRET
-# MAGIC_LINK_SECRET
-# RESEND_API_KEY
+wrangler kv:namespace create "PLEDGES"
+wrangler kv:namespace create "PLEDGES" --preview
 ```
 
 ### Set Secrets
 
 ```bash
 cd worker
-
-# Generate a random secret for magic links
 openssl rand -base64 32
 
-# Set secrets (use test keys!)
 wrangler secret put STRIPE_SECRET_KEY
-# Paste: sk_test_...
-
-wrangler secret put SNIPCART_SECRET
-# Paste: your Snipcart secret API key
-
 wrangler secret put MAGIC_LINK_SECRET
-# Paste: the random string you generated
-
+wrangler secret put CHECKOUT_INTENT_SECRET
 wrangler secret put RESEND_API_KEY
-# Paste: re_...
+wrangler secret put ADMIN_SECRET
 ```
 
 ### Run Worker Locally
 
+Preferred:
+
 ```bash
-cd worker
-wrangler dev
-# Worker runs at http://localhost:8787
+./scripts/dev.sh
 ```
 
----
+Manual fallback:
+
+```bash
+cd worker
+npx wrangler dev --env dev --port 8787
+```
 
 ## 2. Resend Setup
 
@@ -426,37 +410,7 @@ curl -X POST 'https://api.resend.com/emails' \
 
 ---
 
-## 3. Snipcart Setup (Test Mode)
-
-### Dashboard Configuration
-
-1. Login to [app.snipcart.com](https://app.snipcart.com)
-2. Go to **Account** → **API Keys**
-3. Copy your **Public Test API Key**
-4. Go to **Domains & URLs**
-5. Add allowed domains:
-   - `127.0.0.1:4000` (local dev)
-   - `pool.dustwave.xyz` (production)
-
-### Update Jekyll Config
-
-In `_config.yml`, set your test key:
-
-```yaml
-snipcart_api_key: "YOUR_PUBLIC_TEST_API_KEY"
-```
-
-### Disable Product Validation (for local testing)
-
-In Snipcart dashboard:
-1. Go to **Store configurations** → **Product validation**
-2. Toggle OFF "Fetch product details from URL"
-
-This prevents validation errors on localhost.
-
----
-
-## 4. Stripe Setup (Test Mode)
+## 3. Stripe Setup (Test Mode)
 
 ### Get Test Keys
 
@@ -502,7 +456,7 @@ printf '\nSTRIPE_WEBHOOK_SECRET=whsec_...\n' >> worker/.dev.vars
 
 ---
 
-## 5. Full End-to-End Test
+## 4. Full End-to-End Test
 
 ### Start All Services
 
@@ -538,18 +492,16 @@ stripe listen --forward-to 127.0.0.1:8787/webhooks/stripe
    - Click "Pledge $5" on a tier
    - Cart opens with item
 
-2. **Checkout**: Click checkout in Snipcart
-   - Fill in test billing info
+2. **Checkout**: Click "Continue to Pledge" in the first-party cart review
+   - Verify the review shows subtotal + tip + tax + shipping immediately
    - Use Stripe test card: `4242 4242 4242 4242`
    - Any future expiry, any CVC
-   - Verify the cart shows subtotal + tip + tax + shipping immediately
-   - Verify checkout order summary shows the same breakdown without a delayed blank state
 
-3. **Stripe Setup**: After Snipcart checkout, you're redirected to Stripe
+3. **Stripe Setup**: After the first-party checkout handoff, you're redirected to Stripe
    - Card is saved (not charged)
    - Redirected to success page
 
-4. **Check email**: You should receive the supporter email with magic links
+4. **Check email**: You should receive the supporter email(s) with magic links
 
 5. **Test community access**:
    - Click the community link in the email
@@ -570,7 +522,7 @@ stripe listen --forward-to 127.0.0.1:8787/webhooks/stripe
 
 ---
 
-## 6. Testing Individual Components
+## 5. Testing Individual Components
 
 ### Test Magic Link Token
 
@@ -606,11 +558,11 @@ wrangler kv:key get "results:hand-relations:poster" --binding VOTES --preview
 
 ---
 
-## 7. Troubleshooting
+## 6. Troubleshooting
 
-### "Missing required information" in Snipcart
-- Make custom fields optional for testing, or
-- Fill in the required field in the cart before checkout
+### Checkout start fails closed
+- Verify `CHECKOUT_INTENT_SECRET` exists in `worker/.dev.vars`
+- Confirm the cart payload uses valid first-party item IDs like `{campaignSlug}__{tierId}`
 
 ### Webhook not received
 - Check Stripe CLI is running and forwarding
@@ -633,7 +585,7 @@ wrangler kv:key get "results:hand-relations:poster" --binding VOTES --preview
 
 ---
 
-## 8. Testing Worker Enhancements
+## 7. Testing Worker Enhancements
 
 ### Test Campaign Validation
 
@@ -643,21 +595,13 @@ wrangler kv:key get "results:hand-relations:poster" --binding VOTES --preview
    cat _site/api/campaigns.json  # Verify it exists
    ```
 
-2. **Test with live campaign:**
+2. **Test malformed first-party checkout start:**
    ```bash
-   curl -X POST http://localhost:8787/start \
+   curl -X POST http://localhost:8787/checkout-intent/start \
      -H "Content-Type: application/json" \
-     -d '{"orderId":"test-123","campaignSlug":"hand-relations","amountCents":500,"email":"test@example.com"}'
+     -d '{"campaignSlug":"hand-relations","items":[{"id":"bad-item","quantity":1}],"email":"test@example.com"}'
    ```
-   Expected: Returns `{"url":"https://checkout.stripe.com/..."}`
-
-3. **Test with invalid campaign:**
-   ```bash
-   curl -X POST http://localhost:8787/start \
-     -H "Content-Type: application/json" \
-     -d '{"orderId":"test-123","campaignSlug":"nonexistent","amountCents":500}'
-   ```
-   Expected: Returns `{"error":"Campaign not found"}`
+   Expected: Returns a fail-closed validation error such as `Invalid cart item id`
 
 ### Test Stripe Webhook Signature Verification
 
@@ -687,15 +631,14 @@ wrangler kv:key get "results:hand-relations:poster" --binding VOTES --preview
    ```
    Expected: `{"error":"Invalid signature"}`
 
-### Test Snipcart Order Metadata
+### Test Stored Pledge Metadata
 
 After completing a pledge flow:
 
-1. **Check Snipcart dashboard** → Orders → Your test order
-2. **Verify metadata contains:**
+1. **Check Worker-backed pledge data** through `/pledge?token=...`
+2. **Verify data contains:**
    - `stripeCustomerId`
    - `stripePaymentMethodId`
-   - `stripeSetupIntentId`
    - `pledgeStatus: "active"`
    - `charged: false`
 
@@ -717,8 +660,8 @@ After completing a pledge flow:
    Expected: `{"success":true,"message":"Pledge cancelled"}`
 
 3. **Verify cancellation:**
-   - Check Snipcart order status = "Cancelled"
-   - Retry cancel: should get `{"error":"Order is already cancelled"}`
+   - Check the pledge now reports `pledgeStatus: "cancelled"`
+   - Retry cancel: should get a clean error response
 
 ### Test Update Payment Method
 
@@ -760,31 +703,27 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 
 ---
 
-## 9. Production Checklist
+## 8. Production Checklist
 
 - [ ] Switch Stripe to live keys
-- [ ] Switch Snipcart to live API key
-- [ ] Remove `127.0.0.1:4000` from Snipcart allowed domains
 - [ ] Verify `dustwave.xyz` domain in Resend
 - [ ] Deploy Worker: `wrangler deploy`
 - [ ] Set up Stripe webhook in dashboard → `https://pledge.dustwave.xyz/webhooks/stripe`
-- [ ] Update `cart.js` Worker URL to production
 - [ ] Test with a real $1 pledge
 
----
-
-## 10. Secrets Reference
+## 9. Secrets Reference
 
 ### GitHub Actions (Repo → Settings → Secrets)
 - `STRIPE_SECRET_KEY` — Stripe live secret (sk_...)
-- `SNIPCART_SECRET` — Snipcart API key (Basic auth for /api)
+- `CHECKOUT_INTENT_SECRET` — HMAC secret for checkout intent signing
 - Uses `GITHUB_TOKEN` auto-provided for commits
 
 ### Cloudflare Worker (wrangler or dashboard → Variables)
 - `STRIPE_SECRET_KEY` — same as above
-- `SNIPCART_SECRET` — same as above
-- `SNIPCART_API_BASE` — `https://app.snipcart.com/api`
 - `SITE_BASE` — `https://pool.dustwave.xyz`
+- `WORKER_BASE` — `https://pledge.dustwave.xyz`
+- `APP_MODE` — `live` or `test`
+- `CHECKOUT_INTENT_SECRET` — Random 32+ char string for checkout signing
 - `MAGIC_LINK_SECRET` — Random 32+ char string for HMAC token signing
 - `RESEND_API_KEY` — Resend API key for supporter emails (re_...)
 - `ADMIN_SECRET` — Random string for admin API endpoints
@@ -799,18 +738,12 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
   - Keys: `vote:{campaignSlug}:{decisionId}:{orderId}` → option string
   - Keys: `results:{campaignSlug}:{decisionId}` → JSON `{optionA: count, ...}`
 
-### Snipcart Dashboard
-- **Public API key** → in `_includes/snipcart-foot.html`
-- **Allowed domains** → include `pool.dustwave.xyz`
-- **Email templates** → disabled for pledge flows; supporter email is sent by the Worker via Resend
-
 ### Stripe Dashboard
 - Webhook endpoint = `https://pledge.dustwave.xyz/webhooks/stripe`
   - Events: `checkout.session.completed`
-- Product catalog not required; amounts come from Snipcart line items
+- Product catalog not required; amounts come from Worker-canonicalized first-party cart items
 
 ### Resend Dashboard
 - **Domain**: Verify `dustwave.xyz` for sending from `pledges@dustwave.xyz`
 - **API Key**: Create key with "Sending access" permission
 - Used for: All supporter-facing pledge email (confirmation, manage/community access, diary updates, announcements, charge success, payment failure, cancellations)
-- Snipcart transactional pledge emails are disabled

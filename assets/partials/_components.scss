@@ -1653,6 +1653,170 @@ main {
   .btn {
     margin-top: 16px;
   }
+
+  &__recovery {
+    margin: 24px 0;
+    padding: 20px;
+    border: 1px solid $color--light;
+    border-radius: $radius--md;
+    background: rgba(0, 0, 0, 0.03);
+    text-align: left;
+  }
+
+  &__recovery-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+
+    .btn {
+      margin-top: 0;
+    }
+  }
+
+  &__summary {
+    max-width: 560px;
+    margin: 32px auto 24px;
+    padding: 24px;
+    border: 1px solid $color--light;
+    border-radius: $radius--md;
+    background: $color--white;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.05);
+    text-align: left;
+  }
+
+  &__summary-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  &__summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid $color--light;
+    border-radius: $radius--sm;
+    background: rgba(0, 0, 0, 0.015);
+  }
+
+  &__summary-item-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  &__summary-item-name {
+    font-size: 15px;
+    line-height: 1.4;
+    color: $color--primary;
+  }
+
+  &__summary-item-meta {
+    color: $color--secondary;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  &__summary-item-amount {
+    font-size: 15px;
+    line-height: 1.4;
+    white-space: nowrap;
+    color: $color--black;
+  }
+
+  &__meta {
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: $color--secondary;
+  }
+
+  &__meta--compact {
+    margin-bottom: 0;
+  }
+
+  &__section-label {
+    margin: 0 0 12px 0;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: $color--secondary;
+  }
+
+  &__campaign-title {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: $color--primary;
+  }
+
+  &__backend-status {
+    margin: 0 0 20px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: $color--secondary;
+  }
+
+  &__summary-section {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid $color--light;
+
+    &:last-of-type {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+  }
+
+  &__summary-note {
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: $color--secondary;
+  }
+
+  &__summary-totals {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 0;
+
+    > div {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: baseline;
+      font-size: 14px;
+      line-height: 1.5;
+
+      span {
+        color: $color--secondary;
+      }
+
+      strong {
+        white-space: nowrap;
+      }
+    }
+
+    .pledge-result__summary-total {
+      margin-top: 4px;
+      padding-top: 12px;
+      border-top: 1px solid $color--light;
+
+      span,
+      strong {
+        color: $color--black;
+      }
+    }
+  }
 }
 
 // Community Teaser (on campaign page)
@@ -1896,11 +2060,18 @@ main {
   }
   
   &__fill {
+    width: 0;
     height: 100%;
     background: $color--primary;
     border-radius: 4px;
     transition: width 0.3s ease;
-  }
+
+	    @for $i from 0 through 100 {
+	      &--w-#{$i} {
+	        width: $i * 1%;
+	      }
+	    }
+	  }
   
   &__count {
     font-size: 12px;
@@ -1924,6 +2095,25 @@ main {
       color: #28a745;
       margin-left: 8px;
     }
+  }
+}
+
+.community-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 9999;
+  padding: 12px 16px;
+  border: 1px solid #252c3a;
+  border-radius: 8px;
+  background: #141821;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  font-size: 14px;
+
+  &--error {
+    border-color: #dc3545;
+    background: #dc3545;
   }
 }
 

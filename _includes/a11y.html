@@ -15,15 +15,7 @@
 
 {%- when "live-announce" -%}
 {%- comment %} Announce to screen readers via live region (requires JS) {% endcomment -%}
-<script>
-(function() {
-  var region = document.getElementById('aria-live-region');
-  if (region) {
-    region.textContent = {{ include.text | jsonify }};
-    setTimeout(function() { region.textContent = ''; }, 1000);
-  }
-})();
-</script>
+<span class="sr-only" data-live-announce="{{ include.text | escape }}"></span>
 
 {%- when "loading" -%}
 {%- comment %} Accessible loading indicator {% endcomment -%}

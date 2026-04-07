@@ -1,6 +1,9 @@
 <article class="campaign-card" data-campaign-slug="{{ include.campaign.slug }}" data-goal="{{ include.campaign.goal_amount }}">
+    {% assign cart_add_item_classes = "poolcart-add-item" %}
   {% if include.campaign.campaign_background %}
-  <div class="campaign-card__background" style="background-image: url('{{ include.campaign.campaign_background }}');"></div>
+  <div class="campaign-card__background" aria-hidden="true">
+    <img src="{{ include.campaign.campaign_background }}" alt="" class="campaign-card__background-image">
+  </div>
   {% endif %}
   {% if include.campaign.hero_image %}
   <a href="{{ include.campaign.url }}" class="campaign-card__image-link">
@@ -25,7 +28,7 @@
         {% endif %}
         
         {% if show_button %}
-        <button class="campaign-card__featured-tier snipcart-add-item"
+        <button class="campaign-card__featured-tier {{ cart_add_item_classes }}"
                 data-item-id="{{ include.campaign.slug }}__{{ featured.id }}"
                 data-item-name="{{ include.campaign.title }} — {{ featured.name }}"
                 data-item-price="{{ featured.price }}"
@@ -56,7 +59,7 @@
           <div class="featured-tier__price">{{ featured.price | money }}</div>
         </button>
         {% elsif is_late_support_featured %}
-        <button class="campaign-card__featured-tier campaign-card__featured-tier--disabled snipcart-add-item"
+        <button class="campaign-card__featured-tier campaign-card__featured-tier--disabled {{ cart_add_item_classes }}"
                 disabled
                 data-late-support="true"
                 data-item-id="{{ include.campaign.slug }}__{{ featured.id }}"

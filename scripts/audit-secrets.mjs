@@ -10,7 +10,6 @@ const localSecretFiles = [
 ];
 
 const allowlistedTestValues = new Set([
-  'snipcart_test_secret',
   'whsec_smoke',
   'sk_test_smoke',
   'test-admin-secret',

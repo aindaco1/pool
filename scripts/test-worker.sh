@@ -69,34 +69,20 @@ if [ -z "$WORKER_STATUS" ] || [ "$WORKER_STATUS" = "000" ]; then
 fi
 pass "Worker responding (HTTP $WORKER_STATUS)"
 
-# 3. Test /start rejects missing checkout token
+# 3. Test deleted legacy /start endpoint
 request_json "POST" "$WORKER_URL/start" '{"campaignSlug":"nonexistent-campaign"}'
-[ "$REQUEST_STATUS" = "400" ] || fail "/start should return 400 when checkout token is missing (got $REQUEST_STATUS)"
-echo "$REQUEST_BODY" | grep -q "Missing checkout token" || fail "/start should explain that the checkout token is missing"
-pass "/start rejects tokenless requests"
+[ "$REQUEST_STATUS" = "404" ] || fail "/start should be absent now that the legacy checkout path is deleted (got $REQUEST_STATUS)"
+pass "/start is absent"
 
-# 4. Test /start fail-closes without a verifiable Snipcart checkout session
-# Prefer the dedicated local smoke campaign when it is available, otherwise fall back
-# to the first campaign slug so we can still validate the checkout-session contract.
-START_SLUG=$(echo "$CAMPAIGNS" | jq -r '
-  if any(.campaigns[]; .slug == "smoke-editable" and .state == "live" and .charged == false) then
-    "smoke-editable"
-  else
-    (.campaigns[0].slug // empty)
-  end
-')
-if [ -n "$START_SLUG" ]; then
-  request_json "POST" "$WORKER_URL/start" "{\"publicToken\":\"invalid-local-smoke-token\",\"campaignSlug\":\"$START_SLUG\",\"email\":\"test@example.com\"}"
+# 4. Test /checkout-intent/start fail-closes on malformed cart payloads
+request_json "POST" "$WORKER_URL/checkout-intent/start" '{"campaignSlug":"smoke-editable","email":"test@example.com","items":[{"id":"bad-item","quantity":1}]}'
 
-  if [ "$REQUEST_STATUS" = "200" ] && echo "$REQUEST_BODY" | grep -q '"url"'; then
-    fail "/start should not create a checkout response from an invalid Snipcart token"
-  fi
-
-  echo "$REQUEST_BODY" | grep -Eq "Invalid checkout token|Unable to verify checkout session" || fail "/start should fail closed when checkout verification cannot succeed"
-  pass "/start fail-closes without a verifiable checkout session"
-else
-  warn "No campaigns found to validate /start session verification"
+if [ "$REQUEST_STATUS" = "200" ] && echo "$REQUEST_BODY" | grep -q '"url"'; then
+  fail "/checkout-intent/start should not create a checkout session from a malformed cart payload"
 fi
+
+echo "$REQUEST_BODY" | grep -Eq "Invalid cart item id|Checkout intent signing unavailable|Campaign not accepting pledges" || fail "/checkout-intent/start should fail closed on malformed or unavailable checkout starts"
+pass "/checkout-intent/start fail-closes on malformed checkout payloads"
 
 # 5. Test /pledge without token
 RESP=$(curl -s "${WORKER_HEADERS[@]}" "$WORKER_URL/pledge" 2>/dev/null)
