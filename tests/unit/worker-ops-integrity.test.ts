@@ -53,6 +53,7 @@ vi.mock('../../worker/src/github.js', () => ({
 class PaginatedKVNamespace {
   store = new Map<string, string>();
   pageSize: number;
+  listCalls: Array<{ prefix: string; cursor?: string }> = [];
 
   constructor(pageSize = 2) {
     this.pageSize = pageSize;
@@ -76,6 +77,7 @@ class PaginatedKVNamespace {
   }
 
   async list({ prefix = '', cursor }: { prefix?: string; cursor?: string } = {}) {
+    this.listCalls.push({ prefix, cursor });
     const matchingKeys = Array.from(this.store.keys())
       .filter(key => key.startsWith(prefix))
       .sort();
@@ -177,6 +179,7 @@ describe('worker operational integrity', () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;
 
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-direct-settle-1']));
     await kv.put('pledge:order-direct-settle-1', JSON.stringify({
       orderId: 'order-direct-settle-1',
       email: 'buyer@example.com',
@@ -238,6 +241,7 @@ describe('worker operational integrity', () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;
 
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-scheduled-settle-1']));
     await kv.put('pledge:order-scheduled-settle-1', JSON.stringify({
       orderId: 'order-scheduled-settle-1',
       email: 'buyer@example.com',
@@ -341,6 +345,12 @@ describe('worker operational integrity', () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;
 
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify([
+      'order-backfill-1',
+      'order-backfill-2',
+      'order-backfill-3'
+    ]));
+
     for (let index = 1; index <= 3; index++) {
       await kv.put(`pledge:order-backfill-${index}`, JSON.stringify({
         orderId: `order-backfill-${index}`,
@@ -375,6 +385,76 @@ describe('worker operational integrity', () => {
     expect(finalPledge.stripeCustomerId).toBe('cus_buyer3@example.com');
   });
 
+  it('fails closed when settlement dispatch is missing a campaign pledge index', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/settle-dispatch/hand-relations', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer admin-secret',
+          'Content-Type': 'application/json'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.requiresRebuild).toBe(true);
+  });
+
+  it('fails closed when customer backfill is missing a campaign pledge index', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/backfill-customers/hand-relations', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer admin-secret',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.requiresRebuild).toBe(true);
+  });
+
+  it('serves combined live campaign data from one public endpoint', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 1200,
+      pledgeCount: 1,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+    await kv.put('tier-inventory:hand-relations', JSON.stringify({
+      'frame-slot': { limit: 1000, claimed: 2 }
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/live/hand-relations'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=30, stale-while-revalidate=300');
+    const body = await response.json();
+    expect(body.stats.pledgedAmount).toBe(1200);
+    expect(body.inventory.tiers['frame-slot'].remaining).toBe(998);
+  });
+
   it('enumerates paginated supporters for admin broadcasts', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;
@@ -388,6 +468,11 @@ describe('worker operational integrity', () => {
         charged: false
       }));
     }
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify([
+      'order-supporter-1',
+      'order-supporter-2',
+      'order-supporter-3'
+    ]));
 
     const response = await worker.fetch(
       new Request('https://pool.test/admin/broadcast/announcement', {
@@ -411,6 +496,7 @@ describe('worker operational integrity', () => {
     const body = await response.json();
     expect(body.recipientCount).toBe(3);
     expect(body.recipients).toContain('supporter3@example.com');
+    expect(kv.listCalls.some((call) => call.prefix === 'pledge:')).toBe(false);
   });
 
   it('pre-marks milestone sends so nested milestone checks do not duplicate broadcasts', async () => {

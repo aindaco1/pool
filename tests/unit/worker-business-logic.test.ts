@@ -59,6 +59,8 @@ vi.mock('../../worker/src/github.js', () => ({
 
 class MockKVNamespace {
   store = new Map<string, string>();
+  listCalls: Array<{ prefix: string; cursor?: string }> = [];
+  putCalls: Array<{ key: string; value: string }> = [];
 
   async get(key: string, options?: { type?: string }) {
     if (!this.store.has(key)) return null;
@@ -71,6 +73,7 @@ class MockKVNamespace {
 
   async put(key: string, value: string) {
     this.store.set(key, value);
+    this.putCalls.push({ key, value });
   }
 
   async delete(key: string) {
@@ -78,6 +81,7 @@ class MockKVNamespace {
   }
 
   async list({ prefix = '', cursor }: { prefix?: string; cursor?: string } = {}) {
+    this.listCalls.push({ prefix, cursor });
     if (cursor) {
       return { keys: [], list_complete: true, cursor: undefined };
     }
@@ -393,6 +397,35 @@ describe('Worker business logic hardening', () => {
         expect.objectContaining({ campaignSlug: 'sunder' })
       ]
     });
+  });
+
+  it('uses aggregated tier reservation counts during checkout validation when available', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace()
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    await kv.put('tier-reservation-counts:hand-relations', JSON.stringify({ 'frame-slot': 1 }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__frame-slot', quantity: 1 }],
+          email: 'buyer@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(kv.listCalls.some((call) => call.prefix === 'tier-reservation:hand-relations:')).toBe(false);
   });
 
   it('keeps the first-party checkout summary route dark by default', async () => {
@@ -1488,5 +1521,82 @@ describe('Worker business logic hardening', () => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  it('does not rewrite rate-limit counters for repeated blocked requests inside the same window', async () => {
+    const env = createEnv({
+      RATELIMIT: new MockKVNamespace()
+    });
+    const rateLimitKv = env.RATELIMIT as MockKVNamespace;
+    const now = Math.floor(Date.now() / 1000);
+
+    await rateLimitKv.put('rl:votes:203.0.113.7', JSON.stringify({
+      count: 30,
+      reset: now + 60
+    }));
+    const putsBeforeBlockedRequests = rateLimitKv.putCalls.length;
+
+    const firstResponse = await worker.fetch(
+      new Request('https://pool.test/votes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CF-Connecting-IP': '203.0.113.7'
+        },
+        body: JSON.stringify({
+          token: 'fake-token',
+          decisionId: 'poster',
+          option: 'A'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    const secondResponse = await worker.fetch(
+      new Request('https://pool.test/votes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CF-Connecting-IP': '203.0.113.7'
+        },
+        body: JSON.stringify({
+          token: 'fake-token',
+          decisionId: 'poster',
+          option: 'A'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(firstResponse.status).toBe(429);
+    expect(secondResponse.status).toBe(429);
+    expect(rateLimitKv.putCalls).toHaveLength(putsBeforeBlockedRequests);
+    expect(await firstResponse.json()).toMatchObject({ error: 'Too many requests' });
+    expect(await secondResponse.json()).toMatchObject({ error: 'Too many requests' });
+  });
+
+  it('adds test setup pledges to the campaign index used by stats and inventory rebuilds', async () => {
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    const setupResponse = await worker.fetch(
+      new Request('https://pool.test/test/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'smoke-local@example.com',
+          campaignSlug: 'smoke-editable'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(setupResponse.status).toBe(200);
+    expect(await kv.get('campaign-pledges:smoke-editable', { type: 'json' })).toContain('test-order-active-1');
   });
 });

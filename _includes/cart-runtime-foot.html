@@ -6,6 +6,8 @@
   data-platform-name="{{ site.author | escape }}"
   data-sales-tax-rate="{{ site.sales_tax_rate | default: 0.07875 }}"
   data-flat-shipping-rate="{{ site.flat_shipping_rate | default: 3.00 }}"
+  data-live-stats-cache-ttl-seconds="{{ site.live_stats_cache_ttl_seconds | default: 300 }}"
+  data-live-inventory-cache-ttl-seconds="{{ site.live_inventory_cache_ttl_seconds | default: 300 }}"
   data-cart-runtime="{{ site.cart_runtime | default: 'first_party' }}"
   data-checkout-provider="{{ site.checkout_provider | default: 'first_party' }}"></script>
 <div hidden data-pool-cart-root="true"></div>

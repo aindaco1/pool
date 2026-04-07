@@ -89,6 +89,19 @@ The local Worker defaults in [worker/wrangler.toml](/Users/aindaco1/Library/Mobi
 
 If you change `sales_tax_rate` or `flat_shipping_rate` in the Jekyll config, update the mirrored Worker env vars in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) too and restart `./scripts/dev.sh` before testing checkout math.
 
+If you tune free-plan read behavior, keep these in sync too:
+
+- `live_stats_cache_ttl_seconds`
+- `live_inventory_cache_ttl_seconds`
+
+After changing either cache TTL locally, restart `./scripts/dev.sh` and rerun:
+
+```bash
+npx vitest run tests/unit/live-stats.test.ts tests/unit/manage-page.test.ts tests/unit/config-boot.test.ts
+```
+
+Those suites protect the combined `/live/:slug` read path, the browser cache behavior, and the config boot wiring that forks rely on.
+
 On GitHub, the same gate runs automatically in the `Merge Smoke` workflow for pull requests targeting `main`.
 
 ### Secret Audit
@@ -161,6 +174,8 @@ For local CSV verification against your actual local Worker state, use:
 ./scripts/pledge-report.sh --local
 ./scripts/fulfillment-report.sh --local
 ```
+
+Use `pledge-report.sh` when you want the full ledger, including modify/cancel deltas and tip-change annotations. Use `fulfillment-report.sh` when you want the merged current state for a backer within a campaign.
 
 ### Intentional Behavior Changes
 

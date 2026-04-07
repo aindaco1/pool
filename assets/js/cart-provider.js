@@ -542,6 +542,26 @@
     return Array.from(slugs);
   }
 
+  function invalidateLiveCampaignCaches(campaignSlugs) {
+    const slugs = Array.from(new Set((campaignSlugs || []).filter(Boolean)));
+    if (slugs.length === 0) return;
+
+    slugs.forEach((slug) => {
+      try {
+        localStorage.removeItem(`pool_stats_${slug}`);
+        localStorage.removeItem(`pool_inventory_${slug}`);
+      } catch (_error) {}
+    });
+
+    if (typeof window.invalidateStatsCache === 'function') {
+      slugs.forEach((slug) => window.invalidateStatsCache(slug));
+    }
+
+    if (typeof window.invalidateInventoryCache === 'function') {
+      slugs.forEach((slug) => window.invalidateInventoryCache(slug));
+    }
+  }
+
   function buildFirstPartyCheckoutPayload(state) {
     const items = state?.cart?.items?.items || [];
     if (items.length === 0) {
@@ -1504,6 +1524,8 @@
     }
 
     if (isPledgeSuccessPath()) {
+      const successSnapshot = readFirstPartyCheckoutSnapshot();
+      invalidateLiveCampaignCaches(getFirstPartyCampaignSlugs(successSnapshot?.cart?.items));
       renderSuccessSummaryCard();
       clearFirstPartyCheckoutSnapshot();
       hydrateSuccessSummaryCardFromBackend();

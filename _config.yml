@@ -10,6 +10,8 @@ cart_runtime: first_party
 checkout_provider: first_party
 sales_tax_rate: 0.07875
 flat_shipping_rate: 3.00
+live_stats_cache_ttl_seconds: 300
+live_inventory_cache_ttl_seconds: 300
 
 sass:
   sass_dir: assets/partials

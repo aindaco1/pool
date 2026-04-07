@@ -1057,6 +1057,14 @@ describe('cart provider shim', () => {
       campaignUrl: '/campaigns/demo/',
       savedAt: Date.now()
     }));
+    localStorage.setItem('pool_stats_demo', JSON.stringify({
+      data: { pledgedAmount: 8500 },
+      timestamp: Date.now()
+    }));
+    localStorage.setItem('pool_inventory_demo', JSON.stringify({
+      data: { tiers: { featured: { remaining: 1 } } },
+      timestamp: Date.now()
+    }));
 
     document.body.innerHTML = `
       <main class="pledge-result">
@@ -1072,6 +1080,8 @@ describe('cart provider shim', () => {
     const summaryCard = document.querySelector('[data-first-party-success-summary]') as HTMLElement | null;
     expect(summaryCard).toBeNull();
     expect(localStorage.getItem('pool_first_party_checkout_snapshot')).toBeNull();
+    expect(localStorage.getItem('pool_stats_demo')).toBeNull();
+    expect(localStorage.getItem('pool_inventory_demo')).toBeNull();
   });
 
   it('does not render a saved first-party pledge summary for physical pledges on the success page', async () => {

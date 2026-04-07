@@ -66,7 +66,9 @@ _(None currently)_
 ## Planned
 
 - [ ] Admin dashboard page (read-only) from KV data
-- [ ] Pages CMS per-campaign permissions (waiting on Pages CMS roadmap)
+- [ ] Native Stripe integration via API (not jumping to Stripe's payment link)
+- [ ] Replace Pages CMS with dedicated content editor and per-campaign permissions
+- [ ] Integrate [Podman](https://podman.io) for local dev/testing
 - [ ] More explicit inventory overselling protection
   - Move scarce limited-tier claims into a per-campaign Durable Object coordinator
   - Keep `tier-inventory:{slug}` in KV as a projection/cache for public reads, not the source of truth

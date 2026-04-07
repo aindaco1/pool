@@ -13,6 +13,7 @@
  *   POST /pledge/payment-method/start - Update payment method
  *   GET  /votes              - Get voting status
  *   POST /votes              - Cast a vote
+ *   GET  /live/:slug         - Get combined live stats + inventory for a campaign
  *   GET  /stats/:slug        - Get live pledge stats for a campaign
  *   POST /stats/:slug/recalculate - Recalculate stats from KV (admin)
  *   GET  /inventory/:slug    - Get tier inventory (remaining counts) for a campaign
@@ -101,10 +102,20 @@ function timingSafeEqual(a, b) {
   }
 
   // Campaign pledge index helpers - maintain per-campaign list of order IDs
+  function getCampaignIndexKey(campaignSlug) {
+  return `campaign-pledges:${campaignSlug}`;
+  }
+
+  async function getCampaignOrderIds(env, campaignSlug) {
+  if (!env.PLEDGES) return null;
+  const orderIds = await env.PLEDGES.get(getCampaignIndexKey(campaignSlug), { type: 'json' });
+  return Array.isArray(orderIds) ? orderIds : null;
+  }
+
   async function addToCampaignIndex(env, campaignSlug, orderId) {
   if (!env.PLEDGES) return;
-  const key = `campaign-pledges:${campaignSlug}`;
-  const index = await env.PLEDGES.get(key, { type: 'json' }) || [];
+  const key = getCampaignIndexKey(campaignSlug);
+  const index = await getCampaignOrderIds(env, campaignSlug) || [];
   if (!index.includes(orderId)) {
    index.push(orderId);
    await env.PLEDGES.put(key, JSON.stringify(index));
@@ -113,9 +124,16 @@ function timingSafeEqual(a, b) {
 
   async function removeFromCampaignIndex(env, campaignSlug, orderId) {
   if (!env.PLEDGES) return;
-  const key = `campaign-pledges:${campaignSlug}`;
-  const index = await env.PLEDGES.get(key, { type: 'json' }) || [];
+  const key = getCampaignIndexKey(campaignSlug);
+  const index = await getCampaignOrderIds(env, campaignSlug) || [];
   const filtered = index.filter(id => id !== orderId);
+  if (filtered.length === index.length) {
+    return;
+  }
+  if (filtered.length === 0) {
+    await env.PLEDGES.delete(key);
+    return;
+  }
   await env.PLEDGES.put(key, JSON.stringify(filtered));
   }
 
@@ -187,6 +205,28 @@ async function checkRateLimit(request, env, options = {}) {
     if (now > record.reset) {
       record.count = 0;
       record.reset = now + windowSeconds;
+    }
+
+    // Once a client is already over limit inside the current window,
+    // fail closed without rewriting the same counter on every blocked hit.
+    if (record.count >= limit) {
+      const retryAfter = Math.max(0, record.reset - now);
+      return {
+        allowed: false,
+        response: new Response(JSON.stringify({
+          error: 'Too many requests',
+          retryAfter
+        }), {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(retryAfter),
+            'X-RateLimit-Limit': String(limit),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(record.reset)
+          }
+        })
+      };
     }
     
     record.count++;
@@ -835,8 +875,38 @@ function getTierReservationKey(campaignSlug, orderId) {
   return `tier-reservation:${campaignSlug}:${orderId}`;
 }
 
+function getTierReservationCountsKey(campaignSlug) {
+  return `tier-reservation-counts:${campaignSlug}`;
+}
+
+function mergeTierReservationCounts(currentCounts = {}, reservation = [], multiplier = 1) {
+  const nextCounts = { ...(currentCounts || {}) };
+  for (const tierItem of reservation || []) {
+    if (!tierItem?.id) continue;
+    const current = nextCounts[tierItem.id] || 0;
+    const nextValue = current + ((tierItem.qty || 1) * multiplier);
+    if (nextValue > 0) {
+      nextCounts[tierItem.id] = nextValue;
+    } else {
+      delete nextCounts[tierItem.id];
+    }
+  }
+  return nextCounts;
+}
+
 async function getReservedTierCounts(env, campaignSlug, excludedOrderId = null) {
   if (!env.PLEDGES) return {};
+
+  const countsKey = getTierReservationCountsKey(campaignSlug);
+  const aggregatedCounts = await env.PLEDGES.get(countsKey, { type: 'json' });
+  if (aggregatedCounts && typeof aggregatedCounts === 'object') {
+    let counts = { ...aggregatedCounts };
+    if (excludedOrderId) {
+      const excludedReservation = await env.PLEDGES.get(getTierReservationKey(campaignSlug, excludedOrderId), { type: 'json' });
+      counts = mergeTierReservationCounts(counts, excludedReservation, -1);
+    }
+    return counts;
+  }
 
   const reservedCounts = {};
   let cursor = undefined;
@@ -863,6 +933,13 @@ async function getReservedTierCounts(env, campaignSlug, excludedOrderId = null) 
     cursor = reservationList.cursor;
   }
 
+  await env.PLEDGES.put(countsKey, JSON.stringify(reservedCounts), { expirationTtl: 3600 });
+
+  if (excludedOrderId) {
+    const excludedReservation = await env.PLEDGES.get(getTierReservationKey(campaignSlug, excludedOrderId), { type: 'json' });
+    return mergeTierReservationCounts(reservedCounts, excludedReservation, -1);
+  }
+
   return reservedCounts;
 }
 
@@ -881,25 +958,46 @@ function resolveAuthorizedOrderId(payload, requestedOrderId = null) {
 async function saveTierReservation(env, campaignSlug, orderId, selectedTiers = []) {
   if (!env.PLEDGES || !orderId) return;
 
+  const reservationKey = getTierReservationKey(campaignSlug, orderId);
+  const countsKey = getTierReservationCountsKey(campaignSlug);
+  const previousReservation = await env.PLEDGES.get(reservationKey, { type: 'json' });
   const limitedTiers = selectedTiers
     .filter(tierItem => tierItem.tier?.limit_total)
     .map(tierItem => ({ id: tierItem.id, qty: tierItem.qty }));
 
   if (limitedTiers.length === 0) {
-    await env.PLEDGES.delete(getTierReservationKey(campaignSlug, orderId));
+    await clearTierReservation(env, campaignSlug, orderId);
     return;
   }
 
-  await env.PLEDGES.put(
-    getTierReservationKey(campaignSlug, orderId),
-    JSON.stringify(limitedTiers),
-    { expirationTtl: 3600 }
-  );
+  let counts = await env.PLEDGES.get(countsKey, { type: 'json' }) || {};
+  counts = mergeTierReservationCounts(counts, previousReservation, -1);
+  counts = mergeTierReservationCounts(counts, limitedTiers, 1);
+
+  await Promise.all([
+    env.PLEDGES.put(reservationKey, JSON.stringify(limitedTiers), { expirationTtl: 3600 }),
+    env.PLEDGES.put(countsKey, JSON.stringify(counts), { expirationTtl: 3600 })
+  ]);
 }
 
 async function clearTierReservation(env, campaignSlug, orderId) {
   if (!env.PLEDGES || !orderId) return;
-  await env.PLEDGES.delete(getTierReservationKey(campaignSlug, orderId));
+  const reservationKey = getTierReservationKey(campaignSlug, orderId);
+  const countsKey = getTierReservationCountsKey(campaignSlug);
+  const existingReservation = await env.PLEDGES.get(reservationKey, { type: 'json' });
+  const aggregatedCounts = await env.PLEDGES.get(countsKey, { type: 'json' });
+
+  const operations = [env.PLEDGES.delete(reservationKey)];
+  if (aggregatedCounts && typeof aggregatedCounts === 'object') {
+    const nextCounts = mergeTierReservationCounts(aggregatedCounts, existingReservation, -1);
+    if (Object.keys(nextCounts).length > 0) {
+      operations.push(env.PLEDGES.put(countsKey, JSON.stringify(nextCounts), { expirationTtl: 3600 }));
+    } else {
+      operations.push(env.PLEDGES.delete(countsKey));
+    }
+  }
+
+  await Promise.all(operations);
 }
 
 async function claimSelectedTierInventory(env, campaignSlug, selectedTiers = [], campaign) {
@@ -1148,6 +1246,11 @@ export default {
 
       if (path === '/test/votes' && method === 'POST') {
         return handleTestVotes(request, env);
+      }
+
+      if (path.startsWith('/live/') && method === 'GET') {
+        const campaignSlug = path.replace('/live/', '');
+        return handleGetLiveCampaign(campaignSlug, env);
       }
 
       // Stats endpoints for live pledge totals
@@ -2943,42 +3046,11 @@ async function handleModifyPledge(request, env) {
       });
 
       let pledgeStored = false;
-      let oldStatsRemoved = false;
-      let newStatsAdded = false;
-      let supportStatsSynced = false;
       let statsReconciled = false;
 
       try {
         await env.PLEDGES.put(`pledge:${targetOrderId}`, JSON.stringify(nextPledgeData));
         pledgeStored = true;
-
-        await removePledgeFromStats(env, {
-          campaignSlug,
-          amount: originalPledgeData.subtotal ?? originalPledgeData.amount ?? 0,
-          tierId: originalPledgeData.tierId,
-          tierQty: originalPledgeData.tierQty || 1,
-          additionalTiers: originalPledgeData.additionalTiers || [],
-          supportItems: [],
-          customAmount: 0
-        });
-        oldStatsRemoved = true;
-
-        await addPledgeToStats(env, {
-          campaignSlug,
-          amount: canonicalContribution.totals.subtotal,
-          tierId: nextPledgeData.tierId,
-          tierQty: nextPledgeData.tierQty || 1,
-          additionalTiers: nextPledgeData.additionalTiers || []
-        });
-        newStatsAdded = true;
-
-        await updateSupportItemStats(
-          env,
-          campaignSlug,
-          originalPledgeData.supportItems || [],
-          nextPledgeData.supportItems || []
-        );
-        supportStatsSynced = true;
 
         await recalculateStats(env, campaignSlug);
         statsReconciled = true;
@@ -2991,44 +3063,7 @@ async function handleModifyPledge(request, env) {
           await env.PLEDGES.put(`pledge:${targetOrderId}`, JSON.stringify(originalPledgeData));
         }
 
-        if (supportStatsSynced) {
-          await updateSupportItemStats(
-            env,
-            campaignSlug,
-            nextPledgeData.supportItems || [],
-            originalPledgeData.supportItems || []
-          );
-        }
-
-        if (newStatsAdded) {
-          await removePledgeFromStats(env, {
-            campaignSlug,
-            amount: canonicalContribution.totals.subtotal,
-            tierId: nextPledgeData.tierId,
-            tierQty: nextPledgeData.tierQty || 1,
-            additionalTiers: nextPledgeData.additionalTiers || [],
-            supportItems: [],
-            customAmount: 0
-          });
-        }
-
-        if (oldStatsRemoved) {
-          await addPledgeToStats(env, {
-            campaignSlug,
-            amount: originalPledgeData.subtotal ?? originalPledgeData.amount ?? 0,
-            tierId: originalPledgeData.tierId,
-            tierQty: originalPledgeData.tierQty || 1,
-            additionalTiers: originalPledgeData.additionalTiers || []
-          });
-          await updateSupportItemStats(
-            env,
-            campaignSlug,
-            [],
-            originalPledgeData.supportItems || []
-          );
-        }
-
-        if (pledgeStored || oldStatsRemoved || newStatsAdded || supportStatsSynced || statsReconciled) {
+        if (pledgeStored || statsReconciled) {
           await recalculateStats(env, campaignSlug);
         }
 
@@ -3208,22 +3243,17 @@ async function settleCampaign(campaignSlug, env, options = {}) {
   }
 
   const stripe = createStripeClient(getStripeKey(env));
-
-  // Paginate KV list to ensure we get all pledge keys
-  let cursor = undefined;
-  const allKeys = [];
-  do {
-    const page = await env.PLEDGES.list({ prefix: 'pledge:', cursor });
-    allKeys.push(...page.keys);
-    cursor = page.list_complete ? undefined : page.cursor;
-  } while (cursor);
+  const orderIds = await getCampaignOrderIds(env, campaignSlug);
+  if (!orderIds) {
+    throw new Error(`Campaign pledge index missing for ${campaignSlug}. Run /admin/rebuild/${campaignSlug} first.`);
+  }
   
   // Aggregate pledges by email - one charge per supporter
   const pledgesByEmail = {};
   let skippedNoCustomer = 0;
 
-  for (const key of allKeys) {
-    const pledge = await env.PLEDGES.get(key.name, { type: 'json' });
+  for (const orderId of orderIds) {
+    const pledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
     if (pledge && 
         pledge.campaignSlug === campaignSlug && 
         pledge.pledgeStatus === 'active' &&
@@ -3620,24 +3650,14 @@ async function handleSettleDispatch(request, campaignSlug, env) {
 
   if (!job || job.status !== 'running') {
     // Initialize: read campaign pledge index
-    let orderIds = await env.PLEDGES.get(`campaign-pledges:${campaignSlug}`, { type: 'json' });
+    const orderIds = await getCampaignOrderIds(env, campaignSlug);
 
-    if (!orderIds || orderIds.length === 0) {
-      // Fallback: rebuild index from KV scan (one-time migration)
-      console.log(`🔄 No campaign index for ${campaignSlug}, rebuilding...`);
-      orderIds = [];
-      let cursor = undefined;
-      do {
-        const page = await env.PLEDGES.list({ prefix: 'pledge:', cursor });
-        for (const key of page.keys) {
-          const pledge = await env.PLEDGES.get(key.name, { type: 'json' });
-          if (pledge && pledge.campaignSlug === campaignSlug && pledge.pledgeStatus !== 'cancelled') {
-            orderIds.push(pledge.orderId);
-          }
-        }
-        cursor = page.list_complete ? undefined : page.cursor;
-      } while (cursor);
-      await env.PLEDGES.put(`campaign-pledges:${campaignSlug}`, JSON.stringify(orderIds));
+    if (!orderIds) {
+      return jsonResponse({
+        error: `Campaign pledge index missing for ${campaignSlug}. Run /admin/rebuild/${campaignSlug} first.`,
+        campaignSlug,
+        requiresRebuild: true
+      }, 409);
     }
 
     job = {
@@ -3979,20 +3999,28 @@ async function handleBackfillCustomers(request, campaignSlug, env) {
   const body = await request.json().catch(() => ({}));
   const dryRun = body.dryRun === true;
 
+  const orderIds = await getCampaignOrderIds(env, campaignSlug);
+  if (!orderIds) {
+    return jsonResponse({
+      error: `Campaign pledge index missing for ${campaignSlug}. Run /admin/rebuild/${campaignSlug} first.`,
+      campaignSlug,
+      requiresRebuild: true
+    }, 409);
+  }
+
   // Find pledges missing stripeCustomerId
   const needsBackfill = [];
 
-  const pledgeKeys = await listAllPledgeKeys(env);
-
-  for (const key of pledgeKeys) {
-    const pledge = await env.PLEDGES.get(key.name, { type: 'json' });
+  for (const orderId of orderIds) {
+    const key = `pledge:${orderId}`;
+    const pledge = await env.PLEDGES.get(key, { type: 'json' });
     if (pledge &&
         pledge.campaignSlug === campaignSlug &&
         pledge.pledgeStatus === 'active' &&
         !pledge.charged &&
         !pledge.stripeCustomerId &&
         pledge.stripePaymentMethodId) {
-      needsBackfill.push({ key: key.name, pledge });
+      needsBackfill.push({ key, pledge });
     }
   }
 
@@ -4127,6 +4155,7 @@ async function handleTestSetup(request, env) {
   const orderIds = [];
   for (const pledge of testPledges) {
     await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
+    await addToCampaignIndex(env, pledge.campaignSlug, pledge.orderId);
     orderIds.push(pledge.orderId);
   }
 
@@ -4179,6 +4208,10 @@ async function handleTestCleanup(request, env) {
   ];
 
   for (const orderId of testOrderIds) {
+    const pledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+    if (pledge?.campaignSlug) {
+      await removeFromCampaignIndex(env, pledge.campaignSlug, orderId);
+    }
     await env.PLEDGES.delete(`pledge:${orderId}`);
   }
 
@@ -4199,6 +4232,28 @@ async function getCampaignSupporters(env, campaignSlug) {
   
   const supporters = [];
   const seenEmails = new Set();
+  const orderIds = await getCampaignOrderIds(env, campaignSlug);
+
+  if (Array.isArray(orderIds)) {
+    for (const orderId of orderIds) {
+      const pledgeData = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+      if (!pledgeData) continue;
+      if (pledgeData.campaignSlug !== campaignSlug) continue;
+      if (pledgeData.pledgeStatus === 'cancelled') continue;
+      if (!pledgeData.email) continue;
+
+      const emailLower = pledgeData.email.toLowerCase();
+      if (seenEmails.has(emailLower)) continue;
+      seenEmails.add(emailLower);
+
+      supporters.push({
+        email: pledgeData.email,
+        orderId: pledgeData.orderId
+      });
+    }
+
+    return supporters;
+  }
 
   const pledgeKeys = await listAllPledgeKeys(env);
 
@@ -4207,6 +4262,7 @@ async function getCampaignSupporters(env, campaignSlug) {
     if (!pledgeData) continue;
     if (pledgeData.campaignSlug !== campaignSlug) continue;
     if (pledgeData.pledgeStatus === 'cancelled') continue;
+    if (!pledgeData.email) continue;
     
     const emailLower = pledgeData.email.toLowerCase();
     if (seenEmails.has(emailLower)) continue;
@@ -5089,7 +5145,7 @@ async function handleGetStats(campaignSlug, env) {
   const campaign = await getCampaign(env, campaignSlug);
   
   // SEC-004: Stats are public, use permissive CORS
-  return jsonResponse({
+  return cacheablePublicJsonResponse({
     campaignSlug,
     pledgedAmount: stats.pledgedAmount,
     pledgeCount: stats.pledgeCount,
@@ -5102,7 +5158,55 @@ async function handleGetStats(campaignSlug, env) {
       ? Math.round((stats.pledgedAmount / (campaign.goal_amount * 100)) * 100) 
       : 0,
     updatedAt: stats.updatedAt
-  }, 200, env, true);
+  }, 200, env);
+}
+
+async function handleGetLiveCampaign(campaignSlug, env) {
+  if (!campaignSlug) {
+    return jsonResponse({ error: 'Missing campaign slug' }, 400, env, true);
+  }
+
+  const [stats, inventory, campaign] = await Promise.all([
+    getCampaignStats(env, campaignSlug),
+    getTierInventory(env, campaignSlug),
+    getCampaign(env, campaignSlug)
+  ]);
+
+  const tiers = {};
+  for (const tier of (campaign?.tiers || [])) {
+    if (tier.limit_total) {
+      const inv = inventory?.[tier.id] || { limit: tier.limit_total, claimed: 0 };
+      tiers[tier.id] = {
+        name: tier.name,
+        limit: inv.limit,
+        claimed: inv.claimed,
+        remaining: inv.limit - inv.claimed
+      };
+    }
+  }
+
+  return cacheablePublicJsonResponse({
+    campaignSlug,
+    stats: {
+      campaignSlug,
+      pledgedAmount: stats?.pledgedAmount || 0,
+      pledgeCount: stats?.pledgeCount || 0,
+      tierCounts: stats?.tierCounts || {},
+      supportItems: stats?.supportItems || {},
+      goalAmount: campaign?.goal_amount || 0,
+      goalDeadline: campaign?.goal_deadline || null,
+      state: campaign?.state || 'unknown',
+      percentFunded: campaign?.goal_amount
+        ? Math.round(((stats?.pledgedAmount || 0) / (campaign.goal_amount * 100)) * 100)
+        : 0,
+      updatedAt: stats?.updatedAt || null
+    },
+    inventory: {
+      campaignSlug,
+      tiers,
+      raw: inventory || {}
+    }
+  }, 200, env);
 }
 
 async function handleRecalculateStats(request, campaignSlug, env) {
@@ -5146,11 +5250,11 @@ async function handleGetInventory(campaignSlug, env) {
   }
   
   // SEC-004: Inventory is public, use permissive CORS
-  return jsonResponse({
+  return cacheablePublicJsonResponse({
     campaignSlug,
     tiers,
     raw: inventory
-  }, 200, env, true);
+  }, 200, env);
 }
 
 async function handleRecalculateInventory(request, campaignSlug, env) {
@@ -5474,7 +5578,9 @@ async function handleRecoverCheckout(request, env) {
 
 // SEC-004 & SEC-012: Response helpers use imported getAllowedOrigin and SECURITY_HEADERS from validation.js
 
-function jsonResponse(data, status = 200, env = null, isPublic = false) {
+const PUBLIC_READ_CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=300';
+
+function jsonResponse(data, status = 200, env = null, isPublic = false, extraHeaders = {}) {
   const origin = getAllowedOrigin(env, isPublic);
   return new Response(JSON.stringify(data), {
     status,
@@ -5483,8 +5589,15 @@ function jsonResponse(data, status = 200, env = null, isPublic = false) {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key',
+      ...extraHeaders,
       ...SECURITY_HEADERS
     }
+  });
+}
+
+function cacheablePublicJsonResponse(data, status = 200, env = null) {
+  return jsonResponse(data, status, env, true, {
+    'Cache-Control': PUBLIC_READ_CACHE_CONTROL
   });
 }
 

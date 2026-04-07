@@ -10,6 +10,8 @@
     platformName: dataset.platformName || 'The Pool',
     salesTaxRate: dataset.salesTaxRate || '0.07875',
     flatShippingRate: dataset.flatShippingRate || '3.00',
+    liveStatsCacheTtlSeconds: dataset.liveStatsCacheTtlSeconds || '300',
+    liveInventoryCacheTtlSeconds: dataset.liveInventoryCacheTtlSeconds || '300',
     cartRuntime: dataset.cartRuntime || 'first_party',
     checkoutProvider: dataset.checkoutProvider || 'first_party'
   };

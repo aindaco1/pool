@@ -17,10 +17,19 @@
     const parsed = Number(bootScript.dataset.flatShippingRate);
     return Math.round((Number.isFinite(parsed) && parsed >= 0 ? parsed : 3) * 100);
   })();
+  const LIVE_STATS_CACHE_TTL_MS = (() => {
+    const parsed = Number(bootScript.dataset.liveStatsCacheTtlSeconds);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : 5 * 60 * 1000;
+  })();
+  const LIVE_INVENTORY_CACHE_TTL_MS = (() => {
+    const parsed = Number(bootScript.dataset.liveInventoryCacheTtlSeconds);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : 5 * 60 * 1000;
+  })();
   const DEFAULT_PLATFORM_TIP_PERCENT = 5;
   const MAX_PLATFORM_TIP_PERCENT = 15;
   const WIDTH_PERCENT_CLASS_PREFIX = 'u-width-pct-';
   const LEFT_PERCENT_CLASS_PREFIX = 'u-left-pct-';
+  const liveSnapshotRequests = {};
   let allCampaigns = [];
   let pledges = [];
   let isDevMode = false;
@@ -468,15 +477,113 @@
   const liveInventory = {};
   const liveStats = {};
 
+  function readCachedValue(key, ttlMs) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (Date.now() - Number(parsed.timestamp || 0) > ttlMs) {
+        localStorage.removeItem(key);
+        return null;
+      }
+      return parsed.data ?? null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writeCachedValue(key, data) {
+    try {
+      localStorage.setItem(key, JSON.stringify({
+        data,
+        timestamp: Date.now()
+      }));
+    } catch (_error) {}
+  }
+
+  function invalidateCampaignCaches(campaignSlug) {
+    if (!campaignSlug) return;
+
+    delete liveStats[campaignSlug];
+    delete liveInventory[campaignSlug];
+
+    try {
+      localStorage.removeItem(`pool_stats_${campaignSlug}`);
+      localStorage.removeItem(`pool_inventory_${campaignSlug}`);
+    } catch (_error) {}
+
+    if (typeof window.invalidateStatsCache === 'function') {
+      window.invalidateStatsCache(campaignSlug);
+    }
+    if (typeof window.invalidateInventoryCache === 'function') {
+      window.invalidateInventoryCache(campaignSlug);
+    }
+  }
+
+  async function fetchLiveCampaignSnapshot(campaignSlug) {
+    const cachedStats = readCachedValue(`pool_stats_${campaignSlug}`, LIVE_STATS_CACHE_TTL_MS);
+    const cachedInventory = readCachedValue(`pool_inventory_${campaignSlug}`, LIVE_INVENTORY_CACHE_TTL_MS);
+
+    if (cachedStats && cachedInventory) {
+      liveStats[campaignSlug] = cachedStats;
+      liveInventory[campaignSlug] = cachedInventory.tiers || {};
+      return {
+        stats: cachedStats,
+        inventory: cachedInventory
+      };
+    }
+
+    if (liveSnapshotRequests[campaignSlug]) {
+      return liveSnapshotRequests[campaignSlug];
+    }
+
+    liveSnapshotRequests[campaignSlug] = fetch(`${WORKER_BASE}/live/${campaignSlug}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`Failed to fetch live campaign data for ${campaignSlug}`);
+        }
+        const data = await res.json();
+        if (data?.stats) {
+          liveStats[campaignSlug] = data.stats;
+          writeCachedValue(`pool_stats_${campaignSlug}`, data.stats);
+        }
+        if (data?.inventory) {
+          liveInventory[campaignSlug] = data.inventory.tiers || {};
+          writeCachedValue(`pool_inventory_${campaignSlug}`, data.inventory);
+        }
+        return data;
+      })
+      .finally(() => {
+        delete liveSnapshotRequests[campaignSlug];
+      });
+
+    return liveSnapshotRequests[campaignSlug];
+  }
+
   async function fetchLiveStats(campaignSlug) {
     if (liveStats[campaignSlug]) {
       return liveStats[campaignSlug];
+    }
+    const cached = readCachedValue(`pool_stats_${campaignSlug}`, LIVE_STATS_CACHE_TTL_MS);
+    if (cached) {
+      liveStats[campaignSlug] = cached;
+      return cached;
+    }
+    try {
+      const snapshot = await fetchLiveCampaignSnapshot(campaignSlug);
+      if (snapshot?.stats) {
+        return snapshot.stats;
+      }
+    } catch (e) {
+      console.error('Failed to fetch combined live data for', campaignSlug, e);
     }
     try {
       const res = await fetch(`${WORKER_BASE}/stats/${campaignSlug}`);
       if (res.ok) {
         const data = await res.json();
         liveStats[campaignSlug] = data;
+        writeCachedValue(`pool_stats_${campaignSlug}`, data);
         return data;
       }
     } catch (e) {
@@ -489,11 +596,25 @@
     if (liveInventory[campaignSlug]) {
       return liveInventory[campaignSlug];
     }
+    const cached = readCachedValue(`pool_inventory_${campaignSlug}`, LIVE_INVENTORY_CACHE_TTL_MS);
+    if (cached?.tiers) {
+      liveInventory[campaignSlug] = cached.tiers;
+      return liveInventory[campaignSlug];
+    }
+    try {
+      const snapshot = await fetchLiveCampaignSnapshot(campaignSlug);
+      if (snapshot?.inventory?.tiers) {
+        return snapshot.inventory.tiers;
+      }
+    } catch (e) {
+      console.error('Failed to fetch combined live inventory for', campaignSlug, e);
+    }
     try {
       const res = await fetch(`${WORKER_BASE}/inventory/${campaignSlug}`);
       if (res.ok) {
         const data = await res.json();
         liveInventory[campaignSlug] = data.tiers || {};
+        writeCachedValue(`pool_inventory_${campaignSlug}`, data);
         return liveInventory[campaignSlug];
       }
     } catch (e) {
@@ -1664,6 +1785,7 @@
         );
         const failed = results.filter((response) => !response.ok);
         if (failed.length > 0) throw new Error(`Failed to cancel ${failed.length} pledge(s)`);
+        invalidateCampaignCaches(pledge.campaignSlug);
         window.location.reload();
       } catch (err) {
         alert('Error: ' + err.message);
@@ -2013,6 +2135,7 @@
             }
           }
 
+          invalidateCampaignCaches(pledge.campaignSlug);
           btn.textContent = 'Saved!';
           setTimeout(() => window.location.reload(), 500);
         } catch (err) {

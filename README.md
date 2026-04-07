@@ -71,6 +71,40 @@ For full local development with Jekyll, the Worker, Stripe CLI webhook forwardin
 ./scripts/dev.sh
 ```
 
+## Cloudflare Free-Plan Guidance For Forks
+
+The Pool is intentionally shaped so most traffic stays cheap:
+
+- GitHub Pages serves the static site, so normal page loads do not invoke the Worker
+- public live data now prefers one combined `/live/:slug` request instead of separate stats + inventory calls
+- campaign pages cache live stats and inventory in `localStorage` for `live_stats_cache_ttl_seconds` / `live_inventory_cache_ttl_seconds` (default `300`)
+- background tabs stop refreshing until the page becomes visible again
+- single-campaign reports, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans
+- limited-tier availability checks now reuse `tier-reservation-counts:{slug}` aggregates instead of repeatedly listing reservation keys
+- once a client is already over a rate limit window, repeated blocked requests no longer rewrite the same KV counter on every hit
+
+Fork knobs worth knowing:
+
+- site config: `live_stats_cache_ttl_seconds`, `live_inventory_cache_ttl_seconds`, `sales_tax_rate`, `flat_shipping_rate`
+- Worker env: mirrored pricing values in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
+
+### Practical Scalability Scenarios
+
+These are rough planning scenarios, not guarantees. They assume the default 5-minute browser cache TTLs, mostly normal user behavior, and Cloudflare’s current published free-plan limits for Workers and KV.
+
+| Scenario | Rough daily activity | Free-plan outlook |
+|----------|----------------------|-------------------|
+| Small collective launch | ~1,500 campaign-page visits, ~75 manage/supporter visits, ~20 checkout starts, ~10 completed pledges | Comfortable. Static pages absorb most traffic, and dynamic Worker usage should stay in the low thousands. |
+| Busy launch week | ~8,000 campaign-page visits, ~250 manage/supporter visits, ~60 checkout starts, ~25 completed or modified pledges | Still plausible on free tier for read traffic. The first budget to watch is KV writes, not Worker requests. |
+| Growing multi-project studio | ~20,000+ dynamic reads per day or many dozens of completed / modified / cancelled pledges per day | Start planning for the paid Workers plan before a major campaign push. Read traffic may still be fine, but mutation-heavy days can outgrow free KV writes first. |
+
+As of April 7, 2026, Cloudflare documents the Workers Free plan at `100,000` requests per day, and Workers KV Free at `100,000` reads per day plus `1,000` writes per day and `1,000` list requests per day:
+
+- [Cloudflare Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
+- [Cloudflare Workers KV limits](https://developers.cloudflare.com/kv/platform/limits/)
+
+The practical takeaway for forks is simple: The Pool can handle a healthy amount of browsing traffic on the free plan, but completed pledges, pledge modifications, cancellations, and admin repair flows are the part to watch most closely because they spend the scarce KV write budget.
+
 ## Testing
 
 ```bash
@@ -88,6 +122,9 @@ Local reporting:
 ./scripts/pledge-report.sh --local
 ./scripts/fulfillment-report.sh --local
 ```
+
+- `pledge-report.sh` is a ledger/history export, so modified pledges appear as deltas and mixed changes now keep tip-update context in the `items` column.
+- `fulfillment-report.sh` is the merged current-state view per `email + campaign`, which is the better comparison point for repeat backers and non-stackable projects.
 
 **Current full-suite baseline:**
 - Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow

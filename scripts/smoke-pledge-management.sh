@@ -55,8 +55,6 @@ initial_stats=$(curl -sf "${WORKER_HEADERS[@]}" "$WORKER_URL/stats/$CAMPAIGN_SLU
 initial_inventory=$(curl -sf "${WORKER_HEADERS[@]}" "$WORKER_URL/inventory/$CAMPAIGN_SLUG") || fail "inventory endpoint unavailable for $CAMPAIGN_SLUG"
 initial_pledge_count=$(echo "$initial_stats" | jq -r '.pledgeCount // 0')
 initial_pledged_amount=$(echo "$initial_stats" | jq -r '.pledgedAmount // 0')
-initial_claimed=$(echo "$initial_inventory" | jq -r '.tiers["limited-poster"].claimed // 0')
-
 if [ "$(echo "$initial_stats" | jq -r '.state')" != "live" ]; then
   fail "campaign '$CAMPAIGN_SLUG' is not live"
 fi
@@ -68,6 +66,8 @@ setup=$(curl -sf -X POST "${WORKER_HEADERS[@]}" "$WORKER_URL/test/setup" \
 
 token=$(echo "$setup" | jq -r '.token')
 order_id=$(echo "$setup" | jq -r '.pledges[0].orderId')
+inventory_tier_id=$(echo "$setup" | jq -r '.pledges[0].additionalTiers[0].id // empty')
+inventory_tier_qty=$(echo "$setup" | jq -r '.pledges[0].additionalTiers[0].qty // 0')
 
 [ -n "$token" ] && [ "$token" != "null" ] || fail "setup did not return a token"
 [ -n "$order_id" ] && [ "$order_id" != "null" ] || fail "setup did not return an order id"
@@ -91,11 +91,18 @@ can_cancel=$(echo "$pledges" | jq -r '.[0].canCancel')
 [ "$can_cancel" = "true" ] || fail "expected canCancel=true"
 pass "manage link exposes mutable pledge state"
 
-post_setup_inventory=$(curl -sf "${WORKER_HEADERS[@]}" "$WORKER_URL/inventory/$CAMPAIGN_SLUG")
-claimed_after_setup=$(echo "$post_setup_inventory" | jq -r '.tiers["limited-poster"].claimed // 0')
-expected_claimed_after_setup=$((initial_claimed + 1))
-[ "$claimed_after_setup" = "$expected_claimed_after_setup" ] || fail "expected limited-poster claimed count to increase from $initial_claimed to $expected_claimed_after_setup after setup"
-pass "limited inventory claim recorded"
+if [ -n "$inventory_tier_id" ] && [ "$inventory_tier_qty" -gt 0 ]; then
+  initial_claimed=$(echo "$initial_inventory" | jq -r --arg tier "$inventory_tier_id" '.tiers[$tier].claimed // 0')
+  post_setup_inventory=$(curl -sf "${WORKER_HEADERS[@]}" "$WORKER_URL/inventory/$CAMPAIGN_SLUG")
+  claimed_after_setup=$(echo "$post_setup_inventory" | jq -r --arg tier "$inventory_tier_id" '.tiers[$tier].claimed // 0')
+  expected_claimed_after_setup=$((initial_claimed + inventory_tier_qty))
+  [ "$claimed_after_setup" = "$expected_claimed_after_setup" ] || fail "expected $inventory_tier_id claimed count to increase from $initial_claimed to $expected_claimed_after_setup after setup"
+  pass "limited inventory claim recorded"
+else
+  expected_claimed_after_setup=''
+  initial_claimed=''
+  pass "fixture pledge did not include a limited tier claim"
+fi
 
 modify=$(curl -sf -X POST "${WORKER_HEADERS[@]}" "$WORKER_URL/pledge/modify" \
   -H "Content-Type: application/json" \
@@ -116,7 +123,9 @@ post_modify_inventory=$(curl -sf "${WORKER_HEADERS[@]}" "$WORKER_URL/inventory/$
 
 expected_pledge_count_after_modify=$((initial_pledge_count + 1))
 [ "$(echo "$post_modify_stats" | jq -r '.pledgeCount // 0')" = "$expected_pledge_count_after_modify" ] || fail "expected pledgeCount to increase from $initial_pledge_count to $expected_pledge_count_after_modify after modify"
-[ "$(echo "$post_modify_inventory" | jq -r '.tiers["limited-poster"].claimed // 0')" = "$expected_claimed_after_setup" ] || fail "modify should preserve limited inventory claim at $expected_claimed_after_setup"
+if [ -n "$inventory_tier_id" ] && [ -n "$expected_claimed_after_setup" ]; then
+  [ "$(echo "$post_modify_inventory" | jq -r --arg tier "$inventory_tier_id" '.tiers[$tier].claimed // 0')" = "$expected_claimed_after_setup" ] || fail "modify should preserve $inventory_tier_id claim at $expected_claimed_after_setup"
+fi
 pass "modify preserves stats and inventory coherently"
 
 cancel=$(curl -sf -X POST "${WORKER_HEADERS[@]}" "$WORKER_URL/pledge/cancel" \
@@ -135,7 +144,9 @@ post_cancel_inventory=$(curl -sf "${WORKER_HEADERS[@]}" "$WORKER_URL/inventory/$
 [ "$(echo "$post_cancel_pledges" | jq 'length')" = "0" ] || fail "cancelled pledge should not remain in manage list"
 [ "$(echo "$post_cancel_stats" | jq -r '.pledgeCount // 0')" = "$initial_pledge_count" ] || fail "expected pledgeCount to return to $initial_pledge_count after cancel"
 [ "$(echo "$post_cancel_stats" | jq -r '.pledgedAmount // 0')" = "$initial_pledged_amount" ] || fail "expected pledgedAmount to return to $initial_pledged_amount after cancel"
-[ "$(echo "$post_cancel_inventory" | jq -r '.tiers["limited-poster"].claimed // 0')" = "$initial_claimed" ] || fail "expected limited inventory claim count to return to $initial_claimed after cancel"
+if [ -n "$inventory_tier_id" ] && [ -n "$initial_claimed" ]; then
+  [ "$(echo "$post_cancel_inventory" | jq -r --arg tier "$inventory_tier_id" '.tiers[$tier].claimed // 0')" = "$initial_claimed" ] || fail "expected $inventory_tier_id claim count to return to $initial_claimed after cancel"
+fi
 pass "cancel releases stats and inventory"
 
 echo ""

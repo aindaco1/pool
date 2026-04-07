@@ -18,7 +18,9 @@ function renderManagePage() {
     <script
       data-manage-page-script="true"
       data-worker-base="${WORKER_BASE}"
-      data-platform-name="The Pool"></script>
+      data-platform-name="The Pool"
+      data-live-stats-cache-ttl-seconds="300"
+      data-live-inventory-cache-ttl-seconds="300"></script>
   `;
 }
 
@@ -99,6 +101,21 @@ function mockManageFetch(options?: {
       return jsonResponse(pledges);
     }
 
+    if (url === `${WORKER_BASE}/live/hand-relations`) {
+      return jsonResponse({
+        stats: {
+          pledgedAmount: 1000,
+          state: 'live',
+          supportItems: {}
+        },
+        inventory: {
+          tiers: {
+            'frame-slot': { remaining: 10 }
+          }
+        }
+      });
+    }
+
     if (url === `${WORKER_BASE}/inventory/hand-relations`) {
       return jsonResponse({
         tiers: {
@@ -154,6 +171,7 @@ describe('manage page script', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.useFakeTimers();
+    localStorage.clear();
     window.history.replaceState({}, '', '/manage/');
     renderManagePage();
     mockManageFetch({ campaigns: [] });
@@ -173,6 +191,7 @@ describe('manage page script', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     document.body.innerHTML = '';
+    localStorage.clear();
   });
 
   it('shows an error when no pledge token is provided', async () => {
@@ -191,7 +210,7 @@ describe('manage page script', () => {
   });
 
   it('loads and renders a pledge from the worker token endpoint', async () => {
-    mockManageFetch();
+    const fetchMock = mockManageFetch();
     window.history.replaceState({}, '', '/manage/?t=token-123');
 
     await import('../../assets/js/manage-page.js');
@@ -199,11 +218,15 @@ describe('manage page script', () => {
     await vi.waitFor(() => {
       expect(document.getElementById('pledges-list')?.hidden).toBe(false);
     });
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/live/hand-relations`);
+    });
 
     expect(global.fetch).toHaveBeenCalledWith('/api/campaigns.json');
     expect(global.fetch).toHaveBeenCalledWith(`${WORKER_BASE}/pledges?token=token-123`);
-    expect(global.fetch).toHaveBeenCalledWith(`${WORKER_BASE}/inventory/hand-relations`);
-    expect(global.fetch).toHaveBeenCalledWith(`${WORKER_BASE}/stats/hand-relations`);
+    expect(global.fetch).toHaveBeenCalledWith(`${WORKER_BASE}/live/hand-relations`);
+    expect(fetchMock).not.toHaveBeenCalledWith(`${WORKER_BASE}/inventory/hand-relations`);
+    expect(fetchMock).not.toHaveBeenCalledWith(`${WORKER_BASE}/stats/hand-relations`);
     expect(document.querySelector('.pledge-card__campaign')?.textContent).toContain('Hand Relations');
     expect(document.querySelector('.pledge-card__status')?.textContent).toContain('active');
     expect(getButton('[data-action="payment"][data-index="0"]').textContent).toContain('Update Card');
@@ -215,6 +238,55 @@ describe('manage page script', () => {
     expect(progressFill?.className).toContain('u-width-pct-');
     expect(goalMarker?.getAttribute('style')).toBeNull();
     expect(goalMarker?.className).toContain('u-left-pct-');
+  });
+
+  it('reuses cached stats and inventory on manage page without refetching them', async () => {
+    localStorage.setItem('pool_stats_hand-relations', JSON.stringify({
+      data: {
+        pledgedAmount: 1000,
+        state: 'live',
+        supportItems: {}
+      },
+      timestamp: Date.now()
+    }));
+    localStorage.setItem('pool_inventory_hand-relations', JSON.stringify({
+      data: {
+        tiers: {
+          'frame-slot': { remaining: 10 }
+        }
+      },
+      timestamp: Date.now()
+    }));
+
+    const fetchMock = mockManageFetch();
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/campaigns.json');
+    expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/pledges?token=token-123`);
+    expect(fetchMock).not.toHaveBeenCalledWith(`${WORKER_BASE}/inventory/hand-relations`);
+    expect(fetchMock).not.toHaveBeenCalledWith(`${WORKER_BASE}/stats/hand-relations`);
+    expect(fetchMock).not.toHaveBeenCalledWith(`${WORKER_BASE}/live/hand-relations`);
+  });
+
+  it('coalesces uncached live stats and inventory into one combined worker request', async () => {
+    const fetchMock = mockManageFetch();
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/live/hand-relations`);
+    });
+
+    expect(fetchMock.mock.calls.filter(([url]) => url === `${WORKER_BASE}/live/hand-relations`)).toHaveLength(1);
+    expect(fetchMock).not.toHaveBeenCalledWith(`${WORKER_BASE}/inventory/hand-relations`);
+    expect(fetchMock).not.toHaveBeenCalledWith(`${WORKER_BASE}/stats/hand-relations`);
   });
 
   it('starts the payment-method update flow from an active pledge', async () => {
@@ -331,6 +403,14 @@ describe('manage page script', () => {
   it('cancels a pledge after confirmation', async () => {
     const fetchMock = mockManageFetch();
     window.history.replaceState({}, '', '/manage/?t=token-123');
+    localStorage.setItem('pool_stats_hand-relations', JSON.stringify({
+      data: { pledgedAmount: 1000 },
+      timestamp: Date.now()
+    }));
+    localStorage.setItem('pool_inventory_hand-relations', JSON.stringify({
+      data: { tiers: { 'frame-slot': { remaining: 10 } } },
+      timestamp: Date.now()
+    }));
 
     await import('../../assets/js/manage-page.js');
 
@@ -353,11 +433,24 @@ describe('manage page script', () => {
         })
       );
     });
+
+    await vi.waitFor(() => {
+      expect(localStorage.getItem('pool_stats_hand-relations')).toBeNull();
+      expect(localStorage.getItem('pool_inventory_hand-relations')).toBeNull();
+    });
   });
 
   it('posts a pledge modify request after confirmation', async () => {
     const fetchMock = mockManageFetch();
     window.history.replaceState({}, '', '/manage/?t=token-123');
+    localStorage.setItem('pool_stats_hand-relations', JSON.stringify({
+      data: { pledgedAmount: 1000 },
+      timestamp: Date.now()
+    }));
+    localStorage.setItem('pool_inventory_hand-relations', JSON.stringify({
+      data: { tiers: { 'frame-slot': { remaining: 10 } } },
+      timestamp: Date.now()
+    }));
 
     await import('../../assets/js/manage-page.js');
 
@@ -400,6 +493,11 @@ describe('manage page script', () => {
 
     await vi.waitFor(() => {
       expect(saveButton.textContent).toBe('Saved!');
+    });
+
+    await vi.waitFor(() => {
+      expect(localStorage.getItem('pool_stats_hand-relations')).toBeNull();
+      expect(localStorage.getItem('pool_inventory_hand-relations')).toBeNull();
     });
   });
 

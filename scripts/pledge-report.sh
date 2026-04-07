@@ -87,20 +87,40 @@ def resolve_entries():
     for db_path in db_paths:
         try:
             conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
-            rows = conn.execute(\"select key, blob_id from _mf_entries where key like 'pledge:%'\").fetchall()
-            conn.close()
         except Exception:
             continue
-        if not rows:
-            continue
 
-        sample_blob = rows[0][1]
+        def match_blob_dir(blob_id):
+            for blob_dir in blob_dirs:
+                if (blob_dir / blob_id).exists():
+                    return blob_dir
+            return None
+
+        rows = []
         matched_blob_dir = None
-        for blob_dir in blob_dirs:
-            if (blob_dir / sample_blob).exists():
-                matched_blob_dir = blob_dir
-                break
-        if matched_blob_dir is None:
+
+        if campaign_filter:
+            index_row = conn.execute(\"select blob_id from _mf_entries where key = ?\", (f'campaign-pledges:{campaign_filter}',)).fetchone()
+            if index_row:
+                matched_blob_dir = match_blob_dir(index_row[0])
+                if matched_blob_dir is not None:
+                    try:
+                        order_ids = json.loads((matched_blob_dir / index_row[0]).read_text())
+                    except Exception:
+                        order_ids = []
+                    pledge_keys = [f'pledge:{order_id}' for order_id in (order_ids or [])]
+                    if pledge_keys:
+                        placeholders = ','.join('?' for _ in pledge_keys)
+                        rows = conn.execute(f\"select key, blob_id from _mf_entries where key in ({placeholders})\", pledge_keys).fetchall()
+
+        if not rows:
+            rows = conn.execute(\"select key, blob_id from _mf_entries where key like 'pledge:%'\").fetchall()
+            if rows:
+                matched_blob_dir = match_blob_dir(rows[0][1])
+
+        conn.close()
+
+        if not rows or matched_blob_dir is None:
             continue
 
         return rows, matched_blob_dir
@@ -239,9 +259,10 @@ for key, blob_id in rows:
                     custom_diff = new_custom - prev_custom
                     custom_str = f'+Custom Support \${custom_diff:.2f}' if custom_diff > 0 else f'-Custom Support \${abs(custom_diff):.2f}'
                     items_str = f'{items_str}; {custom_str}' if items_str else custom_str
-                tip_only_change = tip != 0 and subtotal == 0 and tax == 0 and shipping_delta == 0
+                tip_changed = tip != 0
+                tip_only_change = tip_changed and subtotal == 0 and tax == 0 and shipping_delta == 0
                 if items_str:
-                    if tip_only_change:
+                    if tip_changed:
                         items_str = f'(modified) {items_str}; tip updated to {tip_percent}%'
                     else:
                         items_str = f'(modified) {items_str}'
@@ -285,14 +306,34 @@ for key, blob_id in rows:
   exit 0
 fi
 
-# Get all pledge keys
-KEY_LIST_OUTPUT=$("${WRANGLER_CMD[@]}" kv key list --binding PLEDGES --prefix "pledge:" $WRANGLER_ENV_FLAGS $KV_SCOPE_FLAGS $LOCAL_PERSIST_FLAGS 2>&1) || {
-  echo "$KEY_LIST_OUTPUT" >&2
-  exit 1
-}
+KEYS=""
 
-KEYS=$(printf "%s" "$KEY_LIST_OUTPUT" | \
-  python3 -c "
+if [[ -n "$CAMPAIGN_FILTER" ]]; then
+  INDEX_OUTPUT=$("${WRANGLER_CMD[@]}" kv key get "campaign-pledges:$CAMPAIGN_FILTER" --binding PLEDGES $WRANGLER_ENV_FLAGS $KV_SCOPE_FLAGS $LOCAL_PERSIST_FLAGS 2>/dev/null || true)
+  if [[ -n "$INDEX_OUTPUT" ]]; then
+    KEYS=$(printf "%s" "$INDEX_OUTPUT" | \
+      python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    for order_id in (data or []):
+        print(f'pledge:{order_id}')
+except Exception as e:
+    print(f'Error parsing campaign index: {e}', file=sys.stderr)
+    sys.exit(1)
+")
+  fi
+fi
+
+if [[ -z "$KEYS" ]]; then
+  # Get all pledge keys
+  KEY_LIST_OUTPUT=$("${WRANGLER_CMD[@]}" kv key list --binding PLEDGES --prefix "pledge:" $WRANGLER_ENV_FLAGS $KV_SCOPE_FLAGS $LOCAL_PERSIST_FLAGS 2>&1) || {
+    echo "$KEY_LIST_OUTPUT" >&2
+    exit 1
+  }
+
+  KEYS=$(printf "%s" "$KEY_LIST_OUTPUT" | \
+    python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -302,6 +343,7 @@ except Exception as e:
     print(f'Error parsing keys: {e}', file=sys.stderr)
     sys.exit(1)
 ")
+fi
 
 if [[ -z "$KEYS" ]]; then
   echo "No pledges found." >&2
@@ -472,9 +514,10 @@ try:
                         custom_str = f'-Custom Support \${abs(custom_diff):.2f}'
                     items_str = f'{items_str}; {custom_str}' if items_str else custom_str
                 
-                tip_only_change = tip != 0 and subtotal == 0 and tax == 0 and shipping_delta == 0
+                tip_changed = tip != 0
+                tip_only_change = tip_changed and subtotal == 0 and tax == 0 and shipping_delta == 0
                 if items_str:
-                    if tip_only_change:
+                    if tip_changed:
                         items_str = f'(modified) {items_str}; tip updated to {tip_percent}%'
                     else:
                         items_str = f'(modified) {items_str}'

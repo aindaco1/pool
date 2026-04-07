@@ -33,7 +33,7 @@ upcoming → live → post
 |-----------|------|
 | **First-party cart** | Browser-owned cart UI and checkout review state |
 | **Stripe** | SetupIntents (save cards) + PaymentIntents (charge later) |
-| **Cloudflare Worker** | Backend: checkout, webhooks, pledge storage (KV), stats, auto-settle cron |
+| **Cloudflare Worker** | Backend: checkout, webhooks, pledge storage (KV), combined live reads, stats, auto-settle cron |
 | **Jekyll** | Static pages + campaign markdown |
 
 ---
@@ -64,8 +64,10 @@ Pledges are stored in Cloudflare KV. Key patterns:
 | `email:{email}` | Array of order IDs for that email |
 | `stats:{campaignSlug}` | Aggregated totals (pledgedAmount, pledgeCount, tierCounts, supportItems) |
 | `tier-inventory:{campaignSlug}` | Claim counts for limited tiers |
+| `campaign-pledges:{campaignSlug}` | Campaign-scoped pledge index for reports, settlement, rebuilds, and admin reads |
 | `pending-extras:{orderId}` | Temporary storage for support items/custom amount during checkout |
 | `pending-tiers:{orderId}` | Temporary storage for additional tiers when Stripe metadata would be too large |
+| `tier-reservation-counts:{campaignSlug}` | Aggregated reservation counts for limited-tier availability checks |
 | `checkout-intent:{orderId}` | Canonicalized checkout payload used to fan bundled checkout into campaign-scoped pledges |
 
 **Pledge record:**
@@ -171,6 +173,8 @@ Create Stripe Checkout session (setup mode) from the first-party cart state.
 5. If the pledge contains physical items, Stripe Checkout collects shipping address via `shipping_address_collection`
 6. On webhook, Worker fetches any temp metadata, extracts shipping address from Stripe, computes `subtotal + tax + shipping + tip`, persists one pledge per campaign, and then claims limited-tier inventory through a per-campaign Durable Object coordinator
 
+On the free-plan efficiency branch, checkout availability checks prefer the aggregated `tier-reservation-counts:{slug}` cache when present instead of repeatedly listing every reservation key.
+
 The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`, and `/checkout-intent/start` does not reserve limited inventory before checkout completion.
 
 ## Content Rendering Safety
@@ -257,6 +261,23 @@ Update saved payment method.
 
 ### `GET /stats/:campaignSlug`
 Get live pledge statistics for a campaign.
+
+### `GET /live/:campaignSlug`
+Get the combined public live snapshot for a campaign.
+
+**Response shape:**
+```json
+{
+  "stats": { "pledgedAmount": 1200, "pledgeCount": 3 },
+  "inventory": {
+    "tiers": {
+      "frame-slot": { "limit": 1000, "claimed": 2, "remaining": 998 }
+    }
+  }
+}
+```
+
+Campaign pages and the Manage Pledge UI prefer this endpoint so cold loads burn one Worker request instead of separate `stats` and `inventory` reads. The browser then caches the result in `localStorage` for the configured TTL.
 
 **Response:**
 ```json

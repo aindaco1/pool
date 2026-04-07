@@ -43,6 +43,12 @@ async function listAllKeys(env, prefix) {
   return keys;
 }
 
+async function getCampaignOrderIds(env, campaignSlug) {
+  if (!env.PLEDGES) return null;
+  const index = await env.PLEDGES.get(`campaign-pledges:${campaignSlug}`, { type: 'json' });
+  return Array.isArray(index) ? index : null;
+}
+
 function hasTierInventoryCoordinator(env) {
   return !!env?.TIER_INVENTORY_COORDINATOR;
 }
@@ -257,11 +263,14 @@ export async function recalculateStats(env, campaignSlug) {
     updatedAt: new Date().toISOString()
   };
 
-  // List all pledge keys and sum active ones
-  const pledgeKeys = await listAllKeys(env, 'pledge:');
+  const orderIds = await getCampaignOrderIds(env, campaignSlug);
+  const pledgeKeys = Array.isArray(orderIds)
+    ? orderIds.map((orderId) => `pledge:${orderId}`)
+    : await listAllKeys(env, 'pledge:');
   
   for (const key of pledgeKeys) {
-    const pledge = await env.PLEDGES.get(key.name, { type: 'json' });
+    const pledgeKey = typeof key === 'string' ? key : key.name;
+    const pledge = await env.PLEDGES.get(pledgeKey, { type: 'json' });
     if (pledge && 
         pledge.campaignSlug === campaignSlug && 
         pledge.pledgeStatus !== 'cancelled') {
@@ -525,11 +534,14 @@ export async function recalculateTierInventory(env, campaignSlug, tiers) {
     }
   }
   
-  // Count claimed from active pledges
-  const pledgeKeys = await listAllKeys(env, 'pledge:');
+  const orderIds = await getCampaignOrderIds(env, campaignSlug);
+  const pledgeKeys = Array.isArray(orderIds)
+    ? orderIds.map((orderId) => `pledge:${orderId}`)
+    : await listAllKeys(env, 'pledge:');
   
   for (const key of pledgeKeys) {
-    const pledge = await env.PLEDGES.get(key.name, { type: 'json' });
+    const pledgeKey = typeof key === 'string' ? key : key.name;
+    const pledge = await env.PLEDGES.get(pledgeKey, { type: 'json' });
     if (pledge && 
         pledge.campaignSlug === campaignSlug && 
         pledge.pledgeStatus === 'active' &&

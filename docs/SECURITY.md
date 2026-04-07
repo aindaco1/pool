@@ -26,6 +26,8 @@ This document covers the security architecture, known risks, hardening recommend
 | `campaign-charged:{slug}` | PLEDGES | Settlement completion timestamp | **Low** - flag |
 | `settlement-job:{slug}` | PLEDGES | Settlement batch progress | **Low** - ephemeral |
 | `pending-extras:{orderId}` | PLEDGES | Temporary support item / custom amount checkout extras | **Low** - ephemeral |
+| `pending-tiers:{orderId}` | PLEDGES | Temporary overflow tier metadata during checkout | **Low** - ephemeral |
+| `tier-reservation-counts:{slug}` | PLEDGES | Aggregated reservation counts per limited tier | **Low** - ephemeral cache/index |
 | `cron:lastRun` | PLEDGES | Last cron execution timestamp | **Low** - monitoring |
 | `vote:{slug}:{decision}:{email}` | VOTES | Vote choice | **Medium** - links supporter to vote |
 | `results:{slug}:{decision}` | VOTES | Vote tallies | **Low** - semi-public |
@@ -196,6 +198,7 @@ In-Worker rate limiting is now implemented using KV storage with per-IP tracking
 - Rate limits are tracked **per IP address** using `CF-Connecting-IP` header
 - Each IP gets its own bucket, so 100 different users won't interfere with each other
 - The 20/min `/checkout-intent/start` limit accommodates shared NAT environments (offices, universities)
+- Once a client is already over limit for the current window, repeated blocked requests fail closed without rewriting the same KV counter on every hit. That keeps abuse pressure from turning into unnecessary free-plan KV writes.
 
 **Setup:**
 

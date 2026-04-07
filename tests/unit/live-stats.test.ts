@@ -18,10 +18,8 @@ const mockWorkerBase = 'https://pledge.dustwave.xyz';
 
 // Helper to set up the live-stats module globals
 function setupGlobals() {
-  (globalThis as any).window = {
-    POOL_CONFIG: { workerBase: mockWorkerBase },
-    POOL_INVENTORY_CACHE: {},
-  };
+  (window as any).POOL_CONFIG = { workerBase: mockWorkerBase };
+  (window as any).POOL_INVENTORY_CACHE = {};
 }
 
 // Helper to create DOM elements for testing
@@ -703,6 +701,166 @@ describe('checkLateSupport', () => {
     checkLateSupport('test-campaign', 15000, 10000);
 
     expect(enabledLateSupport.size).toBe(1);
+  });
+});
+
+// ============================================================================
+// Runtime Integration Tests
+// ============================================================================
+
+describe('live-stats runtime integration', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    document.body.innerHTML = '';
+    localStorage.clear();
+    setupGlobals();
+    Object.defineProperty(document, 'visibilityState', {
+      value: 'visible',
+      configurable: true
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+    localStorage.clear();
+    if (typeof (window as any).__POOL_LIVE_STATS_DOM_READY_HANDLER === 'function') {
+      document.removeEventListener('DOMContentLoaded', (window as any).__POOL_LIVE_STATS_DOM_READY_HANDLER);
+    }
+    if (typeof (window as any).__POOL_LIVE_STATS_PAGESHOW_HANDLER === 'function') {
+      window.removeEventListener('pageshow', (window as any).__POOL_LIVE_STATS_PAGESHOW_HANDLER);
+    }
+    if (typeof (window as any).__POOL_LIVE_STATS_VISIBILITY_HANDLER === 'function') {
+      document.removeEventListener('visibilitychange', (window as any).__POOL_LIVE_STATS_VISIBILITY_HANDLER);
+    }
+    if (typeof (window as any).__POOL_LIVE_STATS_STORAGE_HANDLER === 'function') {
+      window.removeEventListener('storage', (window as any).__POOL_LIVE_STATS_STORAGE_HANDLER);
+    }
+    if (typeof (window as any).__POOL_LIVE_STATS_INVALIDATION_HANDLER === 'function') {
+      document.removeEventListener('pool:live-cache-invalidated', (window as any).__POOL_LIVE_STATS_INVALIDATION_HANDLER);
+    }
+    delete (window as any).refreshLiveStats;
+    delete (window as any).refreshLiveInventory;
+    delete (window as any).applyDeclarativeStyles;
+    delete (window as any).getTierInventory;
+    delete (window as any).invalidateStatsCache;
+    delete (window as any).invalidateInventoryCache;
+    delete (window as any).POOL_INVENTORY_CACHE;
+    delete (window as any).__POOL_LIVE_STATS_STORAGE_HANDLER;
+    delete (window as any).__POOL_LIVE_STATS_INVALIDATION_HANDLER;
+    delete (window as any).__POOL_LIVE_STATS_DOM_READY_HANDLER;
+    delete (window as any).__POOL_LIVE_STATS_PAGESHOW_HANDLER;
+    delete (window as any).__POOL_LIVE_STATS_VISIBILITY_HANDLER;
+  });
+
+  it('uses fresh localStorage caches on boot without refetching stats or inventory', async () => {
+    const wrap = createProgressWrap({ campaignSlug: 'test-campaign', goal: 10000 });
+    const card = createTierCard({ campaignSlug: 'test-campaign', tierId: 'tier-1' });
+    document.body.appendChild(wrap);
+    document.body.appendChild(card);
+
+    localStorage.setItem('pool_stats_test-campaign', JSON.stringify({
+      data: { pledgedAmount: 500000, supportItems: {} },
+      timestamp: Date.now()
+    }));
+    localStorage.setItem('pool_inventory_test-campaign', JSON.stringify({
+      data: { tiers: { 'tier-1': { remaining: 3, limit: 10 } } },
+      timestamp: Date.now()
+    }));
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    await import('../../assets/js/live-stats.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await Promise.resolve();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect((wrap.querySelector('[data-live-pledged]') as HTMLElement).textContent).toBe('$5k');
+    expect((card.querySelector('[data-live-remaining]') as HTMLElement).textContent).toBe('3');
+  });
+
+  it('coalesces concurrent inventory fetches for the same campaign', async () => {
+    const inventoryPayload = { tiers: { 'tier-1': { remaining: 2, limit: 10 } } };
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        stats: { pledgedAmount: 500000, supportItems: {} },
+        inventory: inventoryPayload
+      })
+    }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    await import('../../assets/js/live-stats.js');
+
+    const [first, second] = await Promise.all([
+      (window as any).getTierInventory('test-campaign', 'tier-1'),
+      (window as any).getTierInventory('test-campaign', 'tier-1')
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('https://pledge.dustwave.xyz/live/test-campaign');
+    expect(first).toEqual({ remaining: 2, limit: 10 });
+    expect(second).toEqual({ remaining: 2, limit: 10 });
+  });
+
+  it('uses one combined live endpoint request for uncached stats and inventory on boot', async () => {
+    const wrap = createProgressWrap({ campaignSlug: 'test-campaign', goal: 10000 });
+    const card = createTierCard({ campaignSlug: 'test-campaign', tierId: 'tier-1' });
+    document.body.appendChild(wrap);
+    document.body.appendChild(card);
+
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        stats: { pledgedAmount: 500000, supportItems: {}, state: 'live' },
+        inventory: { tiers: { 'tier-1': { remaining: 4, limit: 10 } } }
+      })
+    }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    await import('../../assets/js/live-stats.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('https://pledge.dustwave.xyz/live/test-campaign');
+    expect((wrap.querySelector('[data-live-pledged]') as HTMLElement).textContent).toBe('$5k');
+    expect((card.querySelector('[data-live-remaining]') as HTMLElement).textContent).toBe('4');
+  });
+
+  it('forces a fresh stats fetch after cache invalidation on an open page', async () => {
+    const wrap = createProgressWrap({ campaignSlug: 'test-campaign', goal: 10000 });
+    document.body.appendChild(wrap);
+
+    localStorage.setItem('pool_stats_test-campaign', JSON.stringify({
+      data: { pledgedAmount: 500000, supportItems: {} },
+      timestamp: Date.now()
+    }));
+
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => {
+        if (url.endsWith('/stats/test-campaign')) {
+          return { pledgedAmount: 850000, supportItems: {} };
+        }
+        return { stats: { pledgedAmount: 850000, supportItems: {} }, inventory: null };
+      }
+    }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    await import('../../assets/js/live-stats.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await Promise.resolve();
+
+    expect((wrap.querySelector('[data-live-pledged]') as HTMLElement).textContent).toBe('$5k');
+
+    (window as any).invalidateStatsCache('test-campaign');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(fetchMock).toHaveBeenCalledWith('https://pledge.dustwave.xyz/stats/test-campaign');
+    expect((wrap.querySelector('[data-live-pledged]') as HTMLElement).textContent).toBe('$8.5k');
   });
 });
 

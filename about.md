@@ -74,6 +74,8 @@ The Pool runs on a modern static architecture:
 
 The platform is built on services that all offer free tiers, and The Pool was designed from the start to operate effectively within those free tiers whenever possible.
 
+For forks, that means static pages stay on GitHub Pages, public live reads are aggressively combined and browser-cached, and most Cloudflare Worker usage is reserved for the security-sensitive parts of the pledge lifecycle.
+
 For teams forking The Pool, tax and shipping settings live in site config and mirrored Worker env so local UI, checkout, reports, and emails all stay aligned.
 
 ## Open Source

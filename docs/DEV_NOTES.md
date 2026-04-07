@@ -3,11 +3,22 @@
 ## Stack
 
 - **GitHub Pages** — Jekyll 4.4.1 + Sass static site
-- **Legacy hosted cart runtime** — Cart UI only (no payment processing)
+- **First-party cart runtime** — Browser-owned cart, checkout review, and Stripe handoff
 - **Cloudflare Worker** — Backend API, pledge storage (KV), email sending
 - **Stripe** — SetupIntents (save card), PaymentIntents (charge later)
 - **Resend** — Transactional emails (supporter confirmation, milestones, failures)
 - **Pages CMS** — Visual campaign editing via [app.pagescms.org](https://app.pagescms.org)
+
+### Fork-Friendly Free-Plan Knobs
+
+If you are trying to keep a fork comfortable on the Cloudflare Workers free plan, the safest knobs to tune first are:
+
+- `live_stats_cache_ttl_seconds`
+- `live_inventory_cache_ttl_seconds`
+- `sales_tax_rate`
+- `flat_shipping_rate`
+
+The first two live in Jekyll config and shape browser read behavior. The pricing values also need to be mirrored in the Worker env so checkout, emails, reports, and settlement math stay aligned.
 
 ## Design System
 
@@ -684,6 +695,7 @@ Generate CSV reports of pledges from Cloudflare KV:
 - `+Tier` or `+Tier xN` — Tier was added (or quantity increased)
 - `-Tier` or `-Tier xN` — Tier was removed (or quantity decreased)
 - `+Custom Support $X` or `-Custom Support $X` — Custom support was added/removed
+- `; tip updated to N%` — Tip changed during the same modification, even if other pledge fields changed too
 - Unchanged tiers don't appear in the diff
 
 **Custom Support in items:**

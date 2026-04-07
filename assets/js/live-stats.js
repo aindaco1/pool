@@ -3,16 +3,45 @@
  * 
  * Works on any page with progress bars that have [data-live-stats] and [data-campaign-slug]
  * 
- * Stats are cached in localStorage for 60 seconds to reduce API calls.
+ * Stats are cached in localStorage to reduce API calls.
  * Cache is invalidated when user makes a pledge (via invalidateStatsCache).
  */
 
-const STATS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+const DEFAULT_STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_INVENTORY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const WIDTH_PERCENT_CLASS_PREFIX = 'u-width-pct-';
 const LEFT_PERCENT_CLASS_PREFIX = 'u-left-pct-';
+const statsRequestCache = new Map();
+const inventoryRequestCache = new Map();
+const liveSnapshotRequestCache = new Map();
+const DOM_READY_HANDLER_KEY = '__POOL_LIVE_STATS_DOM_READY_HANDLER';
+const PAGESHOW_HANDLER_KEY = '__POOL_LIVE_STATS_PAGESHOW_HANDLER';
+const VISIBILITY_HANDLER_KEY = '__POOL_LIVE_STATS_VISIBILITY_HANDLER';
+const STORAGE_HANDLER_KEY = '__POOL_LIVE_STATS_STORAGE_HANDLER';
+const INVALIDATION_HANDLER_KEY = '__POOL_LIVE_STATS_INVALIDATION_HANDLER';
 
 function getWorkerBase() {
   return window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
+}
+
+function getCacheTtlMs(configKey, fallbackMs) {
+  const parsedSeconds = Number(window.POOL_CONFIG?.[configKey]);
+  if (!Number.isFinite(parsedSeconds) || parsedSeconds <= 0) {
+    return fallbackMs;
+  }
+  return parsedSeconds * 1000;
+}
+
+function getStatsCacheTtlMs() {
+  return getCacheTtlMs('liveStatsCacheTtlSeconds', DEFAULT_STATS_CACHE_TTL_MS);
+}
+
+function getInventoryCacheTtlMs() {
+  return getCacheTtlMs('liveInventoryCacheTtlSeconds', DEFAULT_INVENTORY_CACHE_TTL_MS);
+}
+
+function isPageVisible() {
+  return typeof document === 'undefined' || document.visibilityState !== 'hidden';
 }
 
 function getStatsCache(slug) {
@@ -20,7 +49,7 @@ function getStatsCache(slug) {
     const cached = localStorage.getItem(`pool_stats_${slug}`);
     if (!cached) return null;
     const { data, timestamp } = JSON.parse(cached);
-    if (Date.now() - timestamp > STATS_CACHE_TTL_MS) {
+    if (Date.now() - timestamp > getStatsCacheTtlMs()) {
       localStorage.removeItem(`pool_stats_${slug}`);
       return null;
     }
@@ -41,6 +70,114 @@ function setStatsCache(slug, data) {
   }
 }
 
+function setInventoryMemoryAndCache(slug, data) {
+  if (!data) return;
+  if (data.tiers) {
+    window.POOL_INVENTORY_CACHE[slug] = data;
+  }
+  setInventoryCache(slug, data);
+}
+
+function clearLiveRequestCaches(slug) {
+  if (slug) {
+    statsRequestCache.delete(slug);
+    inventoryRequestCache.delete(slug);
+    liveSnapshotRequestCache.delete(slug);
+    if (window.POOL_INVENTORY_CACHE) {
+      delete window.POOL_INVENTORY_CACHE[slug];
+    }
+    return;
+  }
+
+  statsRequestCache.clear();
+  inventoryRequestCache.clear();
+  liveSnapshotRequestCache.clear();
+  window.POOL_INVENTORY_CACHE = {};
+}
+
+async function fetchLiveCampaignSnapshot(slug, options = {}) {
+  const force = options.force === true;
+
+  if (!force) {
+    const cachedStats = getStatsCache(slug);
+    const cachedInventory = getInventoryCache(slug);
+    if (cachedStats && cachedInventory) {
+      window.POOL_INVENTORY_CACHE[slug] = cachedInventory;
+      return {
+        stats: cachedStats,
+        inventory: cachedInventory
+      };
+    }
+  }
+
+  if (liveSnapshotRequestCache.has(slug)) {
+    return liveSnapshotRequestCache.get(slug);
+  }
+
+  const request = fetch(`${getWorkerBase()}/live/${slug}`)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`Failed to fetch live snapshot for ${slug}`);
+      }
+      return res.json();
+    })
+    .then((data) => {
+      if (data?.stats) {
+        setStatsCache(slug, data.stats);
+      }
+      if (data?.inventory) {
+        setInventoryMemoryAndCache(slug, data.inventory);
+      }
+      return data;
+    })
+    .finally(() => {
+      liveSnapshotRequestCache.delete(slug);
+    });
+
+  liveSnapshotRequestCache.set(slug, request);
+  return request;
+}
+
+async function fetchStatsForSlug(slug, options = {}) {
+  const force = options.force === true;
+  if (!force) {
+    const cached = getStatsCache(slug);
+    if (cached) return cached;
+  }
+
+  if (statsRequestCache.has(slug)) {
+    return statsRequestCache.get(slug);
+  }
+
+  if (!force) {
+    const snapshotPromise = fetchLiveCampaignSnapshot(slug, options)
+      .then((snapshot) => snapshot?.stats || null)
+      .catch(() => null);
+    statsRequestCache.set(slug, snapshotPromise);
+    const snapshotStats = await snapshotPromise;
+    statsRequestCache.delete(slug);
+    if (snapshotStats) return snapshotStats;
+  }
+
+  const request = fetch(`${getWorkerBase()}/stats/${slug}`)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`Failed to fetch stats for ${slug}`);
+      }
+      return res.json();
+    })
+    .then((data) => {
+      setStatsCache(slug, data);
+      return data;
+    })
+    .finally(() => {
+      statsRequestCache.delete(slug);
+    });
+
+  statsRequestCache.set(slug, request);
+  return request;
+}
+
 function applyPercentClass(node, prefix, percent) {
   if (!node) return;
   const clampedPercent = Math.max(0, Math.min(100, Math.round(percent)));
@@ -59,6 +196,7 @@ window.invalidateStatsCache = function(campaignSlug) {
   try {
     if (campaignSlug) {
       localStorage.removeItem(`pool_stats_${campaignSlug}`);
+      clearLiveRequestCaches(campaignSlug);
     } else {
       // Clear all stats caches
       Object.keys(localStorage).forEach(key => {
@@ -66,10 +204,18 @@ window.invalidateStatsCache = function(campaignSlug) {
           localStorage.removeItem(key);
         }
       });
+      clearLiveRequestCaches();
     }
   } catch {
     // localStorage may be disabled
   }
+
+  document.dispatchEvent(new CustomEvent('pool:live-cache-invalidated', {
+    detail: {
+      campaignSlug: campaignSlug || null,
+      kind: 'stats'
+    }
+  }));
 };
 
 function applyDeclarativeStyles(root = document) {
@@ -86,9 +232,10 @@ function applyDeclarativeStyles(root = document) {
   });
 }
 
-async function fetchAllLiveStats() {
+async function fetchAllLiveStats(options = {}) {
   const progressBars = document.querySelectorAll('[data-live-stats][data-campaign-slug]');
   if (progressBars.length === 0) return;
+  const force = options.force === true;
 
   // Get unique campaign slugs
   const slugs = [...new Set([...progressBars].map(el => el.dataset.campaignSlug))];
@@ -98,7 +245,7 @@ async function fetchAllLiveStats() {
   const uncachedSlugs = [];
   
   for (const slug of slugs) {
-    const cached = getStatsCache(slug);
+    const cached = force ? null : getStatsCache(slug);
     if (cached) {
       statsMap[slug] = cached;
     } else {
@@ -109,18 +256,13 @@ async function fetchAllLiveStats() {
   // Fetch uncached stats in parallel
   if (uncachedSlugs.length > 0) {
     const results = await Promise.allSettled(
-      uncachedSlugs.map(async slug => {
-        const res = await fetch(`${getWorkerBase()}/stats/${slug}`);
-        if (!res.ok) throw new Error(`Failed to fetch stats for ${slug}`);
-        return res.json();
-      })
+      uncachedSlugs.map((slug) => fetchStatsForSlug(slug, { force }))
     );
 
     results.forEach((result, i) => {
-      if (result.status === 'fulfilled') {
+      if (result.status === 'fulfilled' && result.value) {
         const slug = uncachedSlugs[i];
         statsMap[slug] = result.value;
-        setStatsCache(slug, result.value);
       }
     });
   }
@@ -255,16 +397,14 @@ function formatMoney(dollars) {
 
 /**
  * Live Inventory - Fetches and displays real-time tier remaining counts
- * Cached in localStorage for 60 seconds.
+ * Cached in localStorage.
  */
-const INVENTORY_CACHE_TTL_MS = 60 * 1000; // 60 seconds
-
 function getInventoryCache(slug) {
   try {
     const cached = localStorage.getItem(`pool_inventory_${slug}`);
     if (!cached) return null;
     const { data, timestamp } = JSON.parse(cached);
-    if (Date.now() - timestamp > INVENTORY_CACHE_TTL_MS) {
+    if (Date.now() - timestamp > getInventoryCacheTtlMs()) {
       localStorage.removeItem(`pool_inventory_${slug}`);
       return null;
     }
@@ -285,6 +425,50 @@ function setInventoryCache(slug, data) {
   }
 }
 
+async function fetchInventoryForSlug(slug, options = {}) {
+  const force = options.force === true;
+
+  if (!force) {
+    const cached = getInventoryCache(slug);
+    if (cached) {
+      window.POOL_INVENTORY_CACHE[slug] = cached;
+      return cached;
+    }
+  }
+
+  if (inventoryRequestCache.has(slug)) {
+    return inventoryRequestCache.get(slug);
+  }
+
+  if (!force) {
+    const snapshotPromise = fetchLiveCampaignSnapshot(slug, options)
+      .then((snapshot) => snapshot?.inventory || null)
+      .catch(() => null);
+    inventoryRequestCache.set(slug, snapshotPromise);
+    const snapshotInventory = await snapshotPromise;
+    inventoryRequestCache.delete(slug);
+    if (snapshotInventory) return snapshotInventory;
+  }
+
+  const request = fetch(`${getWorkerBase()}/inventory/${slug}`)
+    .then((res) => {
+      if (!res.ok) return null;
+      return res.json();
+    })
+    .then((data) => {
+      if (data) {
+        setInventoryMemoryAndCache(slug, data);
+      }
+      return data;
+    })
+    .finally(() => {
+      inventoryRequestCache.delete(slug);
+    });
+
+  inventoryRequestCache.set(slug, request);
+  return request;
+}
+
 /**
  * Invalidate inventory cache (call after pledge changes)
  */
@@ -292,19 +476,29 @@ window.invalidateInventoryCache = function(campaignSlug) {
   try {
     if (campaignSlug) {
       localStorage.removeItem(`pool_inventory_${campaignSlug}`);
+      clearLiveRequestCaches(campaignSlug);
     } else {
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith('pool_inventory_')) {
           localStorage.removeItem(key);
         }
       });
+      clearLiveRequestCaches();
     }
   } catch {}
+
+  document.dispatchEvent(new CustomEvent('pool:live-cache-invalidated', {
+    detail: {
+      campaignSlug: campaignSlug || null,
+      kind: 'inventory'
+    }
+  }));
 };
 
-async function fetchLiveInventory() {
+async function fetchLiveInventory(options = {}) {
   const tierCards = document.querySelectorAll('[data-tier-id][data-campaign-slug]');
   if (tierCards.length === 0) return;
+  const force = options.force === true;
 
   // Get unique campaign slugs
   const slugs = [...new Set([...tierCards].map(el => el.dataset.campaignSlug))];
@@ -314,7 +508,7 @@ async function fetchLiveInventory() {
   const uncachedSlugs = [];
   
   for (const slug of slugs) {
-    const cached = getInventoryCache(slug);
+    const cached = force ? null : getInventoryCache(slug);
     if (cached) {
       inventoryMap[slug] = cached;
     } else {
@@ -325,18 +519,14 @@ async function fetchLiveInventory() {
   // Fetch uncached inventory in parallel
   if (uncachedSlugs.length > 0) {
     const results = await Promise.allSettled(
-      uncachedSlugs.map(async slug => {
-        const res = await fetch(`${getWorkerBase()}/inventory/${slug}`);
-        if (!res.ok) return null;
-        return res.json();
-      })
+      uncachedSlugs.map((slug) => fetchInventoryForSlug(slug, { force }))
     );
 
     results.forEach((result, i) => {
       if (result.status === 'fulfilled' && result.value) {
         const slug = uncachedSlugs[i];
         inventoryMap[slug] = result.value;
-        setInventoryCache(slug, result.value);
+        window.POOL_INVENTORY_CACHE[slug] = result.value;
       }
     });
   }
@@ -515,21 +705,80 @@ function applyCachedInventory() {
 }
 
 // Fetch on page load - apply cached first, then fetch fresh
-document.addEventListener('DOMContentLoaded', () => {
+const previousDomReadyHandler = window[DOM_READY_HANDLER_KEY];
+if (typeof previousDomReadyHandler === 'function') {
+  document.removeEventListener('DOMContentLoaded', previousDomReadyHandler);
+}
+
+const domReadyHandler = () => {
   applyDeclarativeStyles();
   applyCachedStats();
   applyCachedInventory();
-  fetchAllLiveStats();
-  fetchLiveInventory();
-});
-
-// Refetch when navigating back (bfcache restore)
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) {
+  if (isPageVisible()) {
     fetchAllLiveStats();
     fetchLiveInventory();
   }
-});
+};
+window[DOM_READY_HANDLER_KEY] = domReadyHandler;
+document.addEventListener('DOMContentLoaded', domReadyHandler);
+
+// Refetch when navigating back (bfcache restore)
+const previousPageshowHandler = window[PAGESHOW_HANDLER_KEY];
+if (typeof previousPageshowHandler === 'function') {
+  window.removeEventListener('pageshow', previousPageshowHandler);
+}
+
+const pageshowHandler = (event) => {
+  if (event.persisted && isPageVisible()) {
+    fetchAllLiveStats();
+    fetchLiveInventory();
+  }
+};
+window[PAGESHOW_HANDLER_KEY] = pageshowHandler;
+window.addEventListener('pageshow', pageshowHandler);
+
+const previousVisibilityHandler = window[VISIBILITY_HANDLER_KEY];
+if (typeof previousVisibilityHandler === 'function') {
+  document.removeEventListener('visibilitychange', previousVisibilityHandler);
+}
+
+const visibilityHandler = () => {
+  if (!isPageVisible()) return;
+  fetchAllLiveStats();
+  fetchLiveInventory();
+};
+window[VISIBILITY_HANDLER_KEY] = visibilityHandler;
+document.addEventListener('visibilitychange', visibilityHandler);
+
+const previousStorageHandler = window[STORAGE_HANDLER_KEY];
+if (typeof previousStorageHandler === 'function') {
+  window.removeEventListener('storage', previousStorageHandler);
+}
+
+const storageHandler = (event) => {
+  if (!isPageVisible()) return;
+  const key = String(event?.key || '');
+  if (!key.startsWith('pool_stats_') && !key.startsWith('pool_inventory_')) return;
+  const slug = key.replace(/^pool_(stats|inventory)_/, '');
+  clearLiveRequestCaches(slug);
+  fetchAllLiveStats({ force: true });
+  fetchLiveInventory({ force: true });
+};
+window[STORAGE_HANDLER_KEY] = storageHandler;
+window.addEventListener('storage', storageHandler);
+
+const previousInvalidationHandler = window[INVALIDATION_HANDLER_KEY];
+if (typeof previousInvalidationHandler === 'function') {
+  document.removeEventListener('pool:live-cache-invalidated', previousInvalidationHandler);
+}
+
+const invalidationHandler = () => {
+  if (!isPageVisible()) return;
+  fetchAllLiveStats({ force: true });
+  fetchLiveInventory({ force: true });
+};
+window[INVALIDATION_HANDLER_KEY] = invalidationHandler;
+document.addEventListener('pool:live-cache-invalidated', invalidationHandler);
 
 // Export for manual refresh and inventory lookup
 window.refreshLiveStats = fetchAllLiveStats;
@@ -544,10 +793,17 @@ window.POOL_INVENTORY_CACHE = {};
  */
 window.getTierInventory = async function(campaignSlug, tierId) {
   if (!window.POOL_INVENTORY_CACHE[campaignSlug]) {
+    const cached = getInventoryCache(campaignSlug);
+    if (cached) {
+      window.POOL_INVENTORY_CACHE[campaignSlug] = cached;
+    }
+  }
+
+  if (!window.POOL_INVENTORY_CACHE[campaignSlug]) {
     try {
-      const res = await fetch(`${getWorkerBase()}/inventory/${campaignSlug}`);
-      if (res.ok) {
-        window.POOL_INVENTORY_CACHE[campaignSlug] = await res.json();
+      const data = await fetchInventoryForSlug(campaignSlug);
+      if (!data) {
+        return null;
       }
     } catch (e) {
       console.error('Failed to fetch inventory:', e);

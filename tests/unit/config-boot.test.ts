@@ -23,6 +23,8 @@ describe('config boot scripts', () => {
         data-platform-name="The Pool"
         data-sales-tax-rate="0.07875"
         data-flat-shipping-rate="3.00"
+        data-live-stats-cache-ttl-seconds="300"
+        data-live-inventory-cache-ttl-seconds="300"
         data-cart-runtime="first_party"
         data-checkout-provider="first_party"></script>
     `;
@@ -34,6 +36,8 @@ describe('config boot scripts', () => {
       platformName: 'The Pool',
       salesTaxRate: '0.07875',
       flatShippingRate: '3.00',
+      liveStatsCacheTtlSeconds: '300',
+      liveInventoryCacheTtlSeconds: '300',
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party'
     });

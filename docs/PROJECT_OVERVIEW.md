@@ -24,6 +24,33 @@ Creators define campaigns in Markdown; backers pledge through The Pool’s first
 
 All code is versioned and auditable — no external DB or CMS needed.
 
+## Free-Plan Efficiency Notes For Forks
+
+The current architecture is deliberately optimized so free-plan Cloudflare deployments spend their budget on pledge mutations rather than casual browsing:
+
+- campaign pages and the manage page prefer one combined `/live/:slug` read instead of separate stats + inventory requests
+- the browser caches live stats and inventory in `localStorage` for the configured TTLs, and hidden tabs stop refreshing until visible again
+- single-campaign reports, settlement helpers, admin broadcast audience lookups, and stats / inventory reconciliation all prefer the `campaign-pledges:{slug}` index before falling back to full `pledge:` scans
+- limited-tier availability checks prefer `tier-reservation-counts:{slug}` aggregates instead of listing every reservation key
+- rate limiting still fails closed, but repeated blocked requests inside the same window no longer rewrite the same KV counter on every hit
+
+That means the real free-plan ceiling for most forks is usually **KV writes from successful pledge activity**, not public read traffic.
+
+### Rough Planning Scenarios
+
+These scenarios are intentionally approximate. They assume the default 5-minute browser TTLs, one combined live read on cold campaign loads, and Cloudflare’s published free-plan limits as of April 7, 2026.
+
+| Scenario | What it feels like operationally | Planning takeaway |
+|----------|----------------------------------|-------------------|
+| First launch | One or two live campaigns, a few thousand campaign-page visits over several days, and a handful of completed pledges per day | The free plan is a very reasonable starting point. |
+| Strong week-one traction | Several thousand dynamic Worker reads per day and a couple dozen pledge mutations across live campaigns | Still workable, but start watching KV writes and report/admin maintenance habits. |
+| Established community platform | Frequent pledge mutations every day across multiple live campaigns, plus more regular admin repair/reporting flows | Upgrade before a big moment. The read path can still be efficient, but mutation-heavy days become the real constraint. |
+
+For current Cloudflare limits, see:
+
+- [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
+- [Workers KV limits](https://developers.cloudflare.com/kv/platform/limits/)
+
 ---
 
 ## Funding Flow

@@ -5,6 +5,7 @@ import { claimTierInventory, recalculateStats, recalculateTierInventory } from '
 class PaginatedKVNamespace {
   store = new Map<string, string>();
   pageSize: number;
+  listCalls: Array<{ prefix: string; cursor?: string }> = [];
 
   constructor(pageSize = 2) {
     this.pageSize = pageSize;
@@ -28,6 +29,7 @@ class PaginatedKVNamespace {
   }
 
   async list({ prefix = '', cursor }: { prefix?: string; cursor?: string } = {}) {
+    this.listCalls.push({ prefix, cursor });
     const matchingKeys = Array.from(this.store.keys())
       .filter(key => key.startsWith(prefix))
       .sort();
@@ -163,5 +165,83 @@ describe('stats pagination', () => {
 
     expect(result.success).toBe(false);
     expect(result.remaining).toBe(0);
+  });
+
+  it('recalculateStats uses the campaign pledge index when available', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['1', '3']));
+    await kv.put('pledge:1', JSON.stringify({
+      orderId: '1',
+      campaignSlug: 'hand-relations',
+      subtotal: 500,
+      tierId: 'frame-slot',
+      tierQty: 1,
+      pledgeStatus: 'active'
+    }));
+    await kv.put('pledge:2', JSON.stringify({
+      orderId: '2',
+      campaignSlug: 'other-campaign',
+      subtotal: 9999,
+      tierId: 'vip-pass',
+      tierQty: 9,
+      pledgeStatus: 'active'
+    }));
+    await kv.put('pledge:3', JSON.stringify({
+      orderId: '3',
+      campaignSlug: 'hand-relations',
+      subtotal: 1000,
+      tierId: 'vip-pass',
+      tierQty: 1,
+      pledgeStatus: 'active'
+    }));
+
+    const stats = await recalculateStats(env, 'hand-relations');
+
+    expect(stats?.pledgedAmount).toBe(1500);
+    expect(stats?.pledgeCount).toBe(2);
+    expect(kv.listCalls.some((call) => call.prefix === 'pledge:')).toBe(false);
+  });
+
+  it('recalculateTierInventory uses the campaign pledge index when available', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['1', '3']));
+    await kv.put('pledge:1', JSON.stringify({
+      orderId: '1',
+      campaignSlug: 'hand-relations',
+      tierId: 'vip-pass',
+      tierQty: 1,
+      pledgeStatus: 'active',
+      charged: false
+    }));
+    await kv.put('pledge:2', JSON.stringify({
+      orderId: '2',
+      campaignSlug: 'other-campaign',
+      tierId: 'frame-slot',
+      tierQty: 20,
+      pledgeStatus: 'active',
+      charged: false
+    }));
+    await kv.put('pledge:3', JSON.stringify({
+      orderId: '3',
+      campaignSlug: 'hand-relations',
+      tierId: 'frame-slot',
+      tierQty: 1,
+      additionalTiers: [{ id: 'vip-pass', qty: 1 }],
+      pledgeStatus: 'active',
+      charged: false
+    }));
+
+    const inventory = await recalculateTierInventory(env, 'hand-relations', [
+      { id: 'vip-pass', limit_total: 2 },
+      { id: 'frame-slot', limit_total: 5 }
+    ]);
+
+    expect(inventory?.['vip-pass']).toEqual({ limit: 2, claimed: 2 });
+    expect(inventory?.['frame-slot']).toEqual({ limit: 5, claimed: 1 });
+    expect(kv.listCalls.some((call) => call.prefix === 'pledge:')).toBe(false);
   });
 });
