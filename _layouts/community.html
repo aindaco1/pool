@@ -23,12 +23,12 @@
       
       <!-- Access denied / CTA -->
       <div id="community-denied" class="community-page__denied" hidden>
-        <h1>Join the {{ campaign.title }} Community</h1>
+        <h1>Join the {{ campaign.title | escape }} Community</h1>
         <p class="community-page__denied-intro">Supporters get exclusive access to vote on creative decisions and shape the project.</p>
         
         <div class="community-page__cta-box">
           <h3>Become a Supporter</h3>
-          <p>Back <strong>{{ campaign.title }}</strong> at any tier to unlock community features including:</p>
+          <p>Back <strong>{{ campaign.title | escape }}</strong> at any tier to unlock community features including:</p>
           <ul>
             <li>Vote on key creative decisions</li>
             <li>Help shape the final project</li>
@@ -44,7 +44,7 @@
       <div id="community-content" class="community-page__content" hidden>
         <header class="community-page__header">
           <a href="{{ campaign.url }}" class="community-page__back">← Back to Campaign</a>
-          <h1>{{ campaign.title }} Community</h1>
+          <h1>{{ campaign.title | escape }} Community</h1>
           <p class="community-page__intro">As a supporter, you have a voice in shaping this project. Vote on key decisions below.</p>
         </header>
         
@@ -60,7 +60,7 @@
             {% for decision in open_decisions %}
             <div class="decision-card{% if decision.options.first.image %} decision-card--has-images{% endif %}" data-decision-id="{{ decision.id }}" data-status="{{ decision.status }}"{% if decision.deadline %} data-deadline="{{ decision.deadline }}"{% endif %}>
               <div class="decision-card__header">
-                <h3>{{ decision.title }}</h3>
+                <h3>{{ decision.title | escape }}</h3>
                 <div class="decision-card__meta">
                   <span class="decision-card__type">{{ decision.type | capitalize }}</span>
                   {% if decision.deadline %}
@@ -77,16 +77,16 @@
                   {% for option in decision.options %}
                   {% if option.label %}
                   <label class="decision-option{% if option.image %} decision-option--has-image{% endif %}">
-                    <input type="radio" name="decision-{{ decision.id }}" value="{{ option.label }}">
+                    <input type="radio" name="decision-{{ decision.id }}" value="{{ option.label | escape }}">
                     {% if option.image %}
-                    <img src="{{ option.image }}" alt="{{ option.label }}" class="decision-option__image">
+                    <img src="{{ option.image }}" alt="{{ option.label | escape }}" class="decision-option__image">
                     {% endif %}
-                    <span class="decision-option__label">{{ option.label }}</span>
+                    <span class="decision-option__label">{{ option.label | escape }}</span>
                   </label>
                   {% else %}
                   <label class="decision-option">
-                    <input type="radio" name="decision-{{ decision.id }}" value="{{ option }}">
-                    <span>{{ option }}</span>
+                    <input type="radio" name="decision-{{ decision.id }}" value="{{ option | escape }}">
+                    <span>{{ option | escape }}</span>
                   </label>
                   {% endif %}
                   {% endfor %}
@@ -104,12 +104,12 @@
                 <div class="results-bars{% if decision.options.first.image %} results-bars--images{% endif %}">
                   {% for option in decision.options %}
                   {% assign option_value = option.label | default: option %}
-                  <div class="result-bar" data-option="{{ option_value }}">
+                  <div class="result-bar" data-option="{{ option_value | escape }}">
                     {% if option.image %}
-                    <img src="{{ option.image }}" alt="{{ option_value }}" class="result-bar__image">
+                    <img src="{{ option.image }}" alt="{{ option_value | escape }}" class="result-bar__image">
                     {% endif %}
                     <div class="result-bar__label">
-                      <span class="result-bar__option">{{ option_value }}</span>
+                      <span class="result-bar__option">{{ option_value | escape }}</span>
                       <span class="result-bar__percent">0%</span>
                     </div>
                     <div class="result-bar__track">
@@ -137,7 +137,7 @@
             {% for decision in closed_decisions %}
             <div class="decision-card decision-card--closed" data-decision-id="{{ decision.id }}" data-status="{{ decision.status }}"{% if decision.winner %} data-winner="{{ decision.winner }}"{% endif %}>
               <div class="decision-card__header">
-                <h3>{{ decision.title }}</h3>
+                <h3>{{ decision.title | escape }}</h3>
                 <div class="decision-card__meta">
                   <span class="decision-card__type">{{ decision.type | capitalize }}</span>
                   <span class="decision-card__status-closed">Closed</span>
@@ -147,7 +147,7 @@
               <div class="decision-closed">
                 <div class="decision-winner">
                   <span class="decision-winner__label">Winner</span>
-                  <span class="decision-winner__value">{{ decision.winner }}</span>
+                  <span class="decision-winner__value">{{ decision.winner | escape }}</span>
                 </div>
                 <div class="decision-closed__results" data-decision-id="{{ decision.id }}">
                 </div>

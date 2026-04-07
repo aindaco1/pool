@@ -110,21 +110,37 @@
       return b[1] - a[1];
     });
 
-    var html = '<div class="closed-results">';
+    var wrapper = document.createElement('div');
+    wrapper.className = 'closed-results';
+
     sortedOptions.forEach(function(entry) {
       var option = entry[0];
       var count = entry[1];
       var percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
       var isWinner = option === winner;
-      html += '<div class="closed-result' + (isWinner ? ' closed-result--winner' : '') + '">';
-      html += '<span class="closed-result__option">' + option + '</span>';
-      html += '<span class="closed-result__stats">' + percent + '% (' + count + ' votes)</span>';
-      html += '</div>';
-    });
-    html += '<div class="closed-results__total">' + totalVotes + ' total votes</div>';
-    html += '</div>';
 
-    resultsContainer.innerHTML = html;
+      var row = document.createElement('div');
+      row.className = 'closed-result' + (isWinner ? ' closed-result--winner' : '');
+
+      var optionNode = document.createElement('span');
+      optionNode.className = 'closed-result__option';
+      optionNode.textContent = option;
+
+      var statsNode = document.createElement('span');
+      statsNode.className = 'closed-result__stats';
+      statsNode.textContent = percent + '% (' + count + ' votes)';
+
+      row.appendChild(optionNode);
+      row.appendChild(statsNode);
+      wrapper.appendChild(row);
+    });
+
+    var totalNode = document.createElement('div');
+    totalNode.className = 'closed-results__total';
+    totalNode.textContent = totalVotes + ' total votes';
+    wrapper.appendChild(totalNode);
+
+    resultsContainer.replaceChildren(wrapper);
   }
 
   async function loadVoteStatus() {

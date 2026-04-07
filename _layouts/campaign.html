@@ -8,12 +8,12 @@
   {% include first-party-campaign-csp-strict.html %}
   {% endif %}
   {% include cart-head.html %}
-  <title>{{ page.title }} · {{ site.title }}</title>
-  <meta property="og:title" content="{{ page.title }} · {{ site.title }}">
+  <title>{{ page.title | escape }} · {{ site.title | escape }}</title>
+  <meta property="og:title" content="{{ page.title | escape }} · {{ site.title | escape }}">
   <meta property="og:type" content="website">
   <meta property="og:url" content="{{ site.url }}{{ page.url }}">
   {% if page.hero_image %}<meta property="og:image" content="{{ site.url }}{{ page.hero_image }}">{% endif %}
-  {% if page.short_blurb %}<meta property="og:description" content="{{ page.short_blurb | strip_html }}">{% endif %}
+  {% if page.short_blurb %}<meta property="og:description" content="{{ page.short_blurb | strip_html | escape }}">{% endif %}
   <meta name="twitter:card" content="summary_large_image">
 </head>
 <body>
@@ -26,9 +26,9 @@
     </div>
     {% endif %}
     <header class="campaign-header">
-      <h1>{{ page.title }}</h1>
+      <h1>{{ page.title | escape }}</h1>
       {% if page.short_blurb %}
-        <p class="campaign-blurb">{{ page.short_blurb }}</p>
+        <p class="campaign-blurb">{{ page.short_blurb | escape }}</p>
       {% endif %}
       {% if page.goal_deadline %}
       {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
@@ -127,9 +127,9 @@
             </div>
           {% endif %}
         {% elsif page.hero_image_wide %}
-        <img src="{{ page.hero_image_wide }}" alt="{{ page.title }}">
+        <img src="{{ page.hero_image_wide }}" alt="{{ page.title | escape }}">
         {% elsif page.hero_image %}
-        <img src="{{ page.hero_image }}" alt="{{ page.title }}">
+        <img src="{{ page.hero_image }}" alt="{{ page.title | escape }}">
         {% endif %}
         {% assign progress_pledged = page.pledged_amount | default: 0 | plus: 0 %}
         {% include progress.html campaign_slug=page.slug pledged=progress_pledged goal=page.goal_amount deadline=page.goal_deadline stretch_goals=page.stretch_goals stretch_hidden=page.stretch_hidden state=page.state progress_background=page.progress_background %}
@@ -174,17 +174,17 @@
       <div class="campaign-facts">
         {% if page.creator_image %}
           <div class="campaign-facts__creator">
-            <img src="{{ page.creator_image }}" alt="{{ page.creator_name | default: 'Creator' }}">
-            <span>{{ page.creator_name | default: "Dust Wave" }}</span>
+            <img src="{{ page.creator_image }}" alt="{{ page.creator_name | default: 'Creator' | escape }}">
+            <span>{{ page.creator_name | default: "Dust Wave" | escape }}</span>
           </div>
         {% endif %}
         <dl>
           {% unless page.creator_image %}
           <dt>Creator</dt>
-          <dd>{{ page.creator_name | default: "Dust Wave" }}</dd>
+          <dd>{{ page.creator_name | default: "Dust Wave" | escape }}</dd>
           {% endunless %}
           <dt>Category</dt>
-          <dd>{{ page.category | default: "Feature Film" }}</dd>
+          <dd>{{ page.category | default: "Feature Film" | escape }}</dd>
           {% if page.state == 'live' %}
           <dt>How Pledging Works</dt>
           <dd>All-or-nothing: Your card is saved but not charged now. You'll only be charged if this campaign reaches its goal by {{ page.goal_deadline | date: "%b %-d, %Y" }}.</dd>

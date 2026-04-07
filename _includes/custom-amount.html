@@ -42,7 +42,7 @@
       type="button"
       {% if disabled %}disabled aria-disabled="true"{% endif %}
       data-item-id="{{ include.campaign.slug }}__custom-support"
-      data-item-name="{{ include.campaign.title }} — Custom Support"
+      data-item-name="{{ include.campaign.title | escape }} — Custom Support"
       data-item-price="25"
       data-item-url="{{ site.url }}{{ include.campaign.url }}#custom-amount"
       data-item-description="Pledge (charged only if funded) — No reward"

@@ -46,6 +46,24 @@ function renderCommunityPageWithDecision() {
   `;
 }
 
+function renderCommunityPageWithClosedDecision() {
+  document.body.innerHTML = `
+    <div id="community-loading"></div>
+    <div id="community-denied" hidden></div>
+    <div id="community-content" hidden>
+      <div class="decision-card decision-card--closed" data-decision-id="villain-name" data-status="closed">
+        <div class="decision-closed">
+          <div class="decision-closed__results" data-decision-id="villain-name"></div>
+        </div>
+      </div>
+    </div>
+    <script
+      data-community-page-script="true"
+      data-worker-base="https://worker.test"
+      data-campaign-slug="demo"></script>
+  `;
+}
+
 describe('community page script', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -162,6 +180,58 @@ describe('community page script', () => {
     const fill = document.querySelector('.result-bar__fill') as HTMLElement;
     expect(fill.classList.contains('result-bar__fill--w-75')).toBe(true);
     expect(fill.style.width).toBe('');
+
+    consoleLog.mockRestore();
+    consoleError.mockRestore();
+  });
+
+  it('renders closed results without interpreting option labels as HTML', async () => {
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    window.history.replaceState({}, '', '/community/?t=token-789');
+    renderCommunityPageWithClosedDecision();
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://worker.test/pledge?token=token-789') {
+        return new Response(JSON.stringify({
+          campaignSlug: 'demo',
+          pledgeStatus: 'active'
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (url === 'https://worker.test/votes?token=token-789&decisions=villain-name') {
+        return new Response(JSON.stringify({
+          decisions: {
+            'villain-name': {
+              hasVoted: false,
+              userChoice: null,
+              totalVotes: 1,
+              results: { '<img src=x onerror=alert(1)>': 1 }
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error('Unexpected fetch: ' + url);
+    }) as typeof fetch;
+
+    await import('../../assets/js/community-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('community-content')?.hidden).toBe(false);
+      expect(document.querySelector('.closed-result__option')?.textContent).toBe('<img src=x onerror=alert(1)>');
+    });
+
+    expect(document.querySelector('.decision-closed__results img')).toBeNull();
+    expect(document.querySelector('.decision-closed__results .closed-results__total')?.textContent).toBe('1 total votes');
 
     consoleLog.mockRestore();
     consoleError.mockRestore();

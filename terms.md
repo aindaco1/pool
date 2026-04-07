@@ -13,6 +13,7 @@ title: Terms & Creative Guidelines
 - **No account required** — manage your pledge entirely via email links.
 - A single checkout may include more than one campaign, but each campaign is stored and managed as its own pledge after checkout.
 - All campaign deadlines use Mountain Time (MST/MDT).
+- Community votes are limited to the published options on a campaign's supporter page, and closed decisions do not accept new votes.
 
 ## Payment Processing
 

@@ -368,6 +368,8 @@ Supporter-only community page:
 - On failure (cancelled pledge, expired token): Clears cookies, shows access denied CTA
 - Shows voting/polling decisions exclusive to backers
 - `/votes` API returns 403 for cancelled pledges (double-checks access)
+- `/votes` only accepts campaign-defined decision IDs and campaign-defined option values
+- Closed decisions stay readable but reject new votes
 - Votes are keyed by **email** (not orderId) — supporters with multiple pledges still get one vote per decision
 
 ---

@@ -832,12 +832,12 @@
       const hasPhysicalItems = cartHasPhysicalItems(items);
       const checkoutLineItems = buildCheckoutLineItems(items);
       const checkoutErrorMarkup = checkoutUiState.error ? `
-        <p class="pool-first-party-cart__error" role="alert">${checkoutUiState.error}</p>
+        <p class="pool-first-party-cart__error" role="alert">${escapeHtml(checkoutUiState.error)}</p>
       ` : '';
       const itemMarkup = items.length > 0 ? items.map((item) => `
         <li class="pool-first-party-cart__item" data-item-id="${item.uniqueId}">
           <div class="pool-first-party-cart__item-main">
-            <strong class="pool-first-party-cart__item-name">${item.name || item.id || 'Untitled item'}</strong>
+            <strong class="pool-first-party-cart__item-name">${escapeHtml(item.name || item.id || 'Untitled item')}</strong>
             ${(item.stackable === true || (item.quantity || 1) > 1)
               ? `<span class="pool-first-party-cart__item-meta">Qty ${item.quantity || 1}</span>`
               : ''}
@@ -853,10 +853,10 @@
       const cartEstimateMarkup = items.length > 0 ? `
         <div class="pool-first-party-cart__tip-box">
           <div class="pool-first-party-cart__tip-header">
-            <strong>Tip ${getPlatformName()} for platform maintenance.</strong>
+            <strong>Tip ${escapeHtml(getPlatformName())} for platform maintenance.</strong>
             <span data-cart-tip-amount>${formatCents(pricing.tipAmountCents)}</span>
           </div>
-          <p class="pool-first-party-cart__tip-copy">${getPlatformName()} has a 0% platform fee for organizers. Optional tips help keep the platform sustainable for creators.</p>
+          <p class="pool-first-party-cart__tip-copy">${escapeHtml(getPlatformName())} has a 0% platform fee for organizers. Optional tips help keep the platform sustainable for creators.</p>
           <div class="pool-first-party-cart__tip-controls">
             <input
               class="pool-first-party-cart__tip-slider"
@@ -880,7 +880,7 @@
             </div>
             ${pricing.tipAmountCents > 0 ? `
               <div class="pool-first-party-cart__summary-row" data-cart-summary-tip-row>
-                <span data-cart-summary-tip-label>${getPlatformName()} tip (${pricing.tipPercent}%)</span>
+                <span data-cart-summary-tip-label>${escapeHtml(getPlatformName())} tip (${pricing.tipPercent}%)</span>
                 <strong data-cart-summary-tip-amount>${formatCents(pricing.tipAmountCents)}</strong>
               </div>
             ` : ''}
@@ -910,7 +910,7 @@
                 ${checkoutLineItems.map((item) => `
                   <li class="pool-first-party-cart__line-item">
                     <div>
-                      <strong class="pool-first-party-cart__line-item-name">${item.name}</strong>
+                      <strong class="pool-first-party-cart__line-item-name">${escapeHtml(item.name)}</strong>
                       ${item.showQuantity ? `<span>Qty ${item.quantity}</span>` : ''}
                     </div>
                     <strong class="pool-first-party-cart__line-item-amount">${formatCents(item.amountCents)}</strong>
@@ -925,7 +925,7 @@
               </div>
               ${pricing.tipAmountCents > 0 ? `
                 <div class="pool-first-party-cart__summary-row">
-                  <span>${getPlatformName()} tip (${pricing.tipPercent}%)</span>
+                  <span>${escapeHtml(getPlatformName())} tip (${pricing.tipPercent}%)</span>
                   <strong>${formatCents(pricing.tipAmountCents)}</strong>
                 </div>
               ` : ''}

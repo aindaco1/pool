@@ -18,7 +18,7 @@ This protects both backers and creators: you only pay for projects that can actu
 Unlike other platforms, The Pool doesn't require you to create an account. When you pledge, you receive email links to:
 
 - **Manage your pledge** — cancel, modify amount, or update your payment method
-- **Access the supporter community** — vote on creative decisions and see exclusive updates
+- **Access the supporter community** — vote on published creative decisions and see exclusive updates
 
 If your checkout includes more than one campaign, you may receive separate confirmation emails and manage links for each campaign. Just save those emails. They are your keys.
 
@@ -39,7 +39,7 @@ The Pool is designed for filmmakers and creative projects with features like:
 - **Physical & digital tiers** — Offer tangible rewards with automatic shipping address collection and configurable flat-rate shipping
 - **Production phases** — Break your budget into phases supporters can fund directly
 - **Stretch goals** — Unlock additional creative possibilities as funding grows
-- **Community decisions** — Let your backers vote on creative choices
+- **Community decisions** — Let your backers vote on published creative choices
 - **Production diary** — Keep your community engaged with updates
 - **Ongoing support** — Accept contributions after your main campaign ends
 

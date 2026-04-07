@@ -19,7 +19,8 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Campaign lifecycle** — `upcoming` → `live` → `post` states with automatic transitions + Cloudflare cache purge
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
 - **Production phases & registry** — Tabbed interface for itemized funding needs
-- **Community decisions** — Voting/polling for backer engagement
+- **Community decisions** — Voting/polling for backer engagement with published option allowlists and closed-decision lockout
+- **Escaped campaign content surfaces** — Campaign-authored titles, labels, and descriptions render as text in cart, manage, and community UIs for safer forks/CMS imports
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
 - **Announcements** — Admin broadcast emails with custom CTA links to supporters
 - **Instagram integration** — Optional social CTA in supporter emails

@@ -90,7 +90,9 @@ if (token.startsWith('dev-token-')) {
 }
 ```
 
-**Note:** Votes are keyed by **email** (not orderId) to prevent supporters with multiple pledges from voting multiple times.
+**Note:** Votes are keyed by **email** (not orderId) to prevent supporters with multiple pledges from voting multiple times. The Worker also resolves campaign decisions server-side, rejects unknown/closed decisions, and only accepts option values from the campaign's published allowlist.
+
+Campaign-authored titles, descriptions, and support labels are also escaped by default in supporter-facing cart, manage, and community surfaces so forks with creator-editable content do not inherit a stored-XSS footgun by default.
 
 ---
 

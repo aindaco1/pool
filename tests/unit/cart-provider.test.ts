@@ -689,6 +689,59 @@ describe('cart provider shim', () => {
     expect(window.location.hash).not.toBe('#stripe-checkout');
   });
 
+  it('escapes cart item names and checkout errors in the drawer UI', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      workerBase: WORKER_BASE,
+      platformName: '<img src=x onerror=alert(1)> Pool'
+    };
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      error: '<svg onload=alert(2)>'
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    })));
+
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'demo__featured-tier',
+      name: '<img src=x onerror=alert(3)> Tier',
+      price: 25,
+      quantity: 1,
+      url: '/campaigns/demo/'
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    if (!root) throw new Error('Missing cart root');
+
+    expect(root.textContent).toContain('<img src=x onerror=alert(3)> Tier');
+    expect(root.textContent).toContain('Tip <img src=x onerror=alert(1)> Pool for platform maintenance.');
+    expect(root.querySelector('img[src="x"]')).toBeNull();
+    expect(root.querySelector('svg')).toBeNull();
+
+    const continueButton = root.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    const startCheckoutButton = root.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
+    if (!startCheckoutButton) throw new Error('Missing checkout start button');
+    startCheckoutButton.click();
+
+    await vi.waitFor(() => {
+      expect(root.textContent).toContain('<svg onload=alert(2)>');
+    });
+    expect(root.querySelector('svg')).toBeNull();
+  });
+
   it('submits mixed-campaign checkout payloads to the Worker', async () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',

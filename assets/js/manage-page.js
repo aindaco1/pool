@@ -51,6 +51,29 @@
     });
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value);
+  }
+
+  function appendTextElement(parent, tagName, text, className = '') {
+    const node = document.createElement(tagName);
+    if (className) {
+      node.className = className;
+    }
+    node.textContent = text;
+    parent.appendChild(node);
+    return node;
+  }
+
   function calculateTax(subtotalCents) {
     return Math.round(subtotalCents * SALES_TAX_RATE);
   }
@@ -720,7 +743,13 @@
   function showConfirmModal(message, details, onConfirm) {
     const modal = document.getElementById('confirm-modal');
     document.getElementById('confirm-modal-message').textContent = message;
-    document.getElementById('confirm-modal-details').innerHTML = details;
+    const detailsNode = document.getElementById('confirm-modal-details');
+    detailsNode.replaceChildren();
+    if (details instanceof Node) {
+      detailsNode.appendChild(details);
+    } else if (details) {
+      detailsNode.textContent = String(details);
+    }
     pendingConfirmCallback = onConfirm;
     modal.hidden = false;
   }
@@ -864,9 +893,9 @@
                         ${isCurrent ? 'checked' : ''}
                         ${isDisabled ? 'disabled' : ''}>
                       <div class="tier-option__content">
-                        <strong>${tier.name}</strong>
+                        <strong>${escapeHtml(tier.name)}</strong>
                         <span class="tier-option__price">${formatPrice(tier.price)}${isStackable ? ' each' : ''}</span>
-                        ${tier.description ? `<p class="tier-option__desc">${tier.description}</p>` : ''}
+                        ${tier.description ? `<p class="tier-option__desc">${escapeHtml(tier.description)}</p>` : ''}
                         ${isDisabled ? '<span class="tier-option__badge tier-option__badge--soldout">Sold Out</span>' : ''}
                         ${
                           isStackable && !isDisabled
@@ -925,9 +954,9 @@
                         ${isPledged ? 'checked' : ''}
                         ${isDisabled && !isPledged ? 'disabled' : ''}>
                       <div class="tier-option__content">
-                        <strong>${tier.name}</strong>
+                        <strong>${escapeHtml(tier.name)}</strong>
                         <span class="tier-option__price">${formatPrice(tier.price)}${isStackable ? ' each' : ''}</span>
-                        ${tier.description ? `<p class="tier-option__desc">${tier.description}</p>` : ''}
+                        ${tier.description ? `<p class="tier-option__desc">${escapeHtml(tier.description)}</p>` : ''}
                         ${isPledged ? '<span class="tier-option__badge">Pledged</span>' : ''}
                         ${isDisabled && !isPledged ? '<span class="tier-option__badge tier-option__badge--soldout">Sold Out</span>' : ''}
                         ${
@@ -971,23 +1000,23 @@
                 const progressPct =
                   item.target > 0 ? Math.min(100, Math.round((itemCurrent / item.target) * 100)) : 0;
                 return `
-                  <div class="support-option-item ${currentAmount > 0 ? 'support-option-item--active' : ''}" data-support-id="${item.id}">
+                  <div class="support-option-item ${currentAmount > 0 ? 'support-option-item--active' : ''}" data-support-id="${escapeAttribute(item.id)}">
                     <div class="support-option-item__info">
                       <div class="support-option-item__header">
-                        <strong>${item.label}</strong>
+                        <strong>${escapeHtml(item.label)}</strong>
                         <span class="support-option-item__amount">${formatPrice(itemCurrent)} / ${formatPrice(item.target)}</span>
                       </div>
                       <div class="support-option-item__progress">
                         <span data-progress-width="${progressPct}"></span>
                       </div>
-                      ${item.need ? `<p class="support-option-item__desc">${item.need}</p>` : ''}
+                      ${item.need ? `<p class="support-option-item__desc">${escapeHtml(item.need)}</p>` : ''}
                     </div>
                     <div class="support-option-item__input">
                       <span class="input-prefix">$</span>
                       <input type="number"
                         name="support-amount-${index}"
-                        data-support-id="${item.id}"
-                        data-label="${item.label}"
+                        data-support-id="${escapeAttribute(item.id)}"
+                        data-label="${escapeAttribute(item.label)}"
                         data-current="${currentAmount}"
                         value="${currentAmount || ''}"
                         placeholder="${remaining > 0 ? remaining : '0'}"
@@ -1131,7 +1160,7 @@
       <div class="${cardClasses.join(' ')}" data-pledge-index="${index}" data-original-amount="${pledge.amount}" data-current-tier="${currentTierId || ''}" data-current-tier-qty="${pledge.tierQty || 1}" data-campaign-slug="${campaign?.slug || pledge.campaignSlug}">
         <div class="pledge-card__header">
           <div class="pledge-card__header-top">
-            <a href="/campaigns/${pledge.campaignSlug}/" class="pledge-card__campaign">${campaign?.title || pledge.campaignSlug}</a>
+            <a href="/campaigns/${pledge.campaignSlug}/" class="pledge-card__campaign">${escapeHtml(campaign?.title || pledge.campaignSlug)}</a>
             <span class="pledge-card__status status--${statusClass}">${statusLabel}</span>
           </div>
           ${renderCountdown(campaignWithLiveStats)}
@@ -1667,9 +1696,28 @@
       const btn = e.target;
       const errorEl = document.getElementById(`error-${index}`);
       const currentQty = pledge.tierQty || 1;
-      let detailsHtml = '';
+      const detailsFragment = document.createDocumentFragment();
       const originalSubtotal = getPledgeSubtotal(pledge);
       let newSubtotal = originalSubtotal;
+
+      function appendSectionTitle(text) {
+        const p = document.createElement('p');
+        const strong = document.createElement('strong');
+        strong.textContent = text;
+        p.appendChild(strong);
+        detailsFragment.appendChild(p);
+      }
+
+      function appendDetailParagraph(text) {
+        appendTextElement(detailsFragment, 'p', text);
+      }
+
+      function appendDetailList(title, items) {
+        appendSectionTitle(title);
+        const list = document.createElement('ul');
+        items.forEach((item) => appendTextElement(list, 'li', item));
+        detailsFragment.appendChild(list);
+      }
 
       const tierChanged = isSingleTier && selectedTierId !== currentTierId;
       const qtyChanged = isSingleTier && selectedTierQty !== currentQty;
@@ -1685,11 +1733,13 @@
         const newTierAmount = newTier.price * selectedTierQty * 100;
         const tierDiff = newTierAmount - oldTierAmount;
         newSubtotal = originalSubtotal + tierDiff;
-        detailsHtml = `
-          <p><strong>Updating pledge</strong></p>
-          <p>From: ${oldTier?.name || 'Unknown'} × ${currentQty} (${formatMoney(oldTierAmount)})</p>
-          <p>To: ${newTier?.name} × ${selectedTierQty} (${formatMoney(newTierAmount)})</p>
-        `;
+        appendSectionTitle('Updating pledge');
+        appendDetailParagraph(
+          `From: ${oldTier?.name || 'Unknown'} × ${currentQty} (${formatMoney(oldTierAmount)})`
+        );
+        appendDetailParagraph(
+          `To: ${newTier?.name} × ${selectedTierQty} (${formatMoney(newTierAmount)})`
+        );
       } else if (!isSingleTier) {
         const originalTierQuantities = {};
         if (currentTierId) {
@@ -1715,17 +1765,15 @@
         newSubtotal = originalSubtotal + tierDiff;
 
         if (selectedAddTiers.length > 0) {
-          detailsHtml = `
-            <p><strong>Updated tiers</strong></p>
-            <ul>${selectedAddTiers
-              .map((tier) => {
-                const foundTier = campaign.tiers.find((entry) => entry.id === tier.id);
-                return `<li>${foundTier?.name || tier.id} × ${tier.qty || 1} = ${formatMoney(tier.price * (tier.qty || 1) * 100)}</li>`;
-              })
-              .join('')}</ul>
-          `;
+          appendDetailList(
+            'Updated tiers',
+            selectedAddTiers.map((tier) => {
+              const foundTier = campaign.tiers.find((entry) => entry.id === tier.id);
+              return `${foundTier?.name || tier.id} × ${tier.qty || 1} = ${formatMoney(tier.price * (tier.qty || 1) * 100)}`;
+            })
+          );
         } else {
-          detailsHtml = '<p><strong>All tiers removed</strong></p>';
+          appendSectionTitle('All tiers removed');
         }
       }
 
@@ -1736,17 +1784,14 @@
           0
         );
         newSubtotal += supportDiff;
-        detailsHtml += `
-          <p><strong>Support item changes</strong></p>
-          <ul>${selectedSupportItems
-            .map((supportItem) => {
-              const diff = supportItem.amount - (supportItem.currentAmount || 0);
-              const diffStr =
-                diff >= 0 ? `+${formatMoney(diff * 100)}` : formatMoney(diff * 100);
-              return `<li>${supportItem.label}: ${formatMoney((supportItem.currentAmount || 0) * 100)} → ${formatMoney(supportItem.amount * 100)} (${diffStr})</li>`;
-            })
-            .join('')}</ul>
-        `;
+        appendDetailList(
+          'Support item changes',
+          selectedSupportItems.map((supportItem) => {
+            const diff = supportItem.amount - (supportItem.currentAmount || 0);
+            const diffStr = diff >= 0 ? `+${formatMoney(diff * 100)}` : formatMoney(diff * 100);
+            return `${supportItem.label}: ${formatMoney((supportItem.currentAmount || 0) * 100)} → ${formatMoney(supportItem.amount * 100)} (${diffStr})`;
+          })
+        );
       }
 
       if (hasCustomAmountChange) {
@@ -1754,10 +1799,10 @@
         newSubtotal += customDiff;
         const customDiffStr =
           customDiff >= 0 ? `+${formatMoney(customDiff)}` : formatMoney(customDiff);
-        detailsHtml += `
-          <p><strong>Custom support</strong></p>
-          <p>${formatMoney(currentCustomAmountVal * 100)} → ${formatMoney(selectedCustomAmount * 100)} (${customDiffStr})</p>
-        `;
+        appendSectionTitle('Custom support');
+        appendDetailParagraph(
+          `${formatMoney(currentCustomAmountVal * 100)} → ${formatMoney(selectedCustomAmount * 100)} (${customDiffStr})`
+        );
       }
 
       const campaignTiers = campaign?.tiers || [];
@@ -1775,17 +1820,26 @@
       const newTipAmount = calculatePlatformTip(newSubtotal, selectedTipPercent);
       const newTax = calculateTax(newSubtotal);
       const newTotalWithTax = newSubtotal + newTax + confirmShipping + newTipAmount;
-      detailsHtml += `
-        <p class="confirm-totals">
-          <span>Subtotal: ${formatMoney(newSubtotal)}</span>
-          ${newTipAmount > 0 ? `<span>${PLATFORM_NAME} tip (${selectedTipPercent}%): ${formatMoney(newTipAmount)}</span>` : ''}
-          <span>${getSalesTaxLabel()}: ${formatMoney(newTax)}</span>
-          ${confirmShipping > 0 ? `<span>Shipping (USPS): ${formatMoney(confirmShipping)}</span>` : ''}
-          <strong>Total: ${formatMoney(newTotalWithTax)}</strong>
-        </p>
-      `;
+      const totalsNode = document.createElement('p');
+      totalsNode.className = 'confirm-totals';
+      appendTextElement(totalsNode, 'span', `Subtotal: ${formatMoney(newSubtotal)}`);
+      if (newTipAmount > 0) {
+        appendTextElement(
+          totalsNode,
+          'span',
+          `${PLATFORM_NAME} tip (${selectedTipPercent}%): ${formatMoney(newTipAmount)}`
+        );
+      }
+      appendTextElement(totalsNode, 'span', `${getSalesTaxLabel()}: ${formatMoney(newTax)}`);
+      if (confirmShipping > 0) {
+        appendTextElement(totalsNode, 'span', `Shipping (USPS): ${formatMoney(confirmShipping)}`);
+      }
+      const totalStrong = document.createElement('strong');
+      totalStrong.textContent = `Total: ${formatMoney(newTotalWithTax)}`;
+      totalsNode.appendChild(totalStrong);
+      detailsFragment.appendChild(totalsNode);
 
-      showConfirmModal('Are you sure you want to update your pledge?', detailsHtml, async () => {
+      showConfirmModal('Are you sure you want to update your pledge?', detailsFragment, async () => {
         btn.disabled = true;
         btn.textContent = 'Saving...';
         errorEl.hidden = true;

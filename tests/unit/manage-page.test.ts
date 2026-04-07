@@ -242,6 +242,68 @@ describe('manage page script', () => {
     });
   });
 
+  it('escapes campaign-authored content in pledge cards and confirm modal details', async () => {
+    mockManageFetch({
+      campaigns: [
+        {
+          ...baseCampaign,
+          title: '<img src=x onerror=alert(1)> Campaign',
+          tiers: [
+            {
+              id: 'frame-slot',
+              name: '<svg onload=alert(1)>Tier',
+              description: '<img src=x onerror=alert(2)>',
+              price: 10,
+              category: 'digital',
+              stackable: false
+            }
+          ],
+          support_items: [
+            {
+              id: 'lab',
+              label: '<img src=x onerror=alert(3)> Lab',
+              need: '<svg onload=alert(4)>',
+              current: 0,
+              target: 100,
+              late_support: false
+            }
+          ]
+        }
+      ]
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    expect(document.querySelector('.pledge-card__campaign')?.textContent).toContain('<img src=x onerror=alert(1)> Campaign');
+    expect(document.querySelector('.tier-option__desc')?.textContent).toBe('<img src=x onerror=alert(2)>');
+    expect(document.querySelector('.support-option-item__desc')?.textContent).toBe('<svg onload=alert(4)>');
+    expect(document.querySelector('.pledge-card img[src="x"]')).toBeNull();
+    expect(document.querySelector('.pledge-card svg')).toBeNull();
+
+    const supportInput = getInput('input[name="support-amount-0"]');
+    supportInput.value = '5';
+    supportInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(getButton('[data-action="save"][data-index="0"]').disabled).toBe(false);
+    });
+
+    getButton('[data-action="save"][data-index="0"]').click();
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('confirm-modal')?.hidden).toBe(false);
+      expect(document.getElementById('confirm-modal-details')?.textContent).toContain('<img src=x onerror=alert(3)> Lab');
+    });
+
+    expect(document.querySelector('#confirm-modal-details img')).toBeNull();
+    expect(document.querySelector('#confirm-modal-details svg')).toBeNull();
+  });
+
   it('cancels a pledge after confirmation', async () => {
     const fetchMock = mockManageFetch();
     window.history.replaceState({}, '', '/manage/?t=token-123');

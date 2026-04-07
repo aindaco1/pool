@@ -27,7 +27,7 @@
     <div class="support-item" id="support-{{ item.id }}"{% if is_late_support_item %} data-late-support="true"{% endif %}>
       <div class="support-item__info">
         <div class="support-item__header">
-          <strong>{{ item.label }}</strong>
+          <strong>{{ item.label | escape }}</strong>
           <span class="support-item__amount"><span data-live-current>{{ current_amount | money }}</span> / {{ item.target | money }}</span>
         </div>
         <div class="support-item__progress">
@@ -37,7 +37,7 @@
           <span data-progress-width="{{ percent }}"></span>
         </div>
         {% if item.need %}
-          <p class="support-item__need">{{ item.need }}</p>
+          <p class="support-item__need">{{ item.need | escape }}</p>
         {% endif %}
       </div>
       <div class="support-item__actions">
@@ -59,7 +59,7 @@
           id="support-btn-{{ item.id }}"
           {% if item_disabled or remaining <= 0 %}disabled aria-disabled="true"{% endif %}
           data-item-id="{{ include.campaign.slug }}__support__{{ item.id }}"
-          data-item-name="{{ include.campaign.title }} — {{ item.label }}"
+          data-item-name="{{ include.campaign.title | escape }} — {{ item.label | escape }}"
           data-item-price="{{ remaining }}"
           data-item-url="{{ site.url }}{{ include.campaign.url }}#support-{{ item.id }}"
           data-item-description=""

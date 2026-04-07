@@ -6,13 +6,39 @@
  */
 
 import { verifyToken } from '../token.js';
-import { getVoteStatus, castVote, getCampaignResults } from '../votes.js';
-import { isValidVoteOption, isValidDecisionId, isValidSlug, jsonResponse } from '../validation.js';
+import { castVote, getCampaignResults, getDecisionDefinition, getDecisionOptionValues } from '../votes.js';
+import { isValidVoteOption, isValidDecisionId, jsonResponse } from '../validation.js';
+import { getCampaign } from '../campaigns.js';
 
 function getAppMode(env = {}) {
   return String(env.APP_MODE || env.SNIPCART_MODE || 'live').trim().toLowerCase() === 'test'
     ? 'test'
     : 'live';
+}
+
+function buildDecisionContext(campaign, decisionIds) {
+  if (!campaign) {
+    return { error: 'Campaign not found', status: 404 };
+  }
+
+  if (!Array.isArray(campaign.decisions) || campaign.decisions.length === 0) {
+    return { error: 'Campaign has no community decisions', status: 404 };
+  }
+
+  const decisions = [];
+  for (const decisionId of decisionIds) {
+    const definition = getDecisionDefinition(campaign, decisionId);
+    if (!definition) {
+      return { error: `Unknown decision: ${decisionId}`, status: 400 };
+    }
+    decisions.push({
+      id: decisionId,
+      definition,
+      allowedOptions: getDecisionOptionValues(definition)
+    });
+  }
+
+  return { decisions };
 }
 
 /**
@@ -79,9 +105,15 @@ export async function handleGetVotes(request, env) {
     }
   }
   
+  const campaign = await getCampaign(env, campaignSlug);
+  const decisionContext = buildDecisionContext(campaign, decisionIds);
+  if (decisionContext.error) {
+    return jsonResponse({ error: decisionContext.error }, decisionContext.status, env);
+  }
+
   const results = await getCampaignResults(env, {
     campaignSlug,
-    decisionIds,
+    decisions: decisionContext.decisions,
     email
   });
   
@@ -149,12 +181,28 @@ export async function handlePostVote(request, env) {
     }
   }
   
+  const campaign = await getCampaign(env, campaignSlug);
+  const decisionContext = buildDecisionContext(campaign, [decisionId]);
+  if (decisionContext.error) {
+    return jsonResponse({ error: decisionContext.error }, decisionContext.status, env);
+  }
+
+  const [{ definition, allowedOptions }] = decisionContext.decisions;
+  if (definition.status !== 'open') {
+    return jsonResponse({ error: 'Voting is closed for this decision' }, 409, env);
+  }
+
+  if (!allowedOptions.includes(option)) {
+    return jsonResponse({ error: 'Invalid vote option' }, 400, env);
+  }
+
   // Cast vote
   const result = await castVote(env, {
     campaignSlug,
     decisionId,
     email,
-    option
+    option,
+    allowedOptions
   });
   
   if (!result.success) {

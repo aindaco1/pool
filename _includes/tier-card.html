@@ -34,10 +34,10 @@
   </div>
   {% endif %}
   {% if include.tier.image %}
-    <img src="{{ include.tier.image }}" alt="{{ include.tier.name }}" class="tier-card__image">
+    <img src="{{ include.tier.image }}" alt="{{ include.tier.name | escape }}" class="tier-card__image">
   {% endif %}
-  <h3>{{ include.tier.name }} — {{ include.tier.price | money }}</h3>
-  <p>{{ include.tier.description }}</p>
+  <h3>{{ include.tier.name | escape }} — {{ include.tier.price | money }}</h3>
+  <p>{{ include.tier.description | escape }}</p>
   {% if include.tier.limit_total %}
     <p class="limit">Limit: <span data-live-limit>{{ include.tier.limit_total }}</span> · Remaining: <span data-live-remaining>{{ include.tier.remaining }}</span></p>
   {% endif %}
@@ -46,7 +46,7 @@
     class="{{ cart_add_item_classes }}"
     {% if disabled %}disabled aria-disabled="true"{% endif %}
     data-item-id="{{ include.campaign.slug }}__{{ include.tier.id }}"
-    data-item-name="{{ include.campaign.title }} — {{ include.tier.name }}"
+    data-item-name="{{ include.campaign.title | escape }} — {{ include.tier.name | escape }}"
     data-item-price="{{ include.tier.price }}"
     data-item-url="{{ site.url }}{{ include.campaign.url }}#tier-{{ include.tier.id }}"
     data-item-description="{{ include.tier.description | escape }}"

@@ -22,7 +22,7 @@
   
   <ul class="ongoing-list">
     {% for item in include.ongoing_items %}
-      <li>{{ item.label }} — {{ item.remaining | money }} remaining</li>
+      <li>{{ item.label | escape }} — {{ item.remaining | money }} remaining</li>
     {% endfor %}
   </ul>
 </section>

@@ -7,13 +7,13 @@
   {% endif %}
   {% if include.campaign.hero_image %}
   <a href="{{ include.campaign.url }}" class="campaign-card__image-link">
-    <img src="{{ include.campaign.hero_image }}" alt="{{ include.campaign.title }}">
+    <img src="{{ include.campaign.hero_image }}" alt="{{ include.campaign.title | escape }}">
   </a>
   {% endif %}
   
   <div class="campaign-card__content">
-    <h2><a href="{{ include.campaign.url }}">{{ include.campaign.title }}</a></h2>
-    <p class="campaign-card__blurb">{{ include.campaign.short_blurb }}</p>
+    <h2><a href="{{ include.campaign.url }}">{{ include.campaign.title | escape }}</a></h2>
+    <p class="campaign-card__blurb">{{ include.campaign.short_blurb | escape }}</p>
     {% include progress.html campaign_slug=include.campaign.slug pledged=0 goal=include.campaign.goal_amount deadline=include.campaign.goal_deadline start_date=include.campaign.start_date state=include.campaign.state progress_background=include.campaign.progress_background %}
     
     {% if include.campaign.featured_tier_id %}
@@ -30,7 +30,7 @@
         {% if show_button %}
         <button class="campaign-card__featured-tier {{ cart_add_item_classes }}"
                 data-item-id="{{ include.campaign.slug }}__{{ featured.id }}"
-                data-item-name="{{ include.campaign.title }} — {{ featured.name }}"
+                data-item-name="{{ include.campaign.title | escape }} — {{ featured.name | escape }}"
                 data-item-price="{{ featured.price }}"
                 data-item-url="{{ site.url }}{{ include.campaign.url }}#tier-{{ featured.id }}"
                 data-item-description="Pledge (charged only if funded) — {{ featured.description | escape }}"
@@ -48,13 +48,13 @@
                 {% for field in featured.fields %}
                 data-item-custom{{ forloop.index | plus: 2 }}-name="{{ field.name | slugify }}"
                 data-item-custom{{ forloop.index | plus: 2 }}-type="{{ field.type }}"
-                data-item-custom{{ forloop.index | plus: 2 }}-placeholder="{{ field.name }}"
+                data-item-custom{{ forloop.index | plus: 2 }}-placeholder="{{ field.name | escape }}"
                 {% if field.required %}data-item-custom{{ forloop.index | plus: 2 }}-required="true"{% endif %}
                 {% endfor %}
                 {% endif %}>
           <div class="featured-tier__info">
-            <div class="featured-tier__name">{{ featured.name }}</div>
-            <p class="featured-tier__description">{{ featured.description }}</p>
+            <div class="featured-tier__name">{{ featured.name | escape }}</div>
+            <p class="featured-tier__description">{{ featured.description | escape }}</p>
           </div>
           <div class="featured-tier__price">{{ featured.price | money }}</div>
         </button>
@@ -63,7 +63,7 @@
                 disabled
                 data-late-support="true"
                 data-item-id="{{ include.campaign.slug }}__{{ featured.id }}"
-                data-item-name="{{ include.campaign.title }} — {{ featured.name }}"
+                data-item-name="{{ include.campaign.title | escape }} — {{ featured.name | escape }}"
                 data-item-price="{{ featured.price }}"
                 data-item-url="{{ site.url }}{{ include.campaign.url }}#tier-{{ featured.id }}"
                 data-item-description="Late support — {{ featured.description | escape }}"
@@ -77,16 +77,16 @@
                 data-item-custom2-type="hidden"
                 data-item-custom2-value="{{ featured.category | default: 'digital' }}">
           <div class="featured-tier__info">
-            <div class="featured-tier__name">{{ featured.name }}</div>
-            <p class="featured-tier__description">{{ featured.description }}</p>
+            <div class="featured-tier__name">{{ featured.name | escape }}</div>
+            <p class="featured-tier__description">{{ featured.description | escape }}</p>
           </div>
           <div class="featured-tier__price">{{ featured.price | money }}</div>
         </button>
         {% else %}
         <a href="{{ include.campaign.url }}#tier-{{ featured.id }}" class="campaign-card__featured-tier campaign-card__featured-tier--disabled">
           <div class="featured-tier__info">
-            <div class="featured-tier__name">{{ featured.name }}</div>
-            <p class="featured-tier__description">{{ featured.description }}</p>
+            <div class="featured-tier__name">{{ featured.name | escape }}</div>
+            <p class="featured-tier__description">{{ featured.description | escape }}</p>
           </div>
           <div class="featured-tier__price">{{ featured.price | money }}</div>
         </a>
