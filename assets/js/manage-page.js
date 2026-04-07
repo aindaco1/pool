@@ -597,7 +597,7 @@
             <span class="progress-marker__dot"></span>
             <span class="progress-marker__label">
               <span class="progress-marker__amount">${formatMoneyShort(stretchGoal.threshold)}</span>
-              <span class="progress-marker__desc">${stretchUnlocked ? stretchGoal.title : '???'}</span>
+              <span class="progress-marker__desc">${stretchUnlocked ? escapeHtml(stretchGoal.title) : '???'}</span>
             </span>
           </div>
         `;

@@ -18,6 +18,11 @@ describe('campaign content security audit', () => {
     expect(auditCampaignContent(repoRoot)).toEqual([]);
   });
 
+  it('keeps stretch goal titles escaped in the shared progress include', () => {
+    const progressTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'progress.html'), 'utf8');
+    expect(progressTemplate).toContain('{{ s.title | escape }}');
+  });
+
   it('keeps the approved structured embed allowlist narrow', () => {
     expect(Array.from(allowedEmbedProviders).sort()).toEqual(['spotify', 'vimeo', 'youtube']);
     expect(spotifyEmbedPrefix).toBe('https://open.spotify.com/embed/');

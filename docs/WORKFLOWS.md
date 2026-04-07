@@ -364,8 +364,8 @@ Magic link landing page for pledge management:
 ### `/community/:slug/`
 Supporter-only community page:
 - Always verifies with Worker API (doesn't trust cookies alone)
-- On success: Sets `supporter_{slug}` cookie (90 days) for UX optimization
-- On failure (cancelled pledge, expired token): Clears cookies, shows access denied CTA
+- On success: Sets a non-sensitive `supporter_{slug}` cookie for UX optimization and stores the raw bearer token only in `sessionStorage`
+- On failure (cancelled pledge, expired token): Clears session token state, shows access denied CTA
 - Shows voting/polling decisions exclusive to backers
 - `/votes` API returns 403 for cancelled pledges (double-checks access)
 - `/votes` only accepts campaign-defined decision IDs and campaign-defined option values

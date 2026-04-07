@@ -114,10 +114,10 @@
         <div class="progress-marker progress-marker--stretch{% if s_achieved %} progress-marker--achieved{% endif %}{% unless s_unlocked %} progress-marker--locked{% endunless %}" data-progress-left="{{ s_pct }}" data-threshold="{{ s_threshold }}">
           <span class="progress-marker__dot"></span>
           <span class="progress-marker__label">
-            <span class="progress-marker__amount">{{ s_threshold | money_short }}</span>
-            <span class="progress-marker__desc">
+              <span class="progress-marker__amount">{{ s_threshold | money_short }}</span>
+              <span class="progress-marker__desc">
               {% if s_unlocked %}
-                {{ s.title }}
+                {{ s.title | escape }}
               {% else %}
                 ???
               {% endif %}

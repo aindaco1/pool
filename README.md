@@ -15,6 +15,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Configurable pricing settings** — `sales_tax_rate` and `flat_shipping_rate` live in `_config.yml` for site forks, with mirrored Worker env vars for server-side enforcement
 - **Physical & digital tiers** — Physical items trigger Stripe shipping address collection + configurable flat shipping per campaign with physical rewards
 - **Order-scoped magic links** — Each supporter link only manages its own pledge/order
+- **Safer supporter sessions** — Community pages keep supporter access in browser session storage instead of a long-lived token cookie
 - **Stretch goals** — Auto-unlock at funding thresholds
 - **Campaign lifecycle** — `upcoming` → `live` → `post` states with automatic transitions + Cloudflare cache purge
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash

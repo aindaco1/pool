@@ -8,6 +8,7 @@
   var workerBase = dataset.workerBase || '';
   var campaignSlug = dataset.campaignSlug || '';
   var cookieName = 'supporter_' + campaignSlug;
+  var tokenStorageKey = 'supporter_token_' + campaignSlug;
   var userToken = null;
   var RESULT_BAR_WIDTH_CLASS_PREFIX = 'result-bar__fill--w-';
 
@@ -18,11 +19,33 @@
 
   function setCookie(name, value, days) {
     var expires = new Date(Date.now() + days * 864e5).toUTCString();
-    document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Lax';
+    var secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Lax' + secure;
   }
 
   function clearCookie(name) {
     document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+  }
+
+  function readStoredToken() {
+    try {
+      return window.sessionStorage.getItem(tokenStorageKey);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writeStoredToken(token) {
+    if (!token) return;
+    try {
+      window.sessionStorage.setItem(tokenStorageKey, token);
+    } catch (_error) {}
+  }
+
+  function clearStoredToken() {
+    try {
+      window.sessionStorage.removeItem(tokenStorageKey);
+    } catch (_error) {}
   }
 
   function showContent() {
@@ -34,7 +57,7 @@
 
   function showDenied() {
     clearCookie(cookieName);
-    clearCookie('supporter_token_' + campaignSlug);
+    clearStoredToken();
 
     var loading = document.getElementById('community-loading');
     var denied = document.getElementById('community-denied');
@@ -182,14 +205,14 @@
       console.log('[DEV] Setting supporter cookie for testing');
       setCookie(cookieName, 'verified', 90);
       userToken = 'dev-token-' + campaignSlug;
-      setCookie('supporter_token_' + campaignSlug, userToken, 90);
+      writeStoredToken(userToken);
       window.history.replaceState({}, '', window.location.pathname);
       showContent();
       loadVoteStatus();
       return;
     }
 
-    var token = params.get('t') || getCookie('supporter_token_' + campaignSlug);
+    var token = params.get('t') || readStoredToken();
     if (!token) {
       showDenied();
       return;
@@ -227,7 +250,7 @@
 
       userToken = token;
       setCookie(cookieName, 'verified', 90);
-      setCookie('supporter_token_' + campaignSlug, token, 90);
+      writeStoredToken(token);
 
       if (params.get('t')) {
         window.history.replaceState({}, '', window.location.pathname);

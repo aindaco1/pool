@@ -68,7 +68,7 @@ describe('community page script', () => {
   beforeEach(() => {
     vi.resetModules();
     document.cookie = 'supporter_demo=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-    document.cookie = 'supporter_token_demo=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+    window.sessionStorage.clear();
     window.history.replaceState({}, '', '/community/');
     renderCommunityPage();
   });
@@ -77,7 +77,7 @@ describe('community page script', () => {
     vi.restoreAllMocks();
     document.body.innerHTML = '';
     document.cookie = 'supporter_demo=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-    document.cookie = 'supporter_token_demo=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+    window.sessionStorage.clear();
   });
 
   it('shows denied state when there is no supporter token', async () => {
@@ -127,6 +127,48 @@ describe('community page script', () => {
     });
     expect(document.getElementById('community-denied')?.hidden).toBe(true);
     expect(window.location.search).toBe('');
+    expect(window.sessionStorage.getItem('supporter_token_demo')).toBe('token-123');
+    expect(document.cookie).not.toContain('supporter_token_demo=');
+
+    consoleLog.mockRestore();
+    consoleError.mockRestore();
+  });
+
+  it('reuses the stored session token on a same-tab revisit without a query param', async () => {
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    window.sessionStorage.setItem('supporter_token_demo', 'token-stored');
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://worker.test/pledge?token=token-stored') {
+        return new Response(JSON.stringify({
+          campaignSlug: 'demo',
+          pledgeStatus: 'active'
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (url === 'https://worker.test/votes?token=token-stored&decisions=') {
+        return new Response(JSON.stringify({ decisions: {} }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error('Unexpected fetch: ' + url);
+    }) as typeof fetch;
+
+    await import('../../assets/js/community-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('community-content')?.hidden).toBe(false);
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith('https://worker.test/pledge?token=token-stored');
+    expect(document.cookie).not.toContain('supporter_token_demo=');
 
     consoleLog.mockRestore();
     consoleError.mockRestore();

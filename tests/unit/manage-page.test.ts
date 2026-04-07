@@ -304,6 +304,30 @@ describe('manage page script', () => {
     expect(document.querySelector('#confirm-modal-details svg')).toBeNull();
   });
 
+  it('escapes stretch goal titles in compact progress rendering', async () => {
+    mockManageFetch({
+      campaigns: [
+        {
+          ...baseCampaign,
+          stretch_goals: [
+            { threshold: 5000, title: '<img src=x onerror=alert(1)>' }
+          ],
+          stretch_hidden: false
+        }
+      ]
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+      expect(document.querySelector('.progress-marker--stretch .progress-marker__desc')?.textContent).toBe('<img src=x onerror=alert(1)>');
+    });
+
+    expect(document.querySelector('.progress-marker--stretch img')).toBeNull();
+  });
+
   it('cancels a pledge after confirmation', async () => {
     const fetchMock = mockManageFetch();
     window.history.replaceState({}, '', '/manage/?t=token-123');

@@ -576,7 +576,7 @@ wrangler kv:key get "results:hand-relations:poster" --binding VOTES --preview
 
 ### Community page shows "Access Denied"
 - Use `?dev=1` for local testing without Worker
-- Check token cookie: `supporter_hand-relations`
+- Check session storage key: `supporter_token_hand-relations`
 
 ### Votes not persisting
 - Check KV binding in wrangler.toml

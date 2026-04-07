@@ -6,16 +6,93 @@
  * - /community/:slug/ — Supporter-only voting/decisions
  */
 
+const FALLBACK_SITE_BASE = 'https://pool.dustwave.xyz';
+const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
+const SAFE_INSTAGRAM_HOSTS = new Set(['instagram.com', 'www.instagram.com']);
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatEmailText(value) {
+  return escapeHtml(value).replace(/\r?\n/g, '<br>');
+}
+
+function getResolvedSiteBase(siteBase) {
+  try {
+    return new URL(siteBase || FALLBACK_SITE_BASE).toString();
+  } catch (_error) {
+    return FALLBACK_SITE_BASE;
+  }
+}
+
+function getSiteRootUrl(siteBase) {
+  return getResolvedSiteBase(siteBase);
+}
+
+function safeSiteUrl(pathOrUrl, siteBase) {
+  const base = getResolvedSiteBase(siteBase);
+  try {
+    const baseUrl = new URL(base);
+    const resolved = new URL(pathOrUrl || '/', baseUrl);
+    if (!SAFE_LINK_PROTOCOLS.has(resolved.protocol)) {
+      return base;
+    }
+    if (resolved.origin !== baseUrl.origin) {
+      return base;
+    }
+    return resolved.toString();
+  } catch (_error) {
+    return base;
+  }
+}
+
+function safeExternalUrl(pathOrUrl, siteBase) {
+  if (!pathOrUrl) return '';
+  try {
+    const resolved = new URL(pathOrUrl, getResolvedSiteBase(siteBase));
+    if (!SAFE_LINK_PROTOCOLS.has(resolved.protocol)) {
+      return '';
+    }
+    return resolved.toString();
+  } catch (_error) {
+    return '';
+  }
+}
+
+function safeInstagramUrl(instagramUrl) {
+  if (!instagramUrl) return '';
+  try {
+    const resolved = new URL(instagramUrl);
+    if (resolved.protocol !== 'https:') {
+      return '';
+    }
+    const hostname = resolved.hostname.toLowerCase();
+    if (!SAFE_INSTAGRAM_HOSTS.has(hostname)) {
+      return '';
+    }
+    return resolved.toString();
+  } catch (_error) {
+    return '';
+  }
+}
+
 // Instagram CTA block for emails (when campaign has instagram field)
 function getInstagramCTA(instagramUrl, siteBase = 'https://pool.dustwave.xyz') {
-  if (!instagramUrl) return '';
+  const safeInstagramHref = safeInstagramUrl(instagramUrl);
+  if (!safeInstagramHref) return '';
   
   // Instagram logo hosted on our own domain (third-party URLs trigger Gmail spam filters)
-  const instagramIcon = `<img src="https://pool.dustwave.xyz/assets/images/instagram-white.png" alt="Instagram" width="20" height="20" style="vertical-align: middle; margin-right: 8px;">`;
+  const instagramIcon = `<img src="${safeSiteUrl('/assets/images/instagram-white.png', siteBase)}" alt="Instagram" width="20" height="20" style="vertical-align: middle; margin-right: 8px;">`;
   
   return `
   <div style="background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); border-radius: 8px; padding: 16px 20px; margin: 24px 0; text-align: center;">
-    <a href="${instagramUrl}" style="color: #fff; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;">
+    <a href="${safeInstagramHref}" style="color: #fff; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;">
       ${instagramIcon}
       <span>Share to your Story!</span>
     </a>
@@ -34,21 +111,21 @@ function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportIte
   // Main tier
   if (tierName) {
     const qtyText = tierQty > 1 ? ` × ${tierQty}` : '';
-    items.push(`<li style="margin: 4px 0;">${tierName}${qtyText}</li>`);
+    items.push(`<li style="margin: 4px 0;">${escapeHtml(tierName)}${qtyText}</li>`);
   }
   
   // Additional tiers
   for (const tier of additionalTiers) {
     if (tier.name) {
       const qtyText = tier.qty > 1 ? ` × ${tier.qty}` : '';
-      items.push(`<li style="margin: 4px 0;">${tier.name}${qtyText}</li>`);
+      items.push(`<li style="margin: 4px 0;">${escapeHtml(tier.name)}${qtyText}</li>`);
     }
   }
   
   // Support items
   for (const item of supportItems) {
     if (item.label && item.amount > 0) {
-      items.push(`<li style="margin: 4px 0;">${item.label}: $${item.amount.toFixed(2)}</li>`);
+      items.push(`<li style="margin: 4px 0;">${escapeHtml(item.label)}: $${item.amount.toFixed(2)}</li>`);
     }
   }
   
@@ -70,14 +147,15 @@ function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportIte
 
 function renderAmountBreakdown(env, { subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, totalLabel, totalAmount }) {
   const resolvedTotal = totalAmount ?? (subtotal + tax + shipping + tipAmount);
-  const platformAuthor = getPlatformAuthor(env);
-  const salesTaxLabel = formatSalesTaxLabel(env);
+  const platformAuthor = escapeHtml(getPlatformAuthor(env));
+  const salesTaxLabel = escapeHtml(formatSalesTaxLabel(env));
+  const safeTotalLabel = escapeHtml(totalLabel);
   return `
     <p style="margin: 0 0 4px 0;">Subtotal: $${(subtotal / 100).toFixed(2)}</p>
     ${tipAmount > 0 ? `<p style="margin: 0 0 4px 0;">${platformAuthor} tip${tipPercent > 0 ? ` (${tipPercent}%)` : ''}: $${(tipAmount / 100).toFixed(2)}</p>` : ''}
     <p style="margin: 0 0 4px 0;">${salesTaxLabel}: $${(tax / 100).toFixed(2)}</p>
     ${shipping > 0 ? `<p style="margin: 0 0 4px 0;">Shipping: $${(shipping / 100).toFixed(2)}</p>` : ''}
-    <p style="margin: 0 0 8px 0;"><strong>${totalLabel}: $${(resolvedTotal / 100).toFixed(2)}</strong></p>
+    <p style="margin: 0 0 8px 0;"><strong>${safeTotalLabel}: $${(resolvedTotal / 100).toFixed(2)}</strong></p>
   `.trim();
 }
 
@@ -85,8 +163,9 @@ function renderAmountBreakdown(env, { subtotal = 0, tax = 0, shipping = 0, tipAm
  * Send supporter confirmation email after successful pledge
  */
 export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems, hasDecisions }) {
-  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
-  const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
+  const manageUrl = safeSiteUrl(`/manage/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
+  const communityUrl = safeSiteUrl(`/community/${encodeURIComponent(campaignSlug)}/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
+  const siteHomeUrl = getSiteRootUrl(env.SITE_BASE);
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
@@ -107,7 +186,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="text-align: center; margin-bottom: 32px;">
-    <h1 style="margin: 0; font-size: 24px;">Thanks for backing ${campaignTitle}!</h1>
+    <h1 style="margin: 0; font-size: 24px;">Thanks for backing ${escapeHtml(campaignTitle)}!</h1>
   </div>
   
   <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
@@ -141,7 +220,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
     <p style="margin: 0 0 8px 0;"><strong>Save this email!</strong> You'll need these links to manage your pledge.</p>
-    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${env.SITE_BASE}" style="color: #000;">The Pool</a>.</p>
+    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${siteHomeUrl}" style="color: #000;">The Pool</a>.</p>
   </div>
 </body>
 </html>
@@ -174,7 +253,8 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
  * Send pledge modification confirmation email
  */
 export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campaignTitle, previousSubtotal, previousTax = 0, previousShipping = 0, previousTipAmount = 0, newSubtotal, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems }) {
-  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const manageUrl = safeSiteUrl(`/manage/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
+  const siteHomeUrl = getSiteRootUrl(env.SITE_BASE);
   const previousTotal = previousSubtotal + previousTax + previousShipping + previousTipAmount;
   const newTotal = newSubtotal + tax + shipping + tipAmount;
   const increased = newTotal > previousTotal;
@@ -204,7 +284,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   </div>
   
   <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-    <p style="margin: 0 0 8px 0;"><strong>Campaign:</strong> ${campaignTitle}</p>
+    <p style="margin: 0 0 8px 0;"><strong>Campaign:</strong> ${escapeHtml(campaignTitle)}</p>
     <p style="margin: 0 0 8px 0;"><strong>Previous total (if funded):</strong> $${(previousTotal / 100).toFixed(2)}</p>
     <p style="margin: 0 0 8px 0;"><strong>Updated total (if funded):</strong> $${(newTotal / 100).toFixed(2)} (${increased ? '+' : '-'}$${(diff / 100).toFixed(2)})</p>
     ${amountBreakdownHtml}
@@ -227,7 +307,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   ${instagramCTA}
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
-    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${env.SITE_BASE}" style="color: #000;">The Pool</a>.</p>
+    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${siteHomeUrl}" style="color: #000;">The Pool</a>.</p>
   </div>
 </body>
 </html>
@@ -260,7 +340,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
  * Send payment failure notification
  */
 export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems }) {
-  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const manageUrl = safeSiteUrl(`/manage/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
@@ -286,7 +366,7 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
   
   <div style="background: #fff3cd; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #ffc107;">
     <p style="margin: 0 0 12px 0;">
-      We tried to charge your card for your pledge to <strong>${campaignTitle}</strong>, but the payment failed.
+      We tried to charge your card for your pledge to <strong>${escapeHtml(campaignTitle)}</strong>, but the payment failed.
     </p>
     ${amountBreakdownHtml}
     ${pledgeItemsHtml}
@@ -334,8 +414,9 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
  * Send charge success email after campaign settlement
  */
 export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems, hasDecisions }) {
-  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
-  const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
+  const manageUrl = safeSiteUrl(`/manage/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
+  const communityUrl = safeSiteUrl(`/community/${encodeURIComponent(campaignSlug)}/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
+  const siteHomeUrl = getSiteRootUrl(env.SITE_BASE);
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
@@ -360,7 +441,7 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   </div>
   
   <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #bbf7d0;">
-    <p style="margin: 0 0 12px 0;"><strong>${campaignTitle}</strong> has been fully funded!</p>
+    <p style="margin: 0 0 12px 0;"><strong>${escapeHtml(campaignTitle)}</strong> has been fully funded!</p>
     ${amountBreakdownHtml}
     ${pledgeItemsHtml}
   </div>
@@ -383,7 +464,7 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   </div>
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
-    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${env.SITE_BASE}" style="color: #000;">The Pool</a>.</p>
+    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${siteHomeUrl}" style="color: #000;">The Pool</a>.</p>
   </div>
 </body>
 </html>
@@ -416,10 +497,10 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
  * Send diary update notification to supporters
  */
 export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, diaryPhase, token, instagramUrl, hasDecisions }) {
-  const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
+  const communityUrl = safeSiteUrl(`/community/${encodeURIComponent(campaignSlug)}/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const diaryAnchor = diaryPhase ? `#diary-${diaryPhase}` : '#diary';
-  const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/${diaryAnchor}`;
-  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const campaignUrl = safeSiteUrl(`/campaigns/${encodeURIComponent(campaignSlug)}/${diaryAnchor}`, env.SITE_BASE);
+  const manageUrl = safeSiteUrl(`/manage/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
   
   const html = `
@@ -431,12 +512,12 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="text-align: center; margin-bottom: 32px;">
-    <h1 style="margin: 0; font-size: 24px;">New Update: ${campaignTitle}</h1>
+    <h1 style="margin: 0; font-size: 24px;">New Update: ${escapeHtml(campaignTitle)}</h1>
   </div>
   
   <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-    <h2 style="margin: 0 0 12px 0; font-size: 18px;">${diaryTitle}</h2>
-    ${diaryExcerpt ? `<p style="margin: 0; color: #666;">${diaryExcerpt}</p>` : ''}
+    <h2 style="margin: 0 0 12px 0; font-size: 18px;">${escapeHtml(diaryTitle)}</h2>
+    ${diaryExcerpt ? `<p style="margin: 0; color: #666;">${formatEmailText(diaryExcerpt)}</p>` : ''}
   </div>
   
   <div style="text-align: center; margin-bottom: 32px;">
@@ -466,7 +547,7 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
   ${instagramCTA}
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
-    <p style="margin: 0;">You're receiving this because you backed ${campaignTitle}.</p>
+    <p style="margin: 0;">You're receiving this because you backed ${escapeHtml(campaignTitle)}.</p>
   </div>
 </body>
 </html>
@@ -499,7 +580,7 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
  * Send pledge cancellation confirmation email
  */
 export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campaignTitle, subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, amount }) {
-  const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/`;
+  const campaignUrl = safeSiteUrl(`/campaigns/${encodeURIComponent(campaignSlug)}/`, env.SITE_BASE);
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
@@ -523,7 +604,7 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
   </div>
   
   <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-    <p style="margin: 0 0 8px 0;"><strong>Campaign:</strong> ${campaignTitle}</p>
+    <p style="margin: 0 0 8px 0;"><strong>Campaign:</strong> ${escapeHtml(campaignTitle)}</p>
     ${amountBreakdownHtml}
     <p style="margin: 0; color: #666; font-size: 14px;">
       Your card was never charged — this was just a pledge hold.
@@ -573,30 +654,30 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
  * @param {string} milestone - 'one-third' | 'two-thirds' | 'goal' | 'stretch'
  */
 export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTitle, milestone, pledgedAmount, goalAmount, stretchGoalName, token, instagramUrl }) {
-  const campaignUrl = `${env.SITE_BASE}/campaigns/${campaignSlug}/`;
-  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const campaignUrl = safeSiteUrl(`/campaigns/${encodeURIComponent(campaignSlug)}/`, env.SITE_BASE);
+  const manageUrl = safeSiteUrl(`/manage/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
   
   const milestoneConfig = {
     'one-third': {
       emoji: '🚀',
       heading: "We're 1/3 of the way there!",
-      message: `${campaignTitle} has reached 33% of its funding goal. Thanks for being part of this journey!`
+      message: `${escapeHtml(campaignTitle)} has reached 33% of its funding goal. Thanks for being part of this journey!`
     },
     'two-thirds': {
       emoji: '🔥',
       heading: "We're 2/3 funded!",
-      message: `${campaignTitle} is at 66% of its goal. The finish line is in sight!`
+      message: `${escapeHtml(campaignTitle)} is at 66% of its goal. The finish line is in sight!`
     },
     'goal': {
       emoji: '🎉',
       heading: 'Goal Reached!',
-      message: `${campaignTitle} has hit its funding goal! This project is happening. Your pledge will be charged soon.`
+      message: `${escapeHtml(campaignTitle)} has hit its funding goal! This project is happening. Your pledge will be charged soon.`
     },
     'stretch': {
       emoji: '⭐',
-      heading: `Stretch Goal Unlocked: ${stretchGoalName || 'New Reward'}`,
-      message: `${campaignTitle} keeps growing! A new stretch goal has been unlocked.`
+      heading: `Stretch Goal Unlocked: ${escapeHtml(stretchGoalName || 'New Reward')}`,
+      message: `${escapeHtml(campaignTitle)} keeps growing! A new stretch goal has been unlocked.`
     }
   };
   
@@ -632,7 +713,7 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
   ${instagramCTA}
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
-    <p style="margin: 0 0 8px 0;">You're receiving this because you backed ${campaignTitle}.</p>
+    <p style="margin: 0 0 8px 0;">You're receiving this because you backed ${escapeHtml(campaignTitle)}.</p>
     <a href="${manageUrl}" style="color: #666;">Manage your pledge</a>
   </div>
 </body>
@@ -666,14 +747,15 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
  * Send announcement email to supporters with optional highlighted CTA link
  */
 export async function sendAnnouncementEmail(env, { email, campaignSlug, campaignTitle, subject, heading, body, ctaLabel, ctaUrl, token, instagramUrl, hasDecisions }) {
-  const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
-  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const communityUrl = safeSiteUrl(`/community/${encodeURIComponent(campaignSlug)}/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
+  const manageUrl = safeSiteUrl(`/manage/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
+  const safeCtaHref = safeExternalUrl(ctaUrl, env.SITE_BASE);
   
-  const ctaBlock = ctaLabel && ctaUrl ? `
+  const ctaBlock = ctaLabel && safeCtaHref ? `
   <div style="text-align: center; margin: 24px 0 32px 0;">
-    <a href="${ctaUrl}" style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
-      ${ctaLabel}
+    <a href="${safeCtaHref}" style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+      ${escapeHtml(ctaLabel)}
     </a>
   </div>` : '';
   
@@ -686,11 +768,11 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="text-align: center; margin-bottom: 32px;">
-    <h1 style="margin: 0; font-size: 24px;">${heading || subject}</h1>
+    <h1 style="margin: 0; font-size: 24px;">${escapeHtml(heading || subject)}</h1>
   </div>
   
   <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-    <p style="margin: 0; font-size: 15px; color: #333;">${body}</p>
+    <p style="margin: 0; font-size: 15px; color: #333;">${formatEmailText(body)}</p>
   </div>
   
   ${ctaBlock}
@@ -716,7 +798,7 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
   ${instagramCTA}
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
-    <p style="margin: 0;">You're receiving this because you backed ${campaignTitle}.</p>
+    <p style="margin: 0;">You're receiving this because you backed ${escapeHtml(campaignTitle)}.</p>
   </div>
 </body>
 </html>

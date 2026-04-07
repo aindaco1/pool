@@ -20,7 +20,7 @@
 - [x] No-account pledge management architecture (magic links, Worker API design)
 - [x] Pledge management page (`/manage/`)
 - [x] Pledge success/cancel pages
-- [x] Supporter-only community page (`/community/:slug/`) with token + cookie auth
+- [x] Supporter-only community page (`/community/:slug/`) with Worker verification and session-scoped supporter token storage
 - [x] Community voting system with Cloudflare KV (no database)
 - [x] Sass refactor (15 modular partials from single 3,500-line file)
 - [x] Documentation consolidation (15 → 7 focused docs)

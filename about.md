@@ -20,9 +20,20 @@ Unlike other platforms, The Pool doesn't require you to create an account. When 
 - **Manage your pledge** — cancel, modify amount, or update your payment method
 - **Access the supporter community** — vote on published creative decisions and see exclusive updates
 
-If your checkout includes more than one campaign, you may receive separate confirmation emails and manage links for each campaign. Just save those emails. They are your keys.
+If your checkout includes more than one campaign, you'll receive separate confirmation emails and manage links for each campaign. Just save those emails. They are your keys.
 
-## How It Works
+## How Email Magic Links Work
+
+Instead of asking you to create a password, The Pool uses secure email links to prove that you control a pledge.
+
+- **Each pledge gets its own link** — Your confirmation email includes a manage link for that specific campaign pledge.
+- **Use the manage link to make changes** — From there you can review your pledge, adjust it while the campaign is still live, cancel it, or update your saved card.
+- **Community links are supporter-only** — If a campaign has community voting enabled, the email also includes a supporter-community link for that campaign.
+- **Save the email** — The link is the fastest way back to your pledge later. If you open the community page in a new browser or after your browser session resets, using the email link again is the safest way to get back in.
+
+If you backed multiple campaigns in one checkout, you'll still manage them separately afterward.
+
+## Umm, So How Does It Work Again?
 
 1. **Browse** — Find a project you want to support
 2. **Pledge** — Add one or more campaigns to your cart, optionally add a 0% to 15% tip for platform upkeep, and continue into Stripe's secure checkout. Physical rewards add a flat shipping fee per campaign that includes physical items.
@@ -34,14 +45,17 @@ Multiple pledges from the same email are combined into a single charge when the 
 
 ## For Creators
 
-The Pool is designed for filmmakers and creative projects with features like:
+The Pool is designed for filmmakers and other creatives with features like:
 
-- **Physical & digital tiers** — Offer tangible rewards with automatic shipping address collection and configurable flat-rate shipping
+- **0% platform fee for organizers** — Supporters can optionally add a 0% to 15% platform tip to help sustain the platform without reducing campaign funds
+- **First-party checkout** — The Pool controls the cart and pledge review flow while Stripe securely saves cards and handles payment details
+- **Physical & digital tiers** — Offer tangible rewards with automatic shipping address collection and configurable sales tax and flat-rate shipping
 - **Production phases** — Break your budget into phases supporters can fund directly
 - **Stretch goals** — Unlock additional creative possibilities as funding grows
 - **Community decisions** — Let your backers vote on published creative choices
 - **Production diary** — Keep your community engaged with updates
 - **Ongoing support** — Accept contributions after your main campaign ends
+- **No-account supporter access** — Backers manage pledges and join supporter-only community pages through email magic links instead of creating accounts
 
 ## The Technology
 
@@ -49,13 +63,13 @@ The Pool runs on a modern static architecture:
 
 | Layer | Platform | Role |
 |-------|----------|------|
-| Frontend | GitHub Pages | Jekyll static site |
-| Cart | The Pool cart runtime | First-party cart, pledge review, and checkout handoff |
-| Payments | Stripe | Card storage, off-session charges, shipping address collection |
-| Backend | Cloudflare Worker | Canonical pricing, pledge storage, live stats, fulfillment data, settlement |
-| Email | Resend | Confirmations, updates, notifications |
+| Frontend | [GitHub Pages](https://docs.github.com/en/pages) | Jekyll static site |
+| Cart | The Pool | First-party cart, pledge review, and checkout handoff |
+| Payments | [Stripe](https://stripe.com) | Card storage, off-session charges, shipping address collection |
+| Backend | [Cloudflare Workers](https://workers.cloudflare.com) | Canonical pricing, pledge storage, live stats, fulfillment data, settlement |
+| Email | [Resend](https://resend.com) | Confirmations, updates, notifications |
 
-No database servers. No monthly hosting fees. Version-controlled and transparent.
+The platform is built on services that all offer free tiers, and The Pool was designed from the start to operate effectively within those free tiers whenever possible.
 
 For teams forking The Pool, tax and shipping settings live in site config and mirrored Worker env so local UI, checkout, reports, and emails all stay aligned.
 
