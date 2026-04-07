@@ -43,6 +43,61 @@ async function listAllKeys(env, prefix) {
   return keys;
 }
 
+function hasTierInventoryCoordinator(env) {
+  return !!env?.TIER_INVENTORY_COORDINATOR;
+}
+
+function getTierInventoryCoordinatorStub(env, campaignSlug) {
+  const id = env.TIER_INVENTORY_COORDINATOR.idFromName(campaignSlug);
+  return env.TIER_INVENTORY_COORDINATOR.get(id);
+}
+
+async function callTierInventoryCoordinator(env, campaignSlug, path, payload = {}) {
+  const response = await getTierInventoryCoordinatorStub(env, campaignSlug).fetch(
+    `https://tier-inventory-coordinator${path}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaignSlug, ...payload })
+    }
+  );
+
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body?.error || 'Tier inventory coordinator request failed');
+  }
+  return body;
+}
+
+function cloneInventory(inventory = {}) {
+  return JSON.parse(JSON.stringify(inventory || {}));
+}
+
+function getTierSelectionCounts(selectedTiers = []) {
+  const counts = {};
+  for (const tierItem of selectedTiers) {
+    if (!tierItem?.id || !tierItem?.tier?.limit_total) continue;
+    counts[tierItem.id] = (counts[tierItem.id] || 0) + (tierItem.qty || 1);
+  }
+  return counts;
+}
+
+async function buildTierInventorySnapshot(env, campaignSlug, campaign = null) {
+  let inventory = await getTierInventory(env, campaignSlug);
+  if (Object.keys(inventory).length === 0 && campaign?.tiers) {
+    console.log('📦 Recalculating missing tier inventory for:', campaignSlug);
+    inventory = await recalculateTierInventory(env, campaignSlug, campaign.tiers) || {};
+  }
+  return cloneInventory(inventory);
+}
+
+async function syncTierInventoryCoordinator(env, campaignSlug, inventory) {
+  if (!hasTierInventoryCoordinator(env)) return;
+  await callTierInventoryCoordinator(env, campaignSlug, '/replace', {
+    inventory: cloneInventory(inventory)
+  });
+}
+
 /**
  * Update stats when a pledge is created
  */
@@ -275,6 +330,7 @@ export async function initializeTierInventory(env, campaignSlug, tiers) {
   }
   
   await env.PLEDGES.put(`tier-inventory:${campaignSlug}`, JSON.stringify(inventory));
+  await syncTierInventoryCoordinator(env, campaignSlug, inventory);
   return inventory;
 }
 
@@ -285,15 +341,9 @@ export async function initializeTierInventory(env, campaignSlug, tiers) {
  */
 export async function claimTierInventory(env, campaignSlug, tierId, qty = 1, campaign = null) {
   if (!env.PLEDGES || !tierId) return { success: true };
-  
-  let inventory = await getTierInventory(env, campaignSlug);
-  const campaignTier = campaign?.tiers?.find(t => t.id === tierId) || null;
 
-  // Rebuild from active pledges if inventory is missing for a limited campaign.
-  if (Object.keys(inventory).length === 0 && campaign?.tiers) {
-    console.log('📦 Recalculating missing tier inventory for:', campaignSlug);
-    inventory = await recalculateTierInventory(env, campaignSlug, campaign.tiers) || {};
-  }
+  const inventory = await buildTierInventorySnapshot(env, campaignSlug, campaign);
+  const campaignTier = campaign?.tiers?.find(t => t.id === tierId) || null;
   
   if (!inventory[tierId]) {
     if (campaignTier?.limit_total) {
@@ -304,24 +354,32 @@ export async function claimTierInventory(env, campaignSlug, tierId, qty = 1, cam
     }
     return { success: true };
   }
-  
+
+  if (hasTierInventoryCoordinator(env)) {
+    return callTierInventoryCoordinator(env, campaignSlug, '/claim', {
+      tierId,
+      qty,
+      inventory
+    });
+  }
+
   const tierInv = inventory[tierId];
   const remaining = tierInv.limit - tierInv.claimed;
-  
+
   if (qty > remaining) {
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: `Only ${remaining} remaining for this tier`,
-      remaining 
+      remaining
     };
   }
-  
+
   tierInv.claimed += qty;
   await env.PLEDGES.put(`tier-inventory:${campaignSlug}`, JSON.stringify(inventory));
-  
-  return { 
-    success: true, 
-    remaining: tierInv.limit - tierInv.claimed 
+
+  return {
+    success: true,
+    remaining: tierInv.limit - tierInv.claimed
   };
 }
 
@@ -330,11 +388,20 @@ export async function claimTierInventory(env, campaignSlug, tierId, qty = 1, cam
  */
 export async function releaseTierInventory(env, campaignSlug, tierId, qty = 1) {
   if (!env.PLEDGES || !tierId) return;
-  
-  const inventory = await getTierInventory(env, campaignSlug);
-  
+
+  const inventory = cloneInventory(await getTierInventory(env, campaignSlug));
+
   if (!inventory[tierId]) return;
-  
+
+  if (hasTierInventoryCoordinator(env)) {
+    await callTierInventoryCoordinator(env, campaignSlug, '/release', {
+      tierId,
+      qty,
+      inventory
+    });
+    return;
+  }
+
   inventory[tierId].claimed = Math.max(0, inventory[tierId].claimed - qty);
   await env.PLEDGES.put(`tier-inventory:${campaignSlug}`, JSON.stringify(inventory));
 }
@@ -356,6 +423,89 @@ export async function adjustTierInventory(env, campaignSlug, oldTierId, oldQty, 
   }
   
   return { success: true };
+}
+
+export async function claimTierSelectionInventory(env, campaignSlug, selectedTiers = [], campaign = null) {
+  if (!env.PLEDGES) return { success: true, claimedTiers: [] };
+
+  if (hasTierInventoryCoordinator(env)) {
+    const inventory = await buildTierInventorySnapshot(env, campaignSlug, campaign);
+    const nextCounts = getTierSelectionCounts(selectedTiers);
+    const result = await callTierInventoryCoordinator(env, campaignSlug, '/claim-selection', {
+      nextCounts,
+      inventory
+    });
+    return {
+      success: result.success,
+      error: result.error,
+      remaining: result.remaining,
+      claimedTiers: selectedTiers
+        .filter((tierItem) => tierItem?.tier?.limit_total)
+        .map((tierItem) => ({ id: tierItem.id, qty: tierItem.qty }))
+    };
+  }
+
+  const claimedTiers = [];
+  try {
+    for (const tierItem of selectedTiers) {
+      const claimResult = await claimTierInventory(env, campaignSlug, tierItem.id, tierItem.qty, campaign);
+      if (!claimResult.success) {
+        throw new Error(claimResult.error || `Failed to claim inventory for tier "${tierItem.id}"`);
+      }
+      claimedTiers.push({ id: tierItem.id, qty: tierItem.qty });
+    }
+    return { success: true, claimedTiers };
+  } catch (err) {
+    for (const claimedTier of claimedTiers) {
+      await releaseTierInventory(env, campaignSlug, claimedTier.id, claimedTier.qty);
+    }
+    return { success: false, error: err.message };
+  }
+}
+
+export async function applyTierInventorySelectionChanges(env, campaignSlug, campaign, previousSelection = [], nextSelection = []) {
+  if (!env.PLEDGES) return { success: true };
+
+  if (hasTierInventoryCoordinator(env)) {
+    const inventory = await buildTierInventorySnapshot(env, campaignSlug, campaign);
+    return callTierInventoryCoordinator(env, campaignSlug, '/apply-selection', {
+      previousCounts: getTierSelectionCounts(previousSelection),
+      nextCounts: getTierSelectionCounts(nextSelection),
+      inventory
+    });
+  }
+
+  const previousCounts = getTierSelectionCounts(previousSelection);
+  const nextCounts = getTierSelectionCounts(nextSelection);
+  const claimedAdditions = [];
+
+  try {
+    for (const [tierId, nextQty] of Object.entries(nextCounts)) {
+      const previousQty = previousCounts[tierId] || 0;
+      if (nextQty > previousQty) {
+        const delta = nextQty - previousQty;
+        const claimResult = await claimTierInventory(env, campaignSlug, tierId, delta, campaign);
+        if (!claimResult.success) {
+          throw new Error(claimResult.error || `Failed to claim inventory for tier "${tierId}"`);
+        }
+        claimedAdditions.push({ id: tierId, qty: delta });
+      }
+    }
+
+    for (const [tierId, previousQty] of Object.entries(previousCounts)) {
+      const nextQty = nextCounts[tierId] || 0;
+      if (nextQty < previousQty) {
+        await releaseTierInventory(env, campaignSlug, tierId, previousQty - nextQty);
+      }
+    }
+
+    return { success: true };
+  } catch (err) {
+    for (const claimedTier of claimedAdditions) {
+      await releaseTierInventory(env, campaignSlug, claimedTier.id, claimedTier.qty);
+    }
+    return { success: false, error: err.message };
+  }
 }
 
 /**
@@ -402,6 +552,7 @@ export async function recalculateTierInventory(env, campaignSlug, tiers) {
   }
   
   await env.PLEDGES.put(`tier-inventory:${campaignSlug}`, JSON.stringify(inventory));
+  await syncTierInventoryCoordinator(env, campaignSlug, inventory);
   return inventory;
 }
 

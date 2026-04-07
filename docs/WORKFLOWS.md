@@ -169,7 +169,7 @@ Create Stripe Checkout session (setup mode) from the first-party cart state.
 3. Worker validates campaign state, single-tier rules, threshold gates, and limited inventory availability
 4. Worker stores any overflow tier/support-item metadata in temp KV (`pending-tiers:*`, `pending-extras:*`) and creates a setup-mode Stripe Checkout session
 5. If the pledge contains physical items, Stripe Checkout collects shipping address via `shipping_address_collection`
-6. On webhook, Worker fetches any temp metadata, extracts shipping address from Stripe, computes `subtotal + tax + shipping + tip`, persists one pledge per campaign, and then claims inventory
+6. On webhook, Worker fetches any temp metadata, extracts shipping address from Stripe, computes `subtotal + tax + shipping + tip`, persists one pledge per campaign, and then claims limited-tier inventory through a per-campaign Durable Object coordinator
 
 The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`, and `/checkout-intent/start` does not reserve limited inventory before checkout completion.
 
@@ -179,7 +179,7 @@ Handle `checkout.session.completed`:
 - Fetch `supportItems`, `customAmount`, and additional tiers from temp KV when needed
 - Store one pledge per campaign in KV with status `active` (includes support items, custom amount, shipping fee, tip, and shipping address)
 - Update live stats (pledgedAmount, tierCounts, supportItems)
-- Claim tier inventory (for limited tiers) at persistence time
+- Claim tier inventory (for limited tiers) at persistence time through the serialized coordinator
 - Generate magic link token
 - Send campaign-specific supporter confirmation email(s)
 

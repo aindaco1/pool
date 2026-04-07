@@ -26,9 +26,17 @@ FLAT_SHIPPING_RATE = "3.00"
 name = "CHECKOUT_INTENTS"
 class_name = "CheckoutIntentNonceCoordinator"
 
+[[durable_objects.bindings]]
+name = "TIER_INVENTORY_COORDINATOR"
+class_name = "TierInventoryCoordinator"
+
 [[migrations]]
 tag = "v1"
 new_classes = ["CheckoutIntentNonceCoordinator"]
+
+[[migrations]]
+tag = "v2"
+new_classes = ["TierInventoryCoordinator"]
 
 # KV Namespaces - update IDs after running:
 #   wrangler kv:namespace create "VOTES"
@@ -83,6 +91,9 @@ vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "http://127.0.0.1:87
 name = "CHECKOUT_INTENTS"
 class_name = "CheckoutIntentNonceCoordinator"
 
+[[env.dev.durable_objects.bindings]]
+name = "TIER_INVENTORY_COORDINATOR"
+class_name = "TierInventoryCoordinator"
 [[env.dev.kv_namespaces]]
 binding = "VOTES"
 id = "9f11222dad2b4eb7bf80647f4361784a"

@@ -14,6 +14,32 @@ export const youtubeEmbedPrefixes = [
 export const vimeoEmbedPrefix = 'https://player.vimeo.com/video/';
 export const rawHtmlTagPattern = /<\s*\/?\s*([a-z0-9]+)(?:\s[^>]*)?>/ig;
 
+function isApprovedEmbedSrc(provider, src) {
+  try {
+    const parsed = new URL(String(src || '').trim());
+    if (parsed.protocol !== 'https:') return false;
+
+    if (provider === 'spotify') {
+      return parsed.host === 'open.spotify.com' && parsed.pathname.startsWith('/embed/');
+    }
+
+    if (provider === 'youtube') {
+      return (
+        (parsed.host === 'www.youtube.com' || parsed.host === 'www.youtube-nocookie.com') &&
+        parsed.pathname.startsWith('/embed/')
+      );
+    }
+
+    if (provider === 'vimeo') {
+      return parsed.host === 'player.vimeo.com' && parsed.pathname.startsWith('/video/');
+    }
+  } catch (_err) {
+    return false;
+  }
+
+  return false;
+}
+
 export function listCampaignFiles(repoRoot) {
   const campaignsDir = path.join(repoRoot, '_campaigns');
   if (!fs.existsSync(campaignsDir)) {
@@ -85,17 +111,17 @@ export function auditCampaignContent(repoRoot) {
       const srcMatch = blockText.match(/^\s+src:\s*(.+)$/im);
       const src = srcMatch ? srcMatch[1].trim() : '';
 
-      if (provider === 'spotify' && !src.startsWith(spotifyEmbedPrefix)) {
+      if (provider === 'spotify' && !isApprovedEmbedSrc(provider, src)) {
         failures.push(
           `${relPath}: spotify embeds must use a src under ${spotifyEmbedPrefix}.`
         );
       }
 
-      if (provider === 'youtube' && !youtubeEmbedPrefixes.some((prefix) => src.startsWith(prefix))) {
+      if (provider === 'youtube' && !isApprovedEmbedSrc(provider, src)) {
         failures.push(`${relPath}: youtube embeds must use an approved embed src.`);
       }
 
-      if (provider === 'vimeo' && !src.startsWith(vimeoEmbedPrefix)) {
+      if (provider === 'vimeo' && !isApprovedEmbedSrc(provider, src)) {
         failures.push(`${relPath}: vimeo embeds must use a src under ${vimeoEmbedPrefix}.`);
       }
     }

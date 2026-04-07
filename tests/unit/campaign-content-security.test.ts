@@ -30,6 +30,13 @@ describe('campaign content security audit', () => {
     expect(textTemplate).toContain('{{ include.block.body | safe_markdownify }}');
   });
 
+  it('keeps short blurbs on the safe rich text filter', () => {
+    const campaignTemplate = fs.readFileSync(path.join(repoRoot, '_layouts', 'campaign.html'), 'utf8');
+    const cardTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'campaign-card.html'), 'utf8');
+    expect(campaignTemplate).toContain('{{ page.short_blurb | safe_rich_text }}');
+    expect(cardTemplate).toContain('{{ include.campaign.short_blurb | safe_rich_text }}');
+  });
+
   it('keeps external markdown links opening in a new tab from the safe markdown filter', () => {
     const pluginSource = fs.readFileSync(
       path.join(repoRoot, '_plugins', 'content_safety_filter.rb'),

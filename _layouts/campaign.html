@@ -28,7 +28,7 @@
     <header class="campaign-header">
       <h1>{{ page.title | escape }}</h1>
       {% if page.short_blurb %}
-        <p class="campaign-blurb">{{ page.short_blurb | escape }}</p>
+        <p class="campaign-blurb">{{ page.short_blurb | safe_rich_text }}</p>
       {% endif %}
       {% if page.goal_deadline %}
       {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}

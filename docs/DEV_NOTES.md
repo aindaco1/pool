@@ -751,10 +751,11 @@ worker/src/
 ├── campaigns.js          # Fetch/validate campaigns from Jekyll API
 ├── checkout-intent.js    # Checkout snapshot hashing/signing helpers
 ├── checkout-intent-do.js # Durable Object nonce coordinator
+├── tier-inventory-do.js  # Durable Object coordinator for scarce tier claims
 ├── email.js              # Resend email templates
 ├── github.js             # Trigger GitHub Pages rebuilds
 ├── provider-config.js    # Runtime/provider flags
-├── stats.js              # KV-based stats, inventory, milestones
+├── stats.js              # KV-based stats + inventory cache, milestones
 ├── stripe.js             # Stripe API client + webhook signature verification
 ├── token.js              # HMAC magic link token generation/verification
 └── routes/

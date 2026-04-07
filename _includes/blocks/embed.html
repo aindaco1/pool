@@ -1,11 +1,12 @@
 {% assign block = include.block %}
 {% assign provider = block.provider | downcase %}
 {% assign embed_height = block.height | default: 152 | plus: 0 %}
+{% assign safe_src = block.src | approved_embed_src: provider %}
 <figure class="content-block content-block--embed">
-  {% if provider == 'spotify' and block.src and block.src contains 'https://open.spotify.com/embed/' %}
+  {% if provider == 'spotify' and safe_src != '' %}
     <div class="embed-container embed-container--spotify">
       <iframe
-        src="{{ block.src | escape }}"
+        src="{{ safe_src | escape }}"
         width="100%"
         height="{{ embed_height }}"
         frameborder="0"
@@ -15,20 +16,20 @@
         title="{{ block.title | default: block.caption | default: 'Embedded content' | escape }}">
       </iframe>
     </div>
-  {% elsif provider == 'youtube' and block.src and block.src contains 'https://www.youtube.com/embed/' or provider == 'youtube' and block.src and block.src contains 'https://www.youtube-nocookie.com/embed/' %}
+  {% elsif provider == 'youtube' and safe_src != '' %}
     <div class="embed-container embed-container--video">
       <iframe
-        src="{{ block.src | escape }}"
+        src="{{ safe_src | escape }}"
         allowfullscreen
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         loading="lazy"
         title="{{ block.title | default: block.caption | default: 'Embedded video' | escape }}">
       </iframe>
     </div>
-  {% elsif provider == 'vimeo' and block.src and block.src contains 'https://player.vimeo.com/video/' %}
+  {% elsif provider == 'vimeo' and safe_src != '' %}
     <div class="embed-container embed-container--video">
       <iframe
-        src="{{ block.src | escape }}"
+        src="{{ safe_src | escape }}"
         allowfullscreen
         allow="autoplay; fullscreen; picture-in-picture"
         loading="lazy"

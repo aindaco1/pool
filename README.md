@@ -21,7 +21,8 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement with published option allowlists and closed-decision lockout
-- **Sanitized campaign content blocks** — Long-form campaign and diary content accepts Markdown plus a tiny safe inline subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`), automatically opens external links in a new tab, and escapes or rejects other raw HTML
+- **Sanitized campaign content blocks** — Long-form campaign and diary content accepts Markdown plus a tiny safe inline subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`), rewrites unsafe Markdown link schemes, automatically opens external links in a new tab, and escapes or rejects other raw HTML
+- **Serialized limited-tier inventory** — Scarce reward claims are coordinated per campaign through a Durable Object so concurrent checkout completions cannot oversell limited tiers
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
 - **Announcements** — Admin broadcast emails with custom CTA links to supporters
 - **Instagram integration** — Optional social CTA in supporter emails
@@ -90,7 +91,7 @@ Local reporting:
 - Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow
 - Unit, security, and headless E2E suites are green on this branch
 
-**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, secret exposure auditing, campaign-content HTML auditing, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
+**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, secret exposure auditing, campaign-content HTML/link/embed auditing, serialized tier-inventory coordination, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
 
 For local merge smoke on mutable pledges, use:
 

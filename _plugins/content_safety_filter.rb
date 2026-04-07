@@ -3,6 +3,8 @@ require 'uri'
 
 module Jekyll
   module ContentSafetyFilter
+    include Jekyll::Filters
+
     PLACEHOLDERS = {
       /<br\s*\/?>/i => '__POOL_SAFE_BR__',
       /<em>/i => '__POOL_SAFE_EM_OPEN__',
@@ -36,13 +38,32 @@ module Jekyll
     end
 
     def safe_markdownify(input)
-      site = @context.registers[:site]
-      converter = site&.find_converter_instance(Jekyll::Converters::Markdown)
       sanitized = sanitize_rich_text(input)
-      return sanitized unless converter
+      return sanitized unless @context&.registers&.[](:site)
 
-      html = converter.convert(sanitized)
-      add_external_link_attrs(html, site)
+      html = markdownify(sanitized)
+      sanitize_markdown_links(html, @context.registers[:site])
+    end
+
+    def approved_embed_src(input, provider)
+      src = input.to_s.strip
+      return '' if src.empty?
+
+      uri = parse_uri(src)
+      return '' unless uri
+      return '' unless uri.scheme == 'https'
+
+      case provider.to_s.downcase
+      when 'spotify'
+        return src if uri.host == 'open.spotify.com' && uri.path.start_with?('/embed/')
+      when 'youtube'
+        return src if (uri.host == 'www.youtube.com' || uri.host == 'www.youtube-nocookie.com') &&
+          uri.path.start_with?('/embed/')
+      when 'vimeo'
+        return src if uri.host == 'player.vimeo.com' && uri.path.start_with?('/video/')
+      end
+
+      ''
     end
 
     private
@@ -63,7 +84,7 @@ module Jekyll
       text
     end
 
-    def add_external_link_attrs(html, site)
+    def sanitize_markdown_links(html, site)
       return html unless html&.include?('<a')
 
       site_host = begin
@@ -78,29 +99,57 @@ module Jekyll
         href = Regexp.last_match(3)
         trailing_attrs = Regexp.last_match(4)
 
-        next match unless external_http_link?(href, site_host)
-
         updated = match.dup
-        unless leading_attrs.match?(/\btarget\s*=/i) || trailing_attrs.match?(/\btarget\s*=/i)
-          updated.sub!('<a', '<a target="_blank"')
+
+        unless allowed_link_href?(href)
+          updated.sub!(/href=(['"])([^'"]+)\1/i, 'href="#"')
+          updated.gsub!(/\s+target=(['"])[^'"]*\1/i, '')
+          updated.gsub!(/\s+rel=(['"])[^'"]*\1/i, '')
+          next updated
         end
 
-        unless leading_attrs.match?(/\brel\s*=/i) || trailing_attrs.match?(/\brel\s*=/i)
-          updated.sub!('<a', '<a rel="noopener noreferrer"')
+        if external_http_link?(href, site_host)
+          unless leading_attrs.match?(/\btarget\s*=/i) || trailing_attrs.match?(/\btarget\s*=/i)
+            updated.sub!('<a', '<a target="_blank"')
+          end
+
+          unless leading_attrs.match?(/\brel\s*=/i) || trailing_attrs.match?(/\brel\s*=/i)
+            updated.sub!('<a', '<a rel="noopener noreferrer"')
+          end
         end
 
         updated
       end
     end
 
+    def allowed_link_href?(href)
+      return false if href.nil?
+
+      normalized = CGI.unescapeHTML(href.to_s).strip
+      return false if normalized.empty?
+      return true if normalized.start_with?('#', '/', '?', './', '../')
+
+      uri = parse_uri(normalized)
+      return false unless uri
+      return true if uri.scheme.nil? && uri.host.nil?
+
+      %w[http https mailto].include?(uri.scheme)
+    end
+
     def external_http_link?(href, site_host)
-      uri = URI.parse(href)
+      uri = parse_uri(href)
+      return false unless uri
       return false unless %w[http https].include?(uri.scheme)
       return true if site_host.nil? || site_host.empty?
 
       uri.host != site_host
+    end
+
+    def parse_uri(value)
+      normalized = CGI.unescapeHTML(value.to_s).gsub(/[\u0000-\u0020]+/, '')
+      URI.parse(normalized)
     rescue URI::InvalidURIError
-      false
+      nil
     end
   end
 end

@@ -71,9 +71,9 @@ The same block system is used for **Production Diary** entries.
 Content safety rules for campaign/diary blocks:
 
 - Prefer Markdown for formatting.
-- Markdown links remain supported, and external links open in a new tab automatically.
+- Markdown links remain supported, but only safe destinations are kept. External links open in a new tab automatically.
 - A small inline HTML subset is preserved for compatibility: `<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`.
-- Other raw HTML tags are rejected by the content audit and will fail local/CI testing.
+- Structured embeds must use approved `https://` provider URLs, and other raw HTML tags are rejected by the content audit and will fail local/CI testing.
 
 ### Adding Tiers
 

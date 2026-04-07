@@ -64,7 +64,9 @@ This runs:
   - `tests/unit/worker-business-logic.test.ts`
   - `tests/unit/worker-ops-integrity.test.ts`
   - `tests/unit/stats-pagination.test.ts`
+- Content safety filter regressions in `tests/unit/content-safety-filter.test.ts`, including unsafe Markdown link schemes and strict structured-embed URL validation
 - Campaign-content audit coverage in `tests/unit/campaign-content-security.test.ts`, including the allowed inline HTML subset and rejection of disallowed raw tags
+- Durable Object tier-inventory serialization coverage in `tests/unit/tier-inventory-do.test.ts`
 - Local smoke scripts against the test-only mutable campaign:
   - `scripts/test-worker.sh` for site/Worker contract checks and malformed `/checkout-intent/start` verification
   - `scripts/smoke-pledge-management.sh` for successful modify/cancel coverage on the local-only mutable campaign

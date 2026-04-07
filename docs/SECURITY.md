@@ -92,8 +92,10 @@ if (token.startsWith('dev-token-')) {
 
 **Note:** Votes are keyed by **email** (not orderId) to prevent supporters with multiple pledges from voting multiple times. The Worker also resolves campaign decisions server-side, rejects unknown/closed decisions, and only accepts option values from the campaign's published allowlist.
 
-Campaign-authored titles, descriptions, and support labels are also escaped by default in supporter-facing cart, manage, and community surfaces so forks with creator-editable content do not inherit a stored-XSS footgun by default. Long-form campaign and diary blocks now accept Markdown plus a very small inline HTML subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`); other raw tags are escaped at render time and rejected by the content audit.
+Campaign-authored titles, descriptions, and support labels are also escaped by default in supporter-facing cart, manage, and community surfaces so forks with creator-editable content do not inherit a stored-XSS footgun by default. Long-form campaign and diary blocks now accept Markdown plus a very small inline HTML subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`); other raw tags are escaped at render time and rejected by the content audit. Markdown links are rewritten unless they use an allowlisted destination scheme (`http:`, `https:`, `mailto:`, or internal links), and structured embeds must use exact approved `https://` provider URLs instead of passing a substring check.
 Community pages no longer persist the raw supporter bearer token in a long-lived cookie; the token now stays in browser session storage while a non-sensitive verification cookie handles lightweight UX state.
+
+Limited-tier inventory claims also now flow through a per-campaign Durable Object coordinator. KV remains the reporting/cache layer, but scarce inventory mutations are serialized before the Worker persists the pledge, which closes the old raceable read-modify-write path.
 
 ---
 

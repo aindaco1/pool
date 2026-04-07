@@ -41,13 +41,14 @@ import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, se
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
-import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent } from './stats.js';
+import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges } from './stats.js';
 import { triggerSiteRebuild } from './github.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { DEFAULT_PLATFORM_TIP_PERCENT, calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
 import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput, CHECKOUT_INTENT_VERSION, DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
 import { getCheckoutProvider, getFlatShippingFeeCents, getSalesTaxRate } from './provider-config.js';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
+export { TierInventoryCoordinator } from './tier-inventory-do.js';
 
 // Rate limit delay for Resend API (2 req/sec limit)
 const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
@@ -902,57 +903,11 @@ async function clearTierReservation(env, campaignSlug, orderId) {
 }
 
 async function claimSelectedTierInventory(env, campaignSlug, selectedTiers = [], campaign) {
-  const claimedTiers = [];
-
-  try {
-    for (const tierItem of selectedTiers) {
-      const claimResult = await claimTierInventory(env, campaignSlug, tierItem.id, tierItem.qty, campaign);
-      if (!claimResult.success) {
-        throw new Error(claimResult.error || `Failed to claim inventory for tier "${tierItem.id}"`);
-      }
-      claimedTiers.push({ id: tierItem.id, qty: tierItem.qty });
-    }
-    return { success: true, claimedTiers };
-  } catch (err) {
-    for (const claimedTier of claimedTiers) {
-      await releaseTierInventory(env, campaignSlug, claimedTier.id, claimedTier.qty);
-    }
-    return { success: false, error: err.message };
-  }
+  return claimTierSelectionInventory(env, campaignSlug, selectedTiers, campaign);
 }
 
 async function applyTierInventoryChanges(env, campaignSlug, campaign, previousSelection = [], nextSelection = []) {
-  const previousCounts = getTierQuantityMap(previousSelection);
-  const nextCounts = getTierQuantityMap(nextSelection);
-  const claimedAdditions = [];
-
-  try {
-    for (const [tierId, nextQty] of Object.entries(nextCounts)) {
-      const previousQty = previousCounts[tierId] || 0;
-      if (nextQty > previousQty) {
-        const delta = nextQty - previousQty;
-        const claimResult = await claimTierInventory(env, campaignSlug, tierId, delta, campaign);
-        if (!claimResult.success) {
-          throw new Error(claimResult.error || `Failed to claim inventory for tier "${tierId}"`);
-        }
-        claimedAdditions.push({ id: tierId, qty: delta });
-      }
-    }
-
-    for (const [tierId, previousQty] of Object.entries(previousCounts)) {
-      const nextQty = nextCounts[tierId] || 0;
-      if (nextQty < previousQty) {
-        await releaseTierInventory(env, campaignSlug, tierId, previousQty - nextQty);
-      }
-    }
-
-    return { success: true };
-  } catch (err) {
-    for (const claimedTier of claimedAdditions) {
-      await releaseTierInventory(env, campaignSlug, claimedTier.id, claimedTier.qty);
-    }
-    return { success: false, error: err.message };
-  }
+  return applyTierInventorySelectionChanges(env, campaignSlug, campaign, previousSelection, nextSelection);
 }
 
 async function persistNewPledge(env, {

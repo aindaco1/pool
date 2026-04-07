@@ -13,7 +13,7 @@
   
   <div class="campaign-card__content">
     <h2><a href="{{ include.campaign.url }}">{{ include.campaign.title | escape }}</a></h2>
-    <p class="campaign-card__blurb">{{ include.campaign.short_blurb | escape }}</p>
+    <p class="campaign-card__blurb">{{ include.campaign.short_blurb | safe_rich_text }}</p>
     {% include progress.html campaign_slug=include.campaign.slug pledged=0 goal=include.campaign.goal_amount deadline=include.campaign.goal_deadline start_date=include.campaign.start_date state=include.campaign.state progress_background=include.campaign.progress_background %}
     
     {% if include.campaign.featured_tier_id %}

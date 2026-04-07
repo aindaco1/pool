@@ -82,6 +82,8 @@ Returns: `{ "url": "https://checkout.stripe.com/..." }`
 
 The Worker rebuilds tier, add-on, custom-support, shipping, and subtotal state from first-party cart items, validates campaign state and inventory, signs a short-lived checkout snapshot, and only claims limited inventory after the pledge is actually persisted.
 
+Limited-tier claims are serialized through a per-campaign Durable Object coordinator before the KV inventory snapshot is updated, so concurrent webhook completions cannot oversell scarce rewards.
+
 ### GET /pledges?token={token}
 Get the pledge(s) authorized by a magic link token.
 
@@ -117,6 +119,13 @@ Change tiers, quantity, or custom support for an active pledge.
 All fields except `token` are optional. Changes are tracked in the pledge's `history` array with `type: "modified"` entries that include tier state and `customAmount`.
 
 The Worker validates the requested order against the token payload and recalculates totals from stored pledge state plus campaign definitions.
+
+## Content Safety Notes
+
+- Campaign/diary text blocks accept Markdown plus a small inline HTML subset: `<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`.
+- Markdown links are rewritten unless they use an allowlisted destination scheme (`http:`, `https:`, `mailto:`, or internal links).
+- External Markdown links automatically get `target="_blank"` and `rel="noopener noreferrer"`.
+- Structured embeds only render when the provider URL is an approved `https://` Spotify, YouTube, or Vimeo embed URL.
 
 ### POST /pledge/payment-method/start
 Start a Stripe session to update payment method.
