@@ -2563,22 +2563,7 @@ async function handleGetPledge(request, env) {
     }
   }
 
-  return jsonResponse({
-    orderId: payload.orderId,
-    email: payload.email,
-    campaignSlug: payload.campaignSlug,
-    pledgeStatus: 'active',
-    subtotal: 0,
-    tax: 0,
-    shipping: 0,
-    tipPercent: 0,
-    tipAmount: 0,
-    amount: 0,
-    tierId: null,
-    canModify: true,
-    canCancel: true,
-    canUpdatePaymentMethod: true
-  });
+  return jsonResponse({ error: 'Pledge not found' }, 404);
 }
 
 async function handleGetPledges(request, env) {

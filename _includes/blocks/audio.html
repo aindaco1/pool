@@ -2,14 +2,14 @@
 <figure class="content-block content-block--audio">
   <div class="audio-player">
     {% if block.title %}
-      <span class="audio-player__title">{{ block.title }}</span>
+      <span class="audio-player__title">{{ block.title | safe_rich_text }}</span>
     {% endif %}
     <audio controls preload="metadata">
-      <source src="{{ block.src }}" type="audio/mpeg">
+      <source src="{{ block.src | escape }}" type="audio/mpeg">
       Your browser does not support the audio element.
     </audio>
   </div>
   {% if block.caption %}
-    <figcaption class="content-block__caption">{{ block.caption }}</figcaption>
+    <figcaption class="content-block__caption">{{ block.caption | safe_rich_text }}</figcaption>
   {% endif %}
 </figure>

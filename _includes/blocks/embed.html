@@ -1,12 +1,13 @@
 {% assign block = include.block %}
 {% assign provider = block.provider | downcase %}
+{% assign embed_height = block.height | default: 152 | plus: 0 %}
 <figure class="content-block content-block--embed">
   {% if provider == 'spotify' and block.src and block.src contains 'https://open.spotify.com/embed/' %}
     <div class="embed-container embed-container--spotify">
       <iframe
         src="{{ block.src | escape }}"
         width="100%"
-        height="{{ block.height | default: 152 }}"
+        height="{{ embed_height }}"
         frameborder="0"
         allowfullscreen
         allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
@@ -36,6 +37,6 @@
     </div>
   {% endif %}
   {% if block.caption %}
-    <figcaption class="content-block__caption">{{ block.caption }}</figcaption>
+    <figcaption class="content-block__caption">{{ block.caption | safe_rich_text }}</figcaption>
   {% endif %}
 </figure>

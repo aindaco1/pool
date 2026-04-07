@@ -5,12 +5,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const allowedEmbedProviders = new Set(['spotify', 'youtube', 'vimeo']);
+export const allowedInlineHtmlTags = new Set(['b', 'br', 'em', 'i', 'strong', 'u']);
 export const spotifyEmbedPrefix = 'https://open.spotify.com/embed/';
 export const youtubeEmbedPrefixes = [
   'https://www.youtube.com/embed/',
   'https://www.youtube-nocookie.com/embed/'
 ];
 export const vimeoEmbedPrefix = 'https://player.vimeo.com/video/';
+export const rawHtmlTagPattern = /<\s*\/?\s*([a-z0-9]+)(?:\s[^>]*)?>/ig;
 
 export function listCampaignFiles(repoRoot) {
   const campaignsDir = path.join(repoRoot, '_campaigns');
@@ -47,6 +49,17 @@ export function auditCampaignContent(repoRoot) {
 
     if (/<iframe\b/i.test(content)) {
       failures.push(`${relPath}: raw <iframe> HTML is not allowed in campaign content.`);
+    }
+
+    for (const match of content.matchAll(rawHtmlTagPattern)) {
+      const tag = match[1]?.toLowerCase();
+      if (!tag || allowedInlineHtmlTags.has(tag)) {
+        continue;
+      }
+
+      failures.push(
+        `${relPath}: raw <${tag}> HTML is not allowed in campaign content; use Markdown or approved content blocks instead.`
+      );
     }
 
     if (/^\s+html:\s+/m.test(content)) {

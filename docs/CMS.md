@@ -60,13 +60,20 @@ The `long_content` field uses **block-based editing** — each block type shows 
 
 | Type | Fields Shown |
 |------|--------------|
-| **Text** | Markdown content editor |
+| **Text** | Markdown content editor (raw HTML is not supported beyond simple inline tags like `<br>` and `<em>`) |
 | **Image** | Image upload, alt text, caption |
 | **Quote** | Quote text, author |
 | **Gallery** | Layout selector, image list, caption |
 | **Divider** | None (just adds a horizontal line) |
 
 The same block system is used for **Production Diary** entries.
+
+Content safety rules for campaign/diary blocks:
+
+- Prefer Markdown for formatting.
+- Markdown links remain supported, and external links open in a new tab automatically.
+- A small inline HTML subset is preserved for compatibility: `<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`.
+- Other raw HTML tags are rejected by the content audit and will fail local/CI testing.
 
 ### Adding Tiers
 

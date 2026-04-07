@@ -234,6 +234,12 @@ long_content:
         alt: "Still 1"
 ```
 
+Long-content safety/behavior rules:
+- Text blocks support Markdown.
+- External Markdown links render with `target="_blank"` and `rel="noopener noreferrer"` automatically.
+- A small inline HTML subset is preserved for compatibility: `<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`.
+- Other raw HTML tags are escaped at render time and rejected by `scripts/audit-campaign-content.mjs`.
+
 **Gallery layouts:**
 - `grid` (default): 2-column grid, 4:3 aspect ratio (1 column on mobile)
 - `logos`: 2-column grid, auto aspect ratio with `object-fit: contain` (max 200px height) — ideal for sponsor/partner logos

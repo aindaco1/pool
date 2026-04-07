@@ -818,7 +818,7 @@ describe('Worker business logic hardening', () => {
     expect(pledges[0].orderId).toBe('order-scope-1');
   });
 
-  it('falls back to token-scoped placeholder pledge data when no KV pledge exists', async () => {
+  it('returns not found when a valid magic link points to a missing pledge record', async () => {
     const env = createEnv({
       CHECKOUT_PROVIDER: 'first_party'
     });
@@ -835,14 +835,10 @@ describe('Worker business logic hardening', () => {
       { waitUntil: () => {} }
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(404);
 
     const payload = await response.json();
-    expect(payload.orderId).toBe('order-first-party-fallback-1');
-    expect(payload.campaignSlug).toBe('hand-relations');
-    expect(payload.amount).toBe(0);
-    expect(payload.canModify).toBe(true);
-    expect(payload.canCancel).toBe(true);
+    expect(payload).toEqual({ error: 'Pledge not found' });
   });
 
   it('rejects cross-order modify attempts with a token from another pledge', async () => {

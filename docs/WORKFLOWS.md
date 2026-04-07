@@ -193,6 +193,8 @@ Read the pledge collection available to a magic link session.
 ### `GET /pledge?token=...`
 Read pledge details for magic link management page.
 
+If the token is valid but its pledge record no longer exists, this route returns `404` instead of synthesizing a placeholder pledge.
+
 **Response:**
 ```json
 {

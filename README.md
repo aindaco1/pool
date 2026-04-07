@@ -21,7 +21,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement with published option allowlists and closed-decision lockout
-- **Escaped campaign content surfaces** — Campaign-authored titles, labels, and descriptions render as text in cart, manage, and community UIs for safer forks/CMS imports
+- **Sanitized campaign content blocks** — Long-form campaign and diary content accepts Markdown plus a tiny safe inline subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`), automatically opens external links in a new tab, and escapes or rejects other raw HTML
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
 - **Announcements** — Admin broadcast emails with custom CTA links to supporters
 - **Instagram integration** — Optional social CTA in supporter emails
@@ -90,7 +90,7 @@ Local reporting:
 - Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow
 - Unit, security, and headless E2E suites are green on this branch
 
-**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, secret exposure auditing, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
+**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, secret exposure auditing, campaign-content HTML auditing, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
 
 For local merge smoke on mutable pledges, use:
 

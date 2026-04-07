@@ -64,6 +64,7 @@ This runs:
   - `tests/unit/worker-business-logic.test.ts`
   - `tests/unit/worker-ops-integrity.test.ts`
   - `tests/unit/stats-pagination.test.ts`
+- Campaign-content audit coverage in `tests/unit/campaign-content-security.test.ts`, including the allowed inline HTML subset and rejection of disallowed raw tags
 - Local smoke scripts against the test-only mutable campaign:
   - `scripts/test-worker.sh` for site/Worker contract checks and malformed `/checkout-intent/start` verification
   - `scripts/smoke-pledge-management.sh` for successful modify/cancel coverage on the local-only mutable campaign

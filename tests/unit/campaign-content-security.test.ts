@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 import {
   auditCampaignContent,
   allowedEmbedProviders,
+  allowedInlineHtmlTags,
+  rawHtmlTagPattern,
   spotifyEmbedPrefix,
   youtubeEmbedPrefixes,
   vimeoEmbedPrefix,
@@ -23,14 +25,31 @@ describe('campaign content security audit', () => {
     expect(progressTemplate).toContain('{{ s.title | escape }}');
   });
 
+  it('keeps text blocks on the safe markdown filter', () => {
+    const textTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'blocks', 'text.html'), 'utf8');
+    expect(textTemplate).toContain('{{ include.block.body | safe_markdownify }}');
+  });
+
+  it('keeps external markdown links opening in a new tab from the safe markdown filter', () => {
+    const pluginSource = fs.readFileSync(
+      path.join(repoRoot, '_plugins', 'content_safety_filter.rb'),
+      'utf8'
+    );
+    expect(pluginSource).toContain('target="_blank"');
+    expect(pluginSource).toContain('rel="noopener noreferrer"');
+    expect(pluginSource).toContain('external_http_link?');
+  });
+
   it('keeps the approved structured embed allowlist narrow', () => {
     expect(Array.from(allowedEmbedProviders).sort()).toEqual(['spotify', 'vimeo', 'youtube']);
+    expect(Array.from(allowedInlineHtmlTags).sort()).toEqual(['b', 'br', 'em', 'i', 'strong', 'u']);
     expect(spotifyEmbedPrefix).toBe('https://open.spotify.com/embed/');
     expect(youtubeEmbedPrefixes).toEqual([
       'https://www.youtube.com/embed/',
       'https://www.youtube-nocookie.com/embed/'
     ]);
     expect(vimeoEmbedPrefix).toBe('https://player.vimeo.com/video/');
+    expect(rawHtmlTagPattern).toBeInstanceOf(RegExp);
   });
 
   it('rejects raw iframe html and inline styles in campaign content', () => {
@@ -84,6 +103,36 @@ long_content:
 
     const failures = auditCampaignContent(tempRoot);
     expect(failures).toContain('_campaigns/bad-provider.md: embed provider "loom" is not approved.');
+
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it('rejects raw html tags in text blocks while allowing the safe inline subset', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pool-campaign-audit-'));
+    const campaignsDir = path.join(tempRoot, '_campaigns');
+    fs.mkdirSync(campaignsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(campaignsDir, 'bad-text.md'),
+      `---
+layout: campaign
+title: "Bad Text"
+slug: bad-text
+short_blurb: "<em>Safe emphasis</em>"
+long_content:
+  - type: text
+    body: |
+      Safe line<br>
+      <u>Still allowed</u>
+      <img src=x onerror=alert(1)>
+---
+`,
+      'utf8'
+    );
+
+    const failures = auditCampaignContent(tempRoot);
+    expect(failures).toContain(
+      '_campaigns/bad-text.md: raw <img> HTML is not allowed in campaign content; use Markdown or approved content blocks instead.'
+    );
 
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });

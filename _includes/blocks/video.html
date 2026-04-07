@@ -1,27 +1,31 @@
 {% assign block = include.block %}
+{% assign provider = block.provider | downcase %}
+{% unless provider == 'vimeo' %}
+  {% assign provider = 'youtube' %}
+{% endunless %}
 <figure class="content-block content-block--video">
-  <div class="video-embed video-embed--{{ block.provider | default: 'youtube' }}">
-    {% if block.provider == 'vimeo' %}
+  <div class="video-embed video-embed--{{ provider }}">
+    {% if provider == 'vimeo' %}
       <iframe 
-        src="https://player.vimeo.com/video/{{ block.video_id }}?dnt=1" 
+        src="https://player.vimeo.com/video/{{ block.video_id | uri_escape | escape }}?dnt=1"
         frameborder="0" 
         allow="autoplay; fullscreen; picture-in-picture" 
         allowfullscreen
         loading="lazy"
-        title="{{ block.caption | default: 'Video' }}">
+        title="{{ block.caption | default: 'Video' | strip_html | escape }}">
       </iframe>
     {% else %}
       <iframe 
-        src="https://www.youtube-nocookie.com/embed/{{ block.video_id }}" 
+        src="https://www.youtube-nocookie.com/embed/{{ block.video_id | uri_escape | escape }}"
         frameborder="0" 
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
         allowfullscreen
         loading="lazy"
-        title="{{ block.caption | default: 'Video' }}">
+        title="{{ block.caption | default: 'Video' | strip_html | escape }}">
       </iframe>
     {% endif %}
   </div>
   {% if block.caption %}
-    <figcaption class="content-block__caption">{{ block.caption }}</figcaption>
+    <figcaption class="content-block__caption">{{ block.caption | safe_rich_text }}</figcaption>
   {% endif %}
 </figure>

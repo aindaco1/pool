@@ -1,7 +1,7 @@
 {% assign block = include.block %}
 <blockquote class="content-block content-block--quote">
-  <p>{{ block.text }}</p>
+  <p>{{ block.text | safe_rich_text }}</p>
   {% if block.author %}
-    <cite>— {{ block.author }}</cite>
+    <cite>— {{ block.author | safe_rich_text }}</cite>
   {% endif %}
 </blockquote>

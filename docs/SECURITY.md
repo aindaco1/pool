@@ -92,7 +92,7 @@ if (token.startsWith('dev-token-')) {
 
 **Note:** Votes are keyed by **email** (not orderId) to prevent supporters with multiple pledges from voting multiple times. The Worker also resolves campaign decisions server-side, rejects unknown/closed decisions, and only accepts option values from the campaign's published allowlist.
 
-Campaign-authored titles, descriptions, and support labels are also escaped by default in supporter-facing cart, manage, and community surfaces so forks with creator-editable content do not inherit a stored-XSS footgun by default.
+Campaign-authored titles, descriptions, and support labels are also escaped by default in supporter-facing cart, manage, and community surfaces so forks with creator-editable content do not inherit a stored-XSS footgun by default. Long-form campaign and diary blocks now accept Markdown plus a very small inline HTML subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`); other raw tags are escaped at render time and rejected by the content audit.
 Community pages no longer persist the raw supporter bearer token in a long-lived cookie; the token now stays in browser session storage while a non-sensitive verification cookie handles lightweight UX state.
 
 ---
@@ -401,7 +401,7 @@ For local runs, keep `CHECKOUT_INTENT_SECRET` configured if you want the live-wo
 If a magic link token is compromised:
 1. The token is tied to a specific orderId/email/campaign
 2. It can only access/modify that one authorized order
-3. To invalidate: delete the pledge from KV (orderId will no longer exist)
+3. To invalidate: delete the pledge from KV (`GET /pledge` will then return `404` for that token)
 4. Optionally: regenerate MAGIC_LINK_SECRET (invalidates ALL tokens)
 
 ### Admin Secret Compromise
