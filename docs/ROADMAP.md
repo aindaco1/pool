@@ -68,6 +68,10 @@ _(None currently)_
 - [ ] Admin dashboard page (read-only) from KV data
 - [ ] Pages CMS per-campaign permissions (waiting on Pages CMS roadmap)
 - [ ] More explicit inventory overselling protection
+  - Move scarce limited-tier claims into a per-campaign Durable Object coordinator
+  - Keep `tier-inventory:{slug}` in KV as a projection/cache for public reads, not the source of truth
+  - Use SQLite-backed Durable Objects only so the design stays compatible with the Workers Free plan
+  - Restrict Durable Object calls to write paths (checkout persistence, modify, cancel, rebuild) so daily free-plan request limits stay viable
 
 ## Known Issues
 

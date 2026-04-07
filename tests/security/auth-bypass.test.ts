@@ -34,8 +34,9 @@ describe('Authentication Bypass Tests', () => {
         const body = await res.json();
         expect(body.error).toContain('Invalid');
       } else {
-        // In test mode, dev tokens are allowed (429 = rate limited)
-        expect([200, 401, 429]).toContain(res.status);
+        // In test mode, dev tokens bypass token verification but may still
+        // fail closed on missing campaign/decision context.
+        expect([200, 401, 404, 429]).toContain(res.status);
       }
     });
 

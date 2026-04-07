@@ -33,6 +33,8 @@ Instead of asking you to create a password, The Pool uses secure email links to 
 
 If you backed multiple campaigns in one checkout, you'll still manage them separately afterward.
 
+For supporter-community access, The Pool keeps the verified supporter session in the current browser session rather than a long-lived access cookie. Reopening the email link is the safest way back in if that session expires.
+
 ## Umm, So How Does It Work Again?
 
 1. **Browse** — Find a project you want to support
@@ -56,6 +58,7 @@ The Pool is designed for filmmakers and other creatives with features like:
 - **Production diary** — Keep your community engaged with updates
 - **Ongoing support** — Accept contributions after your main campaign ends
 - **No-account supporter access** — Backers manage pledges and join supporter-only community pages through email magic links instead of creating accounts
+- **Safer rich content** — Campaign text and diary entries support Markdown and approved embeds, while unsafe raw HTML and dangerous link or embed schemes are blocked at render time
 
 ## The Technology
 

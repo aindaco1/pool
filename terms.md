@@ -14,6 +14,7 @@ title: Terms & Creative Guidelines
 - A single checkout may include more than one campaign, but each campaign is stored and managed as its own pledge after checkout.
 - All campaign deadlines use Mountain Time (MST/MDT).
 - Community votes are limited to the published options on a campaign's supporter page, and closed decisions do not accept new votes.
+- If a manage link points to a pledge that no longer exists, The Pool treats it as unavailable instead of reconstructing placeholder pledge access.
 
 ## Payment Processing
 
@@ -21,7 +22,7 @@ title: Terms & Creative Guidelines
 - If a campaign is funded, all pledges from the same email for that campaign are combined into a single charge.
 - You may add an **optional platform tip** from 0% to 15% during checkout. The default tip is 5%.
 - Optional platform tips support maintenance of The Pool and are included in your pledge total, but **do not count toward a campaign's funding goal**.
-- Sales tax is applied to pledges using the rate configured for this deployment.
+- Sales tax is applied to pledges using the rate configured for this deployment (Burque GRT baby!).
 - Physical product pledges include a flat shipping fee per campaign that contains physical items. Your shipping address is securely collected via Stripe.
 
 ## Creative Control & Submissions
@@ -52,6 +53,7 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - We collect only the information necessary to process pledges and fulfill rewards: email, name, and payment details. For physical product tiers, we also collect a shipping address via Stripe.
 - Your payment information and shipping address are stored securely by Stripe and are never accessible to us.
 - Email addresses are stored in our system for pledge management, campaign-specific confirmations, campaign updates, and reward fulfillment.
+- Supporter-community access in the browser may be remembered for the current session as a convenience, but the emailed magic link remains the source of truth for access.
 - We do not sell or share your information with third parties except as necessary for payment processing and email delivery.
 
 ## Platform & Technology
@@ -65,6 +67,8 @@ The Pool is an [open-source crowdfunding platform](https://github.com/aindaco1/p
 - **Resend** — Transactional emails (confirmations, updates, charge notifications)
 
 Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project, with optional platform tips helping cover maintenance of The Pool itself.
+
+Campaign-rich text is limited to a small safe formatting subset plus approved embed providers. Unsafe raw HTML and dangerous link or embed schemes are blocked.
 
 ## Questions
 

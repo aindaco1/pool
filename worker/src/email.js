@@ -31,6 +31,25 @@ function getResolvedSiteBase(siteBase) {
   }
 }
 
+function getEmailAssetBase(siteBase) {
+  try {
+    const resolved = new URL(getResolvedSiteBase(siteBase));
+    const hostname = resolved.hostname.toLowerCase();
+    const isLocalHost =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1';
+
+    if (resolved.protocol !== 'https:' || isLocalHost) {
+      return FALLBACK_SITE_BASE;
+    }
+
+    return resolved.toString();
+  } catch (_error) {
+    return FALLBACK_SITE_BASE;
+  }
+}
+
 function getSiteRootUrl(siteBase) {
   return getResolvedSiteBase(siteBase);
 }
@@ -88,7 +107,7 @@ function getInstagramCTA(instagramUrl, siteBase = 'https://pool.dustwave.xyz') {
   if (!safeInstagramHref) return '';
   
   // Instagram logo hosted on our own domain (third-party URLs trigger Gmail spam filters)
-  const instagramIcon = `<img src="${safeSiteUrl('/assets/images/instagram-white.png', siteBase)}" alt="Instagram" width="20" height="20" style="vertical-align: middle; margin-right: 8px;">`;
+  const instagramIcon = `<img src="${safeSiteUrl('/assets/images/instagram-white.png', getEmailAssetBase(siteBase))}" alt="Instagram" width="20" height="20" style="vertical-align: middle; margin-right: 8px;">`;
   
   return `
   <div style="background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); border-radius: 8px; padding: 16px 20px; margin: 24px 0; text-align: center;">

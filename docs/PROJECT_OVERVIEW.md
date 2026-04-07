@@ -100,6 +100,8 @@ All code is versioned and auditable — no external DB or CMS needed.
 6. ✅ Daily Worker cron enabled (7 AM UTC / midnight MT) — check via `GET /admin/cron/status`.  
 7. ✅ Cloudflare cache purge configured (requires CLOUDFLARE_ZONE, CLOUDFLARE_EMAIL, CLOUDFLARE_KEY secrets + CLOUDFLARE_ENABLED variable).  
 8. ✅ Test campaign runs end-to-end in Stripe test mode.
+9. ✅ Long-form content sanitizes Markdown link schemes and only renders structured embeds from exact approved origins.
+10. ✅ Missing-pledge magic-link reads fail closed with `404`.
 
 ---
 
@@ -120,6 +122,8 @@ All code is versioned and auditable — no external DB or CMS needed.
 5. **Countdown pre-rendering**: Calculate initial values at build time (Jekyll) or render time (JS) to avoid "00 00 00 00" flash.
 6. **Support items data flow**: Cart.js extracts support items → Worker stores in temp KV → Webhook merges into final pledge.
 7. **DST-aware timezone handling**: All deadline logic (frontend countdown, Worker settlement, campaign state transitions) uses `Intl.DateTimeFormat` with `timeZone: 'America/Denver'` to detect MST vs MDT — never hardcode UTC offsets.
+8. **Content safety must hold at render time**: authoring audits help, but the real protection comes from runtime Markdown-link sanitization and exact-origin embed validation.
+9. **Magic links must require real pledge rows**: token validity alone is insufficient; missing pledge records should fail closed.
 
 ---
 

@@ -226,6 +226,8 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `APP_MODE` | `"test"` or `"live"` - determines which API keys to use |
 | `RESEND_RATE_LIMIT_DELAY` | Delay between emails in ms (default: 600ms to stay under Resend's 2 req/sec limit) |
 
+When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email images still fall back to the public `https://pool.dustwave.xyz` asset base so inbox clients do not receive broken localhost image URLs.
+
 ## Data Flow
 
 1. **User pledges on campaign page**

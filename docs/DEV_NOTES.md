@@ -829,6 +829,7 @@ Secrets live in Cloudflare Worker environment variables. Never commit:
 **Always host email images on your own domain** (e.g., `pool.dustwave.xyz/assets/images/`). Third-party CDNs trigger Gmail spam filters and cause images to be blocked with "images below are from unknown senders" warnings.
 
 The Instagram CTA icon is hosted at `/assets/images/instagram-white.png`.
+In local dev, email templates still resolve embedded image assets against the public `https://pool.dustwave.xyz` base instead of `127.0.0.1`, so inbox previews do not break on localhost-only URLs.
 
 ### Inline SVG
 

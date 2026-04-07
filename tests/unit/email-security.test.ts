@@ -66,6 +66,33 @@ describe('email HTML security', () => {
     expect(payload.html).not.toContain('Share to your Story!');
   });
 
+  it('uses a public https asset base for instagram email icons even in local dev', async () => {
+    const fetchMock = mockResend();
+
+    await sendSupporterEmail(
+      {
+        ...env,
+        SITE_BASE: 'http://127.0.0.1:4000'
+      },
+      {
+        email: 'supporter@example.com',
+        campaignSlug: 'sunder',
+        campaignTitle: 'sunder',
+        subtotal: 3500,
+        tax: 276,
+        shipping: 300,
+        tipAmount: 210,
+        tipPercent: 6,
+        token: 'magic-token',
+        instagramUrl: 'https://www.instagram.com/dustwave.xyz/'
+      }
+    );
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.html).toContain('https://pool.dustwave.xyz/assets/images/instagram-white.png');
+    expect(payload.html).not.toContain('http://127.0.0.1:4000/assets/images/instagram-white.png');
+  });
+
   it('escapes diary content in update emails', async () => {
     const fetchMock = mockResend();
 

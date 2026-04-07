@@ -142,7 +142,7 @@ Stateless HMAC-signed tokens (no database needed):
 3. Resolve the authorized `orderId`
 4. Fetch pledge from KV and cross-check email + campaign
 
-Each token only authorizes its own order. A valid link no longer grants email-wide access to every pledge on the same address.
+Each token only authorizes its own order. A valid link no longer grants email-wide access to every pledge on the same address, and a valid token without a real backing pledge now fails closed instead of returning a synthetic placeholder.
 
 ---
 
@@ -172,6 +172,12 @@ Create Stripe Checkout session (setup mode) from the first-party cart state.
 6. On webhook, Worker fetches any temp metadata, extracts shipping address from Stripe, computes `subtotal + tax + shipping + tip`, persists one pledge per campaign, and then claims limited-tier inventory through a per-campaign Durable Object coordinator
 
 The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`, and `/checkout-intent/start` does not reserve limited inventory before checkout completion.
+
+## Content Rendering Safety
+
+- Long-form campaign text is sanitized before Markdown rendering and then post-processed to neutralize unsafe link schemes.
+- Structured embeds are only rendered when their `src` resolves to an exact approved provider origin/path.
+- Campaign-content audits still protect `_campaigns/*.md`, but the render layer enforces the same rules so forks and future content sources do not rely on audits alone.
 
 ### `POST /webhooks/stripe`
 Handle `checkout.session.completed`:

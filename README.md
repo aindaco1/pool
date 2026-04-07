@@ -21,8 +21,10 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement with published option allowlists and closed-decision lockout
-- **Sanitized campaign content blocks** — Long-form campaign and diary content accepts Markdown plus a tiny safe inline subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`), rewrites unsafe Markdown link schemes, automatically opens external links in a new tab, and escapes or rejects other raw HTML
+- **Sanitized campaign content blocks** — Long-form campaign and diary content accepts Markdown plus a tiny safe inline subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`), neutralizes unsafe Markdown link schemes, automatically opens external links in a new tab, and escapes or rejects other raw HTML
+- **Strict structured embeds** — Approved `spotify`, `youtube`, and `vimeo` embeds are validated against exact trusted origins and embed paths instead of substring matching
 - **Serialized limited-tier inventory** — Scarce reward claims are coordinated per campaign through a Durable Object so concurrent checkout completions cannot oversell limited tiers
+- **Strict missing-pledge handling** — Magic-link pledge reads fail closed with `404` when the backing pledge record is missing
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
 - **Announcements** — Admin broadcast emails with custom CTA links to supporters
 - **Instagram integration** — Optional social CTA in supporter emails

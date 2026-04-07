@@ -78,6 +78,13 @@ The pre-merge script now auto-starts Jekyll with `_config.yml,_config.local.yml`
 
 This branch now defaults to the first-party cart/runtime path in both `_config.yml` and `_config.local.yml`, and the browser path no longer supports the old hosted-cart runtime.
 
+Recent security hardening that the gate now covers includes:
+
+- fail-closed `GET /pledge` behavior when a magic-link token exists but the pledge row does not
+- Markdown link-scheme neutralization in long-form content
+- exact-origin validation for structured embeds (`spotify`, `youtube`, `vimeo`)
+- serialized limited-tier inventory claims during checkout completion
+
 The local Worker defaults in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) now match that first-party setup. `./scripts/dev.sh` now auto-generates a local `CHECKOUT_INTENT_SECRET` in `worker/.dev.vars` if it is missing, so fresh local checkout starts do not fail closed on an uninitialized dev secret.
 
 If you change `sales_tax_rate` or `flat_shipping_rate` in the Jekyll config, update the mirrored Worker env vars in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) too and restart `./scripts/dev.sh` before testing checkout math.
@@ -750,3 +757,4 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 - **Domain**: Verify `dustwave.xyz` for sending from `pledges@dustwave.xyz`
 - **API Key**: Create key with "Sending access" permission
 - Used for: All supporter-facing pledge email (confirmation, manage/community access, diary updates, announcements, charge success, payment failure, cancellations)
+- Local dev note: even when `SITE_BASE` points at `127.0.0.1`, embedded email images still use the public `https://pool.dustwave.xyz` asset base so inbox previews do not show broken localhost image URLs.
