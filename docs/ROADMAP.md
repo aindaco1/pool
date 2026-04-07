@@ -67,9 +67,8 @@ _(None currently)_
 
 - [ ] Admin dashboard page (read-only) from KV data
 - [ ] Pages CMS per-campaign permissions (waiting on Pages CMS roadmap)
+- [ ] More explicit inventory overselling protection
 
 ## Known Issues
-
-**Legacy note removed**: Local checkout no longer depends on hosted-cart crawling behavior.
 
 **Credit Card Autofill**: CC number, expiry, and CVV fields are inside Stripe's iframe for PCI compliance — not accessible to our autofill scripts.
