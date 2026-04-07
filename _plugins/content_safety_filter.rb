@@ -1,10 +1,9 @@
 require 'cgi'
+require 'kramdown'
 require 'uri'
 
 module Jekyll
   module ContentSafetyFilter
-    include Jekyll::Filters
-
     PLACEHOLDERS = {
       /<br\s*\/?>/i => '__POOL_SAFE_BR__',
       /<em>/i => '__POOL_SAFE_EM_OPEN__',
@@ -37,12 +36,18 @@ module Jekyll
       sanitize_rich_text(input)
     end
 
-    def safe_markdownify(input)
-      sanitized = sanitize_rich_text(input)
-      return sanitized unless @context&.registers&.[](:site)
+    def safe_markdown_source(input)
+      sanitize_rich_text(input)
+    end
 
-      html = markdownify(sanitized)
-      sanitize_markdown_links(html, @context.registers[:site])
+    def safe_markdownify(input, site_url = nil)
+      sanitized = sanitize_rich_text(input)
+      html = Kramdown::Document.new(sanitized).to_html
+      sanitize_markdown_links(html, site_url)
+    end
+
+    def sanitize_markdown_links(html, site_url = nil)
+      sanitize_rendered_markdown_links(html, site_url)
     end
 
     def approved_embed_src(input, provider)
@@ -84,11 +89,10 @@ module Jekyll
       text
     end
 
-    def sanitize_markdown_links(html, site)
+    def sanitize_rendered_markdown_links(html, site_url = nil)
       return html unless html&.include?('<a')
 
       site_host = begin
-        site_url = site&.config&.fetch('url', nil)
         site_url && URI.parse(site_url).host
       rescue URI::InvalidURIError
         nil

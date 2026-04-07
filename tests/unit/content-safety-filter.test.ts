@@ -17,11 +17,10 @@ site = Jekyll::Site.new(Jekyll.configuration({
 }))
 filter = Object.new
 filter.extend(Jekyll::ContentSafetyFilter)
-filter.instance_variable_set(:@context, Liquid::Context.new({}, {}, { site: site }))
 result = if '${method}' == 'approved_embed_src'
   filter.approved_embed_src(ARGV[0], ARGV[1])
 else
-  filter.safe_markdownify(ARGV[0])
+  filter.safe_markdownify(ARGV[0], site.config['url'])
 end
 puts result
 `;

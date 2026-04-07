@@ -27,7 +27,7 @@ describe('campaign content security audit', () => {
 
   it('keeps text blocks on the safe markdown filter', () => {
     const textTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'blocks', 'text.html'), 'utf8');
-    expect(textTemplate).toContain('{{ include.block.body | safe_markdownify }}');
+    expect(textTemplate).toContain('{{ include.block.body | safe_markdown_source | markdownify | sanitize_markdown_links: site.url }}');
   });
 
   it('keeps short blurbs on the safe rich text filter', () => {
