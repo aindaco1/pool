@@ -80,9 +80,9 @@ Canonicalize the first-party cart payload and create a Stripe setup-mode Checkou
 
 Returns: `{ "url": "https://checkout.stripe.com/..." }`
 
-The Worker rebuilds tier, add-on, custom-support, shipping, and subtotal state from first-party cart items, validates campaign state and inventory, signs a short-lived checkout snapshot, and only claims limited inventory after the pledge is actually persisted.
+The Worker rebuilds tier, add-on, custom-support, shipping, and subtotal state from first-party cart items, validates campaign state and inventory, signs a short-lived checkout snapshot, reserves scarce inventory for limited tiers before redirecting into Stripe, and confirms those reservations when the pledge is actually persisted.
 
-Limited-tier claims are serialized through a per-campaign Durable Object coordinator before the KV inventory snapshot is updated, so concurrent webhook completions cannot oversell scarce rewards.
+Limited-tier reservations and claims are serialized through a per-campaign Durable Object coordinator before the KV inventory snapshot is updated, so concurrent checkout starts, retries, modifications, and webhook completions cannot oversell scarce rewards.
 
 ### GET /pledges?token={token}
 Get the pledge(s) authorized by a magic link token.

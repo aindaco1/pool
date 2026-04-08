@@ -67,8 +67,9 @@ Pledges are stored in Cloudflare KV. Key patterns:
 | `campaign-pledges:{campaignSlug}` | Campaign-scoped pledge index for reports, settlement, rebuilds, and admin reads |
 | `pending-extras:{orderId}` | Temporary storage for support items/custom amount during checkout |
 | `pending-tiers:{orderId}` | Temporary storage for additional tiers when Stripe metadata would be too large |
-| `tier-reservation-counts:{campaignSlug}` | Aggregated reservation counts for limited-tier availability checks |
 | `checkout-intent:{orderId}` | Canonicalized checkout payload used to fan bundled checkout into campaign-scoped pledges |
+
+Scarce-tier reservations and committed claim state now live in the per-campaign Durable Object coordinator rather than KV. `tier-inventory:{campaignSlug}` remains the public projection used by `/inventory/:slug` and `/live/:slug`.
 
 **Pledge record:**
 ```json
@@ -168,14 +169,14 @@ Create Stripe Checkout session (setup mode) from the first-party cart state.
 **Data flow:**
 1. Cart.js passes the selected tip percent plus the current first-party cart items
 2. Worker reconstructs the cart shape from first-party items and canonical campaign rules
-3. Worker validates campaign state, single-tier rules, threshold gates, and limited inventory availability
-4. Worker stores any overflow tier/support-item metadata in temp KV (`pending-tiers:*`, `pending-extras:*`) and creates a setup-mode Stripe Checkout session
+3. Worker validates campaign state, single-tier rules, threshold gates, and scarce-tier availability
+4. For limited tiers, Worker reserves scarce inventory through the per-campaign coordinator, then stores any overflow tier/support-item metadata in temp KV (`pending-tiers:*`, `pending-extras:*`) and creates a setup-mode Stripe Checkout session
 5. If the pledge contains physical items, Stripe Checkout collects shipping address via `shipping_address_collection`
-6. On webhook, Worker fetches any temp metadata, extracts shipping address from Stripe, computes `subtotal + tax + shipping + tip`, persists one pledge per campaign, and then claims limited-tier inventory through a per-campaign Durable Object coordinator
+6. On webhook, Worker fetches any temp metadata, extracts shipping address from Stripe, computes `subtotal + tax + shipping + tip`, persists one pledge per campaign, and confirms any held limited-tier reservations through the per-campaign Durable Object coordinator
 
-On the free-plan efficiency branch, checkout availability checks prefer the aggregated `tier-reservation-counts:{slug}` cache when present instead of repeatedly listing every reservation key.
+Limited-tier availability decisions now come from the coordinator's reservation-aware state on write paths, while `/inventory/:slug` and `/live/:slug` continue reading the public KV projection only.
 
-The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`, and `/checkout-intent/start` does not reserve limited inventory before checkout completion.
+The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`. `/checkout-intent/start` now reserves scarce inventory before Stripe redirect, and persistence confirms those reservations. Older campaigns do not need a migration job because claimed inventory can rebuild from pledge truth, and successful persistence can still fall back to a fresh coordinator claim if no preexisting reservation exists.
 
 ## Content Rendering Safety
 
@@ -189,7 +190,7 @@ Handle `checkout.session.completed`:
 - Fetch `supportItems`, `customAmount`, and additional tiers from temp KV when needed
 - Store one pledge per campaign in KV with status `active` (includes support items, custom amount, shipping fee, tip, and shipping address)
 - Update live stats (pledgedAmount, tierCounts, supportItems)
-- Claim tier inventory (for limited tiers) at persistence time through the serialized coordinator
+- Confirm held limited-tier reservations, or claim through the serialized coordinator if the pledge predates reservation-aware checkout start
 - Generate magic link token
 - Send campaign-specific supporter confirmation email(s)
 

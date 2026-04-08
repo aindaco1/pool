@@ -27,11 +27,12 @@ This document covers the security architecture, known risks, hardening recommend
 | `settlement-job:{slug}` | PLEDGES | Settlement batch progress | **Low** - ephemeral |
 | `pending-extras:{orderId}` | PLEDGES | Temporary support item / custom amount checkout extras | **Low** - ephemeral |
 | `pending-tiers:{orderId}` | PLEDGES | Temporary overflow tier metadata during checkout | **Low** - ephemeral |
-| `tier-reservation-counts:{slug}` | PLEDGES | Aggregated reservation counts per limited tier | **Low** - ephemeral cache/index |
 | `cron:lastRun` | PLEDGES | Last cron execution timestamp | **Low** - monitoring |
 | `vote:{slug}:{decision}:{email}` | VOTES | Vote choice | **Medium** - links supporter to vote |
 | `results:{slug}:{decision}` | VOTES | Vote tallies | **Low** - semi-public |
 | `rl:{endpoint}:{ip}` | RATELIMIT | Request count + reset time | **Low** - ephemeral |
+
+Scarce limited-tier reservation and committed-count truth is no longer stored in KV. That race-sensitive state now lives in the per-campaign Durable Object coordinator, while KV keeps only the public `tier-inventory:{slug}` projection.
 
 ---
 
@@ -97,7 +98,7 @@ if (token.startsWith('dev-token-')) {
 Campaign-authored titles, descriptions, and support labels are also escaped by default in supporter-facing cart, manage, and community surfaces so forks with creator-editable content do not inherit a stored-XSS footgun by default. Long-form campaign and diary blocks now accept Markdown plus a very small inline HTML subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`); other raw tags are escaped at render time and rejected by the content audit. Markdown links are rewritten unless they use an allowlisted destination scheme (`http:`, `https:`, `mailto:`, or internal links), and structured embeds must use exact approved `https://` provider URLs instead of passing a substring check.
 Community pages no longer persist the raw supporter bearer token in a long-lived cookie; the token now stays in browser session storage while a non-sensitive verification cookie handles lightweight UX state.
 
-Limited-tier inventory claims also now flow through a per-campaign Durable Object coordinator. KV remains the reporting/cache layer, but scarce inventory mutations are serialized before the Worker persists the pledge, which closes the old raceable read-modify-write path.
+Limited-tier inventory mutations now flow through a per-campaign Durable Object coordinator from checkout start onward. Scarce tiers are reserved before redirecting into Stripe, confirmed at successful persistence time, and only projected back into KV for public reads. That keeps race-sensitive inventory truth out of client-visible KV while preserving efficient public `/inventory/:slug` reads.
 
 ---
 

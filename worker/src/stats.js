@@ -338,8 +338,11 @@ export async function initializeTierInventory(env, campaignSlug, tiers) {
     }
   }
   
-  await env.PLEDGES.put(`tier-inventory:${campaignSlug}`, JSON.stringify(inventory));
-  await syncTierInventoryCoordinator(env, campaignSlug, inventory);
+  if (hasTierInventoryCoordinator(env)) {
+    await syncTierInventoryCoordinator(env, campaignSlug, inventory);
+  } else {
+    await env.PLEDGES.put(`tier-inventory:${campaignSlug}`, JSON.stringify(inventory));
+  }
   return inventory;
 }
 
@@ -563,8 +566,11 @@ export async function recalculateTierInventory(env, campaignSlug, tiers) {
     }
   }
   
-  await env.PLEDGES.put(`tier-inventory:${campaignSlug}`, JSON.stringify(inventory));
-  await syncTierInventoryCoordinator(env, campaignSlug, inventory);
+  if (hasTierInventoryCoordinator(env)) {
+    await syncTierInventoryCoordinator(env, campaignSlug, inventory);
+  } else {
+    await env.PLEDGES.put(`tier-inventory:${campaignSlug}`, JSON.stringify(inventory));
+  }
   return inventory;
 }
 

@@ -5,7 +5,7 @@ set -euo pipefail
 
 for arg in "$@"; do
   if [ "$arg" = "--podman" ]; then
-    exec "$(cd "$(dirname "$0")" && pwd)/dev-podman.sh"
+    exec "$(cd "$(dirname "$0")" && pwd)/dev-podman.sh" "$@"
   fi
 done
 

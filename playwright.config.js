@@ -1,10 +1,14 @@
 const { defineConfig } = require('@playwright/test');
 const useExternalServer = process.env.PLAYWRIGHT_EXTERNAL_SERVER === '1';
+const configuredWorkers = process.env.PLAYWRIGHT_WORKERS
+  ? Number(process.env.PLAYWRIGHT_WORKERS)
+  : undefined;
 
 module.exports = defineConfig({
   testDir: './tests/e2e',
   timeout: 60_000,
   retries: 1,
+  workers: Number.isFinite(configuredWorkers) && configuredWorkers > 0 ? configuredWorkers : undefined,
   use: {
     baseURL: 'http://127.0.0.1:4000',
     headless: true,

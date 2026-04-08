@@ -45,7 +45,7 @@ if [ "$#" -eq 0 ]; then
 fi
 
 shared_stack_ready() {
-  if curl -s http://127.0.0.1:4000 >/dev/null 2>&1 && \
+  if curl -s http://127.0.0.1:4000/campaigns/hand-relations/ >/dev/null 2>&1 && \
      curl -s http://127.0.0.1:8787/stats/does-not-exist >/dev/null 2>&1; then
     return 0
   fi
@@ -60,8 +60,7 @@ shared_stack_ready() {
 if ! shared_stack_ready; then
   echo "📦 Starting shared Podman dev stack..." >&2
   PODMAN_PLAYWRIGHT_LOG="${PODMAN_PLAYWRIGHT_LOG:-/tmp/pool-playwright-podman.log}"
-  ./scripts/dev.sh --podman > "$PODMAN_PLAYWRIGHT_LOG" 2>&1 &
-  DEV_PID=$!
+  PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_PLAYWRIGHT_LOG" 2>&1
   PODMAN_STACK_STARTED=true
 
   echo "⏳ Waiting for Podman-backed site and worker..." >&2
@@ -78,6 +77,15 @@ if ! shared_stack_ready; then
   fi
 fi
 
+cleanup() {
+  if [ "$PODMAN_STACK_STARTED" = "true" ]; then
+    podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
+    podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
+  fi
+}
+
+trap cleanup EXIT
+
 if [ "$PODMAN_REBUILD" = "1" ] || ! podman image exists "$PLAYWRIGHT_IMAGE"; then
   echo "🔨 Building $PLAYWRIGHT_IMAGE..." >&2
   podman build -t "$PLAYWRIGHT_IMAGE" -f "$ROOT_DIR/Containerfile.playwright.dev" "$ROOT_DIR" >&2
@@ -92,5 +100,6 @@ exec podman run --rm \
   -w /workspace \
   -e CI="${CI:-1}" \
   -e PLAYWRIGHT_EXTERNAL_SERVER=1 \
+  -e PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-1}" \
   "$PLAYWRIGHT_IMAGE" \
   bash /workspace/scripts/podman-playwright-entrypoint.sh "$@"

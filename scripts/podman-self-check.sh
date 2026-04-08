@@ -8,13 +8,11 @@ echo "Running Podman self-check..."
 echo ""
 echo "Starting Podman-backed local services..."
 PODMAN_SELF_CHECK_LOG="${PODMAN_SELF_CHECK_LOG:-/tmp/pool-podman-self-check.log}"
-./scripts/dev.sh --podman > "$PODMAN_SELF_CHECK_LOG" 2>&1 &
-DEV_PID=$!
+PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_SELF_CHECK_LOG" 2>&1
 
 cleanup() {
-  if [ -n "${DEV_PID:-}" ]; then
-    kill "$DEV_PID" 2>/dev/null || true
-  fi
+  podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
+  podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
 }
 
 trap cleanup EXIT

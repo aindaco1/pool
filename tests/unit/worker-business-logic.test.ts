@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
 import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput } from '../../worker/src/checkout-intent.js';
+import { TierInventoryCoordinator } from '../../worker/src/tier-inventory-do.js';
 
 const mockStripeClient = {
   checkout: {
@@ -110,6 +111,85 @@ class MockCheckoutIntentNamespace {
         const body = init?.body ? JSON.parse(String(init.body)) : {};
         this.calls.push({ url, body });
         return jsonResponse({ ok: true, status: 'consumed_implicit' });
+      }
+    };
+  }
+}
+
+class MockTierInventoryNamespace {
+  calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+  responders = new Map<string, (body: Record<string, unknown>) => unknown>();
+
+  idFromName(name: string) {
+    return { name };
+  }
+
+  get(_id: { name: string }) {
+    return {
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        const body = init?.body ? JSON.parse(String(init.body)) : {};
+        this.calls.push({ url, body });
+        const pathname = new URL(url).pathname;
+        const responder = this.responders.get(pathname);
+        const payload = responder ? await responder(body) : { success: true };
+        return jsonResponse(payload);
+      }
+    };
+  }
+}
+
+class MockDurableObjectStorage {
+  store = new Map<string, unknown>();
+
+  async get(key: string) {
+    return this.store.get(key);
+  }
+
+  async put(key: string, value: unknown) {
+    this.store.set(key, value);
+  }
+
+  async transaction<T>(callback: (storage: MockDurableObjectStorage) => Promise<T>) {
+    return callback(this);
+  }
+}
+
+class MockDurableObjectState {
+  storage = new MockDurableObjectStorage();
+}
+
+class StatefulTierInventoryNamespace {
+  instances = new Map<string, TierInventoryCoordinator>();
+  calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+  kv: MockKVNamespace;
+
+  constructor(kv: MockKVNamespace) {
+    this.kv = kv;
+  }
+
+  idFromName(name: string) {
+    return { name };
+  }
+
+  get(id: { name: string }) {
+    if (!this.instances.has(id.name)) {
+      this.instances.set(
+        id.name,
+        new TierInventoryCoordinator(new MockDurableObjectState() as never, { PLEDGES: this.kv } as never)
+      );
+    }
+    const coordinator = this.instances.get(id.name)!;
+    return {
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        const body = init?.body ? JSON.parse(String(init.body)) : {};
+        this.calls.push({ url, body });
+        return coordinator.fetch(new Request(url, {
+          method: init?.method || 'POST',
+          headers: init?.headers,
+          body: init?.body
+        }));
       }
     };
   }
@@ -306,10 +386,12 @@ describe('Worker business logic hardening', () => {
 
   it('creates a first-party checkout session only when the provider flag is enabled', async () => {
     const checkoutIntents = new MockCheckoutIntentNamespace();
+    const tierInventory = new MockTierInventoryNamespace();
     const env = createEnv({
       CHECKOUT_PROVIDER: 'first_party',
       CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
-      CHECKOUT_INTENTS: checkoutIntents
+      CHECKOUT_INTENTS: checkoutIntents,
+      TIER_INVENTORY_COORDINATOR: tierInventory
     });
 
     const response = await worker.fetch(
@@ -344,6 +426,14 @@ describe('Worker business logic hardening', () => {
     expect(sessionPayload.metadata.amountCents).toBe('2000');
     expect(sessionPayload.metadata.hasExtras).toBe('true');
     expect(sessionPayload.metadata.orderId).toMatch(/^pool-intent-/);
+    expect(tierInventory.calls).toContainEqual(expect.objectContaining({
+      url: 'https://tier-inventory-coordinator/reserve-selection',
+      body: expect.objectContaining({
+        campaignSlug: 'hand-relations',
+        reservationId: expect.stringMatching(/^pool-intent-/),
+        nextCounts: { 'frame-slot': 1 }
+      })
+    }));
 
     const kv = env.PLEDGES as MockKVNamespace;
     expect(await kv.get(sessionPayload.metadata.orderId ? `pending-checkout:${sessionPayload.metadata.orderId}` : '', { type: 'json' })).toMatchObject({
@@ -359,10 +449,12 @@ describe('Worker business logic hardening', () => {
   });
 
   it('creates a bundled first-party checkout session for mixed-campaign carts', async () => {
+    const tierInventory = new MockTierInventoryNamespace();
     const env = createEnv({
       CHECKOUT_PROVIDER: 'first_party',
       CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
-      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace()
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace(),
+      TIER_INVENTORY_COORDINATOR: tierInventory
     });
 
     const response = await worker.fetch(
@@ -397,17 +489,18 @@ describe('Worker business logic hardening', () => {
         expect.objectContaining({ campaignSlug: 'sunder' })
       ]
     });
+    expect(tierInventory.calls.filter((call) => call.url.endsWith('/reserve-selection'))).toHaveLength(0);
   });
 
-  it('uses aggregated tier reservation counts during checkout validation when available', async () => {
+  it('persists limited-tier reservations before redirecting into Stripe', async () => {
+    const tierInventory = new MockTierInventoryNamespace();
     const env = createEnv({
       CHECKOUT_PROVIDER: 'first_party',
       CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
-      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace()
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace(),
+      TIER_INVENTORY_COORDINATOR: tierInventory
     });
     const kv = env.PLEDGES as MockKVNamespace;
-
-    await kv.put('tier-reservation-counts:hand-relations', JSON.stringify({ 'frame-slot': 1 }));
 
     const response = await worker.fetch(
       new Request('https://pool.test/checkout-intent/start', {
@@ -415,7 +508,7 @@ describe('Worker business logic hardening', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           campaignSlug: 'hand-relations',
-          items: [{ id: 'hand-relations__frame-slot', quantity: 1 }],
+          items: [{ id: 'hand-relations__vip-pass', quantity: 1 }],
           email: 'buyer@example.com',
           tipPercent: 5
         })
@@ -425,7 +518,175 @@ describe('Worker business logic hardening', () => {
     );
 
     expect(response.status).toBe(200);
+
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    const reservationOrderId = sessionPayload.metadata.orderId;
+    expect(await kv.get(`tier-reservation:hand-relations:${reservationOrderId}`)).toBeNull();
+    expect(await kv.get('tier-reservation-counts:hand-relations')).toBeNull();
+    expect(tierInventory.calls).toContainEqual(expect.objectContaining({
+      url: 'https://tier-inventory-coordinator/reserve-selection',
+      body: expect.objectContaining({
+        campaignSlug: 'hand-relations',
+        reservationId: reservationOrderId,
+        nextCounts: { 'vip-pass': 1 }
+      })
+    }));
+  });
+
+  it('releases limited-tier reservations if Stripe session creation fails', async () => {
+    const tierInventory = new MockTierInventoryNamespace();
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace(),
+      TIER_INVENTORY_COORDINATOR: tierInventory
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    mockStripeClient.checkout.sessions.create.mockRejectedValueOnce(new Error('stripe unavailable'));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__vip-pass', quantity: 1 }],
+          email: 'buyer@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(500);
+    expect(await kv.list({ prefix: 'tier-reservation:hand-relations:' })).toMatchObject({
+      keys: []
+    });
+    expect(await kv.get('tier-reservation-counts:hand-relations')).toBeNull();
+    expect(tierInventory.calls.some((call) => call.url.endsWith('/release-reservation'))).toBe(true);
+  });
+
+  it('allows only one last-unit scarce checkout start across repeated requests', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace()
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    const tierInventory = new StatefulTierInventoryNamespace(kv);
+    (env as Record<string, unknown>).TIER_INVENTORY_COORDINATOR = tierInventory;
+
+    const firstResponse = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__vip-pass', quantity: 1 }],
+          email: 'buyer@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    const secondResponse = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__vip-pass', quantity: 1 }],
+          email: 'second@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(400);
+    expect(await secondResponse.json()).toMatchObject({
+      error: 'Tier "vip-pass" is sold out',
+      remaining: 0
+    });
+  });
+
+  it('fails closed for scarce-tier checkout start when no coordinator is available', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace()
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    await kv.put('tier-reservation-counts:hand-relations', JSON.stringify({ 'vip-pass': 1 }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__vip-pass', quantity: 1 }],
+          email: 'buyer@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: 'Limited tier reservation unavailable'
+    });
+  });
+
+  it('prefers coordinator reservation counts over KV reservation scans during checkout validation', async () => {
+    const tierInventory = new MockTierInventoryNamespace();
+    tierInventory.responders.set('/reserved-counts', async () => ({
+      success: true,
+      reservedCounts: { 'vip-pass': 1 }
+    }));
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace(),
+      TIER_INVENTORY_COORDINATOR: tierInventory
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__vip-pass', quantity: 1 }],
+          email: 'buyer@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: 'Tier "vip-pass" is sold out',
+      remaining: 0
+    });
     expect(kv.listCalls.some((call) => call.prefix === 'tier-reservation:hand-relations:')).toBe(false);
+    expect(tierInventory.calls).toContainEqual(expect.objectContaining({
+      url: 'https://tier-inventory-coordinator/reserved-counts',
+      body: expect.objectContaining({
+        campaignSlug: 'hand-relations'
+      })
+    }));
   });
 
   it('keeps the first-party checkout summary route dark by default', async () => {
@@ -997,6 +1258,91 @@ describe('Worker business logic hardening', () => {
     expect(response.status).toBe(200);
   });
 
+  it('blocks modify requests that would move into a scarce tier reserved by another in-flight checkout', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace()
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    const tierInventory = new StatefulTierInventoryNamespace(kv);
+    (env as Record<string, unknown>).TIER_INVENTORY_COORDINATOR = tierInventory;
+
+    await kv.put('pledge:order-first-party-modify-2', JSON.stringify({
+      orderId: 'order-first-party-modify-2',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      stripeCustomerId: 'cus_existing',
+      tierId: 'frame-slot',
+      tierName: 'Buy 1 Frame',
+      tierQty: 1,
+      subtotal: 500,
+      tax: 39,
+      shipping: 0,
+      tipPercent: 0,
+      tipAmount: 0,
+      amount: 539,
+      pledgeStatus: 'active',
+      charged: false,
+      createdAt: '2026-03-30T00:00:00.000Z',
+      updatedAt: '2026-03-30T00:00:00.000Z',
+      history: []
+    }));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 500,
+      pledgeCount: 1,
+      tierCounts: { 'frame-slot': 1 },
+      supportItems: {},
+      updatedAt: '2026-03-30T00:00:00.000Z'
+    }));
+
+    const reserveResponse = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__vip-pass', quantity: 1 }],
+          email: 'other@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+    expect(reserveResponse.status).toBe(200);
+
+    mockVerifyToken.mockResolvedValue({
+      orderId: 'order-first-party-modify-2',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge/modify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: 'valid-token',
+          newTierId: 'vip-pass',
+          newTierQty: 1
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: 'Tier "vip-pass" is sold out',
+      remaining: 0
+    });
+    expect(await kv.get('pledge:order-first-party-modify-2', { type: 'json' })).toMatchObject({
+      tierId: 'frame-slot'
+    });
+  });
+
   it('does not mark webhook events processed before a failed pledge persistence can retry', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as MockKVNamespace;
@@ -1016,8 +1362,6 @@ describe('Worker business logic hardening', () => {
       supportItems: [{ id: 'location-scouting', amount: 10 }],
       customAmount: 5
     }));
-    await kv.put('tier-reservation:hand-relations:order-webhook-retry-1', JSON.stringify([{ id: 'vip-pass', qty: 1 }]));
-
     const webhookEvent = {
       id: 'evt_retryable_checkout',
       type: 'checkout.session.completed',
@@ -1101,8 +1445,6 @@ describe('Worker business logic hardening', () => {
       supportItems: [{ id: 'location-scouting', amount: 10 }],
       customAmount: 5
     }));
-    await kv.put('tier-reservation:hand-relations:order-webhook-duplicate-1', JSON.stringify([{ id: 'vip-pass', qty: 1 }]));
-
     const webhookEvent = {
       id: 'evt_duplicate_checkout_success',
       type: 'checkout.session.completed',
@@ -1182,16 +1524,150 @@ describe('Worker business logic hardening', () => {
     });
   });
 
-  it('persists first-party checkout sessions only when webhook cart integrity matches', async () => {
-    const env = createEnv();
+  it('keeps scarce inventory stable across duplicate webhook delivery after reservation confirmation', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace()
+    });
     const kv = env.PLEDGES as MockKVNamespace;
+    const tierInventory = new StatefulTierInventoryNamespace(kv);
+    (env as Record<string, unknown>).TIER_INVENTORY_COORDINATOR = tierInventory;
+
+    const startResponse = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__vip-pass', quantity: 1 }],
+          email: 'buyer@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+    expect(startResponse.status).toBe(200);
+
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    const orderId = sessionPayload.metadata.orderId;
+
+    const webhookEvent = {
+      id: 'evt_duplicate_after_confirm',
+      type: 'checkout.session.completed',
+      livemode: false,
+      data: {
+        object: {
+          mode: 'setup',
+          customer_email: 'buyer@example.com',
+          customer: 'cus_123',
+          setup_intent: 'seti_123',
+          metadata: {
+            orderId,
+            campaignSlug: 'hand-relations',
+            amountCents: '10000',
+            tierId: 'vip-pass',
+            tierName: 'VIP Pass',
+            tierQty: '1',
+            tipPercent: '5',
+            hasAdditionalTiers: '',
+            hasExtras: '',
+            hasPhysical: '',
+            isPaymentUpdate: '',
+            checkoutProvider: 'first_party',
+            checkoutNonce: sessionPayload.metadata.checkoutNonce,
+            checkoutCartHash: sessionPayload.metadata.checkoutCartHash,
+            checkoutSnapshotVersion: sessionPayload.metadata.checkoutSnapshotVersion
+          }
+        }
+      }
+    };
+
+    const firstWebhook = await worker.fetch(
+      new Request('https://pool.test/webhooks/stripe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Stripe-Signature': 'sig_test'
+        },
+        body: JSON.stringify(webhookEvent)
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+    const secondWebhook = await worker.fetch(
+      new Request('https://pool.test/webhooks/stripe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Stripe-Signature': 'sig_test'
+        },
+        body: JSON.stringify(webhookEvent)
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(firstWebhook.status).toBe(200);
+    expect(secondWebhook.status).toBe(200);
+    expect(await kv.get('tier-reservation:hand-relations:' + orderId)).toBeNull();
+    expect(await kv.get('tier-inventory:hand-relations', { type: 'json' })).toMatchObject({
+      'vip-pass': { limit: 1, claimed: 1 }
+    });
+
+    const followupStart = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__vip-pass', quantity: 1 }],
+          email: 'another@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(followupStart.status).toBe(400);
+    expect(await followupStart.json()).toMatchObject({
+      error: 'Tier "vip-pass" is sold out',
+      remaining: 0
+    });
+  });
+
+  it('persists first-party checkout sessions only when webhook cart integrity matches', async () => {
+    const env = createEnv({
+      TIER_INVENTORY_COORDINATOR: undefined
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    const tierInventory = new StatefulTierInventoryNamespace(kv);
+    (env as Record<string, unknown>).TIER_INVENTORY_COORDINATOR = tierInventory;
 
     await kv.put('pending-tiers:order-first-party-good-1', JSON.stringify([{ id: 'vip-pass', qty: 1 }]));
     await kv.put('pending-extras:order-first-party-good-1', JSON.stringify({
       supportItems: [{ id: 'location-scouting', amount: 10 }],
       customAmount: 5
     }));
-    await kv.put('tier-reservation:hand-relations:order-first-party-good-1', JSON.stringify([{ id: 'vip-pass', qty: 1 }]));
+    await tierInventory.get(tierInventory.idFromName('hand-relations')).fetch(
+      'https://tier-inventory-coordinator/reserve-selection',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          reservationId: 'order-first-party-good-1',
+          nextCounts: { 'vip-pass': 1 },
+          inventory: {
+            'vip-pass': { limit: 1, claimed: 0 },
+            'frame-slot': { limit: 1000, claimed: 0 },
+            'creature-cameo': { limit: 1, claimed: 0 }
+          }
+        })
+      }
+    );
 
     const checkoutCartHash = await hashCheckoutContribution(buildCheckoutHashInput({
       campaignSlug: 'hand-relations',
@@ -1265,6 +1741,14 @@ describe('Worker business logic hardening', () => {
       supportItems: [{ id: 'location-scouting', amount: 10 }],
       customAmount: 5
     });
+    expect(await kv.get('tier-reservation:hand-relations:order-first-party-good-1')).toBeNull();
+    expect(tierInventory.calls).toContainEqual(expect.objectContaining({
+      url: 'https://tier-inventory-coordinator/confirm-reservation',
+      body: expect.objectContaining({
+        campaignSlug: 'hand-relations',
+        reservationId: 'order-first-party-good-1'
+      })
+    }));
   });
 
   it('fans out bundled first-party checkout sessions into one pledge per campaign', async () => {
@@ -1455,8 +1939,6 @@ describe('Worker business logic hardening', () => {
       supportItems: [{ id: 'location-scouting', amount: 10 }],
       customAmount: 5
     }));
-    await kv.put('tier-reservation:hand-relations:order-first-party-bad-1', JSON.stringify([{ id: 'vip-pass', qty: 1 }]));
-
     const webhookEvent = {
       id: 'evt_first_party_checkout_bad_hash',
       type: 'checkout.session.completed',
@@ -1598,5 +2080,134 @@ describe('Worker business logic hardening', () => {
 
     expect(setupResponse.status).toBe(200);
     expect(await kv.get('campaign-pledges:smoke-editable', { type: 'json' })).toContain('test-order-active-1');
+  });
+
+  it('recalculates inventory through the coordinator write path on the admin endpoint', async () => {
+    const tierInventory = new MockTierInventoryNamespace();
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret',
+      TIER_INVENTORY_COORDINATOR: tierInventory
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-1']));
+    await kv.put('pledge:order-1', JSON.stringify({
+      orderId: 'order-1',
+      campaignSlug: 'hand-relations',
+      tierId: 'vip-pass',
+      tierQty: 1,
+      pledgeStatus: 'active',
+      charged: false
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/inventory/hand-relations/recalculate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': 'admin-secret'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(tierInventory.calls).toContainEqual(expect.objectContaining({
+      url: 'https://tier-inventory-coordinator/replace',
+      body: expect.objectContaining({
+        campaignSlug: 'hand-relations',
+        inventory: expect.objectContaining({
+          'vip-pass': { limit: 1, claimed: 1 }
+        })
+      })
+    }));
+  });
+
+  it('recovers a missed checkout by confirming the existing reservation', async () => {
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret',
+      TIER_INVENTORY_COORDINATOR: undefined
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    const tierInventory = new StatefulTierInventoryNamespace(kv);
+    (env as Record<string, unknown>).TIER_INVENTORY_COORDINATOR = tierInventory;
+
+    await kv.put('pending-tiers:order-recover-1', JSON.stringify([{ id: 'vip-pass', qty: 1 }]));
+    await kv.put('pending-extras:order-recover-1', JSON.stringify({
+      supportItems: [{ id: 'location-scouting', amount: 10 }],
+      customAmount: 5
+    }));
+    await tierInventory.get(tierInventory.idFromName('hand-relations')).fetch(
+      'https://tier-inventory-coordinator/reserve-selection',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          reservationId: 'order-recover-1',
+          nextCounts: { 'vip-pass': 1 },
+          inventory: {
+            'vip-pass': { limit: 1, claimed: 0 },
+            'frame-slot': { limit: 1000, claimed: 0 },
+            'creature-cameo': { limit: 1, claimed: 0 }
+          }
+        })
+      }
+    );
+
+    mockStripeClient.checkout.sessions.retrieve.mockResolvedValueOnce({
+      id: 'cs_recover_1',
+      status: 'complete',
+      mode: 'setup',
+      customer_email: 'buyer@example.com',
+      customer: 'cus_123',
+      created: 1775000000,
+      setup_intent: 'seti_123',
+      metadata: {
+        orderId: 'order-recover-1',
+        campaignSlug: 'hand-relations',
+        amountCents: '12000',
+        tierId: 'frame-slot',
+        tierName: 'Buy 1 Frame',
+        tierQty: '1',
+        tipPercent: '5',
+        hasAdditionalTiers: 'true',
+        hasExtras: 'true',
+        hasPhysical: '',
+        isPaymentUpdate: ''
+      }
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/recover-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': 'admin-secret'
+        },
+        body: JSON.stringify({
+          sessionId: 'cs_recover_1',
+          sendEmail: false
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(await kv.get('pledge:order-recover-1', { type: 'json' })).toMatchObject({
+      orderId: 'order-recover-1',
+      campaignSlug: 'hand-relations',
+      additionalTiers: [{ id: 'vip-pass', qty: 1 }]
+    });
+    expect(await kv.get('tier-reservation:hand-relations:order-recover-1')).toBeNull();
+    expect(tierInventory.calls).toContainEqual(expect.objectContaining({
+      url: 'https://tier-inventory-coordinator/confirm-reservation',
+      body: expect.objectContaining({
+        campaignSlug: 'hand-relations',
+        reservationId: 'order-recover-1'
+      })
+    }));
   });
 });

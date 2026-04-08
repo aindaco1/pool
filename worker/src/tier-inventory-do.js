@@ -47,16 +47,32 @@ export class TierInventoryCoordinator {
       return this.handleReplace(payload.value);
     }
 
+    if (url.pathname === '/reserve-selection') {
+      return this.handleReserveSelection(payload.value);
+    }
+
+    if (url.pathname === '/release-reservation') {
+      return this.handleReleaseReservation(payload.value);
+    }
+
+    if (url.pathname === '/confirm-reservation') {
+      return this.handleConfirmReservation(payload.value);
+    }
+
+    if (url.pathname === '/reserved-counts') {
+      return this.handleReservedCounts(payload.value);
+    }
+
     return jsonResponse({ error: 'Not found' }, 404);
   }
 
   async handleClaim(payload) {
     const result = await this.ctx.storage.transaction(async (storage) => {
-      const inventory = await getWorkingInventory(storage, payload.inventory);
-      const tier = inventory[payload.tierId];
+      const state = await getWorkingState(storage, payload.inventory);
+      const tier = state.inventory[payload.tierId];
 
       if (!tier) {
-        return { success: true };
+        return { success: true, state };
       }
 
       const remaining = Number(tier.limit || 0) - Number(tier.claimed || 0);
@@ -69,34 +85,37 @@ export class TierInventoryCoordinator {
       }
 
       tier.claimed = Number(tier.claimed || 0) + payload.qty;
-      await storage.put('inventory', inventory);
+      state.updatedAt = new Date().toISOString();
+      await putWorkingState(storage, state);
 
       return {
         success: true,
         remaining: Math.max(0, Number(tier.limit || 0) - Number(tier.claimed || 0)),
-        inventory
+        inventory: state.inventory,
+        state
       };
     });
 
-    await syncInventoryToKv(this.env, payload.campaignSlug, result.inventory);
+    await syncInventoryToKv(this.env, payload.campaignSlug, result.state?.inventory || result.inventory);
     return jsonResponse(result);
   }
 
   async handleRelease(payload) {
     const result = await this.ctx.storage.transaction(async (storage) => {
-      const inventory = await getWorkingInventory(storage, payload.inventory);
-      const tier = inventory[payload.tierId];
+      const state = await getWorkingState(storage, payload.inventory);
+      const tier = state.inventory[payload.tierId];
 
       if (!tier) {
-        return { success: true, inventory };
+        return { success: true, inventory: state.inventory, state };
       }
 
       tier.claimed = Math.max(0, Number(tier.claimed || 0) - payload.qty);
-      await storage.put('inventory', inventory);
-      return { success: true, inventory };
+      state.updatedAt = new Date().toISOString();
+      await putWorkingState(storage, state);
+      return { success: true, inventory: state.inventory, state };
     });
 
-    await syncInventoryToKv(this.env, payload.campaignSlug, result.inventory);
+    await syncInventoryToKv(this.env, payload.campaignSlug, result.state?.inventory || result.inventory);
     return jsonResponse(result);
   }
 
@@ -111,7 +130,8 @@ export class TierInventoryCoordinator {
 
   async handleApplySelection(payload) {
     const result = await this.ctx.storage.transaction(async (storage) => {
-      const inventory = await getWorkingInventory(storage, payload.inventory);
+      const state = await getWorkingState(storage, payload.inventory);
+      const inventory = state.inventory;
       const previousCounts = payload.previousCounts || {};
       const nextCounts = payload.nextCounts || {};
       const tierIds = new Set([...Object.keys(previousCounts), ...Object.keys(nextCounts)]);
@@ -147,25 +167,130 @@ export class TierInventoryCoordinator {
         }
       }
 
-      await storage.put('inventory', inventory);
-      return { success: true, inventory };
+      state.updatedAt = new Date().toISOString();
+      await putWorkingState(storage, state);
+      return { success: true, inventory, state };
     });
 
-    await syncInventoryToKv(this.env, payload.campaignSlug, result.inventory);
+    await syncInventoryToKv(this.env, payload.campaignSlug, result.state?.inventory || result.inventory);
     return jsonResponse(result);
   }
 
   async handleReplace(payload) {
-    const inventory = cloneInventory(payload.inventory || {});
-    await this.ctx.storage.put('inventory', inventory);
-    await syncInventoryToKv(this.env, payload.campaignSlug, inventory);
-    return jsonResponse({ success: true, inventory });
+    const state = await this.ctx.storage.transaction(async (storage) => {
+      const currentState = await getWorkingState(storage, payload.inventory);
+      currentState.inventory = cloneInventory(payload.inventory || {});
+      currentState.updatedAt = new Date().toISOString();
+      await putWorkingState(storage, currentState);
+      return currentState;
+    });
+    await syncInventoryToKv(this.env, payload.campaignSlug, state.inventory);
+    return jsonResponse({ success: true, inventory: state.inventory, state });
+  }
+
+  async handleReserveSelection(payload) {
+    const result = await this.ctx.storage.transaction(async (storage) => {
+      const state = await getWorkingState(storage, payload.inventory);
+      const reservationId = payload.reservationId;
+      const previousReservation = normalizeCountMap(state.reservations[reservationId] || {});
+      const nextReservation = normalizeCountMap(payload.nextCounts || {});
+      const reservedCounts = getReservedCounts(state.reservations, reservationId);
+      const tierIds = new Set([...Object.keys(previousReservation), ...Object.keys(nextReservation)]);
+
+      for (const tierId of tierIds) {
+        const tier = state.inventory[tierId];
+        if (!tier) continue;
+
+        const nextQty = Number(nextReservation[tierId] || 0);
+        const reservedByOthers = Number(reservedCounts[tierId] || 0);
+        const available = Number(tier.limit || 0) - Number(tier.claimed || 0) - reservedByOthers;
+        if (nextQty > available) {
+          return {
+            success: false,
+            error: `Only ${Math.max(0, available)} remaining for this tier`,
+            remaining: Math.max(0, available)
+          };
+        }
+      }
+
+      if (Object.keys(nextReservation).length > 0) {
+        state.reservations[reservationId] = nextReservation;
+      } else {
+        delete state.reservations[reservationId];
+      }
+      state.updatedAt = new Date().toISOString();
+      await putWorkingState(storage, state);
+      return {
+        success: true,
+        inventory: state.inventory,
+        reservations: cloneReservations(state.reservations),
+        state
+      };
+    });
+
+    await syncInventoryToKv(this.env, payload.campaignSlug, result.state?.inventory || result.inventory);
+    return jsonResponse(result);
+  }
+
+  async handleReleaseReservation(payload) {
+    const result = await this.ctx.storage.transaction(async (storage) => {
+      const state = await getWorkingState(storage, payload.inventory);
+      delete state.reservations[payload.reservationId];
+      state.updatedAt = new Date().toISOString();
+      await putWorkingState(storage, state);
+      return {
+        success: true,
+        inventory: state.inventory,
+        reservations: cloneReservations(state.reservations),
+        state
+      };
+    });
+
+    await syncInventoryToKv(this.env, payload.campaignSlug, result.state?.inventory || result.inventory);
+    return jsonResponse(result);
+  }
+
+  async handleConfirmReservation(payload) {
+    const result = await this.ctx.storage.transaction(async (storage) => {
+      const state = await getWorkingState(storage, payload.inventory);
+      const reservation = normalizeCountMap(state.reservations[payload.reservationId] || {});
+      const confirmed = Object.keys(reservation).length > 0;
+
+      for (const [tierId, qty] of Object.entries(reservation)) {
+        const tier = state.inventory[tierId];
+        if (!tier) continue;
+        tier.claimed = Number(tier.claimed || 0) + Number(qty || 0);
+      }
+
+      delete state.reservations[payload.reservationId];
+      state.updatedAt = new Date().toISOString();
+      await putWorkingState(storage, state);
+      return {
+        success: true,
+        confirmed,
+        inventory: state.inventory,
+        reservations: cloneReservations(state.reservations),
+        state
+      };
+    });
+
+    await syncInventoryToKv(this.env, payload.campaignSlug, result.state?.inventory || result.inventory);
+    return jsonResponse(result);
+  }
+
+  async handleReservedCounts(payload) {
+    const state = await getWorkingState(this.ctx.storage, payload.inventory);
+    return jsonResponse({
+      success: true,
+      reservedCounts: getReservedCounts(state.reservations, payload.reservationId)
+    });
   }
 }
 
 function validatePayload(body) {
   const campaignSlug = String(body?.campaignSlug || '');
   const tierId = body?.tierId == null ? null : String(body.tierId || '');
+  const reservationId = body?.reservationId == null ? null : String(body.reservationId || '');
   const qty = body?.qty == null ? null : Number(body.qty);
   const inventory = body?.inventory && typeof body.inventory === 'object' ? body.inventory : {};
   const previousCounts = body?.previousCounts && typeof body.previousCounts === 'object' ? body.previousCounts : {};
@@ -179,6 +304,10 @@ function validatePayload(body) {
     return { ok: false, error: 'Invalid tier ID' };
   }
 
+  if (reservationId !== null && (!reservationId || reservationId.length > 200)) {
+    return { ok: false, error: 'Invalid reservation ID' };
+  }
+
   if (qty !== null && (!Number.isFinite(qty) || qty <= 0)) {
     return { ok: false, error: 'Invalid quantity' };
   }
@@ -188,6 +317,7 @@ function validatePayload(body) {
     value: {
       campaignSlug,
       tierId,
+      reservationId,
       qty: qty == null ? null : Math.floor(qty),
       inventory: cloneInventory(inventory),
       previousCounts: normalizeCountMap(previousCounts),
@@ -206,17 +336,42 @@ function normalizeCountMap(map) {
   return normalized;
 }
 
-async function getWorkingInventory(storage, bootstrapInventory) {
-  const stored = await storage.get('inventory');
-  if (stored && typeof stored === 'object') {
-    return cloneInventory(stored);
+async function getWorkingState(storage, bootstrapInventory) {
+  const storedState = await storage.get('state');
+  if (storedState && typeof storedState === 'object') {
+    return normalizeState(storedState, bootstrapInventory);
   }
 
-  const inventory = cloneInventory(bootstrapInventory || {});
-  if (Object.keys(inventory).length > 0) {
-    await storage.put('inventory', inventory);
+  const legacyInventory = await storage.get('inventory');
+  if (legacyInventory && typeof legacyInventory === 'object') {
+    const migratedState = normalizeState({ inventory: legacyInventory }, bootstrapInventory);
+    await putWorkingState(storage, migratedState);
+    return migratedState;
   }
-  return inventory;
+
+  const state = normalizeState({ inventory: bootstrapInventory || {} }, bootstrapInventory);
+  if (Object.keys(state.inventory).length > 0) {
+    await putWorkingState(storage, state);
+  }
+  return state;
+}
+
+async function putWorkingState(storage, state) {
+  await storage.put('state', {
+    inventory: cloneInventory(state.inventory),
+    reservations: cloneReservations(state.reservations),
+    updatedAt: state.updatedAt || null
+  });
+}
+
+function normalizeState(state, bootstrapInventory) {
+  const inventory = cloneInventory(state?.inventory || bootstrapInventory || {});
+  const reservations = cloneReservations(state?.reservations || {});
+  return {
+    inventory,
+    reservations,
+    updatedAt: typeof state?.updatedAt === 'string' ? state.updatedAt : null
+  };
 }
 
 async function syncInventoryToKv(env, campaignSlug, inventory) {
@@ -226,6 +381,21 @@ async function syncInventoryToKv(env, campaignSlug, inventory) {
 
 function cloneInventory(inventory) {
   return JSON.parse(JSON.stringify(inventory || {}));
+}
+
+function cloneReservations(reservations) {
+  return JSON.parse(JSON.stringify(reservations || {}));
+}
+
+function getReservedCounts(reservations = {}, excludedReservationId = null) {
+  const counts = {};
+  for (const [reservationId, reservation] of Object.entries(reservations || {})) {
+    if (excludedReservationId && reservationId === excludedReservationId) continue;
+    for (const [tierId, qty] of Object.entries(normalizeCountMap(reservation))) {
+      counts[tierId] = (counts[tierId] || 0) + qty;
+    }
+  }
+  return counts;
 }
 
 function jsonResponse(data, status = 200) {

@@ -7,6 +7,8 @@ WORKER_PID=""
 JEKYLL_PID=""
 TEMP_DEV_VARS=""
 ORIGINAL_DEV_VARS_BACKUP=""
+LOG_DIR="$(mktemp -d /tmp/pool-premerge-logs.XXXXXX)"
+declare -a PHASE_RESULTS=()
 
 prefer_podman_path() {
   local candidate=""
@@ -20,6 +22,22 @@ prefer_podman_path() {
       export PATH="$candidate:$PATH"
       return 0
     fi
+  done
+  return 1
+}
+
+prefer_node20_path() {
+  local candidate=""
+  for candidate in \
+    "$HOME/.nvm/versions/node/v20.19.6/bin" \
+    "$HOME/.nvm/versions/node/v20.*/bin"
+  do
+    for resolved in $candidate; do
+      if [[ -x "$resolved/node" ]]; then
+        export PATH="$resolved:$PATH"
+        return 0
+      fi
+    done
   done
   return 1
 }
@@ -68,6 +86,19 @@ build_with_podman_jekyll() {
     bash -lc 'cd /workspace && SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet'
 }
 
+verify_build_artifacts() {
+  if ! rg -n '\.pool-first-party-cart__panel' _site/assets/main.css >/dev/null; then
+    echo "main.css is missing expected first-party cart UI styles"
+    return 1
+  fi
+}
+
+reset_podman_dev_artifacts() {
+  ensure_podman_ready || return 1
+  podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
+  podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
+}
+
 stop_worker() {
   if [[ -n "${WORKER_PID}" ]]; then
     kill "${WORKER_PID}" 2>/dev/null || true
@@ -110,6 +141,62 @@ cleanup() {
 
 trap cleanup EXIT
 
+if [[ "${1:-}" = "__podman_build_check" ]]; then
+  build_with_podman_jekyll
+  verify_build_artifacts
+  exit 0
+fi
+
+phase_slug() {
+  echo "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+}
+
+print_phase_summary() {
+  local entry=""
+  local status=""
+  local label=""
+  local logfile=""
+  echo ""
+  echo "Phase summary:"
+  for entry in "${PHASE_RESULTS[@]}"; do
+    IFS='|' read -r status label logfile <<< "$entry"
+    echo "  - ${status}: ${label}"
+    echo "    log: ${logfile}"
+  done
+  echo "  logs dir: ${LOG_DIR}"
+}
+
+run_phase() {
+  local label="$1"
+  shift
+
+  local slug
+  local logfile
+  local status
+  slug="$(phase_slug "$label")"
+  logfile="${LOG_DIR}/${slug}.log"
+
+  echo "${label}"
+  if "$@" >"${logfile}" 2>&1; then
+    PHASE_RESULTS+=("PASS|${label}|${logfile}")
+    echo "  PASS"
+    echo "  log: ${logfile}"
+    echo ""
+    return 0
+  else
+    status=$?
+  fi
+
+  PHASE_RESULTS+=("FAIL|${label}|${logfile}")
+  echo "  FAIL"
+  echo "  log: ${logfile}"
+  echo ""
+  echo "Last log lines:"
+  tail -n 60 "${logfile}" || true
+  print_phase_summary
+  return "${status}"
+}
+
 echo "==> Pre-merge regression checks"
 echo ""
 
@@ -124,6 +211,7 @@ export MAGIC_LINK_SECRET="${MAGIC_LINK_SECRET:-test-magic-link-secret}"
 export RESEND_API_KEY="${RESEND_API_KEY:-re_test_smoke}"
 SMOKE_ADMIN_SECRET="${ADMIN_SECRET}"
 
+prefer_node20_path || true
 stabilize_podman_connection
 
 if [[ -f worker/.dev.vars ]]; then
@@ -133,43 +221,35 @@ if [[ -f worker/.dev.vars ]]; then
   fi
 fi
 
-echo "1. Secret audit"
-npm run test:secrets
-echo ""
+run_phase "1. Secret audit" npm run test:secrets
 
-echo "2. Syntax checks"
-node --check worker/src/index.js
-node --check worker/src/stats.js
-echo ""
+run_phase "2. Syntax checks" bash -lc '
+  node --check worker/src/index.js
+  node --check worker/src/stats.js
+'
 
-echo "3. Focused regression suites"
-npx vitest run \
+run_phase "3. Focused regression suites" npx vitest run \
   tests/unit/worker-business-logic.test.ts \
   tests/unit/worker-ops-integrity.test.ts \
   tests/unit/stats-pagination.test.ts
-echo ""
 
-echo "4. Full unit suite"
-npm run test:unit
-echo ""
+run_phase "4. Full unit suite" npm run test:unit
 
-echo "5. First-party build artifact checks"
 USE_PODMAN_JEKYLL=false
 if host_jekyll_available; then
-  bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
+  run_phase "5. First-party build artifact checks" bash -lc '
+    bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
+    rg -n "\.pool-first-party-cart__panel" _site/assets/main.css >/dev/null
+  '
 else
   echo "Host Jekyll gems unavailable; falling back to Podman-backed build"
   USE_PODMAN_JEKYLL=true
-  build_with_podman_jekyll || exit 1
+  run_phase "5. First-party build artifact checks" bash -lc '
+    PATH="$HOME/.nvm/versions/node/v20.19.6/bin:/opt/podman/bin:$PATH"
+    scripts/pre-merge-regression.sh __podman_build_check
+  '
 fi
 
-if ! rg -n '\.pool-first-party-cart__panel' _site/assets/main.css >/dev/null; then
-  echo "main.css is missing expected first-party cart UI styles"
-  exit 1
-fi
-echo ""
-
-echo "6. Security suite"
 if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
   prefer_podman_path || true
   if command -v podman >/dev/null 2>&1; then
@@ -220,15 +300,15 @@ fi
 
 start_worker || exit 1
 
-npm run test:security
-echo ""
+run_phase "6. Security suite" npm run test:security
 
-echo "7. Local mutable-pledge smoke"
 stop_worker
 
 if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
-  ./scripts/test-worker.sh --podman
-  ADMIN_SECRET="${SMOKE_ADMIN_SECRET}" ./scripts/smoke-pledge-management.sh --podman
+  reset_podman_dev_artifacts || exit 1
+  run_phase "7a. Podman worker smoke" ./scripts/test-worker.sh --podman
+  reset_podman_dev_artifacts || exit 1
+  run_phase "7b. Podman mutable-pledge smoke" env ADMIN_SECRET="${SMOKE_ADMIN_SECRET}" ./scripts/smoke-pledge-management.sh --podman
 else
   start_worker || exit 1
 
@@ -249,17 +329,16 @@ else
     exit 1
   fi
 
-  SITE_URL=http://127.0.0.1:4000 WORKER_URL=http://127.0.0.1:8787 ./scripts/test-worker.sh
-  WORKER_URL=http://127.0.0.1:8787 ADMIN_SECRET="${SMOKE_ADMIN_SECRET}" ./scripts/smoke-pledge-management.sh
+  run_phase "7a. Host worker smoke" env SITE_URL=http://127.0.0.1:4000 WORKER_URL=http://127.0.0.1:8787 ./scripts/test-worker.sh
+  run_phase "7b. Host mutable-pledge smoke" env WORKER_URL=http://127.0.0.1:8787 ADMIN_SECRET="${SMOKE_ADMIN_SECRET}" ./scripts/smoke-pledge-management.sh
 fi
-echo ""
 
-echo "8. E2E suite"
 if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
-  SKIP_MANUAL_CHECKOUT=1 ./scripts/test-e2e.sh --podman
+  reset_podman_dev_artifacts || exit 1
+  run_phase "8. Podman E2E suite" env CI=1 ./scripts/podman-playwright-run.sh npx playwright test --workers=1
 else
-  npm run test:e2e:headless
+  run_phase "8. Headless E2E suite" npm run test:e2e:headless
 fi
-echo ""
 
 echo "Pre-merge regression checks completed."
+print_phase_summary

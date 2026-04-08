@@ -871,6 +871,40 @@ async function ensureTierAvailability(env, campaignSlug, campaign, selectedTiers
   return { valid: true };
 }
 
+function hasTierInventoryCoordinator(env) {
+  return !!env?.TIER_INVENTORY_COORDINATOR;
+}
+
+function getTierInventoryCoordinatorStub(env, campaignSlug) {
+  const id = env.TIER_INVENTORY_COORDINATOR.idFromName(campaignSlug);
+  return env.TIER_INVENTORY_COORDINATOR.get(id);
+}
+
+async function callTierInventoryCoordinator(env, campaignSlug, path, payload = {}) {
+  const response = await getTierInventoryCoordinatorStub(env, campaignSlug).fetch(
+    `https://tier-inventory-coordinator${path}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaignSlug, ...payload })
+    }
+  );
+
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body?.error || 'Tier inventory coordinator request failed');
+  }
+  return body;
+}
+
+async function buildTierInventorySnapshot(env, campaignSlug, campaign = null) {
+  let inventory = await getTierInventory(env, campaignSlug);
+  if (Object.keys(inventory).length === 0 && campaign?.tiers?.some(tier => tier.limit_total)) {
+    inventory = await recalculateTierInventory(env, campaignSlug, campaign.tiers) || {};
+  }
+  return JSON.parse(JSON.stringify(inventory || {}));
+}
+
 function getTierReservationKey(campaignSlug, orderId) {
   return `tier-reservation:${campaignSlug}:${orderId}`;
 }
@@ -879,68 +913,20 @@ function getTierReservationCountsKey(campaignSlug) {
   return `tier-reservation-counts:${campaignSlug}`;
 }
 
-function mergeTierReservationCounts(currentCounts = {}, reservation = [], multiplier = 1) {
-  const nextCounts = { ...(currentCounts || {}) };
-  for (const tierItem of reservation || []) {
-    if (!tierItem?.id) continue;
-    const current = nextCounts[tierItem.id] || 0;
-    const nextValue = current + ((tierItem.qty || 1) * multiplier);
-    if (nextValue > 0) {
-      nextCounts[tierItem.id] = nextValue;
-    } else {
-      delete nextCounts[tierItem.id];
-    }
-  }
-  return nextCounts;
-}
-
 async function getReservedTierCounts(env, campaignSlug, excludedOrderId = null) {
-  if (!env.PLEDGES) return {};
+  if (!env.PLEDGES || !hasTierInventoryCoordinator(env)) return {};
 
-  const countsKey = getTierReservationCountsKey(campaignSlug);
-  const aggregatedCounts = await env.PLEDGES.get(countsKey, { type: 'json' });
-  if (aggregatedCounts && typeof aggregatedCounts === 'object') {
-    let counts = { ...aggregatedCounts };
-    if (excludedOrderId) {
-      const excludedReservation = await env.PLEDGES.get(getTierReservationKey(campaignSlug, excludedOrderId), { type: 'json' });
-      counts = mergeTierReservationCounts(counts, excludedReservation, -1);
-    }
-    return counts;
-  }
-
-  const reservedCounts = {};
-  let cursor = undefined;
-  let listComplete = false;
-
-  while (!listComplete) {
-    const reservationList = await env.PLEDGES.list({
-      prefix: `tier-reservation:${campaignSlug}:`,
-      cursor
+  try {
+    const result = await callTierInventoryCoordinator(env, campaignSlug, '/reserved-counts', {
+      reservationId: excludedOrderId
     });
-
-    for (const key of reservationList.keys || []) {
-      const reservationOrderId = key.name.split(':').pop();
-      if (excludedOrderId && reservationOrderId === excludedOrderId) continue;
-
-      const reservation = await env.PLEDGES.get(key.name, { type: 'json' });
-      for (const tierItem of reservation || []) {
-        if (!tierItem?.id) continue;
-        reservedCounts[tierItem.id] = (reservedCounts[tierItem.id] || 0) + (tierItem.qty || 1);
-      }
+    if (result?.reservedCounts && typeof result.reservedCounts === 'object') {
+      return result.reservedCounts;
     }
-
-    listComplete = reservationList.list_complete !== false;
-    cursor = reservationList.cursor;
+  } catch (err) {
+    console.error('Failed to fetch reserved tier counts from coordinator:', err.message);
   }
-
-  await env.PLEDGES.put(countsKey, JSON.stringify(reservedCounts), { expirationTtl: 3600 });
-
-  if (excludedOrderId) {
-    const excludedReservation = await env.PLEDGES.get(getTierReservationKey(campaignSlug, excludedOrderId), { type: 'json' });
-    return mergeTierReservationCounts(reservedCounts, excludedReservation, -1);
-  }
-
-  return reservedCounts;
+  return {};
 }
 
 function resolveAuthorizedOrderId(payload, requestedOrderId = null) {
@@ -955,53 +941,103 @@ function resolveAuthorizedOrderId(payload, requestedOrderId = null) {
   return { valid: true, orderId: payload.orderId };
 }
 
-async function saveTierReservation(env, campaignSlug, orderId, selectedTiers = []) {
-  if (!env.PLEDGES || !orderId) return;
-
-  const reservationKey = getTierReservationKey(campaignSlug, orderId);
-  const countsKey = getTierReservationCountsKey(campaignSlug);
-  const previousReservation = await env.PLEDGES.get(reservationKey, { type: 'json' });
+async function saveTierReservation(env, campaignSlug, orderId, selectedTiers = [], campaign = null) {
+  if (!env.PLEDGES || !orderId) return { success: true };
   const limitedTiers = selectedTiers
     .filter(tierItem => tierItem.tier?.limit_total)
     .map(tierItem => ({ id: tierItem.id, qty: tierItem.qty }));
 
   if (limitedTiers.length === 0) {
     await clearTierReservation(env, campaignSlug, orderId);
-    return;
+    return { success: true };
   }
 
-  let counts = await env.PLEDGES.get(countsKey, { type: 'json' }) || {};
-  counts = mergeTierReservationCounts(counts, previousReservation, -1);
-  counts = mergeTierReservationCounts(counts, limitedTiers, 1);
+  try {
+    if (!hasTierInventoryCoordinator(env)) {
+      return { success: false, error: 'Limited tier reservation unavailable' };
+    }
 
+    const inventory = await buildTierInventorySnapshot(env, campaignSlug, campaign);
+    const result = await callTierInventoryCoordinator(env, campaignSlug, '/reserve-selection', {
+      reservationId: orderId,
+      nextCounts: getTierQuantityMap(limitedTiers),
+      inventory
+    });
+    if (!result?.success) {
+      return result;
+    }
+
+    return { success: true };
+  } catch (err) {
+    try {
+      await callTierInventoryCoordinator(env, campaignSlug, '/release-reservation', {
+        reservationId: orderId
+      });
+    } catch (releaseErr) {
+      console.error('Failed to rollback tier reservation in coordinator:', releaseErr.message);
+    }
+    throw err;
+  }
+}
+
+async function deleteTierReservationProjection(env, campaignSlug, orderId) {
+  if (!env.PLEDGES || !orderId) return;
+  const reservationKey = getTierReservationKey(campaignSlug, orderId);
+  const countsKey = getTierReservationCountsKey(campaignSlug);
   await Promise.all([
-    env.PLEDGES.put(reservationKey, JSON.stringify(limitedTiers), { expirationTtl: 3600 }),
-    env.PLEDGES.put(countsKey, JSON.stringify(counts), { expirationTtl: 3600 })
+    env.PLEDGES.delete(reservationKey),
+    env.PLEDGES.delete(countsKey)
   ]);
 }
 
 async function clearTierReservation(env, campaignSlug, orderId) {
   if (!env.PLEDGES || !orderId) return;
-  const reservationKey = getTierReservationKey(campaignSlug, orderId);
-  const countsKey = getTierReservationCountsKey(campaignSlug);
-  const existingReservation = await env.PLEDGES.get(reservationKey, { type: 'json' });
-  const aggregatedCounts = await env.PLEDGES.get(countsKey, { type: 'json' });
-
-  const operations = [env.PLEDGES.delete(reservationKey)];
-  if (aggregatedCounts && typeof aggregatedCounts === 'object') {
-    const nextCounts = mergeTierReservationCounts(aggregatedCounts, existingReservation, -1);
-    if (Object.keys(nextCounts).length > 0) {
-      operations.push(env.PLEDGES.put(countsKey, JSON.stringify(nextCounts), { expirationTtl: 3600 }));
-    } else {
-      operations.push(env.PLEDGES.delete(countsKey));
+  await deleteTierReservationProjection(env, campaignSlug, orderId);
+  if (hasTierInventoryCoordinator(env)) {
+    try {
+      await callTierInventoryCoordinator(env, campaignSlug, '/release-reservation', {
+        reservationId: orderId
+      });
+    } catch (err) {
+      console.error('Failed to clear tier reservation in coordinator:', err.message);
     }
   }
-
-  await Promise.all(operations);
 }
 
 async function claimSelectedTierInventory(env, campaignSlug, selectedTiers = [], campaign) {
   return claimTierSelectionInventory(env, campaignSlug, selectedTiers, campaign);
+}
+
+async function confirmOrClaimSelectedTierInventory(env, campaignSlug, orderId, selectedTiers = [], campaign) {
+  const limitedTiers = selectedTiers
+    .filter(tierItem => tierItem?.tier?.limit_total)
+    .map(tierItem => ({ id: tierItem.id, qty: tierItem.qty || 1 }));
+
+  if (!env.PLEDGES || !orderId || limitedTiers.length === 0) {
+    return claimSelectedTierInventory(env, campaignSlug, selectedTiers, campaign);
+  }
+
+  if (!hasTierInventoryCoordinator(env)) {
+    return claimSelectedTierInventory(env, campaignSlug, selectedTiers, campaign);
+  }
+
+  const inventory = await buildTierInventorySnapshot(env, campaignSlug, campaign);
+  const result = await callTierInventoryCoordinator(env, campaignSlug, '/confirm-reservation', {
+    reservationId: orderId,
+    inventory
+  });
+  if (!result?.success) {
+    return result;
+  }
+  if (!result.confirmed) {
+    return claimSelectedTierInventory(env, campaignSlug, selectedTiers, campaign);
+  }
+
+  await deleteTierReservationProjection(env, campaignSlug, orderId);
+  return {
+    success: true,
+    claimedTiers: limitedTiers
+  };
 }
 
 async function applyTierInventoryChanges(env, campaignSlug, campaign, previousSelection = [], nextSelection = []) {
@@ -1019,7 +1055,13 @@ async function persistNewPledge(env, {
     return { success: false, error: 'PLEDGES KV not configured' };
   }
 
-  const inventoryClaim = await claimSelectedTierInventory(env, campaignSlug, selectedTiers, campaign);
+  const inventoryClaim = await confirmOrClaimSelectedTierInventory(
+    env,
+    campaignSlug,
+    pledgeData.orderId,
+    selectedTiers,
+    campaign
+  );
   if (!inventoryClaim.success) {
     return inventoryClaim;
   }
@@ -1056,8 +1098,6 @@ async function persistNewPledge(env, {
       await updateSupportItemStats(env, campaignSlug, [], supportItems);
       supportStatsUpdated = true;
     }
-
-    await clearTierReservation(env, campaignSlug, pledgeData.orderId);
 
     return { success: true };
   } catch (err) {
@@ -1635,6 +1675,34 @@ async function handleFirstPartyCheckoutStart(request, env) {
     );
   }
 
+  const reservedCheckoutGroups = [];
+  try {
+    for (const group of checkoutGroups) {
+      const checkoutOrderId = checkoutGroups.length === 1
+        ? orderId
+        : buildBundleOrderId(orderId, group.campaignSlug);
+      const reservation = await saveTierReservation(
+        env,
+        group.campaignSlug,
+        checkoutOrderId,
+        group.canonicalContribution.selectedTiers,
+        group.campaign
+      );
+      if (!reservation?.success) {
+        throw new Error(reservation.error || 'Failed to reserve limited inventory');
+      }
+      reservedCheckoutGroups.push({ campaignSlug: group.campaignSlug, orderId: checkoutOrderId });
+    }
+  } catch (reservationErr) {
+    if (env.PLEDGES) {
+      await env.PLEDGES.delete(getCheckoutBundleStorageKey(orderId));
+    }
+    for (const reservedGroup of reservedCheckoutGroups) {
+      await clearTierReservation(env, reservedGroup.campaignSlug, reservedGroup.orderId);
+    }
+    return jsonResponse({ error: reservationErr.message }, 409);
+  }
+
   const stripe = createStripeClient(getStripeKey(env));
 
   try {
@@ -1678,6 +1746,9 @@ async function handleFirstPartyCheckoutStart(request, env) {
   } catch (stripeErr) {
     if (env.PLEDGES) {
       await env.PLEDGES.delete(getCheckoutBundleStorageKey(orderId));
+    }
+    for (const reservedGroup of reservedCheckoutGroups) {
+      await clearTierReservation(env, reservedGroup.campaignSlug, reservedGroup.orderId);
     }
     return jsonResponse({ error: 'Failed to create checkout session: ' + stripeErr.message }, 500);
   }

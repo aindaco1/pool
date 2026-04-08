@@ -31,7 +31,7 @@ The current architecture is deliberately optimized so free-plan Cloudflare deplo
 - campaign pages and the manage page prefer one combined `/live/:slug` read instead of separate stats + inventory requests
 - the browser caches live stats and inventory in `localStorage` for the configured TTLs, and hidden tabs stop refreshing until visible again
 - single-campaign reports, settlement helpers, admin broadcast audience lookups, and stats / inventory reconciliation all prefer the `campaign-pledges:{slug}` index before falling back to full `pledge:` scans
-- limited-tier availability checks prefer `tier-reservation-counts:{slug}` aggregates instead of listing every reservation key
+- limited-tier write paths now ask the per-campaign coordinator for reservation-aware availability, while public inventory stays in KV as a projection
 - rate limiting still fails closed, but repeated blocked requests inside the same window no longer rewrite the same KV counter on every hit
 
 That means the real free-plan ceiling for most forks is usually **KV writes from successful pledge activity**, not public read traffic.

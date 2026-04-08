@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 USE_PODMAN=false
+PODMAN_STARTED_BY_SCRIPT=false
 
 for arg in "$@"; do
     if [ "$arg" = "--podman" ]; then
@@ -73,8 +74,9 @@ cleanup() {
     if [ -n "${NGROK_PID:-}" ]; then
         kill "$NGROK_PID" 2>/dev/null || true
     fi
-    if [ -n "${DEV_PID:-}" ]; then
-        kill "$DEV_PID" 2>/dev/null || true
+    if [ "$PODMAN_STARTED_BY_SCRIPT" = "true" ]; then
+        podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
+        podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
     fi
     if [ -f "${BACKUP_FILE:-}" ] && [ "${USE_PODMAN:-false}" != "true" ]; then
         mv "$BACKUP_FILE" "$CONFIG_FILE"
@@ -88,8 +90,8 @@ if [ "$USE_PODMAN" = "true" ]; then
     prefer_podman_path || true
     echo "📦 Starting shared Podman dev stack..."
     PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/pool-test-checkout-podman.log}"
-    ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1 &
-    DEV_PID=$!
+    PODMAN_DETACH=true ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1
+    PODMAN_STARTED_BY_SCRIPT=true
 
     echo "⏳ Waiting for Podman-backed local services..."
     PODMAN_READY=false

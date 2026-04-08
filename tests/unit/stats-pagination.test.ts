@@ -51,6 +51,31 @@ function createEnv() {
   };
 }
 
+class MockTierInventoryNamespace {
+  calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+
+  idFromName(name: string) {
+    return { name };
+  }
+
+  get(_id: { name: string }) {
+    return {
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        const body = init?.body ? JSON.parse(String(init.body)) : {};
+        this.calls.push({ url, body });
+        return new Response(JSON.stringify({
+          success: true,
+          inventory: body.inventory || {}
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    };
+  }
+}
+
 describe('stats pagination', () => {
   it('recalculateStats counts pledges across all KV pages', async () => {
     const env = createEnv();
@@ -243,5 +268,37 @@ describe('stats pagination', () => {
     expect(inventory?.['vip-pass']).toEqual({ limit: 2, claimed: 2 });
     expect(inventory?.['frame-slot']).toEqual({ limit: 5, claimed: 1 });
     expect(kv.listCalls.some((call) => call.prefix === 'pledge:')).toBe(false);
+  });
+
+  it('recalculateTierInventory uses the coordinator as the write path when available', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES;
+    const tierInventory = new MockTierInventoryNamespace();
+    (env as Record<string, unknown>).TIER_INVENTORY_COORDINATOR = tierInventory;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['1']));
+    await kv.put('pledge:1', JSON.stringify({
+      orderId: '1',
+      campaignSlug: 'hand-relations',
+      tierId: 'vip-pass',
+      tierQty: 1,
+      pledgeStatus: 'active',
+      charged: false
+    }));
+
+    const inventory = await recalculateTierInventory(env, 'hand-relations', [
+      { id: 'vip-pass', limit_total: 2 }
+    ]);
+
+    expect(inventory?.['vip-pass']).toEqual({ limit: 2, claimed: 1 });
+    expect(tierInventory.calls).toContainEqual(expect.objectContaining({
+      url: 'https://tier-inventory-coordinator/replace',
+      body: expect.objectContaining({
+        campaignSlug: 'hand-relations',
+        inventory: {
+          'vip-pass': { limit: 2, claimed: 1 }
+        }
+      })
+    }));
   });
 });

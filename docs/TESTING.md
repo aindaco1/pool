@@ -88,7 +88,7 @@ Recent security hardening that the gate now covers includes:
 - fail-closed `GET /pledge` behavior when a magic-link token exists but the pledge row does not
 - Markdown link-scheme neutralization in long-form content
 - exact-origin validation for structured embeds (`spotify`, `youtube`, `vimeo`)
-- serialized limited-tier inventory claims during checkout completion
+- serialized limited-tier inventory reservations at checkout start and confirmation at successful persistence time
 
 The local Worker defaults in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) now match that first-party setup. `./scripts/dev.sh` now auto-generates a local `CHECKOUT_INTENT_SECRET` in `worker/.dev.vars` if it is missing, so fresh local checkout starts do not fail closed on an uninitialized dev secret.
 
@@ -135,6 +135,8 @@ npx vitest run tests/unit/live-stats.test.ts tests/unit/manage-page.test.ts test
 Those suites protect the combined `/live/:slug` read path, the browser cache behavior, and the config boot wiring that forks rely on.
 
 On GitHub, the same gate runs automatically in the `Merge Smoke` workflow for pull requests targeting `main`.
+
+The merge gate now writes one log file per phase and prints a final PASS/FAIL summary with log paths. If a late Podman-backed phase fails, start with the log directory printed at the end of the run instead of scrolling through the whole transcript.
 
 ### Secret Audit
 
@@ -214,7 +216,7 @@ Use `pledge-report.sh` when you want the full ledger, including modify/cancel de
 When reviewing results, do not flag these as regressions:
 
 - Magic links are now order-scoped instead of email-scoped.
-- `/checkout-intent/start` no longer reserves limited inventory before checkout completion.
+- `/checkout-intent/start` now reserves scarce limited inventory before redirecting into Stripe, and successful persistence confirms that reservation.
 - Legacy `GET /checkout` is intentionally disabled.
 
 ### Adding Tests

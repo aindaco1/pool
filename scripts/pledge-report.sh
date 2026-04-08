@@ -48,8 +48,9 @@ prefer_podman_path() {
 }
 
 cleanup() {
-  if [[ "$PODMAN_STARTED_BY_SCRIPT" == "true" && -n "${DEV_PID:-}" ]]; then
-    kill "$DEV_PID" 2>/dev/null || true
+  if [[ "$PODMAN_STARTED_BY_SCRIPT" == "true" ]]; then
+    podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
+    podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
   fi
 }
 
@@ -61,8 +62,7 @@ if [[ "$USE_PODMAN" == "true" && "$PODMAN_REPORT_INTERNAL" != "1" ]]; then
   if ! podman exec pool-dev-worker true >/dev/null 2>&1; then
     echo "📦 Starting shared Podman dev stack..." >&2
     PODMAN_REPORT_LOG="${PODMAN_REPORT_LOG:-/tmp/pool-pledge-report-podman.log}"
-    ./scripts/dev.sh --podman > "$PODMAN_REPORT_LOG" 2>&1 &
-    DEV_PID=$!
+    PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_REPORT_LOG" 2>&1
     PODMAN_STARTED_BY_SCRIPT=true
 
     echo "⏳ Waiting for Podman-backed worker..." >&2

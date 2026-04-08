@@ -9,7 +9,7 @@ This version is tuned for the current checkout and Worker business-logic behavio
 These behaviors changed intentionally and should **not** be treated as regressions during smoke testing:
 
 - Magic links are order-scoped instead of email-scoped.
-- `/checkout-intent/start` no longer reserves limited inventory before checkout completion.
+- `/checkout-intent/start` now reserves scarce limited inventory before redirecting into Stripe, and successful persistence confirms that reservation.
 - Legacy `GET /checkout` is disabled.
 - Settlement only marks a campaign fully settled when no active pledges were skipped.
 
@@ -104,7 +104,7 @@ Treat any of these as merge blockers:
 4. Expected result:
    - no console errors on the campaign page
    - the checkout summary matches the selected tier, support items, custom amount, and tip
-   - limited tiers are **not** held just because checkout was started
+   - if the selected tier is scarce and near exhaustion, checkout start can hold it immediately
 
 ### 2. Checkout Completion
 
@@ -157,10 +157,11 @@ curl -s "$STAGING_WORKER_URL/inventory/<campaign-slug>" | jq
 ### 6. Limited Inventory Behavior
 
 1. Start checkout for a limited tier but do **not** complete payment.
-2. From a second browser/profile, start checkout for the same limited tier.
+2. From a second browser/profile, start checkout for the same last-unit limited tier.
 3. Expected result:
-   - the second checkout can still start
-   - inventory is only consumed when the pledge is actually persisted/claimed
+   - the second checkout is blocked or sold out while the first reservation is still active
+   - public inventory remains the projection of committed claims, so the user-facing sold-out behavior may lead the public claimed count briefly
+   - successful webhook persistence confirms the held reservation instead of re-claiming against a separate truth source
 
 ### 7. Threshold-Gated Tier Behavior
 

@@ -4,8 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-trap 'cleanup' EXIT
-
 JEKYLL_PORT=4000
 WORKER_PORT=8787
 STRIPE_LOG="/tmp/pool-stripe-listen.log"
@@ -19,6 +17,13 @@ WORKER_NODE_MODULES_VOLUME="pool-dev-worker-node-modules"
 SKIP_STRIPE="${SKIP_STRIPE:-false}"
 PODMAN_REBUILD="${PODMAN_REBUILD:-0}"
 PODMAN_SOCKET=""
+PODMAN_DETACH="${PODMAN_DETACH:-false}"
+
+for arg in "$@"; do
+  if [ "$arg" = "--detach" ]; then
+    PODMAN_DETACH=true
+  fi
+done
 
 detect_os_family() {
   case "$(uname -s)" in
@@ -145,6 +150,34 @@ wait_for_stripe_secret() {
   return 1
 }
 
+kill_port_if_busy() {
+  local port="$1"
+  local label="$2"
+  local pids=""
+
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+
+  pids="$(lsof -ti tcp:"$port" || true)"
+  if [ -z "$pids" ]; then
+    return 0
+  fi
+
+  echo "🔄 Clearing existing $label process(es) on port $port..."
+  while IFS= read -r pid; do
+    [ -z "$pid" ] && continue
+    local process_name=""
+    process_name="$(ps -p "$pid" -o comm= 2>/dev/null | tr -d '[:space:]' || true)"
+    if [ "$process_name" = "gvproxy" ]; then
+      echo "   Skipping gvproxy; Podman will manage that listener."
+      continue
+    fi
+    kill "$pid" 2>/dev/null || true
+  done <<< "$pids"
+  sleep 1
+}
+
 ensure_podman_ready() {
   if ! command -v podman >/dev/null 2>&1; then
     echo "❌ Podman is required for --podman mode."
@@ -265,6 +298,10 @@ cleanup() {
   cleanup_pod
 }
 
+if [ "$PODMAN_DETACH" != "true" ]; then
+  trap 'cleanup' EXIT
+fi
+
 prefer_node20_path || true
 prefer_podman_path || true
 prefer_stripe_path || true
@@ -272,6 +309,8 @@ ensure_podman_ready
 ensure_local_secret "CHECKOUT_INTENT_SECRET"
 
 cleanup_pod
+kill_port_if_busy "$JEKYLL_PORT" "Jekyll"
+kill_port_if_busy "$WORKER_PORT" "Worker"
 
 build_image_if_needed "$SITE_IMAGE" "$ROOT_DIR" "$ROOT_DIR/Containerfile.dev"
 build_image_if_needed "$WORKER_IMAGE" "$ROOT_DIR/worker" "$ROOT_DIR/worker/Containerfile.dev"
@@ -362,6 +401,11 @@ echo "   - Rebuild images with: PODMAN_REBUILD=1 ./scripts/dev.sh --podman"
 echo "   - Logs: podman logs -f $SITE_CONTAINER | podman logs -f $WORKER_CONTAINER"
 echo "   - Stop all services with Ctrl+C"
 echo ""
+
+if [ "$PODMAN_DETACH" = "true" ]; then
+  echo "📎 Detached mode enabled; containers will keep running after this command exits"
+  exit 0
+fi
 
 while true; do
   sleep 1

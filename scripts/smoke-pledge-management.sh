@@ -4,6 +4,7 @@
 set -euo pipefail
 
 USE_PODMAN=false
+PODMAN_STARTED_BY_SCRIPT=false
 
 for arg in "$@"; do
   if [ "$arg" = "--podman" ]; then
@@ -47,6 +48,17 @@ prefer_podman_path() {
   return 1
 }
 
+podman_stack_ready() {
+  curl -s "http://127.0.0.1:4000/campaigns/hand-relations/" > /dev/null 2>&1 && \
+    curl -s "$WORKER_URL/stats/$CAMPAIGN_SLUG" > /dev/null 2>&1 && \
+    curl -s "$WORKER_URL/inventory/$CAMPAIGN_SLUG" > /dev/null 2>&1
+}
+
+cleanup_podman_stack() {
+  podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
+  podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
+}
+
 cleanup_fixture() {
   curl -s -X POST "${WORKER_HEADERS[@]}" "$WORKER_URL/test/cleanup" \
     -H "Content-Type: application/json" \
@@ -55,8 +67,8 @@ cleanup_fixture() {
 
 cleanup() {
   cleanup_fixture
-  if [ -n "${DEV_PID:-}" ]; then
-    kill "$DEV_PID" 2>/dev/null || true
+  if [ "$PODMAN_STARTED_BY_SCRIPT" = "true" ]; then
+    cleanup_podman_stack
   fi
 }
 
@@ -71,25 +83,28 @@ trap cleanup EXIT
 
 if [ "$USE_PODMAN" = "true" ]; then
   prefer_podman_path || true
-  echo "📦 Starting shared Podman dev stack..."
-  PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/pool-smoke-podman.log}"
-  ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1 &
-  DEV_PID=$!
+  if podman_stack_ready; then
+    echo "✅ Reusing existing Podman dev stack"
+  else
+    echo "📦 Starting shared Podman dev stack..."
+    PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/pool-smoke-podman.log}"
+    PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1
+    PODMAN_STARTED_BY_SCRIPT=true
 
-  echo "⏳ Waiting for Podman-backed local services..."
-  PODMAN_READY=false
-  for _ in {1..60}; do
-    if curl -s "http://127.0.0.1:4000" > /dev/null 2>&1 && \
-       curl -s "$WORKER_URL/stats/does-not-exist" > /dev/null 2>&1; then
-      echo "✅ Podman dev stack is ready"
-      PODMAN_READY=true
-      break
+    echo "⏳ Waiting for Podman-backed local services..."
+    PODMAN_READY=false
+    for _ in {1..60}; do
+      if podman_stack_ready; then
+        echo "✅ Podman dev stack is ready"
+        PODMAN_READY=true
+        break
+      fi
+      sleep 1
+    done
+
+    if [ "$PODMAN_READY" != "true" ]; then
+      fail "Podman dev stack did not become ready within 60 seconds"
     fi
-    sleep 1
-  done
-
-  if [ "$PODMAN_READY" != "true" ]; then
-    fail "Podman dev stack did not become ready within 60 seconds"
   fi
 fi
 

@@ -23,7 +23,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Community decisions** — Voting/polling for backer engagement with published option allowlists and closed-decision lockout
 - **Sanitized campaign content blocks** — Long-form campaign and diary content accepts Markdown plus a tiny safe inline subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`), neutralizes unsafe Markdown link schemes, automatically opens external links in a new tab, and escapes or rejects other raw HTML
 - **Strict structured embeds** — Approved `spotify`, `youtube`, and `vimeo` embeds are validated against exact trusted origins and embed paths instead of substring matching
-- **Serialized limited-tier inventory** — Scarce reward claims are coordinated per campaign through a Durable Object so concurrent checkout completions cannot oversell limited tiers
+- **Serialized limited-tier inventory** — Scarce rewards reserve through a per-campaign Durable Object at checkout start and confirm through that same coordinator at persistence time, so limited tiers do not oversell under concurrent demand
 - **Strict missing-pledge handling** — Magic-link pledge reads fail closed with `404` when the backing pledge record is missing
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
 - **Announcements** — Admin broadcast emails with custom CTA links to supporters
@@ -110,7 +110,7 @@ The Pool is intentionally shaped so most traffic stays cheap:
 - campaign pages cache live stats and inventory in `localStorage` for `live_stats_cache_ttl_seconds` / `live_inventory_cache_ttl_seconds` (default `300`)
 - background tabs stop refreshing until the page becomes visible again
 - single-campaign reports, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans
-- limited-tier availability checks now reuse `tier-reservation-counts:{slug}` aggregates instead of repeatedly listing reservation keys
+- limited-tier write paths now ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
 - once a client is already over a rate limit window, repeated blocked requests no longer rewrite the same KV counter on every hit
 
 Fork knobs worth knowing:

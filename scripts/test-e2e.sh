@@ -7,6 +7,7 @@ echo "🚀 Starting E2E tests..."
 
 USE_PODMAN=false
 SKIP_MANUAL_CHECKOUT="${SKIP_MANUAL_CHECKOUT:-0}"
+PODMAN_STARTED_BY_SCRIPT=false
 
 for arg in "$@"; do
     if [ "$arg" = "--podman" ]; then
@@ -74,8 +75,9 @@ cleanup() {
     if [ -n "${NGROK_PID:-}" ]; then
         kill "$NGROK_PID" 2>/dev/null || true
     fi
-    if [ -n "${DEV_PID:-}" ]; then
-        kill "$DEV_PID" 2>/dev/null || true
+    if [ "$PODMAN_STARTED_BY_SCRIPT" = "true" ]; then
+        podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
+        podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
     fi
     if [ -f "_config.local.yml.bak" ] && [ "${USE_PODMAN:-false}" != "true" ]; then
         mv _config.local.yml.bak _config.local.yml
@@ -89,27 +91,7 @@ NGROK_URL="https://cole-unelapsed-patrice.ngrok-free.dev"
 
 if [ "$USE_PODMAN" = "true" ]; then
     prefer_podman_path || true
-    echo "📦 Starting shared Podman dev stack..."
-    PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/pool-test-e2e-podman.log}"
-    ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1 &
-    DEV_PID=$!
-
-    echo "⏳ Waiting for Podman-backed local services..."
-    PODMAN_READY=false
-    for i in {1..60}; do
-        if curl -s http://127.0.0.1:4000 > /dev/null 2>&1 && \
-           curl -s http://127.0.0.1:8787/stats/does-not-exist > /dev/null 2>&1; then
-            echo "✅ Podman dev stack is ready"
-            PODMAN_READY=true
-            break
-        fi
-        sleep 1
-    done
-
-    if [ "$PODMAN_READY" != "true" ]; then
-        echo "❌ Podman dev stack did not become ready within 60 seconds"
-        exit 1
-    fi
+    echo "📦 Podman mode enabled"
 else
     # Kill any existing processes
     pkill -f "ngrok http" 2>/dev/null || true
@@ -161,6 +143,27 @@ if [ "$SKIP_MANUAL_CHECKOUT" = "1" ]; then
 fi
 
 if [ "$USE_PODMAN" = "true" ]; then
+    echo "📦 Starting shared Podman dev stack for manual checkout coverage..."
+    PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/pool-test-e2e-podman.log}"
+    PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1
+    PODMAN_STARTED_BY_SCRIPT=true
+
+    echo "⏳ Waiting for Podman-backed local services..."
+    PODMAN_READY=false
+    for i in {1..60}; do
+        if curl -s http://127.0.0.1:4000/campaigns/hand-relations/ > /dev/null 2>&1 && \
+           curl -s http://127.0.0.1:8787/stats/does-not-exist > /dev/null 2>&1; then
+            echo "✅ Podman dev stack is ready"
+            PODMAN_READY=true
+            break
+        fi
+        sleep 1
+    done
+
+    if [ "$PODMAN_READY" != "true" ]; then
+        echo "❌ Podman dev stack did not become ready within 60 seconds"
+        exit 1
+    fi
     echo "⏭️  Podman mode uses containerized Playwright for automated coverage and localhost host Playwright for manual checkout coverage"
 elif [ "$USES_FIRST_PARTY_LOCAL" != "true" ]; then
     echo "🌐 Starting ngrok for checkout test..."

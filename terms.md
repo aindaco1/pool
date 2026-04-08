@@ -22,7 +22,7 @@ title: Terms & Creative Guidelines
 - If a campaign is funded, all pledges from the same email for that campaign are combined into a single charge.
 - You may add an **optional platform tip** from 0% to 15% during checkout. The default tip is 5%.
 - Optional platform tips support maintenance of The Pool and are included in your pledge total, but **do not count toward a campaign's funding goal**.
-- Sales tax is applied to pledges using the rate configured for this deployment (Burque GRT baby!).
+- Sales tax is applied to pledges using the rate configured for this deployment.
 - Physical product pledges include a flat shipping fee per campaign that contains physical items. Your shipping address is securely collected via Stripe.
 
 ## Creative Control & Submissions
