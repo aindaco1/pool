@@ -3,6 +3,14 @@
 
 set -euo pipefail
 
+USE_PODMAN=false
+
+for arg in "$@"; do
+  if [ "$arg" = "--podman" ]; then
+    USE_PODMAN=true
+  fi
+done
+
 WORKER_URL="${WORKER_URL:-http://127.0.0.1:8787}"
 CAMPAIGN_SLUG="${CAMPAIGN_SLUG:-smoke-editable}"
 SMOKE_EMAIL="${SMOKE_EMAIL:-smoke-local@example.com}"
@@ -23,10 +31,33 @@ pass() { echo -e "${GREEN}✓${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; exit 1; }
 warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 
-cleanup() {
+prefer_podman_path() {
+  local candidate=""
+  for candidate in \
+    "/opt/podman/bin" \
+    "/usr/local/podman/bin" \
+    "/opt/homebrew/bin" \
+    "/usr/local/bin"
+  do
+    if [ -x "$candidate/podman" ]; then
+      export PATH="$candidate:$PATH"
+      return 0
+    fi
+  done
+  return 1
+}
+
+cleanup_fixture() {
   curl -s -X POST "${WORKER_HEADERS[@]}" "$WORKER_URL/test/cleanup" \
     -H "Content-Type: application/json" \
     -d "{\"email\":\"$SMOKE_EMAIL\"}" >/dev/null || true
+}
+
+cleanup() {
+  cleanup_fixture
+  if [ -n "${DEV_PID:-}" ]; then
+    kill "$DEV_PID" 2>/dev/null || true
+  fi
 }
 
 command -v curl >/dev/null 2>&1 || fail "curl is required"
@@ -38,11 +69,35 @@ fi
 
 trap cleanup EXIT
 
+if [ "$USE_PODMAN" = "true" ]; then
+  prefer_podman_path || true
+  echo "📦 Starting shared Podman dev stack..."
+  PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/pool-smoke-podman.log}"
+  ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1 &
+  DEV_PID=$!
+
+  echo "⏳ Waiting for Podman-backed local services..."
+  PODMAN_READY=false
+  for _ in {1..60}; do
+    if curl -s "http://127.0.0.1:4000" > /dev/null 2>&1 && \
+       curl -s "$WORKER_URL/stats/does-not-exist" > /dev/null 2>&1; then
+      echo "✅ Podman dev stack is ready"
+      PODMAN_READY=true
+      break
+    fi
+    sleep 1
+  done
+
+  if [ "$PODMAN_READY" != "true" ]; then
+    fail "Podman dev stack did not become ready within 60 seconds"
+  fi
+fi
+
 echo "Local pledge management smoke test"
 echo "Worker: $WORKER_URL | Campaign: $CAMPAIGN_SLUG | Email: $SMOKE_EMAIL"
 echo ""
 
-cleanup
+cleanup_fixture
 
 if [ -n "$ADMIN_SECRET" ]; then
   curl -sf -X POST "${WORKER_HEADERS[@]}" "$WORKER_URL/stats/$CAMPAIGN_SLUG/recalculate" \

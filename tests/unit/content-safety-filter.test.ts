@@ -1,16 +1,207 @@
 import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
+const podmanCandidates = ['/opt/podman/bin/podman', 'podman'];
+
+let bundleCheckCache: boolean | null = null;
+let podmanCommandCache: string | null = null;
+let podmanSiteImageReady = false;
+let podmanEnvironmentCache: NodeJS.ProcessEnv | null = null;
+
+function hostBundlerAvailable() {
+  if (bundleCheckCache !== null) return bundleCheckCache;
+
+  try {
+    execFileSync('bundle', ['check'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: 'pipe'
+    });
+    bundleCheckCache = true;
+  } catch {
+    bundleCheckCache = false;
+  }
+
+  return bundleCheckCache;
+}
+
+function resolvePodmanCommand() {
+  if (podmanCommandCache) return podmanCommandCache;
+
+  for (const candidate of podmanCandidates) {
+    if (candidate.includes('/') && !fs.existsSync(candidate)) continue;
+    const env = resolvePodmanEnvironment(candidate);
+    try {
+      execFileSync(candidate, ['info'], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        stdio: 'pipe',
+        env
+      });
+      podmanCommandCache = candidate;
+      return candidate;
+    } catch {
+      try {
+        execFileSync(candidate, ['machine', 'start', 'podman-machine-default'], {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          stdio: 'pipe',
+          env
+        });
+        execFileSync(candidate, ['info'], {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          stdio: 'pipe',
+          env
+        });
+        podmanCommandCache = candidate;
+        return candidate;
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  throw new Error(
+    'Host Bundler is unavailable and Podman is not reachable. Start the Podman dev stack with ./scripts/dev.sh --podman or install the local Ruby toolchain.'
+  );
+}
+
+function resolvePodmanEnvironment(podmanCommand: string) {
+  if (podmanEnvironmentCache) return podmanEnvironmentCache;
+
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  try {
+    const socketPath = execFileSync(
+      podmanCommand,
+      ['machine', 'inspect', '--format', '{{.ConnectionInfo.PodmanSocket.Path}}', 'podman-machine-default'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        stdio: 'pipe',
+        env
+      }
+    ).trim();
+    if (socketPath && fs.existsSync(socketPath)) {
+      env.CONTAINER_HOST = `unix://${socketPath}`;
+    }
+  } catch {
+    // Linux/rootless hosts often do not need an explicit Podman machine socket.
+  }
+
+  podmanEnvironmentCache = env;
+  return podmanEnvironmentCache;
+}
+
+function renderFilterInPodman(script: string, input: string, provider: string) {
+  const podman = resolvePodmanCommand();
+  const podmanEnv = resolvePodmanEnvironment(podman);
+
+  try {
+    execFileSync(podman, ['container', 'exists', 'pool-dev-site'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: 'pipe',
+      env: podmanEnv
+    });
+  } catch {
+    if (!podmanSiteImageReady) {
+      try {
+        execFileSync(podman, ['image', 'exists', 'localhost/pool-dev-site:latest'], {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          stdio: 'pipe',
+          env: podmanEnv
+        });
+      } catch {
+        execFileSync(podman, ['build', '-t', 'localhost/pool-dev-site:latest', '-f', 'Containerfile.dev', '.'], {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          stdio: 'pipe',
+          env: podmanEnv
+        });
+      }
+      try {
+        execFileSync(podman, ['volume', 'exists', 'pool-dev-bundle'], {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          stdio: 'ignore',
+          env: podmanEnv
+        });
+      } catch {
+        execFileSync(podman, ['volume', 'create', 'pool-dev-bundle'], {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          stdio: 'pipe',
+          env: podmanEnv
+        });
+      }
+      podmanSiteImageReady = true;
+    }
+
+    return execFileSync(
+      podman,
+      [
+        'run',
+        '--rm',
+        '-v',
+        `${repoRoot}:/workspace`,
+        '-v',
+        'pool-dev-bundle:/usr/local/bundle',
+        '-e',
+        `FILTER_SCRIPT=${script}`,
+        '-e',
+        `FILTER_INPUT=${input}`,
+        '-e',
+        `FILTER_PROVIDER=${provider}`,
+        'localhost/pool-dev-site:latest',
+        'bash',
+        '-lc',
+        'cd /workspace && bundle exec ruby -e "$FILTER_SCRIPT" "$FILTER_INPUT" "$FILTER_PROVIDER"'
+      ],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: podmanEnv
+      }
+    ).trim();
+  }
+
+  return execFileSync(
+    podman,
+    [
+      'exec',
+      '-i',
+      '-e',
+      `FILTER_SCRIPT=${script}`,
+      '-e',
+      `FILTER_INPUT=${input}`,
+      '-e',
+      `FILTER_PROVIDER=${provider}`,
+      'pool-dev-site',
+      'bash',
+      '-lc',
+      'cd /workspace && bundle exec ruby -e "$FILTER_SCRIPT" "$FILTER_INPUT" "$FILTER_PROVIDER"'
+    ],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: podmanEnv
+    }
+  ).trim();
+}
 
 function renderFilter(method: 'safe_markdownify' | 'approved_embed_src', input: string, provider = '') {
   const script = `
+root = Dir.pwd
 require 'jekyll'
 require 'liquid'
-require '${repoRoot}/_plugins/content_safety_filter'
+require File.join(root, '_plugins', 'content_safety_filter')
 site = Jekyll::Site.new(Jekyll.configuration({
-  'source' => '${repoRoot}',
+  'source' => root,
   'destination' => '/tmp/pool-filter-dest',
   'url' => 'https://pool.dustwave.xyz',
   'quiet' => true
@@ -25,10 +216,14 @@ end
 puts result
 `;
 
-  return execFileSync('bundle', ['exec', 'ruby', '-e', script, input, provider], {
-    cwd: repoRoot,
-    encoding: 'utf8'
-  }).trim();
+  if (hostBundlerAvailable()) {
+    return execFileSync('bundle', ['exec', 'ruby', '-e', script, input, provider], {
+      cwd: repoRoot,
+      encoding: 'utf8'
+    }).trim();
+  }
+
+  return renderFilterInPodman(script, input, provider);
 }
 
 describe('content safety filter', () => {

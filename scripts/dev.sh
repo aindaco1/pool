@@ -3,6 +3,12 @@
 
 set -euo pipefail
 
+for arg in "$@"; do
+  if [ "$arg" = "--podman" ]; then
+    exec "$(cd "$(dirname "$0")" && pwd)/dev-podman.sh"
+  fi
+done
+
 trap 'kill 0' EXIT
 
 JEKYLL_PORT=4000
@@ -32,6 +38,21 @@ prefer_node20_path() {
         return 0
       fi
     done
+  done
+  return 1
+}
+
+prefer_stripe_path() {
+  local candidate=""
+  for candidate in \
+    "/opt/homebrew/bin" \
+    "/usr/local/bin" \
+    "$HOME/.local/bin"
+  do
+    if [ -x "$candidate/stripe" ]; then
+      export PATH="$candidate:$PATH"
+      return 0
+    fi
   done
   return 1
 }
@@ -116,6 +137,7 @@ kill_port_if_busy() {
 echo "🚀 Starting development environment..."
 
 prefer_node20_path || true
+prefer_stripe_path || true
 
 if [ "$USES_FIRST_PARTY_LOCAL" = "true" ]; then
   ensure_local_secret "CHECKOUT_INTENT_SECRET"

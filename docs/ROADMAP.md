@@ -53,6 +53,10 @@
 - [x] Multi-tier pledge support (`additionalTiers` in pledge records)
 - [x] Stats recalculation fix for `additionalTiers`
 - [x] Production campaign launch (Hand Relations)
+- [x] Podman-backed local dev/testing path
+  - rootless Jekyll + Worker containers via `./scripts/dev.sh --podman`
+  - containerized automated Playwright via `npm run test:e2e:headless:podman`
+  - Podman-aware smoke/report helpers and `npm run podman:doctor` / `npm run podman:self-check`
 - [x] Pages CMS integration for visual campaign editing
   - Block-based content editing (text, image, quote, gallery, divider)
   - Polymorphic fields with `type: block` and `blockKey`
@@ -68,7 +72,6 @@ _(None currently)_
 - [ ] Admin dashboard page (read-only) from KV data
 - [ ] Native Stripe integration via API (not jumping to Stripe's payment link)
 - [ ] Replace Pages CMS with dedicated content editor and per-campaign permissions
-- [ ] Integrate [Podman](https://podman.io) for local dev/testing
 - [ ] More explicit inventory overselling protection
   - Move scarce limited-tier claims into a per-campaign Durable Object coordinator
   - Keep `tier-inventory:{slug}` in KV as a projection/cache for public reads, not the source of truth

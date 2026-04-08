@@ -16,6 +16,29 @@ bundle exec jekyll serve
 # Visit http://localhost:4000
 ```
 
+Or use the rootless Podman path:
+
+```bash
+npm run podman:doctor
+./scripts/dev.sh --podman
+```
+
+That mode keeps the standard local ports and local state files, but runs Jekyll and Wrangler inside containers so new forks do not need host Ruby or host Wrangler just to boot the app.
+
+If you want to run the checkout helper or browser suite against the same Podman-backed stack:
+
+```bash
+./scripts/test-checkout.sh --podman
+./scripts/test-e2e.sh --podman
+./scripts/test-worker.sh --podman
+./scripts/smoke-pledge-management.sh --podman
+./scripts/pledge-report.sh --podman --local
+./scripts/fulfillment-report.sh --podman --local
+npm run test:e2e:headless:podman
+npm run podman:doctor
+npm run podman:self-check
+```
+
 Clear cache if styles don't update:
 ```bash
 bundle exec jekyll clean

@@ -4,6 +4,14 @@
 
 set -e
 
+USE_PODMAN=false
+
+for arg in "$@"; do
+  if [ "$arg" = "--podman" ]; then
+    USE_PODMAN=true
+  fi
+done
+
 SITE_URL="${SITE_URL:-http://127.0.0.1:4000}"
 WORKER_URL="${WORKER_URL:-http://localhost:8787}"
 REQUEST_IP="${REQUEST_IP:-127.0.0.$(( (RANDOM % 200) + 20 ))}"
@@ -22,6 +30,22 @@ pass() { echo -e "${GREEN}✓${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; exit 1; }
 warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 
+prefer_podman_path() {
+  local candidate=""
+  for candidate in \
+    "/opt/podman/bin" \
+    "/usr/local/podman/bin" \
+    "/opt/homebrew/bin" \
+    "/usr/local/bin"
+  do
+    if [ -x "$candidate/podman" ]; then
+      export PATH="$candidate:$PATH"
+      return 0
+    fi
+  done
+  return 1
+}
+
 request_json() {
   local method="$1"
   local url="$2"
@@ -36,6 +60,38 @@ request_json() {
   REQUEST_BODY=$(cat "$body_file")
   rm -f "$body_file"
 }
+
+cleanup() {
+  if [ -n "${DEV_PID:-}" ]; then
+    kill "$DEV_PID" 2>/dev/null || true
+  fi
+}
+
+trap cleanup EXIT
+
+if [ "$USE_PODMAN" = "true" ]; then
+  prefer_podman_path || true
+  echo "📦 Starting shared Podman dev stack..."
+  PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/pool-test-worker-podman.log}"
+  ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1 &
+  DEV_PID=$!
+
+  echo "⏳ Waiting for Podman-backed local services..."
+  PODMAN_READY=false
+  for _ in {1..60}; do
+    if curl -s "$SITE_URL" > /dev/null 2>&1 && \
+       curl -s "$WORKER_URL/stats/does-not-exist" > /dev/null 2>&1; then
+      echo "✅ Podman dev stack is ready"
+      PODMAN_READY=true
+      break
+    fi
+    sleep 1
+  done
+
+  if [ "$PODMAN_READY" != "true" ]; then
+    fail "Podman dev stack did not become ready within 60 seconds"
+  fi
+fi
 
 echo "Testing Worker endpoints..."
 echo "Site: $SITE_URL | Worker: $WORKER_URL"

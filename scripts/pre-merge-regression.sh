@@ -8,6 +8,66 @@ JEKYLL_PID=""
 TEMP_DEV_VARS=""
 ORIGINAL_DEV_VARS_BACKUP=""
 
+prefer_podman_path() {
+  local candidate=""
+  for candidate in \
+    "/opt/podman/bin" \
+    "/usr/local/podman/bin" \
+    "/opt/homebrew/bin" \
+    "/usr/local/bin"
+  do
+    if [[ -x "$candidate/podman" ]]; then
+      export PATH="$candidate:$PATH"
+      return 0
+    fi
+  done
+  return 1
+}
+
+stabilize_podman_connection() {
+  local socket_path=""
+
+  prefer_podman_path || return 0
+  command -v podman >/dev/null 2>&1 || return 0
+
+  socket_path="$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true)"
+  if [[ -n "${socket_path}" && -S "${socket_path}" ]]; then
+    export CONTAINER_HOST="unix://${socket_path}"
+  fi
+}
+
+host_jekyll_available() {
+  if ! command -v bundle >/dev/null 2>&1; then
+    return 1
+  fi
+  bundle check >/dev/null 2>&1
+}
+
+ensure_podman_ready() {
+  prefer_podman_path || true
+  if ! command -v podman >/dev/null 2>&1; then
+    echo "Podman is required for the fallback Jekyll build path."
+    return 1
+  fi
+  podman info >/dev/null 2>&1
+}
+
+build_with_podman_jekyll() {
+  ensure_podman_ready || return 1
+
+  if ! podman image exists localhost/pool-dev-site:latest; then
+    podman build -t localhost/pool-dev-site:latest -f Containerfile.dev .
+  fi
+
+  podman volume exists pool-dev-bundle >/dev/null 2>&1 || podman volume create pool-dev-bundle >/dev/null
+
+  podman run --rm \
+    -v "$PWD:/workspace" \
+    -v pool-dev-bundle:/usr/local/bundle \
+    localhost/pool-dev-site:latest \
+    bash -lc 'cd /workspace && SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet'
+}
+
 stop_worker() {
   if [[ -n "${WORKER_PID}" ]]; then
     kill "${WORKER_PID}" 2>/dev/null || true
@@ -64,6 +124,8 @@ export MAGIC_LINK_SECRET="${MAGIC_LINK_SECRET:-test-magic-link-secret}"
 export RESEND_API_KEY="${RESEND_API_KEY:-re_test_smoke}"
 SMOKE_ADMIN_SECRET="${ADMIN_SECRET}"
 
+stabilize_podman_connection
+
 if [[ -f worker/.dev.vars ]]; then
   DEV_ADMIN_SECRET="$(grep '^ADMIN_SECRET=' worker/.dev.vars | head -1 | cut -d= -f2- || true)"
   if [[ -n "${DEV_ADMIN_SECRET}" ]]; then
@@ -92,7 +154,14 @@ npm run test:unit
 echo ""
 
 echo "5. First-party build artifact checks"
-bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
+USE_PODMAN_JEKYLL=false
+if host_jekyll_available; then
+  bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
+else
+  echo "Host Jekyll gems unavailable; falling back to Podman-backed build"
+  USE_PODMAN_JEKYLL=true
+  build_with_podman_jekyll || exit 1
+fi
 
 if ! rg -n '\.pool-first-party-cart__panel' _site/assets/main.css >/dev/null; then
   echo "main.css is missing expected first-party cart UI styles"
@@ -101,12 +170,25 @@ fi
 echo ""
 
 echo "6. Security suite"
+if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
+  prefer_podman_path || true
+  if command -v podman >/dev/null 2>&1; then
+    podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
+  fi
+fi
+
 if command -v lsof >/dev/null 2>&1; then
   EXISTING_WORKER_PIDS="$(lsof -ti tcp:8787 || true)"
   if [[ -n "${EXISTING_WORKER_PIDS}" ]]; then
     echo "Stopping existing process(es) on port 8787"
     while IFS= read -r pid; do
-      [[ -n "${pid}" ]] && kill "${pid}" 2>/dev/null || true
+      [[ -z "${pid}" ]] && continue
+      process_name="$(ps -p "${pid}" -o comm= 2>/dev/null | tr -d '[:space:]' || true)"
+      if [[ "${process_name}" = "gvproxy" ]]; then
+        echo "Skipping gvproxy on port 8787; Podman ports are cleaned up via pod removal."
+        continue
+      fi
+      kill "${pid}" 2>/dev/null || true
     done <<< "${EXISTING_WORKER_PIDS}"
     sleep 1
   fi
@@ -143,31 +225,41 @@ echo ""
 
 echo "7. Local mutable-pledge smoke"
 stop_worker
-start_worker || exit 1
 
-if ! curl -s "http://127.0.0.1:4000" >/dev/null 2>&1; then
-  bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000 >/tmp/pool-premerge-jekyll.log 2>&1 &
-  JEKYLL_PID=$!
-fi
+if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
+  ./scripts/test-worker.sh --podman
+  ADMIN_SECRET="${SMOKE_ADMIN_SECRET}" ./scripts/smoke-pledge-management.sh --podman
+else
+  start_worker || exit 1
 
-for _ in {1..60}; do
-  if curl -s "http://127.0.0.1:4000" >/dev/null 2>&1; then
-    break
+  if ! curl -s "http://127.0.0.1:4000" >/dev/null 2>&1; then
+    bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000 >/tmp/pool-premerge-jekyll.log 2>&1 &
+    JEKYLL_PID=$!
   fi
-  sleep 1
-done
 
-if ! curl -s "http://127.0.0.1:4000" >/dev/null 2>&1; then
-  echo "Jekyll failed to start. See /tmp/pool-premerge-jekyll.log"
-  exit 1
+  for _ in {1..60}; do
+    if curl -s "http://127.0.0.1:4000" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+
+  if ! curl -s "http://127.0.0.1:4000" >/dev/null 2>&1; then
+    echo "Jekyll failed to start. See /tmp/pool-premerge-jekyll.log"
+    exit 1
+  fi
+
+  SITE_URL=http://127.0.0.1:4000 WORKER_URL=http://127.0.0.1:8787 ./scripts/test-worker.sh
+  WORKER_URL=http://127.0.0.1:8787 ADMIN_SECRET="${SMOKE_ADMIN_SECRET}" ./scripts/smoke-pledge-management.sh
 fi
-
-SITE_URL=http://127.0.0.1:4000 WORKER_URL=http://127.0.0.1:8787 ./scripts/test-worker.sh
-WORKER_URL=http://127.0.0.1:8787 ADMIN_SECRET="${SMOKE_ADMIN_SECRET}" ./scripts/smoke-pledge-management.sh
 echo ""
 
 echo "8. E2E suite"
-npm run test:e2e:headless
+if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
+  SKIP_MANUAL_CHECKOUT=1 ./scripts/test-e2e.sh --podman
+else
+  npm run test:e2e:headless
+fi
 echo ""
 
 echo "Pre-merge regression checks completed."

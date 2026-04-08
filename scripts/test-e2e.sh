@@ -5,6 +5,15 @@ cd "$(dirname "$0")/.."
 
 echo "🚀 Starting E2E tests..."
 
+USE_PODMAN=false
+SKIP_MANUAL_CHECKOUT="${SKIP_MANUAL_CHECKOUT:-0}"
+
+for arg in "$@"; do
+    if [ "$arg" = "--podman" ]; then
+        USE_PODMAN=true
+    fi
+done
+
 LOCAL_CONFIG_FILE="_config.local.yml"
 LOCAL_CART_RUNTIME=$(grep -E '^cart_runtime:' "$LOCAL_CONFIG_FILE" 2>/dev/null | awk '{print $2}')
 LOCAL_CHECKOUT_PROVIDER=$(grep -E '^checkout_provider:' "$LOCAL_CONFIG_FILE" 2>/dev/null | awk '{print $2}')
@@ -32,6 +41,22 @@ prefer_node20_path() {
 
 prefer_node20_path || true
 
+prefer_podman_path() {
+    local candidate=""
+    for candidate in \
+        "/opt/podman/bin" \
+        "/usr/local/podman/bin" \
+        "/opt/homebrew/bin" \
+        "/usr/local/bin"
+    do
+        if [ -x "$candidate/podman" ]; then
+            export PATH="$candidate:$PATH"
+            return 0
+        fi
+    done
+    return 1
+}
+
 has_local_secret() {
     local key="$1"
     grep -q "^${key}=" "worker/.dev.vars" 2>/dev/null
@@ -42,43 +67,87 @@ if [ "$USES_FIRST_PARTY_LOCAL" = "true" ] && ! has_local_secret "CHECKOUT_INTENT
     echo "   Automated E2E coverage still runs, but real first-party checkout start will fail closed."
 fi
 
-# Kill any existing processes
-pkill -f "ngrok http" 2>/dev/null || true
-pkill -f "jekyll serve" 2>/dev/null || true
-sleep 1
+cleanup() {
+    if [ -n "${JEKYLL_PID:-}" ]; then
+        kill "$JEKYLL_PID" 2>/dev/null || true
+    fi
+    if [ -n "${NGROK_PID:-}" ]; then
+        kill "$NGROK_PID" 2>/dev/null || true
+    fi
+    if [ -n "${DEV_PID:-}" ]; then
+        kill "$DEV_PID" 2>/dev/null || true
+    fi
+    if [ -f "_config.local.yml.bak" ] && [ "${USE_PODMAN:-false}" != "true" ]; then
+        mv _config.local.yml.bak _config.local.yml
+    fi
+}
 
-# Start Jekyll with localhost first (for automated tests)
-echo "🔨 Starting Jekyll (localhost)..."
-rm -rf _site .jekyll-cache
+trap cleanup EXIT
 
-# Temporarily use localhost URL for automated tests
 LOCAL_URL="http://127.0.0.1:4000"
 NGROK_URL="https://cole-unelapsed-patrice.ngrok-free.dev"
 
-# Build with localhost for fast automated tests
-sed -i.bak "s|^url:.*|url: $LOCAL_URL|" _config.local.yml
-bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000 > /tmp/jekyll.log 2>&1 &
-JEKYLL_PID=$!
+if [ "$USE_PODMAN" = "true" ]; then
+    prefer_podman_path || true
+    echo "📦 Starting shared Podman dev stack..."
+    PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/pool-test-e2e-podman.log}"
+    ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1 &
+    DEV_PID=$!
 
-# Wait for Jekyll
-for i in {1..30}; do
-    if curl -s http://127.0.0.1:4000 > /dev/null 2>&1; then
-        echo "✅ Jekyll ready"
-        break
+    echo "⏳ Waiting for Podman-backed local services..."
+    PODMAN_READY=false
+    for i in {1..60}; do
+        if curl -s http://127.0.0.1:4000 > /dev/null 2>&1 && \
+           curl -s http://127.0.0.1:8787/stats/does-not-exist > /dev/null 2>&1; then
+            echo "✅ Podman dev stack is ready"
+            PODMAN_READY=true
+            break
+        fi
+        sleep 1
+    done
+
+    if [ "$PODMAN_READY" != "true" ]; then
+        echo "❌ Podman dev stack did not become ready within 60 seconds"
+        exit 1
     fi
+else
+    # Kill any existing processes
+    pkill -f "ngrok http" 2>/dev/null || true
+    pkill -f "jekyll serve" 2>/dev/null || true
     sleep 1
-done
+
+    # Start Jekyll with localhost first (for automated tests)
+    echo "🔨 Starting Jekyll (localhost)..."
+    rm -rf _site .jekyll-cache
+
+    # Build with localhost for fast automated tests
+    sed -i.bak "s|^url:.*|url: $LOCAL_URL|" _config.local.yml
+    bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000 > /tmp/jekyll.log 2>&1 &
+    JEKYLL_PID=$!
+
+    # Wait for Jekyll
+    for i in {1..30}; do
+        if curl -s http://127.0.0.1:4000 > /dev/null 2>&1; then
+            echo "✅ Jekyll ready"
+            break
+        fi
+        sleep 1
+    done
+fi
 
 # Run automated tests first (no ngrok needed)
 echo ""
 echo "🧪 Running automated tests..."
-CI=1 npx playwright test --headed
-AUTOMATED_EXIT=$?
+if [ "$USE_PODMAN" = "true" ]; then
+    CI=1 ./scripts/podman-playwright-run.sh npx playwright test
+    AUTOMATED_EXIT=$?
+else
+    CI=1 npx playwright test --headed
+    AUTOMATED_EXIT=$?
+fi
 
 if [ $AUTOMATED_EXIT -ne 0 ]; then
     echo "❌ Automated tests failed"
-    kill $JEKYLL_PID 2>/dev/null || true
-    mv _config.local.yml.bak _config.local.yml
     exit $AUTOMATED_EXIT
 fi
 
@@ -86,7 +155,14 @@ echo ""
 echo "✅ Automated tests passed!"
 echo ""
 
-if [ "$USES_FIRST_PARTY_LOCAL" != "true" ]; then
+if [ "$SKIP_MANUAL_CHECKOUT" = "1" ]; then
+    echo "⏭️  SKIP_MANUAL_CHECKOUT=1 set; skipping manual checkout step"
+    exit 0
+fi
+
+if [ "$USE_PODMAN" = "true" ]; then
+    echo "⏭️  Podman mode uses containerized Playwright for automated coverage and localhost host Playwright for manual checkout coverage"
+elif [ "$USES_FIRST_PARTY_LOCAL" != "true" ]; then
     echo "🌐 Starting ngrok for checkout test..."
 
     # Start ngrok
@@ -121,12 +197,5 @@ echo ""
 echo "🧪 Running checkout test..."
 npx playwright test --headed --grep "manual checkout"
 CHECKOUT_EXIT=$?
-
-# Cleanup
-echo ""
-echo "🧹 Cleaning up..."
-kill $JEKYLL_PID 2>/dev/null || true
-kill ${NGROK_PID:-0} 2>/dev/null || true
-mv _config.local.yml.bak _config.local.yml
 
 exit $CHECKOUT_EXIT

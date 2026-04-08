@@ -12,9 +12,13 @@ npm run test:secrets       # Secret exposure audit for local env files
 npm run test:premerge      # Merge-readiness checks for changed Worker logic
 npm run test:e2e           # E2E tests (Playwright) — starts Jekyll
 npm run test:e2e:headless  # CI mode
+npm run test:e2e:headless:podman  # Automated browser suite with Playwright in Podman
 npm run test:e2e:parity    # First-party critical-path browser flows
+npm run podman:doctor      # Cross-platform Podman readiness check
 npm run test:security      # Security pen tests (Worker must be running)
 npm run test:security:staging  # Security tests against a staging worker, if you maintain one
+./scripts/test-checkout.sh --podman  # Manual checkout helper against the Podman stack
+./scripts/test-e2e.sh --podman       # Automated + manual browser helper against the Podman stack
 npm test                   # Run all tests
 ```
 
@@ -75,6 +79,7 @@ This runs:
 - Playwright headless E2E via `npm run test:e2e:headless`
 
 The pre-merge script now auto-starts Jekyll with `_config.yml,_config.local.yml` when needed so the local-only `smoke-editable` campaign is available during merge gating, and the Playwright harness uses the same combined config locally.
+When host Bundler/Jekyll gems are unavailable, that gate now falls back to a Podman-backed Jekyll build plus the Podman-aware smoke/browser helpers instead of failing on host Ruby setup alone.
 
 This branch now defaults to the first-party cart/runtime path in both `_config.yml` and `_config.local.yml`, and the browser path no longer supports the old hosted-cart runtime.
 
@@ -86,6 +91,33 @@ Recent security hardening that the gate now covers includes:
 - serialized limited-tier inventory claims during checkout completion
 
 The local Worker defaults in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) now match that first-party setup. `./scripts/dev.sh` now auto-generates a local `CHECKOUT_INTENT_SECRET` in `worker/.dev.vars` if it is missing, so fresh local checkout starts do not fail closed on an uninitialized dev secret.
+
+If you want a simpler local boot path with fewer host dependencies, `./scripts/dev.sh --podman` now starts Jekyll and the Worker in rootless Podman containers while preserving the same ports and local Wrangler state.
+
+The browser helper scripts support the same mode:
+
+```bash
+./scripts/test-checkout.sh --podman
+./scripts/test-e2e.sh --podman
+./scripts/test-worker.sh --podman
+./scripts/smoke-pledge-management.sh --podman
+./scripts/pledge-report.sh --podman --local
+./scripts/fulfillment-report.sh --podman --local
+```
+
+Those helpers still run Playwright and shell smoke logic on the host for now, but they boot the site and Worker through the shared Podman-backed local stack first. The report scripts can now run directly through the Worker container as well. That keeps local testing and exports closer to production-like service boundaries without forcing host Ruby or host Wrangler setup.
+
+For a mostly host-independent browser path, `npm run test:e2e:headless:podman` now runs the automated Playwright suite inside a dedicated Podman container on the same local pod network as the site and Worker. The manual checkout step remains host-driven on purpose, because it is still meant to open a real interactive browser session.
+
+The content-safety filter suite in `tests/unit/content-safety-filter.test.ts` also falls back to Podman when host Bundler/Jekyll gems are unavailable. On macOS, it can start the Podman machine as part of that fallback.
+
+The current Podman scope is intentionally narrow:
+
+- included: Jekyll, Worker, local `worker/.dev.vars`, local Wrangler state, optional host Stripe CLI forwarding, Podman-aware `test-checkout.sh`, `test-e2e.sh`, `test-worker.sh`, `smoke-pledge-management.sh`, `pledge-report.sh`, and `fulfillment-report.sh`
+- included too: containerized headless Playwright for the automated browser suite
+- not yet included: a fully containerized pre-merge gate, or a containerized manual checkout browser step
+
+Use [docs/PODMAN.md](./PODMAN.md) for the exact setup and current limitations.
 
 If you change `sales_tax_rate` or `flat_shipping_rate` in the Jekyll config, update the mirrored Worker env vars in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) too and restart `./scripts/dev.sh` before testing checkout math.
 

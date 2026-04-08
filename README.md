@@ -71,6 +71,36 @@ For full local development with Jekyll, the Worker, Stripe CLI webhook forwardin
 ./scripts/dev.sh
 ```
 
+For a lower-dependency local boot path, Podman mode now runs Jekyll and the Worker in rootless containers while keeping the same local ports and local Wrangler state:
+
+```bash
+./scripts/dev.sh --podman
+```
+
+Rebuild the Podman dev images after dependency or base-image changes with:
+
+```bash
+PODMAN_REBUILD=1 ./scripts/dev.sh --podman
+```
+
+See [docs/PODMAN.md](docs/PODMAN.md) for the current scope and limitations.
+
+On this branch, the Podman path is host-validated on macOS. Linux and Windows are supported by design and have doctor/self-check coverage, but were not host-validated in this thread.
+
+The checkout and E2E helper scripts also support that mode:
+
+```bash
+./scripts/test-checkout.sh --podman
+./scripts/test-e2e.sh --podman
+./scripts/test-worker.sh --podman
+./scripts/smoke-pledge-management.sh --podman
+./scripts/pledge-report.sh --podman --local
+./scripts/fulfillment-report.sh --podman --local
+npm run test:e2e:headless:podman
+npm run podman:doctor
+npm run podman:self-check
+```
+
 ## Cloudflare Free-Plan Guidance For Forks
 
 The Pool is intentionally shaped so most traffic stays cheap:
@@ -123,6 +153,20 @@ Local reporting:
 ./scripts/fulfillment-report.sh --local
 ```
 
+Podman-backed local testing:
+
+```bash
+./scripts/test-checkout.sh --podman  # Manual checkout helper against the Podman dev stack
+./scripts/test-e2e.sh --podman       # Automated + manual browser helper against the Podman dev stack
+./scripts/test-worker.sh --podman    # Site/Worker contract smoke against the Podman dev stack
+./scripts/smoke-pledge-management.sh --podman  # Mutable-pledge smoke against the Podman dev stack
+./scripts/pledge-report.sh --podman --local    # Local ledger CSV through the Worker container
+./scripts/fulfillment-report.sh --podman --local # Local fulfillment CSV through the Worker container
+npm run test:e2e:headless:podman     # Automated browser suite with Playwright in a container
+```
+
+When host Bundler/Jekyll gems are unavailable, the pre-merge gate now falls back to Podman for the Jekyll build and the local smoke/browser phases instead of failing early on host Ruby setup.
+
 - `pledge-report.sh` is a ledger/history export, so modified pledges appear as deltas and mixed changes now keep tip-update context in the `items` column.
 - `fulfillment-report.sh` is the merged current-state view per `email + campaign`, which is the better comparison point for repeat backers and non-stackable projects.
 
@@ -151,6 +195,7 @@ See [TESTING.md](docs/TESTING.md) for full testing guide and [SECURITY.md](docs/
 See [`docs/`](docs/) for full documentation:
 
 - [CONTRIBUTING.md](docs/CONTRIBUTING.md) — Getting started, setup & contribution guide
+- [PODMAN.md](docs/PODMAN.md) — Rootless Podman local dev path for Jekyll + Worker
 - [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) — System architecture
 - [WORKFLOWS.md](docs/WORKFLOWS.md) — Pledge lifecycle, magic links & charge flow
 - [DEV_NOTES.md](docs/DEV_NOTES.md) — Development notes, content model & FAQ
@@ -194,7 +239,8 @@ assets/
 worker/               # Cloudflare Worker (pledge.dustwave.xyz)
   └── src/            # Worker source (Stripe, email, voting, tokens, tip-aware totals)
 scripts/              # Automation & reporting
-  ├── dev.sh               # Start all dev services (Jekyll, Worker, Stripe CLI with matched webhook secret)
+  ├── dev.sh               # Start all dev services (host mode or Podman mode)
+  ├── dev-podman.sh        # Rootless Podman launcher for Jekyll + Worker
   ├── pledge-report.sh     # Ledger-style CSV report (history entries incl. tip columns)
   ├── fulfillment-report.sh # Aggregated CSV report (current state by backer, total incl. tip)
   ├── smoke-pledge-management.sh # Local end-to-end modify/cancel smoke on the test-only campaign
