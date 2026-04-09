@@ -38,8 +38,8 @@ For supporter-community access, The Pool keeps the verified supporter session in
 ## Umm, So How Does It Work Again?
 
 1. **Browse** — Find a project you want to support
-2. **Pledge** — Add one or more campaigns to your cart, optionally add a 0% to 15% tip for platform upkeep, and continue into Stripe's secure checkout. Physical rewards add a flat shipping fee per campaign that includes physical items.
-3. **Save card** — Stripe securely saves your payment method (no charge yet)
+2. **Pledge** — Add one or more campaigns to your cart, optionally add a 0% to 15% tip for platform upkeep, and continue into The Pool's secure payment step powered by Stripe. Physical rewards add a flat shipping fee per campaign that includes physical items.
+3. **Save card** — Stripe securely saves your payment method inside that checkout flow (no charge yet)
 4. **Wait** — Campaign runs until its deadline (all times in Mountain Time)
 5. **Result** — If a campaign is funded, your pledge for that campaign is charged. If it isn't, nothing happens.
 
@@ -50,8 +50,8 @@ Multiple pledges from the same email are combined into a single charge when the 
 The Pool is designed for filmmakers and other creatives with features like:
 
 - **0% platform fee for organizers** — Supporters can optionally add a 0% to 15% platform tip to help sustain the platform without reducing campaign funds
-- **First-party checkout** — The Pool controls the cart and pledge review flow while Stripe securely saves cards and handles payment details
-- **Physical & digital tiers** — Offer tangible rewards with automatic shipping address collection and configurable sales tax and flat-rate shipping
+- **First-party checkout** — The Pool controls the cart, checkout sidecars, and pledge review flow while Stripe securely handles payment details
+- **Physical & digital tiers** — Offer tangible rewards with checkout-time shipping address capture and configurable sales tax and flat-rate shipping
 - **Production phases** — Break your budget into phases supporters can fund directly
 - **Stretch goals** — Unlock additional creative possibilities as funding grows
 - **Community decisions** — Let your backers vote on published creative choices
@@ -67,16 +67,14 @@ The Pool runs on a modern static architecture:
 | Layer | Platform | Role |
 |-------|----------|------|
 | Frontend | [GitHub Pages](https://docs.github.com/en/pages) | Jekyll static site |
-| Cart | The Pool | First-party cart, pledge review, and checkout handoff |
-| Payments | [Stripe](https://stripe.com) | Card storage, off-session charges, shipping address collection |
+| Cart | The Pool | First-party cart, checkout sidecars, and pledge review |
+| Payments | [Stripe](https://stripe.com) | Secure payment fields, saved cards, and off-session charges |
 | Backend | [Cloudflare Workers](https://workers.cloudflare.com) | Canonical pricing, pledge storage, live stats, fulfillment data, settlement |
 | Email | [Resend](https://resend.com) | Confirmations, updates, notifications |
 
 The platform is built on services that all offer free tiers, and The Pool was designed from the start to operate effectively within those free tiers whenever possible.
 
-For forks, that means static pages stay on GitHub Pages, public live reads are aggressively combined and browser-cached, and most Cloudflare Worker usage is reserved for the security-sensitive parts of the pledge lifecycle.
-
-For teams forking The Pool, tax and shipping settings live in site config and mirrored Worker env so local UI, checkout, reports, and emails all stay aligned.
+For forks, that means static pages stay on GitHub Pages, public live reads are aggressively combined and browser-cached, and most Cloudflare Worker usage is reserved for the security-sensitive parts of the pledge lifecycle, while tax and shipping settings stay mirrored between site config and Worker env so local UI, checkout, reports, and emails all remain aligned.
 
 ## Open Source
 

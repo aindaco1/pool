@@ -30,7 +30,7 @@
 - [x] Worker cron trigger for auto-settle (midnight MT)
 - [x] Aggregated charging (one charge per supporter per campaign, not per pledge row)
 - [x] Mountain Time deadline handling (DST-aware via `Intl.DateTimeFormat` across frontend + Worker)
-- [x] Physical tier shipping ($3 per campaign with physical rewards, address collection via Stripe Checkout)
+- [x] Physical tier shipping ($3 per campaign with physical rewards, address capture during checkout)
 - [x] First-party physical-item detection (`category: physical` / `shippable` cart metadata)
 - [x] Tip Jar / platform tip feature (0% to 15%, default 5%, excluded from campaign progress)
 - [x] Email templates with full breakdown (subtotal, optional tip, tax, shipping, total)
@@ -61,6 +61,12 @@
   - scarce limited-tier reservations and committed claims now flow through a per-campaign Durable Object coordinator
   - `tier-inventory:{slug}` remains a KV projection for public reads, not the source of truth
   - coordinator calls stay on write/admin paths so the design remains compatible with Workers Free-plan usage
+- [x] Replace hosted Stripe Checkout with a native first-party Stripe flow
+  - the existing second checkout sidecar now hosts Stripe-powered on-site payment UI instead of forcing a full-page handoff
+  - `Update Card` on `/manage/` now uses the same secure payment pattern
+  - checkout E2E coverage is now fully automated, with the old manual Stripe handoff cases removed
+  - successful checkout now invalidates live stats/inventory caches and leaves a short-lived refresh marker so campaign totals refresh reliably after pledge persistence
+  - recent hardening trimmed long-lived browser PII, tightened sensitive Worker response caching, added origin checks, and added a dedicated retry budget for checkout completion recovery
 - [x] Pages CMS integration for visual campaign editing
   - Block-based content editing (text, image, quote, gallery, divider)
   - Polymorphic fields with `type: block` and `blockKey`
@@ -74,8 +80,13 @@ _(None currently)_
 ## Planned
 
 - [ ] Admin dashboard page (read-only) from KV data
-- [ ] Native Stripe integration via API (not jumping to Stripe's payment link)
+- [ ] Shipping calculator to replace flat rate
+  - Support USA, Europe, Canada, Australia, Mexico, Latin America, Japan
+- [ ] Non-Stripe tax calculator to replace flat rate sales tax
+  - Support USA, Europe, Canada, Australia, Mexico, Latin America, Japan
 - [ ] Replace Pages CMS with dedicated content editor and per-campaign permissions
+- [ ] Accessibility compliance
+
 ## Known Issues
 
 **Credit Card Autofill**: CC number, expiry, and CVV fields are inside Stripe's iframe for PCI compliance — not accessible to our autofill scripts.

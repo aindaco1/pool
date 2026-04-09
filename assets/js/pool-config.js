@@ -13,6 +13,8 @@
     liveStatsCacheTtlSeconds: dataset.liveStatsCacheTtlSeconds || '300',
     liveInventoryCacheTtlSeconds: dataset.liveInventoryCacheTtlSeconds || '300',
     cartRuntime: dataset.cartRuntime || 'first_party',
-    checkoutProvider: dataset.checkoutProvider || 'first_party'
+    checkoutProvider: dataset.checkoutProvider || 'first_party',
+    checkoutUiMode: dataset.checkoutUiMode || 'hosted',
+    stripePublishableKey: dataset.stripePublishableKey || ''
   };
 })();

@@ -21,13 +21,13 @@ Included today:
 - optional host Stripe CLI forwarding to the local Worker
 - automatic Stripe CLI discovery from common macOS/Homebrew install paths
 - automated headless Playwright execution in a dedicated Podman container
-- Podman-aware worker, mutable-pledge, and local report helper scripts
+- Podman-aware checkout, E2E, worker, mutable-pledge, and local report helper scripts
 - pre-merge fallback support for Jekyll build and local smoke/browser phases on machines without a working host Bundler/Jekyll toolchain
 
 Not included yet:
 
-- a fully containerized `npm run test:premerge`
 - a containerized manual checkout browser step
+- true host-validation for Linux and Windows in this repo thread
 
 That is intentional. The first slice is meant to improve onboarding and local parity without risking application regressions.
 
@@ -129,7 +129,7 @@ The browser helper scripts can now boot against the Podman-backed stack:
 npm run test:e2e:headless:podman
 ```
 
-The main `test-e2e.sh --podman` flow still keeps the manual checkout step on the host because it is meant to open a real local browser window. The automated headless browser suite runs in its own Playwright container and reuses the already-running site/Worker instead of trying to boot Jekyll inside the test container.
+`./scripts/test-e2e.sh --podman` is now fully automated browser coverage. The dedicated `./scripts/test-checkout.sh --podman` helper remains the manual interactive path when you specifically want to drive a real checkout in your own browser. The automated headless browser suite runs in its own Playwright container and reuses the already-running site/Worker instead of trying to boot Jekyll inside the test container.
 
 ## Cross-Platform First Run
 

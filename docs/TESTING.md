@@ -1,6 +1,6 @@
 # Testing Guide
 
-This guide covers the test suites and manual testing setup.
+This guide covers the automated test suites, local test infrastructure, and manual verification paths.
 
 ## Quick Reference
 
@@ -10,7 +10,7 @@ npm run test:unit:watch    # Watch mode
 npm run test:unit:coverage # With coverage report
 npm run test:secrets       # Secret exposure audit for local env files
 npm run test:premerge      # Merge-readiness checks for changed Worker logic
-npm run test:e2e           # E2E tests (Playwright) — starts Jekyll
+npm run test:e2e           # E2E tests (Playwright) — fully automated browser coverage
 npm run test:e2e:headless  # CI mode
 npm run test:e2e:headless:podman  # Automated browser suite with Playwright in Podman
 npm run test:e2e:parity    # First-party critical-path browser flows
@@ -18,9 +18,11 @@ npm run podman:doctor      # Cross-platform Podman readiness check
 npm run test:security      # Security pen tests (Worker must be running)
 npm run test:security:staging  # Security tests against a staging worker, if you maintain one
 ./scripts/test-checkout.sh --podman  # Manual checkout helper against the Podman stack
-./scripts/test-e2e.sh --podman       # Automated + manual browser helper against the Podman stack
+./scripts/test-e2e.sh --podman       # Automated browser helper against the Podman stack
 npm test                   # Run all tests
 ```
+
+`./scripts/test-e2e.sh --podman` is now the fully automated browser path. Use `./scripts/test-checkout.sh --podman` when you specifically want to drive the checkout manually in a real browser.
 
 ---
 
@@ -90,9 +92,9 @@ Recent security hardening that the gate now covers includes:
 - exact-origin validation for structured embeds (`spotify`, `youtube`, `vimeo`)
 - serialized limited-tier inventory reservations at checkout start and confirmation at successful persistence time
 
-The local Worker defaults in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) now match that first-party setup. `./scripts/dev.sh` now auto-generates a local `CHECKOUT_INTENT_SECRET` in `worker/.dev.vars` if it is missing, so fresh local checkout starts do not fail closed on an uninitialized dev secret.
+The local Worker defaults in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) now match that first-party setup. `./scripts/dev.sh --podman` now auto-generates a local `CHECKOUT_INTENT_SECRET` in `worker/.dev.vars` if it is missing, so fresh local checkout starts do not fail closed on an uninitialized dev secret.
 
-If you want a simpler local boot path with fewer host dependencies, `./scripts/dev.sh --podman` now starts Jekyll and the Worker in rootless Podman containers while preserving the same ports and local Wrangler state.
+For local work, prefer `./scripts/dev.sh --podman`. It starts Jekyll and the Worker in rootless Podman containers while preserving the same ports and local Wrangler state.
 
 The browser helper scripts support the same mode:
 
@@ -107,7 +109,7 @@ The browser helper scripts support the same mode:
 
 Those helpers still run Playwright and shell smoke logic on the host for now, but they boot the site and Worker through the shared Podman-backed local stack first. The report scripts can now run directly through the Worker container as well. That keeps local testing and exports closer to production-like service boundaries without forcing host Ruby or host Wrangler setup.
 
-For a mostly host-independent browser path, `npm run test:e2e:headless:podman` now runs the automated Playwright suite inside a dedicated Podman container on the same local pod network as the site and Worker. The manual checkout step remains host-driven on purpose, because it is still meant to open a real interactive browser session.
+For a mostly host-independent browser path, `npm run test:e2e:headless:podman` now runs the automated Playwright suite inside a dedicated Podman container on the same local pod network as the site and Worker.
 
 The content-safety filter suite in `tests/unit/content-safety-filter.test.ts` also falls back to Podman when host Bundler/Jekyll gems are unavailable. On macOS, it can start the Podman machine as part of that fallback.
 
@@ -115,18 +117,18 @@ The current Podman scope is intentionally narrow:
 
 - included: Jekyll, Worker, local `worker/.dev.vars`, local Wrangler state, optional host Stripe CLI forwarding, Podman-aware `test-checkout.sh`, `test-e2e.sh`, `test-worker.sh`, `smoke-pledge-management.sh`, `pledge-report.sh`, and `fulfillment-report.sh`
 - included too: containerized headless Playwright for the automated browser suite
-- not yet included: a fully containerized pre-merge gate, or a containerized manual checkout browser step
+- not yet included: a containerized interactive manual checkout browser step
 
 Use [docs/PODMAN.md](./PODMAN.md) for the exact setup and current limitations.
 
-If you change `sales_tax_rate` or `flat_shipping_rate` in the Jekyll config, update the mirrored Worker env vars in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) too and restart `./scripts/dev.sh` before testing checkout math.
+If you change `sales_tax_rate` or `flat_shipping_rate` in the Jekyll config, update the mirrored Worker env vars in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) too and restart `./scripts/dev.sh --podman` before testing checkout math.
 
 If you tune free-plan read behavior, keep these in sync too:
 
 - `live_stats_cache_ttl_seconds`
 - `live_inventory_cache_ttl_seconds`
 
-After changing either cache TTL locally, restart `./scripts/dev.sh` and rerun:
+After changing either cache TTL locally, restart `./scripts/dev.sh --podman` and rerun:
 
 ```bash
 npx vitest run tests/unit/live-stats.test.ts tests/unit/manage-page.test.ts tests/unit/config-boot.test.ts
@@ -174,9 +176,9 @@ git worktree remove ../pool-main-check
 
 ### Manual Smoke Checklist
 
-Run these against staging before merge when a staging environment exists. If no staging environment exists for The Pool, run the same checklist locally with `./scripts/dev.sh` and record that exception in the PR/release notes.
+Run these against staging before merge when a staging environment exists. If no staging environment exists for The Pool, run the same checklist locally with `./scripts/dev.sh --podman` and record that exception in the PR/release notes.
 
-1. Start a new checkout on a live test campaign and confirm `/checkout-intent/start` returns a Stripe Checkout URL.
+1. Start a new checkout on a live test campaign and confirm `/checkout-intent/start` returns a custom-session bootstrap in custom mode, or a hosted URL in hosted fallback mode.
 2. Complete a pledge and verify the webhook stores the pledge, stats update, and confirmation email path stays healthy.
 3. Modify a pledge with tier/support/custom amount changes and verify totals, history, and inventory update correctly.
 4. Cancel an uncharged pledge and verify stats and inventory are released correctly.
@@ -187,7 +189,7 @@ For checkout or Worker business-logic changes, a smoke pass is still required be
 
 - Prefer staging when available.
 - If no staging exists, use the stronger local path:
-  - `./scripts/dev.sh`
+  - `./scripts/dev.sh --podman`
   - `./scripts/smoke-pledge-management.sh`
   - the operator checklist in [docs/MERGE_SMOKE_CHECKLIST.md](./MERGE_SMOKE_CHECKLIST.md)
   - a PR note explicitly stating that no staging environment exists
@@ -216,7 +218,7 @@ Use `pledge-report.sh` when you want the full ledger, including modify/cancel de
 When reviewing results, do not flag these as regressions:
 
 - Magic links are now order-scoped instead of email-scoped.
-- `/checkout-intent/start` now reserves scarce limited inventory before redirecting into Stripe, and successful persistence confirms that reservation.
+- `/checkout-intent/start` now reserves scarce limited inventory before payment confirmation, and successful persistence confirms that reservation.
 - Legacy `GET /checkout` is intentionally disabled.
 
 ### Adding Tests
@@ -239,7 +241,7 @@ describe('myFunction', () => {
 
 Browser-based tests for full user flows in `tests/e2e/`.
 
-### Coverage (47 tests total; 44 run in CI and 3 are skipped/manual/local-only)
+### Coverage
 
 **Campaign Page Structure:**
 - Required page elements (hero, sidebar, progress bar)
@@ -308,10 +310,10 @@ Browser-based tests for full user flows in `tests/e2e/`.
 - Upcoming campaign disabled tiers
 - State indicators in progress meta
 
-**Manual Checkout (skipped in CI):**
-- Full pledge flow: cart runtime → pledge review → Stripe Checkout → success page
+**Checkout Coverage Highlights:**
+- Full pledge flow: cart runtime → pledge review → on-site Stripe payment step → success page
 - Verify checkout order summary preview appears immediately and resolves to tip-aware totals
-- Worker API integration test (automated, checks `/stats` endpoint)
+- Worker API integration test coverage for live stats and checkout bootstrap
 
 ### Running
 
@@ -420,7 +422,7 @@ wrangler secret put ADMIN_SECRET
 Preferred:
 
 ```bash
-./scripts/dev.sh
+./scripts/dev.sh --podman
 ```
 
 Manual fallback:
@@ -493,7 +495,7 @@ stripe login
 Preferred option for local end-to-end testing:
 
 ```bash
-./scripts/dev.sh
+./scripts/dev.sh --podman
 ```
 
 This starts Jekyll, the Worker, Stripe CLI forwarding, and writes the matching `STRIPE_WEBHOOK_SECRET` into `worker/.dev.vars`.
@@ -522,7 +524,7 @@ printf '\nSTRIPE_WEBHOOK_SECRET=whsec_...\n' >> worker/.dev.vars
 Preferred:
 
 ```bash
-./scripts/dev.sh
+./scripts/dev.sh --podman
 ```
 
 Manual fallback:
@@ -556,9 +558,10 @@ stripe listen --forward-to 127.0.0.1:8787/webhooks/stripe
    - Use Stripe test card: `4242 4242 4242 4242`
    - Any future expiry, any CVC
 
-3. **Stripe Setup**: After the first-party checkout handoff, you're redirected to Stripe
+3. **Stripe Setup**: The second checkout sidecar keeps you on-site and mounts Stripe's secure payment UI
    - Card is saved (not charged)
-   - Redirected to success page
+   - The client waits for pledge persistence confirmation before treating the flow as successful
+   - You are then sent to the success page
 
 4. **Check email**: You should receive the supporter email(s) with magic links
 
@@ -574,7 +577,7 @@ stripe listen --forward-to 127.0.0.1:8787/webhooks/stripe
 
 | Card Number | Scenario |
 |-------------|----------|
-| `4242 4242 4242 4242` | Successful payment |
+| `4242 4242 4242 4242` | Successful save/setup |
 | `4000 0000 0000 3220` | 3D Secure required |
 | `4000 0000 0000 9995` | Declined (insufficient funds) |
 | `4000 0000 0000 0002` | Declined (generic) |
@@ -666,14 +669,14 @@ wrangler kv:key get "results:hand-relations:poster" --binding VOTES --preview
 
 1. **Ensure Stripe CLI is forwarding webhooks:**
    ```bash
-   ./scripts/dev.sh
+   ./scripts/dev.sh --podman
    # Or, manually: stripe listen --forward-to localhost:8787/webhooks/stripe
    ```
 
 2. **Set the webhook secret:**
    ```bash
-   # scripts/dev.sh does this automatically for worker/.dev.vars
-   # Manual setup only if you are not using scripts/dev.sh
+   # scripts/dev.sh --podman does this automatically for worker/.dev.vars
+   # Manual setup only if you are not using the main Podman dev script
    ```
 
 3. **Trigger a test webhook:**
@@ -729,7 +732,7 @@ curl -X POST http://localhost:8787/pledge/payment-method/start \
   -H "Content-Type: application/json" \
   -d '{"token":"YOUR_TOKEN"}'
 ```
-Expected: Returns new Stripe Checkout URL for card update.
+Expected: Returns a custom-session bootstrap for on-site `Update Card`, or a hosted URL in fallback mode.
 
 ### Test Live Stats Endpoint
 

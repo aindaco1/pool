@@ -8,15 +8,132 @@
   const FIRST_PARTY_CART_TOKEN_PREFIX = 'poolcart_';
   const FIRST_PARTY_ITEM_ID_PREFIX = 'poolitem_';
   const FIRST_PARTY_CHECKOUT_SNAPSHOT_KEY = 'pool_first_party_checkout_snapshot';
+  const ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_KEY = 'pool_active_custom_checkout_order_id';
   const FIRST_PARTY_CART_STATE_KEY = 'pool_first_party_cart_state';
+  const FIRST_PARTY_CART_DRAFT_KEY = 'pool_first_party_cart_draft';
+  const PENDING_PLEDGE_KEY = 'pool_pending_pledge';
+  const LIVE_REFRESH_MARKER_KEY = 'pool_live_refresh_needed';
   const CART_VIEW_ROUTE = '/cart';
   const CHECKOUT_VIEW_ROUTE = '/checkout';
   const DEFAULT_WORKER_BASE = 'https://pledge.dustwave.xyz';
+  const DEFAULT_CHECKOUT_UI_MODE = 'hosted';
   const DEFAULT_PLATFORM_TIP_PERCENT = 5;
   const MAX_PLATFORM_TIP_PERCENT = 15;
+  const FIRST_PARTY_CHECKOUT_SNAPSHOT_TTL_MS = 6 * 60 * 60 * 1000;
+  const ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_TTL_MS = 30 * 60 * 1000;
+  const PENDING_PLEDGE_TTL_MS = 30 * 60 * 1000;
+  const FIRST_PARTY_CART_DRAFT_TTL_MS = 12 * 60 * 60 * 1000;
+  const LIVE_REFRESH_MARKER_TTL_MS = 10 * 60 * 1000;
   const DEFAULT_PLATFORM_NAME = 'The Pool';
   const DEFAULT_FLAT_SHIPPING_RATE = 3;
   const DEFAULT_SALES_TAX_RATE = 0.07875;
+  const DEFAULT_SHIPPING_COUNTRY = 'US';
+  const SHIPPING_COUNTRY_OPTIONS = [
+    { value: 'US', label: 'United States' },
+    { value: 'CA', label: 'Canada' },
+    { value: 'MX', label: 'Mexico' },
+    { value: 'AR', label: 'Argentina' },
+    { value: 'BR', label: 'Brazil' },
+    { value: 'CL', label: 'Chile' },
+    { value: 'CO', label: 'Colombia' },
+    { value: 'CR', label: 'Costa Rica' },
+    { value: 'DO', label: 'Dominican Republic' },
+    { value: 'EC', label: 'Ecuador' },
+    { value: 'GT', label: 'Guatemala' },
+    { value: 'JM', label: 'Jamaica' },
+    { value: 'PA', label: 'Panama' },
+    { value: 'PE', label: 'Peru' },
+    { value: 'PR', label: 'Puerto Rico' },
+    { value: 'UY', label: 'Uruguay' },
+    { value: 'AT', label: 'Austria' },
+    { value: 'BE', label: 'Belgium' },
+    { value: 'BG', label: 'Bulgaria' },
+    { value: 'CH', label: 'Switzerland' },
+    { value: 'CY', label: 'Cyprus' },
+    { value: 'CZ', label: 'Czech Republic' },
+    { value: 'DE', label: 'Germany' },
+    { value: 'DK', label: 'Denmark' },
+    { value: 'EE', label: 'Estonia' },
+    { value: 'ES', label: 'Spain' },
+    { value: 'FI', label: 'Finland' },
+    { value: 'FR', label: 'France' },
+    { value: 'GB', label: 'United Kingdom' },
+    { value: 'GR', label: 'Greece' },
+    { value: 'HR', label: 'Croatia' },
+    { value: 'HU', label: 'Hungary' },
+    { value: 'IE', label: 'Ireland' },
+    { value: 'IS', label: 'Iceland' },
+    { value: 'IT', label: 'Italy' },
+    { value: 'LT', label: 'Lithuania' },
+    { value: 'LU', label: 'Luxembourg' },
+    { value: 'LV', label: 'Latvia' },
+    { value: 'MT', label: 'Malta' },
+    { value: 'NL', label: 'Netherlands' },
+    { value: 'NO', label: 'Norway' },
+    { value: 'PL', label: 'Poland' },
+    { value: 'PT', label: 'Portugal' },
+    { value: 'RO', label: 'Romania' },
+    { value: 'SE', label: 'Sweden' },
+    { value: 'SI', label: 'Slovenia' },
+    { value: 'SK', label: 'Slovakia' },
+    { value: 'AU', label: 'Australia' },
+    { value: 'IN', label: 'India' },
+    { value: 'JP', label: 'Japan' },
+    { value: 'KR', label: 'South Korea' }
+  ];
+  const US_STATE_OPTIONS = [
+    ['AL', 'Alabama'],
+    ['AK', 'Alaska'],
+    ['AZ', 'Arizona'],
+    ['AR', 'Arkansas'],
+    ['CA', 'California'],
+    ['CO', 'Colorado'],
+    ['CT', 'Connecticut'],
+    ['DE', 'Delaware'],
+    ['FL', 'Florida'],
+    ['GA', 'Georgia'],
+    ['HI', 'Hawaii'],
+    ['ID', 'Idaho'],
+    ['IL', 'Illinois'],
+    ['IN', 'Indiana'],
+    ['IA', 'Iowa'],
+    ['KS', 'Kansas'],
+    ['KY', 'Kentucky'],
+    ['LA', 'Louisiana'],
+    ['ME', 'Maine'],
+    ['MD', 'Maryland'],
+    ['MA', 'Massachusetts'],
+    ['MI', 'Michigan'],
+    ['MN', 'Minnesota'],
+    ['MS', 'Mississippi'],
+    ['MO', 'Missouri'],
+    ['MT', 'Montana'],
+    ['NE', 'Nebraska'],
+    ['NV', 'Nevada'],
+    ['NH', 'New Hampshire'],
+    ['NJ', 'New Jersey'],
+    ['NM', 'New Mexico'],
+    ['NY', 'New York'],
+    ['NC', 'North Carolina'],
+    ['ND', 'North Dakota'],
+    ['OH', 'Ohio'],
+    ['OK', 'Oklahoma'],
+    ['OR', 'Oregon'],
+    ['PA', 'Pennsylvania'],
+    ['RI', 'Rhode Island'],
+    ['SC', 'South Carolina'],
+    ['SD', 'South Dakota'],
+    ['TN', 'Tennessee'],
+    ['TX', 'Texas'],
+    ['UT', 'Utah'],
+    ['VT', 'Vermont'],
+    ['VA', 'Virginia'],
+    ['WA', 'Washington'],
+    ['WV', 'West Virginia'],
+    ['WI', 'Wisconsin'],
+    ['WY', 'Wyoming'],
+    ['DC', 'District of Columbia']
+  ];
 
   function getRequestedRuntime() {
     return window.POOL_CONFIG?.cartRuntime || DEFAULT_RUNTIME;
@@ -28,6 +145,10 @@
 
   function getWorkerBase() {
     return window.POOL_CONFIG?.workerBase || DEFAULT_WORKER_BASE;
+  }
+
+  function getCheckoutUiMode() {
+    return String(window.POOL_CONFIG?.checkoutUiMode || DEFAULT_CHECKOUT_UI_MODE).trim().toLowerCase();
   }
 
   function getPlatformName() {
@@ -49,8 +170,81 @@
     return `Sales tax (${(getSalesTaxRate() * 100).toFixed(3).replace(/\.?0+$/, '')}%)`;
   }
 
+  function renderShippingCountryOptions(selectedValue) {
+    const selected = String(selectedValue || DEFAULT_SHIPPING_COUNTRY).trim().toUpperCase();
+    return SHIPPING_COUNTRY_OPTIONS.map((option) => `
+      <option value="${escapeHtml(option.value)}" ${selected === option.value ? 'selected' : ''}>${escapeHtml(option.label)}</option>
+    `).join('');
+  }
+
+  function renderUsStateOptions(selectedValue) {
+    const selected = String(selectedValue || '').trim().toUpperCase();
+    return `
+      <option value="">Select state</option>
+      ${US_STATE_OPTIONS.map(([value, label]) => `
+        <option value="${escapeHtml(value)}" ${selected === value ? 'selected' : ''}>${escapeHtml(label)}</option>
+      `).join('')}
+    `;
+  }
+
   function getCartRoot() {
     return document.querySelector('[data-pool-cart-root]');
+  }
+
+  function getSessionStorageSafe() {
+    try {
+      return window.sessionStorage;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function getLocalStorageSafe() {
+    try {
+      return window.localStorage;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writeTimedStorageValue(storage, key, value) {
+    if (!storage) return;
+    if (!value) {
+      storage.removeItem(key);
+      return;
+    }
+    storage.setItem(key, JSON.stringify({
+      value: String(value),
+      savedAt: Date.now()
+    }));
+  }
+
+  function readTimedStorageValue(storage, key, ttlMs) {
+    if (!storage) return '';
+    const raw = storage.getItem(key);
+    if (!raw) return '';
+
+    try {
+      const parsed = JSON.parse(raw);
+      const value = String(parsed?.value || '').trim();
+      const savedAt = Number(parsed?.savedAt || 0);
+      if (!value) {
+        storage.removeItem(key);
+        return '';
+      }
+      if (Number.isFinite(savedAt) && savedAt > 0 && Date.now() - savedAt > ttlMs) {
+        storage.removeItem(key);
+        return '';
+      }
+      return value;
+    } catch (_error) {
+      const legacyValue = String(raw || '').trim();
+      if (!legacyValue) {
+        storage.removeItem(key);
+        return '';
+      }
+      return legacyValue;
+    }
   }
 
   function dispatchProviderReady(detail) {
@@ -59,6 +253,52 @@
 
   function dispatchCartReady(detail) {
     document.dispatchEvent(new CustomEvent('poolcart.ready', { detail: detail || {} }));
+  }
+
+  function loadStripeJs() {
+    if (window.PoolStripeCheckoutSidecar && typeof window.PoolStripeCheckoutSidecar.ensureStripeJs === 'function') {
+      return window.PoolStripeCheckoutSidecar.ensureStripeJs();
+    }
+    return Promise.reject(new Error('Stripe checkout helper is unavailable.'));
+  }
+
+  let stripeJsPrewarmPromise = null;
+  let stripeJsPrewarmScheduled = false;
+
+  function canUseCustomCheckoutUi() {
+    return getRequestedCheckoutProvider() === FIRST_PARTY_CHECKOUT_PROVIDER && getCheckoutUiMode() === 'custom';
+  }
+
+  function prewarmStripeJs() {
+    if (!canUseCustomCheckoutUi()) return null;
+    if (stripeJsPrewarmPromise) return stripeJsPrewarmPromise;
+
+    stripeJsPrewarmPromise = loadStripeJs().catch((error) => {
+      stripeJsPrewarmPromise = null;
+      throw error;
+    });
+
+    return stripeJsPrewarmPromise;
+  }
+
+  function scheduleStripeJsPrewarm() {
+    if (!canUseCustomCheckoutUi() || stripeJsPrewarmScheduled || stripeJsPrewarmPromise) return;
+    stripeJsPrewarmScheduled = true;
+
+    const start = function() {
+      stripeJsPrewarmScheduled = false;
+      const prewarm = prewarmStripeJs();
+      if (prewarm && typeof prewarm.catch === 'function') {
+        void prewarm.catch(() => {});
+      }
+    };
+
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(start, { timeout: 1200 });
+      return;
+    }
+
+    window.setTimeout(start, 120);
   }
 
   function createEventBus() {
@@ -244,6 +484,12 @@
     return '$' + (Math.round(Number(cents || 0)) / 100).toFixed(2);
   }
 
+  function renderBusyButtonLabel(label, isBusy) {
+    const safeLabel = escapeHtml(String(label || ''));
+    if (!isBusy) return safeLabel;
+    return `${safeLabel}<span class="pool-button-spinner" aria-hidden="true"></span>`;
+  }
+
   function escapeHtml(value) {
     return String(value || '')
       .replace(/&/g, '&amp;')
@@ -398,7 +644,6 @@
 
     return {
       cart: {
-        email: String(state?.cart?.email || ''),
         tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT),
         items: items.map((item) => ({
           id: item?.id || '',
@@ -428,12 +673,22 @@
   }
 
   function readFirstPartyCheckoutSnapshot() {
+    const storage = getLocalStorageSafe();
+    if (!storage) return null;
+
     try {
-      const raw = localStorage.getItem(FIRST_PARTY_CHECKOUT_SNAPSHOT_KEY);
+      const raw = storage.getItem(FIRST_PARTY_CHECKOUT_SNAPSHOT_KEY);
       if (!raw) return null;
 
       const snapshot = JSON.parse(raw);
       if (!Array.isArray(snapshot?.cart?.items) || snapshot.cart.items.length === 0) {
+        storage.removeItem(FIRST_PARTY_CHECKOUT_SNAPSHOT_KEY);
+        return null;
+      }
+
+      const savedAt = Number(snapshot?.savedAt || 0);
+      if (Number.isFinite(savedAt) && savedAt > 0 && Date.now() - savedAt > FIRST_PARTY_CHECKOUT_SNAPSHOT_TTL_MS) {
+        storage.removeItem(FIRST_PARTY_CHECKOUT_SNAPSHOT_KEY);
         return null;
       }
 
@@ -443,9 +698,127 @@
     }
   }
 
+  function buildFirstPartyCartDraftState(state) {
+    const email = String(state?.cart?.email || '').trim();
+    const billingAddress = state?.cart?.billingAddress && typeof state.cart.billingAddress === 'object'
+      ? { ...state.cart.billingAddress }
+      : {};
+    const customer = state?.customer && typeof state.customer === 'object'
+      ? { ...state.customer }
+      : {};
+
+    const hasBillingAddress = Object.values(billingAddress).some((value) => String(value || '').trim());
+    const hasCustomer = Object.values(customer).some((value) => String(value || '').trim());
+
+    if (!email && !hasBillingAddress && !hasCustomer) {
+      return null;
+    }
+
+    return {
+      email,
+      billingAddress,
+      customer,
+      savedAt: Date.now()
+    };
+  }
+
+  function writeFirstPartyCartDraftState(state) {
+    const storage = getSessionStorageSafe();
+    if (!storage) return;
+
+    try {
+      const payload = buildFirstPartyCartDraftState(state);
+      if (!payload) {
+        storage.removeItem(FIRST_PARTY_CART_DRAFT_KEY);
+        return;
+      }
+      storage.setItem(FIRST_PARTY_CART_DRAFT_KEY, JSON.stringify(payload));
+    } catch (_error) {}
+  }
+
+  function readFirstPartyCartDraftState() {
+    const storage = getSessionStorageSafe();
+    if (!storage) return null;
+
+    try {
+      const raw = storage.getItem(FIRST_PARTY_CART_DRAFT_KEY);
+      if (!raw) return null;
+      const draft = JSON.parse(raw);
+      const savedAt = Number(draft?.savedAt || 0);
+      if (Number.isFinite(savedAt) && savedAt > 0 && Date.now() - savedAt > FIRST_PARTY_CART_DRAFT_TTL_MS) {
+        storage.removeItem(FIRST_PARTY_CART_DRAFT_KEY);
+        return null;
+      }
+
+      return {
+        email: String(draft?.email || ''),
+        billingAddress: draft?.billingAddress && typeof draft.billingAddress === 'object'
+          ? { ...draft.billingAddress }
+          : {},
+        customer: draft?.customer && typeof draft.customer === 'object'
+          ? { ...draft.customer }
+          : {}
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
   function clearFirstPartyCheckoutSnapshot() {
     try {
-      localStorage.removeItem(FIRST_PARTY_CHECKOUT_SNAPSHOT_KEY);
+      getLocalStorageSafe()?.removeItem(FIRST_PARTY_CHECKOUT_SNAPSHOT_KEY);
+    } catch (_error) {}
+  }
+
+  function writeActiveCustomCheckoutOrderId(orderId) {
+    const nextOrderId = String(orderId || '').trim();
+    try {
+      const sessionStorage = getSessionStorageSafe();
+      const localStorage = getLocalStorageSafe();
+      writeTimedStorageValue(sessionStorage, ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_KEY, nextOrderId);
+      if (localStorage) {
+        localStorage.removeItem(ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_KEY);
+      }
+    } catch (_error) {}
+  }
+
+  function readActiveCustomCheckoutOrderId() {
+    try {
+      const sessionStorage = getSessionStorageSafe();
+      const localStorage = getLocalStorageSafe();
+      const sessionValue = readTimedStorageValue(
+        sessionStorage,
+        ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_KEY,
+        ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_TTL_MS
+      );
+      if (sessionValue) return sessionValue;
+
+      const migrated = readTimedStorageValue(
+        localStorage,
+        ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_KEY,
+        ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_TTL_MS
+      );
+      if (migrated) {
+        writeTimedStorageValue(sessionStorage, ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_KEY, migrated);
+        localStorage?.removeItem(ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_KEY);
+      }
+      return migrated;
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  function setPendingPledgeFlag() {
+    try {
+      writeTimedStorageValue(getSessionStorageSafe(), PENDING_PLEDGE_KEY, 'true');
+      getLocalStorageSafe()?.removeItem(PENDING_PLEDGE_KEY);
+    } catch (_error) {}
+  }
+
+  function clearPendingPledgeFlag() {
+    try {
+      getSessionStorageSafe()?.removeItem(PENDING_PLEDGE_KEY);
+      getLocalStorageSafe()?.removeItem(PENDING_PLEDGE_KEY);
     } catch (_error) {}
   }
 
@@ -455,14 +828,7 @@
 
     return {
       token: String(state?.cart?.token || `${FIRST_PARTY_CART_TOKEN_PREFIX}${Date.now().toString(36)}`),
-      email: String(state?.cart?.email || ''),
       tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT),
-      billingAddress: state?.cart?.billingAddress && typeof state.cart.billingAddress === 'object'
-        ? { ...state.cart.billingAddress }
-        : {},
-      customer: state?.customer && typeof state.customer === 'object'
-        ? { ...state.customer }
-        : {},
       items: items.map((item) => ({
         id: String(item?.id || ''),
         uniqueId: String(item?.uniqueId || ''),
@@ -483,10 +849,12 @@
     try {
       const payload = buildPersistedFirstPartyCartState(state);
       if (!payload) {
+        getSessionStorageSafe()?.removeItem(FIRST_PARTY_CART_DRAFT_KEY);
         localStorage.removeItem(FIRST_PARTY_CART_STATE_KEY);
         return;
       }
 
+      writeFirstPartyCartDraftState(state);
       localStorage.setItem(FIRST_PARTY_CART_STATE_KEY, JSON.stringify(payload));
     } catch (_error) {}
   }
@@ -511,19 +879,19 @@
 
       return {
         token: String(persisted?.token || `${FIRST_PARTY_CART_TOKEN_PREFIX}${Date.now().toString(36)}`),
-        email: String(persisted?.email || ''),
         tipPercent: sanitizeTipPercent(persisted?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT),
-        billingAddress: persisted?.billingAddress && typeof persisted.billingAddress === 'object'
-          ? { ...persisted.billingAddress }
-          : {},
-        customer: persisted?.customer && typeof persisted.customer === 'object'
-          ? { ...persisted.customer }
-          : {},
         items
       };
     } catch (_error) {
       return null;
     }
+  }
+
+  function clearPersistedFirstPartyCartState() {
+    try {
+      getLocalStorageSafe()?.removeItem(FIRST_PARTY_CART_STATE_KEY);
+      getSessionStorageSafe()?.removeItem(FIRST_PARTY_CART_DRAFT_KEY);
+    } catch (_error) {}
   }
 
   function getFirstPartyCampaignSlug(items) {
@@ -560,6 +928,18 @@
     if (typeof window.invalidateInventoryCache === 'function') {
       slugs.forEach((slug) => window.invalidateInventoryCache(slug));
     }
+  }
+
+  function markLiveCampaignRefreshNeeded(campaignSlugs) {
+    const slugs = Array.from(new Set((campaignSlugs || []).filter(Boolean)));
+    if (slugs.length === 0) return;
+
+    try {
+      getLocalStorageSafe()?.setItem(LIVE_REFRESH_MARKER_KEY, JSON.stringify({
+        campaignSlugs: slugs,
+        timestamp: Date.now()
+      }));
+    } catch (_error) {}
   }
 
   function buildFirstPartyCheckoutPayload(state) {
@@ -633,9 +1013,11 @@
 
   function buildFirstPartyInitialState() {
     const persisted = readPersistedFirstPartyCartState();
+    const draft = readFirstPartyCartDraftState();
     const persistedItems = persisted?.items || [];
     const persistedTipPercent = sanitizeTipPercent(persisted?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
     const persistedTotals = calculateCartTotals(persistedItems, persistedTipPercent);
+    const draftEmail = String(draft?.email || '');
 
     return {
       cart: {
@@ -645,15 +1027,15 @@
         },
         subtotal: persistedTotals.subtotal || 0,
         total: persistedTotals.total || 0,
-        email: persisted?.email || '',
+        email: draftEmail,
         tipPercent: persistedTipPercent,
-        billingAddress: persisted?.billingAddress || {},
+        billingAddress: draft?.billingAddress || {},
         items: {
           count: persistedItems.length,
           items: persistedItems
         }
       },
-      customer: persisted?.customer || {}
+      customer: draft?.customer || (draftEmail ? { email: draftEmail } : {})
     };
   }
 
@@ -663,9 +1045,13 @@
     let currentRoute = null;
     let isCartOpen = false;
     let suppressDrawerRerender = false;
+    let activeCustomCheckoutMount = null;
+    let customCheckoutFlowToken = 0;
     let checkoutUiState = {
       status: 'idle',
-      error: ''
+      error: '',
+      mode: getCheckoutUiMode(),
+      customCheckout: null
     };
 
     function emitStateChanged() {
@@ -694,7 +1080,8 @@
       if (!snapshot?.cart?.items?.length) return false;
 
       const nextItems = snapshot.cart.items.map((item) => normalizeCartItem(item));
-      const nextEmail = String(snapshot?.cart?.email || '');
+      const draft = readFirstPartyCartDraftState();
+      const nextEmail = String(draft?.email || snapshot?.cart?.email || '');
       const nextTipPercent = sanitizeTipPercent(snapshot?.cart?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
       const totals = calculateCartTotals(nextItems, nextTipPercent);
 
@@ -702,6 +1089,7 @@
         ...store.getState(),
         customer: {
           ...store.getState().customer,
+          ...(draft?.customer || {}),
           email: nextEmail
         },
         cart: {
@@ -709,6 +1097,7 @@
           ...totals,
           email: nextEmail,
           tipPercent: nextTipPercent,
+          billingAddress: draft?.billingAddress || store.getState().cart?.billingAddress || {},
           items: {
             count: nextItems.length,
             items: nextItems
@@ -786,7 +1175,8 @@
 
       try {
         const response = await fetch(
-          `${getWorkerBase()}/checkout-intent/summary?orderId=${encodeURIComponent(orderId)}`
+          `${getWorkerBase()}/checkout-intent/summary?orderId=${encodeURIComponent(orderId)}`,
+          { cache: 'no-store' }
         );
         if (!response.ok) return null;
 
@@ -795,6 +1185,66 @@
         return payload;
       } catch (_error) {
         return null;
+      }
+    }
+
+    async function waitForPersistedFirstPartyCheckout(orderId, options) {
+      if (!isFirstPartyOrderId(orderId)) {
+        return { ok: false, summary: null };
+      }
+
+      const timeoutMs = Math.max(1000, Number(options?.timeoutMs || 15000));
+      const pollIntervalMs = Math.max(250, Number(options?.pollIntervalMs || 750));
+      const deadline = Date.now() + timeoutMs;
+      let lastSummary = null;
+
+      while (Date.now() <= deadline) {
+        const summary = await fetchFirstPartySuccessSummary(orderId);
+        if (summary) {
+          lastSummary = summary;
+          if (summary.persisted === true || Boolean(summary.createdAt)) {
+            return { ok: true, summary };
+          }
+        }
+
+        if (Date.now() >= deadline) break;
+
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, pollIntervalMs);
+        });
+      }
+
+      return {
+        ok: false,
+        summary: lastSummary
+      };
+    }
+
+    async function recoverCompletedFirstPartyCheckout(orderId, sessionId) {
+      if (!isFirstPartyOrderId(orderId) || !sessionId) {
+        return { ok: false };
+      }
+
+      try {
+        const response = await fetch(`${getWorkerBase()}/checkout-intent/complete`, {
+          method: 'POST',
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            orderId,
+            sessionId
+          })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        return {
+          ok: response.ok && payload?.persisted === true,
+          payload
+        };
+      } catch (_error) {
+        return { ok: false };
       }
     }
 
@@ -838,6 +1288,7 @@
       if (!root) return;
 
       if (!isCartOpen) {
+        teardownActiveCustomCheckoutMount();
         root.innerHTML = '';
         root.setAttribute('aria-hidden', 'true');
         return;
@@ -851,9 +1302,101 @@
       const pricing = buildFirstPartyPricing(state);
       const hasPhysicalItems = cartHasPhysicalItems(items);
       const checkoutLineItems = buildCheckoutLineItems(items);
-      const checkoutErrorMarkup = checkoutUiState.error ? `
-        <p class="pool-first-party-cart__error" role="alert">${escapeHtml(checkoutUiState.error)}</p>
-      ` : '';
+      const wantsCustomCheckout = isCheckoutPreview &&
+        isFirstPartyCheckoutEnabled &&
+        getCheckoutUiMode() === 'custom';
+      const isCustomCheckout = wantsCustomCheckout && checkoutUiState.mode === 'custom';
+      const customCheckout = checkoutUiState.customCheckout || {};
+      const checkoutErrorMarkup = `
+        <p class="pool-first-party-cart__error" data-cart-checkout-error role="alert" ${checkoutUiState.error ? '' : 'hidden'}>${escapeHtml(checkoutUiState.error || '')}</p>
+      `;
+      const customCheckoutMarkup = wantsCustomCheckout ? `
+        ${hasPhysicalItems ? `
+          <div class="pool-first-party-cart__callout pool-first-party-cart__callout--stripe">
+            <p class="pool-first-party-cart__section-label">Shipping address</p>
+            <div class="pool-first-party-cart__shipping-fallback pool-first-party-cart__shipping-fallback--plain" data-cart-custom-shipping-fallback>
+              <div class="pool-first-party-cart__shipping-grid">
+                <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-name">Full name <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <input id="pool-custom-shipping-name" name="shipping_name" class="pool-first-party-cart__input" type="text" autocomplete="shipping name" value="${escapeHtml(customCheckout?.shippingDraft?.name || '')}" data-cart-custom-shipping-field="name">
+                </div>
+                <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-checkout-email-fallback">Email address <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <input
+                    id="pool-custom-checkout-email-fallback"
+                    name="shipping_email"
+                    class="pool-first-party-cart__input"
+                    type="email"
+                    inputmode="email"
+                    autocomplete="shipping email"
+                    value="${escapeHtml(customCheckout?.emailDraft || '')}"
+                    data-cart-custom-checkout-email
+                  >
+                  <p class="pool-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
+                </div>
+                <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line1">Address line 1 <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <input id="pool-custom-shipping-line1" name="shipping_address_line1" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line1" value="${escapeHtml(customCheckout?.shippingDraft?.address?.line1 || '')}" data-cart-custom-shipping-field="line1">
+                </div>
+                <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line2">Address line 2</label>
+                  <input id="pool-custom-shipping-line2" name="shipping_address_line2" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line2" value="${escapeHtml(customCheckout?.shippingDraft?.address?.line2 || '')}" data-cart-custom-shipping-field="line2">
+                </div>
+                <div class="pool-first-party-cart__field">
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-city">City <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <input id="pool-custom-shipping-city" name="shipping_city" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level2" value="${escapeHtml(customCheckout?.shippingDraft?.address?.city || '')}" data-cart-custom-shipping-field="city">
+                </div>
+                <div class="pool-first-party-cart__field">
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-state">State / Province <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <input id="pool-custom-shipping-state" name="shipping_state" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level1" value="${escapeHtml(customCheckout?.shippingDraft?.address?.state || '')}" data-cart-custom-shipping-field="state">
+                </div>
+                <div class="pool-first-party-cart__field">
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-postal">Postal code <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <input id="pool-custom-shipping-postal" name="shipping_postal_code" class="pool-first-party-cart__input" type="text" inputmode="numeric" autocomplete="shipping postal-code" value="${escapeHtml(customCheckout?.shippingDraft?.address?.postal_code || '')}" data-cart-custom-shipping-field="postal_code">
+                </div>
+                <div class="pool-first-party-cart__field">
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-country">Country <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <select id="pool-custom-shipping-country" name="shipping_country" class="pool-first-party-cart__input pool-first-party-cart__input--select" autocomplete="shipping country" data-cart-custom-shipping-field="country">
+                    ${renderShippingCountryOptions(customCheckout?.shippingDraft?.address?.country || DEFAULT_SHIPPING_COUNTRY)}
+                  </select>
+                </div>
+              </div>
+              <p class="pool-first-party-cart__field-error" data-cart-custom-shipping-error ${customCheckout?.shippingError ? '' : 'hidden'}>${escapeHtml(customCheckout?.shippingError || '')}</p>
+            </div>
+          </div>
+        ` : `
+          <div class="pool-first-party-cart__callout pool-first-party-cart__callout--stripe">
+            <p class="pool-first-party-cart__section-label">Contact</p>
+            <div class="pool-first-party-cart__stripe-shell">
+              <div class="pool-first-party-cart__field pool-first-party-cart__field--compact" data-cart-custom-checkout-email-fallback>
+                <label class="pool-first-party-cart__field-label" for="pool-custom-checkout-email">Email address <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                <input
+                  id="pool-custom-checkout-email"
+                  class="pool-first-party-cart__input"
+                  type="email"
+                  inputmode="email"
+                  autocomplete="email"
+                  value="${escapeHtml(customCheckout?.emailDraft || '')}"
+                  data-cart-custom-checkout-email
+                >
+                <p class="pool-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
+              </div>
+            </div>
+          </div>
+        `}
+        <div class="pool-first-party-cart__callout pool-first-party-cart__callout--stripe">
+          <p class="pool-first-party-cart__section-label">Payment method</p>
+          <div class="pool-first-party-cart__stripe-shell">
+            <div class="pool-first-party-cart__stripe-region pool-first-party-cart__stripe-region--payment" data-cart-custom-checkout-region="payment"></div>
+          </div>
+          <p class="pool-first-party-cart__note pool-first-party-cart__note--payment-consent">By providing your card information, you allow The Pool to charge your card if the campaign(s) you backed reaches its goal before its end date.</p>
+        </div>
+      ` : `
+        <div class="pool-first-party-cart__callout">
+          <p class="pool-first-party-cart__section-label">Next step</p>
+          <p class="pool-first-party-cart__note">Continue to Stripe's secure payment platform to enter your payment information and email address -- this finalizes your pledge. You will only be charged if the campaign funds successfully.</p>
+        </div>
+      `;
       const itemMarkup = items.length > 0 ? items.map((item) => `
         <li class="pool-first-party-cart__item" data-item-id="${item.uniqueId}">
           <div class="pool-first-party-cart__item-main">
@@ -965,10 +1508,7 @@
               </div>
             </div>
           </div>
-          <div class="pool-first-party-cart__callout">
-            <p class="pool-first-party-cart__section-label">Next step</p>
-            <p class="pool-first-party-cart__note">Continue to Stripe's secure payment platform to enter your payment information and email address -- this finalizes your pledge. You will only be charged if the campaign funds successfully.</p>
-          </div>
+          ${customCheckoutMarkup}
           ${checkoutErrorMarkup}
         </section>
       ` : `
@@ -978,23 +1518,50 @@
       const footerActions = isCheckoutPreview ? `
           <div class="pool-first-party-cart__actions">
             <button type="button" class="pool-first-party-cart__action pool-first-party-cart__action--secondary" data-cart-back>Back to cart</button>
-            <button
-              type="button"
-            class="pool-first-party-cart__action"
-            data-cart-start-checkout
-            ${!isFirstPartyCheckoutEnabled || checkoutUiState.status === 'submitting' ? 'disabled' : ''}
-          >${checkoutUiState.status === 'submitting' ? 'Starting pledge...' : (isFirstPartyCheckoutEnabled ? 'Continue to pledge' : 'Legacy checkout only')}</button>
+            ${wantsCustomCheckout ? `
+              <button
+                type="button"
+                class="pool-first-party-cart__action${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting' ? ' is-busy' : ''}"
+                data-cart-confirm-custom-checkout
+                aria-busy="${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting' ? 'true' : 'false'}"
+                ${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'submitting' || customCheckout?.mountStatus !== 'mounted' ? 'disabled' : ''}
+              >${renderBusyButtonLabel(
+                checkoutUiState.status === 'confirming'
+                  ? 'Saving payment method...'
+                  : checkoutUiState.status === 'redirecting'
+                    ? 'Finishing pledge...'
+                    : 'Save payment method',
+                checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting'
+              )}</button>
+            ` : `
+              <button
+                type="button"
+                class="pool-first-party-cart__action"
+                data-cart-start-checkout
+                ${!isFirstPartyCheckoutEnabled || checkoutUiState.status === 'submitting' ? 'disabled' : ''}
+              >${checkoutUiState.status === 'submitting' ? 'Starting pledge...' : (isFirstPartyCheckoutEnabled ? 'Continue to pledge' : 'Legacy checkout only')}</button>
+            `}
         </div>
       ` : `
         <div class="pool-first-party-cart__actions">
           <button type="button" class="pool-first-party-cart__action pool-first-party-cart__action--secondary" data-cart-close>Keep browsing</button>
-          <button type="button" class="pool-first-party-cart__action" data-cart-continue ${items.length === 0 ? 'disabled' : ''}>Review pledge</button>
+          <button type="button" class="pool-first-party-cart__action" data-cart-continue ${items.length === 0 ? 'disabled' : ''}>Checkout</button>
         </div>
       `;
 
+      if (activeCustomCheckoutMount) {
+        if (isCustomCheckout && checkoutUiState.customCheckout) {
+          checkoutUiState.customCheckout = {
+            ...checkoutUiState.customCheckout,
+            mountStatus: 'idle'
+          };
+        }
+        teardownActiveCustomCheckoutMount();
+      }
+
       root.innerHTML = `
         <div class="pool-first-party-cart__backdrop" data-cart-close></div>
-        <aside class="pool-first-party-cart__panel" aria-label="Cart drawer">
+        <aside class="pool-first-party-cart__panel${isCheckoutPreview ? ' pool-first-party-cart__panel--checkout' : ''}" aria-label="Cart drawer">
           <header class="pool-first-party-cart__header">
             <div>
               ${isCheckoutPreview
@@ -1012,6 +1579,9 @@
         </aside>
       `;
       root.setAttribute('aria-hidden', 'false');
+      if (isCustomCheckout && customCheckout?.scriptStatus === 'ready') {
+        mountCustomCheckoutIntoDrawer(root);
+      }
     }
 
     function syncFirstPartyCartTipUI() {
@@ -1051,6 +1621,7 @@
     function openFirstPartyCart() {
       currentRoute = currentRoute || CART_VIEW_ROUTE;
       isCartOpen = true;
+      scheduleStripeJsPrewarm();
       renderFirstPartyCart();
     }
 
@@ -1066,6 +1637,529 @@
         ...(nextState || {})
       };
       renderFirstPartyCart();
+    }
+
+  function teardownActiveCustomCheckoutMount() {
+      if (!activeCustomCheckoutMount || typeof activeCustomCheckoutMount.unmount !== 'function') {
+        activeCustomCheckoutMount = null;
+        return;
+      }
+
+      try {
+        activeCustomCheckoutMount.unmount();
+      } catch (_error) {}
+      activeCustomCheckoutMount = null;
+    }
+
+    function invalidateCustomCheckoutFlow() {
+      customCheckoutFlowToken += 1;
+      return customCheckoutFlowToken;
+    }
+
+    function isActiveCustomCheckoutFlow(flowToken) {
+      return flowToken === customCheckoutFlowToken &&
+        currentRoute === CHECKOUT_VIEW_ROUTE &&
+        checkoutUiState.mode === 'custom' &&
+        Boolean(checkoutUiState.customCheckout);
+    }
+
+    function getActiveCustomCheckoutOrderId() {
+      return String(checkoutUiState?.customCheckout?.orderId || readActiveCustomCheckoutOrderId() || '').trim();
+    }
+
+    async function abandonActiveCustomCheckoutIntent(orderId = getActiveCustomCheckoutOrderId()) {
+      const nextOrderId = String(orderId || '').trim();
+      if (!nextOrderId) return;
+
+      try {
+        await fetch(`${getWorkerBase()}/checkout-intent/abandon`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ orderId: nextOrderId })
+        });
+      } catch (_error) {
+      } finally {
+        writeActiveCustomCheckoutOrderId('');
+        clearFirstPartyCheckoutSnapshot();
+        clearPendingPledgeFlag();
+      }
+    }
+
+    function updateCustomCheckoutStatus(statusText, footerLabel) {
+      const root = getCartRoot();
+      if (!root) return;
+
+      const button = root.querySelector('[data-cart-confirm-custom-checkout], [data-cart-start-checkout]');
+      if (button && footerLabel) {
+        button.textContent = footerLabel;
+      }
+    }
+
+    function isCustomCheckoutBusy() {
+      return checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting';
+    }
+
+    function syncCustomCheckoutConfirmButton() {
+      const root = getCartRoot();
+      const button = root?.querySelector('[data-cart-confirm-custom-checkout]');
+      if (!button) return;
+
+      const isConfirming = checkoutUiState.status === 'confirming';
+      const isRedirecting = checkoutUiState.status === 'redirecting';
+      const isSubmitting = checkoutUiState.status === 'submitting';
+      const isMounted = checkoutUiState.customCheckout?.mountStatus === 'mounted';
+      button.disabled = isConfirming || isRedirecting || isSubmitting || !isMounted;
+      button.classList.toggle('is-busy', isConfirming || isRedirecting);
+      button.setAttribute('aria-busy', isConfirming || isRedirecting ? 'true' : 'false');
+      button.innerHTML = renderBusyButtonLabel(
+        isConfirming
+          ? 'Saving payment method...'
+          : isRedirecting
+            ? 'Finishing pledge...'
+            : isSubmitting
+              ? 'Loading secure payment...'
+              : 'Save payment method',
+        isConfirming || isRedirecting
+      );
+    }
+
+    function focusCustomCheckoutEmailField() {
+      const input = getCartRoot()?.querySelector('[data-cart-custom-checkout-email]');
+      if (!(input instanceof HTMLInputElement)) return;
+      input.focus();
+      if (typeof input.select === 'function' && input.value) {
+        input.select();
+      }
+      if (typeof input.scrollIntoView === 'function') {
+        input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+
+    function getCustomCheckoutEmailFieldMessage(errorLike) {
+      const rawMessage = String(errorLike?.error?.message || errorLike?.message || '').trim();
+      const message = rawMessage.toLowerCase();
+      if (!message || !message.includes('email')) {
+        return '';
+      }
+      if (message.includes('required') || message.includes('updateemail') || message.includes('provide an email address')) {
+        return 'Enter an email address to continue.';
+      }
+      if (message.includes('valid email')) {
+        return 'Enter a valid email address to continue.';
+      }
+      return rawMessage || 'Enter an email address to continue.';
+    }
+
+    function setCustomCheckoutEmailError(message) {
+      const root = getCartRoot();
+      const errorNode = root?.querySelector('[data-cart-custom-checkout-email-error]');
+      const input = root?.querySelector('[data-cart-custom-checkout-email]');
+      if (!errorNode) return;
+
+      const nextMessage = String(message || '');
+      errorNode.textContent = nextMessage;
+      errorNode.hidden = !nextMessage;
+      if (input instanceof HTMLInputElement) {
+        input.setAttribute('aria-invalid', nextMessage ? 'true' : 'false');
+      }
+    }
+
+    function setCheckoutUiError(message) {
+      const root = getCartRoot();
+      const errorNode = root?.querySelector('[data-cart-checkout-error]');
+      const nextMessage = String(message || '');
+      checkoutUiState.error = nextMessage;
+      if (!errorNode) return;
+      errorNode.textContent = nextMessage;
+      errorNode.hidden = !nextMessage;
+    }
+
+    function shouldShowCheckoutLevelStripeError(errorLike) {
+      const type = String(errorLike?.type || errorLike?.error?.type || '').trim().toLowerCase();
+      const code = String(errorLike?.code || errorLike?.error?.code || '').trim().toLowerCase();
+      const message = String(errorLike?.message || errorLike?.error?.message || '').trim();
+
+      if (type === 'validation_error') return false;
+      if (code === 'incomplete_number' || code === 'incomplete_cvc' || code === 'incomplete_expiry') return false;
+      if (/(incomplete|invalid|required|empty)/i.test(message)) return false;
+      return true;
+    }
+
+    function setCustomCheckoutShippingError(message) {
+      const root = getCartRoot();
+      const errorNode = root?.querySelector('[data-cart-custom-shipping-error]');
+      if (!errorNode) return;
+
+      const nextMessage = String(message || '');
+      errorNode.textContent = nextMessage;
+      errorNode.hidden = !nextMessage;
+    }
+
+    function readCustomCheckoutShippingDraft() {
+      const root = getCartRoot();
+      const fields = root ? Array.from(root.querySelectorAll('[data-cart-custom-shipping-field]')) : [];
+      const read = function(name) {
+        const field = fields.find((node) => node.getAttribute('data-cart-custom-shipping-field') === name);
+        if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+          return String(field.value || '').trim();
+        }
+        return '';
+      };
+
+      return {
+        name: read('name'),
+        address: {
+          line1: read('line1'),
+          line2: read('line2'),
+          city: read('city'),
+          state: read('state'),
+          postal_code: read('postal_code'),
+          country: (read('country') || 'US').toUpperCase()
+        }
+      };
+    }
+
+    async function syncCustomCheckoutShippingToStripe(options) {
+      const shippingDraft = readCustomCheckoutShippingDraft();
+      checkoutUiState.customCheckout = {
+        ...(checkoutUiState.customCheckout || {}),
+        shippingDraft,
+        shippingError: ''
+      };
+
+      const missingRequiredField = !shippingDraft.name ||
+        !shippingDraft.address.line1 ||
+        !shippingDraft.address.city ||
+        !shippingDraft.address.state ||
+        !shippingDraft.address.postal_code ||
+        !shippingDraft.address.country;
+
+      if (missingRequiredField) {
+        const message = 'Enter a complete shipping address to continue.';
+        checkoutUiState.customCheckout.shippingError = message;
+        setCustomCheckoutShippingError(message);
+        return {
+          ok: false,
+          message
+        };
+      }
+
+      if (!activeCustomCheckoutMount || typeof activeCustomCheckoutMount.updateShippingAddress !== 'function') {
+        setCustomCheckoutShippingError('');
+        return { ok: true };
+      }
+
+      const result = await activeCustomCheckoutMount.updateShippingAddress(shippingDraft);
+      const message = result?.error?.message || '';
+      checkoutUiState.customCheckout.shippingError = message;
+      setCustomCheckoutShippingError(message);
+
+      if (message && options?.raise) {
+        throw new Error(message);
+      }
+
+      return {
+        ok: !message,
+        message
+      };
+    }
+
+    async function syncCustomCheckoutEmailToStripe(email, options) {
+      const trimmedEmail = String(email || '').trim();
+      checkoutUiState.customCheckout = {
+        ...(checkoutUiState.customCheckout || {}),
+        emailDraft: trimmedEmail,
+        emailError: ''
+      };
+
+      if (!trimmedEmail) {
+        const message = 'Enter an email address to continue.';
+        checkoutUiState.customCheckout.emailError = message;
+        setCustomCheckoutEmailError(message);
+        return {
+          ok: false,
+          message
+        };
+      }
+
+      if (!activeCustomCheckoutMount || typeof activeCustomCheckoutMount.updateEmail !== 'function') {
+        setCustomCheckoutEmailError('');
+        return { ok: true };
+      }
+
+      const result = await activeCustomCheckoutMount.updateEmail(trimmedEmail);
+      const message = result?.error?.message || '';
+      checkoutUiState.customCheckout.emailError = message;
+      setCustomCheckoutEmailError(message);
+
+      if (message && options?.raise) {
+        throw new Error(message);
+      }
+
+      return {
+        ok: !message,
+        message
+      };
+    }
+
+    async function mountCustomCheckoutIntoDrawer(root) {
+      if (!root || currentRoute !== CHECKOUT_VIEW_ROUTE || checkoutUiState.mode !== 'custom') return;
+      if (!checkoutUiState.customCheckout || checkoutUiState.customCheckout.scriptStatus !== 'ready') return;
+      if (checkoutUiState.customCheckout.mountStatus !== 'idle') return;
+      if (!window.PoolStripeCheckoutSidecar || typeof window.PoolStripeCheckoutSidecar.mount !== 'function') return;
+      const flowToken = customCheckoutFlowToken;
+
+      const paymentContainer = root.querySelector('[data-cart-custom-checkout-region="payment"]');
+      const shippingContainer = root.querySelector('[data-cart-custom-checkout-region="address"]');
+
+      checkoutUiState.customCheckout.mountStatus = 'mounting';
+      syncCustomCheckoutConfirmButton();
+
+      try {
+        const mountResult = await window.PoolStripeCheckoutSidecar.mount({
+          publishableKey: checkoutUiState.customCheckout.publishableKey,
+          clientSecret: checkoutUiState.customCheckout.clientSecret,
+          paymentContainer,
+          shippingContainer,
+          useShippingAddressElement: Boolean(shippingContainer),
+          allowedCountries: SHIPPING_COUNTRY_OPTIONS.map((option) => option.value),
+          defaultCountry: DEFAULT_SHIPPING_COUNTRY,
+          onChange: function(event) {
+            if (!isActiveCustomCheckoutFlow(flowToken)) return;
+            checkoutUiState.customCheckout = {
+              ...(checkoutUiState.customCheckout || {}),
+              canConfirm: Boolean(event?.session?.canConfirm)
+            };
+            syncCustomCheckoutConfirmButton();
+          }
+        });
+
+        if (!isActiveCustomCheckoutFlow(flowToken)) {
+          try {
+            mountResult?.unmount?.();
+          } catch (_error) {}
+          return;
+        }
+
+        activeCustomCheckoutMount = mountResult;
+        checkoutUiState.customCheckout.mountStatus = 'mounted';
+        if (shippingContainer && !mountResult?.supportsShippingAddressElement) {
+          shippingContainer.hidden = true;
+          const fallbackShipping = root.querySelector('[data-cart-custom-shipping-fallback]');
+          if (fallbackShipping) {
+            fallbackShipping.hidden = false;
+          }
+        }
+        syncCustomCheckoutConfirmButton();
+      } catch (error) {
+        if (!isActiveCustomCheckoutFlow(flowToken)) return;
+        activeCustomCheckoutMount = null;
+        await abandonActiveCustomCheckoutIntent(getActiveCustomCheckoutOrderId());
+        setCheckoutUiState({
+          status: 'idle',
+          mode: 'custom',
+          error: error?.message || 'Secure checkout could not be mounted.',
+          customCheckout: {
+            ...(checkoutUiState.customCheckout || {}),
+            mountStatus: 'error'
+          }
+        });
+      }
+    }
+
+    async function confirmCustomCheckout() {
+      if (isCustomCheckoutBusy()) return;
+      if (!activeCustomCheckoutMount || typeof activeCustomCheckoutMount.confirm !== 'function') {
+        setCheckoutUiState({
+          ...checkoutUiState,
+          status: 'idle',
+          error: 'Secure checkout is not ready yet.'
+        });
+        return;
+      }
+
+      const root = getCartRoot();
+      const emailInput = root?.querySelector('[data-cart-custom-checkout-email]');
+      const emailFallbackVisible = Boolean(root?.querySelector('[data-cart-custom-checkout-email-fallback]:not([hidden])'));
+      const emailValue = emailInput instanceof HTMLInputElement ? emailInput.value : '';
+      const mount = activeCustomCheckoutMount;
+      const flowToken = customCheckoutFlowToken;
+      const orderId = String(checkoutUiState.customCheckout?.orderId || '');
+
+      try {
+        checkoutUiState.status = 'confirming';
+        setCheckoutUiError('');
+        checkoutUiState.customCheckout = {
+          ...(checkoutUiState.customCheckout || {}),
+          emailDraft: String(emailValue || '').trim(),
+          emailError: ''
+        };
+        syncCustomCheckoutConfirmButton();
+        setCustomCheckoutEmailError('');
+
+        if (emailFallbackVisible) {
+          const emailResult = await syncCustomCheckoutEmailToStripe(emailValue, { raise: true });
+          if (!emailResult.ok) {
+            checkoutUiState.status = 'idle';
+            checkoutUiState.customCheckout = {
+              ...(checkoutUiState.customCheckout || {}),
+              emailDraft: String(emailValue || '').trim(),
+              emailError: emailResult.message || ''
+            };
+            focusCustomCheckoutEmailField();
+            syncCustomCheckoutConfirmButton();
+            return;
+          }
+        }
+
+        if (getCartRoot()?.querySelector('[data-cart-custom-shipping-fallback]:not([hidden])')) {
+          const shippingResult = await syncCustomCheckoutShippingToStripe({ raise: true });
+          if (!shippingResult.ok) {
+            checkoutUiState.status = 'idle';
+            syncCustomCheckoutConfirmButton();
+            return;
+          }
+        }
+
+        const result = await mount.confirm();
+        if (result?.type === 'error' || result?.error) {
+          checkoutUiState.status = 'idle';
+          const emailFieldMessage = getCustomCheckoutEmailFieldMessage(result);
+          if (emailFieldMessage) {
+            checkoutUiState.customCheckout = {
+              ...(checkoutUiState.customCheckout || {}),
+              emailError: emailFieldMessage
+            };
+            setCustomCheckoutEmailError(emailFieldMessage);
+            setCheckoutUiError('');
+            focusCustomCheckoutEmailField();
+            syncCustomCheckoutConfirmButton();
+            return;
+          }
+          if (shouldShowCheckoutLevelStripeError(result)) {
+            setCheckoutUiError(result?.error?.message || 'Stripe could not confirm the setup.');
+          } else {
+            setCheckoutUiError('');
+          }
+          syncCustomCheckoutConfirmButton();
+          return;
+        }
+
+        if (!isActiveCustomCheckoutFlow(flowToken)) {
+          return;
+        }
+
+        checkoutUiState.status = 'redirecting';
+        syncCustomCheckoutConfirmButton();
+
+        let completion = await waitForPersistedFirstPartyCheckout(orderId, {
+          timeoutMs: 2500,
+          pollIntervalMs: 400
+        });
+        if (!isActiveCustomCheckoutFlow(flowToken)) {
+          return;
+        }
+
+        if (!completion.ok) {
+          const recovery = await recoverCompletedFirstPartyCheckout(
+            orderId,
+            String(checkoutUiState.customCheckout?.sessionId || '')
+          );
+          if (!isActiveCustomCheckoutFlow(flowToken)) {
+            return;
+          }
+
+          if (recovery.ok) {
+            completion = await waitForPersistedFirstPartyCheckout(orderId, {
+              timeoutMs: 3500,
+              pollIntervalMs: 350
+            });
+          }
+        }
+
+        if (!completion.ok) {
+          checkoutUiState.status = 'idle';
+          setCheckoutUiError('Payment method saved, but pledge confirmation is still processing. Please stay on this page a moment and try again.');
+          syncCustomCheckoutConfirmButton();
+          return;
+        }
+
+        const affectedCampaignSlugs = getFirstPartyCampaignSlugs(store.getState()?.cart?.items?.items);
+        markLiveCampaignRefreshNeeded(affectedCampaignSlugs);
+        invalidateLiveCampaignCaches(affectedCampaignSlugs);
+        writeActiveCustomCheckoutOrderId('');
+        redirectWindow(`/pledge-success/?orderId=${encodeURIComponent(orderId)}`);
+      } catch (error) {
+        checkoutUiState.status = 'idle';
+        const emailFieldMessage = getCustomCheckoutEmailFieldMessage(error);
+        if (emailFieldMessage) {
+          checkoutUiState.customCheckout = {
+            ...(checkoutUiState.customCheckout || {}),
+            emailError: emailFieldMessage
+          };
+          setCustomCheckoutEmailError(emailFieldMessage);
+          setCheckoutUiError('');
+          focusCustomCheckoutEmailField();
+          syncCustomCheckoutConfirmButton();
+          return;
+        }
+        setCheckoutUiError(error?.message || 'There was an error saving your payment method.');
+        syncCustomCheckoutConfirmButton();
+      }
+    }
+
+    async function bootstrapCustomCheckout(data, stripeReadyPromise) {
+      const flowToken = invalidateCustomCheckoutFlow();
+      const nextCustomCheckout = {
+        sessionId: String(data?.sessionId || ''),
+        clientSecret: String(data?.clientSecret || ''),
+        publishableKey: String(data?.publishableKey || ''),
+        orderId: String(data?.orderId || ''),
+        scriptStatus: 'loading',
+        mountStatus: 'idle'
+      };
+
+      setCheckoutUiState({
+        status: 'idle',
+        error: '',
+        mode: 'custom',
+        customCheckout: nextCustomCheckout
+      });
+      writeActiveCustomCheckoutOrderId(nextCustomCheckout.orderId);
+
+      try {
+        if (stripeReadyPromise) {
+          await stripeReadyPromise.catch(() => loadStripeJs());
+        } else {
+          await loadStripeJs();
+        }
+        if (!isActiveCustomCheckoutFlow(flowToken)) return;
+        setCheckoutUiState({
+          status: 'idle',
+          error: '',
+          mode: 'custom',
+          customCheckout: {
+            ...nextCustomCheckout,
+            scriptStatus: 'ready',
+            mountStatus: 'idle'
+          }
+        });
+      } catch (error) {
+        if (!isActiveCustomCheckoutFlow(flowToken)) return;
+        await abandonActiveCustomCheckoutIntent(nextCustomCheckout.orderId);
+        setCheckoutUiState({
+          status: 'idle',
+          mode: 'custom',
+          error: error?.message || 'Stripe.js failed to load.',
+          customCheckout: {
+            ...nextCustomCheckout,
+            scriptStatus: 'error',
+            mountStatus: 'error'
+          }
+        });
+      }
     }
 
     async function startFirstPartyCheckout() {
@@ -1094,8 +2188,15 @@
       });
 
       try {
+        const stripeReadyPromise = canUseCustomCheckoutUi() ? prewarmStripeJs() : null;
+        const existingOrderId = getActiveCustomCheckoutOrderId();
+        if (existingOrderId) {
+          await abandonActiveCustomCheckoutIntent(existingOrderId);
+        }
+
         const response = await fetch(`${getWorkerBase()}/checkout-intent/start`, {
           method: 'POST',
+          cache: 'no-store',
           headers: {
             'Content-Type': 'application/json'
           },
@@ -1107,21 +2208,37 @@
           throw new Error(data.error || `Worker returned ${response.status}`);
         }
 
+        writeFirstPartyCheckoutSnapshot(store.getState());
+        setPendingPledgeFlag();
+
+        if (data?.checkoutUiMode === 'custom') {
+          if (!data?.clientSecret || !data?.publishableKey || !data?.sessionId) {
+            throw new Error('Custom checkout bootstrap was incomplete.');
+          }
+
+          await bootstrapCustomCheckout(data, stripeReadyPromise);
+          return;
+        }
+
         if (!data?.url) {
           throw new Error('No checkout URL returned');
         }
 
-        writeFirstPartyCheckoutSnapshot(store.getState());
-        localStorage.setItem('pool_pending_pledge', 'true');
         checkoutUiState = {
           status: 'redirecting',
-          error: ''
+          error: '',
+          mode: 'hosted',
+          customCheckout: null
         };
+        invalidateCustomCheckoutFlow();
         redirectWindow(data.url);
       } catch (error) {
+        invalidateCustomCheckoutFlow();
         setCheckoutUiState({
           status: 'idle',
-          error: error?.message || 'There was an error starting your pledge.'
+          error: error?.message || 'There was an error starting your pledge.',
+          mode: getCheckoutUiMode(),
+          customCheckout: null
         });
       }
     }
@@ -1135,6 +2252,14 @@
         const closeTrigger = event.target?.closest?.('[data-cart-close]');
         if (closeTrigger) {
           event.preventDefault();
+          if (isCustomCheckoutBusy()) return;
+          const activeOrderId = getActiveCustomCheckoutOrderId();
+          if (currentRoute === CHECKOUT_VIEW_ROUTE && activeOrderId) {
+            void abandonActiveCustomCheckoutIntent(activeOrderId).finally(() => {
+              closeFirstPartyCart();
+            });
+            return;
+          }
           closeFirstPartyCart();
           return;
         }
@@ -1150,11 +2275,20 @@
         const backTrigger = event.target?.closest?.('[data-cart-back]');
         if (backTrigger) {
           event.preventDefault();
-          setCheckoutUiState({
-            status: 'idle',
-            error: ''
-          });
-          apiRoot.api.theme.cart.navigate(CART_VIEW_ROUTE);
+          if (isCustomCheckoutBusy()) return;
+          const activeOrderId = getActiveCustomCheckoutOrderId();
+          const goBackToCart = function() {
+            setCheckoutUiState({
+              status: 'idle',
+              error: ''
+            });
+            apiRoot.api.theme.cart.navigate(CART_VIEW_ROUTE);
+          };
+          if (activeOrderId) {
+            void abandonActiveCustomCheckoutIntent(activeOrderId).finally(goBackToCart);
+            return;
+          }
+          goBackToCart();
           return;
         }
 
@@ -1162,6 +2296,13 @@
         if (startCheckoutTrigger) {
           event.preventDefault();
           startFirstPartyCheckout();
+          return;
+        }
+
+        const confirmCustomCheckoutTrigger = event.target?.closest?.('[data-cart-confirm-custom-checkout]');
+        if (confirmCustomCheckoutTrigger) {
+          event.preventDefault();
+          confirmCustomCheckout();
           return;
         }
 
@@ -1214,10 +2355,30 @@
         }
 
         const emailField = event.target?.closest?.('[data-cart-email]');
-        if (!emailField) return;
+        if (emailField) {
+          apiRoot.api.cart.update({
+            email: emailField.value
+          });
+          return;
+        }
 
-        apiRoot.api.cart.update({
-          email: emailField.value
+        const shippingField = event.target?.closest?.('[data-cart-custom-shipping-field]');
+        if (shippingField) {
+          syncCustomCheckoutShippingToStripe().catch((error) => {
+            checkoutUiState.status = 'idle';
+            setCheckoutUiError(error?.message || 'Shipping validation failed.');
+            syncCustomCheckoutConfirmButton();
+          });
+          return;
+        }
+
+        const customCheckoutEmailField = event.target?.closest?.('[data-cart-custom-checkout-email]');
+        if (!customCheckoutEmailField) return;
+
+        syncCustomCheckoutEmailToStripe(customCheckoutEmailField.value).catch((error) => {
+          checkoutUiState.status = 'idle';
+          setCheckoutUiError(error?.message || 'Email validation failed.');
+          syncCustomCheckoutConfirmButton();
         });
       };
 
@@ -1457,9 +2618,13 @@
               const previousRoute = currentRoute;
               currentRoute = route || null;
               if (currentRoute !== CHECKOUT_VIEW_ROUTE) {
+                invalidateCustomCheckoutFlow();
+                teardownActiveCustomCheckoutMount();
                 checkoutUiState = {
                   status: 'idle',
-                  error: ''
+                  error: '',
+                  mode: getCheckoutUiMode(),
+                  customCheckout: null
                 };
               }
               const payload = {
@@ -1468,6 +2633,15 @@
               };
               renderFirstPartyCart();
               eventBus.emit('theme.routechanged', payload);
+              if (
+                currentRoute === CHECKOUT_VIEW_ROUTE &&
+                getRequestedCheckoutProvider() === FIRST_PARTY_CHECKOUT_PROVIDER &&
+                getCheckoutUiMode() === 'custom' &&
+                checkoutUiState.status === 'idle' &&
+                !checkoutUiState.customCheckout
+              ) {
+                void startFirstPartyCheckout();
+              }
               return Promise.resolve(payload);
             }
           }
@@ -1527,7 +2701,10 @@
       const successSnapshot = readFirstPartyCheckoutSnapshot();
       invalidateLiveCampaignCaches(getFirstPartyCampaignSlugs(successSnapshot?.cart?.items));
       renderSuccessSummaryCard();
+      clearPersistedFirstPartyCartState();
       clearFirstPartyCheckoutSnapshot();
+      clearPendingPledgeFlag();
+      writeActiveCustomCheckoutOrderId('');
       hydrateSuccessSummaryCardFromBackend();
     } else if (isPledgeCancelledPath()) {
       renderCancelledRecoveryCard();

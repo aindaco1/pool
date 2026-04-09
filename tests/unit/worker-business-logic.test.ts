@@ -448,6 +448,130 @@ describe('Worker business logic hardening', () => {
     });
   });
 
+  it('returns custom checkout bootstrap data when custom UI mode is enabled', async () => {
+    mockStripeClient.checkout.sessions.create.mockResolvedValueOnce({
+      id: 'cs_test_custom_123',
+      client_secret: 'cs_test_secret_123'
+    });
+
+    const checkoutIntents = new MockCheckoutIntentNamespace();
+    const tierInventory = new MockTierInventoryNamespace();
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_UI_MODE: 'custom',
+      STRIPE_PUBLISHABLE_KEY_TEST: 'pk_test_pool_123',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: checkoutIntents,
+      TIER_INVENTORY_COORDINATOR: tierInventory
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [
+            { id: 'hand-relations__frame-slot', quantity: 1 }
+          ],
+          email: 'buyer@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    await expect(response.json()).resolves.toMatchObject({
+      checkoutUiMode: 'custom',
+      sessionId: 'cs_test_custom_123',
+      clientSecret: 'cs_test_secret_123',
+      publishableKey: 'pk_test_pool_123',
+      orderId: expect.stringMatching(/^pool-intent-/)
+    });
+
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    const requestOptions = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[1];
+    expect(sessionPayload.ui_mode).toBe('custom');
+    expect(sessionPayload.payment_method_types).toEqual(['card', 'link']);
+    expect(sessionPayload.consent_collection).toEqual({
+      payment_method_reuse_agreement: {
+        position: 'hidden'
+      }
+    });
+    expect(sessionPayload.return_url).toMatch(/^https:\/\/pool\.test\/pledge-success\/\?orderId=pool-intent-/);
+    expect(sessionPayload.success_url).toBeUndefined();
+    expect(sessionPayload.cancel_url).toBeUndefined();
+    expect(requestOptions).toEqual({ stripeVersion: '2026-02-25.clover' });
+  });
+
+  it('rejects cross-site first-party checkout start requests', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_UI_MODE: 'custom',
+      STRIPE_PUBLISHABLE_KEY_TEST: 'pk_test_pool_123',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace(),
+      TIER_INVENTORY_COORDINATOR: new MockTierInventoryNamespace()
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://evil.test',
+          'Sec-Fetch-Site': 'cross-site'
+        },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__frame-slot', quantity: 1 }],
+          email: 'buyer@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    await expect(response.json()).resolves.toEqual({ error: 'Origin not allowed' });
+    expect(mockStripeClient.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on custom checkout start when the publishable key is missing', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_UI_MODE: 'custom',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace(),
+      TIER_INVENTORY_COORDINATOR: new MockTierInventoryNamespace()
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [
+            { id: 'hand-relations__frame-slot', quantity: 1 }
+          ],
+          email: 'buyer@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: 'Custom checkout unavailable' });
+  });
+
   it('creates a bundled first-party checkout session for mixed-campaign carts', async () => {
     const tierInventory = new MockTierInventoryNamespace();
     const env = createEnv({
@@ -565,6 +689,71 @@ describe('Worker business logic hardening', () => {
     });
     expect(await kv.get('tier-reservation-counts:hand-relations')).toBeNull();
     expect(tierInventory.calls.some((call) => call.url.endsWith('/release-reservation'))).toBe(true);
+  });
+
+  it('abandons a pending checkout intent and releases scarce reservations', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace()
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    const tierInventory = new StatefulTierInventoryNamespace(kv);
+    (env as Record<string, unknown>).TIER_INVENTORY_COORDINATOR = tierInventory;
+
+    const startResponse = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__vip-pass', quantity: 1 }],
+          email: 'buyer@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(startResponse.status).toBe(200);
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    const startedOrderId = sessionPayload?.metadata?.orderId;
+    expect(startedOrderId).toMatch(/^pool-intent-/);
+
+    const abandonResponse = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/abandon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: startedOrderId })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(abandonResponse.status).toBe(200);
+    expect(await abandonResponse.json()).toMatchObject({
+      success: true,
+      released: 1
+    });
+    expect(await kv.get(`pending-checkout:${startedOrderId}`)).toBeNull();
+
+    const secondStart = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__vip-pass', quantity: 1 }],
+          email: 'retry@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(secondStart.status).toBe(200);
   });
 
   it('allows only one last-unit scarce checkout start across repeated requests', async () => {
@@ -742,6 +931,7 @@ describe('Worker business logic hardening', () => {
       orderId: 'pool-intent-abc123',
       campaignSlug: 'hand-relations',
       campaignTitle: 'Hand Relations',
+      persisted: true,
       pledgeStatus: 'active',
       createdAt: '2026-04-01T12:34:56.000Z',
       shippingCollected: true,
@@ -799,6 +989,7 @@ describe('Worker business logic hardening', () => {
       campaignSlug: 'smoke-editable',
       campaignTitle: null,
       campaignTitles: ['SMOKE EDITABLE', 'Hand Relations'],
+      persisted: false,
       pledgeStatus: 'active',
       createdAt: null,
       shippingCollected: true,
@@ -810,6 +1001,52 @@ describe('Worker business logic hardening', () => {
         amount: 3686
       }
     });
+  });
+
+  it('treats a confirmed checkout bundle summary as persisted once recovery completes', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    await kv.put('pending-checkout:pool-intent-bundle-confirmed-1', JSON.stringify({
+      orderId: 'pool-intent-bundle-confirmed-1',
+      campaignCount: 2,
+      confirmedAt: '2026-04-09T18:34:56.000Z',
+      totals: {
+        subtotal: 3000,
+        tax: 236,
+        shipping: 300,
+        tipAmount: 150,
+        amount: 3686
+      },
+      campaigns: [
+        {
+          orderId: 'pool-intent-bundle-confirmed-1-smoke-editable',
+          campaignSlug: 'smoke-editable',
+          hasPhysical: false
+        },
+        {
+          orderId: 'pool-intent-bundle-confirmed-1-hand-relations',
+          campaignSlug: 'hand-relations',
+          hasPhysical: true
+        }
+      ]
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/summary?orderId=pool-intent-bundle-confirmed-1', {
+        method: 'GET'
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      orderId: 'pool-intent-bundle-confirmed-1',
+      persisted: true
+    }));
   });
 
   it('returns first-party recovery campaign status when enabled', async () => {
@@ -1256,6 +1493,88 @@ describe('Worker business logic hardening', () => {
     );
 
     expect(response.status).toBe(200);
+  });
+
+  it('returns custom checkout bootstrap data for payment-method updates when custom UI mode is enabled', async () => {
+    mockVerifyToken.mockResolvedValue({
+      orderId: 'order-update-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations'
+    });
+    mockStripeClient.checkout.sessions.create.mockResolvedValueOnce({
+      id: 'cs_test_update_123',
+      client_secret: 'cs_test_update_secret_123'
+    });
+
+    const env = createEnv({
+      CHECKOUT_UI_MODE: 'custom',
+      STRIPE_PUBLISHABLE_KEY_TEST: 'pk_test_pool_123'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('pledge:order-update-1', JSON.stringify({
+      orderId: 'order-update-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      stripeCustomerId: 'cus_existing'
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge/payment-method/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'valid-token' })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    await expect(response.json()).resolves.toEqual({
+      checkoutUiMode: 'custom',
+      sessionId: 'cs_test_update_123',
+      clientSecret: 'cs_test_update_secret_123',
+      publishableKey: 'pk_test_pool_123'
+    });
+
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    const requestOptions = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[1];
+    expect(sessionPayload.ui_mode).toBe('custom');
+    expect(sessionPayload.payment_method_types).toEqual(['card', 'link']);
+    expect(sessionPayload.consent_collection).toEqual({
+      payment_method_reuse_agreement: {
+        position: 'hidden'
+      }
+    });
+    expect(sessionPayload.return_url).toBe('https://pool.test/manage/?t=valid-token');
+    expect(sessionPayload.success_url).toBeUndefined();
+    expect(sessionPayload.cancel_url).toBeUndefined();
+    expect(requestOptions).toEqual({ stripeVersion: '2026-02-25.clover' });
+  });
+
+  it('rejects cross-site payment method update starts', async () => {
+    const env = createEnv({
+      CHECKOUT_UI_MODE: 'custom',
+      STRIPE_PUBLISHABLE_KEY_TEST: 'pk_test_pool_123'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge/payment-method/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://evil.test',
+          'Sec-Fetch-Site': 'cross-site'
+        },
+        body: JSON.stringify({ token: 'valid-token' })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    await expect(response.json()).resolves.toEqual({ error: 'Origin not allowed' });
   });
 
   it('blocks modify requests that would move into a scarce tier reserved by another in-flight checkout', async () => {
@@ -2209,5 +2528,185 @@ describe('Worker business logic hardening', () => {
         reservationId: 'order-recover-1'
       })
     }));
+  });
+
+  it('self-completes a first-party checkout session when webhook persistence is still pending', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      TIER_INVENTORY_COORDINATOR: undefined
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    const tierInventory = new StatefulTierInventoryNamespace(kv);
+    (env as Record<string, unknown>).TIER_INVENTORY_COORDINATOR = tierInventory;
+
+    const orderId = 'pool-intent-recover-1';
+    const checkoutCartHash = await hashCheckoutBundle(buildCheckoutBundleHashInput({
+      contributions: [{
+        campaignSlug: 'hand-relations',
+        canonicalContribution: {
+          tierId: 'frame-slot',
+          tierName: 'Buy 1 Frame',
+          tierQty: 1,
+          selectedTiers: [{ id: 'frame-slot', qty: 1 }],
+          additionalTiers: [],
+          supportItems: [],
+          customAmount: 0,
+          hasPhysical: false,
+          totals: {
+            subtotal: 500,
+            tax: 39,
+            shipping: 0,
+            tipPercent: 5,
+            tipAmount: 25,
+            amount: 564
+          }
+        },
+        tipPercent: 5
+      }]
+    }));
+
+    await kv.put('pending-checkout:pool-intent-recover-1', JSON.stringify({
+      orderId,
+      checkoutProvider: 'first_party',
+      campaignCount: 1,
+      tipPercent: 5,
+      totals: {
+        subtotal: 500,
+        tax: 39,
+        shipping: 0,
+        tipAmount: 25,
+        amount: 564
+      },
+      campaigns: [{
+        orderId,
+        campaignSlug: 'hand-relations',
+        tierId: 'frame-slot',
+        tierName: 'Buy 1 Frame',
+        tierQty: 1,
+        additionalTiers: [],
+        supportItems: [],
+        customAmount: 0,
+        hasPhysical: false,
+        totals: {
+          subtotal: 500,
+          tax: 39,
+          shipping: 0,
+          tipAmount: 25,
+          amount: 564
+        }
+      }]
+    }));
+
+    mockStripeClient.checkout.sessions.retrieve.mockResolvedValueOnce({
+      id: 'cs_complete_1',
+      status: 'complete',
+      mode: 'setup',
+      customer_email: 'buyer@example.com',
+      customer: 'cus_123',
+      created: 1775000000,
+      setup_intent: 'seti_123',
+      metadata: {
+        orderId,
+        campaignSlug: 'hand-relations',
+        amountCents: '500',
+        tierId: 'frame-slot',
+        tierName: 'Buy 1 Frame',
+        tierQty: '1',
+        tipPercent: '5',
+        hasAdditionalTiers: '',
+        hasExtras: '',
+        hasPhysical: '',
+        isPaymentUpdate: '',
+        checkoutProvider: 'first_party',
+        checkoutCartHash,
+        checkoutSnapshotVersion: '1'
+      }
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          sessionId: 'cs_complete_1'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      recovered: true,
+      persisted: true,
+      orderId
+    });
+    expect(await kv.get(`pledge:${orderId}`, { type: 'json' })).toMatchObject({
+      orderId,
+      campaignSlug: 'hand-relations'
+    });
+  });
+
+  it('rejects cross-site checkout completion recovery requests', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://evil.test',
+          'Sec-Fetch-Site': 'cross-site'
+        },
+        body: JSON.stringify({
+          orderId: 'pool-intent-cross-site-1',
+          sessionId: 'cs_complete_1'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    await expect(response.json()).resolves.toEqual({ error: 'Origin not allowed' });
+  });
+
+  it('rate limits repeated checkout completion recovery attempts', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      RATELIMIT: new MockKVNamespace()
+    });
+    const rateLimitKv = env.RATELIMIT as MockKVNamespace;
+    await rateLimitKv.put('rl:complete:pool-intent-rate-limit-1', JSON.stringify({
+      count: 8,
+      reset: Math.floor(Date.now() / 1000) + 60
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://pool.test'
+        },
+        body: JSON.stringify({
+          orderId: 'pool-intent-rate-limit-1',
+          sessionId: 'cs_complete_1'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Too many requests'
+    });
   });
 });

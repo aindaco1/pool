@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects card details in setup mode so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
+A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
 ## Features
 
@@ -12,8 +12,9 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **All-or-nothing pledging** — Cards saved now, charged only if goal is met
 - **Optional platform tip** — 0% to 15% tip (default 5%) included in totals but excluded from campaign progress
 - **Tip-aware cart + checkout** — Shared pricing logic keeps subtotal, tip, tax, shipping, and total in sync across cart, checkout, Worker, reports, and emails
+- **On-site Stripe payment step** — The existing second checkout sidecar hosts secure Stripe payment UI, and Manage Pledge uses the same pattern for `Update Card`
 - **Configurable pricing settings** — `sales_tax_rate` and `flat_shipping_rate` live in `_config.yml` for site forks, with mirrored Worker env vars for server-side enforcement
-- **Physical & digital tiers** — Physical items trigger Stripe shipping address collection + configurable flat shipping per campaign with physical rewards
+- **Physical & digital tiers** — Physical items trigger shipping address capture during checkout + configurable flat shipping per campaign with physical rewards
 - **Order-scoped magic links** — Each supporter link only manages its own pledge/order
 - **Safer supporter sessions** — Community pages keep supporter access in browser session storage instead of a long-lived token cookie
 - **Stretch goals** — Auto-unlock at funding thresholds
@@ -36,56 +37,49 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 ## Architecture
 
 ```
-[Visitor] → GitHub Pages (Jekyll + first-party cart / checkout review UI)
-          → Cloudflare Worker (Stripe SetupIntent + webhook + cron)
+[Visitor] → GitHub Pages (Jekyll + first-party cart / checkout sidecars)
+          → Cloudflare Worker (on-site Stripe session bootstrap + webhook + cron)
 ```
 
 | Layer | Platform | Role |
 |-------|----------|------|
 | Frontend | GitHub Pages | Jekyll + Sass + first-party cart runtime |
-| Payments | Stripe | SetupIntents + off-session charges |
-| API | Cloudflare Worker | Stripe checkout, webhook, tip-aware totals, stats, auto-settle, cache purge |
+| Payments | Stripe | Secure payment fields, saved payment methods, off-session charges |
+| API | Cloudflare Worker | Checkout-session bootstrap, webhook, tip-aware totals, stats, auto-settle, cache purge |
 | CMS | Pages CMS | Visual campaign editing (commits to GitHub) |
 
 ## Quick Start
 
 ```bash
-bundle install
-bundle exec jekyll serve
-# Visit http://localhost:4000
+npm run podman:doctor
+./scripts/dev.sh --podman
+# Visit http://127.0.0.1:4000
 ```
 
-For development with local URL overrides:
+That is the recommended local development path. It boots Jekyll, the Worker, optional Stripe CLI forwarding, and the local support services together with the repo's current defaults.
+
+If you want to rebuild the Podman dev images after dependency or base-image changes:
 ```bash
-bundle exec jekyll serve --config _config.yml,_config.local.yml
+PODMAN_REBUILD=1 ./scripts/dev.sh --podman
 ```
 
 Fork-friendly pricing settings live in:
 - `sales_tax_rate` and `flat_shipping_rate` in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
 - mirrored Worker env vars `SALES_TAX_RATE` and `FLAT_SHIPPING_RATE` in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
 
-If you change those values locally, restart `./scripts/dev.sh` so the Worker uses the same math as the site.
+If you change those values locally, restart `./scripts/dev.sh --podman` so the Worker uses the same math as the site.
 
-For full local development with Jekyll, the Worker, Stripe CLI webhook forwarding, automatic local webhook-secret sync, and stale port cleanup on the standard local ports:
+If you specifically need the host-only fallback instead:
 ```bash
-./scripts/dev.sh
+bundle install
+bundle exec jekyll serve --config _config.yml,_config.local.yml
 ```
 
-For a lower-dependency local boot path, Podman mode now runs Jekyll and the Worker in rootless containers while keeping the same local ports and local Wrangler state:
-
-```bash
-./scripts/dev.sh --podman
-```
-
-Rebuild the Podman dev images after dependency or base-image changes with:
-
-```bash
-PODMAN_REBUILD=1 ./scripts/dev.sh --podman
-```
+For a full host-only stack, run the Worker separately with `cd worker && wrangler dev --env dev --port 8787`.
 
 See [docs/PODMAN.md](docs/PODMAN.md) for the current scope and limitations.
 
-On this branch, the Podman path is host-validated on macOS. Linux and Windows are supported by design and have doctor/self-check coverage, but were not host-validated in this thread.
+The Podman path is host-validated on macOS. Linux and Windows are supported by design and have doctor/self-check coverage, but were not host-validated in this thread.
 
 The checkout and E2E helper scripts also support that mode:
 
@@ -100,6 +94,8 @@ npm run test:e2e:headless:podman
 npm run podman:doctor
 npm run podman:self-check
 ```
+
+If you want to exercise the on-site Stripe checkout locally, add `STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...` to [`worker/.dev.vars`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/.dev.vars) before starting the stack.
 
 ## Cloudflare Free-Plan Guidance For Forks
 
@@ -141,7 +137,7 @@ The practical takeaway for forks is simple: The Pool can handle a healthy amount
 npm run test:premerge  # Syntax + full/focused regressions + first-party build checks + local smoke + security + headless E2E
 npm run test:secrets   # Secret exposure audit against local env files, tracked files, and git history
 npm run test:unit      # Unit tests (Vitest)
-npm run test:e2e       # E2E tests (Playwright) — automated + manual checkout coverage
+npm run test:e2e       # E2E tests (Playwright) — fully automated browser coverage
 npm run test:e2e:headless # CI-style automated browser suite
 npm run test:security  # Security tests — pen testing the Worker API
 npm test               # Run unit + e2e
@@ -156,8 +152,8 @@ Local reporting:
 Podman-backed local testing:
 
 ```bash
-./scripts/test-checkout.sh --podman  # Manual checkout helper against the Podman dev stack
-./scripts/test-e2e.sh --podman       # Automated + manual browser helper against the Podman dev stack
+./scripts/test-checkout.sh --podman  # Manual interactive checkout helper against the Podman dev stack
+./scripts/test-e2e.sh --podman       # Automated browser helper against the Podman dev stack
 ./scripts/test-worker.sh --podman    # Site/Worker contract smoke against the Podman dev stack
 ./scripts/smoke-pledge-management.sh --podman  # Mutable-pledge smoke against the Podman dev stack
 ./scripts/pledge-report.sh --podman --local    # Local ledger CSV through the Worker container
@@ -279,7 +275,7 @@ npm run deploy:worker
 ```
 
 The Worker powers:
-- Stripe Checkout session creation in setup mode
+- on-site Stripe setup-mode session bootstrap for the first-party checkout sidecar and the Manage Pledge `Update Card` modal, with hosted fallback still available as a compatibility path
 - webhook processing and pledge persistence
 - tip-aware total calculation
 - supporter email delivery via Resend

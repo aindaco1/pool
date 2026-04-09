@@ -19,6 +19,7 @@ APP_MODE = "live"  # "test" or "live"
 PLATFORM_AUTHOR = "Dust Wave"
 CHECKOUT_PROVIDER = "first_party"
 CART_RUNTIME = "first_party"
+CHECKOUT_UI_MODE = "hosted"
 SALES_TAX_RATE = "0.07875"
 FLAT_SHIPPING_RATE = "3.00"
 
@@ -85,7 +86,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # checkout exercises the first-party path end to end without changing
 # production defaults.
 [env.dev]
-vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "http://127.0.0.1:8787", APP_MODE = "test", PLATFORM_AUTHOR = "Dust Wave", CHECKOUT_PROVIDER = "first_party", CART_RUNTIME = "first_party", SALES_TAX_RATE = "0.07875", FLAT_SHIPPING_RATE = "3.00" }
+vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "http://127.0.0.1:8787", APP_MODE = "test", PLATFORM_AUTHOR = "Dust Wave", CHECKOUT_PROVIDER = "first_party", CART_RUNTIME = "first_party", CHECKOUT_UI_MODE = "custom", SALES_TAX_RATE = "0.07875", FLAT_SHIPPING_RATE = "3.00" }
 
 [[env.dev.durable_objects.bindings]]
 name = "CHECKOUT_INTENTS"

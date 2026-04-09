@@ -3,9 +3,9 @@
 ## Stack
 
 - **GitHub Pages** — Jekyll 4.4.1 + Sass static site
-- **First-party cart runtime** — Browser-owned cart, checkout review, and Stripe handoff
+- **First-party cart runtime** — Browser-owned cart, checkout review, and on-site Stripe payment flow
 - **Cloudflare Worker** — Backend API, pledge storage (KV), email sending
-- **Stripe** — SetupIntents (save card), PaymentIntents (charge later)
+- **Stripe** — Checkout Sessions in setup mode for the on-site payment step, plus PaymentIntents for later charging
 - **Resend** — Transactional emails (supporter confirmation, milestones, failures)
 - **Pages CMS** — Visual campaign editing via [app.pagescms.org](https://app.pagescms.org)
 
@@ -287,7 +287,7 @@ tiers:
 
 **Tier gating**: Add `requires_threshold` (integer, dollars) to lock a tier until the campaign reaches that funding level. When live stats update and `pledgedAmount >= requires_threshold`, the tier animates to "Unlocked!" state with a badge. The animation respects `prefers-reduced-motion`.
 
-**Physical tiers**: Set `category: physical` to trigger shipping address collection via Stripe Checkout and add a $3 shipping fee for each campaign that contains physical rewards. The first-party cart carries that category through the checkout-intent payload, and Stripe handles address collection directly.
+**Physical tiers**: Set `category: physical` to trigger shipping address collection during the on-site Stripe payment step and add a $3 shipping fee for each campaign that contains physical rewards. The first-party cart carries that category through the checkout-intent payload.
 
 ### Production Phases
 
@@ -372,7 +372,7 @@ All money values must be integers (no cents).
 
 ### Cart Runtime
 
-The site now uses a first-party cart runtime exposed through `window.PoolCartProvider`. Shared UI code talks to that provider instead of directly depending on a hosted-cart global.
+The site now uses a first-party cart runtime exposed through `window.PoolCartProvider`. Shared UI code talks to that provider instead of depending on a separate hosted-cart helper.
 
 Key files:
 - `assets/js/cart-provider.js` — browser-owned cart state, drawer rendering, checkout preview, success/cancel recovery
@@ -401,9 +401,9 @@ The pledge flow is now first-party end to end until Stripe:
 
 1. **User adds tier to cart** → first-party cart drawer opens
 2. **User reviews pledge** → drawer shows tiers, support items, custom support, tip, and immediate pricing
-3. **User clicks "Continue to Pledge"** → `cart-provider.js` posts canonical cart items to Worker `/checkout-intent/start`
-4. **Worker creates Stripe Checkout (setup mode)** → saves card without charging
-5. **User completes Stripe Checkout** → redirected to `/pledge-success/`
+3. **User clicks "Checkout"** → `cart-provider.js` posts canonical cart items to Worker `/checkout-intent/start`
+4. **Worker creates a Stripe setup session** → the second checkout sidecar mounts secure Stripe payment UI on-site and saves the card without charging
+5. **User completes the on-site payment step** → the client waits for persisted backend confirmation before treating the pledge as successful
 6. **Stripe webhook fires** → Worker stores one pledge per campaign in KV, updates stats, sends supporter email(s)
 
 Key points:
@@ -411,7 +411,7 @@ Key points:
 - order IDs are Worker-issued `pool-intent-*` values tied to the checkout nonce
 - Stripe collects real payment and shipping details
 - tax is calculated server-side from the configured `sales_tax_rate` in `_config.yml` and mirrored Worker env
-- optional Dust Wave tip defaults to 5%, can be set from 0% to 15%, and is included in final charge totals but excluded from campaign funding progress
+- optional The Pool tip defaults to 5%, can be set from 0% to 15%, and is included in final charge totals but excluded from campaign funding progress
 - checkout preview totals are rendered immediately from shared pricing logic
 
 ### Support Items & Custom Amounts
@@ -431,7 +431,7 @@ Data flow:
 Manage page display:
 - During **live** campaigns: all support items are shown for modification
 - During **post** campaigns: only items with `late_support: true` are shown (and only if funded)
-- Pledge summary shows subtotal, optional Dust Wave tip, tax, shipping, and total
+- Pledge summary shows subtotal, optional The Pool tip, tax, shipping, and total
 - Modifying tiers dynamically recalculates shipping based on tier `category`
 - Active pledges are grouped separately from Closed pledges; deadline-passed active pledges render as locked and become read-only except for "Update Card"
 
@@ -472,6 +472,7 @@ Create `worker/.dev.vars` for local development:
 
 ```bash
 STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 CHECKOUT_INTENT_SECRET=random-32-char-string-for-hmac
 MAGIC_LINK_SECRET=random-32-char-string-for-hmac
@@ -500,25 +501,26 @@ Update `worker/wrangler.toml` with the returned IDs.
 
 ### 5. Start Development
 
-**Option A: All-in-one script**
+**Option A: Podman-first local stack (recommended)**
 
 ```bash
-./scripts/dev.sh
+npm run podman:doctor
+./scripts/dev.sh --podman
 ```
 
 This starts:
 - **Jekyll** at http://127.0.0.1:4000 (with `_config.local.yml` overrides)
-- **Worker** at http://127.0.0.1:8787 (via `npx wrangler dev --env dev --port 8787` with local KV simulation)
-- **Stripe CLI** forwarding webhooks to the local Worker
-- **ngrok** tunnel (if installed) for optional external-device testing
+- **Worker** at http://127.0.0.1:8787
+- **Stripe CLI** forwarding webhooks to the local Worker when available
+- local containerized dependencies for the supported Podman dev/test path
 
-The script auto-updates `worker/.dev.vars` with the Stripe CLI webhook secret.
+The script auto-updates `worker/.dev.vars` with the Stripe CLI webhook secret when Stripe CLI is available.
 It uses the same Stripe listener instance for both forwarding and secret capture, which avoids the local webhook mismatch that can happen if you start one listener to print a secret and another to forward events.
-It also clears stale Jekyll, Worker, and ngrok inspector processes on the standard local ports before starting, so the local stack matches the automated smoke/test harness.
+It also clears stale listeners on the standard local ports before starting, so the local stack matches the automated smoke/test harness.
 
 > **Note:** Local KV simulation is used by default for fast iteration and compatibility with `scripts/seed-all-campaigns.sh`. KV data resets when the worker restarts. Use `--remote` if you need persistent data or to see real pledges.
 
-**Option B: Manual start (separate terminals)**
+**Option B: Host tools only (manual start)**
 
 ```bash
 # Terminal 1: Jekyll
@@ -547,8 +549,9 @@ If a Stripe checkout completes but the pledge doesn't appear:
 
 ```bash
 npm run test:secrets
-./scripts/test-worker.sh
-./scripts/smoke-pledge-management.sh
+./scripts/test-worker.sh --podman
+./scripts/smoke-pledge-management.sh --podman
+./scripts/test-e2e.sh --podman
 ```
 
 **Troubleshooting: Stripe Webhook Errors (Mode Mismatch)**
@@ -563,8 +566,8 @@ If Stripe shows webhook failures ("other errors") for the production endpoint:
 
 1. Visit http://127.0.0.1:4000
 2. Click a campaign → Add a tier to cart
-3. Review the first-party checkout preview → Click "Continue to Pledge"
-4. Complete Stripe Checkout with test card: `4242 4242 4242 4242`
+3. Review the first-party checkout preview → Click "Checkout"
+4. Complete the on-site Stripe payment step with test card: `4242 4242 4242 4242`
 5. Check Worker logs for pledge confirmation
 6. Check email (if Resend configured)
 
@@ -739,7 +742,7 @@ Generate aggregated reports showing the **current state** of each backer's pledg
 - **No** status, created_at, or order_id columns
 - Items show final quantities (e.g., if backer modified from frame→dialogue, only dialogue appears)
 - Includes `shipping_address` for physical tier fulfillment
-- `total` is the final charge amount including optional Dust Wave tip
+- `total` is the final charge amount including optional The Pool tip
 
 **Use cases:**
 - Fulfillment spreadsheets (what rewards to deliver to each backer)
@@ -778,7 +781,7 @@ worker/src/
 
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /checkout-intent/start` | Create Stripe Checkout (setup mode) for new pledge |
+| `POST /checkout-intent/start` | Create the Stripe setup session used by the on-site payment step |
 | `POST /webhooks/stripe` | Handle Stripe events, store pledge, send emails |
 | `GET /pledge?token=...` | Get pledge details for manage page |
 | `POST /pledge/cancel` | Cancel an active pledge |
@@ -1206,4 +1209,4 @@ curl -s https://pledge.dustwave.xyz/admin/cron/status \
 
 ---
 
-_Last updated: Mar 31, 2026_
+_Last updated: Apr 9, 2026_

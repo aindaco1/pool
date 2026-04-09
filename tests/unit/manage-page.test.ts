@@ -15,12 +15,24 @@ function renderManagePage() {
       <button id="confirm-modal-cancel"></button>
       <button id="confirm-modal-confirm"></button>
     </div>
+    <div id="payment-update-modal" hidden>
+      <div class="modal__backdrop" data-payment-update-close></div>
+      <label for="payment-update-email">Email address *</label>
+      <input id="payment-update-email">
+      <p id="payment-update-email-error" hidden></p>
+      <div id="payment-update-payment"></div>
+      <p>By providing your card information, you allow The Pool to charge your card if the campaign(s) you backed reaches its goal before its end date.</p>
+      <p id="payment-update-error" hidden></p>
+      <button id="payment-update-cancel" data-payment-update-close></button>
+      <button id="payment-update-confirm" disabled></button>
+    </div>
     <script
       data-manage-page-script="true"
       data-worker-base="${WORKER_BASE}"
       data-platform-name="The Pool"
       data-live-stats-cache-ttl-seconds="300"
-      data-live-inventory-cache-ttl-seconds="300"></script>
+      data-live-inventory-cache-ttl-seconds="300"
+      data-checkout-ui-mode="hosted"></script>
   `;
 }
 
@@ -76,6 +88,7 @@ function mockManageFetch(options?: {
   campaigns?: Array<Record<string, unknown>>;
   pledges?: Array<Record<string, unknown>>;
   paymentStartUrl?: string;
+  paymentStartPayload?: Record<string, unknown> | null;
   paymentStartStatus?: number;
   modifyStatus?: number;
   cancelStatus?: number;
@@ -84,6 +97,7 @@ function mockManageFetch(options?: {
     campaigns = [baseCampaign],
     pledges = [basePledge],
     paymentStartUrl = window.location.href,
+    paymentStartPayload = null,
     paymentStartStatus = 200,
     modifyStatus = 200,
     cancelStatus = 200
@@ -133,7 +147,7 @@ function mockManageFetch(options?: {
     }
 
     if (url === `${WORKER_BASE}/pledge/payment-method/start` && method === 'POST') {
-      return jsonResponse({ url: paymentStartUrl }, paymentStartStatus);
+      return jsonResponse(paymentStartPayload || { url: paymentStartUrl }, paymentStartStatus);
     }
 
     if (url === `${WORKER_BASE}/pledge/cancel` && method === 'POST') {
@@ -192,6 +206,7 @@ describe('manage page script', () => {
     vi.restoreAllMocks();
     document.body.innerHTML = '';
     localStorage.clear();
+    delete (window as any).PoolStripeCheckoutSidecar;
   });
 
   it('shows an error when no pledge token is provided', async () => {
@@ -312,6 +327,79 @@ describe('manage page script', () => {
         })
       );
     });
+  });
+
+  it('opens an in-page custom payment update modal when custom checkout mode is returned', async () => {
+    const updateEmail = vi.fn(async () => ({}));
+    const confirm = vi.fn(async () => ({ type: 'success' }));
+    (window as any).PoolStripeCheckoutSidecar = {
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe),
+      mount: vi.fn(async ({ onChange }) => {
+        if (typeof onChange === 'function') {
+          onChange({ session: { canConfirm: true } });
+        }
+
+        return {
+          supportsShippingAddressElement: false,
+          updateEmail,
+          confirm,
+          unmount: vi.fn()
+        };
+      })
+    };
+
+    const fetchMock = mockManageFetch({
+      paymentStartPayload: {
+        checkoutUiMode: 'custom',
+        sessionId: 'cs_test_update_123',
+        clientSecret: 'cs_test_update_secret_123',
+        publishableKey: 'pk_test_update_123'
+      }
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    getButton('[data-action="payment"][data-index="0"]').click();
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${WORKER_BASE}/pledge/payment-method/start`,
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: 'token-123' })
+        })
+      );
+      expect(document.getElementById('payment-update-modal')?.hidden).toBe(false);
+      expect(document.body.textContent).toContain('Email address *');
+      expect(document.body.textContent).toContain('By providing your card information, you allow The Pool to charge your card if the campaign(s) you backed reaches its goal before its end date.');
+    });
+
+    const emailInput = getInput('#payment-update-email');
+    expect(emailInput.value).toBe('supporter@example.com');
+    emailInput.value = 'updated@example.com';
+    emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(updateEmail).toHaveBeenCalledWith('updated@example.com');
+    });
+
+    const confirmButton = getButton('#payment-update-confirm');
+    expect(confirmButton.disabled).toBe(false);
+    confirmButton.click();
+
+    await vi.waitFor(() => {
+      expect(confirm).toHaveBeenCalledTimes(1);
+    });
+
+    expect(confirmButton.textContent).toContain('Saved');
+
+    expect(localStorage.getItem('pool_first_party_cart_state')).toBeNull();
   });
 
   it('escapes campaign-authored content in pledge cards and confirm modal details', async () => {

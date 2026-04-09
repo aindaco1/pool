@@ -1,13 +1,13 @@
 # Workflows
 
-The Pool uses a **no-account, email-based pledge management system**. Backers save their card via Stripe, manage pledges via order-scoped magic links, and are only charged if the campaign is funded.
+The Pool uses a **no-account, email-based pledge management system**. Backers save a payment method through Stripe in The Pool's on-site payment step, manage pledges via order-scoped magic links, and are only charged if the campaign is funded.
 
 ## Key Differentiators
 
 - **No accounts** — Email + payment info only (no registration)
 - **Magic link management** — Cancel, modify, or update payment method via an order-scoped email link
 - **All-or-nothing** — Cards saved now, charged only if goal is met
-- **Optional platform tip** — 0% to 15% Dust Wave tip (default 5%) added to totals but excluded from campaign progress
+- **Optional platform tip** — 0% to 15% The Pool tip (default 5%) added to totals but excluded from campaign progress
 - **Worker-owned email** — All supporter email comes from Resend
 - **Film-focused** — Designed for creative crowdfunding
 
@@ -22,7 +22,7 @@ upcoming → live → post
 | State | UX | Actions |
 |-------|-----|---------|
 | `upcoming` | Buttons disabled, "Coming soon" | Countdown to launch |
-| `live` | Pledge buttons active | Cards saved via Stripe SetupIntent |
+| `live` | Pledge buttons active | Cards saved via The Pool's on-site Stripe payment step |
 | `post` | Campaign closed | Charges processed (if funded) |
 
 ---
@@ -32,7 +32,7 @@ upcoming → live → post
 | Component | Role |
 |-----------|------|
 | **First-party cart** | Browser-owned cart UI and checkout review state |
-| **Stripe** | SetupIntents (save cards) + PaymentIntents (charge later) |
+| **Stripe** | Checkout Sessions in setup mode (custom on-site payment step) + PaymentIntents (charge later) |
 | **Cloudflare Worker** | Backend: checkout, webhooks, pledge storage (KV), combined live reads, stats, auto-settle cron |
 | **Jekyll** | Static pages + campaign markdown |
 
@@ -43,9 +43,9 @@ upcoming → live → post
 ```
 1. BROWSE     → Visitor views campaign, adds tier to the first-party cart, adjusts optional tip
 2. REVIEW     → First-party cart drawer shows pledge review, tip state, and immediate pricing
-3. START      → Worker canonicalizes the cart via `/checkout-intent/start` and creates Stripe Checkout (setup mode)
-4. SAVE CARD  → Stripe Checkout saves payment method (no charge)
-5. CONFIRM    → Stripe webhook → Worker stores one pledge per campaign in KV and sends campaign-specific supporter email(s)
+3. START      → Worker canonicalizes the cart via `/checkout-intent/start`, reserves scarce tiers when needed, and creates a setup-mode Stripe Checkout Session
+4. SAVE CARD  → The existing checkout sidecar keeps the visitor on-site, mounts secure Stripe payment UI, and saves the payment method (no charge)
+5. CONFIRM    → Stripe confirms the setup, then Worker persists one pledge per campaign in KV, sends campaign-specific supporter email(s), and refreshes live campaign reads before success UX completes
 6. MANAGE     → Backer uses magic link to cancel/modify/update card
 7. DEADLINE   → Worker cron (midnight MT) checks campaigns
 8. CHARGE     → If funded + deadline passed: aggregate by email within each campaign, charge once per supporter per campaign
@@ -103,7 +103,7 @@ Scarce-tier reservations and committed claim state now live in the per-campaign 
 - `supportItems` — Array of `{ id, amount }` for production phase contributions
 - `customAmount` — Dollar amount for "no reward" custom support additions
 - `additionalTiers` — Array of `{ id, qty }` for multi-tier pledges (when `single_tier_only: false`)
-- `tipPercent` / `tipAmount` — Optional Dust Wave platform tip stored separately from campaign subtotal
+- `tipPercent` / `tipAmount` — Optional The Pool platform tip stored separately from campaign subtotal
 - Bundled multi-campaign checkouts are persisted as separate pledge records, one per campaign
 
 **History entries:**
@@ -152,7 +152,7 @@ Each token only authorizes its own order. A valid link no longer grants email-wi
 ## Worker API Routes
 
 ### `POST /checkout-intent/start`
-Create Stripe Checkout session (setup mode) from the first-party cart state.
+Create a setup-mode Stripe Checkout Session from the first-party cart state for the on-site payment step.
 
 **Request:**
 ```json
@@ -164,19 +164,23 @@ Create Stripe Checkout session (setup mode) from the first-party cart state.
   "tipPercent": 5
 }
 ```
-**Response:** `{ url }` → Redirect to Stripe Checkout
+**Response:**  
+- custom mode: `{ checkoutUiMode, sessionId, clientSecret, publishableKey, orderId }`
+- hosted fallback: `{ checkoutUiMode: "hosted", url }`
 
 **Data flow:**
 1. Cart.js passes the selected tip percent plus the current first-party cart items
 2. Worker reconstructs the cart shape from first-party items and canonical campaign rules
 3. Worker validates campaign state, single-tier rules, threshold gates, and scarce-tier availability
-4. For limited tiers, Worker reserves scarce inventory through the per-campaign coordinator, then stores any overflow tier/support-item metadata in temp KV (`pending-tiers:*`, `pending-extras:*`) and creates a setup-mode Stripe Checkout session
-5. If the pledge contains physical items, Stripe Checkout collects shipping address via `shipping_address_collection`
-6. On webhook, Worker fetches any temp metadata, extracts shipping address from Stripe, computes `subtotal + tax + shipping + tip`, persists one pledge per campaign, and confirms any held limited-tier reservations through the per-campaign Durable Object coordinator
+4. For limited tiers, Worker reserves scarce inventory through the per-campaign coordinator, then stores any overflow tier/support-item metadata in temp KV (`pending-tiers:*`, `pending-extras:*`) and creates a setup-mode Stripe Checkout Session
+5. In custom UI mode, the existing second checkout sidecar mounts secure Stripe payment UI on-site; physical checkouts also capture shipping details during that step
+6. Worker treats webhook persistence as the source of truth, with a first-party recovery path available for local or delayed-completion cases so the sidecar does not claim success before the pledge is actually persisted
+7. On persistence, Worker fetches any temp metadata, extracts shipping details from Stripe, computes `subtotal + tax + shipping + tip`, persists one pledge per campaign, and confirms any held limited-tier reservations through the per-campaign Durable Object coordinator
+8. After persistence succeeds, the client invalidates campaign live-stat caches and writes a short-lived refresh marker so restored tabs and follow-up page loads fetch fresh totals
 
 Limited-tier availability decisions now come from the coordinator's reservation-aware state on write paths, while `/inventory/:slug` and `/live/:slug` continue reading the public KV projection only.
 
-The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`. `/checkout-intent/start` now reserves scarce inventory before Stripe redirect, and persistence confirms those reservations. Older campaigns do not need a migration job because claimed inventory can rebuild from pledge truth, and successful persistence can still fall back to a fresh coordinator claim if no preexisting reservation exists.
+The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`. `/checkout-intent/start` now reserves scarce inventory before the payment step completes, and persistence confirms those reservations. Older campaigns do not need a migration job because claimed inventory can rebuild from pledge truth, and successful persistence can still fall back to a fresh coordinator claim if no preexisting reservation exists.
 
 ## Content Rendering Safety
 
@@ -258,7 +262,16 @@ Change tier or amount.
 Update saved payment method.
 
 **Request:** `{ token }`  
-**Response:** `{ url }` → New Stripe Checkout session (setup mode)
+**Response:**  
+- custom mode: `{ checkoutUiMode, sessionId, clientSecret, publishableKey }`
+- hosted fallback: `{ checkoutUiMode: "hosted", url }`
+
+**Data flow:**
+1. Manage Pledge validates the magic-link token and active pledge state
+2. Worker creates a setup-mode Stripe Checkout Session for payment-method refresh
+3. In custom mode, the existing Update Card modal mounts Stripe's secure payment UI on-site
+4. Worker keeps webhook persistence as the source of truth, with the same guarded completion-recovery path available for delayed local webhook delivery
+5. On success, the pledge record updates to the newly saved payment method and `payment_failed` retries can charge again immediately
 
 ### `GET /stats/:campaignSlug`
 Get live pledge statistics for a campaign.
@@ -360,10 +373,10 @@ curl -X POST http://localhost:8787/admin/recover-checkout \
 Campaign detail with tier buttons → first-party cart drawer
 
 ### `/campaigns/:slug/pledge-success/`
-Post-Stripe success page with confirmation + manage link
+Post-persistence success page with confirmation + manage link
 
 ### `/campaigns/:slug/pledge-cancel/`
-User cancelled Stripe Checkout (not the pledge itself)
+User left the payment step before completion (not the pledge itself)
 
 ### `/manage/`
 Magic link landing page for pledge management:
@@ -372,7 +385,7 @@ Magic link landing page for pledge management:
 - Shows pledge cards with state-dependent UI
 - Groups projects into **Active** and **Closed** sections
 - Sorts active cards with the most recent campaigns first
-- Displays full breakdown: subtotal, optional Dust Wave tip, configured sales tax, configured flat shipping per physical campaign, total
+- Displays full breakdown: subtotal, optional The Pool tip, configured sales tax, configured flat shipping per physical campaign, total
 - Reads pricing labels and rates from shared config so cart UI, Worker totals, emails, and reports stay aligned for forks
 
 **Pledge card states:**
@@ -385,7 +398,7 @@ Magic link landing page for pledge management:
 | `payment_failed` | Warning notice with "Update Payment Method" button |
 | `cancelled` | "This pledge has been cancelled" notice |
 
-**Shipping in modify flow:** When a supporter changes tiers, the manage page dynamically recalculates shipping — if the new tier selection includes any `category: physical` tier, the $3 shipping fee is shown; otherwise it's hidden. The confirmation modal shows the updated total before the user confirms.
+**Shipping in modify flow:** When a supporter changes tiers, the manage page dynamically recalculates shipping — if the new tier selection includes any `category: physical` tier, the configured flat shipping fee is shown; otherwise it's hidden. The confirmation modal shows the updated total before the user confirms.
 
 **Tip in modify flow:** The manage page exposes the same 0% to 15% tip slider. During live campaigns, supporters can adjust it and see subtotal / tip / tax / shipping / total update immediately. Once the deadline passes, the tip slider becomes read-only along with the rest of the pledge controls.
 
@@ -475,7 +488,7 @@ The Worker handles all pledge-related email via Resend.
 
 ### Resend Integration (Worker)
 
-The Worker sends supporter emails after Stripe webhook confirms the SetupIntent:
+The Worker sends supporter emails after Stripe webhook confirms the setup-mode session:
 
 ```js
 // In Worker: POST /webhooks/stripe handler
@@ -514,15 +527,15 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
 
 All emails show exact amounts with 2 decimal places (no rounding).
 
-**Pledge Confirmation** (sent after Stripe SetupIntent success)
+**Pledge Confirmation** (sent after the setup-mode Stripe session completes successfully)
 - Subject: "Your pledge to {Campaign Title}"
-- Contains: Full breakdown (subtotal, optional Dust Wave tip, tax, shipping if physical, total), pledge items, manage link, community link
+- Contains: Full breakdown (subtotal, optional The Pool tip, tax, shipping if physical, total), pledge items, manage link, community link
 - Includes: Instagram CTA (if campaign has Instagram URL)
 - Community link shown only if campaign has active decisions
 
 **Pledge Modified** (sent when supporter changes their pledge)
 - Subject: "Pledge updated for {Campaign Title}"
-- Contains: Previous subtotal, new subtotal, change amount (+/-), optional Dust Wave tip, tax, shipping (if physical), new total, updated pledge items
+- Contains: Previous subtotal, new subtotal, change amount (+/-), optional The Pool tip, tax, shipping (if physical), new total, updated pledge items
 - Includes: Instagram CTA (if campaign has Instagram URL)
 - Community link shown only if campaign has active decisions
 
@@ -563,6 +576,9 @@ All emails show exact amounts with 2 decimal places (no rounding).
 - Pledge mutations blocked once pledge is charged
 - All secrets in Cloudflare Worker environment variables
 - Stripe webhook signatures verified
+- Sensitive checkout and payment-method bootstrap responses are `private, no-store`
+- First-party checkout and payment-method POSTs enforce trusted `SITE_BASE` origins
+- Browser-stored checkout drafts and in-flight identifiers are session-scoped or time-limited
 - All deadlines evaluated in Mountain Time
 - Community/voting access revoked immediately when pledge is cancelled
 - `/votes` API checks pledge status on every request (not just token validity)
@@ -590,4 +606,4 @@ All emails show exact amounts with 2 decimal places (no rounding).
 
 ---
 
-_Last updated: Mar 31, 2026_
+_Last updated: Apr 9, 2026_

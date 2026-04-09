@@ -18,12 +18,12 @@ title: Terms & Creative Guidelines
 
 ## Payment Processing
 
-- Your card is saved securely by **Stripe** — we never see or store your payment details. No charge is made until the campaign succeeds.
+- Your card details are handled by **Stripe's secure payment fields** embedded in The Pool checkout. We do not store full card numbers or CVC values. No charge is made until the campaign succeeds.
 - If a campaign is funded, all pledges from the same email for that campaign are combined into a single charge.
 - You may add an **optional platform tip** from 0% to 15% during checkout. The default tip is 5%.
 - Optional platform tips support maintenance of The Pool and are included in your pledge total, but **do not count toward a campaign's funding goal**.
 - Sales tax is applied to pledges using the rate configured for this deployment.
-- Physical product pledges include a flat shipping fee per campaign that contains physical items. Your shipping address is securely collected via Stripe.
+- Physical product pledges include a flat shipping fee per campaign that contains physical items. Your shipping address is collected during checkout so physical rewards can be fulfilled.
 
 ## Creative Control & Submissions
 
@@ -50,9 +50,9 @@ This section applies only to campaigns that explicitly solicit creative submissi
 
 ## Privacy & Data
 
-- We collect only the information necessary to process pledges and fulfill rewards: email, name, and payment details. For physical product tiers, we also collect a shipping address via Stripe.
-- Your payment information and shipping address are stored securely by Stripe and are never accessible to us.
-- Email addresses are stored in our system for pledge management, campaign-specific confirmations, campaign updates, and reward fulfillment.
+- We collect only the information necessary to process pledges and fulfill rewards: email, name, pledge/order details, and, for physical product tiers, a shipping address.
+- Full card details are handled and stored by Stripe. The Pool does not store full card numbers or CVC values.
+- Email addresses and any shipping details needed for fulfillment may be stored in our system for pledge management, campaign-specific confirmations, campaign updates, and reward fulfillment.
 - Supporter-community access in the browser may be remembered for the current session as a convenience, but the emailed magic link remains the source of truth for access.
 - We do not sell or share your information with third parties except as necessary for payment processing and email delivery.
 
@@ -60,15 +60,13 @@ This section applies only to campaigns that explicitly solicit creative submissi
 
 The Pool is an [open-source crowdfunding platform](https://github.com/aindaco1/pool) built with:
 
-- **Jekyll** — Static site generation, hosted on GitHub Pages
-- **The Pool cart runtime** — First-party cart management, pledge review, and checkout handoff
-- **Stripe** — Secure card storage, payment processing, and shipping address collection
-- **Cloudflare Workers** — Backend API for canonical pledge validation, pledge storage, live stats, and automated campaign settlement
-- **Resend** — Transactional emails (confirmations, updates, charge notifications)
+- **Jekyll on [GitHub Pages](https://docs.github.com/en/pages)** — Static site generation
+- **The Pool cart runtime** — First-party cart management, checkout sidecars, and pledge review
+- **[Stripe](https://stripe.com)** — Secure payment fields, saved payment methods, and payment processing
+- **[Cloudflare Workers](https://workers.cloudflare.com)** — Backend API for canonical pledge validation, pledge storage, live stats, and automated campaign settlement
+- **[Resend](https://resend.com)** — Transactional emails (confirmations, updates, charge notifications)
 
 Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project, with optional platform tips helping cover maintenance of The Pool itself.
-
-Campaign-rich text is limited to a small safe formatting subset plus approved embed providers. Unsafe raw HTML and dangerous link or embed schemes are blocked.
 
 ## Questions
 
@@ -76,4 +74,4 @@ For questions about these terms or your pledge, email us at support@dustwave.xyz
 
 ---
 
-_Last updated: March 2026_
+_Last updated: April 2026_

@@ -9,8 +9,18 @@
   data-live-stats-cache-ttl-seconds="{{ site.live_stats_cache_ttl_seconds | default: 300 }}"
   data-live-inventory-cache-ttl-seconds="{{ site.live_inventory_cache_ttl_seconds | default: 300 }}"
   data-cart-runtime="{{ site.cart_runtime | default: 'first_party' }}"
-  data-checkout-provider="{{ site.checkout_provider | default: 'first_party' }}"></script>
+  data-checkout-provider="{{ site.checkout_provider | default: 'first_party' }}"
+  data-checkout-ui-mode="{{ site.checkout_ui_mode | default: 'hosted' }}"
+  data-stripe-publishable-key="{{ site.stripe_publishable_key | default: '' }}"></script>
+{% assign pool_checkout_ui_mode = site.checkout_ui_mode | default: 'hosted' %}
+{% if pool_checkout_ui_mode == 'custom' %}
+<link rel="preconnect" href="https://js.stripe.com" crossorigin>
+<link rel="preconnect" href="https://api.stripe.com" crossorigin>
+<link rel="dns-prefetch" href="//js.stripe.com">
+<link rel="dns-prefetch" href="//api.stripe.com">
+{% endif %}
 <div hidden data-pool-cart-root="true"></div>
+<script src="/assets/js/stripe-checkout-sidecar.js" defer></script>
 <script src="/assets/js/cart-provider.js" defer></script>
 <script src="/assets/js/cart.js" defer></script>
 <script src="/assets/js/buy-buttons.js" defer></script>

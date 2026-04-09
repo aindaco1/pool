@@ -6,7 +6,6 @@ cd "$(dirname "$0")/.."
 echo "🚀 Starting E2E tests..."
 
 USE_PODMAN=false
-SKIP_MANUAL_CHECKOUT="${SKIP_MANUAL_CHECKOUT:-0}"
 PODMAN_STARTED_BY_SCRIPT=false
 
 for arg in "$@"; do
@@ -135,70 +134,4 @@ fi
 
 echo ""
 echo "✅ Automated tests passed!"
-echo ""
-
-if [ "$SKIP_MANUAL_CHECKOUT" = "1" ]; then
-    echo "⏭️  SKIP_MANUAL_CHECKOUT=1 set; skipping manual checkout step"
-    exit 0
-fi
-
-if [ "$USE_PODMAN" = "true" ]; then
-    echo "📦 Starting shared Podman dev stack for manual checkout coverage..."
-    PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/pool-test-e2e-podman.log}"
-    PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1
-    PODMAN_STARTED_BY_SCRIPT=true
-
-    echo "⏳ Waiting for Podman-backed local services..."
-    PODMAN_READY=false
-    for i in {1..60}; do
-        if curl -s http://127.0.0.1:4000/campaigns/hand-relations/ > /dev/null 2>&1 && \
-           curl -s http://127.0.0.1:8787/stats/does-not-exist > /dev/null 2>&1; then
-            echo "✅ Podman dev stack is ready"
-            PODMAN_READY=true
-            break
-        fi
-        sleep 1
-    done
-
-    if [ "$PODMAN_READY" != "true" ]; then
-        echo "❌ Podman dev stack did not become ready within 60 seconds"
-        exit 1
-    fi
-    echo "⏭️  Podman mode uses containerized Playwright for automated coverage and localhost host Playwright for manual checkout coverage"
-elif [ "$USES_FIRST_PARTY_LOCAL" != "true" ]; then
-    echo "🌐 Starting ngrok for checkout test..."
-
-    # Start ngrok
-    ngrok http 4000 --request-header-add "ngrok-skip-browser-warning:true" --log=stdout > /tmp/ngrok.log 2>&1 &
-    NGROK_PID=$!
-    sleep 3
-
-    # Update config to use ngrok URL
-    sed -i '' "s|^url:.*|url: $NGROK_URL|" _config.local.yml
-
-    # Rebuild Jekyll with ngrok URL
-    kill $JEKYLL_PID 2>/dev/null || true
-    sleep 1
-    rm -rf _site .jekyll-cache
-    bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000 > /tmp/jekyll.log 2>&1 &
-    JEKYLL_PID=$!
-
-    # Wait for Jekyll
-    for i in {1..30}; do
-        if curl -s http://127.0.0.1:4000 > /dev/null 2>&1; then
-            echo "✅ Jekyll ready with ngrok URL"
-            break
-        fi
-        sleep 1
-    done
-else
-    echo "⏭️  Local config uses first-party checkout; running manual checkout test on localhost"
-fi
-
-# Run manual checkout test
-echo ""
-echo "🧪 Running checkout test..."
-npx playwright test --headed --grep "manual checkout"
-CHECKOUT_EXIT=$?
-
-exit $CHECKOUT_EXIT
+exit 0

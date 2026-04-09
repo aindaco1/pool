@@ -217,10 +217,25 @@ ensure_podman_ready() {
 
   echo "⏳ Waiting for Podman API to become ready..."
   local ready=0
+  local attempted_restart=0
   for _ in $(seq 1 60); do
     if podman info >/dev/null 2>&1; then
       ready=1
       break
+    fi
+    if [ "$ready" != "1" ] && [ "$attempted_restart" = "0" ] && { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; }; then
+      local machine_state=""
+      machine_state="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
+      if [ "$machine_state" = "running" ]; then
+        echo "🔄 Podman machine looks stale; restarting it..."
+        podman machine stop podman-machine-default >/tmp/pool-podman-machine-stop.log 2>&1 || true
+        podman machine start --quiet --no-info podman-machine-default >/tmp/pool-podman-machine-start.log 2>&1 || true
+        PODMAN_SOCKET="$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true)"
+        if [ "$os_family" = "macos" ] && [ -n "$PODMAN_SOCKET" ]; then
+          export CONTAINER_HOST="unix://${PODMAN_SOCKET}"
+        fi
+        attempted_restart=1
+      fi
     fi
     sleep 2
   done

@@ -2,6 +2,15 @@
 
 Cloudflare Worker handling first-party checkout canonicalization, Stripe integration, pledge management, and order-scoped supporter authentication.
 
+For day-to-day local development, prefer the repo-root Podman path:
+
+```bash
+npm run podman:doctor
+./scripts/dev.sh --podman
+```
+
+That boots the site and Worker together on the standard local ports and is the easiest way to exercise the full on-site checkout and `Update Card` flows locally.
+
 ## Setup
 
 ### 1. Create KV Namespaces
@@ -51,10 +60,17 @@ wrangler secret put ADMIN_SECRET
 4. Copy the signing secret to `STRIPE_WEBHOOK_SECRET_LIVE`
 5. Repeat for test mode with `STRIPE_WEBHOOK_SECRET_TEST`
 
-### 4. Deploy
+### 4. Deploy / Run
+
+For full local development, prefer the repo-root Podman path above. If you specifically need to run only the Worker on the host:
 
 ```bash
 wrangler dev --env dev
+```
+
+Deploy with:
+
+```bash
 wrangler deploy
 npm run deploy:worker
 ```
@@ -64,7 +80,7 @@ On GitHub, pushes to `main` also deploy the Worker automatically through `.githu
 ## API Endpoints
 
 ### POST /checkout-intent/start
-Canonicalize the first-party cart payload and create a Stripe setup-mode Checkout session for a new pledge.
+Canonicalize the first-party cart payload and create a Stripe setup-mode Checkout Session for a new pledge.
 
 ```json
 {
@@ -78,9 +94,9 @@ Canonicalize the first-party cart payload and create a Stripe setup-mode Checkou
 }
 ```
 
-Returns: `{ "url": "https://checkout.stripe.com/..." }`
+Returns either a custom-session bootstrap (`checkoutUiMode`, `sessionId`, `clientSecret`, `publishableKey`, `orderId`) or a hosted fallback URL.
 
-The Worker rebuilds tier, add-on, custom-support, shipping, and subtotal state from first-party cart items, validates campaign state and inventory, signs a short-lived checkout snapshot, reserves scarce inventory for limited tiers before redirecting into Stripe, and confirms those reservations when the pledge is actually persisted.
+The Worker rebuilds tier, add-on, custom-support, shipping, and subtotal state from first-party cart items, validates campaign state and inventory, signs a short-lived checkout snapshot, reserves scarce inventory for limited tiers before the payment step completes, and confirms those reservations when the pledge is actually persisted.
 
 Limited-tier reservations and claims are serialized through a per-campaign Durable Object coordinator before the KV inventory snapshot is updated, so concurrent checkout starts, retries, modifications, and webhook completions cannot oversell scarce rewards.
 
@@ -136,7 +152,7 @@ Start a Stripe session to update payment method.
 }
 ```
 
-Returns: `{ "url": "https://checkout.stripe.com/..." }`
+Returns either a custom-session bootstrap for the on-site `Update Card` flow or a hosted fallback URL.
 
 ### POST /webhooks/stripe
 Stripe webhook endpoint (signature verified).
@@ -232,8 +248,8 @@ When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email
 
 1. **User pledges on campaign page**
    - first-party cart created with tier item
-   - `POST /checkout-intent/start` creates Stripe SetupIntent
-   - User redirected to Stripe Checkout to save card
+   - `POST /checkout-intent/start` creates the setup-mode Stripe session used by the on-site payment step
+   - the existing checkout sidecar mounts secure Stripe payment UI to save the card
 
 2. **Stripe webhook: checkout.session.completed**
    - Extract payment method and customer from SetupIntent
@@ -253,18 +269,23 @@ When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email
 
 ## Test Mode
 
-For local development:
+Preferred local development path:
 
 ```bash
-# Start Jekyll site
-bundle exec jekyll serve --config _config.yml,_config.local.yml
+npm run podman:doctor
+./scripts/dev.sh --podman
+```
 
-# Start worker in test mode
+That starts the site and the Worker together, and the Worker still runs with `--env dev` under the hood.
+
+If you specifically need the Worker-only fallback:
+
+```bash
 cd worker
 wrangler dev --env dev
 ```
 
-The `--env dev` flag:
+The `dev` environment:
 - Sets `APP_MODE=test`
 - Uses `STRIPE_SECRET_KEY_TEST`
 - Points `SITE_BASE` to localhost

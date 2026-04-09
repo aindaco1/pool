@@ -3,27 +3,27 @@
 ## Getting Started
 
 ### Prerequisites
-- Ruby + Bundler (for Jekyll)
+- Podman for the recommended local path, or:
+- Ruby + Bundler (for host Jekyll)
 - Node.js (for Worker + scripts)
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (for Cloudflare Worker)
-- [Stripe CLI](https://stripe.com/docs/stripe-cli) (for webhook testing)
+- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (for host Worker development)
+- optional: [Stripe CLI](https://stripe.com/docs/stripe-cli) (for webhook testing)
 
 ### Local Development
-
-```bash
-bundle install
-bundle exec jekyll serve
-# Visit http://localhost:4000
-```
-
-Or use the rootless Podman path:
 
 ```bash
 npm run podman:doctor
 ./scripts/dev.sh --podman
 ```
 
-That mode keeps the standard local ports and local state files, but runs Jekyll and Wrangler inside containers so new forks do not need host Ruby or host Wrangler just to boot the app.
+That is the default local development path. It keeps the standard local ports and local state files, but runs Jekyll and Wrangler inside containers so new forks do not need host Ruby or host Wrangler just to boot the app.
+
+If you need the host-only path instead:
+
+```bash
+bundle install
+bundle exec jekyll serve --config _config.yml,_config.local.yml
+```
 
 If you want to run the checkout helper or browser suite against the same Podman-backed stack:
 
@@ -38,6 +38,8 @@ npm run test:e2e:headless:podman
 npm run podman:doctor
 npm run podman:self-check
 ```
+
+`./scripts/test-e2e.sh --podman` is now fully automated browser coverage. `./scripts/test-checkout.sh --podman` remains the manual interactive helper when you want to step through a real checkout in your own browser.
 
 Clear cache if styles don't update:
 ```bash
@@ -70,7 +72,7 @@ bundle exec jekyll clean
 
 ---
 
-## Current Status (Jan 2026)
+## Current Status (Apr 2026)
 
 ✅ **Completed:**
 - Jekyll + first-party cart site structure
@@ -79,7 +81,9 @@ bundle exec jekyll clean
 - Campaign cards, two-column layout, hero variants
 - Production phases, community decisions, production diary
 - Pledge UX, cart icon, first-party checkout review
+- Native first-party Stripe payment flow in the existing checkout sidecar
 - No-account pledge management (magic links, `/manage/` page)
+- On-site `Update Card` flow in `/manage/`
 - Supporter-only community page with voting
 - Non-stackable tier support (hide quantity controls in cart)
 - Mobile hamburger/cart overlay handling
@@ -90,7 +94,10 @@ bundle exec jekyll clean
 - Countdown timer pre-rendering (no "00 00 00 00" flash)
 - Multi-tier pledge support (`additionalTiers`)
 - Unit tests (Vitest) and E2E tests (Playwright)
+- Fully automated checkout E2E coverage
 - Production campaign launch (Hand Relations)
+- Podman-backed local dev/testing path
+- More explicit inventory overselling protection via Durable Object coordination
 - Pages CMS integration for visual campaign editing
 
 🚧 **In Progress:**
@@ -101,7 +108,9 @@ _(None currently)_
 ## Branching & PRs
 
 ### Branch Naming
-- Feature branches: `amp/<short-name>` (e.g., `amp/pledge-hook`)
+- Feature branches: `feat/<short-name>` (e.g., `feat/pledge-hook`)
+- Fix branches: `fix/<short-name>`
+- Docs branches: `docs/<short-name>`
 
 ### Commit Style
 - Conventional prefixes: `feat`, `fix`, `docs`, `chore`, `infra`
@@ -118,7 +127,9 @@ _(None currently)_
 
 ## First Contribution Checklist
 
-- [ ] Clone repo, run `bundle exec jekyll serve` to preview
+- [ ] Clone repo, run `npm run podman:doctor`
+- [ ] Start local dev with `./scripts/dev.sh --podman`
+- [ ] Only use the host-only Jekyll/Wrangler path if you intentionally need it
 - [ ] Skim `_layouts/` & `_includes/` to see first-party cart integration
 - [ ] Review `assets/js/` cart & pledge scripts
 - [ ] Read `worker/src/` to understand the backend (pledge storage, stats, charging)
@@ -130,7 +141,8 @@ _(None currently)_
 
 - **GitHub Actions**: Add test `STRIPE_SECRET_KEY` + `CHECKOUT_INTENT_SECRET`
 - **Cloudflare Worker**: Same secrets as env vars; set `SITE_BASE`
-- **Stripe**: Create webhook to `https://pledge.dustwave.xyz/webhooks/stripe`
+- **Stripe**: For hosted environments, create a webhook to `https://pledge.dustwave.xyz/webhooks/stripe`
+- **Local custom checkout**: add `STRIPE_PUBLISHABLE_KEY_TEST` to `worker/.dev.vars`
 
 See [TESTING.md](TESTING.md) for full secrets reference.
 
@@ -159,8 +171,8 @@ See [TESTING.md](TESTING.md) for full secrets reference.
 
 ## Contact & Ownership
 
-See [AGENTS.md](AGENTS.md) for roles and responsibilities.
+Use the project docs and existing git history for context, and keep changes scoped and well-tested before opening a PR.
 
 ---
 
-_Last updated: Jan 2026_
+_Last updated: April 2026_

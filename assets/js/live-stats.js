@@ -19,6 +19,8 @@ const PAGESHOW_HANDLER_KEY = '__POOL_LIVE_STATS_PAGESHOW_HANDLER';
 const VISIBILITY_HANDLER_KEY = '__POOL_LIVE_STATS_VISIBILITY_HANDLER';
 const STORAGE_HANDLER_KEY = '__POOL_LIVE_STATS_STORAGE_HANDLER';
 const INVALIDATION_HANDLER_KEY = '__POOL_LIVE_STATS_INVALIDATION_HANDLER';
+const LIVE_REFRESH_MARKER_KEY = 'pool_live_refresh_needed';
+const LIVE_REFRESH_MARKER_TTL_MS = 10 * 60 * 1000;
 
 function getWorkerBase() {
   return window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
@@ -93,6 +95,26 @@ function clearLiveRequestCaches(slug) {
   inventoryRequestCache.clear();
   liveSnapshotRequestCache.clear();
   window.POOL_INVENTORY_CACHE = {};
+}
+
+function consumePendingLiveRefreshMarker() {
+  try {
+    const raw = localStorage.getItem(LIVE_REFRESH_MARKER_KEY);
+    if (!raw) return false;
+    const marker = JSON.parse(raw);
+    const timestamp = Number(marker?.timestamp || 0);
+    if (!Number.isFinite(timestamp) || Date.now() - timestamp > LIVE_REFRESH_MARKER_TTL_MS) {
+      localStorage.removeItem(LIVE_REFRESH_MARKER_KEY);
+      return false;
+    }
+    localStorage.removeItem(LIVE_REFRESH_MARKER_KEY);
+    return true;
+  } catch {
+    try {
+      localStorage.removeItem(LIVE_REFRESH_MARKER_KEY);
+    } catch {}
+    return false;
+  }
 }
 
 async function fetchLiveCampaignSnapshot(slug, options = {}) {
@@ -714,9 +736,10 @@ const domReadyHandler = () => {
   applyDeclarativeStyles();
   applyCachedStats();
   applyCachedInventory();
+  const shouldForceRefresh = consumePendingLiveRefreshMarker();
   if (isPageVisible()) {
-    fetchAllLiveStats();
-    fetchLiveInventory();
+    fetchAllLiveStats({ force: shouldForceRefresh });
+    fetchLiveInventory({ force: shouldForceRefresh });
   }
 };
 window[DOM_READY_HANDLER_KEY] = domReadyHandler;
@@ -729,9 +752,10 @@ if (typeof previousPageshowHandler === 'function') {
 }
 
 const pageshowHandler = (event) => {
+  const shouldForceRefresh = consumePendingLiveRefreshMarker();
   if (event.persisted && isPageVisible()) {
-    fetchAllLiveStats();
-    fetchLiveInventory();
+    fetchAllLiveStats({ force: shouldForceRefresh || event.persisted });
+    fetchLiveInventory({ force: shouldForceRefresh || event.persisted });
   }
 };
 window[PAGESHOW_HANDLER_KEY] = pageshowHandler;
@@ -744,8 +768,9 @@ if (typeof previousVisibilityHandler === 'function') {
 
 const visibilityHandler = () => {
   if (!isPageVisible()) return;
-  fetchAllLiveStats();
-  fetchLiveInventory();
+  const shouldForceRefresh = consumePendingLiveRefreshMarker();
+  fetchAllLiveStats({ force: shouldForceRefresh });
+  fetchLiveInventory({ force: shouldForceRefresh });
 };
 window[VISIBILITY_HANDLER_KEY] = visibilityHandler;
 document.addEventListener('visibilitychange', visibilityHandler);
@@ -758,6 +783,12 @@ if (typeof previousStorageHandler === 'function') {
 const storageHandler = (event) => {
   if (!isPageVisible()) return;
   const key = String(event?.key || '');
+  if (key === LIVE_REFRESH_MARKER_KEY) {
+    clearLiveRequestCaches();
+    fetchAllLiveStats({ force: true });
+    fetchLiveInventory({ force: true });
+    return;
+  }
   if (!key.startsWith('pool_stats_') && !key.startsWith('pool_inventory_')) return;
   const slug = key.replace(/^pool_(stats|inventory)_/, '');
   clearLiveRequestCaches(slug);

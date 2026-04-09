@@ -1,9 +1,10 @@
 const CHECKOUT_PROVIDERS = ['first_party'];
 const CART_RUNTIMES = ['first_party'];
+const CHECKOUT_UI_MODES = ['hosted', 'embedded', 'custom'];
 const DEFAULT_SALES_TAX_RATE = 0.07875;
 const DEFAULT_FLAT_SHIPPING_RATE = 3;
 
-export { CHECKOUT_PROVIDERS, CART_RUNTIMES };
+export { CHECKOUT_PROVIDERS, CART_RUNTIMES, CHECKOUT_UI_MODES };
 
 export function getCheckoutProvider(env = {}) {
   return normalizeFlag(env.CHECKOUT_PROVIDER, CHECKOUT_PROVIDERS, 'first_party');
@@ -11,6 +12,10 @@ export function getCheckoutProvider(env = {}) {
 
 export function getCartRuntime(env = {}) {
   return normalizeFlag(env.CART_RUNTIME, CART_RUNTIMES, 'first_party');
+}
+
+export function getCheckoutUiMode(env = {}) {
+  return normalizeFlag(env.CHECKOUT_UI_MODE, CHECKOUT_UI_MODES, 'hosted');
 }
 
 export function isFirstPartyCheckoutEnabled(env = {}) {

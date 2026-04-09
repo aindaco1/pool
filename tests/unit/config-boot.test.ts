@@ -26,7 +26,9 @@ describe('config boot scripts', () => {
         data-live-stats-cache-ttl-seconds="300"
         data-live-inventory-cache-ttl-seconds="300"
         data-cart-runtime="first_party"
-        data-checkout-provider="first_party"></script>
+        data-checkout-provider="first_party"
+        data-checkout-ui-mode="hosted"
+        data-stripe-publishable-key="pk_test_pool"></script>
     `;
 
     await import('../../assets/js/pool-config.js');
@@ -39,7 +41,9 @@ describe('config boot scripts', () => {
       liveStatsCacheTtlSeconds: '300',
       liveInventoryCacheTtlSeconds: '300',
       cartRuntime: 'first_party',
-      checkoutProvider: 'first_party'
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'hosted',
+      stripePublishableKey: 'pk_test_pool'
     });
   });
 });

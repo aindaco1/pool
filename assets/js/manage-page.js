@@ -25,6 +25,7 @@
     const parsed = Number(bootScript.dataset.liveInventoryCacheTtlSeconds);
     return Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : 5 * 60 * 1000;
   })();
+  const CHECKOUT_UI_MODE = String(bootScript.dataset.checkoutUiMode || 'hosted').trim().toLowerCase();
   const DEFAULT_PLATFORM_TIP_PERCENT = 5;
   const MAX_PLATFORM_TIP_PERCENT = 15;
   const WIDTH_PERCENT_CLASS_PREFIX = 'u-width-pct-';
@@ -34,6 +35,20 @@
   let pledges = [];
   let isDevMode = false;
   let currentToken = null;
+  let activePaymentUpdateMount = null;
+  let activePaymentUpdatePledge = null;
+  let isSubmittingPaymentUpdate = false;
+
+  function renderBusyButtonLabel(label, isBusy) {
+    const safeLabel = String(label || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    if (!isBusy) return safeLabel;
+    return `${safeLabel}<span class="pool-button-spinner" aria-hidden="true"></span>`;
+  }
 
   function applyPercentClass(node, prefix, percent) {
     if (!node) return;
@@ -637,6 +652,187 @@
     document.getElementById('pledge-error-message').textContent = message;
   }
 
+  function getPaymentUpdateModal() {
+    return document.getElementById('payment-update-modal');
+  }
+
+  function resetPaymentUpdateUi() {
+    const modal = getPaymentUpdateModal();
+    if (!modal) return;
+
+    const error = document.getElementById('payment-update-error');
+    const emailError = document.getElementById('payment-update-email-error');
+    const paymentMount = document.getElementById('payment-update-payment');
+    const confirmButton = document.getElementById('payment-update-confirm');
+
+    if (error) {
+      error.hidden = true;
+      error.textContent = '';
+    }
+    if (emailError) {
+      emailError.hidden = true;
+      emailError.textContent = '';
+    }
+    if (paymentMount) paymentMount.innerHTML = '';
+    if (confirmButton) {
+      confirmButton.disabled = true;
+      confirmButton.textContent = 'Save payment method';
+    }
+
+    isSubmittingPaymentUpdate = false;
+  }
+
+  function teardownPaymentUpdateMount() {
+    if (!activePaymentUpdateMount || typeof activePaymentUpdateMount.unmount !== 'function') {
+      activePaymentUpdateMount = null;
+      return;
+    }
+
+    try {
+      activePaymentUpdateMount.unmount();
+    } catch (_error) {}
+    activePaymentUpdateMount = null;
+  }
+
+  function closePaymentUpdateModal() {
+    const modal = getPaymentUpdateModal();
+    if (!modal) return;
+    if (isSubmittingPaymentUpdate) return;
+    teardownPaymentUpdateMount();
+    activePaymentUpdatePledge = null;
+    modal.hidden = true;
+    resetPaymentUpdateUi();
+  }
+
+  function setPaymentUpdateEmailError(message) {
+    const node = document.getElementById('payment-update-email-error');
+    if (!node) return;
+    node.textContent = String(message || '');
+    node.hidden = !message;
+  }
+
+  function setPaymentUpdateError(message) {
+    const node = document.getElementById('payment-update-error');
+    if (!node) return;
+    node.textContent = String(message || '');
+    node.hidden = !message;
+  }
+
+  function shouldShowPaymentUpdateLevelStripeError(errorLike) {
+    const message = String(errorLike?.error?.message || errorLike?.message || '').trim().toLowerCase();
+    if (!message) return true;
+
+    return !(
+      message.includes('incomplete') ||
+      message.includes('invalid') ||
+      message.includes('required') ||
+      message.includes('enter a card') ||
+      message.includes('card number') ||
+      message.includes('security code') ||
+      message.includes('expiration')
+    );
+  }
+
+  function syncPaymentUpdateConfirmButton(canConfirm = false) {
+    const confirmButton = document.getElementById('payment-update-confirm');
+    if (!confirmButton) return;
+    confirmButton.disabled = isSubmittingPaymentUpdate || !canConfirm;
+    confirmButton.classList.toggle('is-busy', isSubmittingPaymentUpdate);
+    confirmButton.setAttribute('aria-busy', isSubmittingPaymentUpdate ? 'true' : 'false');
+    confirmButton.innerHTML = renderBusyButtonLabel(
+      isSubmittingPaymentUpdate ? 'Saving payment method...' : 'Save payment method',
+      isSubmittingPaymentUpdate
+    );
+  }
+
+  async function syncPaymentUpdateEmailToStripe(email, options = {}) {
+    const trimmedEmail = String(email || '').trim();
+    if (!trimmedEmail) {
+      const message = 'Enter an email address to continue.';
+      setPaymentUpdateEmailError(message);
+      return {
+        ok: false,
+        message
+      };
+    }
+
+    if (!activePaymentUpdateMount || typeof activePaymentUpdateMount.updateEmail !== 'function') {
+      setPaymentUpdateEmailError('');
+      return { ok: true };
+    }
+
+    const result = await activePaymentUpdateMount.updateEmail(trimmedEmail);
+    const message = result?.error?.message || '';
+    setPaymentUpdateEmailError(message);
+    if (message && options.raise) {
+      throw new Error(message);
+    }
+    return {
+      ok: !message,
+      message
+    };
+  }
+
+  async function openCustomPaymentUpdateModal(pledge, payload) {
+    const modal = getPaymentUpdateModal();
+    if (!modal) throw new Error('Payment update modal is unavailable.');
+    if (!window.PoolStripeCheckoutSidecar || typeof window.PoolStripeCheckoutSidecar.mount !== 'function') {
+      throw new Error('Stripe payment update helper is unavailable.');
+    }
+
+    teardownPaymentUpdateMount();
+    resetPaymentUpdateUi();
+    activePaymentUpdatePledge = pledge;
+    modal.hidden = false;
+
+    const emailInput = document.getElementById('payment-update-email');
+    const paymentMount = document.getElementById('payment-update-payment');
+
+    if (emailInput) {
+      emailInput.value = pledge.email || '';
+    }
+
+    if (typeof window.PoolStripeCheckoutSidecar.ensureStripeJs === 'function') {
+      await window.PoolStripeCheckoutSidecar.ensureStripeJs();
+    }
+
+    activePaymentUpdateMount = await window.PoolStripeCheckoutSidecar.mount({
+      publishableKey: payload.publishableKey,
+      clientSecret: payload.clientSecret,
+      paymentContainer: paymentMount,
+      onChange: function(event) {
+        syncPaymentUpdateConfirmButton(Boolean(event?.session?.canConfirm) || Boolean(activePaymentUpdateMount));
+      }
+    });
+    syncPaymentUpdateConfirmButton(true);
+  }
+
+  async function startPaymentMethodUpdate(pledge) {
+    if (isDevMode) {
+      alert('DEV MODE: Would redirect to payment update page');
+      return;
+    }
+
+    const res = await fetch(`${WORKER_BASE}/pledge/payment-method/start`, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: currentToken })
+    });
+    if (!res.ok) throw new Error('Failed to start payment update');
+    const payload = await res.json();
+
+    if (payload?.checkoutUiMode === 'custom') {
+      await openCustomPaymentUpdateModal(pledge, payload);
+      return;
+    }
+
+    if (!payload?.url) {
+      throw new Error('No payment update URL returned.');
+    }
+    window.location.href = payload.url;
+  }
+
   function formatMoney(cents) {
     return (
       '$' +
@@ -888,6 +1084,54 @@
   document.getElementById('confirm-modal-confirm')?.addEventListener('click', () => {
     if (pendingConfirmCallback) pendingConfirmCallback();
     hideConfirmModal();
+  });
+  document.querySelectorAll('[data-payment-update-close]').forEach((node) => {
+    node.addEventListener('click', closePaymentUpdateModal);
+  });
+  document.getElementById('payment-update-email')?.addEventListener('change', (event) => {
+    syncPaymentUpdateEmailToStripe(event.target.value).catch((error) => {
+      setPaymentUpdateError(error.message || 'Email validation failed.');
+    });
+  });
+  document.getElementById('payment-update-confirm')?.addEventListener('click', async () => {
+    if (!activePaymentUpdateMount || typeof activePaymentUpdateMount.confirm !== 'function') return;
+    const emailInput = document.getElementById('payment-update-email');
+    const confirmButton = document.getElementById('payment-update-confirm');
+
+    try {
+      isSubmittingPaymentUpdate = true;
+      setPaymentUpdateError('');
+      syncPaymentUpdateConfirmButton(true);
+
+      const emailResult = await syncPaymentUpdateEmailToStripe(emailInput?.value || '', { raise: true });
+      if (!emailResult.ok) {
+        isSubmittingPaymentUpdate = false;
+        syncPaymentUpdateConfirmButton(true);
+        return;
+      }
+
+      const result = await activePaymentUpdateMount.confirm();
+      if (result?.type === 'error' || result?.error) {
+        if (shouldShowPaymentUpdateLevelStripeError(result)) {
+          throw new Error(result?.error?.message || 'Stripe could not save the updated payment method.');
+        }
+
+        isSubmittingPaymentUpdate = false;
+        setPaymentUpdateError('');
+        syncPaymentUpdateConfirmButton(true);
+        return;
+      }
+
+      if (confirmButton) confirmButton.textContent = 'Saved';
+      setTimeout(() => {
+        closePaymentUpdateModal();
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      isSubmittingPaymentUpdate = false;
+      setPaymentUpdateError(error.message || 'There was an error updating your payment method.');
+      syncPaymentUpdateConfirmButton(true);
+    }
   });
 
   async function renderPledges() {
@@ -1223,7 +1467,7 @@
           <div class="pledge-card__error" id="error-${index}" hidden></div>
           <div class="pledge-card__footer" id="footer-${index}">
             <div class="pledge-card__notice">
-              <p><strong>🤔 How pledging works:</strong> Your card will be stored securely but not charged now. You'll only be charged if the campaign reaches its goal.</p>
+              <p><strong>How pledging works:</strong> Your card will be stored securely but not charged now. You'll only be charged if the campaign reaches its goal.</p>
             </div>
             ${canCancelPledge ? `<button class="btn-text btn-text--danger" data-action="cancel" data-index="${index}">Cancel Pledge</button>` : ''}
           </div>
@@ -1344,20 +1588,8 @@
 
     card.querySelectorAll('[data-action="payment"]').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        if (isDevMode) {
-          alert('DEV MODE: Would redirect to payment update page');
-          return;
-        }
-
         try {
-          const res = await fetch(`${WORKER_BASE}/pledge/payment-method/start`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: currentToken })
-          });
-          if (!res.ok) throw new Error('Failed to start payment update');
-          const { url } = await res.json();
-          window.location.href = url;
+          await startPaymentMethodUpdate(pledge);
         } catch (err) {
           alert('Error: ' + err.message);
         }
@@ -1795,20 +2027,8 @@
     });
 
     card.querySelector('[data-action="payment"]')?.addEventListener('click', async () => {
-      if (isDevMode) {
-        alert('DEV MODE: Would redirect to payment update page');
-        return;
-      }
-
       try {
-        const res = await fetch(`${WORKER_BASE}/pledge/payment-method/start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: currentToken })
-        });
-        if (!res.ok) throw new Error('Failed to start payment update');
-        const { url } = await res.json();
-        window.location.href = url;
+        await startPaymentMethodUpdate(pledge);
       } catch (err) {
         alert('Error: ' + err.message);
       }

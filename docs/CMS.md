@@ -157,6 +157,12 @@ To add a new field to campaigns, edit `.pages.yml` and add to the `fields` array
 1. Check GitHub Actions — the build may have failed
 2. Wait 2-3 minutes for GitHub Pages to deploy
 3. Hard refresh the browser (Cmd+Shift+R)
+4. If you need to validate locally, prefer the current Podman flow:
+
+```bash
+npm run podman:doctor
+./scripts/dev.sh --podman
+```
 
 ### Image Upload Failed
 
@@ -190,4 +196,4 @@ Pages CMS has "Permissions" on their roadmap. When released, we'll update to sup
 
 ---
 
-_Last updated: Jan 2026_
+_Last updated: Apr 9, 2026_

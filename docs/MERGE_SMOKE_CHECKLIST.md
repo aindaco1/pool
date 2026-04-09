@@ -9,7 +9,7 @@ This version is tuned for the current checkout and Worker business-logic behavio
 These behaviors changed intentionally and should **not** be treated as regressions during smoke testing:
 
 - Magic links are order-scoped instead of email-scoped.
-- `/checkout-intent/start` now reserves scarce limited inventory before redirecting into Stripe, and successful persistence confirms that reservation.
+- `/checkout-intent/start` now reserves scarce limited inventory before payment confirmation, and successful persistence confirms that reservation.
 - Legacy `GET /checkout` is disabled.
 - Settlement only marks a campaign fully settled when no active pledges were skipped.
 
@@ -33,14 +33,14 @@ export STAGING_WORKER_URL="http://127.0.0.1:8787"
 export ADMIN_SECRET="..."
 ```
 
-In that case, run `./scripts/dev.sh` first and record in the sign-off that merge relied on the automated gate plus local smoke coverage because no staging environment exists.
+In that case, run `./scripts/dev.sh --podman` first and record in the sign-off that merge relied on the automated gate plus local smoke coverage because no staging environment exists.
 
 ## Local Rehearsal
 
 Before a staging pass, or instead of one when no staging exists, you can rehearse most of the flow locally with:
 
 ```bash
-./scripts/dev.sh
+./scripts/dev.sh --podman
 ```
 
 That script starts:
@@ -100,7 +100,7 @@ Treat any of these as merge blockers:
 
 1. Open a live staging campaign page.
 2. Add a normal tier and proceed to checkout.
-3. Confirm the browser reaches Stripe Checkout successfully.
+3. Confirm the browser reaches the on-site Stripe payment step successfully, or the hosted fallback path if that mode is intentionally enabled.
 4. Expected result:
    - no console errors on the campaign page
    - the checkout summary matches the selected tier, support items, custom amount, and tip

@@ -862,6 +862,42 @@ describe('live-stats runtime integration', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://pledge.dustwave.xyz/stats/test-campaign');
     expect((wrap.querySelector('[data-live-pledged]') as HTMLElement).textContent).toBe('$8.5k');
   });
+
+  it('forces a fresh live fetch on boot when a post-pledge refresh marker is present', async () => {
+    const wrap = createProgressWrap({ campaignSlug: 'test-campaign', goal: 10000 });
+    document.body.appendChild(wrap);
+
+    localStorage.setItem('pool_stats_test-campaign', JSON.stringify({
+      data: { pledgedAmount: 500000, supportItems: {} },
+      timestamp: Date.now()
+    }));
+    localStorage.setItem('pool_live_refresh_needed', JSON.stringify({
+      campaignSlugs: ['test-campaign'],
+      timestamp: Date.now()
+    }));
+
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => {
+        if (url.endsWith('/stats/test-campaign')) {
+          return { pledgedAmount: 925000, supportItems: {}, state: 'live' };
+        }
+        return {
+          stats: { pledgedAmount: 925000, supportItems: {}, state: 'live' },
+          inventory: null
+        };
+      }
+    }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    await import('../../assets/js/live-stats.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('https://pledge.dustwave.xyz/stats/test-campaign');
+      expect((wrap.querySelector('[data-live-pledged]') as HTMLElement).textContent).toBe('$9.3k');
+    });
+    expect(localStorage.getItem('pool_live_refresh_needed')).toBeNull();
+  });
 });
 
 // ============================================================================

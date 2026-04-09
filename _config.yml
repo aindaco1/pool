@@ -8,6 +8,8 @@ permalink: pretty
 worker_base: "https://pledge.dustwave.xyz"
 cart_runtime: first_party
 checkout_provider: first_party
+checkout_ui_mode: hosted
+stripe_publishable_key: ""
 sales_tax_rate: 0.07875
 flat_shipping_rate: 3.00
 live_stats_cache_ttl_seconds: 300

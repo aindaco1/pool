@@ -1,6 +1,6 @@
 # Security Guide
 
-This document covers the security architecture, known risks, hardening recommendations, and penetration testing procedures for The Pool crowdfunding platform.
+This document covers the security architecture, known risks, applied hardening measures, accepted tradeoffs, and penetration testing procedures for The Pool crowdfunding platform.
 
 ## Security Architecture
 
@@ -67,13 +67,13 @@ Scarce limited-tier reservation and committed-count truth is no longer stored in
 
 ---
 
-## Hardening Recommendations
+## Applied Hardening Notes
 
-### SEC-001: Lock Down Dev-Token Bypass
+### SEC-001: Lock Down Dev-Token Bypass (✅ FIXED)
 
 **File:** `worker/src/routes/votes.js`
 
-**Current (VULNERABLE):**
+**Historical vulnerable pattern:**
 ```javascript
 if (token.startsWith('dev-token-')) {
   campaignSlug = token.replace('dev-token-', '');
@@ -100,13 +100,15 @@ Community pages no longer persist the raw supporter bearer token in a long-lived
 
 Limited-tier inventory mutations now flow through a per-campaign Durable Object coordinator from checkout start onward. Scarce tiers are reserved before redirecting into Stripe, confirmed at successful persistence time, and only projected back into KV for public reads. That keeps race-sensitive inventory truth out of client-visible KV while preserving efficient public `/inventory/:slug` reads.
 
+The newer on-site Stripe checkout and `Update Card` flows now also fail more privately by default: Worker responses that carry Stripe session bootstrap data or order-specific completion state are served with `Cache-Control: private, no-store`, cross-site browser POSTs to checkout-start / checkout-complete / payment-method-start are rejected unless they originate from `SITE_BASE`, and the browser keeps only short-lived in-flight checkout markers for reservation recovery instead of leaving them in long-lived storage indefinitely. Long-lived cart persistence now keeps only cart structure and pricing inputs; contact and address drafts are downgraded to session-scoped storage, and `/checkout-intent/complete` has its own retry budget so local recovery can’t be spammed indefinitely. After successful pledge persistence, the checkout flow now also invalidates live stats/inventory caches immediately and leaves a short-lived refresh marker so restored campaign pages do not keep showing stale totals from pre-pledge browser state.
+
 ---
 
-### SEC-002: Fail Closed on Missing Stripe Webhook Secret
+### SEC-002: Fail Closed on Missing Stripe Webhook Secret (✅ FIXED)
 
 **File:** `worker/src/index.js` (handleStripeWebhook)
 
-**Current (VULNERABLE):**
+**Historical vulnerable pattern:**
 ```javascript
 const webhookSecret = getStripeWebhookSecret(env);
 if (webhookSecret) {
@@ -130,11 +132,11 @@ if (!valid) {
 
 ---
 
-### SEC-003: Guard Test Endpoints
+### SEC-003: Guard Test Endpoints (✅ FIXED)
 
 **File:** `worker/src/index.js` (router)
 
-Add centralized guard before test endpoint routing:
+The Worker now blocks test endpoints outside `APP_MODE === 'test'` before those handlers run:
 
 ```javascript
 // Block test endpoints in production
@@ -143,7 +145,7 @@ if (path.startsWith('/test/') && env.APP_MODE !== 'test') {
 }
 ```
 
-Each handler should also verify (defense in depth):
+Each handler also verifies the environment as defense in depth:
 ```javascript
 async function handleTestSetup(request, env) {
   if (env.APP_MODE !== 'test') {
@@ -250,11 +252,11 @@ cd worker && npx wrangler dev --port 8787
 
 ---
 
-### SEC-006: Timing-Safe Admin Secret Comparison
+### SEC-006: Timing-Safe Admin Secret Comparison (✅ FIXED)
 
 **File:** `worker/src/index.js`
 
-Add helper:
+The Worker now uses a timing-safe comparison helper for admin secrets:
 ```javascript
 function timingSafeEqual(a, b) {
   if (!a || !b || a.length !== b.length) return false;
@@ -282,6 +284,32 @@ function requireAdmin(request, env) {
   return { ok: true };
 }
 ```
+
+---
+
+## Accepted Tradeoffs / Follow-Up Candidates
+
+These are the currently known items that are not treated as active vulnerabilities requiring immediate code changes:
+
+### SEC-008: Magic Link Tokens Long-Lived (90 days)
+
+Status: **Accepted tradeoff**
+
+Why it remains:
+- magic links are intentionally accountless and need to stay usable across longer campaign timelines
+- each token is scoped to a specific order/campaign path rather than granting broad account access
+
+If this ever changes, the likely follow-up would be shortening token lifetime and pairing it with easier reissue/recovery UX.
+
+### SEC-010: Tokens in Query Strings (Referer Leakage Risk)
+
+Status: **Accepted tradeoff**
+
+Why it remains:
+- magic-link entry currently depends on emailed URLs with query parameters
+- the platform already limits referrer leakage with stricter response headers and scoped access behavior
+
+If this becomes a higher-priority concern, the likely follow-up would be a one-time token exchange flow that strips the raw token from the visible URL after first load.
 
 ---
 
@@ -424,10 +452,10 @@ If a magic link token is compromised:
 
 ### Missed Stripe Webhook (Development)
 
-If a checkout completes but the pledge doesn't appear (common in local dev):
+If the on-site payment step completes but the pledge doesn't appear yet (common in local dev when webhook forwarding is delayed or broken):
 
 1. Check Stripe CLI output for webhook delivery status
-2. Use the admin recovery endpoint to manually create the pledge:
+2. The client will first try `/checkout-intent/complete` automatically for local recovery, but if the pledge still does not appear, use the admin recovery endpoint to manually create it:
    ```bash
    curl -X POST http://localhost:8787/admin/recover-checkout \
      -H 'Authorization: Bearer YOUR_ADMIN_SECRET' \
@@ -440,6 +468,7 @@ If a checkout completes but the pledge doesn't appear (common in local dev):
 - Use `scripts/dev.sh` which runs the Worker with local KV simulation
 - `scripts/dev.sh` starts a single Stripe listener, forwards events to `127.0.0.1:8787/webhooks/stripe`, writes that same listener's `whsec_...` secret into `worker/.dev.vars`, and clears stale local processes on the standard dev ports before startup
 - If you start Stripe manually, use the same listener instance for forwarding and for the secret you copy into local config
+- `./scripts/dev.sh --podman` is the easiest way to keep the local site/Worker boundary production-like without relying on host Ruby/Wrangler setup
 - For testing with seeded data, run `./scripts/seed-all-campaigns.sh` after starting the worker
 
 ---
@@ -452,4 +481,4 @@ If a checkout completes but the pledge doesn't appear (common in local dev):
 
 ---
 
-_Last updated: Mar 2026_
+_Last updated: Apr 9, 2026_

@@ -2,7 +2,7 @@
 
 **Goal:**  
 Enable creative crowdfunding with true *all-or-nothing* logic using static hosting.  
-Creators define campaigns in Markdown; backers pledge through The Pool’s first-party cart and Stripe setup-mode checkout; cards are charged automatically only if the campaign is funded. Backers can optionally add a 0% to 15% Dust Wave platform tip (default 5%) that is included in the final charge but excluded from campaign progress.
+Creators define campaigns in Markdown; backers pledge through The Pool’s first-party cart and an on-site Stripe setup-mode payment step; cards are charged automatically only if the campaign is funded. Backers can optionally add a 0% to 15% Dust Wave platform tip (default 5%) that is included in the final charge but excluded from campaign progress.
 
 **Branding:**  
 - Platform name: **The Pool**
@@ -16,13 +16,13 @@ Creators define campaigns in Markdown; backers pledge through The Pool’s first
 | Layer | Platform | Role |
 |-------|-----------|------|
 | **Frontend** | GitHub Pages (Jekyll + Sass + cart runtime) | Campaign pages, cart, UX |
-| **Payments** | Stripe (Setup Intents + off-session charges) | Store then charge cards |
-| **API/Glue** | Cloudflare Worker (`pledge.dustwave.xyz`) | Handles Stripe checkout, webhooks, tip-aware totals, and reporting data |
+| **Payments** | Stripe (Checkout Sessions in setup mode + off-session charges) | Secure payment fields, saved payment methods, then charge cards later |
+| **API/Glue** | Cloudflare Worker (`pledge.dustwave.xyz`) | Handles checkout bootstrap, webhooks, tip-aware totals, recovery, and reporting data |
 | **Automation** | Worker cron + GitHub Action | Auto-settle (batched) + state transitions |
 | **Storage** | Markdown / YAML | Campaign definitions & state |
 | **Styling** | Sass (15 modular partials) | Design system matching dust-wave-shop |
 
-All code is versioned and auditable — no external DB or CMS needed.
+All code is versioned and auditable — no external DB is required, and campaign editing can stay in-repo or flow through Pages CMS.
 
 ## Free-Plan Efficiency Notes For Forks
 
@@ -35,6 +35,16 @@ The current architecture is deliberately optimized so free-plan Cloudflare deplo
 - rate limiting still fails closed, but repeated blocked requests inside the same window no longer rewrite the same KV counter on every hit
 
 That means the real free-plan ceiling for most forks is usually **KV writes from successful pledge activity**, not public read traffic.
+
+## Local Development Shape
+
+The recommended low-friction local path now uses Podman:
+
+- `./scripts/dev.sh --podman` boots Jekyll and the Worker in rootless containers
+- `npm run podman:doctor` checks host readiness first
+- `./scripts/test-e2e.sh --podman` now runs the browser suite in a fully automated way
+
+The host-based Ruby/Wrangler path still exists, but Podman is the easiest way to get a production-like local environment without hand-installing every dependency.
 
 ### Rough Planning Scenarios
 
@@ -55,9 +65,9 @@ For current Cloudflare limits, see:
 
 ## Funding Flow
 
-1. **Visitor pledges** through the first-party cart → Worker launches Stripe Checkout in “setup” mode. One checkout can include items from multiple campaigns. Cart and checkout show subtotal, shipping, sales tax, and optional Dust Wave tip from a shared pricing model.  
-2. **Stripe** saves a card, returning IDs to the Worker.  
-3. Worker stores pledge data in **Cloudflare KV** (tiers, support items, custom amounts, shipping address, tip percent/amount, Stripe IDs), fanning a bundled checkout out into one campaign-scoped pledge per campaign.  
+1. **Visitor pledges** through the first-party cart → Worker creates a setup-mode Stripe Checkout Session, and the existing second checkout sidecar mounts secure Stripe payment UI on-site. One checkout can include items from multiple campaigns. Cart and checkout show subtotal, shipping, sales tax, and optional Dust Wave tip from a shared pricing model.  
+2. **Stripe** saves a card through that on-site payment step, returning IDs to the Worker.  
+3. Worker stores pledge data in **Cloudflare KV** (tiers, support items, custom amounts, shipping address, tip percent/amount, Stripe IDs), fanning a bundled checkout out into one campaign-scoped pledge per campaign. The client does not treat checkout as successful until persistence is confirmed.  
 4. **Worker cron** runs daily at midnight MT:  
    - Records heartbeat (`cron:lastRun` in KV) for monitoring.
    - Triggers site rebuild when `goal_deadline` passes (`live` → `post`).  
@@ -73,6 +83,12 @@ For current Cloudflare limits, see:
 - Shipping uses the configured flat shipping rate per campaign containing physical rewards.
 - Sales tax uses the configured deployment tax rate.
 - Final stored / charged totals are `subtotal + shipping + tax + tip`.
+
+**Checkout hardening notes:**
+- Sensitive checkout bootstrap/completion responses are served `private, no-store`.
+- Browser POSTs for checkout start/complete and payment-method start are origin-checked against `SITE_BASE`.
+- Long-lived browser storage keeps cart structure and pricing inputs; contact/address drafts stay session-scoped.
+- After successful persistence, the client invalidates cached live stats/inventory immediately and leaves a short-lived refresh marker so restored campaign pages fetch fresh totals.
 
 ---
 
@@ -125,7 +141,7 @@ For current Cloudflare limits, see:
 4. ✅ Stripe webhook configured → Worker `/webhooks/stripe`.  
 5. ✅ Repo secrets set: `STRIPE_SECRET_KEY`, `CHECKOUT_INTENT_SECRET`, and admin/email secrets.  
 6. ✅ Daily Worker cron enabled (7 AM UTC / midnight MT) — check via `GET /admin/cron/status`.  
-7. ✅ Cloudflare cache purge configured (requires CLOUDFLARE_ZONE, CLOUDFLARE_EMAIL, CLOUDFLARE_KEY secrets + CLOUDFLARE_ENABLED variable).  
+7. ✅ Cloudflare cache purge configured (preferred: API token/account ID; legacy email/key auth still works if explicitly configured).  
 8. ✅ Test campaign runs end-to-end in Stripe test mode.
 9. ✅ Long-form content sanitizes Markdown link schemes and only renders structured embeds from exact approved origins.
 10. ✅ Missing-pledge magic-link reads fail closed with `404`.
@@ -154,4 +170,4 @@ For current Cloudflare limits, see:
 
 ---
 
-_Last updated: Mar 31, 2026_
+_Last updated: Apr 9, 2026_

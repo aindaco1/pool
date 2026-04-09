@@ -51,7 +51,7 @@ body.pool-cart-open {
   right: 0;
   display: flex;
   flex-direction: column;
-  width: min(420px, 100%);
+  width: min(540px, 100%);
   height: 100%;
   padding: 24px 20px 20px;
   background: $color--background;
@@ -158,6 +158,11 @@ body.pool-cart-open {
   color: $color--secondary;
 }
 
+.pool-first-party-cart__note--payment-consent {
+  margin-top: 12px;
+  color: $color--default;
+}
+
 .pool-first-party-cart__item-price {
   font-size: 14px;
   line-height: 1.4;
@@ -200,6 +205,10 @@ body.pool-cart-open {
   border: 1px solid $color--light;
   border-radius: $radius--md;
   background: $surface-tint-soft;
+}
+
+.pool-first-party-cart__callout--stripe {
+  background: $color--white;
 }
 
 .pool-first-party-cart__section-label {
@@ -299,10 +308,24 @@ body.pool-cart-open {
   margin-top: 16px;
 }
 
+.pool-first-party-cart__field--compact {
+  margin-top: 4px;
+}
+
+.pool-first-party-cart__field--full {
+  grid-column: 1 / -1;
+}
+
 .pool-first-party-cart__field-label {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   color: $color--primary;
+}
+
+.pool-first-party-cart__required-mark {
+  color: #9f1239;
 }
 
 .pool-first-party-cart__input {
@@ -314,12 +337,34 @@ body.pool-cart-open {
   background: $color--white;
   color: $color--default;
   font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.pool-first-party-cart__input--select {
+  appearance: none;
+  padding-right: 40px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, $color--secondary 50%),
+    linear-gradient(135deg, $color--secondary 50%, transparent 50%);
+  background-position:
+    calc(100% - 19px) calc(50% - 2px),
+    calc(100% - 13px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
 }
 
 .pool-first-party-cart__input:focus {
   outline: 2px solid rgba($color--primary, 0.12);
   outline-offset: 2px;
   border-color: $color--primary;
+}
+
+.pool-first-party-cart__field-error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #9f1239;
 }
 
 .pool-first-party-cart__tip-box {
@@ -373,6 +418,61 @@ body.pool-cart-open {
   line-height: 1.5;
 }
 
+.pool-first-party-cart__stripe-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.pool-first-party-cart__stripe-region {
+  min-height: 62px;
+  padding: 14px 16px;
+  border: 1px solid $color--light;
+  border-radius: $radius--md;
+  background: $color--white;
+  overflow: hidden;
+}
+
+.pool-first-party-cart__stripe-region--contact {
+  min-height: 76px;
+}
+
+.pool-first-party-cart__stripe-region--address {
+  min-height: 228px;
+}
+
+.pool-first-party-cart__stripe-region--payment {
+  min-height: 0;
+  padding: 10px 12px 10px;
+  background: $color--white;
+}
+
+.pool-first-party-cart__shipping-fallback {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid $color--light;
+  border-radius: $radius--md;
+  background: $color--white;
+}
+
+.pool-first-party-cart__shipping-fallback--plain {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.pool-first-party-cart__shipping-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 12px;
+  row-gap: 10px;
+}
+
+.pool-first-party-cart__shipping-fallback .pool-first-party-cart__field {
+  margin-top: 0;
+}
+
 .pool-first-party-cart__total {
   display: flex;
   align-items: center;
@@ -391,8 +491,13 @@ body.pool-cart-open {
 
 .pool-first-party-cart__action {
   @include btn-core($color--primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
   width: 100%;
   min-height: 44px;
+  white-space: nowrap;
   padding-top: $space-sm;
   padding-bottom: $space-sm;
   transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
@@ -408,6 +513,34 @@ body.pool-cart-open {
     background: $color--background;
     color: $color--primary;
     transform: scale(1.03);
+  }
+}
+
+.pool-first-party-cart__action.is-busy,
+.btn.is-busy {
+  opacity: 1;
+  cursor: progress;
+}
+
+.pool-button-spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: pool-button-spin 0.72s linear infinite;
+  opacity: 0.92;
+  flex: 0 0 auto;
+}
+
+@keyframes pool-button-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -443,6 +576,10 @@ body.pool-cart-open {
   }
 
   .pool-first-party-cart__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .pool-first-party-cart__shipping-grid {
     grid-template-columns: 1fr;
   }
 }

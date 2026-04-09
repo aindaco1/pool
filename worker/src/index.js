@@ -47,12 +47,14 @@ import { triggerSiteRebuild } from './github.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { DEFAULT_PLATFORM_TIP_PERCENT, calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
 import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput, CHECKOUT_INTENT_VERSION, DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
-import { getCheckoutProvider, getFlatShippingFeeCents, getSalesTaxRate } from './provider-config.js';
+import { getCheckoutProvider, getCheckoutUiMode, getFlatShippingFeeCents, getSalesTaxRate } from './provider-config.js';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
 
 // Rate limit delay for Resend API (2 req/sec limit)
 const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
+const STRIPE_CUSTOM_UI_MODE_API_VERSION = '2026-02-25.clover';
+const PRIVATE_NO_STORE_CACHE_CONTROL = 'private, no-store, max-age=0';
 
 // Extract plain text excerpt from diary entry (supports both legacy body and content blocks)
 function getDiaryExcerpt(entry, maxLength = 200) {
@@ -100,6 +102,51 @@ function timingSafeEqual(a, b) {
   }
   return result === 0;
   }
+
+function getSiteOrigin(env) {
+  try {
+    return new URL(String(env?.SITE_BASE || '')).origin;
+  } catch {
+    return '';
+  }
+}
+
+function isTrustedSiteOriginRequest(request, env) {
+  const expectedOrigin = getSiteOrigin(env);
+  if (!expectedOrigin) return true;
+
+  const secFetchSite = String(request.headers.get('Sec-Fetch-Site') || '').trim().toLowerCase();
+  if (secFetchSite === 'cross-site') {
+    return false;
+  }
+
+  const origin = String(request.headers.get('Origin') || '').trim();
+  if (origin) {
+    return timingSafeEqual(origin, expectedOrigin);
+  }
+
+  const referer = String(request.headers.get('Referer') || '').trim();
+  if (!referer) {
+    return true;
+  }
+
+  try {
+    return timingSafeEqual(new URL(referer).origin, expectedOrigin);
+  } catch {
+    return false;
+  }
+}
+
+function requireTrustedSiteOrigin(request, env) {
+  if (isTrustedSiteOriginRequest(request, env)) {
+    return { ok: true };
+  }
+
+  return {
+    ok: false,
+    response: privateJsonResponse({ error: 'Origin not allowed' }, 403, env)
+  };
+}
 
   // Campaign pledge index helpers - maintain per-campaign list of order IDs
   function getCampaignIndexKey(campaignSlug) {
@@ -271,6 +318,7 @@ async function checkRateLimit(request, env, options = {}) {
 // Rate limit configurations for different endpoint types
 const RATE_LIMITS = {
   start: { prefix: 'rl:start', limit: 20, windowSeconds: 60 },      // 20 pledges/min
+  complete: { prefix: 'rl:complete', limit: 8, windowSeconds: 60 }, // 8 recovery attempts/min
   votes: { prefix: 'rl:votes', limit: 30, windowSeconds: 60 },      // 30 votes/min
   admin: { prefix: 'rl:admin', limit: 5, windowSeconds: 60 },       // 5 admin calls/min
   pledge: { prefix: 'rl:pledge', limit: 20, windowSeconds: 60 },    // 20 pledge ops/min
@@ -898,11 +946,45 @@ async function callTierInventoryCoordinator(env, campaignSlug, path, payload = {
 }
 
 async function buildTierInventorySnapshot(env, campaignSlug, campaign = null) {
+  if (hasTierInventoryCoordinator(env)) {
+    try {
+      const result = await callTierInventoryCoordinator(env, campaignSlug, '/snapshot');
+      if (result?.inventory && typeof result.inventory === 'object') {
+        return JSON.parse(JSON.stringify(result.inventory));
+      }
+    } catch (err) {
+      console.error('Failed to fetch tier inventory snapshot from coordinator:', err.message);
+    }
+  }
+
   let inventory = await getTierInventory(env, campaignSlug);
   if (Object.keys(inventory).length === 0 && campaign?.tiers?.some(tier => tier.limit_total)) {
     inventory = await recalculateTierInventory(env, campaignSlug, campaign.tiers) || {};
   }
   return JSON.parse(JSON.stringify(inventory || {}));
+}
+
+async function buildTierAvailabilitySnapshot(env, campaignSlug, campaign = null) {
+  if (hasTierInventoryCoordinator(env)) {
+    try {
+      const result = await callTierInventoryCoordinator(env, campaignSlug, '/snapshot');
+      if (result?.inventory && typeof result.inventory === 'object') {
+        return {
+          inventory: JSON.parse(JSON.stringify(result.inventory)),
+          reservedCounts: result?.reservedCounts && typeof result.reservedCounts === 'object'
+            ? JSON.parse(JSON.stringify(result.reservedCounts))
+            : {}
+        };
+      }
+    } catch (err) {
+      console.error('Failed to fetch reservation-aware tier snapshot from coordinator:', err.message);
+    }
+  }
+
+  return {
+    inventory: await buildTierInventorySnapshot(env, campaignSlug, campaign),
+    reservedCounts: await getReservedTierCounts(env, campaignSlug)
+  };
 }
 
 function getTierReservationKey(campaignSlug, orderId) {
@@ -1002,6 +1084,27 @@ async function clearTierReservation(env, campaignSlug, orderId) {
       console.error('Failed to clear tier reservation in coordinator:', err.message);
     }
   }
+}
+
+async function abandonCheckoutIntent(env, orderId) {
+  if (!env.PLEDGES || !orderId) {
+    return { success: true, released: 0 };
+  }
+
+  const manifest = await env.PLEDGES.get(getCheckoutBundleStorageKey(orderId), { type: 'json' });
+  if (!manifest || !Array.isArray(manifest.campaigns)) {
+    return { success: true, released: 0 };
+  }
+
+  for (const campaignEntry of manifest.campaigns) {
+    const reservedOrderId = String(campaignEntry?.orderId || '').trim();
+    const campaignSlug = String(campaignEntry?.campaignSlug || '').trim();
+    if (!campaignSlug || !reservedOrderId) continue;
+    await clearTierReservation(env, campaignSlug, reservedOrderId);
+  }
+
+  await env.PLEDGES.delete(getCheckoutBundleStorageKey(orderId));
+  return { success: true, released: manifest.campaigns.length };
 }
 
 async function claimSelectedTierInventory(env, campaignSlug, selectedTiers = [], campaign) {
@@ -1158,6 +1261,16 @@ function getStripeWebhookSecret(env) {
   return env.STRIPE_WEBHOOK_SECRET;
 }
 
+function getStripePublishableKey(env) {
+  if (getAppMode(env) === 'test' && env.STRIPE_PUBLISHABLE_KEY_TEST) {
+    return env.STRIPE_PUBLISHABLE_KEY_TEST;
+  }
+  if (getAppMode(env) === 'live' && env.STRIPE_PUBLISHABLE_KEY_LIVE) {
+    return env.STRIPE_PUBLISHABLE_KEY_LIVE;
+  }
+  return env.STRIPE_PUBLISHABLE_KEY || '';
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -1187,6 +1300,10 @@ export default {
 
       if (path === '/checkout-intent/recovery' && method === 'GET') {
         return handleFirstPartyCheckoutRecovery(request, env);
+      }
+
+      if (path === '/checkout-intent/complete' && method === 'POST') {
+        return handleFirstPartyCheckoutComplete(request, env, ctx);
       }
 
       if (path === '/webhooks/stripe' && method === 'POST') {
@@ -1286,6 +1403,16 @@ export default {
 
       if (path === '/test/votes' && method === 'POST') {
         return handleTestVotes(request, env);
+      }
+
+      if (path === '/checkout-intent/abandon' && method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const orderId = String(body?.orderId || '').trim();
+        if (!orderId) {
+          return jsonResponse({ error: 'Missing orderId' }, 400);
+        }
+        const result = await abandonCheckoutIntent(env, orderId);
+        return jsonResponse(result);
       }
 
       if (path.startsWith('/live/') && method === 'GET') {
@@ -1517,6 +1644,9 @@ async function handleFirstPartyCheckoutStart(request, env) {
     return jsonResponse({ error: 'Not found' }, 404);
   }
 
+  const trustedOrigin = requireTrustedSiteOrigin(request, env);
+  if (!trustedOrigin.ok) return trustedOrigin.response;
+
   const rateLimit = await checkRateLimit(request, env, RATE_LIMITS.start);
   if (!rateLimit.allowed) return rateLimit.response;
 
@@ -1524,32 +1654,32 @@ async function handleFirstPartyCheckoutStart(request, env) {
   const { campaignSlug, items, customAmount = 0, email, tipPercent } = body || {};
   const normalizedTipPercent = sanitizePlatformTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
   if (campaignSlug && !isValidSlug(campaignSlug)) {
-    return jsonResponse({ error: 'Invalid campaign slug format' }, 400);
+    return privateJsonResponse({ error: 'Invalid campaign slug format' }, 400, env);
   }
 
   if (email && !isValidEmail(email)) {
-    return jsonResponse({ error: 'Invalid email format' }, 400);
+    return privateJsonResponse({ error: 'Invalid email format' }, 400, env);
   }
 
   const parsedCart = extractCampaignCartsFromFirstPartyItems(items, customAmount, campaignSlug);
   if (!parsedCart.valid) {
-    return jsonResponse({ error: parsedCart.error }, 400);
+    return privateJsonResponse({ error: parsedCart.error }, 400, env);
   }
 
   const orderCarts = parsedCart.carts || [];
   if (orderCarts.length === 0) {
-    return jsonResponse({ error: 'Your cart is empty.' }, 400);
+    return privateJsonResponse({ error: 'Your cart is empty.' }, 400, env);
   }
 
   const checkoutGroups = [];
   for (const orderCart of orderCarts) {
     if (!orderCart.campaignSlug) {
-      return jsonResponse({ error: 'Could not determine campaign from cart contents' }, 400);
+      return privateJsonResponse({ error: 'Could not determine campaign from cart contents' }, 400, env);
     }
 
     const { valid, error, campaign } = await isCampaignLive(env, orderCart.campaignSlug);
     if (!valid) {
-      return jsonResponse({ error: error || 'Campaign not accepting pledges' }, 400);
+      return privateJsonResponse({ error: error || 'Campaign not accepting pledges' }, 400, env);
     }
 
     const tierSelection = buildTierSelectionFromStartRequest(campaign, {
@@ -1558,12 +1688,12 @@ async function handleFirstPartyCheckoutStart(request, env) {
       additionalTiers: orderCart.tierSelections.slice(1)
     });
     if (!tierSelection.valid) {
-      return jsonResponse({ error: tierSelection.error }, 400);
+      return privateJsonResponse({ error: tierSelection.error }, 400, env);
     }
 
     const desiredSupportItems = buildDesiredSupportItems(campaign, [], orderCart.supportItems);
     if (!desiredSupportItems.valid) {
-      return jsonResponse({ error: desiredSupportItems.error }, 400);
+      return privateJsonResponse({ error: desiredSupportItems.error }, 400, env);
     }
 
     const canonicalContribution = buildCanonicalContribution(env, campaign, {
@@ -1573,12 +1703,12 @@ async function handleFirstPartyCheckoutStart(request, env) {
       tipPercent: normalizedTipPercent
     });
     if (!canonicalContribution.valid) {
-      return jsonResponse({ error: canonicalContribution.error }, 400);
+      return privateJsonResponse({ error: canonicalContribution.error }, 400, env);
     }
 
     const sessionShape = compareCartShapeToContribution(orderCart, canonicalContribution);
     if (!sessionShape.valid) {
-      return jsonResponse({ error: sessionShape.error }, 400);
+      return privateJsonResponse({ error: sessionShape.error }, 400, env);
     }
 
     const thresholdValidation = await validateTierThresholdSelection(
@@ -1588,7 +1718,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
       canonicalContribution.selectedTiers
     );
     if (!thresholdValidation.valid) {
-      return jsonResponse({ error: thresholdValidation.error }, 400);
+      return privateJsonResponse({ error: thresholdValidation.error }, 400, env);
     }
 
     const availability = await ensureTierAvailability(
@@ -1598,7 +1728,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
       canonicalContribution.selectedTiers
     );
     if (!availability.valid) {
-      return jsonResponse({ error: availability.error, remaining: availability.remaining }, 400);
+      return privateJsonResponse({ error: availability.error, remaining: availability.remaining }, 400, env);
     }
 
     checkoutGroups.push({
@@ -1609,7 +1739,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
   }
 
   if (!env.CHECKOUT_INTENT_SECRET) {
-    return jsonResponse({ error: 'Checkout intent signing unavailable' }, 503);
+    return privateJsonResponse({ error: 'Checkout intent signing unavailable' }, 503, env);
   }
 
   const bundleTotals = checkoutGroups.reduce((totals, group) => ({
@@ -1643,7 +1773,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
     exp: checkoutIntentExp
   });
   if (!nonceResult.ok) {
-    return jsonResponse({ error: nonceResult.error }, nonceResult.status);
+    return privateJsonResponse({ error: nonceResult.error }, nonceResult.status, env);
   }
 
   const orderId = `pool-intent-${nonce}`;
@@ -1700,17 +1830,34 @@ async function handleFirstPartyCheckoutStart(request, env) {
     for (const reservedGroup of reservedCheckoutGroups) {
       await clearTierReservation(env, reservedGroup.campaignSlug, reservedGroup.orderId);
     }
-    return jsonResponse({ error: reservationErr.message }, 409);
+    return privateJsonResponse({ error: reservationErr.message }, 409, env);
   }
 
   const stripe = createStripeClient(getStripeKey(env));
+  const checkoutUiMode = getCheckoutUiMode(env);
+  const usingCustomCheckoutUi = checkoutUiMode === 'custom';
+  const stripePublishableKey = getStripePublishableKey(env);
+
+  if (usingCustomCheckoutUi && !stripePublishableKey) {
+    if (env.PLEDGES) {
+      await env.PLEDGES.delete(getCheckoutBundleStorageKey(orderId));
+    }
+    for (const reservedGroup of reservedCheckoutGroups) {
+      await clearTierReservation(env, reservedGroup.campaignSlug, reservedGroup.orderId);
+    }
+    return privateJsonResponse({ error: 'Custom checkout unavailable' }, 503, env);
+  }
 
   try {
+    const allowedShippingCountries = [
+      'US', 'CA', 'MX', 'AR', 'BR', 'CL', 'CO', 'CR', 'DO', 'EC', 'GT', 'JM', 'PA', 'PE', 'PR', 'UY',
+      'AT', 'BE', 'BG', 'CH', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU',
+      'IE', 'IS', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK',
+      'AU', 'IN', 'JP', 'KR'
+    ];
     const sessionParams = {
       mode: 'setup',
-      payment_method_types: ['card'],
-      success_url: `${env.SITE_BASE}/pledge-success/?orderId=${orderId}`,
-      cancel_url: `${env.SITE_BASE}/pledge-cancelled/`,
+      payment_method_types: ['card', 'link'],
       metadata: {
         orderId,
         campaignSlug: checkoutGroups[0].campaignSlug,
@@ -1731,18 +1878,49 @@ async function handleFirstPartyCheckoutStart(request, env) {
       }
     };
 
+    if (usingCustomCheckoutUi) {
+      sessionParams.ui_mode = 'custom';
+      sessionParams.return_url = `${env.SITE_BASE}/pledge-success/?orderId=${orderId}`;
+      sessionParams.consent_collection = {
+        payment_method_reuse_agreement: {
+          position: 'hidden'
+        }
+      };
+    } else {
+      sessionParams.success_url = `${env.SITE_BASE}/pledge-success/?orderId=${orderId}`;
+      sessionParams.cancel_url = `${env.SITE_BASE}/pledge-cancelled/`;
+    }
+
     if (email) {
       sessionParams.customer_email = email;
     }
 
     if (checkoutGroups.some((group) => group.canonicalContribution.hasPhysical)) {
       sessionParams.shipping_address_collection = {
-        allowed_countries: ['US']
+        allowed_countries: allowedShippingCountries
       };
     }
 
-    const session = await stripe.checkout.sessions.create(sessionParams);
-    return jsonResponse({ url: session.url });
+    const session = await stripe.checkout.sessions.create(
+      sessionParams,
+      usingCustomCheckoutUi ? { stripeVersion: STRIPE_CUSTOM_UI_MODE_API_VERSION } : undefined
+    );
+
+    if (usingCustomCheckoutUi) {
+      if (!session.client_secret) {
+        throw new Error('Stripe custom checkout session missing client_secret');
+      }
+
+      return privateJsonResponse({
+        checkoutUiMode: 'custom',
+        sessionId: session.id,
+        clientSecret: session.client_secret,
+        publishableKey: stripePublishableKey,
+        orderId
+      }, 200, env);
+    }
+
+    return privateJsonResponse({ checkoutUiMode: 'hosted', url: session.url }, 200, env);
   } catch (stripeErr) {
     if (env.PLEDGES) {
       await env.PLEDGES.delete(getCheckoutBundleStorageKey(orderId));
@@ -1750,7 +1928,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
     for (const reservedGroup of reservedCheckoutGroups) {
       await clearTierReservation(env, reservedGroup.campaignSlug, reservedGroup.orderId);
     }
-    return jsonResponse({ error: 'Failed to create checkout session: ' + stripeErr.message }, 500);
+    return privateJsonResponse({ error: 'Failed to create checkout session: ' + stripeErr.message }, 500, env);
   }
 }
 
@@ -1782,11 +1960,12 @@ async function handleFirstPartyCheckoutSummary(request, env) {
 
       const shippingCollected = bundle.campaigns.some((entry) => entry.hasPhysical === true);
 
-      return jsonResponse({
+      return privateJsonResponse({
         orderId: bundle.orderId || orderId,
         campaignSlug: bundle.campaigns[0]?.campaignSlug || null,
         campaignTitle: campaignTitles.length === 1 ? campaignTitles[0] : null,
         campaignTitles,
+        persisted: Boolean(bundle.confirmedAt),
         pledgeStatus: 'active',
         createdAt: null,
         shippingCollected,
@@ -1800,7 +1979,7 @@ async function handleFirstPartyCheckoutSummary(request, env) {
       }, 200, env);
     }
 
-    return jsonResponse({ error: 'Not found' }, 404);
+    return privateJsonResponse({ error: 'Not found' }, 404, env);
   }
 
   const campaign = await getCampaign(env, pledge.campaignSlug);
@@ -1813,10 +1992,11 @@ async function handleFirstPartyCheckoutSummary(request, env) {
     pledge?.shippingAddress?.country
   );
 
-  return jsonResponse({
+  return privateJsonResponse({
     orderId: pledge.orderId,
     campaignSlug: pledge.campaignSlug,
     campaignTitle: campaign?.title || null,
+    persisted: true,
     pledgeStatus: pledge.pledgeStatus || 'active',
     createdAt: pledge.createdAt || null,
     shippingCollected,
@@ -1860,6 +2040,169 @@ async function handleFirstPartyCheckoutRecovery(request, env) {
       ? `${campaignTitle} is still accepting pledges.`
       : (liveCheck.error || 'Campaign not accepting pledges')
   }, 200, env);
+}
+
+async function handleFirstPartyCheckoutComplete(request, env, ctx) {
+  if (getCheckoutProvider(env) !== 'first_party') {
+    return jsonResponse({ error: 'Not found' }, 404);
+  }
+
+  const trustedOrigin = requireTrustedSiteOrigin(request, env);
+  if (!trustedOrigin.ok) return trustedOrigin.response;
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return privateJsonResponse({ error: 'Invalid JSON' }, 400, env);
+  }
+
+  const orderId = String(body?.orderId || '').trim();
+  const sessionId = String(body?.sessionId || '').trim();
+
+  if (!isFirstPartyOrderId(orderId)) {
+    return privateJsonResponse({ error: 'Invalid orderId' }, 400, env);
+  }
+
+  const rateLimit = await checkRateLimit(request, env, {
+    ...RATE_LIMITS.complete,
+    keyFn: () => orderId || 'unknown'
+  });
+  if (!rateLimit.allowed) return rateLimit.response;
+
+  if (!sessionId) {
+    return privateJsonResponse({ error: 'Missing sessionId' }, 400, env);
+  }
+
+  if (!env.PLEDGES) {
+    return privateJsonResponse({ error: 'Pledge storage unavailable' }, 503, env);
+  }
+
+  const existingPledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+  if (existingPledge) {
+    return privateJsonResponse({
+      success: true,
+      recovered: false,
+      persisted: true,
+      orderId
+    }, 200, env);
+  }
+
+  const stripe = createStripeClient(getStripeKey(env));
+
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (!session) {
+      return privateJsonResponse({ error: 'Checkout session not found' }, 404, env);
+    }
+
+    if (String(session?.metadata?.orderId || '') !== orderId) {
+      return privateJsonResponse({ error: 'Checkout session does not match orderId' }, 409, env);
+    }
+
+    if (session.status !== 'complete') {
+      return privateJsonResponse({
+        error: 'Checkout session is not complete',
+        persisted: false,
+        status: session.status
+      }, 409, env);
+    }
+
+    if (session.mode !== 'setup') {
+      return privateJsonResponse({ error: 'Session is not a setup mode session' }, 400, env);
+    }
+    const metadata = session.metadata || {};
+    const bundleManifest = await loadCheckoutBundleManifest(env, orderId);
+    const setupIntentId = session.setup_intent;
+    const normalizedTipPercent = metadata.tipPercent === undefined || metadata.tipPercent === null || metadata.tipPercent === ''
+      ? 0
+      : sanitizePlatformTipPercent(metadata.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+    const email = session.customer_email || session.customer_details?.email;
+    let customerId = session.customer;
+
+    let shippingAddress = null;
+    if (session.shipping_details) {
+      const sd = session.shipping_details;
+      shippingAddress = {
+        name: sd.name || '',
+        address1: sd.address?.line1 || '',
+        address2: sd.address?.line2 || '',
+        city: sd.address?.city || '',
+        province: sd.address?.state || '',
+        postalCode: sd.address?.postal_code || '',
+        country: sd.address?.country || ''
+      };
+    }
+
+    const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+    const paymentMethodId = setupIntent.payment_method;
+
+    if (!customerId && setupIntent.customer) {
+      customerId = setupIntent.customer;
+    }
+
+    if (!customerId) {
+      try {
+        const newCustomer = await stripe.customers.create({ email });
+        if (newCustomer.id) {
+          await stripe.paymentMethods.attach(paymentMethodId, { customer: newCustomer.id });
+          customerId = newCustomer.id;
+        }
+      } catch (custErr) {
+        console.error('Failed to create Stripe customer during checkout completion:', custErr.message);
+      }
+    }
+
+    if (metadata.checkoutProvider === 'first_party' && bundleManifest?.campaigns?.length) {
+      const recoveryResponse = await processFirstPartyCheckoutBundle({
+        env,
+        ctx,
+        stripe,
+        session,
+        orderId,
+        email,
+        customerId,
+        paymentMethodId,
+        setupIntentId,
+        shippingAddress,
+        normalizedTipPercent,
+        checkoutCartHash: metadata.checkoutCartHash,
+        checkoutSnapshotVersion: metadata.checkoutSnapshotVersion,
+        bundleManifest,
+        markStripeEventProcessed: async () => {}
+      });
+
+      if (!recoveryResponse.ok) {
+        const payload = await recoveryResponse.json().catch(() => ({}));
+        return privateJsonResponse({
+          error: payload?.error || 'Failed to complete checkout session',
+          persisted: false
+        }, recoveryResponse.status || 500, env);
+      }
+
+      const summaryBundle = await loadCheckoutBundleManifest(env, orderId);
+      const recoveredPledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+      const persisted = Boolean(recoveredPledge) || Boolean(summaryBundle?.confirmedAt);
+
+      return privateJsonResponse({
+        success: persisted,
+        recovered: persisted,
+        persisted,
+        orderId
+      }, persisted ? 200 : 409, env);
+    }
+
+    return privateJsonResponse({
+      error: 'Checkout session could not be completed from recovery data',
+      persisted: false
+    }, 409, env);
+  } catch (err) {
+    return privateJsonResponse({
+      error: 'Failed to complete checkout session',
+      details: err?.message || 'Unknown error',
+      persisted: false
+    }, 500, env);
+  }
 }
 
 async function loadCheckoutBundleManifest(env, orderId) {
@@ -3232,16 +3575,24 @@ async function handleModifyPledge(request, env) {
 }
 
 async function handleUpdatePaymentMethod(request, env) {
-  const body = await request.json();
+  const trustedOrigin = requireTrustedSiteOrigin(request, env);
+  if (!trustedOrigin.ok) return trustedOrigin.response;
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return privateJsonResponse({ error: 'Invalid JSON' }, 400, env);
+  }
   const { token } = body;
 
   if (!token) {
-    return jsonResponse({ error: 'Missing token' }, 400);
+    return privateJsonResponse({ error: 'Missing token' }, 400, env);
   }
 
   const payload = await verifyToken(env.MAGIC_LINK_SECRET, token);
   if (!payload) {
-    return jsonResponse({ error: 'Invalid or expired token' }, 401);
+    return privateJsonResponse({ error: 'Invalid or expired token' }, 401, env);
   }
 
   let existingCustomerId = null;
@@ -3254,12 +3605,17 @@ async function handleUpdatePaymentMethod(request, env) {
   }
 
   const stripe = createStripeClient(getStripeKey(env));
+  const checkoutUiMode = getCheckoutUiMode(env);
+  const usingCustomCheckoutUi = checkoutUiMode === 'custom';
+  const stripePublishableKey = getStripePublishableKey(env);
+
+  if (usingCustomCheckoutUi && !stripePublishableKey) {
+    return privateJsonResponse({ error: 'Custom checkout unavailable' }, 503, env);
+  }
   
   const sessionParams = {
     mode: 'setup',
-    payment_method_types: ['card'],
-    success_url: `${env.SITE_BASE}/manage/?t=${token}`,
-    cancel_url: `${env.SITE_BASE}/manage/?t=${token}`,
+    payment_method_types: ['card', 'link'],
     metadata: {
       orderId: payload.orderId,
       campaignSlug: payload.campaignSlug,
@@ -3267,6 +3623,19 @@ async function handleUpdatePaymentMethod(request, env) {
       isPaymentUpdate: 'true'
     }
   };
+
+  if (usingCustomCheckoutUi) {
+    sessionParams.ui_mode = 'custom';
+    sessionParams.return_url = `${env.SITE_BASE}/manage/?t=${token}`;
+    sessionParams.consent_collection = {
+      payment_method_reuse_agreement: {
+        position: 'hidden'
+      }
+    };
+  } else {
+    sessionParams.success_url = `${env.SITE_BASE}/manage/?t=${token}`;
+    sessionParams.cancel_url = `${env.SITE_BASE}/manage/?t=${token}`;
+  }
 
   // Try with existing customer, fall back to email if customer doesn't exist
   if (existingCustomerId) {
@@ -3282,17 +3651,34 @@ async function handleUpdatePaymentMethod(request, env) {
   }
 
   try {
-    const session = await stripe.checkout.sessions.create(sessionParams);
+    const session = await stripe.checkout.sessions.create(
+      sessionParams,
+      usingCustomCheckoutUi ? { stripeVersion: STRIPE_CUSTOM_UI_MODE_API_VERSION } : undefined
+    );
+
+    if (usingCustomCheckoutUi) {
+      if (!session.client_secret) {
+        console.error('Stripe custom session missing client_secret:', JSON.stringify(session, null, 2));
+        return privateJsonResponse({ error: 'Failed to create checkout session' }, 500, env);
+      }
+
+      return privateJsonResponse({
+        checkoutUiMode: 'custom',
+        sessionId: session.id,
+        clientSecret: session.client_secret,
+        publishableKey: stripePublishableKey
+      }, 200, env);
+    }
 
     if (!session.url) {
       console.error('Stripe session has no URL:', JSON.stringify(session, null, 2));
-      return jsonResponse({ error: 'Failed to create checkout session' }, 500);
+      return privateJsonResponse({ error: 'Failed to create checkout session' }, 500, env);
     }
 
-    return jsonResponse({ url: session.url });
+    return privateJsonResponse({ checkoutUiMode: 'hosted', url: session.url }, 200, env);
   } catch (err) {
     console.error('Stripe checkout session error:', err);
-    return jsonResponse({ error: `Stripe error: ${err.message || 'Unknown error'}` }, 500);
+    return privateJsonResponse({ error: `Stripe error: ${err.message || 'Unknown error'}` }, 500, env);
   }
 }
 
@@ -5237,21 +5623,25 @@ async function handleGetLiveCampaign(campaignSlug, env) {
     return jsonResponse({ error: 'Missing campaign slug' }, 400, env, true);
   }
 
-  const [stats, inventory, campaign] = await Promise.all([
+  const [stats, inventorySnapshot, campaign] = await Promise.all([
     getCampaignStats(env, campaignSlug),
-    getTierInventory(env, campaignSlug),
+    buildTierAvailabilitySnapshot(env, campaignSlug),
     getCampaign(env, campaignSlug)
   ]);
+  const inventory = inventorySnapshot?.inventory || {};
+  const reservedCounts = inventorySnapshot?.reservedCounts || {};
 
   const tiers = {};
   for (const tier of (campaign?.tiers || [])) {
     if (tier.limit_total) {
       const inv = inventory?.[tier.id] || { limit: tier.limit_total, claimed: 0 };
+      const reserved = Number(reservedCounts?.[tier.id] || 0);
       tiers[tier.id] = {
         name: tier.name,
         limit: inv.limit,
         claimed: inv.claimed,
-        remaining: inv.limit - inv.claimed
+        reserved,
+        remaining: Math.max(0, inv.limit - inv.claimed - reserved)
       };
     }
   }
@@ -5275,7 +5665,15 @@ async function handleGetLiveCampaign(campaignSlug, env) {
     inventory: {
       campaignSlug,
       tiers,
-      raw: inventory || {}
+      raw: Object.fromEntries(
+        Object.entries(inventory || {}).map(([tierId, inv]) => [
+          tierId,
+          {
+            ...inv,
+            reserved: Number(reservedCounts?.[tierId] || 0)
+          }
+        ])
+      )
     }
   }, 200, env);
 }
@@ -5303,19 +5701,23 @@ async function handleGetInventory(campaignSlug, env) {
     return jsonResponse({ error: 'Missing campaign slug' }, 400, env, true);
   }
 
-  const inventory = await getTierInventory(env, campaignSlug);
   const campaign = await getCampaign(env, campaignSlug);
+  const inventorySnapshot = await buildTierAvailabilitySnapshot(env, campaignSlug, campaign);
+  const inventory = inventorySnapshot.inventory || {};
+  const reservedCounts = inventorySnapshot.reservedCounts || {};
   
   // Merge inventory with tier data for complete picture
   const tiers = {};
   for (const tier of (campaign?.tiers || [])) {
     if (tier.limit_total) {
       const inv = inventory[tier.id] || { limit: tier.limit_total, claimed: 0 };
+      const reserved = Number(reservedCounts?.[tier.id] || 0);
       tiers[tier.id] = {
         name: tier.name,
         limit: inv.limit,
         claimed: inv.claimed,
-        remaining: inv.limit - inv.claimed
+        reserved,
+        remaining: Math.max(0, inv.limit - inv.claimed - reserved)
       };
     }
   }
@@ -5324,7 +5726,15 @@ async function handleGetInventory(campaignSlug, env) {
   return cacheablePublicJsonResponse({
     campaignSlug,
     tiers,
-    raw: inventory
+    raw: Object.fromEntries(
+      Object.entries(inventory || {}).map(([tierId, inv]) => [
+        tierId,
+        {
+          ...inv,
+          reserved: Number(reservedCounts?.[tierId] || 0)
+        }
+      ])
+    )
   }, 200, env);
 }
 
@@ -5663,6 +6073,13 @@ function jsonResponse(data, status = 200, env = null, isPublic = false, extraHea
       ...extraHeaders,
       ...SECURITY_HEADERS
     }
+  });
+}
+
+function privateJsonResponse(data, status = 200, env = null, extraHeaders = {}) {
+  return jsonResponse(data, status, env, false, {
+    'Cache-Control': PRIVATE_NO_STORE_CACHE_CONTROL,
+    ...extraHeaders
   });
 }
 

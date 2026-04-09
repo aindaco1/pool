@@ -41,6 +41,10 @@
       margin-bottom: $space-xs;
     }
   }
+
+  &__content--wide {
+    max-width: 640px;
+  }
   
   &__details {
     background: $surface-tint-medium;
@@ -64,6 +68,114 @@
     color: $color--secondary;
     margin-bottom: $space-md;
   }
+
+  &__field {
+    display: grid;
+    gap: 8px;
+    margin-bottom: $space-md;
+  }
+
+  &__label {
+    font-size: 13px;
+    font-weight: 700;
+    color: $color--primary;
+  }
+
+  &__required-mark {
+    color: #9f1239;
+  }
+
+  &__field input {
+    width: 100%;
+    min-height: 44px;
+    padding: 11px 14px;
+    border: 1px solid $color--light;
+    border-radius: $radius--md;
+    background: $color--white;
+    color: $color--default;
+    font-family: "Inter", sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  &__field input::placeholder {
+    color: $color--secondary;
+  }
+
+  &__field input:focus {
+    outline: 2px solid rgba($color--primary, 0.12);
+    outline-offset: 2px;
+    border-color: $color--primary;
+  }
+
+  &__mount {
+    min-height: 62px;
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    border: 1px dashed $color--light;
+    border-radius: $radius--md;
+    background: rgba($color--background, 0.72);
+    font-size: 13px;
+    line-height: 1.5;
+    color: $color--secondary;
+    margin-bottom: $space-md;
+  }
+
+  &__mount--payment {
+    min-height: 0;
+    display: block;
+    width: 100%;
+    padding: 8px 0 0;
+    border: 0;
+    background: transparent;
+    color: $color--default;
+    margin-bottom: 0;
+  }
+
+  &__payment-section {
+    margin-bottom: $space-md;
+    padding: 14px 18px 12px;
+    border: 1px solid $color--light;
+    border-radius: $radius--md;
+    background: #f8fbff;
+  }
+
+  &__section-label {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: $color--primary;
+  }
+
+  &__section-label--payment {
+    margin: 0 0 8px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  &__note {
+    margin: 0 0 $space-md;
+    font-size: 13px;
+    line-height: 1.5;
+    color: $color--secondary;
+  }
+
+  &__note--payment-consent {
+    color: $color--default;
+  }
+
+  &__error-text {
+    margin: 0 0 $space-md;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #9f1239;
+  }
   
   &__error {
     background: rgba($color--danger, 0.1);
@@ -79,5 +191,9 @@
     gap: $space-sm;
     justify-content: flex-end;
     margin-top: $space-xl;
+
+    .btn {
+      white-space: nowrap;
+    }
   }
 }

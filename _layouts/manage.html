@@ -42,6 +42,28 @@
           </div>
         </div>
       </div>
+
+      <div id="payment-update-modal" class="modal" hidden>
+        <div class="modal__backdrop" data-payment-update-close></div>
+        <div class="modal__content modal__content--wide">
+          <h3>Update Card</h3>
+          <div class="modal__field">
+            <label class="modal__label" for="payment-update-email">Email address <span class="modal__required-mark" aria-hidden="true">*</span></label>
+            <input id="payment-update-email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com">
+            <p id="payment-update-email-error" class="modal__error-text" hidden></p>
+          </div>
+          <div class="modal__payment-section">
+            <p class="modal__section-label modal__section-label--payment">Payment method</p>
+            <div id="payment-update-payment" class="modal__mount modal__mount--payment"></div>
+          </div>
+          <p class="modal__note modal__note--payment-consent">By providing your card information, you allow The Pool to charge your card if the campaign(s) you backed reaches its goal before its end date.</p>
+          <p id="payment-update-error" class="modal__error-text" hidden></p>
+          <div class="modal__actions">
+            <button class="btn btn--secondary" id="payment-update-cancel" data-payment-update-close>Cancel</button>
+            <button class="btn" id="payment-update-confirm" disabled>Save payment method</button>
+          </div>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -55,6 +77,7 @@
       </div>
     </div>
   </footer>
+  <script src="/assets/js/stripe-checkout-sidecar.js" defer></script>
   <script
     src="/assets/js/manage-page.js"
     defer
@@ -64,6 +87,7 @@
     data-sales-tax-rate="{{ site.sales_tax_rate | default: 0.07875 }}"
     data-flat-shipping-rate="{{ site.flat_shipping_rate | default: 3.00 }}"
     data-live-stats-cache-ttl-seconds="{{ site.live_stats_cache_ttl_seconds | default: 300 }}"
-    data-live-inventory-cache-ttl-seconds="{{ site.live_inventory_cache_ttl_seconds | default: 300 }}"></script>
+    data-live-inventory-cache-ttl-seconds="{{ site.live_inventory_cache_ttl_seconds | default: 300 }}"
+    data-checkout-ui-mode="{{ site.checkout_ui_mode | default: 'hosted' }}"></script>
 </body>
 </html>

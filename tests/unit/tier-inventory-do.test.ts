@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { TierInventoryCoordinator } from '../../worker/src/tier-inventory-do.js';
 
@@ -123,7 +123,10 @@ describe('TierInventoryCoordinator', () => {
         'vip-pass': { limit: 2, claimed: 0 }
       },
       reservations: {
-        'intent-1': { 'vip-pass': 1 }
+        'intent-1': {
+          counts: { 'vip-pass': 1 },
+          expiresAt: expect.any(String)
+        }
       }
     });
 
@@ -284,6 +287,106 @@ describe('TierInventoryCoordinator', () => {
       reservedCounts: {
         'vip-pass': 1
       }
+    });
+  });
+
+  it('drops expired reservations from availability snapshots', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-09T06:00:00Z'));
+
+    const state = new MockDurableObjectState();
+    const env = { PLEDGES: new MockKVNamespace() };
+    await state.storage.put('state', {
+      inventory: {
+        'vip-pass': { limit: 2, claimed: 1 }
+      },
+      reservations: {
+        stale: {
+          counts: { 'vip-pass': 1 },
+          expiresAt: '2026-04-09T05:55:00Z'
+        }
+      },
+      updatedAt: '2026-04-09T05:50:00Z'
+    });
+
+    const coordinator = new TierInventoryCoordinator(state as never, env as never);
+    const snapshot = await coordinator.fetch(new Request('https://tier-inventory/snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations'
+      })
+    }));
+
+    expect(await snapshot.json()).toEqual({
+      success: true,
+      inventory: {
+        'vip-pass': { limit: 2, claimed: 1 }
+      },
+      reservedCounts: {},
+      updatedAt: '2026-04-09T05:50:00Z'
+    });
+
+    expect(await state.storage.get('state')).toMatchObject({
+      reservations: {}
+    });
+
+    vi.useRealTimers();
+  });
+
+  it('clears transient reservations when inventory is replaced during a rebuild', async () => {
+    const env = { PLEDGES: new MockKVNamespace() };
+    const coordinator = new TierInventoryCoordinator(new MockDurableObjectState() as never, env as never);
+
+    await coordinator.fetch(new Request('https://tier-inventory/reserve-selection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        reservationId: 'intent-stale',
+        nextCounts: { 'vip-pass': 1 },
+        inventory: {
+          'vip-pass': { limit: 2, claimed: 0 }
+        }
+      })
+    }));
+
+    const replace = await coordinator.fetch(new Request('https://tier-inventory/replace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        inventory: {
+          'vip-pass': { limit: 2, claimed: 1 }
+        }
+      })
+    }));
+
+    expect(await replace.json()).toMatchObject({
+      success: true,
+      inventory: {
+        'vip-pass': { limit: 2, claimed: 1 }
+      },
+      state: {
+        reservations: {}
+      }
+    });
+
+    const snapshot = await coordinator.fetch(new Request('https://tier-inventory/snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations'
+      })
+    }));
+
+    expect(await snapshot.json()).toEqual({
+      success: true,
+      inventory: {
+        'vip-pass': { limit: 2, claimed: 1 }
+      },
+      reservedCounts: {},
+      updatedAt: expect.any(String)
     });
   });
 });

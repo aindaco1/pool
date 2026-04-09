@@ -297,20 +297,12 @@ test.describe('Support Items', () => {
   });
 
   test('support item input updates cart data-item-price', async ({ page }) => {
-    await page.goto('/campaigns/hand-relations/');
+    await page.goto('/campaigns/smoke-editable/');
     
-    const supportInput = page.locator('#support-input-location-scouting');
-    const supportButton = page.locator('#support-btn-location-scouting');
-    
-    if (await supportInput.count() === 0) {
-      test.skip();
-      return;
-    }
-    
-    if (await supportInput.isDisabled()) {
-      test.skip();
-      return;
-    }
+    const supportInput = page.locator('#support-input-snack-run');
+    const supportButton = page.locator('#support-btn-snack-run');
+    await expect(supportInput).toBeVisible();
+    await expect(supportInput).toBeEnabled();
     
     // Enter a value
     await supportInput.fill('75');
@@ -354,15 +346,12 @@ test.describe('Custom Amount', () => {
   });
 
   test('custom amount input updates cart data-item-price', async ({ page }) => {
-    await page.goto('/campaigns/hand-relations/');
+    await page.goto('/campaigns/smoke-editable/');
     
     const customInput = page.locator('#custom-amount-input');
     const customButton = page.locator('#custom-amount-btn');
-    
-    if (await customInput.isDisabled()) {
-      test.skip();
-      return;
-    }
+    await expect(customInput).toBeVisible();
+    await expect(customInput).toBeEnabled();
     
     // Initial price should be 25 (the placeholder default)
     await expect(customButton).toHaveAttribute('data-item-price', '25');
@@ -640,6 +629,9 @@ test.describe('Cart Flow', () => {
     const workerBase = await page.evaluate(() => {
       return (window as any).POOL_CONFIG?.workerBase;
     });
+    const checkoutUiMode = await page.evaluate(() => {
+      return (window as any).POOL_CONFIG?.checkoutUiMode || 'hosted';
+    });
 
     expect(workerBase).toBeTruthy();
 
@@ -675,11 +667,13 @@ test.describe('Cart Flow', () => {
     await expect(page.locator('[data-cart-email]')).toHaveCount(0);
     await expect(page.locator('[data-cart-tip]')).toHaveCount(0);
 
-    await expect(page.locator('[data-cart-start-checkout]')).toBeVisible();
-    await page.evaluate(() => {
-      const button = document.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
-      button?.click();
-    });
+    if (checkoutUiMode !== 'custom') {
+      await expect(page.locator('[data-cart-start-checkout]')).toBeVisible();
+      await page.evaluate(() => {
+        const button = document.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
+        button?.click();
+      });
+    }
     await page.waitForURL('**/campaigns/smoke-editable/#checkout-redirected');
 
     expect(capturedPayload).toMatchObject({
@@ -694,7 +688,15 @@ test.describe('Cart Flow', () => {
       customAmount: 0
     });
 
-    const pendingPledge = await page.evaluate(() => localStorage.getItem('pool_pending_pledge'));
+    const pendingPledge = await page.evaluate(() => {
+      const raw = sessionStorage.getItem('pool_pending_pledge');
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw)?.value ?? null;
+      } catch {
+        return null;
+      }
+    });
     expect(pendingPledge).toBe('true');
   });
 
@@ -1066,107 +1068,136 @@ test.describe('Campaign States', () => {
   });
 });
 
-test.describe('Manual Checkout Flow', () => {
-  test('manual pledge flow - cart to Stripe', async ({ page }) => {
-    // Skip in CI - requires manual interaction and running Worker
-    test.skip(!!process.env.CI, 'Skipped in CI - requires manual interaction');
-    
-    test.setTimeout(300_000); // 5 minutes for manual completion
-    
-    const baseUrl = process.env.PROD_TEST ? 'https://pool.dustwave.xyz' : '';
-    
-    try {
-      // 1. Navigate to campaign
-      await page.goto(`${baseUrl}/campaigns/hand-relations/`);
-      console.log('\n📍 Navigated to Hand Relations campaign');
-      
-      // 2. Add tier to cart
-      const tierButton = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR).first();
-      if (await tierButton.count() === 0) {
-        console.log('❌ No enabled tiers - campaign may not be live');
-        return;
-      }
-      
-      const tierName = await tierButton.getAttribute('data-item-name');
-      const tierPrice = await tierButton.getAttribute('data-item-price');
-      console.log(`🎯 Adding tier: ${tierName} ($${tierPrice})`);
-      
-      await tierButton.click();
-      console.log('🛒 Added tier to cart');
-      
-      // 3. Wait for cart runtime and open cart
-      await page.waitForTimeout(2000);
-      await openCartViaClient(page);
-      console.log('🛒 Cart opened');
-      
-      // Should see pledge notice in cart
-      await page.waitForTimeout(1000);
-      const pledgeNotice = page.locator('.pledge-notice-cart');
-      if (await pledgeNotice.count() > 0) {
-        console.log('✅ Pledge notice visible in cart');
-      }
-      
-      // 4. Click Checkout - billing is auto-filled by cart.js and auto-skipped
-      await page.locator('button:has-text("Checkout")').first().click();
-      console.log('➡️  Clicked Checkout');
-      
-      // 5. Wait for auto-navigation to Pledge step (billing is auto-filled and skipped)
-      console.log('⏳ Waiting for auto-navigation to Pledge step...');
-      await page.waitForTimeout(3000);
-      
-      // 6. Should see custom pledge template with pledge button
-      const pledgeButton = page.locator('#pool-pledge-button');
-      await expect(pledgeButton).toBeVisible({ timeout: 10000 });
-      console.log('✅ Custom pledge button visible');
-      
-      // 7. Check terms checkbox
-      const termsCheckbox = page.locator('input[name="agree-terms"]');
-      if (await termsCheckbox.count() > 0) {
-        await termsCheckbox.check();
-        console.log('✅ Terms checkbox checked');
-      }
-      
-      console.log('\n' + '='.repeat(60));
-      console.log('🎯 MANUAL STEPS REQUIRED');
-      console.log('='.repeat(60));
-      console.log('\n1. Click "Save Card & Pledge" button');
-      console.log('   (This will redirect to Stripe Checkout)');
-      console.log('\n2. In Stripe Checkout, enter test card:');
-      console.log('   Card:   4242 4242 4242 4242');
-      console.log('   Expiry: 12/34');
-      console.log('   CVC:    123');
-      console.log('\n3. Click "Set up" or "Save card"');
-      console.log('\n4. You should be redirected to /pledge-success/');
-      console.log('   with a confirmation message');
-      console.log('\n⏳ Waiting up to 5 minutes for completion...\n');
-      
-      // Wait for redirect to success page or user closes browser
-      try {
-        await page.waitForURL('**/pledge-success/**', { timeout: 300_000 });
-        console.log('✅ Redirected to success page!');
-        
-        // Verify success page content
-        const successHeading = page.locator('h1, h2');
-        const headingText = await successHeading.first().textContent();
-        console.log(`📄 Success page heading: ${headingText}`);
-        
-        console.log('\n✅ Test complete - pledge flow successful!');
-      } catch (e: any) {
-        if (e.message?.includes('closed')) {
-          console.log('✅ Browser closed by user.');
-        } else if (e.name === 'TimeoutError') {
-          console.log('⏰ Timeout waiting for success page');
-        } else {
-          throw e;
-        }
-      }
-    } catch (e: any) {
-      if (e.message?.includes('Target page, context or browser has been closed')) {
-        console.log('✅ Browser closed by user. Test complete.');
-      } else {
-        throw e;
-      }
+test.describe('Checkout Flow', () => {
+  test('custom on-site checkout can save a payment method without leaving the site', async ({ page }) => {
+    test.setTimeout(60_000);
+
+    await page.addInitScript(() => {
+      (window as any).Stripe = () => ({
+        initCheckout: async () => ({
+          loadActions: async () => ({
+            type: 'success',
+            actions: {
+              getSession: () => ({ id: 'cs_test_custom_e2e' }),
+              updateEmail: async () => ({}),
+              confirm: async () => ({ type: 'success' })
+            }
+          }),
+          createPaymentElement: () => ({
+            mount: (node: HTMLElement) => {
+              node.innerHTML = '<div data-test-payment-element>Mock payment element</div>';
+            },
+            unmount: () => {}
+          }),
+          on: (eventName: string, handler: Function) => {
+            if (eventName === 'change') {
+              handler({ session: { canConfirm: true } });
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto('/campaigns/smoke-editable/');
+
+    const cartRuntime = await page.evaluate(() => {
+      return (window as any).PoolCartProvider?.activeRuntime || (window as any).POOL_CONFIG?.cartRuntime || 'first_party';
+    });
+    if (cartRuntime !== 'first_party') {
+      test.skip();
+      return;
     }
+
+    const workerBase = await page.evaluate(() => {
+      return (window as any).POOL_CONFIG?.workerBase;
+    });
+    const checkoutUiMode = await page.evaluate(() => {
+      return (window as any).POOL_CONFIG?.checkoutUiMode || 'hosted';
+    });
+
+    expect(workerBase).toBeTruthy();
+    expect(checkoutUiMode).toBe('custom');
+
+    let capturedPayload: any = null;
+    await page.route(`${workerBase}/checkout-intent/start`, async (route) => {
+      capturedPayload = JSON.parse(route.request().postData() || '{}');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          checkoutUiMode: 'custom',
+          sessionId: 'cs_test_custom_e2e',
+          clientSecret: 'cs_test_custom_secret_e2e',
+          publishableKey: 'pk_test_pool_e2e',
+          orderId: 'pool-intent-e2e-custom-123'
+        })
+      });
+    });
+    await page.route(`${workerBase}/checkout-intent/summary?orderId=pool-intent-e2e-custom-123`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          orderId: 'pool-intent-e2e-custom-123',
+          campaignSlug: 'smoke-editable',
+          campaignTitle: 'SMOKE EDITABLE',
+          persisted: true,
+          pledgeStatus: 'active',
+          createdAt: '2026-04-09T12:34:56.000Z',
+          shippingCollected: false,
+          totals: {
+            subtotal: 1000,
+            tax: 79,
+            shipping: 0,
+            tipAmount: 50,
+            amount: 1129
+          }
+        })
+      });
+    });
+    await page.route(`${workerBase}/checkout-intent/complete`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          recovered: true,
+          persisted: true,
+          orderId: 'pool-intent-e2e-custom-123'
+        })
+      });
+    });
+
+    const tierButton = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR).first();
+    await expect(tierButton).toBeVisible();
+    const tierId = await tierButton.getAttribute('data-item-id');
+    expect(tierId).toBeTruthy();
+
+    await tierButton.click();
+    await openCartViaClient(page);
+    await page.locator('[data-cart-continue]').click();
+
+    const emailField = page.locator('[data-cart-custom-checkout-email]');
+    await expect(emailField).toBeVisible();
+    await emailField.fill('e2e-supporter@example.com');
+
+    const saveButton = page.locator('[data-cart-confirm-custom-checkout]');
+    await expect(saveButton).toBeVisible();
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+
+    await page.waitForURL('**/pledge-success/**');
+    await expect(page.locator('h1, h2').first()).toContainText(/Pledge|Saved|Success/i);
+
+    expect(capturedPayload).toMatchObject({
+      campaignSlug: 'smoke-editable',
+      items: [
+        {
+          id: tierId,
+          quantity: 1
+        }
+      ]
+    });
   });
 
   test('pledge flow API integration', async ({ page }) => {

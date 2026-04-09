@@ -1,3 +1,7 @@
+import { DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
+
+const DEFAULT_RESERVATION_TTL_SECONDS = DEFAULT_CHECKOUT_INTENT_TTL_SECONDS;
+
 export class TierInventoryCoordinator {
   constructor(ctx, env) {
     this.ctx = ctx;
@@ -61,6 +65,10 @@ export class TierInventoryCoordinator {
 
     if (url.pathname === '/reserved-counts') {
       return this.handleReservedCounts(payload.value);
+    }
+
+    if (url.pathname === '/snapshot') {
+      return this.handleSnapshot(payload.value);
     }
 
     return jsonResponse({ error: 'Not found' }, 404);
@@ -180,6 +188,7 @@ export class TierInventoryCoordinator {
     const state = await this.ctx.storage.transaction(async (storage) => {
       const currentState = await getWorkingState(storage, payload.inventory);
       currentState.inventory = cloneInventory(payload.inventory || {});
+      currentState.reservations = {};
       currentState.updatedAt = new Date().toISOString();
       await putWorkingState(storage, currentState);
       return currentState;
@@ -192,7 +201,7 @@ export class TierInventoryCoordinator {
     const result = await this.ctx.storage.transaction(async (storage) => {
       const state = await getWorkingState(storage, payload.inventory);
       const reservationId = payload.reservationId;
-      const previousReservation = normalizeCountMap(state.reservations[reservationId] || {});
+      const previousReservation = getReservationCounts(state.reservations[reservationId]);
       const nextReservation = normalizeCountMap(payload.nextCounts || {});
       const reservedCounts = getReservedCounts(state.reservations, reservationId);
       const tierIds = new Set([...Object.keys(previousReservation), ...Object.keys(nextReservation)]);
@@ -214,7 +223,7 @@ export class TierInventoryCoordinator {
       }
 
       if (Object.keys(nextReservation).length > 0) {
-        state.reservations[reservationId] = nextReservation;
+        state.reservations[reservationId] = buildReservationEntry(nextReservation);
       } else {
         delete state.reservations[reservationId];
       }
@@ -253,7 +262,7 @@ export class TierInventoryCoordinator {
   async handleConfirmReservation(payload) {
     const result = await this.ctx.storage.transaction(async (storage) => {
       const state = await getWorkingState(storage, payload.inventory);
-      const reservation = normalizeCountMap(state.reservations[payload.reservationId] || {});
+      const reservation = getReservationCounts(state.reservations[payload.reservationId]);
       const confirmed = Object.keys(reservation).length > 0;
 
       for (const [tierId, qty] of Object.entries(reservation)) {
@@ -283,6 +292,16 @@ export class TierInventoryCoordinator {
     return jsonResponse({
       success: true,
       reservedCounts: getReservedCounts(state.reservations, payload.reservationId)
+    });
+  }
+
+  async handleSnapshot(payload) {
+    const state = await getWorkingState(this.ctx.storage, payload.inventory);
+    return jsonResponse({
+      success: true,
+      inventory: cloneInventory(state.inventory),
+      reservedCounts: getReservedCounts(state.reservations),
+      updatedAt: state.updatedAt
     });
   }
 }
@@ -339,7 +358,11 @@ function normalizeCountMap(map) {
 async function getWorkingState(storage, bootstrapInventory) {
   const storedState = await storage.get('state');
   if (storedState && typeof storedState === 'object') {
-    return normalizeState(storedState, bootstrapInventory);
+    const normalized = normalizeState(storedState, bootstrapInventory);
+    if (normalized.cleanedExpiredReservations) {
+      await putWorkingState(storage, normalized);
+    }
+    return normalized;
   }
 
   const legacyInventory = await storage.get('inventory');
@@ -366,11 +389,12 @@ async function putWorkingState(storage, state) {
 
 function normalizeState(state, bootstrapInventory) {
   const inventory = cloneInventory(state?.inventory || bootstrapInventory || {});
-  const reservations = cloneReservations(state?.reservations || {});
+  const { reservations, cleanedExpiredReservations } = normalizeReservations(state?.reservations || {});
   return {
     inventory,
     reservations,
-    updatedAt: typeof state?.updatedAt === 'string' ? state.updatedAt : null
+    updatedAt: typeof state?.updatedAt === 'string' ? state.updatedAt : null,
+    cleanedExpiredReservations
   };
 }
 
@@ -391,11 +415,60 @@ function getReservedCounts(reservations = {}, excludedReservationId = null) {
   const counts = {};
   for (const [reservationId, reservation] of Object.entries(reservations || {})) {
     if (excludedReservationId && reservationId === excludedReservationId) continue;
-    for (const [tierId, qty] of Object.entries(normalizeCountMap(reservation))) {
+    for (const [tierId, qty] of Object.entries(getReservationCounts(reservation))) {
       counts[tierId] = (counts[tierId] || 0) + qty;
     }
   }
   return counts;
+}
+
+function buildReservationEntry(counts, now = Date.now()) {
+  return {
+    counts: normalizeCountMap(counts),
+    expiresAt: new Date(now + (DEFAULT_RESERVATION_TTL_SECONDS * 1000)).toISOString()
+  };
+}
+
+function getReservationCounts(reservation) {
+  if (!reservation || typeof reservation !== 'object') return {};
+  if (reservation.counts && typeof reservation.counts === 'object') {
+    return normalizeCountMap(reservation.counts);
+  }
+  return normalizeCountMap(reservation);
+}
+
+function normalizeReservations(reservations) {
+  const normalized = {};
+  let cleanedExpiredReservations = false;
+  const now = Date.now();
+
+  for (const [reservationId, reservation] of Object.entries(reservations || {})) {
+    if (!reservationId) continue;
+
+    const counts = getReservationCounts(reservation);
+    if (Object.keys(counts).length === 0) continue;
+
+    const expiresAt = normalizeReservationExpiry(reservation, now);
+    if (!expiresAt) {
+      cleanedExpiredReservations = true;
+      continue;
+    }
+
+    normalized[reservationId] = {
+      counts,
+      expiresAt
+    };
+  }
+
+  return { reservations: normalized, cleanedExpiredReservations };
+}
+
+function normalizeReservationExpiry(reservation, now = Date.now()) {
+  const rawExpiresAt = typeof reservation?.expiresAt === 'string' ? reservation.expiresAt : '';
+  const parsed = rawExpiresAt ? Date.parse(rawExpiresAt) : NaN;
+  const expiryMs = Number.isFinite(parsed) ? parsed : now + (DEFAULT_RESERVATION_TTL_SECONDS * 1000);
+  if (expiryMs <= now) return null;
+  return new Date(expiryMs).toISOString();
 }
 
 function jsonResponse(data, status = 200) {

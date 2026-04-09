@@ -93,6 +93,27 @@ class PaginatedKVNamespace {
   }
 }
 
+class MockTierInventoryNamespace {
+  responders = new Map<string, (body: Record<string, unknown>) => unknown>();
+
+  idFromName(name: string) {
+    return { name };
+  }
+
+  get(_id: { name: string }) {
+    return {
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        const body = init?.body ? JSON.parse(String(init.body)) : {};
+        const pathname = new URL(url).pathname;
+        const responder = this.responders.get(pathname);
+        const payload = responder ? await responder(body) : { success: true };
+        return jsonResponse(payload);
+      }
+    };
+  }
+}
+
 const campaignFixture = {
   slug: 'hand-relations',
   title: 'Hand Relations',
@@ -427,7 +448,19 @@ describe('worker operational integrity', () => {
   });
 
   it('serves combined live campaign data from one public endpoint', async () => {
-    const env = createEnv();
+    const tierInventory = new MockTierInventoryNamespace();
+    tierInventory.responders.set('/snapshot', () => ({
+      success: true,
+      inventory: {
+        'frame-slot': { limit: 1000, claimed: 2 }
+      },
+      reservedCounts: {
+        'frame-slot': 2
+      }
+    }));
+    const env = createEnv({
+      TIER_INVENTORY_COORDINATOR: tierInventory
+    });
     const kv = env.PLEDGES as PaginatedKVNamespace;
 
     await kv.put('stats:hand-relations', JSON.stringify({
@@ -452,7 +485,10 @@ describe('worker operational integrity', () => {
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=30, stale-while-revalidate=300');
     const body = await response.json();
     expect(body.stats.pledgedAmount).toBe(1200);
-    expect(body.inventory.tiers['frame-slot'].remaining).toBe(998);
+    expect(body.inventory.tiers['frame-slot'].claimed).toBe(2);
+    expect(body.inventory.tiers['frame-slot'].reserved).toBe(2);
+    expect(body.inventory.tiers['frame-slot'].remaining).toBe(996);
+    expect(body.inventory.raw['frame-slot'].reserved).toBe(2);
   });
 
   it('enumerates paginated supporters for admin broadcasts', async () => {

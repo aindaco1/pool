@@ -86,7 +86,7 @@ function timingSafeEqual(a, b) {
 export function createStripeClient(secretKey) {
   const baseUrl = 'https://api.stripe.com/v1';
 
-  async function request(method, path, data) {
+  async function request(method, path, data, requestOptions = {}) {
     const url = `${baseUrl}${path}`;
     const options = {
       method,
@@ -95,6 +95,10 @@ export function createStripeClient(secretKey) {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
     };
+
+    if (requestOptions.stripeVersion) {
+      options.headers['Stripe-Version'] = requestOptions.stripeVersion;
+    }
 
     if (data) {
       options.body = new URLSearchParams(flattenObject(data)).toString();
@@ -107,7 +111,7 @@ export function createStripeClient(secretKey) {
   return {
     checkout: {
       sessions: {
-        create: (data) => request('POST', '/checkout/sessions', data),
+        create: (data, requestOptions) => request('POST', '/checkout/sessions', data, requestOptions),
         retrieve: (id) => request('GET', `/checkout/sessions/${id}`),
         list: (params) => request('GET', `/checkout/sessions?${new URLSearchParams(params).toString()}`)
       }
