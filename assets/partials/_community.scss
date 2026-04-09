@@ -25,20 +25,18 @@
   }
   
   &__denied-intro {
-    font-size: $font-size-lg;
+    @include type-body-copy;
     max-width: 500px;
     margin: 0 auto $space-2xl;
     
     @include xsm {
-      font-size: $font-size-base;
+      font-size: $type--ui;
     }
   }
   
   &__cta-box {
-    background: $color--white;
-    border: 2px solid $color--primary;
-    border-radius: $radius--md;
-    padding: $space-2xl;
+    @include surface-card($space-2xl);
+    border-width: 1px;
     max-width: 480px;
     margin: 0 auto $space-2xl;
     text-align: left;
@@ -49,12 +47,13 @@
     
     h3 {
       margin: 0 0 $space-sm 0;
-      font-size: $font-size-xl;
+      @include type-card-title;
+      font-size: 20px;
     }
     
     p {
       margin: 0 0 $space-md 0;
-      font-size: 15px;
+      @include type-ui;
     }
     
     ul {
@@ -62,7 +61,7 @@
       padding-left: 20px;
       
       li {
-        font-size: 15px;
+        @include type-ui;
         color: $color--secondary;
         margin-bottom: $space-xs;
         
@@ -111,8 +110,7 @@
   
   &__intro {
     color: $color--secondary;
-    font-size: $font-size-base;
-    line-height: 1.6;
+    @include type-body-copy;
   }
   
   &__empty {
@@ -130,7 +128,7 @@
 }
 
 .community-page .decision-card {
-  background: $color--white;
+  @include surface-card($space-xl, $surface--base);
   
   &__header {
     display: flex;
@@ -140,15 +138,15 @@
     
     h3 {
       margin: 0;
-      font-size: $font-size-lg;
+      @include type-card-title;
+      font-size: 18px;
     }
   }
   
   &__type {
-    font-size: $font-size-xs;
-    text-transform: uppercase;
+    @include type-label;
     color: $color--secondary;
-    background: $surface-tint-strong;
+    background: $surface--subtle;
     padding: 4px $space-xs;
     border-radius: $radius--chip;
   }

@@ -22,21 +22,19 @@
   
   &__content {
     position: relative;
-    background: $color--white;
-    border-radius: $radius--md;
-    padding: $space-2xl;
+    @include surface-elevated($space-2xl, $surface--base);
     max-width: 480px;
     width: calc(100% - 48px);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     max-height: 80vh;
     overflow-y: auto;
     
     h2, h3 {
       margin-bottom: $space-md;
-      font-size: 1.25rem;
+      @include type-card-title;
     }
     
     p {
+      @include type-ui;
       color: $color--secondary;
       margin-bottom: $space-xs;
     }
@@ -47,11 +45,9 @@
   }
   
   &__details {
-    background: $surface-tint-medium;
-    border-radius: $radius--sm;
-    padding: $space-md;
+    @include surface-panel($space-md, $surface--subtle);
     margin: $space-md 0;
-    font-size: $font-size-lg;
+    @include type-ui;
     
     ul {
       margin: 8px 0;
@@ -64,7 +60,7 @@
   }
   
   &__subtitle {
-    font-size: $font-size-md;
+    @include type-ui;
     color: $color--secondary;
     margin-bottom: $space-md;
   }
@@ -76,8 +72,7 @@
   }
 
   &__label {
-    font-size: 13px;
-    font-weight: 700;
+    @include type-label;
     color: $color--primary;
   }
 
@@ -89,12 +84,9 @@
     width: 100%;
     min-height: 44px;
     padding: 11px 14px;
-    border: 1px solid $color--light;
-    border-radius: $radius--md;
-    background: $color--white;
-    color: $color--default;
-    font-family: "Inter", sans-serif;
-    font-size: 14px;
+    @include field-shell;
+    font-family: $font-family--body;
+    font-size: $type--ui;
     font-weight: 400;
     line-height: 1.4;
   }
@@ -104,9 +96,7 @@
   }
 
   &__field input:focus {
-    outline: 2px solid rgba($color--primary, 0.12);
-    outline-offset: 2px;
-    border-color: $color--primary;
+    outline-offset: 1px;
   }
 
   &__mount {
@@ -114,11 +104,10 @@
     display: flex;
     align-items: center;
     padding: 12px 14px;
-    border: 1px dashed $color--light;
+    border: 1px dashed $border--default;
     border-radius: $radius--md;
-    background: rgba($color--background, 0.72);
-    font-size: 13px;
-    line-height: 1.5;
+    background: rgba($surface--subtle, 0.9);
+    @include type-ui;
     color: $color--secondary;
     margin-bottom: $space-md;
   }
@@ -136,18 +125,12 @@
 
   &__payment-section {
     margin-bottom: $space-md;
-    padding: 14px 18px 12px;
-    border: 1px solid $color--light;
-    border-radius: $radius--md;
-    background: #f8fbff;
+    @include surface-panel(14px 18px 12px, $surface--subtle);
   }
 
   &__section-label {
     margin: 0;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    @include type-label;
     color: $color--primary;
   }
 
@@ -161,8 +144,7 @@
 
   &__note {
     margin: 0 0 $space-md;
-    font-size: 13px;
-    line-height: 1.5;
+    @include type-ui;
     color: $color--secondary;
   }
 
@@ -172,18 +154,15 @@
 
   &__error-text {
     margin: 0 0 $space-md;
-    font-size: 12px;
-    line-height: 1.5;
+    @include type-meta;
     color: #9f1239;
   }
   
   &__error {
-    background: rgba($color--danger, 0.1);
+    @include surface-panel($space-sm, rgba($color--danger, 0.08));
     color: $color--danger;
-    padding: $space-sm;
-    border-radius: $radius--sm;
     margin-bottom: $space-md;
-    font-size: $font-size-md;
+    @include type-ui;
   }
   
   &__actions {

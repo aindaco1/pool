@@ -32,6 +32,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Ongoing funding** — Post-campaign support section
 - **Manage Pledge dashboard** — Desktop-friendly Active / Closed sections with locked-state read-only controls after deadline
 - **Tip-aware emails + reports** — Supporter emails, pledge reports, and fulfillment exports all include the platform tip when present
+- **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
 - **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
 ## Architecture
@@ -212,7 +213,7 @@ _includes/            # Reusable components
 _plugins/             # Jekyll plugins (money filter, campaign state)
 assets/
   ├── main.scss       # Sass entry point
-  ├── partials/       # Modular Sass (15 focused partials)
+  ├── partials/       # Modular Sass (14 focused partials)
   │   ├── _variables.scss     # Colors, spacing, typography tokens
   │   ├── _mixins.scss        # Breakpoints, button patterns
   │   ├── _base.scss          # Reset, typography, links

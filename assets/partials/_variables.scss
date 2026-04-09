@@ -14,12 +14,32 @@ $space-2xl: $size--unit * 4;   // 32px
 $space-3xl: $size--unit * 6;   // 48px
 $space-4xl: $size--unit * 8;   // 64px
 
+// Typography - Font families
+$font-family--body: "Inter", sans-serif;
+$font-family--display: "gambado-sans", sans-serif;
+
+// Semantic neutrals
+$ink--strong: #101215;
+$ink--default: #252930;
+$ink--muted: #5d6573;
+$ink--soft: #7b8494;
+
+$surface--page: #f5f5f2;
+$surface--base: #ffffff;
+$surface--subtle: #f0f1ed;
+$surface--soft: #e8ebe5;
+$surface--strong: #d9ddd5;
+
+$border--default: #d2d7df;
+$border--strong: #9ea7b5;
+$border--soft: #e3e6eb;
+
 // Colors - Base
-$color--default: #3a3a3a;
-$color--light: lighten($color--default, 65%);
-$color--primary: #000000;
-$color--secondary: #5a5a5a;
-$color--background: #f8faff;
+$color--default: $ink--default;
+$color--light: $border--default;
+$color--primary: $ink--strong;
+$color--secondary: $ink--muted;
+$color--background: $surface--page;
 
 // Colors - Neutrals
 $color--white: #ffffff;
@@ -66,13 +86,24 @@ $font-size-xl:  20px;
 $font-size-2xl: 24px;
 $font-size-3xl: 32px;
 
-// Typography - Headings
-$h1--size: 56px;
-$product-title--size: 40px;
-$body-copy--size: 20px;
-$body-copy--leading: 28px;
+// Typography - Role scale
+$type--display-xl: 56px;
+$type--page-title: 40px;
+$type--section-title: 32px;
+$type--card-title: 22px;
+$type--body-lg: 18px;
+$type--body: 16px;
+$type--ui: 14px;
+$type--meta: 12px;
+$type--eyebrow: 11px;
+
+// Typography - Legacy aliases
+$h1--size: $type--display-xl;
+$product-title--size: $type--page-title;
+$body-copy--size: $type--body-lg;
+$body-copy--leading: 1.6;
 $btn--font-size: $font-size-xs;
-$btn--letter-spacing: 2px;
+$btn--letter-spacing: 0.08em;
 
 // Layout
 $layout--max-width: 1000px;
@@ -84,18 +115,19 @@ $product-block-gap: 96px;
 $radius--sm: 3px;
 $radius--chip: 4px;
 $radius--lg: 6px;
-$radius--md: 8px;
+$radius--md: 10px;
+$radius--xl: 14px;
 
 // Shadows
 $shadow--soft: 0px 0px 10px rgba(58, 58, 58, 0.2);
 $shadow--success-glow: 0 0 8px rgba(40, 167, 69, 0.5);
 
 // Surface tints (subtle backgrounds)
-$surface-tint-softer: rgba($color--primary, 0.01);
-$surface-tint-soft: rgba($color--primary, 0.02);
-$surface-tint-medium: rgba($color--primary, 0.03);
-$surface-tint-hover: rgba($color--primary, 0.04);
-$surface-tint-strong: rgba($color--primary, 0.05);
+$surface-tint-softer: rgba($color--primary, 0.015);
+$surface-tint-soft: rgba($color--primary, 0.025);
+$surface-tint-medium: rgba($color--primary, 0.04);
+$surface-tint-hover: rgba($color--primary, 0.055);
+$surface-tint-strong: rgba($color--primary, 0.07);
 
 // Progress bar
 $progress--color: #000000;

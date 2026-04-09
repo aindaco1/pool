@@ -3,18 +3,18 @@
 .btn {
   @include btn-core($color--primary);
   text-decoration: none;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
   
   &:before {
     display: none;
   }
   
   &:hover {
-    background: $color--background;
+    background: $surface--base;
     border-color: $color--primary;
     color: $color--primary;
-    text-shadow: none;
-    transform: scale(1.03);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba($color--black, 0.08);
   }
 }
 
@@ -26,11 +26,11 @@
 
 .btn--ghost {
   background: transparent;
-  border: 1px solid $color--light;
+  border: 1px solid $border--default;
   color: $color--secondary;
   
   &:hover {
-    background: $surface-tint-strong;
+    background: $surface--base;
     border-color: $color--primary;
     color: $color--primary;
   }
@@ -42,17 +42,16 @@
 }
 
 .btn--secondary {
-  background: $color--background;
-  border: 1px solid $color--secondary;
+  background: $surface--base;
+  border: 1px solid $border--strong;
   color: $color--primary;
   font-weight: 600;
-  text-shadow: none;
   
   &:hover {
-    background: $color--primary;
+    background: $surface--subtle;
     border-color: $color--primary;
-    color: $color--background;
-    transform: scale(1.03);
+    color: $color--primary;
+    transform: translateY(-1px);
   }
 }
 
@@ -75,7 +74,6 @@
   background: transparent;
   border-color: $color--danger;
   color: $color--danger;
-  text-shadow: none;
   
   &:before {
     display: none;

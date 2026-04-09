@@ -14,7 +14,10 @@ layout: default
 
 {% if live_campaigns.size > 0 %}
 <section class="campaigns-section">
-  <h2>Active</h2>
+  <div class="campaigns-section__header">
+    <p class="campaigns-section__eyebrow">Live now</p>
+    <h2>Active</h2>
+  </div>
   <div class="campaigns">
     {% for c in live_campaigns %}
       {% include campaign-card.html campaign=c %}
@@ -25,7 +28,10 @@ layout: default
 
 {% if upcoming_campaigns.size > 0 %}
 <section class="campaigns-section">
-  <h2>Upcoming</h2>
+  <div class="campaigns-section__header">
+    <p class="campaigns-section__eyebrow">On deck</p>
+    <h2>Upcoming</h2>
+  </div>
   <div class="campaigns">
     {% for c in upcoming_campaigns %}
       {% include campaign-card.html campaign=c %}
@@ -36,7 +42,10 @@ layout: default
 
 {% if completed_campaigns.size > 0 %}
 <section class="campaigns-section">
-  <h2>Completed</h2>
+  <div class="campaigns-section__header">
+    <p class="campaigns-section__eyebrow">Recently wrapped</p>
+    <h2>Completed</h2>
+  </div>
   <div class="campaigns">
     {% for c in completed_campaigns %}
       {% include campaign-card.html campaign=c %}

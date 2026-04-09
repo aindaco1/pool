@@ -76,7 +76,7 @@ bundle exec jekyll clean
 
 ✅ **Completed:**
 - Jekyll + first-party cart site structure
-- Sass styling system (15 modular partials, 8px grid)
+- Sass styling system (shared modular partials, 8px grid)
 - Money formatting plugin (`$3,800` style)
 - Campaign cards, two-column layout, hero variants
 - Production phases, community decisions, production diary
@@ -101,7 +101,9 @@ bundle exec jekyll clean
 - Pages CMS integration for visual campaign editing
 
 🚧 **In Progress:**
-_(None currently)_
+- Typography, elements, and layouts redesign
+  - shared tokens, type hierarchy, and reusable surface/button/field primitives are in place
+  - public pages, campaign surfaces, checkout, and Manage Pledge are being aligned to the same calmer visual system
 
 ---
 

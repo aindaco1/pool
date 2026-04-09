@@ -29,7 +29,55 @@
 
 // Typography
 @mixin heading-font {
-  font-family: "gambado-sans", sans-serif;
+  font-family: $font-family--display;
+}
+
+@mixin type-page-title {
+  @include heading-font;
+  font-size: $type--page-title;
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+}
+
+@mixin type-section-title {
+  @include heading-font;
+  font-size: $type--section-title;
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+}
+
+@mixin type-card-title {
+  font-size: $type--card-title;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: $color--primary;
+}
+
+@mixin type-label {
+  font-size: $type--eyebrow;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $color--secondary;
+}
+
+@mixin type-ui {
+  font-size: $type--ui;
+  line-height: 1.5;
+}
+
+@mixin type-body-copy {
+  font-size: $type--body;
+  line-height: 1.65;
+}
+
+@mixin type-meta {
+  font-size: $type--meta;
+  line-height: 1.5;
+  color: $color--secondary;
 }
 
 // Buttons
@@ -38,17 +86,20 @@
   cursor: pointer;
   color: $color--white;
   background-color: $bg;
-  border: 1px solid darken($bg, 3%);
-  text-shadow: 2px 2px 5px darken($bg, 3%);
-  border-radius: $radius--sm;
-  font-weight: bold;
+  border: 1px solid darken($bg, 4%);
+  border-radius: $radius--md;
+  font-weight: 700;
   text-transform: uppercase;
   font-size: $btn--font-size;
   letter-spacing: $btn--letter-spacing;
   padding: $space-sm $space-xl;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-xs;
   text-align: center;
   box-sizing: border-box;
+  line-height: 1.1;
 }
 
 @mixin button-hover($color) {
@@ -77,6 +128,53 @@
     border-radius: $radius--sm;
     transform: scale(1);
     transition: all 0.3s cubic-bezier(0.16, 0.8, 0.66, 1.54);
+  }
+}
+
+// Shared surfaces
+@mixin surface-card($padding: null, $background: $surface--base) {
+  background: $background;
+  border: 1px solid $border--default;
+  border-radius: $radius--md;
+  box-shadow: 0 1px 0 rgba($color--black, 0.03);
+
+  @if $padding != null {
+    padding: $padding;
+  }
+}
+
+@mixin surface-panel($padding: null, $background: $surface-tint-soft) {
+  background: $background;
+  border: 1px solid $border--default;
+  border-radius: $radius--md;
+
+  @if $padding != null {
+    padding: $padding;
+  }
+}
+
+@mixin surface-elevated($padding: null, $background: $surface--base) {
+  background: $background;
+  border: 1px solid $border--default;
+  border-radius: $radius--md;
+  box-shadow: 0 18px 40px rgba($color--black, 0.12);
+
+  @if $padding != null {
+    padding: $padding;
+  }
+}
+
+@mixin field-shell {
+  border: 1px solid $border--default;
+  border-radius: $radius--md;
+  background: $surface--base;
+  color: $color--primary;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: $border--strong;
+    box-shadow: 0 0 0 3px rgba($color--primary, 0.08);
   }
 }
 

@@ -34,6 +34,31 @@ detect_os_family() {
   esac
 }
 
+detect_podman_socket() {
+  podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true
+}
+
+configure_podman_connection() {
+  local socket_path="${1:-}"
+
+  if [ -z "$socket_path" ]; then
+    socket_path="$(detect_podman_socket)"
+  fi
+
+  if [ -n "$socket_path" ]; then
+    unset CONTAINER_CONNECTION
+    export CONTAINER_HOST="unix://${socket_path}"
+  fi
+}
+
+podman_machine_log_path() {
+  local socket_path=""
+  socket_path="$(detect_podman_socket)"
+  if [ -n "$socket_path" ]; then
+    echo "$(dirname "$socket_path")/podman-machine-default.log"
+  fi
+}
+
 pass() { printf '✅ %s\n' "$1"; }
 warn() { printf '⚠️  %s\n' "$1"; }
 fail() { printf '❌ %s\n' "$1"; exit 1; }
@@ -49,7 +74,7 @@ echo "Podman doctor"
 echo "OS family: $OS_FAMILY"
 echo ""
 
-if ! podman version >/dev/null 2>&1; then
+if ! podman --version >/dev/null 2>&1; then
   fail "Podman CLI is installed but not responding. Try reinstalling Podman or reopening your shell."
 fi
 pass "Podman CLI is available"
@@ -61,11 +86,22 @@ if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
 
   MACHINE_STATE="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
   if [ "$MACHINE_STATE" != "running" ]; then
-    warn "Podman machine is not running."
-    echo "   Start it with: podman machine start podman-machine-default"
-    exit 1
+    warn "Podman machine is not running. Attempting to start it once..."
+    podman machine start podman-machine-default >/tmp/pool-podman-doctor-start.log 2>&1 || true
+    MACHINE_STATE="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
+    if [ "$MACHINE_STATE" != "running" ]; then
+      LOG_PATH="$(podman_machine_log_path)"
+      if [ -f /tmp/pool-podman-doctor-start.log ]; then
+        echo "   Podman start log: /tmp/pool-podman-doctor-start.log"
+      fi
+      if [ -n "${LOG_PATH:-}" ] && [ -f "$LOG_PATH" ]; then
+        echo "   Podman machine log: $LOG_PATH"
+      fi
+      fail "Podman machine did not stay running after startup."
+    fi
   fi
   pass "Podman machine is running"
+  configure_podman_connection
 
   if [ "$OS_FAMILY" = "macos" ]; then
     MACHINE_VMTYPE="$(podman machine info 2>/dev/null | awk '/vmtype:/ {print $2}' | head -n 1 || true)"
@@ -81,12 +117,36 @@ if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
 fi
 
 if ! podman info >/dev/null 2>&1; then
+  if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
+    warn "Podman machine looks running but the API is stale. Restarting it once..."
+    podman machine stop podman-machine-default >/tmp/pool-podman-doctor-stop.log 2>&1 || true
+    podman machine start podman-machine-default >/tmp/pool-podman-doctor-start.log 2>&1 || true
+    configure_podman_connection
+  fi
+fi
+
+if ! podman info >/dev/null 2>&1; then
   if [ "$OS_FAMILY" = "linux" ]; then
     fail "Podman engine is not ready. Try running 'podman info' directly and fix the local service/session first."
   fi
   fail "Podman engine is not ready. Try: podman machine stop && podman machine start"
 fi
 pass "Podman engine is reachable"
+
+if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
+  for _ in 1 2 3; do
+    configure_podman_connection
+    if ! podman info >/dev/null 2>&1; then
+      LOG_PATH="$(podman_machine_log_path)"
+      if [ -n "${LOG_PATH:-}" ] && [ -f "$LOG_PATH" ]; then
+        echo "   Podman machine log: $LOG_PATH"
+      fi
+      fail "Podman machine is not staying up after startup."
+    fi
+    sleep 1
+  done
+  pass "Podman machine stays reachable after startup"
+fi
 
 ROOTLESS="$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null || echo false)"
 if [ "$ROOTLESS" != "true" ]; then

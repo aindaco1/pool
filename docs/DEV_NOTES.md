@@ -33,7 +33,7 @@ Matches **dust-wave-shop** styling:
 ```
 assets/
 ├── main.scss              # Entry point with font imports
-├── partials/              # 15 modular partials
+├── partials/              # 14 active modular partials
 │   ├── _variables.scss    # Colors, spacing, typography tokens
 │   ├── _mixins.scss       # Breakpoints, button patterns
 │   ├── _base.scss         # Reset, typography, links

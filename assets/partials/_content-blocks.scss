@@ -15,7 +15,7 @@
   &__caption {
     display: block;
     margin-top: $space-sm;
-    font-size: $font-size-md;
+    @include type-meta;
     color: $color--secondary;
     font-style: italic;
     text-align: center;
@@ -23,8 +23,7 @@
   
   // Text block
   &--text {
-    font-size: $font-size-base;
-    line-height: 1.7;
+    @include type-body-copy;
     
     p {
       margin-bottom: $space-md;
@@ -103,21 +102,19 @@
   // Quote block
   &--quote {
     margin: $space-2xl 0;
-    padding: $space-xl $space-2xl;
+    @include surface-panel($space-xl $space-2xl, $surface--subtle);
     border-left: 4px solid $color--primary;
-    background: $surface-tint-soft;
-    font-size: $font-size-lg;
     font-style: italic;
     
     p {
       margin: 0;
-      line-height: 1.6;
+      @include type-body-copy;
     }
     
     cite {
       display: block;
       margin-top: $space-sm;
-      font-size: $font-size-md;
+      @include type-ui;
       font-style: normal;
       color: $color--secondary;
     }
@@ -147,13 +144,10 @@
   display: flex;
   flex-direction: column;
   gap: $space-xs;
-  padding: $space-md;
-  background: $surface-tint-soft;
-  border: 1px solid $color--light;
-  border-radius: $radius--md;
+  @include surface-panel($space-md, $surface--subtle);
   
   &__title {
-    font-size: $font-size-md;
+    @include type-ui;
     font-weight: 600;
     color: $color--primary;
   }
@@ -202,10 +196,6 @@
       @include xsm {
         grid-template-columns: 1fr;
       }
-    }
-    
-    .gallery__item {
-      aspect-ratio: 4 / 3;
     }
   }
   

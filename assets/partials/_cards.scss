@@ -3,13 +3,24 @@
 // Campaign cards section
 .campaigns-section {
   margin-bottom: $space-4xl;
-  
-  h2 {
+
+  &__header {
+    display: grid;
+    gap: $space-xs;
     margin-bottom: $space-2xl;
-    font-size: $font-size-3xl;
-    
+  }
+
+  &__eyebrow {
+    @include type-label;
+    margin: 0;
+  }
+
+  h2 {
+    @include type-section-title;
+    margin-bottom: 0;
+
     @include xsm {
-      font-size: $font-size-2xl;
+      font-size: 28px;
     }
   }
 }
@@ -27,17 +38,18 @@
 }
 
 .campaign-card {
+  @include surface-elevated(null, $surface--base);
   position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
-  border: 1px solid $color--light;
-  border-radius: $radius--md;
   overflow: hidden;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
   
   &:hover {
-    box-shadow: $shadow--soft;
+    box-shadow: 0 18px 40px rgba($color--black, 0.12);
+    border-color: $border--strong;
+    transform: translateY(-2px);
   }
   
   &__background {
@@ -69,7 +81,7 @@
     
     img {
       width: 100%;
-      height: 180px;
+      height: 220px;
       object-fit: cover;
       display: block;
     }
@@ -82,6 +94,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
+    gap: $space-sm;
   }
   
   &__footer {
@@ -92,8 +105,7 @@
   
   h2 {
     margin: 0 0 $space-sm 0;
-    font-size: 22px;
-    line-height: 1.2;
+    @include type-card-title;
     
     a {
       text-decoration: none;
@@ -107,10 +119,9 @@
   
   &__blurb {
     color: $color--secondary;
-    font-size: $font-size-md;
-    line-height: 1.5;
-    margin: 0 0 $space-md 0;
-    height: 42px;
+    @include type-ui;
+    margin: 0;
+    min-height: 42px;
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -122,18 +133,15 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: $space-sm;
-    padding: $space-sm;
-    background: $surface-tint-soft;
-    border: 1px solid $color--light;
-    border-radius: $radius--sm;
+    @include surface-panel($space-sm, $surface--subtle);
     margin-top: $space-md;
     text-decoration: none;
     transition: all 0.2s;
     min-height: 80px;
     
     &:hover {
-      background: $surface-tint-hover;
-      border-color: $color--secondary;
+      background: $surface--base;
+      border-color: $border--strong;
     }
     
     &--disabled {
@@ -142,8 +150,8 @@
     }
     
     .campaign-card:has(.campaign-card__background) & {
-      background: $color--background;
-      border: 1px solid $color--secondary;
+      background: rgba($surface--page, 0.95);
+      border: 1px solid $border--strong;
       
       &:hover {
         background: $color--primary;
@@ -163,17 +171,16 @@
     }
     
     .featured-tier__name {
-      font-size: $font-size-md;
+      @include type-ui;
       font-weight: 600;
       color: $color--primary;
       margin-bottom: 4px;
     }
     
     .featured-tier__description {
-      font-size: $font-size-xs;
+      @include type-meta;
       color: $color--secondary;
       margin: 0;
-      line-height: 1.4;
       height: 34px;
       overflow: hidden;
       display: -webkit-box;
@@ -182,7 +189,8 @@
     }
     
     .featured-tier__price {
-      font-size: $font-size-base;
+      @include type-ui;
+      font-size: 15px;
       font-weight: 700;
       color: $color--primary;
       white-space: nowrap;
@@ -206,19 +214,17 @@
   
   h4 {
     margin: 0 0 $space-md 0;
-    font-size: $font-size-md;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    @include type-label;
+    color: $color--primary;
   }
   
   .notice-small {
-    font-size: $font-size-xs;
+    @include type-meta;
     color: $color--secondary;
     margin-bottom: $space-sm;
-    padding: 8px;
-    background: lighten($goback--accent, 35%);
-    border-left: 2px solid $goback--accent;
+    padding: 8px 10px;
+    background: $surface--subtle;
+    border-left: 2px solid $border--strong;
     border-radius: $radius--sm;
   }
   
@@ -230,14 +236,14 @@
 }
 
 .tier-card {
-  border: 1px solid $color--light;
-  border-radius: $radius--md;
-  padding: $space-xl;
+  @include surface-card($space-xl);
   margin-bottom: $space-xl;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
   
   &:hover {
-    box-shadow: $shadow--soft;
+    box-shadow: 0 10px 24px rgba($color--black, 0.06);
+    border-color: $border--strong;
+    transform: translateY(-1px);
   }
   
   &.compact {
@@ -247,8 +253,7 @@
   
   h3 {
     margin-top: 0;
-    font-size: $font-size-2xl;
-    color: $color--primary;
+    @include type-card-title;
   }
   
   &.compact h3 {
@@ -269,8 +274,8 @@
   
   p {
     color: $color--secondary;
-    font-size: $font-size-base;
-    line-height: 24px;
+    @include type-ui;
+    line-height: 1.6;
     margin: 8px 0;
   }
   
@@ -281,7 +286,7 @@
   }
   
   .limit {
-    font-size: $font-size-md;
+    @include type-ui;
     color: $color--secondary;
     margin: $space-sm 0;
   }
@@ -295,31 +300,31 @@
     @include btn-core($color--primary);
     width: 100%;
     margin-top: $space-md;
-    font-size: $font-size-xs;
+    font-size: $type--meta;
     padding: 8px $space-sm;
-    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
     
     &:before {
       display: none;
     }
     
     &:hover {
-      background: $color--background;
+      background: $surface--base;
       border-color: $color--primary;
       color: $color--primary;
-      text-shadow: none;
-      transform: scale(1.03);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba($color--black, 0.08);
     }
     
     &:disabled {
-      background: $color--light;
-      border-color: $color--light;
+      background: $surface--soft;
+      border-color: $border--default;
+      color: $ink--soft;
       cursor: not-allowed;
-      text-shadow: none;
       
       &:hover {
-        background: $color--light;
         transform: none;
+        box-shadow: none;
       }
     }
   }
@@ -432,14 +437,14 @@
   align-items: flex-start;
   gap: $space-sm;
   padding: $space-md;
-  border: 2px solid $color--light;
+  border: 1px solid $border--default;
   border-radius: $radius--sm;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
   
   &:hover:not(.tier-option--disabled) {
-    border-color: $color--secondary;
-    background: $surface-tint-softer;
+    border-color: $border--strong;
+    background: $surface--subtle;
   }
   
   input[type="radio"],
@@ -464,15 +469,14 @@
   
   &__desc {
     margin: 8px 0 0 0;
-    font-size: $font-size-md;
+    @include type-ui;
     color: $color--secondary;
   }
   
   &__badge {
     display: inline-block;
-    font-size: 11px;
+    @include type-label;
     font-weight: 600;
-    text-transform: uppercase;
     padding: 2px 6px;
     border-radius: 3px;
     background: $color--primary;
@@ -486,7 +490,7 @@
   
   &--selected {
     border-color: $color--primary;
-    background: $surface-tint-soft;
+    background: $surface--subtle;
   }
   
   &--disabled {
@@ -494,7 +498,7 @@
     cursor: not-allowed;
     
     &:hover {
-      border-color: $color--light;
+      border-color: $border--default;
       background: transparent;
     }
   }
@@ -502,13 +506,12 @@
 
 // Decision card
 .decision-card {
-  border: 1px solid $color--light;
-  border-radius: $radius--md;
-  padding: $space-lg;
+  @include surface-card($space-lg);
   
   h4 {
     margin: 0 0 $space-md 0;
-    font-size: $font-size-base;
+    @include type-ui;
+    font-size: 15px;
   }
   
   &__header {

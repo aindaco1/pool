@@ -16,9 +16,7 @@
   display: flex;
   gap: 24px;
   align-items: flex-start;
-  border: 1px solid $color--light;
-  border-radius: $radius--md;
-  padding: 16px;
+  @include surface-card($space-lg);
   margin-bottom: 24px;
   
   @include xsm {
@@ -39,7 +37,7 @@
   
   h5 {
     margin: 0 0 4px 0;
-    font-size: 15px;
+    font-size: $type--ui;
     font-weight: 600;
     color: $color--primary;
     line-height: 1.2;
@@ -50,10 +48,9 @@
   }
   
   p {
-    font-size: 13px;
+    @include type-meta;
     color: $color--secondary;
     margin: 0;
-    line-height: 1.5;
     
     @include xsm {
       font-size: 12px;
@@ -86,7 +83,7 @@
   }
   
   &__currency {
-    font-size: 16px;
+    font-size: $type--body;
     font-weight: 600;
     color: $color--primary;
   }
@@ -94,14 +91,8 @@
   &__input {
     width: 80px;
     padding: 8px 12px;
-    font-size: 16px;
-    border: 1px solid $color--light;
-    border-radius: $radius--sm;
-    
-    &:focus {
-      outline: none;
-      border-color: $color--primary;
-    }
+    font-size: $type--body;
+    @include field-shell;
   }
   
   &__btn {
@@ -109,28 +100,29 @@
     width: 100%;
     font-size: 12px;
     padding: 8px 12px;
-    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
     
     &:before {
       display: none;
     }
     
     &:hover {
-      background: $color--background;
+      background: $surface--base;
       border-color: $color--primary;
       color: $color--primary;
-      text-shadow: none;
-      transform: scale(1.03);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba($color--black, 0.08);
     }
     
     &:disabled {
-      background: $color--light;
-      border-color: $color--light;
+      background: $surface--soft;
+      border-color: $border--default;
+      color: $ink--soft;
       cursor: not-allowed;
-      text-shadow: none;
       
       &:hover {
         transform: none;
+        box-shadow: none;
       }
     }
   }
@@ -159,9 +151,9 @@
   .qty-btn {
     width: 32px;
     height: 32px;
-    border: 1px solid $color--light;
-    border-radius: $radius--sm;
-    background: white;
+    border: 1px solid $border--default;
+    border-radius: $radius--md;
+    background: $surface--base;
     cursor: pointer;
     font-size: 18px;
     display: flex;
@@ -185,9 +177,8 @@
     width: 60px;
     height: 32px;
     text-align: center;
-    border: 1px solid $color--light;
-    border-radius: $radius--sm;
-    font-size: 14px;
+    font-size: $type--ui;
+    @include field-shell;
     
     &::-webkit-outer-spin-button,
     &::-webkit-inner-spin-button {

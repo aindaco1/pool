@@ -22,7 +22,7 @@
 - [x] Pledge success/cancel pages
 - [x] Supporter-only community page (`/community/:slug/`) with Worker verification and session-scoped supporter token storage
 - [x] Community voting system with Cloudflare KV (no database)
-- [x] Sass refactor (15 modular partials from single 3,500-line file)
+- [x] Sass refactor (modular partial architecture extracted from a single 3,500-line file)
 - [x] Documentation consolidation (15 → 7 focused docs)
 - [x] Non-stackable tier support (hide quantity controls for `stackable: false` tiers)
 - [x] Mobile hamburger/cart overlay z-index fix
@@ -77,6 +77,10 @@
   - axe-backed unit coverage exists for the cart drawer, Manage Pledge dialogs, and campaign-page semantics
   - broader browser accessibility coverage now includes public campaign, community, and pledge-result states, the About and Terms pages, and keyboard-only checkout/manage/community/public-control assertions
   - the remaining manual assistive-technology review is follow-up polish, not a blocker for the current accessibility milestone
+- [x] Typography, elements, and layouts redesign
+  - shared tokens, typography, buttons, fields, and surface primitives now underpin the active Sass system
+  - public pages, campaign surfaces, cart / checkout, and Manage Pledge now share the same calmer visual vocabulary
+  - stale parallel styling was removed so new visual work can continue from one active design system instead of multiple competing ones
 
 ## In Progress
 
@@ -97,8 +101,6 @@ _(None currently)_
   - Support USA, Europe, Canada, Australia, Mexico, other countries in the Americas, Japan, South Korea
 - [ ] Non-Stripe tax calculator to replace flat rate sales tax
   - Support USA, Europe, Canada, Australia, Mexico, other countries in the Americas, Japan, South Korea
-- [ ] Typography, elements, and layouts redesign with an emphasis on simplicity, neutrality, clarity, and reusability
-  - Black, white and gray with an eye towards accessibility compliance
 - [ ] Make the platform variable-first for maximum customizability for forks
 - [ ] Mobile responsiveness pass
 - [ ] Developer FAQ based on internal documentation

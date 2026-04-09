@@ -20,7 +20,7 @@ Creators define campaigns in Markdown; backers pledge through The Pool’s first
 | **API/Glue** | Cloudflare Worker (`pledge.dustwave.xyz`) | Handles checkout bootstrap, webhooks, tip-aware totals, recovery, and reporting data |
 | **Automation** | Worker cron + GitHub Action | Auto-settle (batched) + state transitions |
 | **Storage** | Markdown / YAML | Campaign definitions & state |
-| **Styling** | Sass (15 modular partials) | Design system matching dust-wave-shop |
+| **Styling** | Sass (14 active modular partials) | Shared design system for public pages, checkout, and pledge management |
 
 All code is versioned and auditable — no external DB is required, and campaign editing can stay in-repo or flow through Pages CMS.
 
@@ -122,7 +122,7 @@ For current Cloudflare limits, see:
 ├── _plugins/             # Jekyll plugins (money filter)
 ├── assets/
 │   ├── main.scss         # Sass entry point
-│   ├── partials/         # 15 modular Sass partials (variables, mixins, components)
+│   ├── partials/         # 14 active modular Sass partials (tokens, primitives, page surfaces)
 │   └── js/               # Cart, campaign, and runtime scripts
 ├── worker/               # Cloudflare Worker (pledge.dustwave.xyz)
 │   └── src/              # Stripe setup, webhooks, email, votes, tokens, tip-aware totals

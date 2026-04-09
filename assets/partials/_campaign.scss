@@ -81,8 +81,8 @@
 }
 
 .campaign-blurb {
-  font-size: $font-size-xl;
-  line-height: 1.5;
+  @include type-body-copy;
+  font-size: $type--body-lg;
   color: $color--secondary;
   margin: 0 auto;
   max-width: 900px;
@@ -107,10 +107,7 @@
 }
 
 .pledge-notice {
-  background: lighten($goback--accent, 40%);
-  border: 1px solid $goback--accent;
-  border-radius: $radius--md;
-  padding: $space-md;
+  @include surface-panel($space-md, $surface--subtle);
   margin-bottom: $space-xl;
   
   @include xsm {
@@ -119,14 +116,13 @@
   
   h4 {
     margin: 0 0 $space-sm 0;
-    font-size: $font-size-md;
+    font-size: $type--ui;
     font-weight: 700;
     color: $color--primary;
   }
   
   p {
-    font-size: $font-size-sm;
-    line-height: 1.5;
+    @include type-ui;
     margin: 0 0 $space-xs 0;
     color: $color--primary;
     
@@ -140,8 +136,7 @@
   }
   
   &__meta {
-    font-size: $font-size-xs;
-    color: $color--secondary;
+    @include type-meta;
   }
 }
 
@@ -341,18 +336,13 @@
 }
 
 .campaign-facts {
-  background: $surface-tint-soft;
-  border: 1px solid $color--light;
-  border-radius: $radius--md;
-  padding: $space-lg;
+  @include surface-panel($space-lg, $surface--subtle);
   margin-bottom: $space-xl;
   
   h4 {
     margin: 0 0 $space-md 0;
-    font-size: $font-size-md;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    @include type-label;
+    color: $color--primary;
   }
   
   &__creator {
@@ -369,7 +359,7 @@
     }
     
     span {
-      font-size: $font-size-md;
+      @include type-ui;
       font-weight: 600;
       color: $color--primary;
     }
@@ -379,19 +369,16 @@
     margin: 0;
     
     dt {
-      font-size: $font-size-xs;
+      @include type-label;
       color: $color--secondary;
       margin-bottom: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
     
     dd {
       margin: 0 0 $space-sm 0;
-      font-size: $font-size-md;
+      @include type-ui;
       color: $color--primary;
       font-weight: 600;
-      line-height: 1.5;
       
       &:last-child {
         margin-bottom: 0;
@@ -412,8 +399,8 @@
   
   h5 {
     margin: 0 0 $space-sm 0;
-    font-size: $font-size-md;
-    font-weight: 600;
+    @include type-label;
+    color: $color--primary;
   }
 }
 
@@ -421,9 +408,7 @@
   display: flex;
   gap: $space-xl;
   align-items: flex-start;
-  border: 1px solid $color--light;
-  border-radius: $radius--md;
-  padding: $space-md;
+  @include surface-card($space-md);
   margin-bottom: $space-sm;
   
   @include xsm {
@@ -466,19 +451,20 @@
     margin-bottom: $space-sm;
     
     strong {
-      font-size: 15px;
+      @include type-ui;
       font-weight: 600;
       color: $color--primary;
       line-height: 1.2;
       
       @include xsm {
-        font-size: $font-size-md;
+        font-size: $type--ui;
       }
     }
   }
   
   &__amount {
-    font-size: $font-size-sm;
+    @include type-meta;
+    font-size: 13px;
     font-weight: 600;
     color: $color--default;
     
@@ -520,14 +506,13 @@
   }
   
   &__need {
-    font-size: $font-size-sm;
+    @include type-ui;
     color: $color--black;
     margin: 0;
-    line-height: 1.3;
     text-transform: none;
     
     @include xsm {
-      font-size: $font-size-xs;
+      font-size: $type--meta;
     }
   }
   
@@ -538,7 +523,7 @@
   }
   
   &__currency {
-    font-size: $font-size-md;
+    @include type-ui;
     font-weight: 600;
     color: $color--primary;
   }
@@ -546,43 +531,38 @@
   &__input {
     flex: 1;
     padding: $space-xs 10px;
-    font-size: $font-size-md;
-    border: 1px solid $color--light;
-    border-radius: $radius--sm;
-    
-    &:focus {
-      outline: none;
-      border-color: $color--primary;
-    }
+    @include field-shell;
+    font-size: $type--ui;
   }
   
   &__btn {
     @include btn-core($color--primary);
     width: 100%;
-    font-size: $font-size-xs;
+    font-size: $type--meta;
     padding: $space-xs $space-sm;
-    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
     
     &:before {
       display: none;
     }
     
     &:hover {
-      background: $color--background;
+      background: $surface--base;
       border-color: $color--primary;
       color: $color--primary;
-      text-shadow: none;
-      transform: scale(1.03);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba($color--black, 0.08);
     }
     
     &:disabled {
-      background: $color--light;
-      border-color: $color--light;
+      background: $surface--soft;
+      border-color: $border--default;
+      color: $ink--soft;
       cursor: not-allowed;
-      text-shadow: none;
       
       &:hover {
         transform: none;
+        box-shadow: none;
       }
     }
   }
@@ -592,7 +572,7 @@
 .updates {
   margin-top: $space-4xl;
   padding-top: $space-2xl;
-  border-top: 1px solid $color--light;
+  border-top: 1px solid $border--default;
   
   h2 {
     margin-bottom: $space-xl;
@@ -613,16 +593,16 @@
   gap: $space-xs;
   flex-wrap: wrap;
   margin-bottom: $space-xl;
-  border-bottom: 1px solid $color--light;
+  border-bottom: 1px solid $border--default;
   padding-bottom: $space-xs;
 }
 
 .phase-tab {
   @include btn-core($color--primary);
   background: transparent;
-  border: 1px solid $color--light;
+  border: 1px solid $border--default;
   color: $color--secondary;
-  font-size: $font-size-md;
+  font-size: $type--ui;
   padding: $space-xs $space-md;
   border-radius: 999px;
   
@@ -633,7 +613,7 @@
   }
   
   &:hover:not([aria-selected="true"]) {
-    background: rgba(0, 0, 0, 0.05);
+    background: $surface--subtle;
   }
 }
 
@@ -649,9 +629,7 @@
 }
 
 .registry-item {
-  border: 1px solid $color--light;
-  border-radius: $radius--md;
-  padding: $space-md;
+  @include surface-card($space-md);
   
   &__header {
     display: flex;
@@ -660,13 +638,14 @@
     margin-bottom: $space-sm;
     
     strong {
-      font-size: $font-size-base;
+      @include type-ui;
+      font-size: 15px;
       color: $color--primary;
     }
   }
   
   &__amount {
-    font-size: $font-size-md;
+    @include type-ui;
     color: $color--secondary;
   }
   
@@ -678,7 +657,7 @@
   }
   
   &__need {
-    font-size: $font-size-md;
+    @include type-ui;
     color: $color--secondary;
   }
 }
@@ -697,20 +676,19 @@
   gap: $space-xs;
   flex-wrap: wrap;
   margin-bottom: $space-xl;
-  border-bottom: 1px solid $color--light;
+  border-bottom: 1px solid $border--default;
   padding-bottom: $space-xs;
 }
 
 .diary-tab {
   @include btn-core($color--primary);
   background: transparent;
-  border: 1px solid $color--light;
+  border: 1px solid $border--default;
   color: $color--primary;
-  font-size: $font-size-md;
+  font-size: $type--ui;
   font-weight: 600;
   padding: $space-xs $space-md;
   border-radius: 999px;
-  text-shadow: none;
   
   &[aria-selected="true"] {
     background: $color--primary;
@@ -719,7 +697,7 @@
   }
   
   &:hover:not([aria-selected="true"]) {
-    background: rgba(0, 0, 0, 0.05);
+    background: $surface--subtle;
   }
 }
 
@@ -754,26 +732,24 @@
 }
 
 .diary-entry {
-  border: 1px dashed $color--light;
-  border-radius: $radius--sm;
-  padding: $space-md;
+  @include surface-panel($space-md, $surface--base);
+  border-style: dashed;
   
   &__title {
-    font-size: $font-size-xl;
+    @include type-card-title;
     font-weight: 700;
     margin: 0 0 $space-xs 0;
     color: $color--primary;
   }
   
   &__body {
-    font-size: $font-size-md;
+    @include type-ui;
     color: $color--secondary;
     margin: 0 0 $space-xs 0;
-    line-height: 1.6;
   }
   
   &__date {
-    font-size: $font-size-xs;
+    @include type-meta;
     color: $color--secondary;
     font-style: italic;
   }
@@ -781,25 +757,19 @@
 
 // Ongoing Funding
 .ongoing-funding {
-  background: $surface-tint-soft;
-  border: 1px solid $color--light;
-  border-radius: $radius--md;
-  padding: $space-lg;
+  @include surface-panel($space-lg, $surface--subtle);
   margin-bottom: $space-xl;
   
   h4 {
     margin: 0 0 $space-sm 0;
-    font-size: $font-size-md;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    @include type-label;
+    color: $color--primary;
   }
   
   &__intro {
-    font-size: $font-size-md;
+    @include type-ui;
     color: $color--secondary;
     margin-bottom: $space-md;
-    line-height: 1.5;
   }
 }
 
@@ -809,10 +779,10 @@
   margin: $space-md 0 0 0;
   
   li {
-    font-size: $font-size-md;
+    @include type-ui;
     color: $color--secondary;
     padding: 6px 0;
-    border-bottom: 1px dashed $color--light;
+    border-bottom: 1px dashed $border--default;
     
     &:last-child {
       border-bottom: none;
@@ -822,22 +792,19 @@
 
 // Community Teaser (on campaign page)
 .community-teaser {
-  background: linear-gradient(135deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.05) 100%);
-  border: 1px solid $color--light;
-  border-radius: $radius--md;
-  padding: $space-xl;
+  @include surface-panel($space-xl, $surface--subtle);
   margin: $space-2xl 0;
   text-align: center;
   
   h3 {
     margin: 0 0 $space-xs 0;
-    font-size: $font-size-lg;
+    font-size: $type--body-lg;
   }
   
   p {
     margin: 0 0 $space-md 0;
     color: $color--secondary;
-    font-size: $font-size-md;
+    @include type-ui;
   }
   
   .btn--locked {
@@ -854,23 +821,23 @@
 .campaign-container:has(.campaign-background) .community-teaser,
 .campaign-container:has(.campaign-background) .campaign-facts {
   background: rgba($color--white, 0.9);
-  border: 2px solid $color--primary;
-  box-shadow: 0 2px $space-xs rgba(0, 0, 0, 0.1);
+  border-color: $border--strong;
+  box-shadow: 0 10px 24px rgba($color--black, 0.08);
 }
 
 // Improved readability for upcoming campaigns with background images
 .campaign-container[data-state="upcoming"]:has(.campaign-background) {
   .sidebar-tiers {
     background: rgba($color--white, 0.9);
-    border: 2px solid $color--primary;
+    border: 1px solid $border--strong;
     border-radius: $radius--md;
     padding: $space-lg;
-    box-shadow: 0 2px $space-xs rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 24px rgba($color--black, 0.08);
   }
   
   .tier-card {
     background: rgba($color--white, 0.95);
-    border: 1px solid $color--light;
+    border: 1px solid $border--default;
     
     button:disabled {
       background: $color--secondary;
@@ -891,10 +858,10 @@
   
   .support-items {
     background: rgba($color--white, 0.9);
-    border: 1px solid $color--light;
+    border: 1px solid $border--strong;
     border-radius: $radius--md;
     padding: $space-lg;
-    box-shadow: 0 2px $space-xs rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 24px rgba($color--black, 0.08);
   }
   
   .support-item {

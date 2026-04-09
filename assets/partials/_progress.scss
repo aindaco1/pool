@@ -174,7 +174,8 @@
 }
 
 .progress-meta {
-  font-size: 16px;
+  @include type-ui;
+  font-size: 15px;
   color: $color--secondary;
   
   @include xsm {
@@ -191,10 +192,10 @@
 .campaign-container:has(.campaign-background) .progress-meta,
 .campaign-card:has(.campaign-card__background) .progress-meta {
   display: inline-block;
-  background: rgba($color--white, 0.85);
+  background: rgba($color--white, 0.88);
   padding: 4px 10px;
-  border-radius: 4px;
-  border: 1.5px solid $color--black;
+  border-radius: $radius--chip;
+  border: 1px solid $border--strong;
   
   @include xsm {
     padding-top: 4px;
@@ -208,10 +209,10 @@
 .campaign-card:has(.campaign-card__background) .progress-marker__amount,
 .campaign-card:has(.campaign-card__background) .progress-marker__desc {
   display: inline-block;
-  background: rgba($color--white, 0.85);
+  background: rgba($color--white, 0.88);
   padding: 2px 4px;
   border-radius: 3px;
-  border: 1.5px solid $color--black;
+  border: 1px solid $border--strong;
 }
 
 // Compact progress bar for manage pledge page

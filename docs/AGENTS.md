@@ -17,7 +17,7 @@ Current project context:
 - Handles onboarding and handoffs.
 
 ### 2. Implementation Lead
-- Builds and maintains Jekyll templates and Sass styling (15 modular partials).
+- Builds and maintains Jekyll templates and the shared Sass design system.
 - Maintains the first-party cart runtime and Dust Wave custom JS.
 - Connects front-end pledge flow to the Worker `/checkout-intent/start` endpoint.
 - Maintains cart, checkout sidecars, and manage-page UX for tip-aware totals, secure on-site payment flows, and locked pledge states.

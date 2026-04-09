@@ -19,6 +19,61 @@ PODMAN_REBUILD="${PODMAN_REBUILD:-0}"
 PODMAN_SOCKET=""
 PODMAN_DETACH="${PODMAN_DETACH:-false}"
 
+detect_podman_socket() {
+  podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true
+}
+
+configure_podman_connection() {
+  local socket_path="${1:-}"
+
+  if [ -z "$socket_path" ]; then
+    socket_path="$(detect_podman_socket)"
+  fi
+
+  PODMAN_SOCKET="$socket_path"
+  if [ -n "$socket_path" ]; then
+    unset CONTAINER_CONNECTION
+    export CONTAINER_HOST="unix://${socket_path}"
+  fi
+}
+
+podman_machine_log_path() {
+  local socket_path="${PODMAN_SOCKET:-}"
+
+  if [ -z "$socket_path" ]; then
+    socket_path="$(detect_podman_socket)"
+  fi
+
+  if [ -n "$socket_path" ]; then
+    echo "$(dirname "$socket_path")/podman-machine-default.log"
+  fi
+}
+
+ensure_podman_stability() {
+  local os_family="$1"
+  local log_path=""
+
+  if ! { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; }; then
+    return 0
+  fi
+
+  for _ in $(seq 1 5); do
+    configure_podman_connection
+    if ! podman info >/dev/null 2>&1; then
+      echo "❌ Podman machine became unreachable immediately after startup."
+      log_path="$(podman_machine_log_path)"
+      if [ -n "$log_path" ] && [ -f "$log_path" ]; then
+        echo "   Podman machine log: $log_path"
+        tail -n 20 "$log_path" || true
+      fi
+      return 1
+    fi
+    sleep 1
+  done
+
+  return 0
+}
+
 for arg in "$@"; do
   if [ "$arg" = "--detach" ]; then
     PODMAN_DETACH=true
@@ -209,16 +264,16 @@ ensure_podman_ready() {
     else
       echo "✅ Podman machine already running"
     fi
-    PODMAN_SOCKET="$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true)"
-    if [ "$os_family" = "macos" ] && [ -n "$PODMAN_SOCKET" ]; then
-      export CONTAINER_HOST="unix://${PODMAN_SOCKET}"
-    fi
+    configure_podman_connection
   fi
 
   echo "⏳ Waiting for Podman API to become ready..."
   local ready=0
   local attempted_restart=0
   for _ in $(seq 1 60); do
+    if { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; }; then
+      configure_podman_connection
+    fi
     if podman info >/dev/null 2>&1; then
       ready=1
       break
@@ -230,10 +285,7 @@ ensure_podman_ready() {
         echo "🔄 Podman machine looks stale; restarting it..."
         podman machine stop podman-machine-default >/tmp/pool-podman-machine-stop.log 2>&1 || true
         podman machine start --quiet --no-info podman-machine-default >/tmp/pool-podman-machine-start.log 2>&1 || true
-        PODMAN_SOCKET="$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true)"
-        if [ "$os_family" = "macos" ] && [ -n "$PODMAN_SOCKET" ]; then
-          export CONTAINER_HOST="unix://${PODMAN_SOCKET}"
-        fi
+        configure_podman_connection
         attempted_restart=1
       fi
     fi
@@ -274,6 +326,8 @@ ensure_podman_ready() {
     echo "❌ Podman must run rootless for this local dev path."
     exit 1
   fi
+
+  ensure_podman_stability "$os_family" || exit 1
 }
 
 build_image_if_needed() {

@@ -53,6 +53,7 @@ stabilize_podman_connection() {
 
   socket_path="$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true)"
   if [[ -n "${socket_path}" && -S "${socket_path}" ]]; then
+    unset CONTAINER_CONNECTION
     export CONTAINER_HOST="unix://${socket_path}"
   fi
 }
@@ -128,7 +129,19 @@ ensure_podman_ready() {
     echo "Podman is required for the fallback Jekyll build path."
     return 1
   fi
-  podman info >/dev/null 2>&1
+  stabilize_podman_connection
+  if ! podman info >/dev/null 2>&1; then
+    return 1
+  fi
+
+  for _ in 1 2 3; do
+    stabilize_podman_connection
+    if ! podman info >/dev/null 2>&1; then
+      echo "Podman became unreachable during fallback build setup."
+      return 1
+    fi
+    sleep 1
+  done
 }
 
 build_with_podman_jekyll() {
