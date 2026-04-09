@@ -457,7 +457,7 @@ describe('cart provider shim', () => {
       cartRuntime: 'first_party'
     };
 
-    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+    document.body.innerHTML = '<button id="cart-opener" type="button">Open cart</button><div data-pool-cart-root="true" hidden></div>';
 
     await import('../../assets/js/cart-provider.js');
 
@@ -476,11 +476,19 @@ describe('cart provider shim', () => {
       url: '/campaigns/demo/'
     });
 
-    await readyApi.api.theme.cart.open();
+    const opener = document.getElementById('cart-opener') as HTMLButtonElement | null;
+    if (!opener) throw new Error('Missing cart opener');
+    opener.focus();
+
+    await readyApi.api.theme.cart.open(opener);
 
     const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
     expect(root?.hidden).toBe(false);
-    expect(root?.querySelector('.pool-first-party-cart__panel')).toBeTruthy();
+    const panel = root?.querySelector('.pool-first-party-cart__panel') as HTMLElement | null;
+    expect(panel).toBeTruthy();
+    expect(panel?.getAttribute('role')).toBe('dialog');
+    expect(panel?.getAttribute('aria-modal')).toBe('true');
+    expect(panel?.getAttribute('aria-labelledby')).toBe('pool-first-party-cart-title');
     expect(root?.textContent).toContain('Drawer Item');
     expect(root?.textContent).toContain('$18.00');
     expect(root?.textContent).toContain('Pledge total');
@@ -489,19 +497,31 @@ describe('cart provider shim', () => {
     expect(root?.textContent).toContain('Pledge total');
     const cartTipSlider = root?.querySelector('[data-cart-tip]') as HTMLInputElement | null;
     expect(cartTipSlider).toBeTruthy();
-    expect((root?.querySelector('.pool-first-party-cart__close') as HTMLButtonElement | null)?.textContent).toBe('X');
+    const closeButton = root?.querySelector('.pool-first-party-cart__close') as HTMLButtonElement | null;
+    expect(closeButton?.textContent).toBe('X');
+    expect(document.activeElement).toBe(closeButton);
 
     if (!cartTipSlider) throw new Error('Missing cart tip slider');
+    expect(cartTipSlider.getAttribute('aria-labelledby')).toBe('pool-cart-tip-label');
+    expect(cartTipSlider.getAttribute('aria-describedby')).toBe('pool-cart-tip-copy pool-cart-tip-percent');
+    expect(cartTipSlider.getAttribute('aria-valuetext')).toBe('5% tip, $0.90');
     cartTipSlider.value = '6';
     cartTipSlider.dispatchEvent(new Event('input', { bubbles: true }));
     expect(cartTipSlider.isConnected).toBe(true);
     expect(root?.textContent).toContain('The Pool tip (6%)');
+    expect(cartTipSlider.getAttribute('aria-valuetext')).toBe('6% tip, $1.08');
 
     cartTipSlider.value = '7';
     cartTipSlider.dispatchEvent(new Event('input', { bubbles: true }));
     expect(cartTipSlider.isConnected).toBe(true);
     expect(root?.textContent).toContain('The Pool tip (7%)');
+    expect(cartTipSlider.getAttribute('aria-valuetext')).toBe('7% tip, $1.26');
     cartTipSlider.dispatchEvent(new Event('change', { bubbles: true }));
+    cartTipSlider.focus();
+    cartTipSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    cartTipSlider.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(document.activeElement).toBe(cartTipSlider);
+    expect(cartTipSlider.isConnected).toBe(true);
 
     const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
     if (!continueButton) throw new Error('Missing continue button');
@@ -549,12 +569,13 @@ describe('cart provider shim', () => {
     });
     expect(root?.textContent).toContain('Your cart is empty.');
 
-    const closeButton = root?.querySelector('[data-cart-close]') as HTMLButtonElement | null;
-    if (!closeButton) throw new Error('Missing close button');
-    closeButton.click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(root?.innerHTML).toBe('');
-    expect(root?.getAttribute('aria-hidden')).toBe('true');
+    await vi.waitFor(() => {
+      expect(root?.innerHTML).toBe('');
+      expect(root?.getAttribute('aria-hidden')).toBe('true');
+    });
   });
 
   it('starts first-party checkout from the drawer preview when enabled', async () => {
@@ -787,9 +808,13 @@ describe('cart provider shim', () => {
     const shippingState = root?.querySelector('[data-cart-custom-shipping-field="state"]') as HTMLInputElement | null;
     const shippingPostalCode = root?.querySelector('[data-cart-custom-shipping-field="postal_code"]') as HTMLInputElement | null;
     const shippingCountry = root?.querySelector('[data-cart-custom-shipping-field="country"]') as HTMLSelectElement | null;
+    const shippingError = root?.querySelector('#pool-custom-shipping-error') as HTMLElement | null;
     if (!shippingName || !emailField || !shippingLine1 || !shippingCity || !shippingState || !shippingPostalCode || !shippingCountry) {
       throw new Error('Missing custom checkout shipping fields');
     }
+    expect(shippingName.getAttribute('aria-describedby')).toBe('pool-custom-shipping-error');
+    expect(shippingName.getAttribute('aria-invalid')).toBe('false');
+    expect(shippingError?.getAttribute('role')).toBe('alert');
 
     expect(root?.textContent).toContain('Shipping address');
     expect(shippingCountry.value).toBe('US');

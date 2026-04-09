@@ -4,28 +4,35 @@ const WORKER_BASE = 'https://worker.test';
 
 function renderManagePage() {
   document.body.innerHTML = `
-    <div id="pledge-loading"></div>
-    <div id="pledge-error" hidden></div>
-    <p id="pledge-error-message"></p>
-    <div id="pledges-list" hidden></div>
-    <div id="confirm-modal" hidden>
-      <div class="modal__backdrop"></div>
-      <div id="confirm-modal-message"></div>
-      <div id="confirm-modal-details"></div>
-      <button id="confirm-modal-cancel"></button>
-      <button id="confirm-modal-confirm"></button>
-    </div>
-    <div id="payment-update-modal" hidden>
-      <div class="modal__backdrop" data-payment-update-close></div>
-      <label for="payment-update-email">Email address *</label>
-      <input id="payment-update-email">
-      <p id="payment-update-email-error" hidden></p>
-      <div id="payment-update-payment"></div>
-      <p>By providing your card information, you allow The Pool to charge your card if the campaign(s) you backed reaches its goal before its end date.</p>
-      <p id="payment-update-error" hidden></p>
-      <button id="payment-update-cancel" data-payment-update-close></button>
-      <button id="payment-update-confirm" disabled></button>
-    </div>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <header></header>
+    <main id="main-content">
+      <div id="pledge-loading"></div>
+      <div id="pledge-error" role="alert" hidden></div>
+      <p id="pledge-error-message"></p>
+      <div id="pledges-list" hidden></div>
+      <div id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-message confirm-modal-details" hidden>
+        <div class="modal__backdrop"></div>
+        <h3 id="confirm-modal-title">Confirm Changes</h3>
+        <div id="confirm-modal-message"></div>
+        <div id="confirm-modal-details"></div>
+        <button id="confirm-modal-cancel"></button>
+        <button id="confirm-modal-confirm"></button>
+      </div>
+      <div id="payment-update-modal" role="dialog" aria-modal="true" aria-labelledby="payment-update-title" aria-describedby="payment-update-consent payment-update-error" hidden>
+        <div class="modal__backdrop" data-payment-update-close></div>
+        <h3 id="payment-update-title">Update Card</h3>
+        <label for="payment-update-email">Email address *</label>
+        <input id="payment-update-email" aria-describedby="payment-update-email-error">
+        <p id="payment-update-email-error" hidden></p>
+        <div id="payment-update-payment"></div>
+        <p id="payment-update-consent">By providing your card information, you allow The Pool to charge your card if the campaign(s) you backed reaches its goal before its end date.</p>
+        <p id="payment-update-error" role="alert" hidden></p>
+        <button id="payment-update-cancel" data-payment-update-close></button>
+        <button id="payment-update-confirm" disabled></button>
+      </div>
+    </main>
+    <footer></footer>
     <script
       data-manage-page-script="true"
       data-worker-base="${WORKER_BASE}"
@@ -402,6 +409,60 @@ describe('manage page script', () => {
     expect(localStorage.getItem('pool_first_party_cart_state')).toBeNull();
   });
 
+  it('opens the payment update modal with dialog semantics and restores focus on escape', async () => {
+    (window as any).PoolStripeCheckoutSidecar = {
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe),
+      mount: vi.fn(async ({ onChange }) => {
+        if (typeof onChange === 'function') {
+          onChange({ session: { canConfirm: true } });
+        }
+
+        return {
+          supportsShippingAddressElement: false,
+          updateEmail: vi.fn(async () => ({})),
+          confirm: vi.fn(async () => ({ type: 'success' })),
+          unmount: vi.fn()
+        };
+      })
+    };
+
+    mockManageFetch({
+      paymentStartPayload: {
+        checkoutUiMode: 'custom',
+        sessionId: 'cs_test_update_123',
+        clientSecret: 'cs_test_update_secret_123',
+        publishableKey: 'pk_test_update_123'
+      }
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    const paymentButton = getButton('[data-action="payment"][data-index="0"]');
+    paymentButton.focus();
+    paymentButton.click();
+
+    await vi.waitFor(() => {
+      const modal = document.getElementById('payment-update-modal');
+      expect(modal?.hidden).toBe(false);
+      expect(modal?.getAttribute('role')).toBe('dialog');
+      expect(modal?.getAttribute('aria-modal')).toBe('true');
+    });
+
+    expect(document.activeElement).toBe(getInput('#payment-update-email'));
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    vi.advanceTimersByTime(0);
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('payment-update-modal')?.hidden).toBe(true);
+    });
+  });
+
   it('escapes campaign-authored content in pledge cards and confirm modal details', async () => {
     mockManageFetch({
       campaigns: [
@@ -547,8 +608,12 @@ describe('manage page script', () => {
     });
 
     const tipSlider = getInput('#tip-percent-0');
+    expect(tipSlider.getAttribute('aria-labelledby')).toBe('tip-heading-0');
+    expect(tipSlider.getAttribute('aria-describedby')).toBe('tip-copy-0 tip-percent-label-0');
+    expect(tipSlider.getAttribute('aria-valuetext')).toBe('0% tip, $0.00');
     tipSlider.value = '5';
     tipSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(tipSlider.getAttribute('aria-valuetext')).toBe('5% tip, $0.50');
 
     const saveButton = getButton('[data-action="save"][data-index="0"]');
     expect(saveButton.disabled).toBe(false);
@@ -586,6 +651,42 @@ describe('manage page script', () => {
     await vi.waitFor(() => {
       expect(localStorage.getItem('pool_stats_hand-relations')).toBeNull();
       expect(localStorage.getItem('pool_inventory_hand-relations')).toBeNull();
+    });
+  });
+
+  it('opens the confirm modal with dialog semantics and restores focus on escape', async () => {
+    mockManageFetch();
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    const tipSlider = getInput('#tip-percent-0');
+    tipSlider.value = '5';
+    tipSlider.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(tipSlider.getAttribute('aria-valuetext')).toBe('5% tip, $0.50');
+
+    const saveButton = getButton('[data-action="save"][data-index="0"]');
+    saveButton.focus();
+    saveButton.click();
+
+    await vi.waitFor(() => {
+      const modal = document.getElementById('confirm-modal');
+      expect(modal?.hidden).toBe(false);
+      expect(modal?.getAttribute('role')).toBe('dialog');
+      expect(modal?.getAttribute('aria-modal')).toBe('true');
+    });
+
+    expect(document.activeElement).toBe(getButton('#confirm-modal-cancel'));
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    vi.advanceTimersByTime(0);
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('confirm-modal')?.hidden).toBe(true);
     });
   });
 

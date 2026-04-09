@@ -72,6 +72,11 @@
   - Polymorphic fields with `type: block` and `blockKey`
   - Datetime picker for diary entries
   - Full campaign schema (tiers, stretch goals, support items, diary, decisions)
+- [x] Accessibility compliance
+  - dialog, tab, tip-slider, and critical error/live-region semantics are now meaningfully stronger
+  - axe-backed unit coverage exists for the cart drawer, Manage Pledge dialogs, and campaign-page semantics
+  - broader browser accessibility coverage now includes public campaign, community, and pledge-result states, the About and Terms pages, and keyboard-only checkout/manage/community/public-control assertions
+  - the remaining manual assistive-technology review is follow-up polish, not a blocker for the current accessibility milestone
 
 ## In Progress
 
@@ -80,12 +85,25 @@ _(None currently)_
 ## Planned
 
 - [ ] Admin dashboard page (read-only) from KV data
-- [ ] Shipping calculator to replace flat rate
-  - Support USA, Europe, Canada, Australia, Mexico, Latin America, Japan
-- [ ] Non-Stripe tax calculator to replace flat rate sales tax
-  - Support USA, Europe, Canada, Australia, Mexico, Latin America, Japan
+  - Super admin and per-campaign users
+  - Magic link auth
+  - Variable customizability
 - [ ] Replace Pages CMS with dedicated content editor and per-campaign permissions
-- [ ] Accessibility compliance
+  - Review Pages CMS GitHub repo for a starting place
+  - Super admin and per-campaign users
+  - Magic link auth
+  - Block-based with the ability to preview campaign content
+- [ ] Shipping calculator to replace flat rate
+  - Support USA, Europe, Canada, Australia, Mexico, other countries in the Americas, Japan, South Korea
+- [ ] Non-Stripe tax calculator to replace flat rate sales tax
+  - Support USA, Europe, Canada, Australia, Mexico, other countries in the Americas, Japan, South Korea
+- [ ] Typography, elements, and layouts redesign with an emphasis on simplicity, neutrality, clarity, and reusability
+  - Black, white and gray with an eye towards accessibility compliance
+- [ ] Make the platform variable-first for maximum customizability for forks
+- [ ] Mobile responsiveness pass
+- [ ] Developer FAQ based on internal documentation
+- [ ] Marketing landing page for the platform on a different domain
+- [ ] i18n completion with a Spanish language translation available
 
 ## Known Issues
 

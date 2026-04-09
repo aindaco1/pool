@@ -9,6 +9,9 @@ TEMP_DEV_VARS=""
 ORIGINAL_DEV_VARS_BACKUP=""
 LOG_DIR="$(mktemp -d /tmp/pool-premerge-logs.XXXXXX)"
 declare -a PHASE_RESULTS=()
+HOST_JEKYLL_STATUS="unknown"
+HOST_JEKYLL_FAILURE_REASON=""
+HOST_JEKYLL_LOG=""
 
 prefer_podman_path() {
   local candidate=""
@@ -54,11 +57,69 @@ stabilize_podman_connection() {
   fi
 }
 
-host_jekyll_available() {
+check_host_jekyll_status() {
   if ! command -v bundle >/dev/null 2>&1; then
+    HOST_JEKYLL_STATUS="missing_bundler"
     return 1
   fi
-  bundle check >/dev/null 2>&1
+  if bundle check >/dev/null 2>&1; then
+    HOST_JEKYLL_STATUS="ready"
+    return 0
+  fi
+  HOST_JEKYLL_STATUS="missing_gems"
+  return 1
+}
+
+prepare_host_jekyll() {
+  if check_host_jekyll_status; then
+    return 0
+  fi
+
+  if [[ "${HOST_JEKYLL_STATUS}" != "missing_gems" ]]; then
+    return 1
+  fi
+
+  echo "Host Bundler is present but Jekyll gems are missing; attempting bundle install..."
+  HOST_JEKYLL_LOG="${LOG_DIR}/host-jekyll-bundle-install.log"
+  if bundle install >"${HOST_JEKYLL_LOG}" 2>&1 && bundle check >/dev/null 2>&1; then
+    HOST_JEKYLL_STATUS="ready"
+    echo "Host Jekyll gems installed successfully."
+    return 0
+  fi
+
+  HOST_JEKYLL_STATUS="bundle_install_failed"
+  if [[ -f "${HOST_JEKYLL_LOG}" ]] && rg -q "can no longer be found in that source" "${HOST_JEKYLL_LOG}"; then
+    HOST_JEKYLL_FAILURE_REASON="locked gem version is unavailable from RubyGems"
+  elif [[ -f "${HOST_JEKYLL_LOG}" ]] && rg -q "extensions are not built" "${HOST_JEKYLL_LOG}"; then
+    HOST_JEKYLL_FAILURE_REASON="native gem extensions are missing on the host Ruby"
+  else
+    HOST_JEKYLL_FAILURE_REASON="bundle install failed"
+  fi
+  return 1
+}
+
+print_host_jekyll_fallback_reason() {
+  case "${HOST_JEKYLL_STATUS}" in
+    missing_bundler)
+      echo "Host Bundler is unavailable; falling back to the Podman-backed Jekyll build"
+      ;;
+    missing_gems)
+      echo "Host Jekyll gems are missing; falling back to the Podman-backed Jekyll build"
+      ;;
+    bundle_install_failed)
+      if [[ -n "${HOST_JEKYLL_FAILURE_REASON}" ]]; then
+        echo "Host Jekyll gems could not be installed cleanly (${HOST_JEKYLL_FAILURE_REASON}); falling back to the Podman-backed Jekyll build"
+      else
+        echo "Host Jekyll gems could not be installed cleanly; falling back to the Podman-backed Jekyll build"
+      fi
+      if [[ -n "${HOST_JEKYLL_LOG}" ]]; then
+        echo "Host Bundler log: ${HOST_JEKYLL_LOG}"
+      fi
+      ;;
+    *)
+      echo "Host Jekyll is unavailable; falling back to the Podman-backed Jekyll build"
+      ;;
+  esac
 }
 
 ensure_podman_ready() {
@@ -236,13 +297,13 @@ run_phase "3. Focused regression suites" npx vitest run \
 run_phase "4. Full unit suite" npm run test:unit
 
 USE_PODMAN_JEKYLL=false
-if host_jekyll_available; then
+if prepare_host_jekyll; then
   run_phase "5. First-party build artifact checks" bash -lc '
     bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
     rg -n "\.pool-first-party-cart__panel" _site/assets/main.css >/dev/null
   '
 else
-  echo "Host Jekyll gems unavailable; falling back to Podman-backed build"
+  print_host_jekyll_fallback_reason
   USE_PODMAN_JEKYLL=true
   run_phase "5. First-party build artifact checks" bash -lc '
     PATH="$HOME/.nvm/versions/node/v20.19.6/bin:/opt/podman/bin:$PATH"

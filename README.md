@@ -161,7 +161,7 @@ Podman-backed local testing:
 npm run test:e2e:headless:podman     # Automated browser suite with Playwright in a container
 ```
 
-When host Bundler/Jekyll gems are unavailable, the pre-merge gate now falls back to Podman for the Jekyll build and the local smoke/browser phases instead of failing early on host Ruby setup.
+The pre-merge gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. If that still cannot produce a clean host build, it falls back to Podman for the Jekyll build and the local smoke/browser phases instead of failing early on host Ruby setup.
 
 - `pledge-report.sh` is a ledger/history export, so modified pledges appear as deltas and mixed changes now keep tip-update context in the `items` column.
 - `fulfillment-report.sh` is the merged current-state view per `email + campaign`, which is the better comparison point for repeat backers and non-stackable projects.
@@ -170,7 +170,7 @@ When host Bundler/Jekyll gems are unavailable, the pre-merge gate now falls back
 - Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow
 - Unit, security, and headless E2E suites are green on this branch
 
-**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility, campaign states, secret exposure auditing, campaign-content HTML/link/embed auditing, serialized tier-inventory coordination, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
+**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility (including axe-backed public-page checks across campaign, community, and pledge-result states, ARIA snapshots, and keyboard-only checkout/manage/community/public-control assertions), campaign states, secret exposure auditing, campaign-content HTML/link/embed auditing, serialized tier-inventory coordination, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
 
 For local merge smoke on mutable pledges, use:
 
@@ -197,6 +197,7 @@ See [`docs/`](docs/) for full documentation:
 - [DEV_NOTES.md](docs/DEV_NOTES.md) — Development notes, content model & FAQ
 - [TESTING.md](docs/TESTING.md) — Full testing guide & secrets reference
 - [SECURITY.md](docs/SECURITY.md) — Security architecture, rate limiting & pen testing
+- [ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — Accessibility standards, critical surfaces, and current coverage
 - [ROADMAP.md](docs/ROADMAP.md) — Planned features
 - [CMS.md](docs/CMS.md) — Pages CMS setup & campaign editing guide
 

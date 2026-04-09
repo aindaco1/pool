@@ -2,12 +2,12 @@
 <section class="diary" id="diary">
   <h3>Diary</h3>
   
-  <div class="diary-tabs" role="tablist">
-    <button class="diary-tab" role="tab" aria-selected="true" data-tab="fundraising">Fundraising</button>
-    <button class="diary-tab" role="tab" aria-selected="false" data-tab="pre-production">Pre-Production</button>
-    <button class="diary-tab" role="tab" aria-selected="false" data-tab="production">Production</button>
-    <button class="diary-tab" role="tab" aria-selected="false" data-tab="post-production">Post-Production</button>
-    <button class="diary-tab" role="tab" aria-selected="false" data-tab="distribution">Distribution</button>
+  <div class="diary-tabs" role="tablist" aria-label="Diary phases">
+    <button class="diary-tab" id="diary-tab-fundraising" role="tab" aria-selected="true" aria-controls="diary-fundraising" tabindex="0" data-tab="fundraising" type="button">Fundraising</button>
+    <button class="diary-tab" id="diary-tab-pre-production" role="tab" aria-selected="false" aria-controls="diary-pre-production" tabindex="-1" data-tab="pre-production" type="button">Pre-Production</button>
+    <button class="diary-tab" id="diary-tab-production" role="tab" aria-selected="false" aria-controls="diary-production" tabindex="-1" data-tab="production" type="button">Production</button>
+    <button class="diary-tab" id="diary-tab-post-production" role="tab" aria-selected="false" aria-controls="diary-post-production" tabindex="-1" data-tab="post-production" type="button">Post-Production</button>
+    <button class="diary-tab" id="diary-tab-distribution" role="tab" aria-selected="false" aria-controls="diary-distribution" tabindex="-1" data-tab="distribution" type="button">Distribution</button>
   </div>
 
   {% assign phases = "fundraising,pre-production,production,post-production,distribution" | split: "," %}
@@ -15,10 +15,11 @@
     {% assign is_first = false %}
     {% if phase == "fundraising" %}{% assign is_first = true %}{% endif %}
     
-    <div id="diary-{{ phase }}" 
+      <div id="diary-{{ phase }}" 
          class="diary-panel{% unless is_first %} hidden{% endunless %}" 
          role="tabpanel"
-         aria-labelledby="{{ phase }}-tab">
+         aria-labelledby="diary-tab-{{ phase }}"
+         {% unless is_first %}hidden{% endunless %}>
       
       {% assign phase_entries = include.diary | where: "phase", phase | sort: "date" | reverse %}
       {% if phase_entries.size > 0 %}

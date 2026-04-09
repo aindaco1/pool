@@ -71,6 +71,13 @@ async function getActiveRuntime(page: any) {
   });
 }
 
+async function expectAriaSnapshotToContain(locator: any, fragments: string[]) {
+  const snapshot = await locator.ariaSnapshot();
+  for (const fragment of fragments) {
+    expect(snapshot).toContain(fragment);
+  }
+}
+
 test.describe('Campaign Page Structure', () => {
   test('campaign page has required elements', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
@@ -1198,6 +1205,143 @@ test.describe('Checkout Flow', () => {
         }
       ]
     });
+  });
+
+  test('custom on-site checkout supports keyboard-only activation through save', async ({ page }) => {
+    test.setTimeout(60_000);
+
+    await page.addInitScript(() => {
+      (window as any).Stripe = () => ({
+        initCheckout: async () => ({
+          loadActions: async () => ({
+            type: 'success',
+            actions: {
+              getSession: () => ({ id: 'cs_test_custom_keyboard' }),
+              updateEmail: async () => ({}),
+              confirm: async () => ({ type: 'success' })
+            }
+          }),
+          createPaymentElement: () => ({
+            mount: (node: HTMLElement) => {
+              node.innerHTML = '<button type="button" data-test-payment-element>Mock payment element</button>';
+            },
+            unmount: () => {}
+          }),
+          on: (eventName: string, handler: Function) => {
+            if (eventName === 'change') {
+              handler({ session: { canConfirm: true } });
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto('/campaigns/smoke-editable/');
+
+    const cartRuntime = await page.evaluate(() => {
+      return (window as any).PoolCartProvider?.activeRuntime || (window as any).POOL_CONFIG?.cartRuntime || 'first_party';
+    });
+    if (cartRuntime !== 'first_party') {
+      test.skip();
+      return;
+    }
+
+    const workerBase = await page.evaluate(() => {
+      return (window as any).POOL_CONFIG?.workerBase;
+    });
+    const checkoutUiMode = await page.evaluate(() => {
+      return (window as any).POOL_CONFIG?.checkoutUiMode || 'hosted';
+    });
+
+    expect(workerBase).toBeTruthy();
+    expect(checkoutUiMode).toBe('custom');
+
+    await page.route(`${workerBase}/checkout-intent/start`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          checkoutUiMode: 'custom',
+          sessionId: 'cs_test_custom_keyboard',
+          clientSecret: 'cs_test_custom_secret_keyboard',
+          publishableKey: 'pk_test_pool_keyboard',
+          orderId: 'pool-intent-e2e-keyboard-123'
+        })
+      });
+    });
+    await page.route(`${workerBase}/checkout-intent/summary?orderId=pool-intent-e2e-keyboard-123`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          orderId: 'pool-intent-e2e-keyboard-123',
+          campaignSlug: 'smoke-editable',
+          campaignTitle: 'SMOKE EDITABLE',
+          persisted: true,
+          pledgeStatus: 'active',
+          createdAt: '2026-04-09T12:34:56.000Z',
+          shippingCollected: false,
+          totals: {
+            subtotal: 1000,
+            tax: 79,
+            shipping: 0,
+            tipAmount: 50,
+            amount: 1129
+          }
+        })
+      });
+    });
+    await page.route(`${workerBase}/checkout-intent/complete`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          recovered: true,
+          persisted: true,
+          orderId: 'pool-intent-e2e-keyboard-123'
+        })
+      });
+    });
+
+    const tierButton = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR).first();
+    await expect(tierButton).toBeVisible();
+    await tierButton.focus();
+    await page.keyboard.press('Enter');
+
+    const cartPanel = page.locator('.pool-first-party-cart__panel');
+    const cartDialog = page.locator('.pool-first-party-cart__panel[role="dialog"]');
+    await expect(cartPanel).toBeVisible();
+    await expect(page.locator('.pool-first-party-cart__close')).toBeFocused();
+    await expectAriaSnapshotToContain(cartDialog, [
+      'dialog "Your cart"',
+      'button "Checkout"'
+    ]);
+
+    const continueButton = page.locator('[data-cart-continue]');
+    await continueButton.focus();
+    await expect(continueButton).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    await expect(page.locator('[data-cart-custom-checkout-email]')).toBeVisible();
+    await expectAriaSnapshotToContain(cartDialog, [
+      'dialog "Checkout"',
+      'textbox "Email address"',
+      'button "Save payment method"'
+    ]);
+
+    const emailField = page.locator('[data-cart-custom-checkout-email]');
+    await expect(emailField).toBeVisible();
+    await emailField.focus();
+    await page.keyboard.type('keyboard-supporter@example.com');
+
+    const saveButton = page.locator('[data-cart-confirm-custom-checkout]');
+    await saveButton.focus();
+    await expect(saveButton).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    await page.waitForURL('**/pledge-success/**');
+    await expect(page.locator('h1, h2').first()).toContainText(/Pledge|Saved|Success/i);
   });
 
   test('pledge flow API integration', async ({ page }) => {

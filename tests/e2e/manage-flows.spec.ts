@@ -46,12 +46,13 @@ const activePledge = {
   tipAmount: 0
 };
 
-async function routeManageWorker(page: any, options?: { pledges?: Array<Record<string, any>> }) {
+async function routeManageWorker(page: any, options?: { pledges?: Array<Record<string, any>>, paymentStartPayload?: Record<string, any> }) {
   const paymentStartBodies: any[] = [];
   const cancelBodies: any[] = [];
   const modifyBodies: any[] = [];
 
   const pledges = options?.pledges || [activePledge];
+  const paymentStartPayload = options?.paymentStartPayload || { url: '#payment-update' };
 
   await page.route('**/api/campaigns.json', async (route: any) => {
     await route.fulfill({
@@ -100,7 +101,7 @@ async function routeManageWorker(page: any, options?: { pledges?: Array<Record<s
     await route.fulfill({
       status: 200,
       headers: JSON_HEADERS,
-      body: JSON.stringify({ url: '#payment-update' })
+      body: JSON.stringify(paymentStartPayload)
     });
   });
 
@@ -172,6 +173,30 @@ test.describe('Manage Pledge Flows', () => {
     });
   });
 
+  test('supports keyboard-only cancellation flow', async ({ page }) => {
+    const requests = await routeManageWorker(page);
+
+    await page.goto('/manage/?t=token-123');
+    await expect(page.locator('#pledges-list')).toBeVisible();
+
+    const cancelButton = page.locator('[data-action="cancel"][data-index="0"]');
+    await cancelButton.focus();
+    await expect(cancelButton).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    const cancelConfirmButton = page.locator('[data-action="cancel-confirm"][data-index="0"]');
+    await expect(cancelConfirmButton).toBeVisible();
+    await cancelConfirmButton.focus();
+    await expect(cancelConfirmButton).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    await expect.poll(() => requests.cancelBodies.length).toBe(1);
+    expect(requests.cancelBodies[0]).toEqual({
+      token: 'token-123',
+      orderId: 'pool-intent-123'
+    });
+  });
+
   test('submits modify requests after confirm modal approval', async ({ page }) => {
     const requests = await routeManageWorker(page);
 
@@ -211,6 +236,157 @@ test.describe('Manage Pledge Flows', () => {
       customAmount: null,
       tipPercent: 5
     });
+  });
+
+  test('supports keyboard-only modify confirmation flow', async ({ page }) => {
+    const requests = await routeManageWorker(page);
+
+    await page.goto('/manage/?t=token-123');
+    await expect(page.locator('#pledges-list')).toBeVisible();
+
+    const tipSlider = page.locator('#tip-percent-0');
+    await tipSlider.focus();
+    await expect(tipSlider).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+
+    const saveButton = page.locator('[data-action="save"][data-index="0"]');
+    await expect(saveButton).toBeEnabled();
+    await saveButton.focus();
+    await expect(saveButton).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    const confirmModal = page.locator('#confirm-modal');
+    await expect(confirmModal).toBeVisible();
+    await expect(page.locator('#confirm-modal-cancel')).toBeFocused();
+
+    await page.keyboard.press('Tab');
+    await expect(page.locator('#confirm-modal-confirm')).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    await expect.poll(() => requests.modifyBodies.length).toBe(1);
+    expect(requests.modifyBodies[0]).toEqual({
+      token: 'token-123',
+      orderId: 'pool-intent-123',
+      newTierId: 'frame-slot',
+      newTierQty: 1,
+      addTiers: null,
+      supportItems: null,
+      customAmount: null,
+      tipPercent: 1
+    });
+  });
+
+  test('supports keyboard-only payment-method update flow', async ({ page }) => {
+    const requests = await routeManageWorker(page, {
+      paymentStartPayload: {
+        checkoutUiMode: 'custom',
+        sessionId: 'cs_test_update_keyboard_123',
+        clientSecret: 'cs_test_update_secret_keyboard_123',
+        publishableKey: 'pk_test_update_keyboard_123'
+      }
+    });
+
+    await page.addInitScript(() => {
+      (window as any).Stripe = () => ({
+        initCheckout: async () => ({
+          loadActions: async () => ({
+            type: 'success',
+            actions: {
+              getSession: () => ({ id: 'cs_test_update_keyboard_123' }),
+              updateEmail: async () => ({}),
+              confirm: async () => {
+                (window as any).__paymentUpdateConfirmed = true;
+                return { type: 'success' };
+              }
+            }
+          }),
+          createPaymentElement: () => ({
+            mount: (node: HTMLElement) => {
+              node.innerHTML = '<button type="button" data-test-payment-update-element>Mock payment element</button>';
+            },
+            unmount: () => {}
+          }),
+          on: (eventName: string, handler: Function) => {
+            if (eventName === 'change') {
+              handler({ session: { canConfirm: true } });
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto('/manage/?t=token-123');
+    await expect(page.locator('#pledges-list')).toBeVisible();
+
+    const paymentButton = page.locator('[data-action="payment"][data-index="0"]');
+    await paymentButton.focus();
+    await expect(paymentButton).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    const modal = page.locator('#payment-update-modal');
+    await expect(modal).toBeVisible();
+    await expect(page.locator('#payment-update-email')).toBeFocused();
+
+    const confirmButton = page.locator('#payment-update-confirm');
+    await expect(confirmButton).toBeEnabled();
+    await confirmButton.focus();
+    await expect(confirmButton).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    await expect.poll(() => requests.paymentStartBodies.length).toBe(1);
+    await expect.poll(() => page.evaluate(() => Boolean((window as any).__paymentUpdateConfirmed))).toBe(true);
+  });
+
+  test('supports keyboard-only payment-method modal escape and focus restore', async ({ page }) => {
+    await routeManageWorker(page, {
+      paymentStartPayload: {
+        checkoutUiMode: 'custom',
+        sessionId: 'cs_test_update_keyboard_456',
+        clientSecret: 'cs_test_update_secret_keyboard_456',
+        publishableKey: 'pk_test_update_keyboard_456'
+      }
+    });
+
+    await page.addInitScript(() => {
+      (window as any).Stripe = () => ({
+        initCheckout: async () => ({
+          loadActions: async () => ({
+            type: 'success',
+            actions: {
+              getSession: () => ({ id: 'cs_test_update_keyboard_456' }),
+              updateEmail: async () => ({})
+            }
+          }),
+          createPaymentElement: () => ({
+            mount: (node: HTMLElement) => {
+              node.innerHTML = '<button type="button" data-test-payment-update-element>Mock payment element</button>';
+            },
+            unmount: () => {}
+          }),
+          on: (eventName: string, handler: Function) => {
+            if (eventName === 'change') {
+              handler({ session: { canConfirm: true } });
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto('/manage/?t=token-123');
+    await expect(page.locator('#pledges-list')).toBeVisible();
+
+    const paymentButton = page.locator('[data-action="payment"][data-index="0"]');
+    await paymentButton.focus();
+    await page.keyboard.press('Enter');
+
+    const modal = page.locator('#payment-update-modal');
+    await expect(modal).toBeVisible();
+    await expect(page.locator('#payment-update-email')).toBeFocused();
+
+    await page.keyboard.press('Escape');
+
+    await expect(modal).toBeHidden();
+    await expect(paymentButton).toBeFocused();
   });
 
   test('starts payment recovery for payment-failed pledges', async ({ page }) => {

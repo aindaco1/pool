@@ -30,6 +30,15 @@
   const MAX_PLATFORM_TIP_PERCENT = 15;
   const WIDTH_PERCENT_CLASS_PREFIX = 'u-width-pct-';
   const LEFT_PERCENT_CLASS_PREFIX = 'u-left-pct-';
+  const FOCUSABLE_SELECTOR = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    'iframe',
+    '[tabindex]:not([tabindex="-1"])'
+  ].join(', ');
   const liveSnapshotRequests = {};
   let allCampaigns = [];
   let pledges = [];
@@ -38,6 +47,9 @@
   let activePaymentUpdateMount = null;
   let activePaymentUpdatePledge = null;
   let isSubmittingPaymentUpdate = false;
+  let activeManageDialog = null;
+  let activeManageDialogCleanup = null;
+  let activeManageDialogReturnFocus = null;
 
   function renderBusyButtonLabel(label, isBusy) {
     const safeLabel = String(label || '')
@@ -96,6 +108,157 @@
     node.textContent = text;
     parent.appendChild(node);
     return node;
+  }
+
+  function formatTipSliderValueText(tipPercent, tipAmountCents) {
+    const percent = sanitizeTipPercent(tipPercent, 0);
+    return `${percent}% tip, ${formatMoney(Math.max(0, tipAmountCents || 0))}`;
+  }
+
+  function isFocusableNode(node) {
+    return node instanceof HTMLElement &&
+      !node.hidden &&
+      node.getAttribute('aria-hidden') !== 'true' &&
+      !node.closest('[hidden],[aria-hidden="true"]');
+  }
+
+  function getFocusableNodes(container) {
+    if (!(container instanceof HTMLElement)) return [];
+
+    return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter((node) => {
+      if (!isFocusableNode(node)) return false;
+      if ('disabled' in node && node.disabled) return false;
+      return true;
+    });
+  }
+
+  function restoreManageDialogFocus() {
+    const target = activeManageDialogReturnFocus;
+    if (!(target instanceof HTMLElement)) return;
+    if (!target.isConnected) return;
+    window.setTimeout(() => {
+      if (!(target instanceof HTMLElement) || !target.isConnected) return;
+      try {
+        target.focus();
+      } catch (_error) {}
+    }, 0);
+  }
+
+  function lockManageDialogBackground(dialog) {
+    const pushNode = function(node) {
+      if (!(node instanceof HTMLElement)) return;
+      node.setAttribute('data-pool-manage-dialog-lock', 'true');
+      node.setAttribute('data-pool-manage-prev-aria-hidden', node.getAttribute('aria-hidden') ?? '__none__');
+      node.setAttribute('data-pool-manage-prev-inert', node.inert ? 'true' : 'false');
+      node.setAttribute('aria-hidden', 'true');
+      node.inert = true;
+    };
+
+    Array.from(document.body.children).forEach((child) => {
+      if (!(child instanceof HTMLElement)) return;
+      if (child.contains(dialog)) return;
+      pushNode(child);
+    });
+
+    const container = dialog.parentElement;
+    if (container instanceof HTMLElement) {
+      Array.from(container.children).forEach((child) => {
+        if (!(child instanceof HTMLElement) || child === dialog) return;
+        pushNode(child);
+      });
+    }
+
+    return function unlockManageDialogBackground() {
+      document.querySelectorAll('[data-pool-manage-dialog-lock="true"]').forEach((node) => {
+        if (!(node instanceof HTMLElement)) return;
+        const ariaHidden = node.getAttribute('data-pool-manage-prev-aria-hidden');
+        const inert = node.getAttribute('data-pool-manage-prev-inert');
+        if (ariaHidden === '__none__' || ariaHidden === null) {
+          node.removeAttribute('aria-hidden');
+        } else {
+          node.setAttribute('aria-hidden', ariaHidden);
+        }
+        node.inert = inert === 'true';
+        node.removeAttribute('data-pool-manage-dialog-lock');
+        node.removeAttribute('data-pool-manage-prev-aria-hidden');
+        node.removeAttribute('data-pool-manage-prev-inert');
+      });
+    };
+  }
+
+  function teardownManageDialog(restoreFocus = false) {
+    if (typeof activeManageDialogCleanup === 'function') {
+      activeManageDialogCleanup();
+    }
+    activeManageDialogCleanup = null;
+    activeManageDialog = null;
+    if (restoreFocus) {
+      restoreManageDialogFocus();
+    }
+    activeManageDialogReturnFocus = null;
+  }
+
+  function focusManageDialog(dialog, preferredSelector) {
+    const preferred =
+      (preferredSelector ? dialog.querySelector(preferredSelector) : null) ||
+      getFocusableNodes(dialog)[0] ||
+      dialog;
+
+    if (!(preferred instanceof HTMLElement)) return;
+    try {
+      preferred.focus();
+    } catch (_error) {}
+  }
+
+  function activateManageDialog(dialog, options = {}) {
+    teardownManageDialog(false);
+    activeManageDialog = dialog;
+    activeManageDialogReturnFocus = options.returnFocusTarget instanceof HTMLElement
+      ? options.returnFocusTarget
+      : (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    const unlockBackground = lockManageDialogBackground(dialog);
+    const handleKeydown = function(event) {
+      if (activeManageDialog !== dialog || dialog.hidden) return;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (dialog.id === 'payment-update-modal') {
+          closePaymentUpdateModal();
+        } else {
+          hideConfirmModal();
+        }
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const focusable = getFocusableNodes(dialog);
+      if (!focusable.length) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeydown, true);
+    activeManageDialogCleanup = function() {
+      document.removeEventListener('keydown', handleKeydown, true);
+      unlockBackground();
+    };
+
+    focusManageDialog(dialog, options.initialFocusSelector);
   }
 
   function calculateTax(subtotalCents) {
@@ -673,6 +836,10 @@
       emailError.hidden = true;
       emailError.textContent = '';
     }
+    const emailInput = document.getElementById('payment-update-email');
+    if (emailInput instanceof HTMLInputElement) {
+      emailInput.setAttribute('aria-invalid', 'false');
+    }
     if (paymentMount) paymentMount.innerHTML = '';
     if (confirmButton) {
       confirmButton.disabled = true;
@@ -702,13 +869,19 @@
     activePaymentUpdatePledge = null;
     modal.hidden = true;
     resetPaymentUpdateUi();
+    teardownManageDialog(true);
   }
 
   function setPaymentUpdateEmailError(message) {
     const node = document.getElementById('payment-update-email-error');
+    const input = document.getElementById('payment-update-email');
     if (!node) return;
-    node.textContent = String(message || '');
-    node.hidden = !message;
+    const nextMessage = String(message || '');
+    node.textContent = nextMessage;
+    node.hidden = !nextMessage;
+    if (input instanceof HTMLInputElement) {
+      input.setAttribute('aria-invalid', nextMessage ? 'true' : 'false');
+    }
   }
 
   function setPaymentUpdateError(message) {
@@ -784,6 +957,9 @@
     resetPaymentUpdateUi();
     activePaymentUpdatePledge = pledge;
     modal.hidden = false;
+    activateManageDialog(modal, {
+      initialFocusSelector: '#payment-update-email'
+    });
 
     const emailInput = document.getElementById('payment-update-email');
     const paymentMount = document.getElementById('payment-update-payment');
@@ -1057,7 +1233,7 @@
 
   let pendingConfirmCallback = null;
 
-  function showConfirmModal(message, details, onConfirm) {
+  function showConfirmModal(message, details, onConfirm, options = {}) {
     const modal = document.getElementById('confirm-modal');
     document.getElementById('confirm-modal-message').textContent = message;
     const detailsNode = document.getElementById('confirm-modal-details');
@@ -1069,11 +1245,16 @@
     }
     pendingConfirmCallback = onConfirm;
     modal.hidden = false;
+    activateManageDialog(modal, {
+      initialFocusSelector: '#confirm-modal-cancel',
+      returnFocusTarget: options.returnFocusTarget
+    });
   }
 
   function hideConfirmModal() {
     document.getElementById('confirm-modal').hidden = true;
     pendingConfirmCallback = null;
+    teardownManageDialog(true);
   }
 
   document.getElementById('confirm-modal-cancel')?.addEventListener('click', hideConfirmModal);
@@ -1431,12 +1612,12 @@
       tipHtml = `
         <div class="pledge-card__tip" id="tip-section-${index}">
           <div class="pledge-card__tip-header">
-            <h3>Tip ${PLATFORM_NAME}</h3>
+            <h3 id="tip-heading-${index}">Tip ${PLATFORM_NAME}</h3>
             <span class="pledge-card__tip-amount" id="tip-amount-label-${index}">${formatMoney(getPledgeTipAmount(pledge))}</span>
           </div>
-          <p class="pledge-card__tip-copy">Optional support for platform maintenance. This does not count toward the campaign goal.</p>
+          <p class="pledge-card__tip-copy" id="tip-copy-${index}">Optional support for platform maintenance. This does not count toward the campaign goal.</p>
           <div class="pledge-card__tip-controls">
-            <input type="range" min="0" max="${MAX_PLATFORM_TIP_PERCENT}" step="1" value="${currentTipPercent}" id="tip-percent-${index}" data-current="${currentTipPercent}">
+            <input type="range" min="0" max="${MAX_PLATFORM_TIP_PERCENT}" step="1" value="${currentTipPercent}" id="tip-percent-${index}" data-current="${currentTipPercent}" aria-labelledby="tip-heading-${index}" aria-describedby="tip-copy-${index} tip-percent-label-${index}" aria-valuetext="${escapeAttribute(formatTipSliderValueText(currentTipPercent, getPledgeTipAmount(pledge)))}">
             <span class="pledge-card__tip-percent" id="tip-percent-label-${index}">${currentTipPercent}%</span>
           </div>
         </div>
@@ -1952,6 +2133,13 @@
         if (tipPercentLabel) {
           tipPercentLabel.textContent = `${selectedTipPercent}%`;
         }
+        e.target.setAttribute(
+          'aria-valuetext',
+          formatTipSliderValueText(
+            selectedTipPercent,
+            calculatePlatformTip(getPledgeSubtotal(pledge), selectedTipPercent)
+          )
+        );
         if (isSingleTier) {
           updatePledgeSummary(
             index,
@@ -2364,6 +2552,8 @@
           btn.disabled = false;
           btn.textContent = 'Save Changes';
         }
+      }, {
+        returnFocusTarget: btn
       });
     });
   }
@@ -2505,6 +2695,10 @@
     }
     if (tipAmountLabel) {
       tipAmountLabel.textContent = formatMoney(newTipAmount);
+    }
+    const tipInput = document.getElementById(`tip-percent-${index}`);
+    if (tipInput) {
+      tipInput.setAttribute('aria-valuetext', formatTipSliderValueText(tipPercent, newTipAmount));
     }
     taxEl.textContent = formatMoney(newTax);
     if (shippingRow) {

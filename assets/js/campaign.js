@@ -3,6 +3,68 @@
 
 const WORKER_BASE = window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
 
+function initializeTabs(tabSelector, panelSelector, panelIdPrefix) {
+  const tabs = Array.from(document.querySelectorAll(tabSelector));
+  const panels = Array.from(document.querySelectorAll(panelSelector));
+  if (!tabs.length || !panels.length) return;
+
+  function activateTab(nextTab, shouldFocus = false) {
+    if (!(nextTab instanceof HTMLElement)) return;
+    const targetId = nextTab.getAttribute('aria-controls') || `${panelIdPrefix}${nextTab.getAttribute('data-tab') || ''}`;
+
+    tabs.forEach((tab) => {
+      const isSelected = tab === nextTab;
+      tab.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+      tab.setAttribute('tabindex', isSelected ? '0' : '-1');
+    });
+
+    panels.forEach((panel) => {
+      const isTarget = panel.id === targetId;
+      panel.classList.toggle('hidden', !isTarget);
+      panel.hidden = !isTarget;
+    });
+
+    if (shouldFocus) {
+      nextTab.focus();
+    }
+  }
+
+  function moveTabFocus(currentTab, direction) {
+    const currentIndex = tabs.indexOf(currentTab);
+    if (currentIndex === -1) return;
+    const nextIndex = (currentIndex + direction + tabs.length) % tabs.length;
+    activateTab(tabs[nextIndex], true);
+  }
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => activateTab(tab, false));
+    tab.addEventListener('keydown', (event) => {
+      switch (event.key) {
+        case 'ArrowRight':
+        case 'Right':
+          event.preventDefault();
+          moveTabFocus(tab, 1);
+          break;
+        case 'ArrowLeft':
+        case 'Left':
+          event.preventDefault();
+          moveTabFocus(tab, -1);
+          break;
+        case 'Home':
+          event.preventDefault();
+          activateTab(tabs[0], true);
+          break;
+        case 'End':
+          event.preventDefault();
+          activateTab(tabs[tabs.length - 1], true);
+          break;
+        default:
+          break;
+      }
+    });
+  });
+}
+
 function getCartProvider() {
   return window.PoolCartProvider || null;
 }
@@ -19,30 +81,8 @@ async function waitForCartProvider() {
 
 // Tab switching for production phases
 document.addEventListener('DOMContentLoaded', () => {
-  const phaseTabs = document.querySelectorAll('.phase-tab');
-  
-  if (phaseTabs.length > 0) {
-    phaseTabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        const targetId = tab.getAttribute('data-tab');
-        
-        // Update tab states
-        phaseTabs.forEach(t => t.setAttribute('aria-selected', 'false'));
-        tab.setAttribute('aria-selected', 'true');
-        
-        // Show/hide panels
-        const panels = document.querySelectorAll('.phase-panel');
-        panels.forEach(panel => {
-          if (panel.id === `tab-${targetId}`) {
-            panel.classList.remove('hidden');
-          } else {
-            panel.classList.add('hidden');
-          }
-        });
-      });
-    });
-  }
-  
+  initializeTabs('.phase-tab', '.phase-panel', 'tab-');
+
   handleTierChangeFlow();
   handleAddTiersFlow();
 

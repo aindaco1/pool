@@ -10,6 +10,8 @@ layout: default
 {% assign upcoming_campaigns = filtered_campaigns | where: "state", "upcoming" | sort: "start_date" %}
 {% assign completed_campaigns = filtered_campaigns | where: "state", "post" | sort: "goal_deadline" | reverse %}
 
+<h1 class="sr-only">The Pool campaigns</h1>
+
 {% if live_campaigns.size > 0 %}
 <section class="campaigns-section">
   <h2>Active</h2>

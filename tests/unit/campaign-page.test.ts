@@ -3,6 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 function renderCampaignPage() {
   document.body.innerHTML = `
     <button type="button" data-scroll-target="campaign-tiers">Support!</button>
+    <section class="gallery gallery--carousel">
+      <div class="gallery__container">
+        <div class="gallery__item">One</div>
+        <div class="gallery__item">Two</div>
+      </div>
+    </section>
     <section class="community-teaser" id="community-teaser">
       <p class="teaser-locked">Locked</p>
       <p class="teaser-unlocked" hidden>Unlocked</p>
@@ -58,10 +64,17 @@ describe('campaign page script', () => {
     const tiers = document.getElementById('campaign-tiers') as HTMLElement;
     const scrollSpy = vi.fn();
     (tiers as any).scrollIntoView = scrollSpy;
+    const gallery = document.querySelector('.gallery__container') as HTMLElement;
+    const scrollBySpy = vi.fn();
+    const scrollToSpy = vi.fn();
+    (gallery as any).scrollBy = scrollBySpy;
+    (gallery as any).scrollTo = scrollToSpy;
 
     await import('../../assets/js/campaign-page.js');
 
-    (document.querySelector('[data-scroll-target="campaign-tiers"]') as HTMLButtonElement).click();
+    const supportButton = document.querySelector('[data-scroll-target="campaign-tiers"]') as HTMLButtonElement;
+    expect(supportButton.getAttribute('aria-controls')).toBe('campaign-tiers');
+    supportButton.click();
     expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth' });
 
     expect((document.querySelector('.teaser-locked') as HTMLElement).hidden).toBe(true);
@@ -72,6 +85,15 @@ describe('campaign page script', () => {
     const button = document.getElementById('community-btn') as HTMLElement;
     expect(button.classList.contains('btn--primary')).toBe(true);
     expect(button.classList.contains('btn--locked')).toBe(false);
+
+    expect(gallery.getAttribute('tabindex')).toBe('0');
+    expect(gallery.getAttribute('aria-label')).toBe('Image gallery');
+
+    gallery.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    expect(scrollBySpy).toHaveBeenCalled();
+
+    gallery.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }));
+    expect(scrollToSpy).toHaveBeenCalledWith({ left: 0, behavior: 'smooth' });
   });
 
   it('uses hidden state and width classes for countdown and video shell', async () => {
@@ -106,6 +128,8 @@ describe('campaign page script', () => {
 
     expect((document.querySelector('.flip-countdown') as HTMLElement).hidden).toBe(true);
     expect((document.querySelector('.campaign-countdown__heading') as HTMLElement).hidden).toBe(true);
+    expect((document.querySelector('.campaign-countdown__message') as HTMLElement).getAttribute('role')).toBe('status');
+    expect((document.querySelector('.campaign-countdown__message') as HTMLElement).getAttribute('aria-live')).toBe('polite');
 
     video.dispatchEvent(new Event('progress'));
     const bufferBar = document.querySelector('.hero__video-buffer-bar') as HTMLElement;

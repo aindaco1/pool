@@ -3,11 +3,15 @@
 <section class="production-phases" aria-label="Production phases">
   <h3>Production Phases</h3>
   
-  <div class="phase-tabs" role="tablist">
+  <div class="phase-tabs" role="tablist" aria-label="Production phases">
     {% for phase in include.phases %}
       {% assign tab_id = phase.name | slugify %}
       <button class="phase-tab" role="tab" 
+              id="phase-tab-{{ tab_id }}"
               aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" 
+              aria-controls="tab-{{ tab_id }}"
+              tabindex="{% if forloop.first %}0{% else %}-1{% endif %}"
+              type="button"
               data-tab="{{ tab_id }}">
         {{ phase.name | escape }}
       </button>
@@ -19,7 +23,8 @@
     <div id="tab-{{ tab_id }}" 
          class="phase-panel{% unless forloop.first %} hidden{% endunless %}" 
          role="tabpanel"
-         aria-labelledby="{{ tab_id }}-tab">
+         aria-labelledby="phase-tab-{{ tab_id }}"
+         {% unless forloop.first %}hidden{% endunless %}>
       
       {% if phase.registry.size > 0 %}
         <div class="registry-list">

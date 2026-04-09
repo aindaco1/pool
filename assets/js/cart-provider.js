@@ -27,6 +27,15 @@
   const DEFAULT_PLATFORM_NAME = 'The Pool';
   const DEFAULT_FLAT_SHIPPING_RATE = 3;
   const DEFAULT_SALES_TAX_RATE = 0.07875;
+  const FOCUSABLE_SELECTOR = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    'iframe',
+    '[tabindex]:not([tabindex="-1"])'
+  ].join(', ');
   const DEFAULT_SHIPPING_COUNTRY = 'US';
   const SHIPPING_COUNTRY_OPTIONS = [
     { value: 'US', label: 'United States' },
@@ -168,6 +177,15 @@
 
   function formatTaxRateLabel() {
     return `Sales tax (${(getSalesTaxRate() * 100).toFixed(3).replace(/\.?0+$/, '')}%)`;
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value);
+  }
+
+  function formatTipSliderValueText(tipPercent, tipAmountCents) {
+    const percent = sanitizeTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+    return `${percent}% tip, ${formatCents(Math.max(0, tipAmountCents || 0))}`;
   }
 
   function renderShippingCountryOptions(selectedValue) {
@@ -1047,6 +1065,10 @@
     let suppressDrawerRerender = false;
     let activeCustomCheckoutMount = null;
     let customCheckoutFlowToken = 0;
+    let cartDialogCleanup = null;
+    let cartBackgroundUnlock = null;
+    let cartReturnFocusTarget = null;
+    let cartShouldFocusAfterRender = false;
     let checkoutUiState = {
       status: 'idle',
       error: '',
@@ -1074,6 +1096,142 @@
       root.hidden = false;
       root.classList.add('pool-first-party-cart-root');
       return root;
+    }
+
+    function isFocusableNode(node) {
+      return node instanceof HTMLElement &&
+        !node.hidden &&
+        node.getAttribute('aria-hidden') !== 'true' &&
+        !node.closest('[hidden],[aria-hidden="true"]');
+    }
+
+    function getFocusableNodes(container) {
+      if (!(container instanceof HTMLElement)) return [];
+
+      return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter((node) => {
+        if (!isFocusableNode(node)) return false;
+        if ('disabled' in node && node.disabled) return false;
+        return true;
+      });
+    }
+
+    function rememberCartReturnFocus(node) {
+      const target = node instanceof HTMLElement ? node : document.activeElement;
+      if (!(target instanceof HTMLElement)) return;
+      if (getCartRoot()?.contains(target)) return;
+      cartReturnFocusTarget = target;
+    }
+
+    function restoreCartReturnFocus() {
+      const target = cartReturnFocusTarget;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.isConnected) return;
+      window.setTimeout(() => {
+        if (!(target instanceof HTMLElement) || !target.isConnected) return;
+        try {
+          target.focus();
+        } catch (_error) {}
+      }, 0);
+    }
+
+    function lockCartBackground(root) {
+      Array.from(document.body.children).forEach((child) => {
+        if (!(child instanceof HTMLElement) || child === root) return;
+        child.setAttribute('data-pool-cart-lock', 'true');
+        child.setAttribute('data-pool-cart-prev-aria-hidden', child.getAttribute('aria-hidden') ?? '__none__');
+        child.setAttribute('data-pool-cart-prev-inert', child.inert ? 'true' : 'false');
+        child.setAttribute('aria-hidden', 'true');
+        child.inert = true;
+      });
+
+      return function unlockCartBackground() {
+        document.querySelectorAll('[data-pool-cart-lock="true"]').forEach((node) => {
+          if (!(node instanceof HTMLElement)) return;
+          const ariaHidden = node.getAttribute('data-pool-cart-prev-aria-hidden');
+          const inert = node.getAttribute('data-pool-cart-prev-inert');
+          if (ariaHidden === '__none__' || ariaHidden === null) {
+            node.removeAttribute('aria-hidden');
+          } else {
+            node.setAttribute('aria-hidden', ariaHidden);
+          }
+          node.inert = inert === 'true';
+          node.removeAttribute('data-pool-cart-lock');
+          node.removeAttribute('data-pool-cart-prev-aria-hidden');
+          node.removeAttribute('data-pool-cart-prev-inert');
+        });
+      };
+    }
+
+    function teardownCartDialog() {
+      if (typeof cartDialogCleanup === 'function') {
+        cartDialogCleanup();
+      }
+      cartDialogCleanup = null;
+      if (typeof cartBackgroundUnlock === 'function') {
+        cartBackgroundUnlock();
+      }
+      cartBackgroundUnlock = null;
+    }
+
+    function focusCartDialog(panel) {
+      const preferred =
+        panel.querySelector('[data-cart-dialog-initial-focus]') ||
+        panel.querySelector('[data-cart-close]') ||
+        getFocusableNodes(panel)[0] ||
+        panel;
+
+      if (!(preferred instanceof HTMLElement)) return;
+      try {
+        preferred.focus();
+      } catch (_error) {}
+    }
+
+    function activateCartDialog(root) {
+      const panel = root.querySelector('.pool-first-party-cart__panel');
+      if (!(panel instanceof HTMLElement)) return;
+
+      cartBackgroundUnlock = lockCartBackground(root);
+      const handleKeydown = function(event) {
+        if (!isCartOpen) return;
+        if (!root.contains(panel)) return;
+
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          requestCloseFirstPartyCart();
+          return;
+        }
+
+        if (event.key !== 'Tab') return;
+
+        const focusable = getFocusableNodes(panel);
+        if (!focusable.length) {
+          event.preventDefault();
+          panel.focus();
+          return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement;
+
+        if (event.shiftKey && active === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && active === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      };
+
+      document.addEventListener('keydown', handleKeydown, true);
+      cartDialogCleanup = function() {
+        document.removeEventListener('keydown', handleKeydown, true);
+      };
+
+      if (cartShouldFocusAfterRender) {
+        focusCartDialog(panel);
+        cartShouldFocusAfterRender = false;
+      }
     }
 
     function restoreCheckoutFromSnapshot(snapshot) {
@@ -1288,11 +1446,14 @@
       if (!root) return;
 
       if (!isCartOpen) {
+        teardownCartDialog();
         teardownActiveCustomCheckoutMount();
         root.innerHTML = '';
         root.setAttribute('aria-hidden', 'true');
         return;
       }
+
+      teardownCartDialog();
 
       const state = store.getState();
       const items = state.cart.items.items || [];
@@ -1318,7 +1479,7 @@
               <div class="pool-first-party-cart__shipping-grid">
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-name">Full name <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <input id="pool-custom-shipping-name" name="shipping_name" class="pool-first-party-cart__input" type="text" autocomplete="shipping name" value="${escapeHtml(customCheckout?.shippingDraft?.name || '')}" data-cart-custom-shipping-field="name">
+                  <input id="pool-custom-shipping-name" name="shipping_name" class="pool-first-party-cart__input" type="text" autocomplete="shipping name" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.name || '')}" data-cart-custom-shipping-field="name">
                 </div>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-checkout-email-fallback">Email address <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
@@ -1329,39 +1490,40 @@
                     type="email"
                     inputmode="email"
                     autocomplete="shipping email"
+                    aria-describedby="pool-custom-checkout-email-error"
                     value="${escapeHtml(customCheckout?.emailDraft || '')}"
                     data-cart-custom-checkout-email
                   >
-                  <p class="pool-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
+                  <p id="pool-custom-checkout-email-error" class="pool-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
                 </div>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line1">Address line 1 <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <input id="pool-custom-shipping-line1" name="shipping_address_line1" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line1" value="${escapeHtml(customCheckout?.shippingDraft?.address?.line1 || '')}" data-cart-custom-shipping-field="line1">
+                  <input id="pool-custom-shipping-line1" name="shipping_address_line1" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line1" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.line1 || '')}" data-cart-custom-shipping-field="line1">
                 </div>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line2">Address line 2</label>
-                  <input id="pool-custom-shipping-line2" name="shipping_address_line2" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line2" value="${escapeHtml(customCheckout?.shippingDraft?.address?.line2 || '')}" data-cart-custom-shipping-field="line2">
+                  <input id="pool-custom-shipping-line2" name="shipping_address_line2" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line2" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.line2 || '')}" data-cart-custom-shipping-field="line2">
                 </div>
                 <div class="pool-first-party-cart__field">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-city">City <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <input id="pool-custom-shipping-city" name="shipping_city" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level2" value="${escapeHtml(customCheckout?.shippingDraft?.address?.city || '')}" data-cart-custom-shipping-field="city">
+                  <input id="pool-custom-shipping-city" name="shipping_city" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level2" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.city || '')}" data-cart-custom-shipping-field="city">
                 </div>
                 <div class="pool-first-party-cart__field">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-state">State / Province <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <input id="pool-custom-shipping-state" name="shipping_state" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level1" value="${escapeHtml(customCheckout?.shippingDraft?.address?.state || '')}" data-cart-custom-shipping-field="state">
+                  <input id="pool-custom-shipping-state" name="shipping_state" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level1" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.state || '')}" data-cart-custom-shipping-field="state">
                 </div>
                 <div class="pool-first-party-cart__field">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-postal">Postal code <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <input id="pool-custom-shipping-postal" name="shipping_postal_code" class="pool-first-party-cart__input" type="text" inputmode="numeric" autocomplete="shipping postal-code" value="${escapeHtml(customCheckout?.shippingDraft?.address?.postal_code || '')}" data-cart-custom-shipping-field="postal_code">
+                  <input id="pool-custom-shipping-postal" name="shipping_postal_code" class="pool-first-party-cart__input" type="text" inputmode="numeric" autocomplete="shipping postal-code" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.postal_code || '')}" data-cart-custom-shipping-field="postal_code">
                 </div>
                 <div class="pool-first-party-cart__field">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-country">Country <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <select id="pool-custom-shipping-country" name="shipping_country" class="pool-first-party-cart__input pool-first-party-cart__input--select" autocomplete="shipping country" data-cart-custom-shipping-field="country">
+                  <select id="pool-custom-shipping-country" name="shipping_country" class="pool-first-party-cart__input pool-first-party-cart__input--select" autocomplete="shipping country" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" data-cart-custom-shipping-field="country">
                     ${renderShippingCountryOptions(customCheckout?.shippingDraft?.address?.country || DEFAULT_SHIPPING_COUNTRY)}
                   </select>
                 </div>
               </div>
-              <p class="pool-first-party-cart__field-error" data-cart-custom-shipping-error ${customCheckout?.shippingError ? '' : 'hidden'}>${escapeHtml(customCheckout?.shippingError || '')}</p>
+              <p id="pool-custom-shipping-error" class="pool-first-party-cart__field-error" data-cart-custom-shipping-error role="alert" ${customCheckout?.shippingError ? '' : 'hidden'}>${escapeHtml(customCheckout?.shippingError || '')}</p>
             </div>
           </div>
         ` : `
@@ -1370,16 +1532,17 @@
             <div class="pool-first-party-cart__stripe-shell">
               <div class="pool-first-party-cart__field pool-first-party-cart__field--compact" data-cart-custom-checkout-email-fallback>
                 <label class="pool-first-party-cart__field-label" for="pool-custom-checkout-email">Email address <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                <input
-                  id="pool-custom-checkout-email"
-                  class="pool-first-party-cart__input"
-                  type="email"
-                  inputmode="email"
-                  autocomplete="email"
-                  value="${escapeHtml(customCheckout?.emailDraft || '')}"
-                  data-cart-custom-checkout-email
-                >
-                <p class="pool-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
+                  <input
+                    id="pool-custom-checkout-email"
+                    class="pool-first-party-cart__input"
+                    type="email"
+                    inputmode="email"
+                    autocomplete="email"
+                    aria-describedby="pool-custom-checkout-email-error"
+                    value="${escapeHtml(customCheckout?.emailDraft || '')}"
+                    data-cart-custom-checkout-email
+                  >
+                <p id="pool-custom-checkout-email-error" class="pool-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
               </div>
             </div>
           </div>
@@ -1416,22 +1579,25 @@
       const cartEstimateMarkup = items.length > 0 ? `
         <div class="pool-first-party-cart__tip-box">
           <div class="pool-first-party-cart__tip-header">
-            <strong>Tip ${escapeHtml(getPlatformName())} for platform maintenance.</strong>
-            <span data-cart-tip-amount>${formatCents(pricing.tipAmountCents)}</span>
+            <strong id="pool-cart-tip-label">Tip ${escapeHtml(getPlatformName())} for platform maintenance.</strong>
+            <span id="pool-cart-tip-amount" data-cart-tip-amount>${formatCents(pricing.tipAmountCents)}</span>
           </div>
-          <p class="pool-first-party-cart__tip-copy">${escapeHtml(getPlatformName())} has a 0% platform fee for organizers. Optional tips help keep the platform sustainable for creators.</p>
+          <p class="pool-first-party-cart__tip-copy" id="pool-cart-tip-copy">${escapeHtml(getPlatformName())} has a 0% platform fee for organizers. Optional tips help keep the platform sustainable for creators.</p>
           <div class="pool-first-party-cart__tip-controls">
             <input
+              id="pool-cart-tip-input"
               class="pool-first-party-cart__tip-slider"
               type="range"
               min="0"
               max="${MAX_PLATFORM_TIP_PERCENT}"
               step="1"
               value="${pricing.tipPercent}"
-              aria-label="Platform tip percentage"
+              aria-labelledby="pool-cart-tip-label"
+              aria-describedby="pool-cart-tip-copy pool-cart-tip-percent"
+              aria-valuetext="${escapeAttribute(formatTipSliderValueText(pricing.tipPercent, pricing.tipAmountCents))}"
               data-cart-tip
             >
-            <span class="pool-first-party-cart__tip-percent" data-cart-tip-percent>${pricing.tipPercent}%</span>
+            <span class="pool-first-party-cart__tip-percent" id="pool-cart-tip-percent" data-cart-tip-percent>${pricing.tipPercent}%</span>
           </div>
         </div>
         <section class="pool-first-party-cart__callout">
@@ -1561,14 +1727,20 @@
 
       root.innerHTML = `
         <div class="pool-first-party-cart__backdrop" data-cart-close></div>
-        <aside class="pool-first-party-cart__panel${isCheckoutPreview ? ' pool-first-party-cart__panel--checkout' : ''}" aria-label="Cart drawer">
+        <div
+          class="pool-first-party-cart__panel${isCheckoutPreview ? ' pool-first-party-cart__panel--checkout' : ''}"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pool-first-party-cart-title"
+          tabindex="-1"
+        >
           <header class="pool-first-party-cart__header">
             <div>
               ${isCheckoutPreview
-                ? '<p class="pool-first-party-cart__section-label pool-first-party-cart__section-label--header">Checkout</p>'
-                : '<p class="pool-first-party-cart__section-label pool-first-party-cart__section-label--header">Your cart</p>'}
+                ? '<p id="pool-first-party-cart-title" class="pool-first-party-cart__section-label pool-first-party-cart__section-label--header">Checkout</p>'
+                : '<p id="pool-first-party-cart-title" class="pool-first-party-cart__section-label pool-first-party-cart__section-label--header">Your cart</p>'}
             </div>
-            <button type="button" class="pool-first-party-cart__close" data-cart-close aria-label="Close cart">X</button>
+            <button type="button" class="pool-first-party-cart__close" data-cart-close aria-label="Close cart" data-cart-dialog-initial-focus>X</button>
           </header>
           <div class="pool-first-party-cart__body">
             ${bodyMarkup}
@@ -1576,9 +1748,10 @@
           <footer class="pool-first-party-cart__footer">
             ${footerActions}
           </footer>
-        </aside>
+        </div>
       `;
       root.setAttribute('aria-hidden', 'false');
+      activateCartDialog(root);
       if (isCustomCheckout && customCheckout?.scriptStatus === 'ready') {
         mountCustomCheckoutIntoDrawer(root);
       }
@@ -1591,6 +1764,7 @@
       const pricing = buildFirstPartyPricing(store.getState());
       const tipAmount = root.querySelector('[data-cart-tip-amount]');
       const tipPercent = root.querySelector('[data-cart-tip-percent]');
+      const tipInput = root.querySelector('[data-cart-tip]');
       const tipRow = root.querySelector('[data-cart-summary-tip-row]');
       const tipLabel = root.querySelector('[data-cart-summary-tip-label]');
       const tipSummaryAmount = root.querySelector('[data-cart-summary-tip-amount]');
@@ -1602,6 +1776,9 @@
 
       if (tipAmount) tipAmount.textContent = formatCents(pricing.tipAmountCents);
       if (tipPercent) tipPercent.textContent = `${pricing.tipPercent}%`;
+      if (tipInput) {
+        tipInput.setAttribute('aria-valuetext', formatTipSliderValueText(pricing.tipPercent, pricing.tipAmountCents));
+      }
       if (subtotal) subtotal.textContent = formatCents(pricing.subtotalCents);
       if (tax) tax.textContent = formatCents(pricing.taxCents);
       if (total) total.textContent = formatCents(pricing.totalCents);
@@ -1618,9 +1795,11 @@
       }
     }
 
-    function openFirstPartyCart() {
+    function openFirstPartyCart(focusTarget) {
       currentRoute = currentRoute || CART_VIEW_ROUTE;
       isCartOpen = true;
+      rememberCartReturnFocus(focusTarget);
+      cartShouldFocusAfterRender = true;
       scheduleStripeJsPrewarm();
       renderFirstPartyCart();
     }
@@ -1629,6 +1808,7 @@
       if (!isCartOpen) return;
       isCartOpen = false;
       renderFirstPartyCart();
+      restoreCartReturnFocus();
     }
 
     function setCheckoutUiState(nextState) {
@@ -1725,6 +1905,38 @@
       );
     }
 
+    function requestCloseFirstPartyCart() {
+      if (isCustomCheckoutBusy()) return;
+      const activeOrderId = getActiveCustomCheckoutOrderId();
+      if (currentRoute === CHECKOUT_VIEW_ROUTE && activeOrderId) {
+        void abandonActiveCustomCheckoutIntent(activeOrderId).finally(() => {
+          closeFirstPartyCart();
+        });
+        return;
+      }
+      closeFirstPartyCart();
+    }
+
+    function requestBackToCart() {
+      if (isCustomCheckoutBusy()) return;
+      const goBackToCart = function() {
+        setCheckoutUiState({
+          status: 'idle',
+          error: ''
+        });
+        cartShouldFocusAfterRender = true;
+        apiRoot.api.theme.cart.navigate(CART_VIEW_ROUTE);
+      };
+
+      const activeOrderId = getActiveCustomCheckoutOrderId();
+      if (activeOrderId) {
+        void abandonActiveCustomCheckoutIntent(activeOrderId).finally(goBackToCart);
+        return;
+      }
+
+      goBackToCart();
+    }
+
     function focusCustomCheckoutEmailField() {
       const input = getCartRoot()?.querySelector('[data-cart-custom-checkout-email]');
       if (!(input instanceof HTMLInputElement)) return;
@@ -1790,11 +2002,17 @@
     function setCustomCheckoutShippingError(message) {
       const root = getCartRoot();
       const errorNode = root?.querySelector('[data-cart-custom-shipping-error]');
+      const fields = root ? Array.from(root.querySelectorAll('[data-cart-custom-shipping-field]')) : [];
       if (!errorNode) return;
 
       const nextMessage = String(message || '');
       errorNode.textContent = nextMessage;
       errorNode.hidden = !nextMessage;
+      fields.forEach((field) => {
+        if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+          field.setAttribute('aria-invalid', nextMessage ? 'true' : 'false');
+        }
+      });
     }
 
     function readCustomCheckoutShippingDraft() {
@@ -2252,15 +2470,7 @@
         const closeTrigger = event.target?.closest?.('[data-cart-close]');
         if (closeTrigger) {
           event.preventDefault();
-          if (isCustomCheckoutBusy()) return;
-          const activeOrderId = getActiveCustomCheckoutOrderId();
-          if (currentRoute === CHECKOUT_VIEW_ROUTE && activeOrderId) {
-            void abandonActiveCustomCheckoutIntent(activeOrderId).finally(() => {
-              closeFirstPartyCart();
-            });
-            return;
-          }
-          closeFirstPartyCart();
+          requestCloseFirstPartyCart();
           return;
         }
 
@@ -2268,6 +2478,7 @@
         if (continueTrigger) {
           event.preventDefault();
           eventBus.emit('summary.checkout_clicked');
+          cartShouldFocusAfterRender = true;
           apiRoot.api.theme.cart.navigate(CHECKOUT_VIEW_ROUTE);
           return;
         }
@@ -2275,20 +2486,7 @@
         const backTrigger = event.target?.closest?.('[data-cart-back]');
         if (backTrigger) {
           event.preventDefault();
-          if (isCustomCheckoutBusy()) return;
-          const activeOrderId = getActiveCustomCheckoutOrderId();
-          const goBackToCart = function() {
-            setCheckoutUiState({
-              status: 'idle',
-              error: ''
-            });
-            apiRoot.api.theme.cart.navigate(CART_VIEW_ROUTE);
-          };
-          if (activeOrderId) {
-            void abandonActiveCustomCheckoutIntent(activeOrderId).finally(goBackToCart);
-            return;
-          }
-          goBackToCart();
+          requestBackToCart();
           return;
         }
 
@@ -2350,7 +2548,7 @@
         const tipField = event.target?.closest?.('[data-cart-tip]');
         if (tipField) {
           suppressDrawerRerender = false;
-          renderFirstPartyCart();
+          syncFirstPartyCartTipUI();
           return;
         }
 
@@ -2605,7 +2803,8 @@
         theme: {
           cart: {
             open: function() {
-              openFirstPartyCart();
+              const focusTarget = arguments.length > 0 ? arguments[0] : undefined;
+              openFirstPartyCart(focusTarget);
               eventBus.emit('cart.opened');
               return Promise.resolve();
             },
@@ -2617,6 +2816,9 @@
             navigate: function(route) {
               const previousRoute = currentRoute;
               currentRoute = route || null;
+              if (previousRoute !== currentRoute) {
+                cartShouldFocusAfterRender = true;
+              }
               if (currentRoute !== CHECKOUT_VIEW_ROUTE) {
                 invalidateCustomCheckoutFlow();
                 teardownActiveCustomCheckoutMount();

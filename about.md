@@ -59,6 +59,7 @@ The Pool is designed for filmmakers and other creatives with features like:
 - **Ongoing support** — Accept contributions after your main campaign ends
 - **No-account supporter access** — Backers manage pledges and join supporter-only community pages through email magic links instead of creating accounts
 - **Safer rich content** — Campaign text and diary entries support Markdown and approved embeds, while unsafe raw HTML and dangerous link or embed schemes are blocked at render time
+- **Accessibility-conscious UI** — Keyboard-friendly dialogs, tabs, sliders, supporter-community flows, and public campaign interactions are part of the platform baseline, with automated accessibility checks covering critical public pages, pledge-result states, and checkout flows
 
 ## The Technology
 
@@ -75,6 +76,8 @@ The Pool runs on a modern static architecture:
 The platform is built on services that all offer free tiers, and The Pool was designed from the start to operate effectively within those free tiers whenever possible.
 
 For forks, that means static pages stay on GitHub Pages, public live reads are aggressively combined and browser-cached, and most Cloudflare Worker usage is reserved for the security-sensitive parts of the pledge lifecycle, while tax and shipping settings stay mirrored between site config and Worker env so local UI, checkout, reports, and emails all remain aligned.
+
+That architecture also leaves room for accessibility hardening without sacrificing the platform's security model: the surrounding cart, checkout, and management flows use stronger dialog, focus, keyboard, and live-region semantics, while Stripe continues to own the sensitive payment fields inside its secure UI.
 
 ## Open Source
 

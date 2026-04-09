@@ -24,6 +24,19 @@ npm test                   # Run all tests
 
 `./scripts/test-e2e.sh --podman` is now the fully automated browser path. Use `./scripts/test-checkout.sh --podman` when you specifically want to drive the checkout manually in a real browser.
 
+For the accessibility-focused browser slice, use:
+
+```bash
+./scripts/podman-playwright-run.sh npx playwright test \
+  tests/e2e/accessibility-public-pages.spec.ts \
+  tests/e2e/manage-flows.spec.ts \
+  tests/e2e/community-flows.spec.ts \
+  tests/e2e/public-page-controls.spec.ts \
+  tests/e2e/campaign-checkout.spec.ts \
+  --project=chromium \
+  --grep "Public Page Accessibility|keyboard-only|Community Flows|Public Page Keyboard Controls"
+```
+
 ---
 
 ## Unit Tests (Vitest)
@@ -81,7 +94,7 @@ This runs:
 - Playwright headless E2E via `npm run test:e2e:headless`
 
 The pre-merge script now auto-starts Jekyll with `_config.yml,_config.local.yml` when needed so the local-only `smoke-editable` campaign is available during merge gating, and the Playwright harness uses the same combined config locally.
-When host Bundler/Jekyll gems are unavailable, that gate now falls back to a Podman-backed Jekyll build plus the Podman-aware smoke/browser helpers instead of failing on host Ruby setup alone.
+That gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. If the host Ruby path still cannot build cleanly, it falls back to a Podman-backed Jekyll build plus the Podman-aware smoke/browser helpers instead of failing on host setup alone.
 
 This branch now defaults to the first-party cart/runtime path in both `_config.yml` and `_config.local.yml`, and the browser path no longer supports the old hosted-cart runtime.
 

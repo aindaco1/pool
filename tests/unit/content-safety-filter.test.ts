@@ -99,15 +99,25 @@ function resolvePodmanEnvironment(podmanCommand: string) {
 function renderFilterInPodman(script: string, input: string, provider: string) {
   const podman = resolvePodmanCommand();
   const podmanEnv = resolvePodmanEnvironment(podman);
+  let canExecInRunningContainer = false;
 
   try {
-    execFileSync(podman, ['container', 'exists', 'pool-dev-site'], {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      stdio: 'pipe',
-      env: podmanEnv
-    });
+    const runningState = execFileSync(
+      podman,
+      ['inspect', '--format', '{{.State.Running}}', 'pool-dev-site'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        stdio: 'pipe',
+        env: podmanEnv
+      }
+    ).trim();
+    canExecInRunningContainer = runningState === 'true';
   } catch {
+    canExecInRunningContainer = false;
+  }
+
+  if (!canExecInRunningContainer) {
     if (!podmanSiteImageReady) {
       try {
         execFileSync(podman, ['image', 'exists', 'localhost/pool-dev-site:latest'], {

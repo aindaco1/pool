@@ -4,7 +4,12 @@
   {% assign layout = 'grid' %}
 {% endunless %}
 <figure class="content-block content-block--gallery gallery--{{ layout }}">
-  <div class="gallery__container">
+  <div
+    class="gallery__container"
+    {% if layout == 'carousel' %}
+      tabindex="0"
+      aria-label="Image gallery"
+    {% endif %}>
     {% for img in block.images %}
       <div class="gallery__item">
         <img 

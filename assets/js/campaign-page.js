@@ -38,10 +38,44 @@ function getMountainTimeOffset(dateStr) {
 
 function initSupportScroll() {
   document.querySelectorAll('[data-scroll-target]').forEach((button) => {
+    const targetId = button.getAttribute('data-scroll-target');
+    const target = targetId ? document.getElementById(targetId) : null;
+    if (targetId && target) {
+      button.setAttribute('aria-controls', targetId);
+    }
     button.addEventListener('click', () => {
-      const targetId = button.getAttribute('data-scroll-target');
-      const target = targetId ? document.getElementById(targetId) : null;
       target?.scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+}
+
+function initScrollableGalleries() {
+  document.querySelectorAll('.gallery--carousel .gallery__container').forEach((container) => {
+    if (!container.hasAttribute('tabindex')) {
+      container.setAttribute('tabindex', '0');
+    }
+    if (!container.hasAttribute('aria-label')) {
+      container.setAttribute('aria-label', 'Image gallery');
+    }
+
+    container.addEventListener('keydown', (event) => {
+      const currentTarget = event.currentTarget;
+      if (!(currentTarget instanceof HTMLElement)) return;
+
+      const scrollStep = Math.max(240, Math.round(currentTarget.clientWidth * 0.8));
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        currentTarget.scrollBy({ left: scrollStep, behavior: 'smooth' });
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        currentTarget.scrollBy({ left: -scrollStep, behavior: 'smooth' });
+      } else if (event.key === 'Home') {
+        event.preventDefault();
+        currentTarget.scrollTo({ left: 0, behavior: 'smooth' });
+      } else if (event.key === 'End') {
+        event.preventDefault();
+        currentTarget.scrollTo({ left: currentTarget.scrollWidth, behavior: 'smooth' });
+      }
     });
   });
 }
@@ -55,6 +89,11 @@ function initCampaignCountdown() {
   const state = el.getAttribute('data-state');
   const goalMet = el.getAttribute('data-goal-met') === 'true';
   const messageEl = el.querySelector('.campaign-countdown__message');
+  if (messageEl) {
+    messageEl.setAttribute('role', 'status');
+    messageEl.setAttribute('aria-live', 'polite');
+    messageEl.setAttribute('aria-atomic', 'true');
+  }
   if (!deadlineStr && !(state === 'upcoming' && startStr)) return;
 
   let targetDate;
@@ -247,6 +286,7 @@ function initCommunityTeaser(campaignSlug) {
 
 function init() {
   initSupportScroll();
+  initScrollableGalleries();
   initCampaignCountdown();
   initHeroVideo();
   initCommunityTeaser(bootScript.dataset.campaignSlug || '');
