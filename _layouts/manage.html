@@ -1,29 +1,32 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign platform_title = site.platform.name | default: site.title -%}
+{%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-manage-csp.html %}
   {% include cart-head.html %}
-  <title>Manage Pledges · {{ site.platform.name | default: site.title }}</title>
+  <title>{% include t.html key="manage.page_title" lang=current_lang %} · {{ platform_title }}</title>
 </head>
 <body>
-  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
   {% include header.html hide_cart=true %}
 
   <main id="main-content" class="manage-pledge" role="main" tabindex="-1">
     <div class="manage-pledge__container">
-      <h1>Manage Pledge</h1>
+      <h1>{% include t.html key="manage.title" lang=current_lang %}</h1>
       
       <div id="pledge-loading" class="manage-pledge__loading">
-        <p>Loading your pledges...</p>
+        <p>{% include t.html key="manage.loading_pledges" lang=current_lang %}</p>
       </div>
       
       <div id="pledge-error" class="manage-pledge__error" role="alert" hidden>
-        <h2>Unable to load pledges</h2>
-        <p id="pledge-error-message">This link may have expired or is invalid.</p>
-        <a href="/" class="btn">Back to Campaigns</a>
+        <h2>{% include t.html key="manage.load_error_title" lang=current_lang %}</h2>
+        <p id="pledge-error-message">{% include t.html key="manage.load_error_body" lang=current_lang %}</p>
+        <a href="{% include localized-url.html lang=current_lang translation_key='home' %}" class="btn">{% include t.html key="pledge_result.back_to_campaigns" lang=current_lang %}</a>
       </div>
       
       <div id="pledges-list" class="manage-pledge__list" hidden></div>
@@ -40,12 +43,12 @@
       >
         <div class="modal__backdrop"></div>
         <div class="modal__content">
-          <h3 id="confirm-modal-title">Confirm Changes</h3>
-          <p id="confirm-modal-message">Are you sure you want to update your pledge?</p>
+          <h3 id="confirm-modal-title">{% include t.html key="manage.confirm_changes_title" lang=current_lang %}</h3>
+          <p id="confirm-modal-message">{% include t.html key="manage.confirm_changes_body" lang=current_lang %}</p>
           <div class="modal__details" id="confirm-modal-details"></div>
           <div class="modal__actions">
-            <button class="btn btn--secondary" id="confirm-modal-cancel">Cancel</button>
-            <button class="btn" id="confirm-modal-confirm">Confirm Changes</button>
+            <button class="btn btn--secondary" id="confirm-modal-cancel">{% include t.html key="buttons.cancel" lang=current_lang %}</button>
+            <button class="btn" id="confirm-modal-confirm">{% include t.html key="manage.confirm_changes_button" lang=current_lang %}</button>
           </div>
         </div>
       </div>
@@ -61,42 +64,35 @@
       >
         <div class="modal__backdrop" data-payment-update-close></div>
         <div class="modal__content modal__content--wide">
-          <h3 id="payment-update-title">Update Card</h3>
+          <h3 id="payment-update-title">{% include t.html key="manage.update_card" lang=current_lang %}</h3>
           <div class="modal__field">
-            <label class="modal__label" for="payment-update-email">Email address <span class="modal__required-mark" aria-hidden="true">*</span></label>
+            <label class="modal__label" for="payment-update-email">{% include t.html key="manage.email_address" lang=current_lang %} <span class="modal__required-mark" aria-hidden="true">*</span></label>
             <input id="payment-update-email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" aria-describedby="payment-update-email-error">
             <p id="payment-update-email-error" class="modal__error-text" hidden></p>
           </div>
           <div class="modal__payment-section">
-            <p class="modal__section-label modal__section-label--payment">Payment method</p>
+            <p class="modal__section-label modal__section-label--payment">{% include t.html key="manage.payment_method" lang=current_lang %}</p>
             <div id="payment-update-payment" class="modal__mount modal__mount--payment"></div>
           </div>
-          <p id="payment-update-consent" class="modal__note modal__note--payment-consent">By providing your card information, you allow {{ site.platform.name | default: site.title }} to charge your card if the campaign(s) you backed reaches its goal before its end date.</p>
+          <p id="payment-update-consent" class="modal__note modal__note--payment-consent">{% include t.html key="manage.payment_consent" lang=current_lang platform=platform_title %}</p>
           <p id="payment-update-error" class="modal__error-text" role="alert" hidden></p>
           <div class="modal__actions">
-            <button class="btn btn--secondary" id="payment-update-cancel" data-payment-update-close>Cancel</button>
-            <button class="btn" id="payment-update-confirm" disabled>Save payment method</button>
+            <button class="btn btn--secondary" id="payment-update-cancel" data-payment-update-close>{% include t.html key="buttons.cancel" lang=current_lang %}</button>
+            <button class="btn" id="payment-update-confirm" disabled>{% include t.html key="manage.save_payment_method" lang=current_lang %}</button>
           </div>
         </div>
       </div>
     </div>
   </main>
 
-  <footer class="site-footer" role="contentinfo">
-    <div class="site-footer__content">
-      <a href="/" class="site-footer__logo">
-        <img src="{{ site.platform.footer_logo_path | default: site.platform.logo_path | default: '/assets/images/defaults/dust-wave-square.png' }}" alt="{{ site.platform.company_name | default: site.author }}">
-      </a>
-      <div class="site-footer__copyright">
-        <span>(ɔ) {{ 'now' | date: "%Y" }} {{ site.platform.company_name | default: site.author | upcase }}</span>
-      </div>
-    </div>
-  </footer>
+  {% include site-footer.html lang=current_lang %}
   <div id="aria-live-region" class="aria-live" aria-live="polite" aria-atomic="true"></div>
   <script
     src="/assets/js/pool-config.js"
     defer
     data-pool-config-script="true"
+    data-current-lang="{{ current_lang }}"
+    data-runtime-messages="{{ runtime_messages_json | strip | escape }}"
     data-site-url="{{ site.platform.site_url | default: site.url }}"
     data-worker-base="{{ site.platform.worker_url }}"
     data-platform-name="{{ site.platform.name | default: site.title | escape }}"

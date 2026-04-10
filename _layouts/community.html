@@ -1,13 +1,16 @@
 {% assign campaign = site.campaigns | where: "slug", page.campaign_slug | first %}
+{% assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
+{% assign platform_title = site.platform.name | default: site.title %}
+{%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-community-csp.html %}
   {% include cart-head.html %}
-  <title>Community · {{ campaign.title }} · {{ site.platform.name | default: site.title }}</title>
+  <title>{% include t.html key="community.title" lang=current_lang %} · {{ campaign.title }} · {{ platform_title }}</title>
 </head>
 <body>
   {% include header.html hide_cart=true %}
@@ -16,34 +19,34 @@
     <div class="community-page__container">
       <!-- Loading state -->
       <div id="community-loading" class="community-page__loading">
-        <p>Verifying your supporter access...</p>
+        <p>{% include t.html key="community.verifying_access" lang=current_lang %}</p>
       </div>
       
       <!-- Access denied / CTA -->
       <div id="community-denied" class="community-page__denied" hidden>
-        <h1>Join the {{ campaign.title | escape }} Community</h1>
-        <p class="community-page__denied-intro">Supporters get exclusive access to vote on creative decisions and shape the project.</p>
+        <h1>{% include t.html key="community.denied_title" lang=current_lang campaign=campaign.title %}</h1>
+        <p class="community-page__denied-intro">{% include t.html key="community.denied_intro" lang=current_lang %}</p>
         
         <div class="community-page__cta-box">
-          <h2>Become a Supporter</h2>
-          <p>Back <strong>{{ campaign.title | escape }}</strong> at any tier to unlock community features including:</p>
+          <h2>{% include t.html key="community.become_supporter" lang=current_lang %}</h2>
+          <p>{% include t.html key="community.become_supporter_body" lang=current_lang campaign=campaign.title %}</p>
           <ul>
-            <li>Vote on key creative decisions</li>
-            <li>Help shape the final project</li>
-            <li>Connect with fellow supporters</li>
+            <li>{% include t.html key="community.benefit_vote" lang=current_lang %}</li>
+            <li>{% include t.html key="community.benefit_shape" lang=current_lang %}</li>
+            <li>{% include t.html key="community.benefit_connect" lang=current_lang %}</li>
           </ul>
-          <a href="{{ campaign.url }}#tiers" class="btn btn--primary">Support This Campaign →</a>
+          <a href="{{ campaign.url }}#tiers" class="btn btn--primary">{% include t.html key="community.support_cta" lang=current_lang %}</a>
         </div>
         
-        <p class="community-page__already">Already a supporter? <a href="{{ campaign.url }}">Check your email</a> for your access link.</p>
+        <p class="community-page__already">{% include t.html key="community.already_supporter_prefix" lang=current_lang %} <a href="{{ campaign.url }}">{% include t.html key="community.check_email" lang=current_lang %}</a> for your access link.</p>
       </div>
       
       <!-- Supporter content -->
       <div id="community-content" class="community-page__content" hidden>
         <header class="community-page__header">
-          <a href="{{ campaign.url }}" class="community-page__back">← Back to Campaign</a>
-          <h1>{{ campaign.title | escape }} Community</h1>
-          <p class="community-page__intro">As a supporter, you have a voice in shaping this project. Vote on key decisions below.</p>
+          <a href="{{ campaign.url }}" class="community-page__back">{% include t.html key="community.back_to_campaign" lang=current_lang %}</a>
+          <h1>{{ campaign.title | escape }} {% include t.html key="community.heading_suffix" lang=current_lang %}</h1>
+          <p class="community-page__intro">{% include t.html key="community.intro" lang=current_lang %}</p>
         </header>
         
         {{ content }}
@@ -53,7 +56,7 @@
         
         {% if open_decisions.size > 0 %}
         <section class="community-decisions">
-          <h2>Active Decisions</h2>
+          <h2>{% include t.html key="community.active_decisions" lang=current_lang %}</h2>
           <div class="decisions-grid" id="decisions-grid">
             {% for decision in open_decisions %}
             <div class="decision-card{% if decision.options.first.image %} decision-card--has-images{% endif %}" data-decision-id="{{ decision.id }}" data-status="{{ decision.status }}"{% if decision.deadline %} data-deadline="{{ decision.deadline }}"{% endif %}>
@@ -63,7 +66,7 @@
                   <span class="decision-card__type">{{ decision.type | capitalize }}</span>
                   {% if decision.deadline %}
                   <span class="decision-card__deadline" data-deadline="{{ decision.deadline }}">
-                    Ends <time datetime="{{ decision.deadline }}">{{ decision.deadline | date: "%b %d" }}</time>
+                    {% include t.html key="community.ends" lang=current_lang %} <time datetime="{{ decision.deadline }}">{{ decision.deadline | date: "%b %d" }}</time>
                   </span>
                   {% endif %}
                 </div>
@@ -92,7 +95,7 @@
                 
                 <div class="decision-card__footer">
                   <button class="btn btn--small" data-action="submit-vote" data-decision="{{ decision.id }}">
-                    Submit Vote
+                    {% include t.html key="community.submit_vote" lang=current_lang %}
                   </button>
                 </div>
               </div>
@@ -113,13 +116,13 @@
                     <div class="result-bar__track">
                       <div class="result-bar__fill"></div>
                     </div>
-                    <span class="result-bar__count">0 votes</span>
+                    <span class="result-bar__count">{% include t.html key="community.votes_count" lang=current_lang count=0 %}</span>
                   </div>
                   {% endfor %}
                 </div>
                 <div class="decision-card__footer">
-                  <span class="decision-card__voted">✓ You voted: <strong data-user-choice></strong></span>
-                  <span class="decision-card__total"><span data-total-votes>0</span> total votes</span>
+                  <span class="decision-card__voted">{% include t.html key="community.you_voted" lang=current_lang %} <strong data-user-choice></strong></span>
+                  <span class="decision-card__total"><span data-total-votes>0</span> {% include t.html key="community.total_votes_suffix" lang=current_lang %}</span>
                 </div>
               </div>
             </div>
@@ -130,7 +133,7 @@
         
         {% if closed_decisions.size > 0 %}
         <section class="community-decisions community-decisions--closed">
-          <h2>Past Decisions</h2>
+          <h2>{% include t.html key="community.past_decisions" lang=current_lang %}</h2>
           <div class="decisions-grid" id="decisions-grid-closed">
             {% for decision in closed_decisions %}
             <div class="decision-card decision-card--closed" data-decision-id="{{ decision.id }}" data-status="{{ decision.status }}"{% if decision.winner %} data-winner="{{ decision.winner }}"{% endif %}>
@@ -138,13 +141,13 @@
                 <h3>{{ decision.title | escape }}</h3>
                 <div class="decision-card__meta">
                   <span class="decision-card__type">{{ decision.type | capitalize }}</span>
-                  <span class="decision-card__status-closed">Closed</span>
+                  <span class="decision-card__status-closed">{% include t.html key="community.closed" lang=current_lang %}</span>
                 </div>
               </div>
               
               <div class="decision-closed">
                 <div class="decision-winner">
-                  <span class="decision-winner__label">Winner</span>
+                  <span class="decision-winner__label">{% include t.html key="community.winner" lang=current_lang %}</span>
                   <span class="decision-winner__value">{{ decision.winner | escape }}</span>
                 </div>
                 <div class="decision-closed__results" data-decision-id="{{ decision.id }}">
@@ -158,28 +161,21 @@
         
         {% if open_decisions.size == 0 and closed_decisions.size == 0 %}
         <div class="community-page__empty">
-          <p>No decisions yet. Check back soon!</p>
+          <p>{% include t.html key="community.empty" lang=current_lang %}</p>
         </div>
         {% endif %}
       </div>
     </div>
   </main>
 
-  <footer class="site-footer">
-    <div class="site-footer__content">
-      <a href="/" class="site-footer__logo">
-        <img src="{{ site.platform.footer_logo_path | default: site.platform.logo_path | default: '/assets/images/defaults/dust-wave-square.png' }}" alt="{{ site.platform.company_name | default: site.author }}">
-      </a>
-      <div class="site-footer__copyright">
-        <span>(ɔ) {{ 'now' | date: "%Y" }} {{ site.platform.company_name | default: site.author | upcase }}</span>
-      </div>
-    </div>
-  </footer>
+  {% include site-footer.html lang=current_lang %}
   <script
     src="/assets/js/community-page.js"
     defer
     data-community-page-script="true"
     data-worker-base="{{ site.platform.worker_url }}"
-    data-campaign-slug="{{ campaign.slug }}"></script>
+    data-campaign-slug="{{ campaign.slug }}"
+    data-current-lang="{{ current_lang }}"
+    data-runtime-messages="{{ runtime_messages_json | strip | escape }}"></script>
 </body>
 </html>

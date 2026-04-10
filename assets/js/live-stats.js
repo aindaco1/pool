@@ -22,6 +22,31 @@ const INVALIDATION_HANDLER_KEY = '__POOL_LIVE_STATS_INVALIDATION_HANDLER';
 const LIVE_REFRESH_MARKER_KEY = 'pool_live_refresh_needed';
 const LIVE_REFRESH_MARKER_TTL_MS = 10 * 60 * 1000;
 
+function getRuntimeMessages() {
+  return window.POOL_CONFIG?.i18n?.messages || {};
+}
+
+function getRuntimeMessage(path, fallback) {
+  const parts = String(path || '').split('.');
+  let value = getRuntimeMessages();
+  for (let index = 0; index < parts.length; index += 1) {
+    if (!value || typeof value !== 'object') return fallback;
+    value = value[parts[index]];
+  }
+  return typeof value === 'string' && value ? value : fallback;
+}
+
+function formatRuntimeMessage(path, fallback, replacements) {
+  const template = getRuntimeMessage(path, fallback);
+  if (!replacements || typeof template !== 'string') return template;
+  return template.replace(/%\{(.*?)\}/g, (_match, key) => {
+    if (Object.prototype.hasOwnProperty.call(replacements, key)) {
+      return String(replacements[key]);
+    }
+    return '';
+  });
+}
+
 function getWorkerBase() {
   return window.POOL_CONFIG?.platform?.workerUrl || window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
 }
@@ -317,7 +342,10 @@ function updateProgressBar(wrap, stats) {
       countdown.setAttribute('data-goal-met', 'true');
       var msg = countdown.querySelector('.campaign-countdown__message');
       if (msg && msg.classList.contains('campaign-countdown__message--not-funded')) {
-        msg.innerHTML = '<h2>Project Funded</h2>';
+        msg.textContent = '';
+        var heading = document.createElement('h2');
+        heading.textContent = getRuntimeMessage('liveStats.projectFunded', 'Project Funded');
+        msg.appendChild(heading);
         msg.classList.remove('campaign-countdown__message--not-funded');
         msg.classList.add('campaign-countdown__message--funded');
       }
@@ -393,7 +421,7 @@ function updateSupportItems(supportItems) {
             const btn = item.querySelector('.support-item__btn');
             if (btn) {
               btn.disabled = true;
-              btn.textContent = 'Funded';
+              btn.textContent = getRuntimeMessage('liveStats.funded', 'Funded');
             }
           }
         }
@@ -587,7 +615,7 @@ function updateTierInventory(card, tierInv) {
     const btn = card.querySelector('.poolcart-add-item');
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Sold Out';
+      btn.textContent = getRuntimeMessage('liveStats.soldOut', 'Sold Out');
     }
     card.classList.add('tier-card--sold-out');
   }
@@ -625,7 +653,7 @@ function unlockTier(card) {
     btn.removeAttribute('aria-disabled');
     const price = btn.dataset.itemPrice;
     const formattedPrice = formatMoney(parseFloat(price));
-    btn.textContent = `Pledge ${formattedPrice}`;
+    btn.textContent = formatRuntimeMessage('liveStats.pledgeAmount', 'Pledge %{amount}', { amount: formattedPrice });
   }
 }
 
@@ -676,9 +704,11 @@ function enableLateSupportElement(element, type) {
     
     if (type === 'tier') {
       const price = btn.dataset.itemPrice;
-      btn.textContent = `Pledge ${formatMoney(parseFloat(price))}`;
+      btn.textContent = formatRuntimeMessage('liveStats.pledgeAmount', 'Pledge %{amount}', {
+        amount: formatMoney(parseFloat(price))
+      });
     } else if (type === 'support' || type === 'custom') {
-      btn.textContent = 'Support';
+      btn.textContent = getRuntimeMessage('liveStats.support', 'Support');
     }
   }
   

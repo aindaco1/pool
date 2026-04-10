@@ -35,6 +35,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
 - **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, stacking, and overflow fixes instead of a separate mobile-only UI
 - **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, and curated design variables without requiring custom code for normal fork rebranding
+- **English + Spanish i18n foundation** — `_config.yml` now drives supported languages, static locale routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge runtime copy, campaign countdown/gallery/live-stats labels, and localized Worker supporter emails
 - **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
 ## Architecture
@@ -77,6 +78,7 @@ Fork-facing settings now use a structured config model in [`_config.yml`](/Users
 - `platform` for identity, URLs, and support contact
 - `platform` also covers brand assets like logo, footer logo, favicon, and default social image
 - `pricing` for tax, shipping, and platform-tip defaults
+- `i18n` for default/supported languages, language labels, and localized public-page routes
 - `design` for curated typography, radius, layout-width, and theme-token overrides
 - `checkout` for truly variable checkout settings like the Stripe publishable key
 - `cache` for live browser TTLs
@@ -84,6 +86,12 @@ Fork-facing settings now use a structured config model in [`_config.yml`](/Users
 [`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml) is now intentionally thin: it should only carry true local overrides like localhost URLs and `show_test_campaigns`, not a second copy of the base config.
 
 See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for the supported no-code customization surface and which settings are automatically mirrored to the Worker.
+
+For localization, the supported model is:
+
+- shared UI/runtime/email copy lives in `_data/i18n/{lang}.yml`
+- localized long-form pages still need localized source files under the locale prefix
+- the shared footer language switcher preserves the current query string and hash, so tokenized routes like `/manage/?t=...` can switch to `/es/manage/?t=...` without dropping pledge access
 
 The main local/dev/test paths already sync those mirrored Worker values automatically. If you want to refresh the Worker config directly, run:
 
@@ -225,6 +233,7 @@ See [`docs/`](docs/) for full documentation:
 - [SECURITY.md](docs/SECURITY.md) — Security architecture, rate limiting & pen testing
 - [ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — Accessibility standards, critical surfaces, and current coverage
 - [CUSTOMIZATION.md](docs/CUSTOMIZATION.md) — Supported fork-facing branding, pricing, and design overrides
+- [I18N.md](docs/I18N.md) — Current localization structure, routing model, and language-addition workflow
 - [ROADMAP.md](docs/ROADMAP.md) — Planned features
 - [CMS.md](docs/CMS.md) — Pages CMS setup & campaign editing guide
 

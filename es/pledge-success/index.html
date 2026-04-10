@@ -1,0 +1,25 @@
+---
+layout: pledge-result
+title: Aporte guardado
+lang: es
+translation_key: pledge_success
+permalink: /es/pledge-success/
+---
+
+<div class="pledge-result__icon">✓</div>
+
+<h1>{% include t.html key="pledge_result.saved_title" lang="es" %}</h1>
+
+<p>
+  {% include t.html key="pledge_result.saved_body" lang="es" %}
+</p>
+
+<p>
+  {% include t.html key="pledge_result.saved_manage" lang="es" %}
+</p>
+
+<p class="pledge-result__note">
+  <strong>{% include t.html key="pledge_result.saved_note" lang="es" %}</strong>
+</p>
+
+<a href="{% include localized-url.html lang='es' translation_key='home' %}" class="btn">{% include t.html key="pledge_result.back_to_campaigns" lang="es" %}</a>

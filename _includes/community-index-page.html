@@ -1,0 +1,15 @@
+<div class="community-redirect">
+  <h1>{% include t.html key="community.title" lang=page.lang %}</h1>
+  <p>{% include t.html key="community.index_intro" lang=page.lang %}</p>
+
+  <div class="campaigns-list">
+    {% for campaign in site.campaigns %}
+      {% if campaign.decisions %}
+      {% capture community_path %}/community/{{ campaign.slug }}/{% endcapture %}
+      <a href="{% include localized-url.html lang=page.lang path=community_path %}" class="campaign-link">
+        {{ campaign.title }}
+      </a>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>

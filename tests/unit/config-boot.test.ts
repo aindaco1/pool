@@ -19,6 +19,8 @@ describe('config boot scripts', () => {
     document.body.innerHTML = `
       <script
         data-pool-config-script="true"
+        data-current-lang="es"
+        data-runtime-messages='{"cart":{"checkout":"Pagar"},"manage":{"saved":"Guardado"}}'
         data-site-url="https://pool.test"
         data-worker-base="https://worker.test"
         data-platform-name="Fork Pool"
@@ -37,6 +39,17 @@ describe('config boot scripts', () => {
     await import('../../assets/js/pool-config.js');
 
     expect((window as any).POOL_CONFIG).toEqual({
+      i18n: {
+        currentLang: 'es',
+        messages: {
+          cart: {
+            checkout: 'Pagar'
+          },
+          manage: {
+            saved: 'Guardado'
+          }
+        }
+      },
       platform: {
         name: 'Fork Pool',
         companyName: 'Fork Studio',

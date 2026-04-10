@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-function renderCommunityPage() {
+function renderCommunityPage(options?: { runtimeMessages?: Record<string, unknown> }) {
+  const runtimeMessages = options?.runtimeMessages
+    ? ` data-runtime-messages='${JSON.stringify(options.runtimeMessages).replace(/'/g, '&#39;')}'`
+    : '';
   document.body.innerHTML = `
     <div id="community-loading"></div>
     <div id="community-denied" hidden></div>
@@ -8,11 +11,14 @@ function renderCommunityPage() {
     <script
       data-community-page-script="true"
       data-worker-base="https://worker.test"
-      data-campaign-slug="demo"></script>
+      data-campaign-slug="demo"${runtimeMessages}></script>
   `;
 }
 
-function renderCommunityPageWithDecision() {
+function renderCommunityPageWithDecision(options?: { runtimeMessages?: Record<string, unknown> }) {
+  const runtimeMessages = options?.runtimeMessages
+    ? ` data-runtime-messages='${JSON.stringify(options.runtimeMessages).replace(/'/g, '&#39;')}'`
+    : '';
   document.body.innerHTML = `
     <div id="community-loading"></div>
     <div id="community-denied" hidden></div>
@@ -42,7 +48,7 @@ function renderCommunityPageWithDecision() {
     <script
       data-community-page-script="true"
       data-worker-base="https://worker.test"
-      data-campaign-slug="demo"></script>
+      data-campaign-slug="demo"${runtimeMessages}></script>
   `;
 }
 
@@ -274,6 +280,65 @@ describe('community page script', () => {
 
     expect(document.querySelector('.decision-closed__results img')).toBeNull();
     expect(document.querySelector('.decision-closed__results .closed-results__total')?.textContent).toBe('1 total votes');
+
+    consoleLog.mockRestore();
+    consoleError.mockRestore();
+  });
+
+  it('uses localized runtime messages for vote totals', async () => {
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    window.history.replaceState({}, '', '/community/?t=token-456');
+    renderCommunityPageWithDecision({
+      runtimeMessages: {
+        community: {
+          voteSingular: '%{count} voto',
+          votePlural: '%{count} votos',
+          totalVotes: '%{count} votos en total'
+        }
+      }
+    });
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://worker.test/pledge?token=token-456') {
+        return new Response(JSON.stringify({
+          campaignSlug: 'demo',
+          pledgeStatus: 'active'
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (url === 'https://worker.test/votes?token=token-456&decisions=color-palette') {
+        return new Response(JSON.stringify({
+          decisions: {
+            'color-palette': {
+              hasVoted: true,
+              userChoice: 'Blue',
+              totalVotes: 1,
+              results: { Blue: 1 }
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error('Unexpected fetch: ' + url);
+    }) as typeof fetch;
+
+    await import('../../assets/js/community-page.js');
+
+    await vi.waitFor(() => {
+      expect((document.querySelector('[data-view="results"]') as HTMLElement).hidden).toBe(false);
+    });
+
+    expect(document.querySelector('.result-bar__count')?.textContent).toBe('1 voto');
+    expect(document.querySelector('.decision-card__total')?.textContent).toContain('1 votos en total');
 
     consoleLog.mockRestore();
     consoleError.mockRestore();

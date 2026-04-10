@@ -1,24 +1,24 @@
 ---
 layout: pledge-result
 title: Pledge Saved
+lang: en
+translation_key: pledge_success
 ---
 
 <div class="pledge-result__icon">✓</div>
 
-<h1>Your Pledge is Saved!</h1>
+<h1>{% include t.html key="pledge_result.saved_title" %}</h1>
 
 <p>
-  Your payment method has been securely saved. You will <strong>only be charged</strong> 
-  if this campaign reaches its funding goal by the deadline.
+  {% include t.html key="pledge_result.saved_body" %}
 </p>
 
 <p>
-  Check your email for a confirmation with a link to manage your pledge. 
-  You can cancel, modify your tier, or update your payment method anytime before the campaign ends.
+  {% include t.html key="pledge_result.saved_manage" %}
 </p>
 
 <p class="pledge-result__note">
-  <strong>No account needed</strong> — just use the link in your email.
+  <strong>{% include t.html key="pledge_result.saved_note" %}</strong>
 </p>
 
-<a href="/" class="btn">Back to Campaigns</a>
+<a href="{% include localized-url.html lang=page.lang translation_key='home' %}" class="btn">{% include t.html key="pledge_result.back_to_campaigns" %}</a>

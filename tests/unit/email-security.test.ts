@@ -13,7 +13,8 @@ const env = {
   PLATFORM_NAME: 'The Pool',
   PLATFORM_COMPANY_NAME: 'Dust Wave',
   PLEDGES_EMAIL_FROM: 'The Pool <pledges@pool.test>',
-  UPDATES_EMAIL_FROM: 'The Pool <updates@pool.test>'
+  UPDATES_EMAIL_FROM: 'The Pool <updates@pool.test>',
+  I18N_CATALOG_JSON: JSON.stringify({ en: { email: {} } })
 };
 
 function mockResend() {
@@ -30,7 +31,7 @@ function mockResend() {
 }
 
 function getEmailPayload(fetchMock: ReturnType<typeof mockResend>) {
-  const [, init] = fetchMock.mock.calls[0];
+  const [, init] = fetchMock.mock.calls.at(-1) || [];
   return JSON.parse(String(init?.body || '{}'));
 }
 

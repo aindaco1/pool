@@ -18,7 +18,20 @@ const mockWorkerBase = 'https://pledge.dustwave.xyz';
 
 // Helper to set up the live-stats module globals
 function setupGlobals() {
-  (window as any).POOL_CONFIG = { workerBase: mockWorkerBase };
+  (window as any).POOL_CONFIG = {
+    workerBase: mockWorkerBase,
+    i18n: {
+      messages: {
+        liveStats: {
+          projectFunded: 'Project Funded',
+          support: 'Support',
+          funded: 'Funded',
+          soldOut: 'Sold Out',
+          pledgeAmount: 'Pledge %{amount}'
+        }
+      }
+    }
+  };
   (window as any).POOL_INVENTORY_CACHE = {};
 }
 
@@ -897,6 +910,74 @@ describe('live-stats runtime integration', () => {
       expect((wrap.querySelector('[data-live-pledged]') as HTMLElement).textContent).toBe('$9.3k');
     });
     expect(localStorage.getItem('pool_live_refresh_needed')).toBeNull();
+  });
+
+  it('uses localized runtime messages for funded, sold-out, and pledge labels', async () => {
+    (window as any).POOL_CONFIG = {
+      workerBase: mockWorkerBase,
+      i18n: {
+        messages: {
+          liveStats: {
+            projectFunded: 'Proyecto financiado',
+            support: 'Apoyar',
+            funded: 'Financiado',
+            soldOut: 'Agotado',
+            pledgeAmount: 'Aportar %{amount}'
+          }
+        }
+      }
+    };
+
+    const wrap = createProgressWrap({ campaignSlug: 'test-campaign', goal: 10000 });
+    const countdown = document.createElement('div');
+    countdown.id = 'campaign-countdown';
+    countdown.dataset.goalMet = 'false';
+    const message = document.createElement('div');
+    message.className = 'campaign-countdown__message campaign-countdown__message--not-funded';
+    countdown.appendChild(message);
+    document.body.appendChild(countdown);
+
+    const soldOutCard = createTierCard({ campaignSlug: 'test-campaign', tierId: 'tier-1' });
+    const lateSupportCard = createTierCard({ campaignSlug: 'test-campaign', tierId: 'late-tier', lateSupport: true, disabled: true });
+    const supportItem = createSupportItem({ itemId: 'location-scouting', lateSupport: true, disabled: true });
+    const supportList = document.createElement('div');
+    supportList.className = 'support-items';
+    supportList.dataset.campaignSlug = 'test-campaign';
+    supportList.appendChild(supportItem);
+    const customAmount = createCustomAmount({ campaignSlug: 'test-campaign', lateSupport: true, disabled: true, goal: 10000 });
+
+    document.body.appendChild(wrap);
+    document.body.appendChild(soldOutCard);
+    document.body.appendChild(lateSupportCard);
+    document.body.appendChild(supportList);
+    document.body.appendChild(customAmount);
+
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        stats: {
+          pledgedAmount: 1000000,
+          supportItems: { 'location-scouting': 100000 }
+        },
+        inventory: {
+          tiers: {
+            'tier-1': { remaining: 0, limit: 10 },
+            'late-tier': { remaining: 2, limit: 10 }
+          }
+        }
+      })
+    }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    await import('../../assets/js/live-stats.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect((countdown.querySelector('h2') as HTMLElement).textContent).toBe('Proyecto financiado');
+    expect((soldOutCard.querySelector('button') as HTMLButtonElement).textContent).toBe('Agotado');
+    expect((lateSupportCard.querySelector('button') as HTMLButtonElement).textContent).toBe('Aportar $50');
+    expect((supportItem.querySelector('button') as HTMLButtonElement).textContent).toBe('Financiado');
+    expect((customAmount.querySelector('button') as HTMLButtonElement).textContent).toBe('Apoyar');
   });
 });
 

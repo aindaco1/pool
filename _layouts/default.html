@@ -1,19 +1,32 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign default_lang = site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign platform_title = site.platform.name | default: site.title -%}
+{%- capture canonical_path -%}{% include localized-url.html lang=current_lang translation_key=page.translation_key %}{%- endcapture -%}
 <!doctype html>
-<html lang="{{ site.lang | default: 'en' }}">
+<html lang="{{ current_lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include cart-head.html %}
-  <title>{% if page.title %}{{ page.title }} · {% endif %}{{ site.platform.name | default: site.title }}</title>
-  <meta property="og:title" content="{% if page.title %}{{ page.title | escape }} · {% endif %}{{ site.platform.name | default: site.title | escape }}">
+  <title>{% if page.title %}{{ page.title }} · {% endif %}{{ platform_title }}</title>
+  <link rel="canonical" href="{{ site.platform.site_url | default: site.url }}{{ canonical_path | strip }}">
+  {% if page.translation_key and site.i18n.pages[page.translation_key] %}
+    {% for lang in site.i18n.supported_langs %}
+      {% capture alternate_path %}{% include localized-url.html lang=lang translation_key=page.translation_key %}{% endcapture %}
+      <link rel="alternate" hreflang="{{ lang }}" href="{{ site.platform.site_url | default: site.url }}{{ alternate_path | strip }}">
+    {% endfor %}
+    {% capture default_path %}{% include localized-url.html lang=default_lang translation_key=page.translation_key %}{% endcapture %}
+    <link rel="alternate" hreflang="x-default" href="{{ site.platform.site_url | default: site.url }}{{ default_path | strip }}">
+  {% endif %}
+  <meta property="og:title" content="{% if page.title %}{{ page.title | escape }} · {% endif %}{{ platform_title | escape }}">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="{{ site.platform.site_url | default: site.url }}{{ page.url }}">
+  <meta property="og:url" content="{{ site.platform.site_url | default: site.url }}{{ canonical_path | strip }}">
   <meta property="og:image" content="{{ site.platform.site_url | default: site.url }}{{ site.platform.default_social_image_path | default: '/assets/images/defaults/dust-wave-square.png' }}">
 </head>
 <body>
   <!-- Skip link for keyboard navigation -->
-  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
   
   {% include header.html %}
 
@@ -21,16 +34,7 @@
     {{ content }}
   </main>
 
-  <footer class="site-footer" role="contentinfo">
-    <div class="site-footer__content">
-      <a href="/" class="site-footer__logo" aria-label="{{ site.platform.name | default: site.title }} home">
-        <img src="{{ site.platform.footer_logo_path | default: site.platform.logo_path | default: '/assets/images/defaults/dust-wave-square.png' }}" alt="">
-      </a>
-      <div class="site-footer__copyright">
-        <span>(ɔ) {{ 'now' | date: "%Y" }} {{ site.platform.company_name | default: site.author | upcase }}</span>
-      </div>
-    </div>
-  </footer>
+  {% include site-footer.html lang=current_lang %}
 
   <!-- Live region for dynamic announcements -->
   <div id="aria-live-region" class="aria-live" aria-live="polite" aria-atomic="true"></div>

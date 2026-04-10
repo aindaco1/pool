@@ -166,6 +166,58 @@ test.describe('Public Page Accessibility', () => {
     ]);
   });
 
+  test('spanish home page has no obvious axe violations', async ({ page }) => {
+    await page.goto('/es/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+    await expect(page.locator('main')).toBeVisible();
+    await expectNoAxeViolations(page);
+    await expectAriaSnapshotToContain(page.locator('main'), [
+      'heading "Campañas de The Pool"',
+      'heading "Activas"',
+      'heading "Completadas"'
+    ]);
+  });
+
+  test('spanish about page has no obvious axe violations', async ({ page }) => {
+    await page.goto('/es/about/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('h1')).toContainText(/¿Qué es The Pool/i);
+    await expectNoAxeViolations(page);
+    await expectAriaSnapshotToContain(page.locator('main'), [
+      'heading "¿Qué es The Pool?"',
+      'heading "La tecnología"'
+    ]);
+  });
+
+  test('spanish terms page has no obvious axe violations', async ({ page }) => {
+    await page.goto('/es/terms/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('h1')).toContainText(/Términos/i);
+    await expectNoAxeViolations(page);
+    await expectAriaSnapshotToContain(page.locator('main'), [
+      'heading "Términos y pautas creativas"',
+      'heading "Procesamiento de pagos"'
+    ]);
+  });
+
+  test('spanish pledge success page has no obvious axe violations', async ({ page }) => {
+    await page.goto('/es/pledge-success/?orderId=pool-intent-demo123');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('h1')).toContainText(/aporte está guardado/i);
+    await expectNoAxeViolations(page);
+  });
+
+  test('spanish pledge cancelled page has no obvious axe violations', async ({ page }) => {
+    await page.goto('/es/pledge-cancelled/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('h1')).toContainText(/pago cancelado/i);
+    await expectNoAxeViolations(page);
+  });
+
   test('about page stays readable on a small phone viewport', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/about/');
@@ -213,12 +265,20 @@ test.describe('Public Page Accessibility', () => {
   test('community index page has no obvious axe violations', async ({ page }) => {
     await page.goto('/community/');
     await expect(page.locator('main')).toBeVisible();
-    await expect(page.locator('h1')).toContainText(/Campaign Community/i);
+    await expect(page.locator('h1')).toContainText(/Supporter Community/i);
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
-      'heading "Campaign Community"',
+      'heading "Supporter Community"',
       'link "HAND RELATIONS"'
     ]);
+  });
+
+  test('spanish community index page has no obvious axe violations', async ({ page }) => {
+    await page.goto('/es/community/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('h1')).toContainText(/Comunidad de patrocinadores/i);
+    await expectNoAxeViolations(page);
   });
 
   test('community denied page has no obvious axe violations', async ({ page }) => {
@@ -255,6 +315,14 @@ test.describe('Public Page Accessibility', () => {
       'heading "Active Decisions"',
       'button "Submit Vote"'
     ]);
+  });
+
+  test('spanish supporter community page has no obvious axe violations', async ({ page }) => {
+    await routeCommunitySupporterAccess(page);
+    await page.goto('/es/community/hand-relations/?t=token-123');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+    await expect(page.locator('#community-content')).toBeVisible();
+    await expectNoAxeViolations(page);
   });
 
   test('supporter community page stays tidy on a small phone viewport', async ({ page }) => {

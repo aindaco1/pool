@@ -106,6 +106,11 @@
   - auto-synced Worker mirroring from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`
   - curated CSS theme-variable bridge via `assets/theme-vars.css`
   - configurable core brand assets and documented no-code customization surface
+- [x] i18n completion with a Spanish language translation available
+  - `_config.yml` now owns supported languages, language labels, and curated localized public-page routes
+  - English + Spanish routes now exist for `/`, `/about/`, `/terms/`, `/pledge-success/`, `/pledge-cancelled/`, `/manage/`, `/community/`, and supporter community pages
+  - a quieter footer language switcher plus shared route helpers preserve query strings and hashes for tokenized routes such as `/manage/?t=...`
+  - shared public campaign/community labels, site-owned cart/community/Manage Pledge runtime strings, campaign countdown/gallery/live-stats edge copy, and Worker supporter emails now read from locale data plus persisted `preferredLang`
 
 ## Planned
 
@@ -124,7 +129,6 @@
   - Support USA, Europe, Canada, Australia, Mexico, other countries in the Americas, Japan, South Korea
 - [ ] Developer FAQ based on internal documentation
 - [ ] Marketing landing page for the platform on a different domain
-- [ ] i18n completion with a Spanish language translation available
 - [ ] Platform-wide add-on products for backer upsells
 
 ## Known Issues

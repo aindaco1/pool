@@ -144,6 +144,20 @@
     ['DC', 'District of Columbia']
   ];
 
+  function getRuntimeMessages() {
+    return window.POOL_CONFIG?.i18n?.messages || {};
+  }
+
+  function getRuntimeMessage(path, fallback) {
+    const parts = String(path || '').split('.');
+    let value = getRuntimeMessages();
+    for (const part of parts) {
+      if (!value || typeof value !== 'object') return fallback;
+      value = value[part];
+    }
+    return typeof value === 'string' && value ? value : fallback;
+  }
+
   function getRequestedRuntime() {
     return window.POOL_CONFIG?.checkout?.cartRuntime ||
       window.POOL_CONFIG?.cartRuntime ||
@@ -210,7 +224,8 @@
   }
 
   function formatTaxRateLabel() {
-    return `Sales tax (${(getSalesTaxRate() * 100).toFixed(3).replace(/\.?0+$/, '')}%)`;
+    return getRuntimeMessage('cart.salesTaxLabel', 'Sales tax (%{rate}%)')
+      .replace('%{rate}', (getSalesTaxRate() * 100).toFixed(3).replace(/\.?0+$/, ''));
   }
 
   function escapeAttribute(value) {
@@ -652,11 +667,11 @@
   }
 
   function isPledgeCancelledPath() {
-    return /^\/pledge-cancelled\/?$/.test(getCurrentPath());
+    return /^\/(?:[a-z]{2,3}(?:-[a-z0-9]{2,8})?\/)?pledge-cancelled\/?$/.test(getCurrentPath());
   }
 
   function isPledgeSuccessPath() {
-    return /^\/pledge-success\/?$/.test(getCurrentPath());
+    return /^\/(?:[a-z]{2,3}(?:-[a-z0-9]{2,8})?\/)?pledge-success\/?$/.test(getCurrentPath());
   }
 
   function getPledgeSuccessOrderId() {
@@ -998,6 +1013,10 @@
     } catch (_error) {}
   }
 
+  function getCurrentLang() {
+    return window.POOL_CONFIG?.i18n?.currentLang || document.documentElement.lang || 'en';
+  }
+
   function buildFirstPartyCheckoutPayload(state) {
     const items = state?.cart?.items?.items || [];
     if (items.length === 0) {
@@ -1062,7 +1081,8 @@
             campaignSlug,
             items: checkoutItems,
             customAmount,
-            tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent())
+            tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent()),
+            preferredLang: getCurrentLang()
           }
         };
   }
@@ -1520,7 +1540,7 @@
                   <input id="pool-custom-shipping-name" name="shipping_name" class="pool-first-party-cart__input" type="text" autocomplete="shipping name" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.name || '')}" data-cart-custom-shipping-field="name">
                 </div>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
-                  <label class="pool-first-party-cart__field-label" for="pool-custom-checkout-email-fallback">Email address <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-checkout-email-fallback">${escapeHtml(getRuntimeMessage('cart.emailAddress', 'Email address'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                   <input
                     id="pool-custom-checkout-email-fallback"
                     name="shipping_email"
@@ -1566,10 +1586,10 @@
           </div>
         ` : `
           <div class="pool-first-party-cart__callout pool-first-party-cart__callout--stripe">
-            <p class="pool-first-party-cart__section-label">Contact</p>
+            <p class="pool-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.contact', 'Contact'))}</p>
             <div class="pool-first-party-cart__stripe-shell">
               <div class="pool-first-party-cart__field pool-first-party-cart__field--compact" data-cart-custom-checkout-email-fallback>
-                <label class="pool-first-party-cart__field-label" for="pool-custom-checkout-email">Email address <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                <label class="pool-first-party-cart__field-label" for="pool-custom-checkout-email">${escapeHtml(getRuntimeMessage('cart.emailAddress', 'Email address'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                   <input
                     id="pool-custom-checkout-email"
                     class="pool-first-party-cart__input"
@@ -1586,11 +1606,11 @@
           </div>
         `}
         <div class="pool-first-party-cart__callout pool-first-party-cart__callout--stripe">
-          <p class="pool-first-party-cart__section-label">Payment method</p>
+          <p class="pool-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.paymentMethod', 'Payment method'))}</p>
           <div class="pool-first-party-cart__stripe-shell">
             <div class="pool-first-party-cart__stripe-region pool-first-party-cart__stripe-region--payment" data-cart-custom-checkout-region="payment"></div>
           </div>
-          <p class="pool-first-party-cart__note pool-first-party-cart__note--payment-consent">By providing your card information, you allow ${escapeHtml(getPlatformName())} to charge your card if the campaign(s) you backed reaches its goal before its end date.</p>
+          <p class="pool-first-party-cart__note pool-first-party-cart__note--payment-consent">${escapeHtml(getRuntimeMessage('cart.paymentConsent', 'By providing your card information, you allow %{platform} to charge your card if the campaign(s) you backed reaches its goal before its end date.').replace('%{platform}', getPlatformName()))}</p>
         </div>
       ` : `
         <div class="pool-first-party-cart__callout">
@@ -1601,26 +1621,26 @@
       const itemMarkup = items.length > 0 ? items.map((item) => `
         <li class="pool-first-party-cart__item" data-item-id="${item.uniqueId}">
           <div class="pool-first-party-cart__item-main">
-            <strong class="pool-first-party-cart__item-name">${escapeHtml(item.name || item.id || 'Untitled item')}</strong>
+            <strong class="pool-first-party-cart__item-name">${escapeHtml(item.name || item.id || getRuntimeMessage('cart.untitledItem', 'Untitled item'))}</strong>
             ${(item.stackable === true || (item.quantity || 1) > 1)
-              ? `<span class="pool-first-party-cart__item-meta">Qty ${item.quantity || 1}</span>`
+              ? `<span class="pool-first-party-cart__item-meta">${escapeHtml(getRuntimeMessage('cart.quantity', 'Qty %{count}').replace('%{count}', String(item.quantity || 1)))}</span>`
               : ''}
           </div>
           <div class="pool-first-party-cart__item-actions">
             <span class="pool-first-party-cart__item-price">${formatCurrency((item.price || 0) * (item.quantity || 1))}</span>
-            <button type="button" class="pool-first-party-cart__remove" data-remove-item="${item.uniqueId}">Remove</button>
+            <button type="button" class="pool-first-party-cart__remove" data-remove-item="${item.uniqueId}">${escapeHtml(getRuntimeMessage('cart.remove', 'Remove'))}</button>
           </div>
         </li>
       `).join('') : `
-        <li class="pool-first-party-cart__empty">Your cart is empty.</li>
+        <li class="pool-first-party-cart__empty">${escapeHtml(getRuntimeMessage('cart.empty', 'Your cart is empty.'))}</li>
       `;
       const cartEstimateMarkup = items.length > 0 ? `
         <div class="pool-first-party-cart__tip-box">
           <div class="pool-first-party-cart__tip-header">
-            <strong id="pool-cart-tip-label">Tip ${escapeHtml(getPlatformName())} for platform maintenance.</strong>
+            <strong id="pool-cart-tip-label">${escapeHtml(getRuntimeMessage('cart.tipLabel', `Tip ${getPlatformName()} for platform maintenance.`))}</strong>
             <span id="pool-cart-tip-amount" data-cart-tip-amount>${formatCents(pricing.tipAmountCents)}</span>
           </div>
-          <p class="pool-first-party-cart__tip-copy" id="pool-cart-tip-copy">${escapeHtml(getPlatformName())} has a 0% platform fee for organizers. Optional tips help keep the platform sustainable for creators.</p>
+          <p class="pool-first-party-cart__tip-copy" id="pool-cart-tip-copy">${escapeHtml(getRuntimeMessage('cart.tipCopy', `${getPlatformName()} has a 0% platform fee for organizers. Optional tips help keep the platform sustainable for creators.`))}</p>
           <div class="pool-first-party-cart__tip-controls">
             <input
               id="pool-cart-tip-input"
@@ -1639,15 +1659,15 @@
           </div>
         </div>
         <section class="pool-first-party-cart__callout">
-          <p class="pool-first-party-cart__section-label">Pledge total</p>
+          <p class="pool-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.pledgeTotal', 'Pledge total'))}</p>
           <div class="pool-first-party-cart__checkout-summary">
             <div class="pool-first-party-cart__summary-row">
-              <span>Subtotal</span>
+              <span>${escapeHtml(getRuntimeMessage('cart.subtotal', 'Subtotal'))}</span>
               <strong data-cart-summary-subtotal>${formatCents(pricing.subtotalCents)}</strong>
             </div>
             ${pricing.tipAmountCents > 0 ? `
               <div class="pool-first-party-cart__summary-row" data-cart-summary-tip-row>
-                <span data-cart-summary-tip-label>${escapeHtml(getPlatformName())} tip (${pricing.tipPercent}%)</span>
+                <span data-cart-summary-tip-label>${escapeHtml(getRuntimeMessage('cart.tipWithPercent', '%{platform} tip (%{percent}%)').replace('%{platform}', getPlatformName()).replace('%{percent}', String(pricing.tipPercent)))}</span>
                 <strong data-cart-summary-tip-amount>${formatCents(pricing.tipAmountCents)}</strong>
               </div>
             ` : ''}
@@ -1657,12 +1677,12 @@
             </div>
             ${pricing.shippingCents > 0 ? `
               <div class="pool-first-party-cart__summary-row" data-cart-summary-shipping-row>
-                <span>Shipping</span>
+                <span>${escapeHtml(getRuntimeMessage('cart.shipping', 'Shipping'))}</span>
                 <strong data-cart-summary-shipping>${formatCents(pricing.shippingCents)}</strong>
               </div>
             ` : ''}
             <div class="pool-first-party-cart__summary-row pool-first-party-cart__summary-row--total">
-              <span>Pledge total</span>
+              <span>${escapeHtml(getRuntimeMessage('cart.pledgeTotal', 'Pledge total'))}</span>
               <strong data-cart-summary-total>${formatCents(pricing.totalCents)}</strong>
             </div>
           </div>
@@ -1672,13 +1692,13 @@
         <section class="pool-first-party-cart__checkout-preview">
           <div class="pool-first-party-cart__summary-block">
             <div class="pool-first-party-cart__line-items">
-              <p class="pool-first-party-cart__section-label">Pledge summary</p>
+              <p class="pool-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.pledgeSummary', 'Pledge summary'))}</p>
               <ul class="pool-first-party-cart__line-item-list">
                 ${checkoutLineItems.map((item) => `
                   <li class="pool-first-party-cart__line-item">
                     <div>
                       <strong class="pool-first-party-cart__line-item-name">${escapeHtml(item.name)}</strong>
-                      ${item.showQuantity ? `<span>Qty ${item.quantity}</span>` : ''}
+                      ${item.showQuantity ? `<span>${escapeHtml(getRuntimeMessage('cart.quantity', 'Qty %{count}').replace('%{count}', String(item.quantity)))}</span>` : ''}
                     </div>
                     <strong class="pool-first-party-cart__line-item-amount">${formatCents(item.amountCents)}</strong>
                   </li>
@@ -1687,12 +1707,12 @@
             </div>
             <div class="pool-first-party-cart__checkout-summary">
               <div class="pool-first-party-cart__summary-row">
-                <span>Subtotal</span>
+                <span>${escapeHtml(getRuntimeMessage('cart.subtotal', 'Subtotal'))}</span>
                 <strong>${formatCents(pricing.subtotalCents)}</strong>
               </div>
               ${pricing.tipAmountCents > 0 ? `
                 <div class="pool-first-party-cart__summary-row">
-                  <span>${escapeHtml(getPlatformName())} tip (${pricing.tipPercent}%)</span>
+                  <span>${escapeHtml(getRuntimeMessage('cart.tipWithPercent', '%{platform} tip (%{percent}%)').replace('%{platform}', getPlatformName()).replace('%{percent}', String(pricing.tipPercent)))}</span>
                   <strong>${formatCents(pricing.tipAmountCents)}</strong>
                 </div>
               ` : ''}
@@ -1702,12 +1722,12 @@
               </div>
               ${pricing.shippingCents > 0 ? `
                 <div class="pool-first-party-cart__summary-row">
-                  <span>Shipping</span>
+                  <span>${escapeHtml(getRuntimeMessage('cart.shipping', 'Shipping'))}</span>
                   <strong>${formatCents(pricing.shippingCents)}</strong>
                 </div>
               ` : ''}
               <div class="pool-first-party-cart__summary-row pool-first-party-cart__summary-row--total">
-                <span>Pledge total</span>
+                <span>${escapeHtml(getRuntimeMessage('cart.pledgeTotal', 'Pledge total'))}</span>
                 <strong>${formatCents(pricing.totalCents)}</strong>
               </div>
             </div>
@@ -1721,7 +1741,7 @@
       `;
       const footerActions = isCheckoutPreview ? `
           <div class="pool-first-party-cart__actions">
-            <button type="button" class="pool-first-party-cart__action pool-first-party-cart__action--secondary" data-cart-back>Back to cart</button>
+            <button type="button" class="pool-first-party-cart__action pool-first-party-cart__action--secondary" data-cart-back>${escapeHtml(getRuntimeMessage('cart.backToCart', 'Back to cart'))}</button>
             ${wantsCustomCheckout ? `
               <button
                 type="button"
@@ -1731,10 +1751,10 @@
                 ${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'submitting' || customCheckout?.mountStatus !== 'mounted' ? 'disabled' : ''}
               >${renderBusyButtonLabel(
                 checkoutUiState.status === 'confirming'
-                  ? 'Saving payment method...'
+                  ? getRuntimeMessage('cart.savingPaymentMethod', 'Saving payment method...')
                   : checkoutUiState.status === 'redirecting'
-                    ? 'Finishing pledge...'
-                    : 'Save payment method',
+                    ? getRuntimeMessage('cart.finishingPledge', 'Finishing pledge...')
+                    : getRuntimeMessage('cart.savePaymentMethod', 'Save payment method'),
                 checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting'
               )}</button>
             ` : `
@@ -1743,13 +1763,13 @@
                 class="pool-first-party-cart__action"
                 data-cart-start-checkout
                 ${!isFirstPartyCheckoutEnabled || checkoutUiState.status === 'submitting' ? 'disabled' : ''}
-              >${checkoutUiState.status === 'submitting' ? 'Starting pledge...' : (isFirstPartyCheckoutEnabled ? 'Continue to pledge' : 'Legacy checkout only')}</button>
+              >${checkoutUiState.status === 'submitting' ? escapeHtml(getRuntimeMessage('cart.startingPledge', 'Starting pledge...')) : (isFirstPartyCheckoutEnabled ? escapeHtml(getRuntimeMessage('cart.continueToPledge', 'Continue to pledge')) : 'Legacy checkout only')}</button>
             `}
         </div>
       ` : `
         <div class="pool-first-party-cart__actions">
-          <button type="button" class="pool-first-party-cart__action pool-first-party-cart__action--secondary" data-cart-close>Keep browsing</button>
-          <button type="button" class="pool-first-party-cart__action" data-cart-continue ${items.length === 0 ? 'disabled' : ''}>Checkout</button>
+          <button type="button" class="pool-first-party-cart__action pool-first-party-cart__action--secondary" data-cart-close>${escapeHtml(getRuntimeMessage('cart.keepBrowsing', 'Keep browsing'))}</button>
+          <button type="button" class="pool-first-party-cart__action" data-cart-continue ${items.length === 0 ? 'disabled' : ''}>${escapeHtml(getRuntimeMessage('cart.checkout', 'Checkout'))}</button>
         </div>
       `;
 
@@ -1775,10 +1795,10 @@
           <header class="pool-first-party-cart__header">
             <div>
               ${isCheckoutPreview
-                ? '<p id="pool-first-party-cart-title" class="pool-first-party-cart__section-label pool-first-party-cart__section-label--header">Checkout</p>'
-                : '<p id="pool-first-party-cart-title" class="pool-first-party-cart__section-label pool-first-party-cart__section-label--header">Your cart</p>'}
+                ? `<p id="pool-first-party-cart-title" class="pool-first-party-cart__section-label pool-first-party-cart__section-label--header">${escapeHtml(getRuntimeMessage('cart.checkoutTitle', 'Checkout'))}</p>`
+                : `<p id="pool-first-party-cart-title" class="pool-first-party-cart__section-label pool-first-party-cart__section-label--header">${escapeHtml(getRuntimeMessage('cart.yourCart', 'Your cart'))}</p>`}
             </div>
-            <button type="button" class="pool-first-party-cart__close" data-cart-close aria-label="Close cart" data-cart-dialog-initial-focus>X</button>
+            <button type="button" class="pool-first-party-cart__close" data-cart-close aria-label="${escapeAttribute(getRuntimeMessage('cart.closeCart', 'Close cart'))}" data-cart-dialog-initial-focus>X</button>
           </header>
           <div class="pool-first-party-cart__body">
             ${bodyMarkup}
@@ -1823,7 +1843,9 @@
 
       if (tipRow && tipLabel && tipSummaryAmount) {
         tipRow.hidden = pricing.tipAmountCents <= 0;
-        tipLabel.textContent = `${getPlatformName()} tip (${pricing.tipPercent}%)`;
+        tipLabel.textContent = getRuntimeMessage('cart.tipWithPercent', '%{platform} tip (%{percent}%)')
+          .replace('%{platform}', getPlatformName())
+          .replace('%{percent}', String(pricing.tipPercent));
         tipSummaryAmount.textContent = formatCents(pricing.tipAmountCents);
       }
 
@@ -1933,12 +1955,12 @@
       button.setAttribute('aria-busy', isConfirming || isRedirecting ? 'true' : 'false');
       button.innerHTML = renderBusyButtonLabel(
         isConfirming
-          ? 'Saving payment method...'
+          ? getRuntimeMessage('cart.savingPaymentMethod', 'Saving payment method...')
           : isRedirecting
-            ? 'Finishing pledge...'
+            ? getRuntimeMessage('cart.finishingPledge', 'Finishing pledge...')
             : isSubmitting
-              ? 'Loading secure payment...'
-              : 'Save payment method',
+              ? getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...')
+              : getRuntimeMessage('cart.savePaymentMethod', 'Save payment method'),
         isConfirming || isRedirecting
       );
     }
@@ -1994,12 +2016,12 @@
         return '';
       }
       if (message.includes('required') || message.includes('updateemail') || message.includes('provide an email address')) {
-        return 'Enter an email address to continue.';
+        return getRuntimeMessage('cart.emailRequired', 'Enter an email address to continue.');
       }
       if (message.includes('valid email')) {
-        return 'Enter a valid email address to continue.';
+        return getRuntimeMessage('cart.emailInvalid', 'Enter a valid email address to continue.');
       }
-      return rawMessage || 'Enter an email address to continue.';
+      return rawMessage || getRuntimeMessage('cart.emailRequired', 'Enter an email address to continue.');
     }
 
     function setCustomCheckoutEmailError(message) {
@@ -2131,7 +2153,7 @@
       };
 
       if (!trimmedEmail) {
-        const message = 'Enter an email address to continue.';
+        const message = getRuntimeMessage('cart.emailRequired', 'Enter an email address to continue.');
         checkoutUiState.customCheckout.emailError = message;
         setCustomCheckoutEmailError(message);
         return {
@@ -2177,6 +2199,7 @@
         const mountResult = await window.PoolStripeCheckoutSidecar.mount({
           publishableKey: checkoutUiState.customCheckout.publishableKey,
           clientSecret: checkoutUiState.customCheckout.clientSecret,
+          locale: getCurrentLang(),
           paymentContainer,
           shippingContainer,
           useShippingAddressElement: Boolean(shippingContainer),
@@ -2231,7 +2254,7 @@
         setCheckoutUiState({
           ...checkoutUiState,
           status: 'idle',
-          error: 'Secure checkout is not ready yet.'
+          error: getRuntimeMessage('cart.secureCheckoutNotReady', 'Secure checkout is not ready yet.')
         });
         return;
       }
@@ -2337,7 +2360,7 @@
 
         if (!completion.ok) {
           checkoutUiState.status = 'idle';
-          setCheckoutUiError('Payment method saved, but pledge confirmation is still processing. Please stay on this page a moment and try again.');
+          setCheckoutUiError(getRuntimeMessage('cart.paymentProcessingStill', 'Payment method saved, but pledge confirmation is still processing. Please stay on this page a moment and try again.'));
           syncCustomCheckoutConfirmButton();
           return;
         }
@@ -2346,7 +2369,10 @@
         markLiveCampaignRefreshNeeded(affectedCampaignSlugs);
         invalidateLiveCampaignCaches(affectedCampaignSlugs);
         writeActiveCustomCheckoutOrderId('');
-        redirectWindow(`/pledge-success/?orderId=${encodeURIComponent(orderId)}`);
+        const successPath = getCurrentLang() === 'en'
+          ? `/pledge-success/?orderId=${encodeURIComponent(orderId)}`
+          : `/${encodeURIComponent(getCurrentLang())}/pledge-success/?orderId=${encodeURIComponent(orderId)}`;
+        redirectWindow(successPath);
       } catch (error) {
         checkoutUiState.status = 'idle';
         const emailFieldMessage = getCustomCheckoutEmailFieldMessage(error);
@@ -2361,7 +2387,7 @@
           syncCustomCheckoutConfirmButton();
           return;
         }
-        setCheckoutUiError(error?.message || 'There was an error saving your payment method.');
+        setCheckoutUiError(error?.message || getRuntimeMessage('cart.savePaymentError', 'There was an error saving your payment method.'));
         syncCustomCheckoutConfirmButton();
       }
     }
@@ -2408,7 +2434,7 @@
         setCheckoutUiState({
           status: 'idle',
           mode: 'custom',
-          error: error?.message || 'Stripe.js failed to load.',
+          error: error?.message || getRuntimeMessage('cart.secureCheckoutMountError', 'Secure checkout could not be mounted.'),
           customCheckout: {
             ...nextCustomCheckout,
             scriptStatus: 'error',
@@ -2424,7 +2450,7 @@
       if (getRequestedCheckoutProvider() !== FIRST_PARTY_CHECKOUT_PROVIDER) {
         setCheckoutUiState({
           status: 'idle',
-          error: 'First-party checkout is not enabled for this build.'
+          error: getRuntimeMessage('cart.firstPartyDisabled', 'First-party checkout is not enabled for this build.')
         });
         return;
       }
@@ -2492,7 +2518,7 @@
         invalidateCustomCheckoutFlow();
         setCheckoutUiState({
           status: 'idle',
-          error: error?.message || 'There was an error starting your pledge.',
+          error: error?.message || getRuntimeMessage('cart.startPledgeError', 'There was an error starting your pledge.'),
           mode: getCheckoutUiMode(),
           customCheckout: null
         });

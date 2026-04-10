@@ -1,19 +1,7 @@
 ---
 layout: default
 title: Community
+lang: en
+translation_key: community_index
 ---
-
-<div class="community-redirect">
-  <h1>Campaign Community</h1>
-  <p>Select a campaign to access its community features:</p>
-  
-  <div class="campaigns-list">
-    {% for campaign in site.campaigns %}
-      {% if campaign.decisions %}
-      <a href="/community/{{ campaign.slug }}/" class="campaign-link">
-        {{ campaign.title }}
-      </a>
-      {% endif %}
-    {% endfor %}
-  </div>
-</div>
+{% include community-index-page.html %}

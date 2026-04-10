@@ -1,6 +1,8 @@
 ---
 layout: default
 title: Terms & Creative Guidelines
+lang: en
+translation_key: terms
 ---
 
 # Terms & Creative Guidelines
@@ -11,6 +13,7 @@ title: Terms & Creative Guidelines
 - If a campaign does not reach its funding goal, your card will not be charged.
 - You can modify or cancel your pledge anytime before the campaign ends using the magic link in your confirmation email.
 - **No account required** — manage your pledge entirely via email links.
+- Where this deployment offers additional languages, those emailed pledge links and supporter-community links may use localized routes while still authorizing the same pledge.
 - A single checkout may include more than one campaign, but each campaign is stored and managed as its own pledge after checkout.
 - All campaign deadlines use Mountain Time (MST/MDT).
 - Community votes are limited to the published options on a campaign's supporter page, and closed decisions do not accept new votes.

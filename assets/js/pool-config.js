@@ -5,6 +5,7 @@
   if (!script) return;
 
   var dataset = script.dataset || {};
+  var currentLang = dataset.currentLang || 'en';
   var platformName = dataset.platformName || 'The Pool';
   var platformCompanyName = dataset.platformCompanyName || platformName;
   var supportEmail = dataset.platformSupportEmail || '';
@@ -21,8 +22,21 @@
   var checkoutProvider = 'first_party';
   var checkoutUiMode = 'custom';
   var stripePublishableKey = dataset.stripePublishableKey || '';
+  var runtimeMessages = {};
+
+  if (dataset.runtimeMessages) {
+    try {
+      runtimeMessages = JSON.parse(dataset.runtimeMessages);
+    } catch (_error) {
+      runtimeMessages = {};
+    }
+  }
 
   window.POOL_CONFIG = {
+    i18n: {
+      currentLang: currentLang,
+      messages: runtimeMessages
+    },
     platform: {
       name: platformName,
       companyName: platformCompanyName,

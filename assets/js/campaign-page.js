@@ -11,6 +11,32 @@ if (!bootScript) {
 
 const WIDTH_CLASS_PREFIX = 'hero__video-buffer-bar--w-';
 
+function getRuntimeMessages() {
+  return window.POOL_CONFIG?.i18n?.messages || {};
+}
+
+function getRuntimeMessage(path, fallback) {
+  const parts = String(path || '').split('.');
+  let value = getRuntimeMessages();
+  for (let index = 0; index < parts.length; index += 1) {
+    if (!value || typeof value !== 'object') return fallback;
+    value = value[parts[index]];
+  }
+  return typeof value === 'string' && value ? value : fallback;
+}
+
+function setCountdownHeading(messageEl, text, modifierClass) {
+  if (!messageEl) return;
+  messageEl.textContent = '';
+  const heading = document.createElement('h2');
+  heading.textContent = text;
+  messageEl.appendChild(heading);
+  messageEl.classList.remove('campaign-countdown__message--funded', 'campaign-countdown__message--not-funded');
+  if (modifierClass) {
+    messageEl.classList.add(modifierClass);
+  }
+}
+
 function applyWidthClass(node, prefix, percent) {
   if (!node) return;
   const clampedPercent = Math.max(0, Math.min(100, Math.round(percent)));
@@ -55,7 +81,7 @@ function initScrollableGalleries() {
       container.setAttribute('tabindex', '0');
     }
     if (!container.hasAttribute('aria-label')) {
-      container.setAttribute('aria-label', 'Image gallery');
+      container.setAttribute('aria-label', getRuntimeMessage('campaign.imageGallery', 'Image gallery'));
     }
 
     container.addEventListener('keydown', (event) => {
@@ -146,14 +172,23 @@ function initCampaignCountdown() {
       if (headingEl) headingEl.hidden = true;
       if (messageEl) {
         if (state === 'upcoming') {
-          messageEl.innerHTML = '<h2>Campaign is now live!</h2>';
-          messageEl.classList.add('campaign-countdown__message--funded');
+          setCountdownHeading(
+            messageEl,
+            getRuntimeMessage('campaign.countdownLive', 'Campaign is now live!'),
+            'campaign-countdown__message--funded'
+          );
         } else if (goalMet) {
-          messageEl.innerHTML = '<h2>Project Funded</h2>';
-          messageEl.classList.add('campaign-countdown__message--funded');
+          setCountdownHeading(
+            messageEl,
+            getRuntimeMessage('campaign.countdownFunded', 'Project Funded'),
+            'campaign-countdown__message--funded'
+          );
         } else {
-          messageEl.innerHTML = '<h2>Campaign Ended</h2>';
-          messageEl.classList.add('campaign-countdown__message--not-funded');
+          setCountdownHeading(
+            messageEl,
+            getRuntimeMessage('campaign.countdownEnded', 'Campaign Ended'),
+            'campaign-countdown__message--not-funded'
+          );
         }
       }
       return;

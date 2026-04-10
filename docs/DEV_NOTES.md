@@ -1040,14 +1040,44 @@ Use `_includes/a11y.html` for common patterns:
 
 ## Internationalization (i18n)
 
-The site has i18n scaffolding for future multi-language support.
+The site now has a real locale foundation across shared public pages, supporter flows, and site-owned runtime copy. English remains the default locale, and Spanish is the first seeded secondary locale.
 
 ### Structure
 
 ```
 _data/
 └── i18n/
-    └── en.yml     # English translations (default)
+    ├── en.yml     # English translations (default)
+    └── es.yml     # Spanish seed locale
+```
+
+Structured locale settings live in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml):
+
+```yml
+i18n:
+  default_lang: en
+  supported_langs:
+    - en
+    - es
+  language_labels:
+    en: English
+    es: Español
+  pages:
+    home:
+      en: /
+      es: /es/
+    about:
+      en: /about/
+      es: /es/about/
+    terms:
+      en: /terms/
+      es: /es/terms/
+    manage:
+      en: /manage/
+      es: /es/manage/
+    community_index:
+      en: /community/
+      es: /es/community/
 ```
 
 ### Usage
@@ -1058,6 +1088,7 @@ Use the `t.html` include to look up translations:
 {% include t.html key="buttons.pledge" %}
 {% include t.html key="states.opens" date="Jan 15" %}
 {% include t.html key="progress.of_goal" goal="$25,000" %}
+{% include t.html key="buttons.view_campaign" lang="es" %}
 ```
 
 The helper supports interpolation with `%{variable}` placeholders:
@@ -1068,11 +1099,44 @@ states:
   opens: "Opens %{date}"
 ```
 
+It now also supports:
+
+- `lang=` override
+- fallback to the default locale when a key is missing in the current locale
+- development-time missing-key markers instead of silently failing
+
+Use the locale helpers for page routing:
+
+```liquid
+{% include localized-url.html lang=page.lang translation_key="about" %}
+{% include language-switcher.html position="footer" %}
+```
+
+Runtime messages for site-owned JS flows are emitted through [`assets/i18n.json`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/assets/i18n.json) and booted into `POOL_CONFIG.i18n.messages`, so the cart, checkout, supporter community, and Manage Pledge flows can use the same locale catalog without a SPA-style translation layer.
+
+Worker supporter emails also consume the shared locale catalog and the persisted `preferredLang` attached to checkout and manage flows, so localized supporter emails and localized `/manage/` / `/community/:slug/` links stay aligned with the site locale model.
+
+The shared footer language switcher also preserves the current query string and hash, which matters for tokenized routes such as `/manage/?t=...` and supporter-community links.
+
+Important boundary:
+
+- a locale YAML file is the main source for shared site chrome, runtime UI copy, and Worker supporter-email copy
+- it is not a magic full-site translation switch by itself
+- long-form pages and other content-heavy routes still need localized source files when you want real translated page copy
+
 ### Adding a Language
 
-1. Copy `_data/i18n/en.yml` to `_data/i18n/{lang}.yml`
-2. Translate all values
-3. Set `lang: {lang}` in `_config.yml` (or create a multi-language structure)
+1. Add the new language code to `i18n.supported_langs`
+2. Add its display label to `i18n.language_labels`
+3. Add localized public-page routes to `i18n.pages`
+4. Copy `_data/i18n/en.yml` to `_data/i18n/{lang}.yml`
+5. Translate the shared UI/system values
+6. Add localized source pages under the locale prefix for long-form content such as `/about/`, `/terms/`, `/manage/`, `/community/`, or curated community index pages where needed
+
+Manual rule of thumb:
+
+- if the text is shared UI chrome, button text, status text, checkout/manage/community runtime copy, or Worker supporter-email copy, it should usually live in `_data/i18n/{lang}.yml`
+- if the text is real page content written as prose, it should usually live in a localized source page
 
 ### Translation Categories
 
@@ -1087,6 +1151,7 @@ states:
 - `tiers` - Tier-related labels
 - `dates` - Date formats
 - `misc` - Common words
+- `home` - campaigns index headings and eyebrow labels
 
 ---
 

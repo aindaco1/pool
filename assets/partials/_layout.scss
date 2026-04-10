@@ -99,7 +99,7 @@
       gap: $space-md;
     }
   }
-  
+
   &__nav {
     display: flex;
     gap: $space-2xl;
@@ -280,13 +280,29 @@ main {
   &__content {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: $space-md;
     @include fit-to-layout-and-center;
     padding-top: $container-vpad;
     padding-bottom: $container-vpad;
     
     @include xsm {
+      align-items: center;
       padding-top: $space-md;
       padding-bottom: $space-md;
+    }
+  }
+
+  &__brand {
+    display: flex;
+    align-items: center;
+    gap: $space-md;
+
+    @include xsm {
+      align-items: center;
+      flex-wrap: nowrap;
+      min-width: 0;
+      gap: $space-sm;
     }
   }
   
@@ -295,12 +311,60 @@ main {
     
     img {
       max-height: $space-2xl;
-      margin-right: $space-md;
+      margin-right: 0;
     }
   }
   
   &__copyright {
     color: $color--secondary;
     font-size: $font-size-xs;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: $space-lg;
+    margin-left: auto;
+
+    @include xsm {
+      align-items: center;
+      flex-direction: row;
+      flex-shrink: 0;
+      gap: $space-xs;
+      margin-left: auto;
+    }
+  }
+
+  &__lang-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-sm;
+    color: $color--secondary;
+    flex-wrap: wrap;
+
+    @include xsm {
+      gap: $space-xs;
+      flex-wrap: nowrap;
+    }
+  }
+
+  &__lang-link {
+    @include type-meta;
+    text-decoration: none;
+    color: $color--secondary;
+    opacity: 0.85;
+    transition: opacity 0.2s ease, color 0.2s ease;
+
+    &:hover {
+      color: $color--primary;
+      opacity: 1;
+    }
+
+    &.is-current {
+      color: $color--primary;
+      opacity: 1;
+      text-decoration: underline;
+      text-underline-offset: 0.16em;
+    }
   }
 }

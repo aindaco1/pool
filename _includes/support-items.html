@@ -1,7 +1,7 @@
 {% if include.support_items and include.support_items.size > 0 and include.campaign %}
 {% assign cart_add_item_classes = "poolcart-add-item" %}
 <div class="support-items" data-campaign-slug="{{ include.campaign.slug }}" data-goal="{{ include.campaign.goal_amount }}" data-progress-bg="{% if include.campaign.progress_background %}{{ include.campaign.progress_background }}{% endif %}">
-  <h5>Support a phase of the project</h5>
+  <h5>{% include t.html key="support_items.heading" %}</h5>
   {% for item in include.support_items %}
     {% assign current_amount = item.current | default: 0 | plus: 0 %}
     {% assign remaining = item.target | minus: current_amount %}
@@ -19,10 +19,11 @@
       {% assign item_disabled_reason = "Campaign Ended" %}
     {% elsif include.campaign.state == "upcoming" %}
       {% assign item_disabled = true %}
-      {% assign item_disabled_reason = "Opens " | append: include.campaign.start_date | date: "%b %-d" %}
+      {% assign start_formatted = include.campaign.start_date | date: "%b %-d" %}
+      {% capture item_disabled_reason %}{% include t.html key="states.opens" date=start_formatted %}{% endcapture %}
     {% else %}
       {% assign item_disabled = true %}
-      {% assign item_disabled_reason = "Unavailable" %}
+      {% capture item_disabled_reason %}{% include t.html key="misc.unavailable" %}{% endcapture %}
     {% endif %}
     <div class="support-item" id="support-{{ item.id }}"{% if is_late_support_item %} data-late-support="true"{% endif %}>
       <div class="support-item__info">
@@ -69,7 +70,7 @@
           data-item-custom1-name="_stackable"
           data-item-custom1-type="hidden"
           data-item-custom1-value="false">
-          {% if remaining <= 0 %}Funded{% elsif item_disabled %}{{ item_disabled_reason }}{% else %}Support{% endif %}
+          {% if remaining <= 0 %}{% include t.html key="support_items.funded" %}{% elsif item_disabled %}{{ item_disabled_reason }}{% else %}{% include t.html key="support_items.button" %}{% endif %}
         </button>
       </div>
     </div>

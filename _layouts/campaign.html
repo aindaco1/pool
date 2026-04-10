@@ -1,13 +1,15 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign platform_title = site.platform.name | default: site.title -%}
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-campaign-csp-strict.html %}
   {% include cart-head.html %}
-  <title>{{ page.title | escape }} · {{ site.platform.name | default: site.title | escape }}</title>
-  <meta property="og:title" content="{{ page.title | escape }} · {{ site.platform.name | default: site.title | escape }}">
+  <title>{{ page.title | escape }} · {{ platform_title | escape }}</title>
+  <meta property="og:title" content="{{ page.title | escape }} · {{ platform_title | escape }}">
   <meta property="og:type" content="website">
   <meta property="og:url" content="{{ site.platform.site_url | default: site.url }}{{ page.url }}">
   {% if page.hero_image %}
@@ -35,7 +37,7 @@
       {% if page.goal_deadline %}
       {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
       <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-state="{{ page.state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}">
-        <h2 class="campaign-countdown__heading">{% if page.state == "upcoming" %}Starts in{% elsif page.state == "live" %}Ends in{% endif %}</h2>
+        <h2 class="campaign-countdown__heading">{% if page.state == "upcoming" %}{% include t.html key="campaign.starts_in" lang=current_lang %}{% elsif page.state == "live" %}{% include t.html key="campaign.ends_in" lang=current_lang %}{% endif %}</h2>
         {% assign target_date = page.goal_deadline %}
         {% if page.state == "upcoming" %}{% assign target_date = page.start_date %}{% endif %}
         {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
@@ -58,34 +60,34 @@
             <div class="flip-card" data-unit="days">
               <span class="flip-card__value">{% if init_days < 10 %}0{% endif %}{{ init_days }}</span>
             </div>
-            <span class="flip-countdown__label">Days</span>
+            <span class="flip-countdown__label">{% include t.html key="campaign.days" lang=current_lang %}</span>
           </div>
           <div class="flip-countdown__separator">:</div>
           <div class="flip-countdown__group">
             <div class="flip-card" data-unit="hours">
               <span class="flip-card__value">{% if init_hours < 10 %}0{% endif %}{{ init_hours }}</span>
             </div>
-            <span class="flip-countdown__label">Hours</span>
+            <span class="flip-countdown__label">{% include t.html key="campaign.hours" lang=current_lang %}</span>
           </div>
           <div class="flip-countdown__separator">:</div>
           <div class="flip-countdown__group">
             <div class="flip-card" data-unit="mins">
               <span class="flip-card__value">{% if init_mins < 10 %}0{% endif %}{{ init_mins }}</span>
             </div>
-            <span class="flip-countdown__label">Minutes</span>
+            <span class="flip-countdown__label">{% include t.html key="campaign.minutes" lang=current_lang %}</span>
           </div>
           <div class="flip-countdown__separator">:</div>
           <div class="flip-countdown__group">
             <div class="flip-card" data-unit="secs">
               <span class="flip-card__value">{% if init_secs < 10 %}0{% endif %}{{ init_secs }}</span>
             </div>
-            <span class="flip-countdown__label">Seconds</span>
+            <span class="flip-countdown__label">{% include t.html key="campaign.seconds" lang=current_lang %}</span>
           </div>
         </div>
         <div class="campaign-countdown__message"></div>
       </div>
       {% endif %}
-      <button type="button" class="btn btn--primary campaign-header__cta" data-scroll-target="campaign-tiers">Support!</button>
+      <button type="button" class="btn btn--primary campaign-header__cta" data-scroll-target="campaign-tiers">{% include t.html key="campaign.support_cta" lang=current_lang %}</button>
     </header>
 
     <div class="campaign-content">
@@ -145,12 +147,13 @@
 
     {% if page.decisions and page.decisions.size > 0 %}
     <section class="community-teaser" id="community-teaser">
-      <h3>Supporter Community</h3>
-      <p class="teaser-locked">Backers of this campaign get exclusive access to vote on creative decisions.</p>
+      <h3>{% include t.html key="campaign.supporter_community" lang=current_lang %}</h3>
+      <p class="teaser-locked">{% include t.html key="campaign.supporters_only" lang=current_lang %}</p>
       <p class="teaser-unlocked" hidden>You have access! Join your fellow supporters to vote on creative decisions.</p>
-      <a href="/community/{{ page.slug }}/" class="btn btn--secondary btn--locked" id="community-btn">
+      {%- capture community_path -%}/community/{{ page.slug }}/{%- endcapture -%}
+      <a href="{% include localized-url.html lang=current_lang path=community_path %}" class="btn btn--secondary btn--locked" id="community-btn">
         <span class="locked-text">🔒 Supporters Only</span>
-        <span class="unlocked-text" hidden>Access Community →</span>
+        <span class="unlocked-text" hidden>{% include t.html key="campaign.access_community" lang=current_lang %}</span>
       </a>
     </section>
     {% endif %}
@@ -182,15 +185,16 @@
         {% endif %}
         <dl>
           {% unless page.creator_image %}
-          <dt>Creator</dt>
+          <dt>{% include t.html key="campaign.creator" lang=current_lang %}</dt>
           <dd>{{ page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}</dd>
           {% endunless %}
-          <dt>Category</dt>
-          <dd>{{ page.category | default: "Feature Film" | escape }}</dd>
+          <dt>{% include t.html key="campaign.category" lang=current_lang %}</dt>
+          <dd>{{ page.category | default: site.data.i18n[current_lang].campaign.default_category | default: site.data.i18n.en.campaign.default_category | escape }}</dd>
           {% if page.state == 'live' %}
-          <dt>How Pledging Works</dt>
-          <dd>All-or-nothing: Your card is saved but not charged now. You'll only be charged if this campaign reaches its goal by {{ page.goal_deadline | date: "%b %-d, %Y" }}.</dd>
-          <dd class="campaign-facts__pledge-meta">You can update or cancel your pledge anytime before the deadline.</dd>
+          <dt>{% include t.html key="campaign.how_pledging_works" lang=current_lang %}</dt>
+          {% assign deadline_formatted = page.goal_deadline | date: "%b %-d, %Y" %}
+          <dd>{% include t.html key="campaign.all_or_nothing_body" lang=current_lang date=deadline_formatted %}</dd>
+          <dd class="campaign-facts__pledge-meta">{% include t.html key="pledge.notice_meta" lang=current_lang %}</dd>
           {% endif %}
         </dl>
       </div>
@@ -199,7 +203,7 @@
 
       {% if page.tiers %}
       <section class="sidebar-tiers" id="campaign-tiers">
-        <h4>Tiers</h4>
+        <h4>{% include t.html key="campaign.tiers_heading" lang=current_lang %}</h4>
         
         {% assign featured_tier = page.tiers | where: "id", page.featured_tier_id | first %}
         {% if featured_tier %}
@@ -212,7 +216,7 @@
         {% endfor %}
 
         <div class="sidebar-tiers__no-reward">
-          <h4>No Reward</h4>
+          <h4>{% include t.html key="campaign.no_reward_heading" lang=current_lang %}</h4>
           {% include custom-amount.html campaign=page %}
           {% if page.support_items and page.support_items.size > 0 %}
             {% include support-items.html support_items=page.support_items campaign=page %}
@@ -224,16 +228,7 @@
     </aside>
   </main>
 
-  <footer class="site-footer">
-    <div class="site-footer__content">
-      <a href="/" class="site-footer__logo">
-        <img src="{{ site.platform.footer_logo_path | default: site.platform.logo_path | default: '/assets/images/defaults/dust-wave-square.png' }}" alt="{{ site.platform.company_name | default: site.author }}">
-      </a>
-      <div class="site-footer__copyright">
-        <span>(ɔ) {{ 'now' | date: "%Y" }} {{ site.platform.company_name | default: site.author | upcase }}</span>
-      </div>
-    </div>
-  </footer>
+  {% include site-footer.html lang=current_lang %}
 
   {% include cart-foot.html %}
   <script src="/assets/js/live-stats.js"></script>

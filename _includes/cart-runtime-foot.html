@@ -1,7 +1,11 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
 <script
   src="/assets/js/pool-config.js"
   defer
   data-pool-config-script="true"
+  data-current-lang="{{ current_lang }}"
+  data-runtime-messages="{{ runtime_messages_json | strip | escape }}"
   data-site-url="{{ site.platform.site_url | default: site.url }}"
   data-worker-base="{{ site.platform.worker_url }}"
   data-platform-name="{{ site.platform.name | default: site.title | escape }}"

@@ -249,6 +249,7 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `SUPPORT_EMAIL` | Support contact mirrored from site config |
 | `PLEDGES_EMAIL_FROM` | Sender identity for pledge-related emails |
 | `UPDATES_EMAIL_FROM` | Sender identity for update / milestone / announcement emails |
+| `I18N_CATALOG_JSON` | Optional inline locale catalog override for Worker email localization in tests or custom deployments |
 | `SALES_TAX_RATE` | Sales tax rate mirrored from `pricing.sales_tax_rate` |
 | `FLAT_SHIPPING_RATE` | Flat shipping rate mirrored from `pricing.flat_shipping_rate` |
 | `DEFAULT_PLATFORM_TIP_PERCENT` | Default platform tip percent mirrored from `pricing.default_tip_percent` |
@@ -259,6 +260,8 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email images still fall back to the public `https://pool.dustwave.xyz` asset base so inbox clients do not receive broken localhost image URLs.
 
 Fork note: treat those identity and pricing vars as mirrors of the structured site config in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml), especially the `platform` and `pricing` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior now, not Worker env toggles you should normally customize.
+
+Localization note: the Worker now localizes supporter-facing email subjects/body copy and localized `/manage/` / `/community/:slug/` links from the shared site locale catalog. In normal operation it fetches that catalog from `SITE_BASE/assets/i18n.json`; tests and advanced deployments can inject `I18N_CATALOG_JSON` instead. That means localized supporter emails and localized routes such as `/es/manage/` or `/es/community/:slug/` stay aligned with the site locale model when a deployment adds those routes.
 
 ## Data Flow
 

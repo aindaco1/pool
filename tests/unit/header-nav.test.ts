@@ -3,11 +3,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 describe('header nav script', () => {
   beforeEach(() => {
     vi.resetModules();
+    window.history.replaceState({}, '', '/manage/?t=token-123#section');
     document.body.innerHTML = `
       <nav id="mobile-nav" class="site-header__nav">
         <a href="/about/">About</a>
       </nav>
-      <button id="menu-toggle" aria-expanded="false" aria-label="Open menu" type="button"></button>
+      <a href="/es/manage/" data-lang-switcher-link="true">Español</a>
+      <button
+        id="menu-toggle"
+        aria-expanded="false"
+        aria-label="Abrir menú"
+        data-open-label="Abrir menú"
+        data-close-label="Cerrar menú"
+        type="button"></button>
     `;
   });
 
@@ -26,12 +34,19 @@ describe('header nav script', () => {
     toggle.click();
     expect(nav.classList.contains('is-open')).toBe(true);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    expect(toggle.getAttribute('aria-label')).toBe('Close menu');
+    expect(toggle.getAttribute('aria-label')).toBe('Cerrar menú');
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(nav.classList.contains('is-open')).toBe(false);
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    expect(toggle.getAttribute('aria-label')).toBe('Open menu');
+    expect(toggle.getAttribute('aria-label')).toBe('Abrir menú');
     expect(focusSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the current query string and hash on language switcher links', async () => {
+    await import('../../assets/js/header-nav.js');
+
+    const langLink = document.querySelector('[data-lang-switcher-link="true"]') as HTMLAnchorElement;
+    expect(langLink.getAttribute('href')).toBe('/es/manage/?t=token-123#section');
   });
 });

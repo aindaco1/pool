@@ -1,0 +1,4 @@
+---
+permalink: /assets/i18n.json
+---
+{{ site.data.i18n | jsonify }}

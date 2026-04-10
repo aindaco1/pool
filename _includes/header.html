@@ -1,13 +1,16 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign platform_title = site.platform.name | default: site.title -%}
+{%- capture home_url -%}{% include localized-url.html lang=current_lang translation_key="home" %}{%- endcapture -%}
 <header class="site-header" role="banner">
   <div class="site-header__container">
-    <a href="/" class="site-header__branding" aria-label="{{ site.platform.name | default: site.title }} - Home">
+    <a href="{{ home_url | strip }}" class="site-header__branding" aria-label="{% include t.html key='nav.home_aria' lang=current_lang title=platform_title %}">
       <img src="{{ site.platform.logo_path | default: '/assets/images/defaults/dust-wave-square.png' }}" alt="" class="site-header__logo" aria-hidden="true">
-      <span class="site-header__title">{{ site.platform.name | default: site.title }}</span>
+      <span class="site-header__title">{{ platform_title }}</span>
     </a>
     <div class="site-header__actions">
-      <nav class="site-header__nav" id="mobile-nav" role="navigation" aria-label="Main navigation">
-        <a href="/about/">What Is This?</a>
-        <a href="/terms/">Terms</a>
+      <nav class="site-header__nav" id="mobile-nav" role="navigation" aria-label="{% include t.html key='nav.main_navigation' lang=current_lang %}">
+        <a href="{% include localized-url.html lang=current_lang translation_key='about' %}">{% include t.html key="nav.about_label" lang=current_lang %}</a>
+        <a href="{% include localized-url.html lang=current_lang translation_key='terms' %}">{% include t.html key="nav.terms" lang=current_lang %}</a>
       </nav>
       {% unless include.hide_cart %}
         {% include cart-icon.html %}
@@ -15,9 +18,11 @@
       <button 
         class="site-header__menu-toggle" 
         id="menu-toggle" 
-        aria-label="Open menu"
+        aria-label="{% include t.html key='nav.open_menu' lang=current_lang %}"
         aria-expanded="false"
         aria-controls="mobile-nav"
+        data-open-label="{% include t.html key='nav.open_menu' lang=current_lang %}"
+        data-close-label="{% include t.html key='nav.close_menu' lang=current_lang %}"
         type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
           <line x1="3" y1="6" x2="21" y2="6"></line>

@@ -213,6 +213,7 @@ describe('manage page script', () => {
     vi.restoreAllMocks();
     document.body.innerHTML = '';
     localStorage.clear();
+    delete (window as any).POOL_CONFIG;
     delete (window as any).PoolStripeCheckoutSidecar;
   });
 
@@ -229,6 +230,32 @@ describe('manage page script', () => {
     );
     expect(document.getElementById('pledges-list')?.hidden).toBe(true);
     expect(global.fetch).toHaveBeenCalledWith('/api/campaigns.json');
+  });
+
+  it('uses runtime i18n messages for manage loading and action copy', async () => {
+    (window as any).POOL_CONFIG = {
+      i18n: {
+        currentLang: 'es',
+        messages: {
+          manage: {
+            noPledgeTokenProvided: 'No se proporcionó ningún token de aporte.',
+            updateCard: 'Actualizar tarjeta',
+            noChanges: 'Sin cambios'
+          }
+        }
+      }
+    };
+    mockManageFetch();
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    expect(getButton('[data-action="payment"][data-index="0"]').textContent).toContain('Actualizar tarjeta');
+    expect(getButton('[data-action="save"][data-index="0"]').textContent).toBe('Sin cambios');
   });
 
   it('loads and renders a pledge from the worker token endpoint', async () => {
@@ -325,12 +352,12 @@ describe('manage page script', () => {
 
     getButton('[data-action="payment"][data-index="0"]').click();
     await vi.waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
+        expect(fetchMock).toHaveBeenCalledWith(
         `${WORKER_BASE}/pledge/payment-method/start`,
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: 'token-123' })
+          body: JSON.stringify({ token: 'token-123', preferredLang: 'en' })
         })
       );
     });
@@ -374,12 +401,12 @@ describe('manage page script', () => {
     getButton('[data-action="payment"][data-index="0"]').click();
 
     await vi.waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
+        expect(fetchMock).toHaveBeenCalledWith(
         `${WORKER_BASE}/pledge/payment-method/start`,
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: 'token-123' })
+          body: JSON.stringify({ token: 'token-123', preferredLang: 'en' })
         })
       );
       expect(document.getElementById('payment-update-modal')?.hidden).toBe(false);
@@ -573,12 +600,12 @@ describe('manage page script', () => {
     getButton('[data-action="cancel-confirm"][data-index="0"]').click();
 
     await vi.waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
+        expect(fetchMock).toHaveBeenCalledWith(
         `${WORKER_BASE}/pledge/cancel`,
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: 'token-123', orderId: 'pool-intent-123' })
+          body: JSON.stringify({ token: 'token-123', orderId: 'pool-intent-123', preferredLang: 'en' })
         })
       );
     });
@@ -633,6 +660,7 @@ describe('manage page script', () => {
           body: JSON.stringify({
             token: 'token-123',
             orderId: 'pool-intent-123',
+            preferredLang: 'en',
             newTierId: 'frame-slot',
             newTierQty: 1,
             addTiers: null,
@@ -645,7 +673,7 @@ describe('manage page script', () => {
     });
 
     await vi.waitFor(() => {
-      expect(saveButton.textContent).toBe('Saved!');
+      expect(saveButton.textContent).toBe('Saved');
     });
 
     await vi.waitFor(() => {
@@ -716,12 +744,12 @@ describe('manage page script', () => {
     getButton('.pledge-card__payment-failed [data-action="payment"]').click();
 
     await vi.waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
+        expect(fetchMock).toHaveBeenCalledWith(
         `${WORKER_BASE}/pledge/payment-method/start`,
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: 'token-123' })
+          body: JSON.stringify({ token: 'token-123', preferredLang: 'en' })
         })
       );
     });

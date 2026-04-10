@@ -51,12 +51,25 @@ function renderCampaignPageWithVideo() {
 describe('campaign page script', () => {
   beforeEach(() => {
     vi.resetModules();
+    (window as any).POOL_CONFIG = {
+      i18n: {
+        messages: {
+          campaign: {
+            imageGallery: 'Image gallery',
+            countdownLive: 'Campaign is now live!',
+            countdownFunded: 'Project Funded',
+            countdownEnded: 'Campaign Ended'
+          }
+        }
+      }
+    };
     window.history.replaceState({}, '', '/campaigns/demo/?dev=1');
     renderCampaignPage();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    delete (window as any).POOL_CONFIG;
     document.body.innerHTML = '';
   });
 
@@ -130,6 +143,7 @@ describe('campaign page script', () => {
     expect((document.querySelector('.campaign-countdown__heading') as HTMLElement).hidden).toBe(true);
     expect((document.querySelector('.campaign-countdown__message') as HTMLElement).getAttribute('role')).toBe('status');
     expect((document.querySelector('.campaign-countdown__message') as HTMLElement).getAttribute('aria-live')).toBe('polite');
+    expect((document.querySelector('.campaign-countdown__message h2') as HTMLElement).textContent).toBe('Campaign Ended');
 
     video.dispatchEvent(new Event('progress'));
     const bufferBar = document.querySelector('.hero__video-buffer-bar') as HTMLElement;
@@ -148,6 +162,67 @@ describe('campaign page script', () => {
     expect(loading.hidden).toBe(true);
     expect(playButton.hidden).toBe(true);
     expect(overlay.hidden).toBe(true);
+
+    vi.useRealTimers();
+  });
+
+  it('uses localized runtime messages for gallery labels and countdown states', async () => {
+    vi.useFakeTimers();
+    (window as any).POOL_CONFIG = {
+      i18n: {
+        messages: {
+          campaign: {
+            imageGallery: 'Galeria de imagenes',
+            countdownLive: 'La campana ya esta activa',
+            countdownFunded: 'Proyecto financiado',
+            countdownEnded: 'Campana finalizada'
+          }
+        }
+      }
+    };
+    window.history.replaceState({}, '', '/es/campaigns/demo/');
+    renderCampaignPageWithVideo();
+
+    const video = document.getElementById('hero-video') as HTMLVideoElement & {
+      load: () => void;
+      play: () => Promise<void>;
+      buffered: { length: number; end: (index: number) => number };
+      duration: number;
+      ended: boolean;
+    };
+    video.load = vi.fn();
+    video.play = vi.fn(() => Promise.resolve());
+    Object.defineProperty(video, 'buffered', {
+      configurable: true,
+      value: { length: 1, end: () => 5 }
+    });
+    Object.defineProperty(video, 'duration', {
+      configurable: true,
+      value: 10
+    });
+    Object.defineProperty(video, 'ended', {
+      configurable: true,
+      value: false,
+      writable: true
+    });
+
+    await import('../../assets/js/campaign-page.js');
+
+    expect(document.querySelector('.gallery__container')).toBeNull();
+    expect((document.querySelector('.campaign-countdown__message h2') as HTMLElement).textContent).toBe('Campana finalizada');
+
+    document.body.innerHTML = `
+      <section class="gallery gallery--carousel">
+        <div class="gallery__container">
+          <div class="gallery__item">Uno</div>
+        </div>
+      </section>
+      <script data-campaign-page-script="true" data-campaign-slug="demo"></script>
+    `;
+
+    vi.resetModules();
+    await import('../../assets/js/campaign-page.js');
+    expect((document.querySelector('.gallery__container') as HTMLElement).getAttribute('aria-label')).toBe('Galeria de imagenes');
 
     vi.useRealTimers();
   });

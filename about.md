@@ -1,6 +1,8 @@
 ---
 layout: default
 title: What Is This?
+lang: en
+translation_key: about
 ---
 
 # What Is The Pool?
@@ -58,6 +60,7 @@ The Pool is designed for filmmakers and other creatives with features like:
 - **Production diary** — Keep your community engaged with updates
 - **Ongoing support** — Accept contributions after your main campaign ends
 - **No-account supporter access** — Backers manage pledges and join supporter-only community pages through email magic links instead of creating accounts
+- **Locale-ready supporter flows** — Shared UI strings, pledge-result pages, `/manage/`, supporter community routes, and supporter emails can all follow the deployment's configured language model, with English as the default and additional locales layered in through config plus translated content
 - **Safer rich content** — Campaign text and diary entries support Markdown and approved embeds, while unsafe raw HTML and dangerous link or embed schemes are blocked at render time
 - **Accessibility-conscious UI** — Keyboard-friendly dialogs, tabs, sliders, supporter-community flows, and public campaign interactions are part of the platform baseline, with automated accessibility checks covering critical public pages, pledge-result states, and checkout flows
 

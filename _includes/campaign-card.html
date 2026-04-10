@@ -6,7 +6,7 @@
   </div>
   {% endif %}
   {% if include.campaign.hero_image %}
-  <a href="{{ include.campaign.url }}" class="campaign-card__image-link">
+    <a href="{{ include.campaign.url }}" class="campaign-card__image-link">
     <img src="{{ include.campaign.hero_image }}" alt="{{ include.campaign.title | escape }}">
   </a>
   {% endif %}
@@ -96,6 +96,6 @@
   </div>
   
   <div class="campaign-card__footer">
-    <a href="{{ include.campaign.url }}" class="btn btn--block">View Campaign</a>
+    <a href="{{ include.campaign.url }}" class="btn btn--block">{% include t.html key="buttons.view_campaign" %}</a>
   </div>
 </article>

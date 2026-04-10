@@ -1,0 +1,52 @@
+{% if site.show_test_campaigns %}
+  {% assign filtered_campaigns = site.campaigns %}
+{% else %}
+  {% assign filtered_campaigns = site.campaigns | where_exp: "c", "c.test_only != true" %}
+{% endif %}
+{% assign live_campaigns = filtered_campaigns | where: "state", "live" | sort: "goal_deadline" %}
+{% assign upcoming_campaigns = filtered_campaigns | where: "state", "upcoming" | sort: "start_date" %}
+{% assign completed_campaigns = filtered_campaigns | where: "state", "post" | sort: "goal_deadline" | reverse %}
+
+<h1 class="sr-only">{% include t.html key="home.h1" %}</h1>
+
+{% if live_campaigns.size > 0 %}
+<section class="campaigns-section">
+  <div class="campaigns-section__header">
+    <p class="campaigns-section__eyebrow">{% include t.html key="home.live_now_eyebrow" %}</p>
+    <h2>{% include t.html key="home.active_heading" %}</h2>
+  </div>
+  <div class="campaigns">
+    {% for c in live_campaigns %}
+      {% include campaign-card.html campaign=c %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if upcoming_campaigns.size > 0 %}
+<section class="campaigns-section">
+  <div class="campaigns-section__header">
+    <p class="campaigns-section__eyebrow">{% include t.html key="home.on_deck_eyebrow" %}</p>
+    <h2>{% include t.html key="home.upcoming_heading" %}</h2>
+  </div>
+  <div class="campaigns">
+    {% for c in upcoming_campaigns %}
+      {% include campaign-card.html campaign=c %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if completed_campaigns.size > 0 %}
+<section class="campaigns-section">
+  <div class="campaigns-section__header">
+    <p class="campaigns-section__eyebrow">{% include t.html key="home.recently_wrapped_eyebrow" %}</p>
+    <h2>{% include t.html key="home.completed_heading" %}</h2>
+  </div>
+  <div class="campaigns">
+    {% for c in completed_campaigns %}
+      {% include campaign-card.html campaign=c %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}

@@ -31,6 +31,7 @@ The site config is organized around these fork-facing sections:
 
 - `platform`
 - `pricing`
+- `i18n`
 - `design`
 - `checkout`
 - `cache`
@@ -105,6 +106,70 @@ pricing:
   default_tip_percent: 5
   max_tip_percent: 15
 ```
+
+### `i18n`
+
+Use `i18n` for the supported locale model on the static site.
+
+Supported keys:
+
+- `default_lang`
+- `supported_langs`
+- `language_labels`
+- `pages`
+
+`pages` is the public-page route map used by the shared locale helpers. It lets forks add a new language by config plus translated content instead of editing navigation logic by hand.
+
+Example:
+
+```yml
+i18n:
+  default_lang: en
+  supported_langs:
+    - en
+    - es
+  language_labels:
+    en: English
+    es: Español
+  pages:
+    home:
+      en: /
+      es: /es/
+    about:
+      en: /about/
+      es: /es/about/
+    terms:
+      en: /terms/
+      es: /es/terms/
+```
+
+Current supported pattern:
+
+- shared UI/system copy lives in `_data/i18n/{lang}.yml`
+- non-default public pages live under a locale prefix like `/es/`
+- shared runtime/browser messages are emitted through `assets/i18n.json`
+- Worker supporter emails reuse that shared locale catalog plus persisted `preferredLang`
+- the shared footer language switcher is automatic when more than one language is configured
+- long-form pages such as `about` and `terms` should use localized source pages rather than trying to store every paragraph in YAML
+
+What this means in practice:
+
+- changing `i18n.default_lang` only changes the default locale the site resolves against
+- adding a new `_data/i18n/{lang}.yml` file is enough for shared chrome, runtime UI, and Worker supporter-email copy
+- it is not enough for a fully translated site by itself
+- full language support also needs:
+  - the new language added to `i18n.supported_langs`
+  - its label added to `i18n.language_labels`
+  - localized routes added to `i18n.pages`
+  - localized source pages for long-form content you actually want translated
+- tokenized pledge-management routes keep working across locales because the shared language switcher preserves the current query string and hash
+
+Recommended fork workflow:
+
+1. Copy `_data/i18n/en.yml` to `_data/i18n/{lang}.yml`
+2. Add the language to the `i18n` block in `_config.yml`
+3. Add localized source pages for long-form routes such as `/about/` and `/terms/`
+4. Build locally and verify both the shared UI copy and the localized routes
 
 ### `design`
 
@@ -205,6 +270,7 @@ Some settings only affect the Jekyll build and browser-owned UI. Others are also
 
 These can be changed in `_config.yml` without changing Worker config or worrying about the sync step:
 
+- `i18n.*`
 - `design.*`
 - `checkout.stripe_publishable_key`
 - `platform.default_creator_name`
@@ -214,7 +280,7 @@ These can be changed in `_config.yml` without changing Worker config or worrying
 - `platform.default_social_image_path`
 - `cache.*`
 
-These are the safest “restyle/rebrand without Worker-side math or email impact” knobs. They change the generated site, browser boot payload, or theme layer, but they do not need to be mirrored into Worker env.
+These are the safest “site generation / branding / localization without Worker-side math or email impact” knobs. They change the generated site, browser boot payload, or theme layer, but they do not need to be mirrored into Worker env.
 
 ### Auto-Mirrored To Worker
 

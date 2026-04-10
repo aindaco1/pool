@@ -1,0 +1,31 @@
+{%- assign default_lang = site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign current_lang = page.lang | default: default_lang -%}
+{%- assign switcher_position = include.position | default: "header" -%}
+{%- assign supported_langs = site.i18n.supported_langs -%}
+{%- assign localized_pages = site.i18n.pages -%}
+{%- assign localized_page = nil -%}
+{%- assign localized_paths = page.localized_paths -%}
+{%- if page.translation_key and localized_pages -%}
+  {%- assign localized_page = localized_pages[page.translation_key] -%}
+{%- endif -%}
+{%- assign has_switcher = false -%}
+{%- if localized_paths -%}
+  {%- assign has_switcher = true -%}
+{%- elsif localized_page -%}
+  {%- assign has_switcher = true -%}
+{%- endif -%}
+{%- if supported_langs and supported_langs.size > 1 and has_switcher -%}
+  <nav class="{% if switcher_position == 'footer' %}site-footer__lang-switcher{% else %}site-header__lang-switcher{% endif %}" aria-label="{% include t.html key='nav.language_switcher' lang=current_lang %}">
+    {%- for lang in supported_langs -%}
+      {%- capture target_url -%}{% include localized-url.html lang=lang translation_key=page.translation_key localized_paths=localized_paths %}{%- endcapture -%}
+      <a
+        href="{{ target_url | strip }}"
+        data-lang-switcher-link="true"
+        lang="{{ lang }}"
+        hreflang="{{ lang }}"
+        class="{% if switcher_position == 'footer' %}site-footer__lang-link{% else %}site-header__lang-link{% endif %}{% if lang == current_lang %} is-current{% endif %}"
+        {% if lang == current_lang %}aria-current="page"{% endif %}
+      >{{ site.i18n.language_labels[lang] | default: lang }}</a>
+    {%- endfor -%}
+  </nav>
+{%- endif -%}

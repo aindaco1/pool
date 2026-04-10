@@ -55,6 +55,7 @@ export { TierInventoryCoordinator } from './tier-inventory-do.js';
 const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
 const STRIPE_CUSTOM_UI_MODE_API_VERSION = '2026-02-25.clover';
 const PRIVATE_NO_STORE_CACHE_CONTROL = 'private, no-store, max-age=0';
+const DEFAULT_I18N_LANG = 'en';
 
 // Extract plain text excerpt from diary entry (supports both legacy body and content blocks)
 function getDiaryExcerpt(entry, maxLength = 200) {
@@ -109,6 +110,23 @@ function getSiteOrigin(env) {
   } catch {
     return '';
   }
+}
+
+function normalizePreferredLang(value, fallback = DEFAULT_I18N_LANG) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  return /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/.test(normalized) ? normalized : fallback;
+}
+
+function getLocalizedPath(path, preferredLang = DEFAULT_I18N_LANG) {
+  const lang = normalizePreferredLang(preferredLang);
+  const normalizedPath = String(path || '/').startsWith('/') ? String(path || '/') : `/${String(path || '')}`;
+  return lang === DEFAULT_I18N_LANG ? normalizedPath : `/${lang}${normalizedPath}`;
+}
+
+function getLocalizedSiteUrl(env, path, preferredLang = DEFAULT_I18N_LANG) {
+  return `${String(env.SITE_BASE || '').replace(/\/+$/, '')}${getLocalizedPath(path, preferredLang)}`;
 }
 
 function getTestFixtureOrderId(email = 'test@example.com', campaignSlug = 'hand-relations') {
@@ -1684,7 +1702,8 @@ async function handleFirstPartyCheckoutStart(request, env) {
   if (!rateLimit.allowed) return rateLimit.response;
 
   const body = await request.json();
-  const { campaignSlug, items, customAmount = 0, email, tipPercent } = body || {};
+  const { campaignSlug, items, customAmount = 0, email, tipPercent, preferredLang } = body || {};
+  const normalizedPreferredLang = normalizePreferredLang(preferredLang);
   const normalizedTipPercent = sanitizePlatformTipPercent(
     tipPercent,
     getDefaultPlatformTipPercent(env),
@@ -1817,6 +1836,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
   const bundleManifest = {
     orderId,
     checkoutProvider: 'first_party',
+    preferredLang: normalizedPreferredLang,
     campaignCount: checkoutGroups.length,
     tipPercent: normalizedTipPercent,
     totals: bundleTotals,
@@ -1909,6 +1929,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
         checkoutBundleMode: checkoutGroups.length > 1 ? 'true' : '',
         checkoutBundleCount: String(checkoutGroups.length),
         checkoutProvider: 'first_party',
+        preferredLang: normalizedPreferredLang,
         checkoutNonce: nonce,
         checkoutCartHash,
         checkoutSnapshotVersion: String(CHECKOUT_INTENT_VERSION)
@@ -1917,15 +1938,15 @@ async function handleFirstPartyCheckoutStart(request, env) {
 
     if (usingCustomCheckoutUi) {
       sessionParams.ui_mode = 'custom';
-      sessionParams.return_url = `${env.SITE_BASE}/pledge-success/?orderId=${orderId}`;
+      sessionParams.return_url = getLocalizedSiteUrl(env, `/pledge-success/?orderId=${orderId}`, normalizedPreferredLang);
       sessionParams.consent_collection = {
         payment_method_reuse_agreement: {
           position: 'hidden'
         }
       };
     } else {
-      sessionParams.success_url = `${env.SITE_BASE}/pledge-success/?orderId=${orderId}`;
-      sessionParams.cancel_url = `${env.SITE_BASE}/pledge-cancelled/`;
+      sessionParams.success_url = getLocalizedSiteUrl(env, `/pledge-success/?orderId=${orderId}`, normalizedPreferredLang);
+      sessionParams.cancel_url = getLocalizedSiteUrl(env, '/pledge-cancelled/', normalizedPreferredLang);
     }
 
     if (email) {
@@ -2380,6 +2401,7 @@ async function processFirstPartyCheckoutBundle({
       orderId: pledgeOrderId,
       email,
       campaignSlug,
+      preferredLang: normalizePreferredLang(bundleManifest?.preferredLang, DEFAULT_I18N_LANG),
       tierId: canonicalContribution.tierId,
       tierName: canonicalContribution.tierName,
       tierQty: canonicalContribution.tierQty,
@@ -2454,6 +2476,7 @@ async function processFirstPartyCheckoutBundle({
       email,
       campaignSlug,
       campaignTitle,
+      preferredLang: pledgeData.preferredLang,
       subtotal: canonicalContribution.totals.subtotal,
       tax: canonicalContribution.totals.tax,
       shipping: canonicalContribution.totals.shipping,
@@ -2545,7 +2568,7 @@ async function handleStripeWebhook(request, env, ctx) {
     const session = event.data.object;
     
     if (session.mode === 'setup') {
-      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, tipPercent, hasAdditionalTiers, hasExtras, hasPhysical, isPaymentUpdate, checkoutProvider, checkoutNonce, checkoutCartHash, checkoutSnapshotVersion } = session.metadata;
+      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, tipPercent, hasAdditionalTiers, hasExtras, hasPhysical, isPaymentUpdate, checkoutProvider, checkoutNonce, checkoutCartHash, checkoutSnapshotVersion, preferredLang } = session.metadata;
       const tierQtyNum = parseInt(tierQty) || 1;
       const normalizedTipPercent = tipPercent === undefined || tipPercent === null || tipPercent === ''
         ? 0
@@ -2727,6 +2750,7 @@ async function handleStripeWebhook(request, env, ctx) {
                         email: existingPledge.email,
                         campaignSlug: existingPledge.campaignSlug,
                         campaignTitle: pledgeCampaign.title || existingPledge.campaignSlug,
+                        preferredLang: existingPledge.preferredLang || DEFAULT_I18N_LANG,
                         subtotal: existingPledge.subtotal || existingPledge.amount,
                         tax: existingPledge.tax || 0,
                         shipping: existingPledge.shipping || 0,
@@ -2864,6 +2888,7 @@ async function handleStripeWebhook(request, env, ctx) {
             orderId,
             email,
             campaignSlug,
+            preferredLang: normalizePreferredLang(bundleManifest?.preferredLang || preferredLang, DEFAULT_I18N_LANG),
             tierId: canonicalContribution.tierId,
             tierName: canonicalContribution.tierName,
             tierQty: canonicalContribution.tierQty,
@@ -2947,6 +2972,7 @@ async function handleStripeWebhook(request, env, ctx) {
             email,
             campaignSlug,
             campaignTitle,
+            preferredLang: pledgeData.preferredLang,
             subtotal: canonicalContribution.totals.subtotal,
             tax: canonicalContribution.totals.tax,
             shipping: canonicalContribution.totals.shipping,
@@ -3015,6 +3041,7 @@ async function handleStripeWebhook(request, env, ctx) {
         email,
         campaignSlug,
         campaignTitle,
+        preferredLang: pledgeData?.preferredLang || DEFAULT_I18N_LANG,
         subtotal: pledgeData?.subtotal || pledgeData?.amount || 0,
         tax: pledgeData?.tax || 0,
         shipping: pledgeData?.shipping || 0,
@@ -3141,7 +3168,7 @@ async function handleGetPledges(request, env) {
 
 async function handleCancelPledge(request, env) {
   const body = await request.json();
-  const { token, orderId } = body;
+  const { token, orderId, preferredLang } = body;
 
   if (!token) {
     return jsonResponse({ error: 'Missing token' }, 400);
@@ -3184,6 +3211,7 @@ async function handleCancelPledge(request, env) {
       pledgeData.pledgeStatus = 'cancelled';
       pledgeData.cancelledAt = now;
       pledgeData.updatedAt = now;
+      pledgeData.preferredLang = normalizePreferredLang(preferredLang, pledgeData.preferredLang || payload.preferredLang || DEFAULT_I18N_LANG);
       
       // Append cancellation to history
       const cancelSubtotal = pledgeData.subtotal || pledgeData.amount || 0;
@@ -3283,6 +3311,7 @@ async function handleCancelPledge(request, env) {
           email: pledgeData.email,
           campaignSlug: pledgeData.campaignSlug,
           campaignTitle,
+          preferredLang: pledgeData.preferredLang,
           subtotal: cancelSubtotal,
           tax: cancelTax,
           shipping: cancelShipping,
@@ -3310,7 +3339,7 @@ async function handleCancelPledge(request, env) {
 
 async function handleModifyPledge(request, env) {
   const body = await request.json();
-  const { token, orderId, newTierId, newTierQty, addTiers, supportItems, customAmount, tipPercent } = body;
+  const { token, orderId, newTierId, newTierQty, addTiers, supportItems, customAmount, tipPercent, preferredLang } = body;
 
   if (!token) {
     return jsonResponse({ error: 'Missing token' }, 400);
@@ -3461,6 +3490,7 @@ async function handleModifyPledge(request, env) {
         tipPercent: canonicalContribution.totals.tipPercent,
         tipAmount: canonicalContribution.totals.tipAmount,
         amount: canonicalContribution.totals.amount,
+        preferredLang: normalizePreferredLang(preferredLang, pledgeData.preferredLang || payload.preferredLang || DEFAULT_I18N_LANG),
         modifiedAt: now,
         updatedAt: now
       };
@@ -3579,6 +3609,7 @@ async function handleModifyPledge(request, env) {
         email: payload.email,
         campaignSlug,
         campaignTitle,
+        preferredLang: updatedPledgeData?.preferredLang || currentPledge?.preferredLang || payload.preferredLang || DEFAULT_I18N_LANG,
         previousSubtotal,
         previousTax,
         previousShipping,
@@ -3629,7 +3660,7 @@ async function handleUpdatePaymentMethod(request, env) {
   } catch {
     return privateJsonResponse({ error: 'Invalid JSON' }, 400, env);
   }
-  const { token } = body;
+  const { token, preferredLang } = body;
 
   if (!token) {
     return privateJsonResponse({ error: 'Missing token' }, 400, env);
@@ -3641,11 +3672,15 @@ async function handleUpdatePaymentMethod(request, env) {
   }
 
   let existingCustomerId = null;
+  let pledgePreferredLang = normalizePreferredLang(preferredLang, payload.preferredLang || DEFAULT_I18N_LANG);
 
   if (env.PLEDGES) {
     const pledgeData = await env.PLEDGES.get(`pledge:${payload.orderId}`, { type: 'json' });
     if (pledgeData?.stripeCustomerId) {
       existingCustomerId = pledgeData.stripeCustomerId;
+    }
+    if (pledgeData?.preferredLang) {
+      pledgePreferredLang = normalizePreferredLang(pledgeData.preferredLang, pledgePreferredLang);
     }
   }
 
@@ -3671,15 +3706,15 @@ async function handleUpdatePaymentMethod(request, env) {
 
   if (usingCustomCheckoutUi) {
     sessionParams.ui_mode = 'custom';
-    sessionParams.return_url = `${env.SITE_BASE}/manage/?t=${token}`;
+    sessionParams.return_url = getLocalizedSiteUrl(env, `/manage/?t=${token}`, pledgePreferredLang);
     sessionParams.consent_collection = {
       payment_method_reuse_agreement: {
         position: 'hidden'
       }
     };
   } else {
-    sessionParams.success_url = `${env.SITE_BASE}/manage/?t=${token}`;
-    sessionParams.cancel_url = `${env.SITE_BASE}/manage/?t=${token}`;
+    sessionParams.success_url = getLocalizedSiteUrl(env, `/manage/?t=${token}`, pledgePreferredLang);
+    sessionParams.cancel_url = getLocalizedSiteUrl(env, `/manage/?t=${token}`, pledgePreferredLang);
   }
 
   // Try with existing customer, fall back to email if customer doesn't exist
@@ -3927,11 +3962,12 @@ async function settleCampaign(campaignSlug, env, options = {}) {
             combinedItems.customAmount += pledge.customAmount || 0;
           }
 
-          await sendChargeSuccessEmail(env, {
-            email: supporter.email,
-            campaignSlug,
-            campaignTitle,
-            subtotal: combinedSubtotal,
+        await sendChargeSuccessEmail(env, {
+          email: supporter.email,
+          campaignSlug,
+          campaignTitle,
+          preferredLang: supporter.pledges[0]?.preferredLang || DEFAULT_I18N_LANG,
+          subtotal: combinedSubtotal,
             tax: combinedTax,
             shipping: combinedShipping,
             tipAmount: combinedTipAmount,
@@ -4035,6 +4071,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           email: supporter.email,
           campaignSlug,
           campaignTitle,
+          preferredLang: supporter.pledges[0]?.preferredLang || DEFAULT_I18N_LANG,
           subtotal: failedSubtotal,
           tax: failedTax,
           shipping: failedShipping,
@@ -4426,6 +4463,7 @@ async function handleSettleBatch(request, env) {
 
           await sendChargeSuccessEmail(env, {
             email, campaignSlug, campaignTitle,
+            preferredLang: data.pledges[0]?.preferredLang || DEFAULT_I18N_LANG,
             subtotal: combinedSubtotal, tax: combinedTax, shipping: combinedShipping, tipAmount: combinedTipAmount, tipPercent: derivePlatformTipPercent(combinedSubtotal, combinedTipAmount, 0, getMaxPlatformTipPercent(env)), amount: data.totalAmount,
             token,
             hasDecisions: campaign?.has_decisions === true,
@@ -4754,7 +4792,8 @@ async function getCampaignSupporters(env, campaignSlug) {
 
       supporters.push({
         email: pledgeData.email,
-        orderId: pledgeData.orderId
+        orderId: pledgeData.orderId,
+        preferredLang: normalizePreferredLang(pledgeData.preferredLang, DEFAULT_I18N_LANG)
       });
     }
 
@@ -4776,7 +4815,8 @@ async function getCampaignSupporters(env, campaignSlug) {
     
     supporters.push({
       email: pledgeData.email,
-      orderId: pledgeData.orderId
+      orderId: pledgeData.orderId,
+      preferredLang: normalizePreferredLang(pledgeData.preferredLang, DEFAULT_I18N_LANG)
     });
   }
   
@@ -4863,6 +4903,7 @@ async function triggerMilestoneEmails(env, campaignSlug) {
             email: supporter.email,
             campaignSlug,
             campaignTitle: campaign.title,
+            preferredLang: supporter.preferredLang || DEFAULT_I18N_LANG,
             milestone: milestoneType,
             pledgedAmount: stats.pledgedAmount,
             goalAmount: goalAmountCents,
@@ -4937,6 +4978,7 @@ async function handleBroadcastAnnouncement(request, env) {
         email: supporter.email,
         campaignSlug,
         campaignTitle: campaign.title,
+        preferredLang: supporter.preferredLang || DEFAULT_I18N_LANG,
         subject,
         heading,
         body: messageBody,
@@ -5013,6 +5055,7 @@ async function handleBroadcastDiary(request, env) {
         email: supporter.email,
         campaignSlug,
         campaignTitle: campaign.title,
+        preferredLang: supporter.preferredLang || DEFAULT_I18N_LANG,
         diaryTitle,
         diaryExcerpt,
         token,
@@ -5105,6 +5148,7 @@ async function handleDiaryCheck(request, env) {
             email: supporter.email,
             campaignSlug: campaign.slug,
             campaignTitle: campaign.title,
+            preferredLang: supporter.preferredLang || DEFAULT_I18N_LANG,
             diaryTitle: entry.title,
             diaryExcerpt: getDiaryExcerpt(entry),
             diaryPhase: entry.phase,
@@ -5211,6 +5255,7 @@ async function handleBroadcastMilestone(request, env) {
         email: supporter.email,
         campaignSlug,
         campaignTitle: campaign.title,
+        preferredLang: supporter.preferredLang || DEFAULT_I18N_LANG,
         milestone,
         pledgedAmount: campaign.pledged_amount || 0,
         goalAmount: campaign.goal_amount || 100000,
@@ -5350,6 +5395,7 @@ async function handleMilestoneCheck(request, campaignSlug, env) {
           email: supporter.email,
           campaignSlug,
           campaignTitle: campaign.title,
+          preferredLang: supporter.preferredLang || DEFAULT_I18N_LANG,
           milestone: milestoneType,
           pledgedAmount: stats.pledgedAmount,
           goalAmount: goalAmountCents,
@@ -5465,6 +5511,7 @@ async function handleTestEmail(request, env) {
           email,
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
+          preferredLang: DEFAULT_I18N_LANG,
           subtotal: 10000,  // $100.00
           tax: 788,         // $7.88
           shipping: 300,    // $3.00
@@ -5487,6 +5534,7 @@ async function handleTestEmail(request, env) {
           email,
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
+          preferredLang: DEFAULT_I18N_LANG,
           diaryTitle: 'Test Diary Entry',
           diaryExcerpt: 'This is a test diary update to verify the email template is working correctly.',
           token,
@@ -5500,6 +5548,7 @@ async function handleTestEmail(request, env) {
           email,
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
+          preferredLang: DEFAULT_I18N_LANG,
           milestone: 'one-third',
           pledgedAmount: 3333,
           goalAmount: 10000,
@@ -5513,6 +5562,7 @@ async function handleTestEmail(request, env) {
           email,
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
+          preferredLang: DEFAULT_I18N_LANG,
           milestone: 'two-thirds',
           pledgedAmount: 6666,
           goalAmount: 10000,
@@ -5526,6 +5576,7 @@ async function handleTestEmail(request, env) {
           email,
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
+          preferredLang: DEFAULT_I18N_LANG,
           milestone: 'goal',
           pledgedAmount: 10000,
           goalAmount: 10000,
@@ -5539,6 +5590,7 @@ async function handleTestEmail(request, env) {
           email,
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
+          preferredLang: DEFAULT_I18N_LANG,
           milestone: 'stretch',
           pledgedAmount: 15000,
           goalAmount: 10000,
@@ -5553,6 +5605,7 @@ async function handleTestEmail(request, env) {
           email,
           campaignSlug: campaignSlug || 'hand-relations',
           campaignTitle,
+          preferredLang: DEFAULT_I18N_LANG,
           subtotal: 10000,  // $100.00
           tax: 788,         // $7.88
           shipping: 300,    // $3.00
@@ -6019,6 +6072,7 @@ async function handleRecoverCheckout(request, env) {
       orderId: pledgeOrderId,
       email,
       campaignSlug,
+      preferredLang: normalizePreferredLang(metadata.preferredLang, DEFAULT_I18N_LANG),
       tierId: canonicalContribution.tierId,
       tierName: canonicalContribution.tierName,
       tierQty: canonicalContribution.tierQty,
@@ -6069,6 +6123,7 @@ async function handleRecoverCheckout(request, env) {
           email,
           campaignTitle,
           campaignSlug,
+          preferredLang: pledge.preferredLang,
           subtotal: canonicalContribution.totals.subtotal,
           tax: canonicalContribution.totals.tax,
           shipping: canonicalContribution.totals.shipping,

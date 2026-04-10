@@ -1583,6 +1583,59 @@ describe('Worker business logic hardening', () => {
     await expect(response.json()).resolves.toEqual({ error: 'Origin not allowed' });
   });
 
+  it('localizes payment-method update return URLs when preferredLang is provided', async () => {
+    const env = createEnv({
+      CHECKOUT_UI_MODE: 'custom',
+      STRIPE_PUBLISHABLE_KEY_TEST: 'pk_test_pool_123'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge/payment-method/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'valid-token', preferredLang: 'es' })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    expect(sessionPayload.return_url).toBe('https://pool.test/es/manage/?t=valid-token');
+  });
+
+  it('localizes first-party checkout result URLs when preferredLang is provided', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_UI_MODE: 'custom',
+      STRIPE_PUBLISHABLE_KEY_TEST: 'pk_test_pool_123',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace(),
+      TIER_INVENTORY_COORDINATOR: new MockTierInventoryNamespace()
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__frame-slot', quantity: 1 }],
+          email: 'buyer@example.com',
+          tipPercent: 5,
+          preferredLang: 'es'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    expect(sessionPayload.return_url).toMatch(/^https:\/\/pool\.test\/es\/pledge-success\/\?orderId=pool-intent-/);
+    expect(sessionPayload.metadata.preferredLang).toBe('es');
+  });
+
   it('blocks modify requests that would move into a scarce tier reserved by another in-flight checkout', async () => {
     const env = createEnv({
       CHECKOUT_PROVIDER: 'first_party',

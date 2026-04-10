@@ -48,6 +48,31 @@ cache:
   live_stats_ttl_seconds: 300
   live_inventory_ttl_seconds: 300
 
+i18n:
+  default_lang: en
+  supported_langs:
+    - en
+    - es
+  language_labels:
+    en: English
+    es: Español
+  pages:
+    home:
+      en: /
+      es: /es/
+    about:
+      en: /about/
+      es: /es/about/
+    terms:
+      en: /terms/
+      es: /es/terms/
+    manage:
+      en: /manage/
+      es: /es/manage/
+    community_index:
+      en: /community/
+      es: /es/community/
+
 design:
   font_body: '"Inter", sans-serif'
   font_display: '"gambado-sans", sans-serif'

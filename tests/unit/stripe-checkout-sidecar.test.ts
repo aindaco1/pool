@@ -77,7 +77,7 @@ describe('stripe checkout sidecar helper', () => {
       onChange: vi.fn()
     });
 
-    expect((window as any).Stripe).toHaveBeenCalledWith('pk_test_123');
+    expect((window as any).Stripe).toHaveBeenCalledWith('pk_test_123', { locale: 'en' });
     expect(stripeInstance.initCheckout).toHaveBeenCalledWith({
       clientSecret: 'cs_test_secret_123',
       elementsOptions: {

@@ -134,6 +134,7 @@
     const linkAuthenticationContainer = options?.linkAuthenticationContainer;
     const shippingContainer = options?.shippingContainer;
     const useShippingAddressElement = options?.useShippingAddressElement === true;
+    const locale = String(options?.locale || document.documentElement.lang || 'en').trim().toLowerCase();
 
     if (!publishableKey) {
       throw new Error('Missing Stripe publishable key.');
@@ -149,7 +150,9 @@
 
     await ensureStripeJs();
 
-    const stripe = window.Stripe(publishableKey);
+    const stripe = window.Stripe(publishableKey, {
+      locale: locale || 'en'
+    });
     if (!stripe || typeof stripe.initCheckout !== 'function') {
       throw new Error('Stripe custom checkout is unavailable.');
     }

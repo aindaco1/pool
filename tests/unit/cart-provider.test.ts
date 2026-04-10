@@ -736,7 +736,8 @@ describe('cart provider shim', () => {
         { id: 'demo__postcard', quantity: 1 }
       ],
       customAmount: 0,
-      tipPercent: 6
+      tipPercent: 6,
+      preferredLang: 'en'
     });
     expect(sessionStorage.getItem('pool_pending_pledge')).toContain('"value":"true"');
     expect(window.location.hash).toBe('#stripe-checkout');
@@ -1485,7 +1486,8 @@ describe('cart provider shim', () => {
         { id: 'sunder__physical-media', quantity: 1 }
       ],
       customAmount: 0,
-      tipPercent: 5
+      tipPercent: 5,
+      preferredLang: 'en'
     });
   });
 

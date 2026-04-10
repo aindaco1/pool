@@ -8,6 +8,8 @@
   }
 
   const poolConfig = window.POOL_CONFIG || {};
+  const RUNTIME_MESSAGES = poolConfig.i18n?.messages || {};
+  const CURRENT_LANG = poolConfig.i18n?.currentLang || document.documentElement.lang || 'en';
   const WORKER_BASE = poolConfig.platform?.workerUrl || poolConfig.workerBase || bootScript.dataset.workerBase || '';
   const PLATFORM_NAME = poolConfig.platform?.name || poolConfig.platformName || bootScript.dataset.platformName || 'The Pool';
   const SALES_TAX_RATE = (() => {
@@ -86,6 +88,25 @@
   let activeManageDialog = null;
   let activeManageDialogCleanup = null;
   let activeManageDialogReturnFocus = null;
+
+  function getRuntimeMessage(path, fallback) {
+    const parts = String(path || '').split('.');
+    let value = RUNTIME_MESSAGES;
+    for (const part of parts) {
+      if (!value || typeof value !== 'object') return fallback;
+      value = value[part];
+    }
+    return typeof value === 'string' && value ? value : fallback;
+  }
+
+  function formatRuntimeMessage(path, fallback, replacements) {
+    const template = getRuntimeMessage(path, fallback);
+    if (!replacements || typeof template !== 'string') return template;
+    return template.replace(/%\{(\w+)\}/g, (match, key) => {
+      if (!Object.prototype.hasOwnProperty.call(replacements, key)) return match;
+      return String(replacements[key]);
+    });
+  }
 
   function renderBusyButtonLabel(label, isBusy) {
     const safeLabel = String(label || '')
@@ -587,14 +608,14 @@
         ];
       } else {
         if (!currentToken) {
-          showError('No pledge token provided.');
+          showError(getRuntimeMessage('manage.noPledgeTokenProvided', 'No pledge token provided.'));
           return;
         }
 
         const res = await fetch(`${WORKER_BASE}/pledges?token=${encodeURIComponent(currentToken)}`);
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to load pledges');
+          throw new Error(err.error || getRuntimeMessage('manage.failedToLoadPledges', 'Failed to load pledges'));
         }
         pledges = await res.json();
       }
@@ -671,13 +692,16 @@
 
   function renderPledgeSection(title, entries) {
     if (!entries.length) return '';
+    const localizedTitle = title === 'Active'
+      ? getRuntimeMessage('manage.sectionActive', 'Active')
+      : getRuntimeMessage('manage.sectionClosed', 'Closed');
     const showHeader = title !== 'Active';
     return `
       <section class="manage-pledge__section">
         ${showHeader
           ? `
             <div class="manage-pledge__section-header">
-              <h2>${title}</h2>
+              <h2>${escapeHtml(localizedTitle)}</h2>
             </div>
           `
           : ''}
@@ -949,7 +973,9 @@
     confirmButton.classList.toggle('is-busy', isSubmittingPaymentUpdate);
     confirmButton.setAttribute('aria-busy', isSubmittingPaymentUpdate ? 'true' : 'false');
     confirmButton.innerHTML = renderBusyButtonLabel(
-      isSubmittingPaymentUpdate ? 'Saving payment method...' : 'Save payment method',
+      isSubmittingPaymentUpdate
+        ? getRuntimeMessage('manage.savingPaymentMethod', 'Saving payment method...')
+        : getRuntimeMessage('cart.savePaymentMethod', 'Save payment method'),
       isSubmittingPaymentUpdate
     );
   }
@@ -957,7 +983,7 @@
   async function syncPaymentUpdateEmailToStripe(email, options = {}) {
     const trimmedEmail = String(email || '').trim();
     if (!trimmedEmail) {
-      const message = 'Enter an email address to continue.';
+      const message = getRuntimeMessage('manage.emailRequired', 'Enter an email address to continue.');
       setPaymentUpdateEmailError(message);
       return {
         ok: false,
@@ -984,9 +1010,9 @@
 
   async function openCustomPaymentUpdateModal(pledge, payload) {
     const modal = getPaymentUpdateModal();
-    if (!modal) throw new Error('Payment update modal is unavailable.');
+    if (!modal) throw new Error(getRuntimeMessage('manage.paymentUpdateError', 'There was an error updating your payment method.'));
     if (!window.PoolStripeCheckoutSidecar || typeof window.PoolStripeCheckoutSidecar.mount !== 'function') {
-      throw new Error('Stripe payment update helper is unavailable.');
+      throw new Error(getRuntimeMessage('manage.paymentUpdateError', 'There was an error updating your payment method.'));
     }
 
     teardownPaymentUpdateMount();
@@ -1029,7 +1055,7 @@
       method: 'POST',
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: currentToken })
+      body: JSON.stringify({ token: currentToken, preferredLang: CURRENT_LANG })
     });
     if (!res.ok) throw new Error('Failed to start payment update');
     const payload = await res.json();
@@ -1183,7 +1209,9 @@
     if (!campaign || campaign.state === 'post') return '';
 
     const isUpcoming = campaign.state === 'upcoming';
-    const heading = isUpcoming ? 'Starts in' : 'Ends in';
+    const heading = isUpcoming
+      ? getRuntimeMessage('manage.startsIn', 'Starts in')
+      : getRuntimeMessage('manage.endsIn', 'Ends in');
     const targetStr = isUpcoming ? campaign.start_date : campaign.goal_deadline;
     if (!targetStr) return '';
 
@@ -1206,7 +1234,7 @@
     if (diff <= 0) {
       return `
         <div class="pledge-countdown" id="${id}">
-          <span class="pledge-countdown__ended">${isUpcoming ? 'Campaign Live!' : 'Ended'}</span>
+          <span class="pledge-countdown__ended">${isUpcoming ? getRuntimeMessage('manage.campaignLive', 'Campaign Live!') : getRuntimeMessage('manage.ended', 'Ended')}</span>
         </div>
       `;
     }
@@ -1246,8 +1274,8 @@
       if (diff <= 0) {
         el.innerHTML =
           state === 'upcoming'
-            ? '<span class="pledge-countdown__ended">Campaign Live!</span>'
-            : '<span class="pledge-countdown__ended">Ended</span>';
+            ? `<span class="pledge-countdown__ended">${escapeHtml(getRuntimeMessage('manage.campaignLive', 'Campaign Live!'))}</span>`
+            : `<span class="pledge-countdown__ended">${escapeHtml(getRuntimeMessage('manage.ended', 'Ended'))}</span>`;
         return;
       }
 
@@ -1305,9 +1333,9 @@
   document.querySelectorAll('[data-payment-update-close]').forEach((node) => {
     node.addEventListener('click', closePaymentUpdateModal);
   });
-  document.getElementById('payment-update-email')?.addEventListener('change', (event) => {
-    syncPaymentUpdateEmailToStripe(event.target.value).catch((error) => {
-      setPaymentUpdateError(error.message || 'Email validation failed.');
+    document.getElementById('payment-update-email')?.addEventListener('change', (event) => {
+      syncPaymentUpdateEmailToStripe(event.target.value).catch((error) => {
+      setPaymentUpdateError(error.message || getRuntimeMessage('manage.emailValidationFailed', 'Email validation failed.'));
     });
   });
   document.getElementById('payment-update-confirm')?.addEventListener('click', async () => {
@@ -1330,7 +1358,7 @@
       const result = await activePaymentUpdateMount.confirm();
       if (result?.type === 'error' || result?.error) {
         if (shouldShowPaymentUpdateLevelStripeError(result)) {
-          throw new Error(result?.error?.message || 'Stripe could not save the updated payment method.');
+          throw new Error(result?.error?.message || getRuntimeMessage('manage.stripeSaveError', 'Stripe could not save the updated payment method.'));
         }
 
         isSubmittingPaymentUpdate = false;
@@ -1339,14 +1367,14 @@
         return;
       }
 
-      if (confirmButton) confirmButton.textContent = 'Saved';
+      if (confirmButton) confirmButton.textContent = getRuntimeMessage('manage.saved', 'Saved');
       setTimeout(() => {
         closePaymentUpdateModal();
         window.location.reload();
       }, 500);
     } catch (error) {
       isSubmittingPaymentUpdate = false;
-      setPaymentUpdateError(error.message || 'There was an error updating your payment method.');
+      setPaymentUpdateError(error.message || getRuntimeMessage('manage.paymentUpdateError', 'There was an error updating your payment method.'));
       syncPaymentUpdateConfirmButton(true);
     }
   });
@@ -1358,7 +1386,7 @@
     pledges = sortPledgesByProjectRecency(pledges);
 
     if (pledges.length === 0) {
-      container.innerHTML = '<p class="manage-pledge__empty">No active pledges found.</p>';
+      container.innerHTML = `<p class="manage-pledge__empty">${escapeHtml(getRuntimeMessage('manage.noActivePledges', 'No active pledges found.'))}</p>`;
       return;
     }
 
@@ -1408,7 +1436,13 @@
     const isPaymentFailed = pledge.pledgeStatus === 'payment_failed';
     const deadlinePassed = pledge.deadlinePassed === true;
     const isLocked = isActive && deadlinePassed;
-    const statusLabel = isLocked ? 'locked' : pledge.pledgeStatus;
+    const statusLabel = isLocked
+      ? getRuntimeMessage('manage.statusLocked', 'locked')
+      : getRuntimeMessage(
+          `manage.status${String(pledge.pledgeStatus || '')
+            .replace(/(^|_)([a-z])/g, (_m, _prefix, letter) => letter.toUpperCase())}`,
+          pledge.pledgeStatus
+        );
     const statusClass = isLocked ? 'locked' : pledge.pledgeStatus;
     const currentTierId = pledge.tierId?.split('__').pop();
     const tiers = campaign?.tiers || [];
@@ -1452,7 +1486,7 @@
       if (isSingleTier) {
         tiersHtml = `
           <div class="pledge-card__tiers" id="tier-section-${index}">
-            <h2>Select Your Tier</h2>
+            <h2>${escapeHtml(getRuntimeMessage('manage.selectYourTier', 'Select Your Tier'))}</h2>
             <div class="tier-options">
               ${tiers
                 .map((tier) => {
@@ -1478,7 +1512,7 @@
                         <strong>${escapeHtml(tier.name)}</strong>
                         <span class="tier-option__price">${formatPrice(tier.price)}${isStackable ? ' each' : ''}</span>
                         ${tier.description ? `<p class="tier-option__desc">${escapeHtml(tier.description)}</p>` : ''}
-                        ${isDisabled ? '<span class="tier-option__badge tier-option__badge--soldout">Sold Out</span>' : ''}
+                        ${isDisabled ? `<span class="tier-option__badge tier-option__badge--soldout">${escapeHtml(getRuntimeMessage('manage.soldOut', 'Sold Out'))}</span>` : ''}
                         ${
                           isStackable && !isDisabled
                             ? `
@@ -1511,7 +1545,7 @@
 
         tiersHtml = `
           <div class="pledge-card__tiers" id="tier-section-${index}">
-            <h2>Add More Tiers</h2>
+            <h2>${escapeHtml(getRuntimeMessage('manage.addMoreTiers', 'Add More Tiers'))}</h2>
             <div class="tier-options">
               ${tiers
                 .map((tier) => {
@@ -1539,8 +1573,8 @@
                         <strong>${escapeHtml(tier.name)}</strong>
                         <span class="tier-option__price">${formatPrice(tier.price)}${isStackable ? ' each' : ''}</span>
                         ${tier.description ? `<p class="tier-option__desc">${escapeHtml(tier.description)}</p>` : ''}
-                        ${isPledged ? '<span class="tier-option__badge">Pledged</span>' : ''}
-                        ${isDisabled && !isPledged ? '<span class="tier-option__badge tier-option__badge--soldout">Sold Out</span>' : ''}
+                        ${isPledged ? `<span class="tier-option__badge">${escapeHtml(getRuntimeMessage('manage.pledged', 'Pledged'))}</span>` : ''}
+                        ${isDisabled && !isPledged ? `<span class="tier-option__badge tier-option__badge--soldout">${escapeHtml(getRuntimeMessage('manage.soldOut', 'Sold Out'))}</span>` : ''}
                         ${
                           isStackable && !isDisabled
                             ? `
@@ -1569,7 +1603,7 @@
       const liveSupportItems = supportStats.supportItems || {};
       supportItemsHtml = `
         <div class="pledge-card__support" id="support-section-${index}">
-          <h2>Support a Phase</h2>
+          <h2>${escapeHtml(getRuntimeMessage('manage.supportPhase', 'Support a Phase'))}</h2>
           <div class="support-options">
             ${supportItems
               .map((item) => {
@@ -1620,11 +1654,11 @@
     if (isActive && (isLive || (isPost && allowsCustomLateSupport && campaignFunded))) {
       customAmountHtml = `
         <div class="pledge-card__support" id="custom-amount-section-${index}">
-          <h2>Support at Your Discretion</h2>
+          <h2>${escapeHtml(getRuntimeMessage('manage.supportAtYourDiscretion', 'Support at Your Discretion'))}</h2>
           <div class="support-options">
             <div class="support-option-item ${currentCustomAmount > 0 ? 'support-option-item--active' : ''}">
               <div class="support-option-item__info">
-                <p class="support-option-item__desc">Contribute any amount — no reward attached.</p>
+                <p class="support-option-item__desc">${escapeHtml(getRuntimeMessage('manage.customSupportDescription', 'Contribute any amount — no reward attached.'))}</p>
               </div>
               <div class="support-option-item__input">
                 <span class="input-prefix">$</span>
@@ -1648,10 +1682,10 @@
       tipHtml = `
         <div class="pledge-card__tip" id="tip-section-${index}">
           <div class="pledge-card__tip-header">
-            <h3 id="tip-heading-${index}">Tip ${PLATFORM_NAME}</h3>
+            <h3 id="tip-heading-${index}">${escapeHtml(formatRuntimeMessage('manage.tipHeading', 'Tip %{platform}', { platform: PLATFORM_NAME }))}</h3>
             <span class="pledge-card__tip-amount" id="tip-amount-label-${index}">${formatMoney(getPledgeTipAmount(pledge))}</span>
           </div>
-          <p class="pledge-card__tip-copy" id="tip-copy-${index}">Optional support for platform maintenance. This does not count toward the campaign goal.</p>
+          <p class="pledge-card__tip-copy" id="tip-copy-${index}">${escapeHtml(getRuntimeMessage('manage.tipCopy', 'Optional support for platform maintenance. This does not count toward the campaign goal.'))}</p>
           <div class="pledge-card__tip-controls">
             <input type="range" min="0" max="${MAX_PLATFORM_TIP_PERCENT}" step="1" value="${currentTipPercent}" id="tip-percent-${index}" data-current="${currentTipPercent}" aria-labelledby="tip-heading-${index}" aria-describedby="tip-copy-${index} tip-percent-label-${index}" aria-valuetext="${escapeAttribute(formatTipSliderValueText(currentTipPercent, getPledgeTipAmount(pledge)))}">
             <span class="pledge-card__tip-percent" id="tip-percent-label-${index}">${currentTipPercent}%</span>
@@ -1667,38 +1701,38 @@
       if (deadlinePassed) {
         actionsHtml = `
           <div class="pledge-card__actions" id="actions-${index}">
-            <button class="btn btn--secondary" data-action="payment" data-index="${index}">Update Card</button>
+            <button class="btn btn--secondary" data-action="payment" data-index="${index}">${escapeHtml(getRuntimeMessage('manage.updateCard', 'Update Card'))}</button>
           </div>
           <div class="pledge-card__footer" id="footer-${index}">
             <div class="pledge-card__notice pledge-card__notice--deadline">
-              <p><strong>⏰ Campaign deadline has passed.</strong> Your pledge is locked and will be charged if the campaign reaches its goal. You can still update your payment method if needed.</p>
+              <p>⏰ ${escapeHtml(getRuntimeMessage('manage.deadlinePassedNotice', 'Campaign deadline has passed. Your pledge is locked and will be charged if the campaign reaches its goal. You can still update your payment method if needed.'))}</p>
             </div>
           </div>
         `;
       } else {
         actionsHtml = `
           <div class="pledge-card__actions" id="actions-${index}">
-            <button class="btn btn--secondary" data-action="payment" data-index="${index}">Update Card</button>
-            ${canModifyPledge ? `<button class="btn" data-action="save" data-index="${index}" disabled>No Changes</button>` : ''}
+            <button class="btn btn--secondary" data-action="payment" data-index="${index}">${escapeHtml(getRuntimeMessage('manage.updateCard', 'Update Card'))}</button>
+            ${canModifyPledge ? `<button class="btn" data-action="save" data-index="${index}" disabled>${escapeHtml(getRuntimeMessage('manage.noChanges', 'No Changes'))}</button>` : ''}
           </div>
           <div class="pledge-card__error" id="error-${index}" hidden></div>
           <div class="pledge-card__footer" id="footer-${index}">
             <div class="pledge-card__notice">
-              <p><strong>How pledging works:</strong> Your card will be stored securely but not charged now. You'll only be charged if the campaign reaches its goal.</p>
+              <p>${escapeHtml(getRuntimeMessage('manage.pledgeNotice', 'How pledging works: Your card will be stored securely but not charged now. You\'ll only be charged if the campaign reaches its goal.'))}</p>
             </div>
-            ${canCancelPledge ? `<button class="btn-text btn-text--danger" data-action="cancel" data-index="${index}">Cancel Pledge</button>` : ''}
+            ${canCancelPledge ? `<button class="btn-text btn-text--danger" data-action="cancel" data-index="${index}">${escapeHtml(getRuntimeMessage('manage.cancelPledge', 'Cancel Pledge'))}</button>` : ''}
           </div>
           ${
             canCancelPledge
               ? `
             <div class="pledge-card__cancel-section" id="cancel-section-${index}" hidden>
               <div class="cancel-section__warning">
-                <p><strong>Cancel your pledge?</strong></p>
-                <p>This action cannot be undone. Your payment method will not be charged.</p>
+                <p><strong>${escapeHtml(getRuntimeMessage('manage.cancelTitle', 'Cancel your pledge?'))}</strong></p>
+                <p>${escapeHtml(getRuntimeMessage('manage.cancelBody', 'This action cannot be undone. Your payment method will not be charged.'))}</p>
               </div>
               <div class="cancel-section__actions">
-                <button class="btn btn--secondary" data-action="cancel-back" data-index="${index}">Keep Pledge</button>
-                <button class="btn btn--danger" data-action="cancel-confirm" data-index="${index}">Confirm Cancellation</button>
+                <button class="btn btn--secondary" data-action="cancel-back" data-index="${index}">${escapeHtml(getRuntimeMessage('manage.keepPledge', 'Keep Pledge'))}</button>
+                <button class="btn btn--danger" data-action="cancel-confirm" data-index="${index}">${escapeHtml(getRuntimeMessage('manage.confirmCancellation', 'Confirm Cancellation'))}</button>
               </div>
             </div>
             `
@@ -1711,7 +1745,7 @@
     let statusNotice = '';
     if (isCharged) {
       const chargedDate = pledge.chargedAt
-        ? new Date(pledge.chargedAt).toLocaleDateString('en-US', {
+        ? new Date(pledge.chargedAt).toLocaleDateString(CURRENT_LANG, {
             year: 'numeric',
             month: 'short',
             day: 'numeric'
@@ -1719,18 +1753,18 @@
         : null;
       statusNotice = `
         <div class="pledge-card__charged">
-          <p>✓ Successfully charged${chargedDate ? ` on ${chargedDate}` : ''}. Thank you for your support!</p>
+          <p>✓ ${escapeHtml(getRuntimeMessage('manage.chargedSuccess', 'Successfully charged'))}${chargedDate ? ` ${escapeHtml(formatRuntimeMessage('manage.chargedOn', 'on %{date}', { date: chargedDate }))}` : ''}. ${escapeHtml(getRuntimeMessage('manage.chargedThanks', 'Thank you for your support!'))}</p>
         </div>
       `;
     } else if (isPaymentFailed) {
       statusNotice = `
         <div class="pledge-card__payment-failed">
-          <p><strong>⚠️ Payment failed.</strong> Please update your payment method to complete your pledge.</p>
-          <button class="btn btn--small" data-action="payment" data-index="${index}">Update Payment Method</button>
+          <p><strong>⚠️ ${escapeHtml(getRuntimeMessage('manage.statusPaymentFailed', 'Payment Failed'))}.</strong> ${escapeHtml(getRuntimeMessage('manage.paymentFailedNotice', 'Payment failed. Please update your payment method to complete your pledge.'))}</p>
+          <button class="btn btn--small" data-action="payment" data-index="${index}">${escapeHtml(getRuntimeMessage('manage.updatePaymentMethod', 'Update Payment Method'))}</button>
         </div>
       `;
     } else if (isCancelled) {
-      statusNotice = '<div class="pledge-card__cancelled"><p>This pledge has been cancelled.</p></div>';
+      statusNotice = `<div class="pledge-card__cancelled"><p>${escapeHtml(getRuntimeMessage('manage.pledgeCancelledNotice', 'This pledge has been cancelled.'))}</p></div>`;
     }
 
     const cardClasses = ['pledge-card'];
@@ -1765,7 +1799,7 @@
               const total = subtotal + tax + shipping + tipAmount;
               return `
                 <div class="pledge-summary__row">
-                  <span class="label">Subtotal</span>
+                  <span class="label">${escapeHtml(getRuntimeMessage('manage.subtotal', 'Subtotal'))}</span>
                   <span class="value" id="subtotal-${index}">${formatMoney(subtotal)}</span>
                 </div>
                 <div class="pledge-summary__row pledge-summary__row--tip" id="tip-row-${index}" ${tipAmount > 0 ? '' : 'hidden'}>
@@ -1777,11 +1811,11 @@
                   <span class="value" id="tax-${index}">${formatMoney(tax)}</span>
                 </div>
                 <div class="pledge-summary__row pledge-summary__row--shipping" id="shipping-row-${index}" ${shipping > 0 ? '' : 'hidden'}>
-                  <span class="label">Shipping (USPS)</span>
+                  <span class="label">${escapeHtml(getRuntimeMessage('manage.shippingUsps', 'Shipping (USPS)'))}</span>
                   <span class="value" id="shipping-${index}">${formatMoney(shipping)}</span>
                 </div>
                 <div class="pledge-summary__total">
-                  <span class="label">Total</span>
+                  <span class="label">${escapeHtml(getRuntimeMessage('manage.total', 'Total'))}</span>
                   <span class="value" id="amount-${index}">${formatMoney(total)}</span>
                 </div>
               `;
@@ -2219,7 +2253,7 @@
     card.querySelector('[data-action="cancel-confirm"]')?.addEventListener('click', async (e) => {
       const btn = e.target;
       btn.disabled = true;
-      btn.textContent = 'Cancelling...';
+      btn.textContent = getRuntimeMessage('manage.cancelling', 'Cancelling...');
 
       if (isDevMode) {
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -2235,7 +2269,7 @@
             fetch(`${WORKER_BASE}/pledge/cancel`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ token: currentToken, orderId })
+              body: JSON.stringify({ token: currentToken, orderId, preferredLang: CURRENT_LANG })
             })
           )
         );
@@ -2246,7 +2280,7 @@
       } catch (err) {
         alert('Error: ' + err.message);
         btn.disabled = false;
-        btn.textContent = 'Confirm Cancellation';
+        btn.textContent = getRuntimeMessage('manage.confirmCancellation', 'Confirm Cancellation');
       }
     });
 
@@ -2299,12 +2333,20 @@
         const newTierAmount = newTier.price * selectedTierQty * 100;
         const tierDiff = newTierAmount - oldTierAmount;
         newSubtotal = originalSubtotal + tierDiff;
-        appendSectionTitle('Updating pledge');
+        appendSectionTitle(getRuntimeMessage('manage.updatingPledge', 'Updating pledge'));
         appendDetailParagraph(
-          `From: ${oldTier?.name || 'Unknown'} × ${currentQty} (${formatMoney(oldTierAmount)})`
+          formatRuntimeMessage('manage.updatingFrom', 'From: %{tier} × %{quantity} (%{amount})', {
+            tier: oldTier?.name || 'Unknown',
+            quantity: currentQty,
+            amount: formatMoney(oldTierAmount)
+          })
         );
         appendDetailParagraph(
-          `To: ${newTier?.name} × ${selectedTierQty} (${formatMoney(newTierAmount)})`
+          formatRuntimeMessage('manage.updatingTo', 'To: %{tier} × %{quantity} (%{amount})', {
+            tier: newTier?.name || 'Unknown',
+            quantity: selectedTierQty,
+            amount: formatMoney(newTierAmount)
+          })
         );
       } else if (!isSingleTier) {
         const originalTierQuantities = {};
@@ -2332,14 +2374,14 @@
 
         if (selectedAddTiers.length > 0) {
           appendDetailList(
-            'Updated tiers',
+            getRuntimeMessage('manage.updatedTiers', 'Updated tiers'),
             selectedAddTiers.map((tier) => {
               const foundTier = campaign.tiers.find((entry) => entry.id === tier.id);
               return `${foundTier?.name || tier.id} × ${tier.qty || 1} = ${formatMoney(tier.price * (tier.qty || 1) * 100)}`;
             })
           );
         } else {
-          appendSectionTitle('All tiers removed');
+          appendSectionTitle(getRuntimeMessage('manage.allTiersRemoved', 'All tiers removed'));
         }
       }
 
@@ -2351,7 +2393,7 @@
         );
         newSubtotal += supportDiff;
         appendDetailList(
-          'Support item changes',
+          getRuntimeMessage('manage.supportItemChanges', 'Support item changes'),
           selectedSupportItems.map((supportItem) => {
             const diff = supportItem.amount - (supportItem.currentAmount || 0);
             const diffStr = diff >= 0 ? `+${formatMoney(diff * 100)}` : formatMoney(diff * 100);
@@ -2365,7 +2407,7 @@
         newSubtotal += customDiff;
         const customDiffStr =
           customDiff >= 0 ? `+${formatMoney(customDiff)}` : formatMoney(customDiff);
-        appendSectionTitle('Custom support');
+        appendSectionTitle(getRuntimeMessage('manage.customSupport', 'Custom support'));
         appendDetailParagraph(
           `${formatMoney(currentCustomAmountVal * 100)} → ${formatMoney(selectedCustomAmount * 100)} (${customDiffStr})`
         );
@@ -2388,7 +2430,11 @@
       const newTotalWithTax = newSubtotal + newTax + confirmShipping + newTipAmount;
       const totalsNode = document.createElement('p');
       totalsNode.className = 'confirm-totals';
-      appendTextElement(totalsNode, 'span', `Subtotal: ${formatMoney(newSubtotal)}`);
+      appendTextElement(
+        totalsNode,
+        'span',
+        `${getRuntimeMessage('manage.subtotal', 'Subtotal')}: ${formatMoney(newSubtotal)}`
+      );
       if (newTipAmount > 0) {
         appendTextElement(
           totalsNode,
@@ -2398,16 +2444,20 @@
       }
       appendTextElement(totalsNode, 'span', `${getSalesTaxLabel()}: ${formatMoney(newTax)}`);
       if (confirmShipping > 0) {
-        appendTextElement(totalsNode, 'span', `Shipping (USPS): ${formatMoney(confirmShipping)}`);
+        appendTextElement(
+          totalsNode,
+          'span',
+          `${getRuntimeMessage('manage.shippingUsps', 'Shipping (USPS)')}: ${formatMoney(confirmShipping)}`
+        );
       }
       const totalStrong = document.createElement('strong');
-      totalStrong.textContent = `Total: ${formatMoney(newTotalWithTax)}`;
+      totalStrong.textContent = `${getRuntimeMessage('manage.total', 'Total')}: ${formatMoney(newTotalWithTax)}`;
       totalsNode.appendChild(totalStrong);
       detailsFragment.appendChild(totalsNode);
 
-      showConfirmModal('Are you sure you want to update your pledge?', detailsFragment, async () => {
+      showConfirmModal(getRuntimeMessage('manage.confirmUpdatePledge', 'Are you sure you want to update your pledge?'), detailsFragment, async () => {
         btn.disabled = true;
-        btn.textContent = 'Saving...';
+        btn.textContent = getRuntimeMessage('manage.saving', 'Saving...');
         errorEl.hidden = true;
 
         if (isDevMode) {
@@ -2480,13 +2530,17 @@
                   fetch(`${WORKER_BASE}/pledge/cancel`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: currentToken, orderId })
+                    body: JSON.stringify({ token: currentToken, orderId, preferredLang: CURRENT_LANG })
                   })
                 )
               );
               const failed = cancelResults.filter((response) => !response.ok);
               if (failed.length > 0) {
-                throw new Error(`Failed to remove ${failed.length} tier(s)`);
+                throw new Error(
+                  formatRuntimeMessage('manage.failedToRemoveTiers', 'Failed to remove %{count} tier(s)', {
+                    count: failed.length
+                  })
+                );
               }
             }
 
@@ -2507,6 +2561,7 @@
                 body: JSON.stringify({
                   token: currentToken,
                   orderId: primaryOrderIdForSave,
+                  preferredLang: CURRENT_LANG,
                   addTiers: primaryTiers.length > 0 ? primaryTiers : null,
                   supportItems: hasSupportChanges ? selectedSupportItems : null,
                   customAmount: hasCustomAmountChange ? selectedCustomAmount : null,
@@ -2526,6 +2581,7 @@
                     body: JSON.stringify({
                       token: currentToken,
                       orderId,
+                      preferredLang: CURRENT_LANG,
                       tipPercent: selectedTipPercent
                     })
                   })
@@ -2534,7 +2590,11 @@
               const failedTipUpdates = tipUpdates.filter((response) => !response.ok);
               if (failedTipUpdates.length > 0) {
                 throw new Error(
-                  `Failed to update tip on ${failedTipUpdates.length} linked pledge(s)`
+                  formatRuntimeMessage(
+                    'manage.failedToUpdateLinkedTip',
+                    'Failed to update tip on %{count} linked pledge(s)',
+                    { count: failedTipUpdates.length }
+                  )
                 );
               }
             }
@@ -2545,6 +2605,7 @@
               body: JSON.stringify({
                 token: currentToken,
                 orderId: primaryOrderIdForSave,
+                preferredLang: CURRENT_LANG,
                 newTierId: isSingleTier ? selectedTierId : null,
                 newTierQty: isSingleTier ? selectedTierQty : null,
                 addTiers: !isSingleTier ? selectedAddTiers : null,
@@ -2554,7 +2615,9 @@
               })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to update pledge');
+            if (!res.ok) {
+              throw new Error(data.error || getRuntimeMessage('manage.failedToUpdatePledge', 'Failed to update pledge'));
+            }
             if (hasTipChange && pledge.orderIds && pledge.orderIds.length > 1) {
               const secondaryOrderIds = pledge.orderIds.slice(1);
               const tipUpdates = await Promise.all(
@@ -2565,6 +2628,7 @@
                     body: JSON.stringify({
                       token: currentToken,
                       orderId,
+                      preferredLang: CURRENT_LANG,
                       tipPercent: selectedTipPercent
                     })
                   })
@@ -2573,20 +2637,24 @@
               const failedTipUpdates = tipUpdates.filter((response) => !response.ok);
               if (failedTipUpdates.length > 0) {
                 throw new Error(
-                  `Failed to update tip on ${failedTipUpdates.length} linked pledge(s)`
+                  formatRuntimeMessage(
+                    'manage.failedToUpdateLinkedTip',
+                    'Failed to update tip on %{count} linked pledge(s)',
+                    { count: failedTipUpdates.length }
+                  )
                 );
               }
             }
           }
 
           invalidateCampaignCaches(pledge.campaignSlug);
-          btn.textContent = 'Saved!';
+          btn.textContent = getRuntimeMessage('manage.saved', 'Saved');
           setTimeout(() => window.location.reload(), 500);
         } catch (err) {
           errorEl.textContent = err.message;
           errorEl.hidden = false;
           btn.disabled = false;
-          btn.textContent = 'Save Changes';
+          btn.textContent = getRuntimeMessage('manage.saveChanges', 'Save Changes');
         }
       }, {
         returnFocusTarget: btn
@@ -2746,12 +2814,12 @@
     const totalDiff = newTotalWithTax - originalTotal;
     if (totalDiff > 0) {
       changeEl.hidden = false;
-      directionEl.textContent = 'Increase:';
+      directionEl.textContent = getRuntimeMessage('manage.increase', 'Increase:');
       changeAmountEl.textContent = '+' + formatMoney(totalDiff);
       changeAmountEl.className = 'change-up';
     } else if (totalDiff < 0) {
       changeEl.hidden = false;
-      directionEl.textContent = 'Decrease:';
+      directionEl.textContent = getRuntimeMessage('manage.decrease', 'Decrease:');
       changeAmountEl.textContent = formatMoney(totalDiff);
       changeAmountEl.className = 'change-down';
     } else {
@@ -2762,7 +2830,9 @@
     }
 
     saveBtn.disabled = !hasChanges;
-    saveBtn.textContent = hasChanges ? 'Save Changes' : 'No Changes';
+    saveBtn.textContent = hasChanges
+      ? getRuntimeMessage('manage.saveChanges', 'Save Changes')
+      : getRuntimeMessage('manage.noChanges', 'No Changes');
   }
 
   init();

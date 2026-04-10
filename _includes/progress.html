@@ -81,7 +81,7 @@
       <span class="progress-marker__dot"></span>
       <span class="progress-marker__label">
         <span class="progress-marker__amount">{{ goal_num | money_short }}</span>
-        <span class="progress-marker__desc">Goal!</span>
+        <span class="progress-marker__desc">{% include t.html key="progress_markers.goal" %}</span>
       </span>
     </div>
     {% comment %} Final marker (when exceeded goal with no stretch goals) {% endcomment %}
@@ -90,7 +90,7 @@
       <span class="progress-marker__dot"></span>
       <span class="progress-marker__label">
         <span class="progress-marker__amount">{{ pledged_num | money_short }}</span>
-        <span class="progress-marker__desc">Final</span>
+        <span class="progress-marker__desc">{% include t.html key="progress_markers.final" %}</span>
       </span>
     </div>
     {% endif %}
@@ -131,12 +131,15 @@
   <div class="progress-meta">
     <strong data-live-pledged>{{ pledged_num | money }}</strong> of {{ goal_num | money }}
     {% if include.state == 'upcoming' and include.start_date %}
-      · Starts {{ include.start_date | date: "%b %-d, %Y" }}
+      {% assign start_formatted = include.start_date | date: "%b %-d, %Y" %}
+      · {% include t.html key="progress_markers.starts" date=start_formatted %}
     {% elsif include.deadline %}
       {% if include.state == 'post' %}
-        · Ended {{ include.deadline | date: "%b %-d, %Y" }}
+        {% assign end_formatted = include.deadline | date: "%b %-d, %Y" %}
+        · {% include t.html key="progress_markers.ended" date=end_formatted %}
       {% else %}
-        · Ends {{ include.deadline | date: "%b %-d, %Y" }}
+        {% assign end_formatted = include.deadline | date: "%b %-d, %Y" %}
+        · {% include t.html key="progress_markers.ends" date=end_formatted %}
       {% endif %}
     {% endif %}
   </div>

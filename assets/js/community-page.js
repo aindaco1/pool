@@ -7,10 +7,46 @@
   var dataset = script.dataset || {};
   var workerBase = dataset.workerBase || '';
   var campaignSlug = dataset.campaignSlug || '';
+  var currentLang = dataset.currentLang || document.documentElement.lang || 'en';
   var cookieName = 'supporter_' + campaignSlug;
   var tokenStorageKey = 'supporter_token_' + campaignSlug;
   var userToken = null;
   var RESULT_BAR_WIDTH_CLASS_PREFIX = 'result-bar__fill--w-';
+  var runtimeMessages = {};
+
+  if (dataset.runtimeMessages) {
+    try {
+      runtimeMessages = JSON.parse(dataset.runtimeMessages);
+    } catch (_error) {
+      runtimeMessages = {};
+    }
+  }
+
+  function getRuntimeMessage(path, fallback) {
+    var parts = String(path || '').split('.');
+    var value = runtimeMessages;
+    for (var index = 0; index < parts.length; index += 1) {
+      if (!value || typeof value !== 'object') return fallback;
+      value = value[parts[index]];
+    }
+    return typeof value === 'string' && value ? value : fallback;
+  }
+
+  function formatRuntimeMessage(path, fallback, replacements) {
+    var template = getRuntimeMessage(path, fallback);
+    if (!replacements || typeof template !== 'string') return template;
+    return template.replace(/%\{(\w+)\}/g, function(match, key) {
+      if (!Object.prototype.hasOwnProperty.call(replacements, key)) return match;
+      return String(replacements[key]);
+    });
+  }
+
+  function formatVoteCount(count) {
+    if (count === 1) {
+      return formatRuntimeMessage('community.voteSingular', '%{count} vote', { count: count });
+    }
+    return formatRuntimeMessage('community.votePlural', '%{count} votes', { count: count });
+  }
 
   function getCookie(name) {
     var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -106,7 +142,7 @@
 
       if (percentNode) percentNode.textContent = percent + '%';
       applyResultBarWidth(fillNode, percent);
-      if (countNode) countNode.textContent = count + (count === 1 ? ' vote' : ' votes');
+      if (countNode) countNode.textContent = formatVoteCount(count);
 
       if (option === userChoice) {
         bar.classList.add('result-bar--selected');
@@ -116,7 +152,14 @@
     var choiceNode = resultsView.querySelector('[data-user-choice]');
     var totalNode = resultsView.querySelector('[data-total-votes]');
     if (choiceNode) choiceNode.textContent = userChoice;
-    if (totalNode) totalNode.textContent = String(totalVotes);
+    var totalLabelNode = resultsView.querySelector('.decision-card__total');
+    if (totalLabelNode) {
+      totalLabelNode.textContent = formatRuntimeMessage('community.totalVotes', '%{count} total votes', {
+        count: totalVotes
+      });
+    } else if (totalNode) {
+      totalNode.textContent = String(totalVotes);
+    }
 
     votingView.hidden = true;
     resultsView.hidden = false;
@@ -151,7 +194,7 @@
 
       var statsNode = document.createElement('span');
       statsNode.className = 'closed-result__stats';
-      statsNode.textContent = percent + '% (' + count + ' votes)';
+      statsNode.textContent = percent + '% (' + formatVoteCount(count) + ')';
 
       row.appendChild(optionNode);
       row.appendChild(statsNode);
@@ -160,7 +203,9 @@
 
     var totalNode = document.createElement('div');
     totalNode.className = 'closed-results__total';
-    totalNode.textContent = totalVotes + ' total votes';
+    totalNode.textContent = formatRuntimeMessage('community.totalVotes', '%{count} total votes', {
+      count: totalVotes
+    });
     wrapper.appendChild(totalNode);
 
     resultsContainer.replaceChildren(wrapper);
@@ -273,12 +318,12 @@
     var selected = document.querySelector('input[name="decision-' + decisionId + '"]:checked');
 
     if (!selected) {
-      toast('Please select an option first.', true);
+      toast(getRuntimeMessage('community.selectOptionFirst', 'Please select an option first.'), true);
       return;
     }
 
     button.disabled = true;
-    button.textContent = 'Submitting...';
+    button.textContent = getRuntimeMessage('community.submittingVote', 'Submitting...');
 
     try {
       var response = await fetch(workerBase + '/votes', {
@@ -294,23 +339,27 @@
       var data = await response.json();
       if (!response.ok) {
         if (data.userChoice) {
-          toast('You already voted for "' + data.userChoice + '"');
+          toast(formatRuntimeMessage('community.alreadyVotedFor', 'You already voted for "%{choice}".', {
+            choice: data.userChoice
+          }));
           showResults(card, { userChoice: data.userChoice, results: {}, totalVotes: 0 });
         } else {
-          toast(data.error || 'Failed to submit vote', true);
+          toast(data.error || getRuntimeMessage('community.failedToSubmitVote', 'Failed to submit vote'), true);
           button.disabled = false;
-          button.textContent = 'Submit Vote';
+          button.textContent = getRuntimeMessage('community.submitVote', 'Submit Vote');
         }
         return;
       }
 
-      toast('Vote submitted for "' + data.userChoice + '". Thanks!');
+      toast(formatRuntimeMessage('community.voteSubmittedFor', 'Vote submitted for "%{choice}". Thanks!', {
+        choice: data.userChoice
+      }));
       showResults(card, data);
     } catch (error) {
       console.error('Vote error:', error);
-      toast('Failed to submit vote', true);
+      toast(getRuntimeMessage('community.failedToSubmitVote', 'Failed to submit vote'), true);
       button.disabled = false;
-      button.textContent = 'Submit Vote';
+      button.textContent = getRuntimeMessage('community.submitVote', 'Submit Vote');
     }
   });
 

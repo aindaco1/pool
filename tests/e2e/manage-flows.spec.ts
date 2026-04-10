@@ -147,7 +147,24 @@ test.describe('Manage Pledge Flows', () => {
     });
 
     await expect.poll(() => requests.paymentStartBodies.length).toBe(1);
-    expect(requests.paymentStartBodies[0]).toEqual({ token: 'token-123' });
+    expect(requests.paymentStartBodies[0]).toEqual({ token: 'token-123', preferredLang: 'en' });
+  });
+
+  test('loads token-backed pledges on the Spanish route and preserves preferredLang', async ({ page }) => {
+    const requests = await routeManageWorker(page);
+
+    await page.goto('/es/manage/?t=token-123');
+
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+    await expect(page.locator('#pledges-list')).toBeVisible();
+
+    await page.evaluate(() => {
+      const button = document.querySelector('[data-action="payment"][data-index="0"]') as HTMLButtonElement | null;
+      button?.click();
+    });
+
+    await expect.poll(() => requests.paymentStartBodies.length).toBe(1);
+    expect(requests.paymentStartBodies[0]).toEqual({ token: 'token-123', preferredLang: 'es' });
   });
 
   test('submits cancel confirmation to the worker', async ({ page }) => {
@@ -170,7 +187,8 @@ test.describe('Manage Pledge Flows', () => {
     await expect.poll(() => requests.cancelBodies.length).toBe(1);
     expect(requests.cancelBodies[0]).toEqual({
       token: 'token-123',
-      orderId: 'pool-intent-123'
+      orderId: 'pool-intent-123',
+      preferredLang: 'en'
     });
   });
 
@@ -194,7 +212,8 @@ test.describe('Manage Pledge Flows', () => {
     await expect.poll(() => requests.cancelBodies.length).toBe(1);
     expect(requests.cancelBodies[0]).toEqual({
       token: 'token-123',
-      orderId: 'pool-intent-123'
+      orderId: 'pool-intent-123',
+      preferredLang: 'en'
     });
   });
 
@@ -230,6 +249,7 @@ test.describe('Manage Pledge Flows', () => {
     expect(requests.modifyBodies[0]).toEqual({
       token: 'token-123',
       orderId: 'pool-intent-123',
+      preferredLang: 'en',
       newTierId: 'frame-slot',
       newTierQty: 1,
       addTiers: null,
@@ -268,6 +288,7 @@ test.describe('Manage Pledge Flows', () => {
     expect(requests.modifyBodies[0]).toEqual({
       token: 'token-123',
       orderId: 'pool-intent-123',
+      preferredLang: 'en',
       newTierId: 'frame-slot',
       newTierQty: 1,
       addTiers: null,
@@ -471,6 +492,6 @@ test.describe('Manage Pledge Flows', () => {
     });
 
     await expect.poll(() => requests.paymentStartBodies.length).toBe(1);
-    expect(requests.paymentStartBodies[0]).toEqual({ token: 'token-123' });
+    expect(requests.paymentStartBodies[0]).toEqual({ token: 'token-123', preferredLang: 'en' });
   });
 });

@@ -15,24 +15,24 @@
   {% capture disabled_reason %}{% include t.html key="states.opens" date=start_formatted %}{% endcapture %}
 {% else %}
   {% assign disabled = true %}
-  {% assign disabled_reason = "Unavailable" %}
+  {% capture disabled_reason %}{% include t.html key="misc.unavailable" %}{% endcapture %}
 {% endif %}
 
 <div class="custom-amount" id="custom-amount" role="group" aria-labelledby="custom-amount-heading" data-campaign-slug="{{ include.campaign.slug }}"{% if is_late_support_custom %} data-late-support="true" data-goal="{{ include.campaign.goal_amount }}"{% endif %}>
   <div class="custom-amount__info">
-    <h5 id="custom-amount-heading">Support at your discretion</h5>
-    <p id="custom-amount-desc">Contribute any amount — no reward attached.</p>
+    <h5 id="custom-amount-heading">{% include t.html key="custom_amount.heading" %}</h5>
+    <p id="custom-amount-desc">{% include t.html key="custom_amount.description" %}</p>
   </div>
   <div class="custom-amount__actions">
     <div class="custom-amount__input-wrap">
-      <label for="custom-amount-input" class="sr-only">Custom pledge amount in dollars</label>
+      <label for="custom-amount-input" class="sr-only">{% include t.html key="custom_amount.input_label" %}</label>
       <span class="custom-amount__currency" aria-hidden="true">$</span>
       <input type="number" 
              id="custom-amount-input" 
              class="custom-amount__input" 
              min="1" 
              step="1" 
-             placeholder="25"
+             placeholder="{% include t.html key='custom_amount.input_placeholder' %}"
              aria-describedby="custom-amount-desc"
              {% if disabled %}disabled aria-disabled="true"{% endif %}>
     </div>
@@ -41,8 +41,9 @@
       id="custom-amount-btn"
       type="button"
       {% if disabled %}disabled aria-disabled="true"{% endif %}
+      {% capture custom_support_name %}{% include t.html key='pledge.custom_support' %}{% endcapture %}
       data-item-id="{{ include.campaign.slug }}__custom-support"
-      data-item-name="{{ include.campaign.title | escape }} — Custom Support"
+      data-item-name="{{ include.campaign.title | escape }} — {{ custom_support_name | strip }}"
       data-item-price="25"
       data-item-url="{{ site.url }}{{ include.campaign.url }}#custom-amount"
       data-item-description="Pledge (charged only if funded) — No reward"
@@ -52,7 +53,7 @@
       data-item-custom1-name="_stackable"
       data-item-custom1-type="hidden"
       data-item-custom1-value="false">
-      {% if disabled %}{{ disabled_reason }}{% else %}Support{% endif %}
+      {% if disabled %}{{ disabled_reason }}{% else %}{% include t.html key="custom_amount.button" %}{% endif %}
     </button>
   </div>
 </div>
