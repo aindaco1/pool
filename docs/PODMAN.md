@@ -44,6 +44,7 @@ Podman mode is designed around three priorities:
 - same ports as the current host flow
 - same local Worker state model via `wrangler dev`
 - same local Jekyll config overlay via `_config.yml,_config.local.yml`
+- same structured config model, with `_config.local.yml` kept intentionally thin for machine-local overrides
 
 3. Forkability
 - no host Ruby required for the happy-path app boot
@@ -82,6 +83,15 @@ npm run podman:self-check
 ```
 
 `npm run podman:self-check` is the strongest automated confidence pass on this branch. It runs the doctor, boots the Podman-backed stack, runs the worker smoke, and runs the automated Playwright suite in a container.
+
+More specifically, the self-check covers:
+
+- `npm run podman:doctor`
+- `./scripts/dev.sh --podman`
+- `./scripts/test-worker.sh --podman`
+- `npm run test:e2e:headless:podman`
+
+The broader merge gate additionally runs `./scripts/smoke-pledge-management.sh --podman` so the mutable modify/cancel path still gets isolated stateful coverage even when host build phases succeed.
 
 From the repo root:
 
@@ -131,6 +141,8 @@ npm run test:e2e:headless:podman
 
 `./scripts/test-e2e.sh --podman` is now fully automated browser coverage. The dedicated `./scripts/test-checkout.sh --podman` helper remains the manual interactive path when you specifically want to drive a real checkout in your own browser. The automated headless browser suite runs in its own Playwright container and reuses the already-running site/Worker instead of trying to boot Jekyll inside the test container.
 
+For the host-side headless browser path, Playwright now builds a clean static `_site` and serves it with a lightweight HTTP server instead of relying on `jekyll serve`. That keeps browser regressions closer to the real published asset shape and avoids some WEBrick instability during parallel runs.
+
 ## Cross-Platform First Run
 
 If you are setting up a fresh fork, this is the shortest recommended sequence:
@@ -142,6 +154,8 @@ npm run test:e2e:headless:podman
 ```
 
 If the doctor passes and the headless Podman suite is green, you are in a good place for normal local work.
+
+Note that the generated static site now excludes repo-internal folders like `worker/`, `scripts/`, and `tests/`, so local static verification is closer to what a fork would actually publish.
 
 Be explicit about the current confidence level:
 
@@ -177,6 +191,8 @@ podman machine init --now
 
 On macOS, the launcher uses the machine's forwarded Unix API socket directly once the VM is up. That avoids a class of flaky default-connection issues we saw with the packaged CLI.
 
+The doctor and launcher now also do a short stability check after startup so they do not flash green on a machine that immediately falls back into a stale connection state.
+
 On Linux, if `podman info` fails, fix the local rootless Podman session first and then rerun the doctor:
 
 ```bash
@@ -205,6 +221,7 @@ Podman mode is not meant to perfectly clone Cloudflare production, but it does p
 - local Wrangler simulation for KV / Durable Objects
 - the same Worker env/dev config used by the host flow
 - the same first-party cart and checkout path
+- the same static-build browser path used by the host headless harness
 
 ## Next Likely Steps
 
