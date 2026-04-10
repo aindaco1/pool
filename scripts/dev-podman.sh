@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+ruby ./scripts/sync-worker-config.rb
+
 JEKYLL_PORT=4000
 WORKER_PORT=8787
 STRIPE_LOG="/tmp/pool-stripe-listen.log"

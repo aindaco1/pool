@@ -1,8 +1,8 @@
 (function() {
 'use strict';
 
-const WORKER_BASE = window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
-const PLATFORM_NAME = window.POOL_CONFIG?.platformName || 'The Pool';
+const WORKER_BASE = window.POOL_CONFIG?.platform?.workerUrl || window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
+const PLATFORM_NAME = window.POOL_CONFIG?.platform?.name || window.POOL_CONFIG?.platformName || 'The Pool';
 const CART_VIEW_ROUTE = '/cart';
 const CHECKOUT_ENTRY_ROUTES = new Set(['/checkout', '/checkout/billing']);
 const CHECKOUT_PAYMENT_ROUTE = '/checkout/payment';

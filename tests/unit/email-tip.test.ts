@@ -11,10 +11,13 @@ import {
 const env = {
   RESEND_API_KEY: 'test_resend_key',
   SITE_BASE: 'https://pool.test',
-  PLATFORM_AUTHOR: 'Dust Wave'
+  PLATFORM_NAME: 'The Pool',
+  PLATFORM_COMPANY_NAME: 'Dust Wave',
+  PLEDGES_EMAIL_FROM: 'The Pool <pledges@pool.test>',
+  UPDATES_EMAIL_FROM: 'The Pool <updates@pool.test>'
 };
 
-const PLATFORM_TIP_LINE = `${env.PLATFORM_AUTHOR} tip (6%): $2.10`;
+const PLATFORM_TIP_LINE = `${env.PLATFORM_COMPANY_NAME} tip (6%): $2.10`;
 
 function mockResend() {
   const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => ({
@@ -58,6 +61,7 @@ describe('supporter email tip breakdowns', () => {
     const payload = getEmailPayload(fetchMock);
     expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Total (if funded): $42.86');
+    expect(payload.from).toBe('The Pool <pledges@pool.test>');
   });
 
   it('includes the platform tip line in pledge modified emails', async () => {
@@ -82,6 +86,7 @@ describe('supporter email tip breakdowns', () => {
     const payload = getEmailPayload(fetchMock);
     expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('New total (if funded): $42.86');
+    expect(payload.from).toBe('The Pool <pledges@pool.test>');
   });
 
   it('includes the platform tip line in payment failed emails', async () => {
@@ -103,6 +108,7 @@ describe('supporter email tip breakdowns', () => {
     const payload = getEmailPayload(fetchMock);
     expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Amount due: $42.86');
+    expect(payload.from).toBe('The Pool <pledges@pool.test>');
   });
 
   it('includes the platform tip line in charge success emails', async () => {
@@ -124,6 +130,7 @@ describe('supporter email tip breakdowns', () => {
     const payload = getEmailPayload(fetchMock);
     expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Amount charged: $42.86');
+    expect(payload.from).toBe('The Pool <pledges@pool.test>');
   });
 
   it('includes the platform tip line in cancellation emails', async () => {
@@ -144,5 +151,6 @@ describe('supporter email tip breakdowns', () => {
     const payload = getEmailPayload(fetchMock);
     expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Released total: $42.86');
+    expect(payload.from).toBe('The Pool <pledges@pool.test>');
   });
 });

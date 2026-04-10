@@ -16,7 +16,7 @@
   const CART_VIEW_ROUTE = '/cart';
   const CHECKOUT_VIEW_ROUTE = '/checkout';
   const DEFAULT_WORKER_BASE = 'https://pledge.dustwave.xyz';
-  const DEFAULT_CHECKOUT_UI_MODE = 'hosted';
+  const DEFAULT_CHECKOUT_UI_MODE = 'custom';
   const DEFAULT_PLATFORM_TIP_PERCENT = 5;
   const MAX_PLATFORM_TIP_PERCENT = 15;
   const FIRST_PARTY_CHECKOUT_SNAPSHOT_TTL_MS = 6 * 60 * 60 * 1000;
@@ -145,34 +145,68 @@
   ];
 
   function getRequestedRuntime() {
-    return window.POOL_CONFIG?.cartRuntime || DEFAULT_RUNTIME;
+    return window.POOL_CONFIG?.checkout?.cartRuntime ||
+      window.POOL_CONFIG?.cartRuntime ||
+      DEFAULT_RUNTIME;
   }
 
   function getRequestedCheckoutProvider() {
-    return window.POOL_CONFIG?.checkoutProvider || DEFAULT_CHECKOUT_PROVIDER;
+    return window.POOL_CONFIG?.checkout?.provider ||
+      window.POOL_CONFIG?.checkoutProvider ||
+      DEFAULT_CHECKOUT_PROVIDER;
   }
 
   function getWorkerBase() {
-    return window.POOL_CONFIG?.workerBase || DEFAULT_WORKER_BASE;
+    return window.POOL_CONFIG?.platform?.workerUrl ||
+      window.POOL_CONFIG?.workerBase ||
+      DEFAULT_WORKER_BASE;
   }
 
   function getCheckoutUiMode() {
-    return String(window.POOL_CONFIG?.checkoutUiMode || DEFAULT_CHECKOUT_UI_MODE).trim().toLowerCase();
+    return String(
+      window.POOL_CONFIG?.checkout?.uiMode ||
+      window.POOL_CONFIG?.checkoutUiMode ||
+      DEFAULT_CHECKOUT_UI_MODE
+    ).trim().toLowerCase();
   }
 
   function getPlatformName() {
-    return window.POOL_CONFIG?.platformName || DEFAULT_PLATFORM_NAME;
+    return window.POOL_CONFIG?.platform?.name ||
+      window.POOL_CONFIG?.platformName ||
+      DEFAULT_PLATFORM_NAME;
   }
 
   function getSalesTaxRate() {
-    const parsed = Number(window.POOL_CONFIG?.salesTaxRate);
+    const parsed = Number(
+      window.POOL_CONFIG?.pricing?.salesTaxRate ??
+      window.POOL_CONFIG?.salesTaxRate
+    );
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_SALES_TAX_RATE;
   }
 
   function getFlatShippingFeeCents() {
-    const parsed = Number(window.POOL_CONFIG?.flatShippingRate);
+    const parsed = Number(
+      window.POOL_CONFIG?.pricing?.flatShippingRate ??
+      window.POOL_CONFIG?.flatShippingRate
+    );
     const amount = Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_FLAT_SHIPPING_RATE;
     return Math.round(amount * 100);
+  }
+
+  function getDefaultPlatformTipPercent() {
+    const parsed = Number(
+      window.POOL_CONFIG?.pricing?.defaultTipPercent ??
+      window.POOL_CONFIG?.defaultTipPercent
+    );
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : DEFAULT_PLATFORM_TIP_PERCENT;
+  }
+
+  function getMaxPlatformTipPercent() {
+    const parsed = Number(
+      window.POOL_CONFIG?.pricing?.maxTipPercent ??
+      window.POOL_CONFIG?.maxTipPercent
+    );
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : MAX_PLATFORM_TIP_PERCENT;
   }
 
   function formatTaxRateLabel() {
@@ -184,7 +218,7 @@
   }
 
   function formatTipSliderValueText(tipPercent, tipAmountCents) {
-    const percent = sanitizeTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+    const percent = sanitizeTipPercent(tipPercent, getDefaultPlatformTipPercent());
     return `${percent}% tip, ${formatCents(Math.max(0, tipAmountCents || 0))}`;
   }
 
@@ -480,7 +514,7 @@
   function calculateCartTotals(items, tipPercent = DEFAULT_PLATFORM_TIP_PERCENT) {
     const subtotal = items.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
     const subtotalCents = Math.round(subtotal * 100);
-    const nextTipPercent = sanitizeTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+    const nextTipPercent = sanitizeTipPercent(tipPercent, getDefaultPlatformTipPercent());
     const tipAmountCents = Math.round((subtotalCents * nextTipPercent) / 100);
     const shippingCents = getPhysicalCampaignCount(items) * getFlatShippingFeeCents();
     const taxCents = calculateTax(subtotalCents);
@@ -538,10 +572,14 @@
 
   function sanitizeTipPercent(value, fallback) {
     const parsed = Number(value);
-    if (Number.isInteger(parsed) && parsed >= 0 && parsed <= MAX_PLATFORM_TIP_PERCENT) {
+    if (Number.isInteger(parsed) && parsed >= 0 && parsed <= getMaxPlatformTipPercent()) {
       return parsed;
     }
-    return fallback;
+    const fallbackParsed = Number(fallback);
+    if (Number.isInteger(fallbackParsed) && fallbackParsed >= 0 && fallbackParsed <= getMaxPlatformTipPercent()) {
+      return fallbackParsed;
+    }
+    return getDefaultPlatformTipPercent();
   }
 
   function calculateTax(subtotalCents) {
@@ -576,7 +614,7 @@
   function buildFirstPartyPricing(state) {
     const items = state?.cart?.items?.items || [];
     const subtotalCents = Math.round((Number(state?.cart?.subtotal || 0)) * 100);
-    const tipPercent = sanitizeTipPercent(state?.cart?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+    const tipPercent = sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent());
     const tipAmountCents = Math.round((subtotalCents * tipPercent) / 100);
     const shippingCents = getPhysicalCampaignCount(items) * getFlatShippingFeeCents();
     const taxCents = calculateTax(subtotalCents);
@@ -662,7 +700,7 @@
 
     return {
       cart: {
-        tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT),
+        tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent()),
         items: items.map((item) => ({
           id: item?.id || '',
           name: item?.name || '',
@@ -846,7 +884,7 @@
 
     return {
       token: String(state?.cart?.token || `${FIRST_PARTY_CART_TOKEN_PREFIX}${Date.now().toString(36)}`),
-      tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT),
+      tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent()),
       items: items.map((item) => ({
         id: String(item?.id || ''),
         uniqueId: String(item?.uniqueId || ''),
@@ -897,7 +935,7 @@
 
       return {
         token: String(persisted?.token || `${FIRST_PARTY_CART_TOKEN_PREFIX}${Date.now().toString(36)}`),
-        tipPercent: sanitizeTipPercent(persisted?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT),
+        tipPercent: sanitizeTipPercent(persisted?.tipPercent, getDefaultPlatformTipPercent()),
         items
       };
     } catch (_error) {
@@ -1024,7 +1062,7 @@
             campaignSlug,
             items: checkoutItems,
             customAmount,
-            tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT)
+            tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent())
           }
         };
   }
@@ -1033,7 +1071,7 @@
     const persisted = readPersistedFirstPartyCartState();
     const draft = readFirstPartyCartDraftState();
     const persistedItems = persisted?.items || [];
-    const persistedTipPercent = sanitizeTipPercent(persisted?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+    const persistedTipPercent = sanitizeTipPercent(persisted?.tipPercent, getDefaultPlatformTipPercent());
     const persistedTotals = calculateCartTotals(persistedItems, persistedTipPercent);
     const draftEmail = String(draft?.email || '');
 
@@ -1240,7 +1278,7 @@
       const nextItems = snapshot.cart.items.map((item) => normalizeCartItem(item));
       const draft = readFirstPartyCartDraftState();
       const nextEmail = String(draft?.email || snapshot?.cart?.email || '');
-      const nextTipPercent = sanitizeTipPercent(snapshot?.cart?.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+      const nextTipPercent = sanitizeTipPercent(snapshot?.cart?.tipPercent, getDefaultPlatformTipPercent());
       const totals = calculateCartTotals(nextItems, nextTipPercent);
 
       store.setState({
@@ -1552,7 +1590,7 @@
           <div class="pool-first-party-cart__stripe-shell">
             <div class="pool-first-party-cart__stripe-region pool-first-party-cart__stripe-region--payment" data-cart-custom-checkout-region="payment"></div>
           </div>
-          <p class="pool-first-party-cart__note pool-first-party-cart__note--payment-consent">By providing your card information, you allow The Pool to charge your card if the campaign(s) you backed reaches its goal before its end date.</p>
+          <p class="pool-first-party-cart__note pool-first-party-cart__note--payment-consent">By providing your card information, you allow ${escapeHtml(getPlatformName())} to charge your card if the campaign(s) you backed reaches its goal before its end date.</p>
         </div>
       ` : `
         <div class="pool-first-party-cart__callout">
@@ -1589,7 +1627,7 @@
               class="pool-first-party-cart__tip-slider"
               type="range"
               min="0"
-              max="${MAX_PLATFORM_TIP_PERCENT}"
+              max="${getMaxPlatformTipPercent()}"
               step="1"
               value="${pricing.tipPercent}"
               aria-labelledby="pool-cart-tip-label"
@@ -2634,8 +2672,8 @@
               ? String(payload?.email || '')
               : String(currentState.cart?.email || '');
             const nextTipPercent = Object.prototype.hasOwnProperty.call(payload || {}, 'tipPercent')
-              ? sanitizeTipPercent(payload?.tipPercent, currentState.cart?.tipPercent ?? DEFAULT_PLATFORM_TIP_PERCENT)
-              : (currentState.cart?.tipPercent ?? DEFAULT_PLATFORM_TIP_PERCENT);
+              ? sanitizeTipPercent(payload?.tipPercent, currentState.cart?.tipPercent ?? getDefaultPlatformTipPercent())
+              : (currentState.cart?.tipPercent ?? getDefaultPlatformTipPercent());
             const nextItems = currentState.cart?.items?.items || [];
             const totals = calculateCartTotals(nextItems, nextTipPercent);
 

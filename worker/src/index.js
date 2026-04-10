@@ -45,9 +45,9 @@ import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './
 import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges } from './stats.js';
 import { triggerSiteRebuild } from './github.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
-import { DEFAULT_PLATFORM_TIP_PERCENT, calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
+import { calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
 import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput, CHECKOUT_INTENT_VERSION, DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
-import { getCheckoutProvider, getCheckoutUiMode, getFlatShippingFeeCents, getSalesTaxRate } from './provider-config.js';
+import { getCheckoutProvider, getCheckoutUiMode, getDefaultPlatformTipPercent, getFlatShippingFeeCents, getMaxPlatformTipPercent, getSalesTaxRate } from './provider-config.js';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
 
@@ -109,6 +109,33 @@ function getSiteOrigin(env) {
   } catch {
     return '';
   }
+}
+
+function getTestFixtureOrderId(email = 'test@example.com', campaignSlug = 'hand-relations') {
+  const normalizedEmail = String(email || '')
+    .trim()
+    .toLowerCase();
+  const normalizedCampaignSlug = String(campaignSlug || '')
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalizedEmail === 'test@example.com' &&
+    normalizedCampaignSlug === 'hand-relations'
+  ) {
+    return 'test-order-active-1';
+  }
+
+  const safeEmail = normalizedEmail
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32) || 'test';
+  const safeCampaignSlug = normalizedCampaignSlug
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24) || 'campaign';
+
+  return `test-order-${safeCampaignSlug}-${safeEmail}`;
 }
 
 function isTrustedSiteOriginRequest(request, env) {
@@ -385,26 +412,32 @@ function calculateTotalWithTax(env, subtotalCents) {
   return subtotalCents + calculateTax(env, subtotalCents);
 }
 
-function getStoredTipPercent(pledgeData, fallback = 0) {
+function getStoredTipPercent(env, pledgeData, fallback = 0) {
   if (!pledgeData) return fallback;
-  return sanitizePlatformTipPercent(pledgeData.tipPercent, fallback);
+  return sanitizePlatformTipPercent(
+    pledgeData.tipPercent,
+    fallback,
+    getMaxPlatformTipPercent(env)
+  );
 }
 
-function getStoredTipAmount(pledgeData) {
+function getStoredTipAmount(env, pledgeData) {
   if (!pledgeData) return 0;
   if (typeof pledgeData.tipAmount === 'number') {
     return pledgeData.tipAmount;
   }
   const subtotal = pledgeData.subtotal ?? pledgeData.amount ?? 0;
-  return calculatePlatformTip(subtotal, getStoredTipPercent(pledgeData, 0));
+  return calculatePlatformTip(subtotal, getStoredTipPercent(env, pledgeData, 0), getMaxPlatformTipPercent(env));
 }
 
-function buildPledgeTotals(env, subtotalCents, { shipping = 0, tipPercent = DEFAULT_PLATFORM_TIP_PERCENT } = {}) {
+function buildPledgeTotals(env, subtotalCents, { shipping = 0, tipPercent } = {}) {
   const normalizedSubtotal = Math.max(0, Number(subtotalCents) || 0);
   const normalizedShipping = Math.max(0, Number(shipping) || 0);
-  const normalizedTipPercent = sanitizePlatformTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+  const defaultTipPercent = getDefaultPlatformTipPercent(env);
+  const maxTipPercent = getMaxPlatformTipPercent(env);
+  const normalizedTipPercent = sanitizePlatformTipPercent(tipPercent, defaultTipPercent, maxTipPercent);
   const tax = calculateTax(env, normalizedSubtotal);
-  const tipAmount = calculatePlatformTip(normalizedSubtotal, normalizedTipPercent);
+  const tipAmount = calculatePlatformTip(normalizedSubtotal, normalizedTipPercent, maxTipPercent);
   return {
     subtotal: normalizedSubtotal,
     tax,
@@ -812,7 +845,7 @@ function buildDesiredSupportItems(campaign, currentSupportItems = [], requestedS
   };
 }
 
-function buildCanonicalContribution(env, campaign, { tierSelection, supportItems = [], customAmount = 0, tipPercent = DEFAULT_PLATFORM_TIP_PERCENT }) {
+function buildCanonicalContribution(env, campaign, { tierSelection, supportItems = [], customAmount = 0, tipPercent }) {
   const normalizedCustomAmount = Number(customAmount);
   if (!isNonNegativeInteger(normalizedCustomAmount) || !isValidAmount(normalizedCustomAmount * 100)) {
     return { valid: false, error: 'Invalid custom support amount' };
@@ -1652,7 +1685,11 @@ async function handleFirstPartyCheckoutStart(request, env) {
 
   const body = await request.json();
   const { campaignSlug, items, customAmount = 0, email, tipPercent } = body || {};
-  const normalizedTipPercent = sanitizePlatformTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+  const normalizedTipPercent = sanitizePlatformTipPercent(
+    tipPercent,
+    getDefaultPlatformTipPercent(env),
+    getMaxPlatformTipPercent(env)
+  );
   if (campaignSlug && !isValidSlug(campaignSlug)) {
     return privateJsonResponse({ error: 'Invalid campaign slug format' }, 400, env);
   }
@@ -2116,7 +2153,11 @@ async function handleFirstPartyCheckoutComplete(request, env, ctx) {
     const setupIntentId = session.setup_intent;
     const normalizedTipPercent = metadata.tipPercent === undefined || metadata.tipPercent === null || metadata.tipPercent === ''
       ? 0
-      : sanitizePlatformTipPercent(metadata.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+      : sanitizePlatformTipPercent(
+        metadata.tipPercent,
+        getDefaultPlatformTipPercent(env),
+        getMaxPlatformTipPercent(env)
+      );
     const email = session.customer_email || session.customer_details?.email;
     let customerId = session.customer;
 
@@ -2508,7 +2549,11 @@ async function handleStripeWebhook(request, env, ctx) {
       const tierQtyNum = parseInt(tierQty) || 1;
       const normalizedTipPercent = tipPercent === undefined || tipPercent === null || tipPercent === ''
         ? 0
-        : sanitizePlatformTipPercent(tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+        : sanitizePlatformTipPercent(
+          tipPercent,
+          getDefaultPlatformTipPercent(env),
+          getMaxPlatformTipPercent(env)
+        );
       const email = session.customer_email || session.customer_details?.email;
       let customerId = session.customer;
       const setupIntentId = session.setup_intent;
@@ -2685,8 +2730,8 @@ async function handleStripeWebhook(request, env, ctx) {
                         subtotal: existingPledge.subtotal || existingPledge.amount,
                         tax: existingPledge.tax || 0,
                         shipping: existingPledge.shipping || 0,
-                        tipAmount: getStoredTipAmount(existingPledge),
-                        tipPercent: getStoredTipPercent(existingPledge, 0),
+                        tipAmount: getStoredTipAmount(env, existingPledge),
+                        tipPercent: getStoredTipPercent(env, existingPledge, 0),
                         amount: existingPledge.amount,
                         token: chargeToken,
                         hasDecisions: pledgeCampaign?.has_decisions === true,
@@ -2973,8 +3018,8 @@ async function handleStripeWebhook(request, env, ctx) {
         subtotal: pledgeData?.subtotal || pledgeData?.amount || 0,
         tax: pledgeData?.tax || 0,
         shipping: pledgeData?.shipping || 0,
-        tipAmount: getStoredTipAmount(pledgeData),
-        tipPercent: getStoredTipPercent(pledgeData, 0),
+        tipAmount: getStoredTipAmount(env, pledgeData),
+        tipPercent: getStoredTipPercent(env, pledgeData, 0),
         amount: pledgeData?.amount || 0,
         token,
         pledgeItems: pledgeItemsForEmail
@@ -3022,8 +3067,8 @@ async function handleGetPledge(request, env) {
         subtotal: pledgeData.subtotal,
         tax: pledgeData.tax,
         shipping: pledgeData.shipping || 0,
-        tipPercent: getStoredTipPercent(pledgeData, 0),
-        tipAmount: getStoredTipAmount(pledgeData),
+        tipPercent: getStoredTipPercent(env, pledgeData, 0),
+        tipAmount: getStoredTipAmount(env, pledgeData),
         amount: pledgeData.amount,
         tierId: pledgeData.tierId,
         tierName: pledgeData.tierName,
@@ -3073,8 +3118,8 @@ async function handleGetPledges(request, env) {
         subtotal: pledgeData.subtotal,
         tax: pledgeData.tax,
         shipping: pledgeData.shipping || 0,
-        tipPercent: getStoredTipPercent(pledgeData, 0),
-        tipAmount: getStoredTipAmount(pledgeData),
+        tipPercent: getStoredTipPercent(env, pledgeData, 0),
+        tipAmount: getStoredTipAmount(env, pledgeData),
         amount: pledgeData.amount,
         tierId: pledgeData.tierId,
         tierName: pledgeData.tierName,
@@ -3144,8 +3189,8 @@ async function handleCancelPledge(request, env) {
       const cancelSubtotal = pledgeData.subtotal || pledgeData.amount || 0;
       const cancelTax = pledgeData.tax || 0;
       const cancelShipping = pledgeData.shipping || 0;
-      const cancelTipPercent = getStoredTipPercent(pledgeData, 0);
-      const cancelTipAmount = getStoredTipAmount(pledgeData);
+      const cancelTipPercent = getStoredTipPercent(env, pledgeData, 0);
+      const cancelTipAmount = getStoredTipAmount(env, pledgeData);
       const cancelAmount = pledgeData.amount || 0;
       if (!pledgeData.history) {
         pledgeData.history = [{
@@ -3310,7 +3355,7 @@ async function handleModifyPledge(request, env) {
       
       currentPledge = pledgeData;
       campaignSlug = pledgeData.campaignSlug || campaignSlug;
-      currentTipPercent = getStoredTipPercent(pledgeData, 0);
+      currentTipPercent = getStoredTipPercent(env, pledgeData, 0);
     }
   }
 
@@ -3324,7 +3369,7 @@ async function handleModifyPledge(request, env) {
   }
 
   const normalizedTipPercent = hasTipChange
-    ? sanitizePlatformTipPercent(tipPercent, currentTipPercent)
+    ? sanitizePlatformTipPercent(tipPercent, currentTipPercent, getMaxPlatformTipPercent(env))
     : currentTipPercent;
   const currentTierSelection = getPledgeTierSelections(currentPledge, campaign);
   if (!currentTierSelection.valid) {
@@ -3423,7 +3468,7 @@ async function handleModifyPledge(request, env) {
       const previousSubtotal = currentPledge?.subtotal ?? currentPledge?.amount ?? 0;
       const previousTax = currentPledge?.tax ?? 0;
       const previousShipping = currentPledge?.shipping ?? 0;
-      const previousTipAmount = getStoredTipAmount(currentPledge);
+      const previousTipAmount = getStoredTipAmount(env, currentPledge);
       const previousAmount = currentPledge?.amount ?? 0;
 
       if (!nextPledgeData.history) {
@@ -3498,7 +3543,7 @@ async function handleModifyPledge(request, env) {
   const previousSubtotal = currentPledge?.subtotal ?? currentPledge?.amount ?? 0;
   const previousTax = currentPledge?.tax ?? 0;
   const previousShipping = currentPledge?.shipping ?? 0;
-  const previousTipAmount = getStoredTipAmount(currentPledge);
+  const previousTipAmount = getStoredTipAmount(env, currentPledge);
   if (
     previousSubtotal !== canonicalContribution.totals.subtotal ||
     previousTax !== canonicalContribution.totals.tax ||
@@ -3834,7 +3879,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
             combinedSubtotal += pledge.subtotal || pledge.amount || 0;
             combinedTax += pledge.tax || 0;
             combinedShipping += pledge.shipping || 0;
-            combinedTipAmount += getStoredTipAmount(pledge);
+            combinedTipAmount += getStoredTipAmount(env, pledge);
             
             // Merge tier items
             if (pledge.tierName) {
@@ -3890,7 +3935,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
             tax: combinedTax,
             shipping: combinedShipping,
             tipAmount: combinedTipAmount,
-            tipPercent: derivePlatformTipPercent(combinedSubtotal, combinedTipAmount, 0),
+            tipPercent: derivePlatformTipPercent(combinedSubtotal, combinedTipAmount, 0, getMaxPlatformTipPercent(env)),
             amount: supporter.totalAmount,
             token,
             hasDecisions: campaign?.has_decisions === true,
@@ -3943,7 +3988,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           failedSubtotal += pledge.subtotal || pledge.amount || 0;
           failedTax += pledge.tax || 0;
           failedShipping += pledge.shipping || 0;
-          failedTipAmount += getStoredTipAmount(pledge);
+          failedTipAmount += getStoredTipAmount(env, pledge);
           
           if (pledge.tierName) {
             if (!failedItems.tierName) {
@@ -3994,7 +4039,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           tax: failedTax,
           shipping: failedShipping,
           tipAmount: failedTipAmount,
-          tipPercent: derivePlatformTipPercent(failedSubtotal, failedTipAmount, 0),
+          tipPercent: derivePlatformTipPercent(failedSubtotal, failedTipAmount, 0, getMaxPlatformTipPercent(env)),
           amount: supporter.totalAmount,
           token,
           pledgeItems: failedItems
@@ -4359,7 +4404,7 @@ async function handleSettleBatch(request, env) {
             combinedSubtotal += pledge.subtotal || pledge.amount || 0;
             combinedTax += pledge.tax || 0;
             combinedShipping += pledge.shipping || 0;
-            combinedTipAmount += getStoredTipAmount(pledge);
+            combinedTipAmount += getStoredTipAmount(env, pledge);
             if (pledge.tierName) {
               if (!combinedItems.tierName) {
                 combinedItems.tierName = pledge.tierName;
@@ -4381,7 +4426,7 @@ async function handleSettleBatch(request, env) {
 
           await sendChargeSuccessEmail(env, {
             email, campaignSlug, campaignTitle,
-            subtotal: combinedSubtotal, tax: combinedTax, shipping: combinedShipping, tipAmount: combinedTipAmount, tipPercent: derivePlatformTipPercent(combinedSubtotal, combinedTipAmount, 0), amount: data.totalAmount,
+            subtotal: combinedSubtotal, tax: combinedTax, shipping: combinedShipping, tipAmount: combinedTipAmount, tipPercent: derivePlatformTipPercent(combinedSubtotal, combinedTipAmount, 0, getMaxPlatformTipPercent(env)), amount: data.totalAmount,
             token,
             hasDecisions: campaign?.has_decisions === true,
             pledgeItems: combinedItems
@@ -4542,6 +4587,7 @@ async function handleTestSetup(request, env) {
   const body = await request.json().catch(() => ({}));
   const email = body.email || 'test@example.com';
   const campaignSlug = body.campaignSlug || 'hand-relations';
+  const testOrderId = getTestFixtureOrderId(email, campaignSlug);
 
   // Get campaign data to use real tier IDs
   const campaign = await getCampaign(env, campaignSlug);
@@ -4569,7 +4615,7 @@ async function handleTestSetup(request, env) {
   }
   const totals = buildPledgeTotals(env, subtotal, {
     shipping: getFlatShippingFeeCents(env),
-    tipPercent: DEFAULT_PLATFORM_TIP_PERCENT
+    tipPercent: getDefaultPlatformTipPercent(env)
   });
 
   // Create a real Stripe test customer so payment method updates work
@@ -4585,7 +4631,7 @@ async function handleTestSetup(request, env) {
 
   const testPledges = [
     {
-      orderId: 'test-order-active-1',
+      orderId: testOrderId,
       email,
       campaignSlug,
       tierId: firstTier?.id || 'frame',
@@ -4620,7 +4666,7 @@ async function handleTestSetup(request, env) {
   await env.PLEDGES.put(emailKey, JSON.stringify(orderIds));
 
   const token = await generateToken(env.MAGIC_LINK_SECRET, {
-    orderId: testPledges[0].orderId,
+    orderId: testOrderId,
     email,
     campaignSlug
   });
@@ -4659,8 +4705,11 @@ async function handleTestCleanup(request, env) {
 
   const body = await request.json().catch(() => ({}));
   const email = body.email || 'test@example.com';
+  const campaignSlug = body.campaignSlug || 'hand-relations';
+  const testOrderId = getTestFixtureOrderId(email, campaignSlug);
 
   const testOrderIds = [
+    testOrderId,
     'test-order-active-1'
   ];
 
@@ -5350,13 +5399,14 @@ async function handleTestEmail(request, env) {
   const campaignTitle = campaign?.title || 'Test Campaign';
   const instagramUrl = campaign?.instagram || 'https://instagram.com/thepool';
   
-  // Use the test order ID created by /test/setup so manage links work
-  const testOrderId = 'test-order-active-1';
+  // Use the same test order ID shape as /test/setup so manage links work.
+  const resolvedCampaignSlug = campaignSlug || 'hand-relations';
+  const testOrderId = getTestFixtureOrderId(email, resolvedCampaignSlug);
 
   const token = await generateToken(env.MAGIC_LINK_SECRET, {
     orderId: testOrderId,
     email,
-    campaignSlug: campaignSlug || 'hand-relations'
+    campaignSlug: resolvedCampaignSlug
   });
 
   try {
@@ -5898,7 +5948,11 @@ async function handleRecoverCheckout(request, env) {
 
     const tipPercent = metadata.tipPercent === undefined || metadata.tipPercent === null || metadata.tipPercent === ''
       ? 0
-      : sanitizePlatformTipPercent(metadata.tipPercent, DEFAULT_PLATFORM_TIP_PERCENT);
+      : sanitizePlatformTipPercent(
+        metadata.tipPercent,
+        getDefaultPlatformTipPercent(env),
+        getMaxPlatformTipPercent(env)
+      );
 
     let additionalTiers = [];
     if (metadata.hasAdditionalTiers === 'true' && env.PLEDGES) {

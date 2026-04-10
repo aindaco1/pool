@@ -81,10 +81,13 @@
   - shared tokens, typography, buttons, fields, and surface primitives now underpin the active Sass system
   - public pages, campaign surfaces, cart / checkout, and Manage Pledge now share the same calmer visual vocabulary
   - stale parallel styling was removed so new visual work can continue from one active design system instead of multiple competing ones
-
-## In Progress
-
-_(None currently)_
+- [x] Make the platform variable-first for maximum customizability for forks
+  - structured `platform`, `pricing`, `design`, `checkout`, and `cache` settings now form the canonical fork-facing config surface
+  - first-party cart/runtime and custom on-site checkout are now treated as built-in platform behavior, not fork-facing mode switches
+  - Worker branding, sender identity, pricing, and platform-tip defaults are auto-synced from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`
+  - curated design variables now ship through `assets/theme-vars.css`, so major theme changes do not require Sass edits or CSP exceptions
+  - core brand assets like logos, favicon, footer branding, and default social images are now configurable through `platform.*`
+  - a dedicated customization guide now documents the supported no-code surface in `docs/CUSTOMIZATION.md`
 
 ## Planned
 
@@ -101,7 +104,6 @@ _(None currently)_
   - Support USA, Europe, Canada, Australia, Mexico, other countries in the Americas, Japan, South Korea
 - [ ] Non-Stripe tax calculator to replace flat rate sales tax
   - Support USA, Europe, Canada, Australia, Mexico, other countries in the Americas, Japan, South Korea
-- [ ] Make the platform variable-first for maximum customizability for forks
 - [ ] Mobile responsiveness pass
 - [ ] Developer FAQ based on internal documentation
 - [ ] Marketing landing page for the platform on a different domain

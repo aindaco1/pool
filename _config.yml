@@ -4,23 +4,76 @@ url: https://pool.dustwave.xyz
 markdown: kramdown
 permalink: pretty
 
-# Pledge worker URL
-worker_base: "https://pledge.dustwave.xyz"
-cart_runtime: first_party
-checkout_provider: first_party
-checkout_ui_mode: hosted
-stripe_publishable_key: ""
-sales_tax_rate: 0.07875
-flat_shipping_rate: 3.00
-live_stats_cache_ttl_seconds: 300
-live_inventory_cache_ttl_seconds: 300
+# Structured platform settings for forks.
+platform:
+  name: The Pool
+  company_name: Dust Wave
+  support_email: support@dustwave.xyz
+  pledges_email_from: "The Pool <pledges@pool.dustwave.xyz>"
+  updates_email_from: "The Pool <updates@pool.dustwave.xyz>"
+  site_url: "https://pool.dustwave.xyz"
+  worker_url: "https://pledge.dustwave.xyz"
+  default_creator_name: Dust Wave
+  logo_path: /assets/images/defaults/dust-wave-square.png
+  footer_logo_path: /assets/images/defaults/dust-wave-square.png
+  favicon_path: /assets/images/defaults/favicon.png
+  default_social_image_path: /assets/images/defaults/dust-wave-square.png
+
+pricing:
+  sales_tax_rate: 0.07875
+  flat_shipping_rate: 3.00
+  default_tip_percent: 5
+  max_tip_percent: 15
+
+checkout:
+  stripe_publishable_key: ""
+
+cache:
+  live_stats_ttl_seconds: 300
+  live_inventory_ttl_seconds: 300
+
+design:
+  font_body: '"Inter", sans-serif'
+  font_display: '"gambado-sans", sans-serif'
+  layout_max_width: 1000px
+  radius_sm: 3px
+  radius_chip: 4px
+  radius_lg: 6px
+  radius_md: 10px
+  radius_xl: 14px
+  color_text: "#252930"
+  color_text_strong: "#101215"
+  color_text_muted: "#5d6573"
+  color_text_soft: "#7b8494"
+  color_page_background: "#f5f5f2"
+  color_surface_base: "#ffffff"
+  color_surface_subtle: "#f0f1ed"
+  color_surface_soft: "#e8ebe5"
+  color_surface_strong: "#d9ddd5"
+  color_border: "#d2d7df"
+  color_border_strong: "#9ea7b5"
+  color_border_soft: "#e3e6eb"
+  color_primary: "#101215"
+  color_primary_soft: "#858e99"
+  color_primary_border: "#07080a"
+  color_primary_hover: "#000000"
+  color_primary_focus_ring: "rgba(16, 18, 21, 0.08)"
+  color_page_background_overlay: "rgba(245, 245, 242, 0.92)"
+  color_surface_base_overlay: "rgba(255, 255, 255, 0.95)"
+  color_surface_subtle_overlay: "rgba(240, 241, 237, 0.9)"
+  color_success: "#28a745"
+  color_danger_soft: "rgba(220, 53, 69, 0.08)"
+  color_danger_softer: "rgba(220, 53, 69, 0.1)"
+  color_progress: "#000000"
+  surface_tint_softer: "rgba(16, 18, 21, 0.015)"
+  surface_tint_soft: "rgba(16, 18, 21, 0.025)"
+  surface_tint_medium: "rgba(16, 18, 21, 0.04)"
+  surface_tint_hover: "rgba(16, 18, 21, 0.055)"
+  surface_tint_strong: "rgba(16, 18, 21, 0.07)"
 
 sass:
   sass_dir: assets/partials
   style: compressed
-
-include:
-  - .well-known
 
 collections:
   campaigns:

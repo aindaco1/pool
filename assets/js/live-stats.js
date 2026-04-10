@@ -23,11 +23,14 @@ const LIVE_REFRESH_MARKER_KEY = 'pool_live_refresh_needed';
 const LIVE_REFRESH_MARKER_TTL_MS = 10 * 60 * 1000;
 
 function getWorkerBase() {
-  return window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
+  return window.POOL_CONFIG?.platform?.workerUrl || window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
 }
 
 function getCacheTtlMs(configKey, fallbackMs) {
-  const parsedSeconds = Number(window.POOL_CONFIG?.[configKey]);
+  const nestedKey = configKey === 'liveStatsCacheTtlSeconds'
+    ? window.POOL_CONFIG?.cache?.liveStatsTtlSeconds
+    : window.POOL_CONFIG?.cache?.liveInventoryTtlSeconds;
+  const parsedSeconds = Number(nestedKey ?? window.POOL_CONFIG?.[configKey]);
   if (!Number.isFinite(parsedSeconds) || parsedSeconds <= 0) {
     return fallbackMs;
   }

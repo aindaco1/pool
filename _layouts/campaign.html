@@ -3,16 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/png" href="/assets/images/defaults/favicon.png">
-  {% if site.cart_runtime == 'first_party' and site.checkout_provider == 'first_party' %}
+  <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-campaign-csp-strict.html %}
-  {% endif %}
   {% include cart-head.html %}
-  <title>{{ page.title | escape }} · {{ site.title | escape }}</title>
-  <meta property="og:title" content="{{ page.title | escape }} · {{ site.title | escape }}">
+  <title>{{ page.title | escape }} · {{ site.platform.name | default: site.title | escape }}</title>
+  <meta property="og:title" content="{{ page.title | escape }} · {{ site.platform.name | default: site.title | escape }}">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="{{ site.url }}{{ page.url }}">
-  {% if page.hero_image %}<meta property="og:image" content="{{ site.url }}{{ page.hero_image }}">{% endif %}
+  <meta property="og:url" content="{{ site.platform.site_url | default: site.url }}{{ page.url }}">
+  {% if page.hero_image %}
+  <meta property="og:image" content="{{ site.platform.site_url | default: site.url }}{{ page.hero_image }}">
+  {% elsif site.platform.default_social_image_path %}
+  <meta property="og:image" content="{{ site.platform.site_url | default: site.url }}{{ site.platform.default_social_image_path }}">
+  {% endif %}
   {% if page.short_blurb %}<meta property="og:description" content="{{ page.short_blurb | strip_html | escape }}">{% endif %}
   <meta name="twitter:card" content="summary_large_image">
 </head>
@@ -175,13 +177,13 @@
         {% if page.creator_image %}
           <div class="campaign-facts__creator">
             <img src="{{ page.creator_image }}" alt="{{ page.creator_name | default: 'Creator' | escape }}">
-            <span>{{ page.creator_name | default: "Dust Wave" | escape }}</span>
+            <span>{{ page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}</span>
           </div>
         {% endif %}
         <dl>
           {% unless page.creator_image %}
           <dt>Creator</dt>
-          <dd>{{ page.creator_name | default: "Dust Wave" | escape }}</dd>
+          <dd>{{ page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}</dd>
           {% endunless %}
           <dt>Category</dt>
           <dd>{{ page.category | default: "Feature Film" | escape }}</dd>
@@ -225,10 +227,10 @@
   <footer class="site-footer">
     <div class="site-footer__content">
       <a href="/" class="site-footer__logo">
-        <img src="/assets/images/defaults/dust-wave-square.png" alt="Dust Wave">
+        <img src="{{ site.platform.footer_logo_path | default: site.platform.logo_path | default: '/assets/images/defaults/dust-wave-square.png' }}" alt="{{ site.platform.company_name | default: site.author }}">
       </a>
       <div class="site-footer__copyright">
-        <span>(ɔ) {{ 'now' | date: "%Y" }} DUST WAVE</span>
+        <span>(ɔ) {{ 'now' | date: "%Y" }} {{ site.platform.company_name | default: site.author | upcase }}</span>
       </div>
     </div>
   </footer>

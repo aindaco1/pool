@@ -15,24 +15,41 @@ $space-3xl: $size--unit * 6;   // 48px
 $space-4xl: $size--unit * 8;   // 64px
 
 // Typography - Font families
-$font-family--body: "Inter", sans-serif;
-$font-family--display: "gambado-sans", sans-serif;
+$font-family--body-default: "Inter", sans-serif;
+$font-family--display-default: "gambado-sans", sans-serif;
+$font-family--body: var(--pool-font-body, #{$font-family--body-default});
+$font-family--display: var(--pool-font-display, #{$font-family--display-default});
 
 // Semantic neutrals
-$ink--strong: #101215;
-$ink--default: #252930;
-$ink--muted: #5d6573;
-$ink--soft: #7b8494;
+$ink--strong-default: #101215;
+$ink--default-default: #252930;
+$ink--muted-default: #5d6573;
+$ink--soft-default: #7b8494;
 
-$surface--page: #f5f5f2;
-$surface--base: #ffffff;
-$surface--subtle: #f0f1ed;
-$surface--soft: #e8ebe5;
-$surface--strong: #d9ddd5;
+$ink--strong: var(--pool-ink-strong, #{$ink--strong-default});
+$ink--default: var(--pool-ink-default, #{$ink--default-default});
+$ink--muted: var(--pool-ink-muted, #{$ink--muted-default});
+$ink--soft: var(--pool-ink-soft, #{$ink--soft-default});
 
-$border--default: #d2d7df;
-$border--strong: #9ea7b5;
-$border--soft: #e3e6eb;
+$surface--page-default: #f5f5f2;
+$surface--base-default: #ffffff;
+$surface--subtle-default: #f0f1ed;
+$surface--soft-default: #e8ebe5;
+$surface--strong-default: #d9ddd5;
+
+$surface--page: var(--pool-surface-page, #{$surface--page-default});
+$surface--base: var(--pool-surface-base, #{$surface--base-default});
+$surface--subtle: var(--pool-surface-subtle, #{$surface--subtle-default});
+$surface--soft: var(--pool-surface-soft, #{$surface--soft-default});
+$surface--strong: var(--pool-surface-strong, #{$surface--strong-default});
+
+$border--default-default: #d2d7df;
+$border--strong-default: #9ea7b5;
+$border--soft-default: #e3e6eb;
+
+$border--default: var(--pool-border-default, #{$border--default-default});
+$border--strong: var(--pool-border-strong, #{$border--strong-default});
+$border--soft: var(--pool-border-soft, #{$border--soft-default});
 
 // Colors - Base
 $color--default: $ink--default;
@@ -106,29 +123,46 @@ $btn--font-size: $font-size-xs;
 $btn--letter-spacing: 0.08em;
 
 // Layout
-$layout--max-width: 1000px;
+$layout--max-width-default: 1000px;
+$layout--max-width: var(--pool-layout-max-width, #{$layout--max-width-default});
 $container-vpad: $space-2xl;
 $header--mb: $space-3xl;
 $product-block-gap: 96px;
 
 // Border radius
-$radius--sm: 3px;
-$radius--chip: 4px;
-$radius--lg: 6px;
-$radius--md: 10px;
-$radius--xl: 14px;
+$radius--sm-default: 3px;
+$radius--chip-default: 4px;
+$radius--lg-default: 6px;
+$radius--md-default: 10px;
+$radius--xl-default: 14px;
+
+$radius--sm: var(--pool-radius-sm, #{$radius--sm-default});
+$radius--chip: var(--pool-radius-chip, #{$radius--chip-default});
+$radius--lg: var(--pool-radius-lg, #{$radius--lg-default});
+$radius--md: var(--pool-radius-md, #{$radius--md-default});
+$radius--xl: var(--pool-radius-xl, #{$radius--xl-default});
 
 // Shadows
 $shadow--soft: 0px 0px 10px rgba(58, 58, 58, 0.2);
 $shadow--success-glow: 0 0 8px rgba(40, 167, 69, 0.5);
 
 // Surface tints (subtle backgrounds)
-$surface-tint-softer: rgba($color--primary, 0.015);
-$surface-tint-soft: rgba($color--primary, 0.025);
-$surface-tint-medium: rgba($color--primary, 0.04);
-$surface-tint-hover: rgba($color--primary, 0.055);
-$surface-tint-strong: rgba($color--primary, 0.07);
+$color--primary-soft: var(--pool-color-primary-soft, #{lighten($ink--strong-default, 48%)});
+$color--primary-focus-ring: var(--pool-color-primary-focus-ring, rgba($ink--strong-default, 0.08));
+$surface--page-overlay: var(--pool-surface-page-overlay, rgba($surface--page-default, 0.92));
+$surface--base-overlay: var(--pool-surface-base-overlay, rgba($surface--base-default, 0.95));
+$surface--subtle-overlay: var(--pool-surface-subtle-overlay, rgba($surface--subtle-default, 0.9));
+$color--primary-border: var(--pool-color-primary-border, #{darken($ink--strong-default, 4%)});
+$color--primary-hover: var(--pool-color-primary-hover, #{darken($ink--strong-default, 10%)});
+$color--danger-soft: var(--pool-color-danger-soft, rgba($color--danger, 0.08));
+$color--danger-softer: var(--pool-color-danger-softer, rgba($color--danger, 0.1));
+$surface-tint-softer: var(--pool-surface-tint-softer, rgba($ink--strong-default, 0.015));
+$surface-tint-soft: var(--pool-surface-tint-soft, rgba($ink--strong-default, 0.025));
+$surface-tint-medium: var(--pool-surface-tint-medium, rgba($ink--strong-default, 0.04));
+$surface-tint-hover: var(--pool-surface-tint-hover, rgba($ink--strong-default, 0.055));
+$surface-tint-strong: var(--pool-surface-tint-strong, rgba($ink--strong-default, 0.07));
 
 // Progress bar
-$progress--color: #000000;
+$progress--color-default: #000000;
+$progress--color: var(--pool-progress-color, #{$progress--color-default});
 $progress--bg: lightgray;

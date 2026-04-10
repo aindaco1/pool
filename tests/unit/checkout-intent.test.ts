@@ -8,8 +8,18 @@ import {
   verifyCheckoutIntentToken
 } from '../../worker/src/checkout-intent.js';
 import {
+  getCheckoutUiMode,
   getCartRuntime,
+  getDefaultPlatformTipPercent,
+  getMaxPlatformTipPercent,
   getCheckoutProvider,
+  getPlatformCompanyName,
+  getPlatformName,
+  getPledgesEmailFrom,
+  getSiteBase,
+  getSupportEmail,
+  getUpdatesEmailFrom,
+  getWorkerBase,
   isFirstPartyCartEnabled,
   isFirstPartyCheckoutEnabled
 } from '../../worker/src/provider-config.js';
@@ -135,9 +145,34 @@ describe('checkout intent scaffolding', () => {
   it('normalizes provider flags to first-party defaults', () => {
     expect(getCheckoutProvider({})).toBe('first_party');
     expect(getCartRuntime({})).toBe('first_party');
+    expect(getCheckoutUiMode({})).toBe('custom');
     expect(isFirstPartyCheckoutEnabled({ CHECKOUT_PROVIDER: 'first_party' })).toBe(true);
     expect(isFirstPartyCartEnabled({ CART_RUNTIME: 'FIRST_PARTY' })).toBe(true);
     expect(isFirstPartyCheckoutEnabled({ CHECKOUT_PROVIDER: 'weird' })).toBe(true);
+  });
+
+  it('exposes variable-first Worker branding and pricing helpers', () => {
+    const env = {
+      SITE_BASE: 'https://fork.example',
+      WORKER_BASE: 'https://pledge.fork.example',
+      PLATFORM_NAME: 'Fork Pool',
+      PLATFORM_COMPANY_NAME: 'Fork Studio',
+      SUPPORT_EMAIL: 'hello@fork.example',
+      PLEDGES_EMAIL_FROM: 'Fork Pool <pledges@fork.example>',
+      UPDATES_EMAIL_FROM: 'Fork Pool <updates@fork.example>',
+      DEFAULT_PLATFORM_TIP_PERCENT: '7',
+      MAX_PLATFORM_TIP_PERCENT: '18'
+    };
+
+    expect(getSiteBase(env)).toBe('https://fork.example/');
+    expect(getWorkerBase(env)).toBe('https://pledge.fork.example/');
+    expect(getPlatformName(env)).toBe('Fork Pool');
+    expect(getPlatformCompanyName(env)).toBe('Fork Studio');
+    expect(getSupportEmail(env)).toBe('hello@fork.example');
+    expect(getPledgesEmailFrom(env)).toBe('Fork Pool <pledges@fork.example>');
+    expect(getUpdatesEmailFrom(env)).toBe('Fork Pool <updates@fork.example>');
+    expect(getDefaultPlatformTipPercent(env)).toBe(7);
+    expect(getMaxPlatformTipPercent(env)).toBe(18);
   });
 
   it('consumes checkout nonces only once', async () => {

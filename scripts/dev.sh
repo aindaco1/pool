@@ -13,18 +13,9 @@ trap 'kill 0' EXIT
 
 JEKYLL_PORT=4000
 WORKER_PORT=8787
-NGROK_API_PORT=4040
 STRIPE_LOG="/tmp/pool-stripe-listen.log"
-LOCAL_CONFIG_FILE="_config.local.yml"
-LOCAL_CART_RUNTIME=$(grep -E '^cart_runtime:' "$LOCAL_CONFIG_FILE" 2>/dev/null | awk '{print $2}')
-LOCAL_CHECKOUT_PROVIDER=$(grep -E '^checkout_provider:' "$LOCAL_CONFIG_FILE" 2>/dev/null | awk '{print $2}')
-USES_FIRST_PARTY_LOCAL=false
+USES_FIRST_PARTY_LOCAL=true
 SKIP_STRIPE=false
-SKIP_NGROK=false
-
-if [ "$LOCAL_CART_RUNTIME" = "first_party" ] && [ "$LOCAL_CHECKOUT_PROVIDER" = "first_party" ]; then
-  USES_FIRST_PARTY_LOCAL=true
-fi
 
 prefer_node20_path() {
   local candidate=""
@@ -139,9 +130,9 @@ echo "🚀 Starting development environment..."
 prefer_node20_path || true
 prefer_stripe_path || true
 
-if [ "$USES_FIRST_PARTY_LOCAL" = "true" ]; then
-  ensure_local_secret "CHECKOUT_INTENT_SECRET"
-fi
+ruby ./scripts/sync-worker-config.rb
+
+ensure_local_secret "CHECKOUT_INTENT_SECRET"
 
 # Check Stripe CLI login
 if ! stripe config --list &>/dev/null; then
@@ -153,25 +144,9 @@ if ! stripe config --list &>/dev/null; then
   fi
 fi
 
-# Check if ngrok is installed
-if ! command -v ngrok &>/dev/null; then
-  if [ "$USES_FIRST_PARTY_LOCAL" != "true" ]; then
-    echo "⚠️  ngrok not found. Install it with 'brew install ngrok' for external tunnel testing."
-  fi
-  SKIP_NGROK=true
-else
-  # Kill any existing ngrok processes to avoid port conflicts
-  if pgrep -x ngrok > /dev/null; then
-    echo "🔄 Killing existing ngrok processes..."
-    killall ngrok 2>/dev/null
-    sleep 1
-  fi
-fi
-
 # Clear stale local services so the dev environment matches the test harness ports.
 kill_port_if_busy "$JEKYLL_PORT" "Jekyll"
 kill_port_if_busy "$WORKER_PORT" "Worker"
-kill_port_if_busy "$NGROK_API_PORT" "ngrok inspector"
 
 # Jekyll (without livereload - causes issues with iCloud Drive sync)
 echo "📦 Starting Jekyll..."
@@ -229,52 +204,6 @@ else
   echo "⏭️  Skipping Stripe webhook forwarding"
 fi
 
-# ngrok is only needed when validating an external tunnel locally.
-if [ "$USES_FIRST_PARTY_LOCAL" = "true" ]; then
-  echo "⏭️  Local config uses first-party cart/checkout; skipping ngrok tunnel setup"
-elif [ "${SKIP_NGROK:-false}" != "true" ]; then
-  echo "🌐 Starting ngrok tunnel for Jekyll..."
-  sleep 2  # Wait for Jekyll to start
-  
-  ngrok http "$JEKYLL_PORT" --log=stdout > /tmp/ngrok.log 2>&1 &
-  NGROK_PID=$!
-  
-  # Wait for ngrok to start
-  sleep 4
-  
-  # Extract URL from ngrok API
-  NGROK_URL=$(curl -s "http://127.0.0.1:$NGROK_API_PORT/api/tunnels" 2>/dev/null | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    for t in data.get('tunnels', []):
-        url = t.get('public_url', '')
-        if url.startswith('https://'):
-            print(url)
-            break
-except: pass
-" 2>/dev/null)
-  
-  if [ -n "$NGROK_URL" ]; then
-    echo ""
-    echo "📋 NGROK TUNNEL:"
-    echo "   Jekyll: $NGROK_URL"
-    echo ""
-    echo "⚠️  UPDATE _config.local.yml:"
-    echo "   url: $NGROK_URL"
-    echo ""
-    echo "📝 ngrok is optional now and mainly useful for external-device testing."
-    echo "   The first-party checkout flow does not require vendor product crawling."
-    echo ""
-  else
-    echo "⚠️  Could not get ngrok URL. Check http://127.0.0.1:$NGROK_API_PORT"
-    echo "   Log: /tmp/ngrok.log"
-    cat /tmp/ngrok.log | tail -5
-  fi
-else
-  echo "⏭️  Skipping ngrok tunnel"
-fi
-
 echo ""
 echo "✅ All services starting..."
 echo "   Jekyll:   http://127.0.0.1:$JEKYLL_PORT"
@@ -283,9 +212,6 @@ if [ "${SKIP_STRIPE:-false}" = "true" ]; then
   echo "   Stripe:   webhook forwarding inactive"
 else
   echo "   Stripe:   forwarding to worker"
-fi
-if [ "$USES_FIRST_PARTY_LOCAL" != "true" ] && [ "${SKIP_NGROK:-false}" != "true" ]; then
-  echo "   ngrok:    http://127.0.0.1:$NGROK_API_PORT (inspect tunnels)"
 fi
 echo ""
 echo "💡 TROUBLESHOOTING:"

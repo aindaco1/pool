@@ -13,7 +13,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Optional platform tip** — 0% to 15% tip (default 5%) included in totals but excluded from campaign progress
 - **Tip-aware cart + checkout** — Shared pricing logic keeps subtotal, tip, tax, shipping, and total in sync across cart, checkout, Worker, reports, and emails
 - **On-site Stripe payment step** — The existing second checkout sidecar hosts secure Stripe payment UI, and Manage Pledge uses the same pattern for `Update Card`
-- **Configurable pricing settings** — `sales_tax_rate` and `flat_shipping_rate` live in `_config.yml` for site forks, with mirrored Worker env vars for server-side enforcement
+- **Configurable pricing settings** — `pricing.sales_tax_rate`, `pricing.flat_shipping_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` live in `_config.yml`, and the required Worker vars are auto-synced into `worker/wrangler.toml` for server-side enforcement
 - **Physical & digital tiers** — Physical items trigger shipping address capture during checkout + configurable flat shipping per campaign with physical rewards
 - **Order-scoped magic links** — Each supporter link only manages its own pledge/order
 - **Safer supporter sessions** — Community pages keep supporter access in browser session storage instead of a long-lived token cookie
@@ -33,6 +33,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Manage Pledge dashboard** — Desktop-friendly Active / Closed sections with locked-state read-only controls after deadline
 - **Tip-aware emails + reports** — Supporter emails, pledge reports, and fulfillment exports all include the platform tip when present
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
+- **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, and curated design variables without requiring custom code for normal fork rebranding
 - **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
 ## Architecture
@@ -65,10 +66,27 @@ PODMAN_REBUILD=1 ./scripts/dev.sh --podman
 ```
 
 Fork-friendly pricing settings live in:
-- `sales_tax_rate` and `flat_shipping_rate` in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
-- mirrored Worker env vars `SALES_TAX_RATE` and `FLAT_SHIPPING_RATE` in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
+- `pricing.sales_tax_rate`, `pricing.flat_shipping_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
+- auto-synced Worker vars `SALES_TAX_RATE`, `FLAT_SHIPPING_RATE`, `DEFAULT_PLATFORM_TIP_PERCENT`, and `MAX_PLATFORM_TIP_PERCENT` in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
 
 If you change those values locally, restart `./scripts/dev.sh --podman` so the Worker uses the same math as the site.
+
+Fork-facing settings now use a structured config model in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml):
+
+- `platform` for identity, URLs, and support contact
+- `platform` also covers brand assets like logo, footer logo, favicon, and default social image
+- `pricing` for tax, shipping, and platform-tip defaults
+- `design` for curated typography, radius, layout-width, and theme-token overrides
+- `checkout` for truly variable checkout settings like the Stripe publishable key
+- `cache` for live browser TTLs
+
+See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for the supported no-code customization surface and which settings are automatically mirrored to the Worker.
+
+The main local/dev/test paths already sync those mirrored Worker values automatically. If you want to refresh the Worker config directly, run:
+
+```bash
+npm run sync:worker-config
+```
 
 If you specifically need the host-only fallback instead:
 ```bash
@@ -104,7 +122,7 @@ The Pool is intentionally shaped so most traffic stays cheap:
 
 - GitHub Pages serves the static site, so normal page loads do not invoke the Worker
 - public live data now prefers one combined `/live/:slug` request instead of separate stats + inventory calls
-- campaign pages cache live stats and inventory in `localStorage` for `live_stats_cache_ttl_seconds` / `live_inventory_cache_ttl_seconds` (default `300`)
+- campaign pages cache live stats and inventory in `localStorage` for `cache.live_stats_ttl_seconds` / `cache.live_inventory_ttl_seconds` (default `300`)
 - background tabs stop refreshing until the page becomes visible again
 - single-campaign reports, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans
 - limited-tier write paths now ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
@@ -112,8 +130,8 @@ The Pool is intentionally shaped so most traffic stays cheap:
 
 Fork knobs worth knowing:
 
-- site config: `live_stats_cache_ttl_seconds`, `live_inventory_cache_ttl_seconds`, `sales_tax_rate`, `flat_shipping_rate`
-- Worker env: mirrored pricing values in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
+- site config: `cache.live_stats_ttl_seconds`, `cache.live_inventory_ttl_seconds`, `pricing.sales_tax_rate`, `pricing.flat_shipping_rate`
+- Worker env: auto-synced pricing values in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
 
 ### Practical Scalability Scenarios
 
@@ -162,7 +180,7 @@ Podman-backed local testing:
 npm run test:e2e:headless:podman     # Automated browser suite with Playwright in a container
 ```
 
-The pre-merge gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. If that still cannot produce a clean host build, it falls back to Podman for the Jekyll build and the local smoke/browser phases instead of failing early on host Ruby setup.
+The pre-merge gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. If the host Ruby path still cannot produce a clean build, it falls back to Podman for the Jekyll build and the remaining local smoke/browser phases instead of failing early on host setup.
 
 - `pledge-report.sh` is a ledger/history export, so modified pledges appear as deltas and mixed changes now keep tip-update context in the `items` column.
 - `fulfillment-report.sh` is the merged current-state view per `email + campaign`, which is the better comparison point for repeat backers and non-stackable projects.
@@ -199,6 +217,7 @@ See [`docs/`](docs/) for full documentation:
 - [TESTING.md](docs/TESTING.md) — Full testing guide & secrets reference
 - [SECURITY.md](docs/SECURITY.md) — Security architecture, rate limiting & pen testing
 - [ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — Accessibility standards, critical surfaces, and current coverage
+- [CUSTOMIZATION.md](docs/CUSTOMIZATION.md) — Supported fork-facing branding, pricing, and design overrides
 - [ROADMAP.md](docs/ROADMAP.md) — Planned features
 - [CMS.md](docs/CMS.md) — Pages CMS setup & campaign editing guide
 

@@ -48,7 +48,6 @@ That script starts:
 - Jekyll on `http://127.0.0.1:4000`
 - the Worker on `http://127.0.0.1:8787`
 - Stripe CLI webhook forwarding to the local Worker
-- optional ngrok for external-device testing when available
 
 Use local rehearsal to sanity-check checkout, webhook delivery, manage-link behavior, and admin endpoints before running the same flow against staging.
 

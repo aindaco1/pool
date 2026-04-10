@@ -13,12 +13,45 @@
 
 If you are trying to keep a fork comfortable on the Cloudflare Workers free plan, the safest knobs to tune first are:
 
-- `live_stats_cache_ttl_seconds`
-- `live_inventory_cache_ttl_seconds`
-- `sales_tax_rate`
-- `flat_shipping_rate`
+- `cache.live_stats_ttl_seconds`
+- `cache.live_inventory_ttl_seconds`
+- `pricing.sales_tax_rate`
+- `pricing.flat_shipping_rate`
 
-The first two live in Jekyll config and shape browser read behavior. The pricing values also need to be mirrored in the Worker env so checkout, emails, reports, and settlement math stay aligned.
+The first two live in Jekyll config and shape browser read behavior. The pricing values are auto-mirrored into the Worker env so checkout, emails, reports, and settlement math stay aligned.
+
+The config now uses a structured settings model in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml):
+
+- `platform`
+- `pricing`
+- `design`
+- `checkout`
+- `cache`
+
+The sync target is [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml), and the repo’s supported dev/test entry points keep it aligned automatically.
+
+See [CUSTOMIZATION.md](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/docs/CUSTOMIZATION.md) for the supported no-code fork surface, including which settings are site-only and which are auto-mirrored to the Worker.
+
+Current mirrored Worker values worth treating as part of the supported customization surface:
+
+- `PLATFORM_NAME`
+- `PLATFORM_COMPANY_NAME`
+- `SUPPORT_EMAIL`
+- `PLEDGES_EMAIL_FROM`
+- `UPDATES_EMAIL_FROM`
+- `SALES_TAX_RATE`
+- `FLAT_SHIPPING_RATE`
+- `DEFAULT_PLATFORM_TIP_PERCENT`
+- `MAX_PLATFORM_TIP_PERCENT`
+
+The repo now includes `npm run sync:worker-config`, which syncs those mirrored values from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`. The main local dev, test, Worker-only, and pre-merge paths call it automatically.
+
+The merge gate now deliberately splits its local smoke paths:
+
+- `scripts/test-worker.sh` stays a lighter host-level contract smoke
+- `scripts/smoke-pledge-management.sh` runs through the Podman-backed stack during merge gating so the mutable modify/cancel path uses isolated local service state
+
+Note: first-party cart/runtime and the custom on-site checkout UI are now treated as built-in platform behavior, not fork-facing config choices. The `checkout` config namespace is now mainly for truly variable settings like the Stripe publishable key.
 
 ## Design System
 
@@ -410,7 +443,7 @@ Key points:
 - hosted-cart orders are not part of the runtime anymore
 - order IDs are Worker-issued `pool-intent-*` values tied to the checkout nonce
 - Stripe collects real payment and shipping details
-- tax is calculated server-side from the configured `sales_tax_rate` in `_config.yml` and mirrored Worker env
+- tax is calculated server-side from the configured `pricing.sales_tax_rate` in `_config.yml` and mirrored Worker env
 - optional The Pool tip defaults to 5%, can be set from 0% to 15%, and is included in final charge totals but excluded from campaign funding progress
 - checkout preview totals are rendered immediately from shared pricing logic
 
@@ -452,11 +485,6 @@ npm install -g wrangler
 wrangler login
 brew install stripe/stripe-cli/stripe
 stripe login
-```
-
-Optional:
-```bash
-brew install ngrok
 ```
 
 ### 1. Install Dependencies
@@ -585,21 +613,6 @@ If styles don't update:
 ```bash
 bundle exec jekyll clean
 ```
-
-### ngrok for External-Device Testing
-
-If you want to test a local branch from another device on your network:
-
-```bash
-ngrok http 4000
-```
-
-Then update `_config.local.yml`:
-```yaml
-url: https://your-subdomain.ngrok-free.dev
-```
-
-Restart Jekyll to apply the URL change.
 
 ## Test Data Seeding
 

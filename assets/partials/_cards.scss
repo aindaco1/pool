@@ -150,7 +150,7 @@
     }
     
     .campaign-card:has(.campaign-card__background) & {
-      background: rgba($surface--page, 0.95);
+      background: $surface--base-overlay;
       border: 1px solid $border--strong;
       
       &:hover {

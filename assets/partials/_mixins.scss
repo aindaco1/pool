@@ -86,7 +86,7 @@
   cursor: pointer;
   color: $color--white;
   background-color: $bg;
-  border: 1px solid darken($bg, 4%);
+  border: 1px solid $color--primary-border;
   border-radius: $radius--md;
   font-weight: 700;
   text-transform: uppercase;
@@ -108,7 +108,7 @@
   
   &:hover {
     transition: 0.2s all;
-    background-color: darken($color, 10%);
+    background-color: $color--primary-hover;
     
     &:before {
       transform: scale(1.1, 1.5);
@@ -174,7 +174,7 @@
   &:focus {
     outline: none;
     border-color: $border--strong;
-    box-shadow: 0 0 0 3px rgba($color--primary, 0.08);
+    box-shadow: 0 0 0 3px $color--primary-focus-ring;
   }
 }
 

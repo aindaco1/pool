@@ -2,23 +2,23 @@
   src="/assets/js/pool-config.js"
   defer
   data-pool-config-script="true"
-  data-worker-base="{{ site.worker_base }}"
-  data-platform-name="{{ site.author | escape }}"
-  data-sales-tax-rate="{{ site.sales_tax_rate | default: 0.07875 }}"
-  data-flat-shipping-rate="{{ site.flat_shipping_rate | default: 3.00 }}"
-  data-live-stats-cache-ttl-seconds="{{ site.live_stats_cache_ttl_seconds | default: 300 }}"
-  data-live-inventory-cache-ttl-seconds="{{ site.live_inventory_cache_ttl_seconds | default: 300 }}"
-  data-cart-runtime="{{ site.cart_runtime | default: 'first_party' }}"
-  data-checkout-provider="{{ site.checkout_provider | default: 'first_party' }}"
-  data-checkout-ui-mode="{{ site.checkout_ui_mode | default: 'hosted' }}"
-  data-stripe-publishable-key="{{ site.stripe_publishable_key | default: '' }}"></script>
-{% assign pool_checkout_ui_mode = site.checkout_ui_mode | default: 'hosted' %}
-{% if pool_checkout_ui_mode == 'custom' %}
+  data-site-url="{{ site.platform.site_url | default: site.url }}"
+  data-worker-base="{{ site.platform.worker_url }}"
+  data-platform-name="{{ site.platform.name | default: site.title | escape }}"
+  data-platform-company-name="{{ site.platform.company_name | default: site.author | escape }}"
+  data-platform-support-email="{{ site.platform.support_email | default: '' | escape }}"
+  data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"
+  data-sales-tax-rate="{{ site.pricing.sales_tax_rate | default: 0.07875 }}"
+  data-flat-shipping-rate="{{ site.pricing.flat_shipping_rate | default: 3.00 }}"
+  data-default-tip-percent="{{ site.pricing.default_tip_percent | default: 5 }}"
+  data-max-tip-percent="{{ site.pricing.max_tip_percent | default: 15 }}"
+  data-live-stats-cache-ttl-seconds="{{ site.cache.live_stats_ttl_seconds | default: 300 }}"
+  data-live-inventory-cache-ttl-seconds="{{ site.cache.live_inventory_ttl_seconds | default: 300 }}"
+  data-stripe-publishable-key="{{ site.checkout.stripe_publishable_key | default: '' }}"></script>
 <link rel="preconnect" href="https://js.stripe.com" crossorigin>
 <link rel="preconnect" href="https://api.stripe.com" crossorigin>
 <link rel="dns-prefetch" href="//js.stripe.com">
 <link rel="dns-prefetch" href="//api.stripe.com">
-{% endif %}
 <div hidden data-pool-cart-root="true"></div>
 <script src="/assets/js/stripe-checkout-sidecar.js" defer></script>
 <script src="/assets/js/cart-provider.js" defer></script>

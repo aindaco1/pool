@@ -25,6 +25,11 @@ describe('platform tip helpers', () => {
     expect(sanitizePlatformTipPercent(4.5, DEFAULT_PLATFORM_TIP_PERCENT)).toBe(DEFAULT_PLATFORM_TIP_PERCENT);
   });
 
+  it('supports a caller-provided max tip cap', () => {
+    expect(sanitizePlatformTipPercent(18, DEFAULT_PLATFORM_TIP_PERCENT, 20)).toBe(18);
+    expect(sanitizePlatformTipPercent(21, DEFAULT_PLATFORM_TIP_PERCENT, 20)).toBe(DEFAULT_PLATFORM_TIP_PERCENT);
+  });
+
   it('calculates the tip from subtotal cents and percent', () => {
     expect(calculatePlatformTip(10000, 5)).toBe(500);
     expect(calculatePlatformTip(555, 5)).toBe(28);

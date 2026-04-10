@@ -10,7 +10,10 @@ import {
 const env = {
   RESEND_API_KEY: 'test_resend_key',
   SITE_BASE: 'https://pool.test',
-  PLATFORM_AUTHOR: 'Dust Wave'
+  PLATFORM_NAME: 'The Pool',
+  PLATFORM_COMPANY_NAME: 'Dust Wave',
+  PLEDGES_EMAIL_FROM: 'The Pool <pledges@pool.test>',
+  UPDATES_EMAIL_FROM: 'The Pool <updates@pool.test>'
 };
 
 function mockResend() {
@@ -93,6 +96,35 @@ describe('email HTML security', () => {
     expect(payload.html).not.toContain('http://127.0.0.1:4000/assets/images/instagram-white.png');
   });
 
+  it('uses env-driven platform naming and sender identities in email payloads', async () => {
+    const fetchMock = mockResend();
+
+    await sendSupporterEmail(
+      {
+        ...env,
+        PLATFORM_NAME: 'Fork Pool',
+        PLATFORM_COMPANY_NAME: 'Fork Studio',
+        PLEDGES_EMAIL_FROM: 'Fork Pool <pledges@fork.test>'
+      },
+      {
+        email: 'supporter@example.com',
+        campaignSlug: 'sunder',
+        campaignTitle: 'sunder',
+        subtotal: 3500,
+        tax: 276,
+        shipping: 300,
+        tipAmount: 210,
+        tipPercent: 6,
+        token: 'magic-token'
+      }
+    );
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.from).toBe('Fork Pool <pledges@fork.test>');
+    expect(payload.html).toContain('Fork Studio tip (6%): $2.10');
+    expect(payload.html).toContain('visit <a href="https://pool.test/" style="color: #000;">Fork Pool</a>');
+  });
+
   it('escapes diary content in update emails', async () => {
     const fetchMock = mockResend();
 
@@ -110,6 +142,7 @@ describe('email HTML security', () => {
     expect(payload.html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(payload.html).toContain('line 1<br>&lt;script&gt;alert(2)&lt;/script&gt;');
     expect(payload.html).not.toContain('<script>alert(2)</script>');
+    expect(payload.from).toBe('The Pool <updates@pool.test>');
   });
 
   it('sanitizes announcement body and omits unsafe CTA urls', async () => {
@@ -132,6 +165,7 @@ describe('email HTML security', () => {
     expect(payload.html).toContain('Heads up&lt;script&gt;alert(2)&lt;/script&gt;');
     expect(payload.html).not.toContain('javascript:alert(3)');
     expect(payload.html).not.toContain('&lt;b&gt;Click me&lt;/b&gt;');
+    expect(payload.from).toBe('The Pool <updates@pool.test>');
   });
 
   it('escapes stretch goal names in milestone emails', async () => {

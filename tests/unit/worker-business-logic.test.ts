@@ -334,6 +334,7 @@ function createEnv(overrides: Record<string, unknown> = {}) {
     SITE_BASE: 'https://pool.test',
     APP_MODE: 'test',
     STRIPE_SECRET_KEY_TEST: 'sk_test_123',
+    STRIPE_PUBLISHABLE_KEY_TEST: 'pk_test_pool_default',
     STRIPE_WEBHOOK_SECRET_TEST: 'whsec_test_123',
     MAGIC_LINK_SECRET: 'secret',
     PLEDGES: new MockKVNamespace(),
@@ -350,7 +351,11 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('crypto', webcrypto);
-  mockStripeClient.checkout.sessions.create.mockResolvedValue({ url: 'https://stripe.test/checkout' });
+  mockStripeClient.checkout.sessions.create.mockResolvedValue({
+    id: 'cs_test_default_123',
+    client_secret: 'cs_test_default_secret_123',
+    url: 'https://stripe.test/checkout'
+  });
   mockStripeClient.setupIntents.retrieve.mockResolvedValue({ payment_method: 'pm_123', customer: 'cus_123' });
   global.fetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -546,6 +551,7 @@ describe('Worker business logic hardening', () => {
     const env = createEnv({
       CHECKOUT_PROVIDER: 'first_party',
       CHECKOUT_UI_MODE: 'custom',
+      STRIPE_PUBLISHABLE_KEY_TEST: '',
       CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
       CHECKOUT_INTENTS: new MockCheckoutIntentNamespace(),
       TIER_INVENTORY_COORDINATOR: new MockTierInventoryNamespace()
@@ -2398,7 +2404,9 @@ describe('Worker business logic hardening', () => {
     );
 
     expect(setupResponse.status).toBe(200);
-    expect(await kv.get('campaign-pledges:smoke-editable', { type: 'json' })).toContain('test-order-active-1');
+    expect(await kv.get('campaign-pledges:smoke-editable', { type: 'json' })).toContain(
+      'test-order-smoke-editable-smoke-local-example-com'
+    );
   });
 
   it('recalculates inventory through the coordinator write path on the admin endpoint', async () => {

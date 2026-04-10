@@ -1,8 +1,8 @@
 <header class="site-header" role="banner">
   <div class="site-header__container">
-    <a href="/" class="site-header__branding" aria-label="{{ site.title }} - Home">
-      <img src="/assets/images/defaults/dust-wave-square.png" alt="" class="site-header__logo" aria-hidden="true">
-      <span class="site-header__title">{{ site.title }}</span>
+    <a href="/" class="site-header__branding" aria-label="{{ site.platform.name | default: site.title }} - Home">
+      <img src="{{ site.platform.logo_path | default: '/assets/images/defaults/dust-wave-square.png' }}" alt="" class="site-header__logo" aria-hidden="true">
+      <span class="site-header__title">{{ site.platform.name | default: site.title }}</span>
     </a>
     <div class="site-header__actions">
       <nav class="site-header__nav" id="mobile-nav" role="navigation" aria-label="Main navigation">

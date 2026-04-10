@@ -16,12 +16,16 @@ crons = ["0 7 * * *"]
 SITE_BASE = "https://pool.dustwave.xyz"
 WORKER_BASE = "https://pledge.dustwave.xyz"
 APP_MODE = "live"  # "test" or "live"
+PLATFORM_NAME = "The Pool"
+PLATFORM_COMPANY_NAME = "Dust Wave"
 PLATFORM_AUTHOR = "Dust Wave"
-CHECKOUT_PROVIDER = "first_party"
-CART_RUNTIME = "first_party"
-CHECKOUT_UI_MODE = "hosted"
+SUPPORT_EMAIL = "support@dustwave.xyz"
+PLEDGES_EMAIL_FROM = "The Pool <pledges@pool.dustwave.xyz>"
+UPDATES_EMAIL_FROM = "The Pool <updates@pool.dustwave.xyz>"
 SALES_TAX_RATE = "0.07875"
 FLAT_SHIPPING_RATE = "3.00"
+DEFAULT_PLATFORM_TIP_PERCENT = "5"
+MAX_PLATFORM_TIP_PERCENT = "15"
 
 [[durable_objects.bindings]]
 name = "CHECKOUT_INTENTS"
@@ -86,7 +90,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # checkout exercises the first-party path end to end without changing
 # production defaults.
 [env.dev]
-vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "http://127.0.0.1:8787", APP_MODE = "test", PLATFORM_AUTHOR = "Dust Wave", CHECKOUT_PROVIDER = "first_party", CART_RUNTIME = "first_party", CHECKOUT_UI_MODE = "custom", SALES_TAX_RATE = "0.07875", FLAT_SHIPPING_RATE = "3.00" }
+vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "http://127.0.0.1:8787", APP_MODE = "test", PLATFORM_NAME = "The Pool", PLATFORM_COMPANY_NAME = "Dust Wave", PLATFORM_AUTHOR = "Dust Wave", SUPPORT_EMAIL = "support@dustwave.xyz", PLEDGES_EMAIL_FROM = "The Pool <pledges@pool.dustwave.xyz>", UPDATES_EMAIL_FROM = "The Pool <updates@pool.dustwave.xyz>", SALES_TAX_RATE = "0.07875", FLAT_SHIPPING_RATE = "3.00", DEFAULT_PLATFORM_TIP_PERCENT = "5", MAX_PLATFORM_TIP_PERCENT = "15" }
 
 [[env.dev.durable_objects.bindings]]
 name = "CHECKOUT_INTENTS"

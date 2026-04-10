@@ -11,6 +11,8 @@ npm run podman:doctor
 
 That boots the site and Worker together on the standard local ports and is the easiest way to exercise the full on-site checkout and `Update Card` flows locally.
 
+If you specifically work from the `worker/` directory, the Worker npm scripts now auto-run the config mirror first so `worker/wrangler.toml` stays aligned with the repo-root `_config.yml` / `_config.local.yml`.
+
 ## Setup
 
 ### 1. Create KV Namespaces
@@ -65,13 +67,13 @@ wrangler secret put ADMIN_SECRET
 For full local development, prefer the repo-root Podman path above. If you specifically need to run only the Worker on the host:
 
 ```bash
-wrangler dev --env dev
+npm run dev
 ```
 
 Deploy with:
 
 ```bash
-wrangler deploy
+npm run deploy
 npm run deploy:worker
 ```
 
@@ -239,10 +241,22 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | Variable | Description |
 |----------|-------------|
 | `SITE_BASE` | Base URL of the Jekyll site |
+| `WORKER_BASE` | Public base URL of the Worker |
+| `PLATFORM_NAME` | Public platform name used in Worker responses and email copy |
+| `PLATFORM_COMPANY_NAME` | Company/platform-author name used for platform-tip copy |
+| `SUPPORT_EMAIL` | Support contact mirrored from site config |
+| `PLEDGES_EMAIL_FROM` | Sender identity for pledge-related emails |
+| `UPDATES_EMAIL_FROM` | Sender identity for update / milestone / announcement emails |
+| `SALES_TAX_RATE` | Sales tax rate mirrored from `pricing.sales_tax_rate` |
+| `FLAT_SHIPPING_RATE` | Flat shipping rate mirrored from `pricing.flat_shipping_rate` |
+| `DEFAULT_PLATFORM_TIP_PERCENT` | Default platform tip percent mirrored from `pricing.default_tip_percent` |
+| `MAX_PLATFORM_TIP_PERCENT` | Max platform tip percent mirrored from `pricing.max_tip_percent` |
 | `APP_MODE` | `"test"` or `"live"` - determines which API keys to use |
 | `RESEND_RATE_LIMIT_DELAY` | Delay between emails in ms (default: 600ms to stay under Resend's 2 req/sec limit) |
 
 When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email images still fall back to the public `https://pool.dustwave.xyz` asset base so inbox clients do not receive broken localhost image URLs.
+
+Fork note: treat those identity and pricing vars as mirrors of the structured site config in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml), especially the `platform` and `pricing` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior now, not Worker env toggles you should normally customize.
 
 ## Data Flow
 

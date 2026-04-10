@@ -25,6 +25,7 @@ describe('cart provider shim', () => {
       POOL_CONFIG: {
         cartRuntime: 'first_party',
         checkoutProvider: 'first_party',
+        checkoutUiMode: 'hosted',
         workerBase: WORKER_BASE
       }
     });
@@ -73,6 +74,7 @@ describe('cart provider shim', () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
+      checkoutUiMode: 'hosted',
       workerBase: WORKER_BASE
     };
 
@@ -454,7 +456,8 @@ describe('cart provider shim', () => {
 
   it('renders a first-party cart drawer with close and remove controls', async () => {
     (window as any).POOL_CONFIG = {
-      cartRuntime: 'first_party'
+      cartRuntime: 'first_party',
+      checkoutUiMode: 'hosted'
     };
 
     document.body.innerHTML = '<button id="cart-opener" type="button">Open cart</button><div data-pool-cart-root="true" hidden></div>';
@@ -573,15 +576,64 @@ describe('cart provider shim', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     await vi.waitFor(() => {
-      expect(root?.innerHTML).toBe('');
+    expect(root?.innerHTML).toBe('');
       expect(root?.getAttribute('aria-hidden')).toBe('true');
     });
+  });
+
+  it('uses nested config settings for platform naming and tip defaults', async () => {
+    (window as any).POOL_CONFIG = {
+      checkout: {
+        cartRuntime: 'first_party',
+        provider: 'first_party',
+        uiMode: 'hosted'
+      },
+      platform: {
+        name: 'Fork Pool',
+        workerUrl: WORKER_BASE
+      },
+      pricing: {
+        salesTaxRate: '0.05',
+        flatShippingRate: '4.00',
+        defaultTipPercent: '9',
+        maxTipPercent: '20'
+      }
+    };
+
+    document.body.innerHTML = '<button id="cart-opener" type="button">Open cart</button><div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'demo__fork-tier',
+      name: 'Fork Tier',
+      price: 20,
+      quantity: 1,
+      url: '/campaigns/demo/'
+    });
+
+    const opener = document.getElementById('cart-opener') as HTMLButtonElement | null;
+    if (!opener) throw new Error('Missing cart opener');
+    await readyApi.api.theme.cart.open(opener);
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const cartTipSlider = root?.querySelector('[data-cart-tip]') as HTMLInputElement | null;
+    if (!cartTipSlider) throw new Error('Missing cart tip slider');
+
+    expect(root?.textContent).toContain('Tip Fork Pool for platform maintenance.');
+    expect(root?.textContent).toContain('Sales tax (5%)');
+    expect(cartTipSlider.value).toBe('9');
+    expect(cartTipSlider.getAttribute('max')).toBe('20');
+    expect(cartTipSlider.getAttribute('aria-valuetext')).toBe('9% tip, $1.80');
   });
 
   it('starts first-party checkout from the drawer preview when enabled', async () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
+      checkoutUiMode: 'hosted',
       workerBase: WORKER_BASE
     };
 
@@ -1179,6 +1231,7 @@ describe('cart provider shim', () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
+      checkoutUiMode: 'hosted',
       workerBase: WORKER_BASE
     };
 
@@ -1224,6 +1277,7 @@ describe('cart provider shim', () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
+      checkoutUiMode: 'hosted',
       workerBase: WORKER_BASE,
       platformName: '<img src=x onerror=alert(1)> Pool'
     };
@@ -1378,6 +1432,7 @@ describe('cart provider shim', () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
+      checkoutUiMode: 'hosted',
       workerBase: WORKER_BASE
     };
 

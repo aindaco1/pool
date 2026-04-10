@@ -88,13 +88,13 @@ This runs:
 - Durable Object tier-inventory serialization coverage in `tests/unit/tier-inventory-do.test.ts`
 - Local smoke scripts against the test-only mutable campaign:
   - `scripts/test-worker.sh` for site/Worker contract checks and malformed `/checkout-intent/start` verification
-  - `scripts/smoke-pledge-management.sh` for successful modify/cancel coverage on the local-only mutable campaign
+  - `scripts/smoke-pledge-management.sh` for successful modify/cancel coverage on the local-only mutable campaign, using admin rebuild responses as the authoritative stats/inventory source during the smoke
 - Full unit suite via `npm run test:unit`
 - Security suite via `npm run test:security` against an auto-started local Worker
 - Playwright headless E2E via `npm run test:e2e:headless`
 
 The pre-merge script now auto-starts Jekyll with `_config.yml,_config.local.yml` when needed so the local-only `smoke-editable` campaign is available during merge gating, and the Playwright harness uses the same combined config locally.
-That gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. If the host Ruby path still cannot build cleanly, it falls back to a Podman-backed Jekyll build plus the Podman-aware smoke/browser helpers instead of failing on host setup alone.
+That gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. If the host Ruby path still cannot build cleanly, it falls back to a Podman-backed Jekyll build plus the remaining Podman-aware smoke/browser helpers instead of failing on host setup alone.
 
 This branch now defaults to the first-party cart/runtime path in both `_config.yml` and `_config.local.yml`, and the browser path no longer supports the old hosted-cart runtime.
 
@@ -134,12 +134,12 @@ The current Podman scope is intentionally narrow:
 
 Use [docs/PODMAN.md](./PODMAN.md) for the exact setup and current limitations.
 
-If you change `sales_tax_rate` or `flat_shipping_rate` in the Jekyll config, update the mirrored Worker env vars in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) too and restart `./scripts/dev.sh --podman` before testing checkout math.
+If you change `pricing.sales_tax_rate` or `pricing.flat_shipping_rate` in the Jekyll config, the repo now auto-syncs the mirrored Worker values in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) through the main dev/test paths. Restart `./scripts/dev.sh --podman` before testing checkout math so both services pick up the new values.
 
 If you tune free-plan read behavior, keep these in sync too:
 
-- `live_stats_cache_ttl_seconds`
-- `live_inventory_cache_ttl_seconds`
+- `cache.live_stats_ttl_seconds`
+- `cache.live_inventory_ttl_seconds`
 
 After changing either cache TTL locally, restart `./scripts/dev.sh --podman` and rerun:
 

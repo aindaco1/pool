@@ -14,14 +14,7 @@ for arg in "$@"; do
     fi
 done
 
-LOCAL_CONFIG_FILE="_config.local.yml"
-LOCAL_CART_RUNTIME=$(grep -E '^cart_runtime:' "$LOCAL_CONFIG_FILE" 2>/dev/null | awk '{print $2}')
-LOCAL_CHECKOUT_PROVIDER=$(grep -E '^checkout_provider:' "$LOCAL_CONFIG_FILE" 2>/dev/null | awk '{print $2}')
-USES_FIRST_PARTY_LOCAL=false
-
-if [ "$LOCAL_CART_RUNTIME" = "first_party" ] && [ "$LOCAL_CHECKOUT_PROVIDER" = "first_party" ]; then
-    USES_FIRST_PARTY_LOCAL=true
-fi
+USES_FIRST_PARTY_LOCAL=true
 
 prefer_node20_path() {
     local candidate=""
@@ -71,9 +64,6 @@ cleanup() {
     if [ -n "${JEKYLL_PID:-}" ]; then
         kill "$JEKYLL_PID" 2>/dev/null || true
     fi
-    if [ -n "${NGROK_PID:-}" ]; then
-        kill "$NGROK_PID" 2>/dev/null || true
-    fi
     if [ "$PODMAN_STARTED_BY_SCRIPT" = "true" ]; then
         podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
         podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
@@ -86,14 +76,12 @@ cleanup() {
 trap cleanup EXIT
 
 LOCAL_URL="http://127.0.0.1:4000"
-NGROK_URL="https://cole-unelapsed-patrice.ngrok-free.dev"
 
 if [ "$USE_PODMAN" = "true" ]; then
     prefer_podman_path || true
     echo "📦 Podman mode enabled"
 else
     # Kill any existing processes
-    pkill -f "ngrok http" 2>/dev/null || true
     pkill -f "jekyll serve" 2>/dev/null || true
     sleep 1
 
@@ -116,7 +104,7 @@ else
     done
 fi
 
-# Run automated tests first (no ngrok needed)
+# Run automated tests against the local stack.
 echo ""
 echo "🧪 Running automated tests..."
 if [ "$USE_PODMAN" = "true" ]; then

@@ -9,7 +9,7 @@
   padding-bottom: $container-vpad;
   margin-bottom: calc($header--mb / 2);
   border-bottom: 1px solid $border--default;
-  background: rgba($surface--page, 0.92);
+  background: $surface--page-overlay;
   
   @include xsm {
     padding-top: $space-md;
@@ -53,9 +53,9 @@
     background: linear-gradient(
       90deg,
       $color--primary 0%,
-      lighten($color--primary, 48%) 24%,
+      $color--primary-soft 24%,
       $color--primary 50%,
-      lighten($color--primary, 48%) 76%,
+      $color--primary-soft 76%,
       $color--primary 100%
     );
     background-size: 220% 100%;

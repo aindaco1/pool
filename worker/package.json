@@ -5,8 +5,8 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev": "ruby ../scripts/sync-worker-config.rb && wrangler dev",
+    "deploy": "ruby ../scripts/sync-worker-config.rb && wrangler deploy",
     "tail": "wrangler tail"
   },
   "devDependencies": {

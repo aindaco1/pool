@@ -7,27 +7,63 @@
     return;
   }
 
-  const WORKER_BASE = bootScript.dataset.workerBase || '';
-  const PLATFORM_NAME = bootScript.dataset.platformName || 'The Pool';
+  const poolConfig = window.POOL_CONFIG || {};
+  const WORKER_BASE = poolConfig.platform?.workerUrl || poolConfig.workerBase || bootScript.dataset.workerBase || '';
+  const PLATFORM_NAME = poolConfig.platform?.name || poolConfig.platformName || bootScript.dataset.platformName || 'The Pool';
   const SALES_TAX_RATE = (() => {
-    const parsed = Number(bootScript.dataset.salesTaxRate);
+    const parsed = Number(
+      poolConfig.pricing?.salesTaxRate ??
+      poolConfig.salesTaxRate ??
+      bootScript.dataset.salesTaxRate
+    );
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0.07875;
   })();
   const FLAT_SHIPPING_FEE = (() => {
-    const parsed = Number(bootScript.dataset.flatShippingRate);
+    const parsed = Number(
+      poolConfig.pricing?.flatShippingRate ??
+      poolConfig.flatShippingRate ??
+      bootScript.dataset.flatShippingRate
+    );
     return Math.round((Number.isFinite(parsed) && parsed >= 0 ? parsed : 3) * 100);
   })();
+  const DEFAULT_PLATFORM_TIP_PERCENT = (() => {
+    const parsed = Number(
+      poolConfig.pricing?.defaultTipPercent ??
+      poolConfig.defaultTipPercent ??
+      bootScript.dataset.defaultTipPercent
+    );
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : 5;
+  })();
+  const MAX_PLATFORM_TIP_PERCENT = (() => {
+    const parsed = Number(
+      poolConfig.pricing?.maxTipPercent ??
+      poolConfig.maxTipPercent ??
+      bootScript.dataset.maxTipPercent
+    );
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : 15;
+  })();
   const LIVE_STATS_CACHE_TTL_MS = (() => {
-    const parsed = Number(bootScript.dataset.liveStatsCacheTtlSeconds);
+    const parsed = Number(
+      poolConfig.cache?.liveStatsTtlSeconds ??
+      poolConfig.liveStatsCacheTtlSeconds ??
+      bootScript.dataset.liveStatsCacheTtlSeconds
+    );
     return Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : 5 * 60 * 1000;
   })();
   const LIVE_INVENTORY_CACHE_TTL_MS = (() => {
-    const parsed = Number(bootScript.dataset.liveInventoryCacheTtlSeconds);
+    const parsed = Number(
+      poolConfig.cache?.liveInventoryTtlSeconds ??
+      poolConfig.liveInventoryCacheTtlSeconds ??
+      bootScript.dataset.liveInventoryCacheTtlSeconds
+    );
     return Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : 5 * 60 * 1000;
   })();
-  const CHECKOUT_UI_MODE = String(bootScript.dataset.checkoutUiMode || 'hosted').trim().toLowerCase();
-  const DEFAULT_PLATFORM_TIP_PERCENT = 5;
-  const MAX_PLATFORM_TIP_PERCENT = 15;
+  const CHECKOUT_UI_MODE = String(
+    poolConfig.checkout?.uiMode ||
+    poolConfig.checkoutUiMode ||
+    bootScript.dataset.checkoutUiMode ||
+    'custom'
+  ).trim().toLowerCase();
   const WIDTH_PERCENT_CLASS_PREFIX = 'u-width-pct-';
   const LEFT_PERCENT_CLASS_PREFIX = 'u-left-pct-';
   const FOCUSABLE_SELECTOR = [

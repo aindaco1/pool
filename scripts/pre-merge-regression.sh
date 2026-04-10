@@ -3,6 +3,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+ruby ./scripts/sync-worker-config.rb >/dev/null
+
 WORKER_PID=""
 JEKYLL_PID=""
 TEMP_DEV_VARS=""
@@ -404,7 +406,9 @@ else
   fi
 
   run_phase "7a. Host worker smoke" env SITE_URL=http://127.0.0.1:4000 WORKER_URL=http://127.0.0.1:8787 ./scripts/test-worker.sh
-  run_phase "7b. Host mutable-pledge smoke" env WORKER_URL=http://127.0.0.1:8787 ADMIN_SECRET="${SMOKE_ADMIN_SECRET}" ./scripts/smoke-pledge-management.sh
+  stop_worker
+  reset_podman_dev_artifacts || exit 1
+  run_phase "7b. Podman mutable-pledge smoke" env ADMIN_SECRET="${SMOKE_ADMIN_SECRET}" ./scripts/smoke-pledge-management.sh --podman
 fi
 
 if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then

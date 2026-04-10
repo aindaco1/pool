@@ -21,6 +21,7 @@
     "test:e2e:headless:podman": "CI=1 ./scripts/podman-playwright-run.sh npx playwright test --workers=1",
     "test:e2e:parity": "CI=1 playwright test tests/e2e/campaign-checkout.spec.ts tests/e2e/manage-flows.spec.ts --project=chromium",
     "test:e2e:ui": "playwright test --ui",
+    "sync:worker-config": "ruby ./scripts/sync-worker-config.rb",
     "podman:doctor": "./scripts/podman-doctor.sh",
     "podman:self-check": "./scripts/podman-self-check.sh",
     "test:security": "vitest run --config vitest.security.config.ts",

@@ -106,7 +106,7 @@
     padding: 12px 14px;
     border: 1px dashed $border--default;
     border-radius: $radius--md;
-    background: rgba($surface--subtle, 0.9);
+    background: $surface--subtle-overlay;
     @include type-ui;
     color: $color--secondary;
     margin-bottom: $space-md;
@@ -159,7 +159,7 @@
   }
   
   &__error {
-    @include surface-panel($space-sm, rgba($color--danger, 0.08));
+    @include surface-panel($space-sm, $color--danger-soft);
     color: $color--danger;
     margin-bottom: $space-md;
     @include type-ui;

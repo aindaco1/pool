@@ -4,6 +4,10 @@
 
 set -e
 
+cd "$(dirname "$0")/.."
+
+ruby ./scripts/sync-worker-config.rb >/dev/null
+
 USE_PODMAN=false
 PODMAN_STARTED_BY_SCRIPT=false
 

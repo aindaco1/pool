@@ -1,12 +1,22 @@
 /**
  * Resend Email Integration for The Pool
- * 
+ *
  * Sends supporter access emails with magic links for:
  * - /manage/ — Pledge management (cancel, modify, update payment)
  * - /community/:slug/ — Supporter-only voting/decisions
  */
 
-const FALLBACK_SITE_BASE = 'https://pool.dustwave.xyz';
+import {
+  DEFAULT_SITE_BASE,
+  formatSalesTaxLabel,
+  getPlatformCompanyName,
+  getPlatformName,
+  getPledgesEmailFrom,
+  getSiteBase,
+  getUpdatesEmailFrom
+} from './provider-config.js';
+
+const FALLBACK_SITE_BASE = DEFAULT_SITE_BASE;
 const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
 const SAFE_INSTAGRAM_HOSTS = new Set(['instagram.com', 'www.instagram.com']);
 
@@ -23,7 +33,10 @@ function formatEmailText(value) {
   return escapeHtml(value).replace(/\r?\n/g, '<br>');
 }
 
-function getResolvedSiteBase(siteBase) {
+function getResolvedSiteBase(siteBaseOrEnv) {
+  const siteBase = typeof siteBaseOrEnv === 'string'
+    ? siteBaseOrEnv
+    : getSiteBase(siteBaseOrEnv || {});
   try {
     return new URL(siteBase || FALLBACK_SITE_BASE).toString();
   } catch (_error) {
@@ -102,7 +115,7 @@ function safeInstagramUrl(instagramUrl) {
 }
 
 // Instagram CTA block for emails (when campaign has instagram field)
-function getInstagramCTA(instagramUrl, siteBase = 'https://pool.dustwave.xyz') {
+function getInstagramCTA(instagramUrl, siteBase = FALLBACK_SITE_BASE) {
   const safeInstagramHref = safeInstagramUrl(instagramUrl);
   if (!safeInstagramHref) return '';
   
@@ -117,10 +130,6 @@ function getInstagramCTA(instagramUrl, siteBase = 'https://pool.dustwave.xyz') {
     </a>
     <p style="margin: 8px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.9);">Help spread the word on Instagram</p>
   </div>`;
-}
-
-function getPlatformAuthor(env) {
-  return env.PLATFORM_AUTHOR || 'Dust Wave';
 }
 
 // Render pledge items (tiers, support items, custom amount) for email display
@@ -166,7 +175,7 @@ function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportIte
 
 function renderAmountBreakdown(env, { subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, totalLabel, totalAmount }) {
   const resolvedTotal = totalAmount ?? (subtotal + tax + shipping + tipAmount);
-  const platformAuthor = escapeHtml(getPlatformAuthor(env));
+  const platformAuthor = escapeHtml(getPlatformCompanyName(env));
   const salesTaxLabel = escapeHtml(formatSalesTaxLabel(env));
   const safeTotalLabel = escapeHtml(totalLabel);
   return `
@@ -185,6 +194,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
   const manageUrl = safeSiteUrl(`/manage/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const communityUrl = safeSiteUrl(`/community/${encodeURIComponent(campaignSlug)}/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const siteHomeUrl = getSiteRootUrl(env.SITE_BASE);
+  const platformName = escapeHtml(getPlatformName(env));
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE);
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
@@ -239,7 +249,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
     <p style="margin: 0 0 8px 0;"><strong>Save this email!</strong> You'll need these links to manage your pledge.</p>
-    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${siteHomeUrl}" style="color: #000;">The Pool</a>.</p>
+    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${siteHomeUrl}" style="color: #000;">${platformName}</a>.</p>
   </div>
 </body>
 </html>
@@ -252,7 +262,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'The Pool <pledges@pool.dustwave.xyz>',
+      from: getPledgesEmailFrom(env),
       to: email,
       subject: `Your pledge to ${campaignTitle}`,
       html
@@ -274,6 +284,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
 export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campaignTitle, previousSubtotal, previousTax = 0, previousShipping = 0, previousTipAmount = 0, newSubtotal, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems }) {
   const manageUrl = safeSiteUrl(`/manage/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const siteHomeUrl = getSiteRootUrl(env.SITE_BASE);
+  const platformName = escapeHtml(getPlatformName(env));
   const previousTotal = previousSubtotal + previousTax + previousShipping + previousTipAmount;
   const newTotal = newSubtotal + tax + shipping + tipAmount;
   const increased = newTotal > previousTotal;
@@ -326,7 +337,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   ${instagramCTA}
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
-    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${siteHomeUrl}" style="color: #000;">The Pool</a>.</p>
+    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${siteHomeUrl}" style="color: #000;">${platformName}</a>.</p>
   </div>
 </body>
 </html>
@@ -339,7 +350,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'The Pool <pledges@pool.dustwave.xyz>',
+      from: getPledgesEmailFrom(env),
       to: email,
       subject: `Pledge updated for ${campaignTitle}`,
       html
@@ -413,7 +424,7 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'The Pool <pledges@pool.dustwave.xyz>',
+      from: getPledgesEmailFrom(env),
       to: email,
       subject: `Action needed: Update payment for ${campaignTitle}`,
       html
@@ -436,6 +447,7 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   const manageUrl = safeSiteUrl(`/manage/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const communityUrl = safeSiteUrl(`/community/${encodeURIComponent(campaignSlug)}/?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const siteHomeUrl = getSiteRootUrl(env.SITE_BASE);
+  const platformName = escapeHtml(getPlatformName(env));
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
@@ -483,7 +495,7 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   </div>
   
   <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
-    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${siteHomeUrl}" style="color: #000;">The Pool</a>.</p>
+    <p style="margin: 0;">Questions? Reply to this email or visit <a href="${siteHomeUrl}" style="color: #000;">${platformName}</a>.</p>
   </div>
 </body>
 </html>
@@ -496,7 +508,7 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'The Pool <pledges@pool.dustwave.xyz>',
+      from: getPledgesEmailFrom(env),
       to: email,
       subject: `Payment confirmed for ${campaignTitle}`,
       html
@@ -579,7 +591,7 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'The Pool <updates@pool.dustwave.xyz>',
+      from: getUpdatesEmailFrom(env),
       to: email,
       subject: `📝 ${diaryTitle} — ${campaignTitle}`,
       html
@@ -652,7 +664,7 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'The Pool <pledges@pool.dustwave.xyz>',
+      from: getPledgesEmailFrom(env),
       to: email,
       subject: `Pledge cancelled for ${campaignTitle}`,
       html
@@ -746,7 +758,7 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'The Pool <updates@pool.dustwave.xyz>',
+      from: getUpdatesEmailFrom(env),
       to: email,
       subject: `${config.emoji} ${config.heading} — ${campaignTitle}`,
       html
@@ -830,7 +842,7 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'The Pool <updates@pool.dustwave.xyz>',
+      from: getUpdatesEmailFrom(env),
       to: email,
       subject: `📢 ${subject} — ${campaignTitle}`,
       html
@@ -845,4 +857,3 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
 
   return response.json();
 }
-import { formatSalesTaxLabel } from './provider-config.js';
