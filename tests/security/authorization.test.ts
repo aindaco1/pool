@@ -22,21 +22,32 @@ describe('Authorization Security Tests', () => {
 
   describe('SEC-003: Test Endpoint Access in Production', () => {
     it('should reject /test/setup in production mode', async () => {
-      const res = await securityFetch('/test/setup', {
-        method: 'POST',
-        body: JSON.stringify({
-          email: 'attacker@evil.com',
-          campaignSlug: TEST_CAMPAIGNS.valid
-        })
-      });
-      
-      if (PROD_MODE) {
-        // In production, test endpoints should return 404 (not 401/403)
-        // to avoid revealing their existence
-        expect([403, 404]).toContain(res.status);
-      } else {
-        // In test mode, they might work
-        expect([200, 403, 404, 500]).toContain(res.status);
+      const fixture = {
+        email: 'attacker@evil.com',
+        campaignSlug: TEST_CAMPAIGNS.valid
+      };
+
+      try {
+        const res = await securityFetch('/test/setup', {
+          method: 'POST',
+          body: JSON.stringify(fixture)
+        });
+        
+        if (PROD_MODE) {
+          // In production, test endpoints should return 404 (not 401/403)
+          // to avoid revealing their existence
+          expect([403, 404]).toContain(res.status);
+        } else {
+          // In test mode, they might work
+          expect([200, 403, 404, 500]).toContain(res.status);
+        }
+      } finally {
+        if (!PROD_MODE) {
+          await securityFetch('/test/cleanup', {
+            method: 'POST',
+            body: JSON.stringify(fixture)
+          }).catch(() => null);
+        }
       }
     });
 

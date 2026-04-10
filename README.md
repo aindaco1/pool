@@ -162,6 +162,7 @@ npm run test:unit      # Unit tests (Vitest)
 npm run test:e2e       # E2E tests (Playwright) — fully automated browser coverage
 npm run test:e2e:headless # CI-style automated browser suite
 npm run test:security  # Security tests — pen testing the Worker API
+npm run test:security:podman # Security tests with a Podman-backed local stack in one invocation
 npm test               # Run unit + e2e
 ```
 
@@ -181,6 +182,7 @@ Podman-backed local testing:
 ./scripts/pledge-report.sh --podman --local    # Local ledger CSV through the Worker container
 ./scripts/fulfillment-report.sh --podman --local # Local fulfillment CSV through the Worker container
 npm run test:e2e:headless:podman     # Automated browser suite with Playwright in a container
+npm run test:security:podman         # Security suite against a one-shot Podman-backed local stack
 ```
 
 The pre-merge gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. If the host Ruby path still cannot produce a clean build, it falls back to Podman for the Jekyll build and the remaining local smoke/browser phases instead of failing early on host setup.

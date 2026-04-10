@@ -262,7 +262,7 @@ ensure_podman_ready() {
     machine_state="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
     if [ "$machine_state" != "running" ]; then
       echo "🚀 Ensuring Podman machine is running..."
-      podman machine start --quiet --no-info podman-machine-default >/tmp/pool-podman-machine-start.log 2>&1 &
+      podman machine start --quiet --no-info podman-machine-default >/tmp/pool-podman-machine-start.log 2>&1 || true
     else
       echo "✅ Podman machine already running"
     fi
