@@ -2,92 +2,106 @@
 
 ## Completed
 
-- [x] Sass-based design system (8px grid, dust-wave-shop styling)
-- [x] Branding update ("The Pool" platform, "Dust Wave" company)
-- [x] Money formatting plugin (`$3,800` style)
-- [x] Campaign card uniformity with featured tier preview
-- [x] Campaign sorting (active by deadline, completed by recency)
-- [x] Two-column campaign layout with sidebar
-- [x] Hero image variants (`hero_image`, `hero_image_wide`, `hero_video`)
-- [x] Production phases with registry items (tabbed UI)
-- [x] Community decisions (voting/polling)
-- [x] Production diary section
-- [x] Ongoing funding section
-- [x] Pledge UX clarification ("Pledge $X" buttons, notice explaining all-or-nothing)
-- [x] Cart icon with total in header
-- [x] Tier images and creator images support
-- [x] Checkout autofill (auto-select country, password manager state/address support)
-- [x] No-account pledge management architecture (magic links, Worker API design)
-- [x] Pledge management page (`/manage/`)
-- [x] Pledge success/cancel pages
-- [x] Supporter-only community page (`/community/:slug/`) with Worker verification and session-scoped supporter token storage
-- [x] Community voting system with Cloudflare KV (no database)
-- [x] Sass refactor (modular partial architecture extracted from a single 3,500-line file)
-- [x] Documentation consolidation (15 → 7 focused docs)
-- [x] Non-stackable tier support (hide quantity controls for `stackable: false` tiers)
-- [x] Mobile hamburger/cart overlay z-index fix
-- [x] Cloudflare Worker deployment (pledge storage, stats, inventory, emails)
-- [x] Worker cron trigger for auto-settle (midnight MT)
-- [x] Aggregated charging (one charge per supporter per campaign, not per pledge row)
-- [x] Mountain Time deadline handling (DST-aware via `Intl.DateTimeFormat` across frontend + Worker)
-- [x] Physical tier shipping ($3 per campaign with physical rewards, address capture during checkout)
-- [x] First-party physical-item detection (`category: physical` / `shippable` cart metadata)
-- [x] Tip Jar / platform tip feature (0% to 15%, default 5%, excluded from campaign progress)
-- [x] Email templates with full breakdown (subtotal, optional tip, tax, shipping, total)
-- [x] Shipping in pledge reports (fulfillment + ledger CSVs)
-- [x] Live stats API (`/stats/:slug`)
-- [x] Tier inventory tracking (limited tiers)
-- [x] Milestone email notifications (1/3, 2/3, goal, stretch goals)
-- [x] Pledge history tracking (created, modified, cancelled events)
-- [x] Pledge reports (ledger-style and fulfillment CSV exports)
-- [x] Auto state transitions (`start_date` → live, `goal_deadline` → post)
-- [x] i18n scaffolding (translation helper, en.yml, example templates)
-- [x] Accessibility infrastructure (skip link, ARIA landmarks, focus states, sr-only)
-- [x] Tier gating by stretch goal with visual "Unlocked!" animations
-- [x] Unit test suite (Vitest) for live-stats.js functions
-- [x] E2E test suite (Playwright) for checkout flows
-- [x] Support items and custom amounts data flow (cart → Worker → KV → stats)
-- [x] Live support item stats tracking (`updateSupportItemStats()`)
-- [x] Countdown timer pre-rendering (Jekyll build-time calculation to avoid "00 00 00 00" flash)
-- [x] Manage page support items display (all items during live, late_support only during post)
-- [x] Multi-tier pledge support (`additionalTiers` in pledge records)
-- [x] Stats recalculation fix for `additionalTiers`
-- [x] Production campaign launch (Hand Relations)
-- [x] Podman-backed local dev/testing path
-  - rootless Jekyll + Worker containers via `./scripts/dev.sh --podman`
-  - containerized automated Playwright via `npm run test:e2e:headless:podman`
-  - Podman-aware smoke/report helpers and `npm run podman:doctor` / `npm run podman:self-check`
-- [x] More explicit inventory overselling protection
-  - scarce limited-tier reservations and committed claims now flow through a per-campaign Durable Object coordinator
-  - `tier-inventory:{slug}` remains a KV projection for public reads, not the source of truth
-  - coordinator calls stay on write/admin paths so the design remains compatible with Workers Free-plan usage
-- [x] Replace hosted Stripe Checkout with a native first-party Stripe flow
-  - the existing second checkout sidecar now hosts Stripe-powered on-site payment UI instead of forcing a full-page handoff
-  - `Update Card` on `/manage/` now uses the same secure payment pattern
-  - checkout E2E coverage is now fully automated, with the old manual Stripe handoff cases removed
-  - successful checkout now invalidates live stats/inventory caches and leaves a short-lived refresh marker so campaign totals refresh reliably after pledge persistence
-  - recent hardening trimmed long-lived browser PII, tightened sensitive Worker response caching, added origin checks, and added a dedicated retry budget for checkout completion recovery
-- [x] Pages CMS integration for visual campaign editing
-  - Block-based content editing (text, image, quote, gallery, divider)
-  - Polymorphic fields with `type: block` and `blockKey`
-  - Datetime picker for diary entries
-  - Full campaign schema (tiers, stretch goals, support items, diary, decisions)
-- [x] Accessibility compliance
-  - dialog, tab, tip-slider, and critical error/live-region semantics are now meaningfully stronger
-  - axe-backed unit coverage exists for the cart drawer, Manage Pledge dialogs, and campaign-page semantics
-  - broader browser accessibility coverage now includes public campaign, community, and pledge-result states, the About and Terms pages, and keyboard-only checkout/manage/community/public-control assertions
-  - the remaining manual assistive-technology review is follow-up polish, not a blocker for the current accessibility milestone
+**Platform foundation**
+
+- [x] Core branding, formatting, and internationalization scaffolding
+  - The Pool / Dust Wave platform branding
+  - money formatting plugin
+  - translation helper, `en.yml`, and example templates
+- [x] Cloudflare Worker backend and lifecycle automation
+  - pledge storage, stats, inventory, and emails
+  - auto-settle cron
+  - aggregated supporter charging
+  - DST-aware Mountain Time deadline handling across frontend + Worker
+  - automatic campaign state transitions
+- [x] Podman-backed local development and testing
+  - `./scripts/dev.sh --podman`
+  - containerized headless Playwright
+  - Podman-aware smoke/report helpers plus `podman:doctor` and `podman:self-check`
+
+**Campaign and public experience**
+
+- [x] Public campaign presentation system
+  - campaign sorting
+  - uniform campaign cards with featured-tier preview
+  - two-column campaign layout
+  - hero image / wide image / video variants
+  - countdown pre-rendering
+  - tier images and creator images
+- [x] Funding and supporter features on campaign pages
+  - production phases with registry items
+  - community decisions / voting
+  - production diary
+  - ongoing funding
+  - stretch-goal-gated tiers with unlock animations
+  - Hand Relations production launch
+
+**Pledging and supporter management**
+
+- [x] No-account supporter management flow
+  - magic-link architecture
+  - pledge success / cancelled pages
+  - `/manage/` dashboard
+  - supporter-only `/community/:slug/` access with session-scoped supporter tokens
+  - pledge history tracking
+- [x] Flexible pledge composition
+  - support items and custom amounts flowing cart → Worker → KV → stats
+  - live support-item stats tracking
+  - multi-tier pledge support via `additionalTiers`
+  - non-stackable tier support
+  - post/live Manage Pledge support-item display rules
+- [x] Physical reward fulfillment basics
+  - first-party physical-item detection
+  - physical-tier shipping
+  - checkout autofill and shipping-address support
+
+**Payments, inventory, and reporting**
+
+- [x] First-party Stripe checkout and payment-method updates
+  - native on-site Stripe payment step in the second checkout sidecar
+  - `Update Card` using the same secure pattern
+  - fully automated checkout E2E coverage
+  - post-persistence live-stats/inventory refresh handling
+  - checkout hardening around storage, caching, origin checks, and recovery retries
+- [x] Inventory integrity and campaign accounting
+  - live stats API
+  - limited-tier inventory tracking
+  - Durable-Object-backed oversell protection for scarce tiers
+  - stats recalculation support for `additionalTiers`
+- [x] Reporting and supporter communications
+  - milestone notifications
+  - tip-aware emails with full subtotal/tip/tax/shipping breakdowns
+  - ledger-style pledge reports and fulfillment CSV exports
+  - shipping included in reporting
+
+**Creator tooling and content**
+
+- [x] Pages CMS integration for campaign editing
+  - block-based content editing
+  - polymorphic block schema
+  - datetime picker for diary entries
+  - full campaign schema for tiers, stretch goals, support items, diary, and decisions
+- [x] Documentation consolidation and internal runbooks
+
+**Quality, accessibility, and design system**
+
+- [x] Automated quality baseline
+  - Vitest unit coverage
+  - Playwright E2E coverage
+  - stronger merge gate and local smoke coverage
+- [x] Accessibility compliance milestone
+  - stronger dialog, tab, tip-slider, error, and live-region semantics
+  - axe-backed critical-surface coverage
+  - broader browser accessibility coverage across campaign, community, pledge-result, About, and Terms states
 - [x] Typography, elements, and layouts redesign
-  - shared tokens, typography, buttons, fields, and surface primitives now underpin the active Sass system
-  - public pages, campaign surfaces, cart / checkout, and Manage Pledge now share the same calmer visual vocabulary
-  - stale parallel styling was removed so new visual work can continue from one active design system instead of multiple competing ones
-- [x] Make the platform variable-first for maximum customizability for forks
-  - structured `platform`, `pricing`, `design`, `checkout`, and `cache` settings now form the canonical fork-facing config surface
-  - first-party cart/runtime and custom on-site checkout are now treated as built-in platform behavior, not fork-facing mode switches
-  - Worker branding, sender identity, pricing, and platform-tip defaults are auto-synced from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`
-  - curated design variables now ship through `assets/theme-vars.css`, so major theme changes do not require Sass edits or CSP exceptions
-  - core brand assets like logos, favicon, footer branding, and default social images are now configurable through `platform.*`
-  - a dedicated customization guide now documents the supported no-code surface in `docs/CUSTOMIZATION.md`
+  - shared tokens, typography, buttons, fields, and surfaces
+  - aligned public pages, campaign pages, cart / checkout, and Manage Pledge styling
+  - removal of stale parallel styling
+- [x] Variable-first customization for forks
+  - canonical `platform`, `pricing`, `design`, `checkout`, and `cache` settings
+  - auto-synced Worker mirroring from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`
+  - curated CSS theme-variable bridge via `assets/theme-vars.css`
+  - configurable core brand assets and documented no-code customization surface
 
 ## Planned
 
@@ -108,6 +122,7 @@
 - [ ] Developer FAQ based on internal documentation
 - [ ] Marketing landing page for the platform on a different domain
 - [ ] i18n completion with a Spanish language translation available
+- [ ] Platform wide add-on products for upsells
 
 ## Known Issues
 
