@@ -92,9 +92,9 @@ describe('stripe checkout sidecar helper', () => {
             colorDanger: '#9f1239',
             colorBackground: '#f8faff',
             borderRadius: '10px',
-            spacingUnit: '5px',
+            spacingUnit: '4px',
             fontFamily: 'Inter, sans-serif',
-            fontSizeBase: '14px',
+            fontSizeBase: '13px',
             fontWeightNormal: '400'
           },
           rules: {
@@ -109,10 +109,10 @@ describe('stripe checkout sidecar helper', () => {
               border: '1px solid #d7d6d3',
               boxShadow: 'none',
               color: '#111111',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '400',
               lineHeight: '1.4',
-              padding: '12px 14px'
+              padding: '10px 12px'
             },
             '.Input::placeholder': {
               color: '#6b7280'
@@ -131,7 +131,7 @@ describe('stripe checkout sidecar helper', () => {
               border: '1px solid #d7d6d3',
               boxShadow: 'none',
               borderRadius: '10px',
-              padding: '14px 16px'
+              padding: '12px 14px'
             },
             '.Tab:hover': {
               borderColor: '#a9b4c2'

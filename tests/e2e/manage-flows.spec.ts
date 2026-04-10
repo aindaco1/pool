@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectNoHorizontalOverflow } from './helpers/mobile';
 
 const JSON_HEADERS = {
   'content-type': 'application/json',
@@ -387,6 +388,61 @@ test.describe('Manage Pledge Flows', () => {
 
     await expect(modal).toBeHidden();
     await expect(paymentButton).toBeFocused();
+  });
+
+  test('keeps manage and Update Card actions reachable on a small phone viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await routeManageWorker(page, {
+      paymentStartPayload: {
+        checkoutUiMode: 'custom',
+        sessionId: 'cs_test_update_mobile_123',
+        clientSecret: 'cs_test_update_secret_mobile_123',
+        publishableKey: 'pk_test_update_mobile_123'
+      }
+    });
+
+    await page.addInitScript(() => {
+      (window as any).Stripe = () => ({
+        initCheckout: async () => ({
+          loadActions: async () => ({
+            type: 'success',
+            actions: {
+              getSession: () => ({ id: 'cs_test_update_mobile_123' }),
+              updateEmail: async () => ({})
+            }
+          }),
+          createPaymentElement: () => ({
+            mount: (node: HTMLElement) => {
+              node.innerHTML = '<button type="button" data-test-payment-update-element>Mock payment element</button>';
+            },
+            unmount: () => {}
+          }),
+          on: (eventName: string, handler: Function) => {
+            if (eventName === 'change') {
+              handler({ session: { canConfirm: true } });
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto('/manage/?t=token-123');
+    await expect(page.locator('#pledges-list')).toBeVisible();
+    const paymentButton = page.locator('[data-action="payment"][data-index="0"]');
+    await expect(paymentButton).toBeVisible();
+    await paymentButton.scrollIntoViewIfNeeded();
+    await expect(paymentButton).toBeInViewport();
+    await expectNoHorizontalOverflow(page);
+
+    await paymentButton.click();
+
+    const modal = page.locator('#payment-update-modal');
+    const confirmButton = page.locator('#payment-update-confirm');
+    await expect(modal).toBeVisible();
+    await expect(confirmButton).toBeVisible();
+    await expect(confirmButton).toBeInViewport();
+    await expectNoHorizontalOverflow(page);
   });
 
   test('starts payment recovery for payment-failed pledges', async ({ page }) => {

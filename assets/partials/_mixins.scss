@@ -21,9 +21,14 @@
   margin-right: auto;
   
   @include sm {
-    padding-left: $space-xl;
-    padding-right: $space-xl;
+    padding-left: $space-lg;
+    padding-right: $space-lg;
     gap: 0px;
+  }
+
+  @include xsm {
+    padding-left: $space-md;
+    padding-right: $space-md;
   }
 }
 

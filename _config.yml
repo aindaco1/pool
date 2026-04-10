@@ -4,6 +4,22 @@ url: https://pool.dustwave.xyz
 markdown: kramdown
 permalink: pretty
 
+exclude:
+  - README.md
+  - LICENSE
+  - worker
+  - scripts
+  - tests
+  - test-results
+  - playwright-report
+  - package.json
+  - package-lock.json
+  - playwright.config.js
+  - vitest.config.ts
+  - vitest.security.config.ts
+  - Containerfile.dev
+  - Containerfile.playwright.dev
+
 # Structured platform settings for forks.
 platform:
   name: The Pool

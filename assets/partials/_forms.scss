@@ -20,9 +20,10 @@
   margin-bottom: 24px;
   
   @include xsm {
-    display: block;
-    border: none;
-    padding: 0;
+    display: grid;
+    gap: $space-md;
+    padding: $space-md;
+    margin-bottom: $space-md;
   }
   
   &__info {
@@ -67,6 +68,7 @@
     
     @include xsm {
       width: 100%;
+      gap: $space-sm;
     }
   }
   
@@ -78,7 +80,9 @@
     max-width: 120px;
     
     @include xsm {
-      margin-bottom: 8px;
+      width: 100%;
+      max-width: 100%;
+      margin-bottom: 0;
     }
   }
   
@@ -93,6 +97,11 @@
     padding: 8px 12px;
     font-size: $type--body;
     @include field-shell;
+
+    @include xsm {
+      width: 100%;
+      min-height: 44px;
+    }
   }
   
   &__btn {
@@ -124,6 +133,10 @@
         transform: none;
         box-shadow: none;
       }
+    }
+
+    @include xsm {
+      min-height: 44px;
     }
   }
   

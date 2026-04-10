@@ -2,20 +2,34 @@
 
 // Community Page
 .community-page {
+  width: 100%;
   max-width: 900px;
   margin: 0 auto;
   padding: $space-3xl $space-xl;
+
+  @include xsm {
+    padding: $space-2xl $space-md;
+  }
   
   &__loading,
   &__denied {
     text-align: center;
     padding: $space-4xl $space-xl;
+
+    @include xsm {
+      padding: $space-2xl 0;
+    }
   }
   
   &__denied {
     h1 {
       margin-bottom: $space-md;
       line-height: 1;
+
+      @include xsm {
+        font-size: clamp(32px, 9vw, 40px);
+        line-height: 1.02;
+      }
     }
     
     p {
@@ -42,7 +56,7 @@
     text-align: left;
     
     @include xsm {
-      padding: $space-xl;
+      padding: $space-lg $space-md;
     }
     
     h3 {
@@ -91,10 +105,18 @@
   
   &__header {
     margin-bottom: $space-3xl;
+
+    @include xsm {
+      margin-bottom: $space-2xl;
+    }
     
     h1 {
       margin: $space-md 0;
       line-height: 1.2;
+
+      @include xsm {
+        font-size: clamp(32px, 9vw, 40px);
+      }
     }
   }
   
@@ -111,6 +133,10 @@
   &__intro {
     color: $color--secondary;
     @include type-body-copy;
+
+    @include xsm {
+      font-size: $type--ui;
+    }
   }
   
   &__empty {
@@ -135,6 +161,12 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: $space-md;
+
+    @include xsm {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: $space-xs;
+    }
     
     h3 {
       margin: 0;
@@ -157,6 +189,11 @@
     justify-content: space-between;
     align-items: center;
     gap: $space-sm;
+
+    @include xsm {
+      flex-direction: column;
+      align-items: stretch;
+    }
   }
   
   &__closed {
@@ -260,6 +297,12 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   font-size: 14px;
 
+  @include xsm {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+  }
+
   &--error {
     border-color: #dc3545;
     background: #dc3545;
@@ -270,6 +313,10 @@
 .community-redirect {
   text-align: center;
   padding: $space-4xl $space-xl;
+
+  @include xsm {
+    padding: $space-2xl $space-md;
+  }
   
   h1 {
     margin-bottom: $space-md;
@@ -298,6 +345,10 @@
     color: $color--primary;
     font-weight: 600;
     transition: all 0.2s;
+
+    @include xsm {
+      padding: $space-md;
+    }
     
     &:hover {
       border-color: $color--primary;

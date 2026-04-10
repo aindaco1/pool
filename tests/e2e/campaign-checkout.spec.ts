@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectNoHorizontalOverflow } from './helpers/mobile';
 
 const CART_BUTTON_SELECTOR = 'button.poolcart-add-item';
 const TIER_CARD_BUTTON_SELECTOR = '.tier-card button.poolcart-add-item';
@@ -79,6 +80,19 @@ async function expectAriaSnapshotToContain(locator: any, fragments: string[]) {
 }
 
 test.describe('Campaign Page Structure', () => {
+  test('campaign page stays free of horizontal overflow on a small phone viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/campaigns/smoke-editable/');
+
+    await expect(page.locator('.campaign-container')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await expect(page.locator('.campaign-header h1')).toBeInViewport();
+    const sidebarButton = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR).first();
+    await expect(sidebarButton).toBeVisible();
+    await sidebarButton.scrollIntoViewIfNeeded();
+    await expect(sidebarButton).toBeInViewport();
+  });
+
   test('campaign page has required elements', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
     
@@ -1342,6 +1356,74 @@ test.describe('Checkout Flow', () => {
 
     await page.waitForURL('**/pledge-success/**');
     await expect(page.locator('h1, h2').first()).toContainText(/Pledge|Saved|Success/i);
+  });
+
+  test('custom checkout keeps primary actions reachable on a small phone viewport', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.addInitScript(() => {
+      (window as any).Stripe = () => ({
+        initCheckout: async () => ({
+          loadActions: async () => ({
+            type: 'success',
+            actions: {
+              getSession: () => ({ id: 'cs_test_custom_mobile' }),
+              updateEmail: async () => ({}),
+              confirm: async () => ({ type: 'success' })
+            }
+          }),
+          createPaymentElement: () => ({
+            mount: (node: HTMLElement) => {
+              node.innerHTML = '<div data-test-payment-element>Mock payment element</div>';
+            },
+            unmount: () => {}
+          }),
+          on: (eventName: string, handler: Function) => {
+            if (eventName === 'change') {
+              handler({ session: { canConfirm: true } });
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto('/campaigns/smoke-editable/');
+
+    const workerBase = await page.evaluate(() => (window as any).POOL_CONFIG?.workerBase);
+    expect(workerBase).toBeTruthy();
+
+    await page.route(`${workerBase}/checkout-intent/start`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          checkoutUiMode: 'custom',
+          sessionId: 'cs_test_custom_mobile',
+          clientSecret: 'cs_test_custom_secret_mobile',
+          publishableKey: 'pk_test_pool_mobile',
+          orderId: 'pool-intent-e2e-mobile-123'
+        })
+      });
+    });
+
+    const tierButton = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR).first();
+    await expect(tierButton).toBeVisible();
+    await tierButton.click();
+    await openCartViaClient(page);
+
+    const cartPanel = page.locator('.pool-first-party-cart__panel');
+    await expect(cartPanel).toBeVisible();
+    await expect(page.locator('[data-cart-continue]')).toBeInViewport();
+    await expectNoHorizontalOverflow(page);
+
+    await page.locator('[data-cart-continue]').click();
+
+    const saveButton = page.locator('[data-cart-confirm-custom-checkout]');
+    await expect(page.locator('[data-cart-custom-checkout-email]')).toBeVisible();
+    await expect(saveButton).toBeVisible();
+    await expect(saveButton).toBeInViewport();
+    await expectNoHorizontalOverflow(page);
   });
 
   test('pledge flow API integration', async ({ page }) => {

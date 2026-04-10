@@ -16,10 +16,14 @@ For most forks, the main customization files are:
 
 Use `./scripts/dev.sh --podman` for local verification after config changes.
 
+Treat [`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml) as an override-only file. Keep canonical fork settings in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml), and use the local file only for things that should differ on your machine, like localhost URLs or local-only campaign visibility.
+
 The normal local path is now localhost-based:
 
 - site: `http://127.0.0.1:4000`
 - Worker: `http://127.0.0.1:8787`
+
+The generated static site also now excludes repo-internal folders like `worker/`, `scripts/`, and `tests/`, so static verification more closely matches what a fork would actually publish.
 
 ## Supported Config Areas
 

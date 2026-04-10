@@ -95,6 +95,7 @@ This runs:
 
 The pre-merge script now auto-starts Jekyll with `_config.yml,_config.local.yml` when needed so the local-only `smoke-editable` campaign is available during merge gating, and the Playwright harness uses the same combined config locally.
 That gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. If the host Ruby path still cannot build cleanly, it falls back to a Podman-backed Jekyll build plus the remaining Podman-aware smoke/browser helpers instead of failing on host setup alone.
+For headless browser runs, Playwright now builds a static `_site` and serves that output with a lightweight HTTP server instead of using `jekyll serve`, which keeps automated browser checks closer to the real published asset layout.
 
 This branch now defaults to the first-party cart/runtime path in both `_config.yml` and `_config.local.yml`, and the browser path no longer supports the old hosted-cart runtime.
 
@@ -108,6 +109,8 @@ Recent security hardening that the gate now covers includes:
 The local Worker defaults in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) now match that first-party setup. `./scripts/dev.sh --podman` now auto-generates a local `CHECKOUT_INTENT_SECRET` in `worker/.dev.vars` if it is missing, so fresh local checkout starts do not fail closed on an uninitialized dev secret.
 
 For local work, prefer `./scripts/dev.sh --podman`. It starts Jekyll and the Worker in rootless Podman containers while preserving the same ports and local Wrangler state.
+
+[`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml) is now an override-only layer, not a second base config. When you change or add fork-facing settings, prefer [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml) unless the value should truly differ only on your local machine.
 
 The browser helper scripts support the same mode:
 
@@ -123,6 +126,13 @@ The browser helper scripts support the same mode:
 Those helpers still run Playwright and shell smoke logic on the host for now, but they boot the site and Worker through the shared Podman-backed local stack first. The report scripts can now run directly through the Worker container as well. That keeps local testing and exports closer to production-like service boundaries without forcing host Ruby or host Wrangler setup.
 
 For a mostly host-independent browser path, `npm run test:e2e:headless:podman` now runs the automated Playwright suite inside a dedicated Podman container on the same local pod network as the site and Worker.
+
+Recent browser coverage also includes dedicated mobile viewport assertions for:
+
+- campaign pages and secondary public controls
+- cart / checkout drawers on small phone sizes
+- Manage Pledge and Update Card reachability on short mobile viewports
+- no-horizontal-overflow checks on the main public and pledge-management paths
 
 The content-safety filter suite in `tests/unit/content-safety-filter.test.ts` also falls back to Podman when host Bundler/Jekyll gems are unavailable. On macOS, it can start the Podman machine as part of that fallback.
 

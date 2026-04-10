@@ -47,7 +47,7 @@ body.pool-cart-open {
   right: 0;
   display: flex;
   flex-direction: column;
-  width: min(540px, 100%);
+  width: min(580px, 100%);
   height: 100%;
   padding: 24px 20px 20px;
   background: $surface--page;
@@ -235,6 +235,7 @@ body.pool-cart-open {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .pool-first-party-cart__line-item-name,
@@ -395,8 +396,11 @@ body.pool-cart-open {
 
 .pool-first-party-cart__stripe-region--payment {
   min-height: 0;
-  padding: 10px 12px 10px;
-  background: $surface--base;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .pool-first-party-cart__shipping-fallback {
@@ -511,11 +515,29 @@ body.pool-cart-open {
 @include xsm {
   .pool-first-party-cart__panel {
     width: 100%;
-    padding: 20px 16px 16px;
+    padding: 16px 14px 14px;
   }
 
   .pool-first-party-cart__title {
     font-size: 24px;
+  }
+
+  .pool-first-party-cart__header {
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .pool-first-party-cart__body {
+    padding-right: 0;
+  }
+
+  .pool-first-party-cart__checkout-preview {
+    gap: 12px;
+  }
+
+  .pool-first-party-cart__summary-block,
+  .pool-first-party-cart__callout {
+    padding: 14px;
   }
 
   .pool-first-party-cart__item {
@@ -530,7 +552,52 @@ body.pool-cart-open {
     grid-template-columns: 1fr;
   }
 
+  .pool-first-party-cart__line-item,
+  .pool-first-party-cart__summary-row,
+  .pool-first-party-cart__total,
+  .pool-first-party-cart__tip-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .pool-first-party-cart__tip-controls {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .pool-first-party-cart__tip-percent {
+    text-align: left;
+  }
+
+  .pool-first-party-cart__stripe-region {
+    padding: 12px 14px;
+  }
+
+  .pool-first-party-cart__stripe-region--payment {
+    padding: 0;
+  }
+
+  .pool-first-party-cart__shipping-fallback {
+    padding: 14px;
+  }
+
   .pool-first-party-cart__shipping-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 724px) and (max-height: 760px) {
+  .pool-first-party-cart__panel {
+    padding-top: 14px;
+    padding-bottom: 12px;
+  }
+
+  .pool-first-party-cart__header {
+    margin-bottom: 12px;
+  }
+
+  .pool-first-party-cart__footer {
+    padding-top: 14px;
   }
 }

@@ -17,6 +17,7 @@
   @include xsm {
     padding-top: $space-md;
     padding-bottom: $space-md;
+    gap: $space-2xl;
   }
 }
 
@@ -63,7 +64,7 @@
     margin-bottom: calc($header--mb / 2);
     
     @include xsm {
-      font-size: $font-size-3xl;
+      font-size: clamp(32px, 9vw, $font-size-3xl);
       margin-bottom: $space-md;
     }
   }
@@ -89,7 +90,7 @@
   
   @include xsm {
     font-size: $font-size-base;
-    line-height: 1.4;
+    line-height: 1.55;
   }
 }
 
@@ -145,7 +146,7 @@
   overflow: visible;
   
   @include xsm {
-    margin-bottom: 0;
+    margin-bottom: $space-md;
   }
   
   h1 {
@@ -154,7 +155,7 @@
     line-height: 1.1;
     
     @include xsm {
-      font-size: $font-size-3xl;
+      font-size: clamp(32px, 9vw, $font-size-3xl);
       margin-bottom: $space-lg;
     }
   }
@@ -238,6 +239,11 @@
     width: 80px;
     height: 80px;
     border: none;
+
+    @include xsm {
+      width: 64px;
+      height: 64px;
+    }
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.95);
     color: $color--black;
@@ -338,6 +344,11 @@
 .campaign-facts {
   @include surface-panel($space-lg, $surface--subtle);
   margin-bottom: $space-xl;
+
+  @include xsm {
+    padding: $space-md;
+    margin-bottom: $space-md;
+  }
   
   h4 {
     margin: 0 0 $space-md 0;
@@ -350,6 +361,10 @@
     align-items: center;
     gap: $space-sm;
     margin-bottom: $space-md;
+
+    @include xsm {
+      align-items: flex-start;
+    }
     
     img {
       width: 48px;
@@ -396,6 +411,10 @@
 // Support items (phase funding)
 .support-items {
   margin-bottom: $space-xl;
+
+  @include xsm {
+    margin-bottom: $space-md;
+  }
   
   h5 {
     margin: 0 0 $space-sm 0;
@@ -520,6 +539,10 @@
     display: flex;
     align-items: center;
     gap: 4px;
+
+    @include xsm {
+      width: 100%;
+    }
   }
   
   &__currency {
@@ -533,6 +556,10 @@
     padding: $space-xs 10px;
     @include field-shell;
     font-size: $type--ui;
+
+    @include xsm {
+      min-width: 0;
+    }
   }
   
   &__btn {
@@ -580,32 +607,66 @@
 }
 
 // Production Phases
-.production-phases {
+.production-phases,
+.diary {
   margin-bottom: $space-3xl;
-  
-  h3 {
-    margin-bottom: $space-xl;
+
+  @include xsm {
+    margin-bottom: $space-2xl;
   }
 }
 
-.phase-tabs {
+.production-phases h3,
+.diary h3 {
+  margin-bottom: $space-xl;
+}
+
+.phase-tabs,
+.diary-tabs {
   display: flex;
   gap: $space-xs;
   flex-wrap: wrap;
   margin-bottom: $space-xl;
   border-bottom: 1px solid $border--default;
   padding-bottom: $space-xs;
+  min-width: 0;
+  width: 100%;
+
+  @include xsm {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: $space-sm;
+    margin-bottom: $space-md;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
 }
 
-.phase-tab {
+.phase-tab,
+.diary-tab {
   @include btn-core($color--primary);
-  background: transparent;
   border: 1px solid $border--default;
-  color: $color--secondary;
   font-size: $type--ui;
   padding: $space-xs $space-md;
   border-radius: 999px;
+
+  @include xsm {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
   
+}
+
+.phase-tab {
+  background: transparent;
+  color: $color--secondary;
+
   &[aria-selected="true"] {
     background: $color--primary;
     color: $color--white;
@@ -617,10 +678,8 @@
   }
 }
 
-.phase-panel {
-  &.hidden {
-    display: none;
-  }
+.phase-panel.hidden {
+  display: none;
 }
 
 .registry-list {
@@ -630,12 +689,22 @@
 
 .registry-item {
   @include surface-card($space-md);
+
+  @include xsm {
+    padding: $space-sm;
+  }
   
   &__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: $space-sm;
+
+    @include xsm {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
     
     strong {
       @include type-ui;
@@ -654,6 +723,12 @@
     justify-content: space-between;
     align-items: center;
     margin-top: $space-sm;
+
+    @include xsm {
+      flex-direction: column-reverse;
+      align-items: stretch;
+      gap: $space-xs;
+    }
   }
   
   &__need {
@@ -663,25 +738,7 @@
 }
 
 // Diary (consolidated updates + production diary with phase tabs)
-.diary {
-  margin-bottom: $space-3xl;
-  
-  h3 {
-    margin-bottom: $space-xl;
-  }
-}
-
-.diary-tabs {
-  display: flex;
-  gap: $space-xs;
-  flex-wrap: wrap;
-  margin-bottom: $space-xl;
-  border-bottom: 1px solid $border--default;
-  padding-bottom: $space-xs;
-}
-
 .diary-tab {
-  @include btn-core($color--primary);
   background: transparent;
   border: 1px solid $border--default;
   color: $color--primary;
@@ -689,6 +746,11 @@
   font-weight: 600;
   padding: $space-xs $space-md;
   border-radius: 999px;
+
+  @include xsm {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
   
   &[aria-selected="true"] {
     background: $color--primary;
@@ -711,10 +773,8 @@
   }
 }
 
-.diary-panel {
-  &.hidden {
-    display: none;
-  }
+.diary-panel.hidden {
+  display: none;
 }
 
 .production-diary {
@@ -759,6 +819,11 @@
 .ongoing-funding {
   @include surface-panel($space-lg, $surface--subtle);
   margin-bottom: $space-xl;
+
+  @include xsm {
+    padding: $space-md;
+    margin-bottom: $space-md;
+  }
   
   h4 {
     margin: 0 0 $space-sm 0;
@@ -795,6 +860,11 @@
   @include surface-panel($space-xl, $surface--subtle);
   margin: $space-2xl 0;
   text-align: center;
+
+  @include xsm {
+    padding: $space-lg $space-md;
+    margin: $space-xl 0;
+  }
   
   h3 {
     margin: 0 0 $space-xs 0;

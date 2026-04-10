@@ -21,6 +21,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: $space-md;
     @include fit-to-layout-and-center;
   }
   
@@ -31,6 +32,12 @@
     align-items: center;
     gap: $space-md;
     flex-shrink: 0;
+    min-width: 0;
+
+    @include xsm {
+      gap: $space-sm;
+      flex: 1 1 auto;
+    }
   }
   
   &__logo {
@@ -65,7 +72,11 @@
     animation: pool-brand-shimmer 5.2s ease-in-out infinite;
     
     @include xsm {
-      font-size: 32px;
+      font-size: clamp(24px, 7.6vw, 32px);
+      line-height: 0.94;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      max-width: 10ch;
     }
   }
 
@@ -83,6 +94,10 @@
     display: flex;
     align-items: center;
     gap: $space-2xl;
+
+    @include xsm {
+      gap: $space-md;
+    }
   }
   
   &__nav {
@@ -184,6 +199,10 @@
       @include xsm {
         margin-right: 0;
       }
+    }
+
+    @include xsm {
+      flex-shrink: 0;
     }
   }
   

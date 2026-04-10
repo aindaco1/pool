@@ -170,7 +170,10 @@ verify_build_artifacts() {
 }
 
 reset_podman_dev_artifacts() {
-  ensure_podman_ready || return 1
+  if ! ensure_podman_ready; then
+    ./scripts/podman-doctor.sh >/dev/null 2>&1 || return 1
+    ensure_podman_ready || return 1
+  fi
   podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
   podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
 }

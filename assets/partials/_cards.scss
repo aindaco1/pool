@@ -4,6 +4,10 @@
 .campaigns-section {
   margin-bottom: $space-4xl;
 
+  @include xsm {
+    margin-bottom: $space-3xl;
+  }
+
   &__header {
     display: grid;
     gap: $space-xs;
@@ -33,7 +37,7 @@
   
   @include xsm {
     grid-template-columns: 1fr;
-    gap: $space-4xl;
+    gap: $space-2xl;
   }
 }
 
@@ -84,6 +88,10 @@
       height: 220px;
       object-fit: cover;
       display: block;
+
+      @include xsm {
+        height: 200px;
+      }
     }
   }
   
@@ -95,12 +103,20 @@
     display: flex;
     flex-direction: column;
     gap: $space-sm;
+
+    @include xsm {
+      padding: $space-md;
+    }
   }
   
   &__footer {
     position: relative;
     z-index: 1;
     padding: 0 $space-lg $space-lg $space-lg;
+
+    @include xsm {
+      padding: 0 $space-md $space-md $space-md;
+    }
   }
   
   h2 {
@@ -138,6 +154,11 @@
     text-decoration: none;
     transition: all 0.2s;
     min-height: 80px;
+
+    @include xsm {
+      min-height: 0;
+      padding: 12px 14px;
+    }
     
     &:hover {
       background: $surface--base;
@@ -507,6 +528,10 @@
 // Decision card
 .decision-card {
   @include surface-card($space-lg);
+
+  @include xsm {
+    padding: $space-md;
+  }
   
   h4 {
     margin: 0 0 $space-md 0;
@@ -516,6 +541,10 @@
   
   &__header {
     margin-bottom: $space-md;
+
+    @include xsm {
+      margin-bottom: $space-sm;
+    }
     
     h3 {
       margin: 0 0 $space-xs 0;
@@ -563,6 +592,11 @@
   &--images {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: $space-md;
+
+    @include xsm {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: $space-sm;
+    }
   }
 }
 
@@ -575,6 +609,10 @@
   border-radius: $radius--sm;
   cursor: pointer;
   transition: all 0.2s;
+
+  @include xsm {
+    align-items: flex-start;
+  }
   
   &:hover {
     background: $surface-tint-soft;
@@ -587,6 +625,7 @@
   
   span {
     font-size: 15px;
+    min-width: 0;
   }
   
   &--has-image {
@@ -604,6 +643,10 @@
       border-color: $color--primary;
       border-width: 2px;
       background: $surface-tint-soft;
+    }
+
+    @include xsm {
+      padding: $space-xs;
     }
   }
   
@@ -644,6 +687,11 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: $space-md;
+
+    @include xsm {
+      grid-template-columns: 1fr;
+      gap: $space-sm;
+    }
   }
 }
 
@@ -715,6 +763,12 @@
   justify-content: space-between;
   padding: $space-xs 0;
   border-bottom: 1px solid $color--light;
+
+  @include xsm {
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-start;
+  }
   
   &:last-of-type {
     border-bottom: none;

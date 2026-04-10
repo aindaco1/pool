@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectNoHorizontalOverflow } from './helpers/mobile';
 
 async function getCartSnapshot(page: any) {
   return page.evaluate(async () => {
@@ -23,6 +24,22 @@ async function getCartSnapshot(page: any) {
 }
 
 test.describe('Public Page Keyboard Controls', () => {
+  test('diary tabs stay usable on a small phone viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/campaigns/hand-relations/');
+
+    const tablist = page.locator('.diary-tabs');
+    const secondTab = page.locator('.diary-tab[role="tab"]').nth(1);
+    await expect(tablist).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await secondTab.scrollIntoViewIfNeeded();
+    await expect(secondTab).toBeInViewport();
+    await secondTab.focus();
+    await page.keyboard.press('Enter');
+    await expect(secondTab).toHaveAttribute('aria-selected', 'true');
+  });
+
   test('supports keyboard-only diary tab navigation', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
 
@@ -67,6 +84,7 @@ test.describe('Public Page Keyboard Controls', () => {
   });
 
   test('supports keyboard-only custom amount add-to-cart flow', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/campaigns/smoke-editable/');
 
     const customInput = page.locator('#custom-amount-input');
@@ -88,9 +106,11 @@ test.describe('Public Page Keyboard Controls', () => {
         })
       ]
     });
+    await expectNoHorizontalOverflow(page);
   });
 
   test('supports keyboard-only support-item add-to-cart flow', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/campaigns/smoke-editable/');
 
     const supportInput = page.locator('.support-item__input').first();
@@ -111,14 +131,19 @@ test.describe('Public Page Keyboard Controls', () => {
         })
       ]
     });
+    await expectNoHorizontalOverflow(page);
   });
 
   test('supports keyboard-only supporter community teaser activation', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/campaigns/worst-movie-ever/?dev=1');
 
     const communityButton = page.locator('#community-btn');
     await expect(communityButton).toBeVisible();
     await expect(communityButton).toContainText(/Access Community/i);
+    await communityButton.scrollIntoViewIfNeeded();
+    await expect(communityButton).toBeInViewport();
+    await expectNoHorizontalOverflow(page);
 
     await communityButton.focus();
     await expect(communityButton).toBeFocused();

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
+import { expectNoHorizontalOverflow } from './helpers/mobile';
 
 const axePath = path.resolve(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
 
@@ -66,7 +67,31 @@ async function routeCommunitySupporterAccess(page: any, token = 'token-123') {
   });
 }
 
+async function routeCommunityDeniedAccess(page: any, token = 'token-123') {
+  await page.route(`**/pledge?token=${token}`, async (route: any) => {
+    await route.fulfill({
+      status: 404,
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        error: 'Pledge not found'
+      })
+    });
+  });
+}
+
 test.describe('Public Page Accessibility', () => {
+  test('home page stays tidy on a small phone viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await expect(page.locator('main')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    const activeCard = page.locator('.campaign-card').first();
+    await expect(activeCard).toBeVisible();
+    await activeCard.scrollIntoViewIfNeeded();
+    await expect(activeCard).toBeInViewport();
+  });
+
   test('home page has no obvious axe violations', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('main')).toBeVisible();
@@ -141,6 +166,17 @@ test.describe('Public Page Accessibility', () => {
     ]);
   });
 
+  test('about page stays readable on a small phone viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/about/');
+    await expect(page.locator('main')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await expect(page.locator('h1')).toBeInViewport();
+    const technologyHeading = page.locator('h2').filter({ hasText: 'The Technology' });
+    await technologyHeading.scrollIntoViewIfNeeded();
+    await expect(technologyHeading).toBeInViewport();
+  });
+
   test('terms page has no obvious axe violations', async ({ page }) => {
     await page.goto('/terms/');
     await expect(page.locator('main')).toBeVisible();
@@ -186,13 +222,27 @@ test.describe('Public Page Accessibility', () => {
   });
 
   test('community denied page has no obvious axe violations', async ({ page }) => {
-    await page.goto('/community/hand-relations/');
+    await routeCommunityDeniedAccess(page);
+    await page.goto('/community/hand-relations/?t=token-123');
     await expect(page.locator('#community-denied')).toBeVisible();
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
       'heading "Join the HAND RELATIONS Community"',
       'link "Support This Campaign →"'
     ]);
+  });
+
+  test('community denied page keeps the support CTA reachable on a small phone viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await routeCommunityDeniedAccess(page);
+    await page.goto('/community/hand-relations/?t=token-123');
+    await expect(page.locator('#community-denied')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    const supportLink = page.locator('#community-denied .btn');
+    await expect(supportLink).toBeVisible();
+    await supportLink.scrollIntoViewIfNeeded();
+    await expect(supportLink).toBeInViewport();
   });
 
   test('supporter community page has no obvious axe violations', async ({ page }) => {
@@ -205,5 +255,18 @@ test.describe('Public Page Accessibility', () => {
       'heading "Active Decisions"',
       'button "Submit Vote"'
     ]);
+  });
+
+  test('supporter community page stays tidy on a small phone viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await routeCommunitySupporterAccess(page);
+    await page.goto('/community/hand-relations/?t=token-123');
+    await expect(page.locator('#community-content')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    const voteButton = page.locator('[data-action="submit-vote"]').first();
+    await expect(voteButton).toBeVisible();
+    await voteButton.scrollIntoViewIfNeeded();
+    await expect(voteButton).toBeInViewport();
   });
 });

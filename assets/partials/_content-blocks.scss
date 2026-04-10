@@ -3,10 +3,18 @@
 // Long Content Blocks
 .long-content {
   margin-bottom: $space-3xl;
+
+  @include xsm {
+    margin-bottom: $space-2xl;
+  }
 }
 
 .content-block {
   margin-bottom: $space-2xl;
+
+  @include xsm {
+    margin-bottom: $space-xl;
+  }
   
   &:last-child {
     margin-bottom: 0;
@@ -53,6 +61,10 @@
     ul, ol {
       margin: 0 0 $space-md 0;
       padding-left: $space-xl;
+
+      @include xsm {
+        padding-left: 20px;
+      }
       
       li {
         margin-bottom: $space-xs;
@@ -62,12 +74,20 @@
   
   // Video block
   &--video {
-    margin: 0;
+    margin: 0 0 $space-xl;
+
+    @include xsm {
+      margin-bottom: $space-lg;
+    }
   }
   
   // Image block
   &--image {
-    margin: 0;
+    margin: 0 0 $space-xl;
+
+    @include xsm {
+      margin-bottom: $space-lg;
+    }
     
     img {
       display: block;
@@ -79,17 +99,29 @@
   
   // Gallery block
   &--gallery {
-    margin: 0;
+    margin: 0 0 $space-xl;
+
+    @include xsm {
+      margin-bottom: $space-lg;
+    }
   }
   
   // Audio block
   &--audio {
-    margin: 0;
+    margin: 0 0 $space-xl;
+
+    @include xsm {
+      margin-bottom: $space-lg;
+    }
   }
   
   // Embed block
   &--embed {
-    margin: 0;
+    margin: 0 0 $space-xl;
+
+    @include xsm {
+      margin-bottom: $space-lg;
+    }
   }
   
   // Divider block
@@ -97,6 +129,10 @@
     border: none;
     border-top: 1.5px solid black;
     margin: $space-3xl 0;
+
+    @include xsm {
+      margin: $space-2xl 0;
+    }
   }
   
   // Quote block
@@ -105,6 +141,11 @@
     @include surface-panel($space-xl $space-2xl, $surface--subtle);
     border-left: 4px solid $color--primary;
     font-style: italic;
+
+    @include xsm {
+      margin: $space-xl 0;
+      padding: $space-lg $space-md;
+    }
     
     p {
       margin: 0;
@@ -145,6 +186,10 @@
   flex-direction: column;
   gap: $space-xs;
   @include surface-panel($space-md, $surface--subtle);
+
+  @include xsm {
+    padding: $space-sm;
+  }
   
   &__title {
     @include type-ui;
@@ -203,6 +248,10 @@
     .gallery__container {
       grid-template-columns: repeat(2, 1fr);
       align-items: center;
+
+      @include xsm {
+        grid-template-columns: 1fr;
+      }
     }
     
     .gallery__item {
@@ -234,7 +283,7 @@
       aspect-ratio: 16 / 9;
       
       @include xsm {
-        flex: 0 0 90%;
+        flex: 0 0 92%;
       }
     }
   }

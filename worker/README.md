@@ -13,6 +13,8 @@ That boots the site and Worker together on the standard local ports and is the e
 
 If you specifically work from the `worker/` directory, the Worker npm scripts now auto-run the config mirror first so `worker/wrangler.toml` stays aligned with the repo-root `_config.yml` / `_config.local.yml`.
 
+Treat `_config.local.yml` as an override-only file for localhost-specific values. The canonical fork-facing settings should live in the repo-root `_config.yml`, and the Worker mirror will follow from there.
+
 ## Setup
 
 ### 1. Create KV Namespaces
@@ -291,6 +293,8 @@ npm run podman:doctor
 ```
 
 That starts the site and the Worker together, and the Worker still runs with `--env dev` under the hood.
+
+The broader automated browser path now builds and serves a static `_site`, so local headless checks exercise the same published-style asset layout as the site build rather than relying on `jekyll serve`.
 
 If you specifically need the Worker-only fallback:
 

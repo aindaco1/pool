@@ -33,6 +33,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Manage Pledge dashboard** — Desktop-friendly Active / Closed sections with locked-state read-only controls after deadline
 - **Tip-aware emails + reports** — Supporter emails, pledge reports, and fulfillment exports all include the platform tip when present
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
+- **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, stacking, and overflow fixes instead of a separate mobile-only UI
 - **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, and curated design variables without requiring custom code for normal fork rebranding
 - **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
@@ -79,6 +80,8 @@ Fork-facing settings now use a structured config model in [`_config.yml`](/Users
 - `design` for curated typography, radius, layout-width, and theme-token overrides
 - `checkout` for truly variable checkout settings like the Stripe publishable key
 - `cache` for live browser TTLs
+
+[`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml) is now intentionally thin: it should only carry true local overrides like localhost URLs and `show_test_campaigns`, not a second copy of the base config.
 
 See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for the supported no-code customization surface and which settings are automatically mirrored to the Worker.
 
@@ -182,6 +185,8 @@ npm run test:e2e:headless:podman     # Automated browser suite with Playwright i
 
 The pre-merge gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. If the host Ruby path still cannot produce a clean build, it falls back to Podman for the Jekyll build and the remaining local smoke/browser phases instead of failing early on host setup.
 
+The headless browser harness now builds a clean static `_site` and serves it with a lightweight HTTP server rather than relying on `jekyll serve`, which keeps browser regressions closer to the actual published asset shape.
+
 - `pledge-report.sh` is a ledger/history export, so modified pledges appear as deltas and mixed changes now keep tip-update context in the `items` column.
 - `fulfillment-report.sh` is the merged current-state view per `email + campaign`, which is the better comparison point for repeat backers and non-stackable projects.
 
@@ -189,7 +194,7 @@ The pre-merge gate now tries the host Bundler/Jekyll path first, including a one
 - Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow
 - Unit, security, and headless E2E suites are green on this branch
 
-**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility (including axe-backed public-page checks across campaign, community, and pledge-result states, ARIA snapshots, and keyboard-only checkout/manage/community/public-control assertions), campaign states, secret exposure auditing, campaign-content HTML/link/embed auditing, serialized tier-inventory coordination, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
+**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility (including axe-backed public-page checks across campaign, community, and pledge-result states, ARIA snapshots, and keyboard-only checkout/manage/community/public-control assertions), mobile viewport regressions for public pages and pledge flows, campaign states, secret exposure auditing, campaign-content HTML/link/embed auditing, serialized tier-inventory coordination, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
 
 For local merge smoke on mutable pledges, use:
 

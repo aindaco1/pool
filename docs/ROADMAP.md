@@ -97,6 +97,10 @@
   - shared tokens, typography, buttons, fields, and surfaces
   - aligned public pages, campaign pages, cart / checkout, and Manage Pledge styling
   - removal of stale parallel styling
+- [x] Mobile responsiveness pass
+  - focused audit-and-polish work rather than a redesign
+  - shared responsive fixes across campaign pages, cart / checkout, Manage Pledge, Update Card, community pages, and long-form content
+  - mobile browser regressions for overflow, scrollability, and reachable primary actions
 - [x] Variable-first customization for forks
   - canonical `platform`, `pricing`, `design`, `checkout`, and `cache` settings
   - auto-synced Worker mirroring from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`
@@ -118,11 +122,10 @@
   - Support USA, Europe, Canada, Australia, Mexico, other countries in the Americas, Japan, South Korea
 - [ ] Non-Stripe tax calculator to replace flat rate sales tax
   - Support USA, Europe, Canada, Australia, Mexico, other countries in the Americas, Japan, South Korea
-- [ ] Mobile responsiveness pass
 - [ ] Developer FAQ based on internal documentation
 - [ ] Marketing landing page for the platform on a different domain
 - [ ] i18n completion with a Spanish language translation available
-- [ ] Platform wide add-on products for upsells
+- [ ] Platform-wide add-on products for backer upsells
 
 ## Known Issues
 

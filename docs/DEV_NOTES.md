@@ -28,6 +28,8 @@ The config now uses a structured settings model in [`_config.yml`](/Users/aindac
 - `checkout`
 - `cache`
 
+Treat [`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml) as a thin override file for localhost URLs and other machine-local differences, not as a second place to duplicate the canonical fork settings.
+
 The sync target is [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml), and the repo’s supported dev/test entry points keep it aligned automatically.
 
 See [CUSTOMIZATION.md](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/docs/CUSTOMIZATION.md) for the supported no-code fork surface, including which settings are site-only and which are auto-mirrored to the Worker.
@@ -50,6 +52,8 @@ The merge gate now deliberately splits its local smoke paths:
 
 - `scripts/test-worker.sh` stays a lighter host-level contract smoke
 - `scripts/smoke-pledge-management.sh` runs through the Podman-backed stack during merge gating so the mutable modify/cancel path uses isolated local service state
+
+The Playwright harness now builds a clean static `_site` and serves it from a lightweight HTTP server for headless browser checks, instead of relying on `jekyll serve`.
 
 Note: first-party cart/runtime and the custom on-site checkout UI are now treated as built-in platform behavior, not fork-facing config choices. The `checkout` config namespace is now mainly for truly variable settings like the Stripe publishable key.
 
