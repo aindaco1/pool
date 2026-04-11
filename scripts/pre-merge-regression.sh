@@ -133,7 +133,9 @@ ensure_podman_ready() {
   fi
   stabilize_podman_connection
   if ! podman info >/dev/null 2>&1; then
-    return 1
+    ./scripts/podman-doctor.sh >/dev/null 2>&1 || true
+    stabilize_podman_connection
+    podman info >/dev/null 2>&1 || return 1
   fi
 
   for _ in 1 2 3; do
@@ -160,6 +162,10 @@ build_with_podman_jekyll() {
     -v pool-dev-bundle:/usr/local/bundle \
     localhost/pool-dev-site:latest \
     bash -lc 'cd /workspace && SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet'
+}
+
+build_with_host_jekyll() {
+  SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
 }
 
 verify_build_artifacts() {
@@ -221,6 +227,18 @@ cleanup() {
 trap cleanup EXIT
 
 if [[ "${1:-}" = "__podman_build_check" ]]; then
+  build_with_podman_jekyll
+  verify_build_artifacts
+  exit 0
+fi
+
+if [[ "${1:-}" = "__host_or_podman_build_check" ]]; then
+  if build_with_host_jekyll; then
+    verify_build_artifacts
+    exit 0
+  fi
+
+  echo "Host Jekyll build failed during artifact verification; retrying with the Podman-backed build..."
   build_with_podman_jekyll
   verify_build_artifacts
   exit 0
@@ -316,10 +334,7 @@ run_phase "4. Full unit suite" npm run test:unit
 
 USE_PODMAN_JEKYLL=false
 if prepare_host_jekyll; then
-  run_phase "5. First-party build artifact checks" bash -lc '
-    bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
-    rg -n "\.pool-first-party-cart__panel" _site/assets/main.css >/dev/null
-  '
+  run_phase "5. First-party build artifact checks" bash -lc 'scripts/pre-merge-regression.sh __host_or_podman_build_check'
 else
   print_host_jekyll_fallback_reason
   USE_PODMAN_JEKYLL=true

@@ -20,10 +20,17 @@ layout: null
       "charged": {{ campaign.charged | default: false }},
       "single_tier_only": {{ campaign.single_tier_only | default: false }},
       "custom_late_support": {{ campaign.custom_late_support | default: false }},
+      "shipping_fallback_flat_rate": {% if campaign.shipping_fallback_flat_rate != nil %}{{ campaign.shipping_fallback_flat_rate }}{% else %}null{% endif %},
+      "free_shipping": {% if campaign.free_shipping != nil %}{{ campaign.free_shipping | jsonify }}{% else %}null{% endif %},
+      "shipping_options": {{ campaign.shipping_options | default: empty | jsonify }},
       "stretch_goals": {{ campaign.stretch_goals | default: empty | jsonify }},
       "stretch_hidden": {% if campaign.stretch_hidden == false %}false{% else %}true{% endif %},
       "tiers": [
         {% for tier in campaign.tiers %}
+        {% assign resolved_shipping = tier.shipping %}
+        {% if resolved_shipping == nil and tier.shipping_preset %}
+          {% assign resolved_shipping = site.shipping.presets[tier.shipping_preset] %}
+        {% endif %}
         {
           "id": {{ tier.id | jsonify }},
           "name": {{ tier.name | jsonify }},
@@ -33,18 +40,27 @@ layout: null
           "remaining": {{ tier.remaining | default: tier.limit_total | default: 999 }},
           "sold_out": {{ tier.sold_out | default: false }},
           "stackable": {{ tier.stackable | default: false }},
-          "category": {{ tier.category | default: "digital" | jsonify }}
+          "category": {{ tier.category | default: "digital" | jsonify }},
+          "shipping_preset": {{ tier.shipping_preset | jsonify }},
+          "shipping": {% if resolved_shipping %}{{ resolved_shipping | jsonify }}{% else %}null{% endif %}
         }{% unless forloop.last %},{% endunless %}
         {% endfor %}
       ],
       "support_items": [
         {% for item in campaign.support_items %}
+        {% assign resolved_support_shipping = item.shipping %}
+        {% if resolved_support_shipping == nil and item.shipping_preset %}
+          {% assign resolved_support_shipping = site.shipping.presets[item.shipping_preset] %}
+        {% endif %}
         {
           "id": {{ item.id | jsonify }},
           "label": {{ item.label | jsonify }},
           "need": {{ item.need | jsonify }},
           "target": {{ item.target | default: 0 }},
           "current": {{ item.current | default: 0 }},
+          "category": {{ item.category | default: "digital" | jsonify }},
+          "shipping_preset": {{ item.shipping_preset | jsonify }},
+          "shipping": {% if resolved_support_shipping %}{{ resolved_support_shipping | jsonify }}{% else %}null{% endif %},
           "late_support": {{ item.late_support | default: false }}
         }{% unless forloop.last %},{% endunless %}
         {% endfor %}

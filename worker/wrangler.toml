@@ -15,7 +15,7 @@ crons = ["0 7 * * *"]
 [vars]
 SITE_BASE = "https://pool.dustwave.xyz"
 WORKER_BASE = "https://pledge.dustwave.xyz"
-APP_MODE = "live"  # "test" or "live"
+APP_MODE = "live"
 PLATFORM_NAME = "The Pool"
 PLATFORM_COMPANY_NAME = "Dust Wave"
 PLATFORM_AUTHOR = "Dust Wave"
@@ -24,6 +24,17 @@ PLEDGES_EMAIL_FROM = "The Pool <pledges@pool.dustwave.xyz>"
 UPDATES_EMAIL_FROM = "The Pool <updates@pool.dustwave.xyz>"
 SALES_TAX_RATE = "0.07875"
 FLAT_SHIPPING_RATE = "3.00"
+SHIPPING_ORIGIN_ZIP = "87102"
+SHIPPING_ORIGIN_COUNTRY = "US"
+SHIPPING_FALLBACK_FLAT_RATE = "3.00"
+FREE_SHIPPING_DEFAULT = "false"
+USPS_ENABLED = "true"
+USPS_CLIENT_ID = ""
+USPS_API_BASE = ""
+USPS_TIMEOUT_MS = "5000"
+USPS_QUOTE_CACHE_TTL_SECONDS = "600"
+USPS_FAILURE_COOLDOWN_SECONDS = "300"
+USPS_RATE_LIMIT_COOLDOWN_SECONDS = "1800"
 DEFAULT_PLATFORM_TIP_PERCENT = "5"
 MAX_PLATFORM_TIP_PERCENT = "15"
 
@@ -78,6 +89,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - STRIPE_SECRET_KEY_LIVE / STRIPE_SECRET_KEY_TEST
 # - STRIPE_WEBHOOK_SECRET_LIVE / STRIPE_WEBHOOK_SECRET_TEST
 # - STRIPE_WEBHOOK_SECRET      (webhook signing secret)
+# - USPS_CLIENT_SECRET         (USPS OAuth client secret for live shipping quotes)
 #
 # Optional (for GitHub rebuild trigger):
 # - GITHUB_TOKEN               (GitHub PAT with workflow scope)
@@ -90,7 +102,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # checkout exercises the first-party path end to end without changing
 # production defaults.
 [env.dev]
-vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "http://127.0.0.1:8787", APP_MODE = "test", PLATFORM_NAME = "The Pool", PLATFORM_COMPANY_NAME = "Dust Wave", PLATFORM_AUTHOR = "Dust Wave", SUPPORT_EMAIL = "support@dustwave.xyz", PLEDGES_EMAIL_FROM = "The Pool <pledges@pool.dustwave.xyz>", UPDATES_EMAIL_FROM = "The Pool <updates@pool.dustwave.xyz>", SALES_TAX_RATE = "0.07875", FLAT_SHIPPING_RATE = "3.00", DEFAULT_PLATFORM_TIP_PERCENT = "5", MAX_PLATFORM_TIP_PERCENT = "15" }
+vars = { SITE_BASE = "http://127.0.0.1:4000", WORKER_BASE = "http://127.0.0.1:8787", APP_MODE = "test", PLATFORM_NAME = "The Pool", PLATFORM_COMPANY_NAME = "Dust Wave", PLATFORM_AUTHOR = "Dust Wave", SUPPORT_EMAIL = "support@dustwave.xyz", PLEDGES_EMAIL_FROM = "The Pool <pledges@pool.dustwave.xyz>", UPDATES_EMAIL_FROM = "The Pool <updates@pool.dustwave.xyz>", SALES_TAX_RATE = "0.07875", FLAT_SHIPPING_RATE = "3.00", SHIPPING_ORIGIN_ZIP = "87102", SHIPPING_ORIGIN_COUNTRY = "US", SHIPPING_FALLBACK_FLAT_RATE = "3.00", FREE_SHIPPING_DEFAULT = "false", USPS_ENABLED = "true", USPS_CLIENT_ID = "", USPS_API_BASE = "", USPS_TIMEOUT_MS = "5000", USPS_QUOTE_CACHE_TTL_SECONDS = "600", USPS_FAILURE_COOLDOWN_SECONDS = "300", USPS_RATE_LIMIT_COOLDOWN_SECONDS = "1800", DEFAULT_PLATFORM_TIP_PERCENT = "5", MAX_PLATFORM_TIP_PERCENT = "15" }
 
 [[env.dev.durable_objects.bindings]]
 name = "CHECKOUT_INTENTS"
@@ -99,6 +111,7 @@ class_name = "CheckoutIntentNonceCoordinator"
 [[env.dev.durable_objects.bindings]]
 name = "TIER_INVENTORY_COORDINATOR"
 class_name = "TierInventoryCoordinator"
+
 [[env.dev.kv_namespaces]]
 binding = "VOTES"
 id = "9f11222dad2b4eb7bf80647f4361784a"

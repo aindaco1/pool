@@ -284,7 +284,14 @@ const singleTierCampaignFixture = {
       remaining: 999,
       sold_out: false,
       stackable: false,
-      category: 'physical'
+      category: 'physical',
+      shipping_preset: 'bluray',
+      shipping: {
+        weight_oz: 4,
+        length_in: 7,
+        width_in: 5.5,
+        height_in: 0.75
+      }
     }
   ],
   support_items: [],
@@ -304,6 +311,7 @@ const smokeEditableCampaignFixture = {
   charged: false,
   single_tier_only: false,
   custom_late_support: true,
+  shipping_fallback_flat_rate: 12,
   tiers: [
     {
       id: 'standard-pass',
@@ -314,6 +322,61 @@ const smokeEditableCampaignFixture = {
       sold_out: false,
       stackable: true,
       category: 'digital'
+    }
+  ],
+  support_items: [
+    {
+      id: 'festival-fund',
+      label: 'Festival Fund',
+      need: 'submission fees',
+      target: 100,
+      current: 0,
+      category: 'digital',
+      late_support: true
+    },
+    {
+      id: 'signed-script',
+      label: 'Signed Script',
+      need: 'physical add-on smoke test',
+      target: 25,
+      current: 0,
+      category: 'physical',
+      shipping_preset: 'signed_script',
+      shipping: {
+        weight_oz: 7,
+        length_in: 11,
+        width_in: 8.5,
+        height_in: 0.5
+      },
+      late_support: true
+    }
+  ],
+  has_decisions: false,
+  instagram: null,
+  diary: []
+};
+
+const metadataFallbackCampaignFixture = {
+  slug: 'tecolote',
+  title: 'TECOLOTE',
+  state: 'live',
+  goal_amount: 8000,
+  pledged_amount: 0,
+  goal_deadline: '2026-12-31',
+  start_date: '2026-01-01',
+  charged: false,
+  single_tier_only: false,
+  custom_late_support: true,
+  tiers: [
+    {
+      id: 'owl-sticker',
+      name: 'Owl Sticker',
+      price: 10,
+      limit_total: null,
+      remaining: 999,
+      sold_out: false,
+      stackable: true,
+      category: 'physical'
     }
   ],
   support_items: [],
@@ -360,7 +423,7 @@ beforeEach(() => {
   global.fetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     if (url === 'https://pool.test/api/campaigns.json') {
-      return jsonResponse({ campaigns: [campaignFixture, singleTierCampaignFixture, smokeEditableCampaignFixture] });
+      return jsonResponse({ campaigns: [campaignFixture, singleTierCampaignFixture, smokeEditableCampaignFixture, metadataFallbackCampaignFixture] });
     }
     throw new Error(`Unexpected fetch: ${url}`);
   }) as typeof fetch;
@@ -450,6 +513,343 @@ describe('Worker business logic hardening', () => {
           customAmount: 5
         })
       ]
+    });
+  });
+
+  it('uses the provided shipping destination when starting a physical first-party checkout', async () => {
+    const checkoutIntents = new MockCheckoutIntentNamespace();
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: checkoutIntents
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'sunder',
+          items: [{ id: 'sunder__blu-ray', quantity: 1 }],
+          email: 'buyer@example.com',
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    expect(sessionPayload.customer_email).toBe('buyer@example.com');
+    expect(sessionPayload.shipping_address_collection).toMatchObject({
+      allowed_countries: expect.arrayContaining(['US'])
+    });
+
+    const kv = env.PLEDGES as MockKVNamespace;
+    const bundleManifest = await kv.get(
+      sessionPayload.metadata.orderId ? `pending-checkout:${sessionPayload.metadata.orderId}` : '',
+      { type: 'json' }
+    );
+    expect(bundleManifest?.totals).toMatchObject({
+      subtotal: 3500,
+      shipping: 300,
+      tax: 276,
+      tipAmount: 175,
+      amount: 4251
+    });
+    expect(bundleManifest?.campaigns?.[0]).toMatchObject({
+      campaignSlug: 'sunder',
+      hasPhysical: true
+    });
+    expect(bundleManifest?.campaigns?.[0]?.totals).toMatchObject({
+      subtotal: 3500,
+      shipping: 300,
+      tax: 276,
+      tipAmount: 175,
+      amount: 4251
+    });
+  });
+
+  it('marks physical support-item checkouts as shippable when starting first-party checkout', async () => {
+    const checkoutIntents = new MockCheckoutIntentNamespace();
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: checkoutIntents
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'smoke-editable',
+          items: [{ id: 'smoke-editable__support__signed-script', amount: 25 }],
+          email: 'buyer@example.com',
+          shippingAddress: {
+            country: 'CA',
+            postalCode: 'M5V 2T6'
+          }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    expect(sessionPayload.customer_email).toBe('buyer@example.com');
+    expect(sessionPayload.metadata.hasPhysical).toBe('true');
+
+    const kv = env.PLEDGES as MockKVNamespace;
+    const bundleManifest = await kv.get(
+      sessionPayload.metadata.orderId ? `pending-checkout:${sessionPayload.metadata.orderId}` : '',
+      { type: 'json' }
+    );
+    expect(bundleManifest?.campaigns?.[0]).toMatchObject({
+      campaignSlug: 'smoke-editable',
+      hasPhysical: true,
+      supportItems: [{ id: 'signed-script', amount: 25 }]
+    });
+    expect(bundleManifest?.campaigns?.[0]?.totals).toMatchObject({
+      subtotal: 2500,
+      shipping: 1200,
+      tax: 197,
+      tipAmount: 125,
+      amount: 4022
+    });
+  });
+
+  it('returns a shipping quote with shipment data for physical tiers', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/shipping/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'sunder',
+          items: [{ id: 'sunder__blu-ray', quantity: 1 }],
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      quotes: [
+        {
+          campaignSlug: 'sunder',
+          shippingCents: 300,
+          source: 'fallback_flat_rate',
+          carrier: 'fallback',
+          service: 'domestic_ground_fallback',
+          domestic: true,
+          availableOptions: [
+            { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 300 }
+          ],
+          defaultOption: 'standard',
+          selectedOption: 'standard',
+          shipment: {
+            hasPhysical: true,
+            physicalTierCount: 1,
+            physicalSupportItemCount: 0,
+            physicalUnitCount: 1,
+            weightOz: 4,
+            lengthIn: 7,
+            widthIn: 5.5,
+            heightIn: 0.75,
+            tierIds: ['blu-ray'],
+            supportItemIds: []
+          }
+        }
+      ],
+      totalShippingCents: 300,
+      shippingAddress: {
+        country: 'US',
+        postalCode: '80205'
+      }
+    });
+  });
+
+  it('returns a shipping quote with shipment data for physical support items', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/shipping/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'smoke-editable',
+          items: [{ id: 'smoke-editable__support__signed-script', amount: 25 }],
+          shippingAddress: {
+            country: 'CA',
+            postalCode: 'M5V 2T6'
+          }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      quotes: [
+        {
+          campaignSlug: 'smoke-editable',
+          shippingCents: 1200,
+          source: 'fallback_flat_rate',
+          carrier: 'fallback',
+          service: 'international_ground_fallback',
+          domestic: false,
+          availableOptions: [
+            { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 1200 }
+          ],
+          defaultOption: 'standard',
+          selectedOption: 'standard',
+          shipment: {
+            hasPhysical: true,
+            physicalTierCount: 0,
+            physicalSupportItemCount: 1,
+            physicalUnitCount: 1,
+            weightOz: 7,
+            lengthIn: 11,
+            widthIn: 8.5,
+            heightIn: 0.5,
+            tierIds: [],
+            supportItemIds: ['signed-script']
+          }
+        }
+      ],
+      totalShippingCents: 1200,
+      shippingAddress: {
+        country: 'CA',
+        postalCode: 'M5V 2T6'
+      }
+    });
+  });
+
+  it('returns fallback shipping instead of 400 when physical tiers lack shipping metadata', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/shipping/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'tecolote',
+          items: [{ id: 'tecolote__owl-sticker', quantity: 1 }],
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      quotes: [
+        {
+          campaignSlug: 'tecolote',
+          shippingCents: 300,
+          source: 'fallback_missing_metadata',
+          carrier: 'fallback',
+          service: 'domestic_metadata_fallback',
+          domestic: true,
+          availableOptions: [
+            { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 300 }
+          ],
+          defaultOption: 'standard',
+          selectedOption: 'standard',
+          shipment: {
+            hasPhysical: true,
+            physicalTierCount: 1,
+            physicalSupportItemCount: 0,
+            physicalUnitCount: 1,
+            weightOz: 0,
+            lengthIn: 0,
+            widthIn: 0,
+            heightIn: 0,
+            tierIds: ['owl-sticker'],
+            supportItemIds: [],
+            metadataIncomplete: true
+          }
+        }
+      ],
+      totalShippingCents: 300,
+      shippingAddress: {
+        country: 'US',
+        postalCode: '80205'
+      }
+    });
+  });
+
+  it('returns zero shipping for carts without physical tiers', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/shipping/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__frame-slot', quantity: 1 }],
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      quotes: [
+        {
+          campaignSlug: 'hand-relations',
+          shippingCents: 0,
+          source: 'none',
+          carrier: null,
+          service: null,
+          domestic: true,
+          availableOptions: [],
+          defaultOption: 'standard',
+          selectedOption: 'standard',
+          shipment: {
+            hasPhysical: false,
+            physicalTierCount: 0,
+            physicalSupportItemCount: 0,
+            physicalUnitCount: 0,
+            weightOz: 0,
+            lengthIn: 0,
+            widthIn: 0,
+            heightIn: 0,
+            tierIds: [],
+            supportItemIds: []
+          }
+        }
+      ],
+      totalShippingCents: 0,
+      shippingAddress: {
+        country: 'US',
+        postalCode: '80205'
+      }
     });
   });
 
@@ -1241,6 +1641,100 @@ describe('Worker business logic hardening', () => {
         'vip-pass': 1
       }
     });
+  });
+
+  it('recalculates physical-pledge shipping from the stored address during modify', async () => {
+    const env = createEnv({
+      USPS_CLIENT_ID: 'client',
+      USPS_CLIENT_SECRET: 'secret',
+      USPS_API_BASE: 'https://apis-modify.usps.test'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    await kv.put('pledge:order-modify-physical-1', JSON.stringify({
+      orderId: 'order-modify-physical-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'sunder',
+      tierId: 'blu-ray',
+      tierName: 'Blu-ray',
+      tierQty: 1,
+      subtotal: 3500,
+      tax: 276,
+      shipping: 300,
+      tipPercent: 0,
+      tipAmount: 0,
+      amount: 4076,
+      shippingAddress: {
+        name: 'Supporter Example',
+        address1: '123 Main Street',
+        city: 'Denver',
+        state: 'CO',
+        postalCode: '80205',
+        country: 'US'
+      },
+      pledgeStatus: 'active',
+      charged: false,
+      createdAt: '2026-03-30T00:00:00.000Z',
+      updatedAt: '2026-03-30T00:00:00.000Z',
+      history: []
+    }));
+    await kv.put('stats:sunder', JSON.stringify({
+      campaignSlug: 'sunder',
+      pledgedAmount: 3500,
+      pledgeCount: 1,
+      tierCounts: { 'blu-ray': 1 },
+      supportItems: {},
+      updatedAt: '2026-03-30T00:00:00.000Z'
+    }));
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture, singleTierCampaignFixture, smokeEditableCampaignFixture, metadataFallbackCampaignFixture] });
+      }
+      if (url === 'https://apis-modify.usps.test/oauth2/v3/token') {
+        return jsonResponse({ access_token: 'token_modify', expires_in: 3600 });
+      }
+      if (url === 'https://apis-modify.usps.test/prices/v3/base-rates/search') {
+        return jsonResponse({
+          totalBasePrice: 6.75,
+          rates: [
+            {
+              mailClass: 'USPS_GROUND_ADVANTAGE',
+              description: 'USPS Ground Advantage'
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    mockVerifyToken.mockResolvedValue({
+      orderId: 'order-modify-physical-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'sunder'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge/modify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: 'valid-token',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+
+    const updatedPledge = await kv.get('pledge:order-modify-physical-1', { type: 'json' });
+    expect(updatedPledge.shipping).toBe(675);
+    expect(updatedPledge.tipPercent).toBe(5);
+    expect(updatedPledge.tipAmount).toBe(175);
+    expect(updatedPledge.amount).toBe(4626);
   });
 
   it('refuses to persist oversold limited tiers during webhook processing', async () => {

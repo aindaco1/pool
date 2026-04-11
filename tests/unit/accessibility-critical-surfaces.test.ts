@@ -189,8 +189,11 @@ describe('critical surface accessibility', () => {
     if (!saveButton) throw new Error('Missing save button');
     saveButton.click();
 
+    await vi.waitFor(() => {
+      expect(document.getElementById('confirm-modal')?.hidden).toBe(false);
+    });
+
     const modal = document.getElementById('confirm-modal');
-    expect(modal?.hidden).toBe(false);
     await expectNoAxeViolations(modal as Element);
   });
 

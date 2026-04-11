@@ -279,6 +279,44 @@ content:
               values:
                 - { label: Digital (no shipping), value: digital }
                 - { label: Physical (requires shipping), value: physical }
+
+          - name: shipping_preset
+            label: Shipping Preset
+            type: select
+            description: "Optional preset name from _config.yml for common physical items"
+            options:
+              values:
+                - { label: T-shirt, value: tshirt }
+                - { label: Poster, value: poster }
+                - { label: CD, value: cd }
+                - { label: Vinyl, value: vinyl }
+                - { label: DVD, value: dvd }
+                - { label: Blu-ray, value: bluray }
+                - { label: Signed Script, value: signed_script }
+
+          - name: shipping
+            label: Shipping Override
+            type: object
+            description: "Optional explicit shipping measurements for this tier. Leave empty to use the preset."
+            fields:
+              - name: weight_oz
+                label: Weight (oz)
+                type: number
+              - name: packaging_weight_oz
+                label: Packaging Weight (oz)
+                type: number
+              - name: length_in
+                label: Length (in)
+                type: number
+              - name: width_in
+                label: Width (in)
+                type: number
+              - name: height_in
+                label: Height (in)
+                type: number
+              - name: stack_height_in
+                label: Additional Stack Height (in)
+                type: number
           
           - name: stackable
             label: Multiple Quantities?
@@ -367,6 +405,52 @@ content:
             label: Description
             type: string
             description: "What this funding covers"
+
+          - name: category
+            label: Support Type
+            type: select
+            options:
+              values:
+                - { label: Digital / funding bucket (no shipping), value: digital }
+                - { label: Physical add-on (requires shipping), value: physical }
+
+          - name: shipping_preset
+            label: Shipping Preset
+            type: select
+            description: "Optional preset name from _config.yml for common physical support items"
+            options:
+              values:
+                - { label: T-shirt, value: tshirt }
+                - { label: Poster, value: poster }
+                - { label: CD, value: cd }
+                - { label: Vinyl, value: vinyl }
+                - { label: DVD, value: dvd }
+                - { label: Blu-ray, value: bluray }
+                - { label: Signed Script, value: signed_script }
+
+          - name: shipping
+            label: Shipping Override
+            type: object
+            description: "Optional explicit shipping measurements for this support item. Leave empty to use the preset."
+            fields:
+              - name: weight_oz
+                label: Weight (oz)
+                type: number
+              - name: packaging_weight_oz
+                label: Packaging Weight (oz)
+                type: number
+              - name: length_in
+                label: Length (in)
+                type: number
+              - name: width_in
+                label: Width (in)
+                type: number
+              - name: height_in
+                label: Height (in)
+                type: number
+              - name: stack_height_in
+                label: Additional Stack Height (in)
+                type: number
           
           - name: late_support
             label: Late Support
@@ -378,6 +462,30 @@ content:
         type: boolean
         default: false
         description: "Allow custom amount donations after campaign ends"
+
+      - name: shipping_fallback_flat_rate
+        label: Campaign Shipping Fallback ($)
+        type: number
+        description: "Optional per-campaign flat fallback used when live USPS quoting is unavailable. Overrides the global shipping fallback."
+      - name: free_shipping
+        label: Free Shipping Override
+        type: select
+        description: "Optional per-campaign override. Leave on inherit to follow the deployment-wide default."
+        options:
+          values:
+            - { label: Inherit deployment default, value: inherit }
+            - { label: Free shipping, value: true }
+            - { label: Paid shipping, value: false }
+      - name: shipping_options
+        label: Allowed Shipping Options
+        type: select
+        list: true
+        description: "Optional backer-selectable shipping policies. Standard is always available; signature options are domestic-only."
+        options:
+          values:
+            - { label: Standard, value: standard }
+            - { label: Signature Required, value: signature_required }
+            - { label: Adult Signature Required, value: adult_signature_required }
       
       # --- Production Diary ---
       - name: diary

@@ -114,7 +114,7 @@ Each history entry tracks a pledge event with full context:
 - `tipPercent` — Selected tip percentage after this event
 - `tax` / `taxDelta` — Tax amount (or delta)
 - `amount` / `amountDelta` — Total with tax + shipping + tip (or delta)
-- `shipping` / `shippingDelta` — Flat shipping fee (or delta, for tier category changes)
+- `shipping` / `shippingDelta` — Stored shipping amount (or delta, including live-quote, fallback, or free-shipping changes)
 - `tierId`, `tierQty`, `additionalTiers` — Tier state after this event
 - `customAmount` — Custom support amount (if present)
 - `at` — ISO timestamp
@@ -385,7 +385,7 @@ Magic link landing page for pledge management:
 - Shows pledge cards with state-dependent UI
 - Groups projects into **Active** and **Closed** sections
 - Sorts active cards with the most recent campaigns first
-- Displays full breakdown: subtotal, optional The Pool tip, configured sales tax, configured flat shipping per physical campaign, total
+- Displays full breakdown: subtotal, optional The Pool tip, configured sales tax, and stored shipping amount for the pledge, plus total
 - Reads pricing labels and rates from shared config so cart UI, Worker totals, emails, and reports stay aligned for forks
 
 **Pledge card states:**
@@ -398,7 +398,7 @@ Magic link landing page for pledge management:
 | `payment_failed` | Warning notice with "Update Payment Method" button |
 | `cancelled` | "This pledge has been cancelled" notice |
 
-**Shipping in modify flow:** When a supporter changes tiers, the manage page dynamically recalculates shipping — if the new tier selection includes any `category: physical` tier, the configured flat shipping fee is shown; otherwise it's hidden. The confirmation modal shows the updated total before the user confirms.
+**Shipping in modify flow:** When a supporter changes tiers or physical support items, the manage page dynamically recalculates shipping. Physical selections can use USPS-backed live quotes, configured fallback rates, free-shipping overrides, and limited domestic signature-option upgrades. The confirmation modal shows the updated shipping and total before the user confirms.
 
 **Tip in modify flow:** The manage page exposes the same 0% to 15% tip slider. During live campaigns, supporters can adjust it and see subtotal / tip / tax / shipping / total update immediately. Once the deadline passes, the tip slider becomes read-only along with the rest of the pledge controls.
 

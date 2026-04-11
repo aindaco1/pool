@@ -37,6 +37,8 @@
                 data-item-max-quantity="{% if featured.stackable %}{% if featured.max_per_person %}{{ featured.max_per_person }}{% else %}99{% endif %}{% else %}1{% endif %}"
                 data-item-stackable="{% if featured.stackable %}always{% else %}never{% endif %}"
                 data-item-shippable="false"
+                {% if include.campaign.shipping_fallback_flat_rate != nil %}data-item-shipping-fallback-cents="{{ include.campaign.shipping_fallback_flat_rate | times: 100 | round }}"{% endif %}
+                {% if include.campaign.free_shipping != nil %}data-item-campaign-free-shipping="{{ include.campaign.free_shipping }}"{% endif %}
                 data-redirect-url="{{ include.campaign.url }}"
                 data-item-custom1-name="_stackable"
                 data-item-custom1-type="hidden"
@@ -70,6 +72,8 @@
                 data-item-max-quantity="{% if featured.stackable %}{% if featured.max_per_person %}{{ featured.max_per_person }}{% else %}99{% endif %}{% else %}1{% endif %}"
                 data-item-stackable="{% if featured.stackable %}always{% else %}never{% endif %}"
                 data-item-shippable="false"
+                {% if include.campaign.shipping_fallback_flat_rate != nil %}data-item-shipping-fallback-cents="{{ include.campaign.shipping_fallback_flat_rate | times: 100 | round }}"{% endif %}
+                {% if include.campaign.free_shipping != nil %}data-item-campaign-free-shipping="{{ include.campaign.free_shipping }}"{% endif %}
                 data-item-custom1-name="_stackable"
                 data-item-custom1-type="hidden"
                 data-item-custom1-value="{% if featured.stackable %}true{% else %}false{% endif %}"

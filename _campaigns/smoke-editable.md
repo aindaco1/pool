@@ -18,6 +18,10 @@ show_ongoing: false
 single_tier_only: false
 stretch_hidden: true
 custom_late_support: true
+shipping_fallback_flat_rate: 12
+shipping_options:
+  - signature_required
+  - adult_signature_required
 featured_tier_id: standard-pass
 
 long_content:
@@ -35,6 +39,13 @@ support_items:
     label: Snack Run
     need: coffee + crafty
     target: 250
+    late_support: true
+  - id: signed-script
+    label: Signed Script
+    need: physical add-on shipping smoke test
+    target: 25
+    category: physical
+    shipping_preset: signed_script
     late_support: true
 
 tiers:
@@ -56,5 +67,6 @@ tiers:
     remaining: 5
     stackable: false
     category: physical
+    shipping_preset: poster
     late_support: true
 ---

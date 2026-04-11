@@ -12,9 +12,10 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **All-or-nothing pledging** — Cards saved now, charged only if goal is met
 - **Optional platform tip** — 0% to 15% tip (default 5%) included in totals but excluded from campaign progress
 - **Tip-aware cart + checkout** — Shared pricing logic keeps subtotal, tip, tax, shipping, and total in sync across cart, checkout, Worker, reports, and emails
+- **USPS-backed shipping quotes with fallback guardrails** — Physical checkout and modify flows can quote USPS domestic/international shipping, fall back safely to configured flat rates, and support optional domestic signature upgrades without pushing quote churn into KV
 - **On-site Stripe payment step** — The existing second checkout sidecar hosts secure Stripe payment UI, and Manage Pledge uses the same pattern for `Update Card`
-- **Configurable pricing settings** — `pricing.sales_tax_rate`, `pricing.flat_shipping_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` live in `_config.yml`, and the required Worker vars are auto-synced into `worker/wrangler.toml` for server-side enforcement
-- **Physical & digital tiers** — Physical items trigger shipping address capture during checkout + configurable flat shipping per campaign with physical rewards
+- **Configurable pricing settings** — `pricing.sales_tax_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` live in `_config.yml`, and the required Worker vars are auto-synced into `worker/wrangler.toml` for server-side enforcement
+- **Physical & digital tiers** — Physical items trigger shipping address capture during checkout plus Worker-calculated USPS quotes, configured fallback rates, and optional domestic signature upgrades when enabled
 - **Order-scoped magic links** — Each supporter link only manages its own pledge/order
 - **Safer supporter sessions** — Community pages keep supporter access in browser session storage instead of a long-lived token cookie
 - **Stretch goals** — Auto-unlock at funding thresholds
@@ -68,8 +69,14 @@ PODMAN_REBUILD=1 ./scripts/dev.sh --podman
 ```
 
 Fork-friendly pricing settings live in:
-- `pricing.sales_tax_rate`, `pricing.flat_shipping_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
-- auto-synced Worker vars `SALES_TAX_RATE`, `FLAT_SHIPPING_RATE`, `DEFAULT_PLATFORM_TIP_PERCENT`, and `MAX_PLATFORM_TIP_PERCENT` in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
+- `pricing.sales_tax_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
+- auto-synced Worker vars `SALES_TAX_RATE`, `DEFAULT_PLATFORM_TIP_PERCENT`, and `MAX_PLATFORM_TIP_PERCENT` in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
+
+Fork-friendly shipping settings live in:
+- `shipping.origin_*`, `shipping.fallback_flat_rate`, `shipping.free_shipping_default`, and `shipping.usps.*` in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
+- auto-synced Worker vars like `SHIPPING_ORIGIN_ZIP`, `SHIPPING_FALLBACK_FLAT_RATE`, `USPS_ENABLED`, `USPS_CLIENT_ID`, and the USPS timeout/cache/cooldown knobs in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
+
+Keep `USPS_CLIENT_SECRET` out of site config. Set it as a Worker secret or in [`worker/.dev.vars`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/.dev.vars) for local development.
 
 If you change those values locally, restart `./scripts/dev.sh --podman` so the Worker uses the same math as the site.
 
@@ -77,7 +84,8 @@ Fork-facing settings now use a structured config model in [`_config.yml`](/Users
 
 - `platform` for identity, URLs, and support contact
 - `platform` also covers brand assets like logo, footer logo, favicon, and default social image
-- `pricing` for tax, shipping, and platform-tip defaults
+- `pricing` for tax, the legacy flat-shipping compatibility baseline, and platform-tip defaults
+- `shipping` for origin settings, USPS quote behavior, fallback policy, free-shipping defaults, shipping presets, and limited shipping-option policy
 - `i18n` for default/supported languages, language labels, and localized public-page routes
 - `design` for curated typography, radius, layout-width, and theme-token overrides
 - `checkout` for truly variable checkout settings like the Stripe publishable key
@@ -193,7 +201,7 @@ npm run test:e2e:headless:podman     # Automated browser suite with Playwright i
 npm run test:security:podman         # Security suite against a one-shot Podman-backed local stack
 ```
 
-The pre-merge gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. If the host Ruby path still cannot produce a clean build, it falls back to Podman for the Jekyll build and the remaining local smoke/browser phases instead of failing early on host setup.
+The pre-merge gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. If the host Ruby path still cannot produce a clean build, the gate now falls back to the Podman-backed artifact build instead of failing early on host setup.
 
 The headless browser harness now builds a clean static `_site` and serves it with a lightweight HTTP server rather than relying on `jekyll serve`, which keeps browser regressions closer to the actual published asset shape.
 
@@ -234,6 +242,7 @@ See [`docs/`](docs/) for full documentation:
 - [ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — Accessibility standards, critical surfaces, and current coverage
 - [CUSTOMIZATION.md](docs/CUSTOMIZATION.md) — Supported fork-facing branding, pricing, and design overrides
 - [I18N.md](docs/I18N.md) — Current localization structure, routing model, and language-addition workflow
+- [SHIPPING.md](docs/SHIPPING.md) — Current shipping model, USPS setup, and fallback policy
 - [ROADMAP.md](docs/ROADMAP.md) — Planned features
 - [CMS.md](docs/CMS.md) — Pages CMS setup & campaign editing guide
 

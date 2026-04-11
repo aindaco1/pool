@@ -73,6 +73,14 @@
   - tip-aware emails with full subtotal/tip/tax/shipping breakdowns
   - ledger-style pledge reports and fulfillment CSV exports
   - shipping included in reporting
+- [x] Shipping calculator replacing the old flat physical-fee model
+  - USPS-backed live rating for domestic and international physical pledges
+  - deployment-level fallback shipping plus optional campaign-level fallback overrides
+  - deployment-level free-shipping default plus optional campaign overrides
+  - physical tier and support-item shipping metadata with shared presets for common goods
+  - Worker-canonical shipping totals in checkout, Manage Pledge, emails, reports, and fulfillment exports
+  - limited domestic shipping options with `standard`, `signature_required`, and `adult_signature_required`
+  - checkout and Manage Pledge UI now reflect live quotes, fallback quotes, and free-shipping states without inventing a browser-side shipping engine
 
 **Creator tooling and content**
 
@@ -123,13 +131,16 @@
   - Super admin and per-campaign users
   - Magic link auth
   - Block-based with the ability to preview campaign content
-- [ ] Shipping calculator to replace flat rate
-  - Support USA, Europe, Canada, Australia, Mexico, other countries in the Americas, Japan, South Korea
+- [ ] Shipping follow-up work
+  - run a real USPS credentialed manual smoke pass covering domestic live rating, international live rating, fallback behavior, and signature-option flows
+  - replace the current USPS-aware curated checkout country list with a dedicated shipping-country reference that is easier to refresh from USPS destination and suspension data
+  - decide whether any further shipping-option expansion is worth it beyond the current limited domestic signature policy
 - [ ] Non-Stripe tax calculator to replace flat rate sales tax
-  - Support USA, Europe, Canada, Australia, Mexico, other countries in the Americas, Japan, South Korea
+  - Support USA, and international
 - [ ] Developer FAQ based on internal documentation
 - [ ] Marketing landing page for the platform on a different domain
 - [ ] Platform-wide add-on products for backer upsells
+- [ ] SEO pass
 
 ## Known Issues
 

@@ -476,6 +476,10 @@
     align-items: center;
     margin-bottom: 8px;
 
+    &[hidden] {
+      display: none;
+    }
+
     @include xsm {
       align-items: flex-start;
       gap: 8px;

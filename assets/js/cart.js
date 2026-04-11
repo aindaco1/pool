@@ -311,6 +311,16 @@ function buildCartItemFromButton(button) {
     stackable: isStackable,
     shippable: button.getAttribute('data-item-shippable') === 'true'
   };
+  const shippingFallbackCents = Number(button.getAttribute('data-item-shipping-fallback-cents'));
+  if (Number.isFinite(shippingFallbackCents) && shippingFallbackCents >= 0) {
+    item.campaignShippingFallbackCents = Math.round(shippingFallbackCents);
+  }
+  const campaignFreeShipping = button.getAttribute('data-item-campaign-free-shipping');
+  if (campaignFreeShipping === 'true') {
+    item.campaignFreeShipping = true;
+  } else if (campaignFreeShipping === 'false') {
+    item.campaignFreeShipping = false;
+  }
 
   if (maxQty) {
     item.maxQuantity = parseInt(maxQty, 10);

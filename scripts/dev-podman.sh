@@ -364,6 +364,23 @@ wait_for_http() {
   return 1
 }
 
+wait_for_worker_http() {
+  local url="$1"
+  local label="$2"
+  local status=""
+  for _ in $(seq 1 40); do
+    status="$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || true)"
+    if [ -n "$status" ] && [ "$status" != "000" ]; then
+      echo "✅ $label ready"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "❌ $label failed to start"
+  return 1
+}
+
 cleanup() {
   kill "${STRIPE_LISTEN_PID:-0}" >/dev/null 2>&1 || true
   cleanup_pod
@@ -410,7 +427,7 @@ podman run -d \
   "$WORKER_IMAGE" >/dev/null
 
 wait_for_http "http://127.0.0.1:${JEKYLL_PORT}" "Jekyll"
-wait_for_http "http://127.0.0.1:${WORKER_PORT}/stats/does-not-exist" "Worker"
+wait_for_worker_http "http://127.0.0.1:${WORKER_PORT}/stats/does-not-exist" "Worker"
 
 if [ "$SKIP_STRIPE" != "true" ]; then
   if ! command -v stripe >/dev/null 2>&1; then

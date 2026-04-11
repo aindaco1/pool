@@ -31,6 +31,7 @@ The site config is organized around these fork-facing sections:
 
 - `platform`
 - `pricing`
+- `shipping`
 - `i18n`
 - `design`
 - `checkout`
@@ -88,12 +89,12 @@ platform:
 
 ### `pricing`
 
-Use `pricing` for the shared math that must stay consistent across the site and Worker.
+Use `pricing` for the shared tax/tip math that must stay consistent across the site and Worker.
 
 Supported keys:
 
 - `sales_tax_rate`
-- `flat_shipping_rate`
+- `flat_shipping_rate` (legacy compatibility baseline; use `shipping.*` for the current carrier/fallback model)
 - `default_tip_percent`
 - `max_tip_percent`
 
@@ -170,6 +171,93 @@ Recommended fork workflow:
 2. Add the language to the `i18n` block in `_config.yml`
 3. Add localized source pages for long-form routes such as `/about/` and `/terms/`
 4. Build locally and verify both the shared UI copy and the localized routes
+
+### `shipping`
+
+Use `shipping` for origin and fallback shipping settings plus the preset catalog for common physical goods.
+
+Supported keys today:
+
+- `origin_zip`
+- `origin_country`
+- `fallback_flat_rate`
+- `free_shipping_default`
+- `default_option`
+- `usps.enabled`
+- `usps.client_id`
+- `usps.api_base`
+- `usps.timeout_ms`
+- `usps.quote_cache_ttl_seconds`
+- `usps.failure_cooldown_seconds`
+- `usps.rate_limit_cooldown_seconds`
+- `presets`
+
+Campaigns can also optionally set `shipping_fallback_flat_rate` in front matter. When present, that campaign-specific fallback overrides the global `shipping.fallback_flat_rate` if USPS quoting is unavailable.
+
+Campaigns can also optionally set `shipping_options` in front matter to opt into the limited backer-facing shipping policy set:
+
+- `signature_required`
+- `adult_signature_required`
+
+`standard` is always available implicitly and does not need to be listed.
+
+Important secret boundary:
+
+- keep `shipping.usps.client_id` in `_config.yml`
+- keep the companion `USPS_CLIENT_SECRET` in Worker secrets or `worker/.dev.vars`
+- do not commit the secret into Jekyll config
+
+Example:
+
+```yml
+shipping:
+  origin_zip: "80205"
+  origin_country: "US"
+  fallback_flat_rate: 3.00
+  free_shipping_default: false
+  default_option: standard
+  usps:
+    enabled: true
+    client_id: "your-usps-client-id"
+    api_base: ""
+    timeout_ms: 5000
+    quote_cache_ttl_seconds: 600
+    failure_cooldown_seconds: 300
+    rate_limit_cooldown_seconds: 1800
+  presets:
+    poster:
+      weight_oz: 5
+      packaging_weight_oz: 3
+      length_in: 18
+      width_in: 3
+      height_in: 3
+      stack_height_in: 0.5
+    vinyl:
+      weight_oz: 18
+      packaging_weight_oz: 4
+      length_in: 13
+      width_in: 13
+      height_in: 1
+```
+
+What this enables:
+
+- a deployment-level USPS shipping origin
+- a deployment-level free-shipping default that campaigns can still override
+- a configured fallback rate if live carrier quoting is unavailable
+- a fork-facing USPS quote policy surface for timeouts, short-lived quote reuse, and temporary cooldowns after repeated failures or rate limiting
+- reusable `shipping_preset` names in campaign tiers so forks do not need to repeat common merch dimensions
+
+Preset and override metadata can include:
+
+- `weight_oz`
+- `packaging_weight_oz`
+- `length_in`
+- `width_in`
+- `height_in`
+- `stack_height_in`
+
+`weight_oz` is the item weight. `packaging_weight_oz` is a one-time packing allowance for that line item, and `stack_height_in` lets multi-quantity physical tiers stack more realistically than simple `height * qty`.
 
 ### `design`
 
@@ -297,6 +385,17 @@ These site-config values are also reflected into the Worker env values in [`work
 - `pricing.flat_shipping_rate` -> `FLAT_SHIPPING_RATE`
 - `pricing.default_tip_percent` -> `DEFAULT_PLATFORM_TIP_PERCENT`
 - `pricing.max_tip_percent` -> `MAX_PLATFORM_TIP_PERCENT`
+- `shipping.origin_zip` -> `SHIPPING_ORIGIN_ZIP`
+- `shipping.origin_country` -> `SHIPPING_ORIGIN_COUNTRY`
+- `shipping.fallback_flat_rate` -> `SHIPPING_FALLBACK_FLAT_RATE`
+- `shipping.free_shipping_default` -> `FREE_SHIPPING_DEFAULT`
+- `shipping.usps.enabled` -> `USPS_ENABLED`
+- `shipping.usps.client_id` -> `USPS_CLIENT_ID`
+- `shipping.usps.api_base` -> `USPS_API_BASE`
+- `shipping.usps.timeout_ms` -> `USPS_TIMEOUT_MS`
+- `shipping.usps.quote_cache_ttl_seconds` -> `USPS_QUOTE_CACHE_TTL_SECONDS`
+- `shipping.usps.failure_cooldown_seconds` -> `USPS_FAILURE_COOLDOWN_SECONDS`
+- `shipping.usps.rate_limit_cooldown_seconds` -> `USPS_RATE_LIMIT_COOLDOWN_SECONDS`
 
 The repo keeps those values aligned automatically through the main local/dev/test paths. After changing them, restart the local stack so the site and Worker both pick up the new values:
 
@@ -311,6 +410,8 @@ npm run sync:worker-config
 ```
 
 That command syncs the Worker-mirrored values in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) from `_config.yml` and `_config.local.yml`.
+
+It does not write Worker secrets. USPS OAuth secrets still belong in `wrangler secret` or `worker/.dev.vars`.
 
 The main local/dev validation paths already call that sync automatically:
 

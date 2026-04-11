@@ -28,6 +28,14 @@
     );
     return Math.round((Number.isFinite(parsed) && parsed >= 0 ? parsed : 3) * 100);
   })();
+  const FREE_SHIPPING_DEFAULT = (() => {
+    const value =
+      poolConfig.shipping?.freeShippingDefault ??
+      poolConfig.shippingFreeShippingDefault ??
+      bootScript.dataset.shippingFreeShippingDefault;
+    if (value === true || value === false) return value;
+    return String(value || '').trim().toLowerCase() === 'true';
+  })();
   const DEFAULT_PLATFORM_TIP_PERCENT = (() => {
     const parsed = Number(
       poolConfig.pricing?.defaultTipPercent ??
@@ -88,6 +96,64 @@
   let activeManageDialog = null;
   let activeManageDialogCleanup = null;
   let activeManageDialogReturnFocus = null;
+  const shippingQuoteState = new Map();
+  const shippingOptionUtils = window.PoolShippingOptionUtils || {
+    normalizeSelection: function(availableOptions, selectedOption, defaultOption) {
+      const options = Array.isArray(availableOptions) ? availableOptions : [];
+      const requested = String(selectedOption || '').trim().toLowerCase();
+      if (requested && options.some((option) => option?.id === requested)) {
+        return requested;
+      }
+
+      const normalizedDefault = String(defaultOption || 'standard').trim().toLowerCase() || 'standard';
+      if (options.some((option) => option?.id === normalizedDefault)) {
+        return normalizedDefault;
+      }
+
+      return options[0]?.id || 'standard';
+    },
+    getSelectedDetails: function(availableOptions, selectedOption, defaultOption) {
+      const options = Array.isArray(availableOptions) ? availableOptions : [];
+      const resolvedOption = this.normalizeSelection(options, selectedOption, defaultOption);
+      return options.find((option) => option?.id === resolvedOption) || null;
+    },
+    resolveQuote: function(payload, selectedOption, fallbackShippingCents) {
+      const firstQuote = Array.isArray(payload?.quotes) ? payload.quotes[0] : null;
+      const availableOptions = Array.isArray(firstQuote?.availableOptions) ? firstQuote.availableOptions : [];
+      const defaultOption = String(firstQuote?.defaultOption || 'standard').trim().toLowerCase() || 'standard';
+      const resolvedOption = this.normalizeSelection(
+        availableOptions,
+        selectedOption || firstQuote?.selectedOption,
+        defaultOption
+      );
+      const selectedDetails = this.getSelectedDetails(availableOptions, resolvedOption, defaultOption);
+      const shippingCents = selectedDetails
+        ? Math.max(0, Number(selectedDetails.shippingCents || 0))
+        : Math.max(0, Number(payload?.totalShippingCents || fallbackShippingCents || 0));
+
+      return {
+        shippingCents,
+        source: String(firstQuote?.source || ''),
+        availableOptions,
+        defaultOption,
+        selectedOption: resolvedOption
+      };
+    },
+    shouldShowOptions: function(quote) {
+      const source = String(quote?.source || '').trim().toLowerCase();
+      const availableOptions = Array.isArray(quote?.availableOptions) ? quote.availableOptions : [];
+      const shippingCents = Math.max(0, Number(quote?.shippingCents ?? quote?.amountCents ?? 0));
+      return source === 'usps_live' && shippingCents > 0 && availableOptions.length > 1;
+    },
+    formatChoice: function(option, labelResolver, moneyFormatter) {
+      if (!option) return '';
+      const label = typeof labelResolver === 'function' ? labelResolver(option.id) : String(option?.label || option?.id || '');
+      const delta = Math.max(0, Number(option?.priceDeltaCents || 0));
+      if (delta <= 0) return label;
+      const formattedDelta = typeof moneyFormatter === 'function' ? moneyFormatter(delta) : String(delta);
+      return `${label} (+${formattedDelta})`;
+    }
+  };
 
   function getRuntimeMessage(path, fallback) {
     const parts = String(path || '').split('.');
@@ -170,6 +236,175 @@
   function formatTipSliderValueText(tipPercent, tipAmountCents) {
     const percent = sanitizeTipPercent(tipPercent, 0);
     return `${percent}% tip, ${formatMoney(Math.max(0, tipAmountCents || 0))}`;
+  }
+
+  function getFallbackShippingCentsForPledge(pledge, campaign, hasPhysical) {
+    if (!hasPhysical) return 0;
+    if (isCampaignFreeShippingEnabled(campaign)) return 0;
+    const campaignFallback = Number(campaign?.shipping_fallback_flat_rate);
+    if (Number.isFinite(campaignFallback) && campaignFallback >= 0) {
+      return Math.round(campaignFallback * 100);
+    }
+    const existing = Number(pledge?.shipping);
+    if (Number.isFinite(existing) && existing >= 0) {
+      return existing;
+    }
+    return FLAT_SHIPPING_FEE;
+  }
+
+  function isCampaignFreeShippingEnabled(campaign) {
+    if (campaign?.free_shipping === true || campaign?.free_shipping === false) {
+      return campaign.free_shipping;
+    }
+    const normalized = String(campaign?.free_shipping || '').trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+    return FREE_SHIPPING_DEFAULT;
+  }
+
+  function getPledgeShippingQuoteAddress(pledge) {
+    const address = pledge?.shippingAddress || {};
+    const country = String(address.country || '').trim().toUpperCase();
+    const postalCode = String(address.postalCode || address.postal_code || '').trim().toUpperCase();
+    if (!country || !postalCode) return null;
+    return { country, postalCode };
+  }
+
+  function buildSelectedTierEntries(campaign, pledge, tierIdOrAddedTiers, tierQtyOrSupportItems) {
+    const tiers = campaign?.tiers || [];
+    const isSingleTier = campaign?.single_tier_only === true;
+    if (isSingleTier) {
+      const selectedTier = tiers.find((tier) => tier.id === tierIdOrAddedTiers);
+      if (!selectedTier) return [];
+      return [{
+        id: selectedTier.id,
+        qty: Math.max(1, Number(tierQtyOrSupportItems || pledge?.tierQty || 1)),
+        category: selectedTier.category || 'digital'
+      }];
+    }
+
+    return (Array.isArray(tierQtyOrSupportItems) ? tierQtyOrSupportItems : []).map((selectedTier) => {
+      const tier = tiers.find((entry) => entry.id === selectedTier.id);
+      return {
+        id: selectedTier.id,
+        qty: Math.max(1, Number(selectedTier.qty || 1)),
+        category: tier?.category || 'digital'
+      };
+    });
+  }
+
+  function buildSelectedSupportItemEntries(campaign, supportItems) {
+    const campaignSupportItems = campaign?.support_items || [];
+    return (Array.isArray(supportItems) ? supportItems : []).map((supportItem) => {
+      const definition = campaignSupportItems.find((entry) => entry.id === supportItem.id);
+      return {
+        id: supportItem.id,
+        amount: Math.max(0, Number(supportItem.amount || 0)),
+        category: definition?.category || 'digital'
+      };
+    }).filter((supportItem) => supportItem.amount > 0);
+  }
+
+  function createShippingQuoteSignature(pledge, tierEntries, supportItemEntries) {
+    const address = getPledgeShippingQuoteAddress(pledge);
+    return JSON.stringify({
+      campaignSlug: pledge?.campaignSlug || '',
+      address,
+      tiers: (tierEntries || []).map((tier) => ({ id: tier.id, qty: tier.qty })),
+      supportItems: (supportItemEntries || []).map((supportItem) => ({ id: supportItem.id, amount: supportItem.amount }))
+    });
+  }
+
+  function getManageShippingOptionLabel(optionId) {
+    switch (String(optionId || '').trim().toLowerCase()) {
+      case 'signature_required':
+        return getRuntimeMessage('manage.shippingOptionSignatureRequired', 'Signature required');
+      case 'adult_signature_required':
+        return getRuntimeMessage('manage.shippingOptionAdultSignatureRequired', 'Adult signature required');
+      case 'standard':
+      default:
+        return getRuntimeMessage('manage.shippingOptionStandard', 'Standard');
+    }
+  }
+
+  function formatManageShippingOptionChoice(option) {
+    return shippingOptionUtils.formatChoice(option, getManageShippingOptionLabel, formatMoney);
+  }
+
+  function resolveManageShippingQuoteResult(payload, selectedShippingOption) {
+    return shippingOptionUtils.resolveQuote(payload, selectedShippingOption, 0);
+  }
+
+  function shouldShowManageShippingOptions(quotedQuote) {
+    return shippingOptionUtils.shouldShowOptions(quotedQuote);
+  }
+
+  async function fetchQuotedShippingQuote(pledge, campaign, tierEntries, supportItemEntries, selectedShippingOption = null) {
+    const hasPhysical =
+      (tierEntries || []).some((tier) => tier.category === 'physical') ||
+      (supportItemEntries || []).some((supportItem) => supportItem.category === 'physical');
+    if (!hasPhysical) {
+      return {
+        shippingCents: 0,
+        source: 'none',
+        availableOptions: [],
+        defaultOption: 'standard',
+        selectedOption: 'standard'
+      };
+    }
+
+    const address = getPledgeShippingQuoteAddress(pledge);
+    if (!address) {
+      return {
+        shippingCents: getFallbackShippingCentsForPledge(pledge, campaign, true),
+        source: 'fallback_flat_rate',
+        availableOptions: [],
+        defaultOption: 'standard',
+        selectedOption: 'standard'
+      };
+    }
+
+    const signature = createShippingQuoteSignature(pledge, tierEntries, supportItemEntries);
+    const cached = shippingQuoteState.get(signature);
+    if (cached && Number.isFinite(cached.shippingCents)) {
+      return resolveManageShippingQuoteResult(cached, selectedShippingOption);
+    }
+
+    const items = tierEntries.map((tier) => ({
+      id: `${pledge.campaignSlug}__${tier.id}`,
+      quantity: tier.qty
+    })).concat((supportItemEntries || []).map((supportItem) => ({
+      id: `${pledge.campaignSlug}__support__${supportItem.id}`,
+      amount: supportItem.amount
+    })));
+
+    try {
+      const response = await fetch(`${WORKER_BASE}/shipping/quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: pledge.campaignSlug,
+          items,
+          shippingAddress: address
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Shipping quote failed with ${response.status}`);
+      }
+
+      const data = await response.json();
+      shippingQuoteState.set(signature, data);
+      return resolveManageShippingQuoteResult(data, selectedShippingOption);
+    } catch (_error) {
+      return {
+        shippingCents: getFallbackShippingCentsForPledge(pledge, campaign, true),
+        source: 'fallback_flat_rate',
+        availableOptions: [],
+        defaultOption: 'standard',
+        selectedOption: 'standard'
+      };
+    }
   }
 
   function isFocusableNode(node) {
@@ -1811,8 +2046,12 @@
                   <span class="value" id="tax-${index}">${formatMoney(tax)}</span>
                 </div>
                 <div class="pledge-summary__row pledge-summary__row--shipping" id="shipping-row-${index}" ${shipping > 0 ? '' : 'hidden'}>
-                  <span class="label">${escapeHtml(getRuntimeMessage('manage.shippingUsps', 'Shipping (USPS)'))}</span>
+                  <span class="label">${escapeHtml(getRuntimeMessage('manage.shipping', 'Shipping'))}</span>
                   <span class="value" id="shipping-${index}">${formatMoney(shipping)}</span>
+                </div>
+                <div class="pledge-summary__row pledge-summary__row--shipping-option" id="shipping-option-row-${index}" hidden>
+                  <label class="label" for="shipping-option-${index}">${escapeHtml(getRuntimeMessage('manage.shippingOption', 'Delivery option'))}</label>
+                  <select class="value pledge-summary__shipping-option-select" id="shipping-option-${index}" data-shipping-option-index="${index}"></select>
                 </div>
                 <div class="pledge-summary__total">
                   <span class="label">${escapeHtml(getRuntimeMessage('manage.total', 'Total'))}</span>
@@ -1862,6 +2101,7 @@
     let selectedSupportItems = [];
     let selectedCustomAmount = currentCustomAmountVal;
     let selectedTipPercent = currentTipPercent;
+    let selectedShippingOption = String(pledge.shippingOption || 'standard').trim().toLowerCase() || 'standard';
     let selectedTierQty = pledge.tierQty || 1;
     let selectedAddTiers = [];
     const primaryOrderId = pledge.orderIds ? pledge.orderIds[0] : pledge.orderId;
@@ -1899,6 +2139,36 @@
     }
 
     const originalTiers = selectedAddTiers.map((tier) => ({ ...tier }));
+    const refreshSummary = function() {
+      if (isSingleTier) {
+        updatePledgeSummary(
+          index,
+          pledge,
+          campaign,
+          selectedTierId,
+          selectedTierQty,
+          selectedSupportItems,
+          selectedCustomAmount,
+          currentCustomAmountVal,
+          selectedTipPercent,
+          selectedShippingOption
+        );
+        return;
+      }
+
+      updatePledgeSummary(
+        index,
+        pledge,
+        campaign,
+        null,
+        selectedAddTiers,
+        selectedSupportItems,
+        selectedCustomAmount,
+        currentCustomAmountVal,
+        selectedTipPercent,
+        selectedShippingOption
+      );
+    };
 
     if (isLocked) {
       card
@@ -1923,17 +2193,7 @@
           selectedTierId = e.target.value;
           const qtyInput = card.querySelector(`.qty-input[data-tier="${selectedTierId}"]`);
           selectedTierQty = qtyInput ? parseInt(qtyInput.value, 10) || 1 : 1;
-          updatePledgeSummary(
-            index,
-            pledge,
-            campaign,
-            selectedTierId,
-            selectedTierQty,
-            selectedSupportItems,
-            selectedCustomAmount,
-            currentCustomAmountVal,
-            selectedTipPercent
-          );
+          refreshSummary();
         });
       });
 
@@ -1968,17 +2228,7 @@
           }
 
           selectedTierQty = parseInt(input.value, 10) || 1;
-          updatePledgeSummary(
-            index,
-            pledge,
-            campaign,
-            selectedTierId,
-            selectedTierQty,
-            selectedSupportItems,
-            selectedCustomAmount,
-            currentCustomAmountVal,
-            selectedTipPercent
-          );
+          refreshSummary();
         });
       });
 
@@ -1996,17 +2246,7 @@
           e.target.value = String(val);
           selectTierById(tierId);
           selectedTierQty = val;
-          updatePledgeSummary(
-            index,
-            pledge,
-            campaign,
-            selectedTierId,
-            selectedTierQty,
-            selectedSupportItems,
-            selectedCustomAmount,
-            currentCustomAmountVal,
-            selectedTipPercent
-          );
+          refreshSummary();
         });
       });
     } else {
@@ -2089,17 +2329,7 @@
             return { id: tierId, price, qty, pledgedQty, isPledged };
           }
         );
-        updatePledgeSummary(
-          index,
-          pledge,
-          campaign,
-          null,
-          selectedAddTiers,
-          selectedSupportItems,
-          selectedCustomAmount,
-          currentCustomAmountVal,
-          selectedTipPercent
-        );
+        refreshSummary();
       }
     }
 
@@ -2127,31 +2357,7 @@
             currentAmount: parseFloat(field.dataset.current) || 0
           }));
 
-        if (isSingleTier) {
-          updatePledgeSummary(
-            index,
-            pledge,
-            campaign,
-            selectedTierId,
-            selectedTierQty,
-            selectedSupportItems,
-            selectedCustomAmount,
-            currentCustomAmountVal,
-            selectedTipPercent
-          );
-        } else {
-          updatePledgeSummary(
-            index,
-            pledge,
-            campaign,
-            null,
-            selectedAddTiers,
-            selectedSupportItems,
-            selectedCustomAmount,
-            currentCustomAmountVal,
-            selectedTipPercent
-          );
-        }
+        refreshSummary();
       });
     });
 
@@ -2167,31 +2373,7 @@
           e.target.closest('.support-option-item').classList.remove('support-option-item--active');
         }
 
-        if (isSingleTier) {
-          updatePledgeSummary(
-            index,
-            pledge,
-            campaign,
-            selectedTierId,
-            selectedTierQty,
-            selectedSupportItems,
-            selectedCustomAmount,
-            currentCustomAmountVal,
-            selectedTipPercent
-          );
-        } else {
-          updatePledgeSummary(
-            index,
-            pledge,
-            campaign,
-            null,
-            selectedAddTiers,
-            selectedSupportItems,
-            selectedCustomAmount,
-            currentCustomAmountVal,
-            selectedTipPercent
-          );
-        }
+        refreshSummary();
       });
     }
 
@@ -2210,33 +2392,14 @@
             calculatePlatformTip(getPledgeSubtotal(pledge), selectedTipPercent)
           )
         );
-        if (isSingleTier) {
-          updatePledgeSummary(
-            index,
-            pledge,
-            campaign,
-            selectedTierId,
-            selectedTierQty,
-            selectedSupportItems,
-            selectedCustomAmount,
-            currentCustomAmountVal,
-            selectedTipPercent
-          );
-        } else {
-          updatePledgeSummary(
-            index,
-            pledge,
-            campaign,
-            null,
-            selectedAddTiers,
-            selectedSupportItems,
-            selectedCustomAmount,
-            currentCustomAmountVal,
-            selectedTipPercent
-          );
-        }
+        refreshSummary();
       });
     }
+
+    card.querySelector(`#shipping-option-${index}`)?.addEventListener('change', (e) => {
+      selectedShippingOption = String(e.target.value || 'standard').trim().toLowerCase() || 'standard';
+      refreshSummary();
+    });
 
     card.querySelector('[data-action="cancel"]')?.addEventListener('click', () => {
       document.getElementById(`footer-${index}`).hidden = true;
@@ -2292,7 +2455,7 @@
       }
     });
 
-    card.querySelector('[data-action="save"]')?.addEventListener('click', (e) => {
+    card.querySelector('[data-action="save"]')?.addEventListener('click', async (e) => {
       const btn = e.target;
       const errorEl = document.getElementById(`error-${index}`);
       const currentQty = pledge.tierQty || 1;
@@ -2325,6 +2488,7 @@
       const hasSupportChanges = selectedSupportItems.length > 0;
       const hasCustomAmountChange = selectedCustomAmount !== currentCustomAmountVal;
       const hasTipChange = selectedTipPercent !== currentTipPercent;
+      const originalShippingOption = String(pledge.shippingOption || 'standard').trim().toLowerCase() || 'standard';
 
       if (isSingleTier && (tierChanged || qtyChanged)) {
         const newTier = campaign.tiers.find((tier) => tier.id === selectedTierId);
@@ -2413,18 +2577,25 @@
         );
       }
 
-      const campaignTiers = campaign?.tiers || [];
-      let confirmHasPhysical = false;
-      if (isSingleTier) {
-        const selectedTier = campaignTiers.find((tier) => tier.id === selectedTierId);
-        confirmHasPhysical = selectedTier?.category === 'physical';
-      } else {
-        confirmHasPhysical = selectedAddTiers.some((selectedTier) => {
-          const tier = campaignTiers.find((entry) => entry.id === selectedTier.id);
-          return tier?.category === 'physical';
-        });
-      }
-      const confirmShipping = confirmHasPhysical ? FLAT_SHIPPING_FEE : 0;
+      const selectedTierEntries = buildSelectedTierEntries(
+        campaign,
+        pledge,
+        isSingleTier ? selectedTierId : null,
+        isSingleTier ? selectedTierQty : selectedAddTiers
+      );
+      const selectedSupportItemEntries = buildSelectedSupportItemEntries(campaign, selectedSupportItems);
+      const confirmQuote = await fetchQuotedShippingQuote(
+        pledge,
+        campaign,
+        selectedTierEntries,
+        selectedSupportItemEntries,
+        selectedShippingOption
+      );
+      const confirmShipping = Math.max(0, Number(confirmQuote?.shippingCents || 0));
+      const resolvedConfirmShippingOption = String(
+        confirmQuote?.selectedOption || selectedShippingOption || 'standard'
+      ).trim().toLowerCase() || 'standard';
+      const hasShippingOptionChange = resolvedConfirmShippingOption !== originalShippingOption;
       const newTipAmount = calculatePlatformTip(newSubtotal, selectedTipPercent);
       const newTax = calculateTax(newSubtotal);
       const newTotalWithTax = newSubtotal + newTax + confirmShipping + newTipAmount;
@@ -2447,7 +2618,17 @@
         appendTextElement(
           totalsNode,
           'span',
-          `${getRuntimeMessage('manage.shippingUsps', 'Shipping (USPS)')}: ${formatMoney(confirmShipping)}`
+          `${getRuntimeMessage('manage.shipping', 'Shipping')}: ${formatMoney(confirmShipping)}`
+        );
+      }
+      if (
+        hasShippingOptionChange ||
+        shouldShowManageShippingOptions(confirmQuote)
+      ) {
+        appendTextElement(
+          totalsNode,
+          'span',
+          `${getRuntimeMessage('manage.shippingOption', 'Delivery option')}: ${getManageShippingOptionLabel(resolvedConfirmShippingOption)}`
         );
       }
       const totalStrong = document.createElement('strong');
@@ -2468,6 +2649,7 @@
           pledge.tipPercent = selectedTipPercent;
           pledge.tipAmount = newTipAmount;
           pledge.amount = newTotalWithTax;
+          pledge.shippingOption = resolvedConfirmShippingOption;
           if (isSingleTier) {
             pledge.tierId = selectedTierId;
             pledge.tierQty = selectedTierQty;
@@ -2549,6 +2731,7 @@
               hasSupportChanges ||
               hasCustomAmountChange ||
               hasTipChange ||
+              hasShippingOptionChange ||
               ordersToCancel.size > 0;
             const retainedSecondaryOrderIds = (pledge.orderIds || []).filter(
               (orderId) => orderId !== primaryOrderIdForSave && !ordersToCancel.has(orderId)
@@ -2565,7 +2748,8 @@
                   addTiers: primaryTiers.length > 0 ? primaryTiers : null,
                   supportItems: hasSupportChanges ? selectedSupportItems : null,
                   customAmount: hasCustomAmountChange ? selectedCustomAmount : null,
-                  tipPercent: hasTipChange ? selectedTipPercent : null
+                  tipPercent: hasTipChange ? selectedTipPercent : null,
+                  shippingOption: hasShippingOptionChange ? resolvedConfirmShippingOption : null
                 })
               });
               const data = await res.json();
@@ -2611,7 +2795,8 @@
                 addTiers: !isSingleTier ? selectedAddTiers : null,
                 supportItems: hasSupportChanges ? selectedSupportItems : null,
                 customAmount: hasCustomAmountChange ? selectedCustomAmount : null,
-                tipPercent: hasTipChange ? selectedTipPercent : null
+                tipPercent: hasTipChange ? selectedTipPercent : null,
+                shippingOption: hasShippingOptionChange ? resolvedConfirmShippingOption : null
               })
             });
             const data = await res.json();
@@ -2647,6 +2832,7 @@
             }
           }
 
+          pledge.shippingOption = resolvedConfirmShippingOption;
           invalidateCampaignCaches(pledge.campaignSlug);
           btn.textContent = getRuntimeMessage('manage.saved', 'Saved');
           setTimeout(() => window.location.reload(), 500);
@@ -2671,7 +2857,8 @@
     supportItems,
     customAmount = 0,
     currentCustomAmount = 0,
-    tipPercent = getPledgeTipPercent(pledge)
+    tipPercent = getPledgeTipPercent(pledge),
+    shippingOption = String(pledge.shippingOption || 'standard').trim().toLowerCase() || 'standard'
   ) {
     const amountEl = document.getElementById(`amount-${index}`);
     const changeEl = document.getElementById(`change-${index}`);
@@ -2762,18 +2949,13 @@
       hasChanges = true;
     }
 
-    let hasPhysical = false;
-    if (isSingleTier) {
-      const selectedTier = tiers.find((tier) => tier.id === tierIdOrAddedTiers);
-      hasPhysical = selectedTier?.category === 'physical';
-    } else {
-      const selectedTierList = Array.isArray(tierQtyOrSupportItems) ? tierQtyOrSupportItems : [];
-      hasPhysical = selectedTierList.some((selectedTier) => {
-        const tier = tiers.find((entry) => entry.id === selectedTier.id);
-        return tier?.category === 'physical';
-      });
-    }
-    const newShipping = hasPhysical ? FLAT_SHIPPING_FEE : 0;
+    const selectedTierEntries = buildSelectedTierEntries(campaign, pledge, tierIdOrAddedTiers, tierQtyOrSupportItems);
+    const selectedSupportItemEntries = buildSelectedSupportItemEntries(campaign, supportItems);
+    const hasPhysical =
+      selectedTierEntries.some((tier) => tier.category === 'physical') ||
+      selectedSupportItemEntries.some((supportItem) => supportItem.category === 'physical');
+    const fallbackShipping = getFallbackShippingCentsForPledge(pledge, campaign, hasPhysical);
+    let newShipping = fallbackShipping;
 
     const subtotalEl = document.getElementById(`subtotal-${index}`);
     const tipEl = document.getElementById(`tip-${index}`);
@@ -2783,9 +2965,17 @@
     const taxEl = document.getElementById(`tax-${index}`);
     const shippingEl = document.getElementById(`shipping-${index}`);
     const shippingRow = document.getElementById(`shipping-row-${index}`);
+    const shippingOptionRow = document.getElementById(`shipping-option-row-${index}`);
+    const shippingOptionSelect = document.getElementById(`shipping-option-${index}`);
     const newTipAmount = calculatePlatformTip(newSubtotal, tipPercent);
     const newTax = calculateTax(newSubtotal);
     const newTotalWithTax = newSubtotal + newTax + newShipping + newTipAmount;
+    const originalShippingOption = String(pledge.shippingOption || 'standard').trim().toLowerCase() || 'standard';
+    const baseHasChanges = hasChanges;
+    const shippingOptionChanged = shippingOption !== originalShippingOption;
+    if (shippingOptionChanged) {
+      hasChanges = true;
+    }
 
     subtotalEl.textContent = formatMoney(newSubtotal);
     if (tipRow) {
@@ -2808,6 +2998,12 @@
     if (shippingRow) {
       shippingRow.hidden = newShipping === 0;
       shippingEl.textContent = formatMoney(newShipping);
+    }
+    if (shippingOptionRow) {
+      shippingOptionRow.hidden = true;
+    }
+    if (shippingOptionSelect instanceof HTMLSelectElement) {
+      shippingOptionSelect.innerHTML = '';
     }
     amountEl.textContent = formatMoney(newTotalWithTax);
 
@@ -2833,6 +3029,66 @@
     saveBtn.textContent = hasChanges
       ? getRuntimeMessage('manage.saveChanges', 'Save Changes')
       : getRuntimeMessage('manage.noChanges', 'No Changes');
+
+    const quoteSignature = createShippingQuoteSignature(pledge, selectedTierEntries, selectedSupportItemEntries);
+    const requestState = shippingQuoteState.get(index) || { requestId: 0 };
+    const requestId = (requestState.requestId || 0) + 1;
+    shippingQuoteState.set(index, {
+      requestId,
+      signature: quoteSignature
+    });
+
+    void fetchQuotedShippingQuote(pledge, campaign, selectedTierEntries, selectedSupportItemEntries, shippingOption).then((quotedQuote) => {
+      const latestState = shippingQuoteState.get(index);
+      if (!latestState || latestState.requestId !== requestId || latestState.signature !== quoteSignature) {
+        return;
+      }
+
+      const quotedShipping = Math.max(0, Number(quotedQuote?.shippingCents || 0));
+      const resolvedShippingOption = String(quotedQuote?.selectedOption || shippingOption || 'standard').trim().toLowerCase() || 'standard';
+      const quotedTotal = newSubtotal + newTax + quotedShipping + newTipAmount;
+      if (shippingRow) {
+        shippingRow.hidden = quotedShipping === 0;
+        shippingEl.textContent = formatMoney(quotedShipping);
+      }
+      if (shippingOptionRow && shippingOptionSelect instanceof HTMLSelectElement) {
+        const availableOptions = Array.isArray(quotedQuote?.availableOptions) ? quotedQuote.availableOptions : [];
+        const showShippingOptions = shouldShowManageShippingOptions(quotedQuote);
+        shippingOptionRow.hidden = !showShippingOptions;
+        if (showShippingOptions) {
+          shippingOptionSelect.innerHTML = availableOptions.map((option) => `
+            <option value="${escapeAttribute(option.id)}"${option.id === resolvedShippingOption ? ' selected' : ''}>${escapeHtml(formatManageShippingOptionChoice(option))}</option>
+          `).join('');
+          shippingOptionSelect.value = resolvedShippingOption;
+        } else {
+          shippingOptionSelect.innerHTML = '';
+        }
+      }
+      const resolvedHasChanges = baseHasChanges || resolvedShippingOption !== originalShippingOption;
+      saveBtn.disabled = !resolvedHasChanges;
+      saveBtn.textContent = resolvedHasChanges
+        ? getRuntimeMessage('manage.saveChanges', 'Save Changes')
+        : getRuntimeMessage('manage.noChanges', 'No Changes');
+      amountEl.textContent = formatMoney(quotedTotal);
+
+      const quotedDiff = quotedTotal - originalTotal;
+      if (quotedDiff > 0) {
+        changeEl.hidden = false;
+        directionEl.textContent = getRuntimeMessage('manage.increase', 'Increase:');
+        changeAmountEl.textContent = '+' + formatMoney(quotedDiff);
+        changeAmountEl.className = 'change-up';
+      } else if (quotedDiff < 0) {
+        changeEl.hidden = false;
+        directionEl.textContent = getRuntimeMessage('manage.decrease', 'Decrease:');
+        changeAmountEl.textContent = formatMoney(quotedDiff);
+        changeAmountEl.className = 'change-down';
+      } else {
+        changeEl.hidden = true;
+        directionEl.textContent = '';
+        changeAmountEl.textContent = '';
+        changeAmountEl.className = '';
+      }
+    });
   }
 
   init();

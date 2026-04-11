@@ -737,7 +737,8 @@ describe('cart provider shim', () => {
       ],
       customAmount: 0,
       tipPercent: 6,
-      preferredLang: 'en'
+      preferredLang: 'en',
+      shippingOption: 'standard'
     });
     expect(sessionStorage.getItem('pool_pending_pledge')).toContain('"value":"true"');
     expect(window.location.hash).toBe('#stripe-checkout');
@@ -753,9 +754,15 @@ describe('cart provider shim', () => {
     (window as any).invalidateStatsCache = vi.fn();
     (window as any).invalidateInventoryCache = vi.fn();
 
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url === `${WORKER_BASE}/checkout-intent/start`) {
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          campaignSlug: 'demo',
+          items: [{ id: 'demo__featured-tier', quantity: 1 }],
+          preferredLang: 'en',
+          shippingOption: 'standard'
+        });
         return new Response(JSON.stringify({
           checkoutUiMode: 'custom',
           sessionId: 'cs_test_custom_123',
@@ -784,6 +791,43 @@ describe('cart provider shim', () => {
             tipAmount: 125,
             amount: 3122
           }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (url === `${WORKER_BASE}/shipping/quote`) {
+        expect(init?.method).toBe('POST');
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          campaignSlug: 'demo',
+          items: [
+            { id: 'demo__featured-tier', quantity: 1 }
+          ],
+          shippingAddress: {
+            country: 'US',
+            postalCode: '87101'
+          }
+        });
+
+        return new Response(JSON.stringify({
+          totalShippingCents: 900,
+          quotes: [
+            {
+              campaignSlug: 'demo',
+              shippingCents: 900,
+              source: 'usps_live',
+              carrier: 'usps',
+              service: 'usps_ground_advantage',
+              domestic: true,
+              availableOptions: [
+                { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 900 },
+                { id: 'signature_required', label: 'Signature required', domesticOnly: true, priceDeltaCents: 395, shippingCents: 1295 }
+              ],
+              defaultOption: 'standard',
+              selectedOption: 'standard'
+            }
+          ]
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
@@ -839,8 +883,13 @@ describe('cart provider shim', () => {
 
     await vi.waitFor(() => {
       expect(root?.textContent).toContain('Payment method');
-      expect(root?.textContent).toContain('Shipping address');
-      expect(root?.textContent).not.toContain('Contact');
+      expect(root?.textContent).toContain('Contact & Shipping address');
+      expect(root?.textContent).toContain('Shipping');
+      expect(root?.textContent).toContain('Pledge total');
+      expect(root?.textContent).not.toContain('Estimated shipping');
+      expect(root?.textContent).not.toContain('Delivery option');
+      expect(root?.textContent).not.toContain('Enter your shipping address to calculate final shipping before saving your payment method.');
+      expect(root?.querySelector('[data-cart-custom-checkout-email-fallback]')).toBeNull();
       expect(root?.textContent).not.toContain('Card stays the default');
       expect(root?.textContent).toContain('By providing your card information, you allow The Pool to charge your card if the campaign(s) you backed reaches its goal before its end date.');
       expect(root?.textContent).toContain('Full name *');
@@ -869,7 +918,7 @@ describe('cart provider shim', () => {
     expect(shippingName.getAttribute('aria-invalid')).toBe('false');
     expect(shippingError?.getAttribute('role')).toBe('alert');
 
-    expect(root?.textContent).toContain('Shipping address');
+    expect(root?.textContent).toContain('Contact & Shipping address');
     expect(shippingCountry.value).toBe('US');
     expect(Array.from(shippingCountry.options).some((option) => option.value === 'CA')).toBe(true);
 
@@ -883,6 +932,38 @@ describe('cart provider shim', () => {
     shippingCountry.value = 'US';
     shippingPostalCode.dispatchEvent(new Event('change', { bubbles: true }));
 
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
+      const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
+      const totalLabel = root?.querySelector('[data-cart-checkout-summary-total-label]');
+      const totalAmount = root?.querySelector('[data-cart-checkout-summary-total]');
+      const shippingOption = root?.querySelector('[data-cart-custom-shipping-option]') as HTMLSelectElement | null;
+      expect(shippingLabel?.textContent).toContain('Estimated shipping');
+      expect(totalLabel?.textContent).toContain('Estimated total');
+      expect(shippingAmount).toBeNull();
+      expect(totalAmount?.textContent).toBe('$37.22');
+      expect(shippingOption?.value).toBe('standard');
+      expect(root?.textContent).toContain('Signature required (+$3.95)');
+    });
+
+    const shippingOption = root?.querySelector('[data-cart-custom-shipping-option]') as HTMLSelectElement | null;
+    if (!shippingOption) throw new Error('Missing shipping option selector');
+    shippingOption.value = 'signature_required';
+    shippingOption.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
+      const totalAmount = root?.querySelector('[data-cart-checkout-summary-total]');
+      expect(shippingLabel?.textContent).toContain('Estimated shipping');
+      expect(shippingOption.value).toBe('signature_required');
+      expect(totalAmount?.textContent).toBe('$41.17');
+    });
+
+    await vi.waitFor(() => {
+      expect((window as any).PoolStripeCheckoutSidecar.mount).toHaveBeenCalledTimes(1);
+      expect(root?.querySelector('[data-cart-start-checkout]')).toBeNull();
+    });
+
     let confirmButton = root?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
     if (!confirmButton) throw new Error('Missing custom checkout confirm button');
     await vi.waitFor(() => {
@@ -893,7 +974,6 @@ describe('cart provider shim', () => {
     confirmButton.click();
 
     await vi.waitFor(() => {
-      expect(updateEmail).toHaveBeenCalledWith('supporter@example.com');
       expect(updateShippingAddress).toHaveBeenCalledWith({
         name: 'Supporter Example',
         address: {
@@ -989,6 +1069,22 @@ describe('cart provider shim', () => {
     if (!continueButton) throw new Error('Missing continue button');
     continueButton.click();
 
+    const shippingName = root?.querySelector('[data-cart-custom-shipping-field="name"]') as HTMLInputElement | null;
+    const shippingLine1 = root?.querySelector('[data-cart-custom-shipping-field="line1"]') as HTMLInputElement | null;
+    const shippingCity = root?.querySelector('[data-cart-custom-shipping-field="city"]') as HTMLInputElement | null;
+    const shippingState = root?.querySelector('[data-cart-custom-shipping-field="state"]') as HTMLInputElement | null;
+    const shippingPostalCode = root?.querySelector('[data-cart-custom-shipping-field="postal_code"]') as HTMLInputElement | null;
+    if (!shippingName || !shippingLine1 || !shippingCity || !shippingState || !shippingPostalCode) {
+      throw new Error('Missing custom checkout shipping fields');
+    }
+
+    shippingName.value = 'Supporter Example';
+    shippingLine1.value = '123 Main Street';
+    shippingCity.value = 'Albuquerque';
+    shippingState.value = 'NM';
+    shippingPostalCode.value = '87101';
+    shippingPostalCode.dispatchEvent(new Event('change', { bubbles: true }));
+
     await vi.waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/start`, expect.any(Object));
       expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/abandon`, expect.any(Object));
@@ -999,6 +1095,90 @@ describe('cart provider shim', () => {
 
   expect(sessionStorage.getItem('pool_active_custom_checkout_order_id')).toBeNull();
 });
+
+  it('localizes physical checkout shipping labels from runtime messages', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE,
+      i18n: {
+        currentLang: 'es',
+        messages: {
+          cart: {
+            shippingAddress: 'Contacto y direccion de envio',
+            fullName: 'Nombre completo',
+            addressLine1: 'Direccion linea 1',
+            addressLine2: 'Direccion linea 2',
+            city: 'Ciudad',
+            stateProvince: 'Estado / provincia',
+            postalCode: 'Codigo postal',
+            country: 'Pais',
+            emailAddress: 'Correo electronico',
+            paymentMethod: 'Metodo de pago'
+          }
+        }
+      }
+    };
+
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${WORKER_BASE}/shipping/quote`) {
+        return new Response(JSON.stringify({
+          quotes: [],
+          totalShippingCents: 0,
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    (window as any).PoolStripeCheckoutSidecar = {
+      mount: vi.fn()
+    };
+    (window as any).Stripe = vi.fn();
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'demo__featured-tier',
+      name: 'Demo Featured Tier',
+      price: 25,
+      quantity: 1,
+      url: '/campaigns/demo/',
+      shippable: true
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      expect(root?.textContent).toContain('Contacto y direccion de envio');
+      expect(root?.textContent).toContain('Nombre completo');
+      expect(root?.textContent).toContain('Direccion linea 1');
+      expect(root?.textContent).toContain('Direccion linea 2');
+      expect(root?.textContent).toContain('Ciudad');
+      expect(root?.textContent).toContain('Estado / provincia');
+      expect(root?.textContent).toContain('Codigo postal');
+      expect(root?.textContent).toContain('Pais');
+      expect(root?.textContent).toContain('Correo electronico');
+      expect(root?.textContent).toContain('Metodo de pago');
+      expect(root?.textContent).not.toContain('Ingresa tu direccion de envio para calcular el envio final antes de guardar tu metodo de pago.');
+    });
+  });
 
   it('ignores stale custom checkout bootstrap work after backing out and returning to cart', async () => {
     (window as any).POOL_CONFIG = {
@@ -1184,10 +1364,6 @@ describe('cart provider shim', () => {
     if (!continueButton) throw new Error('Missing continue button');
     continueButton.click();
 
-    await vi.waitFor(() => {
-      expect(mount).toHaveBeenCalledTimes(1);
-    });
-
     const emailField = root?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
     const shippingName = root?.querySelector('[data-cart-custom-shipping-field="name"]') as HTMLInputElement | null;
     const shippingLine1 = root?.querySelector('[data-cart-custom-shipping-field="line1"]') as HTMLInputElement | null;
@@ -1206,6 +1382,10 @@ describe('cart provider shim', () => {
     shippingState.value = 'NM';
     shippingPostalCode.value = '87101';
     shippingPostalCode.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(mount).toHaveBeenCalledTimes(1);
+    });
 
     let confirmButton = root?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
     if (!confirmButton) throw new Error('Missing custom checkout confirm button');
@@ -1487,7 +1667,8 @@ describe('cart provider shim', () => {
       ],
       customAmount: 0,
       tipPercent: 5,
-      preferredLang: 'en'
+      preferredLang: 'en',
+      shippingOption: 'standard'
     });
   });
 
@@ -1525,7 +1706,7 @@ describe('cart provider shim', () => {
 
     const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
     expect(root?.textContent).toContain('Shipping');
-    expect(root?.textContent).toContain('$6.00');
+    expect(root?.textContent).toContain('$20.00');
     expect(root?.textContent).toContain('Pledge total');
   });
 

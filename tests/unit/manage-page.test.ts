@@ -97,6 +97,8 @@ function mockManageFetch(options?: {
   paymentStartUrl?: string;
   paymentStartPayload?: Record<string, unknown> | null;
   paymentStartStatus?: number;
+  shippingQuotePayload?: Record<string, unknown> | null;
+  shippingQuoteStatus?: number;
   modifyStatus?: number;
   cancelStatus?: number;
 }) {
@@ -106,6 +108,8 @@ function mockManageFetch(options?: {
     paymentStartUrl = window.location.href,
     paymentStartPayload = null,
     paymentStartStatus = 200,
+    shippingQuotePayload = null,
+    shippingQuoteStatus = 200,
     modifyStatus = 200,
     cancelStatus = 200
   } = options || {};
@@ -113,6 +117,7 @@ function mockManageFetch(options?: {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const method = init?.method || 'GET';
+    const primaryCampaignSlug = String(campaigns[0]?.slug || 'hand-relations');
 
     if (url === '/api/campaigns.json') {
       return jsonResponse({ campaigns });
@@ -122,32 +127,32 @@ function mockManageFetch(options?: {
       return jsonResponse(pledges);
     }
 
-    if (url === `${WORKER_BASE}/live/hand-relations`) {
+    if (url === `${WORKER_BASE}/live/${primaryCampaignSlug}`) {
       return jsonResponse({
         stats: {
-          pledgedAmount: 1000,
+          pledgedAmount: Number(pledges[0]?.subtotal || 1000),
           state: 'live',
           supportItems: {}
         },
         inventory: {
           tiers: {
-            'frame-slot': { remaining: 10 }
+            [String(campaigns[0]?.tiers?.[0]?.id || 'frame-slot')]: { remaining: 10 }
           }
         }
       });
     }
 
-    if (url === `${WORKER_BASE}/inventory/hand-relations`) {
+    if (url === `${WORKER_BASE}/inventory/${primaryCampaignSlug}`) {
       return jsonResponse({
         tiers: {
-          'frame-slot': { remaining: 10 }
+          [String(campaigns[0]?.tiers?.[0]?.id || 'frame-slot')]: { remaining: 10 }
         }
       });
     }
 
-    if (url === `${WORKER_BASE}/stats/hand-relations`) {
+    if (url === `${WORKER_BASE}/stats/${primaryCampaignSlug}`) {
       return jsonResponse({
-        pledgedAmount: 1000,
+        pledgedAmount: Number(pledges[0]?.subtotal || 1000),
         state: 'live',
         supportItems: {}
       });
@@ -155,6 +160,10 @@ function mockManageFetch(options?: {
 
     if (url === `${WORKER_BASE}/pledge/payment-method/start` && method === 'POST') {
       return jsonResponse(paymentStartPayload || { url: paymentStartUrl }, paymentStartStatus);
+    }
+
+    if (url === `${WORKER_BASE}/shipping/quote` && method === 'POST') {
+      return jsonResponse(shippingQuotePayload || { quotes: [], totalShippingCents: 0 }, shippingQuoteStatus);
     }
 
     if (url === `${WORKER_BASE}/pledge/cancel` && method === 'POST') {
@@ -256,6 +265,316 @@ describe('manage page script', () => {
 
     expect(getButton('[data-action="payment"][data-index="0"]').textContent).toContain('Actualizar tarjeta');
     expect(getButton('[data-action="save"][data-index="0"]').textContent).toBe('Sin cambios');
+  });
+
+  it('updates physical-pledge shipping preview from the quote endpoint', async () => {
+    const physicalCampaign = {
+      ...baseCampaign,
+      slug: 'sunder',
+      title: 'Sunder',
+      tiers: [
+        {
+          id: 'blu-ray',
+          name: 'Blu-ray',
+          price: 35,
+          category: 'physical',
+          stackable: false
+        }
+      ]
+    };
+    const physicalPledge = {
+      ...basePledge,
+      campaignSlug: 'sunder',
+      subtotal: 3500,
+      tax: 276,
+      shipping: 300,
+      amount: 4076,
+      tierId: 'blu-ray',
+      tierName: 'Blu-ray',
+      shippingAddress: {
+        postalCode: '80205',
+        country: 'US'
+      }
+    };
+
+    mockManageFetch({
+      campaigns: [physicalCampaign],
+      pledges: [physicalPledge],
+      shippingQuotePayload: {
+        quotes: [
+          {
+            campaignSlug: 'sunder',
+            shippingCents: 675,
+            source: 'usps_live',
+            carrier: 'usps',
+            service: 'usps_ground_advantage',
+            domestic: true
+          }
+        ],
+        totalShippingCents: 675,
+        shippingAddress: {
+          country: 'US',
+          postalCode: '80205'
+        }
+      }
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    const tipInput = getInput('#tip-percent-0');
+    tipInput.value = '5';
+    tipInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('shipping-0')?.textContent).toBe('$6.75');
+      expect(document.getElementById('amount-0')?.textContent).toBe('$46.26');
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${WORKER_BASE}/shipping/quote`,
+      expect.objectContaining({
+        method: 'POST'
+      })
+    );
+  });
+
+  it('keeps shipping rows hidden for pledges with no shipping', async () => {
+    mockManageFetch({
+      campaigns: [baseCampaign],
+      pledges: [basePledge]
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    expect(document.getElementById('shipping-row-0')?.hidden).toBe(true);
+    expect(document.getElementById('shipping-option-row-0')?.hidden).toBe(true);
+    expect((document.getElementById('shipping-option-0') as HTMLSelectElement | null)?.options.length || 0).toBe(0);
+  });
+
+  it('does not show delivery options for fallback shipping quotes', async () => {
+    const physicalCampaign = {
+      ...baseCampaign,
+      slug: 'sunder',
+      title: 'Sunder',
+      tiers: [
+        {
+          id: 'blu-ray',
+          name: 'Blu-ray',
+          price: 35,
+          category: 'physical',
+          stackable: false
+        }
+      ]
+    };
+    const physicalPledge = {
+      ...basePledge,
+      campaignSlug: 'sunder',
+      subtotal: 3500,
+      tax: 276,
+      shipping: 300,
+      amount: 4076,
+      tierId: 'blu-ray',
+      tierName: 'Blu-ray',
+      shippingAddress: {
+        postalCode: '80205',
+        country: 'US'
+      }
+    };
+
+    mockManageFetch({
+      campaigns: [physicalCampaign],
+      pledges: [physicalPledge],
+      shippingQuotePayload: {
+        quotes: [
+          {
+            campaignSlug: 'sunder',
+            shippingCents: 300,
+            source: 'fallback_flat_rate',
+            defaultOption: 'standard',
+            selectedOption: 'standard',
+            availableOptions: [
+              {
+                id: 'standard',
+                shippingCents: 300,
+                priceDeltaCents: 0
+              },
+              {
+                id: 'signature_required',
+                shippingCents: 695,
+                priceDeltaCents: 395
+              }
+            ]
+          }
+        ],
+        totalShippingCents: 300,
+        shippingAddress: {
+          country: 'US',
+          postalCode: '80205'
+        }
+      }
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    const tipInput = getInput('#tip-percent-0');
+    tipInput.value = '5';
+    tipInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('shipping-row-0')?.hidden).toBe(false);
+      expect(document.getElementById('shipping-0')?.textContent).toBe('$3.00');
+      expect(document.getElementById('shipping-option-row-0')?.hidden).toBe(true);
+      expect((document.getElementById('shipping-option-0') as HTMLSelectElement | null)?.options.length || 0).toBe(0);
+    });
+  });
+
+  it('persists a selected shipping option for physical support-item changes', async () => {
+    const physicalCampaign = {
+      ...baseCampaign,
+      support_items: [
+        {
+          id: 'signed-script',
+          label: 'Signed Script',
+          need: 'physical add-on',
+          target: 25,
+          current: 0,
+          category: 'physical',
+          shipping_preset: 'signed_script',
+          shipping: {
+            weight_oz: 7,
+            length_in: 11,
+            width_in: 8.5,
+            height_in: 0.5
+          },
+          late_support: true
+        }
+      ]
+    };
+    const physicalPledge = {
+      ...basePledge,
+      subtotal: 1000,
+      tax: 79,
+      shipping: 300,
+      amount: 1379,
+      shippingAddress: {
+        postalCode: '80205',
+        country: 'US'
+      }
+    };
+
+    const fetchMock = mockManageFetch({
+      campaigns: [physicalCampaign],
+      pledges: [physicalPledge],
+      shippingQuotePayload: {
+        quotes: [
+          {
+            campaignSlug: 'hand-relations',
+            shippingCents: 675,
+            source: 'usps_live',
+            carrier: 'usps',
+            service: 'usps_ground_advantage',
+            domestic: true,
+            defaultOption: 'standard',
+            selectedOption: 'standard',
+            availableOptions: [
+              {
+                id: 'standard',
+                shippingCents: 675,
+                priceDeltaCents: 0
+              },
+              {
+                id: 'signature_required',
+                shippingCents: 1070,
+                priceDeltaCents: 395
+              }
+            ]
+          }
+        ],
+        totalShippingCents: 675,
+        shippingAddress: {
+          country: 'US',
+          postalCode: '80205'
+        }
+      }
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    const supportInput = document.querySelector('input[data-support-id="signed-script"]') as HTMLInputElement | null;
+    expect(supportInput).not.toBeNull();
+    supportInput!.value = '25';
+    supportInput!.dispatchEvent(new Event('input', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      const shippingSelect = document.getElementById('shipping-option-0') as HTMLSelectElement | null;
+      expect(shippingSelect?.options.length).toBe(2);
+      expect(shippingSelect?.value).toBe('standard');
+      expect(document.getElementById('shipping-0')?.textContent).toBe('$6.75');
+    });
+
+    const shippingSelect = document.getElementById('shipping-option-0') as HTMLSelectElement | null;
+    expect(shippingSelect).not.toBeNull();
+    shippingSelect!.value = 'signature_required';
+    shippingSelect!.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('shipping-0')?.textContent).toBe('$10.70');
+      expect(document.getElementById('amount-0')?.textContent).toBe('$48.46');
+    });
+
+    const saveButton = getButton('[data-action="save"][data-index="0"]');
+    expect(saveButton.disabled).toBe(false);
+    saveButton.click();
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('confirm-modal')?.hidden).toBe(false);
+      expect(document.getElementById('confirm-modal-details')?.textContent).toContain(
+        'Delivery option: Signature required'
+      );
+    });
+
+    getButton('#confirm-modal-confirm').click();
+
+    await vi.waitFor(() => {
+      const modifyCall = fetchMock.mock.calls.find(
+        ([url]) => url === `${WORKER_BASE}/pledge/modify`
+      );
+      expect(modifyCall).toBeTruthy();
+      const [, requestInit] = modifyCall!;
+      expect(requestInit?.method).toBe('POST');
+      expect(JSON.parse(String(requestInit?.body || '{}'))).toMatchObject({
+        token: 'token-123',
+        orderId: 'pool-intent-123',
+        preferredLang: 'en',
+        newTierId: 'frame-slot',
+        newTierQty: 1,
+        addTiers: null,
+        supportItems: [{ id: 'signed-script', amount: 25 }],
+        customAmount: null,
+        tipPercent: null,
+        shippingOption: 'signature_required'
+      });
+    });
   });
 
   it('loads and renders a pledge from the worker token endpoint', async () => {
@@ -647,7 +966,9 @@ describe('manage page script', () => {
     expect(saveButton.textContent).toBe('Save Changes');
 
     saveButton.click();
-    expect(document.getElementById('confirm-modal')?.hidden).toBe(false);
+    await vi.waitFor(() => {
+      expect(document.getElementById('confirm-modal')?.hidden).toBe(false);
+    });
 
     getButton('#confirm-modal-confirm').click();
 
@@ -666,7 +987,8 @@ describe('manage page script', () => {
             addTiers: null,
             supportItems: null,
             customAmount: null,
-            tipPercent: 5
+            tipPercent: 5,
+            shippingOption: null
           })
         })
       );

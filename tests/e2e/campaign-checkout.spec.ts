@@ -66,6 +66,18 @@ async function openCartViaClient(page: any) {
   });
 }
 
+async function addCartItemViaClient(page: any, item: Record<string, any>) {
+  await page.evaluate(async (nextItem) => {
+    const provider = (window as any).PoolCartProvider;
+    if (provider?.whenReady) {
+      await provider.whenReady();
+    }
+
+    const client = provider?.getApi?.();
+    await client?.api?.cart?.items?.add?.(nextItem);
+  }, item);
+}
+
 async function getActiveRuntime(page: any) {
   return page.evaluate(() => {
     return (window as any).PoolCartProvider?.activeRuntime || (window as any).POOL_CONFIG?.cartRuntime || 'first_party';
@@ -1219,6 +1231,246 @@ test.describe('Checkout Flow', () => {
         }
       ]
     });
+  });
+
+  test('physical support-item checkout uses domestic shipping quotes and preserves the support item in the start payload', async ({ page }) => {
+    test.setTimeout(60_000);
+
+    await page.addInitScript(() => {
+      (window as any).Stripe = () => ({
+        initCheckout: async () => ({
+          loadActions: async () => ({
+            type: 'success',
+            actions: {
+              getSession: () => ({ id: 'cs_test_support_domestic' }),
+              updateEmail: async () => ({}),
+              confirm: async () => ({ type: 'success' })
+            }
+          }),
+          createPaymentElement: () => ({
+            mount: (node: HTMLElement) => {
+              node.innerHTML = '<div data-test-payment-element>Mock payment element</div>';
+            },
+            unmount: () => {}
+          }),
+          on: (eventName: string, handler: Function) => {
+            if (eventName === 'change') {
+              handler({ session: { canConfirm: true } });
+            }
+          }
+        })
+      });
+    });
+
+    await page.goto('/campaigns/smoke-editable/');
+    if (await getActiveRuntime(page) !== 'first_party') {
+      test.skip();
+      return;
+    }
+
+    await expect.poll(async () => page.evaluate(() => (window as any).POOL_CONFIG?.workerBase || '')).not.toBe('');
+    await expect
+      .poll(async () => page.evaluate(() => (window as any).POOL_CONFIG?.platform?.workerUrl || (window as any).POOL_CONFIG?.workerBase || ''))
+      .not.toBe('');
+    const workerBase = await page.evaluate(
+      () => (window as any).POOL_CONFIG?.platform?.workerUrl || (window as any).POOL_CONFIG?.workerBase
+    );
+
+    let capturedQuotePayload: any = null;
+    let capturedStartPayload: any = null;
+    await page.route(`${workerBase}/shipping/quote`, async (route) => {
+      capturedQuotePayload = JSON.parse(route.request().postData() || '{}');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          quotes: [
+            {
+              campaignSlug: 'smoke-editable',
+              shippingCents: 675,
+              source: 'usps_live',
+              carrier: 'usps',
+              service: 'usps_ground_advantage',
+              domestic: true,
+              availableOptions: [
+                { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 675 },
+                { id: 'signature_required', label: 'Signature required', domesticOnly: true, priceDeltaCents: 395, shippingCents: 1070 }
+              ],
+              defaultOption: 'standard',
+              selectedOption: 'standard'
+            }
+          ],
+          totalShippingCents: 675,
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        })
+      });
+    });
+    await page.route(`${workerBase}/checkout-intent/start`, async (route) => {
+      capturedStartPayload = JSON.parse(route.request().postData() || '{}');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          checkoutUiMode: 'custom',
+          sessionId: 'cs_test_support_domestic',
+          clientSecret: 'cs_test_support_domestic_secret',
+          publishableKey: 'pk_test_support_domestic',
+          orderId: 'pool-intent-e2e-support-domestic'
+        })
+      });
+    });
+
+    await addCartItemViaClient(page, {
+      id: 'smoke-editable__support__signed-script',
+      name: 'SMOKE EDITABLE — Signed Script',
+      price: 25,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/#support-signed-script',
+      shippable: true,
+      campaignShippingFallbackCents: 1200,
+      customFields: [
+        { name: '_stackable', value: 'false' },
+        { name: '_category', value: 'physical' }
+      ]
+    });
+
+    await openCartViaClient(page);
+    await page.locator('[data-cart-continue]').click();
+    await expect(page.locator('[data-cart-confirm-custom-checkout]')).toBeVisible();
+
+    await page.locator('[data-cart-custom-checkout-email]').fill('support-item@example.com');
+    await page.locator('[data-cart-custom-shipping-field="name"]').fill('Supporter Example');
+    await page.locator('[data-cart-custom-shipping-field="line1"]').fill('123 Main Street');
+    await page.locator('[data-cart-custom-shipping-field="city"]').fill('Denver');
+    await page.locator('[data-cart-custom-shipping-field="state"]').fill('CO');
+    await page.locator('[data-cart-custom-shipping-field="postal_code"]').fill('80205');
+    await page.locator('[data-cart-custom-shipping-field="postal_code"]').dispatchEvent('change');
+
+    await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toHaveText('Estimated shipping');
+    await expect(page.locator('[data-cart-custom-shipping-option]')).toHaveValue('standard');
+    await expect.poll(() => capturedQuotePayload).not.toBeNull();
+    await expect.poll(() => capturedStartPayload).not.toBeNull();
+
+    expect(capturedQuotePayload).toMatchObject({
+      campaignSlug: 'smoke-editable',
+      items: [
+        { id: 'smoke-editable__support__signed-script', amount: 25 }
+      ],
+      shippingAddress: {
+        country: 'US',
+        postalCode: '80205'
+      }
+    });
+    expect(capturedStartPayload).toMatchObject({
+      campaignSlug: 'smoke-editable',
+      items: [
+        { id: 'smoke-editable__support__signed-script', amount: 25 }
+      ],
+      shippingOption: 'standard'
+    });
+  });
+
+  test('physical support-item checkout uses international quotes and falls back to the flat rate when quoting fails', async ({ page }) => {
+    test.setTimeout(60_000);
+
+    await page.goto('/campaigns/smoke-editable/');
+    if (await getActiveRuntime(page) !== 'first_party') {
+      test.skip();
+      return;
+    }
+
+    const workerBase = await page.evaluate(
+      () => (window as any).POOL_CONFIG?.platform?.workerUrl || (window as any).POOL_CONFIG?.workerBase
+    );
+    expect(workerBase).toBeTruthy();
+
+    let quoteCalls = 0;
+    await page.route(`${workerBase}/shipping/quote`, async (route) => {
+      quoteCalls += 1;
+      if (quoteCalls === 1) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            quotes: [
+              {
+                campaignSlug: 'smoke-editable',
+                shippingCents: 1400,
+                source: 'usps_live',
+                carrier: 'usps',
+                service: 'priority_mail_international',
+                domestic: false
+              }
+            ],
+            totalShippingCents: 1400,
+            shippingAddress: {
+              country: 'CA',
+              postalCode: 'M5V 2T6'
+            }
+          })
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'USPS unavailable' })
+      });
+    });
+    await page.route(`${workerBase}/checkout-intent/start`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          checkoutUiMode: 'custom',
+          sessionId: 'cs_test_support_international',
+          clientSecret: 'cs_test_support_international_secret',
+          publishableKey: 'pk_test_support_international',
+          orderId: 'pool-intent-e2e-support-international'
+        })
+      });
+    });
+
+    await addCartItemViaClient(page, {
+      id: 'smoke-editable__support__signed-script',
+      name: 'SMOKE EDITABLE — Signed Script',
+      price: 25,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/#support-signed-script',
+      shippable: true,
+      campaignShippingFallbackCents: 1200,
+      customFields: [
+        { name: '_stackable', value: 'false' },
+        { name: '_category', value: 'physical' }
+      ]
+    });
+
+    await openCartViaClient(page);
+    await page.locator('[data-cart-continue]').click();
+
+    await page.locator('[data-cart-custom-checkout-email]').fill('intl-supporter@example.com');
+    await page.locator('[data-cart-custom-shipping-field="name"]').fill('International Supporter');
+    await page.locator('[data-cart-custom-shipping-field="line1"]').fill('55 King Street');
+    await page.locator('[data-cart-custom-shipping-field="city"]').fill('Toronto');
+    await page.locator('[data-cart-custom-shipping-field="state"]').fill('ON');
+    await page.locator('[data-cart-custom-shipping-field="country"]').selectOption('CA');
+    await page.locator('[data-cart-custom-shipping-field="postal_code"]').fill('M5V 2T6');
+    await page.locator('[data-cart-custom-shipping-field="postal_code"]').dispatchEvent('change');
+
+    await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toHaveText('Estimated shipping');
+    await expect(page.locator('[data-cart-checkout-summary-shipping]')).toHaveText('$14.00');
+    await expect(page.locator('[data-cart-custom-shipping-option]')).toHaveCount(0);
+
+    await page.locator('[data-cart-custom-shipping-field="postal_code"]').fill('M4B 1B3');
+    await page.locator('[data-cart-custom-shipping-field="postal_code"]').dispatchEvent('change');
+
+    await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toHaveText('Shipping');
+    await expect(page.locator('[data-cart-checkout-summary-shipping]')).toHaveText('$12.00');
+    await expect(page.locator('[data-cart-custom-shipping-option]')).toHaveCount(0);
   });
 
   test('custom on-site checkout supports keyboard-only activation through save', async ({ page }) => {

@@ -80,8 +80,8 @@ For current Cloudflare limits, see:
 **Pricing rules:**
 - Campaign progress uses subtotal only.
 - Dust Wave platform tips are optional, default to 5%, and are capped at 15%.
-- Shipping uses the configured flat shipping rate per campaign containing physical rewards.
 - Sales tax uses the configured deployment tax rate.
+- Physical shipping is Worker-calculated from deployment/campaign shipping rules, including USPS live quotes when enabled plus configured fallback or free-shipping behavior.
 - Final stored / charged totals are `subtotal + shipping + tax + tip`.
 
 **Checkout hardening notes:**

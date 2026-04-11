@@ -37,58 +37,103 @@
     '[tabindex]:not([tabindex="-1"])'
   ].join(', ');
   const DEFAULT_SHIPPING_COUNTRY = 'US';
+  // USPS-derived checkout destinations, excluding countries on the current USPS temporary suspension notice.
   const SHIPPING_COUNTRY_OPTIONS = [
     { value: 'US', label: 'United States' },
-    { value: 'CA', label: 'Canada' },
-    { value: 'MX', label: 'Mexico' },
+    { value: 'AD', label: 'Andorra' },
+    { value: 'AE', label: 'United Arab Emirates' },
     { value: 'AR', label: 'Argentina' },
-    { value: 'BR', label: 'Brazil' },
-    { value: 'CL', label: 'Chile' },
-    { value: 'CO', label: 'Colombia' },
-    { value: 'CR', label: 'Costa Rica' },
-    { value: 'DO', label: 'Dominican Republic' },
-    { value: 'EC', label: 'Ecuador' },
-    { value: 'GT', label: 'Guatemala' },
-    { value: 'JM', label: 'Jamaica' },
-    { value: 'PA', label: 'Panama' },
-    { value: 'PE', label: 'Peru' },
-    { value: 'PR', label: 'Puerto Rico' },
-    { value: 'UY', label: 'Uruguay' },
     { value: 'AT', label: 'Austria' },
+    { value: 'CA', label: 'Canada' },
+    { value: 'AU', label: 'Australia' },
+    { value: 'BD', label: 'Bangladesh' },
     { value: 'BE', label: 'Belgium' },
-    { value: 'BG', label: 'Bulgaria' },
+    { value: 'BH', label: 'Bahrain' },
+    { value: 'BO', label: 'Bolivia' },
+    { value: 'BR', label: 'Brazil' },
+    { value: 'BS', label: 'Bahamas' },
+    { value: 'BW', label: 'Botswana' },
+    { value: 'BZ', label: 'Belize' },
     { value: 'CH', label: 'Switzerland' },
+    { value: 'CL', label: 'Chile' },
+    { value: 'CN', label: 'China' },
+    { value: 'CO', label: 'Colombia' },
     { value: 'CY', label: 'Cyprus' },
     { value: 'CZ', label: 'Czech Republic' },
     { value: 'DE', label: 'Germany' },
     { value: 'DK', label: 'Denmark' },
+    { value: 'DO', label: 'Dominican Republic' },
+    { value: 'DZ', label: 'Algeria' },
+    { value: 'EC', label: 'Ecuador' },
     { value: 'EE', label: 'Estonia' },
+    { value: 'EG', label: 'Egypt' },
     { value: 'ES', label: 'Spain' },
     { value: 'FI', label: 'Finland' },
     { value: 'FR', label: 'France' },
     { value: 'GB', label: 'United Kingdom' },
+    { value: 'GH', label: 'Ghana' },
+    { value: 'GI', label: 'Gibraltar' },
     { value: 'GR', label: 'Greece' },
+    { value: 'HK', label: 'Hong Kong' },
     { value: 'HR', label: 'Croatia' },
     { value: 'HU', label: 'Hungary' },
+    { value: 'ID', label: 'Indonesia' },
     { value: 'IE', label: 'Ireland' },
+    { value: 'IL', label: 'Israel' },
+    { value: 'IN', label: 'India' },
     { value: 'IS', label: 'Iceland' },
     { value: 'IT', label: 'Italy' },
+    { value: 'JM', label: 'Jamaica' },
+    { value: 'JP', label: 'Japan' },
+    { value: 'JO', label: 'Jordan' },
+    { value: 'KE', label: 'Kenya' },
+    { value: 'KR', label: 'South Korea' },
+    { value: 'KW', label: 'Kuwait' },
+    { value: 'KZ', label: 'Kazakhstan' },
+    { value: 'LB', label: 'Lebanon' },
+    { value: 'LI', label: 'Liechtenstein' },
+    { value: 'LK', label: 'Sri Lanka' },
     { value: 'LT', label: 'Lithuania' },
     { value: 'LU', label: 'Luxembourg' },
     { value: 'LV', label: 'Latvia' },
+    { value: 'MA', label: 'Morocco' },
+    { value: 'MC', label: 'Monaco' },
+    { value: 'MD', label: 'Moldova' },
+    { value: 'ME', label: 'Montenegro' },
+    { value: 'MK', label: 'North Macedonia' },
     { value: 'MT', label: 'Malta' },
+    { value: 'MU', label: 'Mauritius' },
+    { value: 'MX', label: 'Mexico' },
+    { value: 'MY', label: 'Malaysia' },
+    { value: 'NA', label: 'Namibia' },
+    { value: 'NG', label: 'Nigeria' },
     { value: 'NL', label: 'Netherlands' },
     { value: 'NO', label: 'Norway' },
+    { value: 'NZ', label: 'New Zealand' },
+    { value: 'OM', label: 'Oman' },
+    { value: 'PA', label: 'Panama' },
+    { value: 'PE', label: 'Peru' },
+    { value: 'PH', label: 'Philippines' },
+    { value: 'PK', label: 'Pakistan' },
     { value: 'PL', label: 'Poland' },
     { value: 'PT', label: 'Portugal' },
+    { value: 'QA', label: 'Qatar' },
     { value: 'RO', label: 'Romania' },
+    { value: 'RS', label: 'Serbia' },
+    { value: 'RU', label: 'Russia' },
+    { value: 'SA', label: 'Saudi Arabia' },
     { value: 'SE', label: 'Sweden' },
+    { value: 'SG', label: 'Singapore' },
     { value: 'SI', label: 'Slovenia' },
     { value: 'SK', label: 'Slovakia' },
-    { value: 'AU', label: 'Australia' },
-    { value: 'IN', label: 'India' },
-    { value: 'JP', label: 'Japan' },
-    { value: 'KR', label: 'South Korea' }
+    { value: 'SV', label: 'El Salvador' },
+    { value: 'TH', label: 'Thailand' },
+    { value: 'TN', label: 'Tunisia' },
+    { value: 'TR', label: 'Turkey' },
+    { value: 'TW', label: 'Taiwan' },
+    { value: 'UA', label: 'Ukraine' },
+    { value: 'VN', label: 'Vietnam' },
+    { value: 'ZA', label: 'South Africa' }
   ];
   const US_STATE_OPTIONS = [
     ['AL', 'Alabama'],
@@ -143,6 +188,63 @@
     ['WY', 'Wyoming'],
     ['DC', 'District of Columbia']
   ];
+  const shippingOptionUtils = window.PoolShippingOptionUtils || {
+    normalizeSelection: function(availableOptions, selectedOption, defaultOption) {
+      const options = Array.isArray(availableOptions) ? availableOptions : [];
+      const requested = String(selectedOption || '').trim().toLowerCase();
+      if (requested && options.some((option) => option?.id === requested)) {
+        return requested;
+      }
+
+      const normalizedDefault = String(defaultOption || 'standard').trim().toLowerCase() || 'standard';
+      if (options.some((option) => option?.id === normalizedDefault)) {
+        return normalizedDefault;
+      }
+
+      return options[0]?.id || 'standard';
+    },
+    getSelectedDetails: function(availableOptions, selectedOption, defaultOption) {
+      const options = Array.isArray(availableOptions) ? availableOptions : [];
+      const resolvedOption = this.normalizeSelection(options, selectedOption, defaultOption);
+      return options.find((option) => option?.id === resolvedOption) || null;
+    },
+    resolveQuote: function(payload, selectedOption, fallbackShippingCents) {
+      const firstQuote = Array.isArray(payload?.quotes) ? payload.quotes[0] : null;
+      const availableOptions = Array.isArray(firstQuote?.availableOptions) ? firstQuote.availableOptions : [];
+      const defaultOption = String(firstQuote?.defaultOption || 'standard').trim().toLowerCase() || 'standard';
+      const resolvedOption = this.normalizeSelection(
+        availableOptions,
+        selectedOption || firstQuote?.selectedOption,
+        defaultOption
+      );
+      const selectedDetails = this.getSelectedDetails(availableOptions, resolvedOption, defaultOption);
+      const shippingCents = selectedDetails
+        ? Math.max(0, Number(selectedDetails.shippingCents || 0))
+        : Math.max(0, Number(payload?.totalShippingCents || fallbackShippingCents || 0));
+
+      return {
+        shippingCents,
+        source: String(firstQuote?.source || ''),
+        availableOptions,
+        defaultOption,
+        selectedOption: resolvedOption
+      };
+    },
+    shouldShowOptions: function(quote) {
+      const source = String(quote?.source || '').trim().toLowerCase();
+      const availableOptions = Array.isArray(quote?.availableOptions) ? quote.availableOptions : [];
+      const shippingCents = Math.max(0, Number(quote?.shippingCents ?? quote?.amountCents ?? 0));
+      return source === 'usps_live' && shippingCents > 0 && availableOptions.length > 1;
+    },
+    formatChoice: function(option, labelResolver, moneyFormatter) {
+      if (!option) return '';
+      const label = typeof labelResolver === 'function' ? labelResolver(option.id) : String(option?.label || option?.id || '');
+      const delta = Math.max(0, Number(option?.priceDeltaCents || 0));
+      if (delta <= 0) return label;
+      const formattedDelta = typeof moneyFormatter === 'function' ? moneyFormatter(delta) : String(delta);
+      return `${label} (+${formattedDelta})`;
+    }
+  };
 
   function getRuntimeMessages() {
     return window.POOL_CONFIG?.i18n?.messages || {};
@@ -205,6 +307,24 @@
     );
     const amount = Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_FLAT_SHIPPING_RATE;
     return Math.round(amount * 100);
+  }
+
+  function getShippingFallbackFeeCents() {
+    const parsed = Number(
+      window.POOL_CONFIG?.shipping?.fallbackFlatRate ??
+      window.POOL_CONFIG?.shippingFallbackFlatRate
+    );
+    const amount = Number.isFinite(parsed) && parsed >= 0 ? parsed : 3;
+    return Math.round(amount * 100);
+  }
+
+  function isGlobalFreeShippingDefaultEnabled() {
+    const value =
+      window.POOL_CONFIG?.shipping?.freeShippingDefault ??
+      window.POOL_CONFIG?.shippingFreeShippingDefault;
+    if (value === true || value === false) return value;
+    const normalized = String(value || '').trim().toLowerCase();
+    return normalized === 'true';
   }
 
   function getDefaultPlatformTipPercent() {
@@ -338,6 +458,9 @@
 
   function prewarmStripeJs() {
     if (!canUseCustomCheckoutUi()) return null;
+    if (!window.PoolStripeCheckoutSidecar || typeof window.PoolStripeCheckoutSidecar.ensureStripeJs !== 'function') {
+      return null;
+    }
     if (stripeJsPrewarmPromise) return stripeJsPrewarmPromise;
 
     stripeJsPrewarmPromise = loadStripeJs().catch((error) => {
@@ -472,6 +595,16 @@
       stackable: isStackable,
       shippable: button.getAttribute('data-item-shippable') === 'true'
     };
+    const shippingFallbackCents = Number(button.getAttribute('data-item-shipping-fallback-cents'));
+    if (Number.isFinite(shippingFallbackCents) && shippingFallbackCents >= 0) {
+      item.campaignShippingFallbackCents = Math.round(shippingFallbackCents);
+    }
+    const campaignFreeShipping = button.getAttribute('data-item-campaign-free-shipping');
+    if (campaignFreeShipping === 'true') {
+      item.campaignFreeShipping = true;
+    } else if (campaignFreeShipping === 'false') {
+      item.campaignFreeShipping = false;
+    }
 
     if (maxQty) {
       item.maxQuantity = parseInt(maxQty, 10);
@@ -531,7 +664,7 @@
     const subtotalCents = Math.round(subtotal * 100);
     const nextTipPercent = sanitizeTipPercent(tipPercent, getDefaultPlatformTipPercent());
     const tipAmountCents = Math.round((subtotalCents * nextTipPercent) / 100);
-    const shippingCents = getPhysicalCampaignCount(items) * getFlatShippingFeeCents();
+    const shippingCents = getCampaignFallbackShippingCents(items);
     const taxCents = calculateTax(subtotalCents);
 
     return {
@@ -626,12 +759,36 @@
     return slugs.size;
   }
 
+  function getCampaignFallbackShippingCents(items) {
+    const fallbackByCampaign = new Map();
+    for (const item of Array.isArray(items) ? items : []) {
+      if (!firstPartyItemIsPhysical(item)) continue;
+      const slug = getFirstPartyItemCampaignSlug(item);
+      if (!slug) continue;
+      const parsed = Number(item?.campaignShippingFallbackCents);
+      const campaignFreeShipping = item?.campaignFreeShipping;
+      const resolvedFreeShipping = campaignFreeShipping === true
+        ? true
+        : campaignFreeShipping === false
+          ? false
+          : isGlobalFreeShippingDefaultEnabled();
+      const resolvedAmount = resolvedFreeShipping
+        ? 0
+        : (Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : getShippingFallbackFeeCents());
+
+      if (!fallbackByCampaign.has(slug) || resolvedAmount === 0) {
+        fallbackByCampaign.set(slug, resolvedAmount);
+      }
+    }
+    return Array.from(fallbackByCampaign.values()).reduce((sum, amount) => sum + amount, 0);
+  }
+
   function buildFirstPartyPricing(state) {
     const items = state?.cart?.items?.items || [];
     const subtotalCents = Math.round((Number(state?.cart?.subtotal || 0)) * 100);
     const tipPercent = sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent());
     const tipAmountCents = Math.round((subtotalCents * tipPercent) / 100);
-    const shippingCents = getPhysicalCampaignCount(items) * getFlatShippingFeeCents();
+    const shippingCents = getCampaignFallbackShippingCents(items);
     const taxCents = calculateTax(subtotalCents);
 
     return {
@@ -644,6 +801,147 @@
     };
   }
 
+  function isCustomCheckoutEstimateActive(state, options) {
+    if (options?.currentRoute !== CHECKOUT_VIEW_ROUTE) return false;
+    if (options?.checkoutMode !== 'custom') return false;
+    const items = state?.cart?.items?.items || [];
+    return cartHasPhysicalItems(items);
+  }
+
+  function getDisplayedFirstPartyPricing(state, options) {
+    const pricing = buildFirstPartyPricing(state);
+    if (!isCustomCheckoutEstimateActive(state, options)) {
+      return {
+        ...pricing,
+        shippingLabel: getRuntimeMessage('cart.shipping', 'Shipping'),
+        totalLabel: getRuntimeMessage('cart.pledgeTotal', 'Pledge total'),
+        isShippingEstimate: false
+      };
+    }
+
+    const shippingQuote = options?.shippingQuote || null;
+    const fallbackShippingCents = getCampaignFallbackShippingCents(state?.cart?.items?.items || []);
+    const shippingCents = Number.isFinite(Number(shippingQuote?.amountCents))
+      ? Math.max(0, Number(shippingQuote.amountCents))
+      : fallbackShippingCents;
+    const quoteStatus = String(shippingQuote?.status || 'idle').trim().toLowerCase();
+    const hasResolvedQuote = quoteStatus === 'ready';
+    const isCalculatingQuote = quoteStatus === 'loading';
+    const source = String(shippingQuote?.source || '').trim().toLowerCase();
+    const isEstimate = shouldRenderShippingAsEstimate(shippingQuote);
+    const shippingLabel = isCalculatingQuote
+      ? getRuntimeMessage('cart.shippingCalculating', 'Calculating shipping...')
+      : isEstimate
+        ? getRuntimeMessage('cart.shippingEstimate', 'Estimated shipping')
+        : getRuntimeMessage('cart.shipping', 'Shipping');
+
+    return {
+      ...pricing,
+      shippingCents,
+      totalCents: pricing.subtotalCents + pricing.tipAmountCents + pricing.taxCents + shippingCents,
+      shippingLabel,
+      totalLabel: isCalculatingQuote || isEstimate
+        ? getRuntimeMessage('cart.estimatedTotal', 'Estimated total')
+        : getRuntimeMessage('cart.pledgeTotal', 'Pledge total'),
+      isShippingEstimate: isCalculatingQuote || isEstimate,
+      shippingSource: source
+    };
+  }
+
+  function getCartShippingOptionMessageKey(optionId) {
+    switch (String(optionId || '').trim().toLowerCase()) {
+      case 'signature_required':
+        return 'cart.shippingOptionSignatureRequired';
+      case 'adult_signature_required':
+        return 'cart.shippingOptionAdultSignatureRequired';
+      case 'standard':
+      default:
+        return 'cart.shippingOptionStandard';
+    }
+  }
+
+  function getCartShippingOptionLabel(optionId) {
+    switch (String(optionId || '').trim().toLowerCase()) {
+      case 'signature_required':
+        return getRuntimeMessage('cart.shippingOptionSignatureRequired', 'Signature required');
+      case 'adult_signature_required':
+        return getRuntimeMessage('cart.shippingOptionAdultSignatureRequired', 'Adult signature required');
+      case 'standard':
+      default:
+        return getRuntimeMessage('cart.shippingOptionStandard', 'Standard');
+    }
+  }
+
+  function getCartSelectedShippingOptionDetails(shippingQuote) {
+    const availableOptions = Array.isArray(shippingQuote?.availableOptions) ? shippingQuote.availableOptions : [];
+    const selectedOption = shippingOptionUtils.normalizeSelection(
+      availableOptions,
+      shippingQuote?.selectedOption,
+      shippingQuote?.defaultOption
+    );
+    return availableOptions.find((option) => option?.id === selectedOption) || null;
+  }
+
+  function shouldShowCartShippingOptions(shippingQuote) {
+    return shippingOptionUtils.shouldShowOptions({
+      ...shippingQuote,
+      shippingCents: Number(shippingQuote?.amountCents || 0)
+    });
+  }
+
+  function shouldRenderShippingAsEstimate(shippingQuote) {
+    const source = String(shippingQuote?.source || '').trim().toLowerCase();
+    const status = String(shippingQuote?.status || '').trim().toLowerCase();
+    return source === 'usps_live' || status === 'loading';
+  }
+
+  function formatCartShippingOptionChoice(option) {
+    return shippingOptionUtils.formatChoice(option, getCartShippingOptionLabel, formatCents);
+  }
+
+  function renderCartShippingOptionChoices(shippingQuote) {
+    const availableOptions = Array.isArray(shippingQuote?.availableOptions) ? shippingQuote.availableOptions : [];
+    const selectedOption = shippingOptionUtils.normalizeSelection(
+      availableOptions,
+      shippingQuote?.selectedOption,
+      shippingQuote?.defaultOption
+    );
+    return availableOptions.map((option) => `
+      <option value="${escapeAttribute(option.id)}"${option.id === selectedOption ? ' selected' : ''}>${escapeHtml(formatCartShippingOptionChoice(option))}</option>
+    `).join('');
+  }
+
+  function buildCartShippingQuoteState(data, fallbackShippingCents, currentQuote) {
+    const resolvedQuote = shippingOptionUtils.resolveQuote(
+      data,
+      currentQuote?.selectedOption,
+      fallbackShippingCents
+    );
+
+    return {
+      status: 'ready',
+      amountCents: resolvedQuote.shippingCents,
+      source: resolvedQuote.source,
+      availableOptions: resolvedQuote.availableOptions,
+      defaultOption: resolvedQuote.defaultOption,
+      selectedOption: resolvedQuote.selectedOption
+    };
+  }
+
+  function renderCartShippingSummaryValue(shippingQuote, shippingCents) {
+    if (!shouldShowCartShippingOptions(shippingQuote)) {
+      return `<strong data-cart-checkout-summary-shipping>${formatCents(shippingCents)}</strong>`;
+    }
+
+    return `
+      <div class="pool-first-party-cart__summary-value pool-first-party-cart__summary-value--shipping-option">
+        <select id="pool-custom-shipping-option" class="pool-first-party-cart__input pool-first-party-cart__input--select pool-first-party-cart__input--summary-select" data-cart-custom-shipping-option aria-label="${escapeAttribute(getRuntimeMessage('cart.shippingOption', 'Delivery option'))}">
+          ${renderCartShippingOptionChoices(shippingQuote)}
+        </select>
+      </div>
+    `;
+  }
+
   function cartHasPhysicalItems(items) {
     return (items || []).some((item) => {
       if (item?.shippable === true) return true;
@@ -651,6 +949,10 @@
       const fields = Array.isArray(item?.customFields) ? item.customFields : [];
       return fields.some((field) => field?.name === '_category' && field?.value === 'physical');
     });
+  }
+
+  function shouldDeferPhysicalCustomCheckoutStart(state, options) {
+    return false;
   }
 
   function buildCheckoutLineItems(items) {
@@ -1122,6 +1424,7 @@
     let isCartOpen = false;
     let suppressDrawerRerender = false;
     let activeCustomCheckoutMount = null;
+    let customCheckoutShippingQuoteToken = 0;
     let customCheckoutFlowToken = 0;
     let cartDialogCleanup = null;
     let cartBackgroundUnlock = null;
@@ -1518,7 +1821,11 @@
       const total = Number(state.cart.total || 0);
       const isCheckoutPreview = currentRoute === CHECKOUT_VIEW_ROUTE;
       const isFirstPartyCheckoutEnabled = getRequestedCheckoutProvider() === FIRST_PARTY_CHECKOUT_PROVIDER;
-      const pricing = buildFirstPartyPricing(state);
+      const pricing = getDisplayedFirstPartyPricing(state, {
+        currentRoute,
+        checkoutMode: checkoutUiState.mode,
+        shippingQuote: checkoutUiState.customCheckout?.shippingQuote
+      });
       const hasPhysicalItems = cartHasPhysicalItems(items);
       const checkoutLineItems = buildCheckoutLineItems(items);
       const wantsCustomCheckout = isCheckoutPreview &&
@@ -1526,17 +1833,22 @@
         getCheckoutUiMode() === 'custom';
       const isCustomCheckout = wantsCustomCheckout && checkoutUiState.mode === 'custom';
       const customCheckout = checkoutUiState.customCheckout || {};
+      const isDeferredCustomCheckoutStart = shouldDeferPhysicalCustomCheckoutStart(state, {
+        currentRoute,
+        checkoutMode: checkoutUiState.mode,
+        hasCustomCheckoutSession: Boolean(checkoutUiState.customCheckout?.sessionId || checkoutUiState.customCheckout?.clientSecret)
+      });
       const checkoutErrorMarkup = `
         <p class="pool-first-party-cart__error" data-cart-checkout-error role="alert" ${checkoutUiState.error ? '' : 'hidden'}>${escapeHtml(checkoutUiState.error || '')}</p>
       `;
       const customCheckoutMarkup = wantsCustomCheckout ? `
         ${hasPhysicalItems ? `
           <div class="pool-first-party-cart__callout pool-first-party-cart__callout--stripe">
-            <p class="pool-first-party-cart__section-label">Shipping address</p>
+            <p class="pool-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.shippingAddress', 'Contact & Shipping address'))}</p>
             <div class="pool-first-party-cart__shipping-fallback pool-first-party-cart__shipping-fallback--plain" data-cart-custom-shipping-fallback>
               <div class="pool-first-party-cart__shipping-grid">
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
-                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-name">Full name <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-name">${escapeHtml(getRuntimeMessage('cart.fullName', 'Full name'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                   <input id="pool-custom-shipping-name" name="shipping_name" class="pool-first-party-cart__input" type="text" autocomplete="shipping name" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.name || '')}" data-cart-custom-shipping-field="name">
                 </div>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
@@ -1555,27 +1867,27 @@
                   <p id="pool-custom-checkout-email-error" class="pool-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
                 </div>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
-                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line1">Address line 1 <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line1">${escapeHtml(getRuntimeMessage('cart.addressLine1', 'Address line 1'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                   <input id="pool-custom-shipping-line1" name="shipping_address_line1" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line1" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.line1 || '')}" data-cart-custom-shipping-field="line1">
                 </div>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
-                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line2">Address line 2</label>
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line2">${escapeHtml(getRuntimeMessage('cart.addressLine2', 'Address line 2'))}</label>
                   <input id="pool-custom-shipping-line2" name="shipping_address_line2" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line2" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.line2 || '')}" data-cart-custom-shipping-field="line2">
                 </div>
                 <div class="pool-first-party-cart__field">
-                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-city">City <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-city">${escapeHtml(getRuntimeMessage('cart.city', 'City'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                   <input id="pool-custom-shipping-city" name="shipping_city" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level2" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.city || '')}" data-cart-custom-shipping-field="city">
                 </div>
                 <div class="pool-first-party-cart__field">
-                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-state">State / Province <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-state">${escapeHtml(getRuntimeMessage('cart.stateProvince', 'State / Province'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                   <input id="pool-custom-shipping-state" name="shipping_state" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level1" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.state || '')}" data-cart-custom-shipping-field="state">
                 </div>
                 <div class="pool-first-party-cart__field">
-                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-postal">Postal code <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-postal">${escapeHtml(getRuntimeMessage('cart.postalCode', 'Postal code'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                   <input id="pool-custom-shipping-postal" name="shipping_postal_code" class="pool-first-party-cart__input" type="text" inputmode="numeric" autocomplete="shipping postal-code" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.postal_code || '')}" data-cart-custom-shipping-field="postal_code">
                 </div>
                 <div class="pool-first-party-cart__field">
-                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-country">Country <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-country">${escapeHtml(getRuntimeMessage('cart.country', 'Country'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                   <select id="pool-custom-shipping-country" name="shipping_country" class="pool-first-party-cart__input pool-first-party-cart__input--select" autocomplete="shipping country" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" data-cart-custom-shipping-field="country">
                     ${renderShippingCountryOptions(customCheckout?.shippingDraft?.address?.country || DEFAULT_SHIPPING_COUNTRY)}
                   </select>
@@ -1677,12 +1989,12 @@
             </div>
             ${pricing.shippingCents > 0 ? `
               <div class="pool-first-party-cart__summary-row" data-cart-summary-shipping-row>
-                <span>${escapeHtml(getRuntimeMessage('cart.shipping', 'Shipping'))}</span>
+                <span data-cart-summary-shipping-label>${escapeHtml(pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping'))}</span>
                 <strong data-cart-summary-shipping>${formatCents(pricing.shippingCents)}</strong>
               </div>
             ` : ''}
             <div class="pool-first-party-cart__summary-row pool-first-party-cart__summary-row--total">
-              <span>${escapeHtml(getRuntimeMessage('cart.pledgeTotal', 'Pledge total'))}</span>
+              <span data-cart-summary-total-label>${escapeHtml(pricing.totalLabel || getRuntimeMessage('cart.pledgeTotal', 'Pledge total'))}</span>
               <strong data-cart-summary-total>${formatCents(pricing.totalCents)}</strong>
             </div>
           </div>
@@ -1708,27 +2020,29 @@
             <div class="pool-first-party-cart__checkout-summary">
               <div class="pool-first-party-cart__summary-row">
                 <span>${escapeHtml(getRuntimeMessage('cart.subtotal', 'Subtotal'))}</span>
-                <strong>${formatCents(pricing.subtotalCents)}</strong>
+                <strong data-cart-checkout-summary-subtotal>${formatCents(pricing.subtotalCents)}</strong>
               </div>
               ${pricing.tipAmountCents > 0 ? `
-                <div class="pool-first-party-cart__summary-row">
-                  <span>${escapeHtml(getRuntimeMessage('cart.tipWithPercent', '%{platform} tip (%{percent}%)').replace('%{platform}', getPlatformName()).replace('%{percent}', String(pricing.tipPercent)))}</span>
-                  <strong>${formatCents(pricing.tipAmountCents)}</strong>
+                <div class="pool-first-party-cart__summary-row" data-cart-checkout-summary-tip-row>
+                  <span data-cart-checkout-summary-tip-label>${escapeHtml(getRuntimeMessage('cart.tipWithPercent', '%{platform} tip (%{percent}%)').replace('%{platform}', getPlatformName()).replace('%{percent}', String(pricing.tipPercent)))}</span>
+                  <strong data-cart-checkout-summary-tip-amount>${formatCents(pricing.tipAmountCents)}</strong>
                 </div>
               ` : ''}
               <div class="pool-first-party-cart__summary-row">
                   <span>${formatTaxRateLabel()}</span>
-                <strong>${formatCents(pricing.taxCents)}</strong>
+                <strong data-cart-checkout-summary-tax>${formatCents(pricing.taxCents)}</strong>
               </div>
               ${pricing.shippingCents > 0 ? `
                 <div class="pool-first-party-cart__summary-row">
-                  <span>${escapeHtml(getRuntimeMessage('cart.shipping', 'Shipping'))}</span>
-                  <strong>${formatCents(pricing.shippingCents)}</strong>
+                  <span data-cart-checkout-summary-shipping-label>${escapeHtml(pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping'))}</span>
+                  <div data-cart-checkout-summary-shipping-value>
+                    ${renderCartShippingSummaryValue(customCheckout?.shippingQuote, pricing.shippingCents)}
+                  </div>
                 </div>
               ` : ''}
               <div class="pool-first-party-cart__summary-row pool-first-party-cart__summary-row--total">
-                <span>${escapeHtml(getRuntimeMessage('cart.pledgeTotal', 'Pledge total'))}</span>
-                <strong>${formatCents(pricing.totalCents)}</strong>
+                <span data-cart-checkout-summary-total-label>${escapeHtml(pricing.totalLabel || getRuntimeMessage('cart.pledgeTotal', 'Pledge total'))}</span>
+                <strong data-cart-checkout-summary-total>${formatCents(pricing.totalCents)}</strong>
               </div>
             </div>
           </div>
@@ -1742,7 +2056,7 @@
       const footerActions = isCheckoutPreview ? `
           <div class="pool-first-party-cart__actions">
             <button type="button" class="pool-first-party-cart__action pool-first-party-cart__action--secondary" data-cart-back>${escapeHtml(getRuntimeMessage('cart.backToCart', 'Back to cart'))}</button>
-            ${wantsCustomCheckout ? `
+            ${wantsCustomCheckout && !isDeferredCustomCheckoutStart ? `
               <button
                 type="button"
                 class="pool-first-party-cart__action${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting' ? ' is-busy' : ''}"
@@ -1762,8 +2076,10 @@
                 type="button"
                 class="pool-first-party-cart__action"
                 data-cart-start-checkout
-                ${!isFirstPartyCheckoutEnabled || checkoutUiState.status === 'submitting' ? 'disabled' : ''}
-              >${checkoutUiState.status === 'submitting' ? escapeHtml(getRuntimeMessage('cart.startingPledge', 'Starting pledge...')) : (isFirstPartyCheckoutEnabled ? escapeHtml(getRuntimeMessage('cart.continueToPledge', 'Continue to pledge')) : 'Legacy checkout only')}</button>
+                ${!isFirstPartyCheckoutEnabled || checkoutUiState.status === 'submitting' || (isDeferredCustomCheckoutStart && !isCustomCheckoutShippingDraftComplete(customCheckout?.shippingDraft)) ? 'disabled' : ''}
+              >${checkoutUiState.status === 'submitting'
+                ? escapeHtml(getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...'))
+                : (isFirstPartyCheckoutEnabled ? escapeHtml(getRuntimeMessage('cart.continueToPledge', 'Continue to pledge')) : 'Legacy checkout only')}</button>
             `}
         </div>
       ` : `
@@ -1803,7 +2119,7 @@
           <div class="pool-first-party-cart__body">
             ${bodyMarkup}
           </div>
-          <footer class="pool-first-party-cart__footer">
+          <footer class="pool-first-party-cart__footer${isCheckoutPreview ? ' pool-first-party-cart__footer--checkout' : ''}">
             ${footerActions}
           </footer>
         </div>
@@ -1819,7 +2135,11 @@
       const root = getCartRoot();
       if (!root || !isCartOpen || currentRoute === CHECKOUT_VIEW_ROUTE) return;
 
-      const pricing = buildFirstPartyPricing(store.getState());
+      const pricing = getDisplayedFirstPartyPricing(store.getState(), {
+        currentRoute,
+        checkoutMode: checkoutUiState.mode,
+        shippingQuote: checkoutUiState.customCheckout?.shippingQuote
+      });
       const tipAmount = root.querySelector('[data-cart-tip-amount]');
       const tipPercent = root.querySelector('[data-cart-tip-percent]');
       const tipInput = root.querySelector('[data-cart-tip]');
@@ -1829,7 +2149,9 @@
       const subtotal = root.querySelector('[data-cart-summary-subtotal]');
       const tax = root.querySelector('[data-cart-summary-tax]');
       const shippingRow = root.querySelector('[data-cart-summary-shipping-row]');
+      const shippingLabel = root.querySelector('[data-cart-summary-shipping-label]');
       const shipping = root.querySelector('[data-cart-summary-shipping]');
+      const totalLabel = root.querySelector('[data-cart-summary-total-label]');
       const total = root.querySelector('[data-cart-summary-total]');
 
       if (tipAmount) tipAmount.textContent = formatCents(pricing.tipAmountCents);
@@ -1851,8 +2173,105 @@
 
       if (shippingRow && shipping) {
         shippingRow.hidden = pricing.shippingCents <= 0;
+        if (shippingLabel) {
+          shippingLabel.textContent = pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping');
+        }
         shipping.textContent = formatCents(pricing.shippingCents);
       }
+      if (totalLabel) {
+        totalLabel.textContent = pricing.totalLabel || getRuntimeMessage('cart.pledgeTotal', 'Pledge total');
+      }
+    }
+
+    function syncCheckoutPreviewSummaryUI() {
+      const root = getCartRoot();
+      if (!root || !isCartOpen || currentRoute !== CHECKOUT_VIEW_ROUTE) return;
+
+      const state = store.getState();
+      const pricing = getDisplayedFirstPartyPricing(store.getState(), {
+        currentRoute,
+        checkoutMode: checkoutUiState.mode,
+        shippingQuote: checkoutUiState.customCheckout?.shippingQuote
+      });
+      const subtotal = root.querySelector('[data-cart-checkout-summary-subtotal]');
+      const tipRow = root.querySelector('[data-cart-checkout-summary-tip-row]');
+      const tipLabel = root.querySelector('[data-cart-checkout-summary-tip-label]');
+      const tipAmount = root.querySelector('[data-cart-checkout-summary-tip-amount]');
+      const tax = root.querySelector('[data-cart-checkout-summary-tax]');
+      const shippingLabel = root.querySelector('[data-cart-checkout-summary-shipping-label]');
+      const shippingAmount = root.querySelector('[data-cart-checkout-summary-shipping]');
+      const totalLabel = root.querySelector('[data-cart-checkout-summary-total-label]');
+      const total = root.querySelector('[data-cart-checkout-summary-total]');
+      if (subtotal) {
+        subtotal.textContent = formatCents(pricing.subtotalCents);
+      }
+      if (tipRow && tipLabel && tipAmount) {
+        tipRow.hidden = pricing.tipAmountCents <= 0;
+        tipLabel.textContent = getRuntimeMessage('cart.tipWithPercent', '%{platform} tip (%{percent}%)')
+          .replace('%{platform}', getPlatformName())
+          .replace('%{percent}', String(pricing.tipPercent));
+        tipAmount.textContent = formatCents(pricing.tipAmountCents);
+      }
+      if (tax) {
+        tax.textContent = formatCents(pricing.taxCents);
+      }
+      if (shippingLabel) {
+        shippingLabel.textContent = pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping');
+      }
+      if (shippingAmount) {
+        shippingAmount.textContent = formatCents(pricing.shippingCents);
+      }
+      if (totalLabel) {
+        totalLabel.textContent = pricing.totalLabel || getRuntimeMessage('cart.pledgeTotal', 'Pledge total');
+      }
+      if (total) {
+        total.textContent = formatCents(pricing.totalCents);
+      }
+      syncCustomCheckoutShippingOptionUI(root);
+    }
+
+    function syncCustomCheckoutShippingOptionUI(root) {
+      const shippingValueContainer = root?.querySelector('[data-cart-checkout-summary-shipping-value]');
+      const shippingOptionSelect = root?.querySelector('[data-cart-custom-shipping-option]');
+      const shippingQuote = checkoutUiState.customCheckout?.shippingQuote || null;
+      const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
+
+      if (shippingValueContainer) {
+        const currentShippingCents = Number.isFinite(Number(shippingQuote?.amountCents))
+          ? Math.max(0, Number(shippingQuote.amountCents))
+          : getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || []);
+        shippingValueContainer.innerHTML = renderCartShippingSummaryValue(shippingQuote, currentShippingCents);
+      }
+
+      const availableOptions = Array.isArray(shippingQuote?.availableOptions) ? shippingQuote.availableOptions : [];
+      const selectedOption = shippingOptionUtils.normalizeSelection(
+        availableOptions,
+        shippingQuote?.selectedOption,
+        shippingQuote?.defaultOption
+      );
+
+      const refreshedShippingOptionSelect = root?.querySelector('[data-cart-custom-shipping-option]');
+      if (!refreshedShippingOptionSelect) {
+        if (shippingAmount && !shouldShowCartShippingOptions(shippingQuote)) {
+          shippingAmount.textContent = formatCents(
+            Number.isFinite(Number(shippingQuote?.amountCents))
+              ? Math.max(0, Number(shippingQuote.amountCents))
+              : getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || [])
+          );
+        }
+        return;
+      }
+
+      if (!shouldShowCartShippingOptions(shippingQuote)) {
+        return;
+      }
+
+      refreshedShippingOptionSelect.innerHTML = renderCartShippingOptionChoices({
+        availableOptions,
+        selectedOption,
+        defaultOption: shippingQuote?.defaultOption || 'standard'
+      });
+      refreshedShippingOptionSelect.value = selectedOption;
     }
 
     function openFirstPartyCart(focusTarget) {
@@ -1965,6 +2384,28 @@
       );
     }
 
+    function syncCheckoutStartButton() {
+      const root = getCartRoot();
+      const button = root?.querySelector('[data-cart-start-checkout]');
+      if (!button) return;
+
+      const shouldDeferCustomCheckout = shouldDeferPhysicalCustomCheckoutStart(store.getState(), {
+        currentRoute,
+        checkoutMode: checkoutUiState.mode,
+        hasCustomCheckoutSession: Boolean(checkoutUiState.customCheckout?.sessionId || checkoutUiState.customCheckout?.clientSecret)
+      });
+      const shippingDraft = shouldDeferCustomCheckout
+        ? readCustomCheckoutShippingDraft()
+        : checkoutUiState.customCheckout?.shippingDraft || null;
+
+      button.disabled = checkoutUiState.status === 'submitting' ||
+        getRequestedCheckoutProvider() !== FIRST_PARTY_CHECKOUT_PROVIDER ||
+        (shouldDeferCustomCheckout && !isCustomCheckoutShippingDraftComplete(shippingDraft));
+      button.textContent = checkoutUiState.status === 'submitting'
+        ? getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...')
+        : getRuntimeMessage('cart.continueToPledge', 'Continue to pledge');
+    }
+
     function requestCloseFirstPartyCart() {
       if (isCustomCheckoutBusy()) return;
       const activeOrderId = getActiveCustomCheckoutOrderId();
@@ -2048,6 +2489,18 @@
       errorNode.hidden = !nextMessage;
     }
 
+    function isCustomCheckoutShippingDraftComplete(shippingDraft) {
+      const draft = shippingDraft || readCustomCheckoutShippingDraft();
+      return Boolean(
+        draft?.name &&
+        draft?.address?.line1 &&
+        draft?.address?.city &&
+        draft?.address?.state &&
+        draft?.address?.postal_code &&
+        draft?.address?.country
+      );
+    }
+
     function shouldShowCheckoutLevelStripeError(errorLike) {
       const type = String(errorLike?.type || errorLike?.error?.type || '').trim().toLowerCase();
       const code = String(errorLike?.code || errorLike?.error?.code || '').trim().toLowerCase();
@@ -2099,6 +2552,129 @@
       };
     }
 
+    async function refreshCustomCheckoutShippingEstimate() {
+      if (currentRoute !== CHECKOUT_VIEW_ROUTE || checkoutUiState.mode !== 'custom') return;
+      const state = store.getState();
+      if (!cartHasPhysicalItems(state?.cart?.items?.items || [])) return;
+
+      const shippingDraft = readCustomCheckoutShippingDraft();
+      checkoutUiState.customCheckout = {
+        ...(checkoutUiState.customCheckout || {}),
+        shippingDraft
+      };
+
+      if (!isCustomCheckoutShippingDraftComplete(shippingDraft)) {
+        customCheckoutShippingQuoteToken += 1;
+        checkoutUiState.customCheckout = {
+          ...(checkoutUiState.customCheckout || {}),
+          shippingQuote: {
+            status: 'idle',
+            amountCents: getCampaignFallbackShippingCents(state?.cart?.items?.items || []),
+            source: 'fallback_flat_rate',
+            availableOptions: [],
+            defaultOption: 'standard',
+            selectedOption: 'standard'
+          }
+        };
+        syncFirstPartyCartTipUI();
+        syncCheckoutPreviewSummaryUI();
+        return;
+      }
+
+      checkoutUiState.customCheckout = {
+        ...(checkoutUiState.customCheckout || {}),
+          shippingQuote: {
+            status: 'loading',
+            amountCents: Number(checkoutUiState.customCheckout?.shippingQuote?.amountCents) || getCampaignFallbackShippingCents(state?.cart?.items?.items || []),
+            source: checkoutUiState.customCheckout?.shippingQuote?.source || 'fallback_flat_rate',
+            availableOptions: Array.isArray(checkoutUiState.customCheckout?.shippingQuote?.availableOptions)
+              ? checkoutUiState.customCheckout.shippingQuote.availableOptions
+              : [],
+            defaultOption: checkoutUiState.customCheckout?.shippingQuote?.defaultOption || 'standard',
+            selectedOption: checkoutUiState.customCheckout?.shippingQuote?.selectedOption || 'standard'
+          }
+      };
+      const quoteToken = customCheckoutShippingQuoteToken + 1;
+      customCheckoutShippingQuoteToken = quoteToken;
+      syncFirstPartyCartTipUI();
+      syncCheckoutPreviewSummaryUI();
+
+      const payloadResult = buildFirstPartyCheckoutPayload(store.getState());
+      if (!payloadResult.valid) {
+        if (quoteToken === customCheckoutShippingQuoteToken) {
+          checkoutUiState.customCheckout = {
+            ...(checkoutUiState.customCheckout || {}),
+            shippingQuote: {
+              status: 'error',
+              amountCents: getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || []),
+              source: 'fallback_flat_rate',
+              availableOptions: [],
+              defaultOption: 'standard',
+              selectedOption: 'standard'
+            }
+          };
+          syncFirstPartyCartTipUI();
+          syncCheckoutPreviewSummaryUI();
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch(`${getWorkerBase()}/shipping/quote`, {
+          method: 'POST',
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            ...payloadResult.payload,
+            shippingAddress: {
+              country: shippingDraft.address.country,
+              postalCode: shippingDraft.address.postal_code
+            },
+            shippingOption: checkoutUiState.customCheckout?.shippingQuote?.selectedOption || 'standard'
+          })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (quoteToken !== customCheckoutShippingQuoteToken) return;
+
+        checkoutUiState.customCheckout = {
+          ...(checkoutUiState.customCheckout || {}),
+          shippingQuote: response.ok
+            ? buildCartShippingQuoteState(
+                data,
+                getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || []),
+                checkoutUiState.customCheckout?.shippingQuote
+              )
+            : {
+                status: 'error',
+                amountCents: getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || []),
+                source: 'fallback_flat_rate',
+                availableOptions: [],
+                defaultOption: 'standard',
+                selectedOption: 'standard'
+              }
+        };
+      } catch (_error) {
+        if (quoteToken !== customCheckoutShippingQuoteToken) return;
+        checkoutUiState.customCheckout = {
+          ...(checkoutUiState.customCheckout || {}),
+          shippingQuote: {
+            status: 'error',
+            amountCents: getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || []),
+            source: 'fallback_flat_rate',
+            availableOptions: [],
+            defaultOption: 'standard',
+            selectedOption: 'standard'
+          }
+        };
+      }
+
+      syncFirstPartyCartTipUI();
+      syncCheckoutPreviewSummaryUI();
+    }
+
     async function syncCustomCheckoutShippingToStripe(options) {
       const shippingDraft = readCustomCheckoutShippingDraft();
       checkoutUiState.customCheckout = {
@@ -2115,7 +2691,7 @@
         !shippingDraft.address.country;
 
       if (missingRequiredField) {
-        const message = 'Enter a complete shipping address to continue.';
+        const message = getRuntimeMessage('cart.shippingAddressRequired', 'Enter a complete shipping address to continue.');
         checkoutUiState.customCheckout.shippingError = message;
         setCustomCheckoutShippingError(message);
         return {
@@ -2394,7 +2970,9 @@
 
     async function bootstrapCustomCheckout(data, stripeReadyPromise) {
       const flowToken = invalidateCustomCheckoutFlow();
+      const existingCustomCheckout = checkoutUiState.customCheckout || {};
       const nextCustomCheckout = {
+        ...existingCustomCheckout,
         sessionId: String(data?.sessionId || ''),
         clientSecret: String(data?.clientSecret || ''),
         publishableKey: String(data?.publishableKey || ''),
@@ -2455,13 +3033,50 @@
         return;
       }
 
-      const payloadResult = buildFirstPartyCheckoutPayload(store.getState());
+      const state = store.getState();
+      const shouldDeferCustomCheckout = shouldDeferPhysicalCustomCheckoutStart(state, {
+        currentRoute,
+        checkoutMode: checkoutUiState.mode,
+        hasCustomCheckoutSession: Boolean(checkoutUiState.customCheckout?.sessionId || checkoutUiState.customCheckout?.clientSecret)
+      });
+      const shippingDraft = shouldDeferCustomCheckout ? readCustomCheckoutShippingDraft() : null;
+
+      if (shouldDeferCustomCheckout && !isCustomCheckoutShippingDraftComplete(shippingDraft)) {
+        const message = getRuntimeMessage('cart.shippingAddressRequired', 'Enter a complete shipping address to continue.');
+        checkoutUiState.customCheckout = {
+          ...(checkoutUiState.customCheckout || {}),
+          shippingDraft,
+          shippingError: message
+        };
+        setCustomCheckoutShippingError(message);
+        syncCheckoutPreviewSummaryUI();
+        return;
+      }
+
+      const payloadResult = buildFirstPartyCheckoutPayload(state);
       if (!payloadResult.valid) {
         setCheckoutUiState({
           status: 'idle',
           error: payloadResult.error
         });
         return;
+      }
+
+      if (shouldDeferCustomCheckout && shippingDraft) {
+        payloadResult.payload.shippingAddress = {
+          country: shippingDraft.address.country,
+          postalCode: shippingDraft.address.postal_code
+        };
+      }
+
+      payloadResult.payload.shippingOption = checkoutUiState.customCheckout?.shippingQuote?.selectedOption || 'standard';
+
+      const emailField = getCartRoot()?.querySelector('[data-cart-custom-checkout-email]');
+      const emailValue = emailField instanceof HTMLInputElement
+        ? String(emailField.value || '').trim()
+        : '';
+      if (emailValue) {
+        payloadResult.payload.email = emailValue;
       }
 
       setCheckoutUiState({
@@ -2542,6 +3157,10 @@
         if (continueTrigger) {
           event.preventDefault();
           eventBus.emit('summary.checkout_clicked');
+          const prewarm = prewarmStripeJs();
+          if (prewarm && typeof prewarm.catch === 'function') {
+            void prewarm.catch(() => {});
+          }
           cartShouldFocusAfterRender = true;
           apiRoot.api.theme.cart.navigate(CHECKOUT_VIEW_ROUTE);
           return;
@@ -2626,6 +3245,8 @@
 
         const shippingField = event.target?.closest?.('[data-cart-custom-shipping-field]');
         if (shippingField) {
+          syncCheckoutStartButton();
+          void refreshCustomCheckoutShippingEstimate();
           syncCustomCheckoutShippingToStripe().catch((error) => {
             checkoutUiState.status = 'idle';
             setCheckoutUiError(error?.message || 'Shipping validation failed.');
@@ -2634,9 +3255,35 @@
           return;
         }
 
+        const shippingOptionField = event.target?.closest?.('[data-cart-custom-shipping-option]');
+        if (shippingOptionField instanceof HTMLSelectElement) {
+          const currentQuote = checkoutUiState.customCheckout?.shippingQuote || {};
+          const availableOptions = Array.isArray(currentQuote.availableOptions) ? currentQuote.availableOptions : [];
+          const selectedOption = shippingOptionUtils.normalizeSelection(
+            availableOptions,
+            shippingOptionField.value,
+            currentQuote.defaultOption
+          );
+          const selectedDetails = availableOptions.find((option) => option?.id === selectedOption) || null;
+          checkoutUiState.customCheckout = {
+            ...(checkoutUiState.customCheckout || {}),
+            shippingQuote: {
+              ...currentQuote,
+              selectedOption,
+              amountCents: Math.max(
+                0,
+                Number(selectedDetails?.shippingCents ?? currentQuote.amountCents ?? getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || [])) || 0
+              )
+            }
+          };
+          syncCheckoutPreviewSummaryUI();
+          return;
+        }
+
         const customCheckoutEmailField = event.target?.closest?.('[data-cart-custom-checkout-email]');
         if (!customCheckoutEmailField) return;
 
+        syncCheckoutStartButton();
         syncCustomCheckoutEmailToStripe(customCheckoutEmailField.value).catch((error) => {
           checkoutUiState.status = 'idle';
           setCheckoutUiError(error?.message || 'Email validation failed.');

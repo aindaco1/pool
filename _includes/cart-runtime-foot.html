@@ -14,6 +14,11 @@
   data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"
   data-sales-tax-rate="{{ site.pricing.sales_tax_rate | default: 0.07875 }}"
   data-flat-shipping-rate="{{ site.pricing.flat_shipping_rate | default: 3.00 }}"
+    data-shipping-origin-zip="{{ site.shipping.origin_zip | default: '' }}"
+    data-shipping-origin-country="{{ site.shipping.origin_country | default: 'US' }}"
+    data-shipping-fallback-flat-rate="{{ site.shipping.fallback_flat_rate | default: 3.00 }}"
+    data-shipping-free-shipping-default="{{ site.shipping.free_shipping_default | default: false }}"
+    data-shipping-presets="{{ site.shipping.presets | jsonify | escape }}"
   data-default-tip-percent="{{ site.pricing.default_tip_percent | default: 5 }}"
   data-max-tip-percent="{{ site.pricing.max_tip_percent | default: 15 }}"
   data-live-stats-cache-ttl-seconds="{{ site.cache.live_stats_ttl_seconds | default: 300 }}"
@@ -24,6 +29,7 @@
 <link rel="dns-prefetch" href="//js.stripe.com">
 <link rel="dns-prefetch" href="//api.stripe.com">
 <div hidden data-pool-cart-root="true"></div>
+<script src="/assets/js/shipping-option-utils.js" defer></script>
 <script src="/assets/js/stripe-checkout-sidecar.js" defer></script>
 <script src="/assets/js/cart-provider.js" defer></script>
 <script src="/assets/js/cart.js" defer></script>

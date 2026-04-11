@@ -29,6 +29,11 @@ describe('config boot scripts', () => {
         data-default-creator-name="Fork Studio"
         data-sales-tax-rate="0.07875"
         data-flat-shipping-rate="3.00"
+        data-shipping-origin-zip="80205"
+        data-shipping-origin-country="US"
+        data-shipping-fallback-flat-rate="3.00"
+        data-shipping-free-shipping-default="false"
+        data-shipping-presets='{"poster":{"weight_oz":5,"length_in":18,"width_in":3,"height_in":3}}'
         data-default-tip-percent="5"
         data-max-tip-percent="15"
         data-live-stats-cache-ttl-seconds="300"
@@ -64,6 +69,20 @@ describe('config boot scripts', () => {
         defaultTipPercent: '5',
         maxTipPercent: '15'
       },
+      shipping: {
+        originZip: '80205',
+        originCountry: 'US',
+        fallbackFlatRate: '3.00',
+        freeShippingDefault: 'false',
+        presets: {
+          poster: {
+            weight_oz: 5,
+            length_in: 18,
+            width_in: 3,
+            height_in: 3
+          }
+        }
+      },
       cache: {
         liveStatsTtlSeconds: '300',
         liveInventoryTtlSeconds: '300'
@@ -82,6 +101,10 @@ describe('config boot scripts', () => {
       defaultCreatorName: 'Fork Studio',
       salesTaxRate: '0.07875',
       flatShippingRate: '3.00',
+      shippingOriginZip: '80205',
+      shippingOriginCountry: 'US',
+      shippingFallbackFlatRate: '3.00',
+      shippingFreeShippingDefault: 'false',
       defaultTipPercent: '5',
       maxTipPercent: '15',
       liveStatsCacheTtlSeconds: '300',

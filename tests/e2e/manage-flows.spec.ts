@@ -47,20 +47,35 @@ const activePledge = {
   tipAmount: 0
 };
 
-async function routeManageWorker(page: any, options?: { pledges?: Array<Record<string, any>>, paymentStartPayload?: Record<string, any> }) {
+async function routeManageWorker(page: any, options?: {
+  campaigns?: Array<Record<string, any>>,
+  pledges?: Array<Record<string, any>>,
+  paymentStartPayload?: Record<string, any>,
+  shippingQuotePayload?: Record<string, any>
+}) {
   const paymentStartBodies: any[] = [];
   const cancelBodies: any[] = [];
   const modifyBodies: any[] = [];
+  const shippingQuoteBodies: any[] = [];
 
+  const campaigns = options?.campaigns || [baseCampaign];
   const pledges = options?.pledges || [activePledge];
   const paymentStartPayload = options?.paymentStartPayload || { url: '#payment-update' };
+  const shippingQuotePayload = options?.shippingQuotePayload || {
+    quotes: [],
+    totalShippingCents: 0,
+    shippingAddress: {
+      country: 'US',
+      postalCode: '80205'
+    }
+  };
 
   await page.route('**/api/campaigns.json', async (route: any) => {
     await route.fulfill({
       status: 200,
       headers: JSON_HEADERS,
       body: JSON.stringify({
-        campaigns: [baseCampaign]
+        campaigns
       })
     });
   });
@@ -124,10 +139,20 @@ async function routeManageWorker(page: any, options?: { pledges?: Array<Record<s
     });
   });
 
+  await page.route('**/shipping/quote', async (route: any) => {
+    shippingQuoteBodies.push(JSON.parse(route.request().postData() || '{}'));
+    await route.fulfill({
+      status: 200,
+      headers: JSON_HEADERS,
+      body: JSON.stringify(shippingQuotePayload)
+    });
+  });
+
   return {
     paymentStartBodies,
     cancelBodies,
-    modifyBodies
+    modifyBodies,
+    shippingQuoteBodies
   };
 }
 
@@ -246,7 +271,7 @@ test.describe('Manage Pledge Flows', () => {
     });
 
     await expect.poll(() => requests.modifyBodies.length).toBe(1);
-    expect(requests.modifyBodies[0]).toEqual({
+    expect(requests.modifyBodies[0]).toMatchObject({
       token: 'token-123',
       orderId: 'pool-intent-123',
       preferredLang: 'en',
@@ -256,6 +281,122 @@ test.describe('Manage Pledge Flows', () => {
       supportItems: null,
       customAmount: null,
       tipPercent: 5
+    });
+  });
+
+  test('quotes physical support-item shipping before saving modify changes', async ({ page }) => {
+    const physicalCampaign = {
+      ...baseCampaign,
+      support_items: [
+        {
+          id: 'signed-script',
+          label: 'Signed Script',
+          need: 'physical add-on',
+          target: 25,
+          current: 0,
+          category: 'physical',
+          shipping_preset: 'signed_script',
+          shipping: {
+            weight_oz: 7,
+            length_in: 11,
+            width_in: 8.5,
+            height_in: 0.5
+          },
+          late_support: true
+        }
+      ]
+    };
+    const physicalPledge = {
+      ...activePledge,
+      shipping: 300,
+      amount: 1379,
+      shippingAddress: {
+        country: 'US',
+        postalCode: '80205'
+      }
+    };
+    const requests = await routeManageWorker(page, {
+      campaigns: [physicalCampaign],
+      pledges: [physicalPledge],
+      shippingQuotePayload: {
+        quotes: [
+          {
+            campaignSlug: 'hand-relations',
+            shippingCents: 675,
+            source: 'usps_live',
+            carrier: 'usps',
+            service: 'usps_ground_advantage',
+            domestic: true,
+            defaultOption: 'standard',
+            selectedOption: 'standard',
+            availableOptions: [
+              {
+                id: 'standard',
+                shippingCents: 675,
+                priceDeltaCents: 0
+              },
+              {
+                id: 'signature_required',
+                shippingCents: 1070,
+                priceDeltaCents: 395
+              }
+            ]
+          }
+        ],
+        totalShippingCents: 675,
+        shippingAddress: {
+          country: 'US',
+          postalCode: '80205'
+        }
+      }
+    });
+
+    await page.goto('/manage/?t=token-123');
+    await expect(page.locator('#pledges-list')).toBeVisible();
+
+    const supportInput = page.locator('input[data-support-id="signed-script"]');
+    await expect(supportInput).toBeVisible();
+    await supportInput.fill('25');
+
+    const shippingOptionSelect = page.locator('#shipping-option-0');
+    await expect(shippingOptionSelect).toBeVisible();
+    await shippingOptionSelect.selectOption('signature_required');
+    await expect(page.locator('#shipping-0')).toContainText('$10.70');
+    await expect(page.locator('#amount-0')).toContainText('$48.46');
+
+    const saveButton = page.locator('[data-action="save"][data-index="0"]');
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+
+    await expect(page.locator('#confirm-modal')).toBeVisible();
+    await expect(page.locator('#confirm-modal')).toContainText('Shipping: $10.70');
+    await expect(page.locator('#confirm-modal')).toContainText('Delivery option: Signature required');
+    await expect.poll(() => requests.shippingQuoteBodies.length > 0).toBe(true);
+    expect(requests.shippingQuoteBodies.at(-1)).toMatchObject({
+      campaignSlug: 'hand-relations',
+      items: [
+        { id: 'hand-relations__frame-slot', quantity: 1 },
+        { id: 'hand-relations__support__signed-script', amount: 25 }
+      ],
+      shippingAddress: {
+        country: 'US',
+        postalCode: '80205'
+      }
+    });
+
+    await page.locator('#confirm-modal-confirm').click();
+    await expect.poll(() => requests.modifyBodies.length).toBe(1);
+    expect(requests.modifyBodies[0]).toMatchObject({
+      token: 'token-123',
+      orderId: 'pool-intent-123',
+      preferredLang: 'en',
+      newTierId: 'frame-slot',
+      newTierQty: 1,
+      addTiers: null,
+      supportItems: [{ id: 'signed-script', amount: 25 }],
+      customAmount: null,
+      tipPercent: null,
+      shippingOption: 'signature_required'
     });
   });
 
@@ -294,7 +435,8 @@ test.describe('Manage Pledge Flows', () => {
       addTiers: null,
       supportItems: null,
       customAmount: null,
-      tipPercent: 1
+      tipPercent: 1,
+      shippingOption: null
     });
   });
 

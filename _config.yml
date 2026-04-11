@@ -41,6 +41,73 @@ pricing:
   default_tip_percent: 5
   max_tip_percent: 15
 
+shipping:
+  origin_zip: "87102"
+  origin_country: "US"
+  fallback_flat_rate: 3.00
+  free_shipping_default: false
+  default_option: standard
+  # USPS OAuth config is fork-facing here for non-secret settings only.
+  # Keep the companion USPS client secret in Worker secrets / worker/.dev.vars.
+  usps:
+    enabled: true
+    client_id: ""
+    api_base: ""
+    timeout_ms: 5000
+    quote_cache_ttl_seconds: 600
+    failure_cooldown_seconds: 300
+    rate_limit_cooldown_seconds: 1800
+  presets:
+    tshirt:
+      weight_oz: 8
+      packaging_weight_oz: 1
+      length_in: 12
+      width_in: 10
+      height_in: 1.5
+      stack_height_in: 0.5
+    poster:
+      weight_oz: 5
+      packaging_weight_oz: 3
+      length_in: 18
+      width_in: 3
+      height_in: 3
+      stack_height_in: 0.5
+    cd:
+      weight_oz: 4
+      packaging_weight_oz: 2
+      length_in: 6.25
+      width_in: 6.25
+      height_in: 1
+      stack_height_in: 0.25
+    vinyl:
+      weight_oz: 18
+      packaging_weight_oz: 4
+      length_in: 13.5
+      width_in: 13.5
+      height_in: 1
+      stack_height_in: 0.35
+    dvd:
+      weight_oz: 4
+      packaging_weight_oz: 2
+      length_in: 8
+      width_in: 6
+      height_in: 1
+      stack_height_in: 0.2
+    bluray:
+      weight_oz: 4
+      packaging_weight_oz: 2
+      length_in: 7.25
+      width_in: 5.75
+      height_in: 0.9
+      stack_height_in: 0.2
+    signed_script:
+      weight_oz: 20
+      packaging_weight_oz: 4
+      length_in: 12
+      width_in: 9
+      height_in: 1.5
+      stack_height_in: 0.4
+
 checkout:
   stripe_publishable_key: ""
 

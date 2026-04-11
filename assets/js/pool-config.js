@@ -14,6 +14,10 @@
   var defaultCreatorName = dataset.defaultCreatorName || platformCompanyName;
   var salesTaxRate = dataset.salesTaxRate || '0.07875';
   var flatShippingRate = dataset.flatShippingRate || '3.00';
+  var shippingOriginZip = dataset.shippingOriginZip || '';
+  var shippingOriginCountry = dataset.shippingOriginCountry || 'US';
+  var shippingFallbackFlatRate = dataset.shippingFallbackFlatRate || '3.00';
+  var shippingFreeShippingDefault = dataset.shippingFreeShippingDefault || 'false';
   var defaultTipPercent = dataset.defaultTipPercent || '5';
   var maxTipPercent = dataset.maxTipPercent || '15';
   var liveStatsCacheTtlSeconds = dataset.liveStatsCacheTtlSeconds || '300';
@@ -23,12 +27,21 @@
   var checkoutUiMode = 'custom';
   var stripePublishableKey = dataset.stripePublishableKey || '';
   var runtimeMessages = {};
+  var shippingPresets = {};
 
   if (dataset.runtimeMessages) {
     try {
       runtimeMessages = JSON.parse(dataset.runtimeMessages);
     } catch (_error) {
       runtimeMessages = {};
+    }
+  }
+
+  if (dataset.shippingPresets) {
+    try {
+      shippingPresets = JSON.parse(dataset.shippingPresets);
+    } catch (_error) {
+      shippingPresets = {};
     }
   }
 
@@ -51,6 +64,13 @@
       defaultTipPercent: defaultTipPercent,
       maxTipPercent: maxTipPercent
     },
+    shipping: {
+      originZip: shippingOriginZip,
+      originCountry: shippingOriginCountry,
+      fallbackFlatRate: shippingFallbackFlatRate,
+      freeShippingDefault: shippingFreeShippingDefault,
+      presets: shippingPresets
+    },
     cache: {
       liveStatsTtlSeconds: liveStatsCacheTtlSeconds,
       liveInventoryTtlSeconds: liveInventoryCacheTtlSeconds
@@ -69,6 +89,10 @@
     defaultCreatorName: defaultCreatorName,
     salesTaxRate: salesTaxRate,
     flatShippingRate: flatShippingRate,
+    shippingOriginZip: shippingOriginZip,
+    shippingOriginCountry: shippingOriginCountry,
+    shippingFallbackFlatRate: shippingFallbackFlatRate,
+    shippingFreeShippingDefault: shippingFreeShippingDefault,
     defaultTipPercent: defaultTipPercent,
     maxTipPercent: maxTipPercent,
     liveStatsCacheTtlSeconds: liveStatsCacheTtlSeconds,

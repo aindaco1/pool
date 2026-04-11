@@ -164,6 +164,11 @@ body.pool-cart-open {
   border-top: 1px solid $border--default;
 }
 
+.pool-first-party-cart__footer--checkout {
+  padding-top: 14px;
+  border-top: 0;
+}
+
 .pool-first-party-cart__body {
   flex: 1 1 auto;
   min-height: 0;
@@ -262,6 +267,25 @@ body.pool-cart-open {
   justify-content: space-between;
   gap: 16px;
   @include type-ui;
+
+  > :first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+.pool-first-party-cart__summary-value {
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.pool-first-party-cart__summary-value--shipping-option {
+  flex: 0 1 18rem;
+  width: min(100%, 18rem);
 }
 
 .pool-first-party-cart__summary-row--total {
@@ -278,6 +302,10 @@ body.pool-cart-open {
 }
 
 .pool-first-party-cart__field--compact {
+  margin-top: 4px;
+}
+
+.pool-first-party-cart__field--summary {
   margin-top: 4px;
 }
 
@@ -316,6 +344,12 @@ body.pool-cart-open {
     calc(100% - 13px) calc(50% - 2px);
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
+}
+
+.pool-first-party-cart__input--summary-select {
+  min-height: 38px;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 
 .pool-first-party-cart__input:focus {
@@ -377,6 +411,7 @@ body.pool-cart-open {
 .pool-first-party-cart__stripe-shell {
   display: grid;
   gap: 14px;
+  overflow: visible;
 }
 
 .pool-first-party-cart__stripe-region {
@@ -396,11 +431,12 @@ body.pool-cart-open {
 
 .pool-first-party-cart__stripe-region--payment {
   min-height: 0;
-  padding: 0;
+  padding: 2px 0 0;
   background: transparent;
   border: 0;
   border-radius: 0;
   box-shadow: none;
+  overflow: visible;
 }
 
 .pool-first-party-cart__shipping-fallback {
@@ -553,8 +589,6 @@ body.pool-cart-open {
   }
 
   .pool-first-party-cart__line-item,
-  .pool-first-party-cart__summary-row,
-  .pool-first-party-cart__total,
   .pool-first-party-cart__tip-header {
     flex-direction: column;
     align-items: flex-start;

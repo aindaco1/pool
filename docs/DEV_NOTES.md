@@ -16,14 +16,15 @@ If you are trying to keep a fork comfortable on the Cloudflare Workers free plan
 - `cache.live_stats_ttl_seconds`
 - `cache.live_inventory_ttl_seconds`
 - `pricing.sales_tax_rate`
-- `pricing.flat_shipping_rate`
+- `shipping.fallback_flat_rate`
 
-The first two live in Jekyll config and shape browser read behavior. The pricing values are auto-mirrored into the Worker env so checkout, emails, reports, and settlement math stay aligned.
+The first two live in Jekyll config and shape browser read behavior. The pricing/shipping values are auto-mirrored into the Worker env so checkout, emails, reports, and settlement math stay aligned.
 
 The config now uses a structured settings model in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml):
 
 - `platform`
 - `pricing`
+- `shipping`
 - `design`
 - `checkout`
 - `cache`
@@ -43,10 +44,33 @@ Current mirrored Worker values worth treating as part of the supported customiza
 - `UPDATES_EMAIL_FROM`
 - `SALES_TAX_RATE`
 - `FLAT_SHIPPING_RATE`
+- `SHIPPING_ORIGIN_ZIP`
+- `SHIPPING_ORIGIN_COUNTRY`
+- `SHIPPING_FALLBACK_FLAT_RATE`
+- `FREE_SHIPPING_DEFAULT`
+- `USPS_ENABLED`
+- `USPS_CLIENT_ID`
+- `USPS_API_BASE`
+- `USPS_TIMEOUT_MS`
+- `USPS_QUOTE_CACHE_TTL_SECONDS`
+- `USPS_FAILURE_COOLDOWN_SECONDS`
+- `USPS_RATE_LIMIT_COOLDOWN_SECONDS`
 - `DEFAULT_PLATFORM_TIP_PERCENT`
 - `MAX_PLATFORM_TIP_PERCENT`
 
-The repo now includes `npm run sync:worker-config`, which syncs those mirrored values from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`. The main local dev, test, Worker-only, and pre-merge paths call it automatically.
+The repo now includes `npm run sync:worker-config`, which syncs those mirrored values from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`. The main local dev, test, Worker-only, and pre-merge paths call it automatically. The merge gate’s first-party artifact check also falls back to the Podman-backed build path when host Bundler/Jekyll is unavailable.
+
+USPS OAuth secrets are intentionally separate from that mirrored config surface. Keep `USPS_CLIENT_SECRET` in Worker secrets or `worker/.dev.vars`, not in `_config.yml`.
+
+Shipping quote best practices in the current implementation:
+
+- USPS calls only happen in the Worker
+- physical checkout waits for a complete shipping address before bootstrapping secure payment
+- modify flows only re-quote when shipping-relevant inputs change
+- USPS OAuth tokens are cached in memory until near expiry
+- USPS shipment quotes are cached in memory for a short TTL
+- repeated USPS `429`, timeout, or `5xx` failures trigger a temporary in-memory cooldown before trying again
+- the fallback quote path stays Worker-canonical and does not add KV quote-cache churn
 
 The merge gate now deliberately splits its local smoke paths:
 
@@ -324,7 +348,14 @@ tiers:
 
 **Tier gating**: Add `requires_threshold` (integer, dollars) to lock a tier until the campaign reaches that funding level. When live stats update and `pledgedAmount >= requires_threshold`, the tier animates to "Unlocked!" state with a badge. The animation respects `prefers-reduced-motion`.
 
-**Physical tiers**: Set `category: physical` to trigger shipping address collection during the on-site Stripe payment step and add a $3 shipping fee for each campaign that contains physical rewards. The first-party cart carries that category through the checkout-intent payload.
+**Physical tiers**: Set `category: physical` to trigger shipping address collection during the on-site Stripe payment step. The current shipping-calculator groundwork also supports:
+
+- `shipping_preset` for common physical goods like `tshirt`, `poster`, `cd`, `vinyl`, `dvd`, `bluray`, and `signed_script`
+- `shipping.weight_oz`, `shipping.packaging_weight_oz`, `shipping.length_in`, `shipping.width_in`, `shipping.height_in`, and `shipping.stack_height_in` for explicit per-tier overrides
+- optional `shipping_fallback_flat_rate` at the campaign level when a specific campaign needs a different flat fallback than the global deployment default
+- optional `shipping_options` at the campaign level for the limited backer-facing shipping policy set (`signature_required`, `adult_signature_required`)
+
+The first-party cart still carries the physical category through the checkout-intent payload, and future Worker-side shipping quotes will use the preset or explicit shipping measurements rather than a hardcoded flat-fee assumption.
 
 ### Production Phases
 

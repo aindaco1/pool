@@ -3,6 +3,7 @@
  * 
  * Routes:
  *   POST /checkout-intent/start - Create Stripe Checkout from first-party cart state
+ *   POST /shipping/quote      - Quote shipping for a first-party cart
  *   GET  /checkout-intent/summary - Fetch first-party success summary data
  *   GET  /checkout-intent/recovery - Fetch campaign recovery state for cancelled result flow
  *   POST /webhooks/stripe    - Handle Stripe webhooks
@@ -47,7 +48,8 @@ import { triggerSiteRebuild } from './github.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
 import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput, CHECKOUT_INTENT_VERSION, DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
-import { getCheckoutProvider, getCheckoutUiMode, getDefaultPlatformTipPercent, getFlatShippingFeeCents, getMaxPlatformTipPercent, getSalesTaxRate } from './provider-config.js';
+import { getCampaignShippingFallbackFeeCents, getCheckoutProvider, getCheckoutUiMode, getDefaultPlatformTipPercent, getFlatShippingFeeCents, getMaxPlatformTipPercent, getSalesTaxRate, getShippingFallbackFeeCents } from './provider-config.js';
+import { normalizeShippingDestination, quoteCampaignShipment } from './shipping.js';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
 
@@ -363,6 +365,7 @@ async function checkRateLimit(request, env, options = {}) {
 // Rate limit configurations for different endpoint types
 const RATE_LIMITS = {
   start: { prefix: 'rl:start', limit: 20, windowSeconds: 60 },      // 20 pledges/min
+  shipping: { prefix: 'rl:shipping', limit: 30, windowSeconds: 60 },// 30 shipping quotes/min
   complete: { prefix: 'rl:complete', limit: 8, windowSeconds: 60 }, // 8 recovery attempts/min
   votes: { prefix: 'rl:votes', limit: 30, windowSeconds: 60 },      // 30 votes/min
   admin: { prefix: 'rl:admin', limit: 5, windowSeconds: 60 },       // 5 admin calls/min
@@ -481,6 +484,14 @@ function isPositiveInteger(value) {
 
 function buildSupportItemDefinitionMap(campaign) {
   return new Map((campaign?.support_items || []).map(item => [item.id, item]));
+}
+
+function supportItemsIncludePhysical(campaign, supportItems = []) {
+  const definitions = buildSupportItemDefinitionMap(campaign);
+  return (supportItems || []).some((item) => {
+    if (!item?.id || !(Number(item.amount) > 0)) return false;
+    return definitions.get(item.id)?.category === 'physical';
+  });
 }
 
 function getSupportItemsWithLabels(campaign, supportItems = []) {
@@ -863,7 +874,14 @@ function buildDesiredSupportItems(campaign, currentSupportItems = [], requestedS
   };
 }
 
-function buildCanonicalContribution(env, campaign, { tierSelection, supportItems = [], customAmount = 0, tipPercent }) {
+function buildCanonicalContribution(env, campaign, {
+  tierSelection,
+  supportItems = [],
+  customAmount = 0,
+  tipPercent,
+  shippingCents = null,
+  shippingOption = 'standard'
+}) {
   const normalizedCustomAmount = Number(customAmount);
   if (!isNonNegativeInteger(normalizedCustomAmount) || !isValidAmount(normalizedCustomAmount * 100)) {
     return { valid: false, error: 'Invalid custom support amount' };
@@ -886,16 +904,75 @@ function buildCanonicalContribution(env, campaign, { tierSelection, supportItems
     return { valid: false, error: 'Pledge must include at least one contribution' };
   }
 
+  const hasPhysical = tierSelection.hasPhysical === true || supportItemsIncludePhysical(campaign, supportItems);
+  const resolvedShippingCents = hasPhysical
+    ? (Number.isFinite(Number(shippingCents))
+        ? Math.max(0, Number(shippingCents))
+        : getCampaignShippingFallbackFeeCents(campaign, env))
+    : 0;
+  const normalizedShippingOption = String(shippingOption || 'standard').trim().toLowerCase() || 'standard';
+
   return {
     valid: true,
     ...tierSelection,
+    hasPhysical,
+    shippingOption: normalizedShippingOption,
     supportItems,
     customAmount: normalizedCustomAmount,
     totals: buildPledgeTotals(env, subtotal, {
-      shipping: tierSelection.hasPhysical ? getFlatShippingFeeCents(env) : 0,
+      shipping: resolvedShippingCents,
       tipPercent
     })
   };
+}
+
+async function buildCanonicalContributionForStoredShipping(env, campaign, {
+  tierSelection,
+  supportItems = [],
+  customAmount = 0,
+  tipPercent,
+  shippingAddress = null,
+  currentShipping = 0,
+  shippingOption = 'standard'
+}) {
+  const canonicalContribution = buildCanonicalContribution(env, campaign, {
+    tierSelection,
+    supportItems,
+    customAmount,
+    tipPercent,
+    shippingCents: currentShipping,
+    shippingOption
+  });
+  if (!canonicalContribution.valid || !canonicalContribution.hasPhysical) {
+    return canonicalContribution;
+  }
+
+  let resolvedShippingCents = Math.max(0, Number(currentShipping) || 0);
+  const normalizedDestination = normalizeShippingDestination(shippingAddress);
+
+  if (normalizedDestination.valid) {
+    const quotedShipment = await quoteCampaignShipment(
+      env,
+      campaign,
+      tierSelection,
+      normalizedDestination.destination,
+      supportItems,
+      shippingOption
+    );
+    if (quotedShipment.valid) {
+      resolvedShippingCents = Math.max(0, Number(quotedShipment.quote?.shippingCents) || 0);
+      canonicalContribution.shippingOption = quotedShipment.selectedOption || canonicalContribution.shippingOption || 'standard';
+    }
+  } else if (resolvedShippingCents === 0) {
+    resolvedShippingCents = getShippingFallbackFeeCents(env);
+  }
+
+  canonicalContribution.totals = buildPledgeTotals(env, canonicalContribution.totals.subtotal, {
+    shipping: resolvedShippingCents,
+    tipPercent: canonicalContribution.totals.tipPercent
+  });
+
+  return canonicalContribution;
 }
 
 async function validateTierThresholdSelection(env, campaignSlug, campaign, selectedTiers = [], existingSelectedTiers = []) {
@@ -1345,6 +1422,10 @@ export default {
         return handleFirstPartyCheckoutStart(request, env);
       }
 
+      if (path === '/shipping/quote' && method === 'POST') {
+        return handleShippingQuote(request, env);
+      }
+
       if (path === '/checkout-intent/summary' && method === 'GET') {
         return handleFirstPartyCheckoutSummary(request, env);
       }
@@ -1702,7 +1783,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
   if (!rateLimit.allowed) return rateLimit.response;
 
   const body = await request.json();
-  const { campaignSlug, items, customAmount = 0, email, tipPercent, preferredLang } = body || {};
+  const { campaignSlug, items, customAmount = 0, email, tipPercent, preferredLang, shippingAddress, shippingOption } = body || {};
   const normalizedPreferredLang = normalizePreferredLang(preferredLang);
   const normalizedTipPercent = sanitizePlatformTipPercent(
     tipPercent,
@@ -1715,6 +1796,13 @@ async function handleFirstPartyCheckoutStart(request, env) {
 
   if (email && !isValidEmail(email)) {
     return privateJsonResponse({ error: 'Invalid email format' }, 400, env);
+  }
+
+  const normalizedDestination = shippingAddress
+    ? normalizeShippingDestination(shippingAddress)
+    : { valid: false, destination: null };
+  if (shippingAddress && !normalizedDestination.valid) {
+    return privateJsonResponse({ error: normalizedDestination.error }, 400, env);
   }
 
   const parsedCart = extractCampaignCartsFromFirstPartyItems(items, customAmount, campaignSlug);
@@ -1752,11 +1840,13 @@ async function handleFirstPartyCheckoutStart(request, env) {
       return privateJsonResponse({ error: desiredSupportItems.error }, 400, env);
     }
 
-    const canonicalContribution = buildCanonicalContribution(env, campaign, {
+    const canonicalContribution = await buildCanonicalContributionForStoredShipping(env, campaign, {
       tierSelection,
       supportItems: desiredSupportItems.supportItems,
       customAmount: orderCart.customAmount,
-      tipPercent: normalizedTipPercent
+      tipPercent: normalizedTipPercent,
+      shippingAddress: normalizedDestination.valid ? normalizedDestination.destination : null,
+      shippingOption
     });
     if (!canonicalContribution.valid) {
       return privateJsonResponse({ error: canonicalContribution.error }, 400, env);
@@ -1850,6 +1940,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
       supportItems: group.canonicalContribution.supportItems || [],
       customAmount: group.canonicalContribution.customAmount || 0,
       hasPhysical: group.canonicalContribution.hasPhysical === true,
+      shippingOption: group.canonicalContribution.shippingOption || 'standard',
       totals: group.canonicalContribution.totals
     }))
   };
@@ -1923,6 +2014,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
         tierName: checkoutGroups.length === 1 ? (checkoutGroups[0].canonicalContribution.tierName || '') : '',
         tierQty: String(checkoutGroups.length === 1 ? (checkoutGroups[0].canonicalContribution.tierQty || 1) : 0),
         tipPercent: String(normalizedTipPercent),
+        shippingOption: checkoutGroups.length === 1 ? (checkoutGroups[0].canonicalContribution.shippingOption || 'standard') : '',
         hasAdditionalTiers: checkoutGroups.some((group) => group.canonicalContribution.additionalTiers.length > 0) ? 'true' : '',
         hasExtras: checkoutGroups.some((group) => group.canonicalContribution.supportItems.length > 0 || group.canonicalContribution.customAmount > 0) ? 'true' : '',
         hasPhysical: checkoutGroups.some((group) => group.canonicalContribution.hasPhysical) ? 'true' : '',
@@ -1988,6 +2080,101 @@ async function handleFirstPartyCheckoutStart(request, env) {
     }
     return privateJsonResponse({ error: 'Failed to create checkout session: ' + stripeErr.message }, 500, env);
   }
+}
+
+async function handleShippingQuote(request, env) {
+  const trustedOrigin = requireTrustedSiteOrigin(request, env);
+  if (!trustedOrigin.ok) return trustedOrigin.response;
+
+  const rateLimit = await checkRateLimit(request, env, RATE_LIMITS.shipping);
+  if (!rateLimit.allowed) return rateLimit.response;
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return privateJsonResponse({ error: 'Invalid JSON' }, 400, env);
+  }
+
+  const {
+    campaignSlug,
+    items,
+    customAmount = 0,
+    shippingAddress,
+    shippingOption
+  } = body || {};
+
+  if (campaignSlug && !isValidSlug(campaignSlug)) {
+    return privateJsonResponse({ error: 'Invalid campaign slug format' }, 400, env);
+  }
+
+  const normalizedDestination = normalizeShippingDestination(shippingAddress);
+  if (!normalizedDestination.valid) {
+    return privateJsonResponse({ error: normalizedDestination.error }, 400, env);
+  }
+
+  const parsedCart = extractCampaignCartsFromFirstPartyItems(items, customAmount, campaignSlug);
+  if (!parsedCart.valid) {
+    return privateJsonResponse({ error: parsedCart.error }, 400, env);
+  }
+
+  const orderCarts = parsedCart.carts || [];
+  if (orderCarts.length === 0) {
+    return privateJsonResponse({ error: 'Your cart is empty.' }, 400, env);
+  }
+
+  const quotes = [];
+  for (const orderCart of orderCarts) {
+    const campaign = await getCampaign(env, orderCart.campaignSlug);
+    if (!campaign) {
+      return privateJsonResponse({ error: `Campaign "${orderCart.campaignSlug}" not found` }, 404, env);
+    }
+
+    const tierSelection = buildTierSelectionFromStartRequest(campaign, {
+      tierId: orderCart.tierSelections[0]?.id || null,
+      tierQty: orderCart.tierSelections[0]?.qty || 1,
+      additionalTiers: orderCart.tierSelections.slice(1)
+    });
+    if (!tierSelection.valid) {
+      return privateJsonResponse({ error: tierSelection.error }, 400, env);
+    }
+
+    const desiredSupportItems = buildDesiredSupportItems(campaign, [], orderCart.supportItems);
+    if (!desiredSupportItems.valid) {
+      return privateJsonResponse({ error: desiredSupportItems.error }, 400, env);
+    }
+
+    const quote = await quoteCampaignShipment(
+      env,
+      campaign,
+      tierSelection,
+      normalizedDestination.destination,
+      desiredSupportItems.supportItems,
+      shippingOption
+    );
+    if (!quote.valid) {
+      return privateJsonResponse({ error: quote.error }, 400, env);
+    }
+
+    quotes.push({
+      campaignSlug: quote.campaignSlug,
+      shippingCents: quote.quote.shippingCents,
+      source: quote.quote.source,
+      carrier: quote.quote.carrier,
+      service: quote.quote.service,
+      domestic: quote.quote.domestic,
+      availableOptions: quote.availableOptions,
+      defaultOption: quote.defaultOption,
+      selectedOption: quote.selectedOption,
+      shipment: quote.shipment
+    });
+  }
+
+  return privateJsonResponse({
+    quotes,
+    totalShippingCents: quotes.reduce((sum, quote) => sum + (Number(quote.shippingCents) || 0), 0),
+    shippingAddress: normalizedDestination.destination
+  }, 200, env);
 }
 
 async function handleFirstPartyCheckoutSummary(request, env) {
@@ -2372,11 +2559,13 @@ async function processFirstPartyCheckoutBundle({
       return jsonResponse({ error: desiredSupportItems.error }, 409);
     }
 
-    const canonicalContribution = buildCanonicalContribution(env, campaign, {
+    const canonicalContribution = await buildCanonicalContributionForStoredShipping(env, campaign, {
       tierSelection,
       supportItems: desiredSupportItems.supportItems,
       customAmount: entry.customAmount || 0,
-      tipPercent: normalizedTipPercent
+      tipPercent: normalizedTipPercent,
+      shippingAddress: shippingAddress || null,
+      shippingOption: entry.shippingOption || 'standard'
     });
     if (!canonicalContribution.valid) {
       console.error('📝 Invalid pledge contribution in webhook bundle:', canonicalContribution.error);
@@ -2408,6 +2597,7 @@ async function processFirstPartyCheckoutBundle({
       additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
       supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
       customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
+      shippingOption: canonicalContribution.shippingOption || 'standard',
       shippingAddress: canonicalContribution.hasPhysical ? (shippingAddress || undefined) : undefined,
       subtotal: canonicalContribution.totals.subtotal,
       tax: canonicalContribution.totals.tax,
@@ -2430,6 +2620,7 @@ async function processFirstPartyCheckoutBundle({
         tipPercent: canonicalContribution.totals.tipPercent,
         tipAmount: canonicalContribution.totals.tipAmount,
         amount: canonicalContribution.totals.amount,
+        shippingOption: canonicalContribution.shippingOption || 'standard',
         tierId: canonicalContribution.tierId,
         tierQty: canonicalContribution.tierQty,
         additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
@@ -2568,7 +2759,7 @@ async function handleStripeWebhook(request, env, ctx) {
     const session = event.data.object;
     
     if (session.mode === 'setup') {
-      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, tipPercent, hasAdditionalTiers, hasExtras, hasPhysical, isPaymentUpdate, checkoutProvider, checkoutNonce, checkoutCartHash, checkoutSnapshotVersion, preferredLang } = session.metadata;
+      const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, tipPercent, hasAdditionalTiers, hasExtras, hasPhysical, isPaymentUpdate, checkoutProvider, checkoutNonce, checkoutCartHash, checkoutSnapshotVersion, preferredLang, shippingOption } = session.metadata;
       const tierQtyNum = parseInt(tierQty) || 1;
       const normalizedTipPercent = tipPercent === undefined || tipPercent === null || tipPercent === ''
         ? 0
@@ -2823,11 +3014,13 @@ async function handleStripeWebhook(request, env, ctx) {
             return jsonResponse({ error: desiredSupportItems.error }, 409);
           }
 
-          const canonicalContribution = buildCanonicalContribution(env, campaign, {
+          const canonicalContribution = await buildCanonicalContributionForStoredShipping(env, campaign, {
             tierSelection,
             supportItems: desiredSupportItems.supportItems,
             customAmount,
-            tipPercent: normalizedTipPercent
+            tipPercent: normalizedTipPercent,
+            shippingAddress: shippingAddress || null,
+            shippingOption: bundleManifest?.campaigns?.[0]?.shippingOption || shippingOption || 'standard'
           });
           if (!canonicalContribution.valid) {
             console.error('📝 Invalid pledge contribution in webhook metadata:', canonicalContribution.error);
@@ -2895,6 +3088,7 @@ async function handleStripeWebhook(request, env, ctx) {
             additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
             supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
             customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
+            shippingOption: canonicalContribution.shippingOption || 'standard',
             shippingAddress: shippingAddress || undefined,
             subtotal: canonicalContribution.totals.subtotal,
             tax: canonicalContribution.totals.tax,
@@ -2917,6 +3111,7 @@ async function handleStripeWebhook(request, env, ctx) {
               tipPercent: canonicalContribution.totals.tipPercent,
               tipAmount: canonicalContribution.totals.tipAmount,
               amount: canonicalContribution.totals.amount,
+              shippingOption: canonicalContribution.shippingOption || 'standard',
               tierId: canonicalContribution.tierId,
               tierQty: canonicalContribution.tierQty,
               additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
@@ -3229,6 +3424,7 @@ async function handleCancelPledge(request, env) {
           tipPercent: cancelTipPercent,
           tipAmount: cancelTipAmount,
           amount: cancelAmount,
+          shippingOption: pledgeData.shippingOption || 'standard',
           tierId: pledgeData.tierId,
           tierQty: pledgeData.tierQty || 1,
           additionalTiers: pledgeData.additionalTiers,
@@ -3244,6 +3440,7 @@ async function handleCancelPledge(request, env) {
         tipPercent: cancelTipPercent,
         tipAmountDelta: -cancelTipAmount,
         amountDelta: -cancelAmount,
+        shippingOption: pledgeData.shippingOption || 'standard',
         customAmount: pledgeData.customAmount || undefined,
         at: now
       });
@@ -3339,7 +3536,7 @@ async function handleCancelPledge(request, env) {
 
 async function handleModifyPledge(request, env) {
   const body = await request.json();
-  const { token, orderId, newTierId, newTierQty, addTiers, supportItems, customAmount, tipPercent, preferredLang } = body;
+  const { token, orderId, newTierId, newTierQty, addTiers, supportItems, customAmount, tipPercent, preferredLang, shippingOption } = body;
 
   if (!token) {
     return jsonResponse({ error: 'Missing token' }, 400);
@@ -3352,8 +3549,9 @@ async function handleModifyPledge(request, env) {
   const hasSupportChange = Array.isArray(supportItems) && supportItems.length > 0;
   const hasCustomAmountChange = customAmount !== null && customAmount !== undefined;
   const hasTipChange = tipPercent !== null && tipPercent !== undefined;
+  const hasShippingOptionChange = shippingOption !== null && shippingOption !== undefined;
 
-  if (!hasTierChange && !hasQtyChange && !hasAddTiersPayload && !hasSupportChange && !hasCustomAmountChange && !hasTipChange) {
+  if (!hasTierChange && !hasQtyChange && !hasAddTiersPayload && !hasSupportChange && !hasCustomAmountChange && !hasTipChange && !hasShippingOptionChange) {
     return jsonResponse({ error: 'No changes specified' }, 400);
   }
 
@@ -3434,11 +3632,14 @@ async function handleModifyPledge(request, env) {
     return jsonResponse({ error: desiredSupportItems.error }, 400);
   }
 
-  const canonicalContribution = buildCanonicalContribution(env, campaign, {
+  const canonicalContribution = await buildCanonicalContributionForStoredShipping(env, campaign, {
     tierSelection: desiredTierSelection,
     supportItems: desiredSupportItems.supportItems,
     customAmount: hasCustomAmountChange ? customAmount : (currentPledge.customAmount || 0),
-    tipPercent: normalizedTipPercent
+    tipPercent: normalizedTipPercent,
+    shippingAddress: currentPledge.shippingAddress || null,
+    currentShipping: currentPledge.shipping || 0,
+    shippingOption: hasShippingOptionChange ? shippingOption : (currentPledge.shippingOption || 'standard')
   });
   if (!canonicalContribution.valid) {
     return jsonResponse({ error: canonicalContribution.error }, 400);
@@ -3484,6 +3685,7 @@ async function handleModifyPledge(request, env) {
         additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : [],
         supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : [],
         customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : 0,
+        shippingOption: canonicalContribution.shippingOption || pledgeData.shippingOption || 'standard',
         subtotal: canonicalContribution.totals.subtotal,
         tax: canonicalContribution.totals.tax,
         shipping: canonicalContribution.totals.shipping,
@@ -3510,6 +3712,7 @@ async function handleModifyPledge(request, env) {
           tipPercent: currentTipPercent,
           tipAmount: previousTipAmount,
           amount: previousAmount,
+          shippingOption: originalPledgeData.shippingOption || 'standard',
           tierId: originalPledgeData.tierId,
           tierQty: originalPledgeData.tierQty || 1,
           additionalTiers: originalPledgeData.additionalTiers?.length > 0 ? originalPledgeData.additionalTiers : undefined,
@@ -3527,6 +3730,7 @@ async function handleModifyPledge(request, env) {
         tipAmount: canonicalContribution.totals.tipAmount,
         tipAmountDelta: canonicalContribution.totals.tipAmount - previousTipAmount,
         amountDelta: canonicalContribution.totals.amount - previousAmount,
+        shippingOption: nextPledgeData.shippingOption || 'standard',
         tierId: nextPledgeData.tierId,
         tierQty: nextPledgeData.tierQty,
         additionalTiers: nextPledgeData.additionalTiers.length > 0 ? nextPledgeData.additionalTiers : undefined,
@@ -5699,10 +5903,17 @@ async function handleGetStats(campaignSlug, env) {
     return jsonResponse({ error: 'Missing campaign slug' }, 400, env, true);
   }
 
+  const campaign = await getCampaign(env, campaignSlug);
+  if (!campaign) {
+    return jsonResponse({ error: 'Campaign not found' }, 404, env, true);
+  }
+
   const stats = await getCampaignStats(env, campaignSlug);
+  if (!stats) {
+    return jsonResponse({ error: 'Campaign stats not found' }, 404, env, true);
+  }
   
   // Also get campaign data for context
-  const campaign = await getCampaign(env, campaignSlug);
   
   // SEC-004: Stats are public, use permissive CORS
   return cacheablePublicJsonResponse({
@@ -6050,7 +6261,8 @@ async function handleRecoverCheckout(request, env) {
       tierSelection,
       supportItems: desiredSupportItems.supportItems,
       customAmount,
-      tipPercent
+      tipPercent,
+      shippingOption: metadata.shippingOption || 'standard'
     });
     if (!canonicalContribution.valid) {
       return jsonResponse({ error: canonicalContribution.error }, 409);
@@ -6079,6 +6291,7 @@ async function handleRecoverCheckout(request, env) {
       additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
       supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
       customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
+      shippingOption: canonicalContribution.shippingOption || 'standard',
       subtotal: canonicalContribution.totals.subtotal,
       tax: canonicalContribution.totals.tax,
       shipping: canonicalContribution.totals.shipping,

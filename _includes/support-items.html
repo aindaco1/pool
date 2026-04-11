@@ -7,6 +7,11 @@
     {% assign remaining = item.target | minus: current_amount %}
     {% assign percent = current_amount | times: 100 | divided_by: item.target %}
     {% assign item_index = forloop.index %}
+    {% assign item_category = item.category | default: "digital" %}
+    {% assign item_is_physical = false %}
+    {% if item_category == "physical" %}
+      {% assign item_is_physical = true %}
+    {% endif %}
     {% assign is_late_support_item = false %}
     {% if include.campaign.state == "live" %}
       {% assign item_disabled = false %}
@@ -66,10 +71,15 @@
           data-item-description=""
           data-item-max-quantity="1"
           data-item-stackable="never"
-          data-item-shippable="false"
+          data-item-shippable="{% if item_is_physical %}true{% else %}false{% endif %}"
+          {% if include.campaign.shipping_fallback_flat_rate != nil %}data-item-shipping-fallback-cents="{{ include.campaign.shipping_fallback_flat_rate | times: 100 | round }}"{% endif %}
+          {% if include.campaign.free_shipping != nil %}data-item-campaign-free-shipping="{{ include.campaign.free_shipping }}"{% endif %}
           data-item-custom1-name="_stackable"
           data-item-custom1-type="hidden"
-          data-item-custom1-value="false">
+          data-item-custom1-value="false"
+          data-item-custom2-name="_category"
+          data-item-custom2-type="hidden"
+          data-item-custom2-value="{{ item_category }}">
           {% if remaining <= 0 %}{% include t.html key="support_items.funded" %}{% elsif item_disabled %}{{ item_disabled_reason }}{% else %}{% include t.html key="support_items.button" %}{% endif %}
         </button>
       </div>

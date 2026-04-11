@@ -94,13 +94,18 @@ Canonicalize the first-party cart payload and create a Stripe setup-mode Checkou
   ],
   "customAmount": 0,
   "email": "supporter@example.com",
-  "tipPercent": 5
+  "tipPercent": 5,
+  "shippingAddress": {
+    "country": "US",
+    "postalCode": "87102"
+  },
+  "shippingOption": "standard"
 }
 ```
 
 Returns either a custom-session bootstrap (`checkoutUiMode`, `sessionId`, `clientSecret`, `publishableKey`, `orderId`) or a hosted fallback URL.
 
-The Worker rebuilds tier, add-on, custom-support, shipping, and subtotal state from first-party cart items, validates campaign state and inventory, signs a short-lived checkout snapshot, reserves scarce inventory for limited tiers before the payment step completes, and confirms those reservations when the pledge is actually persisted.
+The Worker rebuilds tier, add-on, custom-support, shipping, and subtotal state from first-party cart items, validates campaign state and inventory, signs a short-lived checkout snapshot, reserves scarce inventory for limited tiers before the payment step completes, and confirms those reservations when the pledge is actually persisted. For physical pledges, shipping is Worker-calculated from destination plus campaign/item shipping metadata, using USPS live quotes when available and deployment or campaign fallback rates when not.
 
 Limited-tier reservations and claims are serialized through a per-campaign Durable Object coordinator before the KV inventory snapshot is updated, so concurrent checkout starts, retries, modifications, and webhook completions cannot oversell scarce rewards.
 
@@ -136,7 +141,7 @@ Change tiers, quantity, or custom support for an active pledge.
 }
 ```
 
-All fields except `token` are optional. Changes are tracked in the pledge's `history` array with `type: "modified"` entries that include tier state and `customAmount`.
+All fields except `token` are optional. Changes are tracked in the pledge's `history` array with `type: "modified"` entries that include tier state, `customAmount`, shipping deltas, and any selected shipping option.
 
 The Worker validates the requested order against the token payload and recalculates totals from stored pledge state plus campaign definitions.
 
@@ -251,7 +256,18 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `UPDATES_EMAIL_FROM` | Sender identity for update / milestone / announcement emails |
 | `I18N_CATALOG_JSON` | Optional inline locale catalog override for Worker email localization in tests or custom deployments |
 | `SALES_TAX_RATE` | Sales tax rate mirrored from `pricing.sales_tax_rate` |
-| `FLAT_SHIPPING_RATE` | Flat shipping rate mirrored from `pricing.flat_shipping_rate` |
+| `FLAT_SHIPPING_RATE` | Legacy flat-shipping compatibility baseline mirrored from `pricing.flat_shipping_rate` |
+| `SHIPPING_ORIGIN_ZIP` | USPS shipping origin ZIP mirrored from `shipping.origin_zip` |
+| `SHIPPING_ORIGIN_COUNTRY` | USPS shipping origin country mirrored from `shipping.origin_country` |
+| `SHIPPING_FALLBACK_FLAT_RATE` | Fallback shipping rate mirrored from `shipping.fallback_flat_rate` |
+| `FREE_SHIPPING_DEFAULT` | Deployment-wide free-shipping default mirrored from `shipping.free_shipping_default` |
+| `USPS_ENABLED` | Whether USPS live quoting is enabled |
+| `USPS_CLIENT_ID` | USPS OAuth client id mirrored from `shipping.usps.client_id` |
+| `USPS_API_BASE` | USPS API base URL mirrored from `shipping.usps.api_base` |
+| `USPS_TIMEOUT_MS` | USPS request timeout in ms |
+| `USPS_QUOTE_CACHE_TTL_SECONDS` | Short-lived in-memory USPS quote cache TTL |
+| `USPS_FAILURE_COOLDOWN_SECONDS` | Cooldown after repeated USPS failures |
+| `USPS_RATE_LIMIT_COOLDOWN_SECONDS` | Cooldown after USPS `429` responses |
 | `DEFAULT_PLATFORM_TIP_PERCENT` | Default platform tip percent mirrored from `pricing.default_tip_percent` |
 | `MAX_PLATFORM_TIP_PERCENT` | Max platform tip percent mirrored from `pricing.max_tip_percent` |
 | `APP_MODE` | `"test"` or `"live"` - determines which API keys to use |
@@ -259,7 +275,9 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 
 When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email images still fall back to the public `https://pool.dustwave.xyz` asset base so inbox clients do not receive broken localhost image URLs.
 
-Fork note: treat those identity and pricing vars as mirrors of the structured site config in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml), especially the `platform` and `pricing` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior now, not Worker env toggles you should normally customize.
+Fork note: treat those identity, pricing, and shipping vars as mirrors of the structured site config in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml), especially the `platform`, `pricing`, and `shipping` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior now, not Worker env toggles you should normally customize.
+
+Keep `USPS_CLIENT_SECRET` out of site config. It belongs in Worker secrets or [`worker/.dev.vars`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/.dev.vars).
 
 Localization note: the Worker now localizes supporter-facing email subjects/body copy and localized `/manage/` / `/community/:slug/` links from the shared site locale catalog. In normal operation it fetches that catalog from `SITE_BASE/assets/i18n.json`; tests and advanced deployments can inject `I18N_CATALOG_JSON` instead. That means localized supporter emails and localized routes such as `/es/manage/` or `/es/community/:slug/` stay aligned with the site locale model when a deployment adds those routes.
 
