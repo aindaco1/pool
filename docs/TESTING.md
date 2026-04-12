@@ -240,6 +240,8 @@ For local CSV verification against your actual local Worker state, use:
 
 Use `pledge-report.sh` when you want the full ledger, including modify/cancel deltas and tip-change annotations. Use `fulfillment-report.sh` when you want the merged current state for a backer within a campaign.
 
+If the merged fulfillment view and the public site ever disagree for a campaign, treat that as a likely stale stats/inventory projection issue first, not a reporting bug by default. The admin stats and inventory recalc endpoints now repair stale `campaign-pledges:{slug}` indexes while rebuilding the campaign projection state.
+
 ### Intentional Behavior Changes
 
 When reviewing results, do not flag these as regressions:

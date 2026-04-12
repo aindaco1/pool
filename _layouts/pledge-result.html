@@ -1,5 +1,4 @@
 {%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
-{%- assign platform_title = site.platform.name | default: site.title -%}
 <!doctype html>
 <html lang="{{ current_lang }}">
 <head>
@@ -8,7 +7,7 @@
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include pledge-result-csp.html %}
   {% include cart-head.html %}
-  <title>{{ page.title }} · {{ platform_title }}</title>
+  {% include seo-meta.html lang=current_lang indexable=false %}
 </head>
 <body>
   <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>

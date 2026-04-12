@@ -21,6 +21,12 @@ const STORAGE_HANDLER_KEY = '__POOL_LIVE_STATS_STORAGE_HANDLER';
 const INVALIDATION_HANDLER_KEY = '__POOL_LIVE_STATS_INVALIDATION_HANDLER';
 const LIVE_REFRESH_MARKER_KEY = 'pool_live_refresh_needed';
 const LIVE_REFRESH_MARKER_TTL_MS = 10 * 60 * 1000;
+const logger = window.PoolLogger?.createLogger('live-stats') || {
+  debug() {},
+  info() {},
+  warn() {},
+  error() {}
+};
 
 function getRuntimeMessages() {
   return window.POOL_CONFIG?.i18n?.messages || {};
@@ -870,7 +876,7 @@ window.getTierInventory = async function(campaignSlug, tierId) {
         return null;
       }
     } catch (e) {
-      console.error('Failed to fetch inventory:', e);
+      logger.error('Failed to fetch inventory:', e);
       return null;
     }
   }

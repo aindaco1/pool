@@ -143,7 +143,9 @@ status:
 
 community:
   title: "Comunidad de patrocinadores"
-  index_intro: "Selecciona una campaña para acceder a sus funciones de comunidad:"
+  index_intro: "Explora campañas con funciones de comunidad para patrocinadores. Quienes apoyan pueden entrar a la comunidad de cada campaña desde el enlace de acceso enviado por correo."
+  index_supporter_note: "Las personas que apoyan pueden votar y participar desde el enlace enviado por correo."
+  index_empty: "No hay campañas públicas con comunidad de patrocinadores disponibles en este momento."
   heading_suffix: "Comunidad"
   access_required: "Se requiere acceso de patrocinador"
   vote_cast: "¡Voto enviado!"

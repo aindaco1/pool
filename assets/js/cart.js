@@ -3,6 +3,12 @@
 
 const WORKER_BASE = window.POOL_CONFIG?.platform?.workerUrl || window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
 const PLATFORM_NAME = window.POOL_CONFIG?.platform?.name || window.POOL_CONFIG?.platformName || 'The Pool';
+const logger = window.PoolLogger?.createLogger('cart') || {
+  debug() {},
+  info() {},
+  warn() {},
+  error() {}
+};
 const CART_VIEW_ROUTE = '/cart';
 const CHECKOUT_ENTRY_ROUTES = new Set(['/checkout', '/checkout/billing']);
 const CHECKOUT_PAYMENT_ROUTE = '/checkout/payment';
@@ -122,7 +128,7 @@ function bootCart(handler) {
 }
 
 function debugCartUI(...args) {
-  console.log('[Pool cart]', ...args);
+  logger.debug(...args);
 }
 
 function isTierItem(itemId) {
@@ -361,11 +367,11 @@ async function replaceSingleTierCartItem(button) {
 function initCartRuntime() {
   if (hasInitializedCart) return;
   hasInitializedCart = true;
-  console.log('Cart runtime ready - Pool pledge mode');
+  logger.debug('Cart runtime ready - Pool pledge mode');
   
   // Clear cart if returning from successful pledge
   const pendingPledge = localStorage.getItem('pool_pending_pledge');
-  console.log('Pool: Checking pending pledge flag:', pendingPledge);
+  logger.debug('Checking pending pledge flag:', pendingPledge);
   if (pendingPledge === 'true' && isPledgeSuccessPath()) {
     localStorage.removeItem('pool_pending_pledge');
     
@@ -374,11 +380,11 @@ function initCartRuntime() {
       const state = getCartState();
       const items = state.cart.items.items || [];
       if (items.length > 0) {
-        console.log('Pool: Clearing', items.length, 'items from cart');
+        logger.debug('Clearing', items.length, 'items from cart');
         unsubscribe(); // Stop listening
         items.forEach(item => {
           removeCartItem(item.uniqueId).catch(err => {
-            console.error('Pool: Failed to remove item:', err);
+            logger.error('Failed to remove item:', err);
           });
         });
       }
@@ -389,7 +395,7 @@ function initCartRuntime() {
       const state = getCartState();
       const items = state.cart.items.items || [];
       if (items.length > 0) {
-        console.log('Pool: Clearing', items.length, 'items (delayed)');
+        logger.debug('Clearing', items.length, 'items (delayed)');
         items.forEach(item => {
           removeCartItem(item.uniqueId).catch(() => {});
         });
@@ -447,7 +453,7 @@ function initCartRuntime() {
       try {
         await replaceSingleTierCartItem(btn);
       } catch (err) {
-        console.error('Pool: Failed to replace single-tier cart item:', err);
+        logger.error('Failed to replace single-tier cart item:', err);
       }
     });
   });
@@ -476,12 +482,12 @@ function initCartRuntime() {
       });
       
       if (otherTiers.length > 0) {
-        console.log('Removing other tiers:', otherTiers.map(t => t.id));
+        logger.debug('Removing other tiers:', otherTiers.map(t => t.id));
         for (const tier of otherTiers) {
           try {
             await removeCartItem(tier.uniqueId);
           } catch (err) {
-            console.error('Failed to remove tier:', tier.id, err);
+            logger.error('Failed to remove tier:', tier.id, err);
           }
         }
       }

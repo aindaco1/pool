@@ -15,12 +15,18 @@ import {
   getSiteBase,
   getUpdatesEmailFrom
 } from './provider-config.js';
+import { getScopedConsole } from './logger.js';
 
 const FALLBACK_SITE_BASE = DEFAULT_SITE_BASE;
 const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
 const SAFE_INSTAGRAM_HOSTS = new Set(['instagram.com', 'www.instagram.com']);
 const DEFAULT_I18N_LANG = 'en';
 const EMAIL_I18N_CACHE = new Map();
+let console = globalThis.console;
+
+function configureEmailLogging(env) {
+  console = getScopedConsole(env, 'email');
+}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -275,6 +281,7 @@ function renderAmountBreakdown(env, { subtotal = 0, tax = 0, shipping = 0, tipAm
  * Send supporter confirmation email after successful pledge
  */
 export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems, hasDecisions, preferredLang }) {
+  configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const communityUrl = safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
@@ -367,6 +374,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
  * Send pledge modification confirmation email
  */
 export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campaignTitle, previousSubtotal, previousTax = 0, previousShipping = 0, previousTipAmount = 0, newSubtotal, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems, preferredLang }) {
+  configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const siteHomeUrl = getSiteRootUrl(env.SITE_BASE);
@@ -456,6 +464,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
  * Send payment failure notification
  */
 export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems, preferredLang }) {
+  configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t) : '';
@@ -531,6 +540,7 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
  * Send charge success email after campaign settlement
  */
 export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems, hasDecisions, preferredLang }) {
+  configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const communityUrl = safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
@@ -616,6 +626,7 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
  * Send diary update notification to supporters
  */
 export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, diaryPhase, token, instagramUrl, hasDecisions, preferredLang }) {
+  configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const communityUrl = safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const diaryAnchor = diaryPhase ? `#diary-${diaryPhase}` : '#diary';
@@ -700,6 +711,7 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
  * Send pledge cancellation confirmation email
  */
 export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campaignTitle, subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, amount, preferredLang }) {
+  configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const campaignUrl = safeSiteUrl(`/campaigns/${encodeURIComponent(campaignSlug)}/`, env.SITE_BASE);
   const amountBreakdownHtml = renderAmountBreakdown(env, {
@@ -775,6 +787,7 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
  * @param {string} milestone - 'one-third' | 'two-thirds' | 'goal' | 'stretch'
  */
 export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTitle, milestone, pledgedAmount, goalAmount, stretchGoalName, token, instagramUrl, preferredLang }) {
+  configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const campaignUrl = safeSiteUrl(`/campaigns/${encodeURIComponent(campaignSlug)}/`, env.SITE_BASE);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
@@ -869,6 +882,7 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
  * Send announcement email to supporters with optional highlighted CTA link
  */
 export async function sendAnnouncementEmail(env, { email, campaignSlug, campaignTitle, subject, heading, body, ctaLabel, ctaUrl, token, instagramUrl, hasDecisions, preferredLang }) {
+  configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const communityUrl = safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);

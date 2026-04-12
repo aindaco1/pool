@@ -3,6 +3,7 @@ layout: default
 title: What Is This?
 lang: en
 translation_key: about
+description: Learn how The Pool works, from all-or-nothing pledging to magic-link supporter access.
 ---
 
 # What Is The Pool?
@@ -81,6 +82,8 @@ The platform is built on services that all offer free tiers, and The Pool was de
 For forks, that means static pages stay on GitHub Pages, public live reads are aggressively combined and browser-cached, and most Cloudflare Worker usage is reserved for the security-sensitive parts of the pledge lifecycle, while tax and shipping settings stay mirrored between site config and Worker env so local UI, checkout, reports, and emails all remain aligned.
 
 That architecture also leaves room for accessibility hardening without sacrificing the platform's security model: the surrounding cart, checkout, and management flows use stronger dialog, focus, keyboard, and live-region semantics, while Stripe continues to own the sensitive payment fields inside its secure UI.
+
+The public side is also intentionally crawl-friendly without exposing supporter-only access: public pages and campaign pages emit consistent metadata and conservative structured data, while private magic-link pages such as Manage Pledge and supporter community flows stay out of search indexing.
 
 ## Open Source
 

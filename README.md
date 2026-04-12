@@ -37,6 +37,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, stacking, and overflow fixes instead of a separate mobile-only UI
 - **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, and curated design variables without requiring custom code for normal fork rebranding
 - **English + Spanish i18n foundation** — `_config.yml` now drives supported languages, static locale routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge runtime copy, campaign countdown/gallery/live-stats labels, and localized Worker supporter emails
+- **SEO fundamentals baseline** — Public pages and campaign pages now emit consistent titles, descriptions, canonicals, OG/Twitter tags, and honest JSON-LD, while `robots.txt`, `sitemap.xml`, and explicit noindex rules keep private/tokenized flows out of search intent
 - **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
 ## Architecture
@@ -84,16 +85,20 @@ Fork-facing settings now use a structured config model in [`_config.yml`](/Users
 
 - `platform` for identity, URLs, and support contact
 - `platform` also covers brand assets like logo, footer logo, favicon, and default social image
+- top-level `title` / `description` for Jekyll's site identity and default SEO copy
+- `seo` for bounded SEO identity knobs like `x_handle`, `same_as`, and whether the public community hub should remain indexable
 - `pricing` for tax, the legacy flat-shipping compatibility baseline, and platform-tip defaults
 - `shipping` for origin settings, USPS quote behavior, fallback policy, free-shipping defaults, shipping presets, and limited shipping-option policy
 - `i18n` for default/supported languages, language labels, and localized public-page routes
 - `design` for curated typography, radius, layout-width, and theme-token overrides
+- `debug` for browser and Worker console logging behavior
 - `checkout` for truly variable checkout settings like the Stripe publishable key
 - `cache` for live browser TTLs
 
 [`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml) is now intentionally thin: it should only carry true local overrides like localhost URLs and `show_test_campaigns`, not a second copy of the base config.
 
 See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for the supported no-code customization surface and which settings are automatically mirrored to the Worker.
+See [docs/SEO.md](docs/SEO.md) for the current SEO fundamentals implementation and supported SEO surface.
 
 For localization, the supported model is:
 
@@ -143,7 +148,7 @@ The Pool is intentionally shaped so most traffic stays cheap:
 - public live data now prefers one combined `/live/:slug` request instead of separate stats + inventory calls
 - campaign pages cache live stats and inventory in `localStorage` for `cache.live_stats_ttl_seconds` / `cache.live_inventory_ttl_seconds` (default `300`)
 - background tabs stop refreshing until the page becomes visible again
-- single-campaign reports, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans
+- single-campaign reports, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans, and stats/inventory rebuilds now repair stale campaign indexes when they detect drift
 - limited-tier write paths now ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
 - once a client is already over a rate limit window, repeated blocked requests no longer rewrite the same KV counter on every hit
 
@@ -207,6 +212,7 @@ The headless browser harness now builds a clean static `_site` and serves it wit
 
 - `pledge-report.sh` is a ledger/history export, so modified pledges appear as deltas and mixed changes now keep tip-update context in the `items` column.
 - `fulfillment-report.sh` is the merged current-state view per `email + campaign`, which is the better comparison point for repeat backers and non-stackable projects.
+- if the site ever drifts from the current-state fulfillment view, the admin stats/inventory recalc paths now self-heal stale `campaign-pledges:{slug}` indexes instead of trusting them forever.
 
 **Current full-suite baseline:**
 - Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow
@@ -243,6 +249,7 @@ See [`docs/`](docs/) for full documentation:
 - [CUSTOMIZATION.md](docs/CUSTOMIZATION.md) — Supported fork-facing branding, pricing, and design overrides
 - [I18N.md](docs/I18N.md) — Current localization structure, routing model, and language-addition workflow
 - [SHIPPING.md](docs/SHIPPING.md) — Current shipping model, USPS setup, and fallback policy
+- [SEO.md](docs/SEO.md) — Current crawl, metadata, JSON-LD, and noindex model
 - [ROADMAP.md](docs/ROADMAP.md) — Planned features
 - [CMS.md](docs/CMS.md) — Pages CMS setup & campaign editing guide
 

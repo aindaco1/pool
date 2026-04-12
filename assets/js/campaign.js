@@ -2,6 +2,12 @@
 'use strict';
 
 const WORKER_BASE = window.POOL_CONFIG?.workerBase || 'https://pledge.dustwave.xyz';
+const logger = window.PoolLogger?.createLogger('campaign') || {
+  debug() {},
+  info() {},
+  warn() {},
+  error() {}
+};
 
 function initializeTabs(tabSelector, panelSelector, panelIdPrefix) {
   const tabs = Array.from(document.querySelectorAll(tabSelector));
@@ -136,7 +142,7 @@ async function handleTierChangeFlow() {
   
   const tierButton = document.querySelector(`[data-item-id$="__${changeTierId}"].poolcart-add-item`);
   if (!tierButton) {
-    console.error('Tier button not found for:', changeTierId);
+    logger.error('Tier button not found for:', changeTierId);
     showTierChangeToast('Tier not found. Please select manually.', 'error');
     return;
   }
@@ -166,7 +172,7 @@ async function handleTierChangeFlow() {
     }, 1000);
     
   } catch (err) {
-    console.error('Tier change error:', err);
+    logger.error('Tier change error:', err);
     showTierChangeToast(err.message, 'error');
   }
 }
@@ -235,7 +241,7 @@ async function handleAddTiersFlow() {
     }, 1000);
     
   } catch (err) {
-    console.error('Add items error:', err);
+    logger.error('Add items error:', err);
     showTierChangeToast(err.message, 'error');
   }
 }

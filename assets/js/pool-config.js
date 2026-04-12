@@ -26,6 +26,10 @@
   var checkoutProvider = 'first_party';
   var checkoutUiMode = 'custom';
   var stripePublishableKey = dataset.stripePublishableKey || '';
+  var seoXHandle = dataset.seoXHandle || '';
+  var seoIndexPublicCommunityHub = dataset.seoIndexPublicCommunityHub || 'true';
+  var debugConsoleLoggingEnabled = dataset.debugConsoleLoggingEnabled || 'true';
+  var debugVerboseConsoleLogging = dataset.debugVerboseConsoleLogging || 'true';
   var runtimeMessages = {};
   var shippingPresets = {};
 
@@ -81,6 +85,14 @@
       uiMode: checkoutUiMode,
       stripePublishableKey: stripePublishableKey
     },
+    seo: {
+      xHandle: seoXHandle,
+      indexPublicCommunityHub: seoIndexPublicCommunityHub
+    },
+    debug: {
+      consoleLoggingEnabled: debugConsoleLoggingEnabled,
+      verboseConsoleLogging: debugVerboseConsoleLogging
+    },
     siteUrl: siteUrl,
     workerBase: workerBase,
     platformName: platformName,
@@ -100,6 +112,10 @@
     cartRuntime: cartRuntime,
     checkoutProvider: checkoutProvider,
     checkoutUiMode: checkoutUiMode,
-    stripePublishableKey: stripePublishableKey
+    stripePublishableKey: stripePublishableKey,
+    seoXHandle: seoXHandle,
+    seoIndexPublicCommunityHub: seoIndexPublicCommunityHub,
+    debugConsoleLoggingEnabled: debugConsoleLoggingEnabled,
+    debugVerboseConsoleLogging: debugVerboseConsoleLogging
   };
 })();

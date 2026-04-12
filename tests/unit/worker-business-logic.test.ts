@@ -2956,6 +2956,64 @@ describe('Worker business logic hardening', () => {
     );
   });
 
+  it('repairs stale campaign indexes when recalculating stats', async () => {
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    await kv.put('campaign-pledges:smoke-editable', JSON.stringify(['order-smoke-1']));
+    await kv.put('pledge:order-smoke-1', JSON.stringify({
+      orderId: 'order-smoke-1',
+      email: 'supporter@example.com',
+      campaignSlug: 'smoke-editable',
+      tierId: 'standard-pass',
+      tierQty: 1,
+      subtotal: 1000,
+      amount: 1139,
+      pledgeStatus: 'active',
+      charged: false
+    }));
+    await kv.put('pledge:order-smoke-2', JSON.stringify({
+      orderId: 'order-smoke-2',
+      email: 'supporter@example.com',
+      campaignSlug: 'smoke-editable',
+      tierId: 'standard-pass',
+      tierQty: 2,
+      subtotal: 2000,
+      amount: 2278,
+      pledgeStatus: 'active',
+      charged: false
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/stats/smoke-editable/recalculate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': 'admin-secret'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.stats).toMatchObject({
+      campaignSlug: 'smoke-editable',
+      pledgedAmount: 3000,
+      pledgeCount: 2,
+      tierCounts: {
+        'standard-pass': 3
+      }
+    });
+    expect(await kv.get('campaign-pledges:smoke-editable', { type: 'json' })).toEqual([
+      'order-smoke-1',
+      'order-smoke-2'
+    ]);
+  });
+
   it('recalculates inventory through the coordinator write path on the admin endpoint', async () => {
     const tierInventory = new MockTierInventoryNamespace();
     const env = createEnv({

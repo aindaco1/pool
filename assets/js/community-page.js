@@ -13,6 +13,12 @@
   var userToken = null;
   var RESULT_BAR_WIDTH_CLASS_PREFIX = 'result-bar__fill--w-';
   var runtimeMessages = {};
+  var logger = window.PoolLogger?.createLogger('community') || {
+    debug: function() {},
+    info: function() {},
+    warn: function() {},
+    error: function() {}
+  };
 
   if (dataset.runtimeMessages) {
     try {
@@ -239,7 +245,7 @@
         }
       });
     } catch (error) {
-      console.error('Failed to load vote status:', error);
+      logger.error('Failed to load vote status:', error);
     }
   }
 
@@ -247,7 +253,7 @@
     var params = new URLSearchParams(window.location.search);
 
     if (params.get('dev') === '1' && window.location.hostname === '127.0.0.1') {
-      console.log('[DEV] Setting supporter cookie for testing');
+      logger.debug('Setting supporter cookie for testing');
       setCookie(cookieName, 'verified', 90);
       userToken = 'dev-token-' + campaignSlug;
       writeStoredToken(userToken);
@@ -264,31 +270,31 @@
     }
 
     try {
-      console.log('[Community] Verifying token with:', workerBase + '/pledge?token=' + token.substring(0, 20) + '...');
+      logger.debug('Verifying token with:', workerBase + '/pledge?token=' + token.substring(0, 20) + '...');
       var response = await fetch(workerBase + '/pledge?token=' + encodeURIComponent(token));
-      console.log('[Community] Response status:', response.status);
+      logger.debug('Response status:', response.status);
       if (!response.ok) {
         var errorText = await response.text();
-        console.error('[Community] Verification failed:', errorText);
+        logger.error('Verification failed:', errorText);
         showDenied();
         return;
       }
 
       var pledge = await response.json();
-      console.log('[Community] Pledge data:', {
+      logger.debug('Pledge data:', {
         campaignSlug: pledge.campaignSlug,
         status: pledge.pledgeStatus,
         expected: campaignSlug
       });
 
       if (pledge.campaignSlug !== campaignSlug) {
-        console.error('[Community] Campaign mismatch:', pledge.campaignSlug, '!==', campaignSlug);
+        logger.error('Campaign mismatch:', pledge.campaignSlug, '!==', campaignSlug);
         showDenied();
         return;
       }
 
       if (pledge.pledgeStatus === 'cancelled') {
-        console.error('[Community] Pledge is cancelled');
+        logger.error('Pledge is cancelled');
         showDenied();
         return;
       }
@@ -304,7 +310,7 @@
       showContent();
       loadVoteStatus();
     } catch (error) {
-      console.error('Verification error:', error);
+      logger.error('Verification error:', error);
       showDenied();
     }
   }
@@ -356,7 +362,7 @@
       }));
       showResults(card, data);
     } catch (error) {
-      console.error('Vote error:', error);
+      logger.error('Vote error:', error);
       toast(getRuntimeMessage('community.failedToSubmitVote', 'Failed to submit vote'), true);
       button.disabled = false;
       button.textContent = getRuntimeMessage('community.submitVote', 'Submit Vote');

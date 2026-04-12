@@ -119,6 +119,13 @@
   - English + Spanish routes now exist for `/`, `/about/`, `/terms/`, `/pledge-success/`, `/pledge-cancelled/`, `/manage/`, `/community/`, and supporter community pages
   - a quieter footer language switcher plus shared route helpers preserve query strings and hashes for tokenized routes such as `/manage/?t=...`
   - shared public campaign/community labels, site-owned cart/community/Manage Pledge runtime strings, campaign countdown/gallery/live-stats edge copy, and Worker supporter emails now read from locale data plus persisted `preferredLang`
+- [x] SEO fundamentals baseline
+  - shared metadata now covers titles, descriptions, canonicals, OG/Twitter tags, and default social images across public layouts
+  - `robots.txt`, `sitemap.xml`, and explicit `noindex,nofollow` handling keep private/tokenized/supporter-only flows out of search intent
+  - public pages emit conservative `Organization` / `WebSite` JSON-LD, and campaign pages emit conservative `CreativeWork` plus breadcrumb JSON-LD
+  - the public community hub now points people back to public campaign pages instead of directing crawlers into supporter-only routes
+  - bounded fork-facing SEO config now covers `seo.x_handle`, `seo.same_as`, and whether the public community hub should remain indexable
+  - structured browser and Worker debug logging now ships as a config-driven developer aid with timestamps, severity labels, scoped prefixes, and browser global error capture
 
 ## Planned
 
@@ -140,8 +147,15 @@
 - [ ] Developer FAQ based on internal documentation
 - [ ] Marketing landing page for the platform on a different domain
 - [ ] Platform-wide add-on products for backer upsells
-- [ ] SEO pass
-
+- [ ] SEO follow-up work
+  - manually validate the emitted structured data and crawl files against external tooling
+  - decide whether campaign discoverability needs a dedicated archive page beyond the homepage and improved community hub
+  - expand automated SEO regression coverage if the metadata/crawl surface grows further
+  - decide whether any more fork-facing SEO knobs are actually worth supporting beyond the current bounded config surface
+- [ ] Projection repair follow-up work
+  - add a small admin or scripted smoke path that checks for drift between campaign current-state projections and active pledge records before a merge or deploy
+  - decide whether pledge and fulfillment reporting should surface a clearer “ledger vs current state” warning when both are used during local debugging
+- [ ] Denial of service attack defense pass
 ## Known Issues
 
 **Credit Card Autofill**: CC number, expiry, and CVV fields are inside Stripe's iframe for PCI compliance — not accessible to our autofill scripts.

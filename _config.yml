@@ -1,8 +1,18 @@
 title: The Pool
 author: Dust Wave
+description: The Pool is Dust Wave's crowdfunding platform for independent film and creative projects.
 url: https://pool.dustwave.xyz
 markdown: kramdown
 permalink: pretty
+
+seo:
+  x_handle: ""
+  same_as: []
+  index_public_community_hub: true
+
+debug:
+  console_logging_enabled: true
+  verbose_console_logging: true
 
 exclude:
   - README.md

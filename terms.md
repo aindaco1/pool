@@ -3,6 +3,7 @@ layout: default
 title: Terms & Creative Guidelines
 lang: en
 translation_key: terms
+description: Review pledge terms, payment processing, fulfillment, and privacy details for The Pool.
 ---
 
 # Terms & Creative Guidelines

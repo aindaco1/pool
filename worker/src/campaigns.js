@@ -4,9 +4,16 @@
  * Fetches campaign data from the static site's /api/campaigns.json
  */
 
+import { getScopedConsole } from './logger.js';
+
 let cachedCampaigns = null;
 let cacheTime = 0;
 const CACHE_TTL = 60 * 1000; // 1 minute
+let console = globalThis.console;
+
+function configureCampaignLogging(env) {
+  console = getScopedConsole(env, 'campaigns');
+}
 
 function getMountainOffsetHours(dateString) {
   const [year, month, day] = dateString.split('-').map(Number);
@@ -37,6 +44,8 @@ function getDeadlineMT(dateString) {
  * Fetch campaigns from the site
  */
 export async function getCampaigns(env) {
+  configureCampaignLogging(env);
+
   const now = Date.now();
   
   // Return cached if fresh

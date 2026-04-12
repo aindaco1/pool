@@ -67,7 +67,7 @@ export async function handleGetVotes(request, env) {
     orderId = 'dev-order-1'; // Fixed ID for consistent dev user
     email = 'dev@test.com';
   } else {
-    const payload = await verifyToken(env.MAGIC_LINK_SECRET, token);
+    const payload = await verifyToken(env.MAGIC_LINK_SECRET, token, env);
     if (!payload) {
       return jsonResponse({ error: 'Invalid or expired token' }, 401, env);
     }
@@ -164,7 +164,7 @@ export async function handlePostVote(request, env) {
     orderId = 'dev-order-1'; // Fixed ID for consistent dev user
     email = 'dev@test.com';
   } else {
-    const payload = await verifyToken(env.MAGIC_LINK_SECRET, token);
+    const payload = await verifyToken(env.MAGIC_LINK_SECRET, token, env);
     if (!payload) {
       return jsonResponse({ error: 'Invalid or expired token' }, 401, env);
     }

@@ -31,6 +31,8 @@ TOP_LEVEL_ORDER = [
   'USPS_QUOTE_CACHE_TTL_SECONDS',
   'USPS_FAILURE_COOLDOWN_SECONDS',
   'USPS_RATE_LIMIT_COOLDOWN_SECONDS',
+  'DEBUG_CONSOLE_LOGGING_ENABLED',
+  'DEBUG_VERBOSE_CONSOLE_LOGGING',
   'DEFAULT_PLATFORM_TIP_PERCENT',
   'MAX_PLATFORM_TIP_PERCENT'
 ].freeze
@@ -58,6 +60,8 @@ DEV_ENV_ORDER = [
   'USPS_QUOTE_CACHE_TTL_SECONDS',
   'USPS_FAILURE_COOLDOWN_SECONDS',
   'USPS_RATE_LIMIT_COOLDOWN_SECONDS',
+  'DEBUG_CONSOLE_LOGGING_ENABLED',
+  'DEBUG_VERBOSE_CONSOLE_LOGGING',
   'DEFAULT_PLATFORM_TIP_PERCENT',
   'MAX_PLATFORM_TIP_PERCENT'
 ].freeze
@@ -135,6 +139,7 @@ def build_mirror_values(config, existing)
   pricing = config['pricing'] || {}
   shipping = config['shipping'] || {}
   usps = shipping['usps'] || {}
+  debug = config['debug'] || {}
 
   {
     'SITE_BASE' => platform['site_url'] || config['url'] || existing['SITE_BASE'],
@@ -159,6 +164,8 @@ def build_mirror_values(config, existing)
     'USPS_QUOTE_CACHE_TTL_SECONDS' => usps.key?('quote_cache_ttl_seconds') ? format_int(usps['quote_cache_ttl_seconds']) : existing['USPS_QUOTE_CACHE_TTL_SECONDS'],
     'USPS_FAILURE_COOLDOWN_SECONDS' => usps.key?('failure_cooldown_seconds') ? format_int(usps['failure_cooldown_seconds']) : existing['USPS_FAILURE_COOLDOWN_SECONDS'],
     'USPS_RATE_LIMIT_COOLDOWN_SECONDS' => usps.key?('rate_limit_cooldown_seconds') ? format_int(usps['rate_limit_cooldown_seconds']) : existing['USPS_RATE_LIMIT_COOLDOWN_SECONDS'],
+    'DEBUG_CONSOLE_LOGGING_ENABLED' => debug.key?('console_logging_enabled') ? (debug['console_logging_enabled'] ? 'true' : 'false') : existing['DEBUG_CONSOLE_LOGGING_ENABLED'],
+    'DEBUG_VERBOSE_CONSOLE_LOGGING' => debug.key?('verbose_console_logging') ? (debug['verbose_console_logging'] ? 'true' : 'false') : existing['DEBUG_VERBOSE_CONSOLE_LOGGING'],
     'DEFAULT_PLATFORM_TIP_PERCENT' => pricing.key?('default_tip_percent') ? format_int(pricing['default_tip_percent']) : existing['DEFAULT_PLATFORM_TIP_PERCENT'],
     'MAX_PLATFORM_TIP_PERCENT' => pricing.key?('max_tip_percent') ? format_int(pricing['max_tip_percent']) : existing['MAX_PLATFORM_TIP_PERCENT']
   }.compact

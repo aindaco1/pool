@@ -152,7 +152,9 @@ status:
 # Community / voting
 community:
   title: "Supporter Community"
-  index_intro: "Select a campaign to access its community features:"
+  index_intro: "Explore campaigns with supporter community features. Supporters can enter their campaign community from the access link in their email."
+  index_supporter_note: "Supporters can vote and participate from their emailed access link."
+  index_empty: "No public supporter-community campaigns are available right now."
   heading_suffix: "Community"
   access_required: "Supporter access required"
   vote_cast: "Vote submitted!"

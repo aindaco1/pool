@@ -453,6 +453,7 @@ A per-campaign array of order IDs (`campaign-pledges:{slug}`) is maintained auto
 - Added on pledge creation (webhook) and recovery (`/admin/recover-checkout`)
 - Removed on pledge cancellation
 - Can be rebuilt: `POST /admin/campaign-index/rebuild/:slug`
+- Stats and inventory recalculation now also repair stale indexes if the stored array no longer matches the active pledge records
 
 **Key behaviors:**
 - Cancelled pledges are never charged

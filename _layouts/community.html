@@ -1,6 +1,5 @@
 {% assign campaign = site.campaigns | where: "slug", page.campaign_slug | first %}
 {% assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
-{% assign platform_title = site.platform.name | default: site.title %}
 {%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
 <!doctype html>
 <html lang="{{ current_lang }}">
@@ -10,7 +9,8 @@
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-community-csp.html %}
   {% include cart-head.html %}
-  <title>{% include t.html key="community.title" lang=current_lang %} · {{ campaign.title }} · {{ platform_title }}</title>
+  {% capture community_title %}{% include t.html key="community.title" lang=current_lang %} · {{ campaign.title }}{% endcapture %}
+  {% include seo-meta.html lang=current_lang title=community_title description=campaign.short_blurb image=campaign.hero_image indexable=false %}
 </head>
 <body>
   {% include header.html hide_cart=true %}
@@ -169,6 +169,12 @@
   </main>
 
   {% include site-footer.html lang=current_lang %}
+  <script
+    src="/assets/js/logger.js"
+    defer
+    data-pool-logger-script="true"
+    data-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
+    data-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"></script>
   <script
     src="/assets/js/community-page.js"
     defer

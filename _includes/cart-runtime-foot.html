@@ -23,7 +23,12 @@
   data-max-tip-percent="{{ site.pricing.max_tip_percent | default: 15 }}"
   data-live-stats-cache-ttl-seconds="{{ site.cache.live_stats_ttl_seconds | default: 300 }}"
   data-live-inventory-cache-ttl-seconds="{{ site.cache.live_inventory_ttl_seconds | default: 300 }}"
+  data-seo-x-handle="{{ site.seo.x_handle | default: '' | escape }}"
+  data-seo-index-public-community-hub="{{ site.seo.index_public_community_hub | default: true }}"
+  data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
+  data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"
   data-stripe-publishable-key="{{ site.checkout.stripe_publishable_key | default: '' }}"></script>
+<script src="/assets/js/logger.js" defer data-pool-logger-script="true"></script>
 <link rel="preconnect" href="https://js.stripe.com" crossorigin>
 <link rel="preconnect" href="https://api.stripe.com" crossorigin>
 <link rel="dns-prefetch" href="//js.stripe.com">

@@ -4,6 +4,14 @@
  * Triggers workflow_dispatch to rebuild the site
  */
 
+import { getScopedConsole } from './logger.js';
+
+let console = globalThis.console;
+
+function configureGitHubLogging(env) {
+  console = getScopedConsole(env, 'github');
+}
+
 /**
  * Trigger a GitHub Actions workflow
  * 
@@ -11,6 +19,8 @@
  * @param {string} reason - Reason for the rebuild (for logging)
  */
 export async function triggerSiteRebuild(env, reason = 'manual') {
+  configureGitHubLogging(env);
+
   if (!env.GITHUB_TOKEN) {
     console.warn('GITHUB_TOKEN not set, skipping site rebuild trigger');
     return { triggered: false, reason: 'No GitHub token configured' };

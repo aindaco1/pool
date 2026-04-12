@@ -269,7 +269,7 @@ test.describe('Public Page Accessibility', () => {
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
       'heading "Supporter Community"',
-      'link "HAND RELATIONS"'
+      'link "HAND RELATIONS Elevated horror where a corporate empathy campaign consumes bureaucracy.'
     ]);
   });
 

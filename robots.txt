@@ -1,0 +1,22 @@
+---
+layout: null
+permalink: /robots.txt
+---
+User-agent: *
+Allow: /
+
+Disallow: /manage/
+Disallow: /es/manage/
+{% if site.seo.index_public_community_hub == false %}
+Disallow: /community/
+Disallow: /es/community/
+{% endif %}
+Disallow: /community/*/
+Disallow: /es/community/*/
+Disallow: /pledge-success/
+Disallow: /es/pledge-success/
+Disallow: /pledge-cancelled/
+Disallow: /es/pledge-cancelled/
+Disallow: /api/
+
+Sitemap: {{ site.platform.site_url | default: site.url }}/sitemap.xml

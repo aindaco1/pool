@@ -38,6 +38,10 @@ describe('config boot scripts', () => {
         data-max-tip-percent="15"
         data-live-stats-cache-ttl-seconds="300"
         data-live-inventory-cache-ttl-seconds="300"
+        data-seo-x-handle="dustwave"
+        data-seo-index-public-community-hub="true"
+        data-debug-console-logging-enabled="true"
+        data-debug-verbose-console-logging="false"
         data-stripe-publishable-key="pk_test_pool"></script>
     `;
 
@@ -93,6 +97,14 @@ describe('config boot scripts', () => {
         uiMode: 'custom',
         stripePublishableKey: 'pk_test_pool'
       },
+      seo: {
+        xHandle: 'dustwave',
+        indexPublicCommunityHub: 'true'
+      },
+      debug: {
+        consoleLoggingEnabled: 'true',
+        verboseConsoleLogging: 'false'
+      },
       siteUrl: 'https://pool.test',
       workerBase: 'https://worker.test',
       platformName: 'Fork Pool',
@@ -112,7 +124,11 @@ describe('config boot scripts', () => {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
       checkoutUiMode: 'custom',
-      stripePublishableKey: 'pk_test_pool'
+      stripePublishableKey: 'pk_test_pool',
+      seoXHandle: 'dustwave',
+      seoIndexPublicCommunityHub: 'true',
+      debugConsoleLoggingEnabled: 'true',
+      debugVerboseConsoleLogging: 'false'
     });
   });
 });

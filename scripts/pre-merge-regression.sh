@@ -173,6 +173,42 @@ verify_build_artifacts() {
     echo "main.css is missing expected first-party cart UI styles"
     return 1
   fi
+  if [[ ! -f _site/robots.txt ]]; then
+    echo "robots.txt is missing from the built site"
+    return 1
+  fi
+  if [[ ! -f _site/sitemap.xml ]]; then
+    echo "sitemap.xml is missing from the built site"
+    return 1
+  fi
+  if ! rg -n 'Sitemap: .+/sitemap\.xml' _site/robots.txt >/dev/null; then
+    echo "robots.txt is missing its sitemap pointer"
+    return 1
+  fi
+  if ! rg -n 'Disallow: /manage/' _site/robots.txt >/dev/null; then
+    echo "robots.txt is missing the manage-route disallow"
+    return 1
+  fi
+  if ! rg -n '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9">' _site/sitemap.xml >/dev/null; then
+    echo "sitemap.xml is missing the expected urlset root"
+    return 1
+  fi
+  if ! rg -n '<loc>.+/campaigns/' _site/sitemap.xml >/dev/null; then
+    echo "sitemap.xml is missing public campaign URLs"
+    return 1
+  fi
+  if ! rg -n 'application/ld\+json' _site/index.html >/dev/null; then
+    echo "Home page is missing JSON-LD"
+    return 1
+  fi
+  if ! rg -n 'application/ld\+json' _site/campaigns/*/index.html >/dev/null; then
+    echo "Campaign pages are missing JSON-LD"
+    return 1
+  fi
+  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/manage/index.html >/dev/null; then
+    echo "Manage page is missing noindex robots metadata"
+    return 1
+  fi
 }
 
 reset_podman_dev_artifacts() {

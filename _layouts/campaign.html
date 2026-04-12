@@ -1,5 +1,4 @@
 {%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
-{%- assign platform_title = site.platform.name | default: site.title -%}
 <!doctype html>
 <html lang="{{ current_lang }}">
 <head>
@@ -8,17 +7,9 @@
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-campaign-csp-strict.html %}
   {% include cart-head.html %}
-  <title>{{ page.title | escape }} · {{ platform_title | escape }}</title>
-  <meta property="og:title" content="{{ page.title | escape }} · {{ platform_title | escape }}">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="{{ site.platform.site_url | default: site.url }}{{ page.url }}">
-  {% if page.hero_image %}
-  <meta property="og:image" content="{{ site.platform.site_url | default: site.url }}{{ page.hero_image }}">
-  {% elsif site.platform.default_social_image_path %}
-  <meta property="og:image" content="{{ site.platform.site_url | default: site.url }}{{ site.platform.default_social_image_path }}">
-  {% endif %}
-  {% if page.short_blurb %}<meta property="og:description" content="{{ page.short_blurb | strip_html | escape }}">{% endif %}
-  <meta name="twitter:card" content="summary_large_image">
+  {% assign campaign_social_image = page.hero_image_wide | default: page.hero_image %}
+  {% include seo-meta.html lang=current_lang description=page.short_blurb image=campaign_social_image og_type="website" %}
+  {% include seo-json-ld.html lang=current_lang kind="campaign" %}
 </head>
 <body>
   {% include header.html %}

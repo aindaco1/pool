@@ -4,6 +4,7 @@ title: ¿Qué es esto?
 lang: es
 translation_key: about
 permalink: /es/about/
+description: Aprende cómo funciona The Pool, desde los aportes todo o nada hasta el acceso mediante enlaces mágicos por correo.
 ---
 
 # ¿Qué es The Pool?
@@ -41,7 +42,7 @@ Para el acceso a la comunidad de patrocinadores, The Pool mantiene la sesión ve
 ## Entonces, ¿cómo funciona exactamente?
 
 1. **Explora**: encuentra un proyecto que quieras apoyar
-2. **Aporta**: añade una o más campañas a tu carrito, añade opcionalmente una propina del 0% al 15% para el mantenimiento de la plataforma y continúa al paso de pago seguro de The Pool con Stripe. Las recompensas físicas añaden una tarifa fija de envío por campaña que incluya artículos físicos.
+2. **Aporta**: añade una o más campañas a tu carrito, añade opcionalmente una propina del 0% al 15% para el mantenimiento de la plataforma y continúa al paso de pago seguro de The Pool con Stripe. Las recompensas físicas pueden añadir envío calculado por el Worker durante el pago, incluidas cotizaciones respaldadas por USPS, tarifas de respaldo configuradas u opciones de envío gratis cuando una implementación las habilita.
 3. **Guarda la tarjeta**: Stripe guarda de forma segura tu método de pago dentro de ese flujo (todavía no se realiza ningún cobro)
 4. **Espera**: la campaña continúa hasta su fecha límite (todas las horas están en horario de montaña)
 5. **Resultado**: si una campaña se financia, se cobra tu aporte para esa campaña. Si no, no pasa nada.
@@ -54,13 +55,14 @@ The Pool está diseñado para cineastas y otros creativos, con funciones como:
 
 - **0% de comisión de plataforma para organizadores**: los patrocinadores pueden añadir opcionalmente una propina del 0% al 15% para ayudar a sostener la plataforma sin reducir los fondos de la campaña
 - **Pago de primera parte**: The Pool controla el carrito, los sidecars de pago y el flujo de revisión del aporte, mientras Stripe gestiona de forma segura los datos del pago
-- **Niveles físicos y digitales**: ofrece recompensas tangibles con captura de dirección de envío en el pago y con impuesto de ventas configurable y envío de tarifa fija
+- **Niveles físicos y digitales**: ofrece recompensas tangibles con captura de dirección de envío durante el pago, soporte para cotizaciones respaldadas por USPS, controles de política de envío de respaldo o gratuito, e impuesto sobre ventas configurable
 - **Fases de producción**: divide tu presupuesto en fases que los patrocinadores puedan financiar directamente
 - **Metas ampliadas**: desbloquea posibilidades creativas adicionales a medida que crece la financiación
 - **Decisiones comunitarias**: permite que tus patrocinadores voten sobre decisiones creativas publicadas
 - **Diario de producción**: mantén a tu comunidad implicada con actualizaciones
 - **Apoyo continuo**: acepta contribuciones después de que tu campaña principal termine
 - **Acceso sin cuenta para patrocinadores**: los patrocinadores gestionan aportes y se unen a páginas exclusivas de la comunidad mediante enlaces mágicos por correo, en lugar de crear cuentas
+- **Flujos para patrocinadores listos para varios idiomas**: las cadenas compartidas de la interfaz, las páginas de resultado del aporte, `/manage/`, las rutas de la comunidad de patrocinadores y los correos para patrocinadores pueden seguir el modelo de idioma configurado para la implementación, con inglés como base y otros idiomas añadidos mediante configuración más contenido traducido
 - **Contenido enriquecido más seguro**: el texto de campaña y las entradas del diario admiten Markdown e incrustaciones aprobadas, mientras que el HTML sin procesar inseguro y los esquemas peligrosos de enlaces o incrustaciones se bloquean al renderizarse
 - **Interfaz con accesibilidad como base**: diálogos, pestañas, deslizadores, flujos de comunidad y acciones públicas de campaña compatibles con teclado forman parte de la base de la plataforma, con comprobaciones automatizadas de accesibilidad sobre páginas públicas críticas, estados de resultado del aporte y flujos de pago
 
@@ -81,6 +83,8 @@ La plataforma está construida sobre servicios que ofrecen niveles gratuitos, y 
 Para los forks, eso significa que las páginas estáticas permanecen en GitHub Pages, las lecturas públicas en vivo se combinan de forma agresiva y se cachean en el navegador, y la mayor parte del uso de Cloudflare Workers se reserva para las partes del ciclo de vida del aporte que son sensibles desde el punto de vista de la seguridad, mientras que la configuración de impuestos y envío se mantiene reflejada entre la configuración del sitio y el entorno del Worker para que la interfaz local, el pago, los informes y los correos se mantengan alineados.
 
 Esa arquitectura también deja margen para endurecer la accesibilidad sin sacrificar el modelo de seguridad de la plataforma: los flujos de carrito, pago y gestión usan semántica reforzada para diálogos, foco, teclado y regiones en vivo, mientras Stripe sigue siendo el dueño de los campos sensibles de pago dentro de su interfaz segura.
+
+La parte pública también está pensada para ser rastreable sin exponer el acceso exclusivo para patrocinadores: las páginas públicas y las páginas de campaña emiten metadatos coherentes y datos estructurados conservadores, mientras que las páginas privadas con enlaces mágicos, como Gestionar aporte y los flujos de comunidad para patrocinadores, quedan fuera de la indexación de búsqueda.
 
 ## Código abierto
 

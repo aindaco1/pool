@@ -23,6 +23,8 @@ const DEFAULT_USPS_FAILURE_COOLDOWN_SECONDS = 300;
 const DEFAULT_USPS_RATE_LIMIT_COOLDOWN_SECONDS = 1800;
 const DEFAULT_PLATFORM_TIP_PERCENT = 5;
 const MAX_PLATFORM_TIP_PERCENT = 15;
+const DEFAULT_CONSOLE_LOGGING_ENABLED = true;
+const DEFAULT_VERBOSE_CONSOLE_LOGGING = true;
 
 export {
   CART_RUNTIMES,
@@ -47,6 +49,8 @@ export {
   DEFAULT_SUPPORT_EMAIL,
   DEFAULT_UPDATES_EMAIL_FROM,
   DEFAULT_WORKER_BASE,
+  DEFAULT_CONSOLE_LOGGING_ENABLED,
+  DEFAULT_VERBOSE_CONSOLE_LOGGING,
   MAX_PLATFORM_TIP_PERCENT
 };
 
@@ -188,6 +192,16 @@ export function getMaxPlatformTipPercent(env = {}) {
   return Number.isInteger(parsed) && parsed >= 0
     ? parsed
     : MAX_PLATFORM_TIP_PERCENT;
+}
+
+export function getConsoleLoggingEnabled(env = {}) {
+  const normalized = normalizeBooleanish(env.DEBUG_CONSOLE_LOGGING_ENABLED);
+  return normalized === null ? DEFAULT_CONSOLE_LOGGING_ENABLED : normalized;
+}
+
+export function getVerboseConsoleLogging(env = {}) {
+  const normalized = normalizeBooleanish(env.DEBUG_VERBOSE_CONSOLE_LOGGING);
+  return normalized === null ? DEFAULT_VERBOSE_CONSOLE_LOGGING : normalized;
 }
 
 export function getPlatformName(env = {}) {

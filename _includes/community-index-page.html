@@ -2,14 +2,26 @@
   <h1>{% include t.html key="community.title" lang=page.lang %}</h1>
   <p>{% include t.html key="community.index_intro" lang=page.lang %}</p>
 
+  {% if site.show_test_campaigns %}
+    {% assign visible_campaigns = site.campaigns %}
+  {% else %}
+    {% assign visible_campaigns = site.campaigns | where_exp: "c", "c.test_only != true" %}
+  {% endif %}
+  {% assign visible_campaigns = visible_campaigns | where_exp: "c", "c.decisions and c.decisions.size > 0" | sort: "goal_deadline" | reverse %}
+
   <div class="campaigns-list">
-    {% for campaign in site.campaigns %}
-      {% if campaign.decisions %}
-      {% capture community_path %}/community/{{ campaign.slug }}/{% endcapture %}
-      <a href="{% include localized-url.html lang=page.lang path=community_path %}" class="campaign-link">
-        {{ campaign.title }}
-      </a>
+    {% for campaign in visible_campaigns %}
+    <a href="{{ campaign.url }}" class="campaign-link">
+      <span class="campaign-link__title">{{ campaign.title }}</span>
+      {% if campaign.short_blurb %}
+      <span class="campaign-link__blurb">{{ campaign.short_blurb | strip_html | strip }}</span>
       {% endif %}
+      <span class="campaign-link__meta">{% include t.html key="community.index_supporter_note" lang=page.lang %}</span>
+      <span class="campaign-link__cta">{% include t.html key="buttons.view_campaign" lang=page.lang %} →</span>
+    </a>
     {% endfor %}
+    {% if visible_campaigns.size == 0 %}
+    <p class="community-redirect__empty">{% include t.html key="community.index_empty" lang=page.lang %}</p>
+    {% endif %}
   </div>
 </div>

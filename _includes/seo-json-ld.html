@@ -1,0 +1,106 @@
+{%- assign indexable = include.indexable -%}
+{%- if indexable == nil -%}{%- assign indexable = true -%}{%- endif -%}
+{%- unless indexable == false -%}
+  {%- assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+  {%- assign platform_title = site.platform.name | default: site.title -%}
+  {%- assign site_base = site.platform.site_url | default: site.url -%}
+  {%- assign org_id = site_base | append: "/#organization" -%}
+  {%- assign website_id = site_base | append: "/#website" -%}
+  {%- assign default_image = site.platform.default_social_image_path | default: '/assets/images/defaults/dust-wave-square.png' -%}
+  {%- assign default_description = site.description | strip_html | strip_newlines | replace: '  ', ' ' | strip -%}
+  {%- assign campaign_image = page.hero_image_wide | default: page.hero_image | default: default_image -%}
+  {%- assign same_as = site.seo.same_as | default: empty -%}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {%- if include.kind == "campaign" -%}
+    {
+      "@type": "Organization",
+      "@id": {{ org_id | jsonify }},
+      "name": {{ platform_title | jsonify }},
+      "url": {{ site_base | jsonify }},
+      "email": {{ site.platform.support_email | default: '' | jsonify }},
+      "logo": {{ site_base | append: default_image | jsonify }}{% if same_as and same_as.size > 0 %},
+      "sameAs": {{ same_as | jsonify }}{% endif %}
+    },
+    {
+      "@type": "CreativeWork",
+      "@id": {{ site_base | append: page.url | append: "#creative-work" | jsonify }},
+      "url": {{ site_base | append: page.url | jsonify }},
+      "name": {{ page.title | jsonify }},
+      "description": {{ page.short_blurb | default: default_description | strip_html | strip_newlines | replace: '  ', ' ' | strip | jsonify }},
+      "image": {{ site_base | append: campaign_image | jsonify }},
+      "genre": {{ page.category | default: '' | jsonify }},
+      "creator": {
+        "@type": "Organization",
+        "name": {{ page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author | jsonify }}
+      },
+      "publisher": {
+        "@id": {{ org_id | jsonify }}
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": {{ site_base | append: page.url | append: "#breadcrumbs" | jsonify }},
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": {{ platform_title | jsonify }},
+          "item": {{ site_base | append: "/" | jsonify }}
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": {{ page.title | jsonify }},
+          "item": {{ site_base | append: page.url | jsonify }}
+        }
+      ]
+    }
+    {%- else -%}
+    {
+      "@type": "Organization",
+      "@id": {{ org_id | jsonify }},
+      "name": {{ platform_title | jsonify }},
+      "url": {{ site_base | jsonify }},
+      "email": {{ site.platform.support_email | default: '' | jsonify }},
+      "logo": {{ site_base | append: default_image | jsonify }}{% if same_as and same_as.size > 0 %},
+      "sameAs": {{ same_as | jsonify }}{% endif %}
+    },
+    {
+      "@type": "WebSite",
+      "@id": {{ website_id | jsonify }},
+      "url": {{ site_base | jsonify }},
+      "name": {{ platform_title | jsonify }},
+      "description": {{ default_description | jsonify }},
+      "publisher": {
+        "@id": {{ org_id | jsonify }}
+      },
+      "inLanguage": {{ current_lang | jsonify }}
+    }
+    {%- if page.translation_key and page.translation_key != "home" -%},
+    {
+      "@type": "BreadcrumbList",
+      "@id": {{ site_base | append: page.url | append: "#breadcrumbs" | jsonify }},
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": {{ platform_title | jsonify }},
+          "item": {{ site_base | append: "/" | jsonify }}
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": {{ page.title | default: platform_title | jsonify }},
+          "item": {{ site_base | append: page.url | jsonify }}
+        }
+      ]
+    }
+    {%- endif -%}
+    {%- endif -%}
+  ]
+}
+</script>
+{%- endunless -%}

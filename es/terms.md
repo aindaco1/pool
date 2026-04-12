@@ -4,6 +4,7 @@ title: Términos y pautas creativas
 lang: es
 translation_key: terms
 permalink: /es/terms/
+description: Revisa los términos de aporte, el procesamiento de pagos, el cumplimiento y la privacidad en The Pool.
 ---
 
 # Términos y pautas creativas
@@ -14,6 +15,7 @@ permalink: /es/terms/
 - Si una campaña no alcanza su objetivo de financiación, no se realizará ningún cobro en tu tarjeta.
 - Puedes modificar o cancelar tu aporte en cualquier momento antes de que termine la campaña usando el enlace mágico de tu correo de confirmación.
 - **No se requiere cuenta**: gestiona tu aporte por completo mediante enlaces de correo electrónico.
+- Cuando esta implementación ofrece idiomas adicionales, esos enlaces enviados por correo para el aporte y la comunidad de patrocinadores pueden usar rutas localizadas sin dejar de autorizar el mismo aporte.
 - Un mismo pago puede incluir más de una campaña, pero cada campaña se guarda y se gestiona como un aporte independiente después del pago.
 - Todas las fechas límite de campaña usan horario de montaña (MST/MDT).
 - Los votos de comunidad se limitan a las opciones publicadas en la página de patrocinadores de la campaña, y las decisiones cerradas no aceptan nuevos votos.
@@ -26,7 +28,7 @@ permalink: /es/terms/
 - Puedes añadir una **propina opcional para la plataforma** de entre 0% y 15% durante el pago. La propina predeterminada es del 5%.
 - Las propinas opcionales ayudan al mantenimiento de The Pool y se incluyen en el total de tu aporte, pero **no cuentan para la meta de financiación de la campaña**.
 - El impuesto sobre las ventas se aplica a los aportes usando la tasa configurada para esta implementación.
-- Los aportes con productos físicos incluyen una tarifa fija de envío por campaña que contenga artículos físicos. Tu dirección de envío se recoge durante el pago para poder completar esas recompensas.
+- Los aportes con productos físicos pueden incluir cargos de envío configurados para esta implementación. Según la configuración de esta implementación y de la campaña, el envío puede cotizarse desde USPS, usar una tarifa de respaldo configurada, incluir anulaciones de envío gratis u ofrecer opciones limitadas de mejora con firma para envíos nacionales. Tu dirección de envío se recoge durante el pago para poder completar esas recompensas.
 
 ## Control creativo y envíos
 
@@ -42,7 +44,7 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Los plazos de entrega pueden ajustarse según la realidad de la producción.
 - Proporcionaremos actualizaciones periódicas sobre el progreso de la producción y los plazos de entrega.
 - Las recompensas digitales se entregarán por correo electrónico a la dirección proporcionada durante el aporte.
-- Las recompensas físicas se envían a la dirección recogida durante el pago. Una tarifa fija de envío por campaña física se incluye en el total del aporte.
+- Las recompensas físicas se envían a la dirección recogida durante el pago. Cualquier cargo de envío mostrado durante el pago se guarda con el aporte y se incluye en el total de tu aporte.
 
 ## Reembolsos y cancelaciones
 
@@ -57,7 +59,7 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Los datos completos de tarjeta son gestionados y almacenados por Stripe. The Pool no almacena números completos de tarjeta ni valores CVC.
 - Las direcciones de correo electrónico y cualquier dato de envío necesario para el cumplimiento pueden almacenarse en nuestro sistema para la gestión del aporte, confirmaciones específicas de campaña, actualizaciones de campaña y cumplimiento de recompensas.
 - El acceso a la comunidad de patrocinadores en el navegador puede recordarse durante la sesión actual como una comodidad, pero el enlace mágico enviado por correo sigue siendo la fuente de verdad para el acceso.
-- No vendemos ni compartimos tu información con terceros salvo cuando sea necesario para el procesamiento del pago y la entrega del correo.
+- No vendemos tu información. Solo la compartimos cuando es necesario para el procesamiento del pago, la entrega de correos transaccionales, el cálculo de cotizaciones de envío y el cumplimiento de recompensas.
 
 ## Plataforma y tecnología
 

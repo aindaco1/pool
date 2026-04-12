@@ -22,10 +22,13 @@ The first two live in Jekyll config and shape browser read behavior. The pricing
 
 The config now uses a structured settings model in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml):
 
+- top-level `title` / `description`
+- `seo`
 - `platform`
 - `pricing`
 - `shipping`
 - `design`
+- `debug`
 - `checkout`
 - `cache`
 
@@ -61,6 +64,28 @@ Current mirrored Worker values worth treating as part of the supported customiza
 The repo now includes `npm run sync:worker-config`, which syncs those mirrored values from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`. The main local dev, test, Worker-only, and pre-merge paths call it automatically. The merge gate’s first-party artifact check also falls back to the Podman-backed build path when host Bundler/Jekyll is unavailable.
 
 USPS OAuth secrets are intentionally separate from that mirrored config surface. Keep `USPS_CLIENT_SECRET` in Worker secrets or `worker/.dev.vars`, not in `_config.yml`.
+
+SEO fundamentals now follow a similarly bounded model:
+
+- public layouts use shared includes for metadata and JSON-LD
+- `robots.txt` and `sitemap.xml` are generated from the public static surface
+- `/manage/`, supporter-community pages, and pledge-result pages emit `noindex,nofollow`
+- the supported fork-facing SEO surface is mainly `title`, `description`, `seo.x_handle`, `seo.same_as`, `seo.index_public_community_hub`, `platform.name`, `platform.site_url`, `platform.default_social_image_path`, and page/campaign content fields like `title`, `description`, `short_blurb`, and hero images
+
+Browser and Worker console logging now use shared logger helpers instead of ad hoc `console.*` calls in the main runtimes. That gives the repo one bounded switch:
+
+- `debug.console_logging_enabled`
+- `debug.verbose_console_logging`
+
+If `console_logging_enabled` is `false`, both the browser runtimes and the Worker stay silent. If `verbose_console_logging` is `false`, lower-severity debug/info/log noise is suppressed while warnings and errors can still be emitted.
+
+When enabled, the shared loggers now provide more structured diagnostics by default:
+
+- ISO timestamps on every line
+- stable browser / Worker scope prefixes
+- explicit severity labels
+- normalized `Error` output
+- browser capture for uncaught errors and unhandled promise rejections
 
 Shipping quote best practices in the current implementation:
 
@@ -1298,6 +1323,8 @@ The settlement flow uses **self-chaining batched invocations** to stay within Cl
 | Key | Purpose |
 |-----|---------|
 | `campaign-pledges:{slug}` | Per-campaign array of order IDs (maintained on create/cancel) |
+
+That index is still the preferred fast path for reports, settlement, and admin reads, but stats and inventory recalculation now treat it as repairable projection state rather than untouchable truth. If it drifts from the underlying active pledge records, the rebuild path rewrites it automatically.
 | `settlement-job:{slug}` | Batch progress tracking (cursor, totals) |
 | `campaign-charged:{slug}` | Settlement completion marker (prevents re-settle) |
 | `cron:lastRun` | Heartbeat — last cron execution timestamp |

@@ -30,7 +30,7 @@ The current architecture is deliberately optimized so free-plan Cloudflare deplo
 
 - campaign pages and the manage page prefer one combined `/live/:slug` read instead of separate stats + inventory requests
 - the browser caches live stats and inventory in `localStorage` for the configured TTLs, and hidden tabs stop refreshing until visible again
-- single-campaign reports, settlement helpers, admin broadcast audience lookups, and stats / inventory reconciliation all prefer the `campaign-pledges:{slug}` index before falling back to full `pledge:` scans
+- single-campaign reports, settlement helpers, admin broadcast audience lookups, and stats / inventory reconciliation all prefer the `campaign-pledges:{slug}` index before falling back to full `pledge:` scans, and rebuild paths now repair stale indexes when they detect drift
 - limited-tier write paths now ask the per-campaign coordinator for reservation-aware availability, while public inventory stays in KV as a projection
 - rate limiting still fails closed, but repeated blocked requests inside the same window no longer rewrite the same KV counter on every hit
 

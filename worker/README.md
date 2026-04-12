@@ -15,6 +15,15 @@ If you specifically work from the `worker/` directory, the Worker npm scripts no
 
 Treat `_config.local.yml` as an override-only file for localhost-specific values. The canonical fork-facing settings should live in the repo-root `_config.yml`, and the Worker mirror will follow from there.
 
+The mirrored Worker config now also includes the shared debug flags:
+
+- `DEBUG_CONSOLE_LOGGING_ENABLED`
+- `DEBUG_VERBOSE_CONSOLE_LOGGING`
+
+Those come from `debug.console_logging_enabled` and `debug.verbose_console_logging` in the repo-root [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml), and both default to `true` so local and deployed Workers stay verbose unless a fork explicitly turns logging down.
+
+Worker-side stats and inventory repair now also treat `campaign-pledges:{slug}` as projection state instead of permanent truth. If a campaign index drifts from the underlying active pledge records, the recalc paths repair it automatically while rebuilding campaign totals and limited-tier inventory.
+
 ## Setup
 
 ### 1. Create KV Namespaces

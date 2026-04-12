@@ -1,5 +1,4 @@
 {%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
-{%- assign platform_title = site.platform.name | default: site.title -%}
 {%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
 <!doctype html>
 <html lang="{{ current_lang }}">
@@ -9,7 +8,8 @@
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-manage-csp.html %}
   {% include cart-head.html %}
-  <title>{% include t.html key="manage.page_title" lang=current_lang %} · {{ platform_title }}</title>
+  {% capture manage_title %}{% include t.html key="manage.page_title" lang=current_lang %}{% endcapture %}
+  {% include seo-meta.html lang=current_lang title=manage_title indexable=false %}
 </head>
 <body>
   <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
@@ -110,7 +110,12 @@
     data-max-tip-percent="{{ site.pricing.max_tip_percent | default: 15 }}"
     data-live-stats-cache-ttl-seconds="{{ site.cache.live_stats_ttl_seconds | default: 300 }}"
     data-live-inventory-cache-ttl-seconds="{{ site.cache.live_inventory_ttl_seconds | default: 300 }}"
+    data-seo-x-handle="{{ site.seo.x_handle | default: '' | escape }}"
+    data-seo-index-public-community-hub="{{ site.seo.index_public_community_hub | default: true }}"
+    data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
+    data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"
     data-stripe-publishable-key="{{ site.checkout.stripe_publishable_key | default: '' }}"></script>
+  <script src="/assets/js/logger.js" defer data-pool-logger-script="true"></script>
   <script src="/assets/js/shipping-option-utils.js" defer></script>
   <script src="/assets/js/stripe-checkout-sidecar.js" defer></script>
   <script

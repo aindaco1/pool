@@ -29,13 +29,33 @@ The generated static site also now excludes repo-internal folders like `worker/`
 
 The site config is organized around these fork-facing sections:
 
+- top-level `title` / `description`
+- `seo`
 - `platform`
 - `pricing`
 - `shipping`
 - `i18n`
 - `design`
+- `debug`
 - `checkout`
 - `cache`
+
+### Top-level `title` / `description`
+
+Use the top-level Jekyll metadata for the site's default search/social identity.
+
+Supported keys:
+
+- `title`
+- `description`
+
+These values feed:
+
+- default HTML `<title>` fallback
+- default meta description fallback
+- site-wide `WebSite` JSON-LD fallback description
+
+`platform.name` is still the primary visible brand surface. Treat top-level `title` / `description` as the fork-facing SEO baseline rather than the main UI-branding interface.
 
 ### `platform`
 
@@ -60,6 +80,7 @@ These values feed:
 
 - header / footer branding
 - page titles and meta tags
+- default social-card image
 - campaign creator fallback copy
 - checkout / Manage Pledge UI copy and bootstrapped client config
 - Worker email branding when mirrored
@@ -68,6 +89,7 @@ Notes:
 
 - `platform.*` is the primary branding surface.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
+- `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
 
 Example:
 
@@ -171,6 +193,71 @@ Recommended fork workflow:
 2. Add the language to the `i18n` block in `_config.yml`
 3. Add localized source pages for long-form routes such as `/about/` and `/terms/`
 4. Build locally and verify both the shared UI copy and the localized routes
+
+### SEO surface
+
+Current SEO fundamentals are intentionally bounded. Forks should treat these as the supported knobs:
+
+- top-level `title`
+- top-level `description`
+- `seo.x_handle`
+- `seo.same_as`
+- `seo.index_public_community_hub`
+- `platform.name`
+- `platform.site_url`
+- `platform.default_social_image_path`
+- localized page `title` / `description` front matter on public pages
+- campaign `title`, `short_blurb`, and hero images
+
+That surface currently controls:
+
+- canonical URLs
+- meta descriptions
+- Open Graph and Twitter previews
+- sitemap URL generation
+- site-wide `Organization` / `WebSite` JSON-LD
+- campaign `CreativeWork` / breadcrumb JSON-LD
+
+The implementation is deliberately narrow:
+
+- private/tokenized/supporter-only flows are marked `noindex`
+- `robots.txt` and `sitemap.xml` only advertise the public surface
+- there is no giant per-page SEO settings matrix beyond the content fields the site already supports
+
+Example:
+
+```yml
+seo:
+  x_handle: dustwave
+  same_as:
+    - https://www.instagram.com/dustwave
+    - https://www.youtube.com/@dustwave
+  index_public_community_hub: true
+```
+
+### `debug`
+
+Use `debug` for shared browser-runtime and Worker console logging.
+
+Supported keys:
+
+- `console_logging_enabled`
+- `verbose_console_logging`
+
+What they do:
+
+- `console_logging_enabled: false` suppresses browser and Worker `console` output across the shared cart, campaign, community, live-stats, Manage Pledge, webhook, admin, and scheduled-task runtimes
+- `verbose_console_logging: false` keeps the logger active but suppresses lower-severity debug/info/log noise while still allowing warnings and errors
+
+These defaults are intentionally `true` in `_config.yml`, so forks start with full diagnostics available and can turn logging down later without code changes.
+
+When enabled, the shared loggers now emit:
+
+- ISO timestamps
+- consistent browser / Worker scope prefixes
+- severity labels like `LOG`, `WARN`, and `ERROR`
+- normalized `Error` payloads
+- browser capture for uncaught errors and unhandled promise rejections
 
 ### `shipping`
 

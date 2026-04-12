@@ -5,6 +5,14 @@
  * No database required — tokens are self-verifying.
  */
 
+import { getScopedConsole } from './logger.js';
+
+let console = globalThis.console;
+
+function configureTokenLogging(env) {
+  console = getScopedConsole(env, 'token');
+}
+
 /**
  * Generate a magic link token
  * 
@@ -35,7 +43,9 @@ export async function generateToken(secret, payload, expiryDays = 90) {
  * @param {string} token - The token string
  * @returns {object|null} Decoded payload or null if invalid
  */
-export async function verifyToken(secret, token) {
+export async function verifyToken(secret, token, env = {}) {
+  configureTokenLogging(env);
+
   try {
     const [payloadB64, signatureB64] = token.split('.');
     if (!payloadB64 || !signatureB64) return null;

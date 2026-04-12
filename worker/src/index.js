@@ -45,6 +45,7 @@ import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
 import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges } from './stats.js';
 import { triggerSiteRebuild } from './github.js';
+import { getScopedConsole } from './logger.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
 import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput, CHECKOUT_INTENT_VERSION, DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
@@ -52,6 +53,12 @@ import { getCampaignShippingFallbackFeeCents, getCheckoutProvider, getCheckoutUi
 import { normalizeShippingDestination, quoteCampaignShipment } from './shipping.js';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
+
+let console = globalThis.console;
+
+function configureWorkerLogging(env) {
+  console = getScopedConsole(env, 'index');
+}
 
 // Rate limit delay for Resend API (2 req/sec limit)
 const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
@@ -1401,6 +1408,7 @@ function getStripePublishableKey(env) {
 
 export default {
   async fetch(request, env, ctx) {
+    configureWorkerLogging(env);
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
@@ -1621,6 +1629,7 @@ export default {
   // 1. Check for campaigns that should transition pre → live (based on start_date)
   // 2. Kick off batched settlement for campaigns past deadline + funded
   async scheduled(event, env, ctx) {
+    configureWorkerLogging(env);
     console.log('⏰ Scheduled task triggered:', new Date().toISOString());
     
     // Heartbeat: record cron execution
@@ -3268,7 +3277,7 @@ async function handleGetPledge(request, env) {
     return jsonResponse({ error: 'Missing token' }, 400);
   }
 
-  const payload = await verifyToken(env.MAGIC_LINK_SECRET, token);
+  const payload = await verifyToken(env.MAGIC_LINK_SECRET, token, env);
   if (!payload) {
     return jsonResponse({ error: 'Invalid or expired token' }, 401);
   }
@@ -3313,7 +3322,7 @@ async function handleGetPledges(request, env) {
     return jsonResponse({ error: 'Missing token' }, 400);
   }
 
-  const payload = await verifyToken(env.MAGIC_LINK_SECRET, token);
+  const payload = await verifyToken(env.MAGIC_LINK_SECRET, token, env);
   if (!payload) {
     return jsonResponse({ error: 'Invalid or expired token' }, 401);
   }
@@ -3369,7 +3378,7 @@ async function handleCancelPledge(request, env) {
     return jsonResponse({ error: 'Missing token' }, 400);
   }
 
-  const payload = await verifyToken(env.MAGIC_LINK_SECRET, token);
+  const payload = await verifyToken(env.MAGIC_LINK_SECRET, token, env);
   if (!payload) {
     return jsonResponse({ error: 'Invalid or expired token' }, 401);
   }
@@ -3555,7 +3564,7 @@ async function handleModifyPledge(request, env) {
     return jsonResponse({ error: 'No changes specified' }, 400);
   }
 
-  const payload = await verifyToken(env.MAGIC_LINK_SECRET, token);
+  const payload = await verifyToken(env.MAGIC_LINK_SECRET, token, env);
   if (!payload) {
     return jsonResponse({ error: 'Invalid or expired token' }, 401);
   }
@@ -3870,7 +3879,7 @@ async function handleUpdatePaymentMethod(request, env) {
     return privateJsonResponse({ error: 'Missing token' }, 400, env);
   }
 
-  const payload = await verifyToken(env.MAGIC_LINK_SECRET, token);
+  const payload = await verifyToken(env.MAGIC_LINK_SECRET, token, env);
   if (!payload) {
     return privateJsonResponse({ error: 'Invalid or expired token' }, 401, env);
   }
@@ -6001,7 +6010,7 @@ async function handleRecalculateStats(request, campaignSlug, env) {
     return jsonResponse({ error: 'Missing campaign slug' }, 400);
   }
 
-  const stats = await recalculateStats(env, campaignSlug);
+  const stats = await recalculateStats(env, campaignSlug, { repairIndex: true });
   
   return jsonResponse({
     success: true,
@@ -6066,7 +6075,7 @@ async function handleRecalculateInventory(request, campaignSlug, env) {
     return jsonResponse({ error: 'Campaign not found' }, 404);
   }
 
-  const inventory = await recalculateTierInventory(env, campaignSlug, campaign.tiers || []);
+  const inventory = await recalculateTierInventory(env, campaignSlug, campaign.tiers || [], { repairIndex: true });
   
   return jsonResponse({
     success: true,

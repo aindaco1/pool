@@ -1,4 +1,10 @@
 (function () {
+  const logger = window.PoolLogger?.createLogger('manage') || {
+    debug() {},
+    info() {},
+    warn() {},
+    error() {}
+  };
   const bootScript =
     document.currentScript ||
     document.querySelector('script[data-manage-page-script="true"]');
@@ -726,7 +732,7 @@
       }
 
       if (isDevMode) {
-        console.log('DEV MODE: Using mock pledge data');
+        logger.debug('DEV MODE: Using mock pledge data');
         currentToken = 'dev-token';
         pledges = [
           {
@@ -1049,7 +1055,7 @@
         return snapshot.stats;
       }
     } catch (e) {
-      console.error('Failed to fetch combined live data for', campaignSlug, e);
+      logger.error('Failed to fetch combined live data for', campaignSlug, e);
     }
     try {
       const res = await fetch(`${WORKER_BASE}/stats/${campaignSlug}`);
@@ -1060,7 +1066,7 @@
         return data;
       }
     } catch (e) {
-      console.error('Failed to fetch stats for', campaignSlug, e);
+      logger.error('Failed to fetch stats for', campaignSlug, e);
     }
     return {};
   }
@@ -1080,7 +1086,7 @@
         return snapshot.inventory.tiers;
       }
     } catch (e) {
-      console.error('Failed to fetch combined live inventory for', campaignSlug, e);
+      logger.error('Failed to fetch combined live inventory for', campaignSlug, e);
     }
     try {
       const res = await fetch(`${WORKER_BASE}/inventory/${campaignSlug}`);
@@ -1091,7 +1097,7 @@
         return liveInventory[campaignSlug];
       }
     } catch (e) {
-      console.error('Failed to fetch inventory for', campaignSlug, e);
+      logger.error('Failed to fetch inventory for', campaignSlug, e);
     }
     return {};
   }

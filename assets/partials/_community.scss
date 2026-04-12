@@ -343,7 +343,7 @@
     border-radius: $radius--md;
     text-decoration: none;
     color: $color--primary;
-    font-weight: 600;
+    text-align: left;
     transition: all 0.2s;
 
     @include xsm {
@@ -355,4 +355,34 @@
       box-shadow: $shadow--soft;
     }
   }
+
+  .campaign-link__title {
+    display: block;
+    font-weight: 700;
+  }
+
+  .campaign-link__blurb {
+    display: block;
+    margin-top: $space-xs;
+    color: $color--secondary;
+    font-weight: 400;
+  }
+
+  .campaign-link__meta {
+    display: block;
+    margin-top: $space-sm;
+    color: $color--secondary;
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+
+  .campaign-link__cta {
+    display: inline-block;
+    margin-top: $space-sm;
+    font-weight: 600;
+  }
+}
+
+.community-redirect__empty {
+  margin: 0;
 }

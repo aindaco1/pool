@@ -1,7 +1,8 @@
 {%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
-{%- assign default_lang = site.i18n.default_lang | default: site.lang | default: "en" -%}
-{%- assign platform_title = site.platform.name | default: site.title -%}
-{%- capture canonical_path -%}{% include localized-url.html lang=current_lang translation_key=page.translation_key %}{%- endcapture -%}
+{%- assign page_indexable = page.indexable -%}
+{%- if page_indexable == nil and page.translation_key == 'community_index' and site.seo.index_public_community_hub == false -%}
+  {%- assign page_indexable = false -%}
+{%- endif -%}
 <!doctype html>
 <html lang="{{ current_lang }}">
 <head>
@@ -9,20 +10,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include cart-head.html %}
-  <title>{% if page.title %}{{ page.title }} · {% endif %}{{ platform_title }}</title>
-  <link rel="canonical" href="{{ site.platform.site_url | default: site.url }}{{ canonical_path | strip }}">
-  {% if page.translation_key and site.i18n.pages[page.translation_key] %}
-    {% for lang in site.i18n.supported_langs %}
-      {% capture alternate_path %}{% include localized-url.html lang=lang translation_key=page.translation_key %}{% endcapture %}
-      <link rel="alternate" hreflang="{{ lang }}" href="{{ site.platform.site_url | default: site.url }}{{ alternate_path | strip }}">
-    {% endfor %}
-    {% capture default_path %}{% include localized-url.html lang=default_lang translation_key=page.translation_key %}{% endcapture %}
-    <link rel="alternate" hreflang="x-default" href="{{ site.platform.site_url | default: site.url }}{{ default_path | strip }}">
-  {% endif %}
-  <meta property="og:title" content="{% if page.title %}{{ page.title | escape }} · {% endif %}{{ platform_title | escape }}">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="{{ site.platform.site_url | default: site.url }}{{ canonical_path | strip }}">
-  <meta property="og:image" content="{{ site.platform.site_url | default: site.url }}{{ site.platform.default_social_image_path | default: '/assets/images/defaults/dust-wave-square.png' }}">
+  {% include seo-meta.html lang=current_lang indexable=page_indexable %}
+  {% include seo-json-ld.html lang=current_lang indexable=page_indexable %}
 </head>
 <body>
   <!-- Skip link for keyboard navigation -->
