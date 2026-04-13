@@ -42,7 +42,7 @@ For supporter-community access, The Pool keeps the verified supporter session in
 
 1. **Browse** — Find a project you want to support
 2. **Pledge** — Add one or more campaigns to your cart, optionally add a 0% to 15% tip for platform upkeep, and continue into The Pool's secure payment step powered by Stripe. Physical rewards can add Worker-calculated shipping during checkout, including USPS-backed quotes, configured fallback rates, or free-shipping overrides when a deployment enables them.
-   You may also see optional platform add-ons. Those support Dust Wave directly, do not count toward a campaign's funding goal, and can be digital or physical.
+   You may also see optional platform add-ons. Those support Dust Wave directly, do not count toward a campaign's funding goal, and can be digital or physical. When they are inventory-limited, stock reflects saved pledges rather than in-progress carts.
 3. **Save card** — Stripe securely saves your payment method inside that checkout flow (no charge yet)
 4. **Wait** — Campaign runs until its deadline (all times in Mountain Time)
 5. **Result** — If a campaign is funded, your pledge for that campaign is charged. If it isn't, nothing happens.
@@ -56,7 +56,7 @@ The Pool is designed for filmmakers and other creatives with features like:
 - **0% platform fee for organizers** — Supporters can optionally add a 0% to 15% platform tip to help sustain the platform without reducing campaign funds
 - **First-party checkout** — The Pool controls the cart, checkout sidecars, and pledge review flow while Stripe securely handles payment details
 - **Physical & digital tiers** — Offer tangible rewards with checkout-time shipping address capture, USPS-backed quote support, fallback/free-shipping policy controls, and configurable sales tax
-- **Optional platform add-ons** — Offer a small global merch catalog alongside campaign pledges, with per-variant inventory, low-stock awareness, and shipping support for physical add-ons
+- **Optional platform add-ons** — Offer a small global merch catalog alongside campaign pledges, with per-variant inventory, low-stock awareness based on saved pledges, and shipping support for physical add-ons
 - **Production phases** — Break your budget into phases supporters can fund directly
 - **Stretch goals** — Unlock additional creative possibilities as funding grows
 - **Community decisions** — Let your backers vote on published creative choices

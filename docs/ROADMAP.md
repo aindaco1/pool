@@ -73,6 +73,11 @@
   - tip-aware emails with full subtotal/tip/tax/shipping breakdowns
   - ledger-style pledge reports and fulfillment CSV exports
   - shipping included in reporting
+- [x] Projection repair follow-up work
+  - read-only drift checks for per-campaign and all-campaign projection state
+  - `./scripts/check-projections.sh` operator wrapper for local and Podman-backed checks
+  - mutable-pledge smoke coverage now verifies campaigns stay projection-clean after setup, modify, and cancel
+  - clearer operator guidance around projection drift versus ledger/current-state report differences
 - [x] Platform-wide add-on products for backer upsells
   - first-wave product import:
     - `DUST WAVE T-Shirt`
@@ -164,9 +169,6 @@
   - decide whether campaign discoverability needs a dedicated archive page beyond the homepage and improved community hub
   - expand automated SEO regression coverage if the metadata/crawl surface grows further
   - decide whether any more fork-facing SEO knobs are actually worth supporting beyond the current bounded config surface
-- [ ] Projection repair follow-up work
-  - add a small admin or scripted smoke path that checks for drift between campaign current-state projections and active pledge records before a merge or deploy
-  - decide whether pledge and fulfillment reporting should surface a clearer “ledger vs current state” warning when both are used during local debugging
 - [ ] Denial of service attack defense pass
 - [ ] Decide whether add-ons need a more explicit platform-merch admin/reporting surface
 - [ ] Support different prices per add-on variation

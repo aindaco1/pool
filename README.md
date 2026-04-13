@@ -34,6 +34,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Ongoing funding** — Post-campaign support section
 - **Manage Pledge dashboard** — Desktop-friendly Active / Closed sections with locked-state read-only controls after deadline
 - **Tip-aware emails + reports** — Supporter emails, pledge reports, and fulfillment exports all include the platform tip when present
+- **Projection drift diagnostics** — Read-only admin checks and a local CLI can compare stored stats, inventory, and campaign indexes against saved pledge truth before any repair path mutates data
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
 - **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, stacking, and overflow fixes instead of a separate mobile-only UI
 - **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, and curated design variables without requiring custom code for normal fork rebranding
@@ -143,6 +144,7 @@ The checkout and E2E helper scripts also support that mode:
 ./scripts/smoke-pledge-management.sh --podman
 ./scripts/pledge-report.sh --podman --local
 ./scripts/fulfillment-report.sh --podman --local
+./scripts/check-projections.sh --podman
 npm run test:e2e:headless:podman
 npm run podman:doctor
 npm run podman:self-check
@@ -159,6 +161,7 @@ The Pool is intentionally shaped so most traffic stays cheap:
 - campaign pages cache live stats and inventory in `localStorage` for `cache.live_stats_ttl_seconds` / `cache.live_inventory_ttl_seconds` (default `300`)
 - background tabs stop refreshing until the page becomes visible again
 - single-campaign reports, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans, and stats/inventory rebuilds now repair stale campaign indexes when they detect drift
+- the new read-only drift checks make it easier to confirm when projections are stale before running a repair path
 - limited-tier write paths now ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
 - once a client is already over a rate limit window, repeated blocked requests no longer rewrite the same KV counter on every hit
 
@@ -201,6 +204,7 @@ Local reporting:
 ```bash
 ./scripts/pledge-report.sh --local
 ./scripts/fulfillment-report.sh --local
+./scripts/check-projections.sh
 ```
 
 Podman-backed local testing:
@@ -222,6 +226,7 @@ The headless browser harness now builds a clean static `_site` and serves it wit
 
 - `pledge-report.sh` is a ledger/history export, so modified pledges appear as deltas and mixed changes now keep tip-update context in the `items` column.
 - `fulfillment-report.sh` is the merged current-state view per `email + campaign`, which is the better comparison point for repeat backers and non-stackable projects.
+- `check-projections.sh` is the read-only operator check for stored `campaign-pledges:{slug}`, `stats:{slug}`, and `tier-inventory:{slug}` drift before you decide to repair anything.
 - if the site ever drifts from the current-state fulfillment view, the admin stats/inventory recalc paths now self-heal stale `campaign-pledges:{slug}` indexes instead of trusting them forever.
 
 **Current full-suite baseline:**

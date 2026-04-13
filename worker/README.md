@@ -24,6 +24,14 @@ Those come from `debug.console_logging_enabled` and `debug.verbose_console_loggi
 
 Worker-side stats and inventory repair now also treat `campaign-pledges:{slug}` as projection state instead of permanent truth. If a campaign index drifts from the underlying active pledge records, the recalc paths repair it automatically while rebuilding campaign totals and limited-tier inventory.
 
+Before mutating anything, operators can now run read-only drift checks through:
+
+- `POST /stats/:slug/check`
+- `POST /admin/projections/check`
+- [`scripts/check-projections.sh`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/scripts/check-projections.sh) from the repo root
+
+Those checks compare stored `campaign-pledges:{slug}`, `stats:{slug}`, and `tier-inventory:{slug}` projections against active pledge truth and return a structured diff instead of silently repairing state.
+
 The same “saved truth over draft state” rule now applies to platform add-ons: `_config.yml` defines the starting inventory baseline for each product or variant, while the Worker derives effective remaining inventory from saved pledge state and invalidates cached add-on inventory after pledge create, modify, or cancel events.
 
 ## Setup
@@ -155,6 +163,16 @@ Change tiers, quantity, or custom support for an active pledge.
 All fields except `token` are optional. Changes are tracked in the pledge's `history` array with `type: "modified"` entries that include tier state, bundle add-on changes, `customAmount`, shipping deltas, and any selected shipping option.
 
 The Worker validates the requested order against the token payload and recalculates totals from stored pledge state plus campaign definitions. Same-price structural changes, such as an add-on variant swap, still count as real pledge changes for persistence and supporter email purposes.
+
+### POST /stats/:slug/check
+Run a read-only projection drift check for one campaign.
+
+Requires admin auth and returns whether the stored campaign index, stats projection, and tier inventory projection are still in sync with active pledge truth.
+
+### POST /admin/projections/check
+Run the same read-only drift check across all campaigns.
+
+This is the Worker-side endpoint that powers [`scripts/check-projections.sh`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/scripts/check-projections.sh) and the newer mutable-pledge smoke assertions.
 
 ## Content Safety Notes
 
