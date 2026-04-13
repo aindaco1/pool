@@ -73,6 +73,18 @@
   - tip-aware emails with full subtotal/tip/tax/shipping breakdowns
   - ledger-style pledge reports and fulfillment CSV exports
   - shipping included in reporting
+- [x] Platform-wide add-on products for backer upsells
+  - first-wave product import:
+    - `DUST WAVE T-Shirt`
+    - `DUST WAVE Sticker`
+    - `DUST WAVE Butterfingers T-Shirt`
+  - fixed-price global catalog items and simple variants now live in config
+  - cart sidecar and Manage Pledge can both add or subtract anchor-bound add-ons
+  - multi-campaign carts stay supported through an anchor-campaign model
+  - add-on revenue now rides canonical checkout, shipping, email, and reporting flows without counting toward campaign funding goals
+  - pledge and fulfillment exports now separate campaign pledge revenue from platform add-on revenue
+  - inventory, low-stock thresholds, sold-out variant filtering, and saved-truth stock awareness now exist for the first merch wave
+  - add-ons now render as shared product cards with image, description, quantity, variant selection, and one-click add/remove controls
 - [x] Shipping calculator replacing the old flat physical-fee model
   - USPS-backed live rating for domestic and international physical pledges
   - deployment-level fallback shipping plus optional campaign-level fallback overrides
@@ -147,22 +159,6 @@
   - Support USA, and international
 - [ ] Developer FAQ based on internal documentation
 - [ ] Marketing landing page for the platform on a different domain
-- [ ] Platform-wide add-on products for backer upsells
-  - first-wave product import target:
-    - `DUST WAVE T-Shirt`
-    - `DUST WAVE Sticker`
-    - `DUST WAVE Butterfingers T-Shirt`
-  - current branch progress:
-    - fixed-price global catalog items and simple variants are now in config
-    - cart sidecar and Manage Pledge can both add or subtract anchor-bound add-ons
-    - multi-campaign carts stay supported through an anchor-campaign model
-    - add-on revenue now rides canonical checkout/shipping/email flows without counting toward campaign funding goals
-    - pledge and fulfillment exports now separate campaign pledge revenue from platform add-on revenue
-    - inventory, low-stock thresholds, and sold-out variant filtering now exist for the first merch wave
-    - add-ons now render as shared product cards with image, description, quantity, variant selection, and one-click add/remove controls
-  - remaining work:
-    - decide whether add-ons need a more explicit platform-merch admin/reporting surface
-    - add broader browser/manual coverage once the flow stabilizes
 - [ ] SEO follow-up work
   - manually validate the emitted structured data and crawl files against external tooling
   - decide whether campaign discoverability needs a dedicated archive page beyond the homepage and improved community hub
@@ -172,7 +168,8 @@
   - add a small admin or scripted smoke path that checks for drift between campaign current-state projections and active pledge records before a merge or deploy
   - decide whether pledge and fulfillment reporting should surface a clearer “ledger vs current state” warning when both are used during local debugging
 - [ ] Denial of service attack defense pass
-- [ ] Figure out how to let customers add multiple variations of the same add-on
+- [ ] Decide whether add-ons need a more explicit platform-merch admin/reporting surface
+- [ ] Support different prices per add-on variation
 - [ ] Campaign-specific add-on products
 - [ ] Zero-regression styles reorganization to be cleaner, more efficient, and as DRY as possible
 
