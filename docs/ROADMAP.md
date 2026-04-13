@@ -140,7 +140,9 @@
   - shared metadata now covers titles, descriptions, canonicals, OG/Twitter tags, and default social images across public layouts
   - `robots.txt`, `sitemap.xml`, and explicit `noindex,nofollow` handling keep private/tokenized/supporter-only flows out of search intent
   - public pages emit conservative `Organization` / `WebSite` JSON-LD, and campaign pages emit conservative `CreativeWork` plus breadcrumb JSON-LD
+  - a dedicated public campaigns archive route now gives search crawlers and human visitors a stable index of live, upcoming, and completed public campaigns
   - the public community hub now points people back to public campaign pages instead of directing crawlers into supporter-only routes
+  - stronger merge-gate and unit coverage now protect the public campaigns archive route, alternate-language metadata, sitemap inclusion, and public crawl surface
   - bounded fork-facing SEO config now covers `seo.x_handle`, `seo.same_as`, `seo.default_social_image_alt`, `seo.og_locale_overrides`, and whether the public community hub should remain indexable
   - structured browser and Worker debug logging now ships as a config-driven developer aid with timestamps, severity labels, scoped prefixes, and browser global error capture
 
@@ -151,6 +153,7 @@
   - Magic link auth
   - Variable customizability
   - add-on inventory baseline override / reset controls so admins can restock sold-out products without editing `_config.yml`
+  - decide what the platform-merch admin/reporting surface should look like alongside campaign-facing data
 - [ ] Replace Pages CMS with dedicated content editor and per-campaign permissions
   - Review Pages CMS GitHub repo for a starting place
   - Super admin and per-campaign users
@@ -166,11 +169,8 @@
 - [ ] Marketing landing page for the platform on a different domain
 - [ ] SEO follow-up work
   - manually validate the emitted structured data and crawl files against external tooling
-  - decide whether campaign discoverability needs a dedicated archive page beyond the homepage and improved community hub
-  - expand automated SEO regression coverage if the metadata/crawl surface grows further
   - decide whether any more fork-facing SEO knobs are actually worth supporting beyond the current bounded config surface
 - [ ] Denial of service attack defense pass
-- [ ] Decide whether add-ons need a more explicit platform-merch admin/reporting surface
 - [ ] Support different prices per add-on variation
 - [ ] Campaign-specific add-on products
 - [ ] Zero-regression styles reorganization to be cleaner, more efficient, and as DRY as possible

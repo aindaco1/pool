@@ -536,7 +536,7 @@ test.describe('Cart Flow', () => {
     await page.goto('/');
     
     // Find and click on a live campaign
-    const campaignLink = page.locator('a[href*="/campaigns/"]').first();
+    const campaignLink = page.locator('.campaign-card h2 a[href*="/campaigns/"]').first();
     await expect(campaignLink).toBeVisible();
     await campaignLink.click();
     

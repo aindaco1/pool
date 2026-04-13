@@ -14,6 +14,13 @@
     margin-bottom: $space-2xl;
   }
 
+  &__intro {
+    @include type-ui;
+    color: $color--secondary;
+    margin: 0;
+    max-width: 720px;
+  }
+
   &__eyebrow {
     @include type-label;
     margin: 0;
@@ -22,6 +29,15 @@
   h2 {
     @include type-section-title;
     margin-bottom: 0;
+
+    @include xsm {
+      font-size: 28px;
+    }
+  }
+
+  h1 {
+    @include type-section-title;
+    margin: 0;
 
     @include xsm {
       font-size: 28px;

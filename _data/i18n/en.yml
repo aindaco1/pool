@@ -4,6 +4,7 @@
 # Navigation
 nav:
   home: "Home"
+  campaigns: "Campaigns"
   about: "About"
   terms: "Terms"
   about_label: "What Is This?"
@@ -304,6 +305,11 @@ home:
   upcoming_heading: "Upcoming"
   recently_wrapped_eyebrow: "Recently wrapped"
   completed_heading: "Completed"
+
+campaign_archive:
+  eyebrow: "Browse"
+  title: "Campaigns"
+  intro: "Explore the full public campaign catalog, including live projects, upcoming launches, and recently completed campaigns."
 
 runtime:
   cart:

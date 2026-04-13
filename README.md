@@ -39,7 +39,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, stacking, and overflow fixes instead of a separate mobile-only UI
 - **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, and curated design variables without requiring custom code for normal fork rebranding
 - **English + Spanish i18n foundation** — `_config.yml` now drives supported languages, static locale routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge runtime copy, campaign countdown/gallery/live-stats labels, and localized Worker supporter emails
-- **SEO fundamentals baseline** — Public pages and campaign pages now emit consistent titles, descriptions, canonicals, OG/Twitter tags, and honest JSON-LD, while `robots.txt`, `sitemap.xml`, and explicit noindex rules keep private/tokenized flows out of search intent
+- **SEO fundamentals baseline** — Public pages, campaign pages, and a dedicated campaigns archive now emit consistent titles, descriptions, canonicals, OG/Twitter tags, honest JSON-LD, and alternate-language metadata, while `robots.txt`, `sitemap.xml`, and explicit noindex rules keep private/tokenized flows out of search intent
 - **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
 ## Architecture

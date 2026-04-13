@@ -10,8 +10,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include cart-head.html %}
-  {% include seo-meta.html lang=current_lang indexable=page_indexable %}
-  {% include seo-json-ld.html lang=current_lang indexable=page_indexable %}
+  {% include seo-meta.html lang=current_lang indexable=page_indexable translation_key=page.translation_key localized_paths=page.localized_paths %}
+  {% include seo-json-ld.html lang=current_lang indexable=page_indexable translation_key=page.translation_key localized_paths=page.localized_paths %}
 </head>
 <body>
   <!-- Skip link for keyboard navigation -->

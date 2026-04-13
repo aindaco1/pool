@@ -2,6 +2,7 @@
 
 nav:
   home: "Inicio"
+  campaigns: "Campañas"
   about: "¿Qué es esto?"
   terms: "Términos"
   about_label: "¿Qué es esto?"
@@ -291,6 +292,11 @@ home:
   upcoming_heading: "Próximas"
   recently_wrapped_eyebrow: "Recién finalizadas"
   completed_heading: "Completadas"
+
+campaign_archive:
+  eyebrow: "Explorar"
+  title: "Campañas"
+  intro: "Explora el catálogo público completo de campañas, incluidas las activas, los próximos lanzamientos y las campañas recién finalizadas."
 
 runtime:
   cart:

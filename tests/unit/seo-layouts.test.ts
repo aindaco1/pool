@@ -17,6 +17,8 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('{% include seo-meta.html');
     expect(defaultLayout).toContain('{% include seo-json-ld.html');
     expect(campaignLayout).toContain('{% include seo-json-ld.html');
+    expect(defaultLayout).toContain('translation_key=page.translation_key');
+    expect(campaignLayout).toContain('translation_key=page.translation_key');
   });
 
   it('marks private pledge and supporter layouts as noindex', () => {
@@ -32,6 +34,7 @@ describe('SEO templates', () => {
   it('publishes crawl files with a sitemap and private-route exclusions', () => {
     const robots = readRepoFile('robots.txt');
     const sitemap = readRepoFile('sitemap.xml');
+    const config = readRepoFile('_config.yml');
 
     expect(robots).toContain('Sitemap: {{ site.platform.site_url | default: site.url }}/sitemap.xml');
     expect(robots).toContain('Disallow: /manage/');
@@ -40,6 +43,9 @@ describe('SEO templates', () => {
     expect(sitemap).toContain("item.layout == 'default'");
     expect(sitemap).toContain("item.test_only != true");
     expect(sitemap).toContain('<lastmod>');
+    expect(config).toContain('campaigns_index:');
+    expect(config).toContain('en: /campaigns/');
+    expect(config).toContain('es: /es/campaigns/');
   });
 
   it('keeps the public community hub pointing at public campaign pages', () => {
@@ -59,5 +65,18 @@ describe('SEO templates', () => {
     expect(seoMeta).toContain('twitter:image:alt');
     expect(seoMeta).toContain('site.seo.default_social_image_alt');
     expect(seoMeta).toContain('site.seo.og_locale_overrides');
+  });
+
+  it('adds a crawlable public campaigns archive route and navigation link', () => {
+    const header = readRepoFile('_includes', 'header.html');
+    const archiveInclude = readRepoFile('_includes', 'campaign-archive-page.html');
+    const campaignsPage = readRepoFile('campaigns.md');
+    const campaignsPageEs = readRepoFile('es', 'campaigns.md');
+
+    expect(header).toContain("translation_key='campaigns_index'");
+    expect(archiveInclude).toContain('campaign-card.html');
+    expect(archiveInclude).toContain('campaign_archive.title');
+    expect(campaignsPage).toContain('translation_key: campaigns_index');
+    expect(campaignsPageEs).toContain('translation_key: campaigns_index');
   });
 });

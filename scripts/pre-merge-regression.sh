@@ -197,8 +197,20 @@ verify_build_artifacts() {
     echo "sitemap.xml is missing public campaign URLs"
     return 1
   fi
+  if ! rg -n '<loc>.+/campaigns/</loc>' _site/sitemap.xml >/dev/null; then
+    echo "sitemap.xml is missing the public campaigns archive URL"
+    return 1
+  fi
   if ! rg -n 'application/ld\+json' _site/index.html >/dev/null; then
     echo "Home page is missing JSON-LD"
+    return 1
+  fi
+  if ! rg -n 'href=".+/es/campaigns/"' _site/campaigns/index.html >/dev/null; then
+    echo "Campaigns archive page is missing alternate-language metadata"
+    return 1
+  fi
+  if ! rg -n 'href="/campaigns/"' _site/index.html >/dev/null; then
+    echo "Home page is missing the public campaigns archive navigation link"
     return 1
   fi
   if ! rg -n 'application/ld\+json' _site/campaigns/*/index.html >/dev/null; then

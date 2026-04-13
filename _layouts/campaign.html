@@ -8,8 +8,8 @@
   {% include first-party-campaign-csp-strict.html %}
   {% include cart-head.html %}
   {% assign campaign_social_image = page.hero_image_wide | default: page.hero_image %}
-  {% include seo-meta.html lang=current_lang description=page.short_blurb image=campaign_social_image og_type="website" %}
-  {% include seo-json-ld.html lang=current_lang kind="campaign" %}
+  {% include seo-meta.html lang=current_lang description=page.short_blurb image=campaign_social_image og_type="website" translation_key=page.translation_key localized_paths=page.localized_paths %}
+  {% include seo-json-ld.html lang=current_lang kind="campaign" translation_key=page.translation_key localized_paths=page.localized_paths %}
 </head>
 <body>
   {% include header.html %}

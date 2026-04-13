@@ -2033,7 +2033,7 @@ describe('cart provider shim', () => {
 
     await vi.waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/abandon`, expect.any(Object));
-      expect(root?.textContent).toContain('Your cart');
+      expect(root?.querySelector('[data-cart-continue]')).toBeTruthy();
     });
 
     resolveStripeJs?.();
