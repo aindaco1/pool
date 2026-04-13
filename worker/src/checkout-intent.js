@@ -44,6 +44,16 @@ export function normalizeCheckoutContribution(input = {}) {
   };
 }
 
+function normalizeBundleAddOn(input = {}) {
+  return {
+    productId: String(input.productId || ''),
+    variantId: String(input.variantId || ''),
+    quantity: toNonNegativeInteger(input.quantity),
+    unitPrice: toNonNegativeInteger(input.unitPrice),
+    category: String(input.category || '')
+  };
+}
+
 export function stableStringify(value) {
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value);
@@ -65,6 +75,17 @@ export async function hashCheckoutContribution(input = {}) {
 
 export async function hashCheckoutBundle(input = {}) {
   const normalized = {
+    bundleAddOnAnchorCampaignSlug: String(input.bundleAddOnAnchorCampaignSlug || ''),
+    bundleAddOns: Array.isArray(input.bundleAddOns)
+      ? input.bundleAddOns
+          .map((entry) => normalizeBundleAddOn(entry))
+          .filter((entry) => entry.productId && entry.quantity > 0)
+          .sort((a, b) => (
+            a.productId.localeCompare(b.productId) ||
+            a.variantId.localeCompare(b.variantId) ||
+            a.quantity - b.quantity
+          ))
+      : [],
     contributions: Array.isArray(input.contributions)
       ? input.contributions
           .map((entry) => normalizeCheckoutContribution(entry))
@@ -110,8 +131,20 @@ export function buildCheckoutHashInput({ campaignSlug, canonicalContribution, ti
   };
 }
 
-export function buildCheckoutBundleHashInput({ contributions = [] } = {}) {
+export function buildCheckoutBundleHashInput({
+  contributions = [],
+  bundleAddOns = [],
+  bundleAddOnAnchorCampaignSlug = ''
+} = {}) {
   return {
+    bundleAddOnAnchorCampaignSlug: String(bundleAddOnAnchorCampaignSlug || ''),
+    bundleAddOns: bundleAddOns.map((entry) => ({
+      productId: String(entry?.productId || ''),
+      variantId: String(entry?.variantId || ''),
+      quantity: toNonNegativeInteger(entry?.quantity),
+      unitPrice: toNonNegativeInteger(entry?.unitPrice),
+      category: String(entry?.category || '')
+    })),
     contributions: contributions.map((entry) => buildCheckoutHashInput(entry))
   };
 }

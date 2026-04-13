@@ -1,6 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const WORKER_BASE = 'https://worker.test';
+const ADD_ON_CONFIG = {
+  enabled: true,
+  low_stock_threshold: 5,
+  products: [
+    {
+      id: 'dust-wave-sticker',
+      name: 'DUST WAVE Sticker',
+      description: '3" x 3" matte laminated circle-cut vinyl sticker.',
+      image_url: '/assets/images/add-ons/sticker-glove.png',
+      price: 3,
+      category: 'physical',
+      inventory: 50,
+      variants: []
+    }
+  ]
+};
 
 function renderManagePage() {
   document.body.innerHTML = `
@@ -99,6 +115,7 @@ function mockManageFetch(options?: {
   paymentStartStatus?: number;
   shippingQuotePayload?: Record<string, unknown> | null;
   shippingQuoteStatus?: number;
+  addOnsInventory?: Record<string, unknown> | null;
   modifyStatus?: number;
   cancelStatus?: number;
 }) {
@@ -110,6 +127,19 @@ function mockManageFetch(options?: {
     paymentStartStatus = 200,
     shippingQuotePayload = null,
     shippingQuoteStatus = 200,
+    addOnsInventory = {
+      lowStockThreshold: 5,
+      products: {
+        'dust-wave-sticker': {
+          inventory: 50,
+          sold: 0,
+          remaining: 50,
+          available: true,
+          soldOut: false,
+          variants: {}
+        }
+      }
+    },
     modifyStatus = 200,
     cancelStatus = 200
   } = options || {};
@@ -164,6 +194,13 @@ function mockManageFetch(options?: {
 
     if (url === `${WORKER_BASE}/shipping/quote` && method === 'POST') {
       return jsonResponse(shippingQuotePayload || { quotes: [], totalShippingCents: 0 }, shippingQuoteStatus);
+    }
+
+    if (url === `${WORKER_BASE}/add-ons/inventory`) {
+      return jsonResponse(addOnsInventory || {
+        lowStockThreshold: 5,
+        products: {}
+      });
     }
 
     if (url === `${WORKER_BASE}/pledge/cancel` && method === 'POST') {
@@ -986,6 +1023,7 @@ describe('manage page script', () => {
             newTierQty: 1,
             addTiers: null,
             supportItems: null,
+            bundleAddOns: null,
             customAmount: null,
             tipPercent: 5,
             shippingOption: null
@@ -1001,6 +1039,501 @@ describe('manage page script', () => {
     await vi.waitFor(() => {
       expect(localStorage.getItem('pool_stats_hand-relations')).toBeNull();
       expect(localStorage.getItem('pool_inventory_hand-relations')).toBeNull();
+    });
+  });
+
+  it('lets Manage Pledge add bundle add-ons without duplicating selection rules', async () => {
+    (window as any).POOL_CONFIG = {
+      addOns: ADD_ON_CONFIG
+    };
+    const fetchMock = mockManageFetch();
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    const addOnInput = getInput('[data-manage-addon-quantity][data-addon-product-id="dust-wave-sticker"]');
+    addOnInput.value = '2';
+    addOnInput.dispatchEvent(new Event('input', { bubbles: true }));
+    const addButton = getButton('[data-manage-addon-add][data-addon-product-id="dust-wave-sticker"]');
+    addButton.click();
+
+    const saveButton = getButton('[data-action="save"][data-index="0"]');
+    expect(saveButton.disabled).toBe(false);
+    saveButton.click();
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('confirm-modal')?.hidden).toBe(false);
+    });
+
+    getButton('#confirm-modal-confirm').click();
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${WORKER_BASE}/pledge/modify`,
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: 'token-123',
+            orderId: 'pool-intent-123',
+            preferredLang: 'en',
+            newTierId: 'frame-slot',
+            newTierQty: 1,
+            addTiers: null,
+            supportItems: null,
+            bundleAddOns: [
+              {
+                productId: 'dust-wave-sticker',
+                variantId: '',
+                quantity: 2
+              }
+            ],
+            customAmount: null,
+            tipPercent: null,
+            shippingOption: null
+          })
+        })
+      );
+    });
+  });
+
+  it('lets Manage Pledge edit and remove already-selected bundle add-ons', async () => {
+    (window as any).POOL_CONFIG = {
+      addOns: ADD_ON_CONFIG
+    };
+    const fetchMock = mockManageFetch({
+      pledges: [
+        {
+          ...basePledge,
+          bundleAddOns: [
+            {
+              productId: 'dust-wave-sticker',
+              variantId: '',
+              quantity: 2
+            }
+          ]
+        }
+      ]
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    expect(document.querySelector('[data-manage-selected-addon-quantity][data-addon-product-id="dust-wave-sticker"]')).not.toBeNull();
+    expect(document.querySelector('[data-manage-addon-add][data-addon-product-id="dust-wave-sticker"]')).toBeNull();
+    const selectedImage = document.querySelector('[data-manage-selected-addon] .support-option-item__media img') as HTMLImageElement | null;
+    expect(selectedImage?.getAttribute('src')).toBe('/assets/images/add-ons/sticker-glove.png');
+    expect(document.querySelector('[data-manage-selected-addon]')?.textContent).toContain('50 left');
+    expect(document.querySelector('[data-manage-selected-addon] .qty-btn.qty-minus')).not.toBeNull();
+    expect(document.querySelector('[data-manage-selected-addon] .qty-btn.qty-plus')).not.toBeNull();
+
+    const selectedQtyInput = getInput('[data-manage-selected-addon-quantity][data-addon-product-id="dust-wave-sticker"]');
+    selectedQtyInput.value = '3';
+    selectedQtyInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const saveButton = getButton('[data-action="save"][data-index="0"]');
+    expect(saveButton.disabled).toBe(false);
+    saveButton.click();
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('confirm-modal')?.hidden).toBe(false);
+    });
+
+    getButton('#confirm-modal-confirm').click();
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${WORKER_BASE}/pledge/modify`,
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: 'token-123',
+            orderId: 'pool-intent-123',
+            preferredLang: 'en',
+            newTierId: 'frame-slot',
+            newTierQty: 1,
+            addTiers: null,
+            supportItems: null,
+            bundleAddOns: [
+              {
+                productId: 'dust-wave-sticker',
+                variantId: '',
+                quantity: 3
+              }
+            ],
+            customAmount: null,
+            tipPercent: null,
+            shippingOption: null
+          })
+        })
+      );
+    });
+  });
+
+  it('enables save when an add-on variant changes without changing subtotal', async () => {
+    (window as any).POOL_CONFIG = {
+      addOns: {
+        ...ADD_ON_CONFIG,
+        products: [
+          {
+            id: 'dust-wave-tshirt',
+            name: 'DUST WAVE T-Shirt',
+            description: 'Our official t-shirt. 100% cotton.',
+            image_url: '/assets/images/add-ons/dustwave-tshirt.png',
+            price: 25,
+            category: 'physical',
+            shipping_preset: 'tshirt',
+            variant_option_name: 'Size',
+            variants: [
+              { id: 'm', label: 'M', inventory: 4 },
+              { id: 'l', label: 'L', inventory: 4 }
+            ]
+          }
+        ]
+      }
+    };
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+    mockManageFetch({
+      pledges: [
+        {
+          ...basePledge,
+          bundleAddOns: [
+            {
+              productId: 'dust-wave-tshirt',
+              variantId: 'm',
+              variantLabel: 'M',
+              quantity: 1
+            }
+          ]
+        }
+      ],
+      addOnsInventory: {
+        lowStockThreshold: 5,
+        products: {
+          'dust-wave-tshirt': {
+            inventory: 8,
+            sold: 1,
+            remaining: 7,
+            available: true,
+            soldOut: false,
+            variants: {
+              m: {
+                inventory: 4,
+                sold: 1,
+                remaining: 3,
+                available: true,
+                soldOut: false
+              },
+              l: {
+                inventory: 4,
+                sold: 0,
+                remaining: 4,
+                available: true,
+                soldOut: false
+              }
+            }
+          }
+        }
+      }
+    });
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    const saveButton = getButton('[data-action="save"][data-index="0"]');
+    expect(saveButton.disabled).toBe(true);
+
+    const variantSelect = document.querySelector('[data-manage-selected-addon-variant][data-addon-product-id="dust-wave-tshirt"]') as HTMLSelectElement | null;
+    expect(variantSelect).not.toBeNull();
+    variantSelect!.value = 'l';
+    variantSelect!.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(saveButton.disabled).toBe(false);
+      expect(saveButton.textContent).toBe('Save Changes');
+    });
+  });
+
+  it('uses net add-on changes in the Manage confirm modal totals', async () => {
+    (window as any).POOL_CONFIG = {
+      addOns: {
+        ...ADD_ON_CONFIG,
+        products: [
+          ...ADD_ON_CONFIG.products,
+          {
+            id: 'dust-wave-butterfingers',
+            name: 'DUST WAVE Butterfingers T-Shirt',
+            description: 'Our alternate t-shirt. 100% cotton.',
+            image_url: '/assets/images/add-ons/butterfingers-tshirt.png',
+            price: 25,
+            category: 'physical',
+            shipping_preset: 'tshirt',
+            shipping: {
+              weight_oz: 8,
+              length_in: 10,
+              width_in: 8,
+              height_in: 1
+            },
+            variant_option_name: 'Size',
+            variants: [
+              { id: 'xs', label: 'XS', inventory: 2 }
+            ]
+          }
+        ]
+      }
+    };
+    mockManageFetch({
+      pledges: [
+        {
+          ...basePledge,
+          subtotal: 1300,
+          tax: 102,
+          shipping: 300,
+          amount: 1793,
+          customAmount: 0,
+          tipPercent: 7,
+          tipAmount: 91,
+          bundleAddOns: [
+            {
+              productId: 'dust-wave-sticker',
+              variantId: '',
+              quantity: 1
+            }
+          ],
+          shippingAddress: {
+            postalCode: '80205',
+            country: 'US'
+          }
+        }
+      ],
+      addOnsInventory: {
+        lowStockThreshold: 5,
+        products: {
+          'dust-wave-sticker': {
+            inventory: 50,
+            sold: 0,
+            remaining: 50,
+            available: true,
+            soldOut: false,
+            variants: {}
+          },
+          'dust-wave-butterfingers': {
+            inventory: 2,
+            sold: 0,
+            remaining: 2,
+            available: true,
+            soldOut: false,
+            variants: {
+              xs: {
+                inventory: 2,
+                sold: 0,
+                remaining: 2,
+                available: true,
+                soldOut: false
+              }
+            }
+          }
+        }
+      },
+      shippingQuotePayload: {
+        quotes: [
+          {
+            campaignSlug: 'hand-relations',
+            shippingCents: 300,
+            source: 'fallback_flat_rate',
+            defaultOption: 'standard',
+            selectedOption: 'standard',
+            availableOptions: [
+              {
+                id: 'standard',
+                shippingCents: 300,
+                priceDeltaCents: 0
+              }
+            ]
+          }
+        ],
+        totalShippingCents: 300,
+        shippingAddress: {
+          country: 'US',
+          postalCode: '80205'
+        }
+      }
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    getButton('[data-manage-selected-addon-remove][data-addon-product-id="dust-wave-sticker"]').click();
+    getButton('[data-manage-addon-add][data-addon-product-id="dust-wave-butterfingers"]').click();
+
+    const saveButton = getButton('[data-action="save"][data-index="0"]');
+    saveButton.click();
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('confirm-modal')?.hidden).toBe(false);
+    });
+
+    const confirmDetails = document.getElementById('confirm-modal-details')?.textContent || '';
+    expect(confirmDetails).toContain('DUST WAVE Sticker: 1 → 0 (-1)');
+    expect(confirmDetails).toContain('DUST WAVE Butterfingers T-Shirt (XS): 0 → 1 (+1)');
+    expect(confirmDetails).toContain('The Pool tip change');
+    expect(confirmDetails).toContain('$0.91 → $2.45 (+$1.54, 7%)');
+    expect(confirmDetails).toContain('Subtotal: $35.00');
+    expect(confirmDetails).toContain('Shipping: $3.00');
+    expect(confirmDetails).toContain('Total: $43.21');
+  });
+
+  it('restores fallback shipping when a physical Manage add-on is removed and re-added', async () => {
+    (window as any).POOL_CONFIG = {
+      addOns: ADD_ON_CONFIG
+    };
+    mockManageFetch({
+      pledges: [
+        {
+          ...basePledge,
+          shippingAddress: {
+            postalCode: '80205',
+            country: 'US'
+          }
+        }
+      ],
+      shippingQuotePayload: {
+        quotes: [],
+        totalShippingCents: 0
+      }
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    const addButton = getButton('[data-manage-addon-add][data-addon-product-id="dust-wave-sticker"]');
+    addButton.click();
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('shipping-row-0')?.hidden).toBe(false);
+      expect(document.getElementById('shipping-0')?.textContent).toBe('$3.00');
+    });
+
+    const removeButton = getButton('[data-manage-selected-addon-remove][data-addon-product-id="dust-wave-sticker"]');
+    removeButton.click();
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('shipping-row-0')?.hidden).toBe(true);
+    });
+
+    const reAddButton = getButton('[data-manage-addon-add][data-addon-product-id="dust-wave-sticker"]');
+    reAddButton.click();
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('shipping-row-0')?.hidden).toBe(false);
+      expect(document.getElementById('shipping-0')?.textContent).toBe('$3.00');
+    });
+  });
+
+  it('clamps Manage add-on quantity inputs to available inventory', async () => {
+    (window as any).POOL_CONFIG = {
+      addOns: ADD_ON_CONFIG
+    };
+    mockManageFetch({
+      pledges: [basePledge],
+      addOnsInventory: {
+        lowStockThreshold: 5,
+        products: {
+          'dust-wave-sticker': {
+            inventory: 50,
+            sold: 48,
+            remaining: 2,
+            available: true,
+            soldOut: false,
+            variants: {}
+          }
+        }
+      }
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    const addOnInput = getInput('[data-manage-addon-quantity][data-addon-product-id="dust-wave-sticker"]');
+    addOnInput.value = '999';
+    addOnInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(addOnInput.max).toBe('2');
+    expect(addOnInput.value).toBe('2');
+  });
+
+  it('does not let selected Manage add-ons exceed true remaining inventory', async () => {
+    (window as any).POOL_CONFIG = {
+      addOns: ADD_ON_CONFIG
+    };
+    mockManageFetch({
+      pledges: [
+        {
+          ...basePledge,
+          bundleAddOns: [
+            {
+              productId: 'dust-wave-sticker',
+              variantId: '',
+              quantity: 1
+            }
+          ]
+        }
+      ],
+      addOnsInventory: {
+        lowStockThreshold: 5,
+        products: {
+          'dust-wave-sticker': {
+            inventory: 50,
+            sold: 48,
+            remaining: 2,
+            available: true,
+            soldOut: false,
+            variants: {}
+          }
+        }
+      }
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    const selectedQtyInput = getInput('[data-manage-selected-addon-quantity][data-addon-product-id="dust-wave-sticker"]');
+    expect(selectedQtyInput.max).toBe('2');
+    expect(document.querySelector('[data-manage-selected-addon]')?.textContent).toContain('Only 2 left');
+
+    const plusButton = getButton('[data-manage-selected-addon-adjust="1"][data-addon-product-id="dust-wave-sticker"]');
+    plusButton.click();
+    plusButton.click();
+
+    await vi.waitFor(() => {
+      expect(selectedQtyInput.value).toBe('2');
     });
   });
 

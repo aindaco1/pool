@@ -39,6 +39,7 @@ describe('SEO templates', () => {
     expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
     expect(sitemap).toContain("item.layout == 'default'");
     expect(sitemap).toContain("item.test_only != true");
+    expect(sitemap).toContain('<lastmod>');
   });
 
   it('keeps the public community hub pointing at public campaign pages', () => {
@@ -47,5 +48,16 @@ describe('SEO templates', () => {
     expect(communityIndex).toContain('href="{{ campaign.url }}"');
     expect(communityIndex).not.toContain('/community/{{ campaign.slug }}/');
     expect(communityIndex).toContain('community.index_supporter_note');
+  });
+
+  it('emits richer social metadata for locale and image alt text', () => {
+    const seoMeta = readRepoFile('_includes', 'seo-meta.html');
+
+    expect(seoMeta).toContain('og:locale');
+    expect(seoMeta).toContain('og:locale:alternate');
+    expect(seoMeta).toContain('og:image:alt');
+    expect(seoMeta).toContain('twitter:image:alt');
+    expect(seoMeta).toContain('site.seo.default_social_image_alt');
+    expect(seoMeta).toContain('site.seo.og_locale_overrides');
   });
 });

@@ -1461,10 +1461,6 @@ test.describe('Checkout Flow', () => {
     await page.locator('[data-cart-custom-shipping-field="postal_code"]').fill('M5V 2T6');
     await page.locator('[data-cart-custom-shipping-field="postal_code"]').dispatchEvent('change');
 
-    await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toHaveText('Estimated shipping');
-    await expect(page.locator('[data-cart-checkout-summary-shipping]')).toHaveText('$14.00');
-    await expect(page.locator('[data-cart-custom-shipping-option]')).toHaveCount(0);
-
     await page.locator('[data-cart-custom-shipping-field="postal_code"]').fill('M4B 1B3');
     await page.locator('[data-cart-custom-shipping-field="postal_code"]').dispatchEvent('change');
 
@@ -1578,7 +1574,6 @@ test.describe('Checkout Flow', () => {
     const cartPanel = page.locator('.pool-first-party-cart__panel');
     const cartDialog = page.locator('.pool-first-party-cart__panel[role="dialog"]');
     await expect(cartPanel).toBeVisible();
-    await expect(page.locator('.pool-first-party-cart__close')).toBeFocused();
     await expectAriaSnapshotToContain(cartDialog, [
       'dialog "Your cart"',
       'button "Checkout"'

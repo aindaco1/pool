@@ -433,6 +433,7 @@ test.describe('Manage Pledge Flows', () => {
       newTierId: 'frame-slot',
       newTierQty: 1,
       addTiers: null,
+      bundleAddOns: null,
       supportItems: null,
       customAmount: null,
       tipPercent: 1,

@@ -124,7 +124,7 @@
   - `robots.txt`, `sitemap.xml`, and explicit `noindex,nofollow` handling keep private/tokenized/supporter-only flows out of search intent
   - public pages emit conservative `Organization` / `WebSite` JSON-LD, and campaign pages emit conservative `CreativeWork` plus breadcrumb JSON-LD
   - the public community hub now points people back to public campaign pages instead of directing crawlers into supporter-only routes
-  - bounded fork-facing SEO config now covers `seo.x_handle`, `seo.same_as`, and whether the public community hub should remain indexable
+  - bounded fork-facing SEO config now covers `seo.x_handle`, `seo.same_as`, `seo.default_social_image_alt`, `seo.og_locale_overrides`, and whether the public community hub should remain indexable
   - structured browser and Worker debug logging now ships as a config-driven developer aid with timestamps, severity labels, scoped prefixes, and browser global error capture
 
 ## Planned
@@ -133,6 +133,7 @@
   - Super admin and per-campaign users
   - Magic link auth
   - Variable customizability
+  - add-on inventory baseline override / reset controls so admins can restock sold-out products without editing `_config.yml`
 - [ ] Replace Pages CMS with dedicated content editor and per-campaign permissions
   - Review Pages CMS GitHub repo for a starting place
   - Super admin and per-campaign users
@@ -147,6 +148,21 @@
 - [ ] Developer FAQ based on internal documentation
 - [ ] Marketing landing page for the platform on a different domain
 - [ ] Platform-wide add-on products for backer upsells
+  - first-wave product import target:
+    - `DUST WAVE T-Shirt`
+    - `DUST WAVE Sticker`
+    - `DUST WAVE Butterfingers T-Shirt`
+  - current branch progress:
+    - fixed-price global catalog items and simple variants are now in config
+    - cart sidecar and Manage Pledge can both add or subtract anchor-bound add-ons
+    - multi-campaign carts stay supported through an anchor-campaign model
+    - add-on revenue now rides canonical checkout/shipping/email flows without counting toward campaign funding goals
+    - pledge and fulfillment exports now separate campaign pledge revenue from platform add-on revenue
+    - inventory, low-stock thresholds, and sold-out variant filtering now exist for the first merch wave
+    - add-ons now render as shared product cards with image, description, quantity, variant selection, and one-click add/remove controls
+  - remaining work:
+    - decide whether add-ons need a more explicit platform-merch admin/reporting surface
+    - add broader browser/manual coverage once the flow stabilizes
 - [ ] SEO follow-up work
   - manually validate the emitted structured data and crawl files against external tooling
   - decide whether campaign discoverability needs a dedicated archive page beyond the homepage and improved community hub
@@ -156,6 +172,10 @@
   - add a small admin or scripted smoke path that checks for drift between campaign current-state projections and active pledge records before a merge or deploy
   - decide whether pledge and fulfillment reporting should surface a clearer “ledger vs current state” warning when both are used during local debugging
 - [ ] Denial of service attack defense pass
+- [ ] Figure out how to let customers add multiple variations of the same add-on
+- [ ] Campaign-specific add-on products
+- [ ] Zero-regression styles reorganization to be cleaner, more efficient, and as DRY as possible
+
 ## Known Issues
 
 **Credit Card Autofill**: CC number, expiry, and CVV fields are inside Stripe's iframe for PCI compliance — not accessible to our autofill scripts.

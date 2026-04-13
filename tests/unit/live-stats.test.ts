@@ -874,6 +874,17 @@ describe('live-stats runtime integration', () => {
 
     expect(fetchMock).toHaveBeenCalledWith('https://pledge.dustwave.xyz/stats/test-campaign');
     expect((wrap.querySelector('[data-live-pledged]') as HTMLElement).textContent).toBe('$8.5k');
+    expect(JSON.parse(localStorage.getItem('pool_live_refresh_needed') || '{}').campaignSlugs || []).toContain('test-campaign');
+  });
+
+  it('writes a refresh marker when inventory cache is invalidated', async () => {
+    await import('../../assets/js/live-stats.js');
+
+    (window as any).invalidateInventoryCache('test-campaign');
+
+    const marker = JSON.parse(localStorage.getItem('pool_live_refresh_needed') || '{}');
+    expect(marker.campaignSlugs || []).toContain('test-campaign');
+    expect(typeof marker.timestamp).toBe('number');
   });
 
   it('forces a fresh live fetch on boot when a post-pledge refresh marker is present', async () => {

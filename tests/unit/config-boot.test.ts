@@ -25,6 +25,7 @@ describe('config boot scripts', () => {
         data-worker-base="https://worker.test"
         data-platform-name="Fork Pool"
         data-platform-company-name="Fork Studio"
+        data-platform-author="Fork Studio"
         data-platform-support-email="support@fork.test"
         data-default-creator-name="Fork Studio"
         data-sales-tax-rate="0.07875"
@@ -34,6 +35,7 @@ describe('config boot scripts', () => {
         data-shipping-fallback-flat-rate="3.00"
         data-shipping-free-shipping-default="false"
         data-shipping-presets='{"poster":{"weight_oz":5,"length_in":18,"width_in":3,"height_in":3}}'
+        data-add-ons='{"enabled":true,"low_stock_threshold":5,"products":[{"id":"dust-wave-sticker","name":"DUST WAVE Sticker","image_url":"https://shop.dustwave.xyz/assets/images/sticker-glove.png","price":3,"inventory":50,"category":"physical","shipping_preset":"sticker","variants":[]},{"id":"dust-wave-tshirt","name":"DUST WAVE T-Shirt","image_url":"https://shop.dustwave.xyz/assets/images/dustwave-tshirt.png","price":25,"category":"physical","shipping_preset":"tshirt","variant_option_name":"Size","variants":[{"id":"s","label":"S","inventory":2},{"id":"m","label":"M","inventory":4}]}]}'
         data-default-tip-percent="5"
         data-max-tip-percent="15"
         data-live-stats-cache-ttl-seconds="300"
@@ -62,6 +64,7 @@ describe('config boot scripts', () => {
       platform: {
         name: 'Fork Pool',
         companyName: 'Fork Studio',
+        author: 'Fork Studio',
         supportEmail: 'support@fork.test',
         siteUrl: 'https://pool.test',
         workerUrl: 'https://worker.test',
@@ -87,6 +90,35 @@ describe('config boot scripts', () => {
           }
         }
       },
+      addOns: {
+        enabled: true,
+        low_stock_threshold: 5,
+        products: [
+        {
+          id: 'dust-wave-sticker',
+          name: 'DUST WAVE Sticker',
+          image_url: 'https://shop.dustwave.xyz/assets/images/sticker-glove.png',
+          price: 3,
+          inventory: 50,
+          category: 'physical',
+          shipping_preset: 'sticker',
+            variants: []
+          },
+        {
+          id: 'dust-wave-tshirt',
+          name: 'DUST WAVE T-Shirt',
+          image_url: 'https://shop.dustwave.xyz/assets/images/dustwave-tshirt.png',
+          price: 25,
+            category: 'physical',
+            shipping_preset: 'tshirt',
+            variant_option_name: 'Size',
+            variants: [
+              { id: 's', label: 'S', inventory: 2 },
+              { id: 'm', label: 'M', inventory: 4 }
+            ]
+          }
+        ]
+      },
       cache: {
         liveStatsTtlSeconds: '300',
         liveInventoryTtlSeconds: '300'
@@ -109,6 +141,7 @@ describe('config boot scripts', () => {
       workerBase: 'https://worker.test',
       platformName: 'Fork Pool',
       platformCompanyName: 'Fork Studio',
+      platformAuthor: 'Fork Studio',
       supportEmail: 'support@fork.test',
       defaultCreatorName: 'Fork Studio',
       salesTaxRate: '0.07875',

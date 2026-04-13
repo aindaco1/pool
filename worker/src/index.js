@@ -43,6 +43,7 @@ import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, se
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
+import { getAddOns, getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot } from './add-ons.js';
 import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges } from './stats.js';
 import { triggerSiteRebuild } from './github.js';
 import { getScopedConsole } from './logger.js';
@@ -65,6 +66,7 @@ const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
 const STRIPE_CUSTOM_UI_MODE_API_VERSION = '2026-02-25.clover';
 const PRIVATE_NO_STORE_CACHE_CONTROL = 'private, no-store, max-age=0';
 const DEFAULT_I18N_LANG = 'en';
+const ADD_ON_ITEM_PREFIX = 'addon__';
 
 // Extract plain text excerpt from diary entry (supports both legacy body and content blocks)
 function getDiaryExcerpt(entry, maxLength = 200) {
@@ -509,6 +511,92 @@ function getSupportItemsWithLabels(campaign, supportItems = []) {
   }));
 }
 
+function getBundleAddOnSubtotal(bundleAddOns = []) {
+  return (bundleAddOns || []).reduce((sum, addOn) => (
+    sum + ((Number(addOn?.unitPrice || 0) || 0) * (Number(addOn?.quantity || 0) || 0))
+  ), 0);
+}
+
+function bundleAddOnsIncludePhysical(bundleAddOns = []) {
+  return (bundleAddOns || []).some((addOn) => (
+    addOn?.category === 'physical' && Number(addOn?.quantity || 0) > 0
+  ));
+}
+
+function getBundleAddOnsForAnchorCampaign(bundleAddOns = [], anchorCampaignSlug = '', campaignSlug = '') {
+  if (!anchorCampaignSlug || !campaignSlug || anchorCampaignSlug !== campaignSlug) {
+    return [];
+  }
+  return Array.isArray(bundleAddOns) ? bundleAddOns.map((addOn) => ({ ...addOn })) : [];
+}
+
+function getBundleAddOnsWithLabels(bundleAddOns = []) {
+  return (bundleAddOns || []).map((addOn) => ({
+    ...addOn,
+    label: addOn?.name || addOn?.productId || 'Add-on'
+  }));
+}
+
+function buildPledgeItemsPayload(campaign, canonicalContribution, bundleAddOns = []) {
+  const additionalTiersWithNames = (canonicalContribution.additionalTiers || []).map((tier) => {
+    const tierData = campaign?.tiers?.find((entry) => entry.id === tier.id);
+    return { ...tier, name: tierData?.name || tier.id };
+  });
+  const supportItemsWithLabels = getSupportItemsWithLabels(campaign, canonicalContribution.supportItems || []);
+
+  return {
+    tierName: canonicalContribution.tierName,
+    tierQty: canonicalContribution.tierQty,
+    additionalTiers: additionalTiersWithNames,
+    supportItems: supportItemsWithLabels,
+    addOns: getBundleAddOnsWithLabels(bundleAddOns),
+    customAmount: canonicalContribution.customAmount
+  };
+}
+
+function normalizePledgeItemsForComparison(pledgeItems = {}) {
+  return {
+    tierName: String(pledgeItems?.tierName || ''),
+    tierQty: Math.max(0, Number(pledgeItems?.tierQty || 0)),
+    customAmount: Math.max(0, Number(pledgeItems?.customAmount || 0)),
+    additionalTiers: (pledgeItems?.additionalTiers || []).map((tier) => ({
+      id: String(tier?.id || ''),
+      name: String(tier?.name || ''),
+      qty: Math.max(0, Number(tier?.qty || 0))
+    })).sort((a, b) => (
+      a.id.localeCompare(b.id) ||
+      a.name.localeCompare(b.name) ||
+      a.qty - b.qty
+    )),
+    supportItems: (pledgeItems?.supportItems || []).map((item) => ({
+      id: String(item?.id || ''),
+      label: String(item?.label || ''),
+      amount: Math.max(0, Number(item?.amount || 0))
+    })).sort((a, b) => (
+      a.id.localeCompare(b.id) ||
+      a.label.localeCompare(b.label) ||
+      a.amount - b.amount
+    )),
+    addOns: (pledgeItems?.addOns || []).map((addOn) => ({
+      productId: String(addOn?.productId || ''),
+      label: String(addOn?.label || addOn?.name || ''),
+      variantId: String(addOn?.variantId || ''),
+      variantLabel: String(addOn?.variantLabel || ''),
+      quantity: Math.max(0, Number(addOn?.quantity || addOn?.qty || 0))
+    })).sort((a, b) => (
+      a.productId.localeCompare(b.productId) ||
+      a.variantId.localeCompare(b.variantId) ||
+      a.label.localeCompare(b.label) ||
+      a.quantity - b.quantity
+    ))
+  };
+}
+
+function havePledgeItemsChanged(previousItems = null, nextItems = null) {
+  return JSON.stringify(normalizePledgeItemsForComparison(previousItems || {}))
+    !== JSON.stringify(normalizePledgeItemsForComparison(nextItems || {}));
+}
+
 function getPledgeTierSelections(pledge, campaign) {
   const selectedTiers = [];
   const allTiers = [];
@@ -644,13 +732,173 @@ function compareCartShapeToContribution(orderCart, canonicalContribution) {
   return { valid: true };
 }
 
-function extractCampaignCartsFromFirstPartyItems(items = [], customAmount = 0, campaignSlug = null) {
+function getCustomFieldValue(item = {}, fieldName = '') {
+  const fields = Array.isArray(item?.customFields) ? item.customFields : [];
+  const match = fields.find((field) => field?.name === fieldName);
+  return match ? String(match.value || '') : '';
+}
+
+function parseAddOnCartItem(item = {}) {
+  const itemId = typeof item?.id === 'string' ? item.id.trim() : '';
+  if (!itemId.startsWith(ADD_ON_ITEM_PREFIX)) {
+    return { valid: false, error: 'Invalid add-on item id' };
+  }
+
+  const afterPrefix = itemId.slice(ADD_ON_ITEM_PREFIX.length);
+  const [rawProductId, rawVariantId = ''] = afterPrefix.split('__variant__');
+  const productId = String(rawProductId || '').trim();
+  const variantId = String(rawVariantId || getCustomFieldValue(item, '_variant_id')).trim();
+  const variantLabel = String(getCustomFieldValue(item, '_variant_label')).trim();
+  const quantity = Number(item?.quantity ?? 1);
+
+  if (!productId || !isPositiveInteger(quantity)) {
+    return { valid: false, error: 'Invalid add-on selection' };
+  }
+
+  return {
+    valid: true,
+    addOn: {
+      productId,
+      variantId,
+      variantLabel,
+      quantity
+    }
+  };
+}
+
+function resolveBundleAddOnAnchorCampaignSlug(rawAnchorCampaignSlug, carts = []) {
+  const cartCampaignSlugs = carts.map((cart) => cart.campaignSlug).filter(Boolean);
+  if (cartCampaignSlugs.length === 0) {
+    return null;
+  }
+
+  const normalizedAnchor = typeof rawAnchorCampaignSlug === 'string' ? rawAnchorCampaignSlug.trim() : '';
+  if (normalizedAnchor && cartCampaignSlugs.includes(normalizedAnchor)) {
+    return normalizedAnchor;
+  }
+
+  if (cartCampaignSlugs.length === 1) {
+    return cartCampaignSlugs[0];
+  }
+
+  return cartCampaignSlugs[0];
+}
+
+async function validateBundleAddOns(env, bundleAddOns = [], { currentSelections = [] } = {}) {
+  if (!Array.isArray(bundleAddOns) || bundleAddOns.length === 0) {
+    return { valid: true, bundleAddOns: [] };
+  }
+
+  const catalog = await getAddOns(env);
+  const inventorySnapshot = await getAddOnInventorySnapshot(env);
+  if (catalog?.enabled !== true) {
+    return { valid: false, error: 'Global add-ons are not enabled for this deployment' };
+  }
+
+  const products = new Map((catalog?.products || []).map((product) => [String(product.id || ''), product]));
+  const normalizedSelections = [];
+  const selectedProducts = new Set();
+  const allowanceByKey = new Map();
+  for (const currentSelection of Array.isArray(currentSelections) ? currentSelections : []) {
+    const allowanceProductId = String(currentSelection?.productId || '').trim();
+    const allowanceVariantId = String(currentSelection?.variantId || '').trim();
+    const allowanceQty = Number(currentSelection?.quantity || 0);
+    if (!allowanceProductId || !isPositiveInteger(allowanceQty)) continue;
+    allowanceByKey.set(`${allowanceProductId}::${allowanceVariantId}`, allowanceQty);
+  }
+
+  for (const selection of bundleAddOns) {
+    const productId = String(selection?.productId || '').trim();
+    const quantity = Number(selection?.quantity || 0);
+    if (!productId || !isPositiveInteger(quantity)) {
+      return { valid: false, error: 'Invalid bundle add-on selection' };
+    }
+
+    const product = products.get(productId);
+    if (!product) {
+      return { valid: false, error: `Add-on "${productId}" not found` };
+    }
+
+    if (selectedProducts.has(productId)) {
+      return { valid: false, error: `Add-on "${productId}" can only be selected once per order` };
+    }
+    selectedProducts.add(productId);
+
+    const variants = Array.isArray(product.variants) ? product.variants : [];
+    const normalizedVariantId = String(selection?.variantId || '').trim();
+    let resolvedVariantId = '';
+    let resolvedVariantLabel = '';
+
+    if (variants.length > 0) {
+      const variant = variants.find((entry) => String(entry?.id || '') === normalizedVariantId);
+      if (!variant) {
+        return { valid: false, error: `Add-on "${productId}" requires a valid variant selection` };
+      }
+      resolvedVariantId = String(variant.id || '');
+      resolvedVariantLabel = String(variant.label || resolvedVariantId);
+    }
+
+    const productInventory = inventorySnapshot?.products?.[productId] || null;
+    const variantInventory = resolvedVariantId
+      ? productInventory?.variants?.[resolvedVariantId] || null
+      : null;
+    const rawAvailableQuantity = resolvedVariantId
+      ? variantInventory?.remaining
+      : productInventory?.remaining;
+    const availableQuantity = rawAvailableQuantity === null || rawAvailableQuantity === undefined
+      ? null
+      : Number(rawAvailableQuantity);
+    const allowance = allowanceByKey.get(`${productId}::${resolvedVariantId}`) || 0;
+    if (Number.isFinite(availableQuantity) && quantity > (availableQuantity + allowance)) {
+      return {
+        valid: false,
+        error: `Only ${Math.max(0, availableQuantity + allowance)} remaining for ${String(product.name || productId)}${resolvedVariantLabel ? ` (${resolvedVariantLabel})` : ''}`
+      };
+    }
+
+    normalizedSelections.push({
+      productId,
+      name: String(product.name || productId),
+      imageUrl: String(product.image_url || ''),
+      sourceUrl: String(product.source_url || ''),
+      variantId: resolvedVariantId,
+      variantLabel: resolvedVariantLabel,
+      quantity,
+      unitPrice: Math.round(Number(product.price || 0) * 100),
+      category: String(product.category || 'digital'),
+      shipping_preset: product.shipping_preset || null,
+      shipping: product.shipping || null
+    });
+  }
+
+  normalizedSelections.sort((a, b) => (
+    a.productId.localeCompare(b.productId) ||
+    a.variantId.localeCompare(b.variantId)
+  ));
+
+  return { valid: true, bundleAddOns: normalizedSelections };
+}
+
+async function handleGetAddOnInventory(env) {
+  const snapshot = await getAddOnInventorySnapshot(env);
+  return jsonResponse(snapshot, 200, env, true, {
+    'Cache-Control': PRIVATE_NO_STORE_CACHE_CONTROL
+  });
+}
+
+function extractCampaignCartsFromFirstPartyItems(
+  items = [],
+  customAmount = 0,
+  campaignSlug = null,
+  bundleAddOnAnchorCampaignSlug = null
+) {
   if (!Array.isArray(items)) {
     return { valid: false, error: 'Invalid cart items' };
   }
 
   const normalizedCampaignSlug = typeof campaignSlug === 'string' && campaignSlug ? campaignSlug : null;
   const campaignCarts = new Map();
+  const bundleAddOns = [];
 
   function getCampaignCart(itemCampaignSlug) {
     if (!campaignCarts.has(itemCampaignSlug)) {
@@ -668,6 +916,15 @@ function extractCampaignCartsFromFirstPartyItems(items = [], customAmount = 0, c
     const itemId = typeof item?.id === 'string' ? item.id : '';
     if (!itemId.includes('__')) {
       return { valid: false, error: 'Invalid cart item id' };
+    }
+
+    if (itemId.startsWith(ADD_ON_ITEM_PREFIX)) {
+      const parsedAddOn = parseAddOnCartItem(item);
+      if (!parsedAddOn.valid) {
+        return { valid: false, error: parsedAddOn.error };
+      }
+      bundleAddOns.push(parsedAddOn.addOn);
+      continue;
     }
 
     const [itemCampaignSlug] = itemId.split('__');
@@ -715,9 +972,19 @@ function extractCampaignCartsFromFirstPartyItems(items = [], customAmount = 0, c
     .filter((cart) => cart.tierSelections.length > 0 || cart.supportItems.length > 0 || cart.customAmount > 0)
     .sort((a, b) => a.campaignSlug.localeCompare(b.campaignSlug));
 
+  const resolvedAnchorCampaignSlug = bundleAddOns.length > 0
+    ? resolveBundleAddOnAnchorCampaignSlug(bundleAddOnAnchorCampaignSlug, carts)
+    : null;
+
+  if (bundleAddOns.length > 0 && !resolvedAnchorCampaignSlug) {
+    return { valid: false, error: 'Bundle add-ons require at least one campaign in the cart' };
+  }
+
   return {
     valid: true,
-    carts
+    carts,
+    bundleAddOns,
+    bundleAddOnAnchorCampaignSlug: resolvedAnchorCampaignSlug
   };
 }
 
@@ -885,6 +1152,7 @@ function buildCanonicalContribution(env, campaign, {
   tierSelection,
   supportItems = [],
   customAmount = 0,
+  bundleAddOns = [],
   tipPercent,
   shippingCents = null,
   shippingOption = 'standard'
@@ -903,6 +1171,9 @@ function buildCanonicalContribution(env, campaign, {
     subtotal += supportItem.amount * 100;
   }
 
+  const goalTrackingSubtotal = subtotal;
+  subtotal += getBundleAddOnSubtotal(bundleAddOns);
+
   if (!isValidAmount(subtotal)) {
     return { valid: false, error: 'Invalid pledge amount' };
   }
@@ -911,7 +1182,10 @@ function buildCanonicalContribution(env, campaign, {
     return { valid: false, error: 'Pledge must include at least one contribution' };
   }
 
-  const hasPhysical = tierSelection.hasPhysical === true || supportItemsIncludePhysical(campaign, supportItems);
+  const hasPhysical =
+    tierSelection.hasPhysical === true ||
+    supportItemsIncludePhysical(campaign, supportItems) ||
+    bundleAddOnsIncludePhysical(bundleAddOns);
   const resolvedShippingCents = hasPhysical
     ? (Number.isFinite(Number(shippingCents))
         ? Math.max(0, Number(shippingCents))
@@ -925,7 +1199,9 @@ function buildCanonicalContribution(env, campaign, {
     hasPhysical,
     shippingOption: normalizedShippingOption,
     supportItems,
+    bundleAddOns,
     customAmount: normalizedCustomAmount,
+    goalTrackingSubtotal,
     totals: buildPledgeTotals(env, subtotal, {
       shipping: resolvedShippingCents,
       tipPercent
@@ -937,6 +1213,7 @@ async function buildCanonicalContributionForStoredShipping(env, campaign, {
   tierSelection,
   supportItems = [],
   customAmount = 0,
+  bundleAddOns = [],
   tipPercent,
   shippingAddress = null,
   currentShipping = 0,
@@ -946,6 +1223,7 @@ async function buildCanonicalContributionForStoredShipping(env, campaign, {
     tierSelection,
     supportItems,
     customAmount,
+    bundleAddOns,
     tipPercent,
     shippingCents: currentShipping,
     shippingOption
@@ -964,7 +1242,8 @@ async function buildCanonicalContributionForStoredShipping(env, campaign, {
       tierSelection,
       normalizedDestination.destination,
       supportItems,
-      shippingOption
+      shippingOption,
+      bundleAddOns
     );
     if (quotedShipment.valid) {
       resolvedShippingCents = Math.max(0, Number(quotedShipment.quote?.shippingCents) || 0);
@@ -1325,7 +1604,7 @@ async function persistNewPledge(env, {
 
     await addPledgeToStats(env, {
       campaignSlug,
-      amount: pledgeData.subtotal,
+      amount: pledgeData.goalTrackingSubtotal ?? pledgeData.subtotal,
       tierId: pledgeData.tierId,
       tierQty: pledgeData.tierQty,
       additionalTiers: pledgeData.additionalTiers || []
@@ -1336,6 +1615,8 @@ async function persistNewPledge(env, {
       await updateSupportItemStats(env, campaignSlug, [], supportItems);
       supportStatsUpdated = true;
     }
+
+    invalidateAddOnInventorySnapshot(env);
 
     return { success: true };
   } catch (err) {
@@ -1359,7 +1640,7 @@ async function persistNewPledge(env, {
     if (statsUpdated) {
       await removePledgeFromStats(env, {
         campaignSlug,
-        amount: pledgeData.subtotal,
+        amount: pledgeData.goalTrackingSubtotal ?? pledgeData.subtotal,
         tierId: pledgeData.tierId,
         tierQty: pledgeData.tierQty,
         additionalTiers: pledgeData.additionalTiers || [],
@@ -1367,6 +1648,8 @@ async function persistNewPledge(env, {
         customAmount: pledgeData.customAmount || 0
       });
     }
+
+    invalidateAddOnInventorySnapshot(env);
 
     for (const claimedTier of inventoryClaim.claimedTiers || []) {
       await releaseTierInventory(env, campaignSlug, claimedTier.id, claimedTier.qty);
@@ -1575,6 +1858,10 @@ export default {
       if (path.startsWith('/inventory/') && method === 'GET') {
         const campaignSlug = path.replace('/inventory/', '');
         return handleGetInventory(campaignSlug, env);
+      }
+
+      if (path === '/add-ons/inventory' && method === 'GET') {
+        return handleGetAddOnInventory(env);
       }
 
       if (path.startsWith('/inventory/') && path.endsWith('/recalculate') && method === 'POST') {
@@ -1792,7 +2079,17 @@ async function handleFirstPartyCheckoutStart(request, env) {
   if (!rateLimit.allowed) return rateLimit.response;
 
   const body = await request.json();
-  const { campaignSlug, items, customAmount = 0, email, tipPercent, preferredLang, shippingAddress, shippingOption } = body || {};
+  const {
+    campaignSlug,
+    items,
+    customAmount = 0,
+    email,
+    tipPercent,
+    preferredLang,
+    shippingAddress,
+    shippingOption,
+    bundleAddOnAnchorCampaignSlug
+  } = body || {};
   const normalizedPreferredLang = normalizePreferredLang(preferredLang);
   const normalizedTipPercent = sanitizePlatformTipPercent(
     tipPercent,
@@ -1814,12 +2111,25 @@ async function handleFirstPartyCheckoutStart(request, env) {
     return privateJsonResponse({ error: normalizedDestination.error }, 400, env);
   }
 
-  const parsedCart = extractCampaignCartsFromFirstPartyItems(items, customAmount, campaignSlug);
+  const parsedCart = extractCampaignCartsFromFirstPartyItems(
+    items,
+    customAmount,
+    campaignSlug,
+    bundleAddOnAnchorCampaignSlug
+  );
   if (!parsedCart.valid) {
     return privateJsonResponse({ error: parsedCart.error }, 400, env);
   }
 
   const orderCarts = parsedCart.carts || [];
+  const validatedBundleAddOns = await validateBundleAddOns(env, parsedCart.bundleAddOns || []);
+  if (!validatedBundleAddOns.valid) {
+    return privateJsonResponse({ error: validatedBundleAddOns.error }, 400, env);
+  }
+  const bundleAddOns = validatedBundleAddOns.bundleAddOns || [];
+  const resolvedBundleAddOnAnchorCampaignSlug = bundleAddOns.length > 0
+    ? parsedCart.bundleAddOnAnchorCampaignSlug
+    : null;
   if (orderCarts.length === 0) {
     return privateJsonResponse({ error: 'Your cart is empty.' }, 400, env);
   }
@@ -1853,6 +2163,11 @@ async function handleFirstPartyCheckoutStart(request, env) {
       tierSelection,
       supportItems: desiredSupportItems.supportItems,
       customAmount: orderCart.customAmount,
+      bundleAddOns: getBundleAddOnsForAnchorCampaign(
+        bundleAddOns,
+        resolvedBundleAddOnAnchorCampaignSlug,
+        orderCart.campaignSlug
+      ),
       tipPercent: normalizedTipPercent,
       shippingAddress: normalizedDestination.valid ? normalizedDestination.destination : null,
       shippingOption
@@ -1914,6 +2229,8 @@ async function handleFirstPartyCheckoutStart(request, env) {
   const nonce = createCheckoutNonce();
   const checkoutIntentExp = Math.floor(Date.now() / 1000) + DEFAULT_CHECKOUT_INTENT_TTL_SECONDS;
   const checkoutHashInput = buildCheckoutBundleHashInput({
+    bundleAddOns,
+    bundleAddOnAnchorCampaignSlug: resolvedBundleAddOnAnchorCampaignSlug,
     contributions: checkoutGroups.map((group) => ({
       campaignSlug: group.campaignSlug,
       canonicalContribution: group.canonicalContribution,
@@ -1937,6 +2254,13 @@ async function handleFirstPartyCheckoutStart(request, env) {
     checkoutProvider: 'first_party',
     preferredLang: normalizedPreferredLang,
     campaignCount: checkoutGroups.length,
+    bundleAddOnAnchorCampaignSlug: resolvedBundleAddOnAnchorCampaignSlug,
+    bundleAddOns,
+    bundleAddOnTotals: {
+      count: bundleAddOns.length,
+      quantity: bundleAddOns.reduce((sum, entry) => sum + (Number(entry.quantity) || 0), 0),
+      subtotal: bundleAddOns.reduce((sum, entry) => sum + ((Number(entry.unitPrice) || 0) * (Number(entry.quantity) || 0)), 0)
+    },
     tipPercent: normalizedTipPercent,
     totals: bundleTotals,
     campaigns: checkoutGroups.map((group) => ({
@@ -2029,6 +2353,8 @@ async function handleFirstPartyCheckoutStart(request, env) {
         hasPhysical: checkoutGroups.some((group) => group.canonicalContribution.hasPhysical) ? 'true' : '',
         checkoutBundleMode: checkoutGroups.length > 1 ? 'true' : '',
         checkoutBundleCount: String(checkoutGroups.length),
+        checkoutBundleHasAddOns: bundleAddOns.length > 0 ? 'true' : '',
+        bundleAddOnAnchorCampaignSlug: resolvedBundleAddOnAnchorCampaignSlug || '',
         checkoutProvider: 'first_party',
         preferredLang: normalizedPreferredLang,
         checkoutNonce: nonce,
@@ -2110,7 +2436,8 @@ async function handleShippingQuote(request, env) {
     items,
     customAmount = 0,
     shippingAddress,
-    shippingOption
+    shippingOption,
+    bundleAddOnAnchorCampaignSlug
   } = body || {};
 
   if (campaignSlug && !isValidSlug(campaignSlug)) {
@@ -2122,9 +2449,19 @@ async function handleShippingQuote(request, env) {
     return privateJsonResponse({ error: normalizedDestination.error }, 400, env);
   }
 
-  const parsedCart = extractCampaignCartsFromFirstPartyItems(items, customAmount, campaignSlug);
+  const parsedCart = extractCampaignCartsFromFirstPartyItems(
+    items,
+    customAmount,
+    campaignSlug,
+    bundleAddOnAnchorCampaignSlug
+  );
   if (!parsedCart.valid) {
     return privateJsonResponse({ error: parsedCart.error }, 400, env);
+  }
+
+  const validatedBundleAddOns = await validateBundleAddOns(env, parsedCart.bundleAddOns || []);
+  if (!validatedBundleAddOns.valid) {
+    return privateJsonResponse({ error: validatedBundleAddOns.error }, 400, env);
   }
 
   const orderCarts = parsedCart.carts || [];
@@ -2159,7 +2496,12 @@ async function handleShippingQuote(request, env) {
       tierSelection,
       normalizedDestination.destination,
       desiredSupportItems.supportItems,
-      shippingOption
+      shippingOption,
+      getBundleAddOnsForAnchorCampaign(
+        validatedBundleAddOns.bundleAddOns || [],
+        parsedCart.bundleAddOnAnchorCampaignSlug,
+        orderCart.campaignSlug
+      )
     );
     if (!quote.valid) {
       return privateJsonResponse({ error: quote.error }, 400, env);
@@ -2500,6 +2842,8 @@ async function processFirstPartyCheckoutBundle({
   }
 
   const bundleHashInput = buildCheckoutBundleHashInput({
+    bundleAddOns: bundleManifest.bundleAddOns || [],
+    bundleAddOnAnchorCampaignSlug: bundleManifest.bundleAddOnAnchorCampaignSlug || '',
     contributions: bundleManifest.campaigns.map((entry) => ({
       campaignSlug: entry.campaignSlug,
       canonicalContribution: {
@@ -2568,10 +2912,17 @@ async function processFirstPartyCheckoutBundle({
       return jsonResponse({ error: desiredSupportItems.error }, 409);
     }
 
+    const anchorBundleAddOns = getBundleAddOnsForAnchorCampaign(
+      bundleManifest.bundleAddOns || [],
+      bundleManifest.bundleAddOnAnchorCampaignSlug || '',
+      campaignSlug
+    );
+
     const canonicalContribution = await buildCanonicalContributionForStoredShipping(env, campaign, {
       tierSelection,
       supportItems: desiredSupportItems.supportItems,
       customAmount: entry.customAmount || 0,
+      bundleAddOns: anchorBundleAddOns,
       tipPercent: normalizedTipPercent,
       shippingAddress: shippingAddress || null,
       shippingOption: entry.shippingOption || 'standard'
@@ -2605,7 +2956,11 @@ async function processFirstPartyCheckoutBundle({
       tierQty: canonicalContribution.tierQty,
       additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
       supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
+      bundleAddOns: anchorBundleAddOns.length > 0 ? anchorBundleAddOns : undefined,
+      bundleAddOnAnchorCampaignSlug: anchorBundleAddOns.length > 0 ? campaignSlug : undefined,
+      bundleAddOnSubtotal: anchorBundleAddOns.length > 0 ? getBundleAddOnSubtotal(anchorBundleAddOns) : 0,
       customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
+      goalTrackingSubtotal: canonicalContribution.goalTrackingSubtotal,
       shippingOption: canonicalContribution.shippingOption || 'standard',
       shippingAddress: canonicalContribution.hasPhysical ? (shippingAddress || undefined) : undefined,
       subtotal: canonicalContribution.totals.subtotal,
@@ -2634,6 +2989,8 @@ async function processFirstPartyCheckoutBundle({
         tierQty: canonicalContribution.tierQty,
         additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
         supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
+        bundleAddOns: anchorBundleAddOns.length > 0 ? anchorBundleAddOns : undefined,
+        bundleAddOnSubtotal: anchorBundleAddOns.length > 0 ? getBundleAddOnSubtotal(anchorBundleAddOns) : 0,
         customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
         at: now
       }]
@@ -2666,12 +3023,6 @@ async function processFirstPartyCheckoutBundle({
       campaignSlug
     });
 
-    const additionalTiersWithNames = canonicalContribution.additionalTiers.map(t => {
-      const tierData = campaign?.tiers?.find(ct => ct.id === t.id);
-      return { ...t, name: tierData?.name || t.id };
-    });
-    const supportItemsWithLabels = getSupportItemsWithLabels(campaign, canonicalContribution.supportItems);
-
     await sendSupporterEmail(env, {
       email,
       campaignSlug,
@@ -2685,13 +3036,7 @@ async function processFirstPartyCheckoutBundle({
       token,
       instagramUrl: campaign?.instagram,
       hasDecisions: campaign?.has_decisions === true,
-      pledgeItems: {
-        tierName: canonicalContribution.tierName,
-        tierQty: canonicalContribution.tierQty,
-        additionalTiers: additionalTiersWithNames,
-        supportItems: supportItemsWithLabels,
-        customAmount: canonicalContribution.customAmount
-      }
+      pledgeItems: buildPledgeItemsPayload(campaign, canonicalContribution, anchorBundleAddOns)
     });
   }
 
@@ -2964,6 +3309,7 @@ async function handleStripeWebhook(request, env, ctx) {
                           tierQty: existingPledge.tierQty || 1,
                           additionalTiers: chargeAdditionalTiers,
                           supportItems: chargeSupportItems,
+                          addOns: getBundleAddOnsWithLabels(existingPledge.bundleAddOns || []),
                           customAmount: existingPledge.customAmount || 0
                         }
                       });
@@ -3023,10 +3369,17 @@ async function handleStripeWebhook(request, env, ctx) {
             return jsonResponse({ error: desiredSupportItems.error }, 409);
           }
 
+          const anchorBundleAddOns = getBundleAddOnsForAnchorCampaign(
+            bundleManifest?.bundleAddOns || [],
+            bundleManifest?.bundleAddOnAnchorCampaignSlug || '',
+            campaignSlug
+          );
+
           const canonicalContribution = await buildCanonicalContributionForStoredShipping(env, campaign, {
             tierSelection,
             supportItems: desiredSupportItems.supportItems,
             customAmount,
+            bundleAddOns: anchorBundleAddOns,
             tipPercent: normalizedTipPercent,
             shippingAddress: shippingAddress || null,
             shippingOption: bundleManifest?.campaigns?.[0]?.shippingOption || shippingOption || 'standard'
@@ -3049,6 +3402,8 @@ async function handleStripeWebhook(request, env, ctx) {
 
             const recomputedCheckoutCartHash = bundleManifest?.campaigns?.length === 1
               ? await hashCheckoutBundle(buildCheckoutBundleHashInput({
+                  bundleAddOns: bundleManifest?.bundleAddOns || [],
+                  bundleAddOnAnchorCampaignSlug: bundleManifest?.bundleAddOnAnchorCampaignSlug || '',
                   contributions: [{
                     campaignSlug,
                     canonicalContribution,
@@ -3096,7 +3451,11 @@ async function handleStripeWebhook(request, env, ctx) {
             tierQty: canonicalContribution.tierQty,
             additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
             supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
+            bundleAddOns: anchorBundleAddOns.length > 0 ? anchorBundleAddOns : undefined,
+            bundleAddOnAnchorCampaignSlug: anchorBundleAddOns.length > 0 ? campaignSlug : undefined,
+            bundleAddOnSubtotal: anchorBundleAddOns.length > 0 ? getBundleAddOnSubtotal(anchorBundleAddOns) : 0,
             customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
+            goalTrackingSubtotal: canonicalContribution.goalTrackingSubtotal,
             shippingOption: canonicalContribution.shippingOption || 'standard',
             shippingAddress: shippingAddress || undefined,
             subtotal: canonicalContribution.totals.subtotal,
@@ -3125,6 +3484,8 @@ async function handleStripeWebhook(request, env, ctx) {
               tierQty: canonicalContribution.tierQty,
               additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
               supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : undefined,
+              bundleAddOns: anchorBundleAddOns.length > 0 ? anchorBundleAddOns : undefined,
+              bundleAddOnSubtotal: anchorBundleAddOns.length > 0 ? getBundleAddOnSubtotal(anchorBundleAddOns) : 0,
               customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
               at: now
             }]
@@ -3166,12 +3527,6 @@ async function handleStripeWebhook(request, env, ctx) {
             campaignSlug
           });
 
-          const additionalTiersWithNames = canonicalContribution.additionalTiers.map(t => {
-            const tierData = campaign?.tiers?.find(ct => ct.id === t.id);
-            return { ...t, name: tierData?.name || t.id };
-          });
-          const supportItemsWithLabels = getSupportItemsWithLabels(campaign, canonicalContribution.supportItems);
-
           await sendSupporterEmail(env, {
             email,
             campaignSlug,
@@ -3185,13 +3540,7 @@ async function handleStripeWebhook(request, env, ctx) {
             token,
             instagramUrl: campaign?.instagram,
             hasDecisions: campaign?.has_decisions === true,
-            pledgeItems: {
-              tierName: canonicalContribution.tierName,
-              tierQty: canonicalContribution.tierQty,
-              additionalTiers: additionalTiersWithNames,
-              supportItems: supportItemsWithLabels,
-              customAmount: canonicalContribution.customAmount
-            }
+            pledgeItems: buildPledgeItemsPayload(campaign, canonicalContribution, anchorBundleAddOns)
           });
 
           console.log('Pledge confirmed:', { orderId, email, campaignSlug });
@@ -3237,6 +3586,7 @@ async function handleStripeWebhook(request, env, ctx) {
           tierQty: pledgeData.tierQty || 1,
           additionalTiers: failedAdditionalTiers,
           supportItems: failedSupportItems,
+          addOns: getBundleAddOnsWithLabels(pledgeData.bundleAddOns || []),
           customAmount: pledgeData.customAmount || 0
         };
       }
@@ -3303,6 +3653,13 @@ async function handleGetPledge(request, env) {
         amount: pledgeData.amount,
         tierId: pledgeData.tierId,
         tierName: pledgeData.tierName,
+        tierQty: pledgeData.tierQty || 1,
+        additionalTiers: pledgeData.additionalTiers || [],
+        supportItems: pledgeData.supportItems || [],
+        bundleAddOns: pledgeData.bundleAddOns || [],
+        bundleAddOnAnchorCampaignSlug: pledgeData.bundleAddOnAnchorCampaignSlug || '',
+        bundleAddOnSubtotal: pledgeData.bundleAddOnSubtotal || 0,
+        customAmount: pledgeData.customAmount || 0,
         canModify: canChange,
         canCancel: canChange,
         canUpdatePaymentMethod: !pledgeData.charged,
@@ -3357,6 +3714,9 @@ async function handleGetPledges(request, env) {
         tierQty: pledgeData.tierQty || 1,
         additionalTiers: pledgeData.additionalTiers || [],
         supportItems: pledgeData.supportItems || [],
+        bundleAddOns: pledgeData.bundleAddOns || [],
+        bundleAddOnAnchorCampaignSlug: pledgeData.bundleAddOnAnchorCampaignSlug || '',
+        bundleAddOnSubtotal: pledgeData.bundleAddOnSubtotal || 0,
         customAmount: pledgeData.customAmount || 0,
         shippingAddress: pledgeData.shippingAddress || null,
         canModify: canChange,
@@ -3461,7 +3821,7 @@ async function handleCancelPledge(request, env) {
       // Update live stats (use subtotal for goal tracking)
       await removePledgeFromStats(env, {
         campaignSlug: pledgeData.campaignSlug,
-        amount: pledgeData.subtotal || pledgeData.amount || 0,
+        amount: pledgeData.goalTrackingSubtotal || pledgeData.subtotal || pledgeData.amount || 0,
         tierId: pledgeData.tierId,
         tierQty: pledgeData.tierQty || 1,
         additionalTiers: pledgeData.additionalTiers || [],
@@ -3481,6 +3841,8 @@ async function handleCancelPledge(request, env) {
           console.log('📦 Additional tier inventory released:', addTier.id);
         }
       }
+
+      invalidateAddOnInventorySnapshot(env);
       
       // Update email mapping - check if user has other active pledges
       const emailKey = `email:${pledgeData.email.toLowerCase()}`;
@@ -3545,7 +3907,7 @@ async function handleCancelPledge(request, env) {
 
 async function handleModifyPledge(request, env) {
   const body = await request.json();
-  const { token, orderId, newTierId, newTierQty, addTiers, supportItems, customAmount, tipPercent, preferredLang, shippingOption } = body;
+  const { token, orderId, newTierId, newTierQty, addTiers, supportItems, bundleAddOns, customAmount, tipPercent, preferredLang, shippingOption } = body;
 
   if (!token) {
     return jsonResponse({ error: 'Missing token' }, 400);
@@ -3556,11 +3918,12 @@ async function handleModifyPledge(request, env) {
   const hasQtyChange = newTierQty !== null && newTierQty !== undefined;
   const hasAddTiersPayload = Array.isArray(addTiers); // addTiers was passed (even if empty = tier removal)
   const hasSupportChange = Array.isArray(supportItems) && supportItems.length > 0;
+  const hasBundleAddOnChange = Array.isArray(bundleAddOns);
   const hasCustomAmountChange = customAmount !== null && customAmount !== undefined;
   const hasTipChange = tipPercent !== null && tipPercent !== undefined;
   const hasShippingOptionChange = shippingOption !== null && shippingOption !== undefined;
 
-  if (!hasTierChange && !hasQtyChange && !hasAddTiersPayload && !hasSupportChange && !hasCustomAmountChange && !hasTipChange && !hasShippingOptionChange) {
+  if (!hasTierChange && !hasQtyChange && !hasAddTiersPayload && !hasSupportChange && !hasBundleAddOnChange && !hasCustomAmountChange && !hasTipChange && !hasShippingOptionChange) {
     return jsonResponse({ error: 'No changes specified' }, 400);
   }
 
@@ -3641,9 +4004,17 @@ async function handleModifyPledge(request, env) {
     return jsonResponse({ error: desiredSupportItems.error }, 400);
   }
 
+  const desiredBundleAddOns = hasBundleAddOnChange
+    ? await validateBundleAddOns(env, bundleAddOns, { currentSelections: currentPledge.bundleAddOns || [] })
+    : { valid: true, bundleAddOns: currentPledge.bundleAddOns || [] };
+  if (!desiredBundleAddOns.valid) {
+    return jsonResponse({ error: desiredBundleAddOns.error }, 400);
+  }
+
   const canonicalContribution = await buildCanonicalContributionForStoredShipping(env, campaign, {
     tierSelection: desiredTierSelection,
     supportItems: desiredSupportItems.supportItems,
+    bundleAddOns: desiredBundleAddOns.bundleAddOns,
     customAmount: hasCustomAmountChange ? customAmount : (currentPledge.customAmount || 0),
     tipPercent: normalizedTipPercent,
     shippingAddress: currentPledge.shippingAddress || null,
@@ -3693,7 +4064,11 @@ async function handleModifyPledge(request, env) {
         tierQty: canonicalContribution.tierQty,
         additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : [],
         supportItems: canonicalContribution.supportItems.length > 0 ? canonicalContribution.supportItems : [],
+        bundleAddOns: desiredBundleAddOns.bundleAddOns.length > 0 ? desiredBundleAddOns.bundleAddOns : [],
+        bundleAddOnAnchorCampaignSlug: desiredBundleAddOns.bundleAddOns.length > 0 ? campaignSlug : '',
+        bundleAddOnSubtotal: desiredBundleAddOns.bundleAddOns.length > 0 ? getBundleAddOnSubtotal(desiredBundleAddOns.bundleAddOns) : 0,
         customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : 0,
+        goalTrackingSubtotal: canonicalContribution.goalTrackingSubtotal,
         shippingOption: canonicalContribution.shippingOption || pledgeData.shippingOption || 'standard',
         subtotal: canonicalContribution.totals.subtotal,
         tax: canonicalContribution.totals.tax,
@@ -3725,6 +4100,7 @@ async function handleModifyPledge(request, env) {
           tierId: originalPledgeData.tierId,
           tierQty: originalPledgeData.tierQty || 1,
           additionalTiers: originalPledgeData.additionalTiers?.length > 0 ? originalPledgeData.additionalTiers : undefined,
+          bundleAddOns: originalPledgeData.bundleAddOns?.length > 0 ? originalPledgeData.bundleAddOns : undefined,
           customAmount: originalPledgeData.customAmount || undefined,
           at: originalPledgeData.createdAt
         }];
@@ -3743,6 +4119,7 @@ async function handleModifyPledge(request, env) {
         tierId: nextPledgeData.tierId,
         tierQty: nextPledgeData.tierQty,
         additionalTiers: nextPledgeData.additionalTiers.length > 0 ? nextPledgeData.additionalTiers : undefined,
+        bundleAddOns: nextPledgeData.bundleAddOns.length > 0 ? nextPledgeData.bundleAddOns : undefined,
         customAmount: nextPledgeData.customAmount || undefined,
         at: now
       });
@@ -3756,6 +4133,8 @@ async function handleModifyPledge(request, env) {
 
         await recalculateStats(env, campaignSlug);
         statsReconciled = true;
+
+        invalidateAddOnInventorySnapshot(env);
 
         updatedPledgeData = nextPledgeData;
       } catch (err) {
@@ -3787,11 +4166,28 @@ async function handleModifyPledge(request, env) {
   const previousTax = currentPledge?.tax ?? 0;
   const previousShipping = currentPledge?.shipping ?? 0;
   const previousTipAmount = getStoredTipAmount(env, currentPledge);
+  const previousPledgeItemsForEmail = buildPledgeItemsPayload(campaign, currentPledge, currentPledge?.bundleAddOns || []);
+  const nextPledgeItemsForEmail = updatedPledgeData
+    ? buildPledgeItemsPayload(campaign, updatedPledgeData, updatedPledgeData.bundleAddOns || [])
+    : buildPledgeItemsPayload(campaign, {
+      ...currentPledge,
+      tierId: canonicalContribution.tierId,
+      tierName: canonicalContribution.tierName,
+      tierQty: canonicalContribution.tierQty,
+      additionalTiers: canonicalContribution.additionalTiers,
+      supportItems: canonicalContribution.supportItems,
+      customAmount: canonicalContribution.customAmount
+    }, desiredBundleAddOns.bundleAddOns);
+  const pledgeItemsChanged = havePledgeItemsChanged(previousPledgeItemsForEmail, nextPledgeItemsForEmail);
+  const shippingOptionChangedForEmail = String(currentPledge?.shippingOption || 'standard').trim().toLowerCase()
+    !== String(canonicalContribution?.shippingOption || currentPledge?.shippingOption || 'standard').trim().toLowerCase();
   if (
     previousSubtotal !== canonicalContribution.totals.subtotal ||
     previousTax !== canonicalContribution.totals.tax ||
     previousShipping !== canonicalContribution.totals.shipping ||
-    previousTipAmount !== canonicalContribution.totals.tipAmount
+    previousTipAmount !== canonicalContribution.totals.tipAmount ||
+    pledgeItemsChanged ||
+    shippingOptionChangedForEmail
   ) {
     try {
       const campaignTitle = campaign?.title || campaignSlug.replace(/-/g, ' ').toUpperCase();
@@ -3800,24 +4196,6 @@ async function handleModifyPledge(request, env) {
         email: payload.email,
         campaignSlug
       });
-
-      // Build pledge items for email display
-      let pledgeItemsForEmail = null;
-      if (updatedPledgeData) {
-        const additionalTiersWithNames = (updatedPledgeData.additionalTiers || []).map(t => {
-          const tierData = campaign?.tiers?.find(ct => ct.id === t.id);
-          return { ...t, name: tierData?.name || t.id };
-        });
-        const supportItemsWithLabels = getSupportItemsWithLabels(campaign, updatedPledgeData.supportItems || []);
-        pledgeItemsForEmail = {
-          tierName: updatedPledgeData.tierName || null,
-          tierQty: updatedPledgeData.tierQty || 1,
-          additionalTiers: additionalTiersWithNames,
-          supportItems: supportItemsWithLabels,
-          customAmount: updatedPledgeData.customAmount || 0
-        };
-      }
-
       await sendPledgeModifiedEmail(env, {
         email: payload.email,
         campaignSlug,
@@ -3834,7 +4212,7 @@ async function handleModifyPledge(request, env) {
         tipPercent: canonicalContribution.totals.tipPercent,
         token: emailToken,
         instagramUrl: campaign?.instagram,
-        pledgeItems: pledgeItemsForEmail
+        pledgeItems: nextPledgeItemsForEmail
       });
     } catch (err) {
       console.error('Failed to send modification email:', err.message);
@@ -3858,6 +4236,7 @@ async function handleModifyPledge(request, env) {
     shipping: canonicalContribution.totals.shipping,
     tipPercent: canonicalContribution.totals.tipPercent,
     tipAmount: canonicalContribution.totals.tipAmount,
+    bundleAddOns: desiredBundleAddOns.bundleAddOns,
     newAmount: canonicalContribution.totals.amount,
     campaignSlug
   });
@@ -4121,7 +4500,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           let combinedTax = 0;
           let combinedShipping = 0;
           let combinedTipAmount = 0;
-          const combinedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
+          const combinedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], addOns: [], customAmount: 0 };
           
           for (const pledge of supporter.pledges) {
             combinedSubtotal += pledge.subtotal || pledge.amount || 0;
@@ -4168,6 +4547,17 @@ async function settleCampaign(campaignSlug, env, options = {}) {
                 existingItem.amount += supportItem.amount || 0;
               } else {
                 combinedItems.supportItems.push({ label, amount: supportItem.amount || 0 });
+              }
+            }
+
+            for (const addOn of (pledge.bundleAddOns || [])) {
+              const existingAddOn = combinedItems.addOns.find((entry) => (
+                entry.productId === addOn.productId && entry.variantId === addOn.variantId
+              ));
+              if (existingAddOn) {
+                existingAddOn.quantity += addOn.quantity || 1;
+              } else {
+                combinedItems.addOns.push({ ...addOn });
               }
             }
             
@@ -4231,7 +4621,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
         let failedTax = 0;
         let failedShipping = 0;
         let failedTipAmount = 0;
-        const failedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
+        const failedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], addOns: [], customAmount: 0 };
         
         for (const pledge of supporter.pledges) {
           failedSubtotal += pledge.subtotal || pledge.amount || 0;
@@ -4274,6 +4664,17 @@ async function settleCampaign(campaignSlug, env, options = {}) {
               existingItem.amount += supportItem.amount || 0;
             } else {
               failedItems.supportItems.push({ label, amount: supportItem.amount || 0 });
+            }
+          }
+
+          for (const addOn of (pledge.bundleAddOns || [])) {
+            const existingAddOn = failedItems.addOns.find((entry) => (
+              entry.productId === addOn.productId && entry.variantId === addOn.variantId
+            ));
+            if (existingAddOn) {
+              existingAddOn.quantity += addOn.quantity || 1;
+            } else {
+              failedItems.addOns.push({ ...addOn });
             }
           }
           

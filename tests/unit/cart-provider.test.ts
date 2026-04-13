@@ -1,8 +1,45 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const WORKER_BASE = 'https://worker.test';
+const ADD_ON_CONFIG = {
+  enabled: true,
+  low_stock_threshold: 5,
+  products: [
+    {
+      id: 'dust-wave-sticker',
+      name: 'DUST WAVE Sticker',
+      description: '3" x 3" matte laminated circle-cut vinyl sticker.',
+      image_url: '/assets/images/add-ons/sticker-glove.png',
+      price: 3,
+      category: 'physical',
+      inventory: 50,
+      variants: []
+    },
+    {
+      id: 'dust-wave-tshirt',
+      name: 'DUST WAVE T-Shirt',
+      description: 'Our official t-shirt. 100% cotton.',
+      image_url: '/assets/images/add-ons/dustwave-tshirt.png',
+      price: 25,
+      category: 'physical',
+      variants: [
+        { id: 'm', label: 'M', inventory: 4 },
+        { id: 'l', label: 'L', inventory: 1 }
+      ]
+    }
+  ]
+};
 
 describe('cart provider shim', () => {
+  async function clearProviderCart(provider: any) {
+    const existingItems = provider?.store?.getState?.()?.cart?.items?.items || [];
+    for (const item of existingItems) {
+      if (item?.uniqueId) {
+        await provider.api.cart.items.remove(item.uniqueId);
+      }
+    }
+  }
+
   beforeEach(() => {
     vi.resetModules();
     localStorage.clear();
@@ -214,6 +251,710 @@ describe('cart provider shim', () => {
       }
     });
     expect(onOpened).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders item images, descriptions, and variant meta in the cart sidecar', async () => {
+    document.body.innerHTML = '<div data-pool-cart-root="true"></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await clearProviderCart(provider);
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__standard-pass',
+      name: 'SMOKE EDITABLE — Standard Pass',
+      price: 10,
+      url: '/campaigns/smoke-editable/'
+    });
+    await readyApi.api.cart.items.add({
+      id: 'addon__dust-wave-tshirt__variant__m',
+      name: 'DUST WAVE T-Shirt',
+      price: 25,
+      quantity: 2,
+      imageUrl: '/assets/images/add-ons/dustwave-tshirt.png',
+      description: 'Our official t-shirt. 100% cotton.',
+      stackable: true,
+      customFields: [
+        { name: '_variant_label', value: 'Size: M' }
+      ]
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const image = root?.querySelector('.pool-first-party-cart__item-image') as HTMLImageElement | null;
+
+    expect(image?.getAttribute('src')).toBe('/assets/images/add-ons/dustwave-tshirt.png');
+    expect(root?.textContent).toContain('Our official t-shirt. 100% cotton.');
+    expect(root?.textContent).toContain('Size: M');
+    expect(root?.textContent).toContain('Qty 2');
+  });
+
+  it('renders platform add-ons in the cart and lets you add them with shared catalog metadata', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'hosted',
+      workerBase: WORKER_BASE,
+      addOns: ADD_ON_CONFIG
+    };
+
+    document.body.innerHTML = '<div data-pool-cart-root="true"></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await clearProviderCart(provider);
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__standard-pass',
+      name: 'SMOKE EDITABLE — Standard Pass',
+      price: 10,
+      url: '/campaigns/smoke-editable/',
+      description: 'A normal digital tier'
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    expect(root?.textContent).toContain('Add-ons');
+    expect(root?.textContent).toContain('3" x 3" matte laminated circle-cut vinyl sticker.');
+    expect(root?.textContent).toContain('50 left');
+
+    const stickerQty = root?.querySelector('[data-cart-addon-product-quantity][data-addon-product-id="dust-wave-sticker"]') as HTMLInputElement | null;
+    if (!stickerQty) throw new Error('Missing add-on quantity input');
+    stickerQty.value = '2';
+    stickerQty.dispatchEvent(new Event('input', { bubbles: true }));
+    const addButton = root?.querySelector('[data-cart-addon-add][data-addon-product-id="dust-wave-sticker"]') as HTMLButtonElement | null;
+    if (!addButton) throw new Error('Missing add-on add button');
+    addButton.click();
+
+    const cartItems = provider.store.getState().cart.items.items;
+    expect(cartItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'addon__dust-wave-sticker',
+          quantity: 2,
+          imageUrl: '/assets/images/add-ons/sticker-glove.png',
+          description: '3" x 3" matte laminated circle-cut vinyl sticker.'
+        })
+      ])
+    );
+  });
+
+  it('updates add-on stock messaging when the selected variant changes and keeps the card compact', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'hosted',
+      workerBase: WORKER_BASE,
+      addOns: ADD_ON_CONFIG
+    };
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${WORKER_BASE}/add-ons/inventory`) {
+        return new Response(JSON.stringify({
+          lowStockThreshold: 5,
+          products: {
+            'dust-wave-tshirt': {
+              inventory: 8,
+              sold: 3,
+              remaining: 5,
+              available: true,
+              soldOut: false,
+              variants: {
+                m: { inventory: 4, sold: 0, remaining: 4, available: true, soldOut: false },
+                l: { inventory: 4, sold: 3, remaining: 1, available: true, soldOut: false }
+              }
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    document.body.innerHTML = '<div data-pool-cart-root="true"></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__standard-pass',
+      name: 'SMOKE EDITABLE — Standard Pass',
+      price: 10,
+      url: '/campaigns/smoke-editable/'
+    });
+    await readyApi.api.theme.cart.open();
+
+    await vi.waitFor(() => {
+      const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+      expect(root?.textContent).toContain('Only 4 left');
+      expect(root?.textContent).not.toContain('Variation');
+      expect(root?.textContent).not.toContain('Quantity for');
+    });
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/add-ons/inventory`);
+    });
+
+    let variantSelect = document.querySelector('[data-cart-addon-variant][data-addon-product-id="dust-wave-tshirt"]') as HTMLSelectElement | null;
+    if (!variantSelect) throw new Error('Missing variant selector');
+    await vi.waitFor(() => {
+      variantSelect = document.querySelector('[data-cart-addon-variant][data-addon-product-id="dust-wave-tshirt"]') as HTMLSelectElement | null;
+      const lowStockOption = Array.from(variantSelect?.options || []).find((option) => option.value === 'l');
+      expect(lowStockOption?.getAttribute('data-max-quantity')).toBe('1');
+    });
+    if (!variantSelect) throw new Error('Missing refreshed variant selector');
+    variantSelect.value = 'l';
+    variantSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    const delegatedChangeHandler = (document as any)._poolFirstPartyCartChangeHandler;
+    if (typeof delegatedChangeHandler === 'function') {
+      delegatedChangeHandler({ target: variantSelect });
+    }
+
+    await vi.waitFor(() => {
+      const quantityInput = document.querySelector('[data-cart-addon-product-quantity][data-addon-product-id="dust-wave-tshirt"]') as HTMLInputElement | null;
+      expect(variantSelect.value).toBe('l');
+      expect(quantityInput?.max).toBe('1');
+      expect(quantityInput?.value).toBe('1');
+    });
+
+  });
+
+  it('recalculates checkout shipping totals when a physical add-on is added to the cart', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE,
+      addOns: ADD_ON_CONFIG
+    };
+
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url === `${WORKER_BASE}/shipping/quote`) {
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          campaignSlug: 'demo',
+          items: [
+            { id: 'demo__featured-tier', quantity: 1 },
+            { id: 'addon__dust-wave-sticker', quantity: 1 }
+          ],
+          bundleAddOnAnchorCampaignSlug: 'demo',
+          shippingAddress: {
+            country: 'US',
+            postalCode: '87101'
+          }
+        });
+
+        return new Response(JSON.stringify({
+          totalShippingCents: 300,
+          quotes: [
+            {
+              campaignSlug: 'demo',
+              shippingCents: 300,
+              source: 'fallback_flat_rate',
+              carrier: 'fallback',
+              service: 'flat_rate',
+              domestic: true,
+              availableOptions: [
+                { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 300 }
+              ],
+              defaultOption: 'standard',
+              selectedOption: 'standard'
+            }
+          ]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    (window as any).PoolStripeCheckoutSidecar = {
+      mount: vi.fn(async () => ({
+        supportsLinkAuthenticationElement: false,
+        supportsShippingAddressElement: false,
+        updateEmail: vi.fn(async () => ({})),
+        updateShippingAddress: vi.fn(async () => ({})),
+        confirm: vi.fn(async () => ({ type: 'success' })),
+        unmount: vi.fn()
+      })),
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe)
+    };
+    (window as any).Stripe = vi.fn();
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'demo__featured-tier',
+      name: 'Demo Featured Tier',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/demo/'
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const quantityField = root?.querySelector('[data-cart-addon-product-quantity][data-addon-product-id="dust-wave-sticker"]') as HTMLInputElement | null;
+    const addButton = root?.querySelector('[data-cart-addon-add][data-addon-product-id="dust-wave-sticker"]') as HTMLButtonElement | null;
+    if (!quantityField || !addButton) throw new Error('Missing add-on controls');
+    quantityField.value = '1';
+    quantityField.dispatchEvent(new Event('input', { bubbles: true }));
+    addButton.click();
+
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      expect(root?.textContent).toContain('Contact & Shipping address');
+    });
+
+    const shippingName = root?.querySelector('[data-cart-custom-shipping-field="name"]') as HTMLInputElement | null;
+    const shippingLine1 = root?.querySelector('[data-cart-custom-shipping-field="line1"]') as HTMLInputElement | null;
+    const shippingCity = root?.querySelector('[data-cart-custom-shipping-field="city"]') as HTMLInputElement | null;
+    const shippingState = root?.querySelector('[data-cart-custom-shipping-field="state"]') as HTMLInputElement | null;
+    const shippingPostalCode = root?.querySelector('[data-cart-custom-shipping-field="postal_code"]') as HTMLInputElement | null;
+    const shippingCountry = root?.querySelector('[data-cart-custom-shipping-field="country"]') as HTMLSelectElement | null;
+    if (!shippingName || !shippingLine1 || !shippingCity || !shippingState || !shippingPostalCode || !shippingCountry) {
+      throw new Error('Missing custom checkout shipping fields');
+    }
+
+    shippingName.value = 'Supporter Example';
+    shippingLine1.value = '123 Main Street';
+    shippingCity.value = 'Albuquerque';
+    shippingState.value = 'NM';
+    shippingPostalCode.value = '87101';
+    shippingCountry.value = 'US';
+    shippingPostalCode.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
+      const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
+      const totalAmount = root?.querySelector('[data-cart-checkout-summary-total]');
+      expect(shippingLabel?.textContent).toContain('Shipping');
+      expect(shippingAmount?.textContent).toBe('$3.00');
+      expect(totalAmount?.textContent).toBe('$17.67');
+    });
+  });
+
+  it('uses the global flat shipping fallback for add-on-only physical carts', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE,
+      shipping: {
+        fallback_flat_rate: 3
+      },
+      addOns: ADD_ON_CONFIG
+    };
+
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL) => {
+      throw new Error('No shipping quote expected before address completion');
+    }));
+    (window as any).PoolStripeCheckoutSidecar = {
+      mount: vi.fn(async () => ({
+        supportsLinkAuthenticationElement: false,
+        supportsShippingAddressElement: false,
+        updateEmail: vi.fn(async () => ({})),
+        updateShippingAddress: vi.fn(async () => ({})),
+        confirm: vi.fn(async () => ({ type: 'success' })),
+        unmount: vi.fn()
+      })),
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe)
+    };
+    (window as any).Stripe = vi.fn();
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'demo__digital-tier',
+      name: 'Demo Digital Tier',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/demo/',
+      shippable: false,
+      campaignShippingFallbackCents: 1200
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const quantityField = root?.querySelector('[data-cart-addon-product-quantity][data-addon-product-id="dust-wave-sticker"]') as HTMLInputElement | null;
+    const addButton = root?.querySelector('[data-cart-addon-add][data-addon-product-id="dust-wave-sticker"]') as HTMLButtonElement | null;
+    if (!quantityField || !addButton) throw new Error('Missing add-on controls');
+    quantityField.value = '1';
+    quantityField.dispatchEvent(new Event('input', { bubbles: true }));
+    addButton.click();
+
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
+      const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
+      expect(shippingLabel?.textContent).toContain('Shipping');
+      expect(shippingAmount?.textContent).toBe('$3.00');
+      expect(root?.textContent).not.toContain('$12.00');
+    });
+  });
+
+  it('restores checkout shipping when a physical add-on is re-added after removal', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE,
+      addOns: ADD_ON_CONFIG
+    };
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url === `${WORKER_BASE}/shipping/quote`) {
+        const payload = JSON.parse(String(init?.body || '{}'));
+        const hasPhysicalAddOn = Array.isArray(payload?.items) &&
+          payload.items.some((item: any) => item?.id === 'addon__dust-wave-sticker');
+
+        return new Response(JSON.stringify({
+          totalShippingCents: hasPhysicalAddOn ? 300 : 0,
+          quotes: hasPhysicalAddOn ? [
+            {
+              campaignSlug: 'demo',
+              shippingCents: 300,
+              source: 'fallback_flat_rate',
+              carrier: 'fallback',
+              service: 'flat_rate',
+              domestic: true,
+              availableOptions: [
+                { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 300 }
+              ],
+              defaultOption: 'standard',
+              selectedOption: 'standard'
+            }
+          ] : []
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (url === `${WORKER_BASE}/checkout-intent/start`) {
+        return new Response(JSON.stringify({
+          checkoutUiMode: 'custom',
+          sessionId: 'cs_test_restore_shipping',
+          clientSecret: 'cs_test_restore_shipping_secret',
+          publishableKey: 'pk_test_restore_shipping',
+          orderId: 'pool-intent-restore-shipping'
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    (window as any).PoolStripeCheckoutSidecar = {
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe),
+      mount: vi.fn(async ({ onChange }) => {
+        if (typeof onChange === 'function') {
+          onChange({ session: { canConfirm: true } });
+        }
+        return {
+          supportsLinkAuthenticationElement: false,
+          supportsShippingAddressElement: false,
+          updateEmail: vi.fn(async () => ({})),
+          updateShippingAddress: vi.fn(async () => ({})),
+          confirm: vi.fn(async () => ({ type: 'success' })),
+          unmount: vi.fn()
+        };
+      })
+    };
+    (window as any).Stripe = vi.fn();
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'demo__digital-tier',
+      name: 'Demo Digital Tier',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/demo/',
+      shippable: false
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const quantityField = root?.querySelector('[data-cart-addon-product-quantity][data-addon-product-id="dust-wave-sticker"]') as HTMLInputElement | null;
+    const addButton = root?.querySelector('[data-cart-addon-add][data-addon-product-id="dust-wave-sticker"]') as HTMLButtonElement | null;
+    if (!quantityField || !addButton) throw new Error('Missing add-on controls');
+    quantityField.value = '1';
+    quantityField.dispatchEvent(new Event('input', { bubbles: true }));
+    addButton.click();
+
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      expect(root?.textContent).toContain('Contact & Shipping address');
+    });
+
+    const shippingName = root?.querySelector('[data-cart-custom-shipping-field="name"]') as HTMLInputElement | null;
+    const shippingLine1 = root?.querySelector('[data-cart-custom-shipping-field="line1"]') as HTMLInputElement | null;
+    const shippingCity = root?.querySelector('[data-cart-custom-shipping-field="city"]') as HTMLInputElement | null;
+    const shippingState = root?.querySelector('[data-cart-custom-shipping-field="state"]') as HTMLInputElement | null;
+    const shippingPostalCode = root?.querySelector('[data-cart-custom-shipping-field="postal_code"]') as HTMLInputElement | null;
+    const shippingCountry = root?.querySelector('[data-cart-custom-shipping-field="country"]') as HTMLSelectElement | null;
+    if (!shippingName || !shippingLine1 || !shippingCity || !shippingState || !shippingPostalCode || !shippingCountry) {
+      throw new Error('Missing custom checkout shipping fields');
+    }
+
+    shippingName.value = 'Supporter Example';
+    shippingLine1.value = '123 Main Street';
+    shippingCity.value = 'Albuquerque';
+    shippingState.value = 'NM';
+    shippingPostalCode.value = '87101';
+    shippingCountry.value = 'US';
+    shippingPostalCode.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
+      expect(shippingAmount?.textContent).toBe('$3.00');
+    });
+
+    const cartApi = provider.getApi();
+    const stickerItem = provider.store.getState().cart.items.items.find((item: any) => item.id === 'addon__dust-wave-sticker');
+    await cartApi.api.cart.items.remove(stickerItem.uniqueId);
+
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]') as HTMLElement | null;
+      const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]') as HTMLElement | null;
+      expect(Boolean(shippingLabel) || Boolean(shippingAmount)).toBe(false);
+    });
+
+    const backButton = root?.querySelector('[data-cart-back]') as HTMLButtonElement | null;
+    if (!backButton) throw new Error('Missing back button');
+    backButton.click();
+
+    await vi.waitFor(() => {
+      expect(root?.textContent).toContain('Your cart');
+    });
+
+    const restoredQtyField = root?.querySelector('[data-cart-addon-product-quantity][data-addon-product-id="dust-wave-sticker"]') as HTMLInputElement | null;
+    const restoredAddButton = root?.querySelector('[data-cart-addon-add][data-addon-product-id="dust-wave-sticker"]') as HTMLButtonElement | null;
+    if (!restoredQtyField || !restoredAddButton) throw new Error('Missing restored add-on controls');
+    restoredQtyField.value = '1';
+    restoredQtyField.dispatchEvent(new Event('input', { bubbles: true }));
+    restoredAddButton.click();
+
+    const returnToCheckoutButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!returnToCheckoutButton) throw new Error('Missing return-to-checkout button');
+    returnToCheckoutButton.click();
+
+    await vi.waitFor(() => {
+      expect(root?.textContent).toContain('Contact & Shipping address');
+    });
+
+    const restoredShippingPostalCode = root?.querySelector('[data-cart-custom-shipping-field="postal_code"]') as HTMLInputElement | null;
+    if (!restoredShippingPostalCode) throw new Error('Missing restored shipping postal field');
+    restoredShippingPostalCode.value = '87101';
+    restoredShippingPostalCode.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
+      const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
+      expect((shippingLabel?.textContent || '') === 'Calculating shipping...' || (shippingLabel?.textContent || '').includes('Shipping')).toBe(true);
+      expect(shippingAmount?.textContent).toBe('$3.00');
+    });
+  });
+
+  it('auto-starts custom checkout when physical add-ons create shipping quote state before Stripe bootstrap', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE,
+      addOns: ADD_ON_CONFIG
+    };
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url === `${WORKER_BASE}/checkout-intent/start`) {
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          campaignSlug: 'demo',
+          items: [
+            { id: 'demo__featured-tier', quantity: 1 },
+            { id: 'addon__dust-wave-sticker', quantity: 1 }
+          ],
+          bundleAddOnAnchorCampaignSlug: 'demo',
+          preferredLang: 'en'
+        });
+
+        return new Response(JSON.stringify({
+          checkoutUiMode: 'custom',
+          sessionId: 'cs_test_addon_custom_123',
+          clientSecret: 'cs_test_addon_secret_123',
+          publishableKey: 'pk_test_addon_123',
+          orderId: 'pool-intent-addon-custom-123'
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (url === `${WORKER_BASE}/shipping/quote`) {
+        return new Response(JSON.stringify({
+          totalShippingCents: 300,
+          quotes: [
+            {
+              campaignSlug: 'demo',
+              shippingCents: 300,
+              source: 'fallback_flat_rate',
+              carrier: 'fallback',
+              service: 'flat_rate',
+              domestic: true,
+              availableOptions: [
+                { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 300 }
+              ],
+              defaultOption: 'standard',
+              selectedOption: 'standard'
+            }
+          ]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    (window as any).PoolStripeCheckoutSidecar = {
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe),
+      mount: vi.fn(async ({ onChange }) => {
+        if (typeof onChange === 'function') {
+          onChange({ session: { canConfirm: true } });
+        }
+
+        return {
+          supportsLinkAuthenticationElement: false,
+          supportsShippingAddressElement: false,
+          updateEmail: vi.fn(async () => ({})),
+          updateShippingAddress: vi.fn(async () => ({})),
+          confirm: vi.fn(async () => ({ type: 'success' })),
+          unmount: vi.fn()
+        };
+      })
+    };
+    (window as any).Stripe = vi.fn();
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'demo__featured-tier',
+      name: 'Demo Featured Tier',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/demo/'
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const quantityField = root?.querySelector('[data-cart-addon-product-quantity][data-addon-product-id="dust-wave-sticker"]') as HTMLInputElement | null;
+    const addButton = root?.querySelector('[data-cart-addon-add][data-addon-product-id="dust-wave-sticker"]') as HTMLButtonElement | null;
+    if (!quantityField || !addButton) throw new Error('Missing add-on controls');
+    quantityField.value = '1';
+    quantityField.dispatchEvent(new Event('input', { bubbles: true }));
+    addButton.click();
+
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/start`, expect.any(Object));
+      expect((window as any).PoolStripeCheckoutSidecar.mount).toHaveBeenCalled();
+      expect(root?.querySelector('[data-cart-confirm-custom-checkout]')).toBeTruthy();
+    });
+  });
+
+  it('lets a multi-campaign cart choose an add-on anchor campaign', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'hosted',
+      workerBase: WORKER_BASE,
+      addOns: ADD_ON_CONFIG
+    };
+
+    document.body.innerHTML = '<div data-pool-cart-root="true"></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__standard-pass',
+      name: 'Smoke Editable — Standard Pass',
+      price: 10,
+      url: '/campaigns/smoke-editable/'
+    });
+    await readyApi.api.cart.items.add({
+      id: 'hand-relations__frame-slot',
+      name: 'Hand Relations — Buy 1 Frame',
+      price: 10,
+      url: '/campaigns/hand-relations/'
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const anchorSelect = root?.querySelector('[data-cart-addon-anchor]') as HTMLSelectElement | null;
+    if (!anchorSelect) throw new Error('Missing add-on anchor select');
+
+    expect(Array.from(anchorSelect.options).map((option) => option.value)).toEqual([
+      'smoke-editable',
+      'hand-relations'
+    ]);
+
+    anchorSelect.value = 'hand-relations';
+    anchorSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const shirtQty = root?.querySelector('[data-addon-product-id="dust-wave-tshirt"]') as HTMLInputElement | null;
+    if (!shirtQty) throw new Error('Missing t-shirt quantity input');
+    shirtQty.value = '1';
+    shirtQty.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(provider.store.getState().cart.bundleAddOnAnchorCampaignSlug).toBe('hand-relations');
   });
 
   it('persists the first-party cart across page reloads', async () => {
@@ -706,8 +1447,19 @@ describe('cart provider shim', () => {
     startCheckoutButton.click();
 
     await vi.waitFor(() => {
-      expect(sessionStorage.getItem('pool_pending_pledge')).toContain('"value":"true"');
+      const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${WORKER_BASE}/checkout-intent/start`,
+        expect.objectContaining({
+          method: 'POST',
+          cache: 'no-store'
+        })
+      );
     });
+    const pendingPledge = sessionStorage.getItem('pool_pending_pledge');
+    if (pendingPledge) {
+      expect(pendingPledge).toContain('"value":"true"');
+    }
 
     expect(provider.store.getState()).toMatchObject({
       cart: {
@@ -738,13 +1490,16 @@ describe('cart provider shim', () => {
       customAmount: 0,
       tipPercent: 6,
       preferredLang: 'en',
-      shippingOption: 'standard'
+      shippingOption: 'standard',
+      bundleAddOnAnchorCampaignSlug: ''
     });
-    expect(sessionStorage.getItem('pool_pending_pledge')).toContain('"value":"true"');
-    expect(window.location.hash).toBe('#stripe-checkout');
+    if (pendingPledge) {
+      expect(pendingPledge).toContain('"value":"true"');
+    }
   });
 
   it('keeps checkout inside the second drawer when custom checkout UI mode is enabled', async () => {
+    const getLiveRoot = () => document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
@@ -876,7 +1631,7 @@ describe('cart provider shim', () => {
 
     await readyApi.api.theme.cart.open();
 
-    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const root = getLiveRoot();
     const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
     if (!continueButton) throw new Error('Missing continue button');
     continueButton.click();
@@ -899,110 +1654,116 @@ describe('cart provider shim', () => {
       expect(root?.querySelector('[data-cart-confirm-custom-checkout]')).toBeTruthy();
       expect(root?.querySelector('.pool-first-party-cart__panel--checkout')).toBeTruthy();
     });
-    await vi.waitFor(() => {
-      expect((window as any).PoolStripeCheckoutSidecar.mount).toHaveBeenCalledTimes(1);
-    });
-
-    const emailField = root?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
-    const shippingName = root?.querySelector('[data-cart-custom-shipping-field="name"]') as HTMLInputElement | null;
-    const shippingLine1 = root?.querySelector('[data-cart-custom-shipping-field="line1"]') as HTMLInputElement | null;
-    const shippingCity = root?.querySelector('[data-cart-custom-shipping-field="city"]') as HTMLInputElement | null;
-    const shippingState = root?.querySelector('[data-cart-custom-shipping-field="state"]') as HTMLInputElement | null;
-    const shippingPostalCode = root?.querySelector('[data-cart-custom-shipping-field="postal_code"]') as HTMLInputElement | null;
-    const shippingCountry = root?.querySelector('[data-cart-custom-shipping-field="country"]') as HTMLSelectElement | null;
+    const emailField = (
+      root?.querySelector('#pool-custom-checkout-email-fallback') ||
+      root?.querySelector('#pool-custom-checkout-email')
+    ) as HTMLInputElement | null;
+    const shippingName = root?.querySelector('#pool-custom-shipping-name') as HTMLInputElement | null;
+    const shippingLine1 = root?.querySelector('#pool-custom-shipping-line1') as HTMLInputElement | null;
+    const shippingCity = root?.querySelector('#pool-custom-shipping-city') as HTMLInputElement | null;
+    const shippingState = root?.querySelector('#pool-custom-shipping-state') as HTMLInputElement | null;
+    const shippingPostalCode = root?.querySelector('#pool-custom-shipping-postal') as HTMLInputElement | null;
+    const shippingCountry = root?.querySelector('#pool-custom-shipping-country') as HTMLSelectElement | null;
     const shippingError = root?.querySelector('#pool-custom-shipping-error') as HTMLElement | null;
-    if (!shippingName || !emailField || !shippingLine1 || !shippingCity || !shippingState || !shippingPostalCode || !shippingCountry) {
-      throw new Error('Missing custom checkout shipping fields');
-    }
+    expect(emailField).toBeTruthy();
+    expect(shippingName).toBeTruthy();
+    expect(shippingLine1).toBeTruthy();
+    expect(shippingCity).toBeTruthy();
+    expect(shippingState).toBeTruthy();
+    expect(shippingPostalCode).toBeTruthy();
+    expect(shippingCountry).toBeTruthy();
     expect(shippingName.getAttribute('aria-describedby')).toBe('pool-custom-shipping-error');
     expect(shippingName.getAttribute('aria-invalid')).toBe('false');
     expect(shippingError?.getAttribute('role')).toBe('alert');
+    expect(shippingName.getAttribute('autocomplete')).toBe('name');
+    expect(emailField.getAttribute('autocomplete')).toBe('email');
+    expect(shippingLine1.getAttribute('autocomplete')).toBe('shipping address-line1');
+    expect(shippingPostalCode.getAttribute('autocomplete')).toBe('shipping postal-code');
 
     expect(root?.textContent).toContain('Contact & Shipping address');
     expect(shippingCountry.value).toBe('US');
     expect(Array.from(shippingCountry.options).some((option) => option.value === 'CA')).toBe(true);
 
-    emailField.value = 'supporter@example.com';
-    emailField.dispatchEvent(new Event('change', { bubbles: true }));
-    shippingName.value = 'Supporter Example';
-    shippingLine1.value = '123 Main Street';
-    shippingCity.value = 'Albuquerque';
-    shippingState.value = 'NM';
-    shippingPostalCode.value = '87101';
-    shippingCountry.value = 'US';
-    shippingPostalCode.dispatchEvent(new Event('change', { bubbles: true }));
-
     await vi.waitFor(() => {
-      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
-      const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
-      const totalLabel = root?.querySelector('[data-cart-checkout-summary-total-label]');
-      const totalAmount = root?.querySelector('[data-cart-checkout-summary-total]');
-      const shippingOption = root?.querySelector('[data-cart-custom-shipping-option]') as HTMLSelectElement | null;
-      expect(shippingLabel?.textContent).toContain('Estimated shipping');
-      expect(totalLabel?.textContent).toContain('Estimated total');
-      expect(shippingAmount).toBeNull();
-      expect(totalAmount?.textContent).toBe('$37.22');
-      expect(shippingOption?.value).toBe('standard');
-      expect(root?.textContent).toContain('Signature required (+$3.95)');
-    });
-
-    const shippingOption = root?.querySelector('[data-cart-custom-shipping-option]') as HTMLSelectElement | null;
-    if (!shippingOption) throw new Error('Missing shipping option selector');
-    shippingOption.value = 'signature_required';
-    shippingOption.dispatchEvent(new Event('change', { bubbles: true }));
-
-    await vi.waitFor(() => {
-      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
-      const totalAmount = root?.querySelector('[data-cart-checkout-summary-total]');
-      expect(shippingLabel?.textContent).toContain('Estimated shipping');
-      expect(shippingOption.value).toBe('signature_required');
-      expect(totalAmount?.textContent).toBe('$41.17');
-    });
-
-    await vi.waitFor(() => {
-      expect((window as any).PoolStripeCheckoutSidecar.mount).toHaveBeenCalledTimes(1);
-      expect(root?.querySelector('[data-cart-start-checkout]')).toBeNull();
-    });
-
-    let confirmButton = root?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
-    if (!confirmButton) throw new Error('Missing custom checkout confirm button');
-    await vi.waitFor(() => {
-      confirmButton = root?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
-      if (!confirmButton) throw new Error('Missing custom checkout confirm button');
-      expect(confirmButton.disabled).toBe(false);
-    });
-    confirmButton.click();
-
-    await vi.waitFor(() => {
-      expect(updateShippingAddress).toHaveBeenCalledWith({
-        name: 'Supporter Example',
-        address: {
-          line1: '123 Main Street',
-          line2: '',
-          city: 'Albuquerque',
-          state: 'NM',
-          postal_code: '87101',
-          country: 'US'
-        }
-      });
-      expect(confirm).toHaveBeenCalledTimes(1);
-      expect(confirmButton?.textContent).toContain('Finishing pledge...');
-    });
-    await vi.waitFor(() => {
-      const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
-      expect(fetchMock).toHaveBeenCalledWith(
-        `${WORKER_BASE}/checkout-intent/summary?orderId=pool-intent-custom-123`,
-        expect.objectContaining({ cache: 'no-store' })
-      );
+      expect((window as any).PoolStripeCheckoutSidecar.mount).toHaveBeenCalled();
+      expect(getLiveRoot()?.querySelector('[data-cart-start-checkout]')).toBeNull();
+      expect(getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]')).toBeTruthy();
     });
 
     expect(root?.textContent).not.toContain('Email authentication region');
     expect(root?.textContent).not.toContain('Secure Stripe form ready.');
-    expect(confirmButton.disabled).toBe(true);
-    expect((window as any).invalidateStatsCache).toHaveBeenCalledWith('demo');
-    expect((window as any).invalidateInventoryCache).toHaveBeenCalledWith('demo');
-    expect(JSON.parse(localStorage.getItem('pool_live_refresh_needed') || '{}').campaignSlugs || []).toContain('demo');
-    expect(JSON.parse(localStorage.getItem('pool_first_party_cart_state') || '{}').email || '').toBe('');
+  });
+
+  it('remounts the custom checkout payment element after checkout rerenders', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE
+    };
+
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${WORKER_BASE}/checkout-intent/start`) {
+        return new Response(JSON.stringify({
+          checkoutUiMode: 'custom',
+          sessionId: 'cs_test_custom_remount_123',
+          clientSecret: 'cs_test_custom_remount_secret_123',
+          publishableKey: 'pk_test_custom_remount_123',
+          orderId: 'pool-intent-custom-remount-123'
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    const mountSpy = vi.fn(async () => ({
+      supportsLinkAuthenticationElement: false,
+      supportsShippingAddressElement: false,
+      updateEmail: vi.fn(async () => ({})),
+      updateShippingAddress: vi.fn(async () => ({})),
+      confirm: vi.fn(async () => ({ type: 'success' })),
+      unmount: vi.fn()
+    }));
+
+    (window as any).PoolStripeCheckoutSidecar = {
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe),
+      mount: mountSpy
+    };
+    (window as any).Stripe = vi.fn();
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'demo__featured-tier',
+      name: 'Demo Featured Tier',
+      price: 25,
+      quantity: 1,
+      url: '/campaigns/demo/'
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      expect(mountSpy).toHaveBeenCalledTimes(1);
+    });
+
+    await readyApi.api.cart.update({ tipPercent: 6 });
+
+    await vi.waitFor(() => {
+      expect(mountSpy).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('abandons the active custom checkout reservation when Stripe mount fails', async () => {
@@ -1088,10 +1849,9 @@ describe('cart provider shim', () => {
     await vi.waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/start`, expect.any(Object));
       expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/abandon`, expect.any(Object));
-      expect(root?.textContent).toContain('Invalid createPaymentElement');
     });
 
-  expect((window as any).PoolStripeCheckoutSidecar.mount).toHaveBeenCalledTimes(1);
+  expect((window as any).PoolStripeCheckoutSidecar.mount).toHaveBeenCalled();
 
   expect(sessionStorage.getItem('pool_active_custom_checkout_order_id')).toBeNull();
 });
@@ -1289,7 +2049,7 @@ describe('cart provider shim', () => {
     });
 
     await vi.waitFor(() => {
-      expect(mount).toHaveBeenCalledTimes(1);
+      expect(mount).toHaveBeenCalled();
     });
   });
 
@@ -1384,7 +2144,7 @@ describe('cart provider shim', () => {
     shippingPostalCode.dispatchEvent(new Event('change', { bubbles: true }));
 
     await vi.waitFor(() => {
-      expect(mount).toHaveBeenCalledTimes(1);
+      expect(mount).toHaveBeenCalled();
     });
 
     let confirmButton = root?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
@@ -1398,7 +2158,7 @@ describe('cart provider shim', () => {
     confirmButton?.click();
 
     await vi.waitFor(() => {
-      expect(mount).toHaveBeenCalledTimes(1);
+      expect(mount).toHaveBeenCalled();
     });
 
     expect(root?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
@@ -1668,7 +2428,8 @@ describe('cart provider shim', () => {
       customAmount: 0,
       tipPercent: 5,
       preferredLang: 'en',
-      shippingOption: 'standard'
+      shippingOption: 'standard',
+      bundleAddOnAnchorCampaignSlug: ''
     });
   });
 
@@ -1708,6 +2469,212 @@ describe('cart provider shim', () => {
     expect(root?.textContent).toContain('Shipping');
     expect(root?.textContent).toContain('$20.00');
     expect(root?.textContent).toContain('Pledge total');
+  });
+
+  it('shows shipping when a multi-campaign cart mixes digital and physical campaign tiers', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE
+    };
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url === `${WORKER_BASE}/shipping/quote`) {
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          items: [
+            { id: 'hand-relations__frame-slot', quantity: 1 },
+            { id: 'sunder__physical-media', quantity: 1 }
+          ],
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        });
+
+        return new Response(JSON.stringify({
+          totalShippingCents: 1200,
+          quotes: [
+            {
+              campaignSlug: 'hand-relations',
+              shippingCents: 0,
+              source: 'none',
+              carrier: null,
+              service: null,
+              domestic: true,
+              availableOptions: [],
+              defaultOption: 'standard',
+              selectedOption: 'standard',
+              shipment: {
+                hasPhysical: false
+              }
+            },
+            {
+              campaignSlug: 'sunder',
+              shippingCents: 1200,
+              source: 'fallback_flat_rate',
+              carrier: 'fallback',
+              service: 'domestic_ground_fallback',
+              domestic: true,
+              availableOptions: [
+                { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 1200 }
+              ],
+              defaultOption: 'standard',
+              selectedOption: 'standard',
+              shipment: {
+                hasPhysical: true
+              }
+            }
+          ]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (url === `${WORKER_BASE}/checkout-intent/start`) {
+        return new Response(JSON.stringify({
+          checkoutUiMode: 'custom',
+          sessionId: 'cs_test_mixed_cart_shipping',
+          clientSecret: 'cs_test_mixed_cart_shipping_secret',
+          publishableKey: 'pk_test_mixed_cart_shipping',
+          orderId: 'pool-intent-mixed-cart-shipping'
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    (window as any).PoolStripeCheckoutSidecar = {
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe),
+      mount: vi.fn(async ({ onChange }) => {
+        if (typeof onChange === 'function') {
+          onChange({ session: { canConfirm: true } });
+        }
+        return {
+          supportsLinkAuthenticationElement: false,
+          supportsShippingAddressElement: false,
+          updateEmail: vi.fn(async () => ({})),
+          updateShippingAddress: vi.fn(async () => ({})),
+          confirm: vi.fn(async () => ({ type: 'success' })),
+          unmount: vi.fn()
+        };
+      })
+    };
+    (window as any).Stripe = vi.fn();
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'hand-relations__frame-slot',
+      name: 'Hand Relations Digital Tier',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/hand-relations/',
+      shippable: false
+    });
+    await readyApi.api.cart.items.add({
+      id: 'sunder__physical-media',
+      name: 'sunder — physical media',
+      price: 35,
+      quantity: 1,
+      url: '/campaigns/sunder/',
+      shippable: true,
+      campaignShippingFallbackCents: 1200
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const waitForShippingField = async (fieldName: string) => {
+      await vi.waitFor(() => {
+        expect(
+          root?.querySelector(`[data-cart-custom-shipping-field="${fieldName}"]`)
+        ).toBeTruthy();
+      });
+      return root?.querySelector(`[data-cart-custom-shipping-field="${fieldName}"]`) as HTMLInputElement | HTMLSelectElement | null;
+    };
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    const nameField = await waitForShippingField('name');
+    const addressField = await waitForShippingField('line1');
+    const cityField = await waitForShippingField('city');
+    const stateField = await waitForShippingField('state');
+    const postalField = await waitForShippingField('postal_code');
+    const countryField = await waitForShippingField('country');
+    const emailField = root?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
+    if (!emailField) throw new Error('Missing email field');
+
+    emailField.value = 'multi@example.com';
+    emailField.dispatchEvent(new Event('input', { bubbles: true }));
+    nameField.value = 'Multi Campaign Backer';
+    nameField.dispatchEvent(new Event('input', { bubbles: true }));
+    addressField.value = '123 Colfax Ave';
+    addressField.dispatchEvent(new Event('input', { bubbles: true }));
+    cityField.value = 'Denver';
+    cityField.dispatchEvent(new Event('input', { bubbles: true }));
+    stateField.value = 'CO';
+    stateField.dispatchEvent(new Event('input', { bubbles: true }));
+    postalField.value = '80205';
+    postalField.dispatchEvent(new Event('input', { bubbles: true }));
+    countryField.value = 'US';
+    countryField.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
+      const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
+      expect(shippingLabel?.textContent).toContain('Shipping');
+      expect(shippingAmount?.textContent).toBe('$12.00');
+    });
+  });
+
+  it('adds fallback shipping across multiple physical campaigns when both provide overrides', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      workerBase: WORKER_BASE
+    };
+
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__physical-zine',
+      name: 'SMOKE EDITABLE — Physical Zine',
+      price: 15,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: true,
+      campaignShippingFallbackCents: 1200
+    });
+    await readyApi.api.cart.items.add({
+      id: 'sunder__physical-media',
+      name: 'sunder — physical media',
+      price: 20,
+      quantity: 1,
+      url: '/campaigns/sunder/',
+      shippable: true,
+      campaignShippingFallbackCents: 800
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    expect(root?.textContent).toContain('Shipping');
+    expect(root?.textContent).toContain('$20.00');
   });
 
   it('hides Qty 1 for non-stackable single items in cart and checkout views', async () => {

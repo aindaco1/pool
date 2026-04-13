@@ -43,11 +43,12 @@ Para el acceso a la comunidad de patrocinadores, The Pool mantiene la sesión ve
 
 1. **Explora**: encuentra un proyecto que quieras apoyar
 2. **Aporta**: añade una o más campañas a tu carrito, añade opcionalmente una propina del 0% al 15% para el mantenimiento de la plataforma y continúa al paso de pago seguro de The Pool con Stripe. Las recompensas físicas pueden añadir envío calculado por el Worker durante el pago, incluidas cotizaciones respaldadas por USPS, tarifas de respaldo configuradas u opciones de envío gratis cuando una implementación las habilita.
+   También puedes ver complementos opcionales de la plataforma. Esos complementos apoyan directamente a Dust Wave, no cuentan para la meta de financiación de una campaña y pueden ser digitales o físicos.
 3. **Guarda la tarjeta**: Stripe guarda de forma segura tu método de pago dentro de ese flujo (todavía no se realiza ningún cobro)
 4. **Espera**: la campaña continúa hasta su fecha límite (todas las horas están en horario de montaña)
 5. **Resultado**: si una campaña se financia, se cobra tu aporte para esa campaña. Si no, no pasa nada.
 
-Los múltiples aportes desde el mismo correo se combinan en un único cobro cuando la misma campaña tiene éxito. Las propinas opcionales para la plataforma van a Dust Wave para ayudar a mantener The Pool y no cuentan para la meta de financiación del proyecto.
+Los múltiples aportes desde el mismo correo se combinan en un único cobro cuando la misma campaña tiene éxito. Las propinas opcionales para la plataforma y los complementos de la plataforma van a Dust Wave para ayudar a mantener The Pool y no cuentan para la meta de financiación del proyecto.
 
 ## Para creadores
 
@@ -56,6 +57,7 @@ The Pool está diseñado para cineastas y otros creativos, con funciones como:
 - **0% de comisión de plataforma para organizadores**: los patrocinadores pueden añadir opcionalmente una propina del 0% al 15% para ayudar a sostener la plataforma sin reducir los fondos de la campaña
 - **Pago de primera parte**: The Pool controla el carrito, los sidecars de pago y el flujo de revisión del aporte, mientras Stripe gestiona de forma segura los datos del pago
 - **Niveles físicos y digitales**: ofrece recompensas tangibles con captura de dirección de envío durante el pago, soporte para cotizaciones respaldadas por USPS, controles de política de envío de respaldo o gratuito, e impuesto sobre ventas configurable
+- **Complementos opcionales de la plataforma**: ofrece un pequeño catálogo global de merch junto con los aportes de campaña, con inventario por variante, avisos de poco stock y soporte de envío para complementos físicos
 - **Fases de producción**: divide tu presupuesto en fases que los patrocinadores puedan financiar directamente
 - **Metas ampliadas**: desbloquea posibilidades creativas adicionales a medida que crece la financiación
 - **Decisiones comunitarias**: permite que tus patrocinadores voten sobre decisiones creativas publicadas
@@ -80,7 +82,7 @@ The Pool funciona sobre una arquitectura estática moderna:
 
 La plataforma está construida sobre servicios que ofrecen niveles gratuitos, y The Pool fue diseñado desde el principio para funcionar eficazmente dentro de esos niveles gratuitos siempre que sea posible.
 
-Para los forks, eso significa que las páginas estáticas permanecen en GitHub Pages, las lecturas públicas en vivo se combinan de forma agresiva y se cachean en el navegador, y la mayor parte del uso de Cloudflare Workers se reserva para las partes del ciclo de vida del aporte que son sensibles desde el punto de vista de la seguridad, mientras que la configuración de impuestos y envío se mantiene reflejada entre la configuración del sitio y el entorno del Worker para que la interfaz local, el pago, los informes y los correos se mantengan alineados.
+Para los forks, eso significa que las páginas estáticas permanecen en GitHub Pages, las lecturas públicas en vivo se combinan de forma agresiva y se cachean en el navegador, y la mayor parte del uso de Cloudflare Workers se reserva para las partes del ciclo de vida del aporte que son sensibles desde el punto de vista de la seguridad, mientras que la configuración de impuestos, envío, SEO y logging se mantiene reflejada o acotada mediante la configuración para que la interfaz local, el pago, los informes y los correos se mantengan alineados.
 
 Esa arquitectura también deja margen para endurecer la accesibilidad sin sacrificar el modelo de seguridad de la plataforma: los flujos de carrito, pago y gestión usan semántica reforzada para diálogos, foco, teclado y regiones en vivo, mientras Stripe sigue siendo el dueño de los campos sensibles de pago dentro de su interfaz segura.
 

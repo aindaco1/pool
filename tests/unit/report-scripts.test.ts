@@ -18,7 +18,13 @@ function buildPledge({
   tax,
   shipping,
   amount,
-  createdAt
+  createdAt,
+  goalTrackingSubtotal = null,
+  bundleAddOnSubtotal = null,
+  bundleAddOns = [],
+  shippingAddress = null,
+  customAmount = 0,
+  history = null
 }: {
   orderId: string;
   email: string;
@@ -32,7 +38,30 @@ function buildPledge({
   shipping: number;
   amount: number;
   createdAt: string;
+  goalTrackingSubtotal?: number | null;
+  bundleAddOnSubtotal?: number | null;
+  bundleAddOns?: Array<Record<string, unknown>>;
+  shippingAddress?: Record<string, unknown> | null;
+  customAmount?: number;
+  history?: Array<Record<string, unknown>> | null;
 }) {
+  const defaultHistory = [
+    {
+      type: 'created',
+      tierId,
+      tierQty,
+      subtotal,
+      tipPercent,
+      tipAmount,
+      tax,
+      shipping,
+      amount,
+      bundleAddOns,
+      bundleAddOnSubtotal,
+      customAmount,
+      at: createdAt
+    }
+  ];
   return {
     orderId,
     email,
@@ -45,23 +74,15 @@ function buildPledge({
     tax,
     shipping,
     amount,
+    goalTrackingSubtotal,
+    bundleAddOnSubtotal,
+    bundleAddOns,
+    shippingAddress,
+    customAmount,
     pledgeStatus: 'active',
     charged: false,
     createdAt,
-    history: [
-      {
-        type: 'created',
-        tierId,
-        tierQty,
-        subtotal,
-        tipPercent,
-        tipAmount,
-        tax,
-        shipping,
-        amount,
-        at: createdAt
-      }
-    ]
+    history: history ?? defaultHistory
   };
 }
 
@@ -167,9 +188,9 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,smoke-editable,One Frame,10.00,5,0.50,0.79,0.00,11.29,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-smoke-editable',
-      'supporter@example.com,sunder,Handheld Prop,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-sunder'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
+      'supporter@example.com,smoke-editable,One Frame,,10.00,0.00,10.00,5,0.50,0.79,0.00,11.29,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-smoke-editable',
+      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-sunder'
     ]);
   });
 
@@ -206,9 +227,9 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
-      'supporter@example.com,smoke-editable,One Frame,10.00,5,0.50,0.79,0.00,11.29,',
-      'supporter@example.com,sunder,Handheld Prop,25.00,5,1.25,1.97,3.00,31.22,'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
+      'supporter@example.com,smoke-editable,One Frame,,10.00,0.00,10.00,5,0.50,0.79,0.00,11.29,',
+      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,'
     ]);
   });
 
@@ -260,9 +281,9 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,sunder,Handheld Prop,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-tip-only-1',
-      'supporter@example.com,sunder,(tip updated to 9%),0.00,9,1.00,0.00,0.00,1.00,modified,no,2026-04-06T13:00:00.000Z,pool-intent-tip-only-1'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
+      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-tip-only-1',
+      'supporter@example.com,sunder,(tip updated to 9%),,0.00,0.00,0.00,9,1.00,0.00,0.00,1.00,modified,no,2026-04-06T13:00:00.000Z,pool-intent-tip-only-1'
     ]);
   });
 
@@ -317,9 +338,76 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,sunder,Handheld Prop,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-tip-and-support-1',
-      'supporter@example.com,sunder,(modified) +Custom Support $10.00; tip updated to 8%,10.00,8,1.55,0.79,0.00,9.34,modified,no,2026-04-06T13:00:00.000Z,pool-intent-tip-and-support-1'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
+      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-tip-and-support-1',
+      'supporter@example.com,sunder,(modified) +Custom Support $10.00; tip updated to 8%,,10.00,0.00,10.00,8,1.55,0.79,0.00,9.34,modified,no,2026-04-06T13:00:00.000Z,pool-intent-tip-and-support-1'
+    ]);
+  });
+
+  it('labels add-on-only modifications clearly in pledge-report output', () => {
+    const lines = runReportScript('pledge-report.sh', {
+      'pledge:pool-intent-addon-mod-1': {
+        ...buildPledge({
+          orderId: 'pool-intent-addon-mod-1',
+          email: 'supporter@example.com',
+          campaignSlug: 'sunder',
+          tierId: 'prop',
+          tierQty: 1,
+          subtotal: 3500,
+          goalTrackingSubtotal: 1000,
+          bundleAddOnSubtotal: 2500,
+          bundleAddOns: [
+            { productId: 'dust-wave-butterfingers', name: 'DUST WAVE Butterfingers T-Shirt', variantLabel: 'XS', quantity: 1, unitPrice: 2500 }
+          ],
+          tipPercent: 5,
+          tipAmount: 175,
+          tax: 276,
+          shipping: 300,
+          amount: 4251,
+          createdAt: '2026-04-06T12:00:00.000Z'
+        }),
+        history: [
+          {
+            type: 'created',
+            tierId: 'prop',
+            tierQty: 1,
+            subtotal: 1300,
+            goalTrackingSubtotal: 1000,
+            bundleAddOnSubtotal: 300,
+            bundleAddOns: [
+              { productId: 'dust-wave-sticker', name: 'DUST WAVE Sticker', quantity: 1, unitPrice: 300 }
+            ],
+            tipPercent: 5,
+            tipAmount: 65,
+            tax: 102,
+            shipping: 300,
+            amount: 1767,
+            at: '2026-04-06T12:00:00.000Z'
+          },
+          {
+            type: 'modified',
+            subtotalDelta: 2200,
+            bundleAddOns: [
+              { productId: 'dust-wave-butterfingers', name: 'DUST WAVE Butterfingers T-Shirt', variantLabel: 'XS', quantity: 1, unitPrice: 2500 }
+            ],
+            tipPercent: 5,
+            tipAmount: 110,
+            tipAmountDelta: 110,
+            taxDelta: 174,
+            shippingDelta: 0,
+            amountDelta: 2484,
+            tierId: 'prop',
+            tierQty: 1,
+            at: '2026-04-06T13:00:00.000Z'
+          }
+        ]
+      }
+    });
+
+    expect(lines).toEqual([
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
+      'supporter@example.com,sunder,Handheld Prop,DUST WAVE Sticker,10.00,3.00,13.00,5,0.65,1.02,3.00,17.67,created,no,2026-04-06T12:00:00.000Z,pool-intent-addon-mod-1',
+      'supporter@example.com,sunder,(modified add-ons; tip updated to 5%),+DUST WAVE Butterfingers T-Shirt (XS); -DUST WAVE Sticker,0.00,22.00,22.00,5,1.10,1.74,0.00,24.84,modified,no,2026-04-06T13:00:00.000Z,pool-intent-addon-mod-1'
     ]);
   });
 
@@ -362,8 +450,8 @@ describe('pledge and fulfillment reports', () => {
     );
 
     expect(lines).toEqual([
-      'email,campaign,items,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,sunder,Handheld Prop,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-sunder'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
+      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-sunder'
     ]);
   });
 
@@ -406,8 +494,113 @@ describe('pledge and fulfillment reports', () => {
     );
 
     expect(lines).toEqual([
-      'email,campaign,items,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
-      'supporter@example.com,sunder,Handheld Prop,25.00,5,1.25,1.97,3.00,31.22,'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
+      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,'
+    ]);
+  });
+
+  it('separates platform add-on value from campaign pledge value in pledge-report output', () => {
+    const lines = runReportScript('pledge-report.sh', {
+      'pledge:pool-intent-add-ons-1': buildPledge({
+        orderId: 'pool-intent-add-ons-1',
+        email: 'supporter@example.com',
+        campaignSlug: 'sunder',
+        tierId: 'prop',
+        tierQty: 1,
+        subtotal: 5000,
+        goalTrackingSubtotal: 2500,
+        bundleAddOnSubtotal: 2500,
+        bundleAddOns: [
+          { productId: 'dust-wave-sticker', name: 'DUST WAVE Sticker', quantity: 2, unitPrice: 500 },
+          { productId: 'dust-wave-tshirt', name: 'DUST WAVE T-Shirt', variantLabel: 'M', quantity: 1, unitPrice: 1500 }
+        ],
+        tipPercent: 5,
+        tipAmount: 250,
+        tax: 394,
+        shipping: 300,
+        amount: 5944,
+        createdAt: '2026-04-06T12:00:00.000Z'
+      })
+    });
+
+    expect(lines).toEqual([
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
+      'supporter@example.com,sunder,Handheld Prop,DUST WAVE Sticker x2; DUST WAVE T-Shirt (M),25.00,25.00,50.00,5,2.50,3.94,3.00,59.44,created,no,2026-04-06T12:00:00.000Z,pool-intent-add-ons-1'
+    ]);
+  });
+
+  it('surfaces add-on items separately in fulfillment-report output', () => {
+    const lines = runReportScript('fulfillment-report.sh', {
+      'pledge:pool-intent-add-ons-1': buildPledge({
+        orderId: 'pool-intent-add-ons-1',
+        email: 'supporter@example.com',
+        campaignSlug: 'sunder',
+        tierId: 'prop',
+        tierQty: 1,
+        subtotal: 5000,
+        goalTrackingSubtotal: 2500,
+        bundleAddOnSubtotal: 2500,
+        bundleAddOns: [
+          { productId: 'dust-wave-sticker', name: 'DUST WAVE Sticker', quantity: 2, unitPrice: 500 },
+          { productId: 'dust-wave-tshirt', name: 'DUST WAVE T-Shirt', variantLabel: 'M', quantity: 1, unitPrice: 1500 }
+        ],
+        tipPercent: 5,
+        tipAmount: 250,
+        tax: 394,
+        shipping: 300,
+        amount: 5944,
+        shippingAddress: {
+          name: 'Supporter Example',
+          address1: '123 Example St',
+          city: 'Denver',
+          province: 'CO',
+          postalCode: '80205',
+          country: 'US'
+        },
+        createdAt: '2026-04-06T12:00:00.000Z'
+      })
+    });
+
+    expect(lines).toEqual([
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
+      'supporter@example.com,sunder,Handheld Prop,DUST WAVE Sticker x2; DUST WAVE T-Shirt (M),25.00,25.00,50.00,5,2.50,3.94,3.00,59.44,\"Supporter Example, 123 Example St, Denver, CO, 80205, US\"'
+    ]);
+  });
+
+  it('keeps fulfillment aligned with the final add-on state after modifications', () => {
+    const lines = runReportScript('fulfillment-report.sh', {
+      'pledge:pool-intent-addon-final-1': buildPledge({
+        orderId: 'pool-intent-addon-final-1',
+        email: 'supporter@example.com',
+        campaignSlug: 'sunder',
+        tierId: 'prop',
+        tierQty: 1,
+        subtotal: 3500,
+        goalTrackingSubtotal: 1000,
+        bundleAddOnSubtotal: 2500,
+        bundleAddOns: [
+          { productId: 'dust-wave-butterfingers', name: 'DUST WAVE Butterfingers T-Shirt', variantLabel: 'XS', quantity: 1, unitPrice: 2500 }
+        ],
+        tipPercent: 7,
+        tipAmount: 245,
+        tax: 276,
+        shipping: 300,
+        amount: 4321,
+        shippingAddress: {
+          name: 'Supporter Example',
+          address1: '123 Example St',
+          city: 'Denver',
+          province: 'CO',
+          postalCode: '80205',
+          country: 'US'
+        },
+        createdAt: '2026-04-06T12:00:00.000Z'
+      })
+    });
+
+    expect(lines).toEqual([
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
+      'supporter@example.com,sunder,Handheld Prop,DUST WAVE Butterfingers T-Shirt (XS),10.00,25.00,35.00,7,2.45,2.76,3.00,43.21,\"Supporter Example, 123 Example St, Denver, CO, 80205, US\"'
     ]);
   });
 });

@@ -170,6 +170,30 @@ TIER_NAMES = {
 def get_tier_name(tier_id, fallback=''):
     return TIER_NAMES.get(tier_id, fallback or tier_id or '')
 
+def get_add_on_label(add_on):
+    name = str(add_on.get('name') or add_on.get('productId') or 'Platform add-on').strip()
+    variant = str(add_on.get('variantLabel') or '').strip()
+    return f'{name} ({variant})' if variant else name
+
+def get_add_on_subtotal(data):
+    if data.get('bundleAddOnSubtotal') is not None:
+        return (data.get('bundleAddOnSubtotal') or 0) / 100
+    return sum(((add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)) for add_on in (data.get('bundleAddOns') or [])) / 100
+
+def get_campaign_subtotal(data, subtotal):
+    if data.get('goalTrackingSubtotal') is not None:
+        return (data.get('goalTrackingSubtotal') or 0) / 100
+    return subtotal - get_add_on_subtotal(data)
+
+def build_count_items_str(counts):
+    items = []
+    for item_name in sorted(counts.keys()):
+        qty = counts.get(item_name, 0)
+        if qty <= 0:
+            continue
+        items.append(f'{item_name} x{qty}' if qty > 1 else item_name)
+    return '; '.join(items)
+
 campaign_filter = '$CAMPAIGN_FILTER'
 
 root = Path('.wrangler/state/v3')
@@ -226,8 +250,19 @@ if not rows or blob_dir is None:
 print(f'Found {len(rows)} pledges. Processing...', file=sys.stderr)
 
 # Aggregate by (email, campaign)
-# Structure: { (email, campaign): { 'subtotal': 0, 'tax': 0, 'total': 0, 'items': { tier_name: qty } } }
-aggregated = defaultdict(lambda: {'subtotal': 0.0, 'tip': 0.0, 'tip_percent': 0, 'tax': 0.0, 'shipping': 0.0, 'total': 0.0, 'items': defaultdict(int), 'shipping_address': ''})
+aggregated = defaultdict(lambda: {
+    'campaign_subtotal': 0.0,
+    'add_on_subtotal': 0.0,
+    'subtotal': 0.0,
+    'tip': 0.0,
+    'tip_percent': 0,
+    'tax': 0.0,
+    'shipping': 0.0,
+    'total': 0.0,
+    'items': defaultdict(int),
+    'add_on_items': defaultdict(int),
+    'shipping_address': ''
+})
 
 for _, blob_id in rows:
     blob_path = blob_dir / blob_id
@@ -248,10 +283,14 @@ for _, blob_id in rows:
     key = (email, campaign)
 
     subtotal = (data.get('subtotal') or data.get('amount') or 0) / 100
+    campaign_subtotal = get_campaign_subtotal(data, subtotal)
+    add_on_subtotal = get_add_on_subtotal(data)
     tip = (data.get('tipAmount') or 0) / 100
     tax = (data.get('tax') or 0) / 100
     total = (data.get('amount') or 0) / 100
 
+    aggregated[key]['campaign_subtotal'] += campaign_subtotal
+    aggregated[key]['add_on_subtotal'] += add_on_subtotal
     aggregated[key]['subtotal'] += subtotal
     aggregated[key]['tip'] += tip
     aggregated[key]['tax'] += tax
@@ -283,31 +322,32 @@ for _, blob_id in rows:
         if add_name:
             aggregated[key]['items'][add_name] += add_qty
 
+    for add_on in data.get('bundleAddOns', []) or []:
+        add_on_name = get_add_on_label(add_on)
+        add_on_qty = add_on.get('quantity', 1) or 1
+        if add_on_name:
+            aggregated[key]['add_on_items'][add_on_name] += add_on_qty
+
 # Output aggregated CSV
 output = StringIO()
 writer = csv.writer(output)
-writer.writerow(['email', 'campaign', 'items', 'subtotal', 'tip_percent', 'tip', 'tax', 'shipping', 'total', 'shipping_address'])
+writer.writerow(['email', 'campaign', 'items', 'add_on_items', 'campaign_subtotal', 'platform_add_on_subtotal', 'subtotal', 'tip_percent', 'tip', 'tax', 'shipping', 'total', 'shipping_address'])
 
 for (email, campaign), data in sorted(aggregated.items()):
     # Skip if no items or zero total
     if not data['items'] or data['total'] <= 0:
         continue
     
-    # Build items string
-    items_list = []
-    for item_name, qty in sorted(data['items'].items()):
-        if qty > 0:
-            if qty > 1:
-                items_list.append(f'{item_name} x{qty}')
-            else:
-                items_list.append(item_name)
-    
-    items_str = '; '.join(items_list)
+    items_str = build_count_items_str(data['items'])
+    add_on_items_str = build_count_items_str(data['add_on_items'])
     
     writer.writerow([
         email,
         campaign,
         items_str,
+        add_on_items_str,
+        f\"{data['campaign_subtotal']:.2f}\",
+        f\"{data['add_on_subtotal']:.2f}\",
         f\"{data['subtotal']:.2f}\",
         str(data['tip_percent']),
         f\"{data['tip']:.2f}\",
@@ -405,11 +445,46 @@ TIER_NAMES = {
 def get_tier_name(tier_id, fallback=''):
     return TIER_NAMES.get(tier_id, fallback or tier_id or '')
 
+def get_add_on_label(add_on):
+    name = str(add_on.get('name') or add_on.get('productId') or 'Platform add-on').strip()
+    variant = str(add_on.get('variantLabel') or '').strip()
+    return f'{name} ({variant})' if variant else name
+
+def get_add_on_subtotal(data):
+    if data.get('bundleAddOnSubtotal') is not None:
+        return (data.get('bundleAddOnSubtotal') or 0) / 100
+    return sum(((add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)) for add_on in (data.get('bundleAddOns') or [])) / 100
+
+def get_campaign_subtotal(data, subtotal):
+    if data.get('goalTrackingSubtotal') is not None:
+        return (data.get('goalTrackingSubtotal') or 0) / 100
+    return subtotal - get_add_on_subtotal(data)
+
+def build_count_items_str(counts):
+    items = []
+    for item_name in sorted(counts.keys()):
+        qty = counts.get(item_name, 0)
+        if qty <= 0:
+            continue
+        items.append(f'{item_name} x{qty}' if qty > 1 else item_name)
+    return '; '.join(items)
+
 campaign_filter = '$CAMPAIGN_FILTER'
 
 # Aggregate by (email, campaign)
-# Structure: { (email, campaign): { 'subtotal': 0, 'tax': 0, 'total': 0, 'items': { tier_name: qty } } }
-aggregated = defaultdict(lambda: {'subtotal': 0.0, 'tip': 0.0, 'tip_percent': 0, 'tax': 0.0, 'shipping': 0.0, 'total': 0.0, 'items': defaultdict(int), 'shipping_address': ''})
+aggregated = defaultdict(lambda: {
+    'campaign_subtotal': 0.0,
+    'add_on_subtotal': 0.0,
+    'subtotal': 0.0,
+    'tip': 0.0,
+    'tip_percent': 0,
+    'tax': 0.0,
+    'shipping': 0.0,
+    'total': 0.0,
+    'items': defaultdict(int),
+    'add_on_items': defaultdict(int),
+    'shipping_address': ''
+})
 
 # Read pledges separated by delimiter
 pledge_data = ''
@@ -430,9 +505,13 @@ for line in sys.stdin:
                 email = data.get('email', '')
                 key = (email, campaign)
                 subtotal = (data.get('subtotal') or data.get('amount') or 0) / 100
+                campaign_subtotal = get_campaign_subtotal(data, subtotal)
+                add_on_subtotal = get_add_on_subtotal(data)
                 tip = (data.get('tipAmount') or 0) / 100
                 tax = (data.get('tax') or 0) / 100
                 total = (data.get('amount') or 0) / 100
+                aggregated[key]['campaign_subtotal'] += campaign_subtotal
+                aggregated[key]['add_on_subtotal'] += add_on_subtotal
                 aggregated[key]['subtotal'] += subtotal
                 aggregated[key]['tip'] += tip
                 aggregated[key]['tax'] += tax
@@ -459,6 +538,11 @@ for line in sys.stdin:
                     add_qty = add_tier.get('qty', 1) or 1
                     if add_name:
                         aggregated[key]['items'][add_name] += add_qty
+                for add_on in data.get('bundleAddOns', []) or []:
+                    add_on_name = get_add_on_label(add_on)
+                    add_on_qty = add_on.get('quantity', 1) or 1
+                    if add_on_name:
+                        aggregated[key]['add_on_items'][add_on_name] += add_on_qty
             except json.JSONDecodeError:
                 pass
             except Exception as e:
@@ -470,20 +554,20 @@ for line in sys.stdin:
 # Output aggregated CSV
 output = StringIO()
 writer = csv.writer(output)
-writer.writerow(['email', 'campaign', 'items', 'subtotal', 'tip_percent', 'tip', 'tax', 'shipping', 'total', 'shipping_address'])
+writer.writerow(['email', 'campaign', 'items', 'add_on_items', 'campaign_subtotal', 'platform_add_on_subtotal', 'subtotal', 'tip_percent', 'tip', 'tax', 'shipping', 'total', 'shipping_address'])
 
 for (email, campaign), data in sorted(aggregated.items()):
     if not data['items'] or data['total'] <= 0:
         continue
-    items_list = []
-    for item_name, qty in sorted(data['items'].items()):
-        if qty > 0:
-            items_list.append(f'{item_name} x{qty}' if qty > 1 else item_name)
-    items_str = '; '.join(items_list)
+    items_str = build_count_items_str(data['items'])
+    add_on_items_str = build_count_items_str(data['add_on_items'])
     writer.writerow([
         email,
         campaign,
         items_str,
+        add_on_items_str,
+        f\"{data['campaign_subtotal']:.2f}\",
+        f\"{data['add_on_subtotal']:.2f}\",
         f\"{data['subtotal']:.2f}\",
         str(data['tip_percent']),
         f\"{data['tip']:.2f}\",

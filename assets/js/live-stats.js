@@ -131,6 +131,28 @@ function clearLiveRequestCaches(slug) {
   window.POOL_INVENTORY_CACHE = {};
 }
 
+function markPendingLiveRefresh(campaignSlug) {
+  try {
+    const existing = (() => {
+      const raw = localStorage.getItem(LIVE_REFRESH_MARKER_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed?.campaignSlugs)
+        ? parsed.campaignSlugs.filter((value) => typeof value === 'string' && value)
+        : [];
+    })();
+    const campaignSlugs = campaignSlug
+      ? Array.from(new Set([...existing, campaignSlug]))
+      : existing;
+    localStorage.setItem(LIVE_REFRESH_MARKER_KEY, JSON.stringify({
+      campaignSlugs,
+      timestamp: Date.now()
+    }));
+  } catch {
+    // localStorage may be disabled
+  }
+}
+
 function consumePendingLiveRefreshMarker() {
   try {
     const raw = localStorage.getItem(LIVE_REFRESH_MARKER_KEY);
@@ -265,6 +287,8 @@ window.invalidateStatsCache = function(campaignSlug) {
   } catch {
     // localStorage may be disabled
   }
+
+  markPendingLiveRefresh(campaignSlug);
 
   document.dispatchEvent(new CustomEvent('pool:live-cache-invalidated', {
     detail: {
@@ -545,6 +569,8 @@ window.invalidateInventoryCache = function(campaignSlug) {
       clearLiveRequestCaches();
     }
   } catch {}
+
+  markPendingLiveRefresh(campaignSlug);
 
   document.dispatchEvent(new CustomEvent('pool:live-cache-invalidated', {
     detail: {
@@ -886,15 +912,4 @@ window.getTierInventory = async function(campaignSlug, tierId) {
     return inventory.tiers[tierId];
   }
   return null;
-};
-
-/**
- * Invalidate inventory cache (call after pledge changes)
- */
-window.invalidateInventoryCache = function(campaignSlug) {
-  if (campaignSlug) {
-    delete window.POOL_INVENTORY_CACHE[campaignSlug];
-  } else {
-    window.POOL_INVENTORY_CACHE = {};
-  }
 };

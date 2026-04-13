@@ -97,6 +97,7 @@
     data-worker-base="{{ site.platform.worker_url }}"
     data-platform-name="{{ site.platform.name | default: site.title | escape }}"
     data-platform-company-name="{{ site.platform.company_name | default: site.author | escape }}"
+    data-platform-author="{{ site.author | default: site.platform.company_name | escape }}"
     data-platform-support-email="{{ site.platform.support_email | default: '' | escape }}"
     data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"
     data-sales-tax-rate="{{ site.pricing.sales_tax_rate | default: 0.07875 }}"
@@ -106,6 +107,7 @@
     data-shipping-fallback-flat-rate="{{ site.shipping.fallback_flat_rate | default: 3.00 }}"
     data-shipping-free-shipping-default="{{ site.shipping.free_shipping_default | default: false }}"
     data-shipping-presets="{{ site.shipping.presets | jsonify | escape }}"
+    data-add-ons="{{ site['add_ons'] | jsonify | escape }}"
     data-default-tip-percent="{{ site.pricing.default_tip_percent | default: 5 }}"
     data-max-tip-percent="{{ site.pricing.max_tip_percent | default: 15 }}"
     data-live-stats-cache-ttl-seconds="{{ site.cache.live_stats_ttl_seconds | default: 300 }}"
@@ -116,6 +118,7 @@
     data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"
     data-stripe-publishable-key="{{ site.checkout.stripe_publishable_key | default: '' }}"></script>
   <script src="/assets/js/logger.js" defer data-pool-logger-script="true"></script>
+  <script src="/assets/js/add-on-utils.js" defer></script>
   <script src="/assets/js/shipping-option-utils.js" defer></script>
   <script src="/assets/js/stripe-checkout-sidecar.js" defer></script>
   <script

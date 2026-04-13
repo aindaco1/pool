@@ -550,6 +550,12 @@
   }
 }
 
+.pledge-card__support-note {
+  margin: 0 0 8px;
+  @include type-meta;
+  color: $color--secondary;
+}
+
 .confirm-totals {
   display: flex;
   flex-direction: column;
@@ -671,6 +677,126 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+
+  &--addons {
+    margin-bottom: 12px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+
+    .support-option-item__input input:not(.qty-input) {
+      text-align: right;
+    }
+
+    .support-option-item__input {
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .support-option-item {
+      display: grid;
+      grid-template-columns: 96px minmax(0, 1fr) auto;
+      grid-template-areas: "media info input";
+      align-items: start;
+      gap: 16px 20px;
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .support-option-item__media {
+      grid-area: media;
+      align-self: start;
+    }
+
+    .support-option-item__info {
+      grid-area: info;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+      align-self: start;
+    }
+
+    .support-option-item__header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .support-option-item__header strong {
+      line-height: 1.1;
+    }
+
+    .support-option-item__amount--selected-addon {
+      margin: 0;
+      line-height: 1.2;
+      text-align: right;
+      align-self: start;
+    }
+
+    .support-option-item__input {
+      grid-area: input;
+      justify-self: end;
+      align-self: start;
+      margin-left: auto;
+    }
+
+    .support-option-item__input--no-variant {
+      display: grid;
+      gap: 10px;
+      justify-items: end;
+      align-content: center;
+    }
+
+    .support-option-item__input--no-variant .btn {
+      width: 100%;
+    }
+
+    .pool-first-party-cart__input--select {
+      width: min(180px, 100%);
+    }
+
+    .pool-first-party-cart__input--addon-qty {
+      width: 76px;
+      min-width: 76px;
+      min-height: 44px;
+    }
+
+    .tier-option__quantity {
+      margin-top: 0;
+      flex: 0 0 auto;
+    }
+
+    .btn {
+      flex: 0 0 auto;
+      min-height: 40px;
+    }
+
+    .support-option-item__input .qty-input {
+      text-align: center;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    @include xsm {
+      .support-option-item {
+        grid-template-columns: 96px minmax(0, 1fr);
+        grid-template-areas:
+          "media info"
+          "input input";
+      }
+
+      .support-option-item__input {
+        justify-self: stretch;
+        margin-left: 0;
+      }
+    }
+  }
   
   .support-option-item {
     display: flex;
@@ -680,11 +806,6 @@
     @include surface-card(16px);
     transition: all 0.2s;
     overflow: hidden;
-    
-    &--active {
-      border-color: $border--strong;
-      background: $surface--subtle;
-    }
     
     &__info {
       flex: 1;
@@ -697,13 +818,30 @@
         @include type-ui;
       }
     }
+
+    &__media {
+      flex: 0 0 72px;
+      width: 72px;
+      aspect-ratio: 1;
+      overflow: hidden;
+      border: 1px solid $border--default;
+      border-radius: 14px;
+      background: $surface--base;
+
+      img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+      }
+    }
     
     &__header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: baseline;
       gap: 8px;
-      margin-bottom: 8px;
+      margin-bottom: 0;
       
       @include xsm {
         flex-direction: column;
@@ -748,9 +886,13 @@
     
     &__current {
       @include type-meta;
-      color: $color--success;
+      color: $color--secondary;
       font-weight: 600;
       margin: 4px 0 0 0;
+    }
+
+    &__current--low-stock {
+      color: $color--danger-text;
     }
     
     &__input {
@@ -791,6 +933,21 @@
     @include xsm {
       flex-direction: column;
       align-items: stretch;
+
+      &__media {
+        width: 100%;
+        max-width: 96px;
+      }
     }
   }
+}
+
+.manage-addon-available {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid $border--default;
+}
+
+.manage-addon-available-grid .addon-product-card {
+  background: $surface--base;
 }

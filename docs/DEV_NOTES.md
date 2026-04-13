@@ -380,6 +380,13 @@ tiers:
 - optional `shipping_fallback_flat_rate` at the campaign level when a specific campaign needs a different flat fallback than the global deployment default
 - optional `shipping_options` at the campaign level for the limited backer-facing shipping policy set (`signature_required`, `adult_signature_required`)
 
+**Platform add-on products**: Global merch or upsell items now have a separate config path under `add_ons` in [/_config.yml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml). That catalog is intended for fixed-price platform-wide products with simple variants, like shirt sizes, and should not be modeled as campaign `support_items`. The Worker mirrors the catalog through [/api/add-ons.json](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/api/add-ons.json), exposes a current inventory snapshot through `/add-ons/inventory`, carries bundle-level add-on selections plus an anchor campaign through checkout, persists those anchor-bound add-ons on the pledge without counting them toward campaign-goal totals, and now exposes them separately in pledge and fulfillment exports. Cart and Manage Pledge both consume the same inventory-aware product-state logic, including low-stock messaging and sold-out variant filtering.
+
+- `category: digital` add-ons never contribute to shipping
+- `category: physical` add-ons participate in the same shipping calculator used for physical tiers and physical support items
+- physical add-ons can use `shipping_preset` for shared presets like `tshirt` and `sticker`
+- or they can define explicit `shipping.weight_oz`, `shipping.packaging_weight_oz`, `shipping.length_in`, `shipping.width_in`, `shipping.height_in`, and `shipping.stack_height_in`
+
 The first-party cart still carries the physical category through the checkout-intent payload, and future Worker-side shipping quotes will use the preset or explicit shipping measurements rather than a hardcoded flat-fee assumption.
 
 ### Production Phases

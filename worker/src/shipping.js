@@ -1,5 +1,6 @@
 import {
   getCampaignShippingFallbackFeeCents,
+  getShippingFallbackFeeCents,
   getShippingOriginCountry,
   getUspsApiBase,
   getUspsClientId,
@@ -86,6 +87,17 @@ export function getSupportItemShippingProfile(supportItem = {}) {
   );
 }
 
+export function getAddOnShippingProfile(addOn = {}) {
+  if (addOn?.category !== 'physical') {
+    return { valid: true, shipping: null };
+  }
+
+  return normalizeShippingProfile(
+    addOn?.shipping,
+    `Physical add-on "${addOn?.productId || addOn?.name || 'unknown'}"`
+  );
+}
+
 function normalizeShippingProfile(shipping, label) {
   if (!shipping || typeof shipping !== 'object') {
     return { valid: false, error: `${label} is missing shipping metadata` };
@@ -117,18 +129,25 @@ function normalizeShippingProfile(shipping, label) {
   };
 }
 
-export function summarizeShipmentFromTierSelection(tierSelection = { selectedTiers: [] }, supportItems = [], campaign = null) {
+export function summarizeShipmentFromTierSelection(
+  tierSelection = { selectedTiers: [] },
+  supportItems = [],
+  campaign = null,
+  bundleAddOns = []
+) {
   const shipment = {
     hasPhysical: false,
     physicalTierCount: 0,
     physicalSupportItemCount: 0,
+    physicalAddOnCount: 0,
     physicalUnitCount: 0,
     weightOz: 0,
     lengthIn: 0,
     widthIn: 0,
     heightIn: 0,
     tierIds: [],
-    supportItemIds: []
+    supportItemIds: [],
+    addOnIds: []
   };
 
   for (const selected of tierSelection?.selectedTiers || []) {
@@ -188,14 +207,45 @@ export function summarizeShipmentFromTierSelection(tierSelection = { selectedTie
     shipment.supportItemIds.push(supportItemId);
   }
 
+  for (const selected of bundleAddOns || []) {
+    const productId = typeof selected?.productId === 'string' ? selected.productId : '';
+    const quantity = Number(selected?.quantity || 0);
+    if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
+      return { valid: false, error: `Invalid quantity for add-on "${productId || 'unknown'}"` };
+    }
+    if (selected?.category !== 'physical') {
+      continue;
+    }
+
+    const profile = getAddOnShippingProfile(selected);
+    if (!profile.valid) {
+      return profile;
+    }
+
+    shipment.hasPhysical = true;
+    shipment.physicalAddOnCount += 1;
+    shipment.physicalUnitCount += quantity;
+    shipment.weightOz += (profile.shipping.weightOz * quantity) + profile.shipping.packagingWeightOz;
+    shipment.lengthIn = Math.max(shipment.lengthIn, profile.shipping.lengthIn);
+    shipment.widthIn = Math.max(shipment.widthIn, profile.shipping.widthIn);
+    shipment.heightIn += profile.shipping.heightIn + (profile.shipping.stackHeightIn * Math.max(0, quantity - 1));
+    shipment.addOnIds.push(productId);
+  }
+
   return { valid: true, shipment };
 }
 
-function summarizePhysicalSelectionWithoutMetadata(tierSelection = { selectedTiers: [] }, supportItems = [], campaign = null) {
+function summarizePhysicalSelectionWithoutMetadata(
+  tierSelection = { selectedTiers: [] },
+  supportItems = [],
+  campaign = null,
+  bundleAddOns = []
+) {
   const shipment = {
     hasPhysical: false,
     physicalTierCount: 0,
     physicalSupportItemCount: 0,
+    physicalAddOnCount: 0,
     physicalUnitCount: 0,
     weightOz: 0,
     lengthIn: 0,
@@ -203,6 +253,7 @@ function summarizePhysicalSelectionWithoutMetadata(tierSelection = { selectedTie
     heightIn: 0,
     tierIds: [],
     supportItemIds: [],
+    addOnIds: [],
     metadataIncomplete: true
   };
 
@@ -241,6 +292,20 @@ function summarizePhysicalSelectionWithoutMetadata(tierSelection = { selectedTie
     shipment.supportItemIds.push(supportItemId);
   }
 
+  for (const selected of bundleAddOns || []) {
+    const productId = typeof selected?.productId === 'string' ? selected.productId : '';
+    const quantity = Number(selected?.quantity || 0);
+    if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
+      return { valid: false, error: `Invalid quantity for add-on "${productId || 'unknown'}"` };
+    }
+    if (selected?.category !== 'physical') continue;
+
+    shipment.hasPhysical = true;
+    shipment.physicalAddOnCount += 1;
+    shipment.physicalUnitCount += quantity;
+    shipment.addOnIds.push(productId);
+  }
+
   return { valid: true, shipment };
 }
 
@@ -251,8 +316,14 @@ function isShippingMetadataError(error) {
 
 export function buildFallbackShippingQuote(env, destination, shipment, campaign = null) {
   const domestic = destination.country === getShippingOriginCountry(env);
+  const addOnOnlyShipment = shipment?.hasPhysical === true &&
+    Number(shipment?.physicalAddOnCount || 0) > 0 &&
+    Number(shipment?.physicalTierCount || 0) <= 0 &&
+    Number(shipment?.physicalSupportItemCount || 0) <= 0;
   return {
-    shippingCents: shipment.hasPhysical ? getCampaignShippingFallbackFeeCents(campaign, env) : 0,
+    shippingCents: shipment.hasPhysical
+      ? (addOnOnlyShipment ? getShippingFallbackFeeCents(env) : getCampaignShippingFallbackFeeCents(campaign, env))
+      : 0,
     source: shipment.hasPhysical ? 'fallback_flat_rate' : 'none',
     carrier: shipment.hasPhysical ? 'fallback' : null,
     service: shipment.hasPhysical
@@ -363,14 +434,22 @@ function buildStandardOnlyShippingOptions(shipment, shippingCents) {
   }];
 }
 
-export async function quoteCampaignShipment(env, campaign, tierSelection, destination, supportItems = [], selectedOption = SHIPPING_OPTION_STANDARD) {
-  const shipmentSummary = summarizeShipmentFromTierSelection(tierSelection, supportItems, campaign);
+export async function quoteCampaignShipment(
+  env,
+  campaign,
+  tierSelection,
+  destination,
+  supportItems = [],
+  selectedOption = SHIPPING_OPTION_STANDARD,
+  bundleAddOns = []
+) {
+  const shipmentSummary = summarizeShipmentFromTierSelection(tierSelection, supportItems, campaign, bundleAddOns);
   if (!shipmentSummary.valid) {
     if (!isShippingMetadataError(shipmentSummary.error)) {
       return shipmentSummary;
     }
 
-    const coarseShipmentSummary = summarizePhysicalSelectionWithoutMetadata(tierSelection, supportItems, campaign);
+    const coarseShipmentSummary = summarizePhysicalSelectionWithoutMetadata(tierSelection, supportItems, campaign, bundleAddOns);
     if (!coarseShipmentSummary.valid) {
       return coarseShipmentSummary;
     }

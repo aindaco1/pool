@@ -160,6 +160,225 @@
       return `${label} (+${formattedDelta})`;
     }
   };
+  const addOnUtils = window.PoolAddOnUtils || {
+    invalidateCachedInventory: function() {
+      try {
+        localStorage.removeItem('pool_add_on_inventory');
+      } catch (_error) {}
+    },
+    getCatalog: function(config) {
+      const source = config || {};
+      return {
+        enabled: source?.enabled === true,
+        products: Array.isArray(source?.products) ? source.products : []
+      };
+    },
+    findProduct: function(catalog, productId) {
+      return this.getCatalog(catalog).products.find((product) => String(product?.id || '') === String(productId || '')) || null;
+    },
+    findVariant: function(product, variantId) {
+      const variants = Array.isArray(product?.variants) ? product.variants : [];
+      return variants.find((variant) => String(variant?.id || '') === String(variantId || '')) || null;
+    },
+    getSelectionKey: function(selection) {
+      return `${String(selection?.productId || '').trim()}::${String(selection?.variantId || '').trim()}`;
+    },
+    getOptionLabel: function(option) {
+      return option?.variantLabel ? `${option.name} (${option.variantLabel})` : String(option?.name || '');
+    },
+    flattenCatalogOptions: function(config) {
+      const catalog = this.getCatalog(config);
+      return catalog.products.flatMap((product) => {
+        const variants = Array.isArray(product?.variants) ? product.variants : [];
+        if (variants.length === 0) {
+          return [{
+            productId: String(product?.id || ''),
+            variantId: '',
+            variantLabel: '',
+            key: `${String(product?.id || '')}::`,
+            name: String(product?.name || ''),
+            description: String(product?.description || ''),
+            imageUrl: String(product?.image_url || ''),
+            unitPrice: Math.round(Number(product?.price || 0) * 100),
+            category: String(product?.category || 'digital')
+          }];
+        }
+        return variants.map((variant) => ({
+          productId: String(product?.id || ''),
+          variantId: String(variant?.id || ''),
+          variantLabel: String(variant?.label || variant?.id || ''),
+          key: `${String(product?.id || '')}::${String(variant?.id || '')}`,
+          name: String(product?.name || ''),
+          description: String(product?.description || ''),
+          imageUrl: String(product?.image_url || ''),
+          unitPrice: Math.round(Number(product?.price || 0) * 100),
+          category: String(product?.category || 'digital')
+        }));
+      });
+    },
+    normalizeSelection: function(selection, config) {
+      const product = this.findProduct(config, selection?.productId);
+      if (!product) return null;
+      const quantity = Math.max(0, Number(selection?.quantity || 0));
+      if (!Number.isFinite(quantity) || quantity <= 0) return null;
+
+      const variants = Array.isArray(product?.variants) ? product.variants : [];
+      let variantId = String(selection?.variantId || '').trim();
+      let variantLabel = String(selection?.variantLabel || '').trim();
+      if (variants.length > 0) {
+        const variant = this.findVariant(product, variantId);
+        if (!variant) return null;
+        variantId = String(variant.id || '');
+        variantLabel = String(variant.label || variantId);
+      } else {
+        variantId = '';
+        variantLabel = '';
+      }
+
+      return {
+        productId: String(product.id || ''),
+        name: String(product.name || ''),
+        description: String(product.description || ''),
+        imageUrl: String(product.image_url || ''),
+        quantity,
+        unitPrice: Math.round(Number(product.price || 0) * 100),
+        category: String(product.category || 'digital'),
+        shipping_preset: product.shipping_preset || null,
+        shipping: product.shipping || null,
+        variantId,
+        variantLabel
+      };
+    },
+    normalizeSelections: function(selections, config) {
+      return (Array.isArray(selections) ? selections : [])
+        .map((selection) => this.normalizeSelection(selection, config))
+        .filter(Boolean)
+        .sort((a, b) => (
+          a.productId.localeCompare(b.productId) ||
+          a.variantId.localeCompare(b.variantId)
+        ));
+    },
+    buildSelectionEntries: function(selections, config) {
+      return this.normalizeSelections(selections, config).map((selection) => ({
+        productId: selection.productId,
+        variantId: selection.variantId,
+        variantLabel: selection.variantLabel,
+        quantity: Math.max(1, Number(selection.quantity || 1)),
+        category: selection.category || 'digital',
+        name: selection.name,
+        description: selection.description,
+        imageUrl: selection.imageUrl,
+        unitPrice: selection.unitPrice,
+        shipping: selection.shipping || null,
+        shipping_preset: selection.shipping_preset || null
+      }));
+    },
+    getSubtotal: function(selections, config) {
+      return this.buildSelectionEntries(selections, config).reduce((sum, selection) => (
+        sum + (Math.max(1, Number(selection.quantity || 1)) * Math.max(0, Number(selection.unitPrice || 0)))
+      ), 0);
+    },
+    haveSelectionsChanged: function(originalSelections, nextSelections, config) {
+      const original = this.buildSelectionEntries(originalSelections, config);
+      const next = this.buildSelectionEntries(nextSelections, config);
+      if (original.length !== next.length) return true;
+      return original.some((selection, index) => {
+        const other = next[index];
+        return !other ||
+          selection.productId !== other.productId ||
+          selection.variantId !== other.variantId ||
+          selection.quantity !== other.quantity;
+      });
+    }
+  };
+  if (typeof addOnUtils.getLowStockThreshold !== 'function') {
+    addOnUtils.getLowStockThreshold = function(config) {
+      return Math.max(0, Number(config?.low_stock_threshold ?? config?.lowStockThreshold ?? 5) || 5);
+    };
+  }
+  if (typeof addOnUtils.buildProductStateEntries !== 'function') {
+    addOnUtils.buildProductStateEntries = function(catalog, selections, inventorySnapshot) {
+      const resolvedCatalog = this.getCatalog(catalog);
+      const threshold = this.getLowStockThreshold(resolvedCatalog);
+      const selectedEntries = this.buildSelectionEntries(selections, resolvedCatalog);
+      const selectedByProduct = new Map();
+      selectedEntries.forEach((entry) => {
+        if (!selectedByProduct.has(entry.productId)) {
+          selectedByProduct.set(entry.productId, entry);
+        }
+      });
+
+      return resolvedCatalog.products.map((product) => {
+        const selected = selectedByProduct.get(String(product?.id || '')) || null;
+        const snapshot = inventorySnapshot?.products?.[product?.id] || {};
+        const variants = Array.isArray(product?.variants) ? product.variants : [];
+        const hasVariants = variants.length > 0;
+        const variantStates = variants.map((variant) => {
+          const variantId = String(variant?.id || '');
+          const variantSnapshot = snapshot?.variants?.[variantId] || {};
+          const configuredInventory = Number.isFinite(Number(variant?.inventory)) && Number(variant.inventory) >= 0 ? Math.round(Number(variant.inventory)) : null;
+          const remaining = variantSnapshot?.remaining === null || variantSnapshot?.remaining === undefined
+            ? configuredInventory
+            : (Number.isFinite(Number(variantSnapshot.remaining)) ? Math.max(0, Number(variantSnapshot.remaining)) : configuredInventory);
+          const selectedQuantity = selected?.variantId === variantId ? Math.max(1, Number(selected.quantity || 1)) : 0;
+          const maxQuantity = remaining;
+          const editableMaxQuantity = remaining === null ? null : remaining + selectedQuantity;
+          const available = maxQuantity === null ? true : maxQuantity > 0;
+          return {
+            id: variantId,
+            label: String(variant?.label || variantId),
+            inventory: configuredInventory,
+            sold: Math.max(0, Number(variantSnapshot?.sold || 0)),
+            remaining,
+            maxQuantity,
+            editableMaxQuantity,
+            selected: selected?.variantId === variantId,
+            available,
+            lowStock: available && maxQuantity !== null && maxQuantity <= threshold
+          };
+        }).filter((variant) => variant.available || variant.selected);
+
+        const defaultVariant = hasVariants
+          ? (variantStates.find((variant) => variant.selected) || variantStates[0] || null)
+          : null;
+        const configuredInventory = Number.isFinite(Number(product?.inventory)) && Number(product.inventory) >= 0 ? Math.round(Number(product.inventory)) : null;
+        const remaining = snapshot?.remaining === null || snapshot?.remaining === undefined
+          ? configuredInventory
+          : (Number.isFinite(Number(snapshot.remaining)) ? Math.max(0, Number(snapshot.remaining)) : configuredInventory);
+        const selectedQuantity = !hasVariants && selected ? Math.max(1, Number(selected.quantity || 1)) : 0;
+        const maxQuantity = hasVariants ? (defaultVariant?.maxQuantity ?? null) : remaining;
+        const editableMaxQuantity = hasVariants ? (defaultVariant?.editableMaxQuantity ?? null) : (remaining === null ? null : remaining + selectedQuantity);
+        const available = hasVariants ? variantStates.length > 0 : (maxQuantity === null ? true : maxQuantity > 0);
+
+        return {
+          productId: String(product?.id || ''),
+          name: String(product?.name || ''),
+          description: String(product?.description || ''),
+          imageUrl: String(product?.image_url || ''),
+          sourceUrl: String(product?.source_url || ''),
+          priceCents: Math.round(Number(product?.price || 0) * 100),
+          category: String(product?.category || 'digital'),
+          variantOptionName: String(product?.variant_option_name || 'Option'),
+          inventory: configuredInventory,
+          sold: Math.max(0, Number(snapshot?.sold || 0)),
+          remaining,
+          maxQuantity,
+          editableMaxQuantity,
+          available,
+          lowStock: !hasVariants && available && maxQuantity !== null && maxQuantity <= threshold,
+          selectedQuantity: Math.max(1, Number(selected?.quantity || 1)),
+          selectedVariantId: hasVariants ? String(selected?.variantId || defaultVariant?.id || '') : '',
+          selectedVariantLabel: hasVariants ? String(selected?.variantLabel || defaultVariant?.label || '') : '',
+          inCart: !!selected,
+          variants: variantStates
+        };
+      }).filter((product) => product.available || product.inCart);
+    };
+  }
+  const ADD_ON_CATALOG = addOnUtils.getCatalog(poolConfig.addOns);
+  const ADD_ON_OPTIONS = addOnUtils.flattenCatalogOptions(ADD_ON_CATALOG);
+  let addOnInventorySnapshot = null;
+  let addOnInventoryRequest = null;
 
   function getRuntimeMessage(path, fallback) {
     const parts = String(path || '').split('.');
@@ -299,6 +518,38 @@
     });
   }
 
+  function getPledgeAddTierState(pledge, campaign) {
+    const tiers = campaign?.tiers || [];
+    const entries = [];
+    const currentTierId = pledge?.tierId?.split('__').pop();
+    if (currentTierId) {
+      const tier = tiers.find((entry) => entry.id === currentTierId);
+      if (tier) {
+        entries.push({
+          id: currentTierId,
+          price: tier.price,
+          qty: pledge?.tierQty || 1,
+          pledgedQty: pledge?.tierQty || 1,
+          isPledged: true,
+          orderId: pledge?.orderIds ? pledge.orderIds[0] : pledge?.orderId
+        });
+      }
+    }
+    for (const addTier of pledge?.additionalTiers || []) {
+      const tier = tiers.find((entry) => entry.id === addTier.id);
+      if (!tier) continue;
+      entries.push({
+        id: addTier.id,
+        price: tier.price,
+        qty: addTier.qty || 1,
+        pledgedQty: addTier.qty || 1,
+        isPledged: true,
+        orderId: addTier.orderId || pledge?.orderIds?.[0] || pledge?.orderId
+      });
+    }
+    return entries;
+  }
+
   function buildSelectedSupportItemEntries(campaign, supportItems) {
     const campaignSupportItems = campaign?.support_items || [];
     return (Array.isArray(supportItems) ? supportItems : []).map((supportItem) => {
@@ -311,13 +562,374 @@
     }).filter((supportItem) => supportItem.amount > 0);
   }
 
-  function createShippingQuoteSignature(pledge, tierEntries, supportItemEntries) {
+  function normalizeTierEntrySnapshot(entries) {
+    return (Array.isArray(entries) ? entries : [])
+      .map((entry) => ({
+        id: String(entry?.id || ''),
+        qty: Math.max(1, Number(entry?.qty || 1)),
+        category: String(entry?.category || 'digital')
+      }))
+      .filter((entry) => entry.id)
+      .sort((a, b) => (
+        a.id.localeCompare(b.id) ||
+        a.qty - b.qty ||
+        a.category.localeCompare(b.category)
+      ));
+  }
+
+  function haveTierEntriesChanged(previousEntries, nextEntries) {
+    const previous = normalizeTierEntrySnapshot(previousEntries);
+    const next = normalizeTierEntrySnapshot(nextEntries);
+    if (previous.length !== next.length) return true;
+    return previous.some((entry, index) => {
+      const other = next[index];
+      return !other ||
+        entry.id !== other.id ||
+        entry.qty !== other.qty ||
+        entry.category !== other.category;
+    });
+  }
+
+  function normalizeManageBundleAddOns(bundleAddOns) {
+    return addOnUtils.normalizeSelections(bundleAddOns, ADD_ON_CATALOG);
+  }
+
+  function getManageAddOnSelectionKey(selection) {
+    return addOnUtils.getSelectionKey(selection);
+  }
+
+  function buildSelectedBundleAddOnEntries(bundleAddOns) {
+    return addOnUtils.buildSelectionEntries(bundleAddOns, ADD_ON_CATALOG);
+  }
+
+  function getManageAddOnOptionLabel(option) {
+    return addOnUtils.getOptionLabel(option);
+  }
+
+  function getManageBundleAddOnSubtotal(bundleAddOns) {
+    return addOnUtils.getSubtotal(bundleAddOns, ADD_ON_CATALOG);
+  }
+
+  function getManageAddOnProductCards(bundleAddOns) {
+    return addOnUtils.buildProductStateEntries
+      ? addOnUtils.buildProductStateEntries(ADD_ON_CATALOG, bundleAddOns, addOnInventorySnapshot)
+      : [];
+  }
+
+  function getManageAvailableAddOnProductCards(bundleAddOns) {
+    return getManageAddOnProductCards(bundleAddOns).filter((product) => !product.inCart);
+  }
+
+  function renderManageAddOnVariantOptions(product, selectedVariantId) {
+    return (product.variants || []).map((variant) => `
+      <option
+        value="${escapeAttribute(variant.id)}"
+        data-max-quantity="${escapeAttribute(String(Math.max(1, Number(variant.maxQuantity ?? 1))))}"
+        data-editable-max-quantity="${escapeAttribute(String(Math.max(1, Number(variant.editableMaxQuantity ?? variant.maxQuantity ?? 1))))}"
+        data-remaining="${escapeAttribute(String(Number.isFinite(Number(variant.remaining)) ? Number(variant.remaining) : ''))}"
+        data-low-stock="${variant.lowStock ? 'true' : 'false'}"
+        ${variant.id === selectedVariantId ? ' selected' : ''}
+      >
+        ${escapeHtml(variant.label)}
+      </option>
+    `).join('');
+  }
+
+  function getManageAddOnStockCopy(product, variant) {
+    const count = variant
+      ? (Number.isFinite(Number(variant.remaining)) ? Number(variant.remaining) : variant.maxQuantity)
+      : (Number.isFinite(Number(product.remaining)) ? Number(product.remaining) : product.maxQuantity);
+    if (!Number.isFinite(Number(count)) || Number(count) <= 0) return '';
+    const isLowStock = variant?.lowStock || product?.lowStock;
+    return getRuntimeMessage(
+      isLowStock ? 'manage.addOnLowStock' : 'manage.addOnStock',
+      isLowStock ? 'Only %{count} left' : '%{count} left'
+    ).replace('%{count}', String(count));
+  }
+
+  function renderManageSelectedAddOnRows(bundleAddOns) {
+    const selections = buildSelectedBundleAddOnEntries(bundleAddOns);
+    if (selections.length === 0) {
+      return '';
+    }
+
+    return `
+      <div class="support-options support-options--addons" data-manage-selected-addons>
+        ${selections.map((selection) => {
+          const product = addOnUtils.findProduct(ADD_ON_CATALOG, selection.productId);
+          if (!product) return '';
+          const imageUrl = String(selection.imageUrl || product.image_url || '').trim();
+          const selectedVariant = selection.variantId ? addOnUtils.findVariant(product, selection.variantId) : null;
+          const cardState = getManageAddOnProductCards(bundleAddOns).find((entry) => entry.productId === selection.productId) || null;
+          const effectiveVariant = selection.variantId
+            ? (cardState?.variants || []).find((variant) => variant.id === selection.variantId) || selectedVariant
+            : null;
+          const inputClasses = [
+            'support-option-item__input',
+            Array.isArray(product.variants) && product.variants.length > 0
+              ? 'support-option-item__input--with-variant'
+              : 'support-option-item__input--no-variant'
+          ].filter(Boolean).join(' ');
+          const maxQuantity = Math.max(1, Number(effectiveVariant?.maxQuantity ?? cardState?.maxQuantity ?? selection.quantity ?? 1));
+          const stockCopy = getManageAddOnStockCopy(cardState || product, effectiveVariant);
+          const stockClass = [
+            'support-option-item__current',
+            (effectiveVariant?.lowStock || cardState?.lowStock) ? 'support-option-item__current--low-stock' : ''
+          ].filter(Boolean).join(' ');
+          return `
+            <div class="support-option-item" data-manage-selected-addon="${escapeAttribute(getManageAddOnSelectionKey(selection))}">
+              ${imageUrl ? `
+                <div class="support-option-item__media">
+                  <img src="${escapeAttribute(imageUrl)}" alt="" loading="lazy" decoding="async">
+                </div>
+              ` : ''}
+              <div class="support-option-item__info">
+                <div class="support-option-item__header">
+                  <strong>${escapeHtml(getManageAddOnOptionLabel(selection))}</strong>
+                  <span class="support-option-item__amount support-option-item__amount--selected-addon">${formatMoney(selection.unitPrice * selection.quantity)}</span>
+                </div>
+                ${selection.description ? `<p class="support-option-item__desc">${escapeHtml(selection.description)}</p>` : ''}
+                ${stockCopy ? `<p class="${stockClass}">${escapeHtml(stockCopy)}</p>` : ''}
+              </div>
+              <div class="${inputClasses}">
+                ${Array.isArray(product.variants) && product.variants.length > 0 ? `
+                  <select
+                    class="pool-first-party-cart__input pool-first-party-cart__input--select"
+                    aria-label="${escapeAttribute(product.variant_option_name || getRuntimeMessage('manage.addOnVariant', 'Variation'))}"
+                    data-manage-selected-addon-variant
+                    data-addon-product-id="${escapeAttribute(selection.productId)}"
+                  >
+                    ${renderManageAddOnVariantOptions(cardState || product, selection.variantId || '')}
+                  </select>
+                ` : ''}
+                <div class="tier-option__quantity">
+                  <button
+                    type="button"
+                    class="qty-btn qty-minus"
+                    data-manage-selected-addon-adjust="-1"
+                    data-addon-product-id="${escapeAttribute(selection.productId)}"
+                    aria-label="${escapeAttribute(getRuntimeMessage('manage.decrease', 'Decrease'))}"
+                  >−</button>
+                  <input
+                    class="qty-input"
+                    type="number"
+                    min="1"
+                    max="${escapeAttribute(String(maxQuantity))}"
+                    step="1"
+                    aria-label="${escapeAttribute(getRuntimeMessage('cart.quantity', 'Quantity'))}"
+                    value="${escapeAttribute(String(Math.min(maxQuantity, Math.max(1, Number(selection.quantity || 1)))))}"
+                    data-manage-selected-addon-quantity
+                    data-addon-product-id="${escapeAttribute(selection.productId)}"
+                  >
+                  <button
+                    type="button"
+                    class="qty-btn qty-plus"
+                    data-manage-selected-addon-adjust="1"
+                    data-addon-product-id="${escapeAttribute(selection.productId)}"
+                    aria-label="${escapeAttribute(getRuntimeMessage('manage.increase', 'Increase'))}"
+                  >+</button>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn--secondary"
+                  data-manage-selected-addon-remove
+                  data-addon-product-id="${escapeAttribute(selection.productId)}"
+                >${escapeHtml(getRuntimeMessage('manage.removeAddOn', 'Remove'))}</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function syncManageSelectedAddOnRowState(card, productId) {
+    if (!(card instanceof HTMLElement)) return;
+    const variantField = Array.from(card.querySelectorAll('[data-manage-selected-addon-variant]'))
+      .find((field) => String(field.dataset.addonProductId || '') === productId);
+    const quantityField = Array.from(card.querySelectorAll('[data-manage-selected-addon-quantity]'))
+      .find((field) => String(field.dataset.addonProductId || '') === productId);
+    if (!(quantityField instanceof HTMLInputElement)) return;
+
+    if (!(variantField instanceof HTMLSelectElement)) {
+      const fallbackMax = Math.max(1, parseInt(quantityField.getAttribute('max') || '1', 10) || 1);
+      const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
+      quantityField.max = String(fallbackMax);
+      quantityField.value = String(Math.min(fallbackMax, currentQuantity));
+      return;
+    }
+
+    const selectedOption = Array.from(variantField.options || []).find((option) => option.value === variantField.value)
+      || variantField.selectedOptions?.[0]
+      || variantField.options?.[variantField.selectedIndex]
+      || null;
+    const maxQuantity = Math.max(1, parseInt(selectedOption?.getAttribute('data-max-quantity') || '1', 10) || 1);
+    const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
+    quantityField.max = String(maxQuantity);
+    quantityField.value = String(Math.min(maxQuantity, currentQuantity));
+  }
+
+  function renderManageAvailableAddOnCards(bundleAddOns, index) {
+    const productCards = getManageAvailableAddOnProductCards(bundleAddOns);
+    if (productCards.length === 0) {
+      return '';
+    }
+
+    return `
+      <div class="addon-product-grid manage-addon-available-grid">
+        ${productCards.map((product) => {
+          const selectedVariant = product.variants?.find((variant) => variant.id === product.selectedVariantId) || product.variants?.[0] || null;
+          const maxQuantity = Math.max(1, Number(selectedVariant?.maxQuantity ?? product.maxQuantity ?? 1));
+          const stockCopy = getManageAddOnStockCopy(product, selectedVariant);
+          const stockClass = (selectedVariant?.lowStock || product.lowStock)
+            ? 'addon-product-card__status addon-product-card__status--block addon-product-card__status--low-stock'
+            : 'addon-product-card__status addon-product-card__status--block';
+          const controlClasses = [
+            'addon-product-card__controls',
+            product.variants?.length ? 'addon-product-card__controls--with-variant' : ''
+          ].filter(Boolean).join(' ');
+          return `
+            <article class="addon-product-card" data-manage-addon-product="${escapeAttribute(product.productId)}" data-manage-addon-active="false">
+              ${product.imageUrl ? `
+                <div class="addon-product-card__media">
+                  <img class="addon-product-card__image" src="${escapeAttribute(product.imageUrl)}" alt="" loading="lazy" decoding="async">
+                </div>
+              ` : ''}
+              <div class="addon-product-card__main">
+                <div class="addon-product-card__header">
+                  <strong class="addon-product-card__name">${escapeHtml(product.name)}</strong>
+                  <span class="addon-product-card__price">${formatMoney(product.priceCents || 0)}</span>
+                </div>
+                ${product.description ? `<p class="addon-product-card__description">${escapeHtml(product.description)}</p>` : ''}
+              </div>
+              <p class="${stockClass}" data-manage-addon-status aria-live="polite" ${stockCopy ? '' : 'hidden'}>${escapeHtml(stockCopy)}</p>
+              <div class="${controlClasses}">
+                ${product.variants?.length ? `
+                  <div class="addon-product-card__field addon-product-card__field--variant">
+                    <select
+                      id="manage-addon-variant-${index}-${escapeAttribute(product.productId)}"
+                      class="pool-first-party-cart__input pool-first-party-cart__input--select"
+                      aria-label="${escapeAttribute(product.variantOptionName || getRuntimeMessage('manage.addOnVariant', 'Variation'))}"
+                      data-manage-addon-variant
+                      data-addon-product-id="${escapeAttribute(product.productId)}"
+                    >
+                      ${renderManageAddOnVariantOptions(product, selectedVariant?.id || '')}
+                    </select>
+                  </div>
+                ` : ''}
+                <div class="addon-product-card__field addon-product-card__field--qty">
+                  <input
+                    id="manage-addon-qty-${index}-${escapeAttribute(product.productId)}"
+                    class="pool-first-party-cart__input pool-first-party-cart__input--addon-qty"
+                    type="number"
+                    min="1"
+                    max="${escapeAttribute(String(maxQuantity))}"
+                    step="1"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    aria-label="${escapeAttribute(getRuntimeMessage('cart.quantity', 'Quantity'))}"
+                    value="${escapeAttribute(String(Math.min(maxQuantity, Math.max(1, Number(product.selectedQuantity || 1)))))}"
+                    data-manage-addon-quantity
+                    data-addon-product-id="${escapeAttribute(product.productId)}"
+                  >
+                </div>
+              </div>
+              <div class="addon-product-card__footer">
+                <button
+                  type="button"
+                  class="btn btn--secondary addon-product-card__button"
+                  data-manage-addon-add
+                  data-addon-product-id="${escapeAttribute(product.productId)}"
+                >${escapeHtml(getRuntimeMessage('manage.addAddOn', 'Add'))}</button>
+              </div>
+            </article>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function renderManageAddOnSection(index, bundleAddOns) {
+    if (!ADD_ON_CATALOG.enabled || ADD_ON_OPTIONS.length === 0) {
+      return '';
+    }
+
+    const supportNote = getRuntimeMessage(
+      'manage.platformAddOnsNote',
+      'These add-ons support %{author} and do not count toward the campaign total.'
+    ).replace('%{author}', getPlatformAuthorName());
+    const selectedMarkup = renderManageSelectedAddOnRows(bundleAddOns);
+    const availableMarkup = renderManageAvailableAddOnCards(bundleAddOns, index);
+    if (!selectedMarkup && !availableMarkup) {
+      return '';
+    }
+
+    return `
+      <div class="pledge-card__support" id="add-on-section-${index}">
+        <h2>${escapeHtml(getRuntimeMessage('manage.platformAddOns', 'Add-ons').replace('%{platform}', PLATFORM_NAME))}</h2>
+        <p class="pledge-card__support-note">${escapeHtml(supportNote)}</p>
+        ${selectedMarkup}
+        ${availableMarkup ? `<div class="manage-addon-available">${availableMarkup}</div>` : ''}
+      </div>
+    `;
+  }
+
+  function syncManageAddOnCardVariantState(card) {
+    if (!(card instanceof HTMLElement)) return;
+    const variantField = card.querySelector('[data-manage-addon-variant]');
+    const quantityField = card.querySelector('[data-manage-addon-quantity]');
+    const statusField = card.querySelector('[data-manage-addon-status]');
+    if (!(quantityField instanceof HTMLInputElement)) return;
+    if (!(variantField instanceof HTMLSelectElement)) {
+      const fallbackMax = Math.max(1, parseInt(quantityField.getAttribute('max') || '1', 10) || 1);
+      const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
+      quantityField.max = String(fallbackMax);
+      quantityField.value = String(Math.min(fallbackMax, currentQuantity));
+      return;
+    }
+
+    const selectedOption = Array.from(variantField.options || []).find((option) => option.value === variantField.value)
+      || variantField.selectedOptions?.[0]
+      || variantField.options?.[variantField.selectedIndex]
+      || null;
+    const maxQuantity = Math.max(1, parseInt(selectedOption?.getAttribute('data-max-quantity') || '1', 10) || 1);
+    const remaining = parseInt(selectedOption?.getAttribute('data-remaining') || '', 10);
+    const isLowStock = selectedOption?.getAttribute('data-low-stock') === 'true';
+    const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
+    quantityField.max = String(maxQuantity);
+    quantityField.value = String(Math.min(maxQuantity, currentQuantity));
+
+    if (!(statusField instanceof HTMLElement)) return;
+    if (Number.isFinite(remaining) && remaining > 0) {
+      statusField.hidden = false;
+      statusField.textContent = getRuntimeMessage(
+        isLowStock ? 'manage.addOnLowStock' : 'manage.addOnStock',
+        isLowStock ? 'Only %{count} left' : '%{count} left'
+      ).replace('%{count}', String(remaining));
+      statusField.classList.toggle('addon-product-card__status--low-stock', isLowStock);
+    } else {
+      statusField.hidden = true;
+      statusField.textContent = '';
+      statusField.classList.remove('addon-product-card__status--low-stock');
+    }
+  }
+
+  function haveManageBundleAddOnsChanged(originalBundleAddOns, selectedBundleAddOns) {
+    return addOnUtils.haveSelectionsChanged(originalBundleAddOns, selectedBundleAddOns, ADD_ON_CATALOG);
+  }
+
+  function createShippingQuoteSignature(pledge, tierEntries, supportItemEntries, bundleAddOnEntries) {
     const address = getPledgeShippingQuoteAddress(pledge);
     return JSON.stringify({
       campaignSlug: pledge?.campaignSlug || '',
       address,
       tiers: (tierEntries || []).map((tier) => ({ id: tier.id, qty: tier.qty })),
-      supportItems: (supportItemEntries || []).map((supportItem) => ({ id: supportItem.id, amount: supportItem.amount }))
+      supportItems: (supportItemEntries || []).map((supportItem) => ({ id: supportItem.id, amount: supportItem.amount })),
+      bundleAddOns: (bundleAddOnEntries || []).map((addOn) => ({
+        productId: addOn.productId,
+        variantId: addOn.variantId || '',
+        quantity: addOn.quantity
+      }))
     });
   }
 
@@ -337,18 +949,20 @@
     return shippingOptionUtils.formatChoice(option, getManageShippingOptionLabel, formatMoney);
   }
 
-  function resolveManageShippingQuoteResult(payload, selectedShippingOption) {
-    return shippingOptionUtils.resolveQuote(payload, selectedShippingOption, 0);
+  function resolveManageShippingQuoteResult(payload, selectedShippingOption, fallbackShippingCents = 0) {
+    return shippingOptionUtils.resolveQuote(payload, selectedShippingOption, fallbackShippingCents);
   }
 
   function shouldShowManageShippingOptions(quotedQuote) {
     return shippingOptionUtils.shouldShowOptions(quotedQuote);
   }
 
-  async function fetchQuotedShippingQuote(pledge, campaign, tierEntries, supportItemEntries, selectedShippingOption = null) {
+  async function fetchQuotedShippingQuote(pledge, campaign, tierEntries, supportItemEntries, bundleAddOnEntries = [], selectedShippingOption = null) {
     const hasPhysical =
       (tierEntries || []).some((tier) => tier.category === 'physical') ||
-      (supportItemEntries || []).some((supportItem) => supportItem.category === 'physical');
+      (supportItemEntries || []).some((supportItem) => supportItem.category === 'physical') ||
+      (bundleAddOnEntries || []).some((addOn) => addOn.category === 'physical');
+    const fallbackShippingCents = getFallbackShippingCentsForPledge(pledge, campaign, true);
     if (!hasPhysical) {
       return {
         shippingCents: 0,
@@ -362,7 +976,7 @@
     const address = getPledgeShippingQuoteAddress(pledge);
     if (!address) {
       return {
-        shippingCents: getFallbackShippingCentsForPledge(pledge, campaign, true),
+        shippingCents: fallbackShippingCents,
         source: 'fallback_flat_rate',
         availableOptions: [],
         defaultOption: 'standard',
@@ -370,10 +984,10 @@
       };
     }
 
-    const signature = createShippingQuoteSignature(pledge, tierEntries, supportItemEntries);
+    const signature = createShippingQuoteSignature(pledge, tierEntries, supportItemEntries, bundleAddOnEntries);
     const cached = shippingQuoteState.get(signature);
     if (cached && Number.isFinite(cached.shippingCents)) {
-      return resolveManageShippingQuoteResult(cached, selectedShippingOption);
+      return resolveManageShippingQuoteResult(cached, selectedShippingOption, fallbackShippingCents);
     }
 
     const items = tierEntries.map((tier) => ({
@@ -382,6 +996,11 @@
     })).concat((supportItemEntries || []).map((supportItem) => ({
       id: `${pledge.campaignSlug}__support__${supportItem.id}`,
       amount: supportItem.amount
+    }))).concat((bundleAddOnEntries || []).map((addOn) => ({
+      id: addOn.variantId
+        ? `addon__${addOn.productId}__variant__${addOn.variantId}`
+        : `addon__${addOn.productId}`,
+      quantity: addOn.quantity
     })));
 
     try {
@@ -391,7 +1010,8 @@
         body: JSON.stringify({
           campaignSlug: pledge.campaignSlug,
           items,
-          shippingAddress: address
+          shippingAddress: address,
+          bundleAddOnAnchorCampaignSlug: pledge.campaignSlug
         })
       });
 
@@ -401,10 +1021,10 @@
 
       const data = await response.json();
       shippingQuoteState.set(signature, data);
-      return resolveManageShippingQuoteResult(data, selectedShippingOption);
+      return resolveManageShippingQuoteResult(data, selectedShippingOption, fallbackShippingCents);
     } catch (_error) {
       return {
-        shippingCents: getFallbackShippingCentsForPledge(pledge, campaign, true),
+        shippingCents: fallbackShippingCents,
         source: 'fallback_flat_rate',
         availableOptions: [],
         defaultOption: 'standard',
@@ -614,6 +1234,7 @@
           ...pledge,
           orderIds: [pledge.orderId],
           supportItems: pledge.supportItems ? pledge.supportItems.map((s) => ({ ...s })) : [],
+          bundleAddOns: normalizeManageBundleAddOns(pledge.bundleAddOns || []),
           additionalTiers: []
         };
 
@@ -689,6 +1310,21 @@
         }
 
         merged.customAmount = (merged.customAmount || 0) + (pledge.customAmount || 0);
+        if (pledge.bundleAddOns) {
+          const nextSelections = normalizeManageBundleAddOns(merged.bundleAddOns || [])
+            .concat(normalizeManageBundleAddOns(pledge.bundleAddOns || []));
+          const mergedByKey = new Map();
+          nextSelections.forEach((selection) => {
+            const key = getManageAddOnSelectionKey(selection);
+            const existing = mergedByKey.get(key);
+            if (existing) {
+              existing.quantity += selection.quantity || 0;
+            } else {
+              mergedByKey.set(key, { ...selection });
+            }
+          });
+          merged.bundleAddOns = Array.from(mergedByKey.values());
+        }
 
         const statusPriority = { cancelled: 0, payment_failed: 1, charged: 2, active: 3 };
         if (statusPriority[pledge.pledgeStatus] < statusPriority[merged.pledgeStatus]) {
@@ -713,6 +1349,7 @@
         subtotal: merged.subtotal || 0,
         tipAmount: merged.tipAmount || 0
       });
+      merged.bundleAddOnSubtotal = getManageBundleAddOnSubtotal(merged.bundleAddOns || []);
       return merged;
     });
 
@@ -981,11 +1618,63 @@
     } catch (_error) {}
   }
 
+  function getPlatformAuthorName() {
+    return String(
+      poolConfig?.platform?.author ||
+      poolConfig?.platformAuthor ||
+      poolConfig?.platform?.companyName ||
+      poolConfig?.platformCompanyName ||
+      PLATFORM_NAME
+    ).trim() || PLATFORM_NAME;
+  }
+
+  async function fetchManageAddOnInventorySnapshot(options) {
+    const force = options?.force === true;
+    if (!force && addOnInventorySnapshot) {
+      return addOnInventorySnapshot;
+    }
+
+    if (!force) {
+      const cached = readCachedValue('pool_add_on_inventory', LIVE_INVENTORY_CACHE_TTL_MS);
+      if (cached) {
+        addOnInventorySnapshot = cached;
+        return cached;
+      }
+    }
+
+    try {
+      const res = await fetch(`${WORKER_BASE}/add-ons/inventory`);
+      if (!res.ok) {
+        throw new Error(`Failed to load add-on inventory (${res.status})`);
+      }
+      const data = await res.json();
+      addOnInventorySnapshot = data;
+      writeCachedValue('pool_add_on_inventory', data);
+      return data;
+    } catch (_error) {
+      return addOnInventorySnapshot || {
+        lowStockThreshold: addOnUtils.getLowStockThreshold(ADD_ON_CATALOG),
+        products: {}
+      };
+    }
+  }
+
+  function ensureManageAddOnInventorySnapshot() {
+    if (addOnInventoryRequest) return addOnInventoryRequest;
+    addOnInventoryRequest = fetchManageAddOnInventorySnapshot().finally(() => {
+      addOnInventoryRequest = null;
+    });
+    return addOnInventoryRequest;
+  }
+
   function invalidateCampaignCaches(campaignSlug) {
     if (!campaignSlug) return;
 
     delete liveStats[campaignSlug];
     delete liveInventory[campaignSlug];
+    addOnInventorySnapshot = null;
+    addOnInventoryRequest = null;
+    addOnUtils.invalidateCachedInventory();
 
     try {
       localStorage.removeItem(`pool_stats_${campaignSlug}`);
@@ -1633,6 +2322,7 @@
 
     const campaignSlugs = [...new Set(pledges.map((pledge) => pledge.campaignSlug))];
     await Promise.all([
+      ensureManageAddOnInventorySnapshot(),
       ...campaignSlugs.map((slug) => fetchLiveInventory(slug)),
       ...campaignSlugs.map((slug) => fetchLiveStats(slug))
     ]);
@@ -1719,6 +2409,7 @@
 
     let tiersHtml = '';
     let supportItemsHtml = '';
+    let addOnsHtml = '';
     let customAmountHtml = '';
     let tipHtml = '';
     let actionsHtml = '';
@@ -1891,6 +2582,11 @@
       `;
     }
 
+    if (isActive && ADD_ON_CATALOG.enabled && ADD_ON_OPTIONS.length > 0) {
+      const pledgedAddOns = normalizeManageBundleAddOns(pledge.bundleAddOns || []);
+      addOnsHtml = renderManageAddOnSection(index, pledgedAddOns);
+    }
+
     const currentCustomAmount = pledge.customAmount || 0;
     if (isActive && (isLive || (isPost && allowsCustomLateSupport && campaignFunded))) {
       customAmountHtml = `
@@ -2026,6 +2722,7 @@
 
         ${tiersHtml}
         ${supportItemsHtml}
+        ${addOnsHtml}
         ${customAmountHtml}
 
         <div class="pledge-card__financials">
@@ -2103,8 +2800,10 @@
     const currentTierId = pledge.tierId?.split('__').pop();
     const currentCustomAmountVal = pledge.customAmount || 0;
     const currentTipPercent = getPledgeTipPercent(pledge);
+    const currentBundleAddOns = buildSelectedBundleAddOnEntries(pledge.bundleAddOns || []);
     let selectedTierId = currentTierId;
     let selectedSupportItems = [];
+    let selectedBundleAddOns = currentBundleAddOns.map((selection) => ({ ...selection }));
     let selectedCustomAmount = currentCustomAmountVal;
     let selectedTipPercent = currentTipPercent;
     let selectedShippingOption = String(pledge.shippingOption || 'standard').trim().toLowerCase() || 'standard';
@@ -2154,6 +2853,7 @@
           selectedTierId,
           selectedTierQty,
           selectedSupportItems,
+          selectedBundleAddOns,
           selectedCustomAmount,
           currentCustomAmountVal,
           selectedTipPercent,
@@ -2169,6 +2869,7 @@
         null,
         selectedAddTiers,
         selectedSupportItems,
+        selectedBundleAddOns,
         selectedCustomAmount,
         currentCustomAmountVal,
         selectedTipPercent,
@@ -2217,19 +2918,21 @@
         }
       }
 
-      card.querySelectorAll('.qty-btn').forEach((btn) => {
+      card.querySelectorAll('.qty-btn[data-tier]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          const tierId = e.target.dataset.tier;
+          const tierId = e.currentTarget?.dataset?.tier;
+          if (!tierId) return;
           selectTierById(tierId);
           const input = card.querySelector(`.qty-input[data-tier="${tierId}"]`);
+          if (!(input instanceof HTMLInputElement)) return;
           const max = parseInt(input.max, 10) || 10;
           const val = parseInt(input.value, 10) || 1;
 
-          if (e.target.classList.contains('qty-minus') && val > 1) {
+          if (e.currentTarget.classList.contains('qty-minus') && val > 1) {
             input.value = String(val - 1);
-          } else if (e.target.classList.contains('qty-plus') && val < max) {
+          } else if (e.currentTarget.classList.contains('qty-plus') && val < max) {
             input.value = String(val + 1);
           }
 
@@ -2238,7 +2941,7 @@
         });
       });
 
-      card.querySelectorAll('.qty-input').forEach((input) => {
+      card.querySelectorAll('.qty-input[data-tier]').forEach((input) => {
         input.addEventListener('click', (e) => e.stopPropagation());
         input.addEventListener('change', (e) => {
           const tierId = e.target.dataset.tier;
@@ -2281,19 +2984,21 @@
         }
       }
 
-      card.querySelectorAll('.qty-btn').forEach((btn) => {
+      card.querySelectorAll('.qty-btn[data-tier]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
 
-          const tierId = e.target.dataset.tier;
+          const tierId = e.currentTarget?.dataset?.tier;
+          if (!tierId) return;
           const input = card.querySelector(`.qty-input[data-tier="${tierId}"]`);
+          if (!(input instanceof HTMLInputElement)) return;
           const max = parseInt(input.max, 10) || 10;
           const val = parseInt(input.value, 10) || 1;
 
-          if (e.target.classList.contains('qty-minus') && val > 1) {
+          if (e.currentTarget.classList.contains('qty-minus') && val > 1) {
             input.value = String(val - 1);
-          } else if (e.target.classList.contains('qty-plus') && val < max) {
+          } else if (e.currentTarget.classList.contains('qty-plus') && val < max) {
             input.value = String(val + 1);
           }
 
@@ -2302,7 +3007,7 @@
         });
       });
 
-      card.querySelectorAll('.qty-input').forEach((input) => {
+      card.querySelectorAll('.qty-input[data-tier]').forEach((input) => {
         input.addEventListener('click', (e) => e.stopPropagation());
         input.addEventListener('change', (e) => {
           const tierId = e.target.dataset.tier;
@@ -2366,6 +3071,153 @@
         refreshSummary();
       });
     });
+
+    function upsertSelectedBundleAddOn(productId, variantId, quantity) {
+      selectedBundleAddOns = selectedBundleAddOns.filter((selection) => selection.productId !== productId);
+      if (quantity > 0) {
+        selectedBundleAddOns.push({ productId, variantId, quantity });
+      }
+      refreshSummary();
+    }
+    function rerenderManageAddOnSection() {
+      const nextMarkup = renderManageAddOnSection(index, selectedBundleAddOns);
+      const currentSection = card.querySelector(`#add-on-section-${index}`);
+      if (nextMarkup) {
+        if (currentSection) {
+          currentSection.outerHTML = nextMarkup;
+        } else {
+          const financialsSection = card.querySelector('.pledge-card__financials');
+          if (financialsSection instanceof HTMLElement) {
+            financialsSection.insertAdjacentHTML('beforebegin', nextMarkup);
+          }
+        }
+      } else if (currentSection) {
+        currentSection.remove();
+      }
+      bindManageAddOnControls();
+    }
+
+    function bindManageAddOnControls() {
+      const findSelectedVariantField = function(productId) {
+        return Array.from(card.querySelectorAll('[data-manage-selected-addon-variant]'))
+          .find((field) => String(field.dataset.addonProductId || '') === productId) || null;
+      };
+
+      const findSelectedQuantityField = function(productId) {
+        return Array.from(card.querySelectorAll('[data-manage-selected-addon-quantity]'))
+          .find((field) => String(field.dataset.addonProductId || '') === productId) || null;
+      };
+
+      card.querySelectorAll('[data-manage-addon-variant]').forEach((select) => {
+        select.addEventListener('change', (event) => {
+          const field = event.target;
+          const cardNode = field.closest('[data-manage-addon-product]');
+          const quantityField = cardNode?.querySelector('[data-manage-addon-quantity]');
+          syncManageAddOnCardVariantState(cardNode);
+          if (quantityField instanceof HTMLInputElement) {
+            const nextQuantity = Math.min(
+              Math.max(1, parseInt(quantityField.max, 10) || 1),
+              Math.max(1, parseInt(quantityField.value, 10) || 1)
+            );
+            quantityField.value = String(nextQuantity);
+          }
+        });
+      });
+
+      card.querySelectorAll('[data-manage-addon-quantity]').forEach((input) => {
+        input.addEventListener('input', (event) => {
+          const field = event.target;
+          const quantity = Math.max(1, parseInt(field.value, 10) || 1);
+          const maxQuantity = Math.max(1, parseInt(field.max, 10) || quantity);
+          const clampedQuantity = Math.min(maxQuantity, quantity);
+          if (String(clampedQuantity) !== String(field.value || '')) {
+            field.value = String(clampedQuantity);
+          }
+        });
+      });
+
+      card.querySelectorAll('[data-manage-addon-add]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const productId = String(button.getAttribute('data-addon-product-id') || '');
+          const cardNode = button.closest('[data-manage-addon-product]');
+          const variantField = cardNode?.querySelector('[data-manage-addon-variant]');
+          const quantityField = cardNode?.querySelector('[data-manage-addon-quantity]');
+          const variantId = variantField instanceof HTMLSelectElement ? String(variantField.value || '') : '';
+          const quantity = quantityField instanceof HTMLInputElement
+            ? Math.min(
+                Math.max(1, parseInt(quantityField.max, 10) || 1),
+                Math.max(1, parseInt(quantityField.value, 10) || 1)
+              )
+            : 1;
+          upsertSelectedBundleAddOn(productId, variantId, quantity);
+          rerenderManageAddOnSection();
+        });
+      });
+
+      card.querySelectorAll('[data-manage-selected-addon-quantity]').forEach((input) => {
+        input.addEventListener('input', (event) => {
+          const field = event.target;
+          const quantity = Math.max(1, parseInt(field.value, 10) || 1);
+          const maxQuantity = Math.max(1, parseInt(field.max, 10) || quantity);
+          const clampedQuantity = Math.min(maxQuantity, quantity);
+          if (String(clampedQuantity) !== String(field.value || '')) {
+            field.value = String(clampedQuantity);
+          }
+          const productId = String(field.dataset.addonProductId || '');
+          const variantField = findSelectedVariantField(productId);
+          const variantId = variantField instanceof HTMLSelectElement ? String(variantField.value || '') : '';
+          upsertSelectedBundleAddOn(productId, variantId, clampedQuantity);
+          rerenderManageAddOnSection();
+        });
+      });
+
+      card.querySelectorAll('[data-manage-selected-addon-adjust]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+          const trigger = event.currentTarget;
+          const productId = String(trigger.getAttribute('data-addon-product-id') || '');
+          const quantityField = findSelectedQuantityField(productId);
+          if (!(quantityField instanceof HTMLInputElement)) return;
+          const delta = parseInt(trigger.getAttribute('data-manage-selected-addon-adjust') || '0', 10) || 0;
+          const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
+          const maxQuantity = Math.max(1, parseInt(quantityField.max, 10) || currentQuantity);
+          const nextQuantity = Math.min(maxQuantity, Math.max(1, currentQuantity + delta));
+          quantityField.value = String(nextQuantity);
+          quantityField.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      });
+
+      card.querySelectorAll('[data-manage-selected-addon-variant]').forEach((select) => {
+        select.addEventListener('change', (event) => {
+          const field = event.target;
+          const productId = String(field.dataset.addonProductId || '');
+          syncManageSelectedAddOnRowState(card, productId);
+          const quantityField = findSelectedQuantityField(productId);
+          const quantity = quantityField instanceof HTMLInputElement
+            ? Math.min(
+                Math.max(1, parseInt(quantityField.max, 10) || 1),
+                Math.max(1, parseInt(quantityField.value, 10) || 1)
+              )
+            : 1;
+          upsertSelectedBundleAddOn(productId, String(field.value || ''), quantity);
+          rerenderManageAddOnSection();
+        });
+      });
+
+      card.querySelectorAll('[data-manage-selected-addon-remove]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const productId = String(button.getAttribute('data-addon-product-id') || '');
+          selectedBundleAddOns = selectedBundleAddOns.filter((selection) => selection.productId !== productId);
+          refreshSummary();
+          rerenderManageAddOnSection();
+        });
+      });
+
+      selectedBundleAddOns.forEach((selection) => {
+        syncManageSelectedAddOnRowState(card, String(selection.productId || ''));
+      });
+    }
+
+    bindManageAddOnControls();
 
     const customAmountInput = card.querySelector(`input[name="custom-amount-${index}"]`);
     if (customAmountInput) {
@@ -2492,6 +3344,7 @@
       const qtyChanged = isSingleTier && selectedTierQty !== currentQty;
       const hasAddedTiers = !isSingleTier && selectedAddTiers.length > 0;
       const hasSupportChanges = selectedSupportItems.length > 0;
+      const hasBundleAddOnChanges = haveManageBundleAddOnsChanged(currentBundleAddOns, selectedBundleAddOns);
       const hasCustomAmountChange = selectedCustomAmount !== currentCustomAmountVal;
       const hasTipChange = selectedTipPercent !== currentTipPercent;
       const originalShippingOption = String(pledge.shippingOption || 'standard').trim().toLowerCase() || 'standard';
@@ -2583,6 +3436,37 @@
         );
       }
 
+      if (hasBundleAddOnChanges) {
+        const currentBundleAddOnSubtotal = getManageBundleAddOnSubtotal(currentBundleAddOns);
+        const nextBundleAddOnSubtotal = getManageBundleAddOnSubtotal(selectedBundleAddOns);
+        newSubtotal += nextBundleAddOnSubtotal - currentBundleAddOnSubtotal;
+
+        const originalAddOnsByKey = new Map(currentBundleAddOns.map((selection) => [
+          getManageAddOnSelectionKey(selection),
+          selection
+        ]));
+        const nextAddOnsByKey = new Map(buildSelectedBundleAddOnEntries(selectedBundleAddOns).map((selection) => [
+          getManageAddOnSelectionKey(selection),
+          selection
+        ]));
+        const addOnChangeKeys = Array.from(new Set([
+          ...originalAddOnsByKey.keys(),
+          ...nextAddOnsByKey.keys()
+        ])).sort();
+        appendDetailList(
+          getRuntimeMessage('manage.addOnChanges', `${PLATFORM_NAME} add-on changes`),
+          addOnChangeKeys.map((key) => {
+            const originalSelection = originalAddOnsByKey.get(key) || null;
+            const nextSelection = nextAddOnsByKey.get(key) || null;
+            const originalQty = originalSelection?.quantity || 0;
+            const nextQty = nextSelection?.quantity || 0;
+            const deltaQty = nextQty - originalQty;
+            const deltaLabel = deltaQty === 0 ? '0' : (deltaQty > 0 ? `+${deltaQty}` : String(deltaQty));
+            return `${getManageAddOnOptionLabel(nextSelection || originalSelection)}: ${originalQty} → ${nextQty} (${deltaLabel})`;
+          })
+        );
+      }
+
       const selectedTierEntries = buildSelectedTierEntries(
         campaign,
         pledge,
@@ -2590,11 +3474,13 @@
         isSingleTier ? selectedTierQty : selectedAddTiers
       );
       const selectedSupportItemEntries = buildSelectedSupportItemEntries(campaign, selectedSupportItems);
+      const selectedBundleAddOnEntries = buildSelectedBundleAddOnEntries(selectedBundleAddOns);
       const confirmQuote = await fetchQuotedShippingQuote(
         pledge,
         campaign,
         selectedTierEntries,
         selectedSupportItemEntries,
+        selectedBundleAddOnEntries,
         selectedShippingOption
       );
       const confirmShipping = Math.max(0, Number(confirmQuote?.shippingCents || 0));
@@ -2602,7 +3488,16 @@
         confirmQuote?.selectedOption || selectedShippingOption || 'standard'
       ).trim().toLowerCase() || 'standard';
       const hasShippingOptionChange = resolvedConfirmShippingOption !== originalShippingOption;
+      const currentTipAmount = getPledgeTipAmount(pledge);
       const newTipAmount = calculatePlatformTip(newSubtotal, selectedTipPercent);
+      if (newTipAmount !== currentTipAmount) {
+        const tipDiff = newTipAmount - currentTipAmount;
+        const tipDiffLabel = tipDiff >= 0 ? `+${formatMoney(tipDiff)}` : formatMoney(tipDiff);
+        appendSectionTitle(getRuntimeMessage('manage.tipChange', `${PLATFORM_NAME} tip change`));
+        appendDetailParagraph(
+          `${formatMoney(currentTipAmount)} → ${formatMoney(newTipAmount)} (${tipDiffLabel}, ${selectedTipPercent}%)`
+        );
+      }
       const newTax = calculateTax(newSubtotal);
       const newTotalWithTax = newSubtotal + newTax + confirmShipping + newTipAmount;
       const totalsNode = document.createElement('p');
@@ -2676,6 +3571,17 @@
               amount: supportItem.amount
             }));
           }
+          pledge.bundleAddOns = selectedBundleAddOnEntries.map((selection) => ({
+            productId: selection.productId,
+            variantId: selection.variantId,
+            variantLabel: selection.variantLabel,
+            quantity: selection.quantity,
+            unitPrice: selection.unitPrice,
+            name: selection.name,
+            description: selection.description,
+            imageUrl: selection.imageUrl,
+            category: selection.category
+          }));
           alert('DEV MODE: Changes saved (simulated)\nNew total: ' + formatMoney(newTotalWithTax));
           renderPledges();
           return;
@@ -2735,6 +3641,7 @@
             const hasAnyChanges =
               primaryTiers.length > 0 ||
               hasSupportChanges ||
+              hasBundleAddOnChanges ||
               hasCustomAmountChange ||
               hasTipChange ||
               hasShippingOptionChange ||
@@ -2753,6 +3660,11 @@
                   preferredLang: CURRENT_LANG,
                   addTiers: primaryTiers.length > 0 ? primaryTiers : null,
                   supportItems: hasSupportChanges ? selectedSupportItems : null,
+                  bundleAddOns: hasBundleAddOnChanges ? selectedBundleAddOnEntries.map((selection) => ({
+                    productId: selection.productId,
+                    variantId: selection.variantId,
+                    quantity: selection.quantity
+                  })) : null,
                   customAmount: hasCustomAmountChange ? selectedCustomAmount : null,
                   tipPercent: hasTipChange ? selectedTipPercent : null,
                   shippingOption: hasShippingOptionChange ? resolvedConfirmShippingOption : null
@@ -2800,6 +3712,11 @@
                 newTierQty: isSingleTier ? selectedTierQty : null,
                 addTiers: !isSingleTier ? selectedAddTiers : null,
                 supportItems: hasSupportChanges ? selectedSupportItems : null,
+                bundleAddOns: hasBundleAddOnChanges ? selectedBundleAddOnEntries.map((selection) => ({
+                  productId: selection.productId,
+                  variantId: selection.variantId,
+                  quantity: selection.quantity
+                })) : null,
                 customAmount: hasCustomAmountChange ? selectedCustomAmount : null,
                 tipPercent: hasTipChange ? selectedTipPercent : null,
                 shippingOption: hasShippingOptionChange ? resolvedConfirmShippingOption : null
@@ -2861,6 +3778,7 @@
     tierIdOrAddedTiers,
     tierQtyOrSupportItems,
     supportItems,
+    bundleAddOns,
     customAmount = 0,
     currentCustomAmount = 0,
     tipPercent = getPledgeTipPercent(pledge),
@@ -2880,8 +3798,15 @@
     const currentTierId = pledge.tierId?.split('__').pop();
     const currentTierQty = pledge.tierQty || 1;
     const pledgeCurrentCustomAmount = pledge.customAmount || 0;
+    const currentBundleAddOnSubtotal = getManageBundleAddOnSubtotal(pledge.bundleAddOns || []);
     const isSingleTier = campaign?.single_tier_only === true;
     const tiers = campaign?.tiers || [];
+    const currentTierEntries = buildSelectedTierEntries(
+      campaign,
+      pledge,
+      isSingleTier ? currentTierId : null,
+      isSingleTier ? currentTierQty : getPledgeAddTierState(pledge, campaign)
+    );
 
     let newSubtotal = originalSubtotal;
     let hasChanges = false;
@@ -2945,6 +3870,16 @@
       hasChanges = true;
     }
 
+    const nextBundleAddOnSubtotal = getManageBundleAddOnSubtotal(bundleAddOns);
+    const hasBundleAddOnSelectionChanges = haveManageBundleAddOnsChanged(pledge.bundleAddOns || [], bundleAddOns);
+    if (nextBundleAddOnSubtotal !== currentBundleAddOnSubtotal) {
+      newSubtotal += nextBundleAddOnSubtotal - currentBundleAddOnSubtotal;
+      hasChanges = true;
+    }
+    if (hasBundleAddOnSelectionChanges) {
+      hasChanges = true;
+    }
+
     const customDiff = (customAmount - pledgeCurrentCustomAmount) * 100;
     if (customDiff !== 0) {
       newSubtotal += customDiff;
@@ -2956,10 +3891,15 @@
     }
 
     const selectedTierEntries = buildSelectedTierEntries(campaign, pledge, tierIdOrAddedTiers, tierQtyOrSupportItems);
+    if (haveTierEntriesChanged(currentTierEntries, selectedTierEntries)) {
+      hasChanges = true;
+    }
     const selectedSupportItemEntries = buildSelectedSupportItemEntries(campaign, supportItems);
+    const selectedBundleAddOnEntries = buildSelectedBundleAddOnEntries(bundleAddOns);
     const hasPhysical =
       selectedTierEntries.some((tier) => tier.category === 'physical') ||
-      selectedSupportItemEntries.some((supportItem) => supportItem.category === 'physical');
+      selectedSupportItemEntries.some((supportItem) => supportItem.category === 'physical') ||
+      selectedBundleAddOnEntries.some((addOn) => addOn.category === 'physical');
     const fallbackShipping = getFallbackShippingCentsForPledge(pledge, campaign, hasPhysical);
     let newShipping = fallbackShipping;
 
@@ -3036,7 +3976,7 @@
       ? getRuntimeMessage('manage.saveChanges', 'Save Changes')
       : getRuntimeMessage('manage.noChanges', 'No Changes');
 
-    const quoteSignature = createShippingQuoteSignature(pledge, selectedTierEntries, selectedSupportItemEntries);
+    const quoteSignature = createShippingQuoteSignature(pledge, selectedTierEntries, selectedSupportItemEntries, selectedBundleAddOnEntries);
     const requestState = shippingQuoteState.get(index) || { requestId: 0 };
     const requestId = (requestState.requestId || 0) + 1;
     shippingQuoteState.set(index, {
@@ -3044,7 +3984,7 @@
       signature: quoteSignature
     });
 
-    void fetchQuotedShippingQuote(pledge, campaign, selectedTierEntries, selectedSupportItemEntries, shippingOption).then((quotedQuote) => {
+    void fetchQuotedShippingQuote(pledge, campaign, selectedTierEntries, selectedSupportItemEntries, selectedBundleAddOnEntries, shippingOption).then((quotedQuote) => {
       const latestState = shippingQuoteState.get(index);
       if (!latestState || latestState.requestId !== requestId || latestState.signature !== quoteSignature) {
         return;

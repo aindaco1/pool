@@ -141,7 +141,7 @@ else
 fi
 
 # CSV header
-echo "email,campaign,items,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id"
+echo "email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id"
 
 if [[ "$KV_SCOPE_FLAGS" == *"--local"* ]]; then
   python3 -c "
@@ -221,6 +221,52 @@ TIER_NAMES = {
 def get_tier_name(tier_id, fallback=''):
     return TIER_NAMES.get(tier_id, fallback or tier_id or '')
 
+def get_add_on_label(add_on):
+    name = str(add_on.get('name') or add_on.get('productId') or 'Platform add-on').strip()
+    variant = str(add_on.get('variantLabel') or '').strip()
+    return f'{name} ({variant})' if variant else name
+
+def get_add_on_counts(add_ons):
+    counts = {}
+    for add_on in (add_ons or []):
+        label = get_add_on_label(add_on)
+        qty = add_on.get('quantity', 1) or 1
+        if label:
+            counts[label] = counts.get(label, 0) + qty
+    return counts
+
+def build_count_items_str(counts, is_negative=False):
+    items = []
+    for item_name in sorted(counts.keys()):
+        qty = counts.get(item_name, 0)
+        if qty <= 0:
+            continue
+        prefix = '-' if is_negative else ''
+        if qty > 1:
+            items.append(f'{prefix}{item_name} x{qty}')
+        else:
+            items.append(f'{prefix}{item_name}')
+    return '; '.join(items) if items else ''
+
+def build_diff_items_str(old_counts, new_counts):
+    items = []
+    all_names = set(old_counts.keys()) | set(new_counts.keys())
+    for item_name in sorted(all_names):
+        old_qty = old_counts.get(item_name, 0)
+        new_qty = new_counts.get(item_name, 0)
+        diff = new_qty - old_qty
+        if diff > 0:
+            items.append(f'+{item_name} x{diff}' if diff > 1 else f'+{item_name}')
+        elif diff < 0:
+            items.append(f'-{item_name} x{abs(diff)}' if diff < -1 else f'-{item_name}')
+    return '; '.join(items) if items else ''
+
+def get_add_on_subtotal(add_ons):
+    return sum(((add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)) for add_on in (add_ons or [])) / 100
+
+def get_campaign_subtotal(subtotal_cents, add_on_subtotal):
+    return (subtotal_cents / 100) - add_on_subtotal
+
 def build_items_str(tier_id, tier_qty, additional_tiers, is_negative=False, custom_amount=0):
     items = []
     tier_name = get_tier_name(tier_id)
@@ -244,11 +290,12 @@ def build_items_str(tier_id, tier_qty, additional_tiers, is_negative=False, cust
         items.append(f'Custom Support \${custom_amount:.2f}')
     return '; '.join(items) if items else ''
 
-def write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping, total, status, charged, timestamp, order_id):
+def write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping, total, status, charged, timestamp, order_id):
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        email, campaign, items_str,
+        email, campaign, items_str, add_on_items_str,
+        f'{campaign_subtotal:.2f}', f'{add_on_subtotal:.2f}',
         f'{subtotal:.2f}', str(tip_percent), f'{tip:.2f}', f'{tax:.2f}', f'{shipping:.2f}', f'{total:.2f}',
         status, 'yes' if charged else 'no', timestamp, order_id
     ])
@@ -266,19 +313,6 @@ def get_tier_counts(entry):
         if add_name:
             counts[add_name] = add_tier.get('qty', 1) or 1
     return counts
-
-def build_diff_items_str(old_counts, new_counts):
-    items = []
-    all_tiers = set(old_counts.keys()) | set(new_counts.keys())
-    for tier_name in sorted(all_tiers):
-        old_qty = old_counts.get(tier_name, 0)
-        new_qty = new_counts.get(tier_name, 0)
-        diff = new_qty - old_qty
-        if diff > 0:
-            items.append(f'+{tier_name} x{diff}' if diff > 1 else f'+{tier_name}')
-        elif diff < 0:
-            items.append(f'-{tier_name} x{abs(diff)}' if diff < -1 else f'-{tier_name}')
-    return '; '.join(items) if items else ''
 
 for key, blob_id in rows:
     blob_path = blob_dir / blob_id
@@ -300,7 +334,9 @@ for key, blob_id in rows:
 
     if history:
         prev_counts = {}
+        prev_add_on_counts = {}
         prev_custom = 0
+        prev_add_on_subtotal = 0
         for entry in history:
             entry_type = entry.get('type', '')
             timestamp = entry.get('at', '')
@@ -313,9 +349,15 @@ for key, blob_id in rows:
                 total = entry.get('amount', 0) / 100
                 custom_amt = entry.get('customAmount', 0) or 0
                 items_str = build_items_str(entry.get('tierId'), entry.get('tierQty', 1), entry.get('additionalTiers'), custom_amount=custom_amt)
+                add_on_counts = get_add_on_counts(entry.get('bundleAddOns') or [])
+                add_on_items_str = build_count_items_str(add_on_counts)
+                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [])
+                campaign_subtotal = get_campaign_subtotal(entry.get('subtotal', 0), add_on_subtotal)
                 prev_counts = get_tier_counts(entry)
+                prev_add_on_counts = add_on_counts
                 prev_custom = custom_amt
-                write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping, total, 'created', charged, timestamp, order_id)
+                prev_add_on_subtotal = add_on_subtotal
+                write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping, total, 'created', charged, timestamp, order_id)
             elif entry_type == 'modified':
                 subtotal = entry.get('subtotalDelta', 0) / 100
                 tip_percent = entry.get('tipPercent', data.get('tipPercent', 0) or 0)
@@ -326,22 +368,37 @@ for key, blob_id in rows:
                 new_counts = get_tier_counts(entry)
                 new_custom = entry.get('customAmount', 0) or 0
                 items_str = build_diff_items_str(prev_counts, new_counts)
+                new_add_on_counts = get_add_on_counts(entry.get('bundleAddOns') or [])
+                add_on_items_str = build_diff_items_str(prev_add_on_counts, new_add_on_counts)
+                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [])
+                add_on_subtotal_delta = add_on_subtotal - prev_add_on_subtotal
+                campaign_subtotal = subtotal - add_on_subtotal_delta
                 if new_custom != prev_custom:
                     custom_diff = new_custom - prev_custom
                     custom_str = f'+Custom Support \${custom_diff:.2f}' if custom_diff > 0 else f'-Custom Support \${abs(custom_diff):.2f}'
                     items_str = f'{items_str}; {custom_str}' if items_str else custom_str
                 tip_changed = tip != 0
                 tip_only_change = tip_changed and subtotal == 0 and tax == 0 and shipping_delta == 0
+                add_on_changed = bool(add_on_items_str)
                 if items_str:
                     if tip_changed:
                         items_str = f'(modified) {items_str}; tip updated to {tip_percent}%'
                     else:
                         items_str = f'(modified) {items_str}'
                 else:
-                    items_str = f'(tip updated to {tip_percent}%)' if tip_only_change else '(modified)'
+                    if tip_only_change:
+                        items_str = f'(tip updated to {tip_percent}%)'
+                    elif add_on_changed and tip_changed:
+                        items_str = f'(modified add-ons; tip updated to {tip_percent}%)'
+                    elif add_on_changed:
+                        items_str = '(modified add-ons)'
+                    else:
+                        items_str = '(modified)'
                 prev_counts = new_counts
+                prev_add_on_counts = new_add_on_counts
                 prev_custom = new_custom
-                write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping_delta, total, 'modified', charged, timestamp, order_id)
+                prev_add_on_subtotal = add_on_subtotal
+                write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal_delta, subtotal, tip_percent, tip, tax, shipping_delta, total, 'modified', charged, timestamp, order_id)
             elif entry_type == 'cancelled':
                 subtotal = entry.get('subtotalDelta', 0) / 100
                 tip_percent = entry.get('tipPercent', data.get('tipPercent', 0) or 0)
@@ -350,7 +407,11 @@ for key, blob_id in rows:
                 shipping_delta = entry.get('shippingDelta', 0) / 100
                 total = entry.get('amountDelta', 0) / 100
                 items_str = build_items_str(data.get('tierId'), data.get('tierQty', 1), data.get('additionalTiers'), is_negative=True, custom_amount=data.get('customAmount', 0) or 0)
-                write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping_delta, total, 'cancelled', charged, timestamp, order_id)
+                add_on_counts = get_add_on_counts(data.get('bundleAddOns') or [])
+                add_on_items_str = build_count_items_str(add_on_counts, is_negative=True)
+                add_on_subtotal = -get_add_on_subtotal(data.get('bundleAddOns') or [])
+                campaign_subtotal = subtotal - add_on_subtotal
+                write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping_delta, total, 'cancelled', charged, timestamp, order_id)
     else:
         pledge_status = data.get('pledgeStatus', 'unknown')
         if charged:
@@ -372,7 +433,11 @@ for key, blob_id in rows:
         shipping = sign * data.get('shipping', 0) / 100
         total = sign * data.get('amount', 0) / 100
         items_str = build_items_str(data.get('tierId'), data.get('tierQty', 1), data.get('additionalTiers'), is_negative=is_cancelled, custom_amount=data.get('customAmount', 0) or 0)
-        write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping, total, status, charged, data.get('createdAt', ''), order_id)
+        add_on_counts = get_add_on_counts(data.get('bundleAddOns') or [])
+        add_on_items_str = build_count_items_str(add_on_counts, is_negative=is_cancelled)
+        add_on_subtotal = sign * get_add_on_subtotal(data.get('bundleAddOns') or [])
+        campaign_subtotal = subtotal - add_on_subtotal
+        write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping, total, status, charged, data.get('createdAt', ''), order_id)
 " 2>/dev/null
   exit 0
 fi
@@ -455,6 +520,33 @@ TIER_NAMES = {
 def get_tier_name(tier_id, fallback=''):
     return TIER_NAMES.get(tier_id, fallback or tier_id or '')
 
+def get_add_on_label(add_on):
+    name = str(add_on.get('name') or add_on.get('productId') or 'Platform add-on').strip()
+    variant = str(add_on.get('variantLabel') or '').strip()
+    return f'{name} ({variant})' if variant else name
+
+def get_add_on_counts(add_ons):
+    counts = {}
+    for add_on in (add_ons or []):
+        label = get_add_on_label(add_on)
+        qty = add_on.get('quantity', 1) or 1
+        if label:
+            counts[label] = counts.get(label, 0) + qty
+    return counts
+
+def build_count_items_str(counts, is_negative=False):
+    items = []
+    for item_name in sorted(counts.keys()):
+        qty = counts.get(item_name, 0)
+        if qty <= 0:
+            continue
+        prefix = '-' if is_negative else ''
+        if qty > 1:
+            items.append(f'{prefix}{item_name} x{qty}')
+        else:
+            items.append(f'{prefix}{item_name}')
+    return '; '.join(items) if items else ''
+
 def build_items_str(tier_id, tier_qty, additional_tiers, is_negative=False, custom_amount=0):
     items = []
     tier_name = get_tier_name(tier_id)
@@ -481,11 +573,18 @@ def build_items_str(tier_id, tier_qty, additional_tiers, is_negative=False, cust
     
     return '; '.join(items) if items else ''
 
-def write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping, total, status, charged, timestamp, order_id):
+def get_add_on_subtotal(add_ons):
+    return sum(((add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)) for add_on in (add_ons or [])) / 100
+
+def get_campaign_subtotal(subtotal_cents, add_on_subtotal):
+    return (subtotal_cents / 100) - add_on_subtotal
+
+def write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping, total, status, charged, timestamp, order_id):
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        email, campaign, items_str,
+        email, campaign, items_str, add_on_items_str,
+        f'{campaign_subtotal:.2f}', f'{add_on_subtotal:.2f}',
         f'{subtotal:.2f}', str(tip_percent), f'{tip:.2f}', f'{tax:.2f}', f'{shipping:.2f}', f'{total:.2f}',
         status, 'yes' if charged else 'no', timestamp, order_id
     ])
@@ -540,7 +639,9 @@ try:
     if history:
         # Output one row per history entry
         prev_counts = {}
+        prev_add_on_counts = {}
         prev_custom = 0
+        prev_add_on_subtotal = 0
         for entry in history:
             entry_type = entry.get('type', '')
             timestamp = entry.get('at', '')
@@ -561,9 +662,15 @@ try:
                     entry.get('additionalTiers'),
                     custom_amount=custom_amt
                 )
+                add_on_counts = get_add_on_counts(entry.get('bundleAddOns') or [])
+                add_on_items_str = build_count_items_str(add_on_counts)
+                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [])
+                campaign_subtotal = get_campaign_subtotal(entry.get('subtotal', 0), add_on_subtotal)
                 prev_counts = get_tier_counts(entry)
+                prev_add_on_counts = add_on_counts
                 prev_custom = custom_amt
-                write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping, total, 'created', charged, timestamp, order_id)
+                prev_add_on_subtotal = add_on_subtotal
+                write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping, total, 'created', charged, timestamp, order_id)
             
             elif entry_type == 'modified':
                 subtotal = entry.get('subtotalDelta', 0) / 100
@@ -575,6 +682,11 @@ try:
                 new_counts = get_tier_counts(entry)
                 new_custom = entry.get('customAmount', 0) or 0
                 items_str = build_diff_items_str(prev_counts, new_counts)
+                new_add_on_counts = get_add_on_counts(entry.get('bundleAddOns') or [])
+                add_on_items_str = build_diff_items_str(prev_add_on_counts, new_add_on_counts)
+                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [])
+                add_on_subtotal_delta = add_on_subtotal - prev_add_on_subtotal
+                campaign_subtotal = subtotal - add_on_subtotal_delta
                 
                 # Add custom amount change if present
                 if new_custom != prev_custom:
@@ -587,16 +699,26 @@ try:
                 
                 tip_changed = tip != 0
                 tip_only_change = tip_changed and subtotal == 0 and tax == 0 and shipping_delta == 0
+                add_on_changed = bool(add_on_items_str)
                 if items_str:
                     if tip_changed:
                         items_str = f'(modified) {items_str}; tip updated to {tip_percent}%'
                     else:
                         items_str = f'(modified) {items_str}'
                 else:
-                    items_str = f'(tip updated to {tip_percent}%)' if tip_only_change else '(modified)'
+                    if tip_only_change:
+                        items_str = f'(tip updated to {tip_percent}%)'
+                    elif add_on_changed and tip_changed:
+                        items_str = f'(modified add-ons; tip updated to {tip_percent}%)'
+                    elif add_on_changed:
+                        items_str = '(modified add-ons)'
+                    else:
+                        items_str = '(modified)'
                 prev_counts = new_counts
+                prev_add_on_counts = new_add_on_counts
                 prev_custom = new_custom
-                write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping_delta, total, 'modified', charged, timestamp, order_id)
+                prev_add_on_subtotal = add_on_subtotal
+                write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal_delta, subtotal, tip_percent, tip, tax, shipping_delta, total, 'modified', charged, timestamp, order_id)
             
             elif entry_type == 'cancelled':
                 subtotal = entry.get('subtotalDelta', 0) / 100
@@ -613,7 +735,11 @@ try:
                     is_negative=True,
                     custom_amount=data.get('customAmount', 0) or 0
                 )
-                write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping_delta, total, 'cancelled', charged, timestamp, order_id)
+                add_on_counts = get_add_on_counts(data.get('bundleAddOns') or [])
+                add_on_items_str = build_count_items_str(add_on_counts, is_negative=True)
+                add_on_subtotal = -get_add_on_subtotal(data.get('bundleAddOns') or [])
+                campaign_subtotal = subtotal - add_on_subtotal
+                write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping_delta, total, 'cancelled', charged, timestamp, order_id)
     else:
         # Legacy pledge without history - output single row with current state
         pledge_status = data.get('pledgeStatus', 'unknown')
@@ -645,8 +771,12 @@ try:
             is_negative=is_cancelled,
             custom_amount=data.get('customAmount', 0) or 0
         )
-        
-        write_row(email, campaign, items_str, subtotal, tip_percent, tip, tax, shipping, total, status, charged, data.get('createdAt', ''), order_id)
+        add_on_counts = get_add_on_counts(data.get('bundleAddOns') or [])
+        add_on_items_str = build_count_items_str(add_on_counts, is_negative=is_cancelled)
+        add_on_subtotal = sign * get_add_on_subtotal(data.get('bundleAddOns') or [])
+        campaign_subtotal = subtotal - add_on_subtotal
+
+        write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping, total, status, charged, data.get('createdAt', ''), order_id)
 
 except json.JSONDecodeError:
     pass

@@ -211,7 +211,7 @@ function getInstagramCTA(instagramUrl, siteBase = FALLBACK_SITE_BASE, t = (_key,
 }
 
 // Render pledge items (tiers, support items, custom amount) for email display
-function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportItems = [], customAmount = 0 }, t = (_key, fallback) => fallback) {
+function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportItems = [], addOns = [], customAmount = 0 }, t = (_key, fallback) => fallback) {
   const items = [];
   
   // Main tier
@@ -233,6 +233,15 @@ function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportIte
     if (item.label && item.amount > 0) {
       items.push(`<li style="margin: 4px 0;">${escapeHtml(item.label)}: $${item.amount.toFixed(2)}</li>`);
     }
+  }
+
+  for (const addOn of addOns) {
+    if (!addOn.label && !addOn.name) continue;
+    const label = addOn.label || addOn.name;
+    const qty = Number(addOn.qty || addOn.quantity || 1);
+    const variantLabel = addOn.variantLabel ? ` (${addOn.variantLabel})` : '';
+    const qtyText = qty > 1 ? ` × ${qty}` : '';
+    items.push(`<li style="margin: 4px 0;">${escapeHtml(label)}${escapeHtml(variantLabel)}${qtyText}</li>`);
   }
   
   // Custom amount
@@ -383,6 +392,8 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   const newTotal = newSubtotal + tax + shipping + tipAmount;
   const increased = newTotal > previousTotal;
   const diff = Math.abs(newTotal - previousTotal);
+  const tipChanged = Number(previousTipAmount || 0) !== Number(tipAmount || 0);
+  const tipDelta = Number(tipAmount || 0) - Number(previousTipAmount || 0);
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t);
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
@@ -394,6 +405,11 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
     totalLabel: t('common.new_total_if_funded', 'New total (if funded)'),
     totalAmount: newTotal
   }, t);
+  const tipChangeHtml = tipChanged ? `
+    <p style="margin: 0 0 8px 0;"><strong>${escapeHtml(t('modified.tip_changed', '%{platform} tip changed:', {
+      platform: getPlatformCompanyName(env)
+    }))}</strong> $${(previousTipAmount / 100).toFixed(2)} → $${(tipAmount / 100).toFixed(2)} (${tipDelta >= 0 ? '+' : '-'}$${(Math.abs(tipDelta) / 100).toFixed(2)}, ${escapeHtml(String(tipPercent))}%)</p>
+  ` : '';
   
   const html = `
 <!DOCTYPE html>
@@ -411,6 +427,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
     <p style="margin: 0 0 8px 0;"><strong>${escapeHtml(t('common.campaign_label', 'Campaign:'))}</strong> ${escapeHtml(campaignTitle)}</p>
     <p style="margin: 0 0 8px 0;"><strong>${escapeHtml(t('common.previous_total_if_funded', 'Previous total (if funded):'))}</strong> $${(previousTotal / 100).toFixed(2)}</p>
     <p style="margin: 0 0 8px 0;"><strong>${escapeHtml(t('common.updated_total_if_funded', 'Updated total (if funded):'))}</strong> $${(newTotal / 100).toFixed(2)} (${increased ? '+' : '-'}$${(diff / 100).toFixed(2)})</p>
+    ${tipChangeHtml}
     ${amountBreakdownHtml}
     ${pledgeItemsHtml}
     <p style="margin: 12px 0 0 0; color: #666; font-size: 14px;">

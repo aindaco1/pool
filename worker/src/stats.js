@@ -344,8 +344,10 @@ export async function recalculateStats(env, campaignSlug, options = {}) {
   const { pledges } = await collectActiveCampaignPledges(env, campaignSlug, options);
 
   for (const pledge of pledges) {
-    // Use subtotal (pre-tax) for goal tracking, fall back to amount for older pledges
-    stats.pledgedAmount += pledge.subtotal || pledge.amount || 0;
+    // Use goalTrackingSubtotal when present so anchor-bound platform add-ons can be
+    // charged with a pledge without inflating the campaign's public funding total.
+    // Fall back to subtotal/amount for older pledges.
+    stats.pledgedAmount += pledge.goalTrackingSubtotal || pledge.subtotal || pledge.amount || 0;
     stats.pledgeCount += 1;
 
     if (pledge.tierId) {

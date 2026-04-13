@@ -203,6 +203,8 @@ Current SEO fundamentals are intentionally bounded. Forks should treat these as 
 - `seo.x_handle`
 - `seo.same_as`
 - `seo.index_public_community_hub`
+- `seo.default_social_image_alt`
+- `seo.og_locale_overrides`
 - `platform.name`
 - `platform.site_url`
 - `platform.default_social_image_path`
@@ -217,6 +219,8 @@ That surface currently controls:
 - sitemap URL generation
 - site-wide `Organization` / `WebSite` JSON-LD
 - campaign `CreativeWork` / breadcrumb JSON-LD
+- fallback social-image alt text
+- Open Graph locale strings
 
 The implementation is deliberately narrow:
 
@@ -233,6 +237,10 @@ seo:
     - https://www.instagram.com/dustwave
     - https://www.youtube.com/@dustwave
   index_public_community_hub: true
+  default_social_image_alt: "Dust Wave on The Pool"
+  og_locale_overrides:
+    en: en_US
+    es: es_ES
 ```
 
 ### `debug`
@@ -345,6 +353,72 @@ Preset and override metadata can include:
 - `stack_height_in`
 
 `weight_oz` is the item weight. `packaging_weight_oz` is a one-time packing allowance for that line item, and `stack_height_in` lets multi-quantity physical tiers stack more realistically than simple `height * qty`.
+
+### `add_ons`
+
+Use `add_ons` for a global, platform-level merch or upsell catalog that is not tied to a single campaign's `support_items`.
+
+The current Worker path treats these as bundle-level selections. Pending checkout manifests can also store an anchor campaign so multi-campaign carts remain supported while later settlement and management flows stay campaign-compatible.
+
+Supported keys today:
+
+- `enabled`
+- `low_stock_threshold`
+- `products`
+
+Each product currently supports:
+
+- `id`
+- `name`
+- `description`
+- `image_url`
+- `price`
+- `category`
+- `inventory`
+- `shipping_preset`
+- `shipping`
+- `source_url`
+- `variant_option_name`
+- `variants`
+
+Example:
+
+```yml
+add_ons:
+  enabled: true
+  low_stock_threshold: 5
+  products:
+    - id: dust-wave-tshirt
+      name: "DUST WAVE T-Shirt"
+      description: "Our official t-shirt. 100% cotton."
+      price: 25.00
+      category: physical
+      shipping_preset: tshirt
+      source_url: "https://shop.dustwave.xyz/"
+      variant_option_name: Size
+      variants:
+        - { id: xs, label: XS, inventory: 1 }
+        - { id: s, label: S, inventory: 2 }
+        - { id: m, label: M, inventory: 4 }
+```
+
+This is meant for fixed-price catalog items and simple variants like shirt sizes. It is separate from campaign `support_items`, which remain campaign-scoped and amount-based.
+
+Add-on shipping behavior:
+
+- `category: digital` means the add-on never contributes to shipping
+- `category: physical` means the add-on participates in the same shipping calculator used for physical tiers and physical support items
+- physical add-ons can either:
+  - reference a shared `shipping_preset`
+  - or provide explicit `shipping.weight_oz`, `shipping.packaging_weight_oz`, `shipping.length_in`, `shipping.width_in`, `shipping.height_in`, and `shipping.stack_height_in`
+
+Current add-on inventory behavior:
+
+- `inventory` can live on the product itself or on each variant
+- `low_stock_threshold` controls when the shared cart/manage UI shows scarcity messaging
+- sold-out variants are removed from the shared product-state surface unless the supporter already owns that exact variant on an existing pledge
+- the cart and Manage Pledge both use the same shared add-on product-card model, so forks do not need to style or configure two different merch systems
+- the add-on section heading and support note are localized through the normal runtime i18n files, and the support note interpolates the configured site author name automatically
 
 ### `design`
 

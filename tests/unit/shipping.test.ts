@@ -56,13 +56,15 @@ describe('shipping utilities', () => {
         hasPhysical: true,
         physicalTierCount: 1,
         physicalSupportItemCount: 0,
+        physicalAddOnCount: 0,
         physicalUnitCount: 2,
         weightOz: 10,
         lengthIn: 18,
         widthIn: 3,
         heightIn: 6,
         tierIds: ['poster'],
-        supportItemIds: []
+        supportItemIds: [],
+        addOnIds: []
       }
     });
   });
@@ -94,13 +96,15 @@ describe('shipping utilities', () => {
         hasPhysical: true,
         physicalTierCount: 1,
         physicalSupportItemCount: 0,
+        physicalAddOnCount: 0,
         physicalUnitCount: 2,
         weightOz: 13,
         lengthIn: 18,
         widthIn: 3,
         heightIn: 3.5,
         tierIds: ['poster'],
-        supportItemIds: []
+        supportItemIds: [],
+        addOnIds: []
       }
     });
   });
@@ -141,13 +145,15 @@ describe('shipping utilities', () => {
         hasPhysical: true,
         physicalTierCount: 0,
         physicalSupportItemCount: 1,
+        physicalAddOnCount: 0,
         physicalUnitCount: 1,
         weightOz: 9,
         lengthIn: 11,
         widthIn: 8.5,
         heightIn: 0.5,
         tierIds: [],
-        supportItemIds: ['signed-script']
+        supportItemIds: ['signed-script'],
+        addOnIds: []
       }
     });
   });
@@ -197,6 +203,7 @@ describe('shipping utilities', () => {
         hasPhysical: true,
         physicalTierCount: 1,
         physicalSupportItemCount: 0,
+        physicalAddOnCount: 0,
         physicalUnitCount: 1,
         weightOz: 0,
         lengthIn: 0,
@@ -204,6 +211,7 @@ describe('shipping utilities', () => {
         heightIn: 0,
         tierIds: ['owl-sticker'],
         supportItemIds: [],
+        addOnIds: [],
         metadataIncomplete: true
       },
       availableOptions: [
@@ -356,6 +364,26 @@ describe('shipping utilities', () => {
     });
   });
 
+  it('uses the global fallback rate for add-on-only physical shipments even when the anchor campaign has an override', () => {
+    expect(buildFallbackShippingQuote(
+      { SHIPPING_ORIGIN_COUNTRY: 'US', SHIPPING_FALLBACK_FLAT_RATE: '3.00' },
+      { country: 'US', postalCode: '80205' },
+      {
+        hasPhysical: true,
+        physicalTierCount: 0,
+        physicalSupportItemCount: 0,
+        physicalAddOnCount: 1
+      },
+      { shipping_fallback_flat_rate: 12 }
+    )).toEqual({
+      shippingCents: 300,
+      source: 'fallback_flat_rate',
+      carrier: 'fallback',
+      service: 'domestic_ground_fallback',
+      domestic: true
+    });
+  });
+
   it('quotes international fallback shipping with the same canonical contract', async () => {
     const result = await quoteCampaignShipment(
       { SHIPPING_ORIGIN_COUNTRY: 'US', SHIPPING_FALLBACK_FLAT_RATE: '10.00' },
@@ -387,13 +415,15 @@ describe('shipping utilities', () => {
         hasPhysical: true,
         physicalTierCount: 1,
         physicalSupportItemCount: 0,
+        physicalAddOnCount: 0,
         physicalUnitCount: 1,
         weightOz: 5,
         lengthIn: 18,
         widthIn: 3,
         heightIn: 3,
         tierIds: ['poster'],
-        supportItemIds: []
+        supportItemIds: [],
+        addOnIds: []
       },
       availableOptions: [
         { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 1000 }
@@ -478,13 +508,15 @@ describe('shipping utilities', () => {
         hasPhysical: true,
         physicalTierCount: 1,
         physicalSupportItemCount: 0,
+        physicalAddOnCount: 0,
         physicalUnitCount: 1,
         weightOz: 5,
         lengthIn: 18,
         widthIn: 3,
         heightIn: 3,
         tierIds: ['poster'],
-        supportItemIds: []
+        supportItemIds: [],
+        addOnIds: []
       },
       availableOptions: [
         { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 675 },
@@ -632,13 +664,15 @@ describe('shipping utilities', () => {
         hasPhysical: true,
         physicalTierCount: 1,
         physicalSupportItemCount: 0,
+        physicalAddOnCount: 0,
         physicalUnitCount: 1,
         weightOz: 5,
         lengthIn: 18,
         widthIn: 3,
         heightIn: 3,
         tierIds: ['poster'],
-        supportItemIds: []
+        supportItemIds: [],
+        addOnIds: []
       },
       availableOptions: [
         { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 1000 }

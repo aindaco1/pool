@@ -8,6 +8,7 @@
   var currentLang = dataset.currentLang || 'en';
   var platformName = dataset.platformName || 'The Pool';
   var platformCompanyName = dataset.platformCompanyName || platformName;
+  var platformAuthor = dataset.platformAuthor || platformCompanyName;
   var supportEmail = dataset.platformSupportEmail || '';
   var siteUrl = dataset.siteUrl || '';
   var workerBase = dataset.workerBase || '';
@@ -32,6 +33,7 @@
   var debugVerboseConsoleLogging = dataset.debugVerboseConsoleLogging || 'true';
   var runtimeMessages = {};
   var shippingPresets = {};
+  var addOns = {};
 
   if (dataset.runtimeMessages) {
     try {
@@ -49,6 +51,14 @@
     }
   }
 
+  if (dataset.addOns) {
+    try {
+      addOns = JSON.parse(dataset.addOns);
+    } catch (_error) {
+      addOns = {};
+    }
+  }
+
   window.POOL_CONFIG = {
     i18n: {
       currentLang: currentLang,
@@ -57,6 +67,7 @@
     platform: {
       name: platformName,
       companyName: platformCompanyName,
+      author: platformAuthor,
       supportEmail: supportEmail,
       siteUrl: siteUrl,
       workerUrl: workerBase,
@@ -75,6 +86,7 @@
       freeShippingDefault: shippingFreeShippingDefault,
       presets: shippingPresets
     },
+    addOns: addOns,
     cache: {
       liveStatsTtlSeconds: liveStatsCacheTtlSeconds,
       liveInventoryTtlSeconds: liveInventoryCacheTtlSeconds
@@ -97,6 +109,7 @@
     workerBase: workerBase,
     platformName: platformName,
     platformCompanyName: platformCompanyName,
+    platformAuthor: platformAuthor,
     supportEmail: supportEmail,
     defaultCreatorName: defaultCreatorName,
     salesTaxRate: salesTaxRate,

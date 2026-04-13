@@ -13,6 +13,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Optional platform tip** — 0% to 15% tip (default 5%) included in totals but excluded from campaign progress
 - **Tip-aware cart + checkout** — Shared pricing logic keeps subtotal, tip, tax, shipping, and total in sync across cart, checkout, Worker, reports, and emails
 - **USPS-backed shipping quotes with fallback guardrails** — Physical checkout and modify flows can quote USPS domestic/international shipping, fall back safely to configured flat rates, and support optional domestic signature upgrades without pushing quote churn into KV
+- **Platform add-ons with inventory awareness** — Bundle-level merch add-ons can be attached to a checkout, stay editable in Manage Pledge, support per-variant stock, and ride the same canonical shipping/reporting/email flow without counting toward campaign funding goals
 - **On-site Stripe payment step** — The existing second checkout sidecar hosts secure Stripe payment UI, and Manage Pledge uses the same pattern for `Update Card`
 - **Configurable pricing settings** — `pricing.sales_tax_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` live in `_config.yml`, and the required Worker vars are auto-synced into `worker/wrangler.toml` for server-side enforcement
 - **Physical & digital tiers** — Physical items trigger shipping address capture during checkout plus Worker-calculated USPS quotes, configured fallback rates, and optional domestic signature upgrades when enabled
@@ -81,14 +82,23 @@ Keep `USPS_CLIENT_SECRET` out of site config. Set it as a Worker secret or in [`
 
 If you change those values locally, restart `./scripts/dev.sh --podman` so the Worker uses the same math as the site.
 
+Fork-friendly global merch/add-on settings now also live in:
+- `add_ons.enabled`, `add_ons.low_stock_threshold`, and `add_ons.products` in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
+- product images, size-aware variants, per-product or per-variant inventory, and `shipping_preset` references for physical catalog items
+- bundle-level add-ons can now be selected in the cart sidecar, anchored to a campaign in multi-campaign carts, and edited later from Manage Pledge
+- low-stock messaging and sold-out variant filtering now come from the shared inventory-aware add-on product-state layer used by both cart and Manage Pledge
+- configured add-on inventory is the starting baseline; remaining stock is derived from saved pledge state, not unsaved cart or Manage drafts
+- pledge and fulfillment reports now separate campaign pledge value from platform add-on value for easier operations
+
 Fork-facing settings now use a structured config model in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml):
 
 - `platform` for identity, URLs, and support contact
 - `platform` also covers brand assets like logo, footer logo, favicon, and default social image
 - top-level `title` / `description` for Jekyll's site identity and default SEO copy
-- `seo` for bounded SEO identity knobs like `x_handle`, `same_as`, and whether the public community hub should remain indexable
+- `seo` for bounded SEO identity knobs like `x_handle`, `same_as`, `default_social_image_alt`, `og_locale_overrides`, and whether the public community hub should remain indexable
 - `pricing` for tax, the legacy flat-shipping compatibility baseline, and platform-tip defaults
 - `shipping` for origin settings, USPS quote behavior, fallback policy, free-shipping defaults, shipping presets, and limited shipping-option policy
+- `add_ons` for a small global merch catalog, fixed-price products, and simple variants like shirt sizes
 - `i18n` for default/supported languages, language labels, and localized public-page routes
 - `design` for curated typography, radius, layout-width, and theme-token overrides
 - `debug` for browser and Worker console logging behavior
@@ -250,6 +260,7 @@ See [`docs/`](docs/) for full documentation:
 - [I18N.md](docs/I18N.md) — Current localization structure, routing model, and language-addition workflow
 - [SHIPPING.md](docs/SHIPPING.md) — Current shipping model, USPS setup, and fallback policy
 - [SEO.md](docs/SEO.md) — Current crawl, metadata, JSON-LD, and noindex model
+- [ADD_ON_PRODUCTS.md](docs/ADD_ON_PRODUCTS.md) — Current global add-on catalog structure and initial merch import model
 - [ROADMAP.md](docs/ROADMAP.md) — Planned features
 - [CMS.md](docs/CMS.md) — Pages CMS setup & campaign editing guide
 

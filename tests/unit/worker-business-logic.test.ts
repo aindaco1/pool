@@ -385,6 +385,50 @@ const metadataFallbackCampaignFixture = {
   diary: []
 };
 
+const addOnCatalogFixture = {
+  enabled: true,
+  low_stock_threshold: 5,
+  products: [
+    {
+      id: 'dust-wave-sticker',
+      name: 'DUST WAVE Sticker',
+      description: 'Sticker',
+      image_url: 'https://shop.dustwave.xyz/assets/images/sticker-glove.png',
+      price: 3,
+      category: 'physical',
+      inventory: 50,
+      shipping_preset: 'sticker',
+      shipping: {
+        weight_oz: 1,
+        length_in: 4,
+        width_in: 4,
+        height_in: 0.125
+      },
+      variants: []
+    },
+    {
+      id: 'dust-wave-tshirt',
+      name: 'DUST WAVE T-Shirt',
+      description: 'T-shirt',
+      image_url: 'https://shop.dustwave.xyz/assets/images/dustwave-tshirt.png',
+      price: 25,
+      category: 'physical',
+      shipping_preset: 'tshirt',
+      shipping: {
+        weight_oz: 8,
+        length_in: 10,
+        width_in: 8,
+        height_in: 1
+      },
+      variant_option_name: 'Size',
+      variants: [
+        { id: 'm', label: 'M', inventory: 4 },
+        { id: 'l', label: 'L', inventory: 4 }
+      ]
+    }
+  ]
+};
+
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -424,6 +468,9 @@ beforeEach(() => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     if (url === 'https://pool.test/api/campaigns.json') {
       return jsonResponse({ campaigns: [campaignFixture, singleTierCampaignFixture, smokeEditableCampaignFixture, metadataFallbackCampaignFixture] });
+    }
+    if (url === 'https://pool.test/api/add-ons.json') {
+      return jsonResponse(addOnCatalogFixture);
     }
     throw new Error(`Unexpected fetch: ${url}`);
   }) as typeof fetch;
@@ -514,6 +561,215 @@ describe('Worker business logic hardening', () => {
         })
       ]
     });
+  });
+
+  it('stores bundle-level add-ons and an anchor campaign for multi-campaign checkout', async () => {
+    const checkoutIntents = new MockCheckoutIntentNamespace();
+    const tierInventory = new MockTierInventoryNamespace();
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: checkoutIntents,
+      TIER_INVENTORY_COORDINATOR: tierInventory
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [
+            { id: 'hand-relations__frame-slot', quantity: 1 },
+            { id: 'sunder__poster', quantity: 1 },
+            { id: 'addon__dust-wave-tshirt__variant__m', quantity: 2 },
+            { id: 'addon__dust-wave-sticker', quantity: 1 }
+          ],
+          email: 'buyer@example.com',
+          tipPercent: 5,
+          bundleAddOnAnchorCampaignSlug: 'sunder'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    expect(sessionPayload.metadata.checkoutBundleMode).toBe('true');
+    expect(sessionPayload.metadata.checkoutBundleHasAddOns).toBe('true');
+    expect(sessionPayload.metadata.bundleAddOnAnchorCampaignSlug).toBe('sunder');
+
+    const kv = env.PLEDGES as MockKVNamespace;
+    const manifest = await kv.get(sessionPayload.metadata.orderId ? `pending-checkout:${sessionPayload.metadata.orderId}` : '', { type: 'json' });
+    expect(manifest).toMatchObject({
+      campaignCount: 2,
+      bundleAddOnAnchorCampaignSlug: 'sunder',
+      bundleAddOnTotals: {
+        count: 2,
+        quantity: 3,
+        subtotal: 5300
+      },
+      bundleAddOns: [
+        expect.objectContaining({
+          productId: 'dust-wave-sticker',
+          quantity: 1,
+          unitPrice: 300
+        }),
+        expect.objectContaining({
+          productId: 'dust-wave-tshirt',
+          variantId: 'm',
+          variantLabel: 'M',
+          quantity: 2,
+          unitPrice: 2500
+        })
+      ]
+    });
+  });
+
+  it('returns remaining add-on inventory without counting merch toward campaign funding', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('pledge:bundle-order-1-sunder:buyer@example.com', JSON.stringify({
+      orderId: 'bundle-order-1-sunder',
+      campaignSlug: 'sunder',
+      pledgeStatus: 'active',
+      bundleAddOns: [
+        {
+          productId: 'dust-wave-sticker',
+          quantity: 3
+        },
+        {
+          productId: 'dust-wave-tshirt',
+          variantId: 'm',
+          quantity: 2
+        }
+      ]
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/add-ons/inventory'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      lowStockThreshold: 5,
+      products: {
+        'dust-wave-sticker': expect.objectContaining({
+          inventory: 50,
+          sold: 3,
+          remaining: 47
+        }),
+        'dust-wave-tshirt': expect.objectContaining({
+          inventory: 8,
+          sold: 2,
+          remaining: 6,
+          variants: {
+            m: expect.objectContaining({
+              inventory: 4,
+              sold: 2,
+              remaining: 2,
+              soldOut: false
+            }),
+            l: expect.objectContaining({
+              inventory: 4,
+              sold: 0,
+              remaining: 4
+            })
+          }
+        })
+      }
+    });
+  });
+
+  it('sends a modification email when add-on contents change without changing totals', async () => {
+    mockVerifyToken.mockResolvedValue({
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      orderId: 'pool-intent-same-price-123'
+    });
+
+    const env = createEnv();
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('pledge:pool-intent-same-price-123', JSON.stringify({
+      orderId: 'pool-intent-same-price-123',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'active',
+      charged: false,
+      tierId: 'frame-slot',
+      tierName: 'Buy 1 Frame',
+      tierQty: 1,
+      additionalTiers: [],
+      supportItems: [],
+      customAmount: 0,
+      subtotal: 3500,
+      goalTrackingSubtotal: 1000,
+      tax: 276,
+      shipping: 300,
+      tipPercent: 7,
+      tipAmount: 245,
+      amount: 4321,
+      shippingOption: 'standard',
+      preferredLang: 'en',
+      shippingAddress: {
+        postalCode: '80205',
+        country: 'US'
+      },
+      bundleAddOns: [
+        {
+          productId: 'dust-wave-tshirt',
+          name: 'DUST WAVE T-Shirt',
+          variantId: 'm',
+          variantLabel: 'M',
+          quantity: 1,
+          unitPrice: 2500,
+          category: 'physical',
+          shipping_preset: 'tshirt'
+        }
+      ]
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge/modify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: 'magic-token',
+          orderId: 'pool-intent-same-price-123',
+          preferredLang: 'en',
+          bundleAddOns: [
+            {
+              productId: 'dust-wave-tshirt',
+              variantId: 'l',
+              quantity: 1
+            }
+          ]
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSendPledgeModifiedEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendPledgeModifiedEmail).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        email: 'buyer@example.com',
+        pledgeItems: expect.objectContaining({
+          addOns: [
+            expect.objectContaining({
+              productId: 'dust-wave-tshirt',
+              variantId: 'l',
+              variantLabel: 'L'
+            })
+          ]
+        })
+      })
+    );
   });
 
   it('uses the provided shipping destination when starting a physical first-party checkout', async () => {
@@ -665,13 +921,15 @@ describe('Worker business logic hardening', () => {
             hasPhysical: true,
             physicalTierCount: 1,
             physicalSupportItemCount: 0,
+            physicalAddOnCount: 0,
             physicalUnitCount: 1,
             weightOz: 4,
             lengthIn: 7,
             widthIn: 5.5,
             heightIn: 0.75,
             tierIds: ['blu-ray'],
-            supportItemIds: []
+            supportItemIds: [],
+            addOnIds: []
           }
         }
       ],
@@ -722,13 +980,15 @@ describe('Worker business logic hardening', () => {
             hasPhysical: true,
             physicalTierCount: 0,
             physicalSupportItemCount: 1,
+            physicalAddOnCount: 0,
             physicalUnitCount: 1,
             weightOz: 7,
             lengthIn: 11,
             widthIn: 8.5,
             heightIn: 0.5,
             tierIds: [],
-            supportItemIds: ['signed-script']
+            supportItemIds: ['signed-script'],
+            addOnIds: []
           }
         }
       ],
@@ -779,6 +1039,7 @@ describe('Worker business logic hardening', () => {
             hasPhysical: true,
             physicalTierCount: 1,
             physicalSupportItemCount: 0,
+            physicalAddOnCount: 0,
             physicalUnitCount: 1,
             weightOz: 0,
             lengthIn: 0,
@@ -786,6 +1047,7 @@ describe('Worker business logic hardening', () => {
             heightIn: 0,
             tierIds: ['owl-sticker'],
             supportItemIds: [],
+            addOnIds: [],
             metadataIncomplete: true
           }
         }
@@ -835,13 +1097,15 @@ describe('Worker business logic hardening', () => {
             hasPhysical: false,
             physicalTierCount: 0,
             physicalSupportItemCount: 0,
+            physicalAddOnCount: 0,
             physicalUnitCount: 0,
             weightOz: 0,
             lengthIn: 0,
             widthIn: 0,
             heightIn: 0,
             tierIds: [],
-            supportItemIds: []
+            supportItemIds: [],
+            addOnIds: []
           }
         }
       ],
@@ -851,6 +1115,108 @@ describe('Worker business logic hardening', () => {
         postalCode: '80205'
       }
     });
+  });
+
+  it('treats physical bundle add-ons as shippable in shipping quotes', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/shipping/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [
+            { id: 'hand-relations__frame-slot', quantity: 1 },
+            { id: 'addon__dust-wave-sticker', quantity: 1 }
+          ],
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          },
+          bundleAddOnAnchorCampaignSlug: 'hand-relations'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      quotes: [
+        {
+          campaignSlug: 'hand-relations',
+          shippingCents: 300,
+          source: 'fallback_flat_rate',
+          carrier: 'fallback',
+          service: 'domestic_ground_fallback',
+          domestic: true,
+          availableOptions: [
+            { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 300 }
+          ],
+          defaultOption: 'standard',
+          selectedOption: 'standard',
+          shipment: {
+            hasPhysical: true,
+            physicalTierCount: 0,
+            physicalSupportItemCount: 0,
+            physicalAddOnCount: 1,
+            physicalUnitCount: 1,
+            weightOz: 1,
+            lengthIn: 4,
+            widthIn: 4,
+            heightIn: 0.125,
+            tierIds: [],
+            supportItemIds: [],
+            addOnIds: ['dust-wave-sticker']
+          }
+        }
+      ],
+      totalShippingCents: 300,
+      shippingAddress: {
+        country: 'US',
+        postalCode: '80205'
+      }
+    });
+  });
+
+  it('returns summed shipping for mixed-campaign carts with digital and physical tiers', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/shipping/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [
+            { id: 'hand-relations__frame-slot', quantity: 1 },
+            { id: 'smoke-editable__support__signed-script', amount: 25 }
+          ],
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.totalShippingCents).toBe(1200);
+    expect(data.quotes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        campaignSlug: 'hand-relations',
+        shippingCents: 0,
+        source: 'none'
+      }),
+      expect.objectContaining({
+        campaignSlug: 'smoke-editable',
+        shippingCents: 1200,
+        source: 'fallback_flat_rate'
+      })
+    ]));
   });
 
   it('returns custom checkout bootstrap data when custom UI mode is enabled', async () => {

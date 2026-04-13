@@ -86,6 +86,8 @@ describe('supporter email tip breakdowns', () => {
 
     const payload = getEmailPayload(fetchMock);
     expect(payload.html).toContain(PLATFORM_TIP_LINE);
+    expect(payload.html).toContain('Dust Wave tip changed:');
+    expect(payload.html).toContain('$1.75 → $2.10 (+$0.35, 6%)');
     expect(payload.html).toContain('New total (if funded): $42.86');
     expect(payload.from).toBe('The Pool <pledges@pool.test>');
   });

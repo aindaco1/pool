@@ -13,6 +13,7 @@
   const FIRST_PARTY_CART_DRAFT_KEY = 'pool_first_party_cart_draft';
   const PENDING_PLEDGE_KEY = 'pool_pending_pledge';
   const LIVE_REFRESH_MARKER_KEY = 'pool_live_refresh_needed';
+  const ADD_ON_ITEM_PREFIX = 'addon__';
   const CART_VIEW_ROUTE = '/cart';
   const CHECKOUT_VIEW_ROUTE = '/checkout';
   const DEFAULT_WORKER_BASE = 'https://pledge.dustwave.xyz';
@@ -208,13 +209,27 @@
       const resolvedOption = this.normalizeSelection(options, selectedOption, defaultOption);
       return options.find((option) => option?.id === resolvedOption) || null;
     },
+    getPrimaryQuote: function(quotes) {
+      const normalizedQuotes = Array.isArray(quotes) ? quotes : [];
+      const shippableQuotes = normalizedQuotes.filter((quote) => (
+        Number(quote?.shippingCents || 0) > 0 || quote?.shipment?.hasPhysical === true
+      ));
+      return shippableQuotes[0] || normalizedQuotes[0] || null;
+    },
     resolveQuote: function(payload, selectedOption, fallbackShippingCents) {
-      const firstQuote = Array.isArray(payload?.quotes) ? payload.quotes[0] : null;
-      const availableOptions = Array.isArray(firstQuote?.availableOptions) ? firstQuote.availableOptions : [];
-      const defaultOption = String(firstQuote?.defaultOption || 'standard').trim().toLowerCase() || 'standard';
+      const quotes = Array.isArray(payload?.quotes) ? payload.quotes : [];
+      const primaryQuote = this.getPrimaryQuote(quotes);
+      const shippableQuotes = quotes.filter((quote) => (
+        Number(quote?.shippingCents || 0) > 0 || quote?.shipment?.hasPhysical === true
+      ));
+      const optionSourceQuote = shippableQuotes.length === 1 ? shippableQuotes[0] : primaryQuote;
+      const availableOptions = shippableQuotes.length === 1 && Array.isArray(optionSourceQuote?.availableOptions)
+        ? optionSourceQuote.availableOptions
+        : [];
+      const defaultOption = String(optionSourceQuote?.defaultOption || 'standard').trim().toLowerCase() || 'standard';
       const resolvedOption = this.normalizeSelection(
         availableOptions,
-        selectedOption || firstQuote?.selectedOption,
+        selectedOption || optionSourceQuote?.selectedOption,
         defaultOption
       );
       const selectedDetails = this.getSelectedDetails(availableOptions, resolvedOption, defaultOption);
@@ -224,7 +239,7 @@
 
       return {
         shippingCents,
-        source: String(firstQuote?.source || ''),
+        source: String(primaryQuote?.source || ''),
         availableOptions,
         defaultOption,
         selectedOption: resolvedOption
@@ -245,9 +260,376 @@
       return `${label} (+${formattedDelta})`;
     }
   };
+  const addOnUtils = window.PoolAddOnUtils || {
+    invalidateCachedInventory: function() {
+      try {
+        localStorage.removeItem('pool_add_on_inventory');
+      } catch (_error) {}
+    },
+    getCatalog: function(config) {
+      return {
+        enabled: config?.enabled === true,
+        products: Array.isArray(config?.products) ? config.products : []
+      };
+    },
+    findProduct: function(catalog, productId) {
+      return this.getCatalog(catalog).products.find((product) => String(product?.id || '') === String(productId || '')) || null;
+    },
+    findVariant: function(product, variantId) {
+      const variants = Array.isArray(product?.variants) ? product.variants : [];
+      return variants.find((variant) => String(variant?.id || '') === String(variantId || '')) || null;
+    },
+    getSelectionKey: function(selection) {
+      return `${String(selection?.productId || '').trim()}::${String(selection?.variantId || '').trim()}`;
+    },
+    getOptionLabel: function(option) {
+      return option?.variantLabel ? `${option.name} (${option.variantLabel})` : String(option?.name || '');
+    },
+    normalizeSelection: function(selection, catalog) {
+      const product = this.findProduct(catalog, selection?.productId);
+      if (!product) return null;
+
+      const quantity = Math.max(0, Number(selection?.quantity || 0));
+      if (!Number.isFinite(quantity) || quantity <= 0) return null;
+
+      const variants = Array.isArray(product?.variants) ? product.variants : [];
+      let variantId = String(selection?.variantId || '').trim();
+      let variantLabel = String(selection?.variantLabel || '').trim();
+      if (variants.length > 0) {
+        const variant = this.findVariant(product, variantId);
+        if (!variant) return null;
+        variantId = String(variant.id || '');
+        variantLabel = String(variant.label || variantId);
+      } else {
+        variantId = '';
+        variantLabel = '';
+      }
+
+      return {
+        productId: String(product.id || ''),
+        name: String(product.name || ''),
+        description: String(product.description || ''),
+        imageUrl: String(product.image_url || ''),
+        sourceUrl: String(product.source_url || ''),
+        quantity,
+        unitPrice: Math.round(Number(product.price || 0) * 100),
+        category: String(product.category || 'digital'),
+        shipping_preset: product.shipping_preset || null,
+        shipping: product.shipping || null,
+        variantOptionName: String(product.variant_option_name || ''),
+        variantId,
+        variantLabel
+      };
+    },
+    normalizeSelections: function(selections, catalog) {
+      return (Array.isArray(selections) ? selections : [])
+        .map((selection) => this.normalizeSelection(selection, catalog))
+        .filter(Boolean)
+        .sort((a, b) => (
+          a.productId.localeCompare(b.productId) ||
+          a.variantId.localeCompare(b.variantId)
+        ));
+    },
+    flattenCatalogOptions: function(catalog) {
+      return this.getCatalog(catalog).products.flatMap((product) => {
+        const variants = Array.isArray(product?.variants) ? product.variants : [];
+        if (variants.length === 0) {
+          return [{
+            productId: String(product?.id || ''),
+            variantId: '',
+            variantLabel: '',
+            key: this.getSelectionKey({ productId: product?.id, variantId: '' }),
+            name: String(product?.name || ''),
+            description: String(product?.description || ''),
+            imageUrl: String(product?.image_url || ''),
+            unitPrice: Math.round(Number(product?.price || 0) * 100),
+            category: String(product?.category || 'digital'),
+            sourceUrl: String(product?.source_url || '')
+          }];
+        }
+
+        return variants.map((variant) => ({
+          productId: String(product?.id || ''),
+          variantId: String(variant?.id || ''),
+          variantLabel: String(variant?.label || variant?.id || ''),
+          key: this.getSelectionKey({ productId: product?.id, variantId: variant?.id }),
+          name: String(product?.name || ''),
+          description: String(product?.description || ''),
+          imageUrl: String(product?.image_url || ''),
+          unitPrice: Math.round(Number(product?.price || 0) * 100),
+          category: String(product?.category || 'digital'),
+          sourceUrl: String(product?.source_url || '')
+        }));
+      });
+    },
+    getSelectionQuantityMap: function(selections, catalog) {
+      const map = new Map();
+      this.normalizeSelections(selections, catalog).forEach((selection) => {
+        map.set(this.getSelectionKey(selection), selection.quantity);
+      });
+      return map;
+    },
+    buildSelectionEntries: function(selections, catalog) {
+      return this.normalizeSelections(selections, catalog).map((selection) => ({
+        productId: selection.productId,
+        variantId: selection.variantId,
+        variantLabel: selection.variantLabel,
+        quantity: Math.max(1, Number(selection.quantity || 1)),
+        category: selection.category || 'digital',
+        name: selection.name,
+        description: selection.description,
+        imageUrl: selection.imageUrl,
+        sourceUrl: selection.sourceUrl,
+        unitPrice: selection.unitPrice,
+        shipping: selection.shipping || null,
+        shipping_preset: selection.shipping_preset || null
+      }));
+    },
+    selectionsFromCartItems: function(items, catalog) {
+      return (Array.isArray(items) ? items : [])
+        .map((item) => {
+          const rawId = String(item?.id || '').trim();
+          if (!rawId.startsWith('addon__')) return null;
+          const match = rawId.match(/^addon__(.+?)(?:__variant__(.+))?$/);
+          if (!match) return null;
+          return this.normalizeSelection({
+            productId: String(match[1] || ''),
+            variantId: String(match[2] || ''),
+            quantity: Math.max(1, Number(item?.quantity || 1))
+          }, catalog);
+        })
+        .filter(Boolean)
+        .sort((a, b) => (
+          a.productId.localeCompare(b.productId) ||
+          a.variantId.localeCompare(b.variantId)
+        ));
+    },
+    buildCartItem: function(selection, catalog) {
+      const normalized = this.normalizeSelection(selection, catalog);
+      if (!normalized) return null;
+
+      const itemId = normalized.variantId
+        ? `addon__${normalized.productId}__variant__${normalized.variantId}`
+        : `addon__${normalized.productId}`;
+      const customFields = [];
+      if (normalized.variantId) {
+        customFields.push({ name: '_variant_id', value: normalized.variantId });
+      }
+      if (normalized.variantLabel) {
+        customFields.push({ name: '_variant_label', value: normalized.variantLabel });
+      }
+      if (normalized.category) {
+        customFields.push({ name: '_category', value: normalized.category });
+      }
+
+      return {
+        id: itemId,
+        uniqueId: itemId,
+        name: normalized.name,
+        description: normalized.description,
+        imageUrl: normalized.imageUrl,
+        url: normalized.sourceUrl || '/',
+        price: normalized.unitPrice / 100,
+        quantity: normalized.quantity,
+        stackable: true,
+        shippable: normalized.category === 'physical',
+        customFields
+      };
+    }
+  };
+  if (typeof addOnUtils.getLowStockThreshold !== 'function') {
+    addOnUtils.getLowStockThreshold = function(config) {
+      return Math.max(0, Number(config?.low_stock_threshold ?? config?.lowStockThreshold ?? 5) || 5);
+    };
+  }
+  if (typeof addOnUtils.buildProductStateEntries !== 'function') {
+    addOnUtils.buildProductStateEntries = function(catalog, selections, inventorySnapshot) {
+      const resolvedCatalog = this.getCatalog(catalog);
+      const threshold = this.getLowStockThreshold(resolvedCatalog);
+      const selectedEntries = this.buildSelectionEntries(selections, resolvedCatalog);
+      const selectedByProduct = new Map();
+      selectedEntries.forEach((entry) => {
+        if (!selectedByProduct.has(entry.productId)) {
+          selectedByProduct.set(entry.productId, entry);
+        }
+      });
+
+      return resolvedCatalog.products.map((product) => {
+        const selected = selectedByProduct.get(String(product?.id || '')) || null;
+        const snapshot = inventorySnapshot?.products?.[product?.id] || {};
+        const variants = Array.isArray(product?.variants) ? product.variants : [];
+        const hasVariants = variants.length > 0;
+
+        const variantStates = variants.map((variant) => {
+          const variantId = String(variant?.id || '');
+          const variantSnapshot = snapshot?.variants?.[variantId] || {};
+          const configuredInventory = Number.isFinite(Number(variant?.inventory)) && Number(variant.inventory) >= 0 ? Math.round(Number(variant.inventory)) : null;
+          const remaining = variantSnapshot?.remaining === null || variantSnapshot?.remaining === undefined
+            ? configuredInventory
+            : (Number.isFinite(Number(variantSnapshot.remaining)) ? Math.max(0, Number(variantSnapshot.remaining)) : configuredInventory);
+          const selectedQuantity = selected?.variantId === variantId ? Math.max(1, Number(selected.quantity || 1)) : 0;
+          const maxQuantity = remaining;
+          const editableMaxQuantity = remaining === null ? null : remaining + selectedQuantity;
+          const available = maxQuantity === null ? true : maxQuantity > 0;
+          return {
+            id: variantId,
+            label: String(variant?.label || variantId),
+            inventory: configuredInventory,
+            sold: Math.max(0, Number(variantSnapshot?.sold || 0)),
+            remaining,
+            maxQuantity,
+            editableMaxQuantity,
+            selected: selected?.variantId === variantId,
+            available,
+            lowStock: available && maxQuantity !== null && maxQuantity <= threshold
+          };
+        }).filter((variant) => variant.available || variant.selected);
+
+        const defaultVariant = hasVariants
+          ? (variantStates.find((variant) => variant.selected) || variantStates[0] || null)
+          : null;
+        const configuredInventory = Number.isFinite(Number(product?.inventory)) && Number(product.inventory) >= 0 ? Math.round(Number(product.inventory)) : null;
+        const remaining = snapshot?.remaining === null || snapshot?.remaining === undefined
+          ? configuredInventory
+          : (Number.isFinite(Number(snapshot.remaining)) ? Math.max(0, Number(snapshot.remaining)) : configuredInventory);
+        const selectedQuantity = !hasVariants && selected ? Math.max(1, Number(selected.quantity || 1)) : 0;
+        const maxQuantity = hasVariants ? (defaultVariant?.maxQuantity ?? null) : remaining;
+        const editableMaxQuantity = hasVariants ? (defaultVariant?.editableMaxQuantity ?? null) : (remaining === null ? null : remaining + selectedQuantity);
+        const available = hasVariants ? variantStates.length > 0 : (maxQuantity === null ? true : maxQuantity > 0);
+
+        return {
+          productId: String(product?.id || ''),
+          name: String(product?.name || ''),
+          description: String(product?.description || ''),
+          imageUrl: String(product?.image_url || ''),
+          sourceUrl: String(product?.source_url || ''),
+          priceCents: Math.round(Number(product?.price || 0) * 100),
+          category: String(product?.category || 'digital'),
+          variantOptionName: String(product?.variant_option_name || 'Option'),
+          inventory: configuredInventory,
+          sold: Math.max(0, Number(snapshot?.sold || 0)),
+          remaining,
+          maxQuantity,
+          editableMaxQuantity,
+          available,
+          lowStock: !hasVariants && available && maxQuantity !== null && maxQuantity <= threshold,
+          selectedQuantity: Math.max(1, Number(selected?.quantity || 1)),
+          selectedVariantId: hasVariants ? String(selected?.variantId || defaultVariant?.id || '') : '',
+          selectedVariantLabel: hasVariants ? String(selected?.variantLabel || defaultVariant?.label || '') : '',
+          inCart: !!selected,
+          variants: variantStates
+        };
+      }).filter((product) => product.available || product.inCart);
+    };
+  }
+  const ADD_ON_CATALOG = addOnUtils.getCatalog(window.POOL_CONFIG?.addOns);
+  const ADD_ON_OPTIONS = addOnUtils.flattenCatalogOptions(ADD_ON_CATALOG);
+  const ADD_ON_INVENTORY_CACHE_KEY = 'pool_add_on_inventory';
+  let addOnInventorySnapshot = null;
+  let addOnInventoryRequest = null;
+  let requestCartAddOnInventoryRerender = null;
+  const cartAddOnDrafts = new Map();
+
+  function getPlatformAuthorName() {
+    return String(
+      window.POOL_CONFIG?.platform?.author ||
+      window.POOL_CONFIG?.platformAuthor ||
+      window.POOL_CONFIG?.platform?.companyName ||
+      window.POOL_CONFIG?.platformCompanyName ||
+      getPlatformName()
+    ).trim() || getPlatformName();
+  }
+
+  function getAddOnInventoryTtlMs() {
+    const parsed = Number(
+      window.POOL_CONFIG?.cache?.liveInventoryTtlSeconds ??
+      window.POOL_CONFIG?.liveInventoryCacheTtlSeconds ??
+      300
+    );
+    return (Number.isFinite(parsed) && parsed >= 0 ? parsed : 300) * 1000;
+  }
+
+  function readCachedAddOnInventory() {
+    try {
+      const raw = localStorage.getItem(ADD_ON_INVENTORY_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const ttlMs = getAddOnInventoryTtlMs();
+      const savedAt = Number(parsed.savedAt || 0);
+      if (ttlMs > 0 && savedAt > 0 && (Date.now() - savedAt) > ttlMs) {
+        return null;
+      }
+      return parsed.data || null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writeCachedAddOnInventory(data) {
+    try {
+      localStorage.setItem(ADD_ON_INVENTORY_CACHE_KEY, JSON.stringify({
+        savedAt: Date.now(),
+        data
+      }));
+    } catch (_error) {}
+  }
+
+  async function fetchCartAddOnInventorySnapshot(options) {
+    const force = options?.force === true;
+    if (!force && addOnInventorySnapshot) {
+      return addOnInventorySnapshot;
+    }
+
+    if (!force) {
+      const cached = readCachedAddOnInventory();
+      if (cached) {
+        addOnInventorySnapshot = cached;
+        return cached;
+      }
+    }
+
+    try {
+      const response = await fetch(`${getWorkerBase()}/add-ons/inventory`);
+      if (!response.ok) {
+        throw new Error(`Failed to load add-on inventory (${response.status})`);
+      }
+      const data = await response.json();
+      addOnInventorySnapshot = data;
+      writeCachedAddOnInventory(data);
+      return data;
+    } catch (_error) {
+      return addOnInventorySnapshot || {
+        lowStockThreshold: addOnUtils.getLowStockThreshold(ADD_ON_CATALOG),
+        products: {}
+      };
+    }
+  }
+
+  function ensureCartAddOnInventorySnapshot() {
+    if (addOnInventoryRequest) return addOnInventoryRequest;
+    addOnInventoryRequest = fetchCartAddOnInventorySnapshot().then((data) => {
+      addOnInventorySnapshot = data;
+      if (typeof requestCartAddOnInventoryRerender === 'function') {
+        requestCartAddOnInventoryRerender();
+      } else if (typeof renderFirstPartyCart === 'function') {
+        renderFirstPartyCart();
+      }
+      return data;
+    }).finally(() => {
+      addOnInventoryRequest = null;
+    });
+    return addOnInventoryRequest;
+  }
 
   function getRuntimeMessages() {
     return window.POOL_CONFIG?.i18n?.messages || {};
+  }
+
+  function getRuntimeLocale() {
+    const htmlLang = String(document.documentElement?.lang || '').trim();
+    if (htmlLang) return htmlLang;
+    return String(window.POOL_CONFIG?.i18n?.lang || 'en').trim() || 'en';
   }
 
   function getRuntimeMessage(path, fallback) {
@@ -258,6 +640,14 @@
       value = value[part];
     }
     return typeof value === 'string' && value ? value : fallback;
+  }
+
+  function humanizeIdentifier(value) {
+    return String(value || '')
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
   }
 
   function getRequestedRuntime() {
@@ -359,8 +749,11 @@
 
   function renderShippingCountryOptions(selectedValue) {
     const selected = String(selectedValue || DEFAULT_SHIPPING_COUNTRY).trim().toUpperCase();
+    const displayNames = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
+      ? new Intl.DisplayNames([getRuntimeLocale()], { type: 'region' })
+      : null;
     return SHIPPING_COUNTRY_OPTIONS.map((option) => `
-      <option value="${escapeHtml(option.value)}" ${selected === option.value ? 'selected' : ''}>${escapeHtml(option.label)}</option>
+      <option value="${escapeHtml(option.value)}" ${selected === option.value ? 'selected' : ''}>${escapeHtml(displayNames?.of(option.value) || option.label)}</option>
     `).join('');
   }
 
@@ -659,12 +1052,15 @@
     window.location.href = url;
   }
 
-  function calculateCartTotals(items, tipPercent = DEFAULT_PLATFORM_TIP_PERCENT) {
+  function calculateCartTotals(items, tipPercent = DEFAULT_PLATFORM_TIP_PERCENT, selectedAnchorSlug = '') {
     const subtotal = items.reduce((sum, item) => sum + ((Number(item.price) || 0) * (Number(item.quantity) || 1)), 0);
     const subtotalCents = Math.round(subtotal * 100);
     const nextTipPercent = sanitizeTipPercent(tipPercent, getDefaultPlatformTipPercent());
     const tipAmountCents = Math.round((subtotalCents * nextTipPercent) / 100);
-    const shippingCents = getCampaignFallbackShippingCents(items);
+    const shippingCents = getCampaignFallbackShippingCents(
+      items,
+      selectedAnchorSlug
+    );
     const taxCents = calculateTax(subtotalCents);
 
     return {
@@ -734,12 +1130,71 @@
     return Math.round(Math.max(0, Number(subtotalCents) || 0) * getSalesTaxRate());
   }
 
+  function isAddOnCartItem(item) {
+    return String(item?.id || '').trim().startsWith(ADD_ON_ITEM_PREFIX);
+  }
+
+  function getCartBundleAddOnSelections(items) {
+    if (!ADD_ON_CATALOG.enabled) return [];
+    return addOnUtils.selectionsFromCartItems
+      ? addOnUtils.selectionsFromCartItems(items, ADD_ON_CATALOG)
+      : [];
+  }
+
+  function getCartBundleAddOnSelectionKey(selection) {
+    return addOnUtils.getSelectionKey
+      ? addOnUtils.getSelectionKey(selection)
+      : `${String(selection?.productId || '').trim()}::${String(selection?.variantId || '').trim()}`;
+  }
+
+  function getCartAddOnOptionLabel(option) {
+    return addOnUtils.getOptionLabel
+      ? addOnUtils.getOptionLabel(option)
+      : String(option?.name || '');
+  }
+
   function getFirstPartyItemCampaignSlug(item) {
+    if (isAddOnCartItem(item)) return '';
     const idSlug = typeof item?.id === 'string' ? item.id.split('__')[0] : '';
     if (idSlug) return idSlug;
 
     const url = String(item?.url || '');
     return url.split('/campaigns/')[1]?.split('/')[0] || '';
+  }
+
+  function getCartCampaignDisplayName(items, slug) {
+    const matchingItem = (Array.isArray(items) ? items : []).find((item) => {
+      return !isAddOnCartItem(item) && getFirstPartyItemCampaignSlug(item) === slug;
+    });
+
+    const explicitLabel = String(matchingItem?.campaignTitle || '').trim();
+    if (explicitLabel) return explicitLabel;
+
+    const itemName = String(matchingItem?.name || '').trim();
+    if (itemName.includes(' — ')) {
+      return itemName.split(' — ')[0].trim();
+    }
+
+    return humanizeIdentifier(slug);
+  }
+
+  function getCartBundleAddOnAnchorOptions(items) {
+    return getFirstPartyCampaignSlugs(items).map((slug) => ({
+      value: slug,
+      label: getCartCampaignDisplayName(items, slug)
+    }));
+  }
+
+  function resolveCartBundleAddOnAnchorCampaignSlug(items, preferredSlug) {
+    const options = getCartBundleAddOnAnchorOptions(items);
+    if (options.length === 0) return '';
+
+    const requested = String(preferredSlug || '').trim();
+    if (requested && options.some((option) => option.value === requested)) {
+      return requested;
+    }
+
+    return String(options[0]?.value || '');
   }
 
   function firstPartyItemIsPhysical(item) {
@@ -752,6 +1207,7 @@
   function getPhysicalCampaignCount(items) {
     const slugs = new Set();
     for (const item of Array.isArray(items) ? items : []) {
+      if (isAddOnCartItem(item)) continue;
       if (!firstPartyItemIsPhysical(item)) continue;
       const slug = getFirstPartyItemCampaignSlug(item);
       if (slug) slugs.add(slug);
@@ -759,27 +1215,59 @@
     return slugs.size;
   }
 
-  function getCampaignFallbackShippingCents(items) {
+  function getFallbackShippingCentsForCampaignSlug(items, campaignSlug) {
+    const normalizedSlug = String(campaignSlug || '').trim();
+    const campaignItem = (Array.isArray(items) ? items : []).find((item) => (
+      !isAddOnCartItem(item) &&
+      getFirstPartyItemCampaignSlug(item) === normalizedSlug
+    ));
+    const parsed = Number(campaignItem?.campaignShippingFallbackCents);
+    const campaignFreeShipping = campaignItem?.campaignFreeShipping;
+    const resolvedFreeShipping = campaignFreeShipping === true
+      ? true
+      : campaignFreeShipping === false
+        ? false
+        : isGlobalFreeShippingDefaultEnabled();
+
+    if (resolvedFreeShipping) {
+      return 0;
+    }
+
+    return Number.isFinite(parsed) && parsed >= 0
+      ? Math.round(parsed)
+      : getShippingFallbackFeeCents();
+  }
+
+  function getCampaignFallbackShippingCents(items, selectedAnchorSlug) {
     const fallbackByCampaign = new Map();
-    for (const item of Array.isArray(items) ? items : []) {
+    const normalizedItems = Array.isArray(items) ? items : [];
+    const physicalCampaignSlugs = new Set();
+    for (const item of normalizedItems) {
+      if (isAddOnCartItem(item)) continue;
       if (!firstPartyItemIsPhysical(item)) continue;
       const slug = getFirstPartyItemCampaignSlug(item);
       if (!slug) continue;
-      const parsed = Number(item?.campaignShippingFallbackCents);
-      const campaignFreeShipping = item?.campaignFreeShipping;
-      const resolvedFreeShipping = campaignFreeShipping === true
-        ? true
-        : campaignFreeShipping === false
-          ? false
-          : isGlobalFreeShippingDefaultEnabled();
-      const resolvedAmount = resolvedFreeShipping
-        ? 0
-        : (Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : getShippingFallbackFeeCents());
+      physicalCampaignSlugs.add(slug);
+      const resolvedAmount = getFallbackShippingCentsForCampaignSlug(normalizedItems, slug);
 
       if (!fallbackByCampaign.has(slug) || resolvedAmount === 0) {
         fallbackByCampaign.set(slug, resolvedAmount);
       }
     }
+
+    const hasPhysicalAddOns = normalizedItems.some((item) => isAddOnCartItem(item) && firstPartyItemIsPhysical(item));
+    if (hasPhysicalAddOns) {
+      const resolvedAnchorSlug = resolveCartBundleAddOnAnchorCampaignSlug(normalizedItems, selectedAnchorSlug);
+      if (resolvedAnchorSlug && !fallbackByCampaign.has(resolvedAnchorSlug)) {
+        fallbackByCampaign.set(
+          resolvedAnchorSlug,
+          physicalCampaignSlugs.size === 0
+            ? getShippingFallbackFeeCents()
+            : getFallbackShippingCentsForCampaignSlug(normalizedItems, resolvedAnchorSlug)
+        );
+      }
+    }
+
     return Array.from(fallbackByCampaign.values()).reduce((sum, amount) => sum + amount, 0);
   }
 
@@ -788,7 +1276,10 @@
     const subtotalCents = Math.round((Number(state?.cart?.subtotal || 0)) * 100);
     const tipPercent = sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent());
     const tipAmountCents = Math.round((subtotalCents * tipPercent) / 100);
-    const shippingCents = getCampaignFallbackShippingCents(items);
+    const shippingCents = getCampaignFallbackShippingCents(
+      items,
+      state?.cart?.bundleAddOnAnchorCampaignSlug
+    );
     const taxCents = calculateTax(subtotalCents);
 
     return {
@@ -820,14 +1311,22 @@
     }
 
     const shippingQuote = options?.shippingQuote || null;
-    const fallbackShippingCents = getCampaignFallbackShippingCents(state?.cart?.items?.items || []);
-    const shippingCents = Number.isFinite(Number(shippingQuote?.amountCents))
-      ? Math.max(0, Number(shippingQuote.amountCents))
-      : fallbackShippingCents;
+    const hasPhysicalItems = cartHasPhysicalItems(state?.cart?.items?.items || []);
+    const fallbackShippingCents = getCampaignFallbackShippingCents(
+      state?.cart?.items?.items || [],
+      state?.cart?.bundleAddOnAnchorCampaignSlug
+    );
     const quoteStatus = String(shippingQuote?.status || 'idle').trim().toLowerCase();
-    const hasResolvedQuote = quoteStatus === 'ready';
     const isCalculatingQuote = quoteStatus === 'loading';
     const source = String(shippingQuote?.source || '').trim().toLowerCase();
+    const quotedAmountCents = Number.isFinite(Number(shippingQuote?.amountCents))
+      ? Math.max(0, Number(shippingQuote.amountCents))
+      : null;
+    const shouldFallbackToPhysicalShipping = hasPhysicalItems &&
+      (quotedAmountCents === null || (quotedAmountCents === 0 && (source === '' || source === 'none')));
+    const shippingCents = shouldFallbackToPhysicalShipping
+      ? fallbackShippingCents
+      : (quotedAmountCents ?? fallbackShippingCents);
     const isEstimate = shouldRenderShippingAsEstimate(shippingQuote);
     const shippingLabel = isCalculatingQuote
       ? getRuntimeMessage('cart.shippingCalculating', 'Calculating shipping...')
@@ -957,11 +1456,243 @@
 
   function buildCheckoutLineItems(items) {
     return (items || []).map((item) => ({
-      name: item?.name || item?.id || 'Untitled item',
+      name: getCartItemFieldValue(item, '_variant_label')
+        ? `${item?.name || item?.id || 'Untitled item'} (${getCartItemFieldValue(item, '_variant_label')})`
+        : (item?.name || item?.id || 'Untitled item'),
       quantity: Math.max(1, Number(item?.quantity || 1)),
       showQuantity: item?.stackable === true || Math.max(1, Number(item?.quantity || 1)) > 1,
       amountCents: Math.round((Number(item?.price) || 0) * Math.max(1, Number(item?.quantity || 1)) * 100)
     }));
+  }
+
+  function renderCartBundleAddOnAnchorOptions(items, selectedSlug) {
+    return getCartBundleAddOnAnchorOptions(items).map((option) => `
+      <option value="${escapeAttribute(option.value)}"${option.value === selectedSlug ? ' selected' : ''}>${escapeHtml(option.label)}</option>
+    `).join('');
+  }
+
+  function getCartBundleAddOnSelectionsByProduct(items) {
+    const selections = getCartBundleAddOnSelections(items);
+    const map = new Map();
+    selections.forEach((selection) => {
+      if (!map.has(selection.productId)) {
+        map.set(selection.productId, selection);
+      }
+    });
+    return map;
+  }
+
+  function getCartAddOnProductCards(items) {
+    return (addOnUtils.buildProductStateEntries
+      ? addOnUtils.buildProductStateEntries(ADD_ON_CATALOG, getCartBundleAddOnSelections(items), addOnInventorySnapshot)
+      : []).filter((product) => !product.inCart);
+  }
+
+  function getCartAddOnDraft(product) {
+    const existing = cartAddOnDrafts.get(product.productId);
+    if (existing) {
+      return {
+        variantId: String(existing.variantId || product.selectedVariantId || ''),
+        quantity: Math.max(1, Number(existing.quantity || 1))
+      };
+    }
+
+    return {
+      variantId: String(product.selectedVariantId || product.variants?.[0]?.id || ''),
+      quantity: Math.max(1, Number(product.selectedQuantity || 1))
+    };
+  }
+
+  function setCartAddOnDraft(productId, draft) {
+    cartAddOnDrafts.set(String(productId || ''), {
+      variantId: String(draft?.variantId || ''),
+      quantity: Math.max(1, Number(draft?.quantity || 1))
+    });
+  }
+
+  function getCartAddOnSelectedVariant(product, draft) {
+    if (product.variants?.length) {
+      return product.variants.find((variant) => variant.id === String(draft?.variantId || '')) || product.variants[0] || null;
+    }
+    return null;
+  }
+
+  function renderCartAddOnVariantOptions(product, selectedVariantId) {
+    return (product.variants || []).map((variant) => `
+      <option
+        value="${escapeAttribute(variant.id)}"
+        data-max-quantity="${escapeAttribute(String(Math.max(1, Number(variant.maxQuantity ?? 1))))}"
+        data-remaining="${escapeAttribute(String(Number.isFinite(Number(variant.remaining)) ? Number(variant.remaining) : ''))}"
+        data-low-stock="${variant.lowStock ? 'true' : 'false'}"
+        ${variant.id === selectedVariantId ? ' selected' : ''}
+      >
+        ${escapeHtml(variant.label)}
+      </option>
+    `).join('');
+  }
+
+  function getCartAddOnStockCopy(product, variant) {
+    const count = variant ? variant.maxQuantity : product.maxQuantity;
+    if (!Number.isFinite(Number(count)) || Number(count) <= 0) return '';
+    const isLowStock = variant?.lowStock || product?.lowStock;
+    return getRuntimeMessage(
+      isLowStock ? 'cart.addOnLowStock' : 'cart.addOnStock',
+      isLowStock ? 'Only %{count} left' : '%{count} left'
+    ).replace('%{count}', String(count));
+  }
+
+  function syncCartAddOnCardVariantState(card) {
+    if (!(card instanceof HTMLElement)) return;
+    const variantField = card.querySelector('[data-cart-addon-variant]');
+    const quantityField = card.querySelector('[data-cart-addon-product-quantity]');
+    const statusField = card.querySelector('[data-cart-addon-status]');
+    if (!(quantityField instanceof HTMLInputElement)) return;
+    if (!(variantField instanceof HTMLSelectElement)) {
+      const fallbackMax = Math.max(1, parseInt(quantityField.getAttribute('max') || '1', 10) || 1);
+      const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
+      quantityField.max = String(fallbackMax);
+      quantityField.value = String(Math.min(fallbackMax, currentQuantity));
+      return;
+    }
+
+    const selectedOption = Array.from(variantField.options || []).find((option) => option.value === variantField.value)
+      || variantField.selectedOptions?.[0]
+      || variantField.options?.[variantField.selectedIndex]
+      || null;
+    const maxQuantity = Math.max(1, parseInt(selectedOption?.getAttribute('data-max-quantity') || '1', 10) || 1);
+    const remaining = parseInt(selectedOption?.getAttribute('data-remaining') || '', 10);
+    const isLowStock = selectedOption?.getAttribute('data-low-stock') === 'true';
+    const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
+    quantityField.max = String(maxQuantity);
+    quantityField.value = String(Math.min(maxQuantity, currentQuantity));
+
+    if (!(statusField instanceof HTMLElement)) return;
+    if (Number.isFinite(remaining) && remaining > 0) {
+      statusField.hidden = false;
+      statusField.textContent = getRuntimeMessage(
+        isLowStock ? 'cart.addOnLowStock' : 'cart.addOnStock',
+        isLowStock ? 'Only %{count} left' : '%{count} left'
+      ).replace('%{count}', String(remaining));
+      statusField.classList.toggle('addon-product-card__status--low-stock', isLowStock);
+    } else {
+      statusField.hidden = true;
+      statusField.textContent = '';
+      statusField.classList.remove('addon-product-card__status--low-stock');
+    }
+  }
+
+  function buildCartAddOnSelectionsFromProductState(items, productId, variantId, quantity) {
+    const nextSelections = getCartBundleAddOnSelections(items).filter((selection) => selection.productId !== productId);
+    if (quantity > 0) {
+      nextSelections.push({ productId, variantId, quantity });
+    }
+    return nextSelections;
+  }
+
+  function renderCartAddOnSection(items, selectedAnchorSlug) {
+    if (!ADD_ON_CATALOG.enabled || !ADD_ON_CATALOG.products?.length || !cartHasPledgeItems(items)) {
+      return '';
+    }
+    void ensureCartAddOnInventorySnapshot();
+    const anchorOptions = getCartBundleAddOnAnchorOptions(items);
+    const resolvedAnchorSlug = resolveCartBundleAddOnAnchorCampaignSlug(items, selectedAnchorSlug);
+    const productCards = getCartAddOnProductCards(items);
+    const supportNote = getRuntimeMessage(
+      'cart.platformAddOnsNote',
+      'These add-ons support %{author} and do not count toward the campaign total.'
+    ).replace('%{author}', getPlatformAuthorName());
+
+    if (productCards.length === 0) {
+      return '';
+    }
+
+    return `
+      <section class="pool-first-party-cart__callout pool-first-party-cart__callout--addons">
+        <p class="pool-first-party-cart__section-label">${escapeHtml(
+          getRuntimeMessage('cart.platformAddOns', 'Add-ons').replace('%{platform}', getPlatformName())
+        )}</p>
+        <p class="pool-first-party-cart__note">${escapeHtml(supportNote)}</p>
+        ${anchorOptions.length > 1 ? `
+          <div class="pool-first-party-cart__field pool-first-party-cart__field--summary">
+            <label class="pool-first-party-cart__field-label" for="pool-cart-addon-anchor">${escapeHtml(getRuntimeMessage('cart.addOnAnchorCampaign', 'Attach add-ons to'))}</label>
+            <select id="pool-cart-addon-anchor" class="pool-first-party-cart__input pool-first-party-cart__input--select" data-cart-addon-anchor>
+              ${renderCartBundleAddOnAnchorOptions(items, resolvedAnchorSlug)}
+            </select>
+          </div>
+        ` : ''}
+        <div class="addon-product-grid">
+          ${productCards.map((product) => {
+            const draft = getCartAddOnDraft(product);
+            const selectedVariant = getCartAddOnSelectedVariant(product, draft);
+            const maxQuantity = Math.max(1, Number(selectedVariant?.maxQuantity ?? product.maxQuantity ?? 1));
+            const stockCopy = getCartAddOnStockCopy(product, selectedVariant);
+            const stockClass = (selectedVariant?.lowStock || product.lowStock)
+              ? 'addon-product-card__status addon-product-card__status--block addon-product-card__status--low-stock'
+              : 'addon-product-card__status addon-product-card__status--block';
+            const controlClasses = [
+              'addon-product-card__controls',
+              product.variants?.length ? 'addon-product-card__controls--with-variant' : ''
+            ].filter(Boolean).join(' ');
+            return `
+              <article class="addon-product-card" data-cart-addon-product="${escapeAttribute(product.productId)}" data-cart-addon-active="false">
+                ${product.imageUrl ? `
+                  <div class="addon-product-card__media">
+                    <img class="addon-product-card__image" src="${escapeAttribute(product.imageUrl)}" alt="" loading="lazy" decoding="async">
+                  </div>
+                ` : ''}
+                <div class="addon-product-card__main">
+                  <div class="addon-product-card__header">
+                    <strong class="addon-product-card__name">${escapeHtml(product.name)}</strong>
+                    <span class="addon-product-card__price">${formatCents(product.priceCents || 0)}</span>
+                  </div>
+                  ${product.description ? `<p class="addon-product-card__description">${escapeHtml(product.description)}</p>` : ''}
+                </div>
+                <p class="${stockClass}" data-cart-addon-status aria-live="polite" ${stockCopy ? '' : 'hidden'}>${escapeHtml(stockCopy)}</p>
+                <div class="${controlClasses}">
+                  ${product.variants?.length ? `
+                    <div class="addon-product-card__field addon-product-card__field--variant">
+                      <select
+                        id="pool-cart-addon-variant-${escapeAttribute(product.productId)}"
+                        class="pool-first-party-cart__input pool-first-party-cart__input--select"
+                        aria-label="${escapeAttribute(product.variantOptionName || getRuntimeMessage('cart.addOnVariant', 'Variation'))}"
+                        data-cart-addon-variant
+                        data-addon-product-id="${escapeAttribute(product.productId)}"
+                      >
+                        ${renderCartAddOnVariantOptions(product, selectedVariant?.id || '')}
+                      </select>
+                    </div>
+                  ` : ''}
+                  <div class="addon-product-card__field addon-product-card__field--qty">
+                    <input
+                      id="pool-cart-addon-qty-${escapeAttribute(product.productId)}"
+                      class="pool-first-party-cart__input pool-first-party-cart__input--addon-qty"
+                      type="number"
+                      min="1"
+                      max="${escapeAttribute(String(maxQuantity))}"
+                      step="1"
+                      inputmode="numeric"
+                      pattern="[0-9]*"
+                      aria-label="${escapeAttribute(getRuntimeMessage('cart.quantity', 'Quantity'))}"
+                      value="${escapeAttribute(String(Math.min(maxQuantity, Math.max(1, Number(draft.quantity || 1)))))}"
+                      data-cart-addon-product-quantity
+                      data-addon-product-id="${escapeAttribute(product.productId)}"
+                    >
+                  </div>
+                </div>
+                <div class="addon-product-card__footer">
+                  <button
+                    type="button"
+                    class="btn btn--secondary addon-product-card__button"
+                    data-cart-addon-add
+                    data-addon-product-id="${escapeAttribute(product.productId)}"
+                  >${escapeHtml(getRuntimeMessage('cart.addToCart', 'Add to cart'))}</button>
+                </div>
+              </article>
+            `;
+          }).join('')}
+        </div>
+      </section>
+    `;
   }
 
   function getCurrentPath() {
@@ -1011,13 +1742,36 @@
     return campaignHref.split('/campaigns/')[1]?.split('/')[0] || '';
   }
 
+  function getCartItemFieldValue(item, fieldName) {
+    const fields = Array.isArray(item?.customFields) ? item.customFields : [];
+    const match = fields.find((field) => field?.name === fieldName);
+    return match ? String(match.value || '') : '';
+  }
+
+  function getCartItemMetaLines(item) {
+    const lines = [];
+    const variantLabel = getCartItemFieldValue(item, '_variant_label');
+    if (variantLabel) {
+      lines.push(variantLabel);
+    }
+    if (item.stackable === true || (item.quantity || 1) > 1) {
+      lines.push(getRuntimeMessage('cart.quantity', 'Qty %{count}').replace('%{count}', String(item.quantity || 1)));
+    }
+    return lines;
+  }
+
   function buildFirstPartyCheckoutSnapshot(state) {
     const items = state?.cart?.items?.items || [];
     if (items.length === 0) return null;
+    const firstCampaignItem = items.find((item) => !isAddOnCartItem(item)) || items[0];
 
     return {
       cart: {
         tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent()),
+        bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
+          items,
+          state?.cart?.bundleAddOnAnchorCampaignSlug
+        ),
         items: items.map((item) => ({
           id: item?.id || '',
           name: item?.name || '',
@@ -1025,13 +1779,14 @@
           quantity: Math.max(1, Number(item?.quantity || 1)),
           url: item?.url || '',
           description: item?.description || '',
+          imageUrl: item?.imageUrl || '',
           stackable: item?.stackable === true,
           shippable: item?.shippable === true,
           maxQuantity: Number.isFinite(Number(item?.maxQuantity)) ? Number(item?.maxQuantity) : undefined,
           customFields: Array.isArray(item?.customFields) ? item.customFields : undefined
         }))
       },
-      campaignUrl: String(items[0]?.url || '/'),
+      campaignUrl: String(firstCampaignItem?.url || '/'),
       savedAt: Date.now()
     };
   }
@@ -1196,12 +1951,18 @@
   }
 
   function buildPersistedFirstPartyCartState(state) {
-    const items = Array.isArray(state?.cart?.items?.items) ? state.cart.items.items : [];
+    const items = coerceBundleAddOnCartItems(
+      Array.isArray(state?.cart?.items?.items) ? state.cart.items.items : []
+    );
     if (items.length === 0) return null;
 
     return {
       token: String(state?.cart?.token || `${FIRST_PARTY_CART_TOKEN_PREFIX}${Date.now().toString(36)}`),
       tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent()),
+      bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
+        items,
+        state?.cart?.bundleAddOnAnchorCampaignSlug
+      ),
       items: items.map((item) => ({
         id: String(item?.id || ''),
         uniqueId: String(item?.uniqueId || ''),
@@ -1210,6 +1971,7 @@
         quantity: Math.max(1, Number(item?.quantity || 1)),
         url: String(item?.url || ''),
         description: String(item?.description || ''),
+        imageUrl: String(item?.imageUrl || ''),
         stackable: item?.stackable === true,
         shippable: item?.shippable === true,
         maxQuantity: Number.isFinite(Number(item?.maxQuantity)) ? Number(item?.maxQuantity) : undefined,
@@ -1242,9 +2004,9 @@
         return null;
       }
 
-      const items = persisted.items
+      const items = coerceBundleAddOnCartItems(persisted.items
         .map((item) => normalizeCartItem(item))
-        .filter((item) => item.id);
+        .filter((item) => item.id));
 
       if (items.length === 0) {
         return null;
@@ -1253,6 +2015,10 @@
       return {
         token: String(persisted?.token || `${FIRST_PARTY_CART_TOKEN_PREFIX}${Date.now().toString(36)}`),
         tipPercent: sanitizeTipPercent(persisted?.tipPercent, getDefaultPlatformTipPercent()),
+        bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
+          items,
+          persisted?.bundleAddOnAnchorCampaignSlug
+        ),
         items
       };
     } catch (_error) {
@@ -1268,14 +2034,17 @@
   }
 
   function getFirstPartyCampaignSlug(items) {
-    const firstItem = Array.isArray(items) ? items[0] : null;
-    return getFirstPartyItemCampaignSlug(firstItem);
+    const firstCampaignItem = Array.isArray(items)
+      ? items.find((item) => !isAddOnCartItem(item))
+      : null;
+    return getFirstPartyItemCampaignSlug(firstCampaignItem);
   }
 
   function getFirstPartyCampaignSlugs(items) {
     const slugs = new Set();
 
     for (const item of Array.isArray(items) ? items : []) {
+      if (isAddOnCartItem(item)) continue;
       const slug = getFirstPartyItemCampaignSlug(item);
       if (slug) slugs.add(slug);
     }
@@ -1286,6 +2055,10 @@
   function invalidateLiveCampaignCaches(campaignSlugs) {
     const slugs = Array.from(new Set((campaignSlugs || []).filter(Boolean)));
     if (slugs.length === 0) return;
+
+    addOnInventorySnapshot = null;
+    addOnInventoryRequest = null;
+    addOnUtils.invalidateCachedInventory();
 
     slugs.forEach((slug) => {
       try {
@@ -1319,6 +2092,16 @@
     return window.POOL_CONFIG?.i18n?.currentLang || document.documentElement.lang || 'en';
   }
 
+  function cartHasPledgeItems(items) {
+    return Array.isArray(items) && items.some((item) => !isAddOnCartItem(item));
+  }
+
+  function coerceBundleAddOnCartItems(items) {
+    const nextItems = Array.isArray(items) ? items : [];
+    if (cartHasPledgeItems(nextItems)) return nextItems;
+    return nextItems.filter((item) => !isAddOnCartItem(item));
+  }
+
   function buildFirstPartyCheckoutPayload(state) {
     const items = state?.cart?.items?.items || [];
     if (items.length === 0) {
@@ -1328,11 +2111,20 @@
       };
     }
 
-    const campaignSlug = getFirstPartyCampaignSlug(items);
+    const resolvedAnchorCampaignSlug = resolveCartBundleAddOnAnchorCampaignSlug(
+      items,
+      state?.cart?.bundleAddOnAnchorCampaignSlug
+    );
+    const hasBundleAddOns = getCartBundleAddOnSelections(items).length > 0;
+    const campaignSlug = hasBundleAddOns && resolvedAnchorCampaignSlug
+      ? resolvedAnchorCampaignSlug
+      : getFirstPartyCampaignSlug(items);
     if (!campaignSlug) {
       return {
         valid: false,
-        error: 'Could not determine which campaign this pledge belongs to.'
+        error: cartHasPledgeItems(items)
+          ? 'Could not determine which campaign this pledge belongs to.'
+          : 'Add-on products require at least one pledge in the cart.'
       };
     }
 
@@ -1384,7 +2176,8 @@
             items: checkoutItems,
             customAmount,
             tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent()),
-            preferredLang: getCurrentLang()
+            preferredLang: getCurrentLang(),
+            bundleAddOnAnchorCampaignSlug: hasBundleAddOns ? resolvedAnchorCampaignSlug : ''
           }
         };
   }
@@ -1394,7 +2187,11 @@
     const draft = readFirstPartyCartDraftState();
     const persistedItems = persisted?.items || [];
     const persistedTipPercent = sanitizeTipPercent(persisted?.tipPercent, getDefaultPlatformTipPercent());
-    const persistedTotals = calculateCartTotals(persistedItems, persistedTipPercent);
+    const persistedTotals = calculateCartTotals(
+      persistedItems,
+      persistedTipPercent,
+      resolveCartBundleAddOnAnchorCampaignSlug(persistedItems, persisted?.bundleAddOnAnchorCampaignSlug)
+    );
     const draftEmail = String(draft?.email || '');
 
     return {
@@ -1407,6 +2204,10 @@
         total: persistedTotals.total || 0,
         email: draftEmail,
         tipPercent: persistedTipPercent,
+        bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
+          persistedItems,
+          persisted?.bundleAddOnAnchorCampaignSlug
+        ),
         billingAddress: draft?.billingAddress || {},
         items: {
           count: persistedItems.length,
@@ -1426,6 +2227,9 @@
     let activeCustomCheckoutMount = null;
     let customCheckoutShippingQuoteToken = 0;
     let customCheckoutFlowToken = 0;
+    let lastCustomCheckoutShippingSignature = '';
+    let persistedCustomCheckoutEmailDraft = '';
+    let persistedCustomCheckoutShippingDraft = null;
     let cartDialogCleanup = null;
     let cartBackgroundUnlock = null;
     let cartReturnFocusTarget = null;
@@ -1448,6 +2252,74 @@
       store.setState(nextState);
       writePersistedFirstPartyCartState(nextState);
       return nextState;
+    }
+
+    function applyCartBundleAddOnSelections(selections) {
+      const normalizedSelections = addOnUtils.normalizeSelections
+        ? addOnUtils.normalizeSelections(selections, ADD_ON_CATALOG)
+        : [];
+
+      const nextState = updateCartState((state) => {
+        const currentItems = Array.isArray(state?.cart?.items?.items) ? state.cart.items.items : [];
+        const nonAddOnItems = currentItems.filter((item) => !isAddOnCartItem(item));
+        const existingAddOnItems = currentItems.filter((item) => isAddOnCartItem(item));
+        const existingById = new Map(existingAddOnItems.map((item) => [String(item.id || ''), item]));
+        const nextAddOnItems = normalizedSelections
+          .map((selection) => addOnUtils.buildCartItem(selection, ADD_ON_CATALOG))
+          .filter(Boolean)
+          .map((item) => {
+            const existingItem = existingById.get(String(item.id || ''));
+            return normalizeCartItem({
+              ...item,
+              uniqueId: existingItem?.uniqueId || item.uniqueId
+            });
+          });
+        const nextItems = coerceBundleAddOnCartItems(nonAddOnItems.concat(nextAddOnItems));
+        const totals = calculateCartTotals(
+          nextItems,
+          state.cart?.tipPercent,
+          resolveCartBundleAddOnAnchorCampaignSlug(nextItems, state.cart?.bundleAddOnAnchorCampaignSlug)
+        );
+
+        return {
+          ...state,
+          cart: {
+            ...state.cart,
+            ...totals,
+            bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
+              nextItems,
+              state.cart?.bundleAddOnAnchorCampaignSlug
+            ),
+            items: {
+              count: nextItems.length,
+              items: nextItems
+            }
+          }
+        };
+      });
+
+      if (currentRoute === CHECKOUT_VIEW_ROUTE && checkoutUiState.mode === 'custom') {
+        void refreshCustomCheckoutShippingEstimate();
+        syncCheckoutPreviewSummaryUI();
+      }
+
+      return nextState;
+    }
+
+    function updateCartBundleAddOnAnchorCampaignSlug(nextSlug) {
+      updateCartState((state) => {
+        const currentItems = Array.isArray(state?.cart?.items?.items) ? state.cart.items.items : [];
+        return {
+          ...state,
+          cart: {
+            ...state.cart,
+            bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
+              currentItems,
+              nextSlug
+            )
+          }
+        };
+      });
     }
 
     function ensureFirstPartyCartRoot() {
@@ -1602,7 +2474,14 @@
       const draft = readFirstPartyCartDraftState();
       const nextEmail = String(draft?.email || snapshot?.cart?.email || '');
       const nextTipPercent = sanitizeTipPercent(snapshot?.cart?.tipPercent, getDefaultPlatformTipPercent());
-      const totals = calculateCartTotals(nextItems, nextTipPercent);
+      const totals = calculateCartTotals(
+        nextItems,
+        nextTipPercent,
+        resolveCartBundleAddOnAnchorCampaignSlug(
+          nextItems,
+          snapshot?.cart?.bundleAddOnAnchorCampaignSlug || ''
+        )
+      );
 
       store.setState({
         ...store.getState(),
@@ -1826,6 +2705,10 @@
         checkoutMode: checkoutUiState.mode,
         shippingQuote: checkoutUiState.customCheckout?.shippingQuote
       });
+      const resolvedBundleAddOnAnchorCampaignSlug = resolveCartBundleAddOnAnchorCampaignSlug(
+        items,
+        state?.cart?.bundleAddOnAnchorCampaignSlug
+      );
       const hasPhysicalItems = cartHasPhysicalItems(items);
       const checkoutLineItems = buildCheckoutLineItems(items);
       const wantsCustomCheckout = isCheckoutPreview &&
@@ -1849,47 +2732,49 @@
               <div class="pool-first-party-cart__shipping-grid">
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-name">${escapeHtml(getRuntimeMessage('cart.fullName', 'Full name'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <input id="pool-custom-shipping-name" name="shipping_name" class="pool-first-party-cart__input" type="text" autocomplete="shipping name" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.name || '')}" data-cart-custom-shipping-field="name">
+                  <input id="pool-custom-shipping-name" name="name" class="pool-first-party-cart__input" type="text" autocomplete="name" autocapitalize="words" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(getPersistedCustomCheckoutShippingDraft()?.name || '')}" data-cart-custom-shipping-field="name">
                 </div>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-checkout-email-fallback">${escapeHtml(getRuntimeMessage('cart.emailAddress', 'Email address'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                   <input
                     id="pool-custom-checkout-email-fallback"
-                    name="shipping_email"
+                    name="email"
                     class="pool-first-party-cart__input"
                     type="email"
                     inputmode="email"
-                    autocomplete="shipping email"
+                    autocomplete="email"
+                    autocapitalize="off"
+                    spellcheck="false"
                     aria-describedby="pool-custom-checkout-email-error"
-                    value="${escapeHtml(customCheckout?.emailDraft || '')}"
+                    value="${escapeHtml(getPersistedCustomCheckoutEmailDraft())}"
                     data-cart-custom-checkout-email
                   >
                   <p id="pool-custom-checkout-email-error" class="pool-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
                 </div>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line1">${escapeHtml(getRuntimeMessage('cart.addressLine1', 'Address line 1'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <input id="pool-custom-shipping-line1" name="shipping_address_line1" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line1" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.line1 || '')}" data-cart-custom-shipping-field="line1">
+                  <input id="pool-custom-shipping-line1" name="address-line1" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line1" autocapitalize="words" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(getPersistedCustomCheckoutShippingDraft()?.address?.line1 || '')}" data-cart-custom-shipping-field="line1">
                 </div>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line2">${escapeHtml(getRuntimeMessage('cart.addressLine2', 'Address line 2'))}</label>
-                  <input id="pool-custom-shipping-line2" name="shipping_address_line2" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line2" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.line2 || '')}" data-cart-custom-shipping-field="line2">
+                  <input id="pool-custom-shipping-line2" name="address-line2" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-line2" autocapitalize="words" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(getPersistedCustomCheckoutShippingDraft()?.address?.line2 || '')}" data-cart-custom-shipping-field="line2">
                 </div>
                 <div class="pool-first-party-cart__field">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-city">${escapeHtml(getRuntimeMessage('cart.city', 'City'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <input id="pool-custom-shipping-city" name="shipping_city" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level2" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.city || '')}" data-cart-custom-shipping-field="city">
+                  <input id="pool-custom-shipping-city" name="address-level2" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level2" autocapitalize="words" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(getPersistedCustomCheckoutShippingDraft()?.address?.city || '')}" data-cart-custom-shipping-field="city">
                 </div>
                 <div class="pool-first-party-cart__field">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-state">${escapeHtml(getRuntimeMessage('cart.stateProvince', 'State / Province'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <input id="pool-custom-shipping-state" name="shipping_state" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level1" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.state || '')}" data-cart-custom-shipping-field="state">
+                  <input id="pool-custom-shipping-state" name="address-level1" class="pool-first-party-cart__input" type="text" autocomplete="shipping address-level1" autocapitalize="characters" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(getPersistedCustomCheckoutShippingDraft()?.address?.state || '')}" data-cart-custom-shipping-field="state">
                 </div>
                 <div class="pool-first-party-cart__field">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-postal">${escapeHtml(getRuntimeMessage('cart.postalCode', 'Postal code'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <input id="pool-custom-shipping-postal" name="shipping_postal_code" class="pool-first-party-cart__input" type="text" inputmode="numeric" autocomplete="shipping postal-code" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(customCheckout?.shippingDraft?.address?.postal_code || '')}" data-cart-custom-shipping-field="postal_code">
+                  <input id="pool-custom-shipping-postal" name="postal-code" class="pool-first-party-cart__input" type="text" inputmode="numeric" autocomplete="shipping postal-code" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(getPersistedCustomCheckoutShippingDraft()?.address?.postal_code || '')}" data-cart-custom-shipping-field="postal_code">
                 </div>
                 <div class="pool-first-party-cart__field">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-country">${escapeHtml(getRuntimeMessage('cart.country', 'Country'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
-                  <select id="pool-custom-shipping-country" name="shipping_country" class="pool-first-party-cart__input pool-first-party-cart__input--select" autocomplete="shipping country" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" data-cart-custom-shipping-field="country">
-                    ${renderShippingCountryOptions(customCheckout?.shippingDraft?.address?.country || DEFAULT_SHIPPING_COUNTRY)}
+                  <select id="pool-custom-shipping-country" name="country" class="pool-first-party-cart__input pool-first-party-cart__input--select" autocomplete="shipping country" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" data-cart-custom-shipping-field="country">
+                    ${renderShippingCountryOptions(getPersistedCustomCheckoutShippingDraft()?.address?.country || DEFAULT_SHIPPING_COUNTRY)}
                   </select>
                 </div>
               </div>
@@ -1909,7 +2794,7 @@
                     inputmode="email"
                     autocomplete="email"
                     aria-describedby="pool-custom-checkout-email-error"
-                    value="${escapeHtml(customCheckout?.emailDraft || '')}"
+                    value="${escapeHtml(getPersistedCustomCheckoutEmailDraft())}"
                     data-cart-custom-checkout-email
                   >
                 <p id="pool-custom-checkout-email-error" class="pool-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
@@ -1930,20 +2815,27 @@
           <p class="pool-first-party-cart__note">Continue to Stripe's secure payment platform to enter your payment information and email address -- this finalizes your pledge. You will only be charged if the campaign funds successfully.</p>
         </div>
       `;
-      const itemMarkup = items.length > 0 ? items.map((item) => `
+      const itemMarkup = items.length > 0 ? items.map((item) => {
+        const metaLines = getCartItemMetaLines(item);
+        return `
         <li class="pool-first-party-cart__item" data-item-id="${item.uniqueId}">
+          ${item.imageUrl ? `
+            <div class="pool-first-party-cart__item-media">
+              <img class="pool-first-party-cart__item-image" src="${escapeAttribute(item.imageUrl)}" alt="" loading="lazy" decoding="async">
+            </div>
+          ` : ''}
           <div class="pool-first-party-cart__item-main">
             <strong class="pool-first-party-cart__item-name">${escapeHtml(item.name || item.id || getRuntimeMessage('cart.untitledItem', 'Untitled item'))}</strong>
-            ${(item.stackable === true || (item.quantity || 1) > 1)
-              ? `<span class="pool-first-party-cart__item-meta">${escapeHtml(getRuntimeMessage('cart.quantity', 'Qty %{count}').replace('%{count}', String(item.quantity || 1)))}</span>`
-              : ''}
+            ${item.description ? `<p class="pool-first-party-cart__item-description">${escapeHtml(item.description)}</p>` : ''}
+            ${metaLines.map((line) => `<span class="pool-first-party-cart__item-meta">${escapeHtml(line)}</span>`).join('')}
           </div>
           <div class="pool-first-party-cart__item-actions">
             <span class="pool-first-party-cart__item-price">${formatCurrency((item.price || 0) * (item.quantity || 1))}</span>
             <button type="button" class="pool-first-party-cart__remove" data-remove-item="${item.uniqueId}">${escapeHtml(getRuntimeMessage('cart.remove', 'Remove'))}</button>
           </div>
         </li>
-      `).join('') : `
+      `;
+      }).join('') : `
         <li class="pool-first-party-cart__empty">${escapeHtml(getRuntimeMessage('cart.empty', 'Your cart is empty.'))}</li>
       `;
       const cartEstimateMarkup = items.length > 0 ? `
@@ -2000,6 +2892,7 @@
           </div>
         </section>
       ` : '';
+      const cartAddOnMarkup = renderCartAddOnSection(items, resolvedBundleAddOnAnchorCampaignSlug);
       const bodyMarkup = isCheckoutPreview ? `
         <section class="pool-first-party-cart__checkout-preview">
           <div class="pool-first-party-cart__summary-block">
@@ -2051,6 +2944,7 @@
         </section>
       ` : `
         <ul class="pool-first-party-cart__items">${itemMarkup}</ul>
+        ${cartAddOnMarkup}
         ${cartEstimateMarkup}
       `;
       const footerActions = isCheckoutPreview ? `
@@ -2128,8 +3022,11 @@
       activateCartDialog(root);
       if (isCustomCheckout && customCheckout?.scriptStatus === 'ready') {
         mountCustomCheckoutIntoDrawer(root);
+        ensureCustomCheckoutMounted(root);
       }
     }
+
+    requestCartAddOnInventoryRerender = renderFirstPartyCart;
 
     function syncFirstPartyCartTipUI() {
       const root = getCartRoot();
@@ -2239,7 +3136,10 @@
       if (shippingValueContainer) {
         const currentShippingCents = Number.isFinite(Number(shippingQuote?.amountCents))
           ? Math.max(0, Number(shippingQuote.amountCents))
-          : getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || []);
+          : getCampaignFallbackShippingCents(
+              store.getState()?.cart?.items?.items || [],
+              store.getState()?.cart?.bundleAddOnAnchorCampaignSlug
+            );
         shippingValueContainer.innerHTML = renderCartShippingSummaryValue(shippingQuote, currentShippingCents);
       }
 
@@ -2256,7 +3156,10 @@
           shippingAmount.textContent = formatCents(
             Number.isFinite(Number(shippingQuote?.amountCents))
               ? Math.max(0, Number(shippingQuote.amountCents))
-              : getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || [])
+              : getCampaignFallbackShippingCents(
+                  store.getState()?.cart?.items?.items || [],
+                  store.getState()?.cart?.bundleAddOnAnchorCampaignSlug
+                )
           );
         }
         return;
@@ -2438,6 +3341,41 @@
       goBackToCart();
     }
 
+    function getPersistedCustomCheckoutEmailDraft() {
+      return String(checkoutUiState.customCheckout?.emailDraft || persistedCustomCheckoutEmailDraft || '');
+    }
+
+    function getPersistedCustomCheckoutShippingDraft() {
+      return checkoutUiState.customCheckout?.shippingDraft || persistedCustomCheckoutShippingDraft || null;
+    }
+
+    function persistCustomCheckoutDraftState(emailDraft, shippingDraft) {
+      if (emailDraft !== undefined) {
+        persistedCustomCheckoutEmailDraft = String(emailDraft || '').trim();
+      }
+      if (shippingDraft !== undefined) {
+        persistedCustomCheckoutShippingDraft = shippingDraft || null;
+      }
+    }
+
+    function getCustomCheckoutShippingSignature(state) {
+      if (currentRoute !== CHECKOUT_VIEW_ROUTE || checkoutUiState.mode !== 'custom') {
+        return '';
+      }
+
+      const items = Array.isArray(state?.cart?.items?.items) ? state.cart.items.items : [];
+      const normalizedItems = items
+        .map((item) => `${String(item?.id || '')}:${Math.max(1, Number(item?.quantity || 1))}`)
+        .sort()
+        .join('|');
+
+      return [
+        normalizedItems,
+        String(state?.cart?.bundleAddOnAnchorCampaignSlug || ''),
+        cartHasPhysicalItems(items) ? 'physical' : 'digital'
+      ].join('::');
+    }
+
     function focusCustomCheckoutEmailField() {
       const input = getCartRoot()?.querySelector('[data-cart-custom-checkout-email]');
       if (!(input instanceof HTMLInputElement)) return;
@@ -2552,12 +3490,37 @@
       };
     }
 
+    function readCustomCheckoutEmailDraft() {
+      const field = getCartRoot()?.querySelector('[data-cart-custom-checkout-email]');
+      if (field instanceof HTMLInputElement) {
+        return String(field.value || '').trim();
+      }
+      return String(checkoutUiState.customCheckout?.emailDraft || persistedCustomCheckoutEmailDraft || '').trim();
+    }
+
     async function refreshCustomCheckoutShippingEstimate() {
       if (currentRoute !== CHECKOUT_VIEW_ROUTE || checkoutUiState.mode !== 'custom') return;
       const state = store.getState();
-      if (!cartHasPhysicalItems(state?.cart?.items?.items || [])) return;
+      if (!cartHasPhysicalItems(state?.cart?.items?.items || [])) {
+        customCheckoutShippingQuoteToken += 1;
+        checkoutUiState.customCheckout = {
+          ...(checkoutUiState.customCheckout || {}),
+          shippingQuote: {
+            status: 'idle',
+            amountCents: 0,
+            source: 'none',
+            availableOptions: [],
+            defaultOption: 'standard',
+            selectedOption: 'standard'
+          }
+        };
+        syncFirstPartyCartTipUI();
+        syncCheckoutPreviewSummaryUI();
+        return;
+      }
 
       const shippingDraft = readCustomCheckoutShippingDraft();
+      persistCustomCheckoutDraftState(undefined, shippingDraft);
       checkoutUiState.customCheckout = {
         ...(checkoutUiState.customCheckout || {}),
         shippingDraft
@@ -2569,7 +3532,10 @@
           ...(checkoutUiState.customCheckout || {}),
           shippingQuote: {
             status: 'idle',
-            amountCents: getCampaignFallbackShippingCents(state?.cart?.items?.items || []),
+            amountCents: getCampaignFallbackShippingCents(
+              state?.cart?.items?.items || [],
+              state?.cart?.bundleAddOnAnchorCampaignSlug
+            ),
             source: 'fallback_flat_rate',
             availableOptions: [],
             defaultOption: 'standard',
@@ -2585,7 +3551,10 @@
         ...(checkoutUiState.customCheckout || {}),
           shippingQuote: {
             status: 'loading',
-            amountCents: Number(checkoutUiState.customCheckout?.shippingQuote?.amountCents) || getCampaignFallbackShippingCents(state?.cart?.items?.items || []),
+            amountCents: Number(checkoutUiState.customCheckout?.shippingQuote?.amountCents) || getCampaignFallbackShippingCents(
+              state?.cart?.items?.items || [],
+              state?.cart?.bundleAddOnAnchorCampaignSlug
+            ),
             source: checkoutUiState.customCheckout?.shippingQuote?.source || 'fallback_flat_rate',
             availableOptions: Array.isArray(checkoutUiState.customCheckout?.shippingQuote?.availableOptions)
               ? checkoutUiState.customCheckout.shippingQuote.availableOptions
@@ -2606,7 +3575,10 @@
             ...(checkoutUiState.customCheckout || {}),
             shippingQuote: {
               status: 'error',
-              amountCents: getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || []),
+              amountCents: getCampaignFallbackShippingCents(
+                store.getState()?.cart?.items?.items || [],
+                store.getState()?.cart?.bundleAddOnAnchorCampaignSlug
+              ),
               source: 'fallback_flat_rate',
               availableOptions: [],
               defaultOption: 'standard',
@@ -2644,12 +3616,18 @@
           shippingQuote: response.ok
             ? buildCartShippingQuoteState(
                 data,
-                getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || []),
+                getCampaignFallbackShippingCents(
+                  store.getState()?.cart?.items?.items || [],
+                  store.getState()?.cart?.bundleAddOnAnchorCampaignSlug
+                ),
                 checkoutUiState.customCheckout?.shippingQuote
               )
             : {
                 status: 'error',
-                amountCents: getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || []),
+                amountCents: getCampaignFallbackShippingCents(
+                  store.getState()?.cart?.items?.items || [],
+                  store.getState()?.cart?.bundleAddOnAnchorCampaignSlug
+                ),
                 source: 'fallback_flat_rate',
                 availableOptions: [],
                 defaultOption: 'standard',
@@ -2662,7 +3640,10 @@
           ...(checkoutUiState.customCheckout || {}),
           shippingQuote: {
             status: 'error',
-            amountCents: getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || []),
+            amountCents: getCampaignFallbackShippingCents(
+              store.getState()?.cart?.items?.items || [],
+              store.getState()?.cart?.bundleAddOnAnchorCampaignSlug
+            ),
             source: 'fallback_flat_rate',
             availableOptions: [],
             defaultOption: 'standard',
@@ -2677,6 +3658,7 @@
 
     async function syncCustomCheckoutShippingToStripe(options) {
       const shippingDraft = readCustomCheckoutShippingDraft();
+      persistCustomCheckoutDraftState(undefined, shippingDraft);
       checkoutUiState.customCheckout = {
         ...(checkoutUiState.customCheckout || {}),
         shippingDraft,
@@ -2722,6 +3704,7 @@
 
     async function syncCustomCheckoutEmailToStripe(email, options) {
       const trimmedEmail = String(email || '').trim();
+      persistCustomCheckoutDraftState(trimmedEmail, undefined);
       checkoutUiState.customCheckout = {
         ...(checkoutUiState.customCheckout || {}),
         emailDraft: trimmedEmail,
@@ -2761,12 +3744,26 @@
     async function mountCustomCheckoutIntoDrawer(root) {
       if (!root || currentRoute !== CHECKOUT_VIEW_ROUTE || checkoutUiState.mode !== 'custom') return;
       if (!checkoutUiState.customCheckout || checkoutUiState.customCheckout.scriptStatus !== 'ready') return;
-      if (checkoutUiState.customCheckout.mountStatus !== 'idle') return;
-      if (!window.PoolStripeCheckoutSidecar || typeof window.PoolStripeCheckoutSidecar.mount !== 'function') return;
-      const flowToken = customCheckoutFlowToken;
-
       const paymentContainer = root.querySelector('[data-cart-custom-checkout-region="payment"]');
       const shippingContainer = root.querySelector('[data-cart-custom-checkout-region="address"]');
+      const mountStatus = checkoutUiState.customCheckout.mountStatus || 'idle';
+      const livePaymentUiMissing = !paymentContainer || paymentContainer.childElementCount === 0;
+
+      if (mountStatus !== 'idle') {
+        if ((mountStatus === 'mounting' || mountStatus === 'mounted') && livePaymentUiMissing) {
+          invalidateCustomCheckoutFlow();
+          teardownActiveCustomCheckoutMount();
+          checkoutUiState.customCheckout = {
+            ...(checkoutUiState.customCheckout || {}),
+            mountStatus: 'idle'
+          };
+        } else {
+          return;
+        }
+      }
+
+      if (!window.PoolStripeCheckoutSidecar || typeof window.PoolStripeCheckoutSidecar.mount !== 'function') return;
+      const flowToken = customCheckoutFlowToken;
 
       checkoutUiState.customCheckout.mountStatus = 'mounting';
       syncCustomCheckoutConfirmButton();
@@ -3140,6 +4137,39 @@
       }
     }
 
+    function shouldBootstrapCustomCheckoutSession() {
+      return (
+        currentRoute === CHECKOUT_VIEW_ROUTE &&
+        getRequestedCheckoutProvider() === FIRST_PARTY_CHECKOUT_PROVIDER &&
+        getCheckoutUiMode() === 'custom' &&
+        checkoutUiState.status === 'idle' &&
+        !checkoutUiState.customCheckout?.sessionId &&
+        !checkoutUiState.customCheckout?.clientSecret
+      );
+    }
+
+    function ensureCustomCheckoutBootstrapped() {
+      if (!shouldBootstrapCustomCheckoutSession()) return;
+      void startFirstPartyCheckout();
+    }
+
+    function ensureCustomCheckoutMounted(root) {
+      if (!root || currentRoute !== CHECKOUT_VIEW_ROUTE || checkoutUiState.mode !== 'custom') return;
+      if (!checkoutUiState.customCheckout?.sessionId || !checkoutUiState.customCheckout?.clientSecret) return;
+      if (checkoutUiState.customCheckout?.scriptStatus !== 'ready') return;
+      if (checkoutUiState.customCheckout?.mountStatus !== 'mounted') return;
+
+      const paymentContainer = root.querySelector('[data-cart-custom-checkout-region="payment"]');
+      const paymentUiMissing = !paymentContainer || paymentContainer.childElementCount === 0;
+      if (!paymentUiMissing) return;
+
+      checkoutUiState.customCheckout = {
+        ...(checkoutUiState.customCheckout || {}),
+        mountStatus: 'idle'
+      };
+      mountCustomCheckoutIntoDrawer(root);
+    }
+
     function bindFirstPartyCartChrome() {
       if (document._poolFirstPartyCartChromeHandler) {
         document.removeEventListener('click', document._poolFirstPartyCartChromeHandler);
@@ -3187,6 +4217,56 @@
           return;
         }
 
+        const addOnAddTrigger = event.target?.closest?.('[data-cart-addon-add]');
+        if (addOnAddTrigger) {
+          event.preventDefault();
+          const productId = String(addOnAddTrigger.getAttribute('data-addon-product-id') || '');
+          const card = addOnAddTrigger.closest('[data-cart-addon-product]');
+          const variantField = card?.querySelector('[data-cart-addon-variant]');
+          const quantityField = card?.querySelector('[data-cart-addon-product-quantity]');
+          const variantId = variantField instanceof HTMLSelectElement ? String(variantField.value || '') : '';
+          const quantity = quantityField instanceof HTMLInputElement
+            ? Math.min(
+                Math.max(1, parseInt(quantityField.max, 10) || 1),
+                Math.max(1, parseInt(quantityField.value, 10) || 1)
+              )
+            : 1;
+          if (quantityField instanceof HTMLInputElement) {
+            quantityField.value = String(quantity);
+          }
+          setCartAddOnDraft(productId, { variantId, quantity });
+          applyCartBundleAddOnSelections(
+            buildCartAddOnSelectionsFromProductState(
+              store.getState()?.cart?.items?.items || [],
+              productId,
+              variantId,
+              quantity
+            )
+          );
+          return;
+        }
+
+        const addOnRemoveTrigger = event.target?.closest?.('[data-cart-addon-remove]');
+        if (addOnRemoveTrigger) {
+          event.preventDefault();
+          const productId = String(addOnRemoveTrigger.getAttribute('data-addon-product-id') || '');
+          const card = addOnRemoveTrigger.closest('[data-cart-addon-product]');
+          const variantField = card?.querySelector('[data-cart-addon-variant]');
+          setCartAddOnDraft(productId, {
+            variantId: variantField instanceof HTMLSelectElement ? String(variantField.value || '') : '',
+            quantity: 1
+          });
+          applyCartBundleAddOnSelections(
+            buildCartAddOnSelectionsFromProductState(
+              store.getState()?.cart?.items?.items || [],
+              productId,
+              '',
+              0
+            )
+          );
+          return;
+        }
+
         const removeTrigger = event.target?.closest?.('[data-remove-item]');
         if (!removeTrigger) return;
 
@@ -3219,6 +4299,32 @@
           return;
         }
 
+        const addOnQuantityField = event.target?.closest?.('[data-cart-addon-product-quantity]');
+        if (addOnQuantityField instanceof HTMLInputElement) {
+          const quantity = Math.max(1, parseInt(addOnQuantityField.value, 10) || 1);
+          const maxQuantity = Math.max(1, parseInt(addOnQuantityField.max, 10) || quantity);
+          const clampedQuantity = Math.min(maxQuantity, quantity);
+          if (String(clampedQuantity) !== String(addOnQuantityField.value || '')) {
+            addOnQuantityField.value = String(clampedQuantity);
+          }
+          const productId = String(addOnQuantityField.getAttribute('data-addon-product-id') || '');
+          const card = addOnQuantityField.closest('[data-cart-addon-product]');
+          const variantField = card?.querySelector('[data-cart-addon-variant]');
+          const variantId = variantField instanceof HTMLSelectElement ? String(variantField.value || '') : '';
+          setCartAddOnDraft(productId, { variantId, quantity: clampedQuantity });
+          if (card?.getAttribute('data-cart-addon-active') === 'true') {
+            applyCartBundleAddOnSelections(
+              buildCartAddOnSelectionsFromProductState(
+                store.getState()?.cart?.items?.items || [],
+                productId,
+                variantId,
+                clampedQuantity
+              )
+            );
+          }
+          return;
+        }
+
         const emailField = event.target?.closest?.('[data-cart-email]');
         if (!emailField) return;
 
@@ -3243,10 +4349,46 @@
           return;
         }
 
+        const addOnAnchorField = event.target?.closest?.('[data-cart-addon-anchor]');
+        if (addOnAnchorField instanceof HTMLSelectElement) {
+          updateCartBundleAddOnAnchorCampaignSlug(addOnAnchorField.value);
+          return;
+        }
+
+        const addOnVariantField = event.target?.closest?.('[data-cart-addon-variant]');
+        if (addOnVariantField instanceof HTMLSelectElement) {
+          const productId = String(addOnVariantField.getAttribute('data-addon-product-id') || '');
+          const card = addOnVariantField.closest('[data-cart-addon-product]');
+          const quantityField = card?.querySelector('[data-cart-addon-product-quantity]');
+          syncCartAddOnCardVariantState(card);
+          const quantity = quantityField instanceof HTMLInputElement
+            ? Math.min(
+                Math.max(1, parseInt(quantityField.max, 10) || 1),
+                Math.max(1, parseInt(quantityField.value, 10) || 1)
+              )
+            : 1;
+          if (quantityField instanceof HTMLInputElement) {
+            quantityField.value = String(quantity);
+          }
+          setCartAddOnDraft(productId, { variantId: addOnVariantField.value, quantity });
+          if (card?.getAttribute('data-cart-addon-active') === 'true') {
+            applyCartBundleAddOnSelections(
+              buildCartAddOnSelectionsFromProductState(
+                store.getState()?.cart?.items?.items || [],
+                productId,
+                addOnVariantField.value,
+                quantity
+              )
+            );
+          }
+          return;
+        }
+
         const shippingField = event.target?.closest?.('[data-cart-custom-shipping-field]');
         if (shippingField) {
           syncCheckoutStartButton();
           void refreshCustomCheckoutShippingEstimate();
+          ensureCustomCheckoutBootstrapped();
           syncCustomCheckoutShippingToStripe().catch((error) => {
             checkoutUiState.status = 'idle';
             setCheckoutUiError(error?.message || 'Shipping validation failed.');
@@ -3272,7 +4414,14 @@
               selectedOption,
               amountCents: Math.max(
                 0,
-                Number(selectedDetails?.shippingCents ?? currentQuote.amountCents ?? getCampaignFallbackShippingCents(store.getState()?.cart?.items?.items || [])) || 0
+                Number(
+                  selectedDetails?.shippingCents ??
+                  currentQuote.amountCents ??
+                  getCampaignFallbackShippingCents(
+                    store.getState()?.cart?.items?.items || [],
+                    store.getState()?.cart?.bundleAddOnAnchorCampaignSlug
+                  )
+                ) || 0
               )
             }
           };
@@ -3348,7 +4497,16 @@
               ? sanitizeTipPercent(payload?.tipPercent, currentState.cart?.tipPercent ?? getDefaultPlatformTipPercent())
               : (currentState.cart?.tipPercent ?? getDefaultPlatformTipPercent());
             const nextItems = currentState.cart?.items?.items || [];
-            const totals = calculateCartTotals(nextItems, nextTipPercent);
+            const totals = calculateCartTotals(
+              nextItems,
+              nextTipPercent,
+              resolveCartBundleAddOnAnchorCampaignSlug(
+                nextItems,
+                Object.prototype.hasOwnProperty.call(payload || {}, 'bundleAddOnAnchorCampaignSlug')
+                  ? payload?.bundleAddOnAnchorCampaignSlug
+                  : currentState.cart?.bundleAddOnAnchorCampaignSlug
+              )
+            );
 
             updateCartState((state) => ({
               ...state,
@@ -3362,6 +4520,12 @@
                 ...payload,
                 email: nextEmail,
                 tipPercent: nextTipPercent,
+                bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
+                  nextItems,
+                  Object.prototype.hasOwnProperty.call(payload || {}, 'bundleAddOnAnchorCampaignSlug')
+                    ? payload?.bundleAddOnAnchorCampaignSlug
+                    : state.cart?.bundleAddOnAnchorCampaignSlug
+                ),
                 billingAddress: {
                   ...(state.cart?.billingAddress || {}),
                   ...(payload?.billingAddress || {})
@@ -3390,14 +4554,24 @@
                 };
 
                 updateCartState((state) => {
-                  const nextItems = previousItems.map((currentItem) => currentItem.uniqueId === existingItem.uniqueId ? updatedItem : currentItem);
-                  const totals = calculateCartTotals(nextItems, state.cart?.tipPercent);
+                  const nextItems = coerceBundleAddOnCartItems(
+                    previousItems.map((currentItem) => currentItem.uniqueId === existingItem.uniqueId ? updatedItem : currentItem)
+                  );
+                  const totals = calculateCartTotals(
+                    nextItems,
+                    state.cart?.tipPercent,
+                    resolveCartBundleAddOnAnchorCampaignSlug(nextItems, state.cart?.bundleAddOnAnchorCampaignSlug)
+                  );
 
                   return {
                     ...state,
                     cart: {
                       ...state.cart,
                       ...totals,
+                      bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
+                        nextItems,
+                        state.cart?.bundleAddOnAnchorCampaignSlug
+                      ),
                       items: {
                         count: nextItems.length,
                         items: nextItems
@@ -3414,14 +4588,22 @@
               }
 
               updateCartState((state) => {
-                const nextItems = previousItems.concat(normalizedItem);
-                const totals = calculateCartTotals(nextItems, state.cart?.tipPercent);
+                const nextItems = coerceBundleAddOnCartItems(previousItems.concat(normalizedItem));
+                const totals = calculateCartTotals(
+                  nextItems,
+                  state.cart?.tipPercent,
+                  resolveCartBundleAddOnAnchorCampaignSlug(nextItems, state.cart?.bundleAddOnAnchorCampaignSlug)
+                );
 
                 return {
                   ...state,
                   cart: {
                     ...state.cart,
                     ...totals,
+                    bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
+                      nextItems,
+                      state.cart?.bundleAddOnAnchorCampaignSlug
+                    ),
                     items: {
                       count: nextItems.length,
                       items: nextItems
@@ -3441,18 +4623,26 @@
 
               updateCartState((state) => {
                 const currentItems = state.cart.items.items || [];
-                const nextItems = currentItems.filter((item) => {
+                const nextItems = coerceBundleAddOnCartItems(currentItems.filter((item) => {
                   const shouldKeep = item.uniqueId !== uniqueId;
                   if (!shouldKeep) removedItem = item;
                   return shouldKeep;
-                });
-                const totals = calculateCartTotals(nextItems, state.cart?.tipPercent);
+                }));
+                const totals = calculateCartTotals(
+                  nextItems,
+                  state.cart?.tipPercent,
+                  resolveCartBundleAddOnAnchorCampaignSlug(nextItems, state.cart?.bundleAddOnAnchorCampaignSlug)
+                );
 
                 return {
                   ...state,
                   cart: {
                     ...state.cart,
                     ...totals,
+                    bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
+                      nextItems,
+                      state.cart?.bundleAddOnAnchorCampaignSlug
+                    ),
                     items: {
                       count: nextItems.length,
                       items: nextItems
@@ -3471,7 +4661,7 @@
 
               updateCartState((state) => {
                 const currentItems = state.cart.items.items || [];
-                const nextItems = currentItems.map((item) => {
+                const nextItems = coerceBundleAddOnCartItems(currentItems.map((item) => {
                   if (item.uniqueId !== uniqueId) return item;
 
                   const requestedQuantity = updates?.quantity ?? item.quantity ?? 1;
@@ -3487,14 +4677,22 @@
                   };
 
                   return updatedItem;
-                });
-                const totals = calculateCartTotals(nextItems, state.cart?.tipPercent);
+                }));
+                const totals = calculateCartTotals(
+                  nextItems,
+                  state.cart?.tipPercent,
+                  resolveCartBundleAddOnAnchorCampaignSlug(nextItems, state.cart?.bundleAddOnAnchorCampaignSlug)
+                );
 
                 return {
                   ...state,
                   cart: {
                     ...state.cart,
                     ...totals,
+                    bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
+                      nextItems,
+                      state.cart?.bundleAddOnAnchorCampaignSlug
+                    ),
                     items: {
                       count: nextItems.length,
                       items: nextItems
@@ -3526,11 +4724,18 @@
             },
             navigate: function(route) {
               const previousRoute = currentRoute;
+              if (currentRoute === CHECKOUT_VIEW_ROUTE && checkoutUiState.mode === 'custom') {
+                persistCustomCheckoutDraftState(
+                  readCustomCheckoutEmailDraft(),
+                  readCustomCheckoutShippingDraft()
+                );
+              }
               currentRoute = route || null;
               if (previousRoute !== currentRoute) {
                 cartShouldFocusAfterRender = true;
               }
               if (currentRoute !== CHECKOUT_VIEW_ROUTE) {
+                lastCustomCheckoutShippingSignature = '';
                 invalidateCustomCheckoutFlow();
                 teardownActiveCustomCheckoutMount();
                 checkoutUiState = {
@@ -3546,14 +4751,9 @@
               };
               renderFirstPartyCart();
               eventBus.emit('theme.routechanged', payload);
-              if (
-                currentRoute === CHECKOUT_VIEW_ROUTE &&
-                getRequestedCheckoutProvider() === FIRST_PARTY_CHECKOUT_PROVIDER &&
-                getCheckoutUiMode() === 'custom' &&
-                checkoutUiState.status === 'idle' &&
-                !checkoutUiState.customCheckout
-              ) {
-                void startFirstPartyCheckout();
+              ensureCustomCheckoutBootstrapped();
+              if (currentRoute === CHECKOUT_VIEW_ROUTE && checkoutUiState.mode === 'custom') {
+                void refreshCustomCheckoutShippingEstimate();
               }
               return Promise.resolve(payload);
             }
@@ -3598,12 +4798,23 @@
     bindFirstPartyRecoveryActions();
     bindFirstPartyButtons();
     store.subscribe(() => {
-      writePersistedFirstPartyCartState(store.getState());
+      const state = store.getState();
+      const nextShippingSignature = getCustomCheckoutShippingSignature(state);
+      const shouldRefreshCustomCheckoutShipping =
+        Boolean(nextShippingSignature) &&
+        nextShippingSignature !== lastCustomCheckoutShippingSignature;
+
+      lastCustomCheckoutShippingSignature = nextShippingSignature;
+      writePersistedFirstPartyCartState(state);
       if (suppressDrawerRerender && isCartOpen && currentRoute !== CHECKOUT_VIEW_ROUTE) {
         syncFirstPartyCartTipUI();
         return;
       }
       renderFirstPartyCart();
+
+      if (shouldRefreshCustomCheckoutShipping) {
+        void refreshCustomCheckoutShippingEstimate();
+      }
     });
 
     if (!isPledgeSuccessPath()) {

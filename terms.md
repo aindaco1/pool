@@ -26,8 +26,9 @@ description: Review pledge terms, payment processing, fulfillment, and privacy d
 - If a campaign is funded, all pledges from the same email for that campaign are combined into a single charge.
 - You may add an **optional platform tip** from 0% to 15% during checkout. The default tip is 5%.
 - Optional platform tips support maintenance of The Pool and are included in your pledge total, but **do not count toward a campaign's funding goal**.
+- This deployment may also offer **optional platform add-ons** alongside a pledge. Platform add-ons support maintenance of The Pool, are included in your pledge total, and **do not count toward a campaign's funding goal**.
 - Sales tax is applied to pledges using the rate configured for this deployment.
-- Physical product pledges may include deployment-configured shipping charges. Depending on this deployment and campaign settings, shipping may be quoted from USPS, use a configured fallback rate, include free-shipping overrides, or offer limited domestic signature-upgrade options. Your shipping address is collected during checkout so physical rewards can be fulfilled.
+- Physical product pledges or physical platform add-ons may include deployment-configured shipping charges. Depending on this deployment and campaign settings, shipping may be quoted from USPS, use a configured fallback rate, include free-shipping overrides, or offer limited domestic signature-upgrade options. Your shipping address is collected during checkout so physical rewards can be fulfilled.
 
 ## Creative Control & Submissions
 
@@ -43,7 +44,7 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - Fulfillment timing may adjust with production realities.
 - We will provide regular updates on production progress and delivery timelines.
 - Digital rewards will be delivered via email to the address provided during pledge.
-- Physical rewards are shipped to the address collected during checkout. Any shipping charge shown during checkout is stored with the pledge and included in your pledge total.
+- Physical rewards and physical platform add-ons are shipped to the address collected during checkout. Any shipping charge shown during checkout is stored with the pledge and included in your pledge total.
 
 ## Refunds & Cancellations
 
@@ -54,7 +55,7 @@ This section applies only to campaigns that explicitly solicit creative submissi
 
 ## Privacy & Data
 
-- We collect only the information necessary to process pledges and fulfill rewards: email, name, pledge/order details, and, for physical product tiers, a shipping address.
+- We collect only the information necessary to process pledges and fulfill rewards: email, name, pledge/order details, and, for physical rewards or physical platform add-ons, a shipping address.
 - Full card details are handled and stored by Stripe. The Pool does not store full card numbers or CVC values.
 - Email addresses and any shipping details needed for fulfillment may be stored in our system for pledge management, campaign-specific confirmations, campaign updates, and reward fulfillment.
 - Supporter-community access in the browser may be remembered for the current session as a convenience, but the emailed magic link remains the source of truth for access.

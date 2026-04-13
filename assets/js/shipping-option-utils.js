@@ -22,13 +22,28 @@
     return options.find((option) => option?.id === resolvedOption) || null;
   }
 
+  function getPrimaryQuote(quotes) {
+    const normalizedQuotes = Array.isArray(quotes) ? quotes : [];
+    const shippableQuotes = normalizedQuotes.filter((quote) => (
+      Number(quote?.shippingCents || 0) > 0 || quote?.shipment?.hasPhysical === true
+    ));
+    return shippableQuotes[0] || normalizedQuotes[0] || null;
+  }
+
   function resolveQuote(payload, selectedOption, fallbackShippingCents) {
-    const firstQuote = Array.isArray(payload?.quotes) ? payload.quotes[0] : null;
-    const availableOptions = Array.isArray(firstQuote?.availableOptions) ? firstQuote.availableOptions : [];
-    const defaultOption = String(firstQuote?.defaultOption || 'standard').trim().toLowerCase() || 'standard';
+    const quotes = Array.isArray(payload?.quotes) ? payload.quotes : [];
+    const primaryQuote = getPrimaryQuote(quotes);
+    const shippableQuotes = quotes.filter((quote) => (
+      Number(quote?.shippingCents || 0) > 0 || quote?.shipment?.hasPhysical === true
+    ));
+    const optionSourceQuote = shippableQuotes.length === 1 ? shippableQuotes[0] : primaryQuote;
+    const availableOptions = shippableQuotes.length === 1 && Array.isArray(optionSourceQuote?.availableOptions)
+      ? optionSourceQuote.availableOptions
+      : [];
+    const defaultOption = String(optionSourceQuote?.defaultOption || 'standard').trim().toLowerCase() || 'standard';
     const resolvedOption = normalizeSelection(
       availableOptions,
-      selectedOption || firstQuote?.selectedOption,
+      selectedOption || optionSourceQuote?.selectedOption,
       defaultOption
     );
     const selectedDetails = getSelectedDetails(availableOptions, resolvedOption, defaultOption);
@@ -38,7 +53,7 @@
 
     return {
       shippingCents,
-      source: String(firstQuote?.source || ''),
+      source: String(primaryQuote?.source || ''),
       availableOptions,
       defaultOption,
       selectedOption: resolvedOption

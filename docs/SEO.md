@@ -15,8 +15,10 @@ The current baseline includes:
 
 - shared metadata includes for public pages and public campaign pages
 - canonical URLs on public layouts
+- locale-aware Open Graph metadata on public layouts
 - page-level descriptions on core public routes
 - Open Graph and Twitter card metadata
+- social image alt metadata
 - generated [`robots.txt`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/robots.txt)
 - generated [`sitemap.xml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/sitemap.xml)
 - explicit `noindex,nofollow` on tokenized or supporter-only layouts
@@ -55,6 +57,7 @@ This is enforced through a mix of:
 - layout-level robots meta tags
 - `robots.txt`
 - sitemap inclusion rules
+- sitemap `lastmod` hints for public pages and campaigns
 
 ## Structured Data
 
@@ -83,10 +86,23 @@ The fork-facing SEO surface is intentionally bounded. Current supported settings
 - `seo.x_handle`
 - `seo.same_as`
 - `seo.index_public_community_hub`
+- `seo.default_social_image_alt`
+- `seo.og_locale_overrides`
 - public-page front matter `title` / `description`
 - campaign content fields such as `title`, `short_blurb`, and hero imagery
 
 This keeps the SEO model variable-first without opening up a huge matrix of fragile or unsupported knobs.
+
+Public metadata also derives a few safe values automatically:
+
+- `og:locale` from the active page language
+- `og:locale:alternate` from the supported translated languages for that page
+- `og:image:alt` / `twitter:image:alt` from explicit image alt text when present, otherwise the page title
+
+Forks can override part of that behavior in a bounded way:
+
+- `seo.default_social_image_alt` supplies the fallback alt text for default social images
+- `seo.og_locale_overrides` maps language codes to explicit Open Graph locale strings
 
 Example:
 
@@ -97,6 +113,10 @@ seo:
     - https://www.instagram.com/dustwave
     - https://www.youtube.com/@dustwave
   index_public_community_hub: true
+  default_social_image_alt: "Dust Wave on The Pool"
+  og_locale_overrides:
+    en: en_US
+    es: es_ES
 ```
 
 ## What Forks Can Safely Change
