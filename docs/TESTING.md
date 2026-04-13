@@ -89,7 +89,7 @@ This runs:
 - Durable Object tier-inventory serialization coverage in `tests/unit/tier-inventory-do.test.ts`
 - Local smoke scripts against the test-only mutable campaign:
   - `scripts/test-worker.sh` for site/Worker contract checks and malformed `/checkout-intent/start` verification
-  - `scripts/smoke-pledge-management.sh` for successful modify/cancel coverage on the local-only mutable campaign, using admin rebuild responses as the authoritative stats/inventory source during the smoke
+  - `scripts/smoke-pledge-management.sh` for successful modify/cancel coverage on the local-only mutable campaign, using admin rebuild responses plus read-only projection drift checks as the authoritative stats/inventory source during the smoke
 - Full unit suite via `npm run test:unit`
 - Security suite via `npm run test:security` against an auto-started local Worker
 - Podman-backed security suite via `npm run test:security:podman` when you want the site/Worker stack booted and exercised in the same invocation
@@ -230,6 +230,8 @@ You can exercise that path end to end with:
 ```bash
 ./scripts/smoke-pledge-management.sh
 ```
+
+When `ADMIN_SECRET` is available, that smoke path now also verifies that the campaign remains projection-clean after setup, modify, and cancel by calling the read-only `POST /stats/:slug/check` endpoint between mutation phases.
 
 For local CSV verification against your actual local Worker state, use:
 

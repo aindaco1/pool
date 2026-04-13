@@ -69,6 +69,11 @@ recalculate_inventory() {
     -H "Authorization: Bearer $ADMIN_SECRET"
 }
 
+check_projection_drift() {
+  curl -sf -X POST "${WORKER_HEADERS[@]}" "$WORKER_URL/stats/$CAMPAIGN_SLUG/check" \
+    -H "Authorization: Bearer $ADMIN_SECRET"
+}
+
 cleanup_fixture() {
   curl -s -X POST "${WORKER_HEADERS[@]}" "$WORKER_URL/test/cleanup" \
     -H "Content-Type: application/json" \
@@ -127,8 +132,10 @@ cleanup_fixture
 if [ -n "$ADMIN_SECRET" ]; then
   initial_stats_response="$(recalculate_stats)" || fail "initial stats recalculate failed"
   initial_inventory_response="$(recalculate_inventory)" || fail "initial inventory recalculate failed"
+  initial_drift_response="$(check_projection_drift)" || fail "initial projection drift check failed"
   initial_stats="$(echo "$initial_stats_response" | jq '.stats')"
   initial_inventory="$(echo "$initial_inventory_response" | jq '.inventory')"
+  [ "$(echo "$initial_drift_response" | jq -r '.inSync')" = "true" ] || fail "initial projection drift detected for $CAMPAIGN_SLUG"
 else
   initial_stats=$(curl -sf "${WORKER_HEADERS[@]}" "$WORKER_URL/stats/$CAMPAIGN_SLUG") || fail "stats endpoint unavailable for $CAMPAIGN_SLUG"
   initial_inventory=$(curl -sf "${WORKER_HEADERS[@]}" "$WORKER_URL/inventory/$CAMPAIGN_SLUG") || fail "inventory endpoint unavailable for $CAMPAIGN_SLUG"
@@ -160,8 +167,10 @@ pass "test pledge created"
 if [ -n "$ADMIN_SECRET" ]; then
   post_setup_stats_response="$(recalculate_stats)" || fail "stats recalculate failed"
   post_setup_inventory_response="$(recalculate_inventory)" || fail "inventory recalculate failed"
+  post_setup_drift_response="$(check_projection_drift)" || fail "projection drift check failed after setup"
   post_setup_stats="$(echo "$post_setup_stats_response" | jq '.stats')"
   post_setup_inventory="$(echo "$post_setup_inventory_response" | jq '.inventory')"
+  [ "$(echo "$post_setup_drift_response" | jq -r '.inSync')" = "true" ] || fail "projection drift detected after fixture setup"
   pass "stats and inventory recalculated for fixture pledge"
 else
   warn "ADMIN_SECRET not set; skipping explicit stats/inventory rebuild after fixture setup"
@@ -213,6 +222,8 @@ post_modify_inventory=$(curl -sf "${WORKER_HEADERS[@]}" "$WORKER_URL/inventory/$
 if [ -n "$ADMIN_SECRET" ]; then
   post_modify_stats="$(recalculate_stats | jq '.stats')" || fail "stats recalculate failed after modify"
   post_modify_inventory="$(recalculate_inventory | jq '.inventory')" || fail "inventory recalculate failed after modify"
+  post_modify_drift="$(check_projection_drift)" || fail "projection drift check failed after modify"
+  [ "$(echo "$post_modify_drift" | jq -r '.inSync')" = "true" ] || fail "projection drift detected after modify"
 fi
 
 expected_pledge_count_after_modify=$(echo "$post_setup_stats" | jq -r '.pledgeCount // 0')
@@ -238,6 +249,8 @@ post_cancel_inventory=$(curl -sf "${WORKER_HEADERS[@]}" "$WORKER_URL/inventory/$
 if [ -n "$ADMIN_SECRET" ]; then
   post_cancel_stats="$(recalculate_stats | jq '.stats')" || fail "stats recalculate failed after cancel"
   post_cancel_inventory="$(recalculate_inventory | jq '.inventory')" || fail "inventory recalculate failed after cancel"
+  post_cancel_drift="$(check_projection_drift)" || fail "projection drift check failed after cancel"
+  [ "$(echo "$post_cancel_drift" | jq -r '.inSync')" = "true" ] || fail "projection drift detected after cancel"
 fi
 
 [ "$(echo "$post_cancel_pledges" | jq 'length')" = "0" ] || fail "cancelled pledge should not remain in manage list"
