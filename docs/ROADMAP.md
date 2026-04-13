@@ -167,9 +167,6 @@
   - Support USA, and international
 - [ ] Developer FAQ based on internal documentation
 - [ ] Marketing landing page for the platform on a different domain
-- [ ] SEO follow-up work
-  - manually validate the emitted structured data and crawl files against external tooling
-  - decide whether any more fork-facing SEO knobs are actually worth supporting beyond the current bounded config surface
 - [ ] Denial of service attack defense pass
 - [ ] Support different prices per add-on variation
 - [ ] Campaign-specific add-on products
