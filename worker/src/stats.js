@@ -58,6 +58,33 @@ async function getCampaignOrderIds(env, campaignSlug) {
   return Array.isArray(index) ? index : null;
 }
 
+async function scanActiveCampaignPledges(env, campaignSlug) {
+  const pledgeMap = new Map();
+  const discoveredOrderIds = [];
+  let cursor = undefined;
+  let listComplete = false;
+
+  while (!listComplete) {
+    const page = await env.PLEDGES.list({ prefix: 'pledge:', cursor });
+    for (const key of page.keys || []) {
+      const pledge = await env.PLEDGES.get(key.name, { type: 'json' });
+      if (!pledge || pledge.campaignSlug !== campaignSlug || pledge.pledgeStatus === 'cancelled') {
+        continue;
+      }
+      discoveredOrderIds.push(pledge.orderId);
+      pledgeMap.set(pledge.orderId, pledge);
+    }
+    listComplete = page.list_complete !== false;
+    cursor = page.cursor;
+  }
+
+  const orderIds = Array.from(new Set(discoveredOrderIds)).sort();
+  return {
+    pledges: orderIds.map((orderId) => pledgeMap.get(orderId)).filter(Boolean),
+    orderIds
+  };
+}
+
 async function collectActiveCampaignPledges(env, campaignSlug, { repairIndex = false } = {}) {
   if (!env.PLEDGES) {
     return { pledges: [], orderIds: [], repaired: false };
@@ -83,25 +110,11 @@ async function collectActiveCampaignPledges(env, campaignSlug, { repairIndex = f
   }
 
   const indexedSorted = Array.isArray(indexedOrderIds) ? [...indexedOrderIds].sort() : [];
-  const discoveredOrderIds = [];
-  let cursor = undefined;
-  let listComplete = false;
-
-  while (!listComplete) {
-    const page = await env.PLEDGES.list({ prefix: 'pledge:', cursor });
-    for (const key of page.keys || []) {
-      const pledge = await env.PLEDGES.get(key.name, { type: 'json' });
-      if (!pledge || pledge.campaignSlug !== campaignSlug || pledge.pledgeStatus === 'cancelled') {
-        continue;
-      }
-      discoveredOrderIds.push(pledge.orderId);
-      pledgeMap.set(pledge.orderId, pledge);
-    }
-    listComplete = page.list_complete !== false;
-    cursor = page.cursor;
+  const scanned = await scanActiveCampaignPledges(env, campaignSlug);
+  const repairedOrderIds = scanned.orderIds;
+  for (const pledge of scanned.pledges) {
+    pledgeMap.set(pledge.orderId, pledge);
   }
-
-  const repairedOrderIds = Array.from(new Set(discoveredOrderIds)).sort();
   const repaired =
     repairedOrderIds.length !== indexedSorted.length ||
     repairedOrderIds.some((orderId, index) => orderId !== indexedSorted[index]);
@@ -119,6 +132,241 @@ async function collectActiveCampaignPledges(env, campaignSlug, { repairIndex = f
     pledges: repairedOrderIds.map((orderId) => pledgeMap.get(orderId)).filter(Boolean),
     orderIds: repairedOrderIds,
     repaired
+  };
+}
+
+function toNonNegativeInteger(value) {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) return 0;
+  return Math.max(0, Math.round(normalized));
+}
+
+function normalizeNumberMap(source = {}) {
+  const normalized = {};
+  for (const [key, value] of Object.entries(source || {})) {
+    const normalizedValue = toNonNegativeInteger(value);
+    if (normalizedValue > 0) {
+      normalized[key] = normalizedValue;
+    }
+  }
+  return normalized;
+}
+
+function buildExpectedStatsSnapshot(campaignSlug, pledges = []) {
+  const stats = {
+    campaignSlug,
+    pledgedAmount: 0,
+    pledgeCount: 0,
+    tierCounts: {},
+    supportItems: {}
+  };
+
+  for (const pledge of pledges) {
+    stats.pledgedAmount += toNonNegativeInteger(
+      pledge.goalTrackingSubtotal || pledge.subtotal || pledge.amount || 0
+    );
+    stats.pledgeCount += 1;
+
+    if (pledge.tierId) {
+      const qty = toNonNegativeInteger(pledge.tierQty || 1);
+      stats.tierCounts[pledge.tierId] = (stats.tierCounts[pledge.tierId] || 0) + qty;
+    }
+
+    for (const addTier of pledge.additionalTiers || []) {
+      if (!addTier?.id) continue;
+      const qty = toNonNegativeInteger(addTier.qty || 1);
+      stats.tierCounts[addTier.id] = (stats.tierCounts[addTier.id] || 0) + qty;
+    }
+
+    for (const item of pledge.supportItems || []) {
+      if (!item?.id) continue;
+      const amountCents = toNonNegativeInteger((item.amount || 0) * 100);
+      stats.supportItems[item.id] = (stats.supportItems[item.id] || 0) + amountCents;
+    }
+  }
+
+  stats.tierCounts = normalizeNumberMap(stats.tierCounts);
+  stats.supportItems = normalizeNumberMap(stats.supportItems);
+  return stats;
+}
+
+function buildExpectedInventorySnapshot(tiers = [], pledges = []) {
+  const inventory = {};
+
+  for (const tier of tiers || []) {
+    if (!tier?.id || !tier.limit_total) continue;
+    inventory[tier.id] = {
+      limit: toNonNegativeInteger(tier.limit_total),
+      claimed: 0
+    };
+  }
+
+  for (const pledge of pledges) {
+    if (pledge.pledgeStatus !== 'active' || pledge.charged) {
+      continue;
+    }
+
+    if (pledge.tierId && inventory[pledge.tierId]) {
+      inventory[pledge.tierId].claimed += toNonNegativeInteger(pledge.tierQty || 1);
+    }
+
+    for (const addTier of pledge.additionalTiers || []) {
+      if (addTier?.id && inventory[addTier.id]) {
+        inventory[addTier.id].claimed += toNonNegativeInteger(addTier.qty || 1);
+      }
+    }
+  }
+
+  return inventory;
+}
+
+function normalizeStoredStatsSnapshot(campaignSlug, stats = {}) {
+  return {
+    campaignSlug,
+    pledgedAmount: toNonNegativeInteger(stats?.pledgedAmount || 0),
+    pledgeCount: toNonNegativeInteger(stats?.pledgeCount || 0),
+    tierCounts: normalizeNumberMap(stats?.tierCounts || {}),
+    supportItems: normalizeNumberMap(stats?.supportItems || {})
+  };
+}
+
+function normalizeStoredInventorySnapshot(tiers = [], inventory = {}) {
+  const normalized = {};
+
+  for (const tier of tiers || []) {
+    if (!tier?.id || !tier.limit_total) continue;
+    const storedEntry = inventory?.[tier.id] || {};
+    normalized[tier.id] = {
+      limit: toNonNegativeInteger(storedEntry.limit || tier.limit_total),
+      claimed: toNonNegativeInteger(storedEntry.claimed || 0)
+    };
+  }
+
+  for (const [tierId, storedEntry] of Object.entries(inventory || {})) {
+    if (normalized[tierId]) continue;
+    normalized[tierId] = {
+      limit: toNonNegativeInteger(storedEntry?.limit || 0),
+      claimed: toNonNegativeInteger(storedEntry?.claimed || 0)
+    };
+  }
+
+  return normalized;
+}
+
+function diffNumberMap(stored = {}, expected = {}) {
+  const differences = {};
+  const keys = Array.from(new Set([...Object.keys(stored || {}), ...Object.keys(expected || {})])).sort();
+
+  for (const key of keys) {
+    const storedValue = toNonNegativeInteger(stored?.[key] || 0);
+    const expectedValue = toNonNegativeInteger(expected?.[key] || 0);
+    if (storedValue !== expectedValue) {
+      differences[key] = { stored: storedValue, expected: expectedValue };
+    }
+  }
+
+  return differences;
+}
+
+function diffInventoryMap(stored = {}, expected = {}) {
+  const differences = {};
+  const keys = Array.from(new Set([...Object.keys(stored || {}), ...Object.keys(expected || {})])).sort();
+
+  for (const key of keys) {
+    const storedEntry = stored?.[key] || { limit: 0, claimed: 0 };
+    const expectedEntry = expected?.[key] || { limit: 0, claimed: 0 };
+    const storedLimit = toNonNegativeInteger(storedEntry.limit || 0);
+    const expectedLimit = toNonNegativeInteger(expectedEntry.limit || 0);
+    const storedClaimed = toNonNegativeInteger(storedEntry.claimed || 0);
+    const expectedClaimed = toNonNegativeInteger(expectedEntry.claimed || 0);
+
+    if (storedLimit !== expectedLimit || storedClaimed !== expectedClaimed) {
+      differences[key] = {
+        stored: { limit: storedLimit, claimed: storedClaimed },
+        expected: { limit: expectedLimit, claimed: expectedClaimed }
+      };
+    }
+  }
+
+  return differences;
+}
+
+function diffOrderIds(storedOrderIds = [], expectedOrderIds = []) {
+  const stored = Array.isArray(storedOrderIds) ? [...storedOrderIds].sort() : [];
+  const expected = Array.isArray(expectedOrderIds) ? [...expectedOrderIds].sort() : [];
+  const storedSet = new Set(stored);
+  const expectedSet = new Set(expected);
+
+  return {
+    missingOrderIds: expected.filter((orderId) => !storedSet.has(orderId)),
+    extraOrderIds: stored.filter((orderId) => !expectedSet.has(orderId))
+  };
+}
+
+export async function checkCampaignProjectionDrift(env, campaignSlug, campaign = null) {
+  configureStatsLogging(env);
+  if (!env.PLEDGES) return null;
+
+  const activeScan = await scanActiveCampaignPledges(env, campaignSlug);
+  const storedOrderIds = await getCampaignOrderIds(env, campaignSlug);
+  const storedStatsRaw = await env.PLEDGES.get(`stats:${campaignSlug}`, { type: 'json' });
+  const storedInventoryRaw = await env.PLEDGES.get(`tier-inventory:${campaignSlug}`, { type: 'json' });
+
+  const expectedStats = buildExpectedStatsSnapshot(campaignSlug, activeScan.pledges);
+  const storedStats = normalizeStoredStatsSnapshot(campaignSlug, storedStatsRaw || {});
+  const expectedInventory = buildExpectedInventorySnapshot(campaign?.tiers || [], activeScan.pledges);
+  const storedInventory = normalizeStoredInventorySnapshot(campaign?.tiers || [], storedInventoryRaw || {});
+  const orderIdDiff = diffOrderIds(storedOrderIds || [], activeScan.orderIds);
+  const statsDifferences = {
+    pledgedAmount:
+      storedStats.pledgedAmount === expectedStats.pledgedAmount
+        ? null
+        : { stored: storedStats.pledgedAmount, expected: expectedStats.pledgedAmount },
+    pledgeCount:
+      storedStats.pledgeCount === expectedStats.pledgeCount
+        ? null
+        : { stored: storedStats.pledgeCount, expected: expectedStats.pledgeCount },
+    tierCounts: diffNumberMap(storedStats.tierCounts, expectedStats.tierCounts),
+    supportItems: diffNumberMap(storedStats.supportItems, expectedStats.supportItems)
+  };
+
+  const campaignIndexInSync =
+    orderIdDiff.missingOrderIds.length === 0 &&
+    orderIdDiff.extraOrderIds.length === 0 &&
+    (Array.isArray(storedOrderIds) || activeScan.orderIds.length === 0);
+
+  const statsInSync =
+    !statsDifferences.pledgedAmount &&
+    !statsDifferences.pledgeCount &&
+    Object.keys(statsDifferences.tierCounts).length === 0 &&
+    Object.keys(statsDifferences.supportItems).length === 0;
+
+  const inventoryDifferences = diffInventoryMap(storedInventory, expectedInventory);
+  const inventoryInSync = Object.keys(inventoryDifferences).length === 0;
+
+  return {
+    campaignSlug,
+    inSync: campaignIndexInSync && statsInSync && inventoryInSync,
+    checks: {
+      campaignIndex: {
+        inSync: campaignIndexInSync,
+        storedOrderIds: Array.isArray(storedOrderIds) ? [...storedOrderIds].sort() : [],
+        expectedOrderIds: activeScan.orderIds,
+        ...orderIdDiff
+      },
+      stats: {
+        inSync: statsInSync,
+        stored: storedStats,
+        expected: expectedStats,
+        differences: statsDifferences
+      },
+      inventory: {
+        inSync: inventoryInSync,
+        stored: storedInventory,
+        expected: expectedInventory,
+        differences: inventoryDifferences
+      }
+    }
   };
 }
 

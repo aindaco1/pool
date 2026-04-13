@@ -242,6 +242,16 @@ Use `pledge-report.sh` when you want the full ledger, including modify/cancel de
 
 If the merged fulfillment view and the public site ever disagree for a campaign, treat that as a likely stale stats/inventory projection issue first, not a reporting bug by default. The admin stats and inventory recalc endpoints now repair stale `campaign-pledges:{slug}` indexes while rebuilding the campaign projection state.
 
+Before you repair a projection, you can now check for drift explicitly:
+
+```bash
+./scripts/check-projections.sh                 # Check all campaigns
+./scripts/check-projections.sh hand-relations  # Check one campaign
+./scripts/check-projections.sh --podman        # Reuse/start the Podman dev stack first
+```
+
+That script calls the read-only admin drift-check endpoints and exits nonzero when stored `campaign-pledges:{slug}`, `stats:{slug}`, or `tier-inventory:{slug}` projections no longer match active pledge truth.
+
 ### Intentional Behavior Changes
 
 When reviewing results, do not flag these as regressions:

@@ -454,6 +454,7 @@ A per-campaign array of order IDs (`campaign-pledges:{slug}`) is maintained auto
 - Removed on pledge cancellation
 - Can be rebuilt: `POST /admin/campaign-index/rebuild/:slug`
 - Stats and inventory recalculation now also repair stale indexes if the stored array no longer matches the active pledge records
+- Drift can now be checked without mutation via `POST /stats/:slug/check` or `POST /admin/projections/check`
 
 **Key behaviors:**
 - Cancelled pledges are never charged

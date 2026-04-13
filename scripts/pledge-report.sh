@@ -139,6 +139,7 @@ if [[ "$KV_SCOPE_FLAGS" == *"--local"* ]]; then
 else
   echo "Fetching pledges from KV${WRANGLER_ENV_FLAGS:+ (dev preview)}..." >&2
 fi
+echo "Report mode: pledge-report is a ledger/history export. Modify and cancel rows are deltas, not final current-state totals." >&2
 
 # CSV header
 echo "email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id"

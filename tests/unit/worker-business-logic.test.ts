@@ -3422,6 +3422,132 @@ describe('Worker business logic hardening', () => {
     }));
   });
 
+  it('checks projection drift for a single campaign without mutating projection state', async () => {
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-hand-1']));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 1000,
+      pledgeCount: 1,
+      tierCounts: { 'frame-slot': 1 },
+      supportItems: {}
+    }));
+    await kv.put('tier-inventory:hand-relations', JSON.stringify({
+      'vip-pass': { limit: 1, claimed: 0 }
+    }));
+    await kv.put('pledge:order-hand-1', JSON.stringify({
+      orderId: 'order-hand-1',
+      email: 'supporter@example.com',
+      campaignSlug: 'hand-relations',
+      tierId: 'frame-slot',
+      tierQty: 1,
+      subtotal: 1000,
+      amount: 1139,
+      pledgeStatus: 'active',
+      charged: false
+    }));
+    await kv.put('pledge:order-hand-2', JSON.stringify({
+      orderId: 'order-hand-2',
+      email: 'supporter@example.com',
+      campaignSlug: 'hand-relations',
+      tierId: 'vip-pass',
+      tierQty: 1,
+      subtotal: 2500,
+      amount: 2848,
+      pledgeStatus: 'active',
+      charged: false,
+      supportItems: [{ id: 'location-scouting', amount: 5 }]
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/stats/hand-relations/check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': 'admin-secret'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.inSync).toBe(false);
+    expect(body.drift.checks.campaignIndex.missingOrderIds).toEqual(['order-hand-2']);
+    expect(body.drift.checks.stats.differences.pledgedAmount).toEqual({ stored: 1000, expected: 3500 });
+    expect(body.drift.checks.stats.differences.supportItems['location-scouting']).toEqual({ stored: 0, expected: 500 });
+    expect(body.drift.checks.inventory.differences['vip-pass']).toEqual({
+      stored: { limit: 1, claimed: 0 },
+      expected: { limit: 1, claimed: 1 }
+    });
+    expect(await kv.get('campaign-pledges:hand-relations', { type: 'json' })).toEqual(['order-hand-1']);
+  });
+
+  it('checks projection drift across all campaigns and reports drifted slugs', async () => {
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    await kv.put('campaign-pledges:smoke-editable', JSON.stringify(['order-smoke-1']));
+    await kv.put('stats:smoke-editable', JSON.stringify({
+      campaignSlug: 'smoke-editable',
+      pledgedAmount: 1000,
+      pledgeCount: 1,
+      tierCounts: { 'standard-pass': 1 },
+      supportItems: {}
+    }));
+    await kv.put('pledge:order-smoke-1', JSON.stringify({
+      orderId: 'order-smoke-1',
+      campaignSlug: 'smoke-editable',
+      tierId: 'standard-pass',
+      tierQty: 1,
+      subtotal: 1000,
+      pledgeStatus: 'active',
+      charged: false
+    }));
+    await kv.put('pledge:order-smoke-2', JSON.stringify({
+      orderId: 'order-smoke-2',
+      campaignSlug: 'smoke-editable',
+      tierId: 'limited-poster',
+      tierQty: 1,
+      subtotal: 2500,
+      pledgeStatus: 'active',
+      charged: false
+    }));
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify([]));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 0,
+      pledgeCount: 0,
+      tierCounts: {},
+      supportItems: {}
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/projections/check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': 'admin-secret'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.inSync).toBe(false);
+    expect(body.driftedCampaigns).toContain('smoke-editable');
+    expect(body.results.find((entry) => entry.campaignSlug === 'smoke-editable')?.inSync).toBe(false);
+  });
+
   it('recovers a missed checkout by confirming the existing reservation', async () => {
     const env = createEnv({
       ADMIN_SECRET: 'admin-secret',

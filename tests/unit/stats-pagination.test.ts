@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { claimTierInventory, recalculateStats, recalculateTierInventory } from '../../worker/src/stats.js';
+import { checkCampaignProjectionDrift, claimTierInventory, recalculateStats, recalculateTierInventory } from '../../worker/src/stats.js';
 
 class PaginatedKVNamespace {
   store = new Map<string, string>();
@@ -300,5 +300,68 @@ describe('stats pagination', () => {
         }
       })
     }));
+  });
+
+  it('checkCampaignProjectionDrift reports stale stats, inventory, and campaign indexes without mutating them', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['1']));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 500,
+      pledgeCount: 1,
+      tierCounts: { 'frame-slot': 1 },
+      supportItems: {}
+    }));
+    await kv.put('tier-inventory:hand-relations', JSON.stringify({
+      'vip-pass': { limit: 2, claimed: 0 },
+      'frame-slot': { limit: 5, claimed: 1 }
+    }));
+    await kv.put('pledge:1', JSON.stringify({
+      orderId: '1',
+      campaignSlug: 'hand-relations',
+      subtotal: 500,
+      tierId: 'frame-slot',
+      tierQty: 1,
+      pledgeStatus: 'active',
+      charged: false
+    }));
+    await kv.put('pledge:2', JSON.stringify({
+      orderId: '2',
+      campaignSlug: 'hand-relations',
+      subtotal: 2000,
+      tierId: 'vip-pass',
+      tierQty: 1,
+      pledgeStatus: 'active',
+      charged: false,
+      supportItems: [{ id: 'location-scouting', amount: 5 }]
+    }));
+
+    const drift = await checkCampaignProjectionDrift(env, 'hand-relations', {
+      slug: 'hand-relations',
+      tiers: [
+        { id: 'vip-pass', limit_total: 2 },
+        { id: 'frame-slot', limit_total: 5 }
+      ]
+    });
+
+    expect(drift?.inSync).toBe(false);
+    expect(drift?.checks.campaignIndex).toMatchObject({
+      inSync: false,
+      storedOrderIds: ['1'],
+      expectedOrderIds: ['1', '2'],
+      missingOrderIds: ['2'],
+      extraOrderIds: []
+    });
+    expect(drift?.checks.stats.differences.pledgedAmount).toEqual({ stored: 500, expected: 2500 });
+    expect(drift?.checks.stats.differences.pledgeCount).toEqual({ stored: 1, expected: 2 });
+    expect(drift?.checks.stats.differences.tierCounts['vip-pass']).toEqual({ stored: 0, expected: 1 });
+    expect(drift?.checks.stats.differences.supportItems['location-scouting']).toEqual({ stored: 0, expected: 500 });
+    expect(drift?.checks.inventory.differences['vip-pass']).toEqual({
+      stored: { limit: 2, claimed: 0 },
+      expected: { limit: 2, claimed: 1 }
+    });
+    expect(await kv.get('campaign-pledges:hand-relations', { type: 'json' })).toEqual(['1']);
   });
 });

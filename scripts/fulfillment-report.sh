@@ -142,6 +142,7 @@ if [[ "$KV_SCOPE_FLAGS" == *"--local"* ]]; then
 else
   echo "Fetching pledges for fulfillment report..." >&2
 fi
+echo "Report mode: fulfillment-report is the merged current-state view per supporter and campaign. Compare it against pledge-report when debugging projection drift." >&2
 
 if [[ "$KV_SCOPE_FLAGS" == *"--local"* ]]; then
   python3 -c "

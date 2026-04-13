@@ -1337,6 +1337,12 @@ That index is still the preferred fast path for reports, settlement, and admin r
 | `cron:lastRun` | Heartbeat — last cron execution timestamp |
 | `cron:lastError` | Last cron error details (7-day TTL) |
 
+**Projection drift checks:**
+
+- `POST /stats/:slug/check` compares stored `campaign-pledges:{slug}`, `stats:{slug}`, and `tier-inventory:{slug}` projections against active pledge truth without mutating anything.
+- `POST /admin/projections/check` runs that same comparison across all campaigns.
+- `./scripts/check-projections.sh` is the operator-friendly local wrapper for those checks.
+
 **Admin endpoints for settlement:**
 
 | Endpoint | Purpose |
@@ -1345,6 +1351,8 @@ That index is still the preferred fast path for reports, settlement, and admin r
 | `POST /admin/settle-batch` | Charge specific pledges (max 6 per call) |
 | `POST /admin/settle/:slug` | Legacy monolithic settle (may hit subrequest limits) |
 | `POST /admin/campaign-index/rebuild/:slug` | Rebuild campaign pledge index from KV |
+| `POST /stats/:slug/check` | Read-only projection drift check for one campaign |
+| `POST /admin/projections/check` | Read-only projection drift check for all campaigns |
 | `POST /admin/backfill-customers/:slug` | Create Stripe customers for pledges missing them |
 | `GET /admin/cron/status` | Check cron heartbeat |
 

@@ -16,9 +16,11 @@
  *   POST /votes              - Cast a vote
  *   GET  /live/:slug         - Get combined live stats + inventory for a campaign
  *   GET  /stats/:slug        - Get live pledge stats for a campaign
+ *   POST /stats/:slug/check - Check stats/index/inventory projection drift (admin)
  *   POST /stats/:slug/recalculate - Recalculate stats from KV (admin)
  *   GET  /inventory/:slug    - Get tier inventory (remaining counts) for a campaign
  *   POST /inventory/:slug/recalculate - Recalculate tier inventory from pledges (admin)
+ *   POST /admin/projections/check - Check projection drift across campaigns (admin)
  *   POST /admin/inventory/init-all    - Initialize inventory for all campaigns (admin)
  *   POST /admin/rebuild      - Trigger GitHub Pages rebuild (admin)
  *   POST /admin/broadcast/announcement - Send announcement with CTA link to campaign supporters
@@ -44,7 +46,7 @@ import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
 import { getAddOns, getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot } from './add-ons.js';
-import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges } from './stats.js';
+import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges, checkCampaignProjectionDrift } from './stats.js';
 import { triggerSiteRebuild } from './github.js';
 import { getScopedConsole } from './logger.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
@@ -1850,7 +1852,10 @@ export default {
       }
 
       if (path.startsWith('/stats/') && method === 'POST') {
-        const campaignSlug = path.replace('/stats/', '').replace('/recalculate', '');
+        const campaignSlug = path.replace('/stats/', '').replace(/\/(check|recalculate)$/, '');
+        if (path.endsWith('/check')) {
+          return handleCheckStatsProjection(request, campaignSlug, env);
+        }
         return handleRecalculateStats(request, campaignSlug, env);
       }
 
@@ -1871,6 +1876,10 @@ export default {
 
       if (path === '/admin/inventory/init-all' && method === 'POST') {
         return handleInitAllInventory(request, env);
+      }
+
+      if (path === '/admin/projections/check' && method === 'POST') {
+        return handleCheckAllProjectionDrift(request, env);
       }
 
       // Admin: Recover a missed Stripe checkout session (creates pledge from completed session)
@@ -6420,6 +6429,28 @@ async function handleRecalculateStats(request, campaignSlug, env) {
   });
 }
 
+async function handleCheckStatsProjection(request, campaignSlug, env) {
+  const auth = requireAdmin(request, env);
+  if (!auth.ok) return auth.response;
+
+  if (!campaignSlug) {
+    return jsonResponse({ error: 'Missing campaign slug' }, 400);
+  }
+
+  const campaign = await getCampaign(env, campaignSlug);
+  if (!campaign) {
+    return jsonResponse({ error: 'Campaign not found' }, 404);
+  }
+
+  const drift = await checkCampaignProjectionDrift(env, campaignSlug, campaign);
+  return jsonResponse({
+    success: true,
+    campaignSlug,
+    inSync: Boolean(drift?.inSync),
+    drift
+  });
+}
+
 async function handleGetInventory(campaignSlug, env) {
   if (!campaignSlug) {
     return jsonResponse({ error: 'Missing campaign slug' }, 400, env, true);
@@ -6526,6 +6557,29 @@ async function handleInitAllInventory(request, env) {
     success: true,
     message: 'Tier inventory initialization complete',
     ...results
+  });
+}
+
+async function handleCheckAllProjectionDrift(request, env) {
+  const auth = requireAdmin(request, env);
+  if (!auth.ok) return auth.response;
+
+  const { campaigns } = await getCampaigns(env);
+  const results = [];
+
+  for (const campaign of campaigns || []) {
+    const drift = await checkCampaignProjectionDrift(env, campaign.slug, campaign);
+    results.push(drift);
+  }
+
+  const driftedCampaigns = results.filter((entry) => !entry?.inSync);
+
+  return jsonResponse({
+    success: true,
+    inSync: driftedCampaigns.length === 0,
+    checkedCampaigns: results.length,
+    driftedCampaigns: driftedCampaigns.map((entry) => entry.campaignSlug),
+    results
   });
 }
 
