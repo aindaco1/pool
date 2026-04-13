@@ -32,7 +32,7 @@
   // Text block
   &--text {
     @include type-body-copy;
-    
+
     p {
       margin-bottom: $space-md;
       
@@ -69,6 +69,52 @@
       li {
         margin-bottom: $space-xs;
       }
+    }
+
+    table {
+      width: 100%;
+      margin: 0 0 $space-xl;
+      border-collapse: collapse;
+      border-spacing: 0;
+      background: $surface--page;
+
+      @include xsm {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+    }
+
+    thead {
+      border-bottom: 1px solid $border--default;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid $border--default;
+
+      &:last-child {
+        border-bottom: 0;
+      }
+    }
+
+    th,
+    td {
+      padding: $space-sm $space-md;
+      text-align: left;
+      vertical-align: top;
+
+      @include xsm {
+        padding: $space-xs $space-sm;
+      }
+    }
+
+    th {
+      @include type-label;
+      color: $color--primary;
+    }
+
+    td {
+      color: $color--primary;
     }
   }
   

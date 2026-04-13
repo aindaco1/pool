@@ -197,9 +197,6 @@ i18n:
     home:
       en: /
       es: /es/
-    campaigns_index:
-      en: /campaigns/
-      es: /es/campaigns/
     about:
       en: /about/
       es: /es/about/

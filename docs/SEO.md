@@ -14,8 +14,7 @@ This document describes The Pool's current SEO model in 2026. It is intentionall
 The current baseline includes:
 
 - shared metadata includes for public pages and public campaign pages
-- a dedicated public campaigns archive page with localized routes
-- alternate-language metadata on the public campaigns archive and other localized public pages
+- alternate-language metadata on localized public pages
 - canonical URLs on public layouts
 - locale-aware Open Graph metadata on public layouts
 - page-level descriptions on core public routes
@@ -27,15 +26,11 @@ The current baseline includes:
 - conservative `Organization` / `WebSite` JSON-LD
 - conservative campaign `CreativeWork` plus breadcrumb JSON-LD
 - a public community hub that links back to public campaign pages instead of pushing crawlers into supporter-only routes
-- a main-navigation route to the public campaigns archive so discovery does not depend on the homepage alone
 
 The main implementation files are:
 
 - [/_includes/seo-meta.html](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_includes/seo-meta.html)
 - [/_includes/seo-json-ld.html](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_includes/seo-json-ld.html)
-- [/_includes/campaign-archive-page.html](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_includes/campaign-archive-page.html)
-- [/campaigns.md](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/campaigns.md)
-- [/es/campaigns.md](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/es/campaigns.md)
 - [/robots.txt](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/robots.txt)
 - [/sitemap.xml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/sitemap.xml)
 
@@ -44,7 +39,6 @@ The main implementation files are:
 Indexable by default:
 
 - home
-- public campaigns archive
 - about
 - terms
 - public campaign pages
@@ -168,7 +162,7 @@ The current SEO model explicitly avoids:
 The roadmap still tracks a few SEO follow-ups outside this document:
 
 - manual validation of structured data and crawl files against external tooling
-- expanding automated SEO regression coverage further if the SEO surface grows beyond the current archive + campaign/public-page model
+- expanding automated SEO regression coverage further if the SEO surface grows beyond the current public-page + campaign-page model
 - deciding whether any additional fork-facing SEO knobs are worth supporting beyond the current bounded surface
 
 ## Notes

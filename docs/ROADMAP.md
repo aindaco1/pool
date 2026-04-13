@@ -140,9 +140,8 @@
   - shared metadata now covers titles, descriptions, canonicals, OG/Twitter tags, and default social images across public layouts
   - `robots.txt`, `sitemap.xml`, and explicit `noindex,nofollow` handling keep private/tokenized/supporter-only flows out of search intent
   - public pages emit conservative `Organization` / `WebSite` JSON-LD, and campaign pages emit conservative `CreativeWork` plus breadcrumb JSON-LD
-  - a dedicated public campaigns archive route now gives search crawlers and human visitors a stable index of live, upcoming, and completed public campaigns
   - the public community hub now points people back to public campaign pages instead of directing crawlers into supporter-only routes
-  - stronger merge-gate and unit coverage now protect the public campaigns archive route, alternate-language metadata, sitemap inclusion, and public crawl surface
+  - stronger merge-gate and unit coverage now protect alternate-language metadata, sitemap inclusion, and the public crawl surface
   - bounded fork-facing SEO config now covers `seo.x_handle`, `seo.same_as`, `seo.default_social_image_alt`, `seo.og_locale_overrides`, and whether the public community hub should remain indexable
   - structured browser and Worker debug logging now ships as a config-driven developer aid with timestamps, severity labels, scoped prefixes, and browser global error capture
 
