@@ -303,6 +303,8 @@ Important secret boundary:
 - keep the companion `USPS_CLIENT_SECRET` in Worker secrets or `worker/.dev.vars`
 - do not commit the secret into Jekyll config
 
+The checkout destination list is intentionally separate from those knobs now. Maintain the currently allowed shipping countries in [`_data/shipping_countries.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_data/shipping_countries.yml) instead of editing browser runtime code.
+
 Example:
 
 ```yml

@@ -34,6 +34,7 @@ describe('config boot scripts', () => {
         data-shipping-origin-country="US"
         data-shipping-fallback-flat-rate="3.00"
         data-shipping-free-shipping-default="false"
+        data-shipping-countries='[{"value":"US","label":"United States"},{"value":"CA","label":"Canada"}]'
         data-shipping-presets='{"poster":{"weight_oz":5,"length_in":18,"width_in":3,"height_in":3}}'
         data-add-ons='{"enabled":true,"low_stock_threshold":5,"products":[{"id":"dust-wave-sticker","name":"DUST WAVE Sticker","image_url":"https://shop.dustwave.xyz/assets/images/sticker-glove.png","price":3,"inventory":50,"category":"physical","shipping_preset":"sticker","variants":[]},{"id":"dust-wave-tshirt","name":"DUST WAVE T-Shirt","image_url":"https://shop.dustwave.xyz/assets/images/dustwave-tshirt.png","price":25,"category":"physical","shipping_preset":"tshirt","variant_option_name":"Size","variants":[{"id":"s","label":"S","inventory":2},{"id":"m","label":"M","inventory":4}]}]}'
         data-default-tip-percent="5"
@@ -81,6 +82,10 @@ describe('config boot scripts', () => {
         originCountry: 'US',
         fallbackFlatRate: '3.00',
         freeShippingDefault: 'false',
+        countries: [
+          { value: 'US', label: 'United States' },
+          { value: 'CA', label: 'Canada' }
+        ],
         presets: {
           poster: {
             weight_oz: 5,
@@ -150,6 +155,10 @@ describe('config boot scripts', () => {
       shippingOriginCountry: 'US',
       shippingFallbackFlatRate: '3.00',
       shippingFreeShippingDefault: 'false',
+      shippingCountries: [
+        { value: 'US', label: 'United States' },
+        { value: 'CA', label: 'Canada' }
+      ],
       defaultTipPercent: '5',
       maxTipPercent: '15',
       liveStatsCacheTtlSeconds: '300',

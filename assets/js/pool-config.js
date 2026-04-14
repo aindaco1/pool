@@ -19,6 +19,7 @@
   var shippingOriginCountry = dataset.shippingOriginCountry || 'US';
   var shippingFallbackFlatRate = dataset.shippingFallbackFlatRate || '3.00';
   var shippingFreeShippingDefault = dataset.shippingFreeShippingDefault || 'false';
+  var shippingCountries = [];
   var defaultTipPercent = dataset.defaultTipPercent || '5';
   var maxTipPercent = dataset.maxTipPercent || '15';
   var liveStatsCacheTtlSeconds = dataset.liveStatsCacheTtlSeconds || '300';
@@ -59,6 +60,14 @@
     }
   }
 
+  if (dataset.shippingCountries) {
+    try {
+      shippingCountries = JSON.parse(dataset.shippingCountries);
+    } catch (_error) {
+      shippingCountries = [];
+    }
+  }
+
   window.POOL_CONFIG = {
     i18n: {
       currentLang: currentLang,
@@ -84,6 +93,7 @@
       originCountry: shippingOriginCountry,
       fallbackFlatRate: shippingFallbackFlatRate,
       freeShippingDefault: shippingFreeShippingDefault,
+      countries: shippingCountries,
       presets: shippingPresets
     },
     addOns: addOns,
@@ -118,6 +128,7 @@
     shippingOriginCountry: shippingOriginCountry,
     shippingFallbackFlatRate: shippingFallbackFlatRate,
     shippingFreeShippingDefault: shippingFreeShippingDefault,
+    shippingCountries: shippingCountries,
     defaultTipPercent: defaultTipPercent,
     maxTipPercent: maxTipPercent,
     liveStatsCacheTtlSeconds: liveStatsCacheTtlSeconds,

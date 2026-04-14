@@ -1,6 +1,7 @@
 {%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
 {%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
 {%- capture add_ons_catalog_json -%}{% include add-ons-catalog-json.html %}{%- endcapture -%}
+{%- assign asset_version = site.time | date: "%s" -%}
 <!doctype html>
 <html lang="{{ current_lang }}">
 <head>
@@ -89,7 +90,7 @@
   {% include site-footer.html lang=current_lang %}
   <div id="aria-live-region" class="aria-live" aria-live="polite" aria-atomic="true"></div>
   <script
-    src="/assets/js/pool-config.js"
+    src="/assets/js/pool-config.js?v={{ asset_version }}"
     defer
     data-pool-config-script="true"
     data-current-lang="{{ current_lang }}"
@@ -118,12 +119,12 @@
     data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
     data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"
     data-stripe-publishable-key="{{ site.checkout.stripe_publishable_key | default: '' }}"></script>
-  <script src="/assets/js/logger.js" defer data-pool-logger-script="true"></script>
-  <script src="/assets/js/add-on-utils.js" defer></script>
-  <script src="/assets/js/shipping-option-utils.js" defer></script>
-  <script src="/assets/js/stripe-checkout-sidecar.js" defer></script>
+  <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
+  <script src="/assets/js/add-on-utils.js?v={{ asset_version }}" defer></script>
+  <script src="/assets/js/shipping-option-utils.js?v={{ asset_version }}" defer></script>
+  <script src="/assets/js/stripe-checkout-sidecar.js?v={{ asset_version }}" defer></script>
   <script
-    src="/assets/js/manage-page.js"
+    src="/assets/js/manage-page.js?v={{ asset_version }}"
     defer
     data-manage-page-script="true"
     data-worker-base="{{ site.platform.worker_url }}"

@@ -531,6 +531,13 @@ body.pool-cart-open {
   width: min(100%, 18rem);
 }
 
+.pool-first-party-cart__summary-value--shipping-option .pool-first-party-cart__input--summary-select {
+  width: 100%;
+  color: $color--primary;
+  font-weight: 600;
+  background-color: $surface--base;
+}
+
 .pool-first-party-cart__summary-row--total {
   margin-top: 6px;
   padding-top: 10px;
@@ -589,9 +596,14 @@ body.pool-cart-open {
 }
 
 .pool-first-party-cart__input--summary-select {
-  min-height: 38px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  min-height: 44px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  font-size: $type--ui;
+}
+
+.pool-first-party-cart__input--summary-postal {
+  max-width: 12rem;
 }
 
 .pool-first-party-cart__input--addon-qty {

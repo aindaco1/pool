@@ -26,7 +26,8 @@
     "podman:self-check": "./scripts/podman-self-check.sh",
     "test:security": "vitest run --config vitest.security.config.ts",
     "test:security:podman": "./scripts/podman-stack-run.sh npx vitest run --config vitest.security.config.ts",
-    "test:security:staging": "WORKER_URL=https://pledge-staging.dustwave.xyz vitest run --config vitest.security.config.ts"
+    "test:security:staging": "WORKER_URL=https://pledge-staging.dustwave.xyz vitest run --config vitest.security.config.ts",
+    "test:usps": "node ./scripts/usps-smoke.mjs"
   },
   "keywords": [],
   "author": "",

@@ -278,6 +278,20 @@ function processPendingCartItem() {
   if (pendingItem) {
     localStorage.removeItem('pendingCartItem');
     var item = JSON.parse(pendingItem);
+    var fallbackCents = Number(item && item.campaignShippingFallbackCents);
+    if (
+      item &&
+      item.campaignHasExplicitShippingOverride === true &&
+      Number.isFinite(fallbackCents) &&
+      Math.round(fallbackCents) === 300 &&
+      item.campaignFreeShipping !== true
+    ) {
+      delete item.campaignHasExplicitShippingOverride;
+      delete item.campaignShippingFallbackCents;
+      if (item.campaignFreeShipping === false) {
+        delete item.campaignFreeShipping;
+      }
+    }
     addCartItem(item).then(function() {
       openCart();
     });
@@ -317,9 +331,15 @@ function buildCartItemFromButton(button) {
     stackable: isStackable,
     shippable: button.getAttribute('data-item-shippable') === 'true'
   };
-  const shippingFallbackCents = Number(button.getAttribute('data-item-shipping-fallback-cents'));
+  const shippingFallbackCentsRaw = button.getAttribute('data-item-shipping-fallback-cents');
+  const shippingFallbackCents = shippingFallbackCentsRaw === null
+    ? NaN
+    : Number(shippingFallbackCentsRaw);
   if (Number.isFinite(shippingFallbackCents) && shippingFallbackCents >= 0) {
     item.campaignShippingFallbackCents = Math.round(shippingFallbackCents);
+  }
+  if (button.getAttribute('data-item-campaign-shipping-override') === 'true') {
+    item.campaignHasExplicitShippingOverride = true;
   }
   const campaignFreeShipping = button.getAttribute('data-item-campaign-free-shipping');
   if (campaignFreeShipping === 'true') {

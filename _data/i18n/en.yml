@@ -357,6 +357,8 @@ runtime:
     sales_tax_label: "Sales tax (%{rate}%)"
     shipping: "Shipping"
     shipping_estimate: "Estimated shipping"
+    shipping_estimate_postal_code: "ZIP for shipping estimate"
+    shipping_estimate_postal_help: "Enter a U.S. ZIP code to estimate shipping before checkout."
     shipping_calculating: "Calculating shipping..."
     shipping_option: "Delivery option"
     shipping_option_standard: "Standard"

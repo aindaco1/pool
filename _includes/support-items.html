@@ -72,6 +72,7 @@
           data-item-max-quantity="1"
           data-item-stackable="never"
           data-item-shippable="{% if item_is_physical %}true{% else %}false{% endif %}"
+          {% if include.campaign.shipping_fallback_flat_rate != nil or include.campaign.free_shipping != nil %}data-item-campaign-shipping-override="true"{% endif %}
           {% if include.campaign.shipping_fallback_flat_rate != nil %}data-item-shipping-fallback-cents="{{ include.campaign.shipping_fallback_flat_rate | times: 100 | round }}"{% endif %}
           {% if include.campaign.free_shipping != nil %}data-item-campaign-free-shipping="{{ include.campaign.free_shipping }}"{% endif %}
           data-item-custom1-name="_stackable"

@@ -66,6 +66,18 @@ async function openCartViaClient(page: any) {
   });
 }
 
+async function openCheckoutViaClient(page: any) {
+  await page.evaluate(async () => {
+    const provider = (window as any).PoolCartProvider;
+    if (provider?.whenReady) {
+      await provider.whenReady();
+    }
+
+    const client = provider?.getApi?.();
+    await client?.api?.theme?.cart?.navigate?.('/checkout');
+  });
+}
+
 async function addCartItemViaClient(page: any, item: Record<string, any>) {
   await page.evaluate(async (nextItem) => {
     const provider = (window as any).PoolCartProvider;
@@ -1338,9 +1350,7 @@ test.describe('Checkout Flow', () => {
     });
 
     await openCartViaClient(page);
-    await page.locator('[data-cart-continue]').click();
-    await expect(page.locator('[data-cart-confirm-custom-checkout]')).toBeVisible();
-
+    await openCheckoutViaClient(page);
     await page.locator('[data-cart-custom-checkout-email]').fill('support-item@example.com');
     await page.locator('[data-cart-custom-shipping-field="name"]').fill('Supporter Example');
     await page.locator('[data-cart-custom-shipping-field="line1"]').fill('123 Main Street');
@@ -1352,6 +1362,7 @@ test.describe('Checkout Flow', () => {
     await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toHaveText('Estimated shipping');
     await expect(page.locator('[data-cart-custom-shipping-option]')).toHaveValue('standard');
     await expect.poll(() => capturedQuotePayload).not.toBeNull();
+    await expect(page.locator('[data-cart-confirm-custom-checkout]')).toBeVisible();
     await expect.poll(() => capturedStartPayload).not.toBeNull();
 
     expect(capturedQuotePayload).toMatchObject({
@@ -1450,7 +1461,7 @@ test.describe('Checkout Flow', () => {
     });
 
     await openCartViaClient(page);
-    await page.locator('[data-cart-continue]').click();
+    await openCheckoutViaClient(page);
 
     await page.locator('[data-cart-custom-checkout-email]').fill('intl-supporter@example.com');
     await page.locator('[data-cart-custom-shipping-field="name"]').fill('International Supporter');
@@ -1483,6 +1494,28 @@ test.describe('Checkout Flow', () => {
     await openCartViaClient(page);
     await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Shipping');
     await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('$3.00');
+  });
+
+  test('physical sunder tier without a ZIP shows estimated shipping and excludes shipping from the total', async ({ page }) => {
+    await page.goto('/campaigns/sunder/');
+    await addCartItemViaClient(page, {
+      id: 'sunder__physical-media',
+      name: 'sunder — physical media',
+      price: 35,
+      quantity: 1,
+      url: '/campaigns/sunder/',
+      shippable: false,
+      customFields: [
+        { name: '_category', value: 'physical' }
+      ]
+    });
+
+    await openCartViaClient(page);
+
+    await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Estimated shipping');
+    await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('--');
+    await expect(page.locator('[data-cart-summary-total-label]')).toContainText('Estimated total');
+    await expect(page.locator('[data-cart-summary-total]')).toHaveText('$39.51');
   });
 
   test('campaign add-ons keep the campaign shipping override in mixed carts', async ({ page }) => {

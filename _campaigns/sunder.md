@@ -134,6 +134,7 @@ tiers:
     description: everything in the $20 tier and a dvd copy of the film or cd of the film's original soundtrack.
     stackable: false
     category: physical
+    shipping_preset: dvd
 
   - id: fan
     name: fan
@@ -142,6 +143,13 @@ tiers:
     description: everything in the $35 tier and a poster pack.
     stackable: false
     category: physical
+    shipping:
+      weight_oz: 10
+      packaging_weight_oz: 3
+      length_in: 18
+      width_in: 3
+      height_in: 3
+      stack_height_in: 0.5
 
   - id: super-fan
     name: super-fan!
@@ -150,6 +158,13 @@ tiers:
     description: everything in the $50 tier and bts footage.
     stackable: false
     category: physical
+    shipping:
+      weight_oz: 10
+      packaging_weight_oz: 3
+      length_in: 18
+      width_in: 3
+      height_in: 3
+      stack_height_in: 0.5
 
   - id: ultra-fan
     name: ultra-fan!!!
@@ -158,4 +173,11 @@ tiers:
     description: everything in the $100 tier and two free tickets to the premiere.
     stackable: false
     category: physical
+    shipping:
+      weight_oz: 10
+      packaging_weight_oz: 3
+      length_in: 18
+      width_in: 3
+      height_in: 3
+      stack_height_in: 0.5
 ---

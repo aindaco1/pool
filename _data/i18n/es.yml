@@ -344,6 +344,8 @@ runtime:
     sales_tax_label: "Impuesto sobre ventas (%{rate}%)"
     shipping: "Envío"
     shipping_estimate: "Envío estimado"
+    shipping_estimate_postal_code: "Código postal para estimar el envío"
+    shipping_estimate_postal_help: "Ingresa un código postal de EE. UU. para estimar el envío antes de pagar."
     shipping_calculating: "Calculando envío..."
     shipping_option: "Opción de entrega"
     shipping_option_standard: "Estándar"

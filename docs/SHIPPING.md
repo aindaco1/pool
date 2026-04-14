@@ -278,6 +278,20 @@ npm run sync:worker-config
 ./scripts/dev.sh --podman
 ```
 
+For a quick live USPS credential and quote sanity check without booting the whole stack, run:
+
+```bash
+npm run test:usps
+```
+
+That helper exercises the real Worker shipping module against a small smoke matrix:
+
+- domestic physical tier
+- domestic signature-required option
+- international physical tier
+- campaign add-on only shipment
+- platform add-on only shipment
+
 USPS also says you can test with your production credentials against the Testing Environment for Mailers by switching the base URL from `apis.usps.com` to `apis-tem.usps.com`.
 
 The default USPS app product currently includes the APIs this feature needs:
@@ -327,6 +341,8 @@ If needed, use a short-lived in-memory / platform-cache style cache keyed by:
 The important rule is:
 
 - do not turn shipping quotes into a high-write KV subsystem
+
+The checkout country selector is now fed from [`_data/shipping_countries.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_data/shipping_countries.yml), which keeps USPS destination maintenance in a dedicated source instead of burying it in browser runtime code.
 
 ## Worker and Frontend Touchpoints
 

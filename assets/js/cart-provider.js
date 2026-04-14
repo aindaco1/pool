@@ -38,104 +38,10 @@
     '[tabindex]:not([tabindex="-1"])'
   ].join(', ');
   const DEFAULT_SHIPPING_COUNTRY = 'US';
-  // USPS-derived checkout destinations, excluding countries on the current USPS temporary suspension notice.
-  const SHIPPING_COUNTRY_OPTIONS = [
-    { value: 'US', label: 'United States' },
-    { value: 'AD', label: 'Andorra' },
-    { value: 'AE', label: 'United Arab Emirates' },
-    { value: 'AR', label: 'Argentina' },
-    { value: 'AT', label: 'Austria' },
-    { value: 'CA', label: 'Canada' },
-    { value: 'AU', label: 'Australia' },
-    { value: 'BD', label: 'Bangladesh' },
-    { value: 'BE', label: 'Belgium' },
-    { value: 'BH', label: 'Bahrain' },
-    { value: 'BO', label: 'Bolivia' },
-    { value: 'BR', label: 'Brazil' },
-    { value: 'BS', label: 'Bahamas' },
-    { value: 'BW', label: 'Botswana' },
-    { value: 'BZ', label: 'Belize' },
-    { value: 'CH', label: 'Switzerland' },
-    { value: 'CL', label: 'Chile' },
-    { value: 'CN', label: 'China' },
-    { value: 'CO', label: 'Colombia' },
-    { value: 'CY', label: 'Cyprus' },
-    { value: 'CZ', label: 'Czech Republic' },
-    { value: 'DE', label: 'Germany' },
-    { value: 'DK', label: 'Denmark' },
-    { value: 'DO', label: 'Dominican Republic' },
-    { value: 'DZ', label: 'Algeria' },
-    { value: 'EC', label: 'Ecuador' },
-    { value: 'EE', label: 'Estonia' },
-    { value: 'EG', label: 'Egypt' },
-    { value: 'ES', label: 'Spain' },
-    { value: 'FI', label: 'Finland' },
-    { value: 'FR', label: 'France' },
-    { value: 'GB', label: 'United Kingdom' },
-    { value: 'GH', label: 'Ghana' },
-    { value: 'GI', label: 'Gibraltar' },
-    { value: 'GR', label: 'Greece' },
-    { value: 'HK', label: 'Hong Kong' },
-    { value: 'HR', label: 'Croatia' },
-    { value: 'HU', label: 'Hungary' },
-    { value: 'ID', label: 'Indonesia' },
-    { value: 'IE', label: 'Ireland' },
-    { value: 'IL', label: 'Israel' },
-    { value: 'IN', label: 'India' },
-    { value: 'IS', label: 'Iceland' },
-    { value: 'IT', label: 'Italy' },
-    { value: 'JM', label: 'Jamaica' },
-    { value: 'JP', label: 'Japan' },
-    { value: 'JO', label: 'Jordan' },
-    { value: 'KE', label: 'Kenya' },
-    { value: 'KR', label: 'South Korea' },
-    { value: 'KW', label: 'Kuwait' },
-    { value: 'KZ', label: 'Kazakhstan' },
-    { value: 'LB', label: 'Lebanon' },
-    { value: 'LI', label: 'Liechtenstein' },
-    { value: 'LK', label: 'Sri Lanka' },
-    { value: 'LT', label: 'Lithuania' },
-    { value: 'LU', label: 'Luxembourg' },
-    { value: 'LV', label: 'Latvia' },
-    { value: 'MA', label: 'Morocco' },
-    { value: 'MC', label: 'Monaco' },
-    { value: 'MD', label: 'Moldova' },
-    { value: 'ME', label: 'Montenegro' },
-    { value: 'MK', label: 'North Macedonia' },
-    { value: 'MT', label: 'Malta' },
-    { value: 'MU', label: 'Mauritius' },
-    { value: 'MX', label: 'Mexico' },
-    { value: 'MY', label: 'Malaysia' },
-    { value: 'NA', label: 'Namibia' },
-    { value: 'NG', label: 'Nigeria' },
-    { value: 'NL', label: 'Netherlands' },
-    { value: 'NO', label: 'Norway' },
-    { value: 'NZ', label: 'New Zealand' },
-    { value: 'OM', label: 'Oman' },
-    { value: 'PA', label: 'Panama' },
-    { value: 'PE', label: 'Peru' },
-    { value: 'PH', label: 'Philippines' },
-    { value: 'PK', label: 'Pakistan' },
-    { value: 'PL', label: 'Poland' },
-    { value: 'PT', label: 'Portugal' },
-    { value: 'QA', label: 'Qatar' },
-    { value: 'RO', label: 'Romania' },
-    { value: 'RS', label: 'Serbia' },
-    { value: 'RU', label: 'Russia' },
-    { value: 'SA', label: 'Saudi Arabia' },
-    { value: 'SE', label: 'Sweden' },
-    { value: 'SG', label: 'Singapore' },
-    { value: 'SI', label: 'Slovenia' },
-    { value: 'SK', label: 'Slovakia' },
-    { value: 'SV', label: 'El Salvador' },
-    { value: 'TH', label: 'Thailand' },
-    { value: 'TN', label: 'Tunisia' },
-    { value: 'TR', label: 'Turkey' },
-    { value: 'TW', label: 'Taiwan' },
-    { value: 'UA', label: 'Ukraine' },
-    { value: 'VN', label: 'Vietnam' },
-    { value: 'ZA', label: 'South Africa' }
-  ];
+  // USPS-derived checkout destinations now live in shared site data so forks can refresh them without editing runtime code.
+  const SHIPPING_COUNTRY_OPTIONS = Array.isArray(window.POOL_CONFIG?.shipping?.countries) && window.POOL_CONFIG.shipping.countries.length > 0
+    ? window.POOL_CONFIG.shipping.countries
+    : [{ value: 'US', label: 'United States' }];
   const US_STATE_OPTIONS = [
     ['AL', 'Alabama'],
     ['AK', 'Alaska'],
@@ -777,8 +683,17 @@
     const displayNames = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
       ? new Intl.DisplayNames([getRuntimeLocale()], { type: 'region' })
       : null;
+    const getCountryLabel = function(option) {
+      const fallbackLabel = String(option?.label || option?.value || '');
+      if (!displayNames || !option?.value) return fallbackLabel;
+      try {
+        return String(displayNames.of(option.value) || fallbackLabel);
+      } catch (_error) {
+        return fallbackLabel;
+      }
+    };
     return SHIPPING_COUNTRY_OPTIONS.map((option) => `
-      <option value="${escapeHtml(option.value)}" ${selected === option.value ? 'selected' : ''}>${escapeHtml(displayNames?.of(option.value) || option.label)}</option>
+      <option value="${escapeHtml(option.value)}" ${selected === option.value ? 'selected' : ''}>${escapeHtml(getCountryLabel(option))}</option>
     `).join('');
   }
 
@@ -957,14 +872,40 @@
     const quantity = Math.max(1, Number(item?.quantity || 1));
     const price = Number(item?.price || 0);
     const maxQuantity = Number(item?.maxQuantity);
-
-    return {
+    const normalizedItem = {
       ...item,
       quantity,
       price,
       maxQuantity: Number.isFinite(maxQuantity) && maxQuantity > 0 ? maxQuantity : undefined,
       uniqueId: item?.uniqueId || `${FIRST_PARTY_ITEM_ID_PREFIX}${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     };
+    const hasExplicitShippingOverride = normalizedItem?.campaignHasExplicitShippingOverride === true;
+    const fallbackCents = Number(normalizedItem?.campaignShippingFallbackCents);
+    const defaultFallbackCents = getShippingFallbackFeeCents();
+    const hasOnlyLegacyDefaultFallback = Number.isFinite(fallbackCents) &&
+      Math.round(fallbackCents) === defaultFallbackCents &&
+      normalizedItem?.campaignFreeShipping !== true;
+
+    if (hasExplicitShippingOverride && hasOnlyLegacyDefaultFallback) {
+      delete normalizedItem.campaignHasExplicitShippingOverride;
+      delete normalizedItem.campaignShippingFallbackCents;
+      if (normalizedItem?.campaignFreeShipping === false) {
+        delete normalizedItem.campaignFreeShipping;
+      }
+      return normalizedItem;
+    }
+
+    if (!hasExplicitShippingOverride) {
+      if (Number.isFinite(fallbackCents) && Math.round(fallbackCents) === defaultFallbackCents) {
+        delete normalizedItem.campaignShippingFallbackCents;
+      }
+
+      if (normalizedItem?.campaignFreeShipping === false) {
+        delete normalizedItem.campaignFreeShipping;
+      }
+    }
+
+    return normalizedItem;
   }
 
   function getItemQuantityCap(item) {
@@ -1020,6 +961,9 @@
     if (Number.isFinite(shippingFallbackCents) && shippingFallbackCents >= 0) {
       item.campaignShippingFallbackCents = Math.round(shippingFallbackCents);
     }
+    if (button.getAttribute('data-item-campaign-shipping-override') === 'true') {
+      item.campaignHasExplicitShippingOverride = true;
+    }
     const campaignFreeShipping = button.getAttribute('data-item-campaign-free-shipping');
     if (campaignFreeShipping === 'true') {
       item.campaignFreeShipping = true;
@@ -1060,6 +1004,9 @@
       : Number(shippingFallbackCentsRaw);
     if (Number.isFinite(shippingFallbackCents) && shippingFallbackCents >= 0) {
       item.campaignShippingFallbackCents = Math.round(shippingFallbackCents);
+    }
+    if (button.getAttribute('data-item-campaign-shipping-override') === 'true') {
+      item.campaignHasExplicitShippingOverride = true;
     }
     const campaignFreeShipping = button.getAttribute('data-item-campaign-free-shipping');
     if (campaignFreeShipping === 'true') {
@@ -1283,6 +1230,61 @@
       : getShippingFallbackFeeCents();
   }
 
+  function campaignHasExplicitFallbackShipping(items, campaignSlug) {
+    const normalizedSlug = String(campaignSlug || '').trim();
+    const campaignItem = (Array.isArray(items) ? items : []).find((item) => (
+      !isAddOnCartItem(item) &&
+      getFirstPartyItemCampaignSlug(item) === normalizedSlug
+    ));
+    const fallbackCents = Number(campaignItem?.campaignShippingFallbackCents);
+    const hasLegacyExplicitFallback = Number.isFinite(fallbackCents) &&
+      Math.round(fallbackCents) !== getShippingFallbackFeeCents();
+    const hasExplicitFreeShippingFlag = campaignItem?.campaignHasExplicitShippingOverride === true &&
+      (campaignItem?.campaignFreeShipping === true || campaignItem?.campaignFreeShipping === false);
+
+    return Boolean(
+      campaignItem &&
+      (
+        campaignItem?.campaignHasExplicitShippingOverride === true ||
+        hasLegacyExplicitFallback ||
+        hasExplicitFreeShippingFlag
+      )
+    );
+  }
+
+  function cartHasExplicitFallbackShipping(items) {
+    const normalizedItems = Array.isArray(items) ? items : [];
+    const addOnSelections = getCartBundleAddOnSelections(normalizedItems);
+    const campaignSlugs = new Set();
+
+    for (const item of normalizedItems) {
+      if (isAddOnCartItem(item)) continue;
+      if (!firstPartyItemIsPhysical(item)) continue;
+      const slug = getFirstPartyItemCampaignSlug(item);
+      if (slug) {
+        campaignSlugs.add(slug);
+      }
+    }
+
+    for (const selection of addOnSelections) {
+      if (String(selection?.category || '').trim().toLowerCase() !== 'physical') continue;
+      if (getCartAddOnScope(selection) === 'campaign') {
+        const campaignSlug = String(selection?.campaignSlug || '').trim();
+        if (campaignSlug) {
+          campaignSlugs.add(campaignSlug);
+        }
+      }
+    }
+
+    for (const slug of campaignSlugs) {
+      if (campaignHasExplicitFallbackShipping(normalizedItems, slug)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   function getCampaignFallbackShippingCents(items, selectedAnchorSlug) {
     const fallbackByCampaign = new Map();
     const normalizedItems = Array.isArray(items) ? items : [];
@@ -1343,8 +1345,8 @@
   }
 
   function isCustomCheckoutEstimateActive(state, options) {
-    if (options?.currentRoute !== CHECKOUT_VIEW_ROUTE) return false;
-    if (options?.checkoutMode !== 'custom') return false;
+    const route = options?.currentRoute;
+    if (route !== CHECKOUT_VIEW_ROUTE && route !== CART_VIEW_ROUTE) return false;
     const items = state?.cart?.items?.items || [];
     return cartHasPhysicalItems(items);
   }
@@ -1361,26 +1363,64 @@
     }
 
     const shippingQuote = options?.shippingQuote || null;
-    const hasPhysicalItems = cartHasPhysicalItems(state?.cart?.items?.items || []);
+    const root = getCartRoot();
+    const estimatePostalField = root?.querySelector('[data-cart-estimate-postal]');
+    const checkoutPostalField = root?.querySelector('[data-cart-custom-shipping-field="postal_code"]');
+    const checkoutCountryField = root?.querySelector('[data-cart-custom-shipping-field="country"]');
+    const shippingDraft = options?.shippingDraft || (
+      options?.currentRoute === CHECKOUT_VIEW_ROUTE && options?.checkoutMode === 'custom'
+        ? {
+            address: {
+              postal_code: checkoutPostalField instanceof HTMLInputElement
+                ? String(checkoutPostalField.value || '').trim()
+                : '',
+              country: checkoutCountryField instanceof HTMLSelectElement
+                ? String(checkoutCountryField.value || '').trim().toUpperCase()
+                : DEFAULT_SHIPPING_COUNTRY
+            }
+          }
+        : {
+            address: {
+              postal_code: estimatePostalField instanceof HTMLInputElement
+                ? String(estimatePostalField.value || '').trim()
+                : '',
+              country: DEFAULT_SHIPPING_COUNTRY
+            }
+          }
+    );
+    const cartItems = state?.cart?.items?.items || [];
+    const hasPhysicalItems = cartHasPhysicalItems(cartItems);
     const fallbackShippingCents = getCampaignFallbackShippingCents(
-      state?.cart?.items?.items || [],
+      cartItems,
       state?.cart?.bundleAddOnAnchorCampaignSlug
     );
+    const hasExplicitFallbackShipping = cartHasExplicitFallbackShipping(cartItems);
     const quoteStatus = String(shippingQuote?.status || 'idle').trim().toLowerCase();
     const isCalculatingQuote = quoteStatus === 'loading';
     const source = String(shippingQuote?.source || '').trim().toLowerCase();
+    const hasEstimateAddress = isShippingPostalCodeQuoteReady(
+      String(shippingDraft?.address?.country || '').trim() || DEFAULT_SHIPPING_COUNTRY,
+      String(shippingDraft?.address?.postal_code || '').trim()
+    );
     const quotedAmountCents = Number.isFinite(Number(shippingQuote?.amountCents))
       ? Math.max(0, Number(shippingQuote.amountCents))
       : null;
+    const needsEstimateInput = hasPhysicalItems &&
+      !hasExplicitFallbackShipping &&
+      !hasEstimateAddress;
     const shouldFallbackToPhysicalShipping = hasPhysicalItems &&
+      !isCalculatingQuote &&
+      !needsEstimateInput &&
       (quotedAmountCents === null || (quotedAmountCents === 0 && (source === '' || source === 'none')));
     const shippingCents = shouldFallbackToPhysicalShipping
       ? fallbackShippingCents
+      : (needsEstimateInput || (isCalculatingQuote && !hasExplicitFallbackShipping))
+        ? 0
       : (quotedAmountCents ?? fallbackShippingCents);
     const isEstimate = shouldRenderShippingAsEstimate(shippingQuote);
-    const shippingLabel = isCalculatingQuote
+    const shippingLabel = (isCalculatingQuote && hasExplicitFallbackShipping)
       ? getRuntimeMessage('cart.shippingCalculating', 'Calculating shipping...')
-      : isEstimate
+      : (isEstimate || needsEstimateInput)
         ? getRuntimeMessage('cart.shippingEstimate', 'Estimated shipping')
         : getRuntimeMessage('cart.shipping', 'Shipping');
 
@@ -1389,11 +1429,13 @@
       shippingCents,
       totalCents: pricing.subtotalCents + pricing.tipAmountCents + pricing.taxCents + shippingCents,
       shippingLabel,
-      totalLabel: isCalculatingQuote || isEstimate
+      totalLabel: isCalculatingQuote || isEstimate || needsEstimateInput
         ? getRuntimeMessage('cart.estimatedTotal', 'Estimated total')
         : getRuntimeMessage('cart.pledgeTotal', 'Pledge total'),
-      isShippingEstimate: isCalculatingQuote || isEstimate,
-      shippingSource: source
+      isShippingEstimate: isCalculatingQuote || isEstimate || needsEstimateInput,
+      shippingSource: source,
+      showShippingRow: pricing.shippingCents > 0 || needsEstimateInput || isCalculatingQuote,
+      shippingDisplayValue: (needsEstimateInput || (isCalculatingQuote && !hasExplicitFallbackShipping)) ? '--' : ''
     };
   }
 
@@ -1477,9 +1519,9 @@
     };
   }
 
-  function renderCartShippingSummaryValue(shippingQuote, shippingCents) {
+  function renderCartShippingSummaryValue(shippingQuote, shippingCents, shippingDisplayValue = '') {
     if (!shouldShowCartShippingOptions(shippingQuote)) {
-      return `<strong data-cart-checkout-summary-shipping>${formatCents(shippingCents)}</strong>`;
+      return `<strong data-cart-checkout-summary-shipping>${escapeHtml(shippingDisplayValue || formatCents(shippingCents))}</strong>`;
     }
 
     return `
@@ -1487,6 +1529,90 @@
         <select id="pool-custom-shipping-option" class="pool-first-party-cart__input pool-first-party-cart__input--select pool-first-party-cart__input--summary-select" data-cart-custom-shipping-option aria-label="${escapeAttribute(getRuntimeMessage('cart.shippingOption', 'Delivery option'))}">
           ${renderCartShippingOptionChoices(shippingQuote)}
         </select>
+      </div>
+    `;
+  }
+
+  function renderCartSummaryShippingRow(pricing) {
+    return `
+      <div class="pool-first-party-cart__summary-row" data-cart-summary-shipping-row>
+        <span data-cart-summary-shipping-label>${escapeHtml(pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping'))}</span>
+        <strong data-cart-summary-shipping>${escapeHtml(pricing.shippingDisplayValue || formatCents(pricing.shippingCents))}</strong>
+      </div>
+    `;
+  }
+
+  function renderCheckoutSummaryShippingRow(pricing, shippingQuote) {
+    return `
+      <div class="pool-first-party-cart__summary-row" data-cart-checkout-summary-shipping-row>
+        <span data-cart-checkout-summary-shipping-label>${escapeHtml(pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping'))}</span>
+        <div data-cart-checkout-summary-shipping-value>
+          ${renderCartShippingSummaryValue(shippingQuote, pricing.shippingCents, pricing.shippingDisplayValue)}
+        </div>
+      </div>
+    `;
+  }
+
+  function getPersistedShippingEstimateCountry(shippingDraft, fallbackDraft) {
+    const country = String(
+      shippingDraft?.address?.country ||
+      fallbackDraft?.address?.country ||
+      DEFAULT_SHIPPING_COUNTRY
+    ).trim().toUpperCase();
+    return /^[A-Z]{2}$/.test(country) ? country : DEFAULT_SHIPPING_COUNTRY;
+  }
+
+  function getPersistedShippingEstimatePostalCode(shippingDraft, fallbackDraft) {
+    return String(
+      shippingDraft?.address?.postal_code ||
+      fallbackDraft?.address?.postal_code ||
+      ''
+    ).trim();
+  }
+
+  function mergeShippingDraftWithDefaults(nextDraft, shippingDraft, fallbackDraft) {
+    const previous = shippingDraft || fallbackDraft || {};
+    const previousAddress = previous?.address || {};
+    const nextAddress = nextDraft?.address || {};
+    return {
+      name: String(nextDraft?.name ?? previous?.name ?? '').trim(),
+      address: {
+        line1: String(nextAddress.line1 ?? previousAddress.line1 ?? '').trim(),
+        line2: String(nextAddress.line2 ?? previousAddress.line2 ?? '').trim(),
+        city: String(nextAddress.city ?? previousAddress.city ?? '').trim(),
+        state: String(nextAddress.state ?? previousAddress.state ?? '').trim(),
+        postal_code: String(nextAddress.postal_code ?? previousAddress.postal_code ?? '').trim(),
+        country: String(nextAddress.country ?? previousAddress.country ?? DEFAULT_SHIPPING_COUNTRY).trim().toUpperCase() || DEFAULT_SHIPPING_COUNTRY
+      }
+    };
+  }
+
+  function isShippingPostalCodeQuoteReady(country, postalCode) {
+    const normalizedCountry = String(country || DEFAULT_SHIPPING_COUNTRY).trim().toUpperCase();
+    const normalizedPostal = String(postalCode || '').trim();
+    if (!normalizedPostal) return false;
+
+    if (normalizedCountry === 'US') {
+      return /^\d{5}(?:-\d{4})?$/.test(normalizedPostal);
+    }
+
+    return normalizedPostal.length >= 3;
+  }
+
+  function renderCartShippingEstimateField(shippingDraft, fallbackDraft) {
+    return `
+      <div class="pool-first-party-cart__field pool-first-party-cart__field--summary" data-cart-shipping-estimate-field>
+        <label class="pool-first-party-cart__field-label" for="pool-cart-estimate-postal">${escapeHtml(getRuntimeMessage('cart.shippingEstimatePostalCode', 'ZIP for shipping estimate'))}</label>
+        <input
+          id="pool-cart-estimate-postal"
+          class="pool-first-party-cart__input pool-first-party-cart__input--summary-postal"
+          type="text"
+          inputmode="numeric"
+          autocomplete="shipping postal-code"
+          value="${escapeAttribute(getPersistedShippingEstimatePostalCode(shippingDraft, fallbackDraft))}"
+          data-cart-estimate-postal
+        >
+        <p class="pool-first-party-cart__note">${escapeHtml(getRuntimeMessage('cart.shippingEstimatePostalHelp', 'Enter a U.S. ZIP code to estimate shipping before checkout.'))}</p>
       </div>
     `;
   }
@@ -1942,6 +2068,21 @@
         return null;
       }
 
+      let didNormalize = false;
+      snapshot.cart.items = snapshot.cart.items.map((item) => {
+        const normalized = normalizeCartItem(item);
+        if (JSON.stringify(normalized) !== JSON.stringify(item)) {
+          didNormalize = true;
+        }
+        return normalized;
+      });
+
+      if (didNormalize) {
+        try {
+          storage.setItem(FIRST_PARTY_CHECKOUT_SNAPSHOT_KEY, JSON.stringify(snapshot));
+        } catch (_error) {}
+      }
+
       return snapshot;
     } catch (_error) {
       return null;
@@ -2099,6 +2240,9 @@
         campaignShippingFallbackCents: Number.isFinite(Number(item?.campaignShippingFallbackCents))
           ? Math.round(Number(item.campaignShippingFallbackCents))
           : undefined,
+        campaignHasExplicitShippingOverride: item?.campaignHasExplicitShippingOverride === true
+          ? true
+          : undefined,
         campaignFreeShipping: item?.campaignFreeShipping === true
           ? true
           : item?.campaignFreeShipping === false
@@ -2126,7 +2270,10 @@
 
   function readPersistedFirstPartyCartState() {
     try {
-      const raw = localStorage.getItem(FIRST_PARTY_CART_STATE_KEY);
+      const storage = getLocalStorageSafe();
+      if (!storage) return null;
+
+      const raw = storage.getItem(FIRST_PARTY_CART_STATE_KEY);
       if (!raw) return null;
 
       const persisted = JSON.parse(raw);
@@ -2134,12 +2281,28 @@
         return null;
       }
 
+      let didNormalize = false;
       const items = coerceBundleAddOnCartItems(persisted.items
-        .map((item) => normalizeCartItem(item))
+        .map((item) => {
+          const normalized = normalizeCartItem(item);
+          if (JSON.stringify(normalized) !== JSON.stringify(item)) {
+            didNormalize = true;
+          }
+          return normalized;
+        })
         .filter((item) => item.id));
 
       if (items.length === 0) {
         return null;
+      }
+
+      if (didNormalize) {
+        try {
+          storage.setItem(FIRST_PARTY_CART_STATE_KEY, JSON.stringify({
+            ...persisted,
+            items
+          }));
+        } catch (_error) {}
       }
 
       return {
@@ -3005,6 +3168,9 @@
             <span class="pool-first-party-cart__tip-percent" id="pool-cart-tip-percent" data-cart-tip-percent>${pricing.tipPercent}%</span>
           </div>
         </div>
+        ${cartHasPhysicalItems(items)
+          ? renderCartShippingEstimateField(customCheckout?.shippingDraft, persistedCustomCheckoutShippingDraft)
+          : ''}
         <section class="pool-first-party-cart__callout">
           <p class="pool-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.pledgeTotal', 'Pledge total'))}</p>
           <div class="pool-first-party-cart__checkout-summary">
@@ -3022,12 +3188,7 @@
               <span>${formatTaxRateLabel()}</span>
               <strong data-cart-summary-tax>${formatCents(pricing.taxCents)}</strong>
             </div>
-            ${pricing.shippingCents > 0 ? `
-              <div class="pool-first-party-cart__summary-row" data-cart-summary-shipping-row>
-                <span data-cart-summary-shipping-label>${escapeHtml(pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping'))}</span>
-                <strong data-cart-summary-shipping>${formatCents(pricing.shippingCents)}</strong>
-              </div>
-            ` : ''}
+            ${pricing.showShippingRow ? renderCartSummaryShippingRow(pricing) : ''}
             <div class="pool-first-party-cart__summary-row pool-first-party-cart__summary-row--total">
               <span data-cart-summary-total-label>${escapeHtml(pricing.totalLabel || getRuntimeMessage('cart.pledgeTotal', 'Pledge total'))}</span>
               <strong data-cart-summary-total>${formatCents(pricing.totalCents)}</strong>
@@ -3068,14 +3229,7 @@
                   <span>${formatTaxRateLabel()}</span>
                 <strong data-cart-checkout-summary-tax>${formatCents(pricing.taxCents)}</strong>
               </div>
-              ${pricing.shippingCents > 0 ? `
-                <div class="pool-first-party-cart__summary-row">
-                  <span data-cart-checkout-summary-shipping-label>${escapeHtml(pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping'))}</span>
-                  <div data-cart-checkout-summary-shipping-value>
-                    ${renderCartShippingSummaryValue(customCheckout?.shippingQuote, pricing.shippingCents)}
-                  </div>
-                </div>
-              ` : ''}
+              ${pricing.showShippingRow ? renderCheckoutSummaryShippingRow(pricing, customCheckout?.shippingQuote) : ''}
               <div class="pool-first-party-cart__summary-row pool-first-party-cart__summary-row--total">
                 <span data-cart-checkout-summary-total-label>${escapeHtml(pricing.totalLabel || getRuntimeMessage('cart.pledgeTotal', 'Pledge total'))}</span>
                 <strong data-cart-checkout-summary-total>${formatCents(pricing.totalCents)}</strong>
@@ -3188,11 +3342,13 @@
       const tipSummaryAmount = root.querySelector('[data-cart-summary-tip-amount]');
       const subtotal = root.querySelector('[data-cart-summary-subtotal]');
       const tax = root.querySelector('[data-cart-summary-tax]');
-      const shippingRow = root.querySelector('[data-cart-summary-shipping-row]');
-      const shippingLabel = root.querySelector('[data-cart-summary-shipping-label]');
-      const shipping = root.querySelector('[data-cart-summary-shipping]');
+      let shippingRow = root.querySelector('[data-cart-summary-shipping-row]');
+      let shippingLabel = root.querySelector('[data-cart-summary-shipping-label]');
+      let shipping = root.querySelector('[data-cart-summary-shipping]');
       const totalLabel = root.querySelector('[data-cart-summary-total-label]');
       const total = root.querySelector('[data-cart-summary-total]');
+      const summary = root.querySelector('.pool-first-party-cart__checkout-summary');
+      const totalRow = root.querySelector('.pool-first-party-cart__summary-row--total');
 
       if (tipAmount) tipAmount.textContent = formatCents(pricing.tipAmountCents);
       if (tipPercent) tipPercent.textContent = `${pricing.tipPercent}%`;
@@ -3211,12 +3367,21 @@
         tipSummaryAmount.textContent = formatCents(pricing.tipAmountCents);
       }
 
-      if (shippingRow && shipping) {
-        shippingRow.hidden = pricing.shippingCents <= 0;
-        if (shippingLabel) {
-          shippingLabel.textContent = pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping');
-        }
-        shipping.textContent = formatCents(pricing.shippingCents);
+      if (!shippingRow && pricing.showShippingRow && summary && totalRow) {
+        totalRow.insertAdjacentHTML('beforebegin', renderCartSummaryShippingRow(pricing));
+        shippingRow = root.querySelector('[data-cart-summary-shipping-row]');
+        shippingLabel = root.querySelector('[data-cart-summary-shipping-label]');
+        shipping = root.querySelector('[data-cart-summary-shipping]');
+      }
+
+      if (shippingRow) {
+        shippingRow.hidden = !pricing.showShippingRow;
+      }
+      if (shippingLabel) {
+        shippingLabel.textContent = pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping');
+      }
+      if (shipping) {
+        shipping.textContent = pricing.shippingDisplayValue || formatCents(pricing.shippingCents);
       }
       if (totalLabel) {
         totalLabel.textContent = pricing.totalLabel || getRuntimeMessage('cart.pledgeTotal', 'Pledge total');
@@ -3238,10 +3403,13 @@
       const tipLabel = root.querySelector('[data-cart-checkout-summary-tip-label]');
       const tipAmount = root.querySelector('[data-cart-checkout-summary-tip-amount]');
       const tax = root.querySelector('[data-cart-checkout-summary-tax]');
-      const shippingLabel = root.querySelector('[data-cart-checkout-summary-shipping-label]');
-      const shippingAmount = root.querySelector('[data-cart-checkout-summary-shipping]');
+      let shippingLabel = root.querySelector('[data-cart-checkout-summary-shipping-label]');
+      let shippingAmount = root.querySelector('[data-cart-checkout-summary-shipping]');
       const totalLabel = root.querySelector('[data-cart-checkout-summary-total-label]');
       const total = root.querySelector('[data-cart-checkout-summary-total]');
+      let shippingRow = root.querySelector('[data-cart-checkout-summary-shipping-row]');
+      const checkoutSummary = root.querySelectorAll('.pool-first-party-cart__checkout-summary')[0];
+      const totalRow = root.querySelector('.pool-first-party-cart__summary-row--total');
       if (subtotal) {
         subtotal.textContent = formatCents(pricing.subtotalCents);
       }
@@ -3255,11 +3423,23 @@
       if (tax) {
         tax.textContent = formatCents(pricing.taxCents);
       }
+      if (!shippingRow && pricing.showShippingRow && checkoutSummary && totalRow) {
+        totalRow.insertAdjacentHTML(
+          'beforebegin',
+          renderCheckoutSummaryShippingRow(pricing, checkoutUiState.customCheckout?.shippingQuote)
+        );
+        shippingRow = root.querySelector('[data-cart-checkout-summary-shipping-row]');
+        shippingLabel = root.querySelector('[data-cart-checkout-summary-shipping-label]');
+        shippingAmount = root.querySelector('[data-cart-checkout-summary-shipping]');
+      }
+      if (shippingRow) {
+        shippingRow.hidden = !pricing.showShippingRow;
+      }
       if (shippingLabel) {
         shippingLabel.textContent = pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping');
       }
       if (shippingAmount) {
-        shippingAmount.textContent = formatCents(pricing.shippingCents);
+        shippingAmount.textContent = pricing.shippingDisplayValue || formatCents(pricing.shippingCents);
       }
       if (totalLabel) {
         totalLabel.textContent = pricing.totalLabel || getRuntimeMessage('cart.pledgeTotal', 'Pledge total');
@@ -3275,6 +3455,11 @@
       const shippingOptionSelect = root?.querySelector('[data-cart-custom-shipping-option]');
       const shippingQuote = checkoutUiState.customCheckout?.shippingQuote || null;
       const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
+      const pricing = getDisplayedFirstPartyPricing(store.getState(), {
+        currentRoute,
+        checkoutMode: checkoutUiState.mode,
+        shippingQuote
+      });
 
       if (shippingValueContainer) {
         const currentShippingCents = Number.isFinite(Number(shippingQuote?.amountCents))
@@ -3283,7 +3468,11 @@
               store.getState()?.cart?.items?.items || [],
               store.getState()?.cart?.bundleAddOnAnchorCampaignSlug
             );
-        shippingValueContainer.innerHTML = renderCartShippingSummaryValue(shippingQuote, currentShippingCents);
+        shippingValueContainer.innerHTML = renderCartShippingSummaryValue(
+          shippingQuote,
+          currentShippingCents,
+          pricing.shippingDisplayValue
+        );
       }
 
       const availableOptions = Array.isArray(shippingQuote?.availableOptions) ? shippingQuote.availableOptions : [];
@@ -3296,7 +3485,7 @@
       const refreshedShippingOptionSelect = root?.querySelector('[data-cart-custom-shipping-option]');
       if (!refreshedShippingOptionSelect) {
         if (shippingAmount && !shouldShowCartShippingOptions(shippingQuote)) {
-          shippingAmount.textContent = formatCents(
+          shippingAmount.textContent = pricing.shippingDisplayValue || formatCents(
             Number.isFinite(Number(shippingQuote?.amountCents))
               ? Math.max(0, Number(shippingQuote.amountCents))
               : getCampaignFallbackShippingCents(
@@ -3327,6 +3516,7 @@
       cartShouldFocusAfterRender = true;
       scheduleStripeJsPrewarm();
       renderFirstPartyCart();
+      void refreshCustomCheckoutShippingEstimate();
     }
 
     function closeFirstPartyCart() {
@@ -3502,7 +3692,10 @@
     }
 
     function getCustomCheckoutShippingSignature(state) {
-      if (currentRoute !== CHECKOUT_VIEW_ROUTE || checkoutUiState.mode !== 'custom') {
+      if (currentRoute !== CHECKOUT_VIEW_ROUTE && currentRoute !== CART_VIEW_ROUTE) {
+        return '';
+      }
+      if (currentRoute === CHECKOUT_VIEW_ROUTE && checkoutUiState.mode !== 'custom') {
         return '';
       }
 
@@ -3633,6 +3826,27 @@
       };
     }
 
+    function readCartShippingEstimateDraft() {
+      const root = getCartRoot();
+      const postalField = root?.querySelector('[data-cart-estimate-postal]');
+      const postalCode = postalField instanceof HTMLInputElement
+        ? String(postalField.value || '').trim()
+        : getPersistedShippingEstimatePostalCode(
+            checkoutUiState?.customCheckout?.shippingDraft,
+            persistedCustomCheckoutShippingDraft
+          );
+
+      return mergeShippingDraftWithDefaults({
+        address: {
+          postal_code: postalCode,
+          country: getPersistedShippingEstimateCountry(
+            checkoutUiState?.customCheckout?.shippingDraft,
+            persistedCustomCheckoutShippingDraft
+          )
+        }
+      }, checkoutUiState?.customCheckout?.shippingDraft, persistedCustomCheckoutShippingDraft);
+    }
+
     function readCustomCheckoutEmailDraft() {
       const field = getCartRoot()?.querySelector('[data-cart-custom-checkout-email]');
       if (field instanceof HTMLInputElement) {
@@ -3642,7 +3856,9 @@
     }
 
     async function refreshCustomCheckoutShippingEstimate() {
-      if (currentRoute !== CHECKOUT_VIEW_ROUTE || checkoutUiState.mode !== 'custom') return;
+      const isCheckoutRoute = currentRoute === CHECKOUT_VIEW_ROUTE;
+      const isCartRoute = currentRoute === CART_VIEW_ROUTE;
+      if (!isCheckoutRoute && !isCartRoute) return;
       const state = store.getState();
       if (!cartHasPhysicalItems(state?.cart?.items?.items || [])) {
         customCheckoutShippingQuoteToken += 1;
@@ -3662,24 +3878,23 @@
         return;
       }
 
-      const shippingDraft = readCustomCheckoutShippingDraft();
+      const shippingDraft = isCheckoutRoute && checkoutUiState.mode === 'custom'
+        ? readCustomCheckoutShippingDraft()
+        : readCartShippingEstimateDraft();
       persistCustomCheckoutDraftState(undefined, shippingDraft);
       checkoutUiState.customCheckout = {
         ...(checkoutUiState.customCheckout || {}),
         shippingDraft
       };
 
-      if (!isCustomCheckoutShippingDraftComplete(shippingDraft)) {
+      if (!isShippingPostalCodeQuoteReady(shippingDraft?.address?.country, shippingDraft?.address?.postal_code)) {
         customCheckoutShippingQuoteToken += 1;
         checkoutUiState.customCheckout = {
           ...(checkoutUiState.customCheckout || {}),
           shippingQuote: {
-            status: 'idle',
-            amountCents: getCampaignFallbackShippingCents(
-              state?.cart?.items?.items || [],
-              state?.cart?.bundleAddOnAnchorCampaignSlug
-            ),
-            source: 'fallback_flat_rate',
+            status: 'needs_input',
+            amountCents: 0,
+            source: 'none',
             availableOptions: [],
             defaultOption: 'standard',
             selectedOption: 'standard'
@@ -3694,11 +3909,10 @@
         ...(checkoutUiState.customCheckout || {}),
           shippingQuote: {
             status: 'loading',
-            amountCents: Number(checkoutUiState.customCheckout?.shippingQuote?.amountCents) || getCampaignFallbackShippingCents(
-              state?.cart?.items?.items || [],
-              state?.cart?.bundleAddOnAnchorCampaignSlug
-            ),
-            source: checkoutUiState.customCheckout?.shippingQuote?.source || 'fallback_flat_rate',
+            amountCents: Number.isFinite(Number(checkoutUiState.customCheckout?.shippingQuote?.amountCents))
+              ? Math.max(0, Number(checkoutUiState.customCheckout.shippingQuote.amountCents))
+              : 0,
+            source: checkoutUiState.customCheckout?.shippingQuote?.source || 'none',
             availableOptions: Array.isArray(checkoutUiState.customCheckout?.shippingQuote?.availableOptions)
               ? checkoutUiState.customCheckout.shippingQuote.availableOptions
               : [],
@@ -4468,6 +4682,21 @@
           return;
         }
 
+        const cartEstimatePostalField = event.target?.closest?.('[data-cart-estimate-postal]');
+        if (cartEstimatePostalField instanceof HTMLInputElement) {
+          persistCustomCheckoutDraftState(undefined, mergeShippingDraftWithDefaults({
+            address: {
+              postal_code: cartEstimatePostalField.value,
+              country: getPersistedShippingEstimateCountry(
+                checkoutUiState?.customCheckout?.shippingDraft,
+                persistedCustomCheckoutShippingDraft
+              )
+            }
+          }, checkoutUiState?.customCheckout?.shippingDraft, persistedCustomCheckoutShippingDraft));
+          void refreshCustomCheckoutShippingEstimate();
+          return;
+        }
+
         const emailField = event.target?.closest?.('[data-cart-email]');
         if (!emailField) return;
 
@@ -4537,6 +4766,21 @@
             setCheckoutUiError(error?.message || 'Shipping validation failed.');
             syncCustomCheckoutConfirmButton();
           });
+          return;
+        }
+
+        const cartEstimatePostalField = event.target?.closest?.('[data-cart-estimate-postal]');
+        if (cartEstimatePostalField instanceof HTMLInputElement) {
+          persistCustomCheckoutDraftState(undefined, mergeShippingDraftWithDefaults({
+            address: {
+              postal_code: cartEstimatePostalField.value,
+              country: getPersistedShippingEstimateCountry(
+                checkoutUiState?.customCheckout?.shippingDraft,
+                persistedCustomCheckoutShippingDraft
+              )
+            }
+          }, checkoutUiState?.customCheckout?.shippingDraft, persistedCustomCheckoutShippingDraft));
+          void refreshCustomCheckoutShippingEstimate();
           return;
         }
 
@@ -4895,7 +5139,10 @@
               renderFirstPartyCart();
               eventBus.emit('theme.routechanged', payload);
               ensureCustomCheckoutBootstrapped();
-              if (currentRoute === CHECKOUT_VIEW_ROUTE && checkoutUiState.mode === 'custom') {
+              if (currentRoute === CHECKOUT_VIEW_ROUTE) {
+                void refreshCustomCheckoutShippingEstimate();
+              }
+              if (currentRoute === CART_VIEW_ROUTE) {
                 void refreshCustomCheckoutShippingEstimate();
               }
               return Promise.resolve(payload);
