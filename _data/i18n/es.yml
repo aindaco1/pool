@@ -29,6 +29,29 @@ campaign:
   all_or_nothing_body: "Todo o nada: tu tarjeta se guarda ahora, pero no se cobra. Solo se te cobrará si esta campaña alcanza su meta antes de %{date}."
   tiers_heading: "Niveles"
   no_reward_heading: "Sin recompensa"
+  play_video: "Reproducir video"
+  supporters_only_cta: "🔒 Solo patrocinadores"
+  supporter_community_unlocked: "¡Tienes acceso! Únete a otras personas que apoyan para votar en decisiones creativas."
+
+diary:
+  heading: "Diario"
+  tablist_label: "Fases del diario"
+  fundraising: "Financiación"
+  pre_production: "Preproducción"
+  production: "Producción"
+  post_production: "Postproducción"
+  distribution: "Distribución"
+  empty: "Todavía no hay entradas."
+
+production_phases:
+  heading: "Fases de producción"
+  region_label: "Fases de producción"
+  tablist_label: "Fases de producción"
+  progress_suffix: "progreso"
+  fund_this_item: "Financiar este artículo"
+  fund_item_description: "Financia %{item} — %{need}"
+  need_label: "Necesidad:"
+  empty: "Aún no hay artículos activos. Próximamente."
 
 custom_amount:
   heading: "Apoya a tu discreción"
@@ -282,6 +305,7 @@ misc:
   close: "Cerrar"
   skip_to_main: "Saltar al contenido principal"
   unavailable: "No disponible"
+  video_not_supported: "Tu navegador no es compatible con la etiqueta de video."
 
 home:
   h1: "Campañas de The Pool"

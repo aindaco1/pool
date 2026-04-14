@@ -1,13 +1,14 @@
+{% assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
 {% if include.diary or include.updates %}
 <section class="diary" id="diary">
-  <h3>Diary</h3>
+  <h3>{% include t.html key="diary.heading" lang=current_lang %}</h3>
   
-  <div class="diary-tabs" role="tablist" aria-label="Diary phases">
-    <button class="diary-tab" id="diary-tab-fundraising" role="tab" aria-selected="true" aria-controls="diary-fundraising" tabindex="0" data-tab="fundraising" type="button">Fundraising</button>
-    <button class="diary-tab" id="diary-tab-pre-production" role="tab" aria-selected="false" aria-controls="diary-pre-production" tabindex="-1" data-tab="pre-production" type="button">Pre-Production</button>
-    <button class="diary-tab" id="diary-tab-production" role="tab" aria-selected="false" aria-controls="diary-production" tabindex="-1" data-tab="production" type="button">Production</button>
-    <button class="diary-tab" id="diary-tab-post-production" role="tab" aria-selected="false" aria-controls="diary-post-production" tabindex="-1" data-tab="post-production" type="button">Post-Production</button>
-    <button class="diary-tab" id="diary-tab-distribution" role="tab" aria-selected="false" aria-controls="diary-distribution" tabindex="-1" data-tab="distribution" type="button">Distribution</button>
+  <div class="diary-tabs" role="tablist" aria-label="{% include t.html key='diary.tablist_label' lang=current_lang %}">
+    <button class="diary-tab" id="diary-tab-fundraising" role="tab" aria-selected="true" aria-controls="diary-fundraising" tabindex="0" data-tab="fundraising" type="button">{% include t.html key="diary.fundraising" lang=current_lang %}</button>
+    <button class="diary-tab" id="diary-tab-pre-production" role="tab" aria-selected="false" aria-controls="diary-pre-production" tabindex="-1" data-tab="pre-production" type="button">{% include t.html key="diary.pre_production" lang=current_lang %}</button>
+    <button class="diary-tab" id="diary-tab-production" role="tab" aria-selected="false" aria-controls="diary-production" tabindex="-1" data-tab="production" type="button">{% include t.html key="diary.production" lang=current_lang %}</button>
+    <button class="diary-tab" id="diary-tab-post-production" role="tab" aria-selected="false" aria-controls="diary-post-production" tabindex="-1" data-tab="post-production" type="button">{% include t.html key="diary.post_production" lang=current_lang %}</button>
+    <button class="diary-tab" id="diary-tab-distribution" role="tab" aria-selected="false" aria-controls="diary-distribution" tabindex="-1" data-tab="distribution" type="button">{% include t.html key="diary.distribution" lang=current_lang %}</button>
   </div>
 
   {% assign phases = "fundraising,pre-production,production,post-production,distribution" | split: "," %}
@@ -69,7 +70,7 @@
           {% endfor %}
         </div>
       {% else %}
-        <p class="empty-state">No entries yet.</p>
+        <p class="empty-state">{% include t.html key="diary.empty" lang=current_lang %}</p>
       {% endif %}
     </div>
   {% endfor %}

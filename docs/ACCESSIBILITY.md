@@ -177,7 +177,7 @@ Good next accessibility improvements include:
 - manual screen-reader verification pass across cart, checkout, manage, and supporter-community flows
 - keeping the public-page axe/ARIA coverage current as new top-level pages and campaign archetypes are added
 - adding keyboard-only assertions alongside any new public interactive widgets as they are introduced
-- an i18n-aware accessibility review once translation work moves forward
+- keeping the i18n-aware accessibility review current as more localized public or supporter-facing copy is added
 
 ---
 

@@ -63,6 +63,25 @@ describe('SEO templates', () => {
     expect(seoMeta).toContain('site.seo.og_locale_overrides');
   });
 
+  it('routes campaign chrome strings through shared translation keys', () => {
+    const campaignLayout = readRepoFile('_layouts', 'campaign.html');
+    const diaryInclude = readRepoFile('_includes', 'diary.html');
+    const productionPhasesInclude = readRepoFile('_includes', 'production-phases.html');
+    const galleryBlock = readRepoFile('_includes', 'blocks', 'gallery.html');
+
+    expect(campaignLayout).toContain("key='campaign.play_video'");
+    expect(campaignLayout).toContain('key="campaign.supporter_community_unlocked"');
+    expect(campaignLayout).toContain('key="campaign.supporters_only_cta"');
+    expect(campaignLayout).toContain('key="misc.video_not_supported"');
+    expect(diaryInclude).toContain('key="diary.heading"');
+    expect(diaryInclude).toContain("key='diary.tablist_label'");
+    expect(diaryInclude).toContain('key="diary.empty"');
+    expect(productionPhasesInclude).toContain('key="production_phases.heading"');
+    expect(productionPhasesInclude).toContain("key='production_phases.region_label'");
+    expect(productionPhasesInclude).toContain('key="production_phases.fund_this_item"');
+    expect(galleryBlock).toContain("key='runtime.campaign.image_gallery'");
+  });
+
   it('keeps the public navigation focused on canonical public pages', () => {
     const header = readRepoFile('_includes', 'header.html');
 

@@ -1,5 +1,6 @@
 {% assign block = include.block %}
 {% assign layout = block.layout | default: 'grid' %}
+{% assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
 {% unless layout == 'carousel' %}
   {% assign layout = 'grid' %}
 {% endunless %}
@@ -8,7 +9,7 @@
     class="gallery__container"
     {% if layout == 'carousel' %}
       tabindex="0"
-      aria-label="Image gallery"
+      aria-label="{% include t.html key='runtime.campaign.image_gallery' lang=current_lang %}"
     {% endif %}>
     {% for img in block.images %}
       <div class="gallery__item">

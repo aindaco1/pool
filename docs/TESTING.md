@@ -138,6 +138,14 @@ Recent browser coverage also includes dedicated mobile viewport assertions for:
 - Manage Pledge and Update Card reachability on short mobile viewports
 - no-horizontal-overflow checks on the main public and pledge-management paths
 
+Recent public-page coverage also now protects more localized campaign chrome, including:
+
+- hero video play/loading states
+- supporter-community teaser copy
+- diary tab labels and empty states
+- production-phase labels and CTA copy
+- gallery accessibility labels
+
 The content-safety filter suite in `tests/unit/content-safety-filter.test.ts` also falls back to Podman when host Bundler/Jekyll gems are unavailable. On macOS, it can start the Podman machine as part of that fallback.
 
 The current Podman scope is intentionally narrow:

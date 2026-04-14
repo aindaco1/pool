@@ -1,9 +1,10 @@
+{% assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
 {% if include.phases and include.campaign %}
 {% assign cart_add_item_classes = "poolcart-add-item" %}
-<section class="production-phases" aria-label="Production phases">
-  <h3>Production Phases</h3>
+<section class="production-phases" aria-label="{% include t.html key='production_phases.region_label' lang=current_lang %}">
+  <h3>{% include t.html key="production_phases.heading" lang=current_lang %}</h3>
   
-  <div class="phase-tabs" role="tablist" aria-label="Production phases">
+  <div class="phase-tabs" role="tablist" aria-label="{% include t.html key='production_phases.tablist_label' lang=current_lang %}">
     {% for phase in include.phases %}
       {% assign tab_id = phase.name | slugify %}
       <button class="phase-tab" role="tab" 
@@ -36,7 +37,7 @@
               </div>
               
               {% assign percent = item.current | times: 100 | divided_by: item.target %}
-              <div class="progress" aria-label="{{ item.label | escape }} progress">
+              <div class="progress" aria-label="{{ item.label | escape }} {% include t.html key='production_phases.progress_suffix' lang=current_lang %}">
                 <i data-progress-width="{{ percent }}"></i>
               </div>
               
@@ -46,23 +47,23 @@
                         data-item-name="{{ item.label | escape }}"
                         data-item-price="{{ item.target | minus: item.current }}"
                         data-item-url="{{ site.url }}{{ include.campaign.url }}"
-                        data-item-description="Fund {{ item.label | escape }} — {{ item.need | escape }}"
+                        data-item-description="{% include t.html key='production_phases.fund_item_description' lang=current_lang item=item.label need=item.need %}"
                         data-item-max-quantity="1"
                         data-item-stackable="never"
                         data-item-custom1-name="_stackable"
                         data-item-custom1-type="hidden"
                         data-item-custom1-value="false">
-                  Fund this item
+                  {% include t.html key="production_phases.fund_this_item" lang=current_lang %}
                 </button>
                 {% if item.need %}
-                  <span class="registry-item__need">Need: {{ item.need | escape }}</span>
+                  <span class="registry-item__need">{% include t.html key="production_phases.need_label" lang=current_lang %} {{ item.need | escape }}</span>
                 {% endif %}
               </div>
             </article>
           {% endfor %}
         </div>
       {% else %}
-        <p class="empty-state">No active items yet. Coming soon.</p>
+        <p class="empty-state">{% include t.html key="production_phases.empty" lang=current_lang %}</p>
       {% endif %}
     </div>
   {% endfor %}

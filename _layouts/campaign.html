@@ -105,15 +105,15 @@
             <div class="hero__video-wrapper" id="hero-video-wrapper">
               <video class="hero__video" id="hero-video" controls preload="metadata" playsinline poster="{% if page.hero_image_wide %}{{ page.hero_image_wide }}{% else %}{{ page.hero_image }}{% endif %}">
                 <source src="{{ page.hero_video }}" type="video/webm">
-                Your browser does not support the video tag.
+                {% include t.html key="misc.video_not_supported" lang=current_lang %}
               </video>
               <div class="hero__video-overlay" id="hero-video-overlay">
-                <button class="hero__video-play" id="hero-video-play" aria-label="Play video">
+                <button class="hero__video-play" id="hero-video-play" type="button" aria-label="{% include t.html key='campaign.play_video' lang=current_lang %}">
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                 </button>
-                <div class="hero__video-loading" id="hero-video-loading" hidden>
+                <div class="hero__video-loading" id="hero-video-loading" role="status" aria-live="polite" hidden>
                   <div class="hero__video-spinner"></div>
-                  <span class="hero__video-loading-text">Loading...</span>
+                  <span class="hero__video-loading-text">{% include t.html key="misc.loading" lang=current_lang %}</span>
                 </div>
               </div>
               <div class="hero__video-buffer" id="hero-video-buffer">
@@ -140,10 +140,10 @@
     <section class="community-teaser" id="community-teaser">
       <h3>{% include t.html key="campaign.supporter_community" lang=current_lang %}</h3>
       <p class="teaser-locked">{% include t.html key="campaign.supporters_only" lang=current_lang %}</p>
-      <p class="teaser-unlocked" hidden>You have access! Join your fellow supporters to vote on creative decisions.</p>
+      <p class="teaser-unlocked" hidden>{% include t.html key="campaign.supporter_community_unlocked" lang=current_lang %}</p>
       {%- capture community_path -%}/community/{{ page.slug }}/{%- endcapture -%}
       <a href="{% include localized-url.html lang=current_lang path=community_path %}" class="btn btn--secondary btn--locked" id="community-btn">
-        <span class="locked-text">🔒 Supporters Only</span>
+        <span class="locked-text">{% include t.html key="campaign.supporters_only_cta" lang=current_lang %}</span>
         <span class="unlocked-text" hidden>{% include t.html key="campaign.access_community" lang=current_lang %}</span>
       </a>
     </section>

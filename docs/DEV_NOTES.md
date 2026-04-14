@@ -1177,6 +1177,8 @@ Use the locale helpers for page routing:
 
 Runtime messages for site-owned JS flows are emitted through [`assets/i18n.json`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/assets/i18n.json) and booted into `POOL_CONFIG.i18n.messages`, so the cart, checkout, supporter community, and Manage Pledge flows can use the same locale catalog without a SPA-style translation layer.
 
+Public campaign templates also pull more shared chrome from the same locale data now, including hero-video play/loading text, supporter-community teaser copy, diary tab labels and empty states, production-phase labels/CTAs, and gallery accessibility labels.
+
 Worker supporter emails also consume the shared locale catalog and the persisted `preferredLang` attached to checkout and manage flows, so localized supporter emails and localized `/manage/` / `/community/:slug/` links stay aligned with the site locale model.
 
 The shared footer language switcher also preserves the current query string and hash, which matters for tokenized routes such as `/manage/?t=...` and supporter-community links.
@@ -1215,6 +1217,7 @@ Manual rule of thumb:
 - `dates` - Date formats
 - `misc` - Common words
 - `home` - campaigns index headings and eyebrow labels
+- `campaign` / `diary` / `production_phases` - shared campaign-page chrome and interactive section labels
 
 ---
 

@@ -126,6 +126,12 @@
   - focused audit-and-polish work rather than a redesign
   - shared responsive fixes across campaign pages, cart / checkout, Manage Pledge, Update Card, community pages, and long-form content
   - mobile browser regressions for overflow, scrollability, and reachable primary actions
+- [x] Zero-regression styles reorganization to be cleaner, more efficient, and as DRY as possible
+  - shared Sass primitives now cover repeated card shells, stacked sections, responsive surfaces, tab lists, pill states, media-object grids, quantity steppers, and primary action buttons
+  - cart / checkout, Manage Pledge, campaign pages, community pages, and long-form content now lean on those shared patterns instead of carrying parallel near-duplicate styling
+  - add-on cards and Manage Pledge controls were normalized across desktop, tablet, and small-phone breakpoints without redesigning the established visual language
+  - Node 25 test compatibility was repaired so the style branch could stay validated on the default local toolchain
+  - the branch kept zero-regression pressure through focused Vitest coverage, Podman-backed Playwright mobile checks, and a full green merge gate
 - [x] Variable-first customization for forks
   - canonical `platform`, `pricing`, `design`, `checkout`, and `cache` settings
   - auto-synced Worker mirroring from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`
@@ -169,7 +175,6 @@
 - [ ] Denial of service attack defense pass
 - [ ] Support different prices per add-on variation
 - [ ] Campaign-specific add-on products
-- [ ] Zero-regression styles reorganization to be cleaner, more efficient, and as DRY as possible
 
 ## Known Issues
 

@@ -172,6 +172,7 @@ Current supported pattern:
 - non-default public pages live under a locale prefix like `/es/`
 - shared runtime/browser messages are emitted through `assets/i18n.json`
 - Worker supporter emails reuse that shared locale catalog plus persisted `preferredLang`
+- campaign chrome such as the hero video button/loading text, supporter-community teaser copy, diary tabs, production-phase controls, and gallery accessibility labels also now comes from `_data/i18n/{lang}.yml`
 - the shared footer language switcher is automatic when more than one language is configured
 - long-form pages such as `about` and `terms` should use localized source pages rather than trying to store every paragraph in YAML
 
