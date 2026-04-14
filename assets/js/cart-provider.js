@@ -1252,10 +1252,11 @@
     );
   }
 
-  function cartHasExplicitFallbackShipping(items) {
+  function cartRequiresQuotedShipping(items) {
     const normalizedItems = Array.isArray(items) ? items : [];
     const addOnSelections = getCartBundleAddOnSelections(normalizedItems);
     const campaignSlugs = new Set();
+    let requiresPlatformQuote = false;
 
     for (const item of normalizedItems) {
       if (isAddOnCartItem(item)) continue;
@@ -1273,16 +1274,18 @@
         if (campaignSlug) {
           campaignSlugs.add(campaignSlug);
         }
+      } else {
+        requiresPlatformQuote = true;
       }
     }
 
     for (const slug of campaignSlugs) {
-      if (campaignHasExplicitFallbackShipping(normalizedItems, slug)) {
+      if (!campaignHasExplicitFallbackShipping(normalizedItems, slug)) {
         return true;
       }
     }
 
-    return false;
+    return requiresPlatformQuote;
   }
 
   function getCampaignFallbackShippingCents(items, selectedAnchorSlug) {
@@ -1348,7 +1351,7 @@
     const route = options?.currentRoute;
     if (route !== CHECKOUT_VIEW_ROUTE && route !== CART_VIEW_ROUTE) return false;
     const items = state?.cart?.items?.items || [];
-    return cartHasPhysicalItems(items);
+    return cartHasPhysicalItems(items) && cartRequiresQuotedShipping(items);
   }
 
   function getDisplayedFirstPartyPricing(state, options) {
@@ -1358,7 +1361,9 @@
         ...pricing,
         shippingLabel: getRuntimeMessage('cart.shipping', 'Shipping'),
         totalLabel: getRuntimeMessage('cart.pledgeTotal', 'Pledge total'),
-        isShippingEstimate: false
+        isShippingEstimate: false,
+        showShippingRow: pricing.shippingCents > 0,
+        shippingDisplayValue: ''
       };
     }
 
@@ -1394,7 +1399,7 @@
       cartItems,
       state?.cart?.bundleAddOnAnchorCampaignSlug
     );
-    const hasExplicitFallbackShipping = cartHasExplicitFallbackShipping(cartItems);
+    const requiresQuotedShipping = cartRequiresQuotedShipping(cartItems);
     const quoteStatus = String(shippingQuote?.status || 'idle').trim().toLowerCase();
     const isCalculatingQuote = quoteStatus === 'loading';
     const source = String(shippingQuote?.source || '').trim().toLowerCase();
@@ -1406,7 +1411,7 @@
       ? Math.max(0, Number(shippingQuote.amountCents))
       : null;
     const needsEstimateInput = hasPhysicalItems &&
-      !hasExplicitFallbackShipping &&
+      requiresQuotedShipping &&
       !hasEstimateAddress;
     const shouldFallbackToPhysicalShipping = hasPhysicalItems &&
       !isCalculatingQuote &&
@@ -1414,11 +1419,11 @@
       (quotedAmountCents === null || (quotedAmountCents === 0 && (source === '' || source === 'none')));
     const shippingCents = shouldFallbackToPhysicalShipping
       ? fallbackShippingCents
-      : (needsEstimateInput || (isCalculatingQuote && !hasExplicitFallbackShipping))
+      : (needsEstimateInput || (isCalculatingQuote && requiresQuotedShipping))
         ? 0
       : (quotedAmountCents ?? fallbackShippingCents);
     const isEstimate = shouldRenderShippingAsEstimate(shippingQuote);
-    const shippingLabel = (isCalculatingQuote && hasExplicitFallbackShipping)
+    const shippingLabel = (isCalculatingQuote && !requiresQuotedShipping)
       ? getRuntimeMessage('cart.shippingCalculating', 'Calculating shipping...')
       : (isEstimate || needsEstimateInput)
         ? getRuntimeMessage('cart.shippingEstimate', 'Estimated shipping')
@@ -1435,7 +1440,7 @@
       isShippingEstimate: isCalculatingQuote || isEstimate || needsEstimateInput,
       shippingSource: source,
       showShippingRow: pricing.shippingCents > 0 || needsEstimateInput || isCalculatingQuote,
-      shippingDisplayValue: (needsEstimateInput || (isCalculatingQuote && !hasExplicitFallbackShipping)) ? '--' : ''
+      shippingDisplayValue: (needsEstimateInput || (isCalculatingQuote && requiresQuotedShipping)) ? '--' : ''
     };
   }
 
@@ -3168,7 +3173,7 @@
             <span class="pool-first-party-cart__tip-percent" id="pool-cart-tip-percent" data-cart-tip-percent>${pricing.tipPercent}%</span>
           </div>
         </div>
-        ${cartHasPhysicalItems(items)
+        ${cartRequiresQuotedShipping(items)
           ? renderCartShippingEstimateField(customCheckout?.shippingDraft, persistedCustomCheckoutShippingDraft)
           : ''}
         <section class="pool-first-party-cart__callout">
@@ -3860,7 +3865,26 @@
       const isCartRoute = currentRoute === CART_VIEW_ROUTE;
       if (!isCheckoutRoute && !isCartRoute) return;
       const state = store.getState();
-      if (!cartHasPhysicalItems(state?.cart?.items?.items || [])) {
+      const cartItems = state?.cart?.items?.items || [];
+      if (!cartHasPhysicalItems(cartItems)) {
+        customCheckoutShippingQuoteToken += 1;
+        checkoutUiState.customCheckout = {
+          ...(checkoutUiState.customCheckout || {}),
+          shippingQuote: {
+            status: 'idle',
+            amountCents: 0,
+            source: 'none',
+            availableOptions: [],
+            defaultOption: 'standard',
+            selectedOption: 'standard'
+          }
+        };
+        syncFirstPartyCartTipUI();
+        syncCheckoutPreviewSummaryUI();
+        return;
+      }
+
+      if (!cartRequiresQuotedShipping(cartItems)) {
         customCheckoutShippingQuoteToken += 1;
         checkoutUiState.customCheckout = {
           ...(checkoutUiState.customCheckout || {}),

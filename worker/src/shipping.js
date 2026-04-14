@@ -501,6 +501,13 @@ export async function quoteCampaignShipment(
   }
 
   const fallbackQuote = buildFallbackShippingQuote(env, destination, shipment, campaign);
+  const explicitCampaignFallbackRate = campaign?.shipping_fallback_flat_rate;
+  const hasExplicitCampaignFallbackRate =
+    explicitCampaignFallbackRate !== null &&
+    explicitCampaignFallbackRate !== undefined &&
+    String(explicitCampaignFallbackRate).trim() !== '' &&
+    Number.isFinite(Number(explicitCampaignFallbackRate)) &&
+    Number(explicitCampaignFallbackRate) >= 0;
 
   if (!shipment.hasPhysical) {
     return {
@@ -512,6 +519,25 @@ export async function quoteCampaignShipment(
       selectedOption: SHIPPING_OPTION_STANDARD,
       selectedOptionDetails: null,
       quote: fallbackQuote
+    };
+  }
+
+  if (hasExplicitCampaignFallbackRate) {
+    const availableOptions = buildStandardOnlyShippingOptions(shipment, fallbackQuote.shippingCents);
+    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, SHIPPING_OPTION_STANDARD);
+    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, SHIPPING_OPTION_STANDARD);
+    return {
+      valid: true,
+      campaignSlug: campaign?.slug || '',
+      shipment,
+      availableOptions,
+      defaultOption: SHIPPING_OPTION_STANDARD,
+      selectedOption: resolvedOption,
+      selectedOptionDetails,
+      quote: {
+        ...fallbackQuote,
+        shippingCents: Math.max(0, Number(selectedOptionDetails?.shippingCents ?? fallbackQuote.shippingCents) || 0)
+      }
     };
   }
 
@@ -678,6 +704,7 @@ async function requestUspsRate(env, payload, mailClass) {
   }
 
   if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
     if (response.status === 429) {
       armUspsBackoff(getUspsRateLimitCooldownMs(env), 'USPS rate limit reached');
     } else if (response.status >= 500) {

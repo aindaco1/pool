@@ -115,9 +115,7 @@ export function getUspsApiBase(env = {}) {
   if (configured) {
     return configured.replace(/\/+$/, '');
   }
-  return String(env.APP_MODE || '').trim().toLowerCase() === 'test'
-    ? DEFAULT_USPS_TEST_API_BASE
-    : DEFAULT_USPS_API_BASE;
+  return DEFAULT_USPS_API_BASE;
 }
 
 export function getUspsClientId(env = {}) {

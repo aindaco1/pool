@@ -744,7 +744,7 @@ describe('cart provider shim', () => {
     });
   });
 
-  it('adds one platform shipping fallback on top of campaign shipping for physical global add-ons', async () => {
+  it('keeps checkout in estimate mode when a physical global add-on is present alongside a flat-rate campaign shipment', async () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
@@ -802,8 +802,11 @@ describe('cart provider shim', () => {
     continueButton.click();
 
     await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
       const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
-      expect(shippingAmount?.textContent).toBe('$15.00');
+      expect(root?.textContent || '').toContain('Estimated total');
+      expect(shippingLabel?.textContent || '').toContain('Estimated shipping');
+      expect(shippingAmount?.textContent).toBe('--');
     });
   });
 
@@ -2887,8 +2890,7 @@ describe('cart provider shim', () => {
       price: 35,
       quantity: 1,
       url: '/campaigns/sunder/',
-      shippable: true,
-      campaignShippingFallbackCents: 1200
+      shippable: true
     });
 
     await readyApi.api.theme.cart.open();
@@ -3164,6 +3166,99 @@ describe('cart provider shim', () => {
     });
   });
 
+  it('hides the ZIP estimate field when every physical campaign shipment has an explicit flat-rate override', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      workerBase: WORKER_BASE,
+      shipping: {
+        countries: SHIPPING_COUNTRIES
+      }
+    };
+
+    const fetchMock = vi.fn(async () => {
+      throw new Error('shipping quote should not be called for override-only carts');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__limited-poster',
+      name: 'SMOKE EDITABLE — Limited Poster',
+      price: 25,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: false,
+      campaignShippingFallbackCents: 1200,
+      campaignHasExplicitShippingOverride: true,
+      customFields: [
+        { name: '_category', value: 'physical' }
+      ]
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    expect(root?.querySelector('[data-cart-estimate-postal]')).toBeNull();
+    expect(root?.querySelector('[data-cart-summary-shipping-label]')?.textContent || '').toContain('Shipping');
+    expect(root?.querySelector('[data-cart-summary-shipping]')?.textContent).toBe('$12.00');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the ZIP estimate field when any physical campaign shipment still needs a quote', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      workerBase: WORKER_BASE,
+      shipping: {
+        countries: SHIPPING_COUNTRIES
+      }
+    };
+
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__limited-poster',
+      name: 'SMOKE EDITABLE — Limited Poster',
+      price: 25,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: false,
+      campaignShippingFallbackCents: 1200,
+      campaignHasExplicitShippingOverride: true,
+      customFields: [
+        { name: '_category', value: 'physical' }
+      ]
+    });
+    await readyApi.api.cart.items.add({
+      id: 'sunder__physical-media',
+      name: 'sunder — physical media',
+      price: 35,
+      quantity: 1,
+      url: '/campaigns/sunder/',
+      shippable: false,
+      customFields: [
+        { name: '_category', value: 'physical' }
+      ]
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    expect(root?.querySelector('[data-cart-estimate-postal]')).toBeTruthy();
+    expect(root?.querySelector('[data-cart-summary-shipping-label]')?.textContent || '').toContain('Estimated shipping');
+    expect(root?.querySelector('[data-cart-summary-shipping]')?.textContent).toBe('--');
+  });
+
   it('keeps hosted checkout in estimate mode until a ZIP is entered for physical carts without an override', async () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
@@ -3383,7 +3478,7 @@ describe('cart provider shim', () => {
     });
   });
 
-  it('shows combined shipping in the sidecar for campaign add-ons in mixed carts after cross-page persistence', async () => {
+  it('keeps the sidecar in estimate mode for mixed carts after cross-page persistence when one shipment still needs a quote', async () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
@@ -3446,8 +3541,9 @@ describe('cart provider shim', () => {
     await vi.waitFor(() => {
       const shippingLabel = root?.querySelector('[data-cart-summary-shipping-label]');
       const shippingAmount = root?.querySelector('[data-cart-summary-shipping]');
-      expect(shippingLabel?.textContent || '').toContain('Shipping');
-      expect(shippingAmount?.textContent).toBe('$15.00');
+      expect(root?.querySelector('[data-cart-estimate-postal]')).toBeTruthy();
+      expect(shippingLabel?.textContent || '').toContain('Estimated shipping');
+      expect(shippingAmount?.textContent).toBe('--');
     });
   });
 

@@ -349,6 +349,113 @@ describe('shipping utilities', () => {
     });
   });
 
+  it('short-circuits USPS and uses the campaign fallback when a campaign override is configured', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('USPS should not be called when a campaign flat shipping override is configured');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await quoteCampaignShipment(
+      {
+        USPS_ENABLED: 'true',
+        USPS_CLIENT_ID: 'client',
+        USPS_CLIENT_SECRET: 'secret',
+        USPS_API_BASE: 'https://apis-live.usps.test',
+        SHIPPING_ORIGIN_ZIP: '80205',
+        SHIPPING_ORIGIN_COUNTRY: 'US',
+        SHIPPING_FALLBACK_FLAT_RATE: '10.00'
+      },
+      { slug: 'smoke-editable', shipping_fallback_flat_rate: 12 },
+      {
+        selectedTiers: [
+          {
+            qty: 1,
+            tier: {
+              id: 'limited-poster',
+              category: 'physical',
+              shipping: {
+                weight_oz: 5,
+                length_in: 18,
+                width_in: 3,
+                height_in: 3
+              }
+            }
+          }
+        ]
+      },
+      { country: 'US', postalCode: '80205' }
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.quote.source).toBe('fallback_flat_rate');
+    expect(result.quote.shippingCents).toBe(1200);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not treat a null campaign shipping override as an explicit flat-rate fallback', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://apis-live.usps.test/oauth2/v3/token') {
+        return new Response(JSON.stringify({
+          access_token: 'token_123',
+          expires_in: 3600
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (url === 'https://apis-live.usps.test/prices/v3/base-rates/search') {
+        return new Response(JSON.stringify({
+          totalBasePrice: 9.8,
+          rates: [
+            {
+              mailClass: 'USPS_GROUND_ADVANTAGE',
+              description: 'USPS Ground Advantage'
+            }
+          ]
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await quoteCampaignShipment(
+      {
+        USPS_ENABLED: 'true',
+        USPS_CLIENT_ID: 'client',
+        USPS_CLIENT_SECRET: 'secret',
+        USPS_API_BASE: 'https://apis-live.usps.test',
+        SHIPPING_ORIGIN_ZIP: '80205',
+        SHIPPING_ORIGIN_COUNTRY: 'US',
+        SHIPPING_FALLBACK_FLAT_RATE: '3.00'
+      },
+      { slug: 'sunder', shipping_fallback_flat_rate: null },
+      {
+        selectedTiers: [
+          {
+            qty: 1,
+            tier: {
+              id: 'physical-media',
+              category: 'physical',
+              shipping: {
+                weight_oz: 4,
+                packaging_weight_oz: 2,
+                length_in: 8,
+                width_in: 6,
+                height_in: 1
+              }
+            }
+          }
+        ]
+      },
+      { country: 'US', postalCode: '80205' }
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.quote.source).toBe('usps_live');
+    expect(result.quote.shippingCents).toBe(980);
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
   it('uses the global fallback rate when a campaign does not set an override', () => {
     expect(buildFallbackShippingQuote(
       { SHIPPING_ORIGIN_COUNTRY: 'US', SHIPPING_FALLBACK_FLAT_RATE: '10.00' },
