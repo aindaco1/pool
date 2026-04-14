@@ -2,19 +2,11 @@
 
 // Long Content Blocks
 .long-content {
-  margin-bottom: $space-3xl;
-
-  @include xsm {
-    margin-bottom: $space-2xl;
-  }
+  @include section-spacing($space-3xl, $space-2xl);
 }
 
 .content-block {
-  margin-bottom: $space-2xl;
-
-  @include xsm {
-    margin-bottom: $space-xl;
-  }
+  @include section-spacing($space-2xl, $space-xl);
   
   &:last-child {
     margin-bottom: 0;
@@ -72,68 +64,19 @@
     }
 
     table {
-      width: 100%;
-      margin: 0 0 $space-xl;
-      border-collapse: collapse;
-      border-spacing: 0;
       background: $surface--page;
-
-      @include xsm {
-        display: block;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-    }
-
-    thead {
-      border-bottom: 1px solid $border--default;
-    }
-
-    tbody tr {
-      border-bottom: 1px solid $border--default;
-
-      &:last-child {
-        border-bottom: 0;
-      }
-    }
-
-    th,
-    td {
-      padding: $space-sm $space-md;
-      text-align: left;
-      vertical-align: top;
-
-      @include xsm {
-        padding: $space-xs $space-sm;
-      }
-    }
-
-    th {
-      @include type-label;
-      color: $color--primary;
-    }
-
-    td {
-      color: $color--primary;
+      @include prose-table($space-xl);
     }
   }
   
   // Video block
   &--video {
-    margin: 0 0 $space-xl;
-
-    @include xsm {
-      margin-bottom: $space-lg;
-    }
+    @include section-spacing($space-xl, $space-lg);
   }
   
   // Image block
   &--image {
-    margin: 0 0 $space-xl;
-
-    @include xsm {
-      margin-bottom: $space-lg;
-    }
+    @include section-spacing($space-xl, $space-lg);
     
     img {
       display: block;
@@ -145,29 +88,17 @@
   
   // Gallery block
   &--gallery {
-    margin: 0 0 $space-xl;
-
-    @include xsm {
-      margin-bottom: $space-lg;
-    }
+    @include section-spacing($space-xl, $space-lg);
   }
   
   // Audio block
   &--audio {
-    margin: 0 0 $space-xl;
-
-    @include xsm {
-      margin-bottom: $space-lg;
-    }
+    @include section-spacing($space-xl, $space-lg);
   }
   
   // Embed block
   &--embed {
-    margin: 0 0 $space-xl;
-
-    @include xsm {
-      margin-bottom: $space-lg;
-    }
+    @include section-spacing($space-xl, $space-lg);
   }
   
   // Divider block
@@ -184,13 +115,12 @@
   // Quote block
   &--quote {
     margin: $space-2xl 0;
-    @include surface-panel($space-xl $space-2xl, $surface--subtle);
+    @include responsive-surface($space-xl $space-2xl, $space-lg $space-md, $surface--subtle, panel);
     border-left: 4px solid $color--primary;
     font-style: italic;
 
     @include xsm {
       margin: $space-xl 0;
-      padding: $space-lg $space-md;
     }
     
     p {
@@ -228,14 +158,8 @@
 
 // Audio player
 .audio-player {
-  display: flex;
-  flex-direction: column;
-  gap: $space-xs;
-  @include surface-panel($space-md, $surface--subtle);
-
-  @include xsm {
-    padding: $space-sm;
-  }
+  @include stack($space-xs);
+  @include responsive-surface($space-md, $space-sm, $surface--subtle, panel);
   
   &__title {
     @include type-ui;

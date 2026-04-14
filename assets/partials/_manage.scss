@@ -50,24 +50,12 @@
   }
   
   &__list {
-    display: flex;
-    flex-direction: column;
-    gap: 36px;
-
-    @include xsm {
-      gap: 24px;
-    }
+    @include stack(36px, 24px);
   }
 
   &__section {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+    @include stack(20px, 16px);
     width: 100%;
-
-    @include xsm {
-      gap: 16px;
-    }
   }
 
   &__section-header {
@@ -135,9 +123,7 @@
   }
   
   &__header-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    @include cluster-between(12px);
     margin-bottom: 12px;
 
     @include xsm {
@@ -158,15 +144,11 @@
   }
   
   &__custom-amount {
-    padding: 20px;
-    border-top: 1px solid $border--default;
-    background: $surface--subtle;
+    @include inset-section(20px, $surface--subtle);
   }
-  
+
   &__support {
-    padding: 20px;
-    border-top: 1px solid $border--default;
-    background: $surface--subtle;
+    @include inset-section(20px, $surface--subtle);
     
     h3 {
       margin: 0 0 16px 0;
@@ -176,16 +158,11 @@
   }
 
   &__tip {
-    padding: 16px 20px 18px;
-    border-top: 1px solid $border--default;
-    background: $surface--subtle;
+    @include inset-section(16px 20px 18px, $surface--subtle);
   }
 
   &__tip-header {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    align-items: baseline;
+    @include cluster-between(12px, baseline);
     margin-bottom: 6px;
 
     h3 {
@@ -674,11 +651,11 @@
 
 // Support Items (Manage Page)
 .support-options {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  @include stack(12px);
 
   &--addons {
+    --manage-selected-addon-controls-width: 344px;
+    --manage-selected-addon-remove-width: 160px;
     margin-bottom: 12px;
     padding: 0;
     border: none;
@@ -696,11 +673,7 @@
     }
 
     .support-option-item {
-      display: grid;
-      grid-template-columns: 96px minmax(0, 1fr) auto;
-      grid-template-areas: "media info input";
-      align-items: start;
-      gap: 16px 20px;
+      @include media-object-grid(96px, auto, "media info input");
       padding: 0;
       border: none;
       border-radius: 0;
@@ -715,17 +688,12 @@
 
     .support-option-item__info {
       grid-area: info;
-      display: grid;
-      gap: 8px;
-      align-content: start;
+      @include stack(8px);
       align-self: start;
     }
 
     .support-option-item__header {
-      display: flex;
-      align-items: start;
-      justify-content: space-between;
-      gap: 16px;
+      @include cluster-between(16px, flex-start);
     }
 
     .support-option-item__header strong {
@@ -746,15 +714,61 @@
       margin-left: auto;
     }
 
-    .support-option-item__input--no-variant {
+    .support-option-item__input.support-option-item__input--with-variant {
       display: grid;
+      width: min(100%, var(--manage-selected-addon-controls-width));
+      min-width: 0;
+      grid-template-columns: minmax(0, 160px) max-content;
+      grid-template-areas:
+        "variant qty"
+        "remove remove";
+      gap: 10px 8px;
+      align-items: start;
+      justify-content: end;
+    }
+
+    .support-option-item__input.support-option-item__input--with-variant [data-manage-selected-addon-variant] {
+      grid-area: variant;
+      width: 100%;
+      max-width: 160px;
+      min-width: 0;
+    }
+
+    .support-option-item__input.support-option-item__input--with-variant .tier-option__quantity {
+      grid-area: qty;
+      justify-self: end;
+    }
+
+    .support-option-item__input.support-option-item__input--with-variant .btn {
+      grid-area: remove;
+      justify-self: end;
+      width: var(--manage-selected-addon-remove-width);
+      min-width: var(--manage-selected-addon-remove-width);
+    }
+
+    .support-option-item__input.support-option-item__input--no-variant {
+      display: grid;
+      width: min(100%, var(--manage-selected-addon-controls-width));
+      min-width: 0;
+      grid-template-columns: max-content;
+      grid-template-areas:
+        "qty"
+        "remove";
       gap: 10px;
       justify-items: end;
-      align-content: center;
+      align-content: start;
+    }
+
+    .support-option-item__input--no-variant .tier-option__quantity {
+      grid-area: qty;
+      justify-self: end;
     }
 
     .support-option-item__input--no-variant .btn {
-      width: 100%;
+      grid-area: remove;
+      width: var(--manage-selected-addon-remove-width);
+      min-width: var(--manage-selected-addon-remove-width);
+      justify-self: end;
     }
 
     .pool-first-party-cart__input--select {
@@ -772,6 +786,10 @@
       flex: 0 0 auto;
     }
 
+    .addon-product-card__field--qty .tier-option__quantity {
+      justify-content: flex-start;
+    }
+
     .btn {
       flex: 0 0 auto;
       min-height: 40px;
@@ -783,7 +801,7 @@
       padding-right: 0;
     }
 
-    @include xsm {
+    @include sm {
       .support-option-item {
         grid-template-columns: 96px minmax(0, 1fr);
         grid-template-areas:
@@ -794,6 +812,26 @@
       .support-option-item__input {
         justify-self: stretch;
         margin-left: 0;
+      }
+
+      .support-option-item__input.support-option-item__input--with-variant {
+        width: 100%;
+        min-width: 0;
+        grid-template-columns: minmax(0, 1fr) max-content;
+      }
+
+      .support-option-item__input.support-option-item__input--with-variant .btn {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .support-option-item__input.support-option-item__input--no-variant {
+        min-width: 0;
+      }
+
+      .support-option-item__input--no-variant .btn {
+        width: 100%;
+        min-width: 0;
       }
     }
   }
@@ -820,13 +858,7 @@
     }
 
     &__media {
-      flex: 0 0 72px;
-      width: 72px;
-      aspect-ratio: 1;
-      overflow: hidden;
-      border: 1px solid $border--default;
-      border-radius: 14px;
-      background: $surface--base;
+      @include thumb-frame(72px, 14px);
 
       img {
         width: 100%;
@@ -837,10 +869,7 @@
     }
     
     &__header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 8px;
+      @include cluster-between(8px, baseline);
       margin-bottom: 0;
       
       @include xsm {
@@ -913,20 +942,7 @@
       }
       
       input {
-        width: 70px;
-        max-width: 70px;
-        height: 40px;
-        padding: 0 4px;
-        @include field-shell;
-        font-size: $type--ui;
-        text-align: right;
-        box-sizing: border-box;
-        
-        &::-webkit-outer-spin-button,
-        &::-webkit-inner-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
+        @include qty-input-shell(70px, 40px, right);
       }
     }
 

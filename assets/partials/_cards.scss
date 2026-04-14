@@ -2,15 +2,10 @@
 
 // Campaign cards section
 .campaigns-section {
-  margin-bottom: $space-4xl;
-
-  @include xsm {
-    margin-bottom: $space-3xl;
-  }
+  @include section-spacing($space-4xl, $space-3xl);
 
   &__header {
-    display: grid;
-    gap: $space-xs;
+    @include grid-stack($space-xs);
     margin-bottom: $space-2xl;
   }
 
@@ -60,17 +55,10 @@
 .campaign-card {
   @include surface-elevated(null, $surface--base);
   position: relative;
-  display: flex;
-  flex-direction: column;
+  @include stack(0);
   height: 100%;
   overflow: hidden;
-  transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
-  
-  &:hover {
-    box-shadow: 0 18px 40px rgba($color--black, 0.12);
-    border-color: $border--strong;
-    transform: translateY(-2px);
-  }
+  @include lift-on-hover(-2px, 0 18px 40px rgba($color--black, 0.12));
   
   &__background {
     position: absolute;
@@ -116,9 +104,7 @@
     z-index: 1;
     padding: $space-lg;
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: $space-sm;
+    @include stack($space-sm);
 
     @include xsm {
       padding: $space-md;
@@ -161,11 +147,8 @@
   }
   
   &__featured-tier {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: $space-sm;
-    @include surface-panel($space-sm, $surface--subtle);
+    @include cluster-between($space-sm, flex-start);
+    @include responsive-surface($space-sm, 12px 14px, $surface--subtle, panel);
     margin-top: $space-md;
     text-decoration: none;
     transition: all 0.2s;
@@ -173,7 +156,6 @@
 
     @include xsm {
       min-height: 0;
-      padding: 12px 14px;
     }
     
     &:hover {
@@ -237,7 +219,7 @@
 
 // Tier cards
 .tiers {
-  margin-bottom: $space-4xl;
+  @include section-spacing($space-4xl);
   
   h2 {
     margin-bottom: $space-2xl;
@@ -275,13 +257,7 @@
 .tier-card {
   @include surface-card($space-xl);
   margin-bottom: $space-xl;
-  transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
-  
-  &:hover {
-    box-shadow: 0 10px 24px rgba($color--black, 0.06);
-    border-color: $border--strong;
-    transform: translateY(-1px);
-  }
+  @include lift-on-hover(-1px, 0 10px 24px rgba($color--black, 0.06));
   
   &.compact {
     padding: $space-sm;
@@ -334,36 +310,9 @@
   }
   
   button {
-    @include btn-core($color--primary);
+    @include primary-action-button(8px $space-sm, $type--meta);
     width: 100%;
     margin-top: $space-md;
-    font-size: $type--meta;
-    padding: 8px $space-sm;
-    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
-    
-    &:before {
-      display: none;
-    }
-    
-    &:hover {
-      background: $surface--base;
-      border-color: $color--primary;
-      color: $color--primary;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba($color--black, 0.08);
-    }
-    
-    &:disabled {
-      background: $surface--soft;
-      border-color: $border--default;
-      color: $ink--soft;
-      cursor: not-allowed;
-      
-      &:hover {
-        transform: none;
-        box-shadow: none;
-      }
-    }
   }
   
   // Unlock badge (hidden by default, shown when unlocked)
@@ -464,9 +413,7 @@
 
 // Tier options (radio/checkbox selections)
 .tier-options {
-  display: flex;
-  flex-direction: column;
-  gap: $space-sm;
+  @include stack($space-sm);
 }
 
 .tier-option {
@@ -543,11 +490,7 @@
 
 // Decision card
 .decision-card {
-  @include surface-card($space-lg);
-
-  @include xsm {
-    padding: $space-md;
-  }
+  @include responsive-surface($space-lg, $space-md, $surface--base, card);
   
   h4 {
     margin: 0 0 $space-md 0;
@@ -575,11 +518,7 @@
   }
   
   &__type {
-    font-size: $font-size-xs;
-    color: $color--secondary;
-    background: $surface-tint-soft;
-    padding: 2px 8px;
-    border-radius: $radius--sm;
+    @include meta-pill;
   }
   
   &__deadline {
@@ -730,11 +669,7 @@
 }
 
 .decision-card__status-closed {
-  font-size: $font-size-xs;
-  color: $color--secondary;
-  background: $surface-tint-soft;
-  padding: 2px 8px;
-  border-radius: $radius--sm;
+  @include meta-pill;
 }
 
 .decision-closed {
@@ -742,10 +677,8 @@
 }
 
 .decision-winner {
-  display: flex;
-  flex-direction: column;
+  @include stack($space-xs);
   align-items: center;
-  gap: $space-xs;
   padding: $space-md;
   background: $color--success-notice-bg;
   border: 1px solid $color--success-notice-border;
@@ -775,8 +708,7 @@
 }
 
 .closed-result {
-  display: flex;
-  justify-content: space-between;
+  @include cluster-between($space-sm, center);
   padding: $space-xs 0;
   border-bottom: 1px solid $color--light;
 

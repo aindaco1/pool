@@ -105,35 +105,8 @@
   }
   
   &__btn {
-    @include btn-core($color--primary);
+    @include primary-action-button(8px 12px, 12px);
     width: 100%;
-    font-size: 12px;
-    padding: 8px 12px;
-    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
-    
-    &:before {
-      display: none;
-    }
-    
-    &:hover {
-      background: $surface--base;
-      border-color: $color--primary;
-      color: $color--primary;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba($color--black, 0.08);
-    }
-    
-    &:disabled {
-      background: $surface--soft;
-      border-color: $border--default;
-      color: $ink--soft;
-      cursor: not-allowed;
-      
-      &:hover {
-        transform: none;
-        box-shadow: none;
-      }
-    }
 
     @include xsm {
       min-height: 44px;
@@ -162,41 +135,10 @@
   margin-top: 12px;
   
   .qty-btn {
-    width: 32px;
-    height: 32px;
-    border: 1px solid $border--default;
-    border-radius: $radius--md;
-    background: $surface--base;
-    cursor: pointer;
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s;
-    
-    &:hover {
-      background: $color--primary;
-      color: white;
-      border-color: $color--primary;
-    }
-    
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+    @include stepper-button(32px, 18px);
   }
   
   .qty-input {
-    width: 60px;
-    height: 32px;
-    text-align: center;
-    font-size: $type--ui;
-    @include field-shell;
-    
-    &::-webkit-outer-spin-button,
-    &::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
+    @include stepper-input(60px, 32px, center);
   }
 }

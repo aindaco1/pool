@@ -122,13 +122,7 @@ body.pool-cart-open {
 }
 
 .pool-first-party-cart__item-media {
-  flex: 0 0 84px;
-  width: 84px;
-  aspect-ratio: 1;
-  overflow: hidden;
-  border: 1px solid $border--default;
-  border-radius: 14px;
-  background: $surface--base;
+  @include thumb-frame(84px, 14px);
 }
 
 .pool-first-party-cart__item-image {
@@ -140,9 +134,7 @@ body.pool-cart-open {
 
 .pool-first-party-cart__item-main,
 .pool-first-party-cart__item-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  @include stack(4px);
 }
 
 .pool-first-party-cart__item-main {
@@ -209,18 +201,12 @@ body.pool-cart-open {
 }
 
 .pool-first-party-cart__summary-block {
-  @include surface-card(16px);
-  display: grid;
-  gap: 12px;
-  align-content: start;
+  @include panel-stack(16px, 12px);
 }
 
 .pool-first-party-cart__callout {
   margin-top: 16px;
-  @include surface-panel(14px 16px, $surface--subtle);
-  display: grid;
-  gap: 12px;
-  align-content: start;
+  @include panel-stack(14px 16px, 12px, $surface--subtle, panel);
 }
 
 .pool-first-party-cart__callout--stripe {
@@ -269,21 +255,17 @@ body.pool-cart-open {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 
+  @include sm {
+    grid-template-columns: 1fr;
+  }
+
   @include xsm {
     grid-template-columns: 1fr;
   }
 }
 
 .addon-product-card {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  grid-template-areas:
-    "media main"
-    "status status"
-    "controls controls"
-    "footer footer";
-  gap: 10px;
-  align-items: start;
+  @include media-object-grid(64px, null, "media main" "status status" "controls controls" "footer footer", 10px, 10px);
   @include surface-card(10px 12px);
   transition: background 0.2s ease, border-color 0.2s ease;
 
@@ -299,15 +281,11 @@ body.pool-cart-open {
 
 .addon-product-card__media {
   grid-area: media;
-  width: 64px;
-  aspect-ratio: 1;
-  overflow: hidden;
-  border: 1px solid $border--default;
-  border-radius: 10px;
-  background: $surface--base;
+  @include thumb-frame(64px, 10px);
 
   @include xsm {
     width: 56px;
+    flex-basis: 56px;
   }
 }
 
@@ -321,9 +299,7 @@ body.pool-cart-open {
 .addon-product-card__main {
   grid-area: main;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  @include stack(3px);
 }
 
 .addon-product-card__header {
@@ -383,7 +359,18 @@ body.pool-cart-open {
 }
 
 .addon-product-card__controls--with-variant {
-  grid-template-columns: minmax(0, 1fr) 64px;
+  grid-template-columns: minmax(0, 160px) max-content;
+  justify-content: space-between;
+}
+
+.addon-product-card__controls--with-variant .addon-product-card__field--variant {
+  grid-column: 1;
+  max-width: 160px;
+}
+
+.addon-product-card__controls--with-variant .addon-product-card__field--qty {
+  grid-column: 2;
+  justify-self: end;
 }
 
 .addon-product-card__field {
@@ -397,6 +384,10 @@ body.pool-cart-open {
 
 .addon-product-card__field--qty {
   min-width: 0;
+}
+
+.addon-product-card__field--qty .tier-option__quantity {
+  justify-content: flex-end;
 }
 
 .addon-product-card__label {
@@ -431,13 +422,7 @@ body.pool-cart-open {
 }
 
 .pool-first-party-cart__addon-media {
-  flex: 0 0 76px;
-  width: 76px;
-  aspect-ratio: 1;
-  overflow: hidden;
-  border: 1px solid $border--default;
-  border-radius: 14px;
-  background: $surface--base;
+  @include thumb-frame(76px, 14px);
 }
 
 .pool-first-party-cart__addon-image {
@@ -496,9 +481,7 @@ body.pool-cart-open {
 }
 
 .pool-first-party-cart__line-item div {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  @include stack(4px);
   min-width: 0;
 }
 
@@ -750,29 +733,15 @@ body.pool-cart-open {
 }
 
 .pool-first-party-cart__action {
-  @include btn-core($color--primary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  @include primary-action-button($space-sm $space-xl, $btn--font-size);
   gap: 0.55rem;
   width: 100%;
   min-height: 44px;
   white-space: nowrap;
-  padding-top: $space-sm;
-  padding-bottom: $space-sm;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
   text-decoration: none;
 
   &:disabled {
-    cursor: not-allowed;
     opacity: 0.45;
-  }
-
-  &:hover:not(:disabled) {
-    background: $surface--base;
-    color: $color--primary;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba($color--black, 0.08);
   }
 }
 

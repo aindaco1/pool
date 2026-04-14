@@ -818,20 +818,36 @@
                   </div>
                 ` : ''}
                 <div class="addon-product-card__field addon-product-card__field--qty">
-                  <input
-                    id="manage-addon-qty-${index}-${escapeAttribute(product.productId)}"
-                    class="pool-first-party-cart__input pool-first-party-cart__input--addon-qty"
-                    type="number"
-                    min="1"
-                    max="${escapeAttribute(String(maxQuantity))}"
-                    step="1"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    aria-label="${escapeAttribute(getRuntimeMessage('cart.quantity', 'Quantity'))}"
-                    value="${escapeAttribute(String(Math.min(maxQuantity, Math.max(1, Number(product.selectedQuantity || 1)))))}"
-                    data-manage-addon-quantity
-                    data-addon-product-id="${escapeAttribute(product.productId)}"
-                  >
+                  <div class="tier-option__quantity">
+                    <button
+                      type="button"
+                      class="qty-btn qty-minus"
+                      data-manage-addon-adjust="-1"
+                      data-addon-product-id="${escapeAttribute(product.productId)}"
+                      aria-label="${escapeAttribute(getRuntimeMessage('manage.decrease', 'Decrease'))}"
+                    >−</button>
+                    <input
+                      id="manage-addon-qty-${index}-${escapeAttribute(product.productId)}"
+                      class="qty-input pool-first-party-cart__input pool-first-party-cart__input--addon-qty"
+                      type="number"
+                      min="1"
+                      max="${escapeAttribute(String(maxQuantity))}"
+                      step="1"
+                      inputmode="numeric"
+                      pattern="[0-9]*"
+                      aria-label="${escapeAttribute(getRuntimeMessage('cart.quantity', 'Quantity'))}"
+                      value="${escapeAttribute(String(Math.min(maxQuantity, Math.max(1, Number(product.selectedQuantity || 1)))))}"
+                      data-manage-addon-quantity
+                      data-addon-product-id="${escapeAttribute(product.productId)}"
+                    >
+                    <button
+                      type="button"
+                      class="qty-btn qty-plus"
+                      data-manage-addon-adjust="1"
+                      data-addon-product-id="${escapeAttribute(product.productId)}"
+                      aria-label="${escapeAttribute(getRuntimeMessage('manage.increase', 'Increase'))}"
+                    >+</button>
+                  </div>
                 </div>
               </div>
               <div class="addon-product-card__footer">
@@ -3133,6 +3149,23 @@
           if (String(clampedQuantity) !== String(field.value || '')) {
             field.value = String(clampedQuantity);
           }
+        });
+      });
+
+      card.querySelectorAll('[data-manage-addon-adjust]').forEach((button) => {
+        button.addEventListener('click', (event) => {
+          const trigger = event.currentTarget;
+          const productId = String(trigger?.getAttribute('data-addon-product-id') || '');
+          const quantityField = Array.from(card.querySelectorAll('[data-manage-addon-quantity]'))
+            .find((field) => String(field.dataset.addonProductId || '') === productId);
+          if (!(quantityField instanceof HTMLInputElement)) return;
+          const delta = parseInt(trigger?.getAttribute('data-manage-addon-adjust') || '0', 10) || 0;
+          if (!delta) return;
+          const currentQuantity = Math.max(1, parseInt(quantityField.value, 10) || 1);
+          const maxQuantity = Math.max(1, parseInt(quantityField.max, 10) || currentQuantity);
+          const nextQuantity = Math.min(maxQuantity, Math.max(1, currentQuantity + delta));
+          quantityField.value = String(nextQuantity);
+          quantityField.dispatchEvent(new Event('input', { bubbles: true }));
         });
       });
 
