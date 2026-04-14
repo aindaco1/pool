@@ -1,5 +1,6 @@
 {%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
 {%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
+{%- capture add_ons_catalog_json -%}{% include add-ons-catalog-json.html %}{%- endcapture -%}
 <script
   src="/assets/js/pool-config.js"
   defer
@@ -20,7 +21,7 @@
   data-shipping-fallback-flat-rate="{{ site.shipping.fallback_flat_rate | default: 3.00 }}"
   data-shipping-free-shipping-default="{{ site.shipping.free_shipping_default | default: false }}"
   data-shipping-presets="{{ site.shipping.presets | jsonify | escape }}"
-  data-add-ons="{{ site['add_ons'] | jsonify | escape }}"
+  data-add-ons="{{ add_ons_catalog_json | strip | escape }}"
   data-default-tip-percent="{{ site.pricing.default_tip_percent | default: 5 }}"
   data-max-tip-percent="{{ site.pricing.max_tip_percent | default: 15 }}"
   data-live-stats-cache-ttl-seconds="{{ site.cache.live_stats_ttl_seconds | default: 300 }}"

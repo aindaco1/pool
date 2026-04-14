@@ -129,6 +129,28 @@ done
 
 cd "$(dirname "$0")/../worker"
 
+SITE_AUTHOR=$(
+  python3 - <<'PY'
+from pathlib import Path
+
+config_path = Path('../_config.yml')
+author = ''
+try:
+    for raw_line in config_path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('author:'):
+            author = line.split(':', 1)[1].strip().strip('"').strip("'")
+            break
+except Exception:
+    author = ''
+
+print(author)
+PY
+)
+export SITE_AUTHOR
+
 if [[ -n "${WRANGLER_BIN:-}" ]]; then
   WRANGLER_CMD=(${WRANGLER_BIN})
 elif [[ -n "${MOCK_WRANGLER_DATA:-}" ]] && command -v wrangler >/dev/null 2>&1; then
@@ -147,6 +169,7 @@ echo "Report mode: fulfillment-report is the merged current-state view per suppo
 if [[ "$KV_SCOPE_FLAGS" == *"--local"* ]]; then
   python3 -c "
 import sys
+import os
 import json
 import csv
 import sqlite3
@@ -176,15 +199,35 @@ def get_add_on_label(add_on):
     variant = str(add_on.get('variantLabel') or '').strip()
     return f'{name} ({variant})' if variant else name
 
-def get_add_on_subtotal(data):
-    if data.get('bundleAddOnSubtotal') is not None:
-        return (data.get('bundleAddOnSubtotal') or 0) / 100
-    return sum(((add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)) for add_on in (data.get('bundleAddOns') or [])) / 100
+def is_campaign_add_on(add_on, campaign_slug=''):
+    scope = str(add_on.get('scope') or '').strip().lower()
+    add_on_campaign = str(add_on.get('campaignSlug') or add_on.get('campaign_slug') or '').strip()
+    normalized_campaign = str(campaign_slug or '').strip()
+    if scope != 'campaign':
+        return False
+    if not normalized_campaign:
+        return True
+    return add_on_campaign == normalized_campaign
 
-def get_campaign_subtotal(data, subtotal):
+def get_add_on_subtotal_cents(add_ons, campaign_slug='', scope='all'):
+    total_cents = 0
+    normalized_scope = str(scope or 'all').strip().lower()
+    for add_on in (add_ons or []):
+        line_total = (add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)
+        if normalized_scope == 'campaign':
+            if not is_campaign_add_on(add_on, campaign_slug):
+                continue
+        elif normalized_scope == 'platform':
+            if is_campaign_add_on(add_on, campaign_slug):
+                continue
+        total_cents += line_total
+    return total_cents
+
+def get_campaign_subtotal_cents(data):
     if data.get('goalTrackingSubtotal') is not None:
-        return (data.get('goalTrackingSubtotal') or 0) / 100
-    return subtotal - get_add_on_subtotal(data)
+        return data.get('goalTrackingSubtotal') or 0
+    subtotal_cents = data.get('subtotal') or data.get('amount') or 0
+    return subtotal_cents - get_add_on_subtotal_cents(data.get('bundleAddOns') or [], data.get('campaignSlug', ''), 'platform')
 
 def build_count_items_str(counts):
     items = []
@@ -195,7 +238,33 @@ def build_count_items_str(counts):
         items.append(f'{item_name} x{qty}' if qty > 1 else item_name)
     return '; '.join(items)
 
+def allocate_cents(total_cents, bucket_cents):
+    if total_cents <= 0 or not bucket_cents:
+        return [0 for _ in bucket_cents]
+    total_bucket_cents = sum(bucket_cents)
+    if total_bucket_cents <= 0:
+        return [0 for _ in bucket_cents]
+    allocations = []
+    consumed = 0
+    for index, bucket in enumerate(bucket_cents):
+        if index == len(bucket_cents) - 1:
+            allocation = total_cents - consumed
+        else:
+            allocation = (total_cents * bucket) // total_bucket_cents
+            consumed += allocation
+        allocations.append(allocation)
+    return allocations
+
+def get_shipping_address_str(addr):
+    if not addr:
+        return ''
+    parts = [addr.get('name', ''), addr.get('address1', ''), addr.get('address2', ''),
+             addr.get('city', ''), addr.get('province', ''), addr.get('postalCode', ''),
+             addr.get('country', '')]
+    return ', '.join(p for p in parts if p)
+
 campaign_filter = '$CAMPAIGN_FILTER'
+site_author = os.environ.get('SITE_AUTHOR', '').strip()
 
 root = Path('.wrangler/state/v3')
 db_paths = sorted((root / 'kv' / 'miniflare-KVNamespaceObject').glob('*.sqlite'))
@@ -250,16 +319,16 @@ if not rows or blob_dir is None:
 
 print(f'Found {len(rows)} pledges. Processing...', file=sys.stderr)
 
-# Aggregate by (email, campaign)
+# Aggregate by (email, campaign, fulfiller)
 aggregated = defaultdict(lambda: {
-    'campaign_subtotal': 0.0,
-    'add_on_subtotal': 0.0,
-    'subtotal': 0.0,
-    'tip': 0.0,
+    'campaign_subtotal': 0,
+    'add_on_subtotal': 0,
+    'subtotal': 0,
+    'tip': 0,
     'tip_percent': 0,
-    'tax': 0.0,
-    'shipping': 0.0,
-    'total': 0.0,
+    'tax': 0,
+    'shipping': 0,
+    'total': 0,
     'items': defaultdict(int),
     'add_on_items': defaultdict(int),
     'shipping_address': ''
@@ -281,62 +350,95 @@ for _, blob_id in rows:
         continue
 
     email = data.get('email', '')
-    key = (email, campaign)
-
-    subtotal = (data.get('subtotal') or data.get('amount') or 0) / 100
-    campaign_subtotal = get_campaign_subtotal(data, subtotal)
-    add_on_subtotal = get_add_on_subtotal(data)
-    tip = (data.get('tipAmount') or 0) / 100
-    tax = (data.get('tax') or 0) / 100
-    total = (data.get('amount') or 0) / 100
-
-    aggregated[key]['campaign_subtotal'] += campaign_subtotal
-    aggregated[key]['add_on_subtotal'] += add_on_subtotal
-    aggregated[key]['subtotal'] += subtotal
-    aggregated[key]['tip'] += tip
-    aggregated[key]['tax'] += tax
-    aggregated[key]['total'] += total
-    if aggregated[key]['subtotal'] > 0 and aggregated[key]['tip'] > 0:
-        aggregated[key]['tip_percent'] = round((aggregated[key]['tip'] / aggregated[key]['subtotal']) * 100)
-
-    shipping = (data.get('shipping') or 0) / 100
-    if shipping > aggregated[key]['shipping']:
-        aggregated[key]['shipping'] = shipping
-
-    addr = data.get('shippingAddress')
-    if addr and not aggregated[key]['shipping_address']:
-        parts = [addr.get('name', ''), addr.get('address1', ''), addr.get('address2', ''),
-                 addr.get('city', ''), addr.get('province', ''), addr.get('postalCode', ''),
-                 addr.get('country', '')]
-        aggregated[key]['shipping_address'] = ', '.join(p for p in parts if p)
+    shipping_address = get_shipping_address_str(data.get('shippingAddress'))
+    subtotal_cents = data.get('subtotal') or data.get('amount') or 0
+    campaign_subtotal_cents = get_campaign_subtotal_cents(data)
+    platform_add_on_subtotal_cents = get_add_on_subtotal_cents(data.get('bundleAddOns') or [], campaign, 'platform')
+    tip_cents = data.get('tipAmount') or 0
+    tax_cents = data.get('tax') or 0
+    shipping_cents = data.get('shipping') or 0
 
     tier_id = data.get('tierId')
+    campaign_items = defaultdict(int)
     if tier_id:
         tier_name = get_tier_name(tier_id, data.get('tierName'))
         tier_qty = data.get('tierQty', 1) or 1
-        aggregated[key]['items'][tier_name] += tier_qty
+        campaign_items[tier_name] += tier_qty
 
     for add_tier in data.get('additionalTiers', []) or []:
         add_id = add_tier.get('id', '')
         add_name = get_tier_name(add_id, add_tier.get('name'))
         add_qty = add_tier.get('qty', 1) or 1
         if add_name:
-            aggregated[key]['items'][add_name] += add_qty
+            campaign_items[add_name] += add_qty
 
+    campaign_add_on_items = defaultdict(int)
+    platform_add_on_items = defaultdict(int)
     for add_on in data.get('bundleAddOns', []) or []:
         add_on_name = get_add_on_label(add_on)
         add_on_qty = add_on.get('quantity', 1) or 1
         if add_on_name:
-            aggregated[key]['add_on_items'][add_on_name] += add_on_qty
+            if is_campaign_add_on(add_on, campaign):
+                campaign_add_on_items[add_on_name] += add_on_qty
+            else:
+                platform_add_on_items[add_on_name] += add_on_qty
+
+    row_specs = []
+    if campaign_subtotal_cents > 0 or campaign_items or campaign_add_on_items:
+        row_specs.append({
+            'campaign': campaign,
+            'fulfiller': campaign,
+            'campaign_subtotal': campaign_subtotal_cents,
+            'add_on_subtotal': 0,
+            'subtotal': campaign_subtotal_cents,
+            'items': campaign_items,
+            'add_on_items': campaign_add_on_items
+        })
+
+    if platform_add_on_subtotal_cents > 0 or platform_add_on_items:
+        row_specs.append({
+            'campaign': '',
+            'fulfiller': site_author,
+            'campaign_subtotal': 0,
+            'add_on_subtotal': platform_add_on_subtotal_cents,
+            'subtotal': platform_add_on_subtotal_cents,
+            'items': defaultdict(int),
+            'add_on_items': platform_add_on_items
+        })
+
+    if not row_specs:
+        continue
+
+    subtotal_allocations = [spec['subtotal'] for spec in row_specs]
+    tip_allocations = allocate_cents(tip_cents, subtotal_allocations)
+    tax_allocations = allocate_cents(tax_cents, subtotal_allocations)
+    shipping_allocations = allocate_cents(shipping_cents, subtotal_allocations)
+
+    for index, spec in enumerate(row_specs):
+        key = (email, spec['campaign'], spec['fulfiller'])
+        aggregated[key]['campaign_subtotal'] += spec['campaign_subtotal']
+        aggregated[key]['add_on_subtotal'] += spec['add_on_subtotal']
+        aggregated[key]['subtotal'] += spec['subtotal']
+        aggregated[key]['tip'] += tip_allocations[index]
+        aggregated[key]['tax'] += tax_allocations[index]
+        aggregated[key]['shipping'] += shipping_allocations[index]
+        aggregated[key]['total'] += spec['subtotal'] + tip_allocations[index] + tax_allocations[index] + shipping_allocations[index]
+        if aggregated[key]['subtotal'] > 0 and aggregated[key]['tip'] > 0:
+            aggregated[key]['tip_percent'] = round((aggregated[key]['tip'] / aggregated[key]['subtotal']) * 100)
+        if shipping_address and not aggregated[key]['shipping_address']:
+            aggregated[key]['shipping_address'] = shipping_address
+        for item_name, qty in spec['items'].items():
+            aggregated[key]['items'][item_name] += qty
+        for item_name, qty in spec['add_on_items'].items():
+            aggregated[key]['add_on_items'][item_name] += qty
 
 # Output aggregated CSV
 output = StringIO()
 writer = csv.writer(output)
-writer.writerow(['email', 'campaign', 'items', 'add_on_items', 'campaign_subtotal', 'platform_add_on_subtotal', 'subtotal', 'tip_percent', 'tip', 'tax', 'shipping', 'total', 'shipping_address'])
+writer.writerow(['email', 'campaign', 'fulfiller', 'items', 'add_on_items', 'campaign_subtotal', 'platform_add_on_subtotal', 'subtotal', 'tip_percent', 'tip', 'tax', 'shipping', 'total', 'shipping_address'])
 
-for (email, campaign), data in sorted(aggregated.items()):
-    # Skip if no items or zero total
-    if not data['items'] or data['total'] <= 0:
+for (email, campaign, fulfiller), data in sorted(aggregated.items()):
+    if (not data['items'] and not data['add_on_items']) or data['total'] <= 0:
         continue
     
     items_str = build_count_items_str(data['items'])
@@ -345,16 +447,17 @@ for (email, campaign), data in sorted(aggregated.items()):
     writer.writerow([
         email,
         campaign,
+        fulfiller,
         items_str,
         add_on_items_str,
-        f\"{data['campaign_subtotal']:.2f}\",
-        f\"{data['add_on_subtotal']:.2f}\",
-        f\"{data['subtotal']:.2f}\",
+        f\"{data['campaign_subtotal'] / 100:.2f}\",
+        f\"{data['add_on_subtotal'] / 100:.2f}\",
+        f\"{data['subtotal'] / 100:.2f}\",
         str(data['tip_percent']),
-        f\"{data['tip']:.2f}\",
-        f\"{data['tax']:.2f}\",
-        f\"{data['shipping']:.2f}\",
-        f\"{data['total']:.2f}\",
+        f\"{data['tip'] / 100:.2f}\",
+        f\"{data['tax'] / 100:.2f}\",
+        f\"{data['shipping'] / 100:.2f}\",
+        f\"{data['total'] / 100:.2f}\",
         data['shipping_address']
     ])
 
@@ -424,6 +527,7 @@ done <<< "$KEYS"
 # Aggregate in Python
 cat "$TMPFILE" | python3 -c "
 import sys
+import os
 import json
 import csv
 from collections import defaultdict
@@ -451,15 +555,35 @@ def get_add_on_label(add_on):
     variant = str(add_on.get('variantLabel') or '').strip()
     return f'{name} ({variant})' if variant else name
 
-def get_add_on_subtotal(data):
-    if data.get('bundleAddOnSubtotal') is not None:
-        return (data.get('bundleAddOnSubtotal') or 0) / 100
-    return sum(((add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)) for add_on in (data.get('bundleAddOns') or [])) / 100
+def is_campaign_add_on(add_on, campaign_slug=''):
+    scope = str(add_on.get('scope') or '').strip().lower()
+    add_on_campaign = str(add_on.get('campaignSlug') or add_on.get('campaign_slug') or '').strip()
+    normalized_campaign = str(campaign_slug or '').strip()
+    if scope != 'campaign':
+        return False
+    if not normalized_campaign:
+        return True
+    return add_on_campaign == normalized_campaign
 
-def get_campaign_subtotal(data, subtotal):
+def get_add_on_subtotal_cents(add_ons, campaign_slug='', scope='all'):
+    total_cents = 0
+    normalized_scope = str(scope or 'all').strip().lower()
+    for add_on in (add_ons or []):
+        line_total = (add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)
+        if normalized_scope == 'campaign':
+            if not is_campaign_add_on(add_on, campaign_slug):
+                continue
+        elif normalized_scope == 'platform':
+            if is_campaign_add_on(add_on, campaign_slug):
+                continue
+        total_cents += line_total
+    return total_cents
+
+def get_campaign_subtotal_cents(data):
     if data.get('goalTrackingSubtotal') is not None:
-        return (data.get('goalTrackingSubtotal') or 0) / 100
-    return subtotal - get_add_on_subtotal(data)
+        return data.get('goalTrackingSubtotal') or 0
+    subtotal_cents = data.get('subtotal') or data.get('amount') or 0
+    return subtotal_cents - get_add_on_subtotal_cents(data.get('bundleAddOns') or [], data.get('campaignSlug', ''), 'platform')
 
 def build_count_items_str(counts):
     items = []
@@ -470,18 +594,44 @@ def build_count_items_str(counts):
         items.append(f'{item_name} x{qty}' if qty > 1 else item_name)
     return '; '.join(items)
 
-campaign_filter = '$CAMPAIGN_FILTER'
+def allocate_cents(total_cents, bucket_cents):
+    if total_cents <= 0 or not bucket_cents:
+        return [0 for _ in bucket_cents]
+    total_bucket_cents = sum(bucket_cents)
+    if total_bucket_cents <= 0:
+        return [0 for _ in bucket_cents]
+    allocations = []
+    consumed = 0
+    for index, bucket in enumerate(bucket_cents):
+        if index == len(bucket_cents) - 1:
+            allocation = total_cents - consumed
+        else:
+            allocation = (total_cents * bucket) // total_bucket_cents
+            consumed += allocation
+        allocations.append(allocation)
+    return allocations
 
-# Aggregate by (email, campaign)
+def get_shipping_address_str(addr):
+    if not addr:
+        return ''
+    parts = [addr.get('name', ''), addr.get('address1', ''), addr.get('address2', ''),
+             addr.get('city', ''), addr.get('province', ''), addr.get('postalCode', ''),
+             addr.get('country', '')]
+    return ', '.join(p for p in parts if p)
+
+campaign_filter = '$CAMPAIGN_FILTER'
+site_author = os.environ.get('SITE_AUTHOR', '').strip()
+
+# Aggregate by (email, campaign, fulfiller)
 aggregated = defaultdict(lambda: {
-    'campaign_subtotal': 0.0,
-    'add_on_subtotal': 0.0,
-    'subtotal': 0.0,
-    'tip': 0.0,
+    'campaign_subtotal': 0,
+    'add_on_subtotal': 0,
+    'subtotal': 0,
+    'tip': 0,
     'tip_percent': 0,
-    'tax': 0.0,
-    'shipping': 0.0,
-    'total': 0.0,
+    'tax': 0,
+    'shipping': 0,
+    'total': 0,
     'items': defaultdict(int),
     'add_on_items': defaultdict(int),
     'shipping_address': ''
@@ -504,46 +654,80 @@ for line in sys.stdin:
                     pledge_data = ''
                     continue
                 email = data.get('email', '')
-                key = (email, campaign)
-                subtotal = (data.get('subtotal') or data.get('amount') or 0) / 100
-                campaign_subtotal = get_campaign_subtotal(data, subtotal)
-                add_on_subtotal = get_add_on_subtotal(data)
-                tip = (data.get('tipAmount') or 0) / 100
-                tax = (data.get('tax') or 0) / 100
-                total = (data.get('amount') or 0) / 100
-                aggregated[key]['campaign_subtotal'] += campaign_subtotal
-                aggregated[key]['add_on_subtotal'] += add_on_subtotal
-                aggregated[key]['subtotal'] += subtotal
-                aggregated[key]['tip'] += tip
-                aggregated[key]['tax'] += tax
-                aggregated[key]['total'] += total
-                if aggregated[key]['subtotal'] > 0 and aggregated[key]['tip'] > 0:
-                    aggregated[key]['tip_percent'] = round((aggregated[key]['tip'] / aggregated[key]['subtotal']) * 100)
-                shipping = (data.get('shipping') or 0) / 100
-                if shipping > aggregated[key]['shipping']:
-                    aggregated[key]['shipping'] = shipping
-                addr = data.get('shippingAddress')
-                if addr and not aggregated[key]['shipping_address']:
-                    parts = [addr.get('name', ''), addr.get('address1', ''), addr.get('address2', ''),
-                             addr.get('city', ''), addr.get('province', ''), addr.get('postalCode', ''),
-                             addr.get('country', '')]
-                    aggregated[key]['shipping_address'] = ', '.join(p for p in parts if p)
+                shipping_address = get_shipping_address_str(data.get('shippingAddress'))
+                subtotal_cents = data.get('subtotal') or data.get('amount') or 0
+                campaign_subtotal_cents = get_campaign_subtotal_cents(data)
+                platform_add_on_subtotal_cents = get_add_on_subtotal_cents(data.get('bundleAddOns') or [], campaign, 'platform')
+                tip_cents = data.get('tipAmount') or 0
+                tax_cents = data.get('tax') or 0
+                shipping_cents = data.get('shipping') or 0
                 tier_id = data.get('tierId')
+                campaign_items = defaultdict(int)
                 if tier_id:
                     tier_name = get_tier_name(tier_id, data.get('tierName'))
                     tier_qty = data.get('tierQty', 1) or 1
-                    aggregated[key]['items'][tier_name] += tier_qty
+                    campaign_items[tier_name] += tier_qty
                 for add_tier in data.get('additionalTiers', []) or []:
                     add_id = add_tier.get('id', '')
                     add_name = get_tier_name(add_id, add_tier.get('name'))
                     add_qty = add_tier.get('qty', 1) or 1
                     if add_name:
-                        aggregated[key]['items'][add_name] += add_qty
+                        campaign_items[add_name] += add_qty
+                campaign_add_on_items = defaultdict(int)
+                platform_add_on_items = defaultdict(int)
                 for add_on in data.get('bundleAddOns', []) or []:
                     add_on_name = get_add_on_label(add_on)
                     add_on_qty = add_on.get('quantity', 1) or 1
                     if add_on_name:
-                        aggregated[key]['add_on_items'][add_on_name] += add_on_qty
+                        if is_campaign_add_on(add_on, campaign):
+                            campaign_add_on_items[add_on_name] += add_on_qty
+                        else:
+                            platform_add_on_items[add_on_name] += add_on_qty
+                row_specs = []
+                if campaign_subtotal_cents > 0 or campaign_items or campaign_add_on_items:
+                    row_specs.append({
+                        'campaign': campaign,
+                        'fulfiller': campaign,
+                        'campaign_subtotal': campaign_subtotal_cents,
+                        'add_on_subtotal': 0,
+                        'subtotal': campaign_subtotal_cents,
+                        'items': campaign_items,
+                        'add_on_items': campaign_add_on_items
+                    })
+                if platform_add_on_subtotal_cents > 0 or platform_add_on_items:
+                    row_specs.append({
+                        'campaign': '',
+                        'fulfiller': site_author,
+                        'campaign_subtotal': 0,
+                        'add_on_subtotal': platform_add_on_subtotal_cents,
+                        'subtotal': platform_add_on_subtotal_cents,
+                        'items': defaultdict(int),
+                        'add_on_items': platform_add_on_items
+                    })
+                if not row_specs:
+                    pledge_data = ''
+                    continue
+                subtotal_allocations = [spec['subtotal'] for spec in row_specs]
+                tip_allocations = allocate_cents(tip_cents, subtotal_allocations)
+                tax_allocations = allocate_cents(tax_cents, subtotal_allocations)
+                shipping_allocations = allocate_cents(shipping_cents, subtotal_allocations)
+                for index, spec in enumerate(row_specs):
+                    key = (email, spec['campaign'], spec['fulfiller'])
+                    aggregated[key]['campaign_subtotal'] += spec['campaign_subtotal']
+                    aggregated[key]['add_on_subtotal'] += spec['add_on_subtotal']
+                    aggregated[key]['subtotal'] += spec['subtotal']
+                    aggregated[key]['tip'] += tip_allocations[index]
+                    aggregated[key]['tax'] += tax_allocations[index]
+                    aggregated[key]['shipping'] += shipping_allocations[index]
+                    aggregated[key]['total'] += spec['subtotal'] + tip_allocations[index] + tax_allocations[index] + shipping_allocations[index]
+                    if aggregated[key]['subtotal'] > 0 and aggregated[key]['tip'] > 0:
+                        aggregated[key]['tip_percent'] = round((aggregated[key]['tip'] / aggregated[key]['subtotal']) * 100)
+                    if shipping_address and not aggregated[key]['shipping_address']:
+                        aggregated[key]['shipping_address'] = shipping_address
+                    for item_name, qty in spec['items'].items():
+                        aggregated[key]['items'][item_name] += qty
+                    for item_name, qty in spec['add_on_items'].items():
+                        aggregated[key]['add_on_items'][item_name] += qty
             except json.JSONDecodeError:
                 pass
             except Exception as e:
@@ -555,26 +739,27 @@ for line in sys.stdin:
 # Output aggregated CSV
 output = StringIO()
 writer = csv.writer(output)
-writer.writerow(['email', 'campaign', 'items', 'add_on_items', 'campaign_subtotal', 'platform_add_on_subtotal', 'subtotal', 'tip_percent', 'tip', 'tax', 'shipping', 'total', 'shipping_address'])
+writer.writerow(['email', 'campaign', 'fulfiller', 'items', 'add_on_items', 'campaign_subtotal', 'platform_add_on_subtotal', 'subtotal', 'tip_percent', 'tip', 'tax', 'shipping', 'total', 'shipping_address'])
 
-for (email, campaign), data in sorted(aggregated.items()):
-    if not data['items'] or data['total'] <= 0:
+for (email, campaign, fulfiller), data in sorted(aggregated.items()):
+    if (not data['items'] and not data['add_on_items']) or data['total'] <= 0:
         continue
     items_str = build_count_items_str(data['items'])
     add_on_items_str = build_count_items_str(data['add_on_items'])
     writer.writerow([
         email,
         campaign,
+        fulfiller,
         items_str,
         add_on_items_str,
-        f\"{data['campaign_subtotal']:.2f}\",
-        f\"{data['add_on_subtotal']:.2f}\",
-        f\"{data['subtotal']:.2f}\",
+        f\"{data['campaign_subtotal'] / 100:.2f}\",
+        f\"{data['add_on_subtotal'] / 100:.2f}\",
+        f\"{data['subtotal'] / 100:.2f}\",
         str(data['tip_percent']),
-        f\"{data['tip']:.2f}\",
-        f\"{data['tax']:.2f}\",
-        f\"{data['shipping']:.2f}\",
-        f\"{data['total']:.2f}\",
+        f\"{data['tip'] / 100:.2f}\",
+        f\"{data['tax'] / 100:.2f}\",
+        f\"{data['shipping'] / 100:.2f}\",
+        f\"{data['total'] / 100:.2f}\",
         data['shipping_address']
     ])
 

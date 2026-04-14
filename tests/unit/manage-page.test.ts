@@ -14,6 +14,19 @@ const ADD_ON_CONFIG = {
       category: 'physical',
       inventory: 50,
       variants: []
+    },
+    {
+      id: 'hand-relations__first-time-sexpot-poster',
+      name: 'First Time Sexpot Poster',
+      description: '18” x 24” First Time Sexpot poster.',
+      image_url: '/assets/images/campaign-add-ons/sexpot-poster.png',
+      price: 35,
+      category: 'physical',
+      inventory: 10,
+      scope: 'campaign',
+      campaign_slug: 'hand-relations',
+      campaign_title: 'Hand Relations',
+      variants: []
     }
   ]
 };
@@ -76,7 +89,8 @@ const baseCampaign = {
       stackable: false
     }
   ],
-  support_items: []
+  support_items: [],
+  campaign_add_ons: []
 };
 
 const basePledge = {
@@ -134,6 +148,14 @@ function mockManageFetch(options?: {
           inventory: 50,
           sold: 0,
           remaining: 50,
+          available: true,
+          soldOut: false,
+          variants: {}
+        },
+        'hand-relations__first-time-sexpot-poster': {
+          inventory: 10,
+          sold: 0,
+          remaining: 10,
           available: true,
           soldOut: false,
           variants: {}
@@ -1099,6 +1121,42 @@ describe('manage page script', () => {
         })
       );
     });
+  });
+
+  it('renders campaign add-ons in a separate Manage section for the current pledge campaign', async () => {
+    (window as any).POOL_CONFIG = {
+      addOns: ADD_ON_CONFIG
+    };
+    mockManageFetch({
+      campaigns: [
+        {
+          ...baseCampaign,
+          campaign_add_ons: [
+            {
+              id: 'hand-relations__first-time-sexpot-poster',
+              name: 'First Time Sexpot Poster',
+              description: '18” x 24” First Time Sexpot poster.',
+              image_url: '/assets/images/campaign-add-ons/sexpot-poster.png',
+              price: 35,
+              category: 'physical',
+              inventory: 10,
+              variants: []
+            }
+          ]
+        }
+      ]
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+
+    await import('../../assets/js/manage-page.js');
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('pledges-list')?.hidden).toBe(false);
+    });
+
+    expect(document.body.textContent).toContain('Campaign Add-ons');
+    expect(document.body.textContent).toContain('First Time Sexpot Poster');
+    expect(document.querySelector('[data-manage-addon-add][data-addon-product-id="hand-relations__first-time-sexpot-poster"]')).not.toBeNull();
   });
 
   it('lets Manage Pledge edit and remove already-selected bundle add-ons', async () => {

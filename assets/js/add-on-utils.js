@@ -82,6 +82,9 @@
       description: String(product.description || ''),
       imageUrl: String(product.image_url || ''),
       sourceUrl: String(product.source_url || ''),
+      scope: String(product.scope || 'platform'),
+      campaignSlug: String(product.campaign_slug || ''),
+      campaignTitle: String(product.campaign_title || ''),
       quantity,
       unitPrice: Math.round(Number(product.price || 0) * 100),
       category: String(product.category || 'digital'),
@@ -120,7 +123,10 @@
           imageUrl: String(product.image_url || ''),
           unitPrice: Math.round(Number(product.price || 0) * 100),
           category: String(product.category || 'digital'),
-          sourceUrl: String(product.source_url || '')
+          sourceUrl: String(product.source_url || ''),
+          scope: String(product.scope || 'platform'),
+          campaignSlug: String(product.campaign_slug || ''),
+          campaignTitle: String(product.campaign_title || '')
         }];
       }
 
@@ -134,7 +140,10 @@
         imageUrl: String(product.image_url || ''),
         unitPrice: Math.round(Number(product.price || 0) * 100),
         category: String(product.category || 'digital'),
-        sourceUrl: String(product.source_url || '')
+        sourceUrl: String(product.source_url || ''),
+        scope: String(product.scope || 'platform'),
+        campaignSlug: String(product.campaign_slug || ''),
+        campaignTitle: String(product.campaign_title || '')
       }));
     });
   }
@@ -163,6 +172,9 @@
       description: selection.description,
       imageUrl: selection.imageUrl,
       sourceUrl: selection.sourceUrl,
+      scope: selection.scope || 'platform',
+      campaignSlug: selection.campaignSlug || '',
+      campaignTitle: selection.campaignTitle || '',
       unitPrice: selection.unitPrice,
       shipping: selection.shipping || null,
       shipping_preset: selection.shipping_preset || null
@@ -242,6 +254,9 @@
         description: String(product?.description || ''),
         imageUrl: String(product?.image_url || ''),
         sourceUrl: String(product?.source_url || ''),
+        scope: String(product?.scope || 'platform'),
+        campaignSlug: String(product?.campaign_slug || ''),
+        campaignTitle: String(product?.campaign_title || ''),
         priceCents: Math.round(Number(product?.price || 0) * 100),
         category: String(product?.category || 'digital'),
         variantOptionName: String(product?.variant_option_name || 'Option'),
@@ -323,6 +338,15 @@
     }
     if (normalized.category) {
       customFields.push({ name: '_category', value: normalized.category });
+    }
+    if (normalized.scope) {
+      customFields.push({ name: '_addon_scope', value: normalized.scope });
+    }
+    if (normalized.campaignSlug) {
+      customFields.push({ name: '_addon_campaign_slug', value: normalized.campaignSlug });
+    }
+    if (normalized.campaignTitle) {
+      customFields.push({ name: '_addon_campaign_title', value: normalized.campaignTitle });
     }
 
     return {

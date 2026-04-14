@@ -262,11 +262,34 @@ def build_diff_items_str(old_counts, new_counts):
             items.append(f'-{item_name} x{abs(diff)}' if diff < -1 else f'-{item_name}')
     return '; '.join(items) if items else ''
 
-def get_add_on_subtotal(add_ons):
-    return sum(((add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)) for add_on in (add_ons or [])) / 100
+def is_campaign_add_on(add_on, campaign_slug=''):
+    scope = str(add_on.get('scope') or '').strip().lower()
+    add_on_campaign = str(add_on.get('campaignSlug') or add_on.get('campaign_slug') or '').strip()
+    normalized_campaign = str(campaign_slug or '').strip()
+    if scope != 'campaign':
+        return False
+    if not normalized_campaign:
+        return True
+    return add_on_campaign == normalized_campaign
 
-def get_campaign_subtotal(subtotal_cents, add_on_subtotal):
-    return (subtotal_cents / 100) - add_on_subtotal
+def get_add_on_subtotal(add_ons, campaign_slug='', scope='all'):
+    total_cents = 0
+    normalized_scope = str(scope or 'all').strip().lower()
+    for add_on in (add_ons or []):
+        line_total = (add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)
+        if normalized_scope == 'campaign':
+            if not is_campaign_add_on(add_on, campaign_slug):
+                continue
+        elif normalized_scope == 'platform':
+            if is_campaign_add_on(add_on, campaign_slug):
+                continue
+        total_cents += line_total
+    return total_cents / 100
+
+def get_campaign_subtotal(subtotal_cents, add_ons, campaign_slug='', goal_tracking_subtotal_cents=None):
+    if goal_tracking_subtotal_cents is not None:
+        return (goal_tracking_subtotal_cents or 0) / 100
+    return (subtotal_cents / 100) - get_add_on_subtotal(add_ons, campaign_slug, 'platform')
 
 def build_items_str(tier_id, tier_qty, additional_tiers, is_negative=False, custom_amount=0):
     items = []
@@ -352,8 +375,13 @@ for key, blob_id in rows:
                 items_str = build_items_str(entry.get('tierId'), entry.get('tierQty', 1), entry.get('additionalTiers'), custom_amount=custom_amt)
                 add_on_counts = get_add_on_counts(entry.get('bundleAddOns') or [])
                 add_on_items_str = build_count_items_str(add_on_counts)
-                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [])
-                campaign_subtotal = get_campaign_subtotal(entry.get('subtotal', 0), add_on_subtotal)
+                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [], campaign, 'platform')
+                campaign_subtotal = get_campaign_subtotal(
+                    entry.get('subtotal', 0),
+                    entry.get('bundleAddOns') or [],
+                    campaign,
+                    entry.get('goalTrackingSubtotal')
+                )
                 prev_counts = get_tier_counts(entry)
                 prev_add_on_counts = add_on_counts
                 prev_custom = custom_amt
@@ -371,7 +399,7 @@ for key, blob_id in rows:
                 items_str = build_diff_items_str(prev_counts, new_counts)
                 new_add_on_counts = get_add_on_counts(entry.get('bundleAddOns') or [])
                 add_on_items_str = build_diff_items_str(prev_add_on_counts, new_add_on_counts)
-                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [])
+                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [], campaign, 'platform')
                 add_on_subtotal_delta = add_on_subtotal - prev_add_on_subtotal
                 campaign_subtotal = subtotal - add_on_subtotal_delta
                 if new_custom != prev_custom:
@@ -410,7 +438,7 @@ for key, blob_id in rows:
                 items_str = build_items_str(data.get('tierId'), data.get('tierQty', 1), data.get('additionalTiers'), is_negative=True, custom_amount=data.get('customAmount', 0) or 0)
                 add_on_counts = get_add_on_counts(data.get('bundleAddOns') or [])
                 add_on_items_str = build_count_items_str(add_on_counts, is_negative=True)
-                add_on_subtotal = -get_add_on_subtotal(data.get('bundleAddOns') or [])
+                add_on_subtotal = -get_add_on_subtotal(data.get('bundleAddOns') or [], campaign, 'platform')
                 campaign_subtotal = subtotal - add_on_subtotal
                 write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping_delta, total, 'cancelled', charged, timestamp, order_id)
     else:
@@ -436,8 +464,13 @@ for key, blob_id in rows:
         items_str = build_items_str(data.get('tierId'), data.get('tierQty', 1), data.get('additionalTiers'), is_negative=is_cancelled, custom_amount=data.get('customAmount', 0) or 0)
         add_on_counts = get_add_on_counts(data.get('bundleAddOns') or [])
         add_on_items_str = build_count_items_str(add_on_counts, is_negative=is_cancelled)
-        add_on_subtotal = sign * get_add_on_subtotal(data.get('bundleAddOns') or [])
-        campaign_subtotal = subtotal - add_on_subtotal
+        add_on_subtotal = sign * get_add_on_subtotal(data.get('bundleAddOns') or [], campaign, 'platform')
+        campaign_subtotal = sign * get_campaign_subtotal(
+            data.get('subtotal', data.get('amount', 0)),
+            data.get('bundleAddOns') or [],
+            campaign,
+            data.get('goalTrackingSubtotal')
+        )
         write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping, total, status, charged, data.get('createdAt', ''), order_id)
 " 2>/dev/null
   exit 0
@@ -577,8 +610,34 @@ def build_items_str(tier_id, tier_qty, additional_tiers, is_negative=False, cust
 def get_add_on_subtotal(add_ons):
     return sum(((add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)) for add_on in (add_ons or [])) / 100
 
-def get_campaign_subtotal(subtotal_cents, add_on_subtotal):
-    return (subtotal_cents / 100) - add_on_subtotal
+def is_campaign_add_on(add_on, campaign_slug=''):
+    scope = str(add_on.get('scope') or '').strip().lower()
+    add_on_campaign = str(add_on.get('campaignSlug') or add_on.get('campaign_slug') or '').strip()
+    normalized_campaign = str(campaign_slug or '').strip()
+    if scope != 'campaign':
+        return False
+    if not normalized_campaign:
+        return True
+    return add_on_campaign == normalized_campaign
+
+def get_add_on_subtotal(add_ons, campaign_slug='', scope='all'):
+    total_cents = 0
+    normalized_scope = str(scope or 'all').strip().lower()
+    for add_on in (add_ons or []):
+        line_total = (add_on.get('unitPrice', 0) or 0) * (add_on.get('quantity', 0) or 0)
+        if normalized_scope == 'campaign':
+            if not is_campaign_add_on(add_on, campaign_slug):
+                continue
+        elif normalized_scope == 'platform':
+            if is_campaign_add_on(add_on, campaign_slug):
+                continue
+        total_cents += line_total
+    return total_cents / 100
+
+def get_campaign_subtotal(subtotal_cents, add_ons, campaign_slug='', goal_tracking_subtotal_cents=None):
+    if goal_tracking_subtotal_cents is not None:
+        return (goal_tracking_subtotal_cents or 0) / 100
+    return (subtotal_cents / 100) - get_add_on_subtotal(add_ons, campaign_slug, 'platform')
 
 def write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping, total, status, charged, timestamp, order_id):
     output = StringIO()
@@ -665,8 +724,13 @@ try:
                 )
                 add_on_counts = get_add_on_counts(entry.get('bundleAddOns') or [])
                 add_on_items_str = build_count_items_str(add_on_counts)
-                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [])
-                campaign_subtotal = get_campaign_subtotal(entry.get('subtotal', 0), add_on_subtotal)
+                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [], campaign, 'platform')
+                campaign_subtotal = get_campaign_subtotal(
+                    entry.get('subtotal', 0),
+                    entry.get('bundleAddOns') or [],
+                    campaign,
+                    entry.get('goalTrackingSubtotal')
+                )
                 prev_counts = get_tier_counts(entry)
                 prev_add_on_counts = add_on_counts
                 prev_custom = custom_amt
@@ -685,7 +749,7 @@ try:
                 items_str = build_diff_items_str(prev_counts, new_counts)
                 new_add_on_counts = get_add_on_counts(entry.get('bundleAddOns') or [])
                 add_on_items_str = build_diff_items_str(prev_add_on_counts, new_add_on_counts)
-                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [])
+                add_on_subtotal = get_add_on_subtotal(entry.get('bundleAddOns') or [], campaign, 'platform')
                 add_on_subtotal_delta = add_on_subtotal - prev_add_on_subtotal
                 campaign_subtotal = subtotal - add_on_subtotal_delta
                 
@@ -738,7 +802,7 @@ try:
                 )
                 add_on_counts = get_add_on_counts(data.get('bundleAddOns') or [])
                 add_on_items_str = build_count_items_str(add_on_counts, is_negative=True)
-                add_on_subtotal = -get_add_on_subtotal(data.get('bundleAddOns') or [])
+                add_on_subtotal = -get_add_on_subtotal(data.get('bundleAddOns') or [], campaign, 'platform')
                 campaign_subtotal = subtotal - add_on_subtotal
                 write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping_delta, total, 'cancelled', charged, timestamp, order_id)
     else:
@@ -774,8 +838,13 @@ try:
         )
         add_on_counts = get_add_on_counts(data.get('bundleAddOns') or [])
         add_on_items_str = build_count_items_str(add_on_counts, is_negative=is_cancelled)
-        add_on_subtotal = sign * get_add_on_subtotal(data.get('bundleAddOns') or [])
-        campaign_subtotal = subtotal - add_on_subtotal
+        add_on_subtotal = sign * get_add_on_subtotal(data.get('bundleAddOns') or [], campaign, 'platform')
+        campaign_subtotal = sign * get_campaign_subtotal(
+            data.get('subtotal', data.get('amount', 0)),
+            data.get('bundleAddOns') or [],
+            campaign,
+            data.get('goalTrackingSubtotal')
+        )
 
         write_row(email, campaign, items_str, add_on_items_str, campaign_subtotal, add_on_subtotal, subtotal, tip_percent, tip, tax, shipping, total, status, charged, data.get('createdAt', ''), order_id)
 

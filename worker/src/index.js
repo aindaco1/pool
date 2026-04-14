@@ -519,6 +519,48 @@ function getBundleAddOnSubtotal(bundleAddOns = []) {
   ), 0);
 }
 
+function isCampaignScopedBundleAddOn(addOn) {
+  return String(addOn?.scope || '').trim().toLowerCase() === 'campaign';
+}
+
+function getCampaignBundleAddOnSubtotal(bundleAddOns = [], campaignSlug = '') {
+  const normalizedCampaignSlug = String(campaignSlug || '').trim();
+  return (bundleAddOns || []).reduce((sum, addOn) => {
+    const quantity = Number(addOn?.quantity || 0) || 0;
+    const unitPrice = Number(addOn?.unitPrice || 0) || 0;
+    if (quantity <= 0 || unitPrice <= 0) return sum;
+    if (!isCampaignScopedBundleAddOn(addOn)) return sum;
+    if (normalizedCampaignSlug && String(addOn?.campaignSlug || '').trim() !== normalizedCampaignSlug) {
+      return sum;
+    }
+    return sum + (unitPrice * quantity);
+  }, 0);
+}
+
+function getPlatformBundleAddOnSubtotal(bundleAddOns = []) {
+  return (bundleAddOns || []).reduce((sum, addOn) => {
+    const quantity = Number(addOn?.quantity || 0) || 0;
+    const unitPrice = Number(addOn?.unitPrice || 0) || 0;
+    if (quantity <= 0 || unitPrice <= 0) return sum;
+    return isCampaignScopedBundleAddOn(addOn) ? sum : sum + (unitPrice * quantity);
+  }, 0);
+}
+
+function getCampaignScopedBundleAddOns(bundleAddOns = [], campaignSlug = '') {
+  const normalizedCampaignSlug = String(campaignSlug || '').trim();
+  if (!normalizedCampaignSlug) {
+    return [];
+  }
+  return (bundleAddOns || []).filter((addOn) => (
+    isCampaignScopedBundleAddOn(addOn) &&
+    String(addOn?.campaignSlug || '').trim() === normalizedCampaignSlug
+  )).map((addOn) => ({ ...addOn }));
+}
+
+function getPlatformBundleAddOns(bundleAddOns = []) {
+  return (bundleAddOns || []).filter((addOn) => !isCampaignScopedBundleAddOn(addOn)).map((addOn) => ({ ...addOn }));
+}
+
 function bundleAddOnsIncludePhysical(bundleAddOns = []) {
   return (bundleAddOns || []).some((addOn) => (
     addOn?.category === 'physical' && Number(addOn?.quantity || 0) > 0
@@ -526,10 +568,20 @@ function bundleAddOnsIncludePhysical(bundleAddOns = []) {
 }
 
 function getBundleAddOnsForAnchorCampaign(bundleAddOns = [], anchorCampaignSlug = '', campaignSlug = '') {
-  if (!anchorCampaignSlug || !campaignSlug || anchorCampaignSlug !== campaignSlug) {
+  const normalizedAnchorCampaignSlug = String(anchorCampaignSlug || '').trim();
+  const normalizedCampaignSlug = String(campaignSlug || '').trim();
+  if (!normalizedCampaignSlug) {
     return [];
   }
-  return Array.isArray(bundleAddOns) ? bundleAddOns.map((addOn) => ({ ...addOn })) : [];
+
+  return Array.isArray(bundleAddOns)
+    ? bundleAddOns.filter((addOn) => {
+        if (isCampaignScopedBundleAddOn(addOn)) {
+          return String(addOn?.campaignSlug || '').trim() === normalizedCampaignSlug;
+        }
+        return Boolean(normalizedAnchorCampaignSlug) && normalizedAnchorCampaignSlug === normalizedCampaignSlug;
+      }).map((addOn) => ({ ...addOn }))
+    : [];
 }
 
 function getBundleAddOnsWithLabels(bundleAddOns = []) {
@@ -863,6 +915,9 @@ async function validateBundleAddOns(env, bundleAddOns = [], { currentSelections 
       name: String(product.name || productId),
       imageUrl: String(product.image_url || ''),
       sourceUrl: String(product.source_url || ''),
+      scope: String(product.scope || 'platform'),
+      campaignSlug: String(product.campaign_slug || ''),
+      campaignTitle: String(product.campaign_title || ''),
       variantId: resolvedVariantId,
       variantLabel: resolvedVariantLabel,
       quantity,
@@ -1173,7 +1228,9 @@ function buildCanonicalContribution(env, campaign, {
     subtotal += supportItem.amount * 100;
   }
 
-  const goalTrackingSubtotal = subtotal;
+  const campaignBundleAddOns = getCampaignScopedBundleAddOns(bundleAddOns, campaign?.slug);
+  const platformBundleAddOns = getPlatformBundleAddOns(bundleAddOns);
+  const goalTrackingSubtotal = subtotal + getCampaignBundleAddOnSubtotal(bundleAddOns, campaign?.slug);
   subtotal += getBundleAddOnSubtotal(bundleAddOns);
 
   if (!isValidAmount(subtotal)) {
@@ -1184,15 +1241,18 @@ function buildCanonicalContribution(env, campaign, {
     return { valid: false, error: 'Pledge must include at least one contribution' };
   }
 
-  const hasPhysical =
+  const hasCampaignPhysical =
     tierSelection.hasPhysical === true ||
     supportItemsIncludePhysical(campaign, supportItems) ||
-    bundleAddOnsIncludePhysical(bundleAddOns);
-  const resolvedShippingCents = hasPhysical
-    ? (Number.isFinite(Number(shippingCents))
-        ? Math.max(0, Number(shippingCents))
-        : getCampaignShippingFallbackFeeCents(campaign, env))
-    : 0;
+    bundleAddOnsIncludePhysical(campaignBundleAddOns);
+  const hasPlatformPhysical = bundleAddOnsIncludePhysical(platformBundleAddOns);
+  const hasPhysical = hasCampaignPhysical || hasPlatformPhysical;
+  const resolvedShippingCents = Number.isFinite(Number(shippingCents))
+    ? Math.max(0, Number(shippingCents))
+    : (
+        (hasCampaignPhysical ? getCampaignShippingFallbackFeeCents(campaign, env) : 0) +
+        (hasPlatformPhysical ? getShippingFallbackFeeCents(env) : 0)
+      );
   const normalizedShippingOption = String(shippingOption || 'standard').trim().toLowerCase() || 'standard';
 
   return {
@@ -1234,25 +1294,55 @@ async function buildCanonicalContributionForStoredShipping(env, campaign, {
     return canonicalContribution;
   }
 
+  const campaignBundleAddOns = getCampaignScopedBundleAddOns(bundleAddOns, campaign?.slug);
+  const platformBundleAddOns = getPlatformBundleAddOns(bundleAddOns);
+  const hasCampaignPhysical =
+    tierSelection.hasPhysical === true ||
+    supportItemsIncludePhysical(campaign, supportItems) ||
+    bundleAddOnsIncludePhysical(campaignBundleAddOns);
+  const hasPlatformPhysical = bundleAddOnsIncludePhysical(platformBundleAddOns);
   let resolvedShippingCents = Math.max(0, Number(currentShipping) || 0);
   const normalizedDestination = normalizeShippingDestination(shippingAddress);
 
   if (normalizedDestination.valid) {
-    const quotedShipment = await quoteCampaignShipment(
-      env,
-      campaign,
-      tierSelection,
-      normalizedDestination.destination,
-      supportItems,
-      shippingOption,
-      bundleAddOns
-    );
-    if (quotedShipment.valid) {
-      resolvedShippingCents = Math.max(0, Number(quotedShipment.quote?.shippingCents) || 0);
+    resolvedShippingCents = 0;
+
+    if (hasCampaignPhysical) {
+      const quotedShipment = await quoteCampaignShipment(
+        env,
+        campaign,
+        tierSelection,
+        normalizedDestination.destination,
+        supportItems,
+        shippingOption,
+        campaignBundleAddOns
+      );
+      if (!quotedShipment.valid) {
+        return quotedShipment;
+      }
+      resolvedShippingCents += Math.max(0, Number(quotedShipment.quote?.shippingCents) || 0);
       canonicalContribution.shippingOption = quotedShipment.selectedOption || canonicalContribution.shippingOption || 'standard';
     }
+
+    if (hasPlatformPhysical) {
+      const platformShipment = await quoteCampaignShipment(
+        env,
+        null,
+        { selectedTiers: [] },
+        normalizedDestination.destination,
+        [],
+        'standard',
+        platformBundleAddOns
+      );
+      if (!platformShipment.valid) {
+        return platformShipment;
+      }
+      resolvedShippingCents += Math.max(0, Number(platformShipment.quote?.shippingCents) || 0);
+    }
   } else if (resolvedShippingCents === 0) {
-    resolvedShippingCents = getShippingFallbackFeeCents(env);
+    resolvedShippingCents =
+      (hasCampaignPhysical ? getCampaignShippingFallbackFeeCents(campaign, env) : 0) +
+      (hasPlatformPhysical ? getShippingFallbackFeeCents(env) : 0);
   }
 
   canonicalContribution.totals = buildPledgeTotals(env, canonicalContribution.totals.subtotal, {
@@ -2479,6 +2569,7 @@ async function handleShippingQuote(request, env) {
   }
 
   const quotes = [];
+  const platformBundleAddOns = getPlatformBundleAddOns(validatedBundleAddOns.bundleAddOns || []);
   for (const orderCart of orderCarts) {
     const campaign = await getCampaign(env, orderCart.campaignSlug);
     if (!campaign) {
@@ -2506,11 +2597,7 @@ async function handleShippingQuote(request, env) {
       normalizedDestination.destination,
       desiredSupportItems.supportItems,
       shippingOption,
-      getBundleAddOnsForAnchorCampaign(
-        validatedBundleAddOns.bundleAddOns || [],
-        parsedCart.bundleAddOnAnchorCampaignSlug,
-        orderCart.campaignSlug
-      )
+      getCampaignScopedBundleAddOns(validatedBundleAddOns.bundleAddOns || [], orderCart.campaignSlug)
     );
     if (!quote.valid) {
       return privateJsonResponse({ error: quote.error }, 400, env);
@@ -2527,6 +2614,34 @@ async function handleShippingQuote(request, env) {
       defaultOption: quote.defaultOption,
       selectedOption: quote.selectedOption,
       shipment: quote.shipment
+    });
+  }
+
+  if (bundleAddOnsIncludePhysical(platformBundleAddOns)) {
+    const platformQuote = await quoteCampaignShipment(
+      env,
+      null,
+      { selectedTiers: [] },
+      normalizedDestination.destination,
+      [],
+      'standard',
+      platformBundleAddOns
+    );
+    if (!platformQuote.valid) {
+      return privateJsonResponse({ error: platformQuote.error }, 400, env);
+    }
+
+    quotes.push({
+      campaignSlug: '',
+      shippingCents: platformQuote.quote.shippingCents,
+      source: platformQuote.quote.source,
+      carrier: platformQuote.quote.carrier,
+      service: platformQuote.quote.service,
+      domestic: platformQuote.quote.domestic,
+      availableOptions: platformQuote.availableOptions,
+      defaultOption: platformQuote.defaultOption,
+      selectedOption: platformQuote.selectedOption,
+      shipment: platformQuote.shipment
     });
   }
 

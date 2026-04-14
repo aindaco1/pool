@@ -425,6 +425,26 @@ const addOnCatalogFixture = {
         { id: 'm', label: 'M', inventory: 4 },
         { id: 'l', label: 'L', inventory: 4 }
       ]
+    },
+    {
+      id: 'smoke-editable__first-time-sexpot-condom-pack',
+      name: 'First Time Sexpot Condom Pack',
+      description: 'Condom pack',
+      image_url: 'https://shop.dustwave.xyz/assets/images/sexpot-condom-pack.png',
+      price: 6,
+      category: 'physical',
+      inventory: 25,
+      shipping_preset: 'sticker',
+      shipping: {
+        weight_oz: 1,
+        length_in: 4,
+        width_in: 4,
+        height_in: 0.125
+      },
+      scope: 'campaign',
+      campaign_slug: 'smoke-editable',
+      campaign_title: 'SMOKE EDITABLE',
+      variants: []
     }
   ]
 };
@@ -681,6 +701,86 @@ describe('Worker business logic hardening', () => {
           }
         })
       }
+    });
+  });
+
+  it('counts campaign add-ons toward goal-tracking subtotal without mixing in platform add-ons', async () => {
+    mockVerifyToken.mockResolvedValue({
+      email: 'buyer@example.com',
+      campaignSlug: 'smoke-editable',
+      orderId: 'pool-intent-campaign-add-on-123'
+    });
+
+    const env = createEnv();
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('pledge:pool-intent-campaign-add-on-123', JSON.stringify({
+      orderId: 'pool-intent-campaign-add-on-123',
+      email: 'buyer@example.com',
+      campaignSlug: 'smoke-editable',
+      pledgeStatus: 'active',
+      charged: false,
+      tierId: 'standard-pass',
+      tierName: 'Standard Pass',
+      tierQty: 1,
+      additionalTiers: [],
+      supportItems: [],
+      customAmount: 0,
+      subtotal: 1000,
+      goalTrackingSubtotal: 1000,
+      tax: 79,
+      shipping: 0,
+      tipPercent: 5,
+      tipAmount: 50,
+      amount: 1129,
+      shippingOption: 'standard',
+      preferredLang: 'en',
+      shippingAddress: {
+        postalCode: '80205',
+        country: 'US'
+      },
+      bundleAddOns: []
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge/modify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: 'magic-token',
+          orderId: 'pool-intent-campaign-add-on-123',
+          preferredLang: 'en',
+          bundleAddOns: [
+            {
+              productId: 'smoke-editable__first-time-sexpot-condom-pack',
+              quantity: 1
+            },
+            {
+              productId: 'dust-wave-sticker',
+              quantity: 1
+            }
+          ]
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(kv.get('pledge:pool-intent-campaign-add-on-123', { type: 'json' })).resolves.toMatchObject({
+      subtotal: 1900,
+      goalTrackingSubtotal: 1600,
+      bundleAddOnSubtotal: 900,
+      bundleAddOns: expect.arrayContaining([
+        expect.objectContaining({
+          productId: 'smoke-editable__first-time-sexpot-condom-pack',
+          scope: 'campaign',
+          campaignSlug: 'smoke-editable'
+        }),
+        expect.objectContaining({
+          productId: 'dust-wave-sticker',
+          scope: 'platform'
+        })
+      ])
     });
   });
 
@@ -1146,6 +1246,31 @@ describe('Worker business logic hardening', () => {
       quotes: [
         {
           campaignSlug: 'hand-relations',
+          shippingCents: 0,
+          source: 'none',
+          carrier: null,
+          service: null,
+          domestic: true,
+          availableOptions: [],
+          defaultOption: 'standard',
+          selectedOption: 'standard',
+          shipment: {
+            hasPhysical: false,
+            physicalTierCount: 0,
+            physicalSupportItemCount: 0,
+            physicalAddOnCount: 0,
+            physicalUnitCount: 0,
+            weightOz: 0,
+            lengthIn: 0,
+            widthIn: 0,
+            heightIn: 0,
+            tierIds: [],
+            supportItemIds: [],
+            addOnIds: []
+          }
+        },
+        {
+          campaignSlug: '',
           shippingCents: 300,
           source: 'fallback_flat_rate',
           carrier: 'fallback',
@@ -1178,6 +1303,46 @@ describe('Worker business logic hardening', () => {
         postalCode: '80205'
       }
     });
+  });
+
+  it('adds one separate platform shipping charge on top of campaign shipping for physical global add-ons', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/shipping/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [
+            { id: 'smoke-editable__support__signed-script', amount: 25 },
+            { id: 'addon__dust-wave-sticker', quantity: 1 }
+          ],
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          },
+          bundleAddOnAnchorCampaignSlug: 'smoke-editable'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.totalShippingCents).toBe(1500);
+    expect(data.quotes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        campaignSlug: 'smoke-editable',
+        shippingCents: 1200,
+        source: 'fallback_flat_rate'
+      }),
+      expect.objectContaining({
+        campaignSlug: '',
+        shippingCents: 300,
+        source: 'fallback_flat_rate'
+      })
+    ]));
   });
 
   it('returns summed shipping for mixed-campaign carts with digital and physical tiers', async () => {

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Test Worker endpoints against local Jekyll site
-# Runs automatically after jekyll build via _plugins/post_build_test.rb
+# Run manually, or via `RUN_POST_BUILD_TESTS=1 bundle exec jekyll build`
 
 set -e
 

@@ -1,0 +1,65 @@
+{
+  "enabled": {{ site['add_ons'].enabled | default: false | jsonify }},
+  "low_stock_threshold": {{ site['add_ons'].low_stock_threshold | default: 5 | jsonify }},
+  "products": [
+    {% assign add_on_comma = false %}
+    {% for product in site['add_ons'].products %}
+      {% assign resolved_shipping = product.shipping %}
+      {% if resolved_shipping == nil and product.shipping_preset %}
+        {% assign resolved_shipping = site.shipping.presets[product.shipping_preset] %}
+      {% endif %}
+      {% if add_on_comma %},{% endif %}
+      {
+        "id": {{ product.id | jsonify }},
+        "name": {{ product.name | jsonify }},
+        "description": {{ product.description | jsonify }},
+        "image_url": {{ product.image_url | jsonify }},
+        "price": {{ product.price | default: 0 }},
+        "inventory": {{ product.inventory | jsonify }},
+        "category": {{ product.category | default: "digital" | jsonify }},
+        "shipping_preset": {{ product.shipping_preset | jsonify }},
+        "shipping": {% if resolved_shipping %}{{ resolved_shipping | jsonify }}{% else %}null{% endif %},
+        "source_url": {{ product.source_url | jsonify }},
+        "variant_option_name": {{ product.variant_option_name | jsonify }},
+        "variants": {{ product.variants | default: empty | jsonify }},
+        "scope": "platform",
+        "campaign_slug": null,
+        "campaign_title": null
+      }
+      {% assign add_on_comma = true %}
+    {% endfor %}
+    {% if site.show_test_campaigns %}
+      {% assign campaign_add_on_campaigns = site.campaigns %}
+    {% else %}
+      {% assign campaign_add_on_campaigns = site.campaigns | where_exp: "c", "c.test_only != true" %}
+    {% endif %}
+    {% for campaign in campaign_add_on_campaigns %}
+      {% for product in campaign.campaign_add_ons %}
+        {% assign resolved_shipping = product.shipping %}
+        {% if resolved_shipping == nil and product.shipping_preset %}
+          {% assign resolved_shipping = site.shipping.presets[product.shipping_preset] %}
+        {% endif %}
+        {% if add_on_comma %},{% endif %}
+        {
+          "id": {{ product.id | jsonify }},
+          "name": {{ product.name | jsonify }},
+          "description": {{ product.description | jsonify }},
+          "image_url": {{ product.image_url | jsonify }},
+          "price": {{ product.price | default: 0 }},
+          "inventory": {{ product.inventory | jsonify }},
+          "category": {{ product.category | default: "digital" | jsonify }},
+          "shipping_preset": {{ product.shipping_preset | jsonify }},
+          "shipping": {% if resolved_shipping %}{{ resolved_shipping | jsonify }}{% else %}null{% endif %},
+          "source_url": {{ product.source_url | jsonify }},
+          "variant_option_name": {{ product.variant_option_name | jsonify }},
+          "variants": {{ product.variants | default: empty | jsonify }},
+          "scope": "campaign",
+          "campaign_slug": {{ campaign.slug | jsonify }},
+          "campaign_title": {{ campaign.title | jsonify }}
+        }
+        {% assign add_on_comma = true %}
+      {% endfor %}
+    {% endfor %}
+  ],
+  "generated_at": {{ site.time | date_to_xmlschema | jsonify }}
+}

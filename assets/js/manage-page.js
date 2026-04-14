@@ -199,8 +199,12 @@
             name: String(product?.name || ''),
             description: String(product?.description || ''),
             imageUrl: String(product?.image_url || ''),
+            sourceUrl: String(product?.source_url || ''),
             unitPrice: Math.round(Number(product?.price || 0) * 100),
-            category: String(product?.category || 'digital')
+            category: String(product?.category || 'digital'),
+            scope: String(product?.scope || 'platform'),
+            campaignSlug: String(product?.campaign_slug || ''),
+            campaignTitle: String(product?.campaign_title || '')
           }];
         }
         return variants.map((variant) => ({
@@ -211,8 +215,12 @@
           name: String(product?.name || ''),
           description: String(product?.description || ''),
           imageUrl: String(product?.image_url || ''),
+          sourceUrl: String(product?.source_url || ''),
           unitPrice: Math.round(Number(product?.price || 0) * 100),
-          category: String(product?.category || 'digital')
+          category: String(product?.category || 'digital'),
+          scope: String(product?.scope || 'platform'),
+          campaignSlug: String(product?.campaign_slug || ''),
+          campaignTitle: String(product?.campaign_title || '')
         }));
       });
     },
@@ -240,6 +248,10 @@
         name: String(product.name || ''),
         description: String(product.description || ''),
         imageUrl: String(product.image_url || ''),
+        sourceUrl: String(product.source_url || ''),
+        scope: String(product.scope || 'platform'),
+        campaignSlug: String(product.campaign_slug || ''),
+        campaignTitle: String(product.campaign_title || ''),
         quantity,
         unitPrice: Math.round(Number(product.price || 0) * 100),
         category: String(product.category || 'digital'),
@@ -268,6 +280,10 @@
         name: selection.name,
         description: selection.description,
         imageUrl: selection.imageUrl,
+        sourceUrl: selection.sourceUrl,
+        scope: selection.scope || 'platform',
+        campaignSlug: selection.campaignSlug || '',
+        campaignTitle: selection.campaignTitle || '',
         unitPrice: selection.unitPrice,
         shipping: selection.shipping || null,
         shipping_preset: selection.shipping_preset || null
@@ -356,6 +372,9 @@
           description: String(product?.description || ''),
           imageUrl: String(product?.image_url || ''),
           sourceUrl: String(product?.source_url || ''),
+          scope: String(product?.scope || 'platform'),
+          campaignSlug: String(product?.campaign_slug || ''),
+          campaignTitle: String(product?.campaign_title || ''),
           priceCents: Math.round(Number(product?.price || 0) * 100),
           category: String(product?.category || 'digital'),
           variantOptionName: String(product?.variant_option_name || 'Option'),
@@ -610,14 +629,32 @@
     return addOnUtils.getSubtotal(bundleAddOns, ADD_ON_CATALOG);
   }
 
-  function getManageAddOnProductCards(bundleAddOns) {
-    return addOnUtils.buildProductStateEntries
-      ? addOnUtils.buildProductStateEntries(ADD_ON_CATALOG, bundleAddOns, addOnInventorySnapshot)
-      : [];
+  function isCampaignScopedAddOn(entry) {
+    return String(entry?.scope || '').trim().toLowerCase() === 'campaign';
   }
 
-  function getManageAvailableAddOnProductCards(bundleAddOns) {
-    return getManageAddOnProductCards(bundleAddOns).filter((product) => !product.inCart);
+  function isPlatformScopedAddOn(entry) {
+    return !isCampaignScopedAddOn(entry);
+  }
+
+  function getManageAddOnCampaignSlug(entry) {
+    return String(entry?.campaignSlug || entry?.campaign_slug || '').trim();
+  }
+
+  function getManageScopedAddOnSelections(bundleAddOns, filterFn) {
+    const selections = buildSelectedBundleAddOnEntries(bundleAddOns);
+    return typeof filterFn === 'function' ? selections.filter(filterFn) : selections;
+  }
+
+  function getManageAddOnProductCards(bundleAddOns, filterFn) {
+    const productCards = addOnUtils.buildProductStateEntries
+      ? addOnUtils.buildProductStateEntries(ADD_ON_CATALOG, bundleAddOns, addOnInventorySnapshot)
+      : [];
+    return typeof filterFn === 'function' ? productCards.filter(filterFn) : productCards;
+  }
+
+  function getManageAvailableAddOnProductCards(bundleAddOns, filterFn) {
+    return getManageAddOnProductCards(bundleAddOns, filterFn).filter((product) => !product.inCart);
   }
 
   function renderManageAddOnVariantOptions(product, selectedVariantId) {
@@ -647,8 +684,7 @@
     ).replace('%{count}', String(count));
   }
 
-  function renderManageSelectedAddOnRows(bundleAddOns) {
-    const selections = buildSelectedBundleAddOnEntries(bundleAddOns);
+  function renderManageSelectedAddOnRows(selections, productCards) {
     if (selections.length === 0) {
       return '';
     }
@@ -660,7 +696,7 @@
           if (!product) return '';
           const imageUrl = String(selection.imageUrl || product.image_url || '').trim();
           const selectedVariant = selection.variantId ? addOnUtils.findVariant(product, selection.variantId) : null;
-          const cardState = getManageAddOnProductCards(bundleAddOns).find((entry) => entry.productId === selection.productId) || null;
+          const cardState = productCards.find((entry) => entry.productId === selection.productId) || null;
           const effectiveVariant = selection.variantId
             ? (cardState?.variants || []).find((variant) => variant.id === selection.variantId) || selectedVariant
             : null;
@@ -769,8 +805,7 @@
     quantityField.value = String(Math.min(maxQuantity, currentQuantity));
   }
 
-  function renderManageAvailableAddOnCards(bundleAddOns, index) {
-    const productCards = getManageAvailableAddOnProductCards(bundleAddOns);
+  function renderManageAvailableAddOnCards(productCards, index) {
     if (productCards.length === 0) {
       return '';
     }
@@ -865,7 +900,7 @@
     `;
   }
 
-  function renderManageAddOnSection(index, bundleAddOns) {
+  function renderManageAddOnSection(index, bundleAddOns, campaign) {
     if (!ADD_ON_CATALOG.enabled || ADD_ON_OPTIONS.length === 0) {
       return '';
     }
@@ -874,20 +909,55 @@
       'manage.platformAddOnsNote',
       'These add-ons support %{author} and do not count toward the campaign total.'
     ).replace('%{author}', getPlatformAuthorName());
-    const selectedMarkup = renderManageSelectedAddOnRows(bundleAddOns);
-    const availableMarkup = renderManageAvailableAddOnCards(bundleAddOns, index);
-    if (!selectedMarkup && !availableMarkup) {
+    const campaignSlug = String(campaign?.slug || '').trim();
+    const platformFilter = isPlatformScopedAddOn;
+    const campaignFilter = function(entry) {
+      return isCampaignScopedAddOn(entry) && getManageAddOnCampaignSlug(entry) === campaignSlug;
+    };
+    const platformSelectedMarkup = renderManageSelectedAddOnRows(
+      getManageScopedAddOnSelections(bundleAddOns, platformFilter),
+      getManageAddOnProductCards(bundleAddOns, platformFilter)
+    );
+    const platformAvailableMarkup = renderManageAvailableAddOnCards(
+      getManageAvailableAddOnProductCards(bundleAddOns, platformFilter),
+      index
+    );
+    const campaignSelectedMarkup = renderManageSelectedAddOnRows(
+      getManageScopedAddOnSelections(bundleAddOns, campaignFilter),
+      getManageAddOnProductCards(bundleAddOns, campaignFilter)
+    );
+    const campaignAvailableMarkup = renderManageAvailableAddOnCards(
+      getManageAvailableAddOnProductCards(bundleAddOns, campaignFilter),
+      index
+    );
+    if (!platformSelectedMarkup && !platformAvailableMarkup && !campaignSelectedMarkup && !campaignAvailableMarkup) {
       return '';
     }
 
-    return `
-      <div class="pledge-card__support" id="add-on-section-${index}">
-        <h2>${escapeHtml(getRuntimeMessage('manage.platformAddOns', 'Add-ons').replace('%{platform}', PLATFORM_NAME))}</h2>
-        <p class="pledge-card__support-note">${escapeHtml(supportNote)}</p>
-        ${selectedMarkup}
-        ${availableMarkup ? `<div class="manage-addon-available">${availableMarkup}</div>` : ''}
-      </div>
-    `;
+    const sections = [];
+
+    if (platformSelectedMarkup || platformAvailableMarkup) {
+      sections.push(`
+        <div class="pledge-card__support" id="add-on-section-${index}">
+          <h2>${escapeHtml(getRuntimeMessage('manage.platformAddOns', 'Add-ons').replace('%{platform}', PLATFORM_NAME))}</h2>
+          <p class="pledge-card__support-note">${escapeHtml(supportNote)}</p>
+          ${platformSelectedMarkup}
+          ${platformAvailableMarkup ? `<div class="manage-addon-available">${platformAvailableMarkup}</div>` : ''}
+        </div>
+      `);
+    }
+
+    if (campaignSelectedMarkup || campaignAvailableMarkup) {
+      sections.push(`
+        <div class="pledge-card__support" id="campaign-add-on-section-${index}">
+          <h2>${escapeHtml(getRuntimeMessage('manage.campaignAddOns', 'Campaign Add-ons'))}</h2>
+          ${campaignSelectedMarkup}
+          ${campaignAvailableMarkup ? `<div class="manage-addon-available">${campaignAvailableMarkup}</div>` : ''}
+        </div>
+      `);
+    }
+
+    return sections.join('');
   }
 
   function syncManageAddOnCardVariantState(card) {
@@ -2600,7 +2670,7 @@
 
     if (isActive && ADD_ON_CATALOG.enabled && ADD_ON_OPTIONS.length > 0) {
       const pledgedAddOns = normalizeManageBundleAddOns(pledge.bundleAddOns || []);
-      addOnsHtml = renderManageAddOnSection(index, pledgedAddOns);
+      addOnsHtml = renderManageAddOnSection(index, pledgedAddOns, campaign);
     }
 
     const currentCustomAmount = pledge.customAmount || 0;
@@ -3096,19 +3166,20 @@
       refreshSummary();
     }
     function rerenderManageAddOnSection() {
-      const nextMarkup = renderManageAddOnSection(index, selectedBundleAddOns);
-      const currentSection = card.querySelector(`#add-on-section-${index}`);
+      const nextMarkup = renderManageAddOnSection(index, selectedBundleAddOns, campaign);
+      const currentSections = Array.from(card.querySelectorAll(`#add-on-section-${index}, #campaign-add-on-section-${index}`));
       if (nextMarkup) {
-        if (currentSection) {
-          currentSection.outerHTML = nextMarkup;
+        if (currentSections[0]) {
+          currentSections[0].outerHTML = nextMarkup;
+          currentSections.slice(1).forEach((section) => section.remove());
         } else {
           const financialsSection = card.querySelector('.pledge-card__financials');
           if (financialsSection instanceof HTMLElement) {
             financialsSection.insertAdjacentHTML('beforebegin', nextMarkup);
           }
         }
-      } else if (currentSection) {
-        currentSection.remove();
+      } else {
+        currentSections.forEach((section) => section.remove());
       }
       bindManageAddOnControls();
     }

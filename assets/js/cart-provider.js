@@ -311,6 +311,9 @@
         description: String(product.description || ''),
         imageUrl: String(product.image_url || ''),
         sourceUrl: String(product.source_url || ''),
+        scope: String(product.scope || 'platform'),
+        campaignSlug: String(product.campaign_slug || ''),
+        campaignTitle: String(product.campaign_title || ''),
         quantity,
         unitPrice: Math.round(Number(product.price || 0) * 100),
         category: String(product.category || 'digital'),
@@ -344,7 +347,10 @@
             imageUrl: String(product?.image_url || ''),
             unitPrice: Math.round(Number(product?.price || 0) * 100),
             category: String(product?.category || 'digital'),
-            sourceUrl: String(product?.source_url || '')
+            sourceUrl: String(product?.source_url || ''),
+            scope: String(product?.scope || 'platform'),
+            campaignSlug: String(product?.campaign_slug || ''),
+            campaignTitle: String(product?.campaign_title || '')
           }];
         }
 
@@ -358,7 +364,10 @@
           imageUrl: String(product?.image_url || ''),
           unitPrice: Math.round(Number(product?.price || 0) * 100),
           category: String(product?.category || 'digital'),
-          sourceUrl: String(product?.source_url || '')
+          sourceUrl: String(product?.source_url || ''),
+          scope: String(product?.scope || 'platform'),
+          campaignSlug: String(product?.campaign_slug || ''),
+          campaignTitle: String(product?.campaign_title || '')
         }));
       });
     },
@@ -380,24 +389,28 @@
         description: selection.description,
         imageUrl: selection.imageUrl,
         sourceUrl: selection.sourceUrl,
+        scope: selection.scope || 'platform',
+        campaignSlug: selection.campaignSlug || '',
+        campaignTitle: selection.campaignTitle || '',
         unitPrice: selection.unitPrice,
         shipping: selection.shipping || null,
         shipping_preset: selection.shipping_preset || null
       }));
     },
+    selectionFromCartItem: function(item, catalog) {
+      const rawId = String(item?.id || '').trim();
+      if (!rawId.startsWith('addon__')) return null;
+      const match = rawId.match(/^addon__(.+?)(?:__variant__(.+))?$/);
+      if (!match) return null;
+      return this.normalizeSelection({
+        productId: String(match[1] || ''),
+        variantId: String(match[2] || ''),
+        quantity: Math.max(1, Number(item?.quantity || 1))
+      }, catalog);
+    },
     selectionsFromCartItems: function(items, catalog) {
       return (Array.isArray(items) ? items : [])
-        .map((item) => {
-          const rawId = String(item?.id || '').trim();
-          if (!rawId.startsWith('addon__')) return null;
-          const match = rawId.match(/^addon__(.+?)(?:__variant__(.+))?$/);
-          if (!match) return null;
-          return this.normalizeSelection({
-            productId: String(match[1] || ''),
-            variantId: String(match[2] || ''),
-            quantity: Math.max(1, Number(item?.quantity || 1))
-          }, catalog);
-        })
+        .map((item) => this.selectionFromCartItem(item, catalog))
         .filter(Boolean)
         .sort((a, b) => (
           a.productId.localeCompare(b.productId) ||
@@ -420,6 +433,15 @@
       }
       if (normalized.category) {
         customFields.push({ name: '_category', value: normalized.category });
+      }
+      if (normalized.scope) {
+        customFields.push({ name: '_addon_scope', value: normalized.scope });
+      }
+      if (normalized.campaignSlug) {
+        customFields.push({ name: '_addon_campaign_slug', value: normalized.campaignSlug });
+      }
+      if (normalized.campaignTitle) {
+        customFields.push({ name: '_addon_campaign_title', value: normalized.campaignTitle });
       }
 
       return {
@@ -503,6 +525,9 @@
           description: String(product?.description || ''),
           imageUrl: String(product?.image_url || ''),
           sourceUrl: String(product?.source_url || ''),
+          scope: String(product?.scope || 'platform'),
+          campaignSlug: String(product?.campaign_slug || ''),
+          campaignTitle: String(product?.campaign_title || ''),
           priceCents: Math.round(Number(product?.price || 0) * 100),
           category: String(product?.category || 'digital'),
           variantOptionName: String(product?.variant_option_name || 'Option'),
@@ -1204,6 +1229,10 @@
     return fields.some((field) => field?.name === '_category' && field?.value === 'physical');
   }
 
+  function getCartAddOnScope(selection) {
+    return String(selection?.scope || 'platform').trim().toLowerCase() || 'platform';
+  }
+
   function getPhysicalCampaignCount(items) {
     const slugs = new Set();
     for (const item of Array.isArray(items) ? items : []) {
@@ -1241,6 +1270,7 @@
   function getCampaignFallbackShippingCents(items, selectedAnchorSlug) {
     const fallbackByCampaign = new Map();
     const normalizedItems = Array.isArray(items) ? items : [];
+    const addOnSelections = getCartBundleAddOnSelections(normalizedItems);
     const physicalCampaignSlugs = new Set();
     for (const item of normalizedItems) {
       if (isAddOnCartItem(item)) continue;
@@ -1255,17 +1285,26 @@
       }
     }
 
-    const hasPhysicalAddOns = normalizedItems.some((item) => isAddOnCartItem(item) && firstPartyItemIsPhysical(item));
-    if (hasPhysicalAddOns) {
-      const resolvedAnchorSlug = resolveCartBundleAddOnAnchorCampaignSlug(normalizedItems, selectedAnchorSlug);
-      if (resolvedAnchorSlug && !fallbackByCampaign.has(resolvedAnchorSlug)) {
-        fallbackByCampaign.set(
-          resolvedAnchorSlug,
-          physicalCampaignSlugs.size === 0
-            ? getShippingFallbackFeeCents()
-            : getFallbackShippingCentsForCampaignSlug(normalizedItems, resolvedAnchorSlug)
-        );
+    let hasPhysicalPlatformAddOns = false;
+    for (const selection of addOnSelections) {
+      if (String(selection?.category || '').trim().toLowerCase() !== 'physical') continue;
+      if (getCartAddOnScope(selection) === 'campaign') {
+        const campaignSlug = String(selection?.campaignSlug || '').trim();
+        if (campaignSlug && !fallbackByCampaign.has(campaignSlug)) {
+          fallbackByCampaign.set(
+            campaignSlug,
+            physicalCampaignSlugs.has(campaignSlug)
+              ? getFallbackShippingCentsForCampaignSlug(normalizedItems, campaignSlug)
+              : getShippingFallbackFeeCents()
+          );
+        }
+      } else {
+        hasPhysicalPlatformAddOns = true;
       }
+    }
+
+    if (hasPhysicalPlatformAddOns) {
+      fallbackByCampaign.set('__platform__', getShippingFallbackFeeCents());
     }
 
     return Array.from(fallbackByCampaign.values()).reduce((sum, amount) => sum + amount, 0);
@@ -1482,10 +1521,54 @@
     return map;
   }
 
-  function getCartAddOnProductCards(items) {
-    return (addOnUtils.buildProductStateEntries
+  function isCampaignScopedAddOn(entry) {
+    return String(entry?.scope || '').trim().toLowerCase() === 'campaign';
+  }
+
+  function isPlatformScopedAddOn(entry) {
+    return !isCampaignScopedAddOn(entry);
+  }
+
+  function getAddOnCampaignSlug(entry) {
+    return String(entry?.campaignSlug || entry?.campaign_slug || '').trim();
+  }
+
+  function getAddOnCampaignTitle(entry) {
+    return String(entry?.campaignTitle || entry?.campaign_title || '').trim();
+  }
+
+  function getCartAddOnProductCards(items, filterFn) {
+    const productCards = addOnUtils.buildProductStateEntries
       ? addOnUtils.buildProductStateEntries(ADD_ON_CATALOG, getCartBundleAddOnSelections(items), addOnInventorySnapshot)
-      : []).filter((product) => !product.inCart);
+      : [];
+
+    return productCards.filter((product) => {
+      if (product.inCart) return false;
+      return typeof filterFn === 'function' ? filterFn(product) : true;
+    });
+  }
+
+  function getCartCampaignAddOnProductGroups(items) {
+    const campaignSlugs = new Set(getFirstPartyCampaignSlugs(items));
+    const groups = new Map();
+
+    getCartAddOnProductCards(items, (product) => (
+      isCampaignScopedAddOn(product) &&
+      campaignSlugs.has(getAddOnCampaignSlug(product))
+    )).forEach((product) => {
+      const campaignSlug = getAddOnCampaignSlug(product);
+      if (!campaignSlug) return;
+      if (!groups.has(campaignSlug)) {
+        groups.set(campaignSlug, {
+          slug: campaignSlug,
+          title: getAddOnCampaignTitle(product) || getCartCampaignDisplayName(items, campaignSlug),
+          products: []
+        });
+      }
+      groups.get(campaignSlug).products.push(product);
+    });
+
+    return Array.from(groups.values());
   }
 
   function getCartAddOnDraft(product) {
@@ -1589,6 +1672,82 @@
     return nextSelections;
   }
 
+  function renderCartAddOnProductGrid(products) {
+    return `
+      <div class="addon-product-grid">
+        ${products.map((product) => {
+          const draft = getCartAddOnDraft(product);
+          const selectedVariant = getCartAddOnSelectedVariant(product, draft);
+          const maxQuantity = Math.max(1, Number(selectedVariant?.maxQuantity ?? product.maxQuantity ?? 1));
+          const stockCopy = getCartAddOnStockCopy(product, selectedVariant);
+          const stockClass = (selectedVariant?.lowStock || product.lowStock)
+            ? 'addon-product-card__status addon-product-card__status--block addon-product-card__status--low-stock'
+            : 'addon-product-card__status addon-product-card__status--block';
+          const controlClasses = [
+            'addon-product-card__controls',
+            product.variants?.length ? 'addon-product-card__controls--with-variant' : ''
+          ].filter(Boolean).join(' ');
+          return `
+            <article class="addon-product-card" data-cart-addon-product="${escapeAttribute(product.productId)}" data-cart-addon-active="false">
+              ${product.imageUrl ? `
+                <div class="addon-product-card__media">
+                  <img class="addon-product-card__image" src="${escapeAttribute(product.imageUrl)}" alt="" loading="lazy" decoding="async">
+                </div>
+              ` : ''}
+              <div class="addon-product-card__main">
+                <div class="addon-product-card__header">
+                  <strong class="addon-product-card__name">${escapeHtml(product.name)}</strong>
+                  <span class="addon-product-card__price">${formatCents(product.priceCents || 0)}</span>
+                </div>
+                ${product.description ? `<p class="addon-product-card__description">${escapeHtml(product.description)}</p>` : ''}
+              </div>
+              <p class="${stockClass}" data-cart-addon-status aria-live="polite" ${stockCopy ? '' : 'hidden'}>${escapeHtml(stockCopy)}</p>
+              <div class="${controlClasses}">
+                ${product.variants?.length ? `
+                  <div class="addon-product-card__field addon-product-card__field--variant">
+                    <select
+                      id="pool-cart-addon-variant-${escapeAttribute(product.productId)}"
+                      class="pool-first-party-cart__input pool-first-party-cart__input--select"
+                      aria-label="${escapeAttribute(product.variantOptionName || getRuntimeMessage('cart.addOnVariant', 'Variation'))}"
+                      data-cart-addon-variant
+                      data-addon-product-id="${escapeAttribute(product.productId)}"
+                    >
+                      ${renderCartAddOnVariantOptions(product, selectedVariant?.id || '')}
+                    </select>
+                  </div>
+                ` : ''}
+                <div class="addon-product-card__field addon-product-card__field--qty">
+                  <input
+                    id="pool-cart-addon-qty-${escapeAttribute(product.productId)}"
+                    class="pool-first-party-cart__input pool-first-party-cart__input--addon-qty"
+                    type="number"
+                    min="1"
+                    max="${escapeAttribute(String(maxQuantity))}"
+                    step="1"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    aria-label="${escapeAttribute(getRuntimeMessage('cart.quantity', 'Quantity'))}"
+                    value="${escapeAttribute(String(Math.min(maxQuantity, Math.max(1, Number(draft.quantity || 1)))))}"
+                    data-cart-addon-product-quantity
+                    data-addon-product-id="${escapeAttribute(product.productId)}"
+                  >
+                </div>
+              </div>
+              <div class="addon-product-card__footer">
+                <button
+                  type="button"
+                  class="btn btn--secondary addon-product-card__button"
+                  data-cart-addon-add
+                  data-addon-product-id="${escapeAttribute(product.productId)}"
+                >${escapeHtml(getRuntimeMessage('cart.addToCart', 'Add to cart'))}</button>
+              </div>
+            </article>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
   function renderCartAddOnSection(items, selectedAnchorSlug) {
     if (!ADD_ON_CATALOG.enabled || !ADD_ON_CATALOG.products?.length || !cartHasPledgeItems(items)) {
       return '';
@@ -1596,103 +1755,55 @@
     void ensureCartAddOnInventorySnapshot();
     const anchorOptions = getCartBundleAddOnAnchorOptions(items);
     const resolvedAnchorSlug = resolveCartBundleAddOnAnchorCampaignSlug(items, selectedAnchorSlug);
-    const productCards = getCartAddOnProductCards(items);
+    const platformProductCards = getCartAddOnProductCards(items, isPlatformScopedAddOn);
+    const campaignProductGroups = getCartCampaignAddOnProductGroups(items);
     const supportNote = getRuntimeMessage(
       'cart.platformAddOnsNote',
       'These add-ons support %{author} and do not count toward the campaign total.'
     ).replace('%{author}', getPlatformAuthorName());
 
-    if (productCards.length === 0) {
+    if (platformProductCards.length === 0 && campaignProductGroups.length === 0) {
       return '';
     }
 
-    return `
-      <section class="pool-first-party-cart__callout pool-first-party-cart__callout--addons">
-        <p class="pool-first-party-cart__section-label">${escapeHtml(
-          getRuntimeMessage('cart.platformAddOns', 'Add-ons').replace('%{platform}', getPlatformName())
-        )}</p>
-        <p class="pool-first-party-cart__note">${escapeHtml(supportNote)}</p>
-        ${anchorOptions.length > 1 ? `
-          <div class="pool-first-party-cart__field pool-first-party-cart__field--summary">
-            <label class="pool-first-party-cart__field-label" for="pool-cart-addon-anchor">${escapeHtml(getRuntimeMessage('cart.addOnAnchorCampaign', 'Attach add-ons to'))}</label>
-            <select id="pool-cart-addon-anchor" class="pool-first-party-cart__input pool-first-party-cart__input--select" data-cart-addon-anchor>
-              ${renderCartBundleAddOnAnchorOptions(items, resolvedAnchorSlug)}
-            </select>
-          </div>
-        ` : ''}
-        <div class="addon-product-grid">
-          ${productCards.map((product) => {
-            const draft = getCartAddOnDraft(product);
-            const selectedVariant = getCartAddOnSelectedVariant(product, draft);
-            const maxQuantity = Math.max(1, Number(selectedVariant?.maxQuantity ?? product.maxQuantity ?? 1));
-            const stockCopy = getCartAddOnStockCopy(product, selectedVariant);
-            const stockClass = (selectedVariant?.lowStock || product.lowStock)
-              ? 'addon-product-card__status addon-product-card__status--block addon-product-card__status--low-stock'
-              : 'addon-product-card__status addon-product-card__status--block';
-            const controlClasses = [
-              'addon-product-card__controls',
-              product.variants?.length ? 'addon-product-card__controls--with-variant' : ''
-            ].filter(Boolean).join(' ');
-            return `
-              <article class="addon-product-card" data-cart-addon-product="${escapeAttribute(product.productId)}" data-cart-addon-active="false">
-                ${product.imageUrl ? `
-                  <div class="addon-product-card__media">
-                    <img class="addon-product-card__image" src="${escapeAttribute(product.imageUrl)}" alt="" loading="lazy" decoding="async">
-                  </div>
-                ` : ''}
-                <div class="addon-product-card__main">
-                  <div class="addon-product-card__header">
-                    <strong class="addon-product-card__name">${escapeHtml(product.name)}</strong>
-                    <span class="addon-product-card__price">${formatCents(product.priceCents || 0)}</span>
-                  </div>
-                  ${product.description ? `<p class="addon-product-card__description">${escapeHtml(product.description)}</p>` : ''}
-                </div>
-                <p class="${stockClass}" data-cart-addon-status aria-live="polite" ${stockCopy ? '' : 'hidden'}>${escapeHtml(stockCopy)}</p>
-                <div class="${controlClasses}">
-                  ${product.variants?.length ? `
-                    <div class="addon-product-card__field addon-product-card__field--variant">
-                      <select
-                        id="pool-cart-addon-variant-${escapeAttribute(product.productId)}"
-                        class="pool-first-party-cart__input pool-first-party-cart__input--select"
-                        aria-label="${escapeAttribute(product.variantOptionName || getRuntimeMessage('cart.addOnVariant', 'Variation'))}"
-                        data-cart-addon-variant
-                        data-addon-product-id="${escapeAttribute(product.productId)}"
-                      >
-                        ${renderCartAddOnVariantOptions(product, selectedVariant?.id || '')}
-                      </select>
-                    </div>
-                  ` : ''}
-                  <div class="addon-product-card__field addon-product-card__field--qty">
-                    <input
-                      id="pool-cart-addon-qty-${escapeAttribute(product.productId)}"
-                      class="pool-first-party-cart__input pool-first-party-cart__input--addon-qty"
-                      type="number"
-                      min="1"
-                      max="${escapeAttribute(String(maxQuantity))}"
-                      step="1"
-                      inputmode="numeric"
-                      pattern="[0-9]*"
-                      aria-label="${escapeAttribute(getRuntimeMessage('cart.quantity', 'Quantity'))}"
-                      value="${escapeAttribute(String(Math.min(maxQuantity, Math.max(1, Number(draft.quantity || 1)))))}"
-                      data-cart-addon-product-quantity
-                      data-addon-product-id="${escapeAttribute(product.productId)}"
-                    >
-                  </div>
-                </div>
-                <div class="addon-product-card__footer">
-                  <button
-                    type="button"
-                    class="btn btn--secondary addon-product-card__button"
-                    data-cart-addon-add
-                    data-addon-product-id="${escapeAttribute(product.productId)}"
-                  >${escapeHtml(getRuntimeMessage('cart.addToCart', 'Add to cart'))}</button>
-                </div>
-              </article>
-            `;
-          }).join('')}
-        </div>
-      </section>
-    `;
+    const sections = [];
+
+    if (platformProductCards.length > 0) {
+      sections.push(`
+        <section class="pool-first-party-cart__callout pool-first-party-cart__callout--addons">
+          <p class="pool-first-party-cart__section-label">${escapeHtml(
+            getRuntimeMessage('cart.platformAddOns', 'Add-ons').replace('%{platform}', getPlatformName())
+          )}</p>
+          <p class="pool-first-party-cart__note">${escapeHtml(supportNote)}</p>
+          ${anchorOptions.length > 1 ? `
+            <div class="pool-first-party-cart__field pool-first-party-cart__field--summary">
+              <label class="pool-first-party-cart__field-label" for="pool-cart-addon-anchor">${escapeHtml(getRuntimeMessage('cart.addOnAnchorCampaign', 'Attach add-ons to'))}</label>
+              <select id="pool-cart-addon-anchor" class="pool-first-party-cart__input pool-first-party-cart__input--select" data-cart-addon-anchor>
+                ${renderCartBundleAddOnAnchorOptions(items, resolvedAnchorSlug)}
+              </select>
+            </div>
+          ` : ''}
+          ${renderCartAddOnProductGrid(platformProductCards)}
+        </section>
+      `);
+    }
+
+    if (campaignProductGroups.length > 0) {
+      const showGroupTitles = campaignProductGroups.length > 1;
+      sections.push(`
+        <section class="pool-first-party-cart__callout pool-first-party-cart__callout--addons">
+          <p class="pool-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.campaignAddOns', 'Campaign Add-ons'))}</p>
+          ${campaignProductGroups.map((group) => `
+            <div class="pool-first-party-cart__field pool-first-party-cart__field--summary">
+              ${showGroupTitles ? `<p class="pool-first-party-cart__field-label">${escapeHtml(group.title)}</p>` : ''}
+              ${renderCartAddOnProductGrid(group.products)}
+            </div>
+          `).join('')}
+        </section>
+      `);
+    }
+
+    return sections.join('');
   }
 
   function getCurrentPath() {
@@ -2098,8 +2209,21 @@
 
   function coerceBundleAddOnCartItems(items) {
     const nextItems = Array.isArray(items) ? items : [];
-    if (cartHasPledgeItems(nextItems)) return nextItems;
-    return nextItems.filter((item) => !isAddOnCartItem(item));
+    if (!cartHasPledgeItems(nextItems)) {
+      return nextItems.filter((item) => !isAddOnCartItem(item));
+    }
+
+    const campaignSlugs = new Set(getFirstPartyCampaignSlugs(nextItems));
+    return nextItems.filter((item) => {
+      if (!isAddOnCartItem(item)) return true;
+      const selection = addOnUtils.selectionFromCartItem
+        ? addOnUtils.selectionFromCartItem(item, ADD_ON_CATALOG)
+        : null;
+      if (!selection) return true;
+      if (!isCampaignScopedAddOn(selection)) return true;
+      const campaignSlug = getAddOnCampaignSlug(selection);
+      return Boolean(campaignSlug) && campaignSlugs.has(campaignSlug);
+    });
   }
 
   function buildFirstPartyCheckoutPayload(state) {

@@ -227,9 +227,9 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
-      'supporter@example.com,smoke-editable,One Frame,,10.00,0.00,10.00,5,0.50,0.79,0.00,11.29,',
-      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,'
+      'email,campaign,fulfiller,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
+      'supporter@example.com,smoke-editable,smoke-editable,One Frame,,10.00,0.00,10.00,5,0.50,0.79,0.00,11.29,',
+      'supporter@example.com,sunder,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,'
     ]);
   });
 
@@ -494,8 +494,8 @@ describe('pledge and fulfillment reports', () => {
     );
 
     expect(lines).toEqual([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
-      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,'
+      'email,campaign,fulfiller,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
+      'supporter@example.com,sunder,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,'
     ]);
   });
 
@@ -511,8 +511,8 @@ describe('pledge and fulfillment reports', () => {
         goalTrackingSubtotal: 2500,
         bundleAddOnSubtotal: 2500,
         bundleAddOns: [
-          { productId: 'dust-wave-sticker', name: 'DUST WAVE Sticker', quantity: 2, unitPrice: 500 },
-          { productId: 'dust-wave-tshirt', name: 'DUST WAVE T-Shirt', variantLabel: 'M', quantity: 1, unitPrice: 1500 }
+          { productId: 'dust-wave-sticker', name: 'DUST WAVE Sticker', quantity: 2, unitPrice: 500, scope: 'platform' },
+          { productId: 'dust-wave-tshirt', name: 'DUST WAVE T-Shirt', variantLabel: 'M', quantity: 1, unitPrice: 1500, scope: 'platform' }
         ],
         tipPercent: 5,
         tipAmount: 250,
@@ -541,8 +541,8 @@ describe('pledge and fulfillment reports', () => {
         goalTrackingSubtotal: 2500,
         bundleAddOnSubtotal: 2500,
         bundleAddOns: [
-          { productId: 'dust-wave-sticker', name: 'DUST WAVE Sticker', quantity: 2, unitPrice: 500 },
-          { productId: 'dust-wave-tshirt', name: 'DUST WAVE T-Shirt', variantLabel: 'M', quantity: 1, unitPrice: 1500 }
+          { productId: 'dust-wave-sticker', name: 'DUST WAVE Sticker', quantity: 2, unitPrice: 500, scope: 'platform' },
+          { productId: 'dust-wave-tshirt', name: 'DUST WAVE T-Shirt', variantLabel: 'M', quantity: 1, unitPrice: 1500, scope: 'platform' }
         ],
         tipPercent: 5,
         tipAmount: 250,
@@ -562,8 +562,9 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
-      'supporter@example.com,sunder,Handheld Prop,DUST WAVE Sticker x2; DUST WAVE T-Shirt (M),25.00,25.00,50.00,5,2.50,3.94,3.00,59.44,\"Supporter Example, 123 Example St, Denver, CO, 80205, US\"'
+      'email,campaign,fulfiller,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
+      'supporter@example.com,,Dust Wave,,DUST WAVE Sticker x2; DUST WAVE T-Shirt (M),0.00,25.00,25.00,5,1.25,1.97,1.50,29.72,\"Supporter Example, 123 Example St, Denver, CO, 80205, US\"',
+      'supporter@example.com,sunder,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,1.50,29.72,\"Supporter Example, 123 Example St, Denver, CO, 80205, US\"'
     ]);
   });
 
@@ -579,7 +580,7 @@ describe('pledge and fulfillment reports', () => {
         goalTrackingSubtotal: 1000,
         bundleAddOnSubtotal: 2500,
         bundleAddOns: [
-          { productId: 'dust-wave-butterfingers', name: 'DUST WAVE Butterfingers T-Shirt', variantLabel: 'XS', quantity: 1, unitPrice: 2500 }
+          { productId: 'dust-wave-butterfingers', name: 'DUST WAVE Butterfingers T-Shirt', variantLabel: 'XS', quantity: 1, unitPrice: 2500, scope: 'platform' }
         ],
         tipPercent: 7,
         tipAmount: 245,
@@ -599,8 +600,91 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
-      'supporter@example.com,sunder,Handheld Prop,DUST WAVE Butterfingers T-Shirt (XS),10.00,25.00,35.00,7,2.45,2.76,3.00,43.21,\"Supporter Example, 123 Example St, Denver, CO, 80205, US\"'
+      'email,campaign,fulfiller,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
+      'supporter@example.com,,Dust Wave,,DUST WAVE Butterfingers T-Shirt (XS),0.00,25.00,25.00,7,1.75,1.98,2.15,30.88,\"Supporter Example, 123 Example St, Denver, CO, 80205, US\"',
+      'supporter@example.com,sunder,sunder,Handheld Prop,,10.00,0.00,10.00,7,0.70,0.78,0.85,12.33,\"Supporter Example, 123 Example St, Denver, CO, 80205, US\"'
+    ]);
+  });
+
+  it('counts campaign add-ons toward campaign subtotal in pledge-report output', () => {
+    const lines = runReportScript('pledge-report.sh', {
+      'pledge:pool-intent-campaign-add-on-1': buildPledge({
+        orderId: 'pool-intent-campaign-add-on-1',
+        email: 'supporter@example.com',
+        campaignSlug: 'smoke-editable',
+        tierId: 'frame',
+        tierQty: 1,
+        subtotal: 1600,
+        goalTrackingSubtotal: 1600,
+        bundleAddOnSubtotal: 600,
+        bundleAddOns: [
+          {
+            productId: 'smoke-editable__first-time-sexpot-condom-pack',
+            name: 'First Time Sexpot Condom Pack',
+            quantity: 1,
+            unitPrice: 600,
+            scope: 'campaign',
+            campaignSlug: 'smoke-editable',
+            campaignTitle: 'SMOKE EDITABLE'
+          }
+        ],
+        tipPercent: 5,
+        tipAmount: 80,
+        tax: 126,
+        shipping: 300,
+        amount: 2106,
+        createdAt: '2026-04-06T12:00:00.000Z'
+      })
+    });
+
+    expect(lines).toEqual([
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
+      'supporter@example.com,smoke-editable,One Frame,First Time Sexpot Condom Pack,16.00,0.00,16.00,5,0.80,1.26,3.00,21.06,created,no,2026-04-06T12:00:00.000Z,pool-intent-campaign-add-on-1'
+    ]);
+  });
+
+  it('lists campaign add-ons under the campaign fulfiller in fulfillment-report output', () => {
+    const lines = runReportScript('fulfillment-report.sh', {
+      'pledge:pool-intent-campaign-add-on-1': buildPledge({
+        orderId: 'pool-intent-campaign-add-on-1',
+        email: 'supporter@example.com',
+        campaignSlug: 'smoke-editable',
+        tierId: 'frame',
+        tierQty: 1,
+        subtotal: 1600,
+        goalTrackingSubtotal: 1600,
+        bundleAddOnSubtotal: 600,
+        bundleAddOns: [
+          {
+            productId: 'smoke-editable__first-time-sexpot-poster',
+            name: 'First Time Sexpot Poster',
+            quantity: 1,
+            unitPrice: 600,
+            scope: 'campaign',
+            campaignSlug: 'smoke-editable',
+            campaignTitle: 'SMOKE EDITABLE'
+          }
+        ],
+        tipPercent: 5,
+        tipAmount: 80,
+        tax: 126,
+        shipping: 300,
+        amount: 2106,
+        shippingAddress: {
+          name: 'Supporter Example',
+          address1: '123 Example St',
+          city: 'Denver',
+          province: 'CO',
+          postalCode: '80205',
+          country: 'US'
+        },
+        createdAt: '2026-04-06T12:00:00.000Z'
+      })
+    });
+
+    expect(lines).toEqual([
+      'email,campaign,fulfiller,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,shipping_address',
+      'supporter@example.com,smoke-editable,smoke-editable,One Frame,First Time Sexpot Poster,16.00,0.00,16.00,5,0.80,1.26,3.00,21.06,\"Supporter Example, 123 Example St, Denver, CO, 80205, US\"'
     ]);
   });
 });
