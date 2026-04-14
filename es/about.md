@@ -44,6 +44,7 @@ Para el acceso a la comunidad de patrocinadores, The Pool mantiene la sesión ve
 1. **Explora**: encuentra un proyecto que quieras apoyar
 2. **Aporta**: añade una o más campañas a tu carrito, añade opcionalmente una propina del 0% al 15% para el mantenimiento de la plataforma y continúa al paso de pago seguro de The Pool con Stripe. Las recompensas físicas pueden añadir envío calculado por el Worker durante el pago, incluidas cotizaciones respaldadas por USPS, tarifas de respaldo configuradas u opciones de envío gratis cuando una implementación las habilita.
    También puedes ver complementos opcionales de la plataforma. Esos complementos apoyan directamente a Dust Wave, no cuentan para la meta de financiación de una campaña y pueden ser digitales o físicos. Cuando su inventario es limitado, el stock refleja los aportes guardados, no los carritos en curso.
+   Algunas campañas también pueden ofrecer complementos de campaña. Esos complementos usan la misma interfaz de tarjetas de complementos, pero sí cuentan para el total de financiación de esa campaña y siguen las reglas de envío de esa campaña.
 3. **Guarda la tarjeta**: Stripe guarda de forma segura tu método de pago dentro de ese flujo (todavía no se realiza ningún cobro)
 4. **Espera**: la campaña continúa hasta su fecha límite (todas las horas están en horario de montaña)
 5. **Resultado**: si una campaña se financia, se cobra tu aporte para esa campaña. Si no, no pasa nada.
@@ -58,6 +59,7 @@ The Pool está diseñado para cineastas y otros creativos, con funciones como:
 - **Pago de primera parte**: The Pool controla el carrito, los sidecars de pago y el flujo de revisión del aporte, mientras Stripe gestiona de forma segura los datos del pago
 - **Niveles físicos y digitales**: ofrece recompensas tangibles con captura de dirección de envío durante el pago, soporte para cotizaciones respaldadas por USPS, controles de política de envío de respaldo o gratuito, e impuesto sobre ventas configurable
 - **Complementos opcionales de la plataforma**: ofrece un pequeño catálogo global de merch junto con los aportes de campaña, con inventario por variante, avisos de poco stock basados en aportes guardados y soporte de envío para complementos físicos
+- **Complementos opcionales de campaña**: permite que una campaña ofrezca merch propio mediante la misma interfaz de complementos en carrito y Gestionar aporte, mientras ese merch sigue contando para el subtotal de la campaña y usa sus reglas de envío
 - **Fases de producción**: divide tu presupuesto en fases que los patrocinadores puedan financiar directamente
 - **Metas ampliadas**: desbloquea posibilidades creativas adicionales a medida que crece la financiación
 - **Decisiones comunitarias**: permite que tus patrocinadores voten sobre decisiones creativas publicadas

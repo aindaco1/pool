@@ -1469,6 +1469,46 @@ test.describe('Checkout Flow', () => {
     await expect(page.locator('[data-cart-custom-shipping-option]')).toHaveCount(0);
   });
 
+  test('mixed digital and physical campaign selections still show shipping in the cart summary', async ({ page }) => {
+    await page.goto('/campaigns/smoke-editable/');
+    const smokeButton = page.locator('[data-item-id="smoke-editable__standard-pass"]').first();
+    await expect(smokeButton).toBeVisible();
+    await smokeButton.click();
+
+    await page.goto('/campaigns/sunder/');
+    const sunderButton = page.locator('[data-item-id="sunder__physical-media"]').first();
+    await expect(sunderButton).toBeVisible();
+    await sunderButton.click();
+
+    await openCartViaClient(page);
+    await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Shipping');
+    await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('$3.00');
+  });
+
+  test('campaign add-ons keep the campaign shipping override in mixed carts', async ({ page }) => {
+    await page.goto('/campaigns/smoke-editable/');
+    const smokeButton = page.locator('[data-item-id="smoke-editable__standard-pass"]').first();
+    await expect(smokeButton).toBeVisible();
+    await smokeButton.click();
+
+    await openCartViaClient(page);
+    const campaignAddOnButton = page.locator('[data-cart-addon-add][data-addon-product-id="smoke-editable__first-time-sexpot-poster"]');
+    await expect(campaignAddOnButton).toBeVisible();
+    await campaignAddOnButton.click();
+
+    await page.goto('/campaigns/sunder/');
+    const sunderButton = page.locator('[data-item-id="sunder__physical-media"]').first();
+    await expect(sunderButton).toBeVisible();
+    await sunderButton.click();
+
+    await openCartViaClient(page);
+    await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Shipping');
+    await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('$15.00');
+    await page.locator('[data-cart-continue]').click();
+    await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toContainText('Shipping');
+    await expect(page.locator('[data-cart-checkout-summary-shipping]')).toHaveText('$15.00');
+  });
+
   test('custom on-site checkout supports keyboard-only activation through save', async ({ page }) => {
     test.setTimeout(60_000);
 

@@ -359,7 +359,15 @@ describe('cart provider shim', () => {
       checkoutProvider: 'first_party',
       checkoutUiMode: 'hosted',
       workerBase: WORKER_BASE,
-      addOns: ADD_ON_CONFIG
+      addOns: ADD_ON_CONFIG,
+      i18n: {
+        currentLang: 'es',
+        messages: {
+          cart: {
+            campaignAddOns: 'Complementos de la campaña'
+          }
+        }
+      }
     };
 
     document.body.innerHTML = '<div data-pool-cart-root="true"></div>';
@@ -380,7 +388,7 @@ describe('cart provider shim', () => {
     await readyApi.api.theme.cart.open();
 
     const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
-    expect(root?.textContent).toContain('Campaign Add-ons');
+    expect(root?.textContent).toContain('Complementos de la campaña');
     expect(root?.textContent).toContain('First Time Sexpot Poster');
 
     const addButton = root?.querySelector('[data-cart-addon-add][data-addon-product-id="smoke-editable__first-time-sexpot-poster"]') as HTMLButtonElement | null;
@@ -405,6 +413,53 @@ describe('cart provider shim', () => {
         })
       ])
     );
+  });
+
+  it('localizes hosted checkout next-step copy from runtime messages', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'hosted',
+      workerBase: WORKER_BASE,
+      i18n: {
+        currentLang: 'es',
+        messages: {
+          cart: {
+            nextStep: 'Próximo paso',
+            hostedCheckoutNote: 'Continúa al pago seguro para terminar tu aporte.'
+          }
+        }
+      }
+    };
+
+    document.body.innerHTML = '<button id="cart-opener" type="button">Open cart</button><div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await clearProviderCart(provider);
+    await readyApi.api.cart.items.add({
+      id: 'demo__drawer-item',
+      name: 'Drawer Item',
+      price: 20,
+      quantity: 1,
+      url: '/campaigns/demo/'
+    });
+
+    const opener = document.getElementById('cart-opener') as HTMLButtonElement | null;
+    if (!opener) throw new Error('Missing cart opener');
+    await readyApi.api.theme.cart.open(opener);
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      expect(root?.textContent).toContain('Próximo paso');
+      expect(root?.textContent).toContain('Continúa al pago seguro para terminar tu aporte.');
+    });
   });
 
   it('updates add-on stock messaging when the selected variant changes and keeps the card compact', async () => {
@@ -609,7 +664,7 @@ describe('cart provider shim', () => {
       const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
       const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
       const totalAmount = root?.querySelector('[data-cart-checkout-summary-total]');
-      expect(shippingLabel?.textContent).toContain('Shipping');
+      expect(shippingLabel?.textContent || '').toContain('Shipping');
       expect(shippingAmount?.textContent).toBe('$3.00');
       expect(totalAmount?.textContent).toBe('$17.67');
     });
@@ -675,7 +730,7 @@ describe('cart provider shim', () => {
     await vi.waitFor(() => {
       const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
       const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
-      expect(shippingLabel?.textContent).toContain('Shipping');
+      expect(shippingLabel?.textContent || '').toContain('Shipping');
       expect(shippingAmount?.textContent).toBe('$3.00');
       expect(root?.textContent).not.toContain('$12.00');
     });
@@ -741,6 +796,77 @@ describe('cart provider shim', () => {
     await vi.waitFor(() => {
       const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
       expect(shippingAmount?.textContent).toBe('$15.00');
+    });
+  });
+
+  it('uses the campaign shipping override for physical campaign add-ons in digital-only carts', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE,
+      shipping: {
+        fallback_flat_rate: 3
+      },
+      addOns: ADD_ON_CONFIG
+    };
+
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL) => {
+      throw new Error('No shipping quote expected before address completion');
+    }));
+    (window as any).PoolStripeCheckoutSidecar = {
+      mount: vi.fn(async () => ({
+        supportsLinkAuthenticationElement: false,
+        supportsShippingAddressElement: false,
+        updateEmail: vi.fn(async () => ({})),
+        updateShippingAddress: vi.fn(async () => ({})),
+        confirm: vi.fn(async () => ({ type: 'success' })),
+        unmount: vi.fn()
+      })),
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe)
+    };
+    (window as any).Stripe = vi.fn();
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__standard-pass',
+      name: 'SMOKE EDITABLE — Standard Pass',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      campaignShippingFallbackCents: 1200
+    });
+    await readyApi.api.cart.items.add({
+      id: 'addon__smoke-editable__first-time-sexpot-poster',
+      name: 'First Time Sexpot Poster',
+      price: 35,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: true,
+      customFields: [
+        { name: '_category', value: 'physical' },
+        { name: '_addon_scope', value: 'campaign' },
+        { name: '_addon_campaign_slug', value: 'smoke-editable' },
+        { name: '_addon_campaign_title', value: 'SMOKE EDITABLE' }
+      ]
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
+      const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
+      expect(shippingLabel?.textContent || '').toContain('Shipping');
+      expect(shippingAmount?.textContent).toBe('$12.00');
     });
   });
 
@@ -2151,7 +2277,7 @@ describe('cart provider shim', () => {
     });
 
     await vi.waitFor(() => {
-      expect(sessionStorage.getItem('pool_active_custom_checkout_order_id')).toContain('"value":"pool-intent-custom-back-123"');
+      expect(sessionStorage.getItem('pool_active_custom_checkout_order_id') || '').toContain('"value":"pool-intent-custom-back-123"');
     });
 
     const backButton = root?.querySelector('[data-cart-back]') as HTMLButtonElement | null;
@@ -2760,8 +2886,314 @@ describe('cart provider shim', () => {
     await vi.waitFor(() => {
       const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
       const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
-      expect(shippingLabel?.textContent).toContain('Shipping');
+      expect(shippingLabel?.textContent || '').toContain('Shipping');
       expect(shippingAmount?.textContent).toBe('$12.00');
+    });
+  });
+
+  it('shows fallback shipping in the sidecar for mixed digital and physical campaign selections', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      workerBase: WORKER_BASE
+    };
+
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'hand-relations__frame-slot',
+      name: 'Hand Relations Digital Tier',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/hand-relations/',
+      shippable: false
+    });
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__support__signed-script',
+      name: 'SMOKE EDITABLE — Signed Script',
+      price: 25,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/#support-signed-script',
+      shippable: true,
+      campaignShippingFallbackCents: 1200
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-summary-shipping-label]');
+      const shippingAmount = root?.querySelector('[data-cart-summary-shipping]');
+      expect(shippingLabel?.textContent || '').toContain('Shipping');
+      expect(shippingAmount?.textContent).toBe('$12.00');
+    });
+  });
+
+  it('does not treat missing campaign shipping overrides as free shipping when adding from campaign buttons', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      workerBase: WORKER_BASE
+    };
+
+    document.body.innerHTML = `
+      <div data-pool-cart-root="true" hidden></div>
+      <button
+        class="poolcart-add-item"
+        data-item-id="sunder__physical-media"
+        data-item-name="sunder — physical media"
+        data-item-price="35"
+        data-item-url="/campaigns/sunder/"
+        data-item-description="Physical media"
+        data-item-stackable="never"
+        data-item-max-quantity="1"
+        data-item-shippable="false"
+        data-item-custom1-name="_category"
+        data-item-custom1-type="hidden"
+        data-item-custom1-value="physical"
+        type="button"
+      >
+        Add
+      </button>
+    `;
+
+    await import('../../assets/js/cart-provider.js');
+
+    const button = document.querySelector('.poolcart-add-item') as HTMLButtonElement | null;
+    if (!button) throw new Error('Missing add item button');
+    button.click();
+    await Promise.resolve();
+
+    const provider = (window as any).PoolCartProvider;
+    const item = provider.store.getState().cart.items.items[0];
+    expect(item?.campaignShippingFallbackCents).toBeUndefined();
+  });
+
+  it('preserves campaign shipping override metadata across persisted cart reloads', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      workerBase: WORKER_BASE,
+      addOns: ADD_ON_CONFIG
+    };
+
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    let provider = (window as any).PoolCartProvider;
+    let readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__standard-pass',
+      name: 'SMOKE EDITABLE — Standard Pass',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: false,
+      campaignShippingFallbackCents: 1200
+    });
+    await readyApi.api.cart.items.add({
+      id: 'addon__smoke-editable__first-time-sexpot-poster',
+      name: 'First Time Sexpot Poster',
+      price: 35,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: true,
+      customFields: [
+        { name: '_category', value: 'physical' },
+        { name: '_addon_scope', value: 'campaign' },
+        { name: '_addon_campaign_slug', value: 'smoke-editable' },
+        { name: '_addon_campaign_title', value: 'SMOKE EDITABLE' }
+      ]
+    });
+    await readyApi.api.cart.items.add({
+      id: 'sunder__some-goodies',
+      name: 'sunder — some goodies',
+      price: 20,
+      quantity: 1,
+      url: '/campaigns/sunder/',
+      shippable: false,
+      customFields: [
+        { name: '_category', value: 'digital' }
+      ]
+    });
+
+    const persisted = JSON.parse(localStorage.getItem('pool_first_party_cart_state') || '{}');
+    expect(persisted.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'smoke-editable__standard-pass',
+        campaignShippingFallbackCents: 1200
+      })
+    ]));
+
+    vi.resetModules();
+    delete (window as any).PoolCartProvider;
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    provider = (window as any).PoolCartProvider;
+    readyApi = await provider.whenReady();
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-summary-shipping-label]');
+      const shippingAmount = root?.querySelector('[data-cart-summary-shipping]');
+      expect(shippingLabel?.textContent || '').toContain('Shipping');
+      expect(shippingAmount?.textContent).toBe('$12.00');
+    });
+  });
+
+  it('uses the campaign shipping override for campaign add-ons in mixed carts', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE,
+      shipping: {
+        fallback_flat_rate: 3
+      },
+      addOns: ADD_ON_CONFIG
+    };
+
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL) => {
+      throw new Error('No shipping quote expected before address completion');
+    }));
+    (window as any).PoolStripeCheckoutSidecar = {
+      mount: vi.fn(async () => ({
+        supportsLinkAuthenticationElement: false,
+        supportsShippingAddressElement: false,
+        updateEmail: vi.fn(async () => ({})),
+        updateShippingAddress: vi.fn(async () => ({})),
+        confirm: vi.fn(async () => ({ type: 'success' })),
+        unmount: vi.fn()
+      })),
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe)
+    };
+    (window as any).Stripe = vi.fn();
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'hand-relations__frame-slot',
+      name: 'Hand Relations Digital Tier',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/hand-relations/',
+      shippable: false
+    });
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__standard-pass',
+      name: 'SMOKE EDITABLE — Standard Pass',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: false,
+      campaignShippingFallbackCents: 1200
+    });
+    await readyApi.api.cart.items.add({
+      id: 'addon__smoke-editable__first-time-sexpot-poster',
+      name: 'First Time Sexpot Poster',
+      price: 35,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: true,
+      customFields: [
+        { name: '_category', value: 'physical' },
+        { name: '_addon_scope', value: 'campaign' },
+        { name: '_addon_campaign_slug', value: 'smoke-editable' },
+        { name: '_addon_campaign_title', value: 'SMOKE EDITABLE' }
+      ]
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
+      const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
+      expect(shippingLabel?.textContent || '').toContain('Shipping');
+      expect(shippingAmount?.textContent).toBe('$12.00');
+    });
+  });
+
+  it('shows combined shipping in the sidecar for campaign add-ons in mixed carts after cross-page persistence', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      workerBase: WORKER_BASE,
+      addOns: ADD_ON_CONFIG
+    };
+
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    let provider = (window as any).PoolCartProvider;
+    let readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__standard-pass',
+      name: 'SMOKE EDITABLE — Standard Pass',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: false,
+      campaignShippingFallbackCents: 1200
+    });
+    await readyApi.api.cart.items.add({
+      id: 'addon__smoke-editable__first-time-sexpot-poster',
+      name: 'First Time Sexpot Poster',
+      price: 35,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: true,
+      customFields: [
+        { name: '_category', value: 'physical' },
+        { name: '_addon_scope', value: 'campaign' },
+        { name: '_addon_campaign_slug', value: 'smoke-editable' },
+        { name: '_addon_campaign_title', value: 'SMOKE EDITABLE' }
+      ]
+    });
+    await readyApi.api.cart.items.add({
+      id: 'sunder__physical-media',
+      name: 'sunder — physical media',
+      price: 35,
+      quantity: 1,
+      url: '/campaigns/sunder/',
+      shippable: false,
+      customFields: [
+        { name: '_category', value: 'physical' }
+      ]
+    });
+
+    vi.resetModules();
+    delete (window as any).PoolCartProvider;
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    provider = (window as any).PoolCartProvider;
+    readyApi = await provider.whenReady();
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    await vi.waitFor(() => {
+      const shippingLabel = root?.querySelector('[data-cart-summary-shipping-label]');
+      const shippingAmount = root?.querySelector('[data-cart-summary-shipping]');
+      expect(shippingLabel?.textContent || '').toContain('Shipping');
+      expect(shippingAmount?.textContent).toBe('$15.00');
     });
   });
 

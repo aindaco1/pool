@@ -14,6 +14,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Tip-aware cart + checkout** — Shared pricing logic keeps subtotal, tip, tax, shipping, and total in sync across cart, checkout, Worker, reports, and emails
 - **USPS-backed shipping quotes with fallback guardrails** — Physical checkout and modify flows can quote USPS domestic/international shipping, fall back safely to configured flat rates, and support optional domestic signature upgrades without pushing quote churn into KV
 - **Platform add-ons with inventory awareness** — Bundle-level merch add-ons can be attached to a checkout, stay editable in Manage Pledge, support per-variant stock, and ride the same canonical shipping/reporting/email flow without counting toward campaign funding goals
+- **Campaign add-ons with campaign-aware accounting** — Campaign markdown can also define campaign-scoped add-ons that render in the same cart / Manage UI, count toward that campaign’s funding subtotal, follow campaign shipping overrides, and disappear automatically when the owning campaign pledge leaves the cart
 - **On-site Stripe payment step** — The existing second checkout sidecar hosts secure Stripe payment UI, and Manage Pledge uses the same pattern for `Update Card`
 - **Configurable pricing settings** — `pricing.sales_tax_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` live in `_config.yml`, and the required Worker vars are auto-synced into `worker/wrangler.toml` for server-side enforcement
 - **Physical & digital tiers** — Physical items trigger shipping address capture during checkout plus Worker-calculated USPS quotes, configured fallback rates, and optional domestic signature upgrades when enabled
@@ -100,6 +101,7 @@ Fork-facing settings now use a structured config model in [`_config.yml`](/Users
 - `pricing` for tax, the legacy flat-shipping compatibility baseline, and platform-tip defaults
 - `shipping` for origin settings, USPS quote behavior, fallback policy, free-shipping defaults, shipping presets, and limited shipping-option policy
 - `add_ons` for a small global merch catalog, fixed-price products, and simple variants like shirt sizes
+- campaign front matter `campaign_add_ons` for campaign-scoped merch that should use the same card UI but count toward that campaign’s subtotal and shipping rules
 - `i18n` for default/supported languages, language labels, and localized public-page routes
 - `design` for curated typography, radius, layout-width, and theme-token overrides
 - `debug` for browser and Worker console logging behavior

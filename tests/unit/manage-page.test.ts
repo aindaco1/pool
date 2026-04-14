@@ -992,6 +992,10 @@ describe('manage page script', () => {
       expect(localStorage.getItem('pool_stats_hand-relations')).toBeNull();
       expect(localStorage.getItem('pool_inventory_hand-relations')).toBeNull();
     });
+
+    expect(JSON.parse(localStorage.getItem('pool_live_refresh_needed') || '{}')).toMatchObject({
+      campaignSlugs: ['hand-relations']
+    });
   });
 
   it('posts a pledge modify request after confirmation', async () => {
@@ -1062,6 +1066,10 @@ describe('manage page script', () => {
       expect(localStorage.getItem('pool_stats_hand-relations')).toBeNull();
       expect(localStorage.getItem('pool_inventory_hand-relations')).toBeNull();
     });
+
+    expect(JSON.parse(localStorage.getItem('pool_live_refresh_needed') || '{}')).toMatchObject({
+      campaignSlugs: ['hand-relations']
+    });
   });
 
   it('lets Manage Pledge add bundle add-ons without duplicating selection rules', async () => {
@@ -1125,7 +1133,15 @@ describe('manage page script', () => {
 
   it('renders campaign add-ons in a separate Manage section for the current pledge campaign', async () => {
     (window as any).POOL_CONFIG = {
-      addOns: ADD_ON_CONFIG
+      addOns: ADD_ON_CONFIG,
+      i18n: {
+        currentLang: 'es',
+        messages: {
+          manage: {
+            campaignAddOns: 'Complementos de la campaña'
+          }
+        }
+      }
     };
     mockManageFetch({
       campaigns: [
@@ -1154,7 +1170,7 @@ describe('manage page script', () => {
       expect(document.getElementById('pledges-list')?.hidden).toBe(false);
     });
 
-    expect(document.body.textContent).toContain('Campaign Add-ons');
+    expect(document.body.textContent).toContain('Complementos de la campaña');
     expect(document.body.textContent).toContain('First Time Sexpot Poster');
     expect(document.querySelector('[data-manage-addon-add][data-addon-product-id="hand-relations__first-time-sexpot-poster"]')).not.toBeNull();
   });

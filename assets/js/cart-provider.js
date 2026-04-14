@@ -1013,7 +1013,10 @@
       stackable: isStackable,
       shippable: button.getAttribute('data-item-shippable') === 'true'
     };
-    const shippingFallbackCents = Number(button.getAttribute('data-item-shipping-fallback-cents'));
+    const shippingFallbackCentsRaw = button.getAttribute('data-item-shipping-fallback-cents');
+    const shippingFallbackCents = shippingFallbackCentsRaw === null
+      ? NaN
+      : Number(shippingFallbackCentsRaw);
     if (Number.isFinite(shippingFallbackCents) && shippingFallbackCents >= 0) {
       item.campaignShippingFallbackCents = Math.round(shippingFallbackCents);
     }
@@ -1051,6 +1054,19 @@
       stackable: isStackable,
       shippable: button.getAttribute('data-item-shippable') === 'true'
     };
+    const shippingFallbackCentsRaw = button.getAttribute('data-item-shipping-fallback-cents');
+    const shippingFallbackCents = shippingFallbackCentsRaw === null
+      ? NaN
+      : Number(shippingFallbackCentsRaw);
+    if (Number.isFinite(shippingFallbackCents) && shippingFallbackCents >= 0) {
+      item.campaignShippingFallbackCents = Math.round(shippingFallbackCents);
+    }
+    const campaignFreeShipping = button.getAttribute('data-item-campaign-free-shipping');
+    if (campaignFreeShipping === 'true') {
+      item.campaignFreeShipping = true;
+    } else if (campaignFreeShipping === 'false') {
+      item.campaignFreeShipping = false;
+    }
 
     if (maxQty) {
       item.maxQuantity = parseInt(maxQty, 10);
@@ -1262,7 +1278,7 @@
       return 0;
     }
 
-    return Number.isFinite(parsed) && parsed >= 0
+    return Number.isFinite(parsed) && parsed > 0
       ? Math.round(parsed)
       : getShippingFallbackFeeCents();
   }
@@ -1291,12 +1307,7 @@
       if (getCartAddOnScope(selection) === 'campaign') {
         const campaignSlug = String(selection?.campaignSlug || '').trim();
         if (campaignSlug && !fallbackByCampaign.has(campaignSlug)) {
-          fallbackByCampaign.set(
-            campaignSlug,
-            physicalCampaignSlugs.has(campaignSlug)
-              ? getFallbackShippingCentsForCampaignSlug(normalizedItems, campaignSlug)
-              : getShippingFallbackFeeCents()
-          );
+          fallbackByCampaign.set(campaignSlug, getFallbackShippingCentsForCampaignSlug(normalizedItems, campaignSlug));
         }
       } else {
         hasPhysicalPlatformAddOns = true;
@@ -2085,6 +2096,14 @@
         imageUrl: String(item?.imageUrl || ''),
         stackable: item?.stackable === true,
         shippable: item?.shippable === true,
+        campaignShippingFallbackCents: Number.isFinite(Number(item?.campaignShippingFallbackCents))
+          ? Math.round(Number(item.campaignShippingFallbackCents))
+          : undefined,
+        campaignFreeShipping: item?.campaignFreeShipping === true
+          ? true
+          : item?.campaignFreeShipping === false
+            ? false
+            : undefined,
         maxQuantity: Number.isFinite(Number(item?.maxQuantity)) ? Number(item?.maxQuantity) : undefined,
         customFields: Array.isArray(item?.customFields) ? item.customFields : undefined
       }))
@@ -2935,8 +2954,8 @@
         </div>
       ` : `
         <div class="pool-first-party-cart__callout">
-          <p class="pool-first-party-cart__section-label">Next step</p>
-          <p class="pool-first-party-cart__note">Continue to Stripe's secure payment platform to enter your payment information and email address -- this finalizes your pledge. You will only be charged if the campaign funds successfully.</p>
+          <p class="pool-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.nextStep', 'Next step'))}</p>
+          <p class="pool-first-party-cart__note">${escapeHtml(getRuntimeMessage('cart.hostedCheckoutNote', "Continue to Stripe's secure payment platform to enter your payment information and email address -- this finalizes your pledge. You will only be charged if the campaign funds successfully."))}</p>
         </div>
       `;
       const itemMarkup = items.length > 0 ? items.map((item) => {

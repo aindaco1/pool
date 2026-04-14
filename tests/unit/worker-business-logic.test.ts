@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
 import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput } from '../../worker/src/checkout-intent.js';
+import { CheckoutIntentNonceCoordinator } from '../../worker/src/checkout-intent-do.js';
 import { TierInventoryCoordinator } from '../../worker/src/tier-inventory-do.js';
 
 const mockStripeClient = {
@@ -111,6 +112,37 @@ class MockCheckoutIntentNamespace {
         const body = init?.body ? JSON.parse(String(init.body)) : {};
         this.calls.push({ url, body });
         return jsonResponse({ ok: true, status: 'consumed_implicit' });
+      }
+    };
+  }
+}
+
+class StatefulCheckoutIntentNamespace {
+  instances = new Map<string, CheckoutIntentNonceCoordinator>();
+  calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+
+  idFromName(name: string) {
+    return { name };
+  }
+
+  get(id: { name: string }) {
+    if (!this.instances.has(id.name)) {
+      this.instances.set(
+        id.name,
+        new CheckoutIntentNonceCoordinator(new MockDurableObjectState() as never, {} as never)
+      );
+    }
+    const coordinator = this.instances.get(id.name)!;
+    return {
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        const body = init?.body ? JSON.parse(String(init.body)) : {};
+        this.calls.push({ url, body });
+        return coordinator.fetch(new Request(url, {
+          method: init?.method || 'POST',
+          headers: init?.headers,
+          body: init?.body
+        }));
       }
     };
   }
@@ -1345,6 +1377,67 @@ describe('Worker business logic hardening', () => {
     ]));
   });
 
+  it('applies the campaign shipping override to physical campaign add-ons', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/shipping/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [
+            { id: 'smoke-editable__standard-pass', quantity: 1 },
+            { id: 'addon__smoke-editable__first-time-sexpot-condom-pack', quantity: 1 }
+          ],
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      quotes: [
+        {
+          campaignSlug: 'smoke-editable',
+          shippingCents: 1200,
+          source: 'fallback_flat_rate',
+          carrier: 'fallback',
+          service: 'domestic_ground_fallback',
+          domestic: true,
+          availableOptions: [
+            { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 1200 }
+          ],
+          defaultOption: 'standard',
+          selectedOption: 'standard',
+          shipment: {
+            hasPhysical: true,
+            physicalTierCount: 0,
+            physicalSupportItemCount: 0,
+            physicalAddOnCount: 1,
+            physicalUnitCount: 1,
+            weightOz: 1,
+            lengthIn: 4,
+            widthIn: 4,
+            heightIn: 0.125,
+            tierIds: [],
+            supportItemIds: [],
+            addOnIds: ['smoke-editable__first-time-sexpot-condom-pack']
+          }
+        }
+      ],
+      totalShippingCents: 1200,
+      shippingAddress: {
+        country: 'US',
+        postalCode: '80205'
+      }
+    });
+  });
+
   it('returns summed shipping for mixed-campaign carts with digital and physical tiers', async () => {
     const env = createEnv();
 
@@ -1356,6 +1449,46 @@ describe('Worker business logic hardening', () => {
           items: [
             { id: 'hand-relations__frame-slot', quantity: 1 },
             { id: 'smoke-editable__support__signed-script', amount: 25 }
+          ],
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.totalShippingCents).toBe(1200);
+    expect(data.quotes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        campaignSlug: 'hand-relations',
+        shippingCents: 0,
+        source: 'none'
+      }),
+      expect.objectContaining({
+        campaignSlug: 'smoke-editable',
+        shippingCents: 1200,
+        source: 'fallback_flat_rate'
+      })
+    ]));
+  });
+
+  it('applies campaign shipping overrides to campaign add-ons in mixed-campaign carts', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/shipping/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [
+            { id: 'hand-relations__frame-slot', quantity: 1 },
+            { id: 'smoke-editable__standard-pass', quantity: 1 },
+            { id: 'addon__smoke-editable__first-time-sexpot-condom-pack', quantity: 1 }
           ],
           shippingAddress: {
             country: 'US',
@@ -3888,6 +4021,7 @@ describe('Worker business logic hardening', () => {
         hasPhysical: '',
         isPaymentUpdate: '',
         checkoutProvider: 'first_party',
+        checkoutNonce: 'nonce_email_dedupe_1',
         checkoutCartHash,
         checkoutSnapshotVersion: '1'
       }
@@ -3918,6 +4052,170 @@ describe('Worker business logic hardening', () => {
       orderId,
       campaignSlug: 'hand-relations'
     });
+  });
+
+  it('sends the initial supporter email only once even if recovery and webhook both process the same order', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENTS: new StatefulCheckoutIntentNamespace(),
+      TIER_INVENTORY_COORDINATOR: undefined
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    const tierInventory = new StatefulTierInventoryNamespace(kv);
+    (env as Record<string, unknown>).TIER_INVENTORY_COORDINATOR = tierInventory;
+
+    const orderId = 'pool-intent-email-dedupe-1';
+    const checkoutCartHash = await hashCheckoutBundle(buildCheckoutBundleHashInput({
+      contributions: [{
+        campaignSlug: 'hand-relations',
+        canonicalContribution: {
+          tierId: 'frame-slot',
+          tierName: 'Buy 1 Frame',
+          tierQty: 1,
+          selectedTiers: [{ id: 'frame-slot', qty: 1 }],
+          additionalTiers: [],
+          supportItems: [],
+          customAmount: 0,
+          hasPhysical: false,
+          totals: {
+            subtotal: 500,
+            tax: 39,
+            shipping: 0,
+            tipPercent: 5,
+            tipAmount: 25,
+            amount: 564
+          }
+        },
+        tipPercent: 5
+      }]
+    }));
+
+    await kv.put(`pending-checkout:${orderId}`, JSON.stringify({
+      orderId,
+      checkoutProvider: 'first_party',
+      campaignCount: 1,
+      tipPercent: 5,
+      totals: {
+        subtotal: 500,
+        tax: 39,
+        shipping: 0,
+        tipAmount: 25,
+        amount: 564
+      },
+      campaigns: [{
+        orderId,
+        campaignSlug: 'hand-relations',
+        tierId: 'frame-slot',
+        tierName: 'Buy 1 Frame',
+        tierQty: 1,
+        additionalTiers: [],
+        supportItems: [],
+        customAmount: 0,
+        hasPhysical: false,
+        totals: {
+          subtotal: 500,
+          tax: 39,
+          shipping: 0,
+          tipAmount: 25,
+          amount: 564
+        }
+      }]
+    }));
+
+    mockStripeClient.checkout.sessions.retrieve.mockResolvedValue({
+      id: 'cs_email_dedupe_1',
+      status: 'complete',
+      mode: 'setup',
+      customer_email: 'buyer@example.com',
+      customer: 'cus_123',
+      created: 1775000000,
+      setup_intent: 'seti_123',
+      metadata: {
+        orderId,
+        campaignSlug: 'hand-relations',
+        amountCents: '500',
+        tierId: 'frame-slot',
+        tierName: 'Buy 1 Frame',
+        tierQty: '1',
+        tipPercent: '5',
+        hasAdditionalTiers: '',
+        hasExtras: '',
+        hasPhysical: '',
+        isPaymentUpdate: '',
+        checkoutProvider: 'first_party',
+        checkoutNonce: 'nonce_email_dedupe_1',
+        checkoutCartHash,
+        checkoutSnapshotVersion: '1'
+      }
+    });
+
+    const recoveryResponse = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://pool.test'
+        },
+        body: JSON.stringify({
+          orderId,
+          sessionId: 'cs_email_dedupe_1'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(recoveryResponse.status).toBe(200);
+    expect(mockSendSupporterEmail).toHaveBeenCalledTimes(1);
+
+    await kv.delete(`pledge:${orderId}`);
+
+    const webhookResponse = await worker.fetch(
+      new Request('https://pool.test/webhooks/stripe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'stripe-signature': 'sig_test'
+        },
+        body: JSON.stringify({
+          id: 'evt_email_dedupe_1',
+          type: 'checkout.session.completed',
+          livemode: false,
+          data: {
+            object: {
+              id: 'cs_email_dedupe_1',
+              mode: 'setup',
+              customer_email: 'buyer@example.com',
+              customer: 'cus_123',
+              created: 1775000000,
+              setup_intent: 'seti_123',
+              metadata: {
+                orderId,
+                campaignSlug: 'hand-relations',
+                amountCents: '500',
+                tierId: 'frame-slot',
+                tierName: 'Buy 1 Frame',
+                tierQty: '1',
+                tipPercent: '5',
+                hasAdditionalTiers: '',
+                hasExtras: '',
+                hasPhysical: '',
+                isPaymentUpdate: '',
+                checkoutProvider: 'first_party',
+                checkoutNonce: 'nonce_email_dedupe_1',
+                checkoutCartHash,
+                checkoutSnapshotVersion: '1'
+              }
+            }
+          }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(webhookResponse.status).toBe(200);
+    expect(mockSendSupporterEmail).toHaveBeenCalledTimes(1);
   });
 
   it('rejects cross-site checkout completion recovery requests', async () => {

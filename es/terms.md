@@ -28,8 +28,9 @@ description: Revisa los términos de aporte, el procesamiento de pagos, el cumpl
 - Puedes añadir una **propina opcional para la plataforma** de entre 0% y 15% durante el pago. La propina predeterminada es del 5%.
 - Las propinas opcionales ayudan al mantenimiento de The Pool y se incluyen en el total de tu aporte, pero **no cuentan para la meta de financiación de la campaña**.
 - Esta implementación también puede ofrecer **complementos opcionales de la plataforma** junto con un aporte. Los complementos de la plataforma ayudan al mantenimiento de The Pool, se incluyen en el total de tu aporte y **no cuentan para la meta de financiación de la campaña**.
+- Una campaña también puede ofrecer **complementos opcionales de campaña** junto con sus niveles. Los complementos de campaña se incluyen en el total de tu aporte, **sí cuentan para la meta de financiación de esa campaña** y permanecen asociados a esa campaña para informes y cumplimiento.
 - El impuesto sobre las ventas se aplica a los aportes usando la tasa configurada para esta implementación.
-- Los aportes con productos físicos o los complementos físicos de la plataforma pueden incluir cargos de envío configurados para esta implementación. Según la configuración de esta implementación y de la campaña, el envío puede cotizarse desde USPS, usar una tarifa de respaldo configurada, incluir anulaciones de envío gratis u ofrecer opciones limitadas de mejora con firma para envíos nacionales. Tu dirección de envío se recoge durante el pago para poder completar esas recompensas.
+- Los aportes con productos físicos, los complementos físicos de campaña o los complementos físicos de la plataforma pueden incluir cargos de envío configurados para esta implementación. Según la configuración de esta implementación y de la campaña, el envío puede cotizarse desde USPS, usar una tarifa de respaldo configurada, incluir anulaciones de envío gratis u ofrecer opciones limitadas de mejora con firma para envíos nacionales. Los complementos de campaña siguen las reglas de envío de su campaña; los complementos físicos de la plataforma pueden cobrarse como un envío de plataforma separado. Tu dirección de envío se recoge durante el pago para poder completar esas recompensas.
 - Si modificas un aporte, The Pool recalcula los totales a partir del estado guardado del aporte y de las definiciones de campaña o complemento vigentes en esa implementación, en lugar de confiar en importes enviados por el navegador.
 
 ## Control creativo y envíos
@@ -46,7 +47,7 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Los plazos de entrega pueden ajustarse según la realidad de la producción.
 - Proporcionaremos actualizaciones periódicas sobre el progreso de la producción y los plazos de entrega.
 - Las recompensas digitales se entregarán por correo electrónico a la dirección proporcionada durante el aporte.
-- Las recompensas físicas y los complementos físicos de la plataforma se envían a la dirección recogida durante el pago. Cualquier cargo de envío mostrado durante el pago se guarda con el aporte y se incluye en el total de tu aporte.
+- Las recompensas físicas, los complementos físicos de campaña y los complementos físicos de la plataforma se envían a la dirección recogida durante el pago. Cualquier cargo de envío mostrado durante el pago se guarda con el aporte y se incluye en el total de tu aporte.
 
 ## Reembolsos y cancelaciones
 
@@ -57,10 +58,11 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 
 ## Privacidad y datos
 
-- Solo recopilamos la información necesaria para procesar aportes y completar recompensas: correo electrónico, nombre, detalles del aporte o pedido y, para recompensas físicas o complementos físicos de la plataforma, una dirección de envío.
+- Solo recopilamos la información necesaria para procesar aportes y completar recompensas: correo electrónico, nombre, detalles del aporte o pedido y, para recompensas físicas, complementos físicos de campaña o complementos físicos de la plataforma, una dirección de envío.
 - Los datos completos de tarjeta son gestionados y almacenados por Stripe. The Pool no almacena números completos de tarjeta ni valores CVC.
 - Las direcciones de correo electrónico y cualquier dato de envío necesario para el cumplimiento pueden almacenarse en nuestro sistema para la gestión del aporte, confirmaciones específicas de campaña, actualizaciones de campaña y cumplimiento de recompensas.
 - Los complementos de la plataforma con inventario limitado usan el estado de los aportes guardados, no los borradores en curso del carrito, para determinar el stock restante.
+- Los complementos de campaña con inventario limitado también usan el estado de los aportes guardados, no los borradores en curso del carrito, para determinar el stock restante.
 - El acceso a la comunidad de patrocinadores en el navegador puede recordarse durante la sesión actual como una comodidad, pero el enlace mágico enviado por correo sigue siendo la fuente de verdad para el acceso.
 - No vendemos tu información. Solo la compartimos cuando es necesario para el procesamiento del pago, la entrega de correos transaccionales, el cálculo de cotizaciones de envío y el cumplimiento de recompensas.
 

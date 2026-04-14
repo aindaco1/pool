@@ -80,6 +80,7 @@
     bootScript.dataset.checkoutUiMode ||
     'custom'
   ).trim().toLowerCase();
+  const LIVE_REFRESH_MARKER_KEY = 'pool_live_refresh_needed';
   const WIDTH_PERCENT_CLASS_PREFIX = 'u-width-pct-';
   const LEFT_PERCENT_CLASS_PREFIX = 'u-left-pct-';
   const FOCUSABLE_SELECTOR = [
@@ -1753,6 +1754,26 @@
     return addOnInventoryRequest;
   }
 
+  function markPendingLiveRefresh(campaignSlug) {
+    if (!campaignSlug) return;
+
+    try {
+      const existing = (() => {
+        const raw = localStorage.getItem(LIVE_REFRESH_MARKER_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed?.campaignSlugs)
+          ? parsed.campaignSlugs.filter((value) => typeof value === 'string' && value)
+          : [];
+      })();
+
+      localStorage.setItem(LIVE_REFRESH_MARKER_KEY, JSON.stringify({
+        campaignSlugs: Array.from(new Set([...existing, campaignSlug])),
+        timestamp: Date.now()
+      }));
+    } catch (_error) {}
+  }
+
   function invalidateCampaignCaches(campaignSlug) {
     if (!campaignSlug) return;
 
@@ -1766,6 +1787,8 @@
       localStorage.removeItem(`pool_stats_${campaignSlug}`);
       localStorage.removeItem(`pool_inventory_${campaignSlug}`);
     } catch (_error) {}
+
+    markPendingLiveRefresh(campaignSlug);
 
     if (typeof window.invalidateStatsCache === 'function') {
       window.invalidateStatsCache(campaignSlug);

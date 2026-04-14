@@ -2152,6 +2152,45 @@ async function consumeCheckoutIntentNonce(env, { nonce, cartHash, exp }) {
   return { ok: true };
 }
 
+async function consumeSupporterEmailNonce(env, orderId) {
+  const normalizedOrderId = String(orderId || '').trim();
+  if (!normalizedOrderId) {
+    return { ok: true, fresh: true };
+  }
+
+  const coordinator = getCheckoutIntentCoordinator(env);
+  if (!coordinator) {
+    return { ok: true, fresh: true };
+  }
+
+  const exp = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
+  const response = await coordinator.fetch('https://checkout-intents.internal/consume', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nonce: `supporter-email:${normalizedOrderId}`,
+      cartHash: 'supporter-email',
+      exp
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (response.ok && payload.ok === true) {
+    return { ok: true, fresh: true };
+  }
+
+  if (response.status === 409) {
+    return { ok: true, fresh: false };
+  }
+
+  console.warn('📧 Supporter email nonce coordinator unavailable, continuing without dedupe:', {
+    orderId: normalizedOrderId,
+    status: response.status,
+    error: payload.error || 'unknown'
+  });
+  return { ok: true, fresh: true };
+}
+
 function createCheckoutNonce() {
   if (typeof crypto?.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -3147,21 +3186,24 @@ async function processFirstPartyCheckoutBundle({
       campaignSlug
     });
 
-    await sendSupporterEmail(env, {
-      email,
-      campaignSlug,
-      campaignTitle,
-      preferredLang: pledgeData.preferredLang,
-      subtotal: canonicalContribution.totals.subtotal,
-      tax: canonicalContribution.totals.tax,
-      shipping: canonicalContribution.totals.shipping,
-      tipAmount: canonicalContribution.totals.tipAmount,
-      tipPercent: canonicalContribution.totals.tipPercent,
-      token,
-      instagramUrl: campaign?.instagram,
-      hasDecisions: campaign?.has_decisions === true,
-      pledgeItems: buildPledgeItemsPayload(campaign, canonicalContribution, anchorBundleAddOns)
-    });
+    const emailNonce = await consumeSupporterEmailNonce(env, pledgeOrderId);
+    if (emailNonce.fresh) {
+      await sendSupporterEmail(env, {
+        email,
+        campaignSlug,
+        campaignTitle,
+        preferredLang: pledgeData.preferredLang,
+        subtotal: canonicalContribution.totals.subtotal,
+        tax: canonicalContribution.totals.tax,
+        shipping: canonicalContribution.totals.shipping,
+        tipAmount: canonicalContribution.totals.tipAmount,
+        tipPercent: canonicalContribution.totals.tipPercent,
+        token,
+        instagramUrl: campaign?.instagram,
+        hasDecisions: campaign?.has_decisions === true,
+        pledgeItems: buildPledgeItemsPayload(campaign, canonicalContribution, anchorBundleAddOns)
+      });
+    }
   }
 
   await persistCheckoutBundleManifest(env, orderId, {
@@ -3651,21 +3693,24 @@ async function handleStripeWebhook(request, env, ctx) {
             campaignSlug
           });
 
-          await sendSupporterEmail(env, {
-            email,
-            campaignSlug,
-            campaignTitle,
-            preferredLang: pledgeData.preferredLang,
-            subtotal: canonicalContribution.totals.subtotal,
-            tax: canonicalContribution.totals.tax,
-            shipping: canonicalContribution.totals.shipping,
-            tipAmount: canonicalContribution.totals.tipAmount,
-            tipPercent: canonicalContribution.totals.tipPercent,
-            token,
-            instagramUrl: campaign?.instagram,
-            hasDecisions: campaign?.has_decisions === true,
-            pledgeItems: buildPledgeItemsPayload(campaign, canonicalContribution, anchorBundleAddOns)
-          });
+          const emailNonce = await consumeSupporterEmailNonce(env, orderId);
+          if (emailNonce.fresh) {
+            await sendSupporterEmail(env, {
+              email,
+              campaignSlug,
+              campaignTitle,
+              preferredLang: pledgeData.preferredLang,
+              subtotal: canonicalContribution.totals.subtotal,
+              tax: canonicalContribution.totals.tax,
+              shipping: canonicalContribution.totals.shipping,
+              tipAmount: canonicalContribution.totals.tipAmount,
+              tipPercent: canonicalContribution.totals.tipPercent,
+              token,
+              instagramUrl: campaign?.instagram,
+              hasDecisions: campaign?.has_decisions === true,
+              pledgeItems: buildPledgeItemsPayload(campaign, canonicalContribution, anchorBundleAddOns)
+            });
+          }
 
           console.log('Pledge confirmed:', { orderId, email, campaignSlug });
         }
@@ -6911,31 +6956,34 @@ async function handleRecoverCheckout(request, env) {
         });
         const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
         
-        await sendSupporterEmail(env, {
-          email,
-          campaignTitle,
-          campaignSlug,
-          preferredLang: pledge.preferredLang,
-          subtotal: canonicalContribution.totals.subtotal,
-          tax: canonicalContribution.totals.tax,
-          shipping: canonicalContribution.totals.shipping,
-          tipAmount: canonicalContribution.totals.tipAmount,
-          tipPercent: canonicalContribution.totals.tipPercent,
-          token,
-          instagramUrl: campaign?.instagram,
-          hasDecisions: campaign?.has_decisions === true,
-          pledgeItems: {
-            tierName: canonicalContribution.tierName || null,
-            tierQty: canonicalContribution.tierQty || 1,
-            additionalTiers: canonicalContribution.additionalTiers.map(t => ({
-              ...t,
-              name: campaign?.tiers?.find(ct => ct.id === t.id)?.name || t.id
-            })),
-            supportItems: getSupportItemsWithLabels(campaign, canonicalContribution.supportItems),
-            customAmount: canonicalContribution.customAmount
-          }
-        });
-        pledge.emailSent = true;
+        const emailNonce = await consumeSupporterEmailNonce(env, pledgeOrderId);
+        if (emailNonce.fresh) {
+          await sendSupporterEmail(env, {
+            email,
+            campaignTitle,
+            campaignSlug,
+            preferredLang: pledge.preferredLang,
+            subtotal: canonicalContribution.totals.subtotal,
+            tax: canonicalContribution.totals.tax,
+            shipping: canonicalContribution.totals.shipping,
+            tipAmount: canonicalContribution.totals.tipAmount,
+            tipPercent: canonicalContribution.totals.tipPercent,
+            token,
+            instagramUrl: campaign?.instagram,
+            hasDecisions: campaign?.has_decisions === true,
+            pledgeItems: {
+              tierName: canonicalContribution.tierName || null,
+              tierQty: canonicalContribution.tierQty || 1,
+              additionalTiers: canonicalContribution.additionalTiers.map(t => ({
+                ...t,
+                name: campaign?.tiers?.find(ct => ct.id === t.id)?.name || t.id
+              })),
+              supportItems: getSupportItemsWithLabels(campaign, canonicalContribution.supportItems),
+              customAmount: canonicalContribution.customAmount
+            }
+          });
+          pledge.emailSent = true;
+        }
       } catch (emailErr) {
         console.error('Failed to send recovery email:', emailErr.message);
         pledge.emailError = emailErr.message;

@@ -421,6 +421,19 @@ Current add-on inventory behavior:
 - the cart and Manage Pledge both use the same shared add-on product-card model, so forks do not need to style or configure two different merch systems
 - the add-on section heading and support note are localized through the normal runtime i18n files, and the support note interpolates the configured site author name automatically
 
+Campaigns can also define campaign-scoped add-ons directly in campaign front matter under `campaign_add_ons`.
+
+That campaign-owned catalog uses the same product shape as the global `add_ons.products` entries, but behaves differently in two important ways:
+
+- campaign add-ons render under a separate `Campaign Add-ons` section in cart and Manage Pledge
+- campaign add-ons count toward the owning campaign subtotal / funding progress and follow that campaign’s shipping rules
+
+By contrast, global `add_ons.products` remain platform merch:
+
+- they render under the normal `Add-ons` section
+- they do not count toward campaign funding totals
+- physical global add-ons combine into one separate platform shipment / shipping charge
+
 ### `design`
 
 Use `design` for curated design-system overrides that do not require Sass edits.

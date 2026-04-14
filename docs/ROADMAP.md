@@ -90,6 +90,16 @@
   - pledge and fulfillment exports now separate campaign pledge revenue from platform add-on revenue
   - inventory, low-stock thresholds, sold-out variant filtering, and saved-truth stock awareness now exist for the first merch wave
   - add-ons now render as shared product cards with image, description, quantity, variant selection, and one-click add/remove controls
+- [x] Campaign-specific add-on products
+  - campaigns can now define `campaign_add_ons` directly in front matter without introducing a second merch UI system
+  - cart sidecar keeps the same add-on card UX, but adds one shared `Campaign Add-ons` section below platform `Add-ons`
+  - Manage Pledge shows only the current pledge campaign’s campaign add-ons while reusing the same selected/available add-on card patterns
+  - campaign add-ons now count toward the owning campaign subtotal and goal-tracking math instead of behaving like platform merch
+  - campaign add-ons inherit the owning campaign’s shipping rules and fallback overrides, including in mixed multi-campaign carts
+  - physical global add-ons now combine into one separate platform shipment / shipping charge instead of borrowing campaign shipping behavior
+  - removing a campaign pledge from the cart now also removes campaign add-ons tied to that campaign
+  - pledge and fulfillment reports now keep platform add-ons and campaign add-ons operationally distinct, including fulfiller ownership
+  - Smoke Editable now includes imported campaign add-ons from the Dust Wave shop for browser, shipping, and report coverage
 - [x] Shipping calculator replacing the old flat physical-fee model
   - USPS-backed live rating for domestic and international physical pledges
   - deployment-level fallback shipping plus optional campaign-level fallback overrides
@@ -174,7 +184,6 @@
 - [ ] Marketing landing page for the platform on a different domain
 - [ ] Denial of service attack defense pass
 - [ ] Support different prices per add-on variation
-- [ ] Campaign-specific add-on products
 
 ## Known Issues
 

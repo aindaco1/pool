@@ -320,9 +320,12 @@ export function buildFallbackShippingQuote(env, destination, shipment, campaign 
     Number(shipment?.physicalAddOnCount || 0) > 0 &&
     Number(shipment?.physicalTierCount || 0) <= 0 &&
     Number(shipment?.physicalSupportItemCount || 0) <= 0;
+  const usePlatformFallback =
+    addOnOnlyShipment &&
+    !campaign;
   return {
     shippingCents: shipment.hasPhysical
-      ? (addOnOnlyShipment ? getShippingFallbackFeeCents(env) : getCampaignShippingFallbackFeeCents(campaign, env))
+      ? (usePlatformFallback ? getShippingFallbackFeeCents(env) : getCampaignShippingFallbackFeeCents(campaign, env))
       : 0,
     source: shipment.hasPhysical ? 'fallback_flat_rate' : 'none',
     carrier: shipment.hasPhysical ? 'fallback' : null,

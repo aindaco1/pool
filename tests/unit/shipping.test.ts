@@ -364,7 +364,27 @@ describe('shipping utilities', () => {
     });
   });
 
-  it('uses the global fallback rate for add-on-only physical shipments even when the anchor campaign has an override', () => {
+  it('uses the global fallback rate for add-on-only platform shipments', () => {
+    expect(buildFallbackShippingQuote(
+      { SHIPPING_ORIGIN_COUNTRY: 'US', SHIPPING_FALLBACK_FLAT_RATE: '3.00' },
+      { country: 'US', postalCode: '80205' },
+      {
+        hasPhysical: true,
+        physicalTierCount: 0,
+        physicalSupportItemCount: 0,
+        physicalAddOnCount: 1
+      },
+      null
+    )).toEqual({
+      shippingCents: 300,
+      source: 'fallback_flat_rate',
+      carrier: 'fallback',
+      service: 'domestic_ground_fallback',
+      domestic: true
+    });
+  });
+
+  it('uses the campaign override for add-on-only campaign shipments', () => {
     expect(buildFallbackShippingQuote(
       { SHIPPING_ORIGIN_COUNTRY: 'US', SHIPPING_FALLBACK_FLAT_RATE: '3.00' },
       { country: 'US', postalCode: '80205' },
@@ -376,7 +396,7 @@ describe('shipping utilities', () => {
       },
       { shipping_fallback_flat_rate: 12 }
     )).toEqual({
-      shippingCents: 300,
+      shippingCents: 1200,
       source: 'fallback_flat_rate',
       carrier: 'fallback',
       service: 'domestic_ground_fallback',

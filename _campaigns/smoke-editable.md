@@ -51,7 +51,7 @@ support_items:
 campaign_add_ons:
   - id: smoke-editable__first-time-sexpot-condom-pack
     name: First Time Sexpot Condom Pack
-    description: Get a 3-pack of First Time Sexpot and Hot N’ Dangerous branded latex condoms! Dust Wave is not responsible for any unwanted pregnancies.
+    description: 3-pack of branded latex condoms
     image_url: /assets/images/campaign-add-ons/sexpot-condom-pack.png
     price: 6
     inventory: 25
@@ -60,7 +60,7 @@ campaign_add_ons:
     source_url: https://shop.dustwave.xyz/?pid=condom-1
   - id: smoke-editable__first-time-sexpot-poster
     name: First Time Sexpot Poster
-    description: 18” x 24” First Time Sexpot poster.
+    description: 18” x 24” First Time Sexpot poster
     image_url: /assets/images/campaign-add-ons/sexpot-poster.png
     price: 35
     inventory: 10
