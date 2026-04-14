@@ -145,12 +145,22 @@ Add a structured `shipping` section to [`_config.yml`](/Users/aindaco1/Library/M
 
 ```yml
 shipping:
-  origin_zip: "80205"
+  origin_zip: "87120"
   origin_country: "US"
   fallback_flat_rate: 3.00
   default_option: standard
   quote_timeout_ms: 2500
   presets:
+    sticker:
+      weight_oz: 1
+      packaging_weight_oz: 0.5
+      length_in: 4
+      width_in: 4
+      height_in: 0.1
+      stack_height_in: 0.05
+      usps_domestic:
+        processing_category: NON_MACHINABLE
+        rate_indicator: SP
     tshirt:
       weight_oz: 8
       packaging_weight_oz: 1
@@ -195,6 +205,8 @@ shipping:
 ```
 
 That config should stay site-driven and auto-mirror any Worker-required values into [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml).
+
+Optional USPS profile hints can live inside preset metadata too. The current implementation supports `usps_domestic.processing_category`, `usps_domestic.rate_indicator`, `usps_domestic.destination_entry_facility_type`, `usps_domestic.price_type`, and `usps_domestic.mail_classes`. Those hints only apply when the whole physical shipment resolves to the same preset-style USPS profile; mixed shipments fall back to the default parcel quote model.
 
 ## Content Model Changes
 

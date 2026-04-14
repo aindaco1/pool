@@ -30,7 +30,7 @@ describe('config boot scripts', () => {
         data-default-creator-name="Fork Studio"
         data-sales-tax-rate="0.07875"
         data-flat-shipping-rate="3.00"
-        data-shipping-origin-zip="80205"
+        data-shipping-origin-zip="87120"
         data-shipping-origin-country="US"
         data-shipping-fallback-flat-rate="3.00"
         data-shipping-free-shipping-default="false"
@@ -78,7 +78,7 @@ describe('config boot scripts', () => {
         maxTipPercent: '15'
       },
       shipping: {
-        originZip: '80205',
+        originZip: '87120',
         originCountry: 'US',
         fallbackFlatRate: '3.00',
         freeShippingDefault: 'false',
@@ -151,7 +151,7 @@ describe('config boot scripts', () => {
       defaultCreatorName: 'Fork Studio',
       salesTaxRate: '0.07875',
       flatShippingRate: '3.00',
-      shippingOriginZip: '80205',
+      shippingOriginZip: '87120',
       shippingOriginCountry: 'US',
       shippingFallbackFlatRate: '3.00',
       shippingFreeShippingDefault: 'false',

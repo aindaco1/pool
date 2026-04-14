@@ -2512,7 +2512,8 @@ describe('cart provider shim', () => {
     startCheckoutButton.click();
 
     await vi.waitFor(() => {
-      expect(root?.textContent).toContain('Campaign not accepting pledges');
+      const errorNode = root?.querySelector('[data-cart-checkout-error]');
+      expect(errorNode?.textContent || '').toContain('Campaign not accepting pledges');
     });
     expect(window.location.hash).not.toBe('#stripe-checkout');
   });
@@ -3160,9 +3161,20 @@ describe('cart provider shim', () => {
 
     await vi.waitFor(() => {
       const shippingRow = root?.querySelector('[data-cart-summary-shipping-row]');
-      const shippingAmount = root?.querySelector('[data-cart-summary-shipping]');
       expect(shippingRow).toBeTruthy();
-      expect(shippingAmount?.textContent).toBe('$9.80');
+      const shippingOption = root?.querySelector('[data-cart-custom-shipping-option]') as HTMLSelectElement | null;
+      expect(shippingOption).toBeTruthy();
+      expect(shippingOption?.value).toBe('standard');
+      expect(Array.from(shippingOption?.options || []).some((option) => option.textContent?.includes('Signature required'))).toBe(true);
+    });
+
+    const shippingOption = root?.querySelector('[data-cart-custom-shipping-option]') as HTMLSelectElement | null;
+    if (!shippingOption) throw new Error('Missing cart shipping option selector');
+    shippingOption.value = 'signature_required';
+    shippingOption.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(root?.querySelector('[data-cart-summary-total]')?.textContent).toBe('$53.26');
     });
   });
 

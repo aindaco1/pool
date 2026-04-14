@@ -116,7 +116,7 @@ Canonicalize the first-party cart payload and create a Stripe setup-mode Checkou
   "tipPercent": 5,
   "shippingAddress": {
     "country": "US",
-    "postalCode": "87102"
+    "postalCode": "87120"
   },
   "shippingOption": "standard"
 }

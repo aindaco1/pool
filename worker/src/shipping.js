@@ -109,6 +109,7 @@ function normalizeShippingProfile(shipping, label) {
   const heightIn = Number(shipping.height_in);
   const packagingWeightOz = Number(shipping.packaging_weight_oz);
   const stackHeightIn = Number(shipping.stack_height_in);
+  const uspsDomesticProfile = normalizeUspsDomesticProfile(shipping.usps_domestic);
 
   if (!(Number.isFinite(weightOz) && weightOz > 0)) {
     return { valid: false, error: `${label} is missing a valid weight` };
@@ -124,9 +125,45 @@ function normalizeShippingProfile(shipping, label) {
       widthIn: Number.isFinite(widthIn) && widthIn > 0 ? widthIn : DEFAULT_DIMENSION_INCHES,
       heightIn: normalizedHeightIn,
       packagingWeightOz: Number.isFinite(packagingWeightOz) && packagingWeightOz > 0 ? packagingWeightOz : 0,
-      stackHeightIn: Number.isFinite(stackHeightIn) && stackHeightIn > 0 ? stackHeightIn : normalizedHeightIn
+      stackHeightIn: Number.isFinite(stackHeightIn) && stackHeightIn > 0 ? stackHeightIn : normalizedHeightIn,
+      uspsDomesticProfile
     }
   };
+}
+
+function normalizeUspsDomesticProfile(profile) {
+  if (!profile || typeof profile !== 'object') {
+    return null;
+  }
+
+  const processingCategory = normalizeOptionalString(profile.processing_category || profile.processingCategory);
+  const destinationEntryFacilityType = normalizeOptionalString(
+    profile.destination_entry_facility_type || profile.destinationEntryFacilityType
+  );
+  const rateIndicator = normalizeOptionalString(profile.rate_indicator || profile.rateIndicator);
+  const priceType = normalizeOptionalString(profile.price_type || profile.priceType);
+  const mailClasses = Array.isArray(profile.mail_classes || profile.mailClasses)
+    ? (profile.mail_classes || profile.mailClasses)
+        .map((value) => normalizeOptionalString(value))
+        .filter(Boolean)
+    : [];
+
+  if (!processingCategory && !destinationEntryFacilityType && !rateIndicator && !priceType && mailClasses.length <= 0) {
+    return null;
+  }
+
+  return {
+    ...(processingCategory ? { processingCategory } : {}),
+    ...(destinationEntryFacilityType ? { destinationEntryFacilityType } : {}),
+    ...(rateIndicator ? { rateIndicator } : {}),
+    ...(priceType ? { priceType } : {}),
+    ...(mailClasses.length > 0 ? { mailClasses } : {})
+  };
+}
+
+function normalizeOptionalString(value) {
+  const normalized = String(value || '').trim();
+  return normalized ? normalized : '';
 }
 
 export function summarizeShipmentFromTierSelection(
@@ -147,7 +184,8 @@ export function summarizeShipmentFromTierSelection(
     heightIn: 0,
     tierIds: [],
     supportItemIds: [],
-    addOnIds: []
+    addOnIds: [],
+    uspsDomesticProfile: undefined
   };
 
   for (const selected of tierSelection?.selectedTiers || []) {
@@ -174,6 +212,7 @@ export function summarizeShipmentFromTierSelection(
     shipment.widthIn = Math.max(shipment.widthIn, profile.shipping.widthIn);
     shipment.heightIn += profile.shipping.heightIn + (profile.shipping.stackHeightIn * Math.max(0, qty - 1));
     shipment.tierIds.push(tier.id);
+    mergeShipmentUspsDomesticProfile(shipment, profile.shipping.uspsDomesticProfile);
   }
 
   const supportItemDefinitions = new Map((campaign?.support_items || []).map((item) => [item.id, item]));
@@ -205,6 +244,7 @@ export function summarizeShipmentFromTierSelection(
     shipment.widthIn = Math.max(shipment.widthIn, profile.shipping.widthIn);
     shipment.heightIn += profile.shipping.heightIn;
     shipment.supportItemIds.push(supportItemId);
+    mergeShipmentUspsDomesticProfile(shipment, profile.shipping.uspsDomesticProfile);
   }
 
   for (const selected of bundleAddOns || []) {
@@ -230,9 +270,32 @@ export function summarizeShipmentFromTierSelection(
     shipment.widthIn = Math.max(shipment.widthIn, profile.shipping.widthIn);
     shipment.heightIn += profile.shipping.heightIn + (profile.shipping.stackHeightIn * Math.max(0, quantity - 1));
     shipment.addOnIds.push(productId);
+    mergeShipmentUspsDomesticProfile(shipment, profile.shipping.uspsDomesticProfile);
+  }
+
+  if (!shipment.uspsDomesticProfile) {
+    delete shipment.uspsDomesticProfile;
   }
 
   return { valid: true, shipment };
+}
+
+function mergeShipmentUspsDomesticProfile(shipment, profile) {
+  if (!shipment || shipment.uspsDomesticProfile === null) {
+    return;
+  }
+
+  const normalizedProfile = profile && typeof profile === 'object' ? profile : null;
+  if (shipment.uspsDomesticProfile === undefined) {
+    shipment.uspsDomesticProfile = normalizedProfile;
+    return;
+  }
+
+  const currentKey = shipment.uspsDomesticProfile ? JSON.stringify(shipment.uspsDomesticProfile) : '';
+  const nextKey = normalizedProfile ? JSON.stringify(normalizedProfile) : '';
+  if (currentKey !== nextKey) {
+    shipment.uspsDomesticProfile = null;
+  }
 }
 
 function summarizePhysicalSelectionWithoutMetadata(
@@ -361,6 +424,11 @@ export function getAvailableShippingOptions(
   const freeShipping = isCampaignFreeShippingEnabled(campaign, env);
   const configured = Array.isArray(campaign?.shipping_options) ? campaign.shipping_options : [];
   const optionIds = new Set([SHIPPING_OPTION_STANDARD]);
+
+  if (!freeShipping && domestic) {
+    optionIds.add(SHIPPING_OPTION_SIGNATURE_REQUIRED);
+    optionIds.add(SHIPPING_OPTION_ADULT_SIGNATURE_REQUIRED);
+  }
 
   if (!freeShipping) {
     for (const optionId of configured) {
@@ -590,6 +658,9 @@ function hasUspsCredentials(env = {}) {
 }
 
 function buildUspsDomesticPayload(env, destination, shipment, mailClass) {
+  const profile = shipment?.uspsDomesticProfile && typeof shipment.uspsDomesticProfile === 'object'
+    ? shipment.uspsDomesticProfile
+    : null;
   return {
     originZIPCode: normalizeUsZip(getEnvString(env.SHIPPING_ORIGIN_ZIP, '')),
     destinationZIPCode: normalizeUsZip(destination.postalCode),
@@ -598,10 +669,10 @@ function buildUspsDomesticPayload(env, destination, shipment, mailClass) {
     width: shipment.widthIn,
     height: shipment.heightIn,
     mailClass,
-    processingCategory: 'MACHINABLE',
-    destinationEntryFacilityType: 'NONE',
-    rateIndicator: 'DR',
-    priceType: 'RETAIL',
+    processingCategory: profile?.processingCategory || 'MACHINABLE',
+    destinationEntryFacilityType: profile?.destinationEntryFacilityType || 'NONE',
+    rateIndicator: profile?.rateIndicator || 'DR',
+    priceType: profile?.priceType || 'RETAIL',
     mailingDate: getTodayIsoDate()
   };
 }
@@ -640,8 +711,13 @@ async function getUspsShippingQuote(env, destination, shipment) {
   }
 
   const domestic = destination.country === getShippingOriginCountry(env);
+  const domesticMailClasses =
+    Array.isArray(shipment?.uspsDomesticProfile?.mailClasses) &&
+    shipment.uspsDomesticProfile.mailClasses.length > 0
+      ? shipment.uspsDomesticProfile.mailClasses
+      : USPS_DOMESTIC_MAIL_CLASSES;
   const quoteSearch = domestic
-    ? await searchUspsRates(env, USPS_DOMESTIC_MAIL_CLASSES, (mailClass) => buildUspsDomesticPayload(env, destination, shipment, mailClass))
+    ? await searchUspsRates(env, domesticMailClasses, (mailClass) => buildUspsDomesticPayload(env, destination, shipment, mailClass))
     : await searchUspsRates(env, USPS_INTERNATIONAL_MAIL_CLASSES, (mailClass) => buildUspsInternationalPayload(env, destination, shipment, mailClass));
 
   if (!quoteSearch.valid) {
@@ -826,7 +902,9 @@ function getUspsQuoteCacheKey(env, destination, shipment) {
     widthIn: Number(shipment?.widthIn || 0),
     heightIn: Number(shipment?.heightIn || 0),
     tierIds: Array.isArray(shipment?.tierIds) ? shipment.tierIds : [],
-    supportItemIds: Array.isArray(shipment?.supportItemIds) ? shipment.supportItemIds : []
+    supportItemIds: Array.isArray(shipment?.supportItemIds) ? shipment.supportItemIds : [],
+    addOnIds: Array.isArray(shipment?.addOnIds) ? shipment.addOnIds : [],
+    uspsDomesticProfile: shipment?.uspsDomesticProfile ? JSON.stringify(shipment.uspsDomesticProfile) : ''
   });
 }
 

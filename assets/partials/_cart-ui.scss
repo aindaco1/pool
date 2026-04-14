@@ -534,7 +534,7 @@ body.pool-cart-open {
 .pool-first-party-cart__summary-value--shipping-option .pool-first-party-cart__input--summary-select {
   width: 100%;
   color: $color--primary;
-  font-weight: 600;
+  font-weight: 500;
   background-color: $surface--base;
 }
 
@@ -599,7 +599,7 @@ body.pool-cart-open {
   min-height: 44px;
   padding-top: 11px;
   padding-bottom: 11px;
-  font-size: $type--ui;
+  font-size: 0.95rem;
 }
 
 .pool-first-party-cart__input--summary-postal {

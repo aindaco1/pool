@@ -1524,9 +1524,14 @@
     };
   }
 
-  function renderCartShippingSummaryValue(shippingQuote, shippingCents, shippingDisplayValue = '') {
+  function renderCartShippingSummaryValue(
+    shippingQuote,
+    shippingCents,
+    shippingDisplayValue = '',
+    amountDataAttribute = 'data-cart-checkout-summary-shipping'
+  ) {
     if (!shouldShowCartShippingOptions(shippingQuote)) {
-      return `<strong data-cart-checkout-summary-shipping>${escapeHtml(shippingDisplayValue || formatCents(shippingCents))}</strong>`;
+      return `<strong ${amountDataAttribute}>${escapeHtml(shippingDisplayValue || formatCents(shippingCents))}</strong>`;
     }
 
     return `
@@ -1538,11 +1543,18 @@
     `;
   }
 
-  function renderCartSummaryShippingRow(pricing) {
+  function renderCartSummaryShippingRow(pricing, shippingQuote) {
     return `
       <div class="pool-first-party-cart__summary-row" data-cart-summary-shipping-row>
         <span data-cart-summary-shipping-label>${escapeHtml(pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping'))}</span>
-        <strong data-cart-summary-shipping>${escapeHtml(pricing.shippingDisplayValue || formatCents(pricing.shippingCents))}</strong>
+        <div data-cart-summary-shipping-value>
+          ${renderCartShippingSummaryValue(
+            shippingQuote,
+            pricing.shippingCents,
+            pricing.shippingDisplayValue,
+            'data-cart-summary-shipping'
+          )}
+        </div>
       </div>
     `;
   }
@@ -3193,7 +3205,7 @@
               <span>${formatTaxRateLabel()}</span>
               <strong data-cart-summary-tax>${formatCents(pricing.taxCents)}</strong>
             </div>
-            ${pricing.showShippingRow ? renderCartSummaryShippingRow(pricing) : ''}
+            ${pricing.showShippingRow ? renderCartSummaryShippingRow(pricing, customCheckout?.shippingQuote) : ''}
             <div class="pool-first-party-cart__summary-row pool-first-party-cart__summary-row--total">
               <span data-cart-summary-total-label>${escapeHtml(pricing.totalLabel || getRuntimeMessage('cart.pledgeTotal', 'Pledge total'))}</span>
               <strong data-cart-summary-total>${formatCents(pricing.totalCents)}</strong>
@@ -3349,6 +3361,7 @@
       const tax = root.querySelector('[data-cart-summary-tax]');
       let shippingRow = root.querySelector('[data-cart-summary-shipping-row]');
       let shippingLabel = root.querySelector('[data-cart-summary-shipping-label]');
+      let shippingValueContainer = root.querySelector('[data-cart-summary-shipping-value]');
       let shipping = root.querySelector('[data-cart-summary-shipping]');
       const totalLabel = root.querySelector('[data-cart-summary-total-label]');
       const total = root.querySelector('[data-cart-summary-total]');
@@ -3373,9 +3386,10 @@
       }
 
       if (!shippingRow && pricing.showShippingRow && summary && totalRow) {
-        totalRow.insertAdjacentHTML('beforebegin', renderCartSummaryShippingRow(pricing));
+        totalRow.insertAdjacentHTML('beforebegin', renderCartSummaryShippingRow(pricing, checkoutUiState.customCheckout?.shippingQuote));
         shippingRow = root.querySelector('[data-cart-summary-shipping-row]');
         shippingLabel = root.querySelector('[data-cart-summary-shipping-label]');
+        shippingValueContainer = root.querySelector('[data-cart-summary-shipping-value]');
         shipping = root.querySelector('[data-cart-summary-shipping]');
       }
 
@@ -3385,12 +3399,75 @@
       if (shippingLabel) {
         shippingLabel.textContent = pricing.shippingLabel || getRuntimeMessage('cart.shipping', 'Shipping');
       }
+      if (shippingValueContainer) {
+        shippingValueContainer.innerHTML = renderCartShippingSummaryValue(
+          checkoutUiState.customCheckout?.shippingQuote || null,
+          pricing.shippingCents,
+          pricing.shippingDisplayValue,
+          'data-cart-summary-shipping'
+        );
+        shipping = root.querySelector('[data-cart-summary-shipping]');
+      }
       if (shipping) {
         shipping.textContent = pricing.shippingDisplayValue || formatCents(pricing.shippingCents);
       }
       if (totalLabel) {
         totalLabel.textContent = pricing.totalLabel || getRuntimeMessage('cart.pledgeTotal', 'Pledge total');
       }
+
+      syncCartDrawerShippingOptionUI(root);
+    }
+
+    function syncCartDrawerShippingOptionUI(root) {
+      const shippingValueContainer = root?.querySelector('[data-cart-summary-shipping-value]');
+      const shippingQuote = checkoutUiState.customCheckout?.shippingQuote || null;
+      const shippingAmount = root?.querySelector('[data-cart-summary-shipping]');
+      const pricing = getDisplayedFirstPartyPricing(store.getState(), {
+        currentRoute,
+        checkoutMode: checkoutUiState.mode,
+        shippingQuote
+      });
+
+      if (shippingValueContainer) {
+        shippingValueContainer.innerHTML = renderCartShippingSummaryValue(
+          shippingQuote,
+          pricing.shippingCents,
+          pricing.shippingDisplayValue,
+          'data-cart-summary-shipping'
+        );
+      }
+
+      const availableOptions = Array.isArray(shippingQuote?.availableOptions) ? shippingQuote.availableOptions : [];
+      const selectedOption = shippingOptionUtils.normalizeSelection(
+        availableOptions,
+        shippingQuote?.selectedOption,
+        shippingQuote?.defaultOption
+      );
+      const refreshedShippingOptionSelect = root?.querySelector('[data-cart-custom-shipping-option]');
+      if (!refreshedShippingOptionSelect) {
+        if (shippingAmount && !shouldShowCartShippingOptions(shippingQuote)) {
+          shippingAmount.textContent = pricing.shippingDisplayValue || formatCents(
+            Number.isFinite(Number(shippingQuote?.amountCents))
+              ? Math.max(0, Number(shippingQuote.amountCents))
+              : getCampaignFallbackShippingCents(
+                  store.getState()?.cart?.items?.items || [],
+                  store.getState()?.cart?.bundleAddOnAnchorCampaignSlug
+                )
+          );
+        }
+        return;
+      }
+
+      if (!shouldShowCartShippingOptions(shippingQuote)) {
+        return;
+      }
+
+      refreshedShippingOptionSelect.innerHTML = renderCartShippingOptionChoices({
+        availableOptions,
+        selectedOption,
+        defaultOption: shippingQuote?.defaultOption || 'standard'
+      });
+      refreshedShippingOptionSelect.value = selectedOption;
     }
 
     function syncCheckoutPreviewSummaryUI() {
@@ -3467,15 +3544,9 @@
       });
 
       if (shippingValueContainer) {
-        const currentShippingCents = Number.isFinite(Number(shippingQuote?.amountCents))
-          ? Math.max(0, Number(shippingQuote.amountCents))
-          : getCampaignFallbackShippingCents(
-              store.getState()?.cart?.items?.items || [],
-              store.getState()?.cart?.bundleAddOnAnchorCampaignSlug
-            );
         shippingValueContainer.innerHTML = renderCartShippingSummaryValue(
           shippingQuote,
-          currentShippingCents,
+          pricing.shippingCents,
           pricing.shippingDisplayValue
         );
       }
@@ -4836,7 +4907,11 @@
               )
             }
           };
-          syncCheckoutPreviewSummaryUI();
+          if (currentRoute === CHECKOUT_VIEW_ROUTE) {
+            syncCheckoutPreviewSummaryUI();
+          } else {
+            syncFirstPartyCartTipUI();
+          }
           return;
         }
 

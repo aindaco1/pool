@@ -1359,22 +1359,13 @@ test.describe('Checkout Flow', () => {
     await page.locator('[data-cart-custom-shipping-field="postal_code"]').fill('80205');
     await page.locator('[data-cart-custom-shipping-field="postal_code"]').dispatchEvent('change');
 
-    await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toHaveText('Estimated shipping');
-    await expect(page.locator('[data-cart-custom-shipping-option]')).toHaveValue('standard');
-    await expect.poll(() => capturedQuotePayload).not.toBeNull();
+    await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toHaveText('Shipping');
+    await expect(page.locator('[data-cart-checkout-summary-shipping]')).toHaveText('$12.00');
+    await expect(page.locator('[data-cart-custom-shipping-option]')).toHaveCount(0);
     await expect(page.locator('[data-cart-confirm-custom-checkout]')).toBeVisible();
     await expect.poll(() => capturedStartPayload).not.toBeNull();
 
-    expect(capturedQuotePayload).toMatchObject({
-      campaignSlug: 'smoke-editable',
-      items: [
-        { id: 'smoke-editable__support__signed-script', amount: 25 }
-      ],
-      shippingAddress: {
-        country: 'US',
-        postalCode: '80205'
-      }
-    });
+    expect(capturedQuotePayload).toBeNull();
     expect(capturedStartPayload).toMatchObject({
       campaignSlug: 'smoke-editable',
       items: [
@@ -1492,8 +1483,8 @@ test.describe('Checkout Flow', () => {
     await sunderButton.click();
 
     await openCartViaClient(page);
-    await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Shipping');
-    await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('$3.00');
+    await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Estimated shipping');
+    await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('--');
   });
 
   test('physical sunder tier without a ZIP shows estimated shipping and excludes shipping from the total', async ({ page }) => {

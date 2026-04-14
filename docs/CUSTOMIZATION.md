@@ -309,7 +309,7 @@ Example:
 
 ```yml
 shipping:
-  origin_zip: "80205"
+  origin_zip: "87120"
   origin_country: "US"
   fallback_flat_rate: 3.00
   free_shipping_default: false
@@ -345,6 +345,7 @@ What this enables:
 - a configured fallback rate if live carrier quoting is unavailable
 - a fork-facing USPS quote policy surface for timeouts, short-lived quote reuse, and temporary cooldowns after repeated failures or rate limiting
 - reusable `shipping_preset` names in campaign tiers so forks do not need to repeat common merch dimensions
+- optional preset-level USPS profile hints for item types that need a different domestic quote shape
 
 Preset and override metadata can include:
 
@@ -354,6 +355,11 @@ Preset and override metadata can include:
 - `width_in`
 - `height_in`
 - `stack_height_in`
+- `usps_domestic.processing_category`
+- `usps_domestic.rate_indicator`
+- `usps_domestic.destination_entry_facility_type`
+- `usps_domestic.price_type`
+- `usps_domestic.mail_classes`
 
 `weight_oz` is the item weight. `packaging_weight_oz` is a one-time packing allowance for that line item, and `stack_height_in` lets multi-quantity physical tiers stack more realistically than simple `height * qty`.
 

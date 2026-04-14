@@ -253,6 +253,19 @@ describe('shipping utilities', () => {
   it('returns standard plus domestic signature options only for domestic physical shipments', () => {
     expect(getAvailableShippingOptions(
       { SHIPPING_ORIGIN_COUNTRY: 'US' },
+      {},
+      { country: 'US', postalCode: '80205' },
+      { hasPhysical: true }
+    )).toEqual([
+      { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 0 },
+      { id: 'signature_required', label: 'Signature required', domesticOnly: true, priceDeltaCents: 395, shippingCents: 395 },
+      { id: 'adult_signature_required', label: 'Adult signature required', domesticOnly: true, priceDeltaCents: 970, shippingCents: 970 }
+    ]);
+  });
+
+  it('preserves configured domestic shipping options alongside the default domestic signature choices', () => {
+    expect(getAvailableShippingOptions(
+      { SHIPPING_ORIGIN_COUNTRY: 'US' },
       { shipping_options: ['signature_required', 'adult_signature_required'] },
       { country: 'US', postalCode: '80205' },
       { hasPhysical: true }
@@ -454,6 +467,170 @@ describe('shipping utilities', () => {
     expect(result.quote.source).toBe('usps_live');
     expect(result.quote.shippingCents).toBe(980);
     expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it('uses a shipment-level USPS domestic profile override when every physical item shares it', async () => {
+    let capturedPayload = null;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://apis-live.usps.test/oauth2/v3/token') {
+        return new Response(JSON.stringify({
+          access_token: 'token_123',
+          expires_in: 3600
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (url === 'https://apis-live.usps.test/prices/v3/base-rates/search') {
+        capturedPayload = JSON.parse(String(init?.body || '{}'));
+        return new Response(JSON.stringify({
+          totalBasePrice: 7.3,
+          rates: [
+            {
+              mailClass: 'USPS_GROUND_ADVANTAGE',
+              description: 'USPS Ground Advantage Nonstandard Single-piece'
+            }
+          ]
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await quoteCampaignShipment(
+      {
+        USPS_ENABLED: 'true',
+        USPS_CLIENT_ID: 'client',
+        USPS_CLIENT_SECRET: 'secret',
+        USPS_API_BASE: 'https://apis-live.usps.test',
+        SHIPPING_ORIGIN_ZIP: '87120',
+        SHIPPING_ORIGIN_COUNTRY: 'US',
+        SHIPPING_FALLBACK_FLAT_RATE: '3.00'
+      },
+      { slug: 'stickers' },
+      {
+        selectedTiers: [
+          {
+            qty: 1,
+            tier: {
+              id: 'sticker-pack',
+              category: 'physical',
+              shipping: {
+                weight_oz: 1,
+                packaging_weight_oz: 0.5,
+                length_in: 4,
+                width_in: 4,
+                height_in: 0.1,
+                usps_domestic: {
+                  processing_category: 'NON_MACHINABLE',
+                  rate_indicator: 'SP'
+                }
+              }
+            }
+          }
+        ]
+      },
+      { country: 'US', postalCode: '87048' }
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.quote.source).toBe('usps_live');
+    expect(result.quote.shippingCents).toBe(730);
+    expect(capturedPayload).toMatchObject({
+      originZIPCode: '87120',
+      destinationZIPCode: '87048',
+      processingCategory: 'NON_MACHINABLE',
+      rateIndicator: 'SP',
+      mailClass: 'USPS_GROUND_ADVANTAGE'
+    });
+  });
+
+  it('falls back to the default USPS parcel profile for mixed physical shipments', async () => {
+    let capturedPayload = null;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://apis-live.usps.test/oauth2/v3/token') {
+        return new Response(JSON.stringify({
+          access_token: 'token_123',
+          expires_in: 3600
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      if (url === 'https://apis-live.usps.test/prices/v3/base-rates/search') {
+        capturedPayload = JSON.parse(String(init?.body || '{}'));
+        return new Response(JSON.stringify({
+          totalBasePrice: 8.85,
+          rates: [
+            {
+              mailClass: 'USPS_GROUND_ADVANTAGE',
+              description: 'USPS Ground Advantage'
+            }
+          ]
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await quoteCampaignShipment(
+      {
+        USPS_ENABLED: 'true',
+        USPS_CLIENT_ID: 'client',
+        USPS_CLIENT_SECRET: 'secret',
+        USPS_API_BASE: 'https://apis-live.usps.test',
+        SHIPPING_ORIGIN_ZIP: '87120',
+        SHIPPING_ORIGIN_COUNTRY: 'US',
+        SHIPPING_FALLBACK_FLAT_RATE: '3.00'
+      },
+      { slug: 'mixed' },
+      {
+        selectedTiers: [
+          {
+            qty: 1,
+            tier: {
+              id: 'sticker-pack',
+              category: 'physical',
+              shipping: {
+                weight_oz: 1,
+                packaging_weight_oz: 0.5,
+                length_in: 4,
+                width_in: 4,
+                height_in: 0.1,
+                usps_domestic: {
+                  processing_category: 'NON_MACHINABLE',
+                  rate_indicator: 'SP'
+                }
+              }
+            }
+          },
+          {
+            qty: 1,
+            tier: {
+              id: 'shirt',
+              category: 'physical',
+              shipping: {
+                weight_oz: 8,
+                packaging_weight_oz: 1,
+                length_in: 12,
+                width_in: 10,
+                height_in: 1.5
+              }
+            }
+          }
+        ]
+      },
+      { country: 'US', postalCode: '87048' }
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.quote.source).toBe('usps_live');
+    expect(result.quote.shippingCents).toBe(885);
+    expect(capturedPayload).toMatchObject({
+      processingCategory: 'MACHINABLE',
+      rateIndicator: 'DR',
+      mailClass: 'USPS_GROUND_ADVANTAGE'
+    });
   });
 
   it('uses the global fallback rate when a campaign does not set an override', () => {
