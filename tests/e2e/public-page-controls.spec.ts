@@ -77,7 +77,28 @@ test.describe('Public Page Keyboard Controls', () => {
     await expect.poll(() => gallery.evaluate((node: Element) => (node as HTMLElement).scrollLeft)).toBeGreaterThan(0);
 
     await page.keyboard.press('End');
-    await expect.poll(() => gallery.evaluate((node: Element) => (node as HTMLElement).scrollLeft)).toBeGreaterThanOrEqual(900);
+    await expect
+      .poll(() =>
+        gallery.evaluate((node: Element) => {
+          const el = node as HTMLElement;
+          return {
+            scrollLeft: el.scrollLeft,
+            maxScrollLeft: el.scrollWidth - el.clientWidth
+          };
+        })
+      )
+      .toMatchObject({
+        scrollLeft: expect.any(Number),
+        maxScrollLeft: expect.any(Number)
+      });
+    await expect
+      .poll(() =>
+        gallery.evaluate((node: Element) => {
+          const el = node as HTMLElement;
+          return (el.scrollWidth - el.clientWidth) - el.scrollLeft;
+        })
+      )
+      .toBeLessThanOrEqual(180);
 
     await page.keyboard.press('Home');
     await expect.poll(() => gallery.evaluate((node: Element) => (node as HTMLElement).scrollLeft)).toBe(0);
