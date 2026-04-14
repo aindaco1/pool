@@ -787,7 +787,7 @@
     }
 
     .addon-product-card__field--qty .tier-option__quantity {
-      justify-content: flex-start;
+      justify-content: flex-end;
     }
 
     .btn {
@@ -828,6 +828,8 @@
       .support-option-item__input.support-option-item__input--no-variant {
         width: min(100%, var(--manage-selected-addon-remove-width));
         min-width: 0;
+        justify-self: end;
+        margin-left: auto;
       }
 
       .support-option-item__input--no-variant .btn {

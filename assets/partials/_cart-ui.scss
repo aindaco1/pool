@@ -352,7 +352,8 @@ body.pool-cart-open {
   grid-area: controls;
   display: grid;
   width: 100%;
-  grid-template-columns: 64px;
+  grid-template-columns: max-content;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
   margin-top: 2px;
