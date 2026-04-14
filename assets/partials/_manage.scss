@@ -801,7 +801,7 @@
       padding-right: 0;
     }
 
-    @include sm {
+    @include xsm {
       .support-option-item {
         grid-template-columns: 96px minmax(0, 1fr);
         grid-template-areas:
@@ -810,28 +810,29 @@
       }
 
       .support-option-item__input {
-        justify-self: stretch;
+        justify-self: end;
         margin-left: 0;
       }
 
       .support-option-item__input.support-option-item__input--with-variant {
-        width: 100%;
+        width: min(100%, 324px);
         min-width: 0;
         grid-template-columns: minmax(0, 1fr) max-content;
       }
 
       .support-option-item__input.support-option-item__input--with-variant .btn {
-        width: 100%;
-        min-width: 0;
+        width: var(--manage-selected-addon-remove-width);
+        min-width: var(--manage-selected-addon-remove-width);
       }
 
       .support-option-item__input.support-option-item__input--no-variant {
+        width: min(100%, var(--manage-selected-addon-remove-width));
         min-width: 0;
       }
 
       .support-option-item__input--no-variant .btn {
-        width: 100%;
-        min-width: 0;
+        width: var(--manage-selected-addon-remove-width);
+        min-width: var(--manage-selected-addon-remove-width);
       }
     }
   }
