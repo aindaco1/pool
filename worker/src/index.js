@@ -597,6 +597,8 @@ function buildPledgeItemsPayload(campaign, canonicalContribution, bundleAddOns =
     return { ...tier, name: tierData?.name || tier.id };
   });
   const supportItemsWithLabels = getSupportItemsWithLabels(campaign, canonicalContribution.supportItems || []);
+  const hasPhysicalShipping = canonicalContribution.hasPhysical === true ||
+    (Array.isArray(bundleAddOns) && bundleAddOns.some((addOn) => String(addOn?.category || '').trim().toLowerCase() === 'physical'));
 
   return {
     tierName: canonicalContribution.tierName,
@@ -604,7 +606,10 @@ function buildPledgeItemsPayload(campaign, canonicalContribution, bundleAddOns =
     additionalTiers: additionalTiersWithNames,
     supportItems: supportItemsWithLabels,
     addOns: getBundleAddOnsWithLabels(bundleAddOns),
-    customAmount: canonicalContribution.customAmount
+    customAmount: canonicalContribution.customAmount,
+    shippingOption: hasPhysicalShipping
+      ? (canonicalContribution.shippingOption || 'standard')
+      : ''
   };
 }
 
@@ -613,6 +618,7 @@ function normalizePledgeItemsForComparison(pledgeItems = {}) {
     tierName: String(pledgeItems?.tierName || ''),
     tierQty: Math.max(0, Number(pledgeItems?.tierQty || 0)),
     customAmount: Math.max(0, Number(pledgeItems?.customAmount || 0)),
+    shippingOption: String(pledgeItems?.shippingOption || '').trim().toLowerCase(),
     additionalTiers: (pledgeItems?.additionalTiers || []).map((tier) => ({
       id: String(tier?.id || ''),
       name: String(tier?.name || ''),
@@ -1331,7 +1337,7 @@ async function buildCanonicalContributionForStoredShipping(env, campaign, {
         { selectedTiers: [] },
         normalizedDestination.destination,
         [],
-        'standard',
+        shippingOption,
         platformBundleAddOns
       );
       if (!platformShipment.valid) {
@@ -2663,7 +2669,7 @@ async function handleShippingQuote(request, env) {
       { selectedTiers: [] },
       normalizedDestination.destination,
       [],
-      'standard',
+      shippingOption,
       platformBundleAddOns
     );
     if (!platformQuote.valid) {

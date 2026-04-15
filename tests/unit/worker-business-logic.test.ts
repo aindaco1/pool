@@ -892,6 +892,7 @@ describe('Worker business logic hardening', () => {
       expect.objectContaining({
         email: 'buyer@example.com',
         pledgeItems: expect.objectContaining({
+          shippingOption: 'standard',
           addOns: [
             expect.objectContaining({
               productId: 'dust-wave-tshirt',
@@ -899,6 +900,190 @@ describe('Worker business logic hardening', () => {
               variantLabel: 'L'
             })
           ]
+        })
+      })
+    );
+  });
+
+  it('includes the updated delivery option in the modification email payload', async () => {
+    mockVerifyToken.mockResolvedValue({
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      orderId: 'pool-intent-shipping-option-123'
+    });
+
+    const env = createEnv();
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('pledge:pool-intent-shipping-option-123', JSON.stringify({
+      orderId: 'pool-intent-shipping-option-123',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'active',
+      charged: false,
+      tierId: 'frame-slot',
+      tierName: 'Buy 1 Frame',
+      tierQty: 1,
+      additionalTiers: [],
+      supportItems: [],
+      customAmount: 0,
+      subtotal: 1000,
+      goalTrackingSubtotal: 1000,
+      tax: 79,
+      shipping: 730,
+      tipPercent: 5,
+      tipAmount: 50,
+      amount: 1859,
+      shippingOption: 'standard',
+      preferredLang: 'en',
+      shippingAddress: {
+        postalCode: '87048',
+        country: 'US'
+      },
+      hasPhysical: true,
+      bundleAddOns: []
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge/modify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: 'magic-token',
+          orderId: 'pool-intent-shipping-option-123',
+          preferredLang: 'en',
+          shippingOption: 'signature_required'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSendPledgeModifiedEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendPledgeModifiedEmail).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        email: 'buyer@example.com',
+        pledgeItems: expect.objectContaining({
+          shippingOption: 'signature_required'
+        })
+      })
+    );
+  });
+
+  it('persists updated shipping pricing for platform physical add-ons when the delivery option changes', async () => {
+    mockVerifyToken.mockResolvedValue({
+      email: 'buyer@example.com',
+      campaignSlug: 'smoke-editable',
+      orderId: 'pool-intent-platform-shipping-option-123'
+    });
+
+    const env = createEnv({
+      USPS_API_BASE: 'https://apis-modify.usps.test',
+      USPS_CLIENT_ID: 'usps_test_client',
+      USPS_CLIENT_SECRET: 'usps_test_secret'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('pledge:pool-intent-platform-shipping-option-123', JSON.stringify({
+      orderId: 'pool-intent-platform-shipping-option-123',
+      email: 'buyer@example.com',
+      campaignSlug: 'smoke-editable',
+      pledgeStatus: 'active',
+      charged: false,
+      tierId: 'standard-pass',
+      tierName: 'Standard Pass',
+      tierQty: 1,
+      additionalTiers: [],
+      supportItems: [],
+      customAmount: 0,
+      subtotal: 3500,
+      goalTrackingSubtotal: 1000,
+      tax: 276,
+      shipping: 885,
+      tipPercent: 5,
+      tipAmount: 175,
+      amount: 4836,
+      shippingOption: 'standard',
+      preferredLang: 'en',
+      shippingAddress: {
+        postalCode: '87048',
+        country: 'US'
+      },
+      hasPhysical: true,
+      bundleAddOns: [
+        {
+          productId: 'dust-wave-tshirt',
+          name: 'DUST WAVE T-Shirt',
+          variantId: 'm',
+          variantLabel: 'M',
+          quantity: 1,
+          unitPrice: 2500,
+          category: 'physical',
+          shipping_preset: 'tshirt',
+          shipping: {
+            weight_oz: 6.5,
+            packaging_weight_oz: 1,
+            length_in: 12,
+            width_in: 10,
+            height_in: 1.5,
+            stack_height_in: 0.5
+          },
+          scope: 'platform'
+        }
+      ]
+    }));
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture, singleTierCampaignFixture, smokeEditableCampaignFixture, metadataFallbackCampaignFixture] });
+      }
+      if (url === 'https://pool.test/api/add-ons.json') {
+        return jsonResponse(addOnCatalogFixture);
+      }
+      if (url === 'https://apis-modify.usps.test/oauth2/v3/token') {
+        return jsonResponse({ access_token: 'token_modify', expires_in: 3600 });
+      }
+      if (url === 'https://apis-modify.usps.test/prices/v3/base-rates/search') {
+        return jsonResponse({
+          totalBasePrice: 8.85,
+          rates: [
+            {
+              mailClass: 'USPS_GROUND_ADVANTAGE',
+              description: 'USPS Ground Advantage'
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge/modify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: 'magic-token',
+          orderId: 'pool-intent-platform-shipping-option-123',
+          preferredLang: 'en',
+          shippingOption: 'signature_required'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(kv.get('pledge:pool-intent-platform-shipping-option-123', { type: 'json' })).resolves.toMatchObject({
+      shipping: 1280,
+      amount: 5231,
+      shippingOption: 'signature_required'
+    });
+    expect(mockSendPledgeModifiedEmail).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        pledgeItems: expect.objectContaining({
+          shippingOption: 'signature_required'
         })
       })
     );

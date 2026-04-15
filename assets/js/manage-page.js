@@ -1098,7 +1098,8 @@
           campaignSlug: pledge.campaignSlug,
           items,
           shippingAddress: address,
-          bundleAddOnAnchorCampaignSlug: pledge.campaignSlug
+          bundleAddOnAnchorCampaignSlug: pledge.campaignSlug,
+          shippingOption: String(selectedShippingOption || 'standard').trim().toLowerCase() || 'standard'
         })
       });
 

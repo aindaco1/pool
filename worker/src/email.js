@@ -211,7 +211,20 @@ function getInstagramCTA(instagramUrl, siteBase = FALLBACK_SITE_BASE, t = (_key,
 }
 
 // Render pledge items (tiers, support items, custom amount) for email display
-function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportItems = [], addOns = [], customAmount = 0 }, t = (_key, fallback) => fallback) {
+function getShippingOptionEmailLabel(optionId, t = (_key, fallback) => fallback) {
+  const normalized = String(optionId || 'standard').trim().toLowerCase() || 'standard';
+  switch (normalized) {
+    case 'signature_required':
+      return t('common.shipping_option_signature_required', 'Signature required');
+    case 'adult_signature_required':
+      return t('common.shipping_option_adult_signature_required', 'Adult signature required');
+    case 'standard':
+    default:
+      return t('common.shipping_option_standard', 'Standard');
+  }
+}
+
+function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportItems = [], addOns = [], customAmount = 0, shippingOption = '' }, t = (_key, fallback) => fallback) {
   const items = [];
   
   // Main tier
@@ -247,6 +260,12 @@ function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportIte
   // Custom amount
   if (customAmount > 0) {
     items.push(`<li style="margin: 4px 0;">${escapeHtml(t('common.additional_support', 'Additional support'))}: $${customAmount.toFixed(2)}</li>`);
+  }
+
+  if (shippingOption) {
+    items.push(
+      `<li style="margin: 4px 0;">${escapeHtml(t('common.delivery_option', 'Delivery option'))}: ${escapeHtml(getShippingOptionEmailLabel(shippingOption, t))}</li>`
+    );
   }
   
   if (items.length === 0) return '';

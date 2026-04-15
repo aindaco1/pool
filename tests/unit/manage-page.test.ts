@@ -615,6 +615,15 @@ describe('manage page script', () => {
     getButton('#confirm-modal-confirm').click();
 
     await vi.waitFor(() => {
+      const shippingQuoteCalls = fetchMock.mock.calls.filter(
+        ([url, requestInit]) => url === `${WORKER_BASE}/shipping/quote` && requestInit?.method === 'POST'
+      );
+      expect(shippingQuoteCalls.length).toBeGreaterThan(0);
+      const [, latestShippingQuoteInit] = shippingQuoteCalls.at(-1) || [];
+      expect(JSON.parse(String(latestShippingQuoteInit?.body || '{}'))).toMatchObject({
+        shippingOption: 'signature_required'
+      });
+
       const modifyCall = fetchMock.mock.calls.find(
         ([url]) => url === `${WORKER_BASE}/pledge/modify`
       );
