@@ -2624,6 +2624,8 @@ describe('Worker business logic hardening', () => {
       }
     };
 
+    const waitUntilPromises: Promise<unknown>[] = [];
+
     const response = await worker.fetch(
       new Request('https://pool.test/webhooks/stripe', {
         method: 'POST',
@@ -3441,6 +3443,8 @@ describe('Worker business logic hardening', () => {
       }
     };
 
+    const waitUntilPromises: Promise<unknown>[] = [];
+
     const response = await worker.fetch(
       new Request('https://pool.test/webhooks/stripe', {
         method: 'POST',
@@ -3451,7 +3455,7 @@ describe('Worker business logic hardening', () => {
         body: JSON.stringify(webhookEvent)
       }),
       env,
-      { waitUntil: () => {} }
+      { waitUntil: (promise) => { waitUntilPromises.push(promise); } }
     );
 
     expect(response.status).toBe(200);
@@ -3596,6 +3600,8 @@ describe('Worker business logic hardening', () => {
       }
     };
 
+    const waitUntilPromises: Promise<unknown>[] = [];
+
     const response = await worker.fetch(
       new Request('https://pool.test/webhooks/stripe', {
         method: 'POST',
@@ -3606,7 +3612,7 @@ describe('Worker business logic hardening', () => {
         body: JSON.stringify(webhookEvent)
       }),
       env,
-      { waitUntil: () => {} }
+      { waitUntil: (promise) => { waitUntilPromises.push(promise); } }
     );
 
     expect(response.status).toBe(200);
@@ -3620,6 +3626,7 @@ describe('Worker business logic hardening', () => {
       campaignSlug: 'hand-relations',
       tierId: 'frame-slot'
     });
+    await Promise.allSettled(waitUntilPromises);
     expect(mockSendSupporterEmail).toHaveBeenCalledTimes(2);
     expect(mockSendSupporterEmail.mock.calls.map(([, payload]) => payload)).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -4236,6 +4243,140 @@ describe('Worker business logic hardening', () => {
     expect(await kv.get(`pledge:${orderId}`, { type: 'json' })).toMatchObject({
       orderId,
       campaignSlug: 'hand-relations'
+    });
+  });
+
+  it('does not block first-party checkout completion on supporter email delivery', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      TIER_INVENTORY_COORDINATOR: undefined
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    const tierInventory = new StatefulTierInventoryNamespace(kv);
+    (env as Record<string, unknown>).TIER_INVENTORY_COORDINATOR = tierInventory;
+
+    const orderId = 'pool-intent-email-nonblocking-1';
+    const checkoutCartHash = await hashCheckoutBundle(buildCheckoutBundleHashInput({
+      contributions: [{
+        campaignSlug: 'hand-relations',
+        canonicalContribution: {
+          tierId: 'frame-slot',
+          tierName: 'Buy 1 Frame',
+          tierQty: 1,
+          selectedTiers: [{ id: 'frame-slot', qty: 1 }],
+          additionalTiers: [],
+          supportItems: [],
+          customAmount: 0,
+          hasPhysical: false,
+          totals: {
+            subtotal: 500,
+            tax: 39,
+            shipping: 0,
+            tipPercent: 5,
+            tipAmount: 25,
+            amount: 564
+          }
+        },
+        tipPercent: 5
+      }]
+    }));
+
+    await kv.put(`pending-checkout:${orderId}`, JSON.stringify({
+      orderId,
+      checkoutProvider: 'first_party',
+      campaignCount: 1,
+      tipPercent: 5,
+      totals: {
+        subtotal: 500,
+        tax: 39,
+        shipping: 0,
+        tipAmount: 25,
+        amount: 564
+      },
+      campaigns: [{
+        orderId,
+        campaignSlug: 'hand-relations',
+        tierId: 'frame-slot',
+        tierName: 'Buy 1 Frame',
+        tierQty: 1,
+        additionalTiers: [],
+        supportItems: [],
+        customAmount: 0,
+        hasPhysical: false,
+        totals: {
+          subtotal: 500,
+          tax: 39,
+          shipping: 0,
+          tipAmount: 25,
+          amount: 564
+        }
+      }]
+    }));
+
+    mockStripeClient.checkout.sessions.retrieve.mockResolvedValueOnce({
+      id: 'cs_complete_email_fail_1',
+      status: 'complete',
+      mode: 'setup',
+      customer_email: 'buyer@example.com',
+      customer: 'cus_123',
+      created: 1775000000,
+      setup_intent: 'seti_123',
+      metadata: {
+        orderId,
+        campaignSlug: 'hand-relations',
+        amountCents: '500',
+        tierId: 'frame-slot',
+        tierName: 'Buy 1 Frame',
+        tierQty: '1',
+        tipPercent: '5',
+        hasAdditionalTiers: '',
+        hasExtras: '',
+        hasPhysical: '',
+        isPaymentUpdate: '',
+        checkoutProvider: 'first_party',
+        checkoutNonce: 'nonce_email_nonblocking_1',
+        checkoutCartHash,
+        checkoutSnapshotVersion: '1'
+      }
+    });
+
+    mockSendSupporterEmail.mockRejectedValueOnce(new Error('resend unavailable'));
+    const waitUntilPromises: Promise<unknown>[] = [];
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          sessionId: 'cs_complete_email_fail_1'
+        })
+      }),
+      env,
+      { waitUntil: (promise) => { waitUntilPromises.push(promise); } }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      recovered: true,
+      persisted: true,
+      orderId
+    });
+    expect(await kv.get(`pledge:${orderId}`, { type: 'json' })).toMatchObject({
+      orderId,
+      campaignSlug: 'hand-relations'
+    });
+    await expect(kv.get(`pending-checkout:${orderId}`, { type: 'json' })).resolves.toMatchObject({
+      confirmedAt: expect.any(String)
+    });
+
+    await Promise.allSettled(waitUntilPromises);
+    expect(mockSendSupporterEmail).toHaveBeenCalledTimes(1);
+    await expect(kv.get(`supporter-email-retry:${orderId}`, { type: 'json' })).resolves.toMatchObject({
+      orderId,
+      attempts: 1,
+      lastError: 'resend unavailable'
     });
   });
 

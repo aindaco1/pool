@@ -24,6 +24,7 @@ const mockStripeClient = {
 
 const mockSendAnnouncementEmail = vi.fn(async () => {});
 const mockSendMilestoneEmail = vi.fn(async () => {});
+const mockSendSupporterEmail = vi.fn(async () => {});
 
 vi.mock('../../worker/src/stripe.js', () => ({
   verifyStripeSignature: vi.fn(async () => ({ valid: true })),
@@ -36,7 +37,7 @@ vi.mock('../../worker/src/token.js', () => ({
 }));
 
 vi.mock('../../worker/src/email.js', () => ({
-  sendSupporterEmail: vi.fn(async () => {}),
+  sendSupporterEmail: mockSendSupporterEmail,
   sendPaymentFailedEmail: vi.fn(async () => {}),
   sendPledgeModifiedEmail: vi.fn(async () => {}),
   sendPledgeCancelledEmail: vi.fn(async () => {}),
@@ -196,6 +197,48 @@ beforeEach(() => {
 });
 
 describe('worker operational integrity', () => {
+  it('retries queued supporter confirmation emails on the retry cron', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('pledge:pool-intent-retry-1', JSON.stringify({
+      orderId: 'pool-intent-retry-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'active',
+      charged: false
+    }));
+    await kv.put('supporter-email-retry:pool-intent-retry-1', JSON.stringify({
+      orderId: 'pool-intent-retry-1',
+      payload: {
+        email: 'buyer@example.com',
+        campaignSlug: 'hand-relations',
+        campaignTitle: 'Hand Relations',
+        subtotal: 500,
+        tax: 39,
+        shipping: 0,
+        tipAmount: 25,
+        tipPercent: 5,
+        token: 'token'
+      },
+      attempts: 1,
+      createdAt: '2026-04-14T00:00:00.000Z',
+      lastAttemptAt: '2026-04-14T00:05:00.000Z',
+      nextAttemptAt: '2026-04-14T00:10:00.000Z',
+      lastError: 'resend unavailable'
+    }));
+
+    await worker.scheduled({ cron: '*/15 * * * *' }, env, { waitUntil: () => {} });
+
+    expect(mockSendSupporterEmail).toHaveBeenCalledTimes(1);
+    await expect(kv.get('supporter-email-retry:pool-intent-retry-1')).resolves.toBeNull();
+    await expect(kv.get('pledge:pool-intent-retry-1', { type: 'json' })).resolves.toMatchObject({
+      emailSent: true,
+      emailError: null
+    });
+    await expect(kv.get('cron:lastEmailRetryRun')).resolves.toBeTruthy();
+  });
+
   it('does not mark direct settlement complete when active pledges are skipped for missing customers', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;

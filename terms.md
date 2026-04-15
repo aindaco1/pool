@@ -54,7 +54,7 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - **Before funding:** Cancel anytime via your pledge management link. Your card will not be charged.
 - **After funding:** Once a campaign reaches its goal and charges are processed, refunds are handled on a case-by-case basis.
 - Cancelled pledges are never charged.
-- Contact us at support@dustwave.xyz for refund requests or issues.
+- Contact us at info@dustwave.xyz for refund requests or issues.
 
 ## Privacy & Data
 
@@ -80,7 +80,7 @@ Pledge data is stored in Cloudflare KV. This architecture means lower overhead c
 
 ## Questions
 
-For questions about these terms or your pledge, email us at support@dustwave.xyz.
+For questions about these terms or your pledge, email us at info@dustwave.xyz.
 
 ---
 

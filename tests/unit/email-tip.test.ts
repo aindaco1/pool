@@ -13,6 +13,7 @@ const env = {
   SITE_BASE: 'https://pool.test',
   PLATFORM_NAME: 'The Pool',
   PLATFORM_COMPANY_NAME: 'Dust Wave',
+  SUPPORT_EMAIL: 'info@pool.test',
   PLEDGES_EMAIL_FROM: 'The Pool <pledges@pool.test>',
   UPDATES_EMAIL_FROM: 'The Pool <updates@pool.test>',
   I18N_CATALOG_JSON: JSON.stringify({ en: { email: {} } })
@@ -63,6 +64,8 @@ describe('supporter email tip breakdowns', () => {
     expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Total (if funded): $42.86');
     expect(payload.from).toBe('The Pool <pledges@pool.test>');
+    expect(payload.reply_to).toBe('info@pool.test');
+    expect(payload.text).toContain('Total (if funded): $42.86');
   });
 
   it('includes the platform tip line in pledge modified emails', async () => {
@@ -90,6 +93,7 @@ describe('supporter email tip breakdowns', () => {
     expect(payload.html).toContain('$1.75 → $2.10 (+$0.35, 6%)');
     expect(payload.html).toContain('New total (if funded): $42.86');
     expect(payload.from).toBe('The Pool <pledges@pool.test>');
+    expect(payload.reply_to).toBe('info@pool.test');
   });
 
   it('includes the platform tip line in payment failed emails', async () => {
@@ -112,6 +116,7 @@ describe('supporter email tip breakdowns', () => {
     expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Amount due: $42.86');
     expect(payload.from).toBe('The Pool <pledges@pool.test>');
+    expect(payload.reply_to).toBe('info@pool.test');
   });
 
   it('includes the platform tip line in charge success emails', async () => {
@@ -134,6 +139,7 @@ describe('supporter email tip breakdowns', () => {
     expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Amount charged: $42.86');
     expect(payload.from).toBe('The Pool <pledges@pool.test>');
+    expect(payload.reply_to).toBe('info@pool.test');
   });
 
   it('includes the platform tip line in cancellation emails', async () => {
@@ -155,6 +161,7 @@ describe('supporter email tip breakdowns', () => {
     expect(payload.html).toContain(PLATFORM_TIP_LINE);
     expect(payload.html).toContain('Released total: $42.86');
     expect(payload.from).toBe('The Pool <pledges@pool.test>');
+    expect(payload.reply_to).toBe('info@pool.test');
   });
 
   it('uses Spanish email copy when preferredLang is es', async () => {

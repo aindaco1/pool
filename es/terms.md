@@ -55,7 +55,7 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - **Antes de la financiación:** puedes cancelar en cualquier momento mediante tu enlace de gestión del aporte. No se realizará ningún cobro.
 - **Después de la financiación:** una vez que una campaña alcanza su meta y se procesan los cobros, los reembolsos se gestionan caso por caso.
 - Los aportes cancelados nunca se cobran.
-- Contáctanos en support@dustwave.xyz para solicitudes de reembolso o incidencias.
+- Contáctanos en info@dustwave.xyz para solicitudes de reembolso o incidencias.
 
 ## Privacidad y datos
 
@@ -81,7 +81,7 @@ Los datos de los aportes se almacenan en Cloudflare KV. Esta arquitectura implic
 
 ## Preguntas
 
-Si tienes preguntas sobre estos términos o sobre tu aporte, escribe a support@dustwave.xyz.
+Si tienes preguntas sobre estos términos o sobre tu aporte, escribe a info@dustwave.xyz.
 
 ---
 

@@ -12,6 +12,7 @@ const env = {
   SITE_BASE: 'https://pool.test',
   PLATFORM_NAME: 'The Pool',
   PLATFORM_COMPANY_NAME: 'Dust Wave',
+  SUPPORT_EMAIL: 'info@pool.test',
   PLEDGES_EMAIL_FROM: 'The Pool <pledges@pool.test>',
   UPDATES_EMAIL_FROM: 'The Pool <updates@pool.test>',
   I18N_CATALOG_JSON: JSON.stringify({ en: { email: {} } })
@@ -70,7 +71,7 @@ describe('email HTML security', () => {
     expect(payload.html).not.toContain('Share to your Story!');
   });
 
-  it('uses a public https asset base for instagram email icons even in local dev', async () => {
+  it('keeps supporter Instagram CTAs lightweight in local dev', async () => {
     const fetchMock = mockResend();
 
     await sendSupporterEmail(
@@ -87,6 +88,32 @@ describe('email HTML security', () => {
         shipping: 300,
         tipAmount: 210,
         tipPercent: 6,
+        token: 'magic-token',
+        instagramUrl: 'https://www.instagram.com/dustwave.xyz/'
+      }
+    );
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.html).toContain('Share this campaign on Instagram');
+    expect(payload.html).not.toContain('/assets/images/instagram-white.png');
+    expect(payload.reply_to).toBe('info@pool.test');
+  });
+
+  it('uses a public https asset base for prominent instagram email icons even in local dev', async () => {
+    const fetchMock = mockResend();
+
+    await sendDiaryUpdateEmail(
+      {
+        ...env,
+        SITE_BASE: 'http://127.0.0.1:4000'
+      },
+      {
+        email: 'supporter@example.com',
+        campaignSlug: 'sunder',
+        campaignTitle: 'sunder',
+        diaryTitle: 'A real update',
+        diaryExcerpt: 'line 1',
+        diaryPhase: 'edit',
         token: 'magic-token',
         instagramUrl: 'https://www.instagram.com/dustwave.xyz/'
       }
@@ -122,6 +149,7 @@ describe('email HTML security', () => {
 
     const payload = getEmailPayload(fetchMock);
     expect(payload.from).toBe('Fork Pool <pledges@fork.test>');
+    expect(payload.reply_to).toBe('info@pool.test');
     expect(payload.html).toContain('Fork Studio tip (6%): $2.10');
     expect(payload.html).toContain('visit <a href="https://pool.test/" style="color: #000;">Fork Pool</a>');
   });
@@ -144,6 +172,7 @@ describe('email HTML security', () => {
     expect(payload.html).toContain('line 1<br>&lt;script&gt;alert(2)&lt;/script&gt;');
     expect(payload.html).not.toContain('<script>alert(2)</script>');
     expect(payload.from).toBe('The Pool <updates@pool.test>');
+    expect(payload.reply_to).toBe('info@pool.test');
   });
 
   it('sanitizes announcement body and omits unsafe CTA urls', async () => {
@@ -167,6 +196,7 @@ describe('email HTML security', () => {
     expect(payload.html).not.toContain('javascript:alert(3)');
     expect(payload.html).not.toContain('&lt;b&gt;Click me&lt;/b&gt;');
     expect(payload.from).toBe('The Pool <updates@pool.test>');
+    expect(payload.reply_to).toBe('info@pool.test');
   });
 
   it('escapes stretch goal names in milestone emails', async () => {

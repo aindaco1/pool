@@ -13,6 +13,7 @@ import {
   getPlatformName,
   getPledgesEmailFrom,
   getSiteBase,
+  getSupportEmail,
   getUpdatesEmailFrom
 } from './provider-config.js';
 import { getScopedConsole } from './logger.js';
@@ -39,6 +40,36 @@ function escapeHtml(value) {
 
 function formatEmailText(value) {
   return escapeHtml(value).replace(/\r?\n/g, '<br>');
+}
+
+function decodeHtmlEntities(value) {
+  return String(value ?? '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+}
+
+function buildPlainTextFromHtml(html) {
+  return decodeHtmlEntities(
+    String(html ?? '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_match, href, text) => {
+        const label = String(text || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        return label ? `${label} (${href})` : href;
+      })
+      .replace(/<li\b[^>]*>/gi, '\n- ')
+      .replace(/<(br|\/p|\/div|\/h[1-6]|\/tr)\s*\/?>/gi, '\n')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim()
+  );
 }
 
 function normalizeLang(value, fallback = DEFAULT_I18N_LANG) {
@@ -192,19 +223,55 @@ function safeInstagramUrl(instagramUrl) {
   }
 }
 
+function buildResendPayload(env, payload) {
+  const replyTo = String(getSupportEmail(env) || '').trim();
+  return {
+    ...payload,
+    ...(replyTo ? { reply_to: replyTo } : {}),
+    text: payload.text || buildPlainTextFromHtml(payload.html)
+  };
+}
+
+async function sendResendEmail(env, payload, { errorLabel = 'Resend error', failureLabel = 'Failed to send email' } = {}) {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(buildResendPayload(env, payload))
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error(`${errorLabel}:`, error);
+    throw new Error(`${failureLabel}: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 // Instagram CTA block for emails (when campaign has instagram field)
-function getInstagramCTA(instagramUrl, siteBase = FALLBACK_SITE_BASE, t = (_key, fallback) => fallback) {
+function getInstagramCTA(instagramUrl, siteBase = FALLBACK_SITE_BASE, t = (_key, fallback) => fallback, { variant = 'prominent' } = {}) {
   const safeInstagramHref = safeInstagramUrl(instagramUrl);
   if (!safeInstagramHref) return '';
-  
+
+  if (variant === 'subtle') {
+    return `
+  <div style="margin: 24px 0 0 0; padding-top: 16px; border-top: 1px solid #eee; font-size: 13px; color: #666;">
+    <p style="margin: 0 0 8px 0;">${escapeHtml(t('common.instagram_optional', 'Optional: help spread the word on Instagram.'))}</p>
+    <a href="${safeInstagramHref}" style="color: #000; text-decoration: underline;">${escapeHtml(t('common.instagram_share_secondary', 'Share this campaign on Instagram'))}</a>
+  </div>`;
+  }
+
   // Instagram logo hosted on our own domain (third-party URLs trigger Gmail spam filters)
   const instagramIcon = `<img src="${safeSiteUrl('/assets/images/instagram-white.png', getEmailAssetBase(siteBase))}" alt="Instagram" width="20" height="20" style="vertical-align: middle; margin-right: 8px;">`;
-  
+
   return `
   <div style="background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); border-radius: 8px; padding: 16px 20px; margin: 24px 0; text-align: center;">
     <a href="${safeInstagramHref}" style="color: #fff; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;">
       ${instagramIcon}
-      <span>${escapeHtml(t('common.instagram_share', 'Share to your Story!'))}</span>
+      <span>${escapeHtml(t('common.instagram_share', 'Share this campaign on Instagram'))}</span>
     </a>
     <p style="margin: 8px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.9);">${escapeHtml(t('common.instagram_help', 'Help spread the word on Instagram'))}</p>
   </div>`;
@@ -315,7 +382,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
   const communityUrl = safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const siteHomeUrl = getSiteRootUrl(env.SITE_BASE);
   const platformName = escapeHtml(getPlatformName(env));
-  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t);
+  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { variant: 'subtle' });
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
@@ -375,27 +442,12 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
 </html>
   `.trim();
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: getPledgesEmailFrom(env),
-      to: email,
-      subject: t('subjects.pledge_confirmed', 'Your pledge to %{campaign}', { campaign: campaignTitle }),
-      html
-    })
+  return sendResendEmail(env, {
+    from: getPledgesEmailFrom(env),
+    to: email,
+    subject: t('subjects.pledge_confirmed', 'Your pledge to %{campaign}', { campaign: campaignTitle }),
+    html
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Resend error:', error);
-    throw new Error(`Failed to send email: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 /**
@@ -413,7 +465,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   const diff = Math.abs(newTotal - previousTotal);
   const tipChanged = Number(previousTipAmount || 0) !== Number(tipAmount || 0);
   const tipDelta = Number(tipAmount || 0) - Number(previousTipAmount || 0);
-  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t);
+  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { variant: 'subtle' });
   const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal: newSubtotal,
@@ -473,27 +525,12 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
 </html>
   `.trim();
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: getPledgesEmailFrom(env),
-      to: email,
-      subject: t('subjects.pledge_updated', 'Pledge updated for %{campaign}', { campaign: campaignTitle }),
-      html
-    })
+  return sendResendEmail(env, {
+    from: getPledgesEmailFrom(env),
+    to: email,
+    subject: t('subjects.pledge_updated', 'Pledge updated for %{campaign}', { campaign: campaignTitle }),
+    html
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Resend error:', error);
-    throw new Error(`Failed to send email: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 /**
@@ -549,27 +586,12 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
 </html>
   `.trim();
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: getPledgesEmailFrom(env),
-      to: email,
-      subject: t('subjects.payment_failed', 'Action needed: Update payment for %{campaign}', { campaign: campaignTitle }),
-      html
-    })
+  return sendResendEmail(env, {
+    from: getPledgesEmailFrom(env),
+    to: email,
+    subject: t('subjects.payment_failed', 'Action needed: Update payment for %{campaign}', { campaign: campaignTitle }),
+    html
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Resend error:', error);
-    throw new Error(`Failed to send email: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 /**
@@ -635,27 +657,12 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
 </html>
   `.trim();
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: getPledgesEmailFrom(env),
-      to: email,
-      subject: t('subjects.charge_success', 'Payment confirmed for %{campaign}', { campaign: campaignTitle }),
-      html
-    })
+  return sendResendEmail(env, {
+    from: getPledgesEmailFrom(env),
+    to: email,
+    subject: t('subjects.charge_success', 'Payment confirmed for %{campaign}', { campaign: campaignTitle }),
+    html
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Resend error:', error);
-    throw new Error(`Failed to send email: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 /**
@@ -720,27 +727,15 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
 </html>
   `.trim();
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: getUpdatesEmailFrom(env),
-      to: email,
-      subject: t('subjects.diary_update', '📝 %{title} — %{campaign}', { title: diaryTitle, campaign: campaignTitle }),
-      html
-    })
+  return sendResendEmail(env, {
+    from: getUpdatesEmailFrom(env),
+    to: email,
+    subject: t('subjects.diary_update', '📝 %{title} — %{campaign}', { title: diaryTitle, campaign: campaignTitle }),
+    html
+  }, {
+    errorLabel: 'Resend error (diary)',
+    failureLabel: 'Failed to send diary email'
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Resend error (diary):', error);
-    throw new Error(`Failed to send diary email: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 /**
@@ -795,27 +790,15 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
 </html>
   `.trim();
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: getPledgesEmailFrom(env),
-      to: email,
-      subject: t('subjects.pledge_cancelled', 'Pledge cancelled for %{campaign}', { campaign: campaignTitle }),
-      html
-    })
+  return sendResendEmail(env, {
+    from: getPledgesEmailFrom(env),
+    to: email,
+    subject: t('subjects.pledge_cancelled', 'Pledge cancelled for %{campaign}', { campaign: campaignTitle }),
+    html
+  }, {
+    errorLabel: 'Resend error (cancelled)',
+    failureLabel: 'Failed to send cancellation email'
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Resend error (cancelled):', error);
-    throw new Error(`Failed to send cancellation email: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 /**
@@ -891,27 +874,15 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
 </html>
   `.trim();
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: getUpdatesEmailFrom(env),
-      to: email,
-      subject: t('subjects.milestone', '%{emoji} %{heading} — %{campaign}', { emoji: config.emoji, heading: config.heading, campaign: campaignTitle }),
-      html
-    })
+  return sendResendEmail(env, {
+    from: getUpdatesEmailFrom(env),
+    to: email,
+    subject: t('subjects.milestone', '%{emoji} %{heading} — %{campaign}', { emoji: config.emoji, heading: config.heading, campaign: campaignTitle }),
+    html
+  }, {
+    errorLabel: 'Resend error (milestone)',
+    failureLabel: 'Failed to send milestone email'
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Resend error (milestone):', error);
-    throw new Error(`Failed to send milestone email: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 /**
@@ -977,25 +948,13 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
 </html>
   `.trim();
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: getUpdatesEmailFrom(env),
-      to: email,
-      subject: t('subjects.announcement', '📢 %{subject} — %{campaign}', { subject, campaign: campaignTitle }),
-      html
-    })
+  return sendResendEmail(env, {
+    from: getUpdatesEmailFrom(env),
+    to: email,
+    subject: t('subjects.announcement', '📢 %{subject} — %{campaign}', { subject, campaign: campaignTitle }),
+    html
+  }, {
+    errorLabel: 'Resend error (announcement)',
+    failureLabel: 'Failed to send announcement email'
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Resend error (announcement):', error);
-    throw new Error(`Failed to send announcement email: ${response.status}`);
-  }
-
-  return response.json();
 }

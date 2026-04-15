@@ -69,6 +69,10 @@ const STRIPE_CUSTOM_UI_MODE_API_VERSION = '2026-02-25.clover';
 const PRIVATE_NO_STORE_CACHE_CONTROL = 'private, no-store, max-age=0';
 const DEFAULT_I18N_LANG = 'en';
 const ADD_ON_ITEM_PREFIX = 'addon__';
+const SUPPORTER_EMAIL_RETRY_PREFIX = 'supporter-email-retry:';
+const SUPPORTER_EMAIL_RETRY_CRON = '*/15 * * * *';
+const SUPPORTER_EMAIL_RETRY_BATCH_SIZE = 10;
+const SUPPORTER_EMAIL_RETRY_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 // Extract plain text excerpt from diary entry (supports both legacy body and content blocks)
 function getDiaryExcerpt(entry, maxLength = 200) {
@@ -2017,16 +2021,36 @@ export default {
     }
   },
 
-  // Cron trigger: runs daily at 7 AM UTC (midnight MST)
-  // 1. Check for campaigns that should transition pre → live (based on start_date)
-  // 2. Kick off batched settlement for campaigns past deadline + funded
+  // Cron triggers:
+  // - `0 7 * * *`: daily campaign transitions + settlement checks
+  // - `*/15 * * * *`: retry failed supporter confirmation emails
   async scheduled(event, env, ctx) {
     configureWorkerLogging(env);
     console.log('⏰ Scheduled task triggered:', new Date().toISOString());
+    const cronExpression = String(event?.cron || '');
     
     // Heartbeat: record cron execution
     if (env.PLEDGES) {
       await env.PLEDGES.put('cron:lastRun', new Date().toISOString(), { expirationTtl: 172800 });
+    }
+
+    if (cronExpression === SUPPORTER_EMAIL_RETRY_CRON) {
+      try {
+        const retryResults = await processQueuedSupporterEmails(env);
+        if (env.PLEDGES) {
+          await env.PLEDGES.put('cron:lastEmailRetryRun', new Date().toISOString(), { expirationTtl: 172800 });
+        }
+        console.log('📧 Supporter email retry complete:', retryResults);
+      } catch (err) {
+        console.error('📧 Supporter email retry failed:', err);
+        if (env.PLEDGES) {
+          await env.PLEDGES.put('cron:lastError', JSON.stringify({
+            at: new Date().toISOString(),
+            error: err.message
+          }), { expirationTtl: 604800 });
+        }
+      }
+      return;
     }
     
     try {
@@ -2110,6 +2134,11 @@ export default {
           console.error('❌ Failed to trigger rebuild:', rebuildErr.message);
           results.errors.push({ type: 'rebuild', error: rebuildErr.message });
         }
+      }
+
+      const retryResults = await processQueuedSupporterEmails(env);
+      if (retryResults.processed > 0) {
+        console.log('📧 Supporter email retry complete:', retryResults);
       }
       
       console.log('⏰ Scheduled task complete:', results);
@@ -2195,6 +2224,144 @@ async function consumeSupporterEmailNonce(env, orderId) {
     error: payload.error || 'unknown'
   });
   return { ok: true, fresh: true };
+}
+
+function getSupporterEmailRetryKey(orderId) {
+  return `${SUPPORTER_EMAIL_RETRY_PREFIX}${String(orderId || '').trim()}`;
+}
+
+function getSupporterEmailRetryDelayMs(attempts) {
+  const normalizedAttempts = Math.max(1, Number(attempts) || 1);
+  return Math.min(12 * 60 * 60 * 1000, 5 * 60 * 1000 * (2 ** (normalizedAttempts - 1)));
+}
+
+async function updatePledgeEmailDeliveryState(env, orderId, updates = {}) {
+  const normalizedOrderId = String(orderId || '').trim();
+  if (!env.PLEDGES || !normalizedOrderId || !updates || typeof updates !== 'object') {
+    return;
+  }
+
+  const pledge = await env.PLEDGES.get(`pledge:${normalizedOrderId}`, { type: 'json' });
+  if (!pledge) return;
+
+  await env.PLEDGES.put(`pledge:${normalizedOrderId}`, JSON.stringify({
+    ...pledge,
+    ...updates
+  }));
+}
+
+async function queueSupporterEmailRetry(env, { orderId, payload, error, attempts = 0 }) {
+  const normalizedOrderId = String(orderId || '').trim();
+  if (!env.PLEDGES || !normalizedOrderId || !payload) {
+    return;
+  }
+
+  const retryKey = getSupporterEmailRetryKey(normalizedOrderId);
+  const existing = await env.PLEDGES.get(retryKey, { type: 'json' });
+  const nextAttempts = Math.max(Number(existing?.attempts || 0), Number(attempts || 0)) + 1;
+  const now = new Date();
+  const nextAttemptAt = new Date(now.getTime() + getSupporterEmailRetryDelayMs(nextAttempts)).toISOString();
+  const lastError = String(error || 'Unknown supporter email error');
+
+  await env.PLEDGES.put(retryKey, JSON.stringify({
+    orderId: normalizedOrderId,
+    payload,
+    attempts: nextAttempts,
+    createdAt: existing?.createdAt || now.toISOString(),
+    lastAttemptAt: now.toISOString(),
+    nextAttemptAt,
+    lastError
+  }), { expirationTtl: SUPPORTER_EMAIL_RETRY_TTL_SECONDS });
+
+  await updatePledgeEmailDeliveryState(env, normalizedOrderId, {
+    emailSent: false,
+    emailError: lastError,
+    emailRetryQueuedAt: now.toISOString(),
+    emailRetryAttempts: nextAttempts,
+    emailNextRetryAt: nextAttemptAt
+  });
+}
+
+async function clearSupporterEmailRetry(env, orderId) {
+  const normalizedOrderId = String(orderId || '').trim();
+  if (!env.PLEDGES || !normalizedOrderId) {
+    return;
+  }
+
+  await env.PLEDGES.delete(getSupporterEmailRetryKey(normalizedOrderId));
+}
+
+async function attemptSupporterEmailDelivery(env, { orderId, payload, attempts = 0 }) {
+  const normalizedOrderId = String(orderId || '').trim();
+  try {
+    await sendSupporterEmail(env, payload);
+    await clearSupporterEmailRetry(env, normalizedOrderId);
+    await updatePledgeEmailDeliveryState(env, normalizedOrderId, {
+      emailSent: true,
+      emailError: null,
+      emailSentAt: new Date().toISOString(),
+      emailRetryQueuedAt: null,
+      emailRetryAttempts: Number(attempts || 0),
+      emailNextRetryAt: null
+    });
+    return { ok: true };
+  } catch (err) {
+    const message = err?.message || 'Unknown supporter email error';
+    await queueSupporterEmailRetry(env, {
+      orderId: normalizedOrderId,
+      payload,
+      error: message,
+      attempts
+    });
+    return { ok: false, error: message };
+  }
+}
+
+async function processQueuedSupporterEmails(env, { maxJobs = SUPPORTER_EMAIL_RETRY_BATCH_SIZE } = {}) {
+  if (!env.PLEDGES) {
+    return { processed: 0, sent: 0, failed: 0 };
+  }
+
+  const dueRecords = [];
+  let cursor;
+
+  do {
+    const page = await env.PLEDGES.list({ prefix: SUPPORTER_EMAIL_RETRY_PREFIX, cursor });
+    for (const entry of page?.keys || []) {
+      const record = await env.PLEDGES.get(entry.name, { type: 'json' });
+      if (!record?.orderId || !record?.payload) continue;
+      if (!record.nextAttemptAt || Date.parse(record.nextAttemptAt) <= Date.now()) {
+        dueRecords.push(record);
+      }
+    }
+    cursor = page?.list_complete ? undefined : page?.cursor;
+  } while (cursor);
+
+  dueRecords.sort((left, right) => {
+    const leftTime = Date.parse(left?.nextAttemptAt || left?.createdAt || 0);
+    const rightTime = Date.parse(right?.nextAttemptAt || right?.createdAt || 0);
+    return leftTime - rightTime;
+  });
+
+  let processed = 0;
+  let sent = 0;
+  let failed = 0;
+
+  for (const record of dueRecords.slice(0, Math.max(1, Number(maxJobs) || SUPPORTER_EMAIL_RETRY_BATCH_SIZE))) {
+    processed++;
+    const result = await attemptSupporterEmailDelivery(env, {
+      orderId: record.orderId,
+      payload: record.payload,
+      attempts: Number(record.attempts || 0)
+    });
+    if (result.ok) {
+      sent++;
+    } else {
+      failed++;
+    }
+  }
+
+  return { processed, sent, failed };
 }
 
 function createCheckoutNonce() {
@@ -3040,6 +3207,7 @@ async function processFirstPartyCheckoutBundle({
 
   const processedCampaigns = [];
   const confirmedCampaigns = [];
+  const supporterEmailJobs = [];
 
   for (const entry of bundleManifest.campaigns) {
     const campaignSlug = entry.campaignSlug;
@@ -3186,15 +3354,16 @@ async function processFirstPartyCheckoutBundle({
       })
     );
 
-    const token = await generateToken(env.MAGIC_LINK_SECRET, {
-      orderId: pledgeOrderId,
-      email,
-      campaignSlug
-    });
-
     const emailNonce = await consumeSupporterEmailNonce(env, pledgeOrderId);
     if (emailNonce.fresh) {
-      await sendSupporterEmail(env, {
+      const token = await generateToken(env.MAGIC_LINK_SECRET, {
+        orderId: pledgeOrderId,
+        email,
+        campaignSlug
+      });
+
+      supporterEmailJobs.push({
+        orderId: pledgeOrderId,
         email,
         campaignSlug,
         campaignTitle,
@@ -3217,6 +3386,22 @@ async function processFirstPartyCheckoutBundle({
     confirmedAt: new Date().toISOString(),
     confirmedCampaigns
   });
+
+  if (supporterEmailJobs.length > 0) {
+    ctx.waitUntil((async () => {
+      for (const job of supporterEmailJobs) {
+        const { orderId, ...payload } = job;
+        const result = await attemptSupporterEmailDelivery(env, {
+          orderId,
+          payload
+        });
+        if (!result.ok) {
+          console.error('Supporter confirmation email failed after checkout completion:', result.error);
+        }
+      }
+    })());
+  }
+
   await markStripeEventProcessed();
   return jsonResponse({ received: true, bundled: true, pledges: processedCampaigns });
 }
@@ -3701,21 +3886,30 @@ async function handleStripeWebhook(request, env, ctx) {
 
           const emailNonce = await consumeSupporterEmailNonce(env, orderId);
           if (emailNonce.fresh) {
-            await sendSupporterEmail(env, {
-              email,
-              campaignSlug,
-              campaignTitle,
-              preferredLang: pledgeData.preferredLang,
-              subtotal: canonicalContribution.totals.subtotal,
-              tax: canonicalContribution.totals.tax,
-              shipping: canonicalContribution.totals.shipping,
-              tipAmount: canonicalContribution.totals.tipAmount,
-              tipPercent: canonicalContribution.totals.tipPercent,
-              token,
-              instagramUrl: campaign?.instagram,
-              hasDecisions: campaign?.has_decisions === true,
-              pledgeItems: buildPledgeItemsPayload(campaign, canonicalContribution, anchorBundleAddOns)
-            });
+            ctx.waitUntil(
+              attemptSupporterEmailDelivery(env, {
+                orderId,
+                payload: {
+                  email,
+                  campaignSlug,
+                  campaignTitle,
+                  preferredLang: pledgeData.preferredLang,
+                  subtotal: canonicalContribution.totals.subtotal,
+                  tax: canonicalContribution.totals.tax,
+                  shipping: canonicalContribution.totals.shipping,
+                  tipAmount: canonicalContribution.totals.tipAmount,
+                  tipPercent: canonicalContribution.totals.tipPercent,
+                  token,
+                  instagramUrl: campaign?.instagram,
+                  hasDecisions: campaign?.has_decisions === true,
+                  pledgeItems: buildPledgeItemsPayload(campaign, canonicalContribution, anchorBundleAddOns)
+                }
+              }).then((result) => {
+                if (!result.ok) {
+                  console.error('Supporter confirmation email failed after webhook persistence:', result.error);
+                }
+              })
+            );
           }
 
           console.log('Pledge confirmed:', { orderId, email, campaignSlug });
@@ -6960,35 +7154,38 @@ async function handleRecoverCheckout(request, env) {
           email,
           campaignSlug
         });
-        const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
         
         const emailNonce = await consumeSupporterEmailNonce(env, pledgeOrderId);
         if (emailNonce.fresh) {
-          await sendSupporterEmail(env, {
-            email,
-            campaignTitle,
-            campaignSlug,
-            preferredLang: pledge.preferredLang,
-            subtotal: canonicalContribution.totals.subtotal,
-            tax: canonicalContribution.totals.tax,
-            shipping: canonicalContribution.totals.shipping,
-            tipAmount: canonicalContribution.totals.tipAmount,
-            tipPercent: canonicalContribution.totals.tipPercent,
-            token,
-            instagramUrl: campaign?.instagram,
-            hasDecisions: campaign?.has_decisions === true,
-            pledgeItems: {
-              tierName: canonicalContribution.tierName || null,
-              tierQty: canonicalContribution.tierQty || 1,
-              additionalTiers: canonicalContribution.additionalTiers.map(t => ({
-                ...t,
-                name: campaign?.tiers?.find(ct => ct.id === t.id)?.name || t.id
-              })),
-              supportItems: getSupportItemsWithLabels(campaign, canonicalContribution.supportItems),
-              customAmount: canonicalContribution.customAmount
+          const emailResult = await attemptSupporterEmailDelivery(env, {
+            orderId: pledgeOrderId,
+            payload: {
+              email,
+              campaignTitle,
+              campaignSlug,
+              preferredLang: pledge.preferredLang,
+              subtotal: canonicalContribution.totals.subtotal,
+              tax: canonicalContribution.totals.tax,
+              shipping: canonicalContribution.totals.shipping,
+              tipAmount: canonicalContribution.totals.tipAmount,
+              tipPercent: canonicalContribution.totals.tipPercent,
+              token,
+              instagramUrl: campaign?.instagram,
+              hasDecisions: campaign?.has_decisions === true,
+              pledgeItems: {
+                tierName: canonicalContribution.tierName || null,
+                tierQty: canonicalContribution.tierQty || 1,
+                additionalTiers: canonicalContribution.additionalTiers.map(t => ({
+                  ...t,
+                  name: campaign?.tiers?.find(ct => ct.id === t.id)?.name || t.id
+                })),
+                supportItems: getSupportItemsWithLabels(campaign, canonicalContribution.supportItems),
+                customAmount: canonicalContribution.customAmount
+              }
             }
           });
-          pledge.emailSent = true;
+          pledge.emailSent = emailResult.ok;
+          pledge.emailError = emailResult.ok ? null : emailResult.error;
         }
       } catch (emailErr) {
         console.error('Failed to send recovery email:', emailErr.message);
