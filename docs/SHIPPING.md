@@ -1,8 +1,8 @@
 # Shipping
 
-This document describes the current shipping model in The Pool, including its Worker-first pricing flow, fork-facing config surface, USPS integration boundary, and remaining follow-up work.
+This document describes the current shipping model in The Pool, including its Worker-first pricing flow, fork-facing config surface, USPS integration boundary, and the rule tree the cart, checkout, Manage Pledge, reporting, and emails now follow.
 
-Note: live USPS credentialed manual verification is still pending. Local fallback-path testing and automated coverage are in place, but a real USPS-backed smoke pass remains planned follow-up work.
+Live USPS credentialed verification is now wired into the local workflow. The repo includes a dedicated USPS smoke helper plus automated regressions for the cart, checkout, and Manage Pledge shipping flows.
 
 ## Recommended Scope
 
@@ -11,6 +11,8 @@ Current implemented scope:
 - USPS live rating for **US domestic**
 - USPS live rating for **international**
 - a configurable **flat fallback shipping rate** when USPS is unavailable or returns no usable rate
+- a limited backer-facing **delivery option** selector for `Standard`, `Signature required`, and `Adult signature required` where applicable
+- explicit manual domestic flat-rate tables for qualifying items like `sticker` and `signed_script`
 - campaign-tier and support-item shipping metadata
 - a shared preset catalog for common physical items
 
@@ -27,7 +29,7 @@ For The Pool, the fallback rate is **$3.00**.
 
 ## Non-Goals
 
-- no user-facing carrier/service selector in v1
+- no broad speed-based carrier/service selector in v1
 - no custom packing engine
 - no browser-side shipping calculation from stored USPS tables
 - no label purchasing in v1
@@ -138,6 +140,8 @@ Keep the option set intentionally narrow:
   - only shown when the campaign explicitly enables it
 
 Do not expose speed-based service choices in v1. Crowdfunding rewards often ship long after the pledge date, so delivery speed is not the meaningful customer choice here; delivery confirmation is.
+
+The current cart and Manage Pledge UI therefore expose a narrow delivery-option selector rather than a full mail-class selector. The Worker still picks the underlying cheapest valid shipping class for `Standard`.
 
 ## Config Surface
 
@@ -323,7 +327,16 @@ This is approximate, but much more realistic than the current flat fee and far s
 
 ### USPS Credentials How-To
 
-As of April 11, 2026, USPS's official onboarding flow is:
+For this platform, you do **not** need the Labels APIs to quote shipping. The Pool's current shipping implementation only needs:
+
+- OAuth
+- Domestic Pricing
+- International Pricing
+- Shipping Options
+
+Those are part of the default USPS app product described in USPS's official getting-started flow.
+
+As of April 14, 2026, the practical setup path is:
 
 1. Create or sign into a USPS Business Account through the USPS Customer Onboarding Portal (COP).
 2. In COP, open `My Apps` and create an app.
@@ -338,11 +351,28 @@ In this repo, that maps to:
 
 - [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
   - `shipping.usps.client_id`
+  - `shipping.usps.enabled`
+  - optional `shipping.usps.api_base` if you need to point at TEM explicitly
   - optional USPS behavior knobs like `timeout_ms`, `quote_cache_ttl_seconds`, and cooldown settings
 - Worker secrets / local Worker env
   - `USPS_CLIENT_SECRET`
+  - optional `USPS_API_BASE`
 
 Do **not** commit the USPS client secret into Jekyll config.
+
+For a normal production-style local setup, the minimum values this repo needs are:
+
+- [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml) or [`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml)
+  - `shipping.usps.enabled: true`
+  - `shipping.usps.client_id: "<your Consumer Key>"`
+- [`worker/.dev.vars`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/.dev.vars)
+  - `USPS_CLIENT_SECRET=<your Consumer Secret>`
+
+If you want to test against USPS TEM with the same production credentials USPS describes, also set:
+
+- `shipping.usps.api_base: "https://apis-tem.usps.com"` in config
+  or
+- `USPS_API_BASE=https://apis-tem.usps.com` in Worker env
 
 For local testing:
 
@@ -379,6 +409,14 @@ The default USPS app product currently includes the APIs this feature needs:
 - Shipping Options
 
 If you need additional access or a quota increase, USPS directs developers to submit a service request through their `Email Us` support flow.
+
+What you can safely ignore for this repo right now:
+
+- Labels APIs
+- Ship / EPA enrollment
+- any return-label or postage-purchase setup
+
+Those are only needed if this project grows from quoting into actual USPS label generation.
 
 Practical operational note for this platform:
 
@@ -476,52 +514,145 @@ Terms should stop promising a flat physical shipping fee and instead describe de
 
 Privacy wording may also need a small update if destination details are sent to USPS for quote calculation.
 
+## Current Rule Tree
+
+### 1. Build shipment buckets first
+
+The Worker does not quote one giant cart blindly. It first splits the cart into operational shipment buckets:
+
+- each campaign shipment follows that campaign's shipping rules
+- campaign add-ons join the owning campaign shipment and inherit that campaign's overrides
+- physical global add-ons do **not** borrow campaign shipping; they combine into one separate platform shipment
+- digital items never create a shipment on their own
+
+This is why a mixed cart can legitimately have:
+
+- one or more campaign shipment quotes
+- plus one platform shipment quote for physical global add-ons
+
+### 2. Short-circuit deterministic shipping before USPS
+
+The Worker skips live USPS when the result is already known:
+
+- a campaign with an explicit `shipping_fallback_flat_rate` uses that campaign override directly for that campaign shipment
+- qualifying domestic `manual_domestic_rate` presets use the explicit manual table directly
+
+Right now that manual path is used for:
+
+- `sticker`
+- `signed_script`
+
+Those items only use the manual flat table when the full shipment still qualifies by weight and dimensions. If not, the Worker falls through to the live USPS path.
+
+### 3. If a quote is still needed, try the preset's cheapest valid class order
+
+When a shipment is not already determined by an override or manual table, the Worker uses the preset metadata to try the cheapest defensible class first.
+
+Current implemented ordering:
+
+- `sticker`
+  - manual `FIRST_CLASS_FLAT`
+  - otherwise cheaper single-piece domestic USPS profile
+  - otherwise normal parcel quote path
+- `signed_script`
+  - manual `FIRST_CLASS_FLAT`
+  - otherwise `MEDIA_MAIL`
+  - otherwise `USPS_GROUND_ADVANTAGE`
+  - otherwise `PRIORITY_MAIL`
+- `cd`, `dvd`, `bluray`
+  - `MEDIA_MAIL`
+  - then `USPS_GROUND_ADVANTAGE`
+  - then `PRIORITY_MAIL`
+- everything else
+  - default live USPS parcel-style quote path
+
+If a shipment mixes incompatible preset profiles, the Worker intentionally falls back to the safer default parcel model instead of trying to get too clever and underquote.
+
+### 4. USPS delivery options layer on top of the base quote
+
+The backer-facing selector is intentionally narrow:
+
+- `Standard`
+- `Signature required`
+- `Adult signature required`
+
+Rules:
+
+- `Standard` defaults to the cheapest eligible shipping option
+- signature options are domestic-only
+- the selector is only shown when the shipment still needs a live USPS quote and the underlying shipment supports those options
+- the selected delivery option is persisted and reused by Manage Pledge, saved totals, reports, and supporter emails
+
+### 5. Fallback only applies when the quote path actually fails
+
+The deployment fallback is still:
+
+- `shipping.fallback_flat_rate: 3.00`
+
+But that fallback should only appear when:
+
+- USPS is unavailable
+- USPS returns no usable rate
+- the shipment has no more specific valid override or manual-table path
+
+The platform should not show the `$3.00` fallback as a fake estimate when we simply have not quoted yet.
+
+## Cart and Checkout Behavior
+
+### ZIP field visibility
+
+The cart only asks for a ZIP when at least one shipment still needs a live quote.
+
+Hide the ZIP field when:
+
+- every physical shipment in the cart is covered by explicit campaign flat-rate overrides
+- or every physical shipment in the cart is covered by deterministic manual flat-rate items such as `sticker` / `signed_script`
+
+Show the ZIP field when:
+
+- any campaign shipment still needs live USPS rating
+- or the platform shipment for physical global add-ons still needs live USPS rating
+
+### Estimate mode
+
+When a ZIP is required but has not been fully entered yet, the UI should stay in estimate mode:
+
+- `Estimated shipping`
+- `--`
+- `Estimated total`
+- subtotal + tip + tax only
+
+This applies both in the cart sidecar and the hosted/on-site checkout preview.
+
+Partial postal input should also remain in estimate mode. The cart should not briefly flash the flat fallback while the user is still typing.
+
+### Known shipping states in the UI
+
+The frontend should distinguish between these states:
+
+- known flat-rate shipment
+  - no ZIP field if no live quote is needed
+  - shipping amount shown immediately
+- live-quote-required shipment without full ZIP/postal input
+  - estimate mode
+- live-quote-required shipment with complete ZIP/postal input
+  - Worker quote shown
+  - optional delivery-option selector shown when supported
+- USPS failure
+  - configured fallback shown instead of blocking checkout
+
 ## Current Acceptance State
 
 The shipping implementation is in good shape when:
 
 - domestic and international physical pledges can use USPS live rating through the Worker
-- the system falls back cleanly to the configured flat rate when USPS is unavailable
-- physical tiers and support items can declare shipping metadata directly or through presets
+- campaign flat-rate overrides short-circuit USPS for those campaign shipments
+- qualifying manual-rate items like `sticker` and `signed_script` skip USPS and use the documented flat table
+- campaign add-ons inherit the owning campaign's shipping rules and overrides
+- physical global add-ons combine into one separate platform shipment instead of borrowing campaign shipping
 - quantity changes affect shipment math correctly
-- checkout, Manage Pledge, emails, reports, and fulfillment exports stay aligned on the stored shipping amount
+- checkout, Manage Pledge, saved pledge totals, emails, reports, and fulfillment exports stay aligned on the stored shipping amount
+- ZIP-required carts stay in estimate mode until the postal code is complete
 - no security regressions are introduced into checkout or pledge modification
 - no accessibility regressions are introduced into shipping-related checkout/manage states
 - no new English-only site-owned shipping copy is introduced on localized routes
-
-## Recommended Implementation Phases
-
-### Phase 1: Config and content model
-
-- add `shipping.*` config
-- add preset catalog support
-- extend CMS/content schema for physical shipping metadata
-- add Worker mirror for any required shipping env values
-
-### Phase 2: Worker quote engine
-
-- add USPS quote client
-- add fallback flat-rate logic
-- replace flat-fee shipping inside canonical contribution building
-
-### Phase 3: Modify/manage parity
-
-- recalculate shipping on shipping-relevant pledge modifications
-- keep Manage Pledge summaries and confirmations aligned
-
-### Phase 4: docs, tests, and policy
-
-- tests
-- docs
-- terms/privacy wording
-
-## Recommended First Slice
-
-The best first slice is:
-
-1. add `shipping.origin_zip`, `shipping.origin_country`, and `shipping.fallback_flat_rate`
-2. add shipping presets plus tier-level `shipping_preset` / `shipping.*`
-3. implement USPS domestic + international quoting in the Worker with fallback flat rate
-4. wire that into `/checkout-intent/start`
-
-That gives us the highest product value quickly while keeping quota and KV risk under control.

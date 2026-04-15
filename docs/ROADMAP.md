@@ -108,6 +108,14 @@
   - Worker-canonical shipping totals in checkout, Manage Pledge, emails, reports, and fulfillment exports
   - limited domestic shipping options with `standard`, `signature_required`, and `adult_signature_required`
   - checkout and Manage Pledge UI now reflect live quotes, fallback quotes, and free-shipping states without inventing a browser-side shipping engine
+- [x] Shipping follow-up work
+  - real USPS credentialed smoke coverage now exists for domestic live rating, international live rating, fallback behavior, and signature-option flows
+  - the checkout country selector now reads from a dedicated shipping-country reference instead of burying USPS-aware destination data in runtime code
+  - campaigns with explicit flat-rate overrides now skip USPS entirely for those shipments
+  - deterministic manual-rate items like `sticker` and `signed_script` can skip USPS and use documented flat-mail pricing when they still qualify
+  - disc presets now try cheaper valid classes like `MEDIA_MAIL` before parcel services, while mixed shipments still fall back to the safer parcel model
+  - cart and checkout now stay in estimate mode until a live quote is actually possible, including ZIP-field hiding for shipments that already have known shipping
+  - the limited delivery-option selector is now wired through cart, checkout, Manage Pledge, saved totals, and supporter emails instead of stopping at quote preview
 
 **Creator tooling and content**
 
@@ -174,10 +182,6 @@
   - Super admin and per-campaign users
   - Magic link auth
   - Block-based with the ability to preview campaign content
-- [ ] Shipping follow-up work
-  - run a real USPS credentialed manual smoke pass covering domestic live rating, international live rating, fallback behavior, and signature-option flows
-  - replace the current USPS-aware curated checkout country list with a dedicated shipping-country reference that is easier to refresh from USPS destination and suspension data
-  - decide whether any further shipping-option expansion is worth it beyond the current limited domestic signature policy
 - [ ] Non-Stripe tax calculator to replace flat rate sales tax
   - Support USA, and international
 - [ ] Developer FAQ based on internal documentation

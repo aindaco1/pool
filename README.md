@@ -2,6 +2,8 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
+Current release milestone: **v0.9**. The Pool will treat **v1.0** as the wider public launch milestone once the remaining roadmap items are complete.
+
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
 ## Features
@@ -12,7 +14,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **All-or-nothing pledging** — Cards saved now, charged only if goal is met
 - **Optional platform tip** — 0% to 15% tip (default 5%) included in totals but excluded from campaign progress
 - **Tip-aware cart + checkout** — Shared pricing logic keeps subtotal, tip, tax, shipping, and total in sync across cart, checkout, Worker, reports, and emails
-- **USPS-backed shipping quotes with fallback guardrails** — Physical checkout and modify flows can quote USPS domestic/international shipping, fall back safely to configured flat rates, and support optional domestic signature upgrades without pushing quote churn into KV
+- **USPS-backed shipping quotes with fallback guardrails** — Physical checkout and modify flows can quote USPS domestic/international shipping, use explicit flat/manual rates where configured, fall back safely to configured flat rates, and support optional domestic signature upgrades without pushing quote churn into KV
 - **Platform add-ons with inventory awareness** — Bundle-level merch add-ons can be attached to a checkout, stay editable in Manage Pledge, support per-variant stock, and ride the same canonical shipping/reporting/email flow without counting toward campaign funding goals
 - **Campaign add-ons with campaign-aware accounting** — Campaign markdown can also define campaign-scoped add-ons that render in the same cart / Manage UI, count toward that campaign’s funding subtotal, follow campaign shipping overrides, and disappear automatically when the owning campaign pledge leaves the cart
 - **On-site Stripe payment step** — The existing second checkout sidecar hosts secure Stripe payment UI, and Manage Pledge uses the same pattern for `Update Card`

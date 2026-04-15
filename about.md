@@ -10,6 +10,8 @@ description: Learn how The Pool works, from all-or-nothing pledging to magic-lin
 
 **The Pool** is Dust Wave's crowdfunding platform for independent film and creative projects, built on open-source technology.
 
+The current platform release milestone is **v0.9**. Dust Wave is reserving **v1.0** for the wider public launch once the remaining roadmap items are complete.
+
 ## All-or-Nothing Pledging
 
 When you back a project on The Pool, your card is saved securely via Stripe — but you're **not charged until the campaign reaches its goal**. If the project doesn't hit its funding target by the deadline, your card is never charged.
@@ -41,7 +43,7 @@ For supporter-community access, The Pool keeps the verified supporter session in
 ## Umm, So How Does It Work Again?
 
 1. **Browse** — Find a project you want to support
-2. **Pledge** — Add one or more campaigns to your cart, optionally add a 0% to 15% tip for platform upkeep, and continue into The Pool's secure payment step powered by Stripe. Physical rewards can add Worker-calculated shipping during checkout, including USPS-backed quotes, configured fallback rates, or free-shipping overrides when a deployment enables them.
+2. **Pledge** — Add one or more campaigns to your cart, optionally add a 0% to 15% tip for platform upkeep, and continue into The Pool's secure payment step powered by Stripe. Physical rewards can add Worker-calculated shipping during checkout, including USPS-backed quotes, configured fallback rates, or free-shipping overrides when a deployment enables them. Some deployments may also show a limited delivery-option selector for domestic signature upgrades.
    You may also see optional platform add-ons. Those support Dust Wave directly, do not count toward a campaign's funding goal, and can be digital or physical. When they are inventory-limited, stock reflects saved pledges rather than in-progress carts.
    Some campaigns may also offer campaign add-ons. Those use the same add-on card UI, but they count toward that campaign's funding total and follow that campaign's shipping rules.
 3. **Save card** — Stripe securely saves your payment method inside that checkout flow (no charge yet)
@@ -56,7 +58,7 @@ The Pool is designed for filmmakers and other creatives with features like:
 
 - **0% platform fee for organizers** — Supporters can optionally add a 0% to 15% platform tip to help sustain the platform without reducing campaign funds
 - **First-party checkout** — The Pool controls the cart, checkout sidecars, and pledge review flow while Stripe securely handles payment details
-- **Physical & digital tiers** — Offer tangible rewards with checkout-time shipping address capture, USPS-backed quote support, fallback/free-shipping policy controls, and configurable sales tax
+- **Physical & digital tiers** — Offer tangible rewards with checkout-time shipping address capture, USPS-backed quote support, fallback/free-shipping policy controls, limited delivery-option upgrades, and configurable sales tax
 - **Optional platform add-ons** — Offer a small global merch catalog alongside campaign pledges, with per-variant inventory, low-stock awareness based on saved pledges, and shipping support for physical add-ons
 - **Optional campaign add-ons** — Let a campaign offer campaign-owned merch through the same cart / Manage Pledge add-on UI while still counting that merch toward the campaign subtotal and using campaign-specific shipping rules
 - **Production phases** — Break your budget into phases supporters can fund directly

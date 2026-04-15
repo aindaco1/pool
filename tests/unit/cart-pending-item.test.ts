@@ -85,8 +85,8 @@ describe('first-party pending cart handoff', () => {
     });
     await readyApi.api.theme.cart.open();
     const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
-    expect(root?.textContent).toContain('Shipping');
-    expect(root?.textContent).toContain('$3.00');
+    expect(root?.textContent).toContain('Estimated shipping');
+    expect(root?.textContent).toContain('--');
     expect(onOpened).toHaveBeenCalled();
   });
 

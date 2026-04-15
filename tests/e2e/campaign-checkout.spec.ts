@@ -646,7 +646,7 @@ test.describe('Cart Flow', () => {
       await expect(page.locator('.pool-first-party-cart__tip-percent')).toHaveText('5%');
       await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('tip (5%)');
       await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('Sales tax (7.875%)');
-      await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('Pledge total');
+      await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('Estimated total');
       return;
     }
 
@@ -1526,11 +1526,11 @@ test.describe('Checkout Flow', () => {
     await sunderButton.click();
 
     await openCartViaClient(page);
-    await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Shipping');
-    await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('$15.00');
+    await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Estimated shipping');
+    await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('--');
     await page.locator('[data-cart-continue]').click();
-    await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toContainText('Shipping');
-    await expect(page.locator('[data-cart-checkout-summary-shipping]')).toHaveText('$15.00');
+    await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toContainText('Estimated shipping');
+    await expect(page.locator('[data-cart-checkout-summary-shipping]')).toHaveText('--');
   });
 
   test('custom on-site checkout supports keyboard-only activation through save', async ({ page }) => {

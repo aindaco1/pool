@@ -64,6 +64,8 @@ Use `platform` for identity, URLs, and brand assets.
 Supported keys:
 
 - `name`
+- `version`
+- `release_label`
 - `company_name`
 - `support_email`
 - `pledges_email_from`
@@ -79,6 +81,7 @@ Supported keys:
 These values feed:
 
 - header / footer branding
+- release metadata for docs/public copy when a fork wants to surface its current milestone
 - page titles and meta tags
 - default social-card image
 - campaign creator fallback copy
@@ -88,6 +91,7 @@ These values feed:
 Notes:
 
 - `platform.*` is the primary branding surface.
+- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v0.9`.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
 
@@ -96,6 +100,8 @@ Example:
 ```yml
 platform:
   name: My Fork
+  version: 0.9.0
+  release_label: v0.9
   company_name: Example Studio
   support_email: support@example.com
   pledges_email_from: "My Fork <pledges@example.com>"
@@ -297,6 +303,8 @@ Campaigns can also optionally set `shipping_options` in front matter to opt into
 
 `standard` is always available implicitly and does not need to be listed.
 
+When a pledge qualifies for multiple delivery options, the shared cart and Manage Pledge UIs render the same localized selector and the Worker persists the selected option as part of the canonical shipping total.
+
 Important secret boundary:
 
 - keep `shipping.usps.client_id` in `_config.yml`
@@ -344,6 +352,7 @@ What this enables:
 - a deployment-level free-shipping default that campaigns can still override
 - a configured fallback rate if live carrier quoting is unavailable
 - a fork-facing USPS quote policy surface for timeouts, short-lived quote reuse, and temporary cooldowns after repeated failures or rate limiting
+- a shared delivery-option selector surface in cart and Manage Pledge without opening up arbitrary carrier-speed choices
 - reusable `shipping_preset` names in campaign tiers so forks do not need to repeat common merch dimensions
 - optional preset-level USPS profile hints for item types that need a different domestic quote shape
 - optional preset-level domestic mail-class ordering for products that qualify for cheaper USPS classes like Media Mail

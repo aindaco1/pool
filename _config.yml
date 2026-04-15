@@ -37,6 +37,8 @@ exclude:
 # Structured platform settings for forks.
 platform:
   name: The Pool
+  version: "0.9.0"
+  release_label: "v0.9"
   company_name: Dust Wave
   support_email: support@dustwave.xyz
   pledges_email_from: "The Pool <pledges@pool.dustwave.xyz>"
@@ -50,7 +52,7 @@ platform:
   default_social_image_path: /assets/images/defaults/dust-wave-square.png
 
 pricing:
-  sales_tax_rate: 0.07875
+  sales_tax_rate: 0.07625
   flat_shipping_rate: 3.00
   default_tip_percent: 5
   max_tip_percent: 15
