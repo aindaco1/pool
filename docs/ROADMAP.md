@@ -188,6 +188,11 @@
 - [ ] Marketing landing page for the platform on a different domain
 - [ ] Denial of service attack defense pass
 - [ ] Support different prices per add-on variation
+- [ ] Rich embed of a campaign for sharing on other platforms
+  - If not launched yet, shows hero_video (with hero_image_wide as a fallback), title, short_blurb, start_date, creator_name, category
+  - If launched and <= goal deadline, shows hero_video (with hero_image_wide as a fallback), title, short_blurb, goal_deadline, creator_name, category, a progress bar with milestone tics like we have on the campaign page with progress_background underneath it, and a live campaign countdown
+  - If > goal deadline and funded, shows hero_video (with hero_image_wide as a fallback), title, short_blurb, final total pledged, creator_name, category, and "Campaign funded!" in green
+  - If > goal deadline and not funded, shows hero_video (with hero_image_wide as a fallback), title, short_blurb, creator_name, category, and "Campaign ended"
 
 ## Known Issues
 
