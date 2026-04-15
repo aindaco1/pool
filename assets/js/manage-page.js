@@ -2863,7 +2863,7 @@
                 </div>
                 <div class="pledge-summary__row pledge-summary__row--shipping-option" id="shipping-option-row-${index}" hidden>
                   <label class="label" for="shipping-option-${index}">${escapeHtml(getRuntimeMessage('manage.shippingOption', 'Delivery option'))}</label>
-                  <select class="value pledge-summary__shipping-option-select" id="shipping-option-${index}" data-shipping-option-index="${index}"></select>
+                  <select class="value pledge-summary__shipping-option-select pool-first-party-cart__input pool-first-party-cart__input--select pool-first-party-cart__input--summary-select" id="shipping-option-${index}" data-shipping-option-index="${index}"></select>
                 </div>
                 <div class="pledge-summary__total">
                   <span class="label">${escapeHtml(getRuntimeMessage('manage.total', 'Total'))}</span>

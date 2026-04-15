@@ -482,6 +482,16 @@
         font-size: 13px;
       }
     }
+
+    &--shipping-option {
+      .pledge-summary__shipping-option-select {
+        flex: 0 1 18rem;
+        width: min(100%, 18rem);
+        color: $color--primary;
+        font-weight: 500;
+        background-color: $surface--base;
+      }
+    }
   }
   
   &__total {
