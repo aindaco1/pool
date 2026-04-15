@@ -30,8 +30,6 @@ campaign:
   how_pledging_works: "How Pledging Works"
   all_or_nothing_body: "All-or-nothing: Your card is saved but not charged now. You'll only be charged if this campaign reaches its goal by %{date}."
   embed_title: "Embed This Campaign"
-  embed_body: "Create a live campaign widget you can paste into another website."
-  embed_cta: "Open Embed Builder"
   tiers_heading: "Tiers"
   no_reward_heading: "No Reward"
   play_video: "Play video"

@@ -28,8 +28,6 @@ campaign:
   how_pledging_works: "Cómo funciona el aporte"
   all_or_nothing_body: "Todo o nada: tu tarjeta se guarda ahora, pero no se cobra. Solo se te cobrará si esta campaña alcanza su meta antes de %{date}."
   embed_title: "Insertar esta campaña"
-  embed_body: "Crea un widget en vivo de la campaña para pegarlo en otro sitio web."
-  embed_cta: "Abrir generador de embed"
   tiers_heading: "Niveles"
   no_reward_heading: "Sin recompensa"
   play_video: "Reproducir video"
