@@ -6723,6 +6723,10 @@ async function handleGetLiveCampaign(campaignSlug, env) {
   ]);
   const inventory = inventorySnapshot?.inventory || {};
   const reservedCounts = inventorySnapshot?.reservedCounts || {};
+  const goalAmount = campaign?.goal_amount || 0;
+  const pledgedAmount = stats?.pledgedAmount || 0;
+  const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
+  const isFunded = goalAmount > 0 ? pledgedAmount >= (goalAmount * 100) : false;
 
   const tiers = {};
   for (const tier of (campaign?.tiers || [])) {
@@ -6741,17 +6745,42 @@ async function handleGetLiveCampaign(campaignSlug, env) {
 
   return cacheablePublicJsonResponse({
     campaignSlug,
+    campaign: {
+      slug: campaign?.slug || campaignSlug,
+      url: campaign?.url || `/campaigns/${encodeURIComponent(campaignSlug)}/`,
+      title: campaign?.title || campaignSlug,
+      creatorName: campaign?.creator_name || null,
+      category: campaign?.category || null,
+      shortBlurb: campaign?.short_blurb || '',
+      shortBlurbHtml: campaign?.short_blurb_html || '',
+      heroImage: campaign?.hero_image || null,
+      heroImageWide: campaign?.hero_image_wide || null,
+      heroImageAlt: campaign?.hero_image_alt || campaign?.title || campaignSlug,
+      heroVideo: campaign?.hero_video || null,
+      progressBackground: campaign?.progress_background || null,
+      startDate: campaign?.start_date || null,
+      goalDeadline: campaign?.goal_deadline || null,
+      goalAmount,
+      state: campaign?.state || 'unknown',
+      effectiveState,
+      isFunded,
+      stretchGoals: campaign?.stretch_goals || [],
+      stretchHidden: campaign?.stretch_hidden !== false,
+      hasDecisions: campaign?.has_decisions === true
+    },
     stats: {
       campaignSlug,
-      pledgedAmount: stats?.pledgedAmount || 0,
+      pledgedAmount,
       pledgeCount: stats?.pledgeCount || 0,
       tierCounts: stats?.tierCounts || {},
       supportItems: stats?.supportItems || {},
-      goalAmount: campaign?.goal_amount || 0,
+      goalAmount,
       goalDeadline: campaign?.goal_deadline || null,
       state: campaign?.state || 'unknown',
-      percentFunded: campaign?.goal_amount
-        ? Math.round(((stats?.pledgedAmount || 0) / (campaign.goal_amount * 100)) * 100)
+      effectiveState,
+      isFunded,
+      percentFunded: goalAmount
+        ? Math.round((pledgedAmount / (goalAmount * 100)) * 100)
         : 0,
       updatedAt: stats?.updatedAt || null
     },

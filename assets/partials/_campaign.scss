@@ -396,6 +396,23 @@
     font-weight: 400 !important;
     color: $color--secondary !important;
   }
+
+  &__embed {
+    margin-top: $space-lg;
+    padding-top: $space-md;
+    border-top: 1px solid $border--default;
+
+    p {
+      @include type-ui;
+      margin: 0 0 $space-sm;
+      color: $color--secondary;
+    }
+
+    .btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
 }
 
 // Support items (phase funding)

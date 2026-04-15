@@ -188,6 +188,14 @@
           <dd class="campaign-facts__pledge-meta">{% include t.html key="pledge.notice_meta" lang=current_lang %}</dd>
           {% endif %}
         </dl>
+        {%- capture embed_builder_path -%}{% include localized-url.html lang=current_lang path='/embed/campaign/' %}{%- endcapture -%}
+        <div class="campaign-facts__embed">
+          <h4>{% include t.html key="campaign.embed_title" lang=current_lang %}</h4>
+          <p>{% include t.html key="campaign.embed_body" lang=current_lang %}</p>
+          <a href="{{ embed_builder_path }}?slug={{ page.slug | uri_escape }}" class="btn btn--secondary">
+            {% include t.html key="campaign.embed_cta" lang=current_lang %}
+          </a>
+        </div>
       </div>
 
 

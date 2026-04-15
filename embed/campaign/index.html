@@ -1,0 +1,56 @@
+---
+layout: campaign-embed
+title: Campaign Embed
+description: Live embeddable campaign preview
+permalink: /embed/campaign/
+indexable: false
+sitemap: false
+lang: en
+---
+<section class="campaign-embed-builder" data-campaign-embed-builder>
+  <div class="campaign-embed-builder__intro">
+    <h1 data-embed-builder-title>Campaign Embed</h1>
+    <p data-embed-builder-intro>Copy this iframe code to embed a live campaign preview on another site.</p>
+  </div>
+  <div class="campaign-embed-builder__controls">
+    <div class="campaign-embed-builder__option-grid">
+      <div class="campaign-embed-builder__field">
+        <label for="campaign-embed-layout" data-embed-layout-label>Layout</label>
+        <select id="campaign-embed-layout" class="pool-first-party-cart__input pool-first-party-cart__input--select" data-campaign-embed-layout>
+          <option value="full" data-embed-layout-full>Full</option>
+          <option value="compact" data-embed-layout-compact>Compact</option>
+        </select>
+      </div>
+      <div class="campaign-embed-builder__field">
+        <label for="campaign-embed-theme" data-embed-theme-label>Theme</label>
+        <select id="campaign-embed-theme" class="pool-first-party-cart__input pool-first-party-cart__input--select" data-campaign-embed-theme>
+          <option value="default" data-embed-theme-default>Default</option>
+          <option value="warm" data-embed-theme-warm>Warm</option>
+          <option value="ocean" data-embed-theme-ocean>Ocean</option>
+        </select>
+      </div>
+      <div class="campaign-embed-builder__field">
+        <label for="campaign-embed-media" data-embed-media-label>Media</label>
+        <select id="campaign-embed-media" class="pool-first-party-cart__input pool-first-party-cart__input--select" data-campaign-embed-media>
+          <option value="show" data-embed-media-show>Show hero media</option>
+          <option value="hide" data-embed-media-hide>Hide hero media</option>
+        </select>
+      </div>
+    </div>
+    <div class="campaign-embed-builder__field">
+      <label for="campaign-embed-code" data-embed-code-label>Embed code</label>
+      <textarea id="campaign-embed-code" readonly data-campaign-embed-code></textarea>
+    </div>
+    <div class="campaign-embed-builder__actions">
+      <button type="button" class="btn btn--primary" data-campaign-embed-copy>Copy code</button>
+      <span class="campaign-embed-builder__status" data-campaign-embed-copy-status></span>
+    </div>
+  </div>
+</section>
+
+<section class="campaign-embed-preview">
+  <div class="campaign-embed-preview__label" data-embed-preview-label>Preview</div>
+  <div class="campaign-embed-widget" data-campaign-embed-root aria-live="polite" aria-busy="true">
+    <div class="campaign-embed-widget__loading" data-campaign-embed-loading>Loading campaign embed...</div>
+  </div>
+</section>
