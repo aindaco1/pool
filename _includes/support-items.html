@@ -8,6 +8,10 @@
     {% assign percent = current_amount | times: 100 | divided_by: item.target %}
     {% assign item_index = forloop.index %}
     {% assign item_category = item.category | default: "digital" %}
+    {% assign resolved_shipping = item.shipping %}
+    {% if resolved_shipping == nil and item.shipping_preset %}
+      {% assign resolved_shipping = site.shipping.presets[item.shipping_preset] %}
+    {% endif %}
     {% assign item_is_physical = false %}
     {% if item_category == "physical" %}
       {% assign item_is_physical = true %}
@@ -72,6 +76,13 @@
           data-item-max-quantity="1"
           data-item-stackable="never"
           data-item-shippable="{% if item_is_physical %}true{% else %}false{% endif %}"
+          {% if resolved_shipping and resolved_shipping.manual_domestic_rate %}data-item-manual-domestic-rate="{{ resolved_shipping.manual_domestic_rate }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.weight_oz != nil %}data-item-shipping-weight-oz="{{ resolved_shipping.weight_oz }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.packaging_weight_oz != nil %}data-item-shipping-packaging-weight-oz="{{ resolved_shipping.packaging_weight_oz }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.length_in != nil %}data-item-shipping-length-in="{{ resolved_shipping.length_in }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.width_in != nil %}data-item-shipping-width-in="{{ resolved_shipping.width_in }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.height_in != nil %}data-item-shipping-height-in="{{ resolved_shipping.height_in }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.stack_height_in != nil %}data-item-shipping-stack-height-in="{{ resolved_shipping.stack_height_in }}"{% endif %}
           {% if include.campaign.shipping_fallback_flat_rate != nil or include.campaign.free_shipping != nil %}data-item-campaign-shipping-override="true"{% endif %}
           {% if include.campaign.shipping_fallback_flat_rate != nil %}data-item-shipping-fallback-cents="{{ include.campaign.shipping_fallback_flat_rate | times: 100 | round }}"{% endif %}
           {% if include.campaign.free_shipping != nil %}data-item-campaign-free-shipping="{{ include.campaign.free_shipping }}"{% endif %}

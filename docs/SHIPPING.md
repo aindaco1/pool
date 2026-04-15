@@ -154,15 +154,19 @@ shipping:
     sticker:
       weight_oz: 1
       packaging_weight_oz: 0.5
-      length_in: 4
-      width_in: 4
-      height_in: 0.1
+      length_in: 11.5
+      width_in: 6.125
+      height_in: 0.2
       stack_height_in: 0.05
+      manual_domestic_rate: FIRST_CLASS_FLAT
       usps_domestic:
         processing_category: NON_MACHINABLE
         rate_indicator: SP
+        mail_classes:
+          - USPS_GROUND_ADVANTAGE
+          - PRIORITY_MAIL
     tshirt:
-      weight_oz: 8
+      weight_oz: 6.5
       packaging_weight_oz: 1
       length_in: 12
       width_in: 10
@@ -182,6 +186,13 @@ shipping:
       width_in: 6.25
       height_in: 1
       stack_height_in: 0.25
+      usps_domestic:
+        processing_category: MACHINABLE
+        rate_indicator: SP
+        mail_classes:
+          - MEDIA_MAIL
+          - USPS_GROUND_ADVANTAGE
+          - PRIORITY_MAIL
     vinyl:
       weight_oz: 18
       length_in: 13
@@ -189,24 +200,78 @@ shipping:
       height_in: 1
     dvd:
       weight_oz: 4
-      length_in: 7.5
-      width_in: 5.5
-      height_in: 0.6
+      packaging_weight_oz: 2
+      length_in: 8
+      width_in: 6
+      height_in: 1
+      stack_height_in: 0.2
+      usps_domestic:
+        processing_category: MACHINABLE
+        rate_indicator: SP
+        mail_classes:
+          - MEDIA_MAIL
+          - USPS_GROUND_ADVANTAGE
+          - PRIORITY_MAIL
     bluray:
       weight_oz: 4
-      length_in: 6.75
-      width_in: 5.25
-      height_in: 0.6
+      packaging_weight_oz: 2
+      length_in: 7.25
+      width_in: 5.75
+      height_in: 0.9
+      stack_height_in: 0.2
+      usps_domestic:
+        processing_category: MACHINABLE
+        rate_indicator: SP
+        mail_classes:
+          - MEDIA_MAIL
+          - USPS_GROUND_ADVANTAGE
+          - PRIORITY_MAIL
     signed_script:
-      weight_oz: 20
-      length_in: 11
+      weight_oz: 7
+      packaging_weight_oz: 1
+      length_in: 11.5
       width_in: 8.5
-      height_in: 1.5
+      height_in: 0.5
+      stack_height_in: 0.1
+      manual_domestic_rate: FIRST_CLASS_FLAT
+      usps_domestic:
+        processing_category: NON_MACHINABLE
+        rate_indicator: SP
+        mail_classes:
+          - MEDIA_MAIL
+          - USPS_GROUND_ADVANTAGE
+          - PRIORITY_MAIL
 ```
 
 That config should stay site-driven and auto-mirror any Worker-required values into [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml).
 
-Optional USPS profile hints can live inside preset metadata too. The current implementation supports `usps_domestic.processing_category`, `usps_domestic.rate_indicator`, `usps_domestic.destination_entry_facility_type`, `usps_domestic.price_type`, and `usps_domestic.mail_classes`. Those hints only apply when the whole physical shipment resolves to the same preset-style USPS profile; mixed shipments fall back to the default parcel quote model.
+Optional preset-level shipping hints can live inside preset metadata too. The current implementation supports:
+
+- `manual_domestic_rate`
+- `usps_domestic.processing_category`
+- `usps_domestic.rate_indicator`
+- `usps_domestic.destination_entry_facility_type`
+- `usps_domestic.price_type`
+- `usps_domestic.mail_classes`
+
+`manual_domestic_rate` is currently domestic-only and supports `FIRST_CLASS_FLAT`, using USPS Notice 123 retail First-Class Mail Large Envelope (Flat) pricing. It only applies when the whole shipment still qualifies for flat mail by weight and dimensions; otherwise the system falls through to the live USPS path.
+
+The USPS-specific hints only apply when the whole physical shipment resolves to the same preset-style USPS profile; mixed shipments fall back to the default parcel quote model.
+
+That means you can encode a conservative “cheapest valid class first” order per preset without trying to infer it on the fly from raw dimensions alone. The current site uses that pattern in two places:
+
+- `sticker`
+  - uses the manual `FIRST_CLASS_FLAT` domestic rate when the shipment still qualifies
+  - otherwise falls through to a cheaper single-piece USPS parcel profile
+- `signed_script`
+  - uses the manual `FIRST_CLASS_FLAT` domestic rate when the shipment still qualifies
+  - otherwise falls through to `MEDIA_MAIL`, then `USPS_GROUND_ADVANTAGE`, then `PRIORITY_MAIL`
+- `cd`, `dvd`, and `bluray`
+  - try `MEDIA_MAIL` first
+  - then fall through to `USPS_GROUND_ADVANTAGE`
+  - then `PRIORITY_MAIL`
+
+We intentionally do not apply true “letter” or “flat” logic automatically. The current USPS Prices API path we use does not expose domestic First-Class letter/flat rating directly, so flat-mail pricing is handled as an explicit manual table, not a live USPS quote.
 
 ## Content Model Changes
 

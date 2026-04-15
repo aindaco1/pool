@@ -346,6 +346,7 @@ What this enables:
 - a fork-facing USPS quote policy surface for timeouts, short-lived quote reuse, and temporary cooldowns after repeated failures or rate limiting
 - reusable `shipping_preset` names in campaign tiers so forks do not need to repeat common merch dimensions
 - optional preset-level USPS profile hints for item types that need a different domestic quote shape
+- optional preset-level domestic mail-class ordering for products that qualify for cheaper USPS classes like Media Mail
 
 Preset and override metadata can include:
 
@@ -355,6 +356,7 @@ Preset and override metadata can include:
 - `width_in`
 - `height_in`
 - `stack_height_in`
+- `manual_domestic_rate`
 - `usps_domestic.processing_category`
 - `usps_domestic.rate_indicator`
 - `usps_domestic.destination_entry_facility_type`
@@ -362,6 +364,23 @@ Preset and override metadata can include:
 - `usps_domestic.mail_classes`
 
 `weight_oz` is the item weight. `packaging_weight_oz` is a one-time packing allowance for that line item, and `stack_height_in` lets multi-quantity physical tiers stack more realistically than simple `height * qty`.
+
+The safest pattern is to encode a deliberate cheapest-valid order per preset instead of trying to infer “letter” or “flat” eligibility from raw dimensions at runtime. The current site now uses:
+
+- `sticker`
+  - `manual_domestic_rate: FIRST_CLASS_FLAT`
+  - then a cheaper single-piece domestic USPS profile if the shipment no longer qualifies for flats
+- `signed_script`
+  - `manual_domestic_rate: FIRST_CLASS_FLAT`
+  - then `MEDIA_MAIL`
+  - then `USPS_GROUND_ADVANTAGE`
+  - then `PRIORITY_MAIL`
+- `cd`, `dvd`, `bluray`
+  - `MEDIA_MAIL`
+  - `USPS_GROUND_ADVANTAGE`
+  - `PRIORITY_MAIL`
+
+If a product does not reliably qualify for a cheaper class, leave it on the default parcel path. Also note that the current USPS Prices API path does not expose domestic First-Class letter/flat rating directly, so “large envelope” logic is implemented here as an explicit manual table (`FIRST_CLASS_FLAT`), not as a live USPS API quote.
 
 ### `add_ons`
 

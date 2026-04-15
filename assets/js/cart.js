@@ -359,6 +359,38 @@ function buildCartItemFromButton(button) {
     item.customFields = customFields;
   }
 
+  const readNumericShippingAttribute = (attributeName) => {
+    const rawValue = button.getAttribute(attributeName);
+    if (rawValue === null || String(rawValue).trim() === '') {
+      return NaN;
+    }
+    return Number(rawValue);
+  };
+  const manualDomesticRate = String(button.getAttribute('data-item-manual-domestic-rate') || '').trim();
+  const weightOz = readNumericShippingAttribute('data-item-shipping-weight-oz');
+  const packagingWeightOz = readNumericShippingAttribute('data-item-shipping-packaging-weight-oz');
+  const lengthIn = readNumericShippingAttribute('data-item-shipping-length-in');
+  const widthIn = readNumericShippingAttribute('data-item-shipping-width-in');
+  const heightIn = readNumericShippingAttribute('data-item-shipping-height-in');
+  const stackHeightIn = readNumericShippingAttribute('data-item-shipping-stack-height-in');
+  if (manualDomesticRate ||
+    Number.isFinite(weightOz) ||
+    Number.isFinite(packagingWeightOz) ||
+    Number.isFinite(lengthIn) ||
+    Number.isFinite(widthIn) ||
+    Number.isFinite(heightIn) ||
+    Number.isFinite(stackHeightIn)) {
+    item.shipping = {
+      ...(manualDomesticRate ? { manual_domestic_rate: manualDomesticRate } : {}),
+      ...(Number.isFinite(weightOz) ? { weight_oz: weightOz } : {}),
+      ...(Number.isFinite(packagingWeightOz) ? { packaging_weight_oz: packagingWeightOz } : {}),
+      ...(Number.isFinite(lengthIn) ? { length_in: lengthIn } : {}),
+      ...(Number.isFinite(widthIn) ? { width_in: widthIn } : {}),
+      ...(Number.isFinite(heightIn) ? { height_in: heightIn } : {}),
+      ...(Number.isFinite(stackHeightIn) ? { stack_height_in: stackHeightIn } : {})
+    };
+  }
+
   return item;
 }
 

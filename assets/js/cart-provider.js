@@ -908,6 +908,136 @@
     return normalizedItem;
   }
 
+  const MANUAL_DOMESTIC_RATE_FIRST_CLASS_FLAT = 'FIRST_CLASS_FLAT';
+  const FIRST_CLASS_FLAT_MIN_LENGTH_IN = 11.5;
+  const FIRST_CLASS_FLAT_MAX_LENGTH_IN = 15;
+  const FIRST_CLASS_FLAT_MIN_WIDTH_IN = 6.125;
+  const FIRST_CLASS_FLAT_MAX_WIDTH_IN = 12;
+  const FIRST_CLASS_FLAT_MAX_HEIGHT_IN = 0.75;
+  const FIRST_CLASS_FLAT_MAX_WEIGHT_OZ = 13;
+  const FIRST_CLASS_FLAT_RATE_TABLE_CENTS = {
+    1: 163,
+    2: 190,
+    3: 217,
+    4: 244,
+    5: 272,
+    6: 300,
+    7: 328,
+    8: 356,
+    9: 384,
+    10: 414,
+    11: 444,
+    12: 474,
+    13: 504
+  };
+
+  function normalizeManualDomesticRate(value) {
+    const normalized = String(value || '').trim().toUpperCase();
+    return normalized === MANUAL_DOMESTIC_RATE_FIRST_CLASS_FLAT ? normalized : '';
+  }
+
+  function getShippingMetric(shipping, snakeKey, camelKey) {
+    const parsed = Number(shipping?.[snakeKey] ?? shipping?.[camelKey]);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  }
+
+  function getManualDomesticShippingCentsFromShipping(shipping, quantity) {
+    if (!shipping || typeof shipping !== 'object') return null;
+    const manualDomesticRate = normalizeManualDomesticRate(
+      shipping.manual_domestic_rate ?? shipping.manualDomesticRate
+    );
+    if (manualDomesticRate !== MANUAL_DOMESTIC_RATE_FIRST_CLASS_FLAT) {
+      return null;
+    }
+
+    const resolvedQuantity = Math.max(1, Number(quantity || 1));
+    if (!Number.isInteger(resolvedQuantity) || resolvedQuantity <= 0) {
+      return null;
+    }
+
+    const weightOz = getShippingMetric(shipping, 'weight_oz', 'weightOz');
+    const packagingWeightOz = getShippingMetric(shipping, 'packaging_weight_oz', 'packagingWeightOz');
+    const lengthIn = getShippingMetric(shipping, 'length_in', 'lengthIn');
+    const widthIn = getShippingMetric(shipping, 'width_in', 'widthIn');
+    const heightIn = getShippingMetric(shipping, 'height_in', 'heightIn');
+    const stackHeightIn = getShippingMetric(shipping, 'stack_height_in', 'stackHeightIn');
+
+    if (!Number.isFinite(weightOz) || weightOz <= 0 ||
+      !Number.isFinite(lengthIn) || !Number.isFinite(widthIn) || !Number.isFinite(heightIn)) {
+      return null;
+    }
+
+    const totalWeightOz = (weightOz * resolvedQuantity) + (Number.isFinite(packagingWeightOz) && packagingWeightOz > 0 ? packagingWeightOz : 0);
+    const effectiveStackHeight = Number.isFinite(stackHeightIn) && stackHeightIn > 0 ? stackHeightIn : heightIn;
+    const totalHeightIn = heightIn + (effectiveStackHeight * Math.max(0, resolvedQuantity - 1));
+
+    const qualifies = totalWeightOz > 0 &&
+      totalWeightOz <= FIRST_CLASS_FLAT_MAX_WEIGHT_OZ &&
+      lengthIn >= FIRST_CLASS_FLAT_MIN_LENGTH_IN &&
+      lengthIn <= FIRST_CLASS_FLAT_MAX_LENGTH_IN &&
+      widthIn >= FIRST_CLASS_FLAT_MIN_WIDTH_IN &&
+      widthIn <= FIRST_CLASS_FLAT_MAX_WIDTH_IN &&
+      totalHeightIn > 0 &&
+      totalHeightIn <= FIRST_CLASS_FLAT_MAX_HEIGHT_IN;
+
+    if (!qualifies) {
+      return null;
+    }
+
+    return FIRST_CLASS_FLAT_RATE_TABLE_CENTS[Math.max(1, Math.ceil(totalWeightOz))] ?? null;
+  }
+
+  function getCartItemManualDomesticShippingCents(item) {
+    return getManualDomesticShippingCentsFromShipping(item?.shipping, item?.quantity || 1);
+  }
+
+  function getManualDomesticShippingSummary(items) {
+    const normalizedItems = Array.isArray(items) ? items : [];
+    const addOnSelections = getCartBundleAddOnSelections(normalizedItems);
+    let candidateCount = 0;
+    let totalCents = 0;
+    let invalid = false;
+
+    for (const item of normalizedItems) {
+      if (isAddOnCartItem(item)) continue;
+      if (!firstPartyItemIsPhysical(item)) continue;
+
+      const slug = getFirstPartyItemCampaignSlug(item);
+      if (slug && campaignHasExplicitFallbackShipping(normalizedItems, slug)) {
+        continue;
+      }
+
+      const manualCents = getCartItemManualDomesticShippingCents(item);
+      if (!Number.isFinite(manualCents) || manualCents < 0) {
+        invalid = true;
+        continue;
+      }
+      candidateCount += 1;
+      totalCents += manualCents;
+    }
+
+    for (const selection of addOnSelections) {
+      if (String(selection?.category || '').trim().toLowerCase() !== 'physical') continue;
+      const scope = getCartAddOnScope(selection);
+      if (scope === 'campaign') {
+        const campaignSlug = String(selection?.campaignSlug || '').trim();
+        if (campaignSlug && campaignHasExplicitFallbackShipping(normalizedItems, campaignSlug)) {
+          continue;
+        }
+      }
+
+      const manualCents = getManualDomesticShippingCentsFromShipping(selection?.shipping, selection?.quantity || 1);
+      if (!Number.isFinite(manualCents) || manualCents < 0) {
+        invalid = true;
+        continue;
+      }
+      candidateCount += 1;
+      totalCents += manualCents;
+    }
+
+    return { candidateCount, totalCents, invalid };
+  }
+
   function getItemQuantityCap(item) {
     return Number.isFinite(item?.maxQuantity) && item.maxQuantity > 0 ? item.maxQuantity : Infinity;
   }
@@ -939,6 +1069,46 @@
 
   function hasInteractiveCustomFields(button) {
     return getButtonCustomFieldDefinitions(button).some((field) => field.type !== 'hidden');
+  }
+
+  function buildButtonShippingMetadata(button) {
+    if (!button) return null;
+
+    const readNumericShippingAttribute = (attributeName) => {
+      const rawValue = button.getAttribute(attributeName);
+      if (rawValue === null || String(rawValue).trim() === '') {
+        return NaN;
+      }
+      return Number(rawValue);
+    };
+
+    const manualDomesticRate = String(button.getAttribute('data-item-manual-domestic-rate') || '').trim();
+    const weightOz = readNumericShippingAttribute('data-item-shipping-weight-oz');
+    const packagingWeightOz = readNumericShippingAttribute('data-item-shipping-packaging-weight-oz');
+    const lengthIn = readNumericShippingAttribute('data-item-shipping-length-in');
+    const widthIn = readNumericShippingAttribute('data-item-shipping-width-in');
+    const heightIn = readNumericShippingAttribute('data-item-shipping-height-in');
+    const stackHeightIn = readNumericShippingAttribute('data-item-shipping-stack-height-in');
+
+    if (!manualDomesticRate &&
+      !Number.isFinite(weightOz) &&
+      !Number.isFinite(packagingWeightOz) &&
+      !Number.isFinite(lengthIn) &&
+      !Number.isFinite(widthIn) &&
+      !Number.isFinite(heightIn) &&
+      !Number.isFinite(stackHeightIn)) {
+      return null;
+    }
+
+    return {
+      ...(manualDomesticRate ? { manual_domestic_rate: manualDomesticRate } : {}),
+      ...(Number.isFinite(weightOz) ? { weight_oz: weightOz } : {}),
+      ...(Number.isFinite(packagingWeightOz) ? { packaging_weight_oz: packagingWeightOz } : {}),
+      ...(Number.isFinite(lengthIn) ? { length_in: lengthIn } : {}),
+      ...(Number.isFinite(widthIn) ? { width_in: widthIn } : {}),
+      ...(Number.isFinite(heightIn) ? { height_in: heightIn } : {}),
+      ...(Number.isFinite(stackHeightIn) ? { stack_height_in: stackHeightIn } : {})
+    };
   }
 
   function buildCartItemFromButton(button) {
@@ -980,6 +1150,11 @@
     const customFields = getButtonCustomFieldDefinitions(button);
     if (customFields.length > 0) {
       item.customFields = customFields;
+    }
+
+    const shipping = buildButtonShippingMetadata(button);
+    if (shipping) {
+      item.shipping = shipping;
     }
 
     return item;
@@ -1024,6 +1199,11 @@
     const customFields = getButtonCustomFieldDefinitions(button);
     if (customFields.length > 0) {
       item.customFields = customFields;
+    }
+
+    const shipping = buildButtonShippingMetadata(button);
+    if (shipping) {
+      item.shipping = shipping;
     }
 
     return item;
@@ -1254,51 +1434,33 @@
 
   function cartRequiresQuotedShipping(items) {
     const normalizedItems = Array.isArray(items) ? items : [];
-    const addOnSelections = getCartBundleAddOnSelections(normalizedItems);
-    const campaignSlugs = new Set();
-    let requiresPlatformQuote = false;
-
-    for (const item of normalizedItems) {
-      if (isAddOnCartItem(item)) continue;
-      if (!firstPartyItemIsPhysical(item)) continue;
-      const slug = getFirstPartyItemCampaignSlug(item);
-      if (slug) {
-        campaignSlugs.add(slug);
-      }
+    const manualSummary = getManualDomesticShippingSummary(normalizedItems);
+    if (manualSummary.invalid) {
+      return true;
     }
 
-    for (const selection of addOnSelections) {
-      if (String(selection?.category || '').trim().toLowerCase() !== 'physical') continue;
-      if (getCartAddOnScope(selection) === 'campaign') {
-        const campaignSlug = String(selection?.campaignSlug || '').trim();
-        if (campaignSlug) {
-          campaignSlugs.add(campaignSlug);
-        }
-      } else {
-        requiresPlatformQuote = true;
-      }
-    }
-
-    for (const slug of campaignSlugs) {
-      if (!campaignHasExplicitFallbackShipping(normalizedItems, slug)) {
-        return true;
-      }
-    }
-
-    return requiresPlatformQuote;
+    return manualSummary.candidateCount > 1;
   }
 
   function getCampaignFallbackShippingCents(items, selectedAnchorSlug) {
     const fallbackByCampaign = new Map();
     const normalizedItems = Array.isArray(items) ? items : [];
     const addOnSelections = getCartBundleAddOnSelections(normalizedItems);
-    const physicalCampaignSlugs = new Set();
+    const manualSummary = getManualDomesticShippingSummary(normalizedItems);
+    const manualDomesticShippingCents = !manualSummary.invalid && manualSummary.candidateCount === 1
+      ? manualSummary.totalCents
+      : 0;
     for (const item of normalizedItems) {
       if (isAddOnCartItem(item)) continue;
       if (!firstPartyItemIsPhysical(item)) continue;
       const slug = getFirstPartyItemCampaignSlug(item);
       if (!slug) continue;
-      physicalCampaignSlugs.add(slug);
+      if (!campaignHasExplicitFallbackShipping(normalizedItems, slug) && manualDomesticShippingCents > 0) {
+        const manualCents = getCartItemManualDomesticShippingCents(item);
+        if (Number.isFinite(manualCents) && manualCents >= 0) {
+          continue;
+        }
+      }
       const resolvedAmount = getFallbackShippingCentsForCampaignSlug(normalizedItems, slug);
 
       if (!fallbackByCampaign.has(slug) || resolvedAmount === 0) {
@@ -1311,11 +1473,20 @@
       if (String(selection?.category || '').trim().toLowerCase() !== 'physical') continue;
       if (getCartAddOnScope(selection) === 'campaign') {
         const campaignSlug = String(selection?.campaignSlug || '').trim();
+        if (campaignSlug && !campaignHasExplicitFallbackShipping(normalizedItems, campaignSlug) && manualDomesticShippingCents > 0) {
+          const manualCents = getManualDomesticShippingCentsFromShipping(selection?.shipping, selection?.quantity || 1);
+          if (Number.isFinite(manualCents) && manualCents >= 0) {
+            continue;
+          }
+        }
         if (campaignSlug && !fallbackByCampaign.has(campaignSlug)) {
           fallbackByCampaign.set(campaignSlug, getFallbackShippingCentsForCampaignSlug(normalizedItems, campaignSlug));
         }
       } else {
-        hasPhysicalPlatformAddOns = true;
+        const manualCents = getManualDomesticShippingCentsFromShipping(selection?.shipping, selection?.quantity || 1);
+        if (!(manualDomesticShippingCents > 0 && Number.isFinite(manualCents) && manualCents >= 0)) {
+          hasPhysicalPlatformAddOns = true;
+        }
       }
     }
 
@@ -1323,7 +1494,7 @@
       fallbackByCampaign.set('__platform__', getShippingFallbackFeeCents());
     }
 
-    return Array.from(fallbackByCampaign.values()).reduce((sum, amount) => sum + amount, 0);
+    return Array.from(fallbackByCampaign.values()).reduce((sum, amount) => sum + amount, manualDomesticShippingCents);
   }
 
   function buildFirstPartyPricing(state) {
@@ -2265,6 +2436,9 @@
           : item?.campaignFreeShipping === false
             ? false
             : undefined,
+        shipping: item?.shipping && typeof item.shipping === 'object'
+          ? item.shipping
+          : undefined,
         maxQuantity: Number.isFinite(Number(item?.maxQuantity)) ? Number(item?.maxQuantity) : undefined,
         customFields: Array.isArray(item?.customFields) ? item.customFields : undefined
       }))

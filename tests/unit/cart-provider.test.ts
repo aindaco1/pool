@@ -2367,6 +2367,28 @@ describe('cart provider shim', () => {
 
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${WORKER_BASE}/shipping/quote`) {
+        return new Response(JSON.stringify({
+          ok: true,
+          shippingCents: 980,
+          quote: {
+            shippingCents: 980,
+            source: 'usps_live',
+            carrier: 'usps',
+            service: 'USPS Ground Advantage',
+            domestic: true
+          },
+          availableOptions: [
+            { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 980 }
+          ],
+          defaultOption: 'standard',
+          selectedOption: 'standard'
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
       if (url !== `${WORKER_BASE}/checkout-intent/start`) {
         throw new Error(`Unexpected fetch: ${url}`);
       }
@@ -3269,6 +3291,57 @@ describe('cart provider shim', () => {
     expect(root?.querySelector('[data-cart-estimate-postal]')).toBeTruthy();
     expect(root?.querySelector('[data-cart-summary-shipping-label]')?.textContent || '').toContain('Estimated shipping');
     expect(root?.querySelector('[data-cart-summary-shipping]')?.textContent).toBe('--');
+  });
+
+  it('hides the ZIP estimate field when the only physical item uses a manual flat domestic rate', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      workerBase: WORKER_BASE,
+      shipping: {
+        countries: SHIPPING_COUNTRIES
+      }
+    };
+
+    const fetchMock = vi.fn(async () => {
+      throw new Error('shipping quote should not be called for manual-flat-only carts');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'smoke-editable__signed-script',
+      name: 'Signed Script',
+      price: 25,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: false,
+      shipping: {
+        manual_domestic_rate: 'FIRST_CLASS_FLAT',
+        weight_oz: 7,
+        packaging_weight_oz: 1,
+        length_in: 11.5,
+        width_in: 8.5,
+        height_in: 0.5,
+        stack_height_in: 0.1
+      },
+      customFields: [
+        { name: '_category', value: 'physical' }
+      ]
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    expect(root?.querySelector('[data-cart-estimate-postal]')).toBeNull();
+    expect(root?.querySelector('[data-cart-summary-shipping-label]')?.textContent || '').toContain('Shipping');
+    expect(root?.querySelector('[data-cart-summary-shipping]')?.textContent).toBe('$3.56');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('keeps hosted checkout in estimate mode until a ZIP is entered for physical carts without an override', async () => {

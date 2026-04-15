@@ -28,6 +28,28 @@ const USPS_INTERNATIONAL_MAIL_CLASSES = [
   'FIRST-CLASS_PACKAGE_INTERNATIONAL_SERVICE',
   'PRIORITY_MAIL_INTERNATIONAL'
 ];
+const MANUAL_DOMESTIC_RATE_FIRST_CLASS_FLAT = 'FIRST_CLASS_FLAT';
+const FIRST_CLASS_FLAT_MIN_LENGTH_IN = 11.5;
+const FIRST_CLASS_FLAT_MAX_LENGTH_IN = 15;
+const FIRST_CLASS_FLAT_MIN_WIDTH_IN = 6.125;
+const FIRST_CLASS_FLAT_MAX_WIDTH_IN = 12;
+const FIRST_CLASS_FLAT_MAX_HEIGHT_IN = 0.75;
+const FIRST_CLASS_FLAT_MAX_WEIGHT_OZ = 13;
+const FIRST_CLASS_FLAT_RATE_TABLE_CENTS = {
+  1: 163,
+  2: 190,
+  3: 217,
+  4: 244,
+  5: 272,
+  6: 300,
+  7: 328,
+  8: 356,
+  9: 384,
+  10: 414,
+  11: 444,
+  12: 474,
+  13: 504
+};
 let cachedUspsToken = null;
 let cachedUspsQuoteResults = new Map();
 let cachedUspsBackoffUntil = 0;
@@ -110,6 +132,7 @@ function normalizeShippingProfile(shipping, label) {
   const packagingWeightOz = Number(shipping.packaging_weight_oz);
   const stackHeightIn = Number(shipping.stack_height_in);
   const uspsDomesticProfile = normalizeUspsDomesticProfile(shipping.usps_domestic);
+  const manualDomesticRate = normalizeManualDomesticRate(shipping.manual_domestic_rate || shipping.manualDomesticRate);
 
   if (!(Number.isFinite(weightOz) && weightOz > 0)) {
     return { valid: false, error: `${label} is missing a valid weight` };
@@ -126,7 +149,8 @@ function normalizeShippingProfile(shipping, label) {
       heightIn: normalizedHeightIn,
       packagingWeightOz: Number.isFinite(packagingWeightOz) && packagingWeightOz > 0 ? packagingWeightOz : 0,
       stackHeightIn: Number.isFinite(stackHeightIn) && stackHeightIn > 0 ? stackHeightIn : normalizedHeightIn,
-      uspsDomesticProfile
+      uspsDomesticProfile,
+      manualDomesticRate
     }
   };
 }
@@ -161,6 +185,19 @@ function normalizeUspsDomesticProfile(profile) {
   };
 }
 
+function normalizeManualDomesticRate(value) {
+  const normalized = normalizeOptionalString(value).toUpperCase();
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized === MANUAL_DOMESTIC_RATE_FIRST_CLASS_FLAT) {
+    return normalized;
+  }
+
+  return null;
+}
+
 function normalizeOptionalString(value) {
   const normalized = String(value || '').trim();
   return normalized ? normalized : '';
@@ -185,7 +222,8 @@ export function summarizeShipmentFromTierSelection(
     tierIds: [],
     supportItemIds: [],
     addOnIds: [],
-    uspsDomesticProfile: undefined
+    uspsDomesticProfile: undefined,
+    manualDomesticRate: undefined
   };
 
   for (const selected of tierSelection?.selectedTiers || []) {
@@ -213,6 +251,7 @@ export function summarizeShipmentFromTierSelection(
     shipment.heightIn += profile.shipping.heightIn + (profile.shipping.stackHeightIn * Math.max(0, qty - 1));
     shipment.tierIds.push(tier.id);
     mergeShipmentUspsDomesticProfile(shipment, profile.shipping.uspsDomesticProfile);
+    mergeShipmentManualDomesticRate(shipment, profile.shipping.manualDomesticRate);
   }
 
   const supportItemDefinitions = new Map((campaign?.support_items || []).map((item) => [item.id, item]));
@@ -245,6 +284,7 @@ export function summarizeShipmentFromTierSelection(
     shipment.heightIn += profile.shipping.heightIn;
     shipment.supportItemIds.push(supportItemId);
     mergeShipmentUspsDomesticProfile(shipment, profile.shipping.uspsDomesticProfile);
+    mergeShipmentManualDomesticRate(shipment, profile.shipping.manualDomesticRate);
   }
 
   for (const selected of bundleAddOns || []) {
@@ -271,10 +311,14 @@ export function summarizeShipmentFromTierSelection(
     shipment.heightIn += profile.shipping.heightIn + (profile.shipping.stackHeightIn * Math.max(0, quantity - 1));
     shipment.addOnIds.push(productId);
     mergeShipmentUspsDomesticProfile(shipment, profile.shipping.uspsDomesticProfile);
+    mergeShipmentManualDomesticRate(shipment, profile.shipping.manualDomesticRate);
   }
 
   if (!shipment.uspsDomesticProfile) {
     delete shipment.uspsDomesticProfile;
+  }
+  if (!shipment.manualDomesticRate) {
+    delete shipment.manualDomesticRate;
   }
 
   return { valid: true, shipment };
@@ -295,6 +339,22 @@ function mergeShipmentUspsDomesticProfile(shipment, profile) {
   const nextKey = normalizedProfile ? JSON.stringify(normalizedProfile) : '';
   if (currentKey !== nextKey) {
     shipment.uspsDomesticProfile = null;
+  }
+}
+
+function mergeShipmentManualDomesticRate(shipment, manualDomesticRate) {
+  if (!shipment || shipment.manualDomesticRate === null) {
+    return;
+  }
+
+  const normalized = normalizeManualDomesticRate(manualDomesticRate);
+  if (shipment.manualDomesticRate === undefined) {
+    shipment.manualDomesticRate = normalized;
+    return;
+  }
+
+  if (shipment.manualDomesticRate !== normalized) {
+    shipment.manualDomesticRate = null;
   }
 }
 
@@ -397,6 +457,64 @@ export function buildFallbackShippingQuote(env, destination, shipment, campaign 
       : null,
     domestic
   };
+}
+
+function qualifiesForManualDomesticRate(shipment, rateId) {
+  if (!shipment?.hasPhysical) {
+    return false;
+  }
+
+  if (rateId !== MANUAL_DOMESTIC_RATE_FIRST_CLASS_FLAT) {
+    return false;
+  }
+
+  const weightOz = Number(shipment.weightOz || 0);
+  const lengthIn = Number(shipment.lengthIn || 0);
+  const widthIn = Number(shipment.widthIn || 0);
+  const heightIn = Number(shipment.heightIn || 0);
+  return Number.isFinite(weightOz) &&
+    weightOz > 0 &&
+    weightOz <= FIRST_CLASS_FLAT_MAX_WEIGHT_OZ &&
+    Number.isFinite(lengthIn) &&
+    lengthIn >= FIRST_CLASS_FLAT_MIN_LENGTH_IN &&
+    lengthIn <= FIRST_CLASS_FLAT_MAX_LENGTH_IN &&
+    Number.isFinite(widthIn) &&
+    widthIn >= FIRST_CLASS_FLAT_MIN_WIDTH_IN &&
+    widthIn <= FIRST_CLASS_FLAT_MAX_WIDTH_IN &&
+    Number.isFinite(heightIn) &&
+    heightIn > 0 &&
+    heightIn <= FIRST_CLASS_FLAT_MAX_HEIGHT_IN;
+}
+
+function buildManualDomesticRateQuote(destination, shipment) {
+  const rateId = normalizeManualDomesticRate(shipment?.manualDomesticRate);
+  if (!rateId || destination?.country !== 'US' || !qualifiesForManualDomesticRate(shipment, rateId)) {
+    return { valid: false, error: 'Manual domestic rate unavailable' };
+  }
+
+  if (rateId === MANUAL_DOMESTIC_RATE_FIRST_CLASS_FLAT) {
+    const billableWeightOz = Math.min(
+      FIRST_CLASS_FLAT_MAX_WEIGHT_OZ,
+      Math.max(1, Math.ceil(Number(shipment.weightOz || 0)))
+    );
+    const shippingCents = FIRST_CLASS_FLAT_RATE_TABLE_CENTS[billableWeightOz];
+    if (!Number.isFinite(shippingCents)) {
+      return { valid: false, error: 'Manual domestic flat rate unavailable' };
+    }
+
+    return {
+      valid: true,
+      quote: {
+        shippingCents,
+        source: 'manual_rate_table',
+        carrier: 'usps_manual',
+        service: 'first_class_flat',
+        domestic: true
+      }
+    };
+  }
+
+  return { valid: false, error: 'Manual domestic rate unavailable' };
 }
 
 export function buildFreeShippingQuote(env, destination, shipment) {
@@ -605,6 +723,26 @@ export async function quoteCampaignShipment(
       quote: {
         ...fallbackQuote,
         shippingCents: Math.max(0, Number(selectedOptionDetails?.shippingCents ?? fallbackQuote.shippingCents) || 0)
+      }
+    };
+  }
+
+  const manualDomesticQuote = buildManualDomesticRateQuote(destination, shipment);
+  if (manualDomesticQuote.valid) {
+    const availableOptions = buildStandardOnlyShippingOptions(shipment, manualDomesticQuote.quote.shippingCents);
+    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, SHIPPING_OPTION_STANDARD);
+    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, SHIPPING_OPTION_STANDARD);
+    return {
+      valid: true,
+      campaignSlug: campaign?.slug || '',
+      shipment,
+      availableOptions,
+      defaultOption: SHIPPING_OPTION_STANDARD,
+      selectedOption: resolvedOption,
+      selectedOptionDetails,
+      quote: {
+        ...manualDomesticQuote.quote,
+        shippingCents: Math.max(0, Number(selectedOptionDetails?.shippingCents ?? manualDomesticQuote.quote.shippingCents) || 0)
       }
     };
   }
