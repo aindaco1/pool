@@ -27,6 +27,7 @@ const mediaSelect = document.querySelector('[data-campaign-embed-media]');
 const codeField = document.querySelector('[data-campaign-embed-code]');
 const copyButton = document.querySelector('[data-campaign-embed-copy]');
 const copyStatus = document.querySelector('[data-campaign-embed-copy-status]');
+const closeLink = document.querySelector('[data-campaign-embed-close]');
 const isFramed = window.self !== window.top;
 
 let currentSlug = '';
@@ -513,6 +514,12 @@ function renderSnapshot(snapshot) {
   const categoryLabel = getRuntimeMessage('campaign.category', 'Category');
   const showMedia = embedOptions.media !== 'hide';
   root.className = 'campaign-embed-widget campaign-embed-widget--theme-' + embedOptions.theme + ' campaign-embed-widget--layout-' + embedOptions.layout + (showMedia ? '' : ' campaign-embed-widget--media-hidden');
+  if (closeLink && !isFramed) {
+    closeLink.href = campaignUrl;
+    closeLink.hidden = false;
+    closeLink.setAttribute('aria-label', getRuntimeMessage('embed.back_to_campaign', 'Back to campaign'));
+    closeLink.setAttribute('title', getRuntimeMessage('embed.back_to_campaign', 'Back to campaign'));
+  }
   root.setAttribute('aria-busy', 'false');
   root.innerHTML = ''
     + '<article class="campaign-embed-card'
@@ -577,6 +584,9 @@ function startCountdown(snapshot) {
 }
 
 function renderError(message) {
+  if (closeLink && !currentSnapshot) {
+    closeLink.hidden = true;
+  }
   root.setAttribute('aria-busy', 'false');
   root.innerHTML = '<div class="campaign-embed-widget__error">' + escapeHtml(message) + '</div>';
   if (countdownTimer) {
@@ -712,6 +722,11 @@ function syncBuilderLabels() {
   });
   if (copyButton) {
     copyButton.textContent = getRuntimeMessage('embed.copy_button', 'Copy code');
+  }
+  if (closeLink && !isFramed) {
+    const closeLabel = getRuntimeMessage('embed.back_to_campaign', 'Back to campaign');
+    closeLink.setAttribute('aria-label', closeLabel);
+    closeLink.setAttribute('title', closeLabel);
   }
 }
 

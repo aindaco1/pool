@@ -23,6 +23,7 @@ describe('campaign embed surface', () => {
     expect(embedPage).toContain('data-campaign-embed-theme');
     expect(embedPage).toContain('data-campaign-embed-media');
     expect(embedLayout).toContain('indexable=false');
+    expect(embedLayout).toContain('data-campaign-embed-close');
     expect(embedLayout).toContain('/assets/js/campaign-embed.js');
     expect(embedLayout).toContain('data-pool-config-script="true"');
   });
@@ -48,6 +49,7 @@ describe('campaign embed surface', () => {
     expect(embedScript).toContain('buildResizeHelperScript');
     expect(embedScript).toContain('data-pool-campaign-embed');
     expect(embedScript).toContain('__POOL_CAMPAIGN_EMBED_RESIZE__');
+    expect(embedScript).toContain('data-campaign-embed-close');
     expect(embedScript).toContain('layout');
     expect(embedScript).toContain('theme');
     expect(embedScript).toContain('media');
@@ -56,6 +58,7 @@ describe('campaign embed surface', () => {
     expect(embedScript).toContain('window.location.pathname');
     expect(embedStyles).toContain('.campaign-embed-builder');
     expect(embedStyles).toContain('.campaign-embed-builder__option-grid');
+    expect(embedStyles).toContain('.campaign-embed-shell__close');
     expect(embedStyles).toContain('.campaign-embed-widget');
     expect(embedStyles).toContain('.campaign-embed-widget--theme-warm');
     expect(embedStyles).toContain('.campaign-embed-card--compact');

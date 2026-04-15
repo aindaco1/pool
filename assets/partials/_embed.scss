@@ -6,9 +6,30 @@
 }
 
 .campaign-embed-shell {
+  position: relative;
   max-width: 1080px;
   margin: 0 auto;
   padding: 28px 18px 36px;
+}
+
+.campaign-embed-shell__close {
+  position: absolute;
+  top: 10px;
+  right: 18px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  font-size: 28px;
+  line-height: 1;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: none;
+  }
 }
 
 .campaign-embed-page--framed {
@@ -17,6 +38,10 @@
   .campaign-embed-shell {
     max-width: none;
     padding: 0;
+  }
+
+  .campaign-embed-shell__close {
+    display: none;
   }
 }
 

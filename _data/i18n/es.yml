@@ -91,6 +91,7 @@ embed:
   code_label: "Código de inserción"
   copy_button: "Copiar código"
   copy_success: "¡Copiado!"
+  back_to_campaign: "Volver a la campaña"
   loading: "Cargando embed de campaña..."
   missing_slug: "Selecciona una campaña para generar un embed."
   load_error: "No se pudo cargar este embed de campaña en este momento."

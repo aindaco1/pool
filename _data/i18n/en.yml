@@ -93,6 +93,7 @@ embed:
   code_label: "Embed code"
   copy_button: "Copy code"
   copy_success: "Copied!"
+  back_to_campaign: "Back to campaign"
   loading: "Loading campaign embed..."
   missing_slug: "Select a campaign to generate an embed."
   load_error: "Unable to load this campaign embed right now."
