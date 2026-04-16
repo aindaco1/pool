@@ -54,6 +54,9 @@ describe('SEO templates', () => {
 
   it('emits richer social metadata for locale and image alt text', () => {
     const seoMeta = readRepoFile('_includes', 'seo-meta.html');
+    const campaignLayout = readRepoFile('_layouts', 'campaign.html');
+    const translationsEn = readRepoFile('_data', 'i18n', 'en.yml');
+    const translationsEs = readRepoFile('_data', 'i18n', 'es.yml');
 
     expect(seoMeta).toContain('og:locale');
     expect(seoMeta).toContain('og:locale:alternate');
@@ -61,6 +64,14 @@ describe('SEO templates', () => {
     expect(seoMeta).toContain('twitter:image:alt');
     expect(seoMeta).toContain('site.seo.default_social_image_alt');
     expect(seoMeta).toContain('site.seo.og_locale_overrides');
+    expect(campaignLayout).toContain('campaign_preview_state');
+    expect(campaignLayout).toContain('title=campaign_social_title');
+    expect(campaignLayout).toContain('description=campaign_social_description');
+    expect(campaignLayout).toContain('image_alt=campaign_social_image_alt');
+    expect(campaignLayout).toContain('/share/campaign/{{ page.slug | uri_escape }}.svg?lang={{ current_lang | uri_escape }}');
+    expect(seoMeta).toContain("unless image_url contains '://' or image_url contains 'data:'");
+    expect(translationsEn).toContain('campaign_preview:');
+    expect(translationsEs).toContain('campaign_preview:');
   });
 
   it('routes campaign chrome strings through shared translation keys', () => {

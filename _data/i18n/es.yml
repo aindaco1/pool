@@ -73,6 +73,17 @@ progress_markers:
   ends: "Termina %{date}"
   ended: "Terminó %{date}"
 
+campaign_preview:
+  starts_title: "%{title} empieza %{date}"
+  ends_title: "%{title} termina %{date}"
+  funded_title: "%{title} financiada"
+  ended_title: "%{title} finalizada"
+  starts_description: "%{category} de %{creator}. Empieza %{date}. %{blurb}"
+  live_description: "%{category} de %{creator}. Termina %{date}. %{blurb}"
+  funded_description: "%{category} de %{creator}. Campaña financiada. %{blurb}"
+  ended_description: "%{category} de %{creator}. Campaña finalizada. %{blurb}"
+  image_alt: "Vista previa de la campaña %{title} de %{creator}"
+
 embed:
   builder_title: "Embed de campaña"
   builder_intro: "Copia este iframe para incrustar una vista previa en vivo de la campaña en otro sitio."

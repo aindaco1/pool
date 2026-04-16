@@ -602,6 +602,36 @@ describe('worker operational integrity', () => {
     expect(kv.listCalls.some((call) => call.prefix === 'pledge:')).toBe(false);
   });
 
+  it('serves a campaign share-card SVG that reflects live campaign data', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 1250000,
+      pledgeCount: 7,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/share/campaign/hand-relations.svg'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toContain('image/svg+xml');
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    const body = await response.text();
+    expect(body).toContain('<svg');
+    expect(body).toContain('Hand Relations');
+    expect(body).toContain('$12,500');
+    expect(body).toContain('50% funded');
+    expect(body).toContain('https://pool.test');
+  });
+
   it('pre-marks milestone sends so nested milestone checks do not duplicate broadcasts', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;

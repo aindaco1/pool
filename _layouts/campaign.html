@@ -7,8 +7,54 @@
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-campaign-csp-strict.html %}
   {% include cart-head.html %}
-  {% assign campaign_social_image = page.hero_image_wide | default: page.hero_image %}
-  {% include seo-meta.html lang=current_lang description=page.short_blurb image=campaign_social_image og_type="website" translation_key=page.translation_key localized_paths=page.localized_paths %}
+  {% capture campaign_social_image %}{{ site.platform.worker_url | default: site.platform.site_url | default: site.url }}/share/campaign/{{ page.slug | uri_escape }}.svg?lang={{ current_lang | uri_escape }}{% endcapture %}
+  {% assign campaign_creator = page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author %}
+  {% assign campaign_category = page.category | default: site.data.i18n[current_lang].campaign.default_category | default: site.data.i18n.en.campaign.default_category %}
+  {% capture campaign_blurb_plain %}{{ page.short_blurb | default: site.description | strip_html | strip_newlines | replace: '  ', ' ' | strip }}{% endcapture %}
+  {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
+  {% assign goal_num = page.goal_amount | default: 0 | plus: 0 %}
+  {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
+  {% assign start_epoch = page.start_date | date: '%s' | plus: 0 %}
+  {% assign deadline_epoch = page.goal_deadline | date: '%s' | plus: 0 %}
+  {% if page.goal_deadline %}{% assign deadline_epoch = deadline_epoch | plus: 86399 %}{% endif %}
+  {% assign campaign_preview_state = page.state | default: '' %}
+  {% if page.charged == true %}
+    {% assign campaign_preview_state = 'funded' %}
+  {% elsif campaign_preview_state == '' %}
+    {% if page.start_date and now_epoch < start_epoch %}
+      {% assign campaign_preview_state = 'upcoming' %}
+    {% elsif page.goal_deadline and now_epoch <= deadline_epoch %}
+      {% assign campaign_preview_state = 'live' %}
+    {% elsif goal_num > 0 and pledged_num >= goal_num %}
+      {% assign campaign_preview_state = 'funded' %}
+    {% else %}
+      {% assign campaign_preview_state = 'ended' %}
+    {% endif %}
+  {% elsif campaign_preview_state == 'post' %}
+    {% if page.charged == true or goal_num > 0 and pledged_num >= goal_num %}
+      {% assign campaign_preview_state = 'funded' %}
+    {% else %}
+      {% assign campaign_preview_state = 'ended' %}
+    {% endif %}
+  {% endif %}
+  {% assign start_date_formatted = page.start_date | date: "%b %-d, %Y" %}
+  {% assign deadline_date_formatted = page.goal_deadline | date: "%b %-d, %Y" %}
+  {% case campaign_preview_state %}
+    {% when 'upcoming' %}
+      {% capture campaign_social_title %}{% include t.html key="campaign_preview.starts_title" lang=current_lang title=page.title date=start_date_formatted %}{% endcapture %}
+      {% capture campaign_social_description %}{% include t.html key="campaign_preview.starts_description" lang=current_lang category=campaign_category creator=campaign_creator date=start_date_formatted blurb=campaign_blurb_plain %}{% endcapture %}
+    {% when 'live' %}
+      {% capture campaign_social_title %}{% include t.html key="campaign_preview.ends_title" lang=current_lang title=page.title date=deadline_date_formatted %}{% endcapture %}
+      {% capture campaign_social_description %}{% include t.html key="campaign_preview.live_description" lang=current_lang category=campaign_category creator=campaign_creator date=deadline_date_formatted blurb=campaign_blurb_plain %}{% endcapture %}
+    {% when 'funded' %}
+      {% capture campaign_social_title %}{% include t.html key="campaign_preview.funded_title" lang=current_lang title=page.title %}{% endcapture %}
+      {% capture campaign_social_description %}{% include t.html key="campaign_preview.funded_description" lang=current_lang category=campaign_category creator=campaign_creator blurb=campaign_blurb_plain %}{% endcapture %}
+    {% else %}
+      {% capture campaign_social_title %}{% include t.html key="campaign_preview.ended_title" lang=current_lang title=page.title %}{% endcapture %}
+      {% capture campaign_social_description %}{% include t.html key="campaign_preview.ended_description" lang=current_lang category=campaign_category creator=campaign_creator blurb=campaign_blurb_plain %}{% endcapture %}
+  {% endcase %}
+  {% capture campaign_social_image_alt %}{% include t.html key="campaign_preview.image_alt" lang=current_lang title=page.title category=campaign_category creator=campaign_creator %}{% endcapture %}
+  {% include seo-meta.html lang=current_lang title=campaign_social_title description=campaign_social_description image=campaign_social_image image_alt=campaign_social_image_alt og_type="website" translation_key=page.translation_key localized_paths=page.localized_paths %}
   {% include seo-json-ld.html lang=current_lang kind="campaign" translation_key=page.translation_key localized_paths=page.localized_paths %}
 </head>
 <body>
