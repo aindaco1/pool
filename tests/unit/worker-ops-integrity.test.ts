@@ -632,6 +632,22 @@ describe('worker operational integrity', () => {
     expect(body).toContain('https://pool.test');
   });
 
+  it('localizes the campaign share-card footer link for non-default languages', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/share/campaign/hand-relations.svg?lang=es'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('https://pool.test/es/campaigns/hand-relations/');
+    expect(body).toContain('CREADOR');
+    expect(body).toContain('financiado');
+  });
+
   it('pre-marks milestone sends so nested milestone checks do not duplicate broadcasts', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;

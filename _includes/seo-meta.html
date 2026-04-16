@@ -55,7 +55,7 @@
 <meta name="robots" content="{% if indexable %}index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1{% else %}noindex,nofollow,noarchive{% endif %}">
 {% if seo_description != "" %}<meta name="description" content="{{ seo_description | escape }}">{% endif %}
 {% if canonical_path != "" %}<link rel="canonical" href="{{ site_base }}{{ canonical_path | strip }}">{% endif %}
-{% if indexable and translation_key and localized_page %}
+{% if indexable and (localized_paths or translation_key and localized_page) %}
   {% for lang in site.i18n.supported_langs %}
     {% capture alternate_path %}{% include localized-url.html lang=lang translation_key=translation_key localized_paths=localized_paths path=explicit_path %}{% endcapture %}
     <link rel="alternate" hreflang="{{ lang }}" href="{{ site_base }}{{ alternate_path | strip }}">
@@ -68,7 +68,7 @@
 {% if canonical_path != "" %}<meta property="og:url" content="{{ site_base }}{{ canonical_path | strip }}">{% endif %}
 <meta property="og:site_name" content="{{ platform_title | escape }}">
 <meta property="og:locale" content="{{ og_locale }}">
-{% if indexable and translation_key and localized_page %}
+{% if indexable and (localized_paths or translation_key and localized_page) %}
   {% for lang in site.i18n.supported_langs %}
     {% if lang != current_lang %}
       {% assign alternate_locale = site.seo.og_locale_overrides[lang] | default: lang | replace: '-', '_' %}

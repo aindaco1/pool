@@ -20,7 +20,7 @@ If you are trying to keep a fork comfortable on the Cloudflare Workers free plan
 
 The first two live in Jekyll config and shape browser read behavior. The pricing/shipping values are auto-mirrored into the Worker env so checkout, emails, reports, and settlement math stay aligned.
 
-The config now uses a structured settings model in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml):
+The config now uses a structured settings model in [`_config.yml`](../_config.yml):
 
 - top-level `title` / `description`
 - `seo`
@@ -32,11 +32,11 @@ The config now uses a structured settings model in [`_config.yml`](/Users/aindac
 - `checkout`
 - `cache`
 
-Treat [`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml) as a thin override file for localhost URLs and other machine-local differences, not as a second place to duplicate the canonical fork settings.
+Treat [`_config.local.yml`](../_config.local.yml) as a thin override file for localhost URLs and other machine-local differences, not as a second place to duplicate the canonical fork settings.
 
-The sync target is [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml), and the repo’s supported dev/test entry points keep it aligned automatically.
+The sync target is [`worker/wrangler.toml`](../worker/wrangler.toml), and the repo’s supported dev/test entry points keep it aligned automatically.
 
-See [CUSTOMIZATION.md](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/docs/CUSTOMIZATION.md) for the supported no-code fork surface, including which settings are site-only and which are auto-mirrored to the Worker.
+See [CUSTOMIZATION.md](../docs/CUSTOMIZATION.md) for the supported no-code fork surface, including which settings are site-only and which are auto-mirrored to the Worker.
 
 Current mirrored Worker values worth treating as part of the supported customization surface:
 
@@ -380,7 +380,7 @@ tiers:
 - optional `shipping_fallback_flat_rate` at the campaign level when a specific campaign needs a different flat fallback than the global deployment default
 - optional `shipping_options` at the campaign level for the limited backer-facing shipping policy set (`signature_required`, `adult_signature_required`)
 
-**Platform add-on products**: Global merch or upsell items now have a separate config path under `add_ons` in [/_config.yml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml). That catalog is intended for fixed-price platform-wide products with simple variants, like shirt sizes, and should not be modeled as campaign `support_items`. The Worker mirrors the catalog through [/api/add-ons.json](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/api/add-ons.json), exposes a current inventory snapshot through `/add-ons/inventory`, carries bundle-level add-on selections plus an anchor campaign through checkout, persists those anchor-bound add-ons on the pledge without counting them toward campaign-goal totals, and now exposes them separately in pledge and fulfillment exports. Cart and Manage Pledge both consume the same inventory-aware product-state logic, including low-stock messaging and sold-out variant filtering.
+**Platform add-on products**: Global merch or upsell items now have a separate config path under `add_ons` in [/_config.yml](../_config.yml). That catalog is intended for fixed-price platform-wide products with simple variants, like shirt sizes, and should not be modeled as campaign `support_items`. The Worker mirrors the catalog through [/api/add-ons.json](../api/add-ons.json), exposes a current inventory snapshot through `/add-ons/inventory`, carries bundle-level add-on selections plus an anchor campaign through checkout, persists those anchor-bound add-ons on the pledge without counting them toward campaign-goal totals, and now exposes them separately in pledge and fulfillment exports. Cart and Manage Pledge both consume the same inventory-aware product-state logic, including low-stock messaging and sold-out variant filtering.
 
 - `category: digital` add-ons never contribute to shipping
 - `category: physical` add-ons participate in the same shipping calculator used for physical tiers and physical support items
@@ -692,11 +692,10 @@ Seed test pledges into local KV for testing:
 **What it does:**
 1. Clears existing pledge data from local KV before seeding
 2. Seeds pledges for all campaigns with realistic scenarios:
-   - **beneath-static**: Past deadline, not funded (~$4,600 / $8,000)
-   - **common-ground**: Past deadline, exceeded goal (~$15,150 / $12,000, all charged)
-   - **hand-relations**: Live, partial funding (~$8,200 / $25,000)
-   - **night-work**: Upcoming, no pledges
-   - **worst-movie-ever**: Live, partial funding (~$1,290 / $2,500)
+   - **hand-relations**: Ended, partial funding (~$8,200 / $25,000)
+   - **sunder**: Live, early funding (~$650 / $2,500)
+   - **tecolote**: Ended, partial funding (~$1,550 / $2,000)
+   - **worst-movie-ever**: Ended, partial funding (~$1,290 / $2,500)
 3. Includes diverse pledge states:
    - Active pledges
    - Charged pledges (for funded campaigns)
@@ -1114,7 +1113,7 @@ _data/
     └── es.yml     # Spanish seed locale
 ```
 
-Structured locale settings live in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml):
+Structured locale settings live in [`_config.yml`](../_config.yml):
 
 ```yml
 i18n:
@@ -1175,7 +1174,7 @@ Use the locale helpers for page routing:
 {% include language-switcher.html position="footer" %}
 ```
 
-Runtime messages for site-owned JS flows are emitted through [`assets/i18n.json`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/assets/i18n.json) and booted into `POOL_CONFIG.i18n.messages`, so the cart, checkout, supporter community, and Manage Pledge flows can use the same locale catalog without a SPA-style translation layer.
+Runtime messages for site-owned JS flows are emitted through [`assets/i18n.json`](../assets/i18n.json) and booted into `POOL_CONFIG.i18n.messages`, so the cart, checkout, supporter community, and Manage Pledge flows can use the same locale catalog without a SPA-style translation layer.
 
 Public campaign templates also pull more shared chrome from the same locale data now, including hero-video play/loading text, supporter-community teaser copy, diary tab labels and empty states, production-phase labels/CTAs, and gallery accessibility labels.
 

@@ -109,11 +109,11 @@ Recent security hardening that the gate now covers includes:
 - exact-origin validation for structured embeds (`spotify`, `youtube`, `vimeo`)
 - serialized limited-tier inventory reservations at checkout start and confirmation at successful persistence time
 
-The local Worker defaults in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) now match that first-party setup. `./scripts/dev.sh --podman` now auto-generates a local `CHECKOUT_INTENT_SECRET` in `worker/.dev.vars` if it is missing, so fresh local checkout starts do not fail closed on an uninitialized dev secret.
+The local Worker defaults in [worker/wrangler.toml](../worker/wrangler.toml) now match that first-party setup. `./scripts/dev.sh --podman` now auto-generates a local `CHECKOUT_INTENT_SECRET` in `worker/.dev.vars` if it is missing, so fresh local checkout starts do not fail closed on an uninitialized dev secret.
 
 For local work, prefer `./scripts/dev.sh --podman`. It starts Jekyll and the Worker in rootless Podman containers while preserving the same ports and local Wrangler state.
 
-[`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml) is now an override-only layer, not a second base config. When you change or add fork-facing settings, prefer [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml) unless the value should truly differ only on your local machine.
+[`_config.local.yml`](../_config.local.yml) is now an override-only layer, not a second base config. When you change or add fork-facing settings, prefer [`_config.yml`](../_config.yml) unless the value should truly differ only on your local machine.
 
 The browser helper scripts support the same mode:
 
@@ -128,7 +128,7 @@ The browser helper scripts support the same mode:
 
 Those helpers still run Playwright and shell smoke logic on the host for now, but they boot the site and Worker through the shared Podman-backed local stack first. The report scripts can now run directly through the Worker container as well. That keeps local testing and exports closer to production-like service boundaries without forcing host Ruby or host Wrangler setup.
 
-For host-side commands that need the Podman-backed stack but should not depend on detached stack persistence across separate shells, use [`scripts/podman-stack-run.sh`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/scripts/podman-stack-run.sh). `npm run test:security:podman` uses that wrapper.
+For host-side commands that need the Podman-backed stack but should not depend on detached stack persistence across separate shells, use [`scripts/podman-stack-run.sh`](../scripts/podman-stack-run.sh). `npm run test:security:podman` uses that wrapper.
 
 For a mostly host-independent browser path, `npm run test:e2e:headless:podman` now runs the automated Playwright suite inside a dedicated Podman container on the same local pod network as the site and Worker.
 
@@ -157,7 +157,7 @@ The current Podman scope is intentionally narrow:
 
 Use [docs/PODMAN.md](./PODMAN.md) for the exact setup and current limitations.
 
-If you change `pricing.sales_tax_rate` or `pricing.flat_shipping_rate` in the Jekyll config, the repo now auto-syncs the mirrored Worker values in [worker/wrangler.toml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) through the main dev/test paths. Restart `./scripts/dev.sh --podman` before testing checkout math so both services pick up the new values.
+If you change `pricing.sales_tax_rate` or `pricing.flat_shipping_rate` in the Jekyll config, the repo now auto-syncs the mirrored Worker values in [worker/wrangler.toml](../worker/wrangler.toml) through the main dev/test paths. Restart `./scripts/dev.sh --podman` before testing checkout math so both services pick up the new values.
 
 If you tune free-plan read behavior, keep these in sync too:
 

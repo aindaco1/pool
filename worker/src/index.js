@@ -232,7 +232,8 @@ function getShareCardMessages(preferredLang = DEFAULT_I18N_LANG) {
 async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState, isFunded, preferredLang }) {
   const siteBase = String(env?.SITE_BASE || '').replace(/\/$/, '');
   const publicSiteBase = String(env?.CANONICAL_SITE_BASE || env?.SITE_BASE || '').replace(/\/$/, '');
-  const campaignPath = String(campaign?.url || `/campaigns/${encodeURIComponent(campaign?.slug || '')}/`);
+  const canonicalCampaignPath = String(campaign?.url || `/campaigns/${encodeURIComponent(campaign?.slug || '')}/`);
+  const campaignPath = getLocalizedPath(canonicalCampaignPath, preferredLang);
   const campaignUrlLabel = `${publicSiteBase}${campaignPath}`;
   const title = trimSvgText(campaign?.title || campaign?.slug || 'Campaign', 48);
   const creator = trimSvgText(campaign?.creator_name || 'The Pool', 40);
@@ -329,7 +330,7 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   <circle cx="${goalMarkerThree}" cy="${progressY + 9}" r="8" fill="#ffffff" stroke="#657082" stroke-width="4" />
   <circle cx="${handleX}" cy="${progressY + 9}" r="12" fill="#ffffff" stroke="#596273" stroke-width="6" />
   <text x="${panelLeft}" y="${footerY}" fill="#596273" font-family="Arial, sans-serif" font-size="22" font-weight="700">${escapeSvgText(String(progressPct))}% ${escapeSvgText(messages.fundedPercent)}</text>
-  <text x="1076" y="${footerY}" text-anchor="end" fill="#7d8593" font-family="Arial, sans-serif" font-size="12" font-weight="700">${escapeSvgText(campaignUrlLabel)}</text>
+  <text x="1076" y="${footerY}" text-anchor="end" fill="#7d8593" font-family="Arial, sans-serif" font-size="10" font-weight="700">${escapeSvgText(campaignUrlLabel)}</text>
 </svg>`;
 }
 

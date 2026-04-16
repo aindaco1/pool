@@ -11,6 +11,8 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
+El hito de lanzamiento actual de la plataforma es **v0.9.1**. Dust Wave reserva **v1.0** para el lanzamiento público más amplio una vez que se completen los elementos restantes de la hoja de ruta.
+
 ## Aportes de todo o nada
 
 Cuando apoyas un proyecto en The Pool, tu tarjeta se guarda de forma segura a través de Stripe, pero **no se te cobra hasta que la campaña alcance su meta**. Si el proyecto no llega a su objetivo de financiación antes de la fecha límite, nunca se realizará el cobro.
@@ -60,6 +62,7 @@ The Pool está diseñado para cineastas y otros creativos, con funciones como:
 - **Niveles físicos y digitales**: ofrece recompensas tangibles con captura de dirección de envío durante el pago, soporte para cotizaciones respaldadas por USPS, controles de política de envío de respaldo o gratuito, mejoras limitadas de opción de entrega e impuesto sobre ventas configurable
 - **Complementos opcionales de la plataforma**: ofrece un pequeño catálogo global de merch junto con los aportes de campaña, con inventario por variante, avisos de poco stock basados en aportes guardados y soporte de envío para complementos físicos
 - **Complementos opcionales de campaña**: permite que una campaña ofrezca merch propio mediante la misma interfaz de complementos en carrito y Gestionar aporte, mientras ese merch sigue contando para el subtotal de la campaña y usa sus reglas de envío
+- **Widgets de campaña en vivo para incrustar**: ofrece a quienes organizan campañas un generador alojado que produce código `iframe` para copiar y pegar y así compartir el progreso en vivo en otros sitios
 - **Fases de producción**: divide tu presupuesto en fases que los patrocinadores puedan financiar directamente
 - **Metas ampliadas**: desbloquea posibilidades creativas adicionales a medida que crece la financiación
 - **Decisiones comunitarias**: permite que tus patrocinadores voten sobre decisiones creativas publicadas

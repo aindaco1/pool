@@ -19,11 +19,13 @@ const DEFAULT_EMBED_HEIGHT_PX = 720;
 const COMPACT_EMBED_HEIGHT_PX = 560;
 const EMBED_LAYOUTS = new Set(['full', 'compact']);
 const EMBED_THEMES = new Set(['default', 'warm', 'ocean']);
+const EMBED_CTA_OPTIONS = new Set(['show', 'hide']);
 const builder = document.querySelector('[data-campaign-embed-builder]');
 const select = document.querySelector('[data-campaign-embed-select]');
 const layoutSelect = document.querySelector('[data-campaign-embed-layout]');
 const themeSelect = document.querySelector('[data-campaign-embed-theme]');
 const mediaSelect = document.querySelector('[data-campaign-embed-media]');
+const ctaSelect = document.querySelector('[data-campaign-embed-cta]');
 const codeField = document.querySelector('[data-campaign-embed-code]');
 const copyButton = document.querySelector('[data-campaign-embed-copy]');
 const copyStatus = document.querySelector('[data-campaign-embed-copy-status]');
@@ -91,6 +93,28 @@ function resolveUrl(pathOrUrl) {
   if (!pathOrUrl) return '';
   try {
     return new URL(pathOrUrl, getSiteUrl()).toString();
+  } catch (_error) {
+    return '';
+  }
+}
+
+function getLocalizedCampaignPath(path) {
+  const currentLang = getCurrentLang();
+  const normalizedPath = String(path || '').trim();
+  if (!normalizedPath.startsWith('/')) return normalizedPath;
+  if (currentLang === 'en') return normalizedPath;
+  if (/^\/[a-z]{2}(?:-[a-z0-9]{2,8})?\//i.test(normalizedPath)) return normalizedPath;
+  return '/' + currentLang + normalizedPath;
+}
+
+function resolveCampaignUrl(pathOrUrl) {
+  if (!pathOrUrl) return '';
+  try {
+    const url = new URL(pathOrUrl, getSiteUrl());
+    if (url.origin === getSiteUrl()) {
+      url.pathname = getLocalizedCampaignPath(url.pathname);
+    }
+    return url.toString();
   } catch (_error) {
     return '';
   }
@@ -182,11 +206,16 @@ function normalizeMedia(value) {
   return value === 'hide' || value === '0' || value === 'false' ? 'hide' : 'show';
 }
 
+function normalizeCta(value) {
+  return EMBED_CTA_OPTIONS.has(value) ? value : 'show';
+}
+
 function normalizeEmbedOptions(options) {
   return {
     layout: normalizeLayout(String(options?.layout || '')),
     theme: normalizeTheme(String(options?.theme || '')),
-    media: normalizeMedia(String(options?.media || ''))
+    media: normalizeMedia(String(options?.media || '')),
+    cta: normalizeCta(String(options?.cta || ''))
   };
 }
 
@@ -195,7 +224,8 @@ function getQueryOptions() {
   return normalizeEmbedOptions({
     layout: params.get('layout'),
     theme: params.get('theme'),
-    media: params.get('media')
+    media: params.get('media'),
+    cta: params.get('cta')
   });
 }
 
@@ -222,6 +252,11 @@ function setQueryState(slug, options) {
   } else {
     nextUrl.searchParams.delete('media');
   }
+  if (normalizedOptions.cta === 'hide') {
+    nextUrl.searchParams.set('cta', normalizedOptions.cta);
+  } else {
+    nextUrl.searchParams.delete('cta');
+  }
   window.history.replaceState({}, '', nextUrl.toString());
 }
 
@@ -240,13 +275,17 @@ function syncOptionControls(options) {
   if (mediaSelect) {
     mediaSelect.value = normalizedOptions.media;
   }
+  if (ctaSelect) {
+    ctaSelect.value = normalizedOptions.cta;
+  }
 }
 
 function getBuilderOptions() {
   return normalizeEmbedOptions({
     layout: layoutSelect ? layoutSelect.value : currentOptions?.layout,
     theme: themeSelect ? themeSelect.value : currentOptions?.theme,
-    media: mediaSelect ? mediaSelect.value : currentOptions?.media
+    media: mediaSelect ? mediaSelect.value : currentOptions?.media,
+    cta: ctaSelect ? ctaSelect.value : currentOptions?.cta
   });
 }
 
@@ -290,13 +329,19 @@ function buildEmbedCode(slug, title, options) {
   if (normalizedOptions.media === 'hide') {
     embedUrl.searchParams.set('media', normalizedOptions.media);
   }
+  if (normalizedOptions.cta === 'hide') {
+    embedUrl.searchParams.set('cta', normalizedOptions.cta);
+  }
   const embedOrigin = embedUrl.origin;
   const embedHeight = getEmbedHeight(normalizedOptions);
+  const iframeTitle = formatRuntimeMessage('embed.iframe_title', '%{title} campaign embed', {
+    title: title || slug
+  });
   return [
     '<iframe',
     '  data-pool-campaign-embed="true"',
     '  src="' + embedUrl.toString() + '"',
-    '  title="' + escapeHtml((title || slug) + ' campaign embed') + '"',
+    '  title="' + escapeHtml(iframeTitle) + '"',
     '  loading="lazy"',
     '  scrolling="no"',
     '  allow="autoplay; fullscreen; picture-in-picture"',
@@ -423,14 +468,14 @@ function renderProgressBar(snapshot) {
     + (goalMet ? ' progress-marker--achieved' : '')
     + '" style="left: ' + goalPct + '%;">'
     + '<span class="progress-marker__dot"></span>'
-    + '<span class="progress-marker__label"><span class="progress-marker__amount">' + escapeHtml(formatMoneyShortFromDollars(goalAmount)) + '</span><span class="progress-marker__desc">' + escapeHtml(getRuntimeMessage('progress_markers.goal', 'Goal!')) + '</span></span>'
+    + '<span class="progress-marker__label"><span class="progress-marker__amount">' + escapeHtml(formatMoneyShortFromDollars(goalAmount)) + '</span><span class="progress-marker__desc">' + escapeHtml(getRuntimeMessage('embed.goal_marker', 'Goal!')) + '</span></span>'
     + '</div>'
     + (showFinalMarker
-      ? '<div class="progress-marker progress-marker--final progress-marker--edge-right progress-marker--achieved" style="left: 100%;"><span class="progress-marker__dot"></span><span class="progress-marker__label"><span class="progress-marker__amount">' + escapeHtml(formatMoneyShortFromDollars(pledgedDollars)) + '</span><span class="progress-marker__desc">' + escapeHtml(getRuntimeMessage('progress_markers.final', 'Final')) + '</span></span></div>'
+      ? '<div class="progress-marker progress-marker--final progress-marker--edge-right progress-marker--achieved" style="left: 100%;"><span class="progress-marker__dot"></span><span class="progress-marker__label"><span class="progress-marker__amount">' + escapeHtml(formatMoneyShortFromDollars(pledgedDollars)) + '</span><span class="progress-marker__desc">' + escapeHtml(getRuntimeMessage('embed.final_marker', 'Final')) + '</span></span></div>'
       : '')
     + stretchMarkersHtml
     + '</div>'
-    + '<div class="progress-meta"><strong>' + escapeHtml(formatCurrencyFromCents(stats.pledgedAmount || 0)) + '</strong> ' + escapeHtml(getRuntimeMessage('progress.raised', 'raised')) + ' · ' + escapeHtml(formatRuntimeMessage('progress.of_goal', 'of %{goal} goal', { goal: formatCurrencyFromCents(goalAmount * 100) })) + '</div>'
+    + '<div class="progress-meta"><strong>' + escapeHtml(formatCurrencyFromCents(stats.pledgedAmount || 0)) + '</strong> ' + escapeHtml(getRuntimeMessage('embed.raised_label', 'raised')) + ' · ' + escapeHtml(formatRuntimeMessage('embed.of_goal_label', 'of %{goal} goal', { goal: formatCurrencyFromCents(goalAmount * 100) })) + '</div>'
     + '</div>';
 }
 
@@ -440,22 +485,22 @@ function renderCountdownMarkup() {
     + '<div class="flip-countdown flip-countdown--embed">'
     + '<div class="flip-countdown__group">'
     + '<div class="flip-card"><span class="flip-card__value" data-campaign-embed-countdown-part="days">00</span></div>'
-    + '<span class="flip-countdown__label">' + escapeHtml(getRuntimeMessage('campaign.days', 'Days')) + '</span>'
+    + '<span class="flip-countdown__label">' + escapeHtml(getRuntimeMessage('embed.countdown_days', 'Days')) + '</span>'
     + '</div>'
-    + '<div class="flip-countdown__separator">:</div>'
+    + '<div class="flip-countdown__separator" aria-hidden="true">:</div>'
     + '<div class="flip-countdown__group">'
     + '<div class="flip-card"><span class="flip-card__value" data-campaign-embed-countdown-part="hours">00</span></div>'
-    + '<span class="flip-countdown__label">' + escapeHtml(getRuntimeMessage('campaign.hours', 'Hours')) + '</span>'
+    + '<span class="flip-countdown__label">' + escapeHtml(getRuntimeMessage('embed.countdown_hours', 'Hours')) + '</span>'
     + '</div>'
-    + '<div class="flip-countdown__separator">:</div>'
+    + '<div class="flip-countdown__separator" aria-hidden="true">:</div>'
     + '<div class="flip-countdown__group">'
     + '<div class="flip-card"><span class="flip-card__value" data-campaign-embed-countdown-part="minutes">00</span></div>'
-    + '<span class="flip-countdown__label">' + escapeHtml(getRuntimeMessage('campaign.minutes', 'Minutes')) + '</span>'
+    + '<span class="flip-countdown__label">' + escapeHtml(getRuntimeMessage('embed.countdown_minutes', 'Minutes')) + '</span>'
     + '</div>'
-    + '<div class="flip-countdown__separator">:</div>'
+    + '<div class="flip-countdown__separator" aria-hidden="true">:</div>'
     + '<div class="flip-countdown__group">'
     + '<div class="flip-card"><span class="flip-card__value" data-campaign-embed-countdown-part="seconds">00</span></div>'
-    + '<span class="flip-countdown__label">' + escapeHtml(getRuntimeMessage('campaign.seconds', 'Seconds')) + '</span>'
+    + '<span class="flip-countdown__label">' + escapeHtml(getRuntimeMessage('embed.countdown_seconds', 'Seconds')) + '</span>'
     + '</div>'
     + '</div>'
     + '</div>';
@@ -509,10 +554,11 @@ function renderSnapshot(snapshot) {
   const campaign = snapshot?.campaign || {};
   const status = getStatusMarkup(snapshot);
   const blurbHtml = campaign.shortBlurbHtml || escapeHtml(campaign.shortBlurb || '');
-  const campaignUrl = resolveUrl(campaign.url || '/campaigns/' + encodeURIComponent(currentSlug) + '/');
-  const creatorLabel = getRuntimeMessage('campaign.creator', 'Creator');
-  const categoryLabel = getRuntimeMessage('campaign.category', 'Category');
+  const campaignUrl = resolveCampaignUrl(campaign.url || '/campaigns/' + encodeURIComponent(currentSlug) + '/');
+  const creatorLabel = getRuntimeMessage('embed.creator_label', 'Creator');
+  const categoryLabel = getRuntimeMessage('embed.category_label', 'Category');
   const showMedia = embedOptions.media !== 'hide';
+  const showCta = embedOptions.cta !== 'hide';
   root.className = 'campaign-embed-widget campaign-embed-widget--theme-' + embedOptions.theme + ' campaign-embed-widget--layout-' + embedOptions.layout + (showMedia ? '' : ' campaign-embed-widget--media-hidden');
   if (closeLink && !isFramed) {
     closeLink.href = campaignUrl;
@@ -525,7 +571,7 @@ function renderSnapshot(snapshot) {
     + '<article class="campaign-embed-card'
     + (embedOptions.layout === 'compact' ? ' campaign-embed-card--compact' : '')
     + (showMedia ? '' : ' campaign-embed-card--media-hidden')
-    + '">'
+    + '" aria-labelledby="campaign-embed-title">'
     + (showMedia ? '<div class="campaign-embed-card__media">' + renderMedia(campaign, embedOptions) + '</div>' : '')
     + '<div class="campaign-embed-card__body">'
     + '<div class="campaign-embed-card__eyebrow">'
@@ -537,13 +583,15 @@ function renderSnapshot(snapshot) {
       : '')
     + (status.statusText ? '<span class="campaign-embed-card__status' + status.statusClass + '">' + escapeHtml(status.statusText) + '</span>' : '')
     + '</div>'
-    + '<h1 class="campaign-embed-card__title">' + escapeHtml(campaign.title || currentSlug) + '</h1>'
+    + '<h2 id="campaign-embed-title" class="campaign-embed-card__title">' + escapeHtml(campaign.title || currentSlug) + '</h2>'
     + '<p class="campaign-embed-card__blurb">' + blurbHtml + '</p>'
     + status.metaMarkup
     + ((campaign.effectiveState || snapshot?.stats?.effectiveState) === 'live' ? renderProgressBar(snapshot) : '')
-    + '<div class="campaign-embed-card__actions">'
-    + '<a class="campaign-embed-card__button" href="' + escapeHtml(campaignUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(getRuntimeMessage('buttons.view_campaign', 'View Campaign')) + '</a>'
-    + '</div>'
+    + (showCta
+      ? '<div class="campaign-embed-card__actions">'
+        + '<a class="campaign-embed-card__button" href="' + escapeHtml(campaignUrl) + '" target="_blank" rel="noopener noreferrer" aria-label="' + escapeHtml(formatRuntimeMessage('embed.view_campaign_aria', 'View campaign: %{title}', { title: campaign.title || currentSlug })) + '">' + escapeHtml(getRuntimeMessage('embed.view_campaign_label', 'View Campaign')) + '</a>'
+        + '</div>'
+      : '')
     + '</div>'
     + '</article>';
 
@@ -588,7 +636,7 @@ function renderError(message) {
     closeLink.hidden = true;
   }
   root.setAttribute('aria-busy', 'false');
-  root.innerHTML = '<div class="campaign-embed-widget__error">' + escapeHtml(message) + '</div>';
+  root.innerHTML = '<div class="campaign-embed-widget__error" role="alert">' + escapeHtml(message) + '</div>';
   if (countdownTimer) {
     window.clearInterval(countdownTimer);
     countdownTimer = null;
@@ -598,7 +646,7 @@ function renderError(message) {
 
 function renderLoading() {
   root.setAttribute('aria-busy', 'true');
-  root.innerHTML = '<div class="campaign-embed-widget__loading">' + escapeHtml(getRuntimeMessage('embed.loading', 'Loading campaign embed...')) + '</div>';
+  root.innerHTML = '<div class="campaign-embed-widget__loading" role="status">' + escapeHtml(getRuntimeMessage('embed.loading', 'Loading campaign embed...')) + '</div>';
 }
 
 async function fetchCampaignList() {
@@ -690,7 +738,7 @@ function syncBuilderCopy() {
       }
     } catch (_error) {
       if (copyStatus) {
-        copyStatus.textContent = '';
+        copyStatus.textContent = getRuntimeMessage('embed.copy_failure', 'Copy failed. Select the code and copy it manually.');
       }
     }
   });
@@ -711,7 +759,11 @@ function syncBuilderLabels() {
     ['[data-embed-media-label]', getRuntimeMessage('embed.media_label', 'Media')],
     ['[data-embed-media-show]', getRuntimeMessage('embed.media_show', 'Show hero media')],
     ['[data-embed-media-hide]', getRuntimeMessage('embed.media_hide', 'Hide hero media')],
+    ['[data-embed-cta-label]', getRuntimeMessage('embed.cta_label', 'Call to action')],
+    ['[data-embed-cta-show]', getRuntimeMessage('embed.cta_show', 'Show campaign button')],
+    ['[data-embed-cta-hide]', getRuntimeMessage('embed.cta_hide', 'Hide campaign button')],
     ['[data-embed-code-label]', getRuntimeMessage('embed.code_label', 'Embed code')],
+    ['[data-embed-code-help]', getRuntimeMessage('embed.code_help', 'Paste this iframe into your site where you want the campaign preview to appear.')],
     ['[data-embed-preview-label]', getRuntimeMessage('embed.preview_label', 'Preview')]
   ];
   mappings.forEach(function (entry) {
@@ -746,7 +798,7 @@ function initSelectHandling() {
 }
 
 function initOptionHandling() {
-  [layoutSelect, themeSelect, mediaSelect].forEach(function (field) {
+  [layoutSelect, themeSelect, mediaSelect, ctaSelect].forEach(function (field) {
     if (!field) return;
     field.addEventListener('change', function () {
       if (copyStatus) {

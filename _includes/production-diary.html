@@ -1,6 +1,7 @@
+{% assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
 {% if include.diary_entries %}
 <section class="production-diary" id="production-diary">
-  <h3>Production Diary</h3>
+  <h3>{% include t.html key="diary.production_heading" lang=current_lang %}</h3>
   
   <div class="diary-list">
     {% for entry in include.diary_entries limit:5 %}
@@ -9,7 +10,7 @@
         <p class="diary-entry__body">{{ entry.body }}</p>
         {% if entry.date %}
           <time class="diary-entry__date" datetime="{{ entry.date }}">
-            {{ entry.date | date: "%b %-d, %Y" }}
+            {% include localized-datetime.html date=entry.date lang=current_lang %}
           </time>
         {% endif %}
       </article>
@@ -18,7 +19,7 @@
   
   {% if include.diary_entries.size > 5 %}
     <button class="btn btn--ghost" data-action="view-all-updates">
-      View all updates
+      {% include t.html key="diary.view_all_updates" lang=current_lang %}
     </button>
   {% endif %}
 </section>

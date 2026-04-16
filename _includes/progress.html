@@ -1,3 +1,4 @@
+{% assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
 {% assign goal_num = include.goal | plus: 0 %}
 {% assign pledged_num = include.pledged | plus: 0 %}
 {% assign stretch_goals = include.stretch_goals %}
@@ -81,7 +82,7 @@
       <span class="progress-marker__dot"></span>
       <span class="progress-marker__label">
         <span class="progress-marker__amount">{{ goal_num | money_short }}</span>
-        <span class="progress-marker__desc">{% include t.html key="progress_markers.goal" %}</span>
+        <span class="progress-marker__desc">{% include t.html key="progress_markers.goal" lang=current_lang %}</span>
       </span>
     </div>
     {% comment %} Final marker (when exceeded goal with no stretch goals) {% endcomment %}
@@ -90,7 +91,7 @@
       <span class="progress-marker__dot"></span>
       <span class="progress-marker__label">
         <span class="progress-marker__amount">{{ pledged_num | money_short }}</span>
-        <span class="progress-marker__desc">{% include t.html key="progress_markers.final" %}</span>
+        <span class="progress-marker__desc">{% include t.html key="progress_markers.final" lang=current_lang %}</span>
       </span>
     </div>
     {% endif %}
@@ -131,15 +132,15 @@
   <div class="progress-meta">
     <strong data-live-pledged>{{ pledged_num | money }}</strong> of {{ goal_num | money }}
     {% if include.state == 'upcoming' and include.start_date %}
-      {% assign start_formatted = include.start_date | date: "%b %-d, %Y" %}
-      · {% include t.html key="progress_markers.starts" date=start_formatted %}
+      {% capture start_formatted %}{% include localized-date.html date=include.start_date lang=current_lang %}{% endcapture %}
+      · {% include t.html key="progress_markers.starts" lang=current_lang date=start_formatted %}
     {% elsif include.deadline %}
       {% if include.state == 'post' %}
-        {% assign end_formatted = include.deadline | date: "%b %-d, %Y" %}
-        · {% include t.html key="progress_markers.ended" date=end_formatted %}
+        {% capture end_formatted %}{% include localized-date.html date=include.deadline lang=current_lang %}{% endcapture %}
+        · {% include t.html key="progress_markers.ended" lang=current_lang date=end_formatted %}
       {% else %}
-        {% assign end_formatted = include.deadline | date: "%b %-d, %Y" %}
-        · {% include t.html key="progress_markers.ends" date=end_formatted %}
+        {% capture end_formatted %}{% include localized-date.html date=include.deadline lang=current_lang %}{% endcapture %}
+        · {% include t.html key="progress_markers.ends" lang=current_lang date=end_formatted %}
       {% endif %}
     {% endif %}
   </div>

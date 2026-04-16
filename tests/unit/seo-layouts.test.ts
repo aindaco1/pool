@@ -77,8 +77,11 @@ describe('SEO templates', () => {
   it('routes campaign chrome strings through shared translation keys', () => {
     const campaignLayout = readRepoFile('_layouts', 'campaign.html');
     const diaryInclude = readRepoFile('_includes', 'diary.html');
+    const productionDiaryInclude = readRepoFile('_includes', 'production-diary.html');
     const productionPhasesInclude = readRepoFile('_includes', 'production-phases.html');
     const galleryBlock = readRepoFile('_includes', 'blocks', 'gallery.html');
+    const localizedDateTime = readRepoFile('_includes', 'localized-datetime.html');
+    const campaignCard = readRepoFile('_includes', 'campaign-card.html');
 
     expect(campaignLayout).toContain("key='campaign.play_video'");
     expect(campaignLayout).toContain('key="campaign.supporter_community_unlocked"');
@@ -87,10 +90,36 @@ describe('SEO templates', () => {
     expect(diaryInclude).toContain('key="diary.heading"');
     expect(diaryInclude).toContain("key='diary.tablist_label'");
     expect(diaryInclude).toContain('key="diary.empty"');
+    expect(diaryInclude).toContain('localized-datetime.html');
+    expect(productionDiaryInclude).toContain('key="diary.production_heading"');
+    expect(productionDiaryInclude).toContain('key="diary.view_all_updates"');
+    expect(productionDiaryInclude).toContain('localized-datetime.html');
+    expect(localizedDateTime).toContain('a. m.');
+    expect(localizedDateTime).toContain('p. m.');
     expect(productionPhasesInclude).toContain('key="production_phases.heading"');
     expect(productionPhasesInclude).toContain("key='production_phases.region_label'");
     expect(productionPhasesInclude).toContain('key="production_phases.fund_this_item"');
     expect(galleryBlock).toContain("key='runtime.campaign.image_gallery'");
+    expect(campaignCard).toContain('translation_key=include.campaign.translation_key');
+    expect(campaignCard).toContain('localized_paths=include.campaign.localized_paths');
+  });
+
+  it('keeps campaign locales wired through the shared switcher and localized routes', () => {
+    const footer = readRepoFile('_includes', 'site-footer.html');
+    const switcher = readRepoFile('_includes', 'language-switcher.html');
+    const localizedUrl = readRepoFile('_includes', 'localized-url.html');
+    const campaignLayout = readRepoFile('_layouts', 'campaign.html');
+    const localizedCampaignPlugin = readRepoFile('_plugins', 'localized_campaign_pages.rb');
+
+    expect(footer).toContain('translation_key=current_translation_key');
+    expect(footer).toContain('localized_paths=current_localized_paths');
+    expect(switcher).toContain('include.lang | default: page.lang');
+    expect(switcher).toContain('include.localized_paths | default: page.localized_paths');
+    expect(localizedUrl).toContain('include.translation_key and include.translation_key != page.translation_key');
+    expect(campaignLayout).toContain('translation_key=page.translation_key localized_paths=page.localized_paths');
+    expect(localizedCampaignPlugin).toContain('class LocalizedCampaignPage < PageWithoutAFile');
+    expect(localizedCampaignPlugin).toContain("campaign.data['localized_paths'] = localized_paths");
+    expect(localizedCampaignPlugin).toContain("File.join(lang.to_s, 'campaigns', slug.to_s)");
   });
 
   it('keeps the public navigation focused on canonical public pages', () => {

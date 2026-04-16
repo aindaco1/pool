@@ -30,12 +30,7 @@
               <h4 class="diary-entry__title">{{ entry.title }}</h4>
               {% if entry.date %}
                 <time class="diary-entry__date" datetime="{{ entry.date | date_to_xmlschema }}">
-                  {% assign date_str = entry.date | date: "%Y-%m-%dT%H:%M" %}
-                  {% if date_str contains "T00:00" %}
-                    {{ entry.date | date: "%b %-d, %Y" }}
-                  {% else %}
-                    {{ entry.date | date: "%b %-d, %Y · %-I:%M %p" }}
-                  {% endif %}
+                  {% include localized-datetime.html date=entry.date lang=current_lang %}
                 </time>
               {% endif %}
               

@@ -10,7 +10,7 @@ description: Learn how The Pool works, from all-or-nothing pledging to magic-lin
 
 **The Pool** is Dust Wave's crowdfunding platform for independent film and creative projects, built on open-source technology.
 
-The current platform release milestone is **v0.9**. Dust Wave is reserving **v1.0** for the wider public launch once the remaining roadmap items are complete.
+The current platform release milestone is **v0.9.1**. Dust Wave is reserving **v1.0** for the wider public launch once the remaining roadmap items are complete.
 
 ## All-or-Nothing Pledging
 
@@ -61,6 +61,7 @@ The Pool is designed for filmmakers and other creatives with features like:
 - **Physical & digital tiers** — Offer tangible rewards with checkout-time shipping address capture, USPS-backed quote support, fallback/free-shipping policy controls, limited delivery-option upgrades, and configurable sales tax
 - **Optional platform add-ons** — Offer a small global merch catalog alongside campaign pledges, with per-variant inventory, low-stock awareness based on saved pledges, and shipping support for physical add-ons
 - **Optional campaign add-ons** — Let a campaign offer campaign-owned merch through the same cart / Manage Pledge add-on UI while still counting that merch toward the campaign subtotal and using campaign-specific shipping rules
+- **Embeddable live campaign widgets** — Give campaign owners a hosted embed builder that generates copy-paste iframe code for sharing live campaign progress on other sites
 - **Production phases** — Break your budget into phases supporters can fund directly
 - **Stretch goals** — Unlock additional creative possibilities as funding grows
 - **Community decisions** — Let your backers vote on published creative choices

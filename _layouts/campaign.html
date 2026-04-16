@@ -17,6 +17,16 @@
   {% assign start_epoch = page.start_date | date: '%s' | plus: 0 %}
   {% assign deadline_epoch = page.goal_deadline | date: '%s' | plus: 0 %}
   {% if page.goal_deadline %}{% assign deadline_epoch = deadline_epoch | plus: 86399 %}{% endif %}
+  {% assign campaign_render_state = page.state | default: '' %}
+  {% if campaign_render_state == '' %}
+    {% if page.start_date and now_epoch < start_epoch %}
+      {% assign campaign_render_state = 'upcoming' %}
+    {% elsif page.goal_deadline and now_epoch <= deadline_epoch %}
+      {% assign campaign_render_state = 'live' %}
+    {% elsif page.goal_deadline %}
+      {% assign campaign_render_state = 'post' %}
+    {% endif %}
+  {% endif %}
   {% assign campaign_preview_state = page.state | default: '' %}
   {% if page.charged == true %}
     {% assign campaign_preview_state = 'funded' %}
@@ -37,8 +47,8 @@
       {% assign campaign_preview_state = 'ended' %}
     {% endif %}
   {% endif %}
-  {% assign start_date_formatted = page.start_date | date: "%b %-d, %Y" %}
-  {% assign deadline_date_formatted = page.goal_deadline | date: "%b %-d, %Y" %}
+  {% capture start_date_formatted %}{% include localized-date.html date=page.start_date lang=current_lang %}{% endcapture %}
+  {% capture deadline_date_formatted %}{% include localized-date.html date=page.goal_deadline lang=current_lang %}{% endcapture %}
   {% case campaign_preview_state %}
     {% when 'upcoming' %}
       {% capture campaign_social_title %}{% include t.html key="campaign_preview.starts_title" lang=current_lang title=page.title date=start_date_formatted %}{% endcapture %}
@@ -60,7 +70,7 @@
 <body>
   {% include header.html %}
 
-  <main class="campaign-container" data-campaign-slug="{{ page.slug }}" data-single-tier-only="{{ page.single_tier_only | default: false }}" data-state="{{ page.state }}">
+  <main class="campaign-container" data-campaign-slug="{{ page.slug }}" data-single-tier-only="{{ page.single_tier_only | default: false }}" data-state="{{ campaign_render_state }}">
     {% if page.campaign_background %}
     <div class="campaign-background" aria-hidden="true">
       <img src="{{ page.campaign_background }}" alt="" class="campaign-background__image">
@@ -73,13 +83,13 @@
       {% endif %}
       {% if page.goal_deadline %}
       {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
-      <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-state="{{ page.state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}">
-        <h2 class="campaign-countdown__heading">{% if page.state == "upcoming" %}{% include t.html key="campaign.starts_in" lang=current_lang %}{% elsif page.state == "live" %}{% include t.html key="campaign.ends_in" lang=current_lang %}{% endif %}</h2>
+      <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-state="{{ campaign_render_state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}">
+        <h2 class="campaign-countdown__heading">{% if campaign_render_state == "upcoming" %}{% include t.html key="campaign.starts_in" lang=current_lang %}{% elsif campaign_render_state == "live" %}{% include t.html key="campaign.ends_in" lang=current_lang %}{% endif %}</h2>
         {% assign target_date = page.goal_deadline %}
-        {% if page.state == "upcoming" %}{% assign target_date = page.start_date %}{% endif %}
+        {% if campaign_render_state == "upcoming" %}{% assign target_date = page.start_date %}{% endif %}
         {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
         {% assign target_epoch = target_date | date: '%s' | plus: 0 %}
-        {% if page.state == "upcoming" %}
+        {% if campaign_render_state == "upcoming" %}
           {% comment %}Target is midnight of start date{% endcomment %}
         {% else %}
           {% assign target_epoch = target_epoch | plus: 86399 %}{% comment %}End of day: +23:59:59{% endcomment %}
@@ -173,12 +183,12 @@
         <img src="{{ page.hero_image }}" alt="{{ page.title | escape }}">
         {% endif %}
         {% assign progress_pledged = page.pledged_amount | default: 0 | plus: 0 %}
-        {% include progress.html campaign_slug=page.slug pledged=progress_pledged goal=page.goal_amount deadline=page.goal_deadline stretch_goals=page.stretch_goals stretch_hidden=page.stretch_hidden state=page.state progress_background=page.progress_background %}
+        {% include progress.html campaign_slug=page.slug pledged=progress_pledged goal=page.goal_amount deadline=page.goal_deadline start_date=page.start_date stretch_goals=page.stretch_goals stretch_hidden=page.stretch_hidden state=campaign_render_state progress_background=page.progress_background lang=current_lang %}
       </header>
 
       <section class="content">
         {% if page.long_content %}
-          {% include long-content.html blocks=page.long_content %}
+          {% include long-content.html blocks=page.long_content lang=current_lang %}
         {% endif %}
       </section>
 
@@ -196,9 +206,9 @@
     {% endif %}
 
     {% if page.diary %}
-      {% include diary.html diary=page.diary %}
+      {% include diary.html diary=page.diary lang=current_lang %}
     {% elsif page.diary_entries %}
-      {% include production-diary.html diary_entries=page.diary_entries %}
+      {% include production-diary.html diary_entries=page.diary_entries lang=current_lang %}
     {% endif %}
 
 
@@ -227,9 +237,9 @@
           {% endunless %}
           <dt>{% include t.html key="campaign.category" lang=current_lang %}</dt>
           <dd>{{ page.category | default: site.data.i18n[current_lang].campaign.default_category | default: site.data.i18n.en.campaign.default_category | escape }}</dd>
-          {% if page.state == 'live' %}
+          {% if campaign_render_state == 'live' %}
           <dt>{% include t.html key="campaign.how_pledging_works" lang=current_lang %}</dt>
-          {% assign deadline_formatted = page.goal_deadline | date: "%b %-d, %Y" %}
+          {% capture deadline_formatted %}{% include localized-date.html date=page.goal_deadline lang=current_lang %}{% endcapture %}
           <dd>{% include t.html key="campaign.all_or_nothing_body" lang=current_lang date=deadline_formatted %}</dd>
           <dd class="campaign-facts__pledge-meta">{% include t.html key="pledge.notice_meta" lang=current_lang %}</dd>
           {% endif %}
@@ -250,19 +260,19 @@
         
         {% assign featured_tier = page.tiers | where: "id", page.featured_tier_id | first %}
         {% if featured_tier %}
-          {% include tier-card.html campaign=page tier=featured_tier compact=true %}
+          {% include tier-card.html campaign=page tier=featured_tier compact=true lang=current_lang state=campaign_render_state %}
         {% endif %}
         
         {% assign other_tiers = page.tiers | where_exp: "t", "t.id != page.featured_tier_id" | sort: "price" %}
         {% for t in other_tiers %}
-          {% include tier-card.html campaign=page tier=t compact=true %}
+          {% include tier-card.html campaign=page tier=t compact=true lang=current_lang state=campaign_render_state %}
         {% endfor %}
 
         <div class="sidebar-tiers__no-reward">
           <h4>{% include t.html key="campaign.no_reward_heading" lang=current_lang %}</h4>
-          {% include custom-amount.html campaign=page %}
+          {% include custom-amount.html campaign=page lang=current_lang state=campaign_render_state %}
           {% if page.support_items and page.support_items.size > 0 %}
-            {% include support-items.html support_items=page.support_items campaign=page %}
+            {% include support-items.html support_items=page.support_items campaign=page lang=current_lang state=campaign_render_state %}
           {% endif %}
         </div>
       </section>
@@ -271,7 +281,7 @@
     </aside>
   </main>
 
-  {% include site-footer.html lang=current_lang %}
+  {% include site-footer.html lang=current_lang translation_key=page.translation_key localized_paths=page.localized_paths %}
 
   {% include cart-foot.html %}
   <script src="/assets/js/live-stats.js"></script>

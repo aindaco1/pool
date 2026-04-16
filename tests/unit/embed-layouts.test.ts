@@ -22,6 +22,8 @@ describe('campaign embed surface', () => {
     expect(embedPage).toContain('data-campaign-embed-layout');
     expect(embedPage).toContain('data-campaign-embed-theme');
     expect(embedPage).toContain('data-campaign-embed-media');
+    expect(embedPage).toContain('data-campaign-embed-cta');
+    expect(embedPage).toContain('campaign-embed-code-help');
     expect(embedLayout).toContain('indexable=false');
     expect(embedLayout).toContain('data-campaign-embed-close');
     expect(embedLayout).toContain('/assets/js/campaign-embed.js');
@@ -43,6 +45,8 @@ describe('campaign embed surface', () => {
     const embedScript = readRepoFile('assets', 'js', 'campaign-embed.js');
     const embedStyles = readRepoFile('assets', 'partials', '_embed.scss');
     const campaignLayout = readRepoFile('_layouts', 'campaign.html');
+    const runtimeMessages = readRepoFile('_includes', 'runtime-messages-json.html');
+    const translationsEs = readRepoFile('_data', 'i18n', 'es.yml');
 
     expect(embedScript).toContain('pool-campaign-embed:resize');
     expect(embedScript).toContain('buildEmbedCode');
@@ -53,11 +57,20 @@ describe('campaign embed surface', () => {
     expect(embedScript).toContain('layout');
     expect(embedScript).toContain('theme');
     expect(embedScript).toContain('media');
+    expect(embedScript).toContain('cta');
     expect(embedScript).toContain('normalizeEmbedOptions');
+    expect(embedScript).toContain('embed.iframe_title');
+    expect(embedScript).toContain('embed.view_campaign_label');
+    expect(embedScript).toContain('embed.creator_label');
+    expect(embedScript).toContain('embed.countdown_days');
+    expect(embedScript).toContain('embed.raised_label');
     expect(embedScript).toContain("'/live/'");
     expect(embedScript).toContain('window.location.pathname');
+    expect(runtimeMessages).toContain('"embed":');
+    expect(translationsEs).toContain('media_label: "Medios"');
     expect(embedStyles).toContain('.campaign-embed-builder');
     expect(embedStyles).toContain('.campaign-embed-builder__option-grid');
+    expect(embedStyles).toContain('.campaign-embed-builder__help');
     expect(embedStyles).toContain('.campaign-embed-shell__close');
     expect(embedStyles).toContain('.campaign-embed-widget');
     expect(embedStyles).toContain('.campaign-embed-widget--theme-warm');

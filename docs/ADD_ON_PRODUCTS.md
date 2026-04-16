@@ -4,7 +4,7 @@ This document describes the current add-on product system as it actually ships n
 
 The platform supports two add-on scopes that intentionally share the same card UX while behaving differently in accounting, shipping, and fulfillment:
 
-- **Platform add-ons** live in the global catalog under `add_ons` in [/_config.yml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
+- **Platform add-ons** live in the global catalog under `add_ons` in [/_config.yml](../_config.yml)
 - **Campaign add-ons** live in campaign front matter under `campaign_add_ons`
 
 Both scopes:
@@ -55,7 +55,7 @@ They:
 
 ## Current Catalog Surface
 
-Global add-on products live in [/_config.yml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml) under `add_ons`.
+Global add-on products live in [/_config.yml](../_config.yml) under `add_ons`.
 
 Current top-level keys:
 
@@ -163,7 +163,7 @@ The current add-on flow is intentionally inventory-aware:
 - inventory can live on the product itself or on each variant
 - global add-ons read inventory from `add_ons`
 - campaign add-ons read inventory from `campaign_add_ons`
-- the Worker exposes a current inventory snapshot at [/add-ons/inventory](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/src/index.js)
+- the Worker exposes a current inventory snapshot at [/add-ons/inventory](../worker/src/index.js)
 - cart and Manage Pledge both consume the same shared inventory-aware product-state helper
 - low-stock messaging appears when remaining quantity is at or below `low_stock_threshold`
 - sold-out variants are removed from the shared product-state surface unless they are already selected on an existing pledge
@@ -209,11 +209,11 @@ The current shipping split is:
 
 ## Runtime Contract
 
-The current catalog is exposed to browser runtime config through [assets/js/pool-config.js](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/assets/js/pool-config.js) and the shared runtime boot include [/_includes/cart-runtime-foot.html](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_includes/cart-runtime-foot.html).
+The current catalog is exposed to browser runtime config through [assets/js/pool-config.js](../assets/js/pool-config.js) and the shared runtime boot include [/_includes/cart-runtime-foot.html](../_includes/cart-runtime-foot.html).
 
 That means cart-side and Manage Pledge UI can read one stable `POOL_CONFIG.addOns` source of truth instead of duplicating product data in multiple templates or scripts.
 
-The Worker now also has a matching static catalog source at [/api/add-ons.json](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/api/add-ons.json), and pending checkout manifests can carry:
+The Worker now also has a matching static catalog source at [/api/add-ons.json](../api/add-ons.json), and pending checkout manifests can carry:
 
 - `bundleAddOns`
 - `bundleAddOnAnchorCampaignSlug`
