@@ -117,11 +117,21 @@ class MockTierInventoryNamespace {
 
 const campaignFixture = {
   slug: 'hand-relations',
+  url: '/campaigns/hand-relations/',
   title: 'Hand Relations',
   state: 'live',
+  creator_name: 'Dust Wave',
+  category: 'Feature Film',
+  short_blurb: 'Elevated horror where a corporate empathy campaign consumes bureaucracy.',
+  short_blurb_html: 'Elevated horror where a corporate empathy campaign consumes bureaucracy.',
+  hero_image: '/assets/images/defaults/dust-wave-square.png',
+  hero_image_wide: '/assets/images/campaigns/hand-relations/hand-relations-wide.png',
+  hero_image_alt: 'Hand Relations',
+  hero_video: '/assets/videos/defaults/hand-relations.webm',
+  progress_background: '/assets/images/campaigns/hand-relations/progress.png',
   goal_amount: 25000,
   pledged_amount: 0,
-  goal_deadline: '2026-12-31',
+  goal_deadline: '2099-12-31',
   start_date: '2026-01-01',
   charged: false,
   single_tier_only: false,
@@ -527,7 +537,21 @@ describe('worker operational integrity', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=30, stale-while-revalidate=300');
     const body = await response.json();
+    expect(body.campaign).toMatchObject({
+      slug: 'hand-relations',
+      url: '/campaigns/hand-relations/',
+      title: 'Hand Relations',
+      creatorName: 'Dust Wave',
+      category: 'Feature Film',
+      shortBlurb: 'Elevated horror where a corporate empathy campaign consumes bureaucracy.',
+      heroImageWide: '/assets/images/campaigns/hand-relations/hand-relations-wide.png',
+      heroVideo: '/assets/videos/defaults/hand-relations.webm',
+      isFunded: false
+    });
     expect(body.stats.pledgedAmount).toBe(1200);
+    expect(typeof body.campaign.effectiveState).toBe('string');
+    expect(body.stats.effectiveState).toBe(body.campaign.effectiveState);
+    expect(body.stats.isFunded).toBe(false);
     expect(body.inventory.tiers['frame-slot'].claimed).toBe(2);
     expect(body.inventory.tiers['frame-slot'].reserved).toBe(2);
     expect(body.inventory.tiers['frame-slot'].remaining).toBe(996);
@@ -576,6 +600,52 @@ describe('worker operational integrity', () => {
     expect(body.recipientCount).toBe(3);
     expect(body.recipients).toContain('supporter3@example.com');
     expect(kv.listCalls.some((call) => call.prefix === 'pledge:')).toBe(false);
+  });
+
+  it('serves a campaign share-card SVG that reflects live campaign data', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 1250000,
+      pledgeCount: 7,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/share/campaign/hand-relations.svg'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toContain('image/svg+xml');
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    const body = await response.text();
+    expect(body).toContain('<svg');
+    expect(body).toContain('Hand Relations');
+    expect(body).toContain('$12,500');
+    expect(body).toContain('50% funded');
+    expect(body).toContain('https://pool.test');
+  });
+
+  it('localizes the campaign share-card footer link for non-default languages', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/share/campaign/hand-relations.svg?lang=es'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('https://pool.test/es/campaigns/hand-relations/');
+    expect(body).toContain('CREADOR');
+    expect(body).toContain('financiado');
   });
 
   it('pre-marks milestone sends so nested milestone checks do not duplicate broadcasts', async () => {

@@ -1,20 +1,22 @@
+{% assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
+{% assign campaign_state = include.state | default: include.campaign.state %}
 {% assign is_late_support_tier = false %}
-{% if include.campaign.state == "live" %}
+{% if campaign_state == "live" %}
   {% assign disabled = false %}
   {% assign disabled_reason = "" %}
-{% elsif include.campaign.state == "post" %}
+{% elsif campaign_state == "post" %}
   {% if include.tier.late_support %}
     {% assign is_late_support_tier = true %}
   {% endif %}
   {% assign disabled = true %}
-  {% capture disabled_reason %}{% include t.html key="states.ended" %}{% endcapture %}
-{% elsif include.campaign.state == "upcoming" %}
+  {% capture disabled_reason %}{% include t.html key="states.ended" lang=current_lang %}{% endcapture %}
+{% elsif campaign_state == "upcoming" %}
   {% assign disabled = true %}
-  {% assign start_formatted = include.campaign.start_date | date: "%b %-d" %}
-  {% capture disabled_reason %}{% include t.html key="states.opens" date=start_formatted %}{% endcapture %}
+  {% capture start_formatted %}{% include localized-date.html date=include.campaign.start_date lang=current_lang format='short_no_year' %}{% endcapture %}
+  {% capture disabled_reason %}{% include t.html key="states.opens" lang=current_lang date=start_formatted %}{% endcapture %}
 {% else %}
   {% assign disabled = true %}
-  {% assign disabled_reason = "Unavailable" %}
+  {% capture disabled_reason %}{% include t.html key="misc.unavailable" lang=current_lang %}{% endcapture %}
 {% endif %}
 
 {% assign tier_locked = false %}
@@ -28,13 +30,13 @@
   {% assign tier_locked = true %}
   {% assign disabled = true %}
   {% assign threshold_formatted = include.tier.requires_threshold | money %}
-  {% capture disabled_reason %}{% include t.html key="tiers.unlocks_at" amount=threshold_formatted %}{% endcapture %}
+  {% capture disabled_reason %}{% include t.html key="tiers.unlocks_at" lang=current_lang amount=threshold_formatted %}{% endcapture %}
 {% endif %}
 <div class="tier-card{% if include.compact %} compact{% endif %}{% if tier_locked %} tier-card--locked{% endif %}" id="tier-{{ include.tier.id }}" data-tier-id="{{ include.tier.id }}" data-campaign-slug="{{ include.campaign.slug }}"{% if include.tier.requires_threshold %} data-requires-threshold="{{ include.tier.requires_threshold }}"{% endif %}{% if is_late_support_tier %} data-late-support="true" data-goal="{{ include.campaign.goal_amount }}"{% endif %}>
   {% if include.tier.requires_threshold %}
   <div class="tier-card__unlock-badge" aria-live="polite">
-    <span class="sr-only">{% include t.html key="tiers.unlocked" %}</span>
-    <span aria-hidden="true">{% include t.html key="tiers.unlocked" %}</span>
+    <span class="sr-only">{% include t.html key="tiers.unlocked" lang=current_lang %}</span>
+    <span aria-hidden="true">{% include t.html key="tiers.unlocked" lang=current_lang %}</span>
   </div>
   {% endif %}
   {% if include.tier.image %}
@@ -43,7 +45,7 @@
   <h3>{{ include.tier.name | escape }} — {{ include.tier.price | money }}</h3>
   <p>{{ include.tier.description | escape }}</p>
   {% if include.tier.limit_total %}
-    <p class="limit">Limit: <span data-live-limit>{{ include.tier.limit_total }}</span> · Remaining: <span data-live-remaining>{{ include.tier.remaining }}</span></p>
+    <p class="limit">{% include t.html key="tiers.limit_label" lang=current_lang %} <span data-live-limit>{{ include.tier.limit_total }}</span> · {% include t.html key="tiers.remaining_label" lang=current_lang %} <span data-live-remaining>{{ include.tier.remaining }}</span></p>
   {% endif %}
 
   <button
@@ -81,6 +83,6 @@
     {% if field.required %}data-item-custom{{ forloop.index | plus: 2 }}-required="true"{% endif %}
     {% endfor %}
     {% endif %}>
-    {% if disabled %}{{ disabled_reason }}{% else %}{% include t.html key="buttons.pledge" %} {{ include.tier.price | money }}{% endif %}
+    {% if disabled %}{{ disabled_reason }}{% else %}{% include t.html key="buttons.pledge" lang=current_lang %} {{ include.tier.price | money }}{% endif %}
   </button>
 </div>

@@ -1,5 +1,7 @@
 {%- assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
 {%- assign platform_title = site.platform.name | default: site.title -%}
+{%- assign current_translation_key = include.translation_key | default: page.translation_key -%}
+{%- assign current_localized_paths = include.localized_paths | default: page.localized_paths -%}
 <footer class="site-footer" role="contentinfo">
   <div class="site-footer__content">
     <div class="site-footer__brand">
@@ -11,7 +13,7 @@
       </div>
     </div>
     <div class="site-footer__meta">
-      {% include language-switcher.html position="footer" %}
+      {% include language-switcher.html position="footer" lang=current_lang translation_key=current_translation_key localized_paths=current_localized_paths %}
     </div>
   </div>
 </footer>

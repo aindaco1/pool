@@ -7,14 +7,70 @@
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-campaign-csp-strict.html %}
   {% include cart-head.html %}
-  {% assign campaign_social_image = page.hero_image_wide | default: page.hero_image %}
-  {% include seo-meta.html lang=current_lang description=page.short_blurb image=campaign_social_image og_type="website" translation_key=page.translation_key localized_paths=page.localized_paths %}
+  {% capture campaign_social_image %}{{ site.platform.worker_url | default: site.platform.site_url | default: site.url }}/share/campaign/{{ page.slug | uri_escape }}.svg?lang={{ current_lang | uri_escape }}{% endcapture %}
+  {% assign campaign_creator = page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author %}
+  {% assign campaign_category = page.category | default: site.data.i18n[current_lang].campaign.default_category | default: site.data.i18n.en.campaign.default_category %}
+  {% capture campaign_blurb_plain %}{{ page.short_blurb | default: site.description | strip_html | strip_newlines | replace: '  ', ' ' | strip }}{% endcapture %}
+  {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
+  {% assign goal_num = page.goal_amount | default: 0 | plus: 0 %}
+  {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
+  {% assign start_epoch = page.start_date | date: '%s' | plus: 0 %}
+  {% assign deadline_epoch = page.goal_deadline | date: '%s' | plus: 0 %}
+  {% if page.goal_deadline %}{% assign deadline_epoch = deadline_epoch | plus: 86399 %}{% endif %}
+  {% assign campaign_render_state = page.state | default: '' %}
+  {% if campaign_render_state == '' %}
+    {% if page.start_date and now_epoch < start_epoch %}
+      {% assign campaign_render_state = 'upcoming' %}
+    {% elsif page.goal_deadline and now_epoch <= deadline_epoch %}
+      {% assign campaign_render_state = 'live' %}
+    {% elsif page.goal_deadline %}
+      {% assign campaign_render_state = 'post' %}
+    {% endif %}
+  {% endif %}
+  {% assign campaign_preview_state = page.state | default: '' %}
+  {% if page.charged == true %}
+    {% assign campaign_preview_state = 'funded' %}
+  {% elsif campaign_preview_state == '' %}
+    {% if page.start_date and now_epoch < start_epoch %}
+      {% assign campaign_preview_state = 'upcoming' %}
+    {% elsif page.goal_deadline and now_epoch <= deadline_epoch %}
+      {% assign campaign_preview_state = 'live' %}
+    {% elsif goal_num > 0 and pledged_num >= goal_num %}
+      {% assign campaign_preview_state = 'funded' %}
+    {% else %}
+      {% assign campaign_preview_state = 'ended' %}
+    {% endif %}
+  {% elsif campaign_preview_state == 'post' %}
+    {% if page.charged == true or goal_num > 0 and pledged_num >= goal_num %}
+      {% assign campaign_preview_state = 'funded' %}
+    {% else %}
+      {% assign campaign_preview_state = 'ended' %}
+    {% endif %}
+  {% endif %}
+  {% capture start_date_formatted %}{% include localized-date.html date=page.start_date lang=current_lang %}{% endcapture %}
+  {% capture deadline_date_formatted %}{% include localized-date.html date=page.goal_deadline lang=current_lang %}{% endcapture %}
+  {% case campaign_preview_state %}
+    {% when 'upcoming' %}
+      {% capture campaign_social_title %}{% include t.html key="campaign_preview.starts_title" lang=current_lang title=page.title date=start_date_formatted %}{% endcapture %}
+      {% capture campaign_social_description %}{% include t.html key="campaign_preview.starts_description" lang=current_lang category=campaign_category creator=campaign_creator date=start_date_formatted blurb=campaign_blurb_plain %}{% endcapture %}
+    {% when 'live' %}
+      {% capture campaign_social_title %}{% include t.html key="campaign_preview.ends_title" lang=current_lang title=page.title date=deadline_date_formatted %}{% endcapture %}
+      {% capture campaign_social_description %}{% include t.html key="campaign_preview.live_description" lang=current_lang category=campaign_category creator=campaign_creator date=deadline_date_formatted blurb=campaign_blurb_plain %}{% endcapture %}
+    {% when 'funded' %}
+      {% capture campaign_social_title %}{% include t.html key="campaign_preview.funded_title" lang=current_lang title=page.title %}{% endcapture %}
+      {% capture campaign_social_description %}{% include t.html key="campaign_preview.funded_description" lang=current_lang category=campaign_category creator=campaign_creator blurb=campaign_blurb_plain %}{% endcapture %}
+    {% else %}
+      {% capture campaign_social_title %}{% include t.html key="campaign_preview.ended_title" lang=current_lang title=page.title %}{% endcapture %}
+      {% capture campaign_social_description %}{% include t.html key="campaign_preview.ended_description" lang=current_lang category=campaign_category creator=campaign_creator blurb=campaign_blurb_plain %}{% endcapture %}
+  {% endcase %}
+  {% capture campaign_social_image_alt %}{% include t.html key="campaign_preview.image_alt" lang=current_lang title=page.title category=campaign_category creator=campaign_creator %}{% endcapture %}
+  {% include seo-meta.html lang=current_lang title=campaign_social_title description=campaign_social_description image=campaign_social_image image_alt=campaign_social_image_alt og_type="website" translation_key=page.translation_key localized_paths=page.localized_paths %}
   {% include seo-json-ld.html lang=current_lang kind="campaign" translation_key=page.translation_key localized_paths=page.localized_paths %}
 </head>
 <body>
   {% include header.html %}
 
-  <main class="campaign-container" data-campaign-slug="{{ page.slug }}" data-single-tier-only="{{ page.single_tier_only | default: false }}" data-state="{{ page.state }}">
+  <main class="campaign-container" data-campaign-slug="{{ page.slug }}" data-single-tier-only="{{ page.single_tier_only | default: false }}" data-state="{{ campaign_render_state }}">
     {% if page.campaign_background %}
     <div class="campaign-background" aria-hidden="true">
       <img src="{{ page.campaign_background }}" alt="" class="campaign-background__image">
@@ -27,13 +83,13 @@
       {% endif %}
       {% if page.goal_deadline %}
       {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
-      <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-state="{{ page.state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}">
-        <h2 class="campaign-countdown__heading">{% if page.state == "upcoming" %}{% include t.html key="campaign.starts_in" lang=current_lang %}{% elsif page.state == "live" %}{% include t.html key="campaign.ends_in" lang=current_lang %}{% endif %}</h2>
+      <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-state="{{ campaign_render_state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}">
+        <h2 class="campaign-countdown__heading">{% if campaign_render_state == "upcoming" %}{% include t.html key="campaign.starts_in" lang=current_lang %}{% elsif campaign_render_state == "live" %}{% include t.html key="campaign.ends_in" lang=current_lang %}{% endif %}</h2>
         {% assign target_date = page.goal_deadline %}
-        {% if page.state == "upcoming" %}{% assign target_date = page.start_date %}{% endif %}
+        {% if campaign_render_state == "upcoming" %}{% assign target_date = page.start_date %}{% endif %}
         {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
         {% assign target_epoch = target_date | date: '%s' | plus: 0 %}
-        {% if page.state == "upcoming" %}
+        {% if campaign_render_state == "upcoming" %}
           {% comment %}Target is midnight of start date{% endcomment %}
         {% else %}
           {% assign target_epoch = target_epoch | plus: 86399 %}{% comment %}End of day: +23:59:59{% endcomment %}
@@ -127,12 +183,12 @@
         <img src="{{ page.hero_image }}" alt="{{ page.title | escape }}">
         {% endif %}
         {% assign progress_pledged = page.pledged_amount | default: 0 | plus: 0 %}
-        {% include progress.html campaign_slug=page.slug pledged=progress_pledged goal=page.goal_amount deadline=page.goal_deadline stretch_goals=page.stretch_goals stretch_hidden=page.stretch_hidden state=page.state progress_background=page.progress_background %}
+        {% include progress.html campaign_slug=page.slug pledged=progress_pledged goal=page.goal_amount deadline=page.goal_deadline start_date=page.start_date stretch_goals=page.stretch_goals stretch_hidden=page.stretch_hidden state=campaign_render_state progress_background=page.progress_background lang=current_lang %}
       </header>
 
       <section class="content">
         {% if page.long_content %}
-          {% include long-content.html blocks=page.long_content %}
+          {% include long-content.html blocks=page.long_content lang=current_lang %}
         {% endif %}
       </section>
 
@@ -150,9 +206,9 @@
     {% endif %}
 
     {% if page.diary %}
-      {% include diary.html diary=page.diary %}
+      {% include diary.html diary=page.diary lang=current_lang %}
     {% elsif page.diary_entries %}
-      {% include production-diary.html diary_entries=page.diary_entries %}
+      {% include production-diary.html diary_entries=page.diary_entries lang=current_lang %}
     {% endif %}
 
 
@@ -181,13 +237,19 @@
           {% endunless %}
           <dt>{% include t.html key="campaign.category" lang=current_lang %}</dt>
           <dd>{{ page.category | default: site.data.i18n[current_lang].campaign.default_category | default: site.data.i18n.en.campaign.default_category | escape }}</dd>
-          {% if page.state == 'live' %}
+          {% if campaign_render_state == 'live' %}
           <dt>{% include t.html key="campaign.how_pledging_works" lang=current_lang %}</dt>
-          {% assign deadline_formatted = page.goal_deadline | date: "%b %-d, %Y" %}
+          {% capture deadline_formatted %}{% include localized-date.html date=page.goal_deadline lang=current_lang %}{% endcapture %}
           <dd>{% include t.html key="campaign.all_or_nothing_body" lang=current_lang date=deadline_formatted %}</dd>
           <dd class="campaign-facts__pledge-meta">{% include t.html key="pledge.notice_meta" lang=current_lang %}</dd>
           {% endif %}
         </dl>
+        {%- capture embed_builder_path -%}{% include localized-url.html lang=current_lang path='/embed/campaign/' %}{%- endcapture -%}
+        <div class="campaign-facts__embed">
+          <a href="{{ embed_builder_path }}?slug={{ page.slug | uri_escape }}" class="btn btn--secondary">
+            {% include t.html key="campaign.embed_title" lang=current_lang %}
+          </a>
+        </div>
       </div>
 
 
@@ -198,19 +260,19 @@
         
         {% assign featured_tier = page.tiers | where: "id", page.featured_tier_id | first %}
         {% if featured_tier %}
-          {% include tier-card.html campaign=page tier=featured_tier compact=true %}
+          {% include tier-card.html campaign=page tier=featured_tier compact=true lang=current_lang state=campaign_render_state %}
         {% endif %}
         
         {% assign other_tiers = page.tiers | where_exp: "t", "t.id != page.featured_tier_id" | sort: "price" %}
         {% for t in other_tiers %}
-          {% include tier-card.html campaign=page tier=t compact=true %}
+          {% include tier-card.html campaign=page tier=t compact=true lang=current_lang state=campaign_render_state %}
         {% endfor %}
 
         <div class="sidebar-tiers__no-reward">
           <h4>{% include t.html key="campaign.no_reward_heading" lang=current_lang %}</h4>
-          {% include custom-amount.html campaign=page %}
+          {% include custom-amount.html campaign=page lang=current_lang state=campaign_render_state %}
           {% if page.support_items and page.support_items.size > 0 %}
-            {% include support-items.html support_items=page.support_items campaign=page %}
+            {% include support-items.html support_items=page.support_items campaign=page lang=current_lang state=campaign_render_state %}
           {% endif %}
         </div>
       </section>
@@ -219,7 +281,7 @@
     </aside>
   </main>
 
-  {% include site-footer.html lang=current_lang %}
+  {% include site-footer.html lang=current_lang translation_key=page.translation_key localized_paths=page.localized_paths %}
 
   {% include cart-foot.html %}
   <script src="/assets/js/live-stats.js"></script>

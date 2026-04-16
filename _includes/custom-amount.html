@@ -1,38 +1,40 @@
+{% assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
 {% assign is_late_support_custom = false %}
 {% assign cart_add_item_classes = "poolcart-add-item" %}
-{% if include.campaign.state == "live" %}
+{% assign campaign_state = include.state | default: include.campaign.state %}
+{% if campaign_state == "live" %}
   {% assign disabled = false %}
   {% assign disabled_reason = "" %}
-{% elsif include.campaign.state == "post" %}
+{% elsif campaign_state == "post" %}
   {% if include.campaign.custom_late_support %}
     {% assign is_late_support_custom = true %}
   {% endif %}
   {% assign disabled = true %}
-  {% capture disabled_reason %}{% include t.html key="states.ended" %}{% endcapture %}
-{% elsif include.campaign.state == "upcoming" %}
+  {% capture disabled_reason %}{% include t.html key="states.ended" lang=current_lang %}{% endcapture %}
+{% elsif campaign_state == "upcoming" %}
   {% assign disabled = true %}
-  {% assign start_formatted = include.campaign.start_date | date: "%b %-d" %}
-  {% capture disabled_reason %}{% include t.html key="states.opens" date=start_formatted %}{% endcapture %}
+  {% capture start_formatted %}{% include localized-date.html date=include.campaign.start_date lang=current_lang format='short_no_year' %}{% endcapture %}
+  {% capture disabled_reason %}{% include t.html key="states.opens" lang=current_lang date=start_formatted %}{% endcapture %}
 {% else %}
   {% assign disabled = true %}
-  {% capture disabled_reason %}{% include t.html key="misc.unavailable" %}{% endcapture %}
+  {% capture disabled_reason %}{% include t.html key="misc.unavailable" lang=current_lang %}{% endcapture %}
 {% endif %}
 
 <div class="custom-amount" id="custom-amount" role="group" aria-labelledby="custom-amount-heading" data-campaign-slug="{{ include.campaign.slug }}"{% if is_late_support_custom %} data-late-support="true" data-goal="{{ include.campaign.goal_amount }}"{% endif %}>
   <div class="custom-amount__info">
-    <h5 id="custom-amount-heading">{% include t.html key="custom_amount.heading" %}</h5>
-    <p id="custom-amount-desc">{% include t.html key="custom_amount.description" %}</p>
+    <h5 id="custom-amount-heading">{% include t.html key="custom_amount.heading" lang=current_lang %}</h5>
+    <p id="custom-amount-desc">{% include t.html key="custom_amount.description" lang=current_lang %}</p>
   </div>
   <div class="custom-amount__actions">
     <div class="custom-amount__input-wrap">
-      <label for="custom-amount-input" class="sr-only">{% include t.html key="custom_amount.input_label" %}</label>
+      <label for="custom-amount-input" class="sr-only">{% include t.html key="custom_amount.input_label" lang=current_lang %}</label>
       <span class="custom-amount__currency" aria-hidden="true">$</span>
       <input type="number" 
              id="custom-amount-input" 
              class="custom-amount__input" 
              min="1" 
              step="1" 
-             placeholder="{% include t.html key='custom_amount.input_placeholder' %}"
+             placeholder="{% include t.html key='custom_amount.input_placeholder' lang=current_lang %}"
              aria-describedby="custom-amount-desc"
              {% if disabled %}disabled aria-disabled="true"{% endif %}>
     </div>
@@ -41,19 +43,19 @@
       id="custom-amount-btn"
       type="button"
       {% if disabled %}disabled aria-disabled="true"{% endif %}
-      {% capture custom_support_name %}{% include t.html key='pledge.custom_support' %}{% endcapture %}
+      {% capture custom_support_name %}{% include t.html key='pledge.custom_support' lang=current_lang %}{% endcapture %}
       data-item-id="{{ include.campaign.slug }}__custom-support"
       data-item-name="{{ include.campaign.title | escape }} — {{ custom_support_name | strip }}"
       data-item-price="25"
       data-item-url="{{ site.url }}{{ include.campaign.url }}#custom-amount"
-      data-item-description="Pledge (charged only if funded) — No reward"
+      data-item-description="{% include t.html key='pledge.charged_only_if_funded' lang=current_lang %} — {% include t.html key='pledge.no_reward' lang=current_lang %}"
       data-item-max-quantity="1"
       data-item-stackable="never"
       data-item-shippable="false"
       data-item-custom1-name="_stackable"
       data-item-custom1-type="hidden"
       data-item-custom1-value="false">
-      {% if disabled %}{{ disabled_reason }}{% else %}{% include t.html key="custom_amount.button" %}{% endif %}
+      {% if disabled %}{{ disabled_reason }}{% else %}{% include t.html key="custom_amount.button" lang=current_lang %}{% endif %}
     </button>
   </div>
 </div>

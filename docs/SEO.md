@@ -14,14 +14,16 @@ This document describes The Pool's current SEO model in 2026. It is intentionall
 The current baseline includes:
 
 - shared metadata includes for public pages and public campaign pages
-- alternate-language metadata on localized public pages
+- alternate-language metadata on localized public pages and localized campaign pages
 - canonical URLs on public layouts
 - locale-aware Open Graph metadata on public layouts
 - page-level descriptions on core public routes
 - Open Graph and Twitter card metadata
 - social image alt metadata
-- generated [`robots.txt`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/robots.txt)
-- generated [`sitemap.xml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/sitemap.xml)
+- state-aware campaign social titles and descriptions
+- Worker-generated campaign share-card SVG images for social previews
+- generated [`robots.txt`](../robots.txt)
+- generated [`sitemap.xml`](../sitemap.xml)
 - explicit `noindex,nofollow` on tokenized or supporter-only layouts
 - conservative `Organization` / `WebSite` JSON-LD
 - conservative campaign `CreativeWork` plus breadcrumb JSON-LD
@@ -29,10 +31,19 @@ The current baseline includes:
 
 The main implementation files are:
 
-- [/_includes/seo-meta.html](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_includes/seo-meta.html)
-- [/_includes/seo-json-ld.html](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_includes/seo-json-ld.html)
-- [/robots.txt](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/robots.txt)
-- [/sitemap.xml](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/sitemap.xml)
+- [/_includes/seo-meta.html](../_includes/seo-meta.html)
+- [/_includes/seo-json-ld.html](../_includes/seo-json-ld.html)
+- [/_layouts/campaign.html](../_layouts/campaign.html)
+- [/worker/src/index.js](../worker/src/index.js)
+- [/robots.txt](../robots.txt)
+- [/sitemap.xml](../sitemap.xml)
+
+Campaign social previews now use a Worker route in the shape:
+
+- `/share/campaign/{slug}.svg?lang=en`
+- `/share/campaign/{slug}.svg?lang=es`
+
+That route generates a state-aware share card from live campaign data so the social image stays closer to the hosted embed’s visual language than a raw hero image alone.
 
 ## Indexing Contract
 
@@ -90,7 +101,7 @@ The fork-facing SEO surface is intentionally bounded. Current supported settings
 - `seo.default_social_image_alt`
 - `seo.og_locale_overrides`
 - public-page front matter `title` / `description`
-- campaign content fields such as `title`, `short_blurb`, and hero imagery
+- campaign content fields such as `title`, `short_blurb`, `creator_name`, `category`, and hero imagery
 
 This keeps the SEO model variable-first without opening up a huge matrix of fragile or unsupported knobs.
 
@@ -99,6 +110,8 @@ Public metadata also derives a few safe values automatically:
 - `og:locale` from the active page language
 - `og:locale:alternate` from the supported translated languages for that page
 - `og:image:alt` / `twitter:image:alt` from explicit image alt text when present, otherwise the page title
+- campaign preview copy from campaign state (`upcoming`, `live`, `funded`, `ended`)
+- campaign preview images from the Worker share-card route rather than directly from the hero image alone
 
 Forks can override part of that behavior in a bounded way:
 
@@ -128,6 +141,7 @@ Forks can safely customize:
 - organization social-profile links
 - whether the public community hub should remain indexable
 - page and campaign descriptive copy that already exists in the content model
+- campaign preview inputs that already exist in the content model, such as campaign title, blurb, category, creator, and hero imagery
 
 Forks should not assume support for:
 
@@ -140,11 +154,13 @@ Forks should not assume support for:
 When checking a deployment manually:
 
 - page source for home/about/terms/campaign pages has correct title, description, canonical, OG, and Twitter tags
+- campaign pages emit the Worker share-card SVG as the social image and include the correct locale-aware route in that image URL
 - `robots.txt` is reachable and only exposes intended public crawl paths
 - `sitemap.xml` is reachable and only includes intended public URLs
 - private/tokenized pages emit `noindex` where appropriate
 - JSON-LD validates cleanly
 - localized pages keep coherent canonical and alternate links
+- localized campaign pages keep coherent canonical and alternate links
 - metadata additions do not create accessibility or performance regressions
 
 ## Non-Goals
@@ -161,7 +177,7 @@ The current SEO model explicitly avoids:
 
 The roadmap still tracks a few SEO follow-ups outside this document:
 
-- manual validation of structured data and crawl files against external tooling
+- manual validation of structured data, crawl files, and campaign share cards against external tooling
 - expanding automated SEO regression coverage further if the SEO surface grows beyond the current public-page + campaign-page model
 - deciding whether any additional fork-facing SEO knobs are worth supporting beyond the current bounded surface
 

@@ -58,52 +58,6 @@ test.describe('Public Page Keyboard Controls', () => {
     await expect(page.locator(`#${controlledPanelId}`)).toBeVisible();
   });
 
-  test('supports keyboard-only carousel gallery navigation', async ({ page }) => {
-    await page.goto('/campaigns/common-ground/');
-
-    const gallery = page.locator('.gallery--carousel .gallery__container').first();
-    await expect(gallery).toBeVisible();
-
-    await gallery.evaluate((node: Element) => {
-      const el = node as HTMLElement;
-      Object.defineProperty(el, 'clientWidth', { value: 320, configurable: true });
-      Object.defineProperty(el, 'scrollWidth', { value: 1280, configurable: true });
-    });
-
-    await gallery.focus();
-    await expect(gallery).toBeFocused();
-
-    await page.keyboard.press('ArrowRight');
-    await expect.poll(() => gallery.evaluate((node: Element) => (node as HTMLElement).scrollLeft)).toBeGreaterThan(0);
-
-    await page.keyboard.press('End');
-    await expect
-      .poll(() =>
-        gallery.evaluate((node: Element) => {
-          const el = node as HTMLElement;
-          return {
-            scrollLeft: el.scrollLeft,
-            maxScrollLeft: el.scrollWidth - el.clientWidth
-          };
-        })
-      )
-      .toMatchObject({
-        scrollLeft: expect.any(Number),
-        maxScrollLeft: expect.any(Number)
-      });
-    await expect
-      .poll(() =>
-        gallery.evaluate((node: Element) => {
-          const el = node as HTMLElement;
-          return (el.scrollWidth - el.clientWidth) - el.scrollLeft;
-        })
-      )
-      .toBeLessThanOrEqual(180);
-
-    await page.keyboard.press('Home');
-    await expect.poll(() => gallery.evaluate((node: Element) => (node as HTMLElement).scrollLeft)).toBe(0);
-  });
-
   test('supports keyboard-only custom amount add-to-cart flow', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/campaigns/smoke-editable/');

@@ -73,6 +73,7 @@ const SUPPORTER_EMAIL_RETRY_PREFIX = 'supporter-email-retry:';
 const SUPPORTER_EMAIL_RETRY_CRON = '*/15 * * * *';
 const SUPPORTER_EMAIL_RETRY_BATCH_SIZE = 10;
 const SUPPORTER_EMAIL_RETRY_TTL_SECONDS = 30 * 24 * 60 * 60;
+const SHARE_CARD_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=3600';
 
 // Extract plain text excerpt from diary entry (supports both legacy body and content blocks)
 function getDiaryExcerpt(entry, maxLength = 200) {
@@ -108,6 +109,229 @@ function getDiaryExcerpt(entry, maxLength = 200) {
   }
   
   return '';
+}
+
+function escapeSvgText(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatSvgCurrencyFromCents(cents) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format((Number(cents || 0) / 100));
+}
+
+function formatSvgDate(dateString) {
+  if (!dateString) return '';
+  const [year, month, day] = String(dateString).split('-').map(Number);
+  if (!year || !month || !day) return String(dateString);
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC'
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function trimSvgText(value, maxLength = 140) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength - 1).trimEnd() + '…';
+}
+
+function stripHtmlTags(value) {
+  return String(value ?? '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function encodeArrayBufferAsBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+async function fetchImageAsDataUrl(url) {
+  if (!url) return '';
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return '';
+    const contentType = response.headers.get('Content-Type') || 'image/png';
+    const buffer = await response.arrayBuffer();
+    return `data:${contentType};base64,${encodeArrayBufferAsBase64(buffer)}`;
+  } catch {
+    return '';
+  }
+}
+
+function wrapSvgText(value, maxCharsPerLine = 24, maxLines = 3) {
+  const words = String(value ?? '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  if (words.length === 0) return [];
+  const lines = [];
+  let currentLine = '';
+  for (const word of words) {
+    const nextLine = currentLine ? `${currentLine} ${word}` : word;
+    if (nextLine.length <= maxCharsPerLine || currentLine === '') {
+      currentLine = nextLine;
+      continue;
+    }
+    lines.push(currentLine);
+    currentLine = word;
+    if (lines.length === maxLines - 1) break;
+  }
+  if (currentLine) {
+    const consumedWords = lines.join(' ').split(' ').filter(Boolean).length;
+    const remainingWords = words.slice(consumedWords);
+    const finalLine = remainingWords.join(' ') || currentLine;
+    lines.push(trimSvgText(finalLine, maxCharsPerLine + 8));
+  }
+  return lines.slice(0, maxLines);
+}
+
+function getShareCardMessages(preferredLang = DEFAULT_I18N_LANG) {
+  const lang = normalizePreferredLang(preferredLang);
+  if (lang.startsWith('es')) {
+    return {
+      creator: 'CREADOR',
+      category: 'CATEGORÍA',
+      starts: 'Empieza',
+      ends: 'Termina',
+      funded: 'Financiada',
+      ended: 'Finalizada',
+      campaign: 'Campaña',
+      of: 'de',
+      fundedPercent: 'financiado'
+    };
+  }
+  return {
+    creator: 'CREATOR',
+    category: 'CATEGORY',
+    starts: 'Starts',
+    ends: 'Ends',
+    funded: 'Funded',
+    ended: 'Ended',
+    campaign: 'Campaign',
+    of: 'of',
+    fundedPercent: 'funded'
+  };
+}
+
+async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState, isFunded, preferredLang }) {
+  const siteBase = String(env?.SITE_BASE || '').replace(/\/$/, '');
+  const publicSiteBase = String(env?.CANONICAL_SITE_BASE || env?.SITE_BASE || '').replace(/\/$/, '');
+  const canonicalCampaignPath = String(campaign?.url || `/campaigns/${encodeURIComponent(campaign?.slug || '')}/`);
+  const campaignPath = getLocalizedPath(canonicalCampaignPath, preferredLang);
+  const campaignUrlLabel = `${publicSiteBase}${campaignPath}`;
+  const title = trimSvgText(campaign?.title || campaign?.slug || 'Campaign', 48);
+  const creator = trimSvgText(campaign?.creator_name || 'The Pool', 40);
+  const category = trimSvgText(campaign?.category || 'Campaign', 24);
+  const blurb = trimSvgText(stripHtmlTags(campaign?.short_blurb || ''), 180);
+  const titleLines = wrapSvgText(title, 14, 2);
+  const blurbLines = wrapSvgText(blurb, 34, 3);
+  const heroImage = campaign?.hero_image_wide || campaign?.hero_image || '';
+  const progressBackground = campaign?.progress_background || '';
+  const heroImageUrl = heroImage ? `${siteBase}${heroImage}` : '';
+  const progressBackgroundUrl = progressBackground ? `${siteBase}${progressBackground}` : '';
+  const heroImageDataUrl = await fetchImageAsDataUrl(heroImageUrl);
+  const progressBackgroundDataUrl = await fetchImageAsDataUrl(progressBackgroundUrl);
+  const pledgedAmount = Number(stats?.pledgedAmount || 0);
+  const goalAmountCents = Number(campaign?.goal_amount || 0) * 100;
+  const progressPct = goalAmountCents > 0
+    ? Math.max(0, Math.min(100, Math.round((pledgedAmount / goalAmountCents) * 100)))
+    : 0;
+  const messages = getShareCardMessages(preferredLang);
+  const panelLeft = 620;
+  const progressWidth = 456;
+  const goalMarkerOne = panelLeft + Math.round(progressWidth / 3);
+  const goalMarkerTwo = panelLeft + Math.round((progressWidth * 2) / 3);
+  const goalMarkerThree = panelLeft + progressWidth;
+  const progressHandleX = panelLeft + Math.round((progressWidth * progressPct) / 100);
+  const handleX = Math.max(632, Math.min(goalMarkerThree, progressHandleX));
+  const creatorY = 126;
+  const metaGap = 32;
+  const categoryY = creatorY + metaGap;
+  const badgeTop = 204;
+  const badgeHeight = 42;
+  const badgeTextY = 231;
+  const titleY = 347;
+  const titleFontSize = 94;
+  const titleLineHeight = 78;
+  const blurbY = titleY + ((Math.max(titleLines.length, 1) - 1) * titleLineHeight) + 45;
+  const blurbLineHeight = 36;
+  const amountY = blurbY + ((Math.max(blurbLines.length, 1) - 1) * blurbLineHeight) + 91;
+  const progressY = amountY + 19;
+  const footerY = progressY + 56;
+
+  let badgeText = messages.campaign;
+  if (effectiveState === 'upcoming') {
+    badgeText = `${messages.starts} ${formatSvgDate(campaign?.start_date)}`;
+  } else if (effectiveState === 'live') {
+    badgeText = `${messages.ends} ${formatSvgDate(campaign?.goal_deadline)}`;
+  } else if (isFunded) {
+    badgeText = messages.funded;
+  } else {
+    badgeText = messages.ended;
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="${escapeSvgText(title)}">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fffdf8" />
+      <stop offset="55%" stop-color="#f2f0eb" />
+      <stop offset="100%" stop-color="#e7ecef" />
+    </linearGradient>
+    <linearGradient id="panel" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#10141b" />
+      <stop offset="100%" stop-color="#1a2028" />
+    </linearGradient>
+    <linearGradient id="progressFill" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0f1117" />
+      <stop offset="100%" stop-color="#303846" />
+    </linearGradient>
+    <clipPath id="heroClip">
+      <rect x="48" y="76" width="492" height="506" rx="28" ry="28" />
+    </clipPath>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)" />
+  ${progressBackgroundDataUrl ? `<image href="${escapeSvgText(progressBackgroundDataUrl)}" x="0" y="0" width="1200" height="630" opacity="0.08" preserveAspectRatio="xMidYMid slice" />` : ''}
+  <rect x="48" y="76" width="492" height="506" rx="28" ry="28" fill="#131820" />
+  ${heroImageDataUrl ? `<image href="${escapeSvgText(heroImageDataUrl)}" x="48" y="76" width="492" height="506" preserveAspectRatio="xMidYMid slice" clip-path="url(#heroClip)" />` : ''}
+  <rect x="48" y="76" width="492" height="506" rx="28" ry="28" fill="url(#panel)" opacity="${heroImageDataUrl ? '0.18' : '1'}" />
+  <rect x="578" y="76" width="574" height="506" rx="34" ry="34" fill="#fbfbf7" opacity="0.93" />
+  <text x="${panelLeft}" y="${creatorY}" fill="#666f7d" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="1.4">${escapeSvgText(messages.creator)}: ${escapeSvgText(creator.toUpperCase())}</text>
+  <text x="${panelLeft}" y="${categoryY}" fill="#666f7d" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="1.4">${escapeSvgText(messages.category)}: ${escapeSvgText(category.toUpperCase())}</text>
+  <rect x="${panelLeft}" y="${badgeTop}" width="248" height="${badgeHeight}" rx="21" ry="21" fill="#11141c" />
+  <text x="744" y="${badgeTextY}" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="21" font-weight="700">${escapeSvgText(badgeText)}</text>
+  <text x="${panelLeft}" y="${titleY}" fill="#11141c" font-family="gambado-sans, Arial Black, Arial, sans-serif" font-size="${titleFontSize}" font-weight="700">${titleLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : titleLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
+  <text x="${panelLeft}" y="${blurbY}" fill="#3d4552" font-family="Arial, sans-serif" font-size="28" font-style="italic">${blurbLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : blurbLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
+  <text x="${panelLeft}" y="${amountY}" fill="#697180" font-family="Arial, sans-serif" font-size="30" font-weight="700"><tspan fill="#11141c" font-size="42" font-weight="800">${escapeSvgText(formatSvgCurrencyFromCents(pledgedAmount))}</tspan><tspan dx="12">${escapeSvgText(messages.of)} ${escapeSvgText(formatSvgCurrencyFromCents(goalAmountCents))}</tspan></text>
+  <rect x="${panelLeft}" y="${progressY}" width="${progressWidth}" height="18" rx="9" ry="9" fill="#e5e8ee" />
+  ${progressBackgroundDataUrl ? `<image href="${escapeSvgText(progressBackgroundDataUrl)}" x="${panelLeft}" y="${progressY}" width="${progressWidth}" height="18" opacity="0.1" preserveAspectRatio="none" />` : ''}
+  <rect x="${panelLeft}" y="${progressY}" width="${Math.max(12, Math.round((progressWidth * progressPct) / 100))}" height="18" rx="9" ry="9" fill="url(#progressFill)" />
+  <line x1="${goalMarkerOne}" y1="${progressY - 6}" x2="${goalMarkerOne}" y2="${progressY + 24}" stroke="#7d8695" stroke-width="2" opacity="0.55" />
+  <line x1="${goalMarkerTwo}" y1="${progressY - 6}" x2="${goalMarkerTwo}" y2="${progressY + 24}" stroke="#7d8695" stroke-width="2" opacity="0.55" />
+  <line x1="${goalMarkerThree}" y1="${progressY - 6}" x2="${goalMarkerThree}" y2="${progressY + 24}" stroke="#7d8695" stroke-width="2" opacity="0.55" />
+  <circle cx="${goalMarkerOne}" cy="${progressY + 9}" r="8" fill="#ffffff" stroke="#657082" stroke-width="4" />
+  <circle cx="${goalMarkerTwo}" cy="${progressY + 9}" r="8" fill="#ffffff" stroke="#657082" stroke-width="4" />
+  <circle cx="${goalMarkerThree}" cy="${progressY + 9}" r="8" fill="#ffffff" stroke="#657082" stroke-width="4" />
+  <circle cx="${handleX}" cy="${progressY + 9}" r="12" fill="#ffffff" stroke="#596273" stroke-width="6" />
+  <text x="${panelLeft}" y="${footerY}" fill="#596273" font-family="Arial, sans-serif" font-size="22" font-weight="700">${escapeSvgText(String(progressPct))}% ${escapeSvgText(messages.fundedPercent)}</text>
+  <text x="1076" y="${footerY}" text-anchor="end" fill="#7d8593" font-family="Arial, sans-serif" font-size="10" font-weight="700">${escapeSvgText(campaignUrlLabel)}</text>
+</svg>`;
 }
 
 // SEC-006: Timing-safe string comparison to prevent timing attacks
@@ -1943,6 +2167,11 @@ export default {
       if (path.startsWith('/live/') && method === 'GET') {
         const campaignSlug = path.replace('/live/', '');
         return handleGetLiveCampaign(campaignSlug, env);
+      }
+
+      if (path.startsWith('/share/campaign/') && method === 'GET' && path.endsWith('.svg')) {
+        const campaignSlug = path.replace('/share/campaign/', '').replace(/\.svg$/, '');
+        return handleGetCampaignShareCard(campaignSlug, request, env);
       }
 
       // Stats endpoints for live pledge totals
@@ -6723,6 +6952,10 @@ async function handleGetLiveCampaign(campaignSlug, env) {
   ]);
   const inventory = inventorySnapshot?.inventory || {};
   const reservedCounts = inventorySnapshot?.reservedCounts || {};
+  const goalAmount = campaign?.goal_amount || 0;
+  const pledgedAmount = stats?.pledgedAmount || 0;
+  const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
+  const isFunded = goalAmount > 0 ? pledgedAmount >= (goalAmount * 100) : false;
 
   const tiers = {};
   for (const tier of (campaign?.tiers || [])) {
@@ -6741,17 +6974,42 @@ async function handleGetLiveCampaign(campaignSlug, env) {
 
   return cacheablePublicJsonResponse({
     campaignSlug,
+    campaign: {
+      slug: campaign?.slug || campaignSlug,
+      url: campaign?.url || `/campaigns/${encodeURIComponent(campaignSlug)}/`,
+      title: campaign?.title || campaignSlug,
+      creatorName: campaign?.creator_name || null,
+      category: campaign?.category || null,
+      shortBlurb: campaign?.short_blurb || '',
+      shortBlurbHtml: campaign?.short_blurb_html || '',
+      heroImage: campaign?.hero_image || null,
+      heroImageWide: campaign?.hero_image_wide || null,
+      heroImageAlt: campaign?.hero_image_alt || campaign?.title || campaignSlug,
+      heroVideo: campaign?.hero_video || null,
+      progressBackground: campaign?.progress_background || null,
+      startDate: campaign?.start_date || null,
+      goalDeadline: campaign?.goal_deadline || null,
+      goalAmount,
+      state: campaign?.state || 'unknown',
+      effectiveState,
+      isFunded,
+      stretchGoals: campaign?.stretch_goals || [],
+      stretchHidden: campaign?.stretch_hidden !== false,
+      hasDecisions: campaign?.has_decisions === true
+    },
     stats: {
       campaignSlug,
-      pledgedAmount: stats?.pledgedAmount || 0,
+      pledgedAmount,
       pledgeCount: stats?.pledgeCount || 0,
       tierCounts: stats?.tierCounts || {},
       supportItems: stats?.supportItems || {},
-      goalAmount: campaign?.goal_amount || 0,
+      goalAmount,
       goalDeadline: campaign?.goal_deadline || null,
       state: campaign?.state || 'unknown',
-      percentFunded: campaign?.goal_amount
-        ? Math.round(((stats?.pledgedAmount || 0) / (campaign.goal_amount * 100)) * 100)
+      effectiveState,
+      isFunded,
+      percentFunded: goalAmount
+        ? Math.round((pledgedAmount / (goalAmount * 100)) * 100)
         : 0,
       updatedAt: stats?.updatedAt || null
     },
@@ -6769,6 +7027,48 @@ async function handleGetLiveCampaign(campaignSlug, env) {
       )
     }
   }, 200, env);
+}
+
+async function handleGetCampaignShareCard(campaignSlug, request, env) {
+  if (!campaignSlug) {
+    return new Response('Missing campaign slug', { status: 400, headers: { ...SECURITY_HEADERS } });
+  }
+
+  const [campaign, stats] = await Promise.all([
+    getCampaign(env, campaignSlug),
+    getCampaignStats(env, campaignSlug)
+  ]);
+
+  if (!campaign) {
+    return new Response('Campaign not found', { status: 404, headers: { ...SECURITY_HEADERS } });
+  }
+
+  const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
+  const pledgedAmount = Number(stats?.pledgedAmount || 0);
+  const goalAmount = Number(campaign?.goal_amount || 0);
+  const isFunded = goalAmount > 0 ? pledgedAmount >= (goalAmount * 100) : false;
+  const requestUrl = new URL(request.url);
+  const preferredLang = normalizePreferredLang(requestUrl.searchParams.get('lang'), DEFAULT_I18N_LANG);
+  const svg = await buildCampaignShareCardSvg({
+    env,
+    campaign,
+    stats,
+    effectiveState,
+    isFunded,
+    preferredLang
+  });
+  const shareCardCacheControl = getAppMode(env) === 'test'
+    ? PRIVATE_NO_STORE_CACHE_CONTROL
+    : SHARE_CARD_CACHE_CONTROL;
+
+  return new Response(svg, {
+    status: 200,
+    headers: {
+      'Content-Type': 'image/svg+xml; charset=utf-8',
+      'Cache-Control': shareCardCacheControl,
+      ...SECURITY_HEADERS
+    }
+  });
 }
 
 async function handleRecalculateStats(request, campaignSlug, env) {

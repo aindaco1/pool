@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v0.9**. The Pool will treat **v1.0** as the wider public launch milestone once the remaining roadmap items are complete.
+Current release milestone: **v0.9.1**. The Pool will treat **v1.0** as the wider public launch milestone once the remaining roadmap items are complete.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -41,8 +41,9 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
 - **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, stacking, and overflow fixes instead of a separate mobile-only UI
 - **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, and curated design variables without requiring custom code for normal fork rebranding
-- **English + Spanish i18n foundation** — `_config.yml` now drives supported languages, static locale routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge runtime copy, campaign countdown/gallery/live-stats labels, hero video/community teaser/diary chrome, and localized Worker supporter emails
-- **SEO fundamentals baseline** — Public pages and campaign pages now emit consistent titles, descriptions, canonicals, OG/Twitter tags, honest JSON-LD, and alternate-language metadata where supported, while `robots.txt`, `sitemap.xml`, and explicit noindex rules keep private/tokenized flows out of search intent
+- **Hosted live campaign embeds** — Campaign pages now link to a locale-aware embed builder that generates copy-paste iframe code with layout/theme/media/CTA options, live Worker-backed data, and auto-resize behavior
+- **English + Spanish i18n foundation** — `_config.yml` now drives supported languages, static locale routes, generated localized campaign routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, public campaign pages, embed pages, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge/embed runtime copy, campaign countdown/gallery/live-stats labels, hero video/community teaser/diary chrome, localized campaign dates, and localized Worker supporter emails
+- **SEO fundamentals baseline** — Public pages and campaign pages now emit consistent titles, descriptions, canonicals, OG/Twitter tags, honest JSON-LD, Worker-generated campaign share-card images, and alternate-language metadata where supported, while `robots.txt`, `sitemap.xml`, and explicit noindex rules keep private/tokenized flows out of search intent
 - **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
 ## Architecture
@@ -75,26 +76,26 @@ PODMAN_REBUILD=1 ./scripts/dev.sh --podman
 ```
 
 Fork-friendly pricing settings live in:
-- `pricing.sales_tax_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
-- auto-synced Worker vars `SALES_TAX_RATE`, `DEFAULT_PLATFORM_TIP_PERCENT`, and `MAX_PLATFORM_TIP_PERCENT` in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
+- `pricing.sales_tax_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` in [`_config.yml`](_config.yml)
+- auto-synced Worker vars `SALES_TAX_RATE`, `DEFAULT_PLATFORM_TIP_PERCENT`, and `MAX_PLATFORM_TIP_PERCENT` in [`worker/wrangler.toml`](worker/wrangler.toml)
 
 Fork-friendly shipping settings live in:
-- `shipping.origin_*`, `shipping.fallback_flat_rate`, `shipping.free_shipping_default`, and `shipping.usps.*` in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
-- auto-synced Worker vars like `SHIPPING_ORIGIN_ZIP`, `SHIPPING_FALLBACK_FLAT_RATE`, `USPS_ENABLED`, `USPS_CLIENT_ID`, and the USPS timeout/cache/cooldown knobs in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
+- `shipping.origin_*`, `shipping.fallback_flat_rate`, `shipping.free_shipping_default`, and `shipping.usps.*` in [`_config.yml`](_config.yml)
+- auto-synced Worker vars like `SHIPPING_ORIGIN_ZIP`, `SHIPPING_FALLBACK_FLAT_RATE`, `USPS_ENABLED`, `USPS_CLIENT_ID`, and the USPS timeout/cache/cooldown knobs in [`worker/wrangler.toml`](worker/wrangler.toml)
 
-Keep `USPS_CLIENT_SECRET` out of site config. Set it as a Worker secret or in [`worker/.dev.vars`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/.dev.vars) for local development.
+Keep `USPS_CLIENT_SECRET` out of site config. Set it as a Worker secret or in [`worker/.dev.vars`](worker/.dev.vars) for local development.
 
 If you change those values locally, restart `./scripts/dev.sh --podman` so the Worker uses the same math as the site.
 
 Fork-friendly global merch/add-on settings now also live in:
-- `add_ons.enabled`, `add_ons.low_stock_threshold`, and `add_ons.products` in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
+- `add_ons.enabled`, `add_ons.low_stock_threshold`, and `add_ons.products` in [`_config.yml`](_config.yml)
 - product images, size-aware variants, per-product or per-variant inventory, and `shipping_preset` references for physical catalog items
 - bundle-level add-ons can now be selected in the cart sidecar, anchored to a campaign in multi-campaign carts, and edited later from Manage Pledge
 - low-stock messaging and sold-out variant filtering now come from the shared inventory-aware add-on product-state layer used by both cart and Manage Pledge
 - configured add-on inventory is the starting baseline; remaining stock is derived from saved pledge state, not unsaved cart or Manage drafts
 - pledge and fulfillment reports now separate campaign pledge value from platform add-on value for easier operations
 
-Fork-facing settings now use a structured config model in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml):
+Fork-facing settings now use a structured config model in [`_config.yml`](_config.yml):
 
 - `platform` for identity, URLs, and support contact
 - `platform` also covers brand assets like logo, footer logo, favicon, and default social image
@@ -110,7 +111,7 @@ Fork-facing settings now use a structured config model in [`_config.yml`](/Users
 - `checkout` for truly variable checkout settings like the Stripe publishable key
 - `cache` for live browser TTLs
 
-[`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml) is now intentionally thin: it should only carry true local overrides like localhost URLs and `show_test_campaigns`, not a second copy of the base config.
+[`_config.local.yml`](_config.local.yml) is now intentionally thin: it should only carry true local overrides like localhost URLs and `show_test_campaigns`, not a second copy of the base config.
 
 See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for the supported no-code customization surface and which settings are automatically mirrored to the Worker.
 See [docs/SEO.md](docs/SEO.md) for the current SEO fundamentals implementation and supported SEO surface.
@@ -119,6 +120,7 @@ For localization, the supported model is:
 
 - shared UI/runtime/email copy lives in `_data/i18n/{lang}.yml`
 - localized long-form pages still need localized source files under the locale prefix
+- generated campaign pages and embed pages now participate in the locale model too, so `/campaigns/{slug}/` can switch cleanly to `/es/campaigns/{slug}/`
 - the shared footer language switcher preserves the current query string and hash, so tokenized routes like `/manage/?t=...` can switch to `/es/manage/?t=...` without dropping pledge access
 
 The main local/dev/test paths already sync those mirrored Worker values automatically. If you want to refresh the Worker config directly, run:
@@ -154,7 +156,7 @@ npm run podman:doctor
 npm run podman:self-check
 ```
 
-If you want to exercise the on-site Stripe checkout locally, add `STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...` to [`worker/.dev.vars`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/.dev.vars) before starting the stack.
+If you want to exercise the on-site Stripe checkout locally, add `STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...` to [`worker/.dev.vars`](worker/.dev.vars) before starting the stack.
 
 ## Cloudflare Free-Plan Guidance For Forks
 
@@ -172,7 +174,7 @@ The Pool is intentionally shaped so most traffic stays cheap:
 Fork knobs worth knowing:
 
 - site config: `cache.live_stats_ttl_seconds`, `cache.live_inventory_ttl_seconds`, `pricing.sales_tax_rate`, `pricing.flat_shipping_rate`
-- Worker env: auto-synced pricing values in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
+- Worker env: auto-synced pricing values in [`worker/wrangler.toml`](worker/wrangler.toml)
 
 ### Practical Scalability Scenarios
 
@@ -266,6 +268,7 @@ See [`docs/`](docs/) for full documentation:
 - [SECURITY.md](docs/SECURITY.md) — Security architecture, rate limiting & pen testing
 - [ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — Accessibility standards, critical surfaces, and current coverage
 - [CUSTOMIZATION.md](docs/CUSTOMIZATION.md) — Supported fork-facing branding, pricing, and design overrides
+- [EMBEDS.md](docs/EMBEDS.md) — Hosted campaign widget routes, options, localization, and resize model
 - [I18N.md](docs/I18N.md) — Current localization structure, routing model, and language-addition workflow
 - [SHIPPING.md](docs/SHIPPING.md) — Current shipping model, USPS setup, and fallback policy
 - [SEO.md](docs/SEO.md) — Current crawl, metadata, JSON-LD, and noindex model

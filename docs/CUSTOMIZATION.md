@@ -4,19 +4,19 @@ This guide covers the supported no-code customization surface for forks of The P
 
 The goal is to let forks rebrand, restyle, and reconfigure the platform through config, while keeping checkout, reports, emails, and the Worker aligned.
 
-The structured config model in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml) is now the canonical fork-facing surface.
+The structured config model in [`_config.yml`](../_config.yml) is now the canonical fork-facing surface.
 
 ## Start Here
 
 For most forks, the main customization files are:
 
-- [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
-- [`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml)
-- [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml)
+- [`_config.yml`](../_config.yml)
+- [`_config.local.yml`](../_config.local.yml)
+- [`worker/wrangler.toml`](../worker/wrangler.toml)
 
 Use `./scripts/dev.sh --podman` for local verification after config changes.
 
-Treat [`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml) as an override-only file. Keep canonical fork settings in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml), and use the local file only for things that should differ on your machine, like localhost URLs or local-only campaign visibility.
+Treat [`_config.local.yml`](../_config.local.yml) as an override-only file. Keep canonical fork settings in [`_config.yml`](../_config.yml), and use the local file only for things that should differ on your machine, like localhost URLs or local-only campaign visibility.
 
 The normal local path is now localhost-based:
 
@@ -91,7 +91,7 @@ These values feed:
 Notes:
 
 - `platform.*` is the primary branding surface.
-- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v0.9`.
+- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v0.9.1`.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
 
@@ -100,8 +100,8 @@ Example:
 ```yml
 platform:
   name: My Fork
-  version: 0.9.0
-  release_label: v0.9
+  version: 0.9.1
+  release_label: v0.9.1
   company_name: Example Studio
   support_email: support@example.com
   pledges_email_from: "My Fork <pledges@example.com>"
@@ -311,7 +311,7 @@ Important secret boundary:
 - keep the companion `USPS_CLIENT_SECRET` in Worker secrets or `worker/.dev.vars`
 - do not commit the secret into Jekyll config
 
-The checkout destination list is intentionally separate from those knobs now. Maintain the currently allowed shipping countries in [`_data/shipping_countries.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_data/shipping_countries.yml) instead of editing browser runtime code.
+The checkout destination list is intentionally separate from those knobs now. Maintain the currently allowed shipping countries in [`_data/shipping_countries.yml`](../_data/shipping_countries.yml) instead of editing browser runtime code.
 
 Example:
 
@@ -474,7 +474,7 @@ By contrast, global `add_ons.products` remain platform merch:
 
 Use `design` for curated design-system overrides that do not require Sass edits.
 
-These values are emitted into the generated stylesheet [assets/theme-vars.css](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/assets/theme-vars.css), which keeps the design-variable bridge compatible with the site’s strict CSP. Forks do not need to edit Sass just to change supported tokens.
+These values are emitted into the generated stylesheet [assets/theme-vars.css](../assets/theme-vars.css), which keeps the design-variable bridge compatible with the site’s strict CSP. Forks do not need to edit Sass just to change supported tokens.
 
 Current supported keys:
 
@@ -583,7 +583,7 @@ These are the safest “site generation / branding / localization without Worker
 
 ### Auto-Mirrored To Worker
 
-These site-config values are also reflected into the Worker env values in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml):
+These site-config values are also reflected into the Worker env values in [`worker/wrangler.toml`](../worker/wrangler.toml):
 
 - `platform.name` -> `PLATFORM_NAME`
 - `platform.company_name` -> `PLATFORM_COMPANY_NAME`
@@ -620,7 +620,7 @@ For convenience, the repo now includes:
 npm run sync:worker-config
 ```
 
-That command syncs the Worker-mirrored values in [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml) from `_config.yml` and `_config.local.yml`.
+That command syncs the Worker-mirrored values in [`worker/wrangler.toml`](../worker/wrangler.toml) from `_config.yml` and `_config.local.yml`.
 
 It does not write Worker secrets. USPS OAuth secrets still belong in `wrangler secret` or `worker/.dev.vars`.
 

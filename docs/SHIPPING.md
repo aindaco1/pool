@@ -145,7 +145,7 @@ The current cart and Manage Pledge UI therefore expose a narrow delivery-option 
 
 ## Config Surface
 
-Add a structured `shipping` section to [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml), for example:
+Add a structured `shipping` section to [`_config.yml`](../_config.yml), for example:
 
 ```yml
 shipping:
@@ -247,7 +247,7 @@ shipping:
           - PRIORITY_MAIL
 ```
 
-That config should stay site-driven and auto-mirror any Worker-required values into [`worker/wrangler.toml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/wrangler.toml).
+That config should stay site-driven and auto-mirror any Worker-required values into [`worker/wrangler.toml`](../worker/wrangler.toml).
 
 Optional preset-level shipping hints can live inside preset metadata too. The current implementation supports:
 
@@ -349,7 +349,7 @@ As of April 14, 2026, the practical setup path is:
 
 In this repo, that maps to:
 
-- [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml)
+- [`_config.yml`](../_config.yml)
   - `shipping.usps.client_id`
   - `shipping.usps.enabled`
   - optional `shipping.usps.api_base` if you need to point at TEM explicitly
@@ -362,10 +362,10 @@ Do **not** commit the USPS client secret into Jekyll config.
 
 For a normal production-style local setup, the minimum values this repo needs are:
 
-- [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml) or [`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml)
+- [`_config.yml`](../_config.yml) or [`_config.local.yml`](../_config.local.yml)
   - `shipping.usps.enabled: true`
   - `shipping.usps.client_id: "<your Consumer Key>"`
-- [`worker/.dev.vars`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/.dev.vars)
+- [`worker/.dev.vars`](../worker/.dev.vars)
   - `USPS_CLIENT_SECRET=<your Consumer Secret>`
 
 If you want to test against USPS TEM with the same production credentials USPS describes, also set:
@@ -376,8 +376,8 @@ If you want to test against USPS TEM with the same production credentials USPS d
 
 For local testing:
 
-- set `shipping.usps.client_id` in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml) or your local override path
-- set `USPS_CLIENT_SECRET=...` in [`worker/.dev.vars`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/.dev.vars)
+- set `shipping.usps.client_id` in [`_config.yml`](../_config.yml) or your local override path
+- set `USPS_CLIENT_SECRET=...` in [`worker/.dev.vars`](../worker/.dev.vars)
 - run:
 
 ```bash
@@ -457,7 +457,7 @@ The important rule is:
 
 - do not turn shipping quotes into a high-write KV subsystem
 
-The checkout country selector is now fed from [`_data/shipping_countries.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_data/shipping_countries.yml), which keeps USPS destination maintenance in a dedicated source instead of burying it in browser runtime code.
+The checkout country selector is now fed from [`_data/shipping_countries.yml`](../_data/shipping_countries.yml), which keeps USPS destination maintenance in a dedicated source instead of burying it in browser runtime code.
 
 ## Worker and Frontend Touchpoints
 
@@ -465,8 +465,8 @@ The checkout country selector is now fed from [`_data/shipping_countries.yml`](/
 
 Main logic seams already exist in:
 
-- [worker/src/index.js](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/src/index.js)
-- [worker/src/provider-config.js](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/src/provider-config.js)
+- [worker/src/index.js](../worker/src/index.js)
+- [worker/src/provider-config.js](../worker/src/provider-config.js)
 
 The current shipping flow now:
 
@@ -504,11 +504,11 @@ Current automated coverage includes:
 
 Current docs that should stay aligned with shipping behavior:
 
-- [README.md](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/README.md)
-- [docs/CUSTOMIZATION.md](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/docs/CUSTOMIZATION.md)
-- [docs/DEV_NOTES.md](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/docs/DEV_NOTES.md)
-- [docs/TESTING.md](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/docs/TESTING.md)
-- [terms.md](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/terms.md)
+- [README.md](../README.md)
+- [docs/CUSTOMIZATION.md](../docs/CUSTOMIZATION.md)
+- [docs/DEV_NOTES.md](../docs/DEV_NOTES.md)
+- [docs/TESTING.md](../docs/TESTING.md)
+- [terms.md](../terms.md)
 
 Terms should stop promising a flat physical shipping fee and instead describe deployment-configured shipping rules, including carrier-rated quotes and fallback rates where applicable.
 

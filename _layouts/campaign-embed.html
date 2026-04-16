@@ -1,0 +1,34 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
+{%- assign asset_version = site.time | date: "%s" -%}
+<!doctype html>
+<html lang="{{ current_lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
+  {% include cart-runtime-head.html %}
+  {% include seo-meta.html lang=current_lang title=page.title description=page.description indexable=false %}
+  <script
+    src="/assets/js/pool-config.js?v={{ asset_version }}"
+    defer
+    data-pool-config-script="true"
+    data-current-lang="{{ current_lang }}"
+    data-runtime-messages="{{ runtime_messages_json | strip | escape }}"
+    data-site-url="{{ site.platform.site_url | default: site.url }}"
+    data-worker-base="{{ site.platform.worker_url }}"
+    data-platform-name="{{ site.platform.name | default: site.title | escape }}"
+    data-platform-company-name="{{ site.platform.company_name | default: site.author | escape }}"
+    data-platform-author="{{ site.author | default: site.platform.company_name | escape }}"
+    data-platform-support-email="{{ site.platform.support_email | default: '' | escape }}"
+    data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"></script>
+  <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
+</head>
+<body class="campaign-embed-page">
+  <main class="campaign-embed-shell">
+    <a href="/" class="campaign-embed-shell__close pool-first-party-cart__close" data-campaign-embed-close aria-label="{% include t.html key='embed.back_to_campaign' lang=current_lang %}" title="{% include t.html key='embed.back_to_campaign' lang=current_lang %}" hidden>&times;</a>
+    {{ content }}
+  </main>
+  <script src="/assets/js/campaign-embed.js?v={{ asset_version }}" defer data-campaign-embed-script="true"></script>
+</body>
+</html>

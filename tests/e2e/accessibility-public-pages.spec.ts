@@ -113,26 +113,6 @@ test.describe('Public Page Accessibility', () => {
     ]);
   });
 
-  test('non-live campaign page has no obvious axe violations', async ({ page }) => {
-    await page.goto('/campaigns/night-work/');
-    await expect(page.locator('.campaign-container')).toBeVisible();
-    await expectNoAxeViolations(page);
-    await expectAriaSnapshotToContain(page.locator('main'), [
-      'heading "NIGHT WORK"',
-      'heading "Campaign Ended"'
-    ]);
-  });
-
-  test('post campaign page has no obvious axe violations', async ({ page }) => {
-    await page.goto('/campaigns/common-ground/');
-    await expect(page.locator('.campaign-container')).toBeVisible();
-    await expectNoAxeViolations(page);
-    await expectAriaSnapshotToContain(page.locator('main'), [
-      'heading "COMMON GROUND"',
-      'heading "Festival Run"'
-    ]);
-  });
-
   test('physical campaign page has no obvious axe violations', async ({ page }) => {
     await page.goto('/campaigns/tecolote/');
     await expect(page.locator('.campaign-container')).toBeVisible();

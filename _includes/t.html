@@ -92,5 +92,14 @@
 {%- if include.url -%}
   {%- assign result = result | replace: "%{url}", include.url -%}
 {%- endif -%}
+{%- if include.creator -%}
+  {%- assign result = result | replace: "%{creator}", include.creator -%}
+{%- endif -%}
+{%- if include.category -%}
+  {%- assign result = result | replace: "%{category}", include.category -%}
+{%- endif -%}
+{%- if include.blurb -%}
+  {%- assign result = result | replace: "%{blurb}", include.blurb -%}
+{%- endif -%}
 
 {{ result -}}

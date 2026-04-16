@@ -1,7 +1,8 @@
 {% if include.support_items and include.support_items.size > 0 and include.campaign %}
+{% assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
 {% assign cart_add_item_classes = "poolcart-add-item" %}
 <div class="support-items" data-campaign-slug="{{ include.campaign.slug }}" data-goal="{{ include.campaign.goal_amount }}" data-progress-bg="{% if include.campaign.progress_background %}{{ include.campaign.progress_background }}{% endif %}">
-  <h5>{% include t.html key="support_items.heading" %}</h5>
+  <h5>{% include t.html key="support_items.heading" lang=current_lang %}</h5>
   {% for item in include.support_items %}
     {% assign current_amount = item.current | default: 0 | plus: 0 %}
     {% assign remaining = item.target | minus: current_amount %}
@@ -17,22 +18,23 @@
       {% assign item_is_physical = true %}
     {% endif %}
     {% assign is_late_support_item = false %}
-    {% if include.campaign.state == "live" %}
+    {% assign campaign_state = include.state | default: include.campaign.state %}
+    {% if campaign_state == "live" %}
       {% assign item_disabled = false %}
       {% assign item_disabled_reason = "" %}
-    {% elsif include.campaign.state == "post" %}
+    {% elsif campaign_state == "post" %}
       {% if item.late_support %}
         {% assign is_late_support_item = true %}
       {% endif %}
       {% assign item_disabled = true %}
-      {% assign item_disabled_reason = "Campaign Ended" %}
-    {% elsif include.campaign.state == "upcoming" %}
+      {% capture item_disabled_reason %}{% include t.html key="states.ended" lang=current_lang %}{% endcapture %}
+    {% elsif campaign_state == "upcoming" %}
       {% assign item_disabled = true %}
-      {% assign start_formatted = include.campaign.start_date | date: "%b %-d" %}
-      {% capture item_disabled_reason %}{% include t.html key="states.opens" date=start_formatted %}{% endcapture %}
+      {% capture start_formatted %}{% include localized-date.html date=include.campaign.start_date lang=current_lang format='short_no_year' %}{% endcapture %}
+      {% capture item_disabled_reason %}{% include t.html key="states.opens" lang=current_lang date=start_formatted %}{% endcapture %}
     {% else %}
       {% assign item_disabled = true %}
-      {% capture item_disabled_reason %}{% include t.html key="misc.unavailable" %}{% endcapture %}
+      {% capture item_disabled_reason %}{% include t.html key="misc.unavailable" lang=current_lang %}{% endcapture %}
     {% endif %}
     <div class="support-item" id="support-{{ item.id }}"{% if is_late_support_item %} data-late-support="true"{% endif %}>
       <div class="support-item__info">
@@ -92,7 +94,7 @@
           data-item-custom2-name="_category"
           data-item-custom2-type="hidden"
           data-item-custom2-value="{{ item_category }}">
-          {% if remaining <= 0 %}{% include t.html key="support_items.funded" %}{% elsif item_disabled %}{{ item_disabled_reason }}{% else %}{% include t.html key="support_items.button" %}{% endif %}
+          {% if remaining <= 0 %}{% include t.html key="support_items.funded" lang=current_lang %}{% elsif item_disabled %}{{ item_disabled_reason }}{% else %}{% include t.html key="support_items.button" lang=current_lang %}{% endif %}
         </button>
       </div>
     </div>

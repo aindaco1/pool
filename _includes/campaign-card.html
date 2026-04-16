@@ -1,20 +1,22 @@
 <article class="campaign-card" data-campaign-slug="{{ include.campaign.slug }}" data-goal="{{ include.campaign.goal_amount }}">
     {% assign cart_add_item_classes = "poolcart-add-item" %}
+  {% assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
+  {%- capture campaign_url -%}{% include localized-url.html lang=current_lang translation_key=include.campaign.translation_key localized_paths=include.campaign.localized_paths path=include.campaign.url %}{%- endcapture -%}
   {% if include.campaign.campaign_background %}
   <div class="campaign-card__background" aria-hidden="true">
     <img src="{{ include.campaign.campaign_background }}" alt="" class="campaign-card__background-image">
   </div>
   {% endif %}
   {% if include.campaign.hero_image %}
-    <a href="{{ include.campaign.url }}" class="campaign-card__image-link">
+    <a href="{{ campaign_url | strip }}" class="campaign-card__image-link">
     <img src="{{ include.campaign.hero_image }}" alt="{{ include.campaign.title | escape }}">
   </a>
   {% endif %}
   
   <div class="campaign-card__content">
-    <h2><a href="{{ include.campaign.url }}">{{ include.campaign.title | escape }}</a></h2>
+    <h2><a href="{{ campaign_url | strip }}">{{ include.campaign.title | escape }}</a></h2>
     <p class="campaign-card__blurb">{{ include.campaign.short_blurb | safe_rich_text }}</p>
-    {% include progress.html campaign_slug=include.campaign.slug pledged=0 goal=include.campaign.goal_amount deadline=include.campaign.goal_deadline start_date=include.campaign.start_date state=include.campaign.state progress_background=include.campaign.progress_background %}
+    {% include progress.html campaign_slug=include.campaign.slug pledged=0 goal=include.campaign.goal_amount deadline=include.campaign.goal_deadline start_date=include.campaign.start_date state=include.campaign.state progress_background=include.campaign.progress_background lang=current_lang %}
     
     {% if include.campaign.featured_tier_id %}
       {% assign featured = include.campaign.tiers | where: "id", include.campaign.featured_tier_id | first %}
@@ -32,7 +34,7 @@
                 data-item-id="{{ include.campaign.slug }}__{{ featured.id }}"
                 data-item-name="{{ include.campaign.title | escape }} — {{ featured.name | escape }}"
                 data-item-price="{{ featured.price }}"
-                data-item-url="{{ site.url }}{{ include.campaign.url }}#tier-{{ featured.id }}"
+                data-item-url="{{ site.url }}{{ campaign_url | strip }}#tier-{{ featured.id }}"
                 data-item-description="Pledge (charged only if funded) — {{ featured.description | escape }}"
                 data-item-max-quantity="{% if featured.stackable %}{% if featured.max_per_person %}{{ featured.max_per_person }}{% else %}99{% endif %}{% else %}1{% endif %}"
                 data-item-stackable="{% if featured.stackable %}always{% else %}never{% endif %}"
@@ -40,7 +42,7 @@
                 {% if include.campaign.shipping_fallback_flat_rate != nil or include.campaign.free_shipping != nil %}data-item-campaign-shipping-override="true"{% endif %}
                 {% if include.campaign.shipping_fallback_flat_rate != nil %}data-item-shipping-fallback-cents="{{ include.campaign.shipping_fallback_flat_rate | times: 100 | round }}"{% endif %}
                 {% if include.campaign.free_shipping != nil %}data-item-campaign-free-shipping="{{ include.campaign.free_shipping }}"{% endif %}
-                data-redirect-url="{{ include.campaign.url }}"
+                data-redirect-url="{{ campaign_url | strip }}"
                 data-item-custom1-name="_stackable"
                 data-item-custom1-type="hidden"
                 data-item-custom1-value="{% if featured.stackable %}true{% else %}false{% endif %}"
@@ -68,7 +70,7 @@
                 data-item-id="{{ include.campaign.slug }}__{{ featured.id }}"
                 data-item-name="{{ include.campaign.title | escape }} — {{ featured.name | escape }}"
                 data-item-price="{{ featured.price }}"
-                data-item-url="{{ site.url }}{{ include.campaign.url }}#tier-{{ featured.id }}"
+                data-item-url="{{ site.url }}{{ campaign_url | strip }}#tier-{{ featured.id }}"
                 data-item-description="Late support — {{ featured.description | escape }}"
                 data-item-max-quantity="{% if featured.stackable %}{% if featured.max_per_person %}{{ featured.max_per_person }}{% else %}99{% endif %}{% else %}1{% endif %}"
                 data-item-stackable="{% if featured.stackable %}always{% else %}never{% endif %}"
@@ -89,7 +91,7 @@
           <div class="featured-tier__price">{{ featured.price | money }}</div>
         </button>
         {% else %}
-        <a href="{{ include.campaign.url }}#tier-{{ featured.id }}" class="campaign-card__featured-tier campaign-card__featured-tier--disabled">
+        <a href="{{ campaign_url | strip }}#tier-{{ featured.id }}" class="campaign-card__featured-tier campaign-card__featured-tier--disabled">
           <div class="featured-tier__info">
             <div class="featured-tier__name">{{ featured.name | escape }}</div>
             <p class="featured-tier__description">{{ featured.description | escape }}</p>
@@ -102,6 +104,6 @@
   </div>
   
   <div class="campaign-card__footer">
-    <a href="{{ include.campaign.url }}" class="btn btn--block">{% include t.html key="buttons.view_campaign" %}</a>
+    <a href="{{ campaign_url | strip }}" class="btn btn--block">{% include t.html key="buttons.view_campaign" lang=current_lang %}</a>
   </div>
 </article>

@@ -362,7 +362,7 @@ test.describe('Manage Pledge Flows', () => {
     await expect(shippingOptionSelect).toBeVisible();
     await shippingOptionSelect.selectOption('signature_required');
     await expect(page.locator('#shipping-0')).toContainText('$10.70');
-    await expect(page.locator('#amount-0')).toContainText('$48.46');
+    await expect(page.locator('#amount-0')).toContainText('$48.37');
 
     const saveButton = page.locator('[data-action="save"][data-index="0"]');
     await expect(saveButton).toBeEnabled();

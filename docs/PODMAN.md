@@ -142,7 +142,7 @@ npm run test:e2e:headless:podman
 
 `./scripts/test-e2e.sh --podman` is now fully automated browser coverage. The dedicated `./scripts/test-checkout.sh --podman` helper remains the manual interactive path when you specifically want to drive a real checkout in your own browser. The automated headless browser suite runs in its own Playwright container and reuses the already-running site/Worker instead of trying to boot Jekyll inside the test container.
 
-For host-side commands that need a Podman-backed site/Worker without assuming detached stack persistence, use [`scripts/podman-stack-run.sh`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/scripts/podman-stack-run.sh). `npm run test:security:podman` uses that wrapper to boot the stack, run the security suite, and tear the stack down in one invocation.
+For host-side commands that need a Podman-backed site/Worker without assuming detached stack persistence, use [`scripts/podman-stack-run.sh`](../scripts/podman-stack-run.sh). `npm run test:security:podman` uses that wrapper to boot the stack, run the security suite, and tear the stack down in one invocation.
 
 For the host-side headless browser path, Playwright now builds a clean static `_site` and serves it with a lightweight HTTP server instead of relying on `jekyll serve`. That keeps browser regressions closer to the real published asset shape and avoids some WEBrick instability during parallel runs.
 

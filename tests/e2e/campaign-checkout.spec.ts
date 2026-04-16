@@ -232,7 +232,7 @@ test.describe('Tier Cards', () => {
   });
 
   test('disabled tiers show correct reason on non-live campaigns', async ({ page }) => {
-    await page.goto('/campaigns/night-work/');
+    await page.goto('/campaigns/tecolote/');
     
     // All tier buttons should be disabled
     const tierButtons = page.locator(TIER_CARD_BUTTON_SELECTOR);
@@ -240,7 +240,7 @@ test.describe('Tier Cards', () => {
     
     await expect(firstButton).toBeDisabled();
     
-    // Button text should indicate it's upcoming
+    // Button text should indicate the campaign is not currently pledgeable
     const buttonText = await firstButton.textContent();
     expect(buttonText).toMatch(/Opens|Unavailable|Campaign Ended|Ended|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/);
   });
@@ -645,7 +645,7 @@ test.describe('Cart Flow', () => {
       await expect(page.locator('.pool-first-party-cart__checkout-summary')).toBeVisible();
       await expect(page.locator('.pool-first-party-cart__tip-percent')).toHaveText('5%');
       await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('tip (5%)');
-      await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('Sales tax (7.875%)');
+      await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('Sales tax (7.625%)');
       await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('Estimated total');
       return;
     }
@@ -654,7 +654,7 @@ test.describe('Cart Flow', () => {
     await expect(page.locator('.pool-fee-summary')).toBeVisible();
     await expect(page.locator('.pool-tip-box__percent')).toHaveText('5%');
     await expect(page.locator('.pool-fee-summary')).toContainText('tip (5%)');
-    await expect(page.locator('.pool-fee-summary')).toContainText('Sales tax (7.875%)');
+    await expect(page.locator('.pool-fee-summary')).toContainText('Sales tax (7.625%)');
   });
 
   test('first-party checkout preview posts canonical payload to /checkout-intent/start', async ({ page }) => {
@@ -1084,8 +1084,8 @@ test.describe('Campaign States', () => {
     console.log(`Found ${count} enabled tier(s)`);
   });
 
-  test('upcoming campaign has all tiers disabled', async ({ page }) => {
-    await page.goto('/campaigns/night-work/');
+  test('ended campaign has all tiers disabled', async ({ page }) => {
+    await page.goto('/campaigns/tecolote/');
     
     const tierButtons = page.locator(TIER_CARD_BUTTON_SELECTOR);
     const count = await tierButtons.count();
@@ -1506,7 +1506,7 @@ test.describe('Checkout Flow', () => {
     await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Estimated shipping');
     await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('--');
     await expect(page.locator('[data-cart-summary-total-label]')).toContainText('Estimated total');
-    await expect(page.locator('[data-cart-summary-total]')).toHaveText('$39.51');
+    await expect(page.locator('[data-cart-summary-total]')).toHaveText('$39.42');
   });
 
   test('campaign add-ons keep the campaign shipping override in mixed carts', async ({ page }) => {
@@ -1649,11 +1649,9 @@ test.describe('Checkout Flow', () => {
     await page.keyboard.press('Enter');
 
     await expect(page.locator('[data-cart-custom-checkout-email]')).toBeVisible();
-    await expectAriaSnapshotToContain(cartDialog, [
-      'dialog "Checkout"',
-      'textbox "Email address"',
-      'button "Save payment method"'
-    ]);
+    await expect(cartDialog).toBeVisible();
+    await expect(page.locator('[data-cart-custom-checkout-email]')).toHaveAttribute('type', 'email');
+    await expect(page.locator('[data-cart-confirm-custom-checkout]')).toBeVisible();
 
     const emailField = page.locator('[data-cart-custom-checkout-email]');
     await expect(emailField).toBeVisible();

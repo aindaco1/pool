@@ -168,6 +168,11 @@
   - stronger merge-gate and unit coverage now protect alternate-language metadata, sitemap inclusion, and the public crawl surface
   - bounded fork-facing SEO config now covers `seo.x_handle`, `seo.same_as`, `seo.default_social_image_alt`, `seo.og_locale_overrides`, and whether the public community hub should remain indexable
   - structured browser and Worker debug logging now ships as a config-driven developer aid with timestamps, severity labels, scoped prefixes, and browser global error capture
+- [x] Campaign embeds and richer share previews
+  - campaign pages now link to a hosted locale-aware embed builder that generates copy-paste iframe code with layout, theme, media, and CTA options
+  - the embed widget uses live Worker-backed campaign state, auto-resizes after paste, and supports localized return links plus localized builder/runtime copy
+  - campaign pages now emit richer state-aware social metadata plus Worker-generated share-card SVG images that stay closer to the embed’s visual language
+  - localized campaign routes, localized embed routes, and locale-aware share-card URLs keep embeds and rich previews aligned across English and Spanish
 
 ## Planned
 

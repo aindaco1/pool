@@ -20,7 +20,7 @@ The mirrored Worker config now also includes the shared debug flags:
 - `DEBUG_CONSOLE_LOGGING_ENABLED`
 - `DEBUG_VERBOSE_CONSOLE_LOGGING`
 
-Those come from `debug.console_logging_enabled` and `debug.verbose_console_logging` in the repo-root [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml), and both default to `true` so local and deployed Workers stay verbose unless a fork explicitly turns logging down.
+Those come from `debug.console_logging_enabled` and `debug.verbose_console_logging` in the repo-root [`_config.yml`](../_config.yml), and both default to `true` so local and deployed Workers stay verbose unless a fork explicitly turns logging down.
 
 Worker-side stats and inventory repair now also treat `campaign-pledges:{slug}` as projection state instead of permanent truth. If a campaign index drifts from the underlying active pledge records, the recalc paths repair it automatically while rebuilding campaign totals and limited-tier inventory.
 
@@ -28,7 +28,7 @@ Before mutating anything, operators can now run read-only drift checks through:
 
 - `POST /stats/:slug/check`
 - `POST /admin/projections/check`
-- [`scripts/check-projections.sh`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/scripts/check-projections.sh) from the repo root
+- [`scripts/check-projections.sh`](../scripts/check-projections.sh) from the repo root
 
 Those checks compare stored `campaign-pledges:{slug}`, `stats:{slug}`, and `tier-inventory:{slug}` projections against active pledge truth and return a structured diff instead of silently repairing state.
 
@@ -78,8 +78,8 @@ wrangler secret put USPS_CLIENT_SECRET
 
 USPS setup for this repo is split intentionally:
 
-- keep `shipping.usps.client_id` in the repo-root [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml) or [`_config.local.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.local.yml)
-- keep `USPS_CLIENT_SECRET` in Worker secrets or [`worker/.dev.vars`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/.dev.vars)
+- keep `shipping.usps.client_id` in the repo-root [`_config.yml`](../_config.yml) or [`_config.local.yml`](../_config.local.yml)
+- keep `USPS_CLIENT_SECRET` in Worker secrets or [`worker/.dev.vars`](../worker/.dev.vars)
 - if you want to point the Worker at USPS TEM for testing, also set `shipping.usps.api_base` or `USPS_API_BASE`
 
 The Pool currently only needs USPS OAuth plus the default pricing/shipping-options product set for live quote calculation. It does **not** require USPS Labels / Ship / EPA setup unless the project later grows into label generation.
@@ -185,7 +185,7 @@ Requires admin auth and returns whether the stored campaign index, stats project
 ### POST /admin/projections/check
 Run the same read-only drift check across all campaigns.
 
-This is the Worker-side endpoint that powers [`scripts/check-projections.sh`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/scripts/check-projections.sh) and the newer mutable-pledge smoke assertions.
+This is the Worker-side endpoint that powers [`scripts/check-projections.sh`](../scripts/check-projections.sh) and the newer mutable-pledge smoke assertions.
 
 ## Content Safety Notes
 
@@ -204,6 +204,15 @@ Start a Stripe session to update payment method.
 ```
 
 Returns either a custom-session bootstrap for the on-site `Update Card` flow or a hosted fallback URL.
+
+### GET /share/campaign/:slug.svg
+Return a public SVG share card for one campaign.
+
+Optional query params:
+
+- `lang=en|es` to localize campaign UI copy and the footer campaign link
+
+The rendered card uses live campaign data, including current state, pledged total, goal progress, and creator/category metadata. Campaign-page `og:image` / `twitter:image` tags point at this route so social previews stay aligned with live campaign and embed state.
 
 ### POST /webhooks/stripe
 Stripe webhook endpoint (signature verified).
@@ -317,11 +326,13 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 
 When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email images still fall back to the public `https://pool.dustwave.xyz` asset base so inbox clients do not receive broken localhost image URLs.
 
-Fork note: treat those identity, pricing, and shipping vars as mirrors of the structured site config in [`_config.yml`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/_config.yml), especially the `platform`, `pricing`, and `shipping` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior now, not Worker env toggles you should normally customize.
+Fork note: treat those identity, pricing, and shipping vars as mirrors of the structured site config in [`_config.yml`](../_config.yml), especially the `platform`, `pricing`, and `shipping` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior now, not Worker env toggles you should normally customize.
 
-Keep `USPS_CLIENT_SECRET` out of site config. It belongs in Worker secrets or [`worker/.dev.vars`](/Users/aindaco1/Library/Mobile%20Documents/com~apple~CloudDocs/pool/worker/.dev.vars).
+Keep `USPS_CLIENT_SECRET` out of site config. It belongs in Worker secrets or [`worker/.dev.vars`](../worker/.dev.vars).
 
 Localization note: the Worker now localizes supporter-facing email subjects/body copy and localized `/manage/` / `/community/:slug/` links from the shared site locale catalog. In normal operation it fetches that catalog from `SITE_BASE/assets/i18n.json`; tests and advanced deployments can inject `I18N_CATALOG_JSON` instead. That means localized supporter emails and localized routes such as `/es/manage/` or `/es/community/:slug/` stay aligned with the site locale model when a deployment adds those routes.
+
+The Worker also serves localized campaign share-card previews at `GET /share/campaign/:slug.svg` with an optional `?lang=es` query. Campaign pages use that route for their social image metadata, and the generated SVG mirrors the campaign embed's state/progress language while linking back to the localized public campaign route.
 
 ## Data Flow
 
