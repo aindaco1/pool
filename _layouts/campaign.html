@@ -84,54 +84,60 @@
       {% if page.goal_deadline %}
       {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
       <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-state="{{ campaign_render_state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}">
-        <h2 class="campaign-countdown__heading">{% if campaign_render_state == "upcoming" %}{% include t.html key="campaign.starts_in" lang=current_lang %}{% elsif campaign_render_state == "live" %}{% include t.html key="campaign.ends_in" lang=current_lang %}{% endif %}</h2>
-        {% assign target_date = page.goal_deadline %}
-        {% if campaign_render_state == "upcoming" %}{% assign target_date = page.start_date %}{% endif %}
-        {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
-        {% assign target_epoch = target_date | date: '%s' | plus: 0 %}
-        {% if campaign_render_state == "upcoming" %}
-          {% comment %}Target is midnight of start date{% endcomment %}
+        {% if campaign_render_state == "upcoming" or campaign_render_state == "live" %}
+          <h2 class="campaign-countdown__heading">{% if campaign_render_state == "upcoming" %}{% include t.html key="campaign.starts_in" lang=current_lang %}{% else %}{% include t.html key="campaign.ends_in" lang=current_lang %}{% endif %}</h2>
+          {% assign target_date = page.goal_deadline %}
+          {% if campaign_render_state == "upcoming" %}{% assign target_date = page.start_date %}{% endif %}
+          {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
+          {% assign target_epoch = target_date | date: '%s' | plus: 0 %}
+          {% if campaign_render_state == "upcoming" %}
+            {% comment %}Target is midnight of start date{% endcomment %}
+          {% else %}
+            {% assign target_epoch = target_epoch | plus: 86399 %}{% comment %}End of day: +23:59:59{% endcomment %}
+          {% endif %}
+          {% assign diff_secs = target_epoch | minus: now_epoch %}
+          {% if diff_secs < 0 %}{% assign diff_secs = 0 %}{% endif %}
+          {% assign init_days = diff_secs | divided_by: 86400 %}
+          {% assign remainder = diff_secs | modulo: 86400 %}
+          {% assign init_hours = remainder | divided_by: 3600 %}
+          {% assign remainder = remainder | modulo: 3600 %}
+          {% assign init_mins = remainder | divided_by: 60 %}
+          {% assign init_secs = remainder | modulo: 60 %}
+          <div class="flip-countdown">
+            <div class="flip-countdown__group">
+              <div class="flip-card" data-unit="days">
+                <span class="flip-card__value">{% if init_days < 10 %}0{% endif %}{{ init_days }}</span>
+              </div>
+              <span class="flip-countdown__label">{% include t.html key="campaign.days" lang=current_lang %}</span>
+            </div>
+            <div class="flip-countdown__separator">:</div>
+            <div class="flip-countdown__group">
+              <div class="flip-card" data-unit="hours">
+                <span class="flip-card__value">{% if init_hours < 10 %}0{% endif %}{{ init_hours }}</span>
+              </div>
+              <span class="flip-countdown__label">{% include t.html key="campaign.hours" lang=current_lang %}</span>
+            </div>
+            <div class="flip-countdown__separator">:</div>
+            <div class="flip-countdown__group">
+              <div class="flip-card" data-unit="mins">
+                <span class="flip-card__value">{% if init_mins < 10 %}0{% endif %}{{ init_mins }}</span>
+              </div>
+              <span class="flip-countdown__label">{% include t.html key="campaign.minutes" lang=current_lang %}</span>
+            </div>
+            <div class="flip-countdown__separator">:</div>
+            <div class="flip-countdown__group">
+              <div class="flip-card" data-unit="secs">
+                <span class="flip-card__value">{% if init_secs < 10 %}0{% endif %}{{ init_secs }}</span>
+              </div>
+              <span class="flip-countdown__label">{% include t.html key="campaign.seconds" lang=current_lang %}</span>
+            </div>
+          </div>
+          <div class="campaign-countdown__message"></div>
         {% else %}
-          {% assign target_epoch = target_epoch | plus: 86399 %}{% comment %}End of day: +23:59:59{% endcomment %}
+          <div class="campaign-countdown__message {% if pledged_num >= page.goal_amount %}campaign-countdown__message--funded{% else %}campaign-countdown__message--not-funded{% endif %}">
+            <h2>{% if pledged_num >= page.goal_amount %}{% include t.html key="runtime.campaign.countdown_funded" lang=current_lang %}{% else %}{% include t.html key="runtime.campaign.countdown_ended" lang=current_lang %}{% endif %}</h2>
+          </div>
         {% endif %}
-        {% assign diff_secs = target_epoch | minus: now_epoch %}
-        {% if diff_secs < 0 %}{% assign diff_secs = 0 %}{% endif %}
-        {% assign init_days = diff_secs | divided_by: 86400 %}
-        {% assign remainder = diff_secs | modulo: 86400 %}
-        {% assign init_hours = remainder | divided_by: 3600 %}
-        {% assign remainder = remainder | modulo: 3600 %}
-        {% assign init_mins = remainder | divided_by: 60 %}
-        {% assign init_secs = remainder | modulo: 60 %}
-        <div class="flip-countdown">
-          <div class="flip-countdown__group">
-            <div class="flip-card" data-unit="days">
-              <span class="flip-card__value">{% if init_days < 10 %}0{% endif %}{{ init_days }}</span>
-            </div>
-            <span class="flip-countdown__label">{% include t.html key="campaign.days" lang=current_lang %}</span>
-          </div>
-          <div class="flip-countdown__separator">:</div>
-          <div class="flip-countdown__group">
-            <div class="flip-card" data-unit="hours">
-              <span class="flip-card__value">{% if init_hours < 10 %}0{% endif %}{{ init_hours }}</span>
-            </div>
-            <span class="flip-countdown__label">{% include t.html key="campaign.hours" lang=current_lang %}</span>
-          </div>
-          <div class="flip-countdown__separator">:</div>
-          <div class="flip-countdown__group">
-            <div class="flip-card" data-unit="mins">
-              <span class="flip-card__value">{% if init_mins < 10 %}0{% endif %}{{ init_mins }}</span>
-            </div>
-            <span class="flip-countdown__label">{% include t.html key="campaign.minutes" lang=current_lang %}</span>
-          </div>
-          <div class="flip-countdown__separator">:</div>
-          <div class="flip-countdown__group">
-            <div class="flip-card" data-unit="secs">
-              <span class="flip-card__value">{% if init_secs < 10 %}0{% endif %}{{ init_secs }}</span>
-            </div>
-            <span class="flip-countdown__label">{% include t.html key="campaign.seconds" lang=current_lang %}</span>
-          </div>
-        </div>
-        <div class="campaign-countdown__message"></div>
       </div>
       {% endif %}
       <button type="button" class="btn btn--primary campaign-header__cta" data-scroll-target="campaign-tiers">{% include t.html key="campaign.support_cta" lang=current_lang %}</button>

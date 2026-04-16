@@ -416,6 +416,10 @@
   justify-content: center;
   align-items: flex-start;
   gap: 8px;
+
+  &[hidden] {
+    display: none !important;
+  }
   
   @include xsm {
     gap: 4px;
@@ -456,6 +460,10 @@
       line-height: 50px;
     }
   }
+}
+
+.campaign-countdown__heading[hidden] {
+  display: none !important;
 }
 
 .flip-card {

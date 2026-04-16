@@ -87,6 +87,9 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('key="campaign.supporter_community_unlocked"');
     expect(campaignLayout).toContain('key="campaign.supporters_only_cta"');
     expect(campaignLayout).toContain('key="misc.video_not_supported"');
+    expect(campaignLayout).toContain('{% if campaign_render_state == "upcoming" or campaign_render_state == "live" %}');
+    expect(campaignLayout).toContain('key="runtime.campaign.countdown_funded"');
+    expect(campaignLayout).toContain('key="runtime.campaign.countdown_ended"');
     expect(diaryInclude).toContain('key="diary.heading"');
     expect(diaryInclude).toContain("key='diary.tablist_label'");
     expect(diaryInclude).toContain('key="diary.empty"');
