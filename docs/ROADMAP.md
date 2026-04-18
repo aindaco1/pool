@@ -178,24 +178,23 @@
 
 ## Planned
 
-- [ ] Admin dashboard page (read-only) from KV data
+- [ ] Admin dashboard page using Cloudflare Workers data, integrated with Stripe and Resend, following crowdfunding best practices
   - Super admin and per-campaign users
   - Magic link auth
   - Variable customizability
   - add-on inventory baseline override / reset controls so admins can restock sold-out products without editing `_config.yml`
   - decide what the platform-merch admin/reporting surface should look like alongside campaign-facing data
-- [ ] Replace Pages CMS with dedicated content editor and per-campaign permissions
-  - Review Pages CMS GitHub repo for a starting place
-  - Super admin and per-campaign users
-  - Magic link auth
-  - Block-based with the ability to preview campaign content
+  - Light CRM for creators to segment and manage their supporters
+  - Marketing tools in-platform to help creators promote their campaigns based on crowdfunding best practices
+  - Digital product delivery in-platform
+  - Replace Pages CMS with dedicated content editor (integrated with GitHub Pages) and per-campaign permissions
+    - Review Pages CMS GitHub repo for a starting place
+    - Block-based with the ability to preview campaign content
+    - Create/edit/delete campaign content, diary, community vote, and other per-campaign variables
 - [ ] Non-Stripe tax calculator to replace flat rate sales tax
-  - Support USA, and international
+  - Support USA and international
 - [ ] Denial of service attack defense pass
 - [ ] Support different prices per add-on variation
-- [ ] Digital product delivery in-platform
-- [ ] Marketing tools in-platform to help creators promote their campaigns based on crowdfunding best practices
-- [ ] Light CRM for creators to segment and manage their supporters
 
 ## Known Issues
 
