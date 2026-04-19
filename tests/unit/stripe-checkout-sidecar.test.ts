@@ -4,6 +4,7 @@ describe('stripe checkout sidecar helper', () => {
   beforeEach(() => {
     vi.resetModules();
     document.body.innerHTML = '';
+    document.documentElement.removeAttribute('style');
     delete (window as any).PoolStripeCheckoutSidecar;
     delete (window as any).Stripe;
   });
@@ -11,11 +12,26 @@ describe('stripe checkout sidecar helper', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     document.body.innerHTML = '';
+    document.documentElement.removeAttribute('style');
     delete (window as any).PoolStripeCheckoutSidecar;
     delete (window as any).Stripe;
   });
 
-  it('mounts a payment element and optional shipping address element from Stripe custom checkout', async () => {
+  it('mounts a payment element and optional shipping address element from Stripe custom checkout using theme vars', async () => {
+    document.documentElement.style.setProperty('--pool-color-primary', '#123456');
+    document.documentElement.style.setProperty('--pool-color-primary-hover', '#102f52');
+    document.documentElement.style.setProperty('--pool-ink-default', '#223344');
+    document.documentElement.style.setProperty('--pool-ink-strong', '#101820');
+    document.documentElement.style.setProperty('--pool-ink-muted', '#667788');
+    document.documentElement.style.setProperty('--pool-ink-soft', '#7a8696');
+    document.documentElement.style.setProperty('--pool-surface-base', '#fffef9');
+    document.documentElement.style.setProperty('--pool-surface-subtle', '#f3f0ea');
+    document.documentElement.style.setProperty('--pool-surface-page', '#ece6dc');
+    document.documentElement.style.setProperty('--pool-border-default', '#c8bbaa');
+    document.documentElement.style.setProperty('--pool-border-strong', '#9a8f82');
+    document.documentElement.style.setProperty('--pool-radius-md', '14px');
+    document.documentElement.style.setProperty('--pool-font-body', '"Source Sans 3", sans-serif');
+
     const paymentMount = vi.fn();
     const paymentUnmount = vi.fn();
     const linkMount = vi.fn();
@@ -86,77 +102,77 @@ describe('stripe checkout sidecar helper', () => {
           theme: 'flat',
           labels: 'floating',
           variables: {
-            colorPrimary: '#0f2742',
-            colorText: '#111111',
-            colorTextSecondary: '#6b7280',
+            colorPrimary: '#123456',
+            colorText: '#223344',
+            colorTextSecondary: '#667788',
             colorDanger: '#9f1239',
-            colorBackground: '#f8faff',
-            borderRadius: '10px',
+            colorBackground: '#f3f0ea',
+            borderRadius: '14px',
             spacingUnit: '4px',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: '"Source Sans 3", sans-serif',
             fontSizeBase: '13px',
             fontWeightNormal: '400'
           },
           rules: {
             '.Block': {
-              backgroundColor: '#ffffff',
-              border: '1px solid #d7d6d3',
+              backgroundColor: '#fffef9',
+              border: '1px solid #c8bbaa',
               boxShadow: 'none',
-              borderRadius: '10px'
+              borderRadius: '14px'
             },
             '.Input': {
-              backgroundColor: '#ffffff',
-              border: '1px solid #d7d6d3',
+              backgroundColor: '#fffef9',
+              border: '1px solid #c8bbaa',
               boxShadow: 'none',
-              color: '#111111',
+              color: '#223344',
               fontSize: '13px',
               fontWeight: '400',
               lineHeight: '1.4',
               padding: '10px 12px'
             },
             '.Input::placeholder': {
-              color: '#6b7280'
+              color: '#667788'
             },
             '.Input:focus': {
-              borderColor: '#0f2742',
-              boxShadow: '0 0 0 1px #0f2742'
+              borderColor: '#123456',
+              boxShadow: '0 0 0 1px #123456'
             },
             '.Label': {
               fontWeight: '700',
-              color: '#111111',
+              color: '#101820',
               fontSize: '12px'
             },
             '.Tab': {
-              backgroundColor: '#ffffff',
-              border: '1px solid #d7d6d3',
+              backgroundColor: '#fffef9',
+              border: '1px solid #c8bbaa',
               boxShadow: 'none',
-              borderRadius: '10px',
+              borderRadius: '14px',
               padding: '12px 14px'
             },
             '.Tab:hover': {
-              borderColor: '#a9b4c2'
+              borderColor: '#9a8f82'
             },
             '.Tab--selected': {
-              backgroundColor: '#f8fbff',
-              border: '2px solid #0f2742',
+              backgroundColor: '#ece6dc',
+              border: '2px solid #123456',
               boxShadow: 'none'
             },
             '.TabLabel': {
-              color: '#7b869a',
+              color: '#7a8696',
               fontWeight: '500',
               fontSize: '13px'
             },
             '.TabLabel--selected': {
-              color: '#0f2742',
+              color: '#102f52',
               fontWeight: '700'
             },
             '.TabIcon': {
-              color: '#7b869a',
-              fill: '#7b869a'
+              color: '#7a8696',
+              fill: '#7a8696'
             },
             '.TabIcon--selected': {
-              color: '#0f2742',
-              fill: '#0f2742'
+              color: '#102f52',
+              fill: '#102f52'
             }
           }
         }

@@ -175,6 +175,13 @@
   - localized campaign routes, localized embed routes, and locale-aware share-card URLs keep embeds and rich previews aligned across English and Spanish
 - [x] Developer FAQ based on internal documentation
 - [x] Marketing landing page for the platform on a different domain
+- [x] Denial of service attack defense pass
+  - `RATELIMIT` KV is now a hard requirement, with fail-closed behavior when the binding is missing
+  - public read endpoints stay intentionally roomy for campaign virality, while checkout, Manage Pledge, and admin mutations use targeted rate limits and request-size caps
+  - request-body parsing now rejects malformed or obviously oversized payloads earlier across the Worker surface
+  - `/checkout-intent/abandon` uses an order-scoped retry budget instead of a naive per-IP limiter
+  - deployed Standard/Paid Workers now declare a conservative `cpu_ms = 100` ceiling as a denial-of-wallet backstop
+  - admin-only observability endpoints and `scripts/check-observability.sh` now expose webhook outcome summaries and sampled mutation timings for tuning
 
 ## Planned
 
@@ -185,15 +192,20 @@
   - add-on inventory baseline override / reset controls so admins can restock sold-out products without editing `_config.yml`
   - decide what the platform-merch admin/reporting surface should look like alongside campaign-facing data
   - Light CRM for creators to segment and manage their supporters
+    - Abandoned cart follow-up
   - Marketing tools in-platform to help creators promote their campaigns based on crowdfunding best practices
   - Digital product delivery in-platform
+  - Visitor and Referral Analytics
+    - Platform analytics for super admin
+    - Platform observability stats for super admin
+    - Campaign analytics for per-campaign users
+    - Generate referral links for per-campaign users
   - Replace Pages CMS with dedicated content editor (integrated with GitHub Pages) and per-campaign permissions
     - Review Pages CMS GitHub repo for a starting place
     - Block-based with the ability to preview campaign content
     - Create/edit/delete campaign content, diary, community vote, and other per-campaign variables
 - [ ] Non-Stripe tax calculator to replace flat rate sales tax
   - Support USA and international
-- [ ] Denial of service attack defense pass
 - [ ] Support different prices per add-on variation
 
 ## Known Issues

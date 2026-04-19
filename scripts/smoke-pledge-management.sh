@@ -17,6 +17,7 @@ CAMPAIGN_SLUG="${CAMPAIGN_SLUG:-smoke-editable}"
 SMOKE_EMAIL="${SMOKE_EMAIL:-smoke-local@example.com}"
 ADMIN_SECRET="${ADMIN_SECRET:-}"
 REQUEST_IP="${REQUEST_IP:-127.0.1.$(( (RANDOM % 200) + 20 ))}"
+ADMIN_REQUEST_IP_BASE="${ADMIN_REQUEST_IP_BASE:-127.$(( (RANDOM % 200) + 20 )).$(( (RANDOM % 200) + 20 ))}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -27,6 +28,17 @@ WORKER_HEADERS=(
   -H "CF-Connecting-IP: ${REQUEST_IP}"
   -H "X-Forwarded-For: ${REQUEST_IP}"
 )
+
+next_admin_request_ip() {
+  NEXT_ADMIN_REQUEST_IP="${ADMIN_REQUEST_IP_BASE}.$(( (RANDOM % 200) + 20 ))"
+}
+
+curl_admin() {
+  next_admin_request_ip
+  curl "$@" \
+    -H "CF-Connecting-IP: ${NEXT_ADMIN_REQUEST_IP}" \
+    -H "X-Forwarded-For: ${NEXT_ADMIN_REQUEST_IP}"
+}
 
 pass() { echo -e "${GREEN}✓${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; exit 1; }
@@ -60,17 +72,17 @@ cleanup_podman_stack() {
 }
 
 recalculate_stats() {
-  curl -sf -X POST "${WORKER_HEADERS[@]}" "$WORKER_URL/stats/$CAMPAIGN_SLUG/recalculate" \
+  curl_admin -sf -X POST "$WORKER_URL/stats/$CAMPAIGN_SLUG/recalculate" \
     -H "Authorization: Bearer $ADMIN_SECRET"
 }
 
 recalculate_inventory() {
-  curl -sf -X POST "${WORKER_HEADERS[@]}" "$WORKER_URL/inventory/$CAMPAIGN_SLUG/recalculate" \
+  curl_admin -sf -X POST "$WORKER_URL/inventory/$CAMPAIGN_SLUG/recalculate" \
     -H "Authorization: Bearer $ADMIN_SECRET"
 }
 
 check_projection_drift() {
-  curl -sf -X POST "${WORKER_HEADERS[@]}" "$WORKER_URL/stats/$CAMPAIGN_SLUG/check" \
+  curl_admin -sf -X POST "$WORKER_URL/stats/$CAMPAIGN_SLUG/check" \
     -H "Authorization: Bearer $ADMIN_SECRET"
 }
 

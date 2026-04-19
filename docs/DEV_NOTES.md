@@ -45,6 +45,15 @@ Current mirrored Worker values worth treating as part of the supported customiza
 - `SUPPORT_EMAIL`
 - `PLEDGES_EMAIL_FROM`
 - `UPDATES_EMAIL_FROM`
+- `EMAIL_LOGO_PATH`
+- `EMAIL_FONT_FAMILY`
+- `EMAIL_HEADING_FONT_FAMILY`
+- `EMAIL_COLOR_TEXT`
+- `EMAIL_COLOR_MUTED`
+- `EMAIL_COLOR_SURFACE`
+- `EMAIL_COLOR_BORDER`
+- `EMAIL_COLOR_PRIMARY`
+- `EMAIL_BUTTON_RADIUS`
 - `SALES_TAX_RATE`
 - `FLAT_SHIPPING_RATE`
 - `SHIPPING_ORIGIN_ZIP`
@@ -108,10 +117,12 @@ Note: first-party cart/runtime and the custom on-site checkout UI are now treate
 
 ## Design System
 
-Matches **dust-wave-shop** styling:
-- **Colors**: Black primary (`#000000`), dark gray text (`#3a3a3a`), light blue-tinted background (`#f8faff`)
-- **Fonts**: Inter (body), Gambado Sans (headings) via Google Fonts + Adobe Typekit
-- **Spacing**: 8px base unit grid system
+The default visual language still starts from Dust Wave's calmer editorial look, but the current repo is no longer locked to one hard-coded brand theme:
+
+- **Theme tokens**: `design.*` in `_config.yml` feeds generated CSS variables in `assets/theme-vars.css`
+- **Checkout styling**: the on-site Stripe Elements sidecar now reads that same token surface for colors, radius, and body font
+- **Supporter-email branding**: a curated subset of `platform.*` + `design.*` is mirrored into Worker env so logo/font/color/button styling stays aligned in email
+- **Spacing**: the Sass system still uses an 8px-based layout rhythm internally
 - **Breakpoints**: 724px (xsm), 1000px (sm/ms)
 
 ## Sass Structure

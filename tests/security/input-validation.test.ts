@@ -230,8 +230,8 @@ describe('Input Validation Security Tests', () => {
         })
       });
       
-      // Might work or fail depending on implementation (429 = rate limited)
-      expect([200, 400, 429, 500]).toContain(res.status);
+      // Might work or fail depending on implementation (415 = strict JSON requirement, 429 = rate limited)
+      expect([200, 400, 415, 429, 500]).toContain(res.status);
     });
   });
 

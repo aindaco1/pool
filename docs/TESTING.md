@@ -91,6 +91,7 @@ This runs:
 - Local smoke scripts against the test-only mutable campaign:
   - `scripts/test-worker.sh` for site/Worker contract checks and malformed `/checkout-intent/start` verification
   - `scripts/smoke-pledge-management.sh` for successful modify/cancel coverage on the local-only mutable campaign, using admin rebuild responses plus read-only projection drift checks as the authoritative stats/inventory source during the smoke
+    The script now rotates its synthetic admin request IPs during those rebuild/check calls so the real admin rate limiter does not create a false negative in local merge gating.
 - Full unit suite via `npm run test:unit`
 - Security suite via `npm run test:security` against an auto-started local Worker
 - Podman-backed security suite via `npm run test:security:podman` when you want the site/Worker stack booted and exercised in the same invocation

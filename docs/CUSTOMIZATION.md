@@ -94,6 +94,7 @@ Notes:
 - `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v0.9.1`.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
+- `platform.logo_path` is also the mirrored brand mark used in supporter emails.
 
 Example:
 
@@ -476,6 +477,10 @@ Use `design` for curated design-system overrides that do not require Sass edits.
 
 These values are emitted into the generated stylesheet [assets/theme-vars.css](../assets/theme-vars.css), which keeps the design-variable bridge compatible with the site’s strict CSP. Forks do not need to edit Sass just to change supported tokens.
 
+The same generated CSS variables also now theme the on-site Stripe Elements sidecar, so supported typography/color/radius overrides carry through the custom checkout payment UI without adding a separate checkout-only config layer.
+
+A deliberately smaller subset of the same branding surface is mirrored into the Worker so supporter emails can reuse the configured logo, font stacks, primary color, border/surface colors, and button radius.
+
 Current supported keys:
 
 - typography:
@@ -570,14 +575,13 @@ Some settings only affect the Jekyll build and browser-owned UI. Others are also
 These can be changed in `_config.yml` without changing Worker config or worrying about the sync step:
 
 - `i18n.*`
-- `design.*`
 - `checkout.stripe_publishable_key`
 - `platform.default_creator_name`
-- `platform.logo_path`
 - `platform.footer_logo_path`
 - `platform.favicon_path`
 - `platform.default_social_image_path`
 - `cache.*`
+- most `design.*` values that are only consumed by the generated site/theme CSS
 
 These are the safest “site generation / branding / localization without Worker-side math or email impact” knobs. They change the generated site, browser boot payload, or theme layer, but they do not need to be mirrored into Worker env.
 
@@ -590,8 +594,17 @@ These site-config values are also reflected into the Worker env values in [`work
 - `platform.support_email` -> `SUPPORT_EMAIL`
 - `platform.pledges_email_from` -> `PLEDGES_EMAIL_FROM`
 - `platform.updates_email_from` -> `UPDATES_EMAIL_FROM`
+- `platform.logo_path` -> `EMAIL_LOGO_PATH`
 - `platform.site_url` -> `SITE_BASE`
 - `platform.worker_url` -> `WORKER_BASE`
+- `design.font_body` -> `EMAIL_FONT_FAMILY`
+- `design.font_display` -> `EMAIL_HEADING_FONT_FAMILY`
+- `design.color_text` -> `EMAIL_COLOR_TEXT`
+- `design.color_text_muted` -> `EMAIL_COLOR_MUTED`
+- `design.color_surface_subtle` -> `EMAIL_COLOR_SURFACE`
+- `design.color_border` -> `EMAIL_COLOR_BORDER`
+- `design.color_primary` -> `EMAIL_COLOR_PRIMARY`
+- `design.radius_lg` -> `EMAIL_BUTTON_RADIUS`
 - `pricing.sales_tax_rate` -> `SALES_TAX_RATE`
 - `pricing.flat_shipping_rate` -> `FLAT_SHIPPING_RATE`
 - `pricing.default_tip_percent` -> `DEFAULT_PLATFORM_TIP_PERCENT`
@@ -643,7 +656,7 @@ Still code-level today:
 - adding new payment providers or checkout modes
 - changing supported embed providers
 - expanding CSP allowlists for arbitrary external hosts
-- changing Stripe-owned field styling beyond Stripe’s supported appearance API
+- changing Stripe-owned field styling beyond the supported design-token bridge and Stripe’s appearance API
 - introducing brand-new layout structures, page templates, or content blocks
 - changing font hosting/CSP behavior beyond the currently supported font stacks
 
@@ -671,6 +684,7 @@ npm run podman:doctor
 - campaign creator fallback
 - CSP-sensitive pages still load without console CSP violations
 - cart / checkout totals
+- Stripe payment UI styling
 - Manage Pledge
 - supporter emails
 

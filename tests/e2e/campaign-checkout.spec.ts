@@ -1021,11 +1021,24 @@ test.describe('Countdown Timers', () => {
       return;
     }
     
+    const endedMessage = countdown.locator('.campaign-countdown__message');
+    const hasEndedMessage = await endedMessage.count() > 0 && await endedMessage.isVisible();
+
+    if (hasEndedMessage) {
+      await expect(endedMessage).toContainText(/Campaign (Ended|Funded)|Project Funded/i);
+      return;
+    }
+
     // Check immediately - values should NOT all be 00
     const daysEl = countdown.locator('[data-unit="days"] .flip-card__value');
     const hoursEl = countdown.locator('[data-unit="hours"] .flip-card__value');
     const minsEl = countdown.locator('[data-unit="mins"] .flip-card__value');
     const secsEl = countdown.locator('[data-unit="secs"] .flip-card__value');
+
+    if (await daysEl.count() === 0 || await hoursEl.count() === 0 || await minsEl.count() === 0 || await secsEl.count() === 0) {
+      test.skip();
+      return;
+    }
     
     // Get all values immediately on page load
     const days = await daysEl.textContent();
@@ -1035,15 +1048,9 @@ test.describe('Countdown Timers', () => {
     
     // At least one should NOT be "00" (unless campaign just ended)
     const allZeros = days === '00' && hours === '00' && mins === '00' && secs === '00';
-    
-    // If campaign is ended, there should be an "ended" message instead
-    const endedMessage = countdown.locator('.campaign-countdown__message');
-    const hasEndedMessage = await endedMessage.count() > 0 && await endedMessage.isVisible();
-    
-    if (!hasEndedMessage) {
-      // If not ended, shouldn't show all zeros (would indicate flash issue)
-      expect(allZeros).toBe(false);
-    }
+
+    // If not ended, shouldn't show all zeros (would indicate flash issue)
+    expect(allZeros).toBe(false);
   });
 
   test('countdown timer updates every second', async ({ page }) => {

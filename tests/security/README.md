@@ -41,7 +41,7 @@ npm run test:premerge
 
 `npm run test:premerge` now includes the secret audit automatically before the Worker, smoke, and browser suites.
 
-For rate limiting tests to work locally, ensure the `RATELIMIT` KV namespace is configured in `wrangler.toml`:
+For rate limiting tests to work locally, ensure the `RATELIMIT` KV namespace is configured in `wrangler.toml`. The Worker now treats that binding as required:
 
 ```toml
 # In [[kv_namespaces]] section (production)
@@ -86,10 +86,13 @@ preview_id = "YOUR_RATELIMIT_PREVIEW_ID"
 - XSS payloads in user fields
 
 ### 5. Rate Limiting (`rate-limiting.test.ts`)
-- Burst requests to `/checkout-intent/start` should fail closed cleanly
-- Vote spam attempts (30 req/min limit)
+- Public `/stats/:slug` bursts should stay uncapped so campaign virality is not treated like abuse
+- Burst requests to `/checkout-intent/start` should hit the enforced write bucket
+- Manage Pledge reads and writes should hit their own higher but enforced buckets
+- Vote spam attempts (45 req/min limit)
 - Admin brute force simulation (5 req/min limit)
-- DoS resilience and resource exhaustion prevention
+- Resource exhaustion prevention should reject oversized checkout bodies with `413`
+- DoS resilience and concurrent operation safety
 - Concurrent operation safety
 
 ## Configuration

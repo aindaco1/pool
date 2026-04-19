@@ -8,6 +8,15 @@
 
 import {
   DEFAULT_SITE_BASE,
+  getEmailBorderColor,
+  getEmailButtonRadius,
+  getEmailFontFamily,
+  getEmailHeadingFontFamily,
+  getEmailLogoPath,
+  getEmailMutedTextColor,
+  getEmailPrimaryColor,
+  getEmailSurfaceColor,
+  getEmailTextColor,
   getSalesTaxRate,
   getPlatformCompanyName,
   getPlatformName,
@@ -223,6 +232,98 @@ function safeInstagramUrl(instagramUrl) {
   }
 }
 
+function parseHexColor(value) {
+  const normalized = String(value || '').trim();
+  if (/^#[0-9a-f]{3}$/i.test(normalized)) {
+    return normalized
+      .slice(1)
+      .split('')
+      .map((char) => parseInt(char + char, 16));
+  }
+  if (/^#[0-9a-f]{6}$/i.test(normalized)) {
+    return [
+      parseInt(normalized.slice(1, 3), 16),
+      parseInt(normalized.slice(3, 5), 16),
+      parseInt(normalized.slice(5, 7), 16)
+    ];
+  }
+  return null;
+}
+
+function getAccessibleButtonTextColor(backgroundColor, fallback = '#ffffff') {
+  const channels = parseHexColor(backgroundColor);
+  if (!channels) return fallback;
+  const [red, green, blue] = channels.map((channel) => channel / 255);
+  const linear = [red, green, blue].map((channel) => (
+    channel <= 0.03928
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4
+  ));
+  const luminance = (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
+  return luminance > 0.5 ? '#111111' : '#ffffff';
+}
+
+function getEmailTheme(env = {}) {
+  const primaryColor = getEmailPrimaryColor(env);
+  const siteBase = getResolvedSiteBase(env);
+  const logoPath = getEmailLogoPath(env);
+  const resolvedLogoUrl = logoPath ? safeSiteUrl(logoPath, getEmailAssetBase(siteBase)) : '';
+  const siteHomeUrl = getSiteRootUrl(siteBase);
+
+  return {
+    siteHomeUrl,
+    logoUrl: resolvedLogoUrl && resolvedLogoUrl !== siteHomeUrl ? resolvedLogoUrl : '',
+    platformName: escapeHtml(getPlatformName(env)),
+    fontFamily: escapeHtml(getEmailFontFamily(env)),
+    headingFontFamily: escapeHtml(getEmailHeadingFontFamily(env)),
+    textColor: escapeHtml(getEmailTextColor(env)),
+    mutedTextColor: escapeHtml(getEmailMutedTextColor(env)),
+    surfaceColor: escapeHtml(getEmailSurfaceColor(env)),
+    borderColor: escapeHtml(getEmailBorderColor(env)),
+    primaryColor: escapeHtml(primaryColor),
+    buttonRadius: escapeHtml(getEmailButtonRadius(env)),
+    primaryTextColor: getAccessibleButtonTextColor(primaryColor)
+  };
+}
+
+function renderEmailHeader(theme, heading, { emoji = '', headingColor = '' } = {}) {
+  const logoBlock = theme.logoUrl ? `
+    <p style="margin: 0 0 16px 0;">
+      <a href="${theme.siteHomeUrl}" style="text-decoration: none;">
+        <img src="${theme.logoUrl}" alt="${theme.platformName}" style="display: inline-block; max-width: 88px; max-height: 88px; width: auto; height: auto;">
+      </a>
+    </p>
+  ` : '';
+  const emojiBlock = emoji ? `<div style="font-size: 48px; margin-bottom: 16px;">${emoji}</div>` : '';
+  const resolvedHeadingColor = headingColor ? ` color: ${headingColor};` : '';
+  return `
+  <div style="text-align: center; margin-bottom: 32px;">
+    ${logoBlock}
+    ${emojiBlock}
+    <h1 style="margin: 0; font-size: 24px; font-family: ${theme.headingFontFamily};${resolvedHeadingColor}">${heading}</h1>
+  </div>`;
+}
+
+function getEmailBodyStyle(theme) {
+  return `font-family: ${theme.fontFamily}; line-height: 1.6; color: ${theme.textColor}; max-width: 600px; margin: 0 auto; padding: 20px;`;
+}
+
+function getEmailCardStyle(theme, extras = '') {
+  return `background: ${theme.surfaceColor}; border-radius: 8px; padding: 20px; margin-bottom: 24px;${extras ? ` ${extras}` : ''}`;
+}
+
+function getEmailPrimaryButtonStyle(theme, extras = '') {
+  return `display: inline-block; background: ${theme.primaryColor}; color: ${theme.primaryTextColor}; padding: 12px 24px; text-decoration: none; border-radius: ${theme.buttonRadius}; font-weight: 600;${extras ? ` ${extras}` : ''}`;
+}
+
+function getEmailSecondaryButtonStyle(theme, extras = '') {
+  return `display: inline-block; background: #fff; color: ${theme.primaryColor}; padding: 12px 24px; text-decoration: none; border-radius: ${theme.buttonRadius}; font-weight: 600; border: 1px solid ${theme.primaryColor};${extras ? ` ${extras}` : ''}`;
+}
+
+function getEmailFooterStyle(theme) {
+  return `border-top: 1px solid ${theme.borderColor}; padding-top: 20px; font-size: 12px; color: ${theme.mutedTextColor};`;
+}
+
 function buildResendPayload(env, payload) {
   const replyTo = String(getSupportEmail(env) || '').trim();
   return {
@@ -252,15 +353,18 @@ async function sendResendEmail(env, payload, { errorLabel = 'Resend error', fail
 }
 
 // Instagram CTA block for emails (when campaign has instagram field)
-function getInstagramCTA(instagramUrl, siteBase = FALLBACK_SITE_BASE, t = (_key, fallback) => fallback, { variant = 'prominent' } = {}) {
+function getInstagramCTA(instagramUrl, siteBase = FALLBACK_SITE_BASE, t = (_key, fallback) => fallback, { variant = 'prominent', theme = null } = {}) {
   const safeInstagramHref = safeInstagramUrl(instagramUrl);
   if (!safeInstagramHref) return '';
+  const borderColor = theme?.borderColor || '#eee';
+  const mutedTextColor = theme?.mutedTextColor || '#666';
+  const linkColor = theme?.primaryColor || '#000';
 
   if (variant === 'subtle') {
     return `
-  <div style="margin: 24px 0 0 0; padding-top: 16px; border-top: 1px solid #eee; font-size: 13px; color: #666;">
+  <div style="margin: 24px 0 0 0; padding-top: 16px; border-top: 1px solid ${borderColor}; font-size: 13px; color: ${mutedTextColor};">
     <p style="margin: 0 0 8px 0;">${escapeHtml(t('common.instagram_optional', 'Optional: help spread the word on Instagram.'))}</p>
-    <a href="${safeInstagramHref}" style="color: #000; text-decoration: underline;">${escapeHtml(t('common.instagram_share_secondary', 'Share this campaign on Instagram'))}</a>
+    <a href="${safeInstagramHref}" style="color: ${linkColor}; text-decoration: underline;">${escapeHtml(t('common.instagram_share_secondary', 'Share this campaign on Instagram'))}</a>
   </div>`;
   }
 
@@ -291,7 +395,11 @@ function getShippingOptionEmailLabel(optionId, t = (_key, fallback) => fallback)
   }
 }
 
-function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportItems = [], addOns = [], customAmount = 0, shippingOption = '' }, t = (_key, fallback) => fallback) {
+function renderPledgeItems(
+  { tierName, tierQty, additionalTiers = [], supportItems = [], addOns = [], customAmount = 0, shippingOption = '' },
+  t = (_key, fallback) => fallback,
+  theme = { borderColor: '#e5e5e5', mutedTextColor: '#555555', textColor: '#333333' }
+) {
   const items = [];
   
   // Main tier
@@ -338,9 +446,9 @@ function renderPledgeItems({ tierName, tierQty, additionalTiers = [], supportIte
   if (items.length === 0) return '';
   
   return `
-  <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e5e5;">
-    <p style="margin: 0 0 8px 0; font-weight: 600; font-size: 14px;">${escapeHtml(t('common.pledge_includes', 'Your pledge includes:'))}</p>
-    <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #555;">
+  <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid ${theme.borderColor};">
+    <p style="margin: 0 0 8px 0; font-weight: 600; font-size: 14px; color: ${theme.textColor};">${escapeHtml(t('common.pledge_includes', 'Your pledge includes:'))}</p>
+    <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: ${theme.mutedTextColor};">
       ${items.join('\n      ')}
     </ul>
   </div>`;
@@ -378,12 +486,13 @@ function renderAmountBreakdown(env, { subtotal = 0, tax = 0, shipping = 0, tipAm
 export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems, hasDecisions, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const communityUrl = safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
-  const siteHomeUrl = getSiteRootUrl(env.SITE_BASE);
-  const platformName = escapeHtml(getPlatformName(env));
-  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { variant: 'subtle' });
-  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t) : '';
+  const siteHomeUrl = theme.siteHomeUrl;
+  const platformName = theme.platformName;
+  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { variant: 'subtle', theme });
+  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t, theme) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
@@ -400,15 +509,13 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="text-align: center; margin-bottom: 32px;">
-    <h1 style="margin: 0; font-size: 24px;">${escapeHtml(t('supporter.thanks_heading', 'Thanks for backing %{campaign}!', { campaign: campaignTitle }))}</h1>
-  </div>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(t('supporter.thanks_heading', 'Thanks for backing %{campaign}!', { campaign: campaignTitle })))}
   
-  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+  <div style="${getEmailCardStyle(theme)}">
     ${amountBreakdownHtml}
     ${pledgeItemsHtml}
-    <p style="margin: 12px 0 0 0; color: #666; font-size: 14px;">
+    <p style="margin: 12px 0 0 0; color: ${theme.mutedTextColor}; font-size: 14px;">
       <strong>${escapeHtml(t('common.remember', 'Remember:'))}</strong> ${escapeHtml(t('supporter.card_saved_notice', "Your card is saved but won't be charged unless this campaign reaches its goal."))}
     </p>
   </div>
@@ -418,25 +525,25 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
     <p style="margin: 0 0 16px 0;">${escapeHtml(t('common.no_account_needed_keys', 'No account needed — these links are your keys:'))}</p>
     
     <div style="margin-bottom: 12px;">
-      <a href="${manageUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+      <a href="${manageUrl}" style="${getEmailPrimaryButtonStyle(theme)}">
         ${escapeHtml(t('common.manage_your_pledge', 'Manage Your Pledge'))}
       </a>
-      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">${escapeHtml(t('common.manage_your_pledge_desc', 'Cancel, modify amount, or update payment method'))}</p>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: ${theme.mutedTextColor};">${escapeHtml(t('common.manage_your_pledge_desc', 'Cancel, modify amount, or update payment method'))}</p>
     </div>
     
     ${hasDecisions !== false ? `<div style="margin-bottom: 12px;">
-      <a href="${communityUrl}" style="display: inline-block; background: #fff; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; border: 1px solid #000;">
+      <a href="${communityUrl}" style="${getEmailSecondaryButtonStyle(theme)}">
         ${escapeHtml(t('common.supporter_community', 'Supporter Community'))}
       </a>
-      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">${escapeHtml(t('common.supporter_community_vote_desc', 'Vote on creative decisions for this project'))}</p>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: ${theme.mutedTextColor};">${escapeHtml(t('common.supporter_community_vote_desc', 'Vote on creative decisions for this project'))}</p>
     </div>` : ''}
   </div>
   
   ${instagramCTA}
   
-  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+  <div style="${getEmailFooterStyle(theme)}">
     <p style="margin: 0 0 8px 0;"><strong>${escapeHtml(t('common.save_this_email', 'Save this email!'))}</strong> ${escapeHtml(t('supporter.save_links_notice', "You'll need these links to manage your pledge."))}</p>
-    <p style="margin: 0;">${escapeHtml(t('common.questions_prefix', 'Questions? Reply to this email or visit'))} <a href="${siteHomeUrl}" style="color: #000;">${platformName}</a>.</p>
+    <p style="margin: 0;">${escapeHtml(t('common.questions_prefix', 'Questions? Reply to this email or visit'))} <a href="${siteHomeUrl}" style="color: ${theme.primaryColor};">${platformName}</a>.</p>
   </div>
 </body>
 </html>
@@ -456,17 +563,18 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
 export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campaignTitle, previousSubtotal, previousTax = 0, previousShipping = 0, previousTipAmount = 0, newSubtotal, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
-  const siteHomeUrl = getSiteRootUrl(env.SITE_BASE);
-  const platformName = escapeHtml(getPlatformName(env));
+  const siteHomeUrl = theme.siteHomeUrl;
+  const platformName = theme.platformName;
   const previousTotal = previousSubtotal + previousTax + previousShipping + previousTipAmount;
   const newTotal = newSubtotal + tax + shipping + tipAmount;
   const increased = newTotal > previousTotal;
   const diff = Math.abs(newTotal - previousTotal);
   const tipChanged = Number(previousTipAmount || 0) !== Number(tipAmount || 0);
   const tipDelta = Number(tipAmount || 0) - Number(previousTipAmount || 0);
-  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { variant: 'subtle' });
-  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t) : '';
+  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { variant: 'subtle', theme });
+  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t, theme) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal: newSubtotal,
     tax,
@@ -489,19 +597,17 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="text-align: center; margin-bottom: 32px;">
-    <h1 style="margin: 0; font-size: 24px;">${escapeHtml(t('modified.heading', 'Pledge Updated'))}</h1>
-  </div>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(t('modified.heading', 'Pledge Updated')))}
   
-  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+  <div style="${getEmailCardStyle(theme)}">
     <p style="margin: 0 0 8px 0;"><strong>${escapeHtml(t('common.campaign_label', 'Campaign:'))}</strong> ${escapeHtml(campaignTitle)}</p>
     <p style="margin: 0 0 8px 0;"><strong>${escapeHtml(t('common.previous_total_if_funded', 'Previous total (if funded):'))}</strong> $${(previousTotal / 100).toFixed(2)}</p>
     <p style="margin: 0 0 8px 0;"><strong>${escapeHtml(t('common.updated_total_if_funded', 'Updated total (if funded):'))}</strong> $${(newTotal / 100).toFixed(2)} (${increased ? '+' : '-'}$${(diff / 100).toFixed(2)})</p>
     ${tipChangeHtml}
     ${amountBreakdownHtml}
     ${pledgeItemsHtml}
-    <p style="margin: 12px 0 0 0; color: #666; font-size: 14px;">
+    <p style="margin: 12px 0 0 0; color: ${theme.mutedTextColor}; font-size: 14px;">
       <strong>${escapeHtml(t('common.remember', 'Remember:'))}</strong> ${escapeHtml(t('supporter.card_saved_notice', "Your card is saved but won't be charged unless this campaign reaches its goal."))}
     </p>
   </div>
@@ -510,7 +616,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
     <p style="margin: 0 0 16px 0;">${escapeHtml(t('modified.success_body', 'Your pledge has been successfully updated. You can manage your pledge anytime using the link below:'))}</p>
     
     <div style="margin-bottom: 12px;">
-      <a href="${manageUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+      <a href="${manageUrl}" style="${getEmailPrimaryButtonStyle(theme)}">
         ${escapeHtml(t('common.manage_your_pledge', 'Manage Your Pledge'))}
       </a>
     </div>
@@ -518,8 +624,8 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   
   ${instagramCTA}
   
-  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
-    <p style="margin: 0;">${escapeHtml(t('common.questions_prefix', 'Questions? Reply to this email or visit'))} <a href="${siteHomeUrl}" style="color: #000;">${platformName}</a>.</p>
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(t('common.questions_prefix', 'Questions? Reply to this email or visit'))} <a href="${siteHomeUrl}" style="color: ${theme.primaryColor};">${platformName}</a>.</p>
   </div>
 </body>
 </html>
@@ -539,8 +645,9 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
 export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
-  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t) : '';
+  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t, theme) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
@@ -558,10 +665,8 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="text-align: center; margin-bottom: 32px;">
-    <h1 style="margin: 0; font-size: 24px; color: #dc3545;">${escapeHtml(t('payment_failed.heading', 'Action Required'))}</h1>
-  </div>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(t('payment_failed.heading', 'Action Required')), { headingColor: '#dc3545' })}
   
   <div style="background: #fff3cd; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #ffc107;">
     <p style="margin: 0 0 12px 0;">
@@ -574,12 +679,12 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
   <p>${escapeHtml(t('payment_failed.processing_body', "The campaign has been funded and we're processing charges. Please update your payment method to complete your pledge:"))}</p>
   
   <div style="text-align: center; margin: 24px 0;">
-    <a href="${manageUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+    <a href="${manageUrl}" style="${getEmailPrimaryButtonStyle(theme)}">
       ${escapeHtml(t('common.update_payment_method', 'Update Payment Method'))}
     </a>
   </div>
   
-  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+  <div style="${getEmailFooterStyle(theme)}">
     <p style="margin: 0;">${escapeHtml(t('payment_failed.footer', 'If you have questions, reply to this email.'))}</p>
   </div>
 </body>
@@ -600,11 +705,12 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
 export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems, hasDecisions, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const communityUrl = safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
-  const siteHomeUrl = getSiteRootUrl(env.SITE_BASE);
-  const platformName = escapeHtml(getPlatformName(env));
-  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t) : '';
+  const siteHomeUrl = theme.siteHomeUrl;
+  const platformName = theme.platformName;
+  const pledgeItemsHtml = pledgeItems ? renderPledgeItems(pledgeItems, t, theme) : '';
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
@@ -622,10 +728,8 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="text-align: center; margin-bottom: 32px;">
-    <h1 style="margin: 0; font-size: 24px; color: #059669;">${escapeHtml(t('charge_success.heading', 'Payment Successful!'))}</h1>
-  </div>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(t('charge_success.heading', 'Payment Successful!')), { headingColor: '#059669' })}
   
   <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin-bottom: 24px; border: 1px solid #bbf7d0;">
     <p style="margin: 0 0 12px 0;">${escapeHtml(t('charge_success.funded_intro', '%{campaign} has been fully funded!', { campaign: campaignTitle }))}</p>
@@ -637,21 +741,21 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   
   <div style="margin-bottom: 32px;">
     ${hasDecisions !== false ? `<div style="margin-bottom: 12px;">
-      <a href="${communityUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+      <a href="${communityUrl}" style="${getEmailPrimaryButtonStyle(theme)}">
         ${escapeHtml(t('common.supporter_community', 'Supporter Community'))}
       </a>
-      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">${escapeHtml(t('common.supporter_community_stay_connected_desc', 'Stay connected and vote on project decisions'))}</p>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: ${theme.mutedTextColor};">${escapeHtml(t('common.supporter_community_stay_connected_desc', 'Stay connected and vote on project decisions'))}</p>
     </div>` : ''}
     
     <div style="margin-bottom: 12px;">
-      <a href="${manageUrl}" style="display: inline-block; background: #fff; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; border: 1px solid #000;">
+      <a href="${manageUrl}" style="${getEmailSecondaryButtonStyle(theme)}">
         ${escapeHtml(t('common.view_your_pledge', 'View Your Pledge'))}
       </a>
     </div>
   </div>
   
-  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
-    <p style="margin: 0;">${escapeHtml(t('common.questions_prefix', 'Questions? Reply to this email or visit'))} <a href="${siteHomeUrl}" style="color: #000;">${platformName}</a>.</p>
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(t('common.questions_prefix', 'Questions? Reply to this email or visit'))} <a href="${siteHomeUrl}" style="color: ${theme.primaryColor};">${platformName}</a>.</p>
   </div>
 </body>
 </html>
@@ -671,11 +775,12 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
 export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, diaryPhase, token, instagramUrl, hasDecisions, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
   const communityUrl = safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const diaryAnchor = diaryPhase ? `#diary-${diaryPhase}` : '#diary';
   const campaignUrl = safeSiteUrl(`/campaigns/${encodeURIComponent(campaignSlug)}/${diaryAnchor}`, env.SITE_BASE);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
-  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t);
+  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { theme });
   
   const html = `
 <!DOCTYPE html>
@@ -684,18 +789,16 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="text-align: center; margin-bottom: 32px;">
-    <h1 style="margin: 0; font-size: 24px;">${escapeHtml(t('diary.heading', 'New Update: %{campaign}', { campaign: campaignTitle }))}</h1>
-  </div>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(t('diary.heading', 'New Update: %{campaign}', { campaign: campaignTitle })))}
   
-  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-    <h2 style="margin: 0 0 12px 0; font-size: 18px;">${escapeHtml(diaryTitle)}</h2>
-    ${diaryExcerpt ? `<p style="margin: 0; color: #666;">${formatEmailText(diaryExcerpt)}</p>` : ''}
+  <div style="${getEmailCardStyle(theme)}">
+    <h2 style="margin: 0 0 12px 0; font-size: 18px; font-family: ${theme.headingFontFamily};">${escapeHtml(diaryTitle)}</h2>
+    ${diaryExcerpt ? `<p style="margin: 0; color: ${theme.mutedTextColor};">${formatEmailText(diaryExcerpt)}</p>` : ''}
   </div>
   
   <div style="text-align: center; margin-bottom: 32px;">
-    <a href="${campaignUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+    <a href="${campaignUrl}" style="${getEmailPrimaryButtonStyle(theme)}">
       ${escapeHtml(t('common.read_full_update', 'Read Full Update'))}
     </a>
   </div>
@@ -704,23 +807,23 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
     <h2 style="font-size: 18px; margin: 0 0 16px 0;">${escapeHtml(t('common.your_supporter_access', 'Your Supporter Access'))}</h2>
     
     ${hasDecisions !== false ? `<div style="margin-bottom: 12px;">
-      <a href="${communityUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+      <a href="${communityUrl}" style="${getEmailPrimaryButtonStyle(theme)}">
         ${escapeHtml(t('common.supporter_community', 'Supporter Community'))}
       </a>
-      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">${escapeHtml(t('common.supporter_community_vote_desc', 'Vote on creative decisions for this project'))}</p>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: ${theme.mutedTextColor};">${escapeHtml(t('common.supporter_community_vote_desc', 'Vote on creative decisions for this project'))}</p>
     </div>` : ''}
     
     <div style="margin-bottom: 12px;">
-      <a href="${manageUrl}" style="display: inline-block; background: #fff; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; border: 1px solid #000;">
+      <a href="${manageUrl}" style="${getEmailSecondaryButtonStyle(theme)}">
         ${escapeHtml(t('common.manage_your_pledge', 'Manage Your Pledge'))}
       </a>
-      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">${escapeHtml(t('common.manage_your_pledge_desc', 'Cancel, modify amount, or update payment method'))}</p>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: ${theme.mutedTextColor};">${escapeHtml(t('common.manage_your_pledge_desc', 'Cancel, modify amount, or update payment method'))}</p>
     </div>
   </div>
   
   ${instagramCTA}
   
-  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+  <div style="${getEmailFooterStyle(theme)}">
     <p style="margin: 0;">${escapeHtml(t('common.because_you_backed', "You're receiving this because you backed %{campaign}.", { campaign: campaignTitle }))}</p>
   </div>
 </body>
@@ -744,6 +847,7 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
 export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campaignTitle, subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, amount, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
   const campaignUrl = safeSiteUrl(`/campaigns/${encodeURIComponent(campaignSlug)}/`, env.SITE_BASE);
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
@@ -762,15 +866,13 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="text-align: center; margin-bottom: 32px;">
-    <h1 style="margin: 0; font-size: 24px;">${escapeHtml(t('cancelled.heading', 'Pledge Cancelled'))}</h1>
-  </div>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(t('cancelled.heading', 'Pledge Cancelled')))}
   
-  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+  <div style="${getEmailCardStyle(theme)}">
     <p style="margin: 0 0 8px 0;"><strong>${escapeHtml(t('common.campaign_label', 'Campaign:'))}</strong> ${escapeHtml(campaignTitle)}</p>
     ${amountBreakdownHtml}
-    <p style="margin: 0; color: #666; font-size: 14px;">
+    <p style="margin: 0; color: ${theme.mutedTextColor}; font-size: 14px;">
       ${escapeHtml(t('cancelled.never_charged', 'Your card was never charged — this was just a pledge hold.'))}
     </p>
   </div>
@@ -778,12 +880,12 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
   <p style="margin-bottom: 24px;">${escapeHtml(t('cancelled.body', "Your pledge has been cancelled and you won't be charged. If you change your mind, you can always make a new pledge while the campaign is still live."))}</p>
   
   <div style="text-align: center; margin-bottom: 32px;">
-    <a href="${campaignUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+    <a href="${campaignUrl}" style="${getEmailPrimaryButtonStyle(theme)}">
       ${escapeHtml(t('common.view_campaign', 'View Campaign'))}
     </a>
   </div>
   
-  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+  <div style="${getEmailFooterStyle(theme)}">
     <p style="margin: 0;">${escapeHtml(t('cancelled.footer', "You've been removed from supporter updates for this campaign. Make a new pledge to rejoin."))}</p>
   </div>
 </body>
@@ -808,9 +910,10 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
 export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTitle, milestone, pledgedAmount, goalAmount, stretchGoalName, token, instagramUrl, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
   const campaignUrl = safeSiteUrl(`/campaigns/${encodeURIComponent(campaignSlug)}/`, env.SITE_BASE);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
-  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t);
+  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { theme });
   
   const milestoneConfig = {
     'one-third': {
@@ -845,30 +948,27 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="text-align: center; margin-bottom: 32px;">
-    <div style="font-size: 48px; margin-bottom: 16px;">${config.emoji}</div>
-    <h1 style="margin: 0; font-size: 24px;">${escapeHtml(config.heading)}</h1>
-  </div>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(config.heading), { emoji: config.emoji })}
   
-  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px; text-align: center;">
+  <div style="${getEmailCardStyle(theme, 'text-align: center;')}">
     <div style="font-size: 36px; font-weight: bold; margin-bottom: 8px;">${percentFunded}%</div>
-    <p style="margin: 0; color: #666;">${escapeHtml(t('milestone.progress', '$%{pledged} of $%{goal} goal', { pledged: (pledgedAmount / 100).toLocaleString(), goal: (goalAmount / 100).toLocaleString() }))}</p>
+    <p style="margin: 0; color: ${theme.mutedTextColor};">${escapeHtml(t('milestone.progress', '$%{pledged} of $%{goal} goal', { pledged: (pledgedAmount / 100).toLocaleString(), goal: (goalAmount / 100).toLocaleString() }))}</p>
   </div>
   
   <p style="margin-bottom: 24px;">${escapeHtml(config.message)}</p>
   
   <div style="text-align: center; margin-bottom: 32px;">
-    <a href="${campaignUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+    <a href="${campaignUrl}" style="${getEmailPrimaryButtonStyle(theme)}">
       ${escapeHtml(t('common.view_campaign', 'View Campaign'))}
     </a>
   </div>
   
   ${instagramCTA}
   
-  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+  <div style="${getEmailFooterStyle(theme)}">
     <p style="margin: 0 0 8px 0;">${escapeHtml(t('common.because_you_backed', "You're receiving this because you backed %{campaign}.", { campaign: campaignTitle }))}</p>
-    <a href="${manageUrl}" style="color: #666;">${escapeHtml(t('common.manage_your_pledge', 'Manage Your Pledge'))}</a>
+    <a href="${manageUrl}" style="color: ${theme.primaryColor};">${escapeHtml(t('common.manage_your_pledge', 'Manage Your Pledge'))}</a>
   </div>
 </body>
 </html>
@@ -891,14 +991,15 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
 export async function sendAnnouncementEmail(env, { email, campaignSlug, campaignTitle, subject, heading, body, ctaLabel, ctaUrl, token, instagramUrl, hasDecisions, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
   const communityUrl = safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
-  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t);
+  const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { theme });
   const safeCtaHref = safeExternalUrl(ctaUrl, env.SITE_BASE);
   
   const ctaBlock = ctaLabel && safeCtaHref ? `
   <div style="text-align: center; margin: 24px 0 32px 0;">
-    <a href="${safeCtaHref}" style="display: inline-block; background: #000; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+    <a href="${safeCtaHref}" style="${getEmailPrimaryButtonStyle(theme, 'padding: 14px 28px; font-size: 16px;')}">
       ${escapeHtml(ctaLabel)}
     </a>
   </div>` : '';
@@ -910,13 +1011,11 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="text-align: center; margin-bottom: 32px;">
-    <h1 style="margin: 0; font-size: 24px;">${escapeHtml(heading || subject)}</h1>
-  </div>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(heading || subject))}
   
-  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-    <p style="margin: 0; font-size: 15px; color: #333;">${formatEmailText(body)}</p>
+  <div style="${getEmailCardStyle(theme)}">
+    <p style="margin: 0; font-size: 15px; color: ${theme.textColor};">${formatEmailText(body)}</p>
   </div>
   
   ${ctaBlock}
@@ -925,23 +1024,23 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
     <h2 style="font-size: 18px; margin: 0 0 16px 0;">${escapeHtml(t('common.your_supporter_access', 'Your Supporter Access'))}</h2>
     
     ${hasDecisions !== false ? `<div style="margin-bottom: 12px;">
-      <a href="${communityUrl}" style="display: inline-block; background: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+      <a href="${communityUrl}" style="${getEmailPrimaryButtonStyle(theme)}">
         ${escapeHtml(t('common.supporter_community', 'Supporter Community'))}
       </a>
-      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">${escapeHtml(t('common.supporter_community_vote_desc', 'Vote on creative decisions for this project'))}</p>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: ${theme.mutedTextColor};">${escapeHtml(t('common.supporter_community_vote_desc', 'Vote on creative decisions for this project'))}</p>
     </div>` : ''}
     
     <div style="margin-bottom: 12px;">
-      <a href="${manageUrl}" style="display: inline-block; background: #fff; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; border: 1px solid #000;">
+      <a href="${manageUrl}" style="${getEmailSecondaryButtonStyle(theme)}">
         ${escapeHtml(t('common.manage_your_pledge', 'Manage Your Pledge'))}
       </a>
-      <p style="margin: 8px 0 0 0; font-size: 14px; color: #666;">${escapeHtml(t('common.manage_your_pledge_desc', 'Cancel, modify amount, or update payment method'))}</p>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: ${theme.mutedTextColor};">${escapeHtml(t('common.manage_your_pledge_desc', 'Cancel, modify amount, or update payment method'))}</p>
     </div>
   </div>
   
   ${instagramCTA}
   
-  <div style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+  <div style="${getEmailFooterStyle(theme)}">
     <p style="margin: 0;">${escapeHtml(t('common.because_you_backed', "You're receiving this because you backed %{campaign}.", { campaign: campaignTitle }))}</p>
   </div>
 </body>

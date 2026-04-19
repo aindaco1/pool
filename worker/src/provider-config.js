@@ -8,6 +8,14 @@ const DEFAULT_PLATFORM_COMPANY_NAME = 'Dust Wave';
 const DEFAULT_SUPPORT_EMAIL = 'info@dustwave.xyz';
 const DEFAULT_PLEDGES_EMAIL_FROM = 'The Pool <pledges@dustwave.xyz>';
 const DEFAULT_UPDATES_EMAIL_FROM = 'The Pool <updates@pool.dustwave.xyz>';
+const DEFAULT_EMAIL_FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+const DEFAULT_EMAIL_HEADING_FONT_FAMILY = DEFAULT_EMAIL_FONT_FAMILY;
+const DEFAULT_EMAIL_TEXT_COLOR = '#333333';
+const DEFAULT_EMAIL_MUTED_TEXT_COLOR = '#666666';
+const DEFAULT_EMAIL_SURFACE_COLOR = '#f8f9fa';
+const DEFAULT_EMAIL_BORDER_COLOR = '#eeeeee';
+const DEFAULT_EMAIL_PRIMARY_COLOR = '#000000';
+const DEFAULT_EMAIL_BUTTON_RADIUS = '6px';
 const DEFAULT_SALES_TAX_RATE = 0.07875;
 const DEFAULT_FLAT_SHIPPING_RATE = 3;
 const DEFAULT_SHIPPING_ORIGIN_ZIP = '87120';
@@ -34,6 +42,14 @@ export {
   DEFAULT_PLEDGES_EMAIL_FROM,
   DEFAULT_PLATFORM_COMPANY_NAME,
   DEFAULT_PLATFORM_NAME,
+  DEFAULT_EMAIL_BORDER_COLOR,
+  DEFAULT_EMAIL_BUTTON_RADIUS,
+  DEFAULT_EMAIL_FONT_FAMILY,
+  DEFAULT_EMAIL_HEADING_FONT_FAMILY,
+  DEFAULT_EMAIL_MUTED_TEXT_COLOR,
+  DEFAULT_EMAIL_PRIMARY_COLOR,
+  DEFAULT_EMAIL_SURFACE_COLOR,
+  DEFAULT_EMAIL_TEXT_COLOR,
   DEFAULT_FREE_SHIPPING_DEFAULT,
   DEFAULT_USPS_ENABLED,
   DEFAULT_USPS_API_BASE,
@@ -220,6 +236,42 @@ export function getPledgesEmailFrom(env = {}) {
 
 export function getUpdatesEmailFrom(env = {}) {
   return normalizeString(env.UPDATES_EMAIL_FROM, DEFAULT_UPDATES_EMAIL_FROM);
+}
+
+export function getEmailLogoPath(env = {}) {
+  return normalizeString(env.EMAIL_LOGO_PATH, '');
+}
+
+export function getEmailFontFamily(env = {}) {
+  return normalizeString(env.EMAIL_FONT_FAMILY, DEFAULT_EMAIL_FONT_FAMILY);
+}
+
+export function getEmailHeadingFontFamily(env = {}) {
+  return normalizeString(env.EMAIL_HEADING_FONT_FAMILY, getEmailFontFamily(env) || DEFAULT_EMAIL_HEADING_FONT_FAMILY);
+}
+
+export function getEmailTextColor(env = {}) {
+  return normalizeString(env.EMAIL_COLOR_TEXT, DEFAULT_EMAIL_TEXT_COLOR);
+}
+
+export function getEmailMutedTextColor(env = {}) {
+  return normalizeString(env.EMAIL_COLOR_MUTED, DEFAULT_EMAIL_MUTED_TEXT_COLOR);
+}
+
+export function getEmailSurfaceColor(env = {}) {
+  return normalizeString(env.EMAIL_COLOR_SURFACE, DEFAULT_EMAIL_SURFACE_COLOR);
+}
+
+export function getEmailBorderColor(env = {}) {
+  return normalizeString(env.EMAIL_COLOR_BORDER, DEFAULT_EMAIL_BORDER_COLOR);
+}
+
+export function getEmailPrimaryColor(env = {}) {
+  return normalizeString(env.EMAIL_COLOR_PRIMARY, DEFAULT_EMAIL_PRIMARY_COLOR);
+}
+
+export function getEmailButtonRadius(env = {}) {
+  return normalizeString(env.EMAIL_BUTTON_RADIUS, DEFAULT_EMAIL_BUTTON_RADIUS);
 }
 
 export function getSiteBase(env = {}) {

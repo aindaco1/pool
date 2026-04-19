@@ -497,6 +497,7 @@ function createEnv(overrides: Record<string, unknown> = {}) {
     STRIPE_WEBHOOK_SECRET_TEST: 'whsec_test_123',
     MAGIC_LINK_SECRET: 'secret',
     PLEDGES: new MockKVNamespace(),
+    RATELIMIT: new MockKVNamespace(),
     ...overrides
   };
 }
@@ -529,6 +530,33 @@ beforeEach(() => {
 });
 
 describe('Worker business logic hardening', () => {
+  it('fails closed when RATELIMIT is not configured', async () => {
+    const env = createEnv({
+      RATELIMIT: undefined
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__frame-slot', quantity: 1 }],
+          email: 'buyer@example.com',
+          tipPercent: 5
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(503);
+    expect(mockStripeClient.checkout.sessions.create).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({
+      error: 'Rate limit storage not configured'
+    });
+  });
+
   it('fails closed on first-party checkout start when the intent secret is missing', async () => {
     const env = createEnv();
 
@@ -3741,7 +3769,7 @@ describe('Worker business logic hardening', () => {
     const now = Math.floor(Date.now() / 1000);
 
     await rateLimitKv.put('rl:votes:203.0.113.7', JSON.stringify({
-      count: 30,
+      count: 45,
       reset: now + 60
     }));
     const putsBeforeBlockedRequests = rateLimitKv.putCalls.length;
@@ -4578,7 +4606,7 @@ describe('Worker business logic hardening', () => {
     });
     const rateLimitKv = env.RATELIMIT as MockKVNamespace;
     await rateLimitKv.put('rl:complete:pool-intent-rate-limit-1', JSON.stringify({
-      count: 8,
+      count: 12,
       reset: Math.floor(Date.now() / 1000) + 60
     }));
 
@@ -4601,6 +4629,318 @@ describe('Worker business logic hardening', () => {
     expect(response.status).toBe(429);
     await expect(response.json()).resolves.toMatchObject({
       error: 'Too many requests'
+    });
+  });
+
+  it('rate limits repeated checkout-intent abandon attempts per order before releasing reservations', async () => {
+    const env = createEnv({
+      RATELIMIT: new MockKVNamespace()
+    });
+    const rateLimitKv = env.RATELIMIT as MockKVNamespace;
+    await rateLimitKv.put('rl:abandon:pool-intent-abandon-limit-1', JSON.stringify({
+      count: 12,
+      reset: Math.floor(Date.now() / 1000) + 60
+    }));
+
+    const pledgesKv = env.PLEDGES as MockKVNamespace;
+    await pledgesKv.put('pending-checkout:pool-intent-abandon-limit-1', JSON.stringify({
+      campaigns: [{ orderId: 'pool-intent-abandon-limit-1', campaignSlug: 'hand-relations' }]
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/abandon', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          orderId: 'pool-intent-abandon-limit-1'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(429);
+    expect(await pledgesKv.get('pending-checkout:pool-intent-abandon-limit-1')).not.toBeNull();
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Too many requests'
+    });
+  });
+
+  it('rate limits repeated pledge reads without touching token verification', async () => {
+    const env = createEnv({
+      RATELIMIT: new MockKVNamespace()
+    });
+    const rateLimitKv = env.RATELIMIT as MockKVNamespace;
+    await rateLimitKv.put('rl:pledge-read:203.0.113.8', JSON.stringify({
+      count: 120,
+      reset: Math.floor(Date.now() / 1000) + 60
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledges?token=fake-token', {
+        headers: {
+          'CF-Connecting-IP': '203.0.113.8'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(429);
+    expect(mockVerifyToken).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Too many requests'
+    });
+  });
+
+  it('records webhook observability for invalid signatures and exposes it via admin status', async () => {
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret'
+    });
+    mockVerifyStripeSignature.mockResolvedValueOnce({ valid: false, error: 'bad signature' });
+
+    const webhookResponse = await worker.fetch(
+      new Request('https://pool.test/webhooks/stripe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'stripe-signature': 't=1,v1=bad'
+        },
+        body: JSON.stringify({
+          id: 'evt_invalid_sig_observability_1',
+          type: 'checkout.session.completed',
+          livemode: false,
+          data: { object: {} }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(webhookResponse.status).toBe(401);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const summaryResponse = await worker.fetch(
+      new Request('https://pool.test/admin/observability/webhooks?days=1', {
+        headers: {
+          'Authorization': 'Bearer admin-secret'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(summaryResponse.status).toBe(200);
+    const summaryPayload = await summaryResponse.json();
+    expect(summaryPayload.summaries[0]).toMatchObject({
+      received: 1,
+      outcomes: {
+        invalid_signature: 1
+      }
+    });
+    expect(summaryPayload.recent[0]).toMatchObject({
+      eventId: '',
+      outcome: 'invalid_signature',
+      status: 401
+    });
+  });
+
+  it('records sampled performance observations and exposes them via admin status', async () => {
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret',
+      OBSERVABILITY_SAMPLE_RATE: '1'
+    });
+
+    const abandonResponse = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/abandon', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          orderId: 'pool-intent-observe-1'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(abandonResponse.status).toBe(200);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const summaryResponse = await worker.fetch(
+      new Request('https://pool.test/admin/observability/performance?days=1', {
+        headers: {
+          'Authorization': 'Bearer admin-secret'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(summaryResponse.status).toBe(200);
+    const summaryPayload = await summaryResponse.json();
+    expect(summaryPayload).toMatchObject({
+      sampleRate: 1
+    });
+    expect(summaryPayload.summaries[0].operations.checkout_intent_abandon).toMatchObject({
+      count: 1
+    });
+  });
+
+  it('rate limits repeated pledge mutations before token validation', async () => {
+    const env = createEnv({
+      RATELIMIT: new MockKVNamespace()
+    });
+    const rateLimitKv = env.RATELIMIT as MockKVNamespace;
+    await rateLimitKv.put('rl:pledge-write:203.0.113.9', JSON.stringify({
+      count: 30,
+      reset: Math.floor(Date.now() / 1000) + 60
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge/modify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'CF-Connecting-IP': '203.0.113.9'
+        },
+        body: JSON.stringify({
+          token: 'fake-token',
+          orderId: 'pool-intent-limit-test'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(429);
+    expect(mockVerifyToken).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Too many requests'
+    });
+  });
+
+  it('rejects oversized checkout-start payloads before parsing', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': String((64 * 1024) + 1)
+        },
+        body: '{}'
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(413);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    await expect(response.json()).resolves.toEqual({
+      error: 'Request body too large'
+    });
+  });
+
+  it('rejects oversized webhook payloads before signature verification', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/webhooks/stripe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': String((256 * 1024) + 1),
+          'stripe-signature': 't=1,v1=fake'
+        },
+        body: '{}'
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(413);
+    expect(mockVerifyStripeSignature).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({
+      error: 'Request body too large'
+    });
+  });
+
+  it('rejects malformed admin recover-checkout JSON before Stripe lookup', async () => {
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/recover-checkout', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer admin-secret',
+          'Content-Type': 'application/json'
+        },
+        body: '{'
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockStripeClient.checkout.sessions.retrieve).not.toHaveBeenCalled();
+    expect(mockStripeClient.checkout.sessions.list).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({
+      error: 'Invalid JSON'
+    });
+  });
+
+  it('allows empty admin diary-check posts without a JSON content type', async () => {
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/diary/check', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer admin-secret'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      dryRun: false,
+      checked: 4
+    });
+  });
+
+  it('rejects checkout-intent abandon requests without application/json bodies', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/abandon', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: '{"orderId":"pool-intent-abandon-1"}'
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(415);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    await expect(response.json()).resolves.toEqual({
+      error: 'Expected application/json request body'
     });
   });
 });

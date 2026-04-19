@@ -22,6 +22,17 @@ The mirrored Worker config now also includes the shared debug flags:
 
 Those come from `debug.console_logging_enabled` and `debug.verbose_console_logging` in the repo-root [`_config.yml`](../_config.yml), and both default to `true` so local and deployed Workers stay verbose unless a fork explicitly turns logging down.
 
+Write-path DoS protection now requires a `RATELIMIT` KV namespace. If that binding is missing, the Worker fails closed with `503` instead of running without abuse protection. Public live-data reads stay intentionally roomy for campaign spikes, while checkout, Manage Pledge, and admin mutations use the tighter per-IP caps documented in [`docs/SECURITY.md`](../docs/SECURITY.md). That requirement adds safety, not a new assumption that every fork must immediately outgrow the Workers Free plan.
+
+Deployed Standard/Paid Workers now also set `limits.cpu_ms = 100` in [`wrangler.toml`](./wrangler.toml). That limit is not enforced in local development and is not a Workers Free override; it is a conservative denial-of-wallet ceiling for paid deployments that still leaves comfortable room above the currently observed fast-path request timings in the unit harness.
+
+The Worker now also writes lightweight observability summaries into `PLEDGES` KV for two things:
+
+- Stripe webhook delivery outcomes and recent delivery history
+- sampled wall-clock timings for a small set of mutation routes used to tune the `cpu_ms` cap
+
+The sampling rate defaults to `0.1` and can be overridden with `OBSERVABILITY_SAMPLE_RATE=0.05` (or any `0-1` value) if a fork wants fewer or more sampled timing writes.
+
 Worker-side stats and inventory repair now also treat `campaign-pledges:{slug}` as projection state instead of permanent truth. If a campaign index drifts from the underlying active pledge records, the recalc paths repair it automatically while rebuilding campaign totals and limited-tier inventory.
 
 Before mutating anything, operators can now run read-only drift checks through:
@@ -217,6 +228,16 @@ The rendered card uses live campaign data, including current state, pledged tota
 ### POST /webhooks/stripe
 Stripe webhook endpoint (signature verified).
 
+### GET /admin/observability/webhooks?days=2
+Admin-only webhook observability summary.
+
+Returns recent per-day webhook delivery counts, outcomes, event-type rollups, duration stats, and a short recent-event window for debugging retries, signature failures, and unexpected traffic spikes.
+
+### GET /admin/observability/performance?days=2
+Admin-only sampled performance summary.
+
+Returns sampled wall-clock timings for key mutation routes such as checkout start, checkout completion, Manage Pledge writes, shipping quotes, and checkout abandon. This is intended as a tuning aid for the deployed `cpu_ms` cap, not as a high-cardinality tracing system.
+
 ### POST /admin/broadcast/diary
 Send diary update notification to all campaign supporters. Requires `x-admin-key` header.
 
@@ -305,6 +326,15 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `SUPPORT_EMAIL` | Support contact mirrored from site config |
 | `PLEDGES_EMAIL_FROM` | Sender identity for pledge-related emails |
 | `UPDATES_EMAIL_FROM` | Sender identity for update / milestone / announcement emails |
+| `EMAIL_LOGO_PATH` | Supporter-email logo path mirrored from `platform.logo_path` |
+| `EMAIL_FONT_FAMILY` | Supporter-email body font stack mirrored from `design.font_body` |
+| `EMAIL_HEADING_FONT_FAMILY` | Supporter-email heading font stack mirrored from `design.font_display` |
+| `EMAIL_COLOR_TEXT` | Supporter-email base text color mirrored from `design.color_text` |
+| `EMAIL_COLOR_MUTED` | Supporter-email muted text color mirrored from `design.color_text_muted` |
+| `EMAIL_COLOR_SURFACE` | Supporter-email card surface color mirrored from `design.color_surface_subtle` |
+| `EMAIL_COLOR_BORDER` | Supporter-email border color mirrored from `design.color_border` |
+| `EMAIL_COLOR_PRIMARY` | Supporter-email primary CTA/link color mirrored from `design.color_primary` |
+| `EMAIL_BUTTON_RADIUS` | Supporter-email button radius mirrored from `design.radius_lg` |
 | `I18N_CATALOG_JSON` | Optional inline locale catalog override for Worker email localization in tests or custom deployments |
 | `SALES_TAX_RATE` | Sales tax rate mirrored from `pricing.sales_tax_rate` |
 | `FLAT_SHIPPING_RATE` | Legacy flat-shipping compatibility baseline mirrored from `pricing.flat_shipping_rate` |
@@ -326,7 +356,7 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 
 When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email images still fall back to the public `https://pool.dustwave.xyz` asset base so inbox clients do not receive broken localhost image URLs.
 
-Fork note: treat those identity, pricing, and shipping vars as mirrors of the structured site config in [`_config.yml`](../_config.yml), especially the `platform`, `pricing`, and `shipping` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior now, not Worker env toggles you should normally customize.
+Fork note: treat those identity, email-branding, pricing, and shipping vars as mirrors of the structured site config in [`_config.yml`](../_config.yml), especially the `platform`, `design`, `pricing`, and `shipping` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior now, not Worker env toggles you should normally customize directly.
 
 Keep `USPS_CLIENT_SECRET` out of site config. It belongs in Worker secrets or [`worker/.dev.vars`](../worker/.dev.vars).
 

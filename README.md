@@ -40,7 +40,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Projection drift diagnostics** — Read-only admin checks and a local CLI can compare stored stats, inventory, and campaign indexes against saved pledge truth before any repair path mutates data
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
 - **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, stacking, and overflow fixes instead of a separate mobile-only UI
-- **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, and curated design variables without requiring custom code for normal fork rebranding
+- **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, curated design variables, themed Stripe Elements, and branded supporter emails without requiring custom code for normal fork rebranding
 - **Hosted live campaign embeds** — Campaign pages now link to a locale-aware embed builder that generates copy-paste iframe code with layout/theme/media/CTA options, live Worker-backed data, and auto-resize behavior
 - **English + Spanish i18n foundation** — `_config.yml` now drives supported languages, static locale routes, generated localized campaign routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, public campaign pages, embed pages, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge/embed runtime copy, campaign countdown/gallery/live-stats labels, hero video/community teaser/diary chrome, localized campaign dates, and localized Worker supporter emails
 - **SEO fundamentals baseline** — Public pages and campaign pages now emit consistent titles, descriptions, canonicals, OG/Twitter tags, honest JSON-LD, Worker-generated campaign share-card images, and alternate-language metadata where supported, while `robots.txt`, `sitemap.xml`, and explicit noindex rules keep private/tokenized flows out of search intent
@@ -107,6 +107,7 @@ Fork-facing settings now use a structured config model in [`_config.yml`](_confi
 - campaign front matter `campaign_add_ons` for campaign-scoped merch that should use the same card UI but count toward that campaign’s subtotal and shipping rules
 - `i18n` for default/supported languages, language labels, and localized public-page routes
 - `design` for curated typography, radius, layout-width, and theme-token overrides
+- a small curated subset of `platform` / `design` is mirrored into the Worker so supporter emails stay aligned with fork branding too
 - `debug` for browser and Worker console logging behavior
 - `checkout` for truly variable checkout settings like the Stripe publishable key
 - `cache` for live browser TTLs
@@ -158,7 +159,7 @@ npm run podman:self-check
 
 If you want to exercise the on-site Stripe checkout locally, add `STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...` to [`worker/.dev.vars`](worker/.dev.vars) before starting the stack.
 
-## Cloudflare Free-Plan Guidance For Forks
+## Cloudflare Plan Guidance For Forks
 
 The Pool is intentionally shaped so most traffic stays cheap:
 
@@ -169,7 +170,10 @@ The Pool is intentionally shaped so most traffic stays cheap:
 - single-campaign reports, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans, and stats/inventory rebuilds now repair stale campaign indexes when they detect drift
 - the new read-only drift checks make it easier to confirm when projections are stale before running a repair path
 - limited-tier write paths now ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
+- public read paths stay intentionally permissive so a legitimately popular campaign does not hit artificial anti-DoS ceilings, while the expensive checkout / Manage / admin writes carry the tighter rate limits and request-size caps
 - once a client is already over a rate limit window, repeated blocked requests no longer rewrite the same KV counter on every hit
+- `POST /checkout-intent/abandon` uses an order-scoped retry bucket so unload/retry cleanup stays friendly to shared IPs without leaving the release path wide open
+- the Worker config also sets `limits.cpu_ms = 100` for deployed Standard/Paid Workers, which is well above the current representative unit-harness timings (`6-28 ms`) while still dramatically below Cloudflare's default 30-second ceiling for paid deployments
 
 Fork knobs worth knowing:
 
@@ -178,20 +182,23 @@ Fork knobs worth knowing:
 
 ### Practical Scalability Scenarios
 
-These are rough planning scenarios, not guarantees. They assume the default 5-minute browser cache TTLs, mostly normal user behavior, and Cloudflare’s current published free-plan limits for Workers and KV.
+These are rough planning scenarios, not guarantees. They assume the default 5-minute browser cache TTLs, mostly normal user behavior, and Cloudflare’s current published Workers and KV pricing/limits.
 
-| Scenario | Rough daily activity | Free-plan outlook |
-|----------|----------------------|-------------------|
-| Small collective launch | ~1,500 campaign-page visits, ~75 manage/supporter visits, ~20 checkout starts, ~10 completed pledges | Comfortable. Static pages absorb most traffic, and dynamic Worker usage should stay in the low thousands. |
-| Busy launch week | ~8,000 campaign-page visits, ~250 manage/supporter visits, ~60 checkout starts, ~25 completed or modified pledges | Still plausible on free tier for read traffic. The first budget to watch is KV writes, not Worker requests. |
-| Growing multi-project studio | ~20,000+ dynamic reads per day or many dozens of completed / modified / cancelled pledges per day | Start planning for the paid Workers plan before a major campaign push. Read traffic may still be fine, but mutation-heavy days can outgrow free KV writes first. |
+| Scenario | Rough daily activity | Plan outlook |
+|----------|----------------------|--------------|
+| Small collective launch | ~1,500 campaign-page visits, ~75 manage/supporter visits, ~20 checkout starts, ~10 completed pledges | Free should still be viable. This is the operating shape The Pool is designed to handle cheaply. |
+| Busy launch week | ~8,000 campaign-page visits, ~250 manage/supporter visits, ~60 checkout starts, ~25 completed or modified pledges | Often still plausible on Free if abuse stays low and admin repair flows are rare, but this is where Paid starts buying real margin. |
+| Growing multi-project studio | ~20,000+ dynamic reads per day or many dozens of completed / modified / cancelled pledges per day | Start planning for Paid before a major push. Mutation-heavy days and abuse-path overhead become the part to watch first. |
 
-As of April 7, 2026, Cloudflare documents the Workers Free plan at `100,000` requests per day, and Workers KV Free at `100,000` reads per day plus `1,000` writes per day and `1,000` list requests per day:
+As of April 18, 2026, Cloudflare documents the Workers Free plan at `100,000` requests per day. The Workers Paid plan starts at `$5/month` and includes `10 million` requests per month plus `30 million` CPU ms per month before overage pricing. Workers KV Free includes `100,000` reads/day plus only `1,000` writes/day and `1,000` list requests/day, while Workers KV on the Paid plan includes `10 million` reads/month and `1 million` writes/month before overages:
 
 - [Cloudflare Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
+- [Cloudflare Workers KV pricing](https://developers.cloudflare.com/kv/platform/pricing/)
 - [Cloudflare Workers KV limits](https://developers.cloudflare.com/kv/platform/limits/)
 
-The practical takeaway for forks is simple: The Pool can handle a healthy amount of browsing traffic on the free plan, but completed pledges, pledge modifications, cancellations, and admin repair flows are the part to watch most closely because they spend the scarce KV write budget.
+The practical takeaway for forks is simple: The Pool can still fit the Workers Free plan for its intended “small number of concurrent campaigns, modest backer volume, one-month run” shape, especially because public read traffic is cheap and most days have little mutation traffic. The reason to move to Paid is not that Free suddenly stopped working, but that Paid gives healthier headroom for flash spikes, abuse-path KV writes, heavier modify/cancel activity, and more operator tooling.
+
+One deployment nuance: Cloudflare's configurable `limits` block is only enforced on the Standard Usage Model and only on deployed Workers, not in local development. That means the new `cpu_ms` guard is a denial-of-wallet backstop for Paid deployments, while Workers Free still relies on Cloudflare's built-in free-plan ceilings.
 
 ## Testing
 
@@ -211,6 +218,7 @@ Local reporting:
 ./scripts/pledge-report.sh --local
 ./scripts/fulfillment-report.sh --local
 ./scripts/check-projections.sh
+ADMIN_SECRET=... ./scripts/check-observability.sh --local
 ```
 
 Podman-backed local testing:
@@ -226,7 +234,7 @@ npm run test:e2e:headless:podman     # Automated browser suite with Playwright i
 npm run test:security:podman         # Security suite against a one-shot Podman-backed local stack
 ```
 
-The pre-merge gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. If the host Ruby path still cannot produce a clean build, the gate now falls back to the Podman-backed artifact build instead of failing early on host setup.
+The pre-merge gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. That mutable smoke also rotates its synthetic admin request IPs so the Worker's real admin rate limit does not create false failures during local projection rebuild checks. If the host Ruby path still cannot produce a clean build, the gate now falls back to the Podman-backed artifact build instead of failing early on host setup.
 
 The headless browser harness now builds a clean static `_site` and serves it with a lightweight HTTP server rather than relying on `jekyll serve`, which keeps browser regressions closer to the actual published asset shape.
 
@@ -258,6 +266,8 @@ See [TESTING.md](docs/TESTING.md) for full testing guide and [SECURITY.md](docs/
 ## Documentation
 
 See [`docs/`](docs/) for full documentation:
+
+Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md), [CUSTOMIZATION.md](docs/CUSTOMIZATION.md), [SECURITY.md](docs/SECURITY.md), and [TESTING.md](docs/TESTING.md).
 
 - [CONTRIBUTING.md](docs/CONTRIBUTING.md) — Getting started, setup & contribution guide
 - [PODMAN.md](docs/PODMAN.md) — Rootless Podman local dev path for Jekyll + Worker

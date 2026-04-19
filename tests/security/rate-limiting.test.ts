@@ -14,6 +14,21 @@ import {
   TEST_CAMPAIGNS
 } from './helpers';
 
+function testIp(octet: number) {
+  return `198.51.100.${octet}`;
+}
+
+async function sequentialRequests(
+  fn: () => Promise<Response>,
+  count: number
+): Promise<Response[]> {
+  const responses: Response[] = [];
+  for (let i = 0; i < count; i++) {
+    responses.push(await fn());
+  }
+  return responses;
+}
+
 describe('Rate Limiting Security Tests', () => {
   beforeAll(() => {
     console.log(`Testing against: ${WORKER_URL}`);
@@ -22,26 +37,25 @@ describe('Rate Limiting Security Tests', () => {
   });
 
   describe('SEC-005: Rate Limiting Existence Check', () => {
-    it('should handle burst of requests to /stats (read-only)', async () => {
-      const requests = () => securityFetch(`/stats/${TEST_CAMPAIGNS.valid}`);
+    it('should leave public /stats read bursts uncapped for campaign virality', async () => {
+      const requests = () => securityFetch(`/stats/${TEST_CAMPAIGNS.valid}`, {
+        headers: {
+          'CF-Connecting-IP': testIp(10)
+        }
+      });
       
       // Send 10 concurrent requests
       const responses = await burstRequests(requests, 10);
       
+      const rateLimited = responses.filter(r => r.status === 429);
+      expect(rateLimited.length).toBe(0);
+
       // Public read-only stats may return either an existing payload or a clean not-found.
       const successCount = responses.filter(r => r.status === 200 || r.status === 404).length;
       expect(successCount).toBeGreaterThanOrEqual(5);
-      
-      // Check if any were rate limited (429)
-      const rateLimited = responses.filter(r => r.status === 429);
-      if (rateLimited.length > 0) {
-        console.log('✅ Rate limiting is active on /stats');
-      } else {
-        console.log('⚠️ No rate limiting detected on /stats (acceptable for read-only)');
-      }
     });
 
-    it('should handle burst requests to checkout start without crashing', async () => {
+    it('should rate limit checkout start bursts before Stripe-heavy work fans out', async () => {
       if (PROD_MODE) {
         console.log('Skipping checkout-intent/start burst test in production to avoid Stripe API spam');
         return;
@@ -49,6 +63,9 @@ describe('Rate Limiting Security Tests', () => {
       
       const requests = () => securityFetch('/checkout-intent/start', {
         method: 'POST',
+        headers: {
+          'CF-Connecting-IP': testIp(11)
+        },
         body: JSON.stringify({
           campaignSlug: TEST_CAMPAIGNS.valid,
           items: [],
@@ -56,29 +73,23 @@ describe('Rate Limiting Security Tests', () => {
         })
       });
       
-      // Send 5 concurrent requests
-      const responses = await burstRequests(requests, 5);
+      // Cross the bucket sequentially so the local KV simulation observes the counter increments.
+      const responses = await sequentialRequests(requests, 45);
       
-      // Check for rate limiting (429) or validation responses (400)
       const statuses = responses.map(r => r.status);
       console.log('/checkout-intent/start burst response statuses:', statuses);
       
       const rateLimited = responses.filter(r => r.status === 429);
-      const invalid = responses.filter(r => r.status === 400);
-      if (rateLimited.length > 0) {
-        console.log('✅ Rate limiting is active on /checkout-intent/start');
-        expect(rateLimited.length).toBeGreaterThan(0);
-      } else if (invalid.length > 0) {
-        console.log('✅ Checkout start validation is failing closed');
-        expect(invalid.length).toBeGreaterThan(0);
-      } else {
-        console.log('⚠️ No rate limiting detected on /checkout-intent/start - consider adding');
-      }
+      expect(rateLimited.length).toBeGreaterThan(0);
+      expect(statuses.every(status => status === 400 || status === 429)).toBe(true);
     });
 
-    it('should potentially rate limit burst requests to /votes', async () => {
+    it('should rate limit vote spam bursts before token validation', async () => {
       const requests = () => securityFetch('/votes', {
         method: 'POST',
+        headers: {
+          'CF-Connecting-IP': testIp(12)
+        },
         body: JSON.stringify({
           token: 'fake-token',
           decisionId: 'poster',
@@ -86,46 +97,71 @@ describe('Rate Limiting Security Tests', () => {
         })
       });
       
-      // Send 10 concurrent requests
-      const responses = await burstRequests(requests, 10);
+      const responses = await sequentialRequests(requests, 50);
       
       const statuses = responses.map(r => r.status);
       console.log('/votes burst response statuses:', statuses);
       
       const rateLimited = responses.filter(r => r.status === 429);
-      if (rateLimited.length > 0) {
-        console.log('✅ Rate limiting is active on /votes');
-      } else {
-        // All should fail auth anyway, but no rate limiting
-        const authFailed = responses.filter(r => r.status === 401);
-        console.log(`⚠️ No rate limiting on /votes (${authFailed.length} auth failures)`);
-      }
+      expect(rateLimited.length).toBeGreaterThan(0);
+      expect(statuses.every(status => status === 401 || status === 429)).toBe(true);
     });
 
-    it('should potentially rate limit admin endpoint attempts', async () => {
+    it('should rate limit admin endpoint brute-force attempts', async () => {
       const requests = () => securityFetch('/admin/rebuild', {
         method: 'POST',
         headers: {
+          'CF-Connecting-IP': testIp(13),
           'Authorization': `Bearer wrong-secret-${Math.random()}`
         },
         body: JSON.stringify({ reason: 'rate-limit-test' })
       });
       
-      // Send 10 concurrent requests with wrong secrets
-      const responses = await burstRequests(requests, 10);
+      const responses = await sequentialRequests(requests, 8);
       
       const statuses = responses.map(r => r.status);
       console.log('/admin/rebuild burst response statuses:', statuses);
       
       const rateLimited = responses.filter(r => r.status === 429);
-      const authFailed = responses.filter(r => r.status === 401);
-      
-      if (rateLimited.length > 0) {
-        console.log('✅ Rate limiting is active on admin endpoints');
-      } else {
-        console.log(`⚠️ No rate limiting on /admin/rebuild (${authFailed.length} auth failures)`);
-        console.log('   Consider adding aggressive rate limiting for admin endpoints');
-      }
+      expect(rateLimited.length).toBeGreaterThan(0);
+      expect(statuses.every(status => status === 401 || status === 429)).toBe(true);
+    });
+
+    it('should rate limit manage-pledge read bursts separately from writes', async () => {
+      const requests = () => securityFetch('/pledges?token=fake-token', {
+        headers: {
+          'CF-Connecting-IP': testIp(14)
+        }
+      });
+
+      const responses = await sequentialRequests(requests, 125);
+      const statuses = responses.map(r => r.status);
+      const rateLimited = responses.filter(r => r.status === 429);
+
+      expect(rateLimited.length).toBeGreaterThan(0);
+      expect(statuses.every(status => status === 401 || status === 429)).toBe(true);
+    });
+
+    it('should rate limit manage-pledge write bursts before token validation', async () => {
+      const requests = () => securityFetch('/pledge/modify', {
+        method: 'POST',
+        headers: {
+          'CF-Connecting-IP': testIp(15)
+        },
+        body: JSON.stringify({
+          token: 'fake-token',
+          orderId: 'pool-intent-rate-limit-write',
+          tierId: 'frame-slot',
+          tierQty: 1
+        })
+      });
+
+      const responses = await sequentialRequests(requests, 35);
+      const statuses = responses.map(r => r.status);
+      const rateLimited = responses.filter(r => r.status === 429);
+
+      expect(rateLimited.length).toBeGreaterThan(0);
+      expect(statuses.every(status => status === 400 || status === 401 || status === 429)).toBe(true);
     });
   });
 
@@ -160,7 +196,7 @@ describe('Rate Limiting Security Tests', () => {
   });
 
   describe('Resource Exhaustion Prevention', () => {
-    it('should reject excessively large request bodies', async () => {
+    it('should reject excessively large request bodies with 413', async () => {
       const largeBody = JSON.stringify({
         orderId: 'test-large-body',
         campaignSlug: TEST_CAMPAIGNS.valid,
@@ -171,12 +207,13 @@ describe('Rate Limiting Security Tests', () => {
       
       const res = await securityFetch('/checkout-intent/start', {
         method: 'POST',
+        headers: {
+          'CF-Connecting-IP': testIp(16)
+        },
         body: largeBody
       });
       
-      // Should reject large body or fail closed gracefully
-      // Cloudflare has a 100MB limit, but smaller limits are good
-      expect([200, 400, 413, 429, 500]).toContain(res.status);
+      expect(res.status).toBe(413);
     });
 
     it('should handle deep JSON nesting', async () => {
@@ -242,12 +279,15 @@ describe('Rate Limiting Security Tests', () => {
       // Without a valid token, these will all fail auth,
       // but we're checking for rate limiting behavior
       
-      const attempts = 20;
+      const attempts = 50;
       const responses: Response[] = [];
       
       for (let i = 0; i < attempts; i++) {
         const res = await securityFetch('/votes', {
           method: 'POST',
+          headers: {
+            'CF-Connecting-IP': testIp(17)
+          },
           body: JSON.stringify({
             token: 'fake-token-for-spam-test',
             decisionId: 'poster',
@@ -262,12 +302,8 @@ describe('Rate Limiting Security Tests', () => {
       const authFailed = responses.filter(r => r.status === 401).length;
       
       console.log(`Vote spam test: ${attempts} attempts, ${rateLimited} rate limited, ${authFailed} auth failed`);
-      
-      if (rateLimited > 0) {
-        console.log('✅ Rate limiting detected for vote spam');
-      } else {
-        console.log('⚠️ No rate limiting for vote spam - consider adding');
-      }
+      expect(rateLimited).toBeGreaterThan(0);
+      expect(rateLimited + authFailed).toBe(attempts);
     });
   });
 

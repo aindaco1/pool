@@ -147,11 +147,52 @@ describe('email HTML security', () => {
       }
     );
 
+  const payload = getEmailPayload(fetchMock);
+  expect(payload.from).toBe('Fork Pool <pledges@fork.test>');
+  expect(payload.reply_to).toBe('info@pool.test');
+  expect(payload.html).toContain('Fork Studio tip (6%): $2.10');
+  expect(payload.html).toContain('visit <a href="https://pool.test/" style="color: #000000;">Fork Pool</a>');
+  });
+
+  it('applies mirrored email theme settings for logo, fonts, and buttons', async () => {
+    const fetchMock = mockResend();
+
+    await sendSupporterEmail(
+      {
+        ...env,
+        PLATFORM_NAME: 'Fork Pool',
+        EMAIL_LOGO_PATH: '/assets/images/brand/logo.png',
+        EMAIL_FONT_FAMILY: '"Source Sans 3", sans-serif',
+        EMAIL_HEADING_FONT_FAMILY: '"Space Grotesk", sans-serif',
+        EMAIL_COLOR_TEXT: '#223344',
+        EMAIL_COLOR_MUTED: '#667788',
+        EMAIL_COLOR_SURFACE: '#f4efe7',
+        EMAIL_COLOR_BORDER: '#cbbda8',
+        EMAIL_COLOR_PRIMARY: '#d9f4ff',
+        EMAIL_BUTTON_RADIUS: '14px'
+      },
+      {
+        email: 'supporter@example.com',
+        campaignSlug: 'sunder',
+        campaignTitle: 'sunder',
+        subtotal: 3500,
+        tax: 276,
+        shipping: 300,
+        tipAmount: 210,
+        tipPercent: 6,
+        token: 'magic-token'
+      }
+    );
+
     const payload = getEmailPayload(fetchMock);
-    expect(payload.from).toBe('Fork Pool <pledges@fork.test>');
-    expect(payload.reply_to).toBe('info@pool.test');
-    expect(payload.html).toContain('Fork Studio tip (6%): $2.10');
-    expect(payload.html).toContain('visit <a href="https://pool.test/" style="color: #000;">Fork Pool</a>');
+    expect(payload.html).toContain('https://pool.test/assets/images/brand/logo.png');
+    expect(payload.html).toContain('font-family: &quot;Source Sans 3&quot;, sans-serif;');
+    expect(payload.html).toContain('font-family: &quot;Space Grotesk&quot;, sans-serif;');
+    expect(payload.html).toContain('background: #f4efe7;');
+    expect(payload.html).toContain('color: #223344;');
+    expect(payload.html).toContain('color: #667788;');
+    expect(payload.html).toContain('background: #d9f4ff; color: #111111;');
+    expect(payload.html).toContain('border-radius: 14px;');
   });
 
   it('escapes diary content in update emails', async () => {

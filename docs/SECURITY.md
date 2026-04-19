@@ -186,22 +186,32 @@ return jsonResponse(data, 200, env);
 
 In-Worker rate limiting is now implemented using KV storage with per-IP tracking.
 
-**Rate Limits:**
+**Write-Path Rate Limits:**
 
 | Endpoint | Limit | Window | Notes |
 |----------|-------|--------|-------|
-| `/checkout-intent/start` | 20 requests | 1 minute | Pledge creation |
-| `/votes` | 30 requests | 1 minute | Voting endpoints |
+| `/checkout-intent/start` | 40 requests | 1 minute | Checkout starts; tuned higher so shared NATs and legitimate spikes still fit |
+| `/shipping/quote` | 90 requests | 1 minute | Shipping quote refreshes stay roomy during cart edits |
+| `/checkout-intent/complete` | 12 requests | 1 minute | Keyed by `orderId` instead of only IP to avoid punishing real retries |
+| `/checkout-intent/abandon` | 12 requests | 1 minute | Keyed by `orderId` so reservation cleanup retries stay friendly to shared IPs |
+| `/pledge` + `/pledges` | 120 requests | 1 minute | Manage-pledge reads stay generous because they are user-facing reads |
+| `/pledge/cancel`, `/pledge/modify`, `/pledge/payment-method/start` | 30 requests | 1 minute | Manage-pledge writes |
+| `/votes` | 45 requests | 1 minute | Voting endpoints |
 | `/admin/*` | 5 requests | 1 minute | Admin operations |
-| `/pledge/*` | 20 requests | 1 minute | Pledge management |
-| `/webhooks/*` | 100 requests | 1 minute | Webhook handlers |
 
 **How It Works:**
 
 - Rate limits are tracked **per IP address** using `CF-Connecting-IP` header
 - Each IP gets its own bucket, so 100 different users won't interfere with each other
-- The 20/min `/checkout-intent/start` limit accommodates shared NAT environments (offices, universities)
+- Public read endpoints like `/live/:slug`, `/stats/:slug`, and `/inventory/:slug` stay uncapped so a legitimately viral campaign does not trip a DoS defense just for being popular
+- The checkout and Manage Pledge write paths keep higher ceilings than a typical brute-force limit so shared NAT environments still have breathing room
+- `/checkout-intent/complete` is keyed by `orderId`, which is friendlier to legitimate recovery retries than a pure per-IP bucket
+- `/checkout-intent/abandon` is also keyed by `orderId`, so cleanup/release retries do not punish supporters behind the same NAT during a busy launch
+- Stripe webhooks are protected with signature verification, idempotency, and a request-body size cap instead of a tight per-IP limit that could interfere with normal Stripe delivery
 - Once a client is already over limit for the current window, repeated blocked requests fail closed without rewriting the same KV counter on every hit. That keeps abuse pressure from turning into unnecessary free-plan KV writes.
+- Expensive POST routes now also reject obviously oversized request bodies before parsing JSON or touching Stripe/KV-heavy flows.
+- Deployed Standard/Paid Workers now also declare `limits.cpu_ms = 100` in `wrangler.toml`. That is a denial-of-wallet guardrail, not a claim that normal requests are anywhere near that expensive.
+- Admin-only observability endpoints now expose webhook delivery summaries and sampled mutation timings so operators can tune DoS defenses without relying only on raw log tails.
 
 **Setup:**
 
@@ -226,7 +236,11 @@ In-Worker rate limiting is now implemented using KV storage with per-IP tracking
    preview_id = "YOUR_RATELIMIT_PREVIEW_ID"
    ```
 
-**Note:** Rate limiting is optional - if `RATELIMIT` KV is not configured, requests proceed without limits. This allows gradual rollout.
+**Note:** `RATELIMIT` is now a hard requirement. If the binding is missing, the Worker fails closed with `503` instead of serving traffic without abuse protection. That change increases the importance of having real KV headroom, but it does not mean the Workers Free plan is suddenly incompatible with the project's intended low-to-moderate crowdfunding scale.
+
+**CPU cap note:** Cloudflare's configurable `limits` block is only enforced on the Standard Usage Model and only on deployed Workers, not in local development. The current `cpu_ms = 100` value was chosen as a conservative backstop after representative unit-harness requests landed around `6 ms`, `15 ms`, and `28 ms` wall-clock time for admin light, checkout recovery, and checkout abandon flows respectively. That is only a proxy measurement, but it is enough to justify a low ceiling with headroom instead of leaving the paid default at `30 seconds`.
+
+**Observability note:** Use `GET /admin/observability/webhooks` to inspect webhook volume, duplicate deliveries, signature failures, and recent outcomes, and `GET /admin/observability/performance` to inspect sampled wall-clock timings for the key mutation routes. The helper script [`scripts/check-observability.sh`](../scripts/check-observability.sh) wraps both endpoints for local or deployed checks.
 
 **Response when rate limited:**
 ```json

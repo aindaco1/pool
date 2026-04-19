@@ -74,6 +74,13 @@ const SUPPORTER_EMAIL_RETRY_CRON = '*/15 * * * *';
 const SUPPORTER_EMAIL_RETRY_BATCH_SIZE = 10;
 const SUPPORTER_EMAIL_RETRY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SHARE_CARD_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=3600';
+const MAX_STANDARD_JSON_BODY_BYTES = 64 * 1024;
+const MAX_STRIPE_WEBHOOK_BODY_BYTES = 256 * 1024;
+const RATELIMIT_REQUIRED_ERROR = 'Rate limit storage not configured';
+const OBSERVABILITY_RETENTION_SECONDS = 14 * 24 * 60 * 60;
+const OBSERVABILITY_RECENT_EVENT_LIMIT = 25;
+const OBSERVABILITY_MAX_DAYS = 7;
+const DEFAULT_OBSERVABILITY_SAMPLE_RATE = 0.1;
 
 // Extract plain text excerpt from diary entry (supports both legacy body and content blocks)
 function getDiaryExcerpt(entry, maxLength = 200) {
@@ -520,9 +527,11 @@ async function checkRateLimit(request, env, options = {}) {
     keyFn = null
   } = options;
   
-  // Skip if RATELIMIT KV not configured
   if (!env.RATELIMIT) {
-    return { allowed: true };
+    return {
+      allowed: false,
+      response: jsonResponse({ error: RATELIMIT_REQUIRED_ERROR }, 503, env)
+    };
   }
   
   const ip = request.headers.get('CF-Connecting-IP') || 
@@ -596,20 +605,405 @@ async function checkRateLimit(request, env, options = {}) {
     };
   } catch (err) {
     console.error('Rate limit check failed:', err);
-    // Fail open on error (don't block requests if KV fails)
-    return { allowed: true };
+    return {
+      allowed: false,
+      response: jsonResponse({ error: 'Rate limiting unavailable' }, 503, env)
+    };
   }
+}
+
+function getRequestContentLength(request) {
+  const raw = request.headers.get('Content-Length');
+  if (!raw) return null;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function requestHasJsonContentType(request) {
+  const contentType = String(request.headers.get('Content-Type') || '').trim().toLowerCase();
+  return contentType === 'application/json' || contentType.startsWith('application/json;');
+}
+
+function requireBodySizeWithinLimit(request, env, maxBytes, { privateResponse: usePrivateResponse = false } = {}) {
+  const contentLength = getRequestContentLength(request);
+  if (contentLength === null || contentLength <= maxBytes) {
+    return { ok: true };
+  }
+
+  const response = usePrivateResponse
+    ? privateJsonResponse({ error: 'Request body too large' }, 413, env)
+    : jsonResponse({ error: 'Request body too large' }, 413, env);
+
+  return {
+    ok: false,
+    response
+  };
+}
+
+async function readRequestTextWithinLimit(request, env, maxBytes, { privateResponse: usePrivateResponse = false } = {}) {
+  const contentLengthCheck = requireBodySizeWithinLimit(request, env, maxBytes, { privateResponse: usePrivateResponse });
+  if (!contentLengthCheck.ok) {
+    return contentLengthCheck;
+  }
+
+  if (!request.body) {
+    return { ok: true, text: '' };
+  }
+
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      const response = usePrivateResponse
+        ? privateJsonResponse({ error: 'Request body too large' }, 413, env)
+        : jsonResponse({ error: 'Request body too large' }, 413, env);
+      return { ok: false, response };
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+
+  text += decoder.decode();
+  return { ok: true, text };
+}
+
+async function parseJsonRequestBody(request, env, {
+  maxBytes = MAX_STANDARD_JSON_BODY_BYTES,
+  privateResponse: usePrivateResponse = false,
+  emptyValue = null
+} = {}) {
+  if (!requestHasJsonContentType(request)) {
+    const response = usePrivateResponse
+      ? privateJsonResponse({ error: 'Expected application/json request body' }, 415, env)
+      : jsonResponse({ error: 'Expected application/json request body' }, 415, env);
+    return { ok: false, response };
+  }
+
+  const textResult = await readRequestTextWithinLimit(request, env, maxBytes, { privateResponse: usePrivateResponse });
+  if (!textResult.ok) {
+    return textResult;
+  }
+
+  const text = String(textResult.text || '');
+  if (text.trim() === '') {
+    return { ok: true, body: emptyValue };
+  }
+
+  try {
+    return { ok: true, body: JSON.parse(text) };
+  } catch {
+    const response = usePrivateResponse
+      ? privateJsonResponse({ error: 'Invalid JSON' }, 400, env)
+      : jsonResponse({ error: 'Invalid JSON' }, 400, env);
+    return { ok: false, response };
+  }
+}
+
+async function parseOptionalJsonRequestBody(request, env, {
+  maxBytes = MAX_STANDARD_JSON_BODY_BYTES,
+  privateResponse: usePrivateResponse = false,
+  emptyValue = null
+} = {}) {
+  const textResult = await readRequestTextWithinLimit(request, env, maxBytes, { privateResponse: usePrivateResponse });
+  if (!textResult.ok) {
+    return textResult;
+  }
+
+  const text = String(textResult.text || '');
+  if (text.trim() === '') {
+    return { ok: true, body: emptyValue };
+  }
+
+  if (!requestHasJsonContentType(request)) {
+    const response = usePrivateResponse
+      ? privateJsonResponse({ error: 'Expected application/json request body' }, 415, env)
+      : jsonResponse({ error: 'Expected application/json request body' }, 415, env);
+    return { ok: false, response };
+  }
+
+  try {
+    return { ok: true, body: JSON.parse(text) };
+  } catch {
+    const response = usePrivateResponse
+      ? privateJsonResponse({ error: 'Invalid JSON' }, 400, env)
+      : jsonResponse({ error: 'Invalid JSON' }, 400, env);
+    return { ok: false, response };
+  }
+}
+
+function getObservabilityDateKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getObservabilitySummaryKey(kind, dateKey = getObservabilityDateKey()) {
+  return `observability:${kind}:${dateKey}`;
+}
+
+function getObservabilityRecentKey(kind) {
+  return `observability:${kind}:recent`;
+}
+
+function clampObservabilityDays(value) {
+  const parsed = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 2;
+  return Math.min(OBSERVABILITY_MAX_DAYS, parsed);
+}
+
+function getObservabilityDateKeys(days = 2) {
+  const clampedDays = clampObservabilityDays(days);
+  const keys = [];
+  const now = new Date();
+  for (let i = 0; i < clampedDays; i++) {
+    const date = new Date(now);
+    date.setUTCDate(now.getUTCDate() - i);
+    keys.push(getObservabilityDateKey(date));
+  }
+  return keys;
+}
+
+function bucketStatusCode(status) {
+  const numericStatus = Number.parseInt(String(status || ''), 10);
+  if (!Number.isFinite(numericStatus) || numericStatus <= 0) return 'unknown';
+  return `${Math.floor(numericStatus / 100)}xx`;
+}
+
+function updateDurationStats(target, durationMs) {
+  const safeDuration = Math.max(0, Number(durationMs) || 0);
+  target.count = (target.count || 0) + 1;
+  target.totalMs = (target.totalMs || 0) + safeDuration;
+  target.maxMs = Math.max(target.maxMs || 0, safeDuration);
+  target.minMs = target.count === 1
+    ? safeDuration
+    : Math.min(Number(target.minMs ?? safeDuration), safeDuration);
+  target.lastMs = safeDuration;
+}
+
+function finalizeDurationStats(target = {}) {
+  const count = Number(target.count || 0);
+  const totalMs = Number(target.totalMs || 0);
+  return {
+    count,
+    totalMs,
+    avgMs: count > 0 ? Number((totalMs / count).toFixed(2)) : 0,
+    minMs: count > 0 ? Number(target.minMs || 0) : 0,
+    maxMs: Number(target.maxMs || 0),
+    lastMs: Number(target.lastMs || 0)
+  };
+}
+
+function getObservabilitySampleRate(env = {}) {
+  const raw = env.OBSERVABILITY_SAMPLE_RATE ?? env.PERFORMANCE_SAMPLE_RATE ?? DEFAULT_OBSERVABILITY_SAMPLE_RATE;
+  const parsed = Number.parseFloat(String(raw));
+  if (!Number.isFinite(parsed)) return DEFAULT_OBSERVABILITY_SAMPLE_RATE;
+  return Math.min(1, Math.max(0, parsed));
+}
+
+function truncateObservabilityValue(value, maxLength = 120) {
+  const stringValue = String(value ?? '').trim();
+  if (!stringValue) return '';
+  return stringValue.length > maxLength
+    ? `${stringValue.slice(0, maxLength - 1)}…`
+    : stringValue;
+}
+
+function queueBackgroundTask(ctx, task, label = 'background task') {
+  const guardedTask = Promise.resolve(task).catch((err) => {
+    console.error(`${label} failed:`, err?.message || err);
+  });
+  if (ctx && typeof ctx.waitUntil === 'function') {
+    ctx.waitUntil(guardedTask);
+    return;
+  }
+  guardedTask.catch(() => {});
+}
+
+async function updateObservabilitySummary(env, kind, updateFn) {
+  if (!env.PLEDGES) return null;
+  const dateKey = getObservabilityDateKey();
+  const key = getObservabilitySummaryKey(kind, dateKey);
+  const summary = await env.PLEDGES.get(key, { type: 'json' }) || {
+    kind,
+    date: dateKey,
+    createdAt: new Date().toISOString(),
+    updatedAt: null
+  };
+  const next = updateFn(summary) || summary;
+  next.kind = kind;
+  next.date = dateKey;
+  next.updatedAt = new Date().toISOString();
+  await env.PLEDGES.put(key, JSON.stringify(next), {
+    expirationTtl: OBSERVABILITY_RETENTION_SECONDS
+  });
+  return next;
+}
+
+async function appendObservabilityRecentEvent(env, kind, entry) {
+  if (!env.PLEDGES) return;
+  const key = getObservabilityRecentKey(kind);
+  const recent = await env.PLEDGES.get(key, { type: 'json' }) || [];
+  const normalizedEntry = {
+    recordedAt: new Date().toISOString(),
+    ...entry
+  };
+  const next = [normalizedEntry, ...recent].slice(0, OBSERVABILITY_RECENT_EVENT_LIMIT);
+  await env.PLEDGES.put(key, JSON.stringify(next), {
+    expirationTtl: OBSERVABILITY_RETENTION_SECONDS
+  });
+}
+
+async function recordWebhookObservation(env, observation = {}) {
+  if (!env.PLEDGES) return;
+  const {
+    outcome = 'unknown',
+    eventId = '',
+    eventType = 'unknown',
+    orderId = '',
+    status = 0,
+    durationMs = 0
+  } = observation;
+
+  await updateObservabilitySummary(env, 'webhook', (summary) => {
+    summary.received = Number(summary.received || 0) + 1;
+    summary.outcomes = summary.outcomes || {};
+    summary.outcomes[outcome] = Number(summary.outcomes[outcome] || 0) + 1;
+    summary.statusCounts = summary.statusCounts || {};
+    const statusBucket = bucketStatusCode(status);
+    summary.statusCounts[statusBucket] = Number(summary.statusCounts[statusBucket] || 0) + 1;
+    summary.eventTypes = summary.eventTypes || {};
+    const normalizedEventType = truncateObservabilityValue(eventType || 'unknown', 80) || 'unknown';
+    const eventTypeSummary = summary.eventTypes[normalizedEventType] || {
+      received: 0,
+      outcomes: {}
+    };
+    eventTypeSummary.received += 1;
+    eventTypeSummary.outcomes[outcome] = Number(eventTypeSummary.outcomes[outcome] || 0) + 1;
+    summary.eventTypes[normalizedEventType] = eventTypeSummary;
+    summary.durations = summary.durations || {};
+    updateDurationStats(summary.durations, durationMs);
+    return summary;
+  });
+
+  await appendObservabilityRecentEvent(env, 'webhook', {
+    outcome,
+    eventId: truncateObservabilityValue(eventId, 80),
+    eventType: truncateObservabilityValue(eventType || 'unknown', 80) || 'unknown',
+    orderId: truncateObservabilityValue(orderId, 80),
+    status: Number(status || 0),
+    durationMs: Math.max(0, Number(durationMs) || 0)
+  });
+}
+
+async function recordPerformanceObservation(env, observation = {}) {
+  if (!env.PLEDGES) return;
+  const {
+    operation = 'unknown',
+    status = 0,
+    durationMs = 0
+  } = observation;
+
+  await updateObservabilitySummary(env, 'performance', (summary) => {
+    summary.sampleRate = getObservabilitySampleRate(env);
+    summary.operations = summary.operations || {};
+    const normalizedOperation = truncateObservabilityValue(operation || 'unknown', 80) || 'unknown';
+    const operationSummary = summary.operations[normalizedOperation] || {
+      count: 0,
+      totalMs: 0,
+      minMs: 0,
+      maxMs: 0,
+      lastMs: 0,
+      statusCounts: {}
+    };
+    updateDurationStats(operationSummary, durationMs);
+    const statusBucket = bucketStatusCode(status);
+    operationSummary.statusCounts[statusBucket] = Number(operationSummary.statusCounts[statusBucket] || 0) + 1;
+    summary.operations[normalizedOperation] = operationSummary;
+    return summary;
+  });
+}
+
+function maybeRecordPerformanceObservation(env, ctx, operation, startedAt, response) {
+  const sampleRate = getObservabilitySampleRate(env);
+  if (sampleRate <= 0 || Math.random() > sampleRate) {
+    return response;
+  }
+
+  queueBackgroundTask(
+    ctx,
+    recordPerformanceObservation(env, {
+      operation,
+      status: response?.status || 0,
+      durationMs: Date.now() - startedAt
+    }),
+    `performance observation (${operation})`
+  );
+  return response;
+}
+
+async function withObservedOperation(env, ctx, operation, fn) {
+  const startedAt = Date.now();
+  const response = await fn();
+  return maybeRecordPerformanceObservation(env, ctx, operation, startedAt, response);
+}
+
+async function listObservabilitySummaries(env, kind, days = 2) {
+  if (!env.PLEDGES) return [];
+
+  const summaries = [];
+  for (const dateKey of getObservabilityDateKeys(days)) {
+    const summary = await env.PLEDGES.get(getObservabilitySummaryKey(kind, dateKey), { type: 'json' });
+    if (!summary) continue;
+
+    if (kind === 'performance') {
+      const operations = {};
+      for (const [operation, entry] of Object.entries(summary.operations || {})) {
+        operations[operation] = {
+          ...finalizeDurationStats(entry),
+          statusCounts: entry?.statusCounts || {}
+        };
+      }
+      summaries.push({
+        date: summary.date,
+        updatedAt: summary.updatedAt,
+        sampleRate: summary.sampleRate ?? getObservabilitySampleRate(env),
+        operations
+      });
+      continue;
+    }
+
+    summaries.push({
+      date: summary.date,
+      updatedAt: summary.updatedAt,
+      received: Number(summary.received || 0),
+      outcomes: summary.outcomes || {},
+      statusCounts: summary.statusCounts || {},
+      eventTypes: summary.eventTypes || {},
+      durations: finalizeDurationStats(summary.durations || {})
+    });
+  }
+
+  return summaries;
+}
+
+async function getObservabilityRecentEvents(env, kind) {
+  if (!env.PLEDGES) return [];
+  return await env.PLEDGES.get(getObservabilityRecentKey(kind), { type: 'json' }) || [];
 }
 
 // Rate limit configurations for different endpoint types
 const RATE_LIMITS = {
-  start: { prefix: 'rl:start', limit: 20, windowSeconds: 60 },      // 20 pledges/min
-  shipping: { prefix: 'rl:shipping', limit: 30, windowSeconds: 60 },// 30 shipping quotes/min
-  complete: { prefix: 'rl:complete', limit: 8, windowSeconds: 60 }, // 8 recovery attempts/min
-  votes: { prefix: 'rl:votes', limit: 30, windowSeconds: 60 },      // 30 votes/min
+  start: { prefix: 'rl:start', limit: 40, windowSeconds: 60 },          // 40 checkout starts/min/IP
+  shipping: { prefix: 'rl:shipping', limit: 90, windowSeconds: 60 },    // 90 quote refreshes/min/IP
+  complete: { prefix: 'rl:complete', limit: 12, windowSeconds: 60 },    // 12 recovery attempts/min/order
+  abandon: { prefix: 'rl:abandon', limit: 12, windowSeconds: 60 },      // 12 abandon attempts/min/order
+  votes: { prefix: 'rl:votes', limit: 45, windowSeconds: 60 },          // 45 vote reads/writes/min/IP
   admin: { prefix: 'rl:admin', limit: 5, windowSeconds: 60 },       // 5 admin calls/min
-  pledge: { prefix: 'rl:pledge', limit: 20, windowSeconds: 60 },    // 20 pledge ops/min
-  webhook: { prefix: 'rl:webhook', limit: 100, windowSeconds: 60 }  // 100 webhooks/min
+  pledgeRead: { prefix: 'rl:pledge-read', limit: 120, windowSeconds: 60 },   // 120 manage reads/min/IP
+  pledgeWrite: { prefix: 'rl:pledge-write', limit: 30, windowSeconds: 60 }   // 30 manage mutations/min/IP
 };
 
 // SEC-006: Admin authentication helper with timing-safe comparison
@@ -2026,6 +2420,10 @@ export default {
       return corsResponse(env);
     }
 
+    if (!env.RATELIMIT) {
+      return jsonResponse({ error: RATELIMIT_REQUIRED_ERROR }, 503, env);
+    }
+
     try {
       // SEC-003: Block test endpoints in production mode (unless admin-authenticated)
       if (path.startsWith('/test/') && getAppMode(env) !== 'test') {
@@ -2036,11 +2434,15 @@ export default {
       }
 
       if (path === '/checkout-intent/start' && method === 'POST') {
-        return handleFirstPartyCheckoutStart(request, env);
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
+        if (!bodyLimit.ok) return bodyLimit.response;
+        return withObservedOperation(env, ctx, 'checkout_intent_start', () => handleFirstPartyCheckoutStart(request, env));
       }
 
       if (path === '/shipping/quote' && method === 'POST') {
-        return handleShippingQuote(request, env);
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
+        if (!bodyLimit.ok) return bodyLimit.response;
+        return withObservedOperation(env, ctx, 'shipping_quote', () => handleShippingQuote(request, env));
       }
 
       if (path === '/checkout-intent/summary' && method === 'GET') {
@@ -2052,31 +2454,51 @@ export default {
       }
 
       if (path === '/checkout-intent/complete' && method === 'POST') {
-        return handleFirstPartyCheckoutComplete(request, env, ctx);
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
+        if (!bodyLimit.ok) return bodyLimit.response;
+        return withObservedOperation(env, ctx, 'checkout_intent_complete', () => handleFirstPartyCheckoutComplete(request, env, ctx));
       }
 
       if (path === '/webhooks/stripe' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STRIPE_WEBHOOK_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         return handleStripeWebhook(request, env, ctx);
       }
 
       if (path === '/pledge' && method === 'GET') {
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.pledgeRead);
+        if (!rl.allowed) return rl.response;
         return handleGetPledge(request, env);
       }
 
       if (path === '/pledges' && method === 'GET') {
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.pledgeRead);
+        if (!rl.allowed) return rl.response;
         return handleGetPledges(request, env);
       }
 
       if (path === '/pledge/cancel' && method === 'POST') {
-        return handleCancelPledge(request, env);
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.pledgeWrite);
+        if (!rl.allowed) return rl.response;
+        return withObservedOperation(env, ctx, 'pledge_cancel', () => handleCancelPledge(request, env));
       }
 
       if (path === '/pledge/modify' && method === 'POST') {
-        return handleModifyPledge(request, env);
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.pledgeWrite);
+        if (!rl.allowed) return rl.response;
+        return withObservedOperation(env, ctx, 'pledge_modify', () => handleModifyPledge(request, env));
       }
 
       if (path === '/pledge/payment-method/start' && method === 'POST') {
-        return handleUpdatePaymentMethod(request, env);
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.pledgeWrite);
+        if (!rl.allowed) return rl.response;
+        return withObservedOperation(env, ctx, 'pledge_payment_method_start', () => handleUpdatePaymentMethod(request, env));
       }
 
       if (path === '/votes' && method === 'GET') {
@@ -2087,6 +2509,8 @@ export default {
       }
 
       if (path === '/votes' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         // SEC-005: Rate limit vote casting
         const rl = await checkRateLimit(request, env, RATE_LIMITS.votes);
         if (!rl.allowed) return rl.response;
@@ -2094,14 +2518,20 @@ export default {
       }
 
       if (path === '/test/setup' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         return handleTestSetup(request, env);
       }
 
       if (path === '/test/cleanup' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         return handleTestCleanup(request, env);
       }
 
       if (path === '/admin/rebuild' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         // SEC-005: Rate limit admin endpoints aggressively
         const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
         if (!rl.allowed) return rl.response;
@@ -2109,30 +2539,40 @@ export default {
       }
 
       if (path === '/admin/broadcast/announcement' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
         if (!rl.allowed) return rl.response;
         return handleBroadcastAnnouncement(request, env);
       }
 
       if (path === '/admin/broadcast/diary' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
         if (!rl.allowed) return rl.response;
         return handleBroadcastDiary(request, env);
       }
 
       if (path === '/admin/diary/check' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
         if (!rl.allowed) return rl.response;
         return handleDiaryCheck(request, env);
       }
 
       if (path === '/admin/broadcast/milestone' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
         if (!rl.allowed) return rl.response;
         return handleBroadcastMilestone(request, env);
       }
 
       if (path.startsWith('/admin/milestone-check/') && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
         if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/admin/milestone-check/', '');
@@ -2140,6 +2580,8 @@ export default {
       }
 
       if (path.startsWith('/admin/settle/') && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
         if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/admin/settle/', '');
@@ -2147,21 +2589,37 @@ export default {
       }
 
       if (path === '/test/email' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         return handleTestEmail(request, env);
       }
 
       if (path === '/test/votes' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
         return handleTestVotes(request, env);
       }
 
       if (path === '/checkout-intent/abandon' && method === 'POST') {
-        const body = await request.json().catch(() => ({}));
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.body || {};
         const orderId = String(body?.orderId || '').trim();
         if (!orderId) {
           return jsonResponse({ error: 'Missing orderId' }, 400);
         }
-        const result = await abandonCheckoutIntent(env, orderId);
-        return jsonResponse(result);
+        const rl = await checkRateLimit(request, env, {
+          ...RATE_LIMITS.abandon,
+          keyFn: () => orderId
+        });
+        if (!rl.allowed) return rl.response;
+        return withObservedOperation(env, ctx, 'checkout_intent_abandon', async () => {
+          const result = await abandonCheckoutIntent(env, orderId);
+          return jsonResponse(result);
+        });
       }
 
       if (path.startsWith('/live/') && method === 'GET') {
@@ -2181,6 +2639,10 @@ export default {
       }
 
       if (path.startsWith('/stats/') && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/stats/', '').replace(/\/(check|recalculate)$/, '');
         if (path.endsWith('/check')) {
           return handleCheckStatsProjection(request, campaignSlug, env);
@@ -2199,48 +2661,94 @@ export default {
       }
 
       if (path.startsWith('/inventory/') && path.endsWith('/recalculate') && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/inventory/', '').replace('/recalculate', '');
         return handleRecalculateInventory(request, campaignSlug, env);
       }
 
       if (path === '/admin/inventory/init-all' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
         return handleInitAllInventory(request, env);
       }
 
       if (path === '/admin/projections/check' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
         return handleCheckAllProjectionDrift(request, env);
       }
 
       // Admin: Recover a missed Stripe checkout session (creates pledge from completed session)
       if (path === '/admin/recover-checkout' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
         return handleRecoverCheckout(request, env);
       }
 
       // Admin: Backfill missing Stripe customer IDs on pledges (processes batch per call)
       if (path.startsWith('/admin/campaign-index/rebuild/') && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/admin/campaign-index/rebuild/', '');
         return handleRebuildCampaignIndex(request, campaignSlug, env);
       }
 
       if (path.startsWith('/admin/backfill-customers/') && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/admin/backfill-customers/', '');
         return handleBackfillCustomers(request, campaignSlug, env);
       }
 
       // Admin: Settle specific pledges by order ID (avoids full KV scan + subrequest limits)
       if (path === '/admin/settle-batch' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
         return handleSettleBatch(request, env);
       }
 
       // Admin: Dispatch batched settlement for a campaign (self-chains until complete)
       if (path.startsWith('/admin/settle-dispatch/') && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/admin/settle-dispatch/', '');
         return handleSettleDispatch(request, campaignSlug, env);
       }
 
       // Admin: Check cron heartbeat status
       if (path === '/admin/cron/status' && method === 'GET') {
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
         return handleCronStatus(request, env);
+      }
+
+      if (path === '/admin/observability/webhooks' && method === 'GET') {
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
+        return handleWebhookObservability(request, env);
+      }
+
+      if (path === '/admin/observability/performance' && method === 'GET') {
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
+        return handlePerformanceObservability(request, env);
       }
 
       return jsonResponse({ error: 'Not found' }, 404);
@@ -2618,7 +3126,12 @@ async function handleFirstPartyCheckoutStart(request, env) {
   const rateLimit = await checkRateLimit(request, env, RATE_LIMITS.start);
   if (!rateLimit.allowed) return rateLimit.response;
 
-  const body = await request.json();
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body;
   const {
     campaignSlug,
     items,
@@ -2964,12 +3477,12 @@ async function handleShippingQuote(request, env) {
   const rateLimit = await checkRateLimit(request, env, RATE_LIMITS.shipping);
   if (!rateLimit.allowed) return rateLimit.response;
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return privateJsonResponse({ error: 'Invalid JSON' }, 400, env);
-  }
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body;
 
   const {
     campaignSlug,
@@ -3211,12 +3724,12 @@ async function handleFirstPartyCheckoutComplete(request, env, ctx) {
   const trustedOrigin = requireTrustedSiteOrigin(request, env);
   if (!trustedOrigin.ok) return trustedOrigin.response;
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return privateJsonResponse({ error: 'Invalid JSON' }, 400, env);
-  }
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body;
 
   const orderId = String(body?.orderId || '').trim();
   const sessionId = String(body?.sessionId || '').trim();
@@ -3637,8 +4150,27 @@ async function processFirstPartyCheckoutBundle({
 
 async function handleStripeWebhook(request, env, ctx) {
   console.log('📨 Stripe webhook received');
+  const startedAt = Date.now();
   const body = await request.text();
   const sig = request.headers.get('stripe-signature');
+  let observedEventId = '';
+  let observedEventType = 'unknown';
+  let observedOrderId = '';
+  const finishWebhook = (response, outcome, extra = {}) => {
+    queueBackgroundTask(
+      ctx,
+      recordWebhookObservation(env, {
+        outcome,
+        eventId: extra.eventId ?? observedEventId,
+        eventType: extra.eventType ?? observedEventType,
+        orderId: extra.orderId ?? observedOrderId,
+        status: response?.status || 0,
+        durationMs: Date.now() - startedAt
+      }),
+      `webhook observation (${outcome})`
+    );
+    return response;
+  };
 
   // SEC-002: Early mode detection from raw payload to avoid signature mismatch
   // When prod worker (live mode) receives test events, the signature won't verify
@@ -3655,7 +4187,14 @@ async function handleStripeWebhook(request, env, ctx) {
         isLiveEvent, 
         isLiveMode 
       });
-      return jsonResponse({ received: true, skipped: 'mode mismatch' }, 200);
+      return finishWebhook(
+        jsonResponse({ received: true, skipped: 'mode mismatch' }, 200),
+        'mode_mismatch',
+        {
+          eventId: parsed.id,
+          eventType: parsed.type
+        }
+      );
     }
   } catch (parseErr) {
     console.error('📨 Failed to parse webhook body for mode check:', parseErr.message);
@@ -3667,16 +4206,21 @@ async function handleStripeWebhook(request, env, ctx) {
   const webhookSecret = getStripeWebhookSecret(env);
   if (!webhookSecret) {
     console.warn('Stripe webhook secret not configured for this mode, acknowledging receipt');
-    return jsonResponse({ received: true, skipped: 'webhook secret not configured' }, 200);
+    return finishWebhook(
+      jsonResponse({ received: true, skipped: 'webhook secret not configured' }, 200),
+      'secret_missing'
+    );
   }
 
   const { valid, error } = await verifyStripeSignature(body, sig, webhookSecret);
   if (!valid) {
     console.error('Webhook signature verification failed:', error);
-    return jsonResponse({ error: 'Invalid signature' }, 401);
+    return finishWebhook(jsonResponse({ error: 'Invalid signature' }, 401), 'invalid_signature');
   }
 
   const event = JSON.parse(body);
+  observedEventId = String(event?.id || '').trim();
+  observedEventType = String(event?.type || 'unknown').trim() || 'unknown';
   console.log('📨 Event type:', event.type);
 
   const eventKey = env.PLEDGES ? `stripe-event:${event.id}` : null;
@@ -3691,7 +4235,7 @@ async function handleStripeWebhook(request, env, ctx) {
     const alreadyProcessed = await env.PLEDGES.get(eventKey);
     if (alreadyProcessed) {
       console.log('📨 Skipping duplicate event:', event.id);
-      return jsonResponse({ received: true });
+      return finishWebhook(jsonResponse({ received: true }), 'duplicate_event');
     }
   }
 
@@ -3700,6 +4244,7 @@ async function handleStripeWebhook(request, env, ctx) {
     
     if (session.mode === 'setup') {
       const { orderId, campaignSlug, amountCents, tierId, tierName, tierQty, tipPercent, hasAdditionalTiers, hasExtras, hasPhysical, isPaymentUpdate, checkoutProvider, checkoutNonce, checkoutCartHash, checkoutSnapshotVersion, preferredLang, shippingOption } = session.metadata;
+      observedOrderId = String(orderId || '').trim();
       const tierQtyNum = parseInt(tierQty) || 1;
       const normalizedTipPercent = tipPercent === undefined || tipPercent === null || tipPercent === ''
         ? 0
@@ -3784,7 +4329,7 @@ async function handleStripeWebhook(request, env, ctx) {
       }
 
       if (checkoutProvider === 'first_party' && bundleManifest?.campaigns?.length > 1 && isPaymentUpdate !== 'true') {
-        return processFirstPartyCheckoutBundle({
+        const bundleResponse = await processFirstPartyCheckoutBundle({
           env,
           ctx,
           stripe,
@@ -3801,6 +4346,7 @@ async function handleStripeWebhook(request, env, ctx) {
           bundleManifest,
           markStripeEventProcessed
         });
+        return finishWebhook(bundleResponse, bundleResponse.status >= 400 ? 'bundled_failed' : 'bundled_processed');
       }
 
       const campaign = await getCampaign(env, campaignSlug);
@@ -3925,7 +4471,7 @@ async function handleStripeWebhook(request, env, ctx) {
             // Duplicate webhook - pledge already processed
             console.log('📝 Pledge already exists, skipping duplicate webhook:', orderId);
             await markStripeEventProcessed();
-            return jsonResponse({ received: true });
+            return finishWebhook(jsonResponse({ received: true }), 'duplicate_pledge');
           }
           
           const tierSelection = buildTierSelectionFromStartRequest(campaign, {
@@ -3935,7 +4481,7 @@ async function handleStripeWebhook(request, env, ctx) {
           });
           if (!tierSelection.valid) {
             console.error('📝 Invalid tier selection in webhook metadata:', tierSelection.error);
-            return jsonResponse({ error: tierSelection.error }, 409);
+            return finishWebhook(jsonResponse({ error: tierSelection.error }, 409), 'rejected_conflict');
           }
 
           const thresholdValidation = await validateTierThresholdSelection(
@@ -3946,13 +4492,13 @@ async function handleStripeWebhook(request, env, ctx) {
           );
           if (!thresholdValidation.valid) {
             console.error('📝 Threshold-gated tier rejected during webhook processing:', thresholdValidation.error);
-            return jsonResponse({ error: thresholdValidation.error }, 409);
+            return finishWebhook(jsonResponse({ error: thresholdValidation.error }, 409), 'rejected_conflict');
           }
 
           const desiredSupportItems = buildDesiredSupportItems(campaign, [], supportItems);
           if (!desiredSupportItems.valid) {
             console.error('📝 Invalid support items in webhook metadata:', desiredSupportItems.error);
-            return jsonResponse({ error: desiredSupportItems.error }, 409);
+            return finishWebhook(jsonResponse({ error: desiredSupportItems.error }, 409), 'rejected_conflict');
           }
 
           const anchorBundleAddOns = getBundleAddOnsForAnchorCampaign(
@@ -3972,18 +4518,18 @@ async function handleStripeWebhook(request, env, ctx) {
           });
           if (!canonicalContribution.valid) {
             console.error('📝 Invalid pledge contribution in webhook metadata:', canonicalContribution.error);
-            return jsonResponse({ error: canonicalContribution.error }, 409);
+            return finishWebhook(jsonResponse({ error: canonicalContribution.error }, 409), 'rejected_conflict');
           }
 
           if (checkoutProvider === 'first_party') {
             if (String(checkoutSnapshotVersion || '') !== String(CHECKOUT_INTENT_VERSION)) {
               console.error('📝 Invalid first-party checkout snapshot version:', checkoutSnapshotVersion);
-              return jsonResponse({ error: 'Invalid checkout snapshot version' }, 409);
+              return finishWebhook(jsonResponse({ error: 'Invalid checkout snapshot version' }, 409), 'rejected_conflict');
             }
 
             if (!checkoutNonce || !checkoutCartHash) {
               console.error('📝 Missing first-party checkout integrity metadata');
-              return jsonResponse({ error: 'Missing checkout integrity metadata' }, 409);
+              return finishWebhook(jsonResponse({ error: 'Missing checkout integrity metadata' }, 409), 'rejected_conflict');
             }
 
             const recomputedCheckoutCartHash = bundleManifest?.campaigns?.length === 1
@@ -4009,7 +4555,7 @@ async function handleStripeWebhook(request, env, ctx) {
                 expectedHashPrefix: String(checkoutCartHash).slice(0, 12),
                 actualHashPrefix: recomputedCheckoutCartHash.slice(0, 12)
               });
-              return jsonResponse({ error: 'Checkout integrity verification failed' }, 409);
+              return finishWebhook(jsonResponse({ error: 'Checkout integrity verification failed' }, 409), 'rejected_conflict');
             }
           }
 
@@ -4023,7 +4569,7 @@ async function handleStripeWebhook(request, env, ctx) {
           );
           if (!availability.valid) {
             console.warn('📝 Inventory unavailable during webhook processing:', availability.error);
-            return jsonResponse({ error: availability.error }, 409);
+            return finishWebhook(jsonResponse({ error: availability.error }, 409), 'rejected_conflict');
           }
 
           const now = new Date().toISOString();
@@ -4086,7 +4632,7 @@ async function handleStripeWebhook(request, env, ctx) {
           });
           if (!persisted.success) {
             console.error('📝 Failed to persist pledge after webhook:', persisted.error);
-            return jsonResponse({ error: persisted.error }, 409);
+            return finishWebhook(jsonResponse({ error: persisted.error }, 409), 'persistence_failed');
           }
 
           await env.PLEDGES.delete(`pending-tiers:${orderId}`);
@@ -4150,6 +4696,7 @@ async function handleStripeWebhook(request, env, ctx) {
   if (event.type === 'payment_intent.payment_failed') {
     const paymentIntent = event.data.object;
     const { orderId, email, campaignSlug } = paymentIntent.metadata || {};
+    observedOrderId = String(orderId || '').trim();
     
     if (orderId && email) {
       const campaign = await getCampaign(env, campaignSlug);
@@ -4214,7 +4761,12 @@ async function handleStripeWebhook(request, env, ctx) {
   }
 
   await markStripeEventProcessed();
-  return jsonResponse({ received: true });
+  const defaultOutcome = event.type === 'payment_intent.payment_failed'
+    ? 'payment_failed_processed'
+    : event.type === 'checkout.session.completed'
+      ? 'processed'
+      : 'ignored_event_type';
+  return finishWebhook(jsonResponse({ received: true }), defaultOutcome);
 }
 
 async function handleGetPledge(request, env) {
@@ -4329,7 +4881,11 @@ async function handleGetPledges(request, env) {
 }
 
 async function handleCancelPledge(request, env) {
-  const body = await request.json();
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body;
   const { token, orderId, preferredLang } = body;
 
   if (!token) {
@@ -4504,7 +5060,11 @@ async function handleCancelPledge(request, env) {
 }
 
 async function handleModifyPledge(request, env) {
-  const body = await request.json();
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body;
   const { token, orderId, newTierId, newTierQty, addTiers, supportItems, bundleAddOns, customAmount, tipPercent, preferredLang, shippingOption } = body;
 
   if (!token) {
@@ -4844,12 +5404,12 @@ async function handleUpdatePaymentMethod(request, env) {
   const trustedOrigin = requireTrustedSiteOrigin(request, env);
   if (!trustedOrigin.ok) return trustedOrigin.response;
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return privateJsonResponse({ error: 'Invalid JSON' }, 400, env);
-  }
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body;
   const { token, preferredLang } = body;
 
   if (!token) {
@@ -5344,7 +5904,12 @@ async function handleSettleCampaign(request, campaignSlug, env) {
     }
   }
 
-  const body = await request.json().catch(() => ({}));
+  const parsedBody = await parseOptionalJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
   const dryRun = body.dryRun === true;
 
   try {
@@ -5511,11 +6076,51 @@ async function handleCronStatus(request, env) {
   });
 }
 
+async function handleWebhookObservability(request, env) {
+  const auth = requireAdmin(request, env);
+  if (!auth.ok) return auth.response;
+
+  const url = new URL(request.url);
+  const days = clampObservabilityDays(url.searchParams.get('days'));
+  const summaries = await listObservabilitySummaries(env, 'webhook', days);
+  const recent = await getObservabilityRecentEvents(env, 'webhook');
+
+  return jsonResponse({
+    success: true,
+    days,
+    now: new Date().toISOString(),
+    summaries,
+    recent
+  });
+}
+
+async function handlePerformanceObservability(request, env) {
+  const auth = requireAdmin(request, env);
+  if (!auth.ok) return auth.response;
+
+  const url = new URL(request.url);
+  const days = clampObservabilityDays(url.searchParams.get('days'));
+  const summaries = await listObservabilitySummaries(env, 'performance', days);
+
+  return jsonResponse({
+    success: true,
+    days,
+    sampleRate: getObservabilitySampleRate(env),
+    now: new Date().toISOString(),
+    summaries
+  });
+}
+
 async function handleSettleBatch(request, env) {
   const auth = requireAdmin(request, env);
   if (!auth.ok) return auth.response;
 
-  const body = await request.json().catch(() => ({}));
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
   const { orderIds, dryRun = false } = body;
 
   if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
@@ -5748,7 +6353,12 @@ async function handleBackfillCustomers(request, campaignSlug, env) {
 
   const BATCH_SIZE = 5;
   const stripe = createStripeClient(getStripeKey(env));
-  const body = await request.json().catch(() => ({}));
+  const parsedBody = await parseOptionalJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
   const dryRun = body.dryRun === true;
 
   const orderIds = await getCampaignOrderIds(env, campaignSlug);
@@ -5834,7 +6444,12 @@ async function handleTestSetup(request, env) {
     return jsonResponse({ error: 'PLEDGES KV not configured' }, 500);
   }
 
-  const body = await request.json().catch(() => ({}));
+  const parsedBody = await parseOptionalJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
   const email = body.email || 'test@example.com';
   const campaignSlug = body.campaignSlug || 'hand-relations';
   const testOrderId = getTestFixtureOrderId(email, campaignSlug);
@@ -5953,7 +6568,12 @@ async function handleTestCleanup(request, env) {
     return jsonResponse({ error: 'PLEDGES KV not configured' }, 500);
   }
 
-  const body = await request.json().catch(() => ({}));
+  const parsedBody = await parseOptionalJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
   const email = body.email || 'test@example.com';
   const campaignSlug = body.campaignSlug || 'hand-relations';
   const testOrderId = getTestFixtureOrderId(email, campaignSlug);
@@ -6144,7 +6764,11 @@ async function handleBroadcastAnnouncement(request, env) {
   const auth = requireAdmin(request, env);
   if (!auth.ok) return auth.response;
 
-  const body = await request.json();
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
   const { campaignSlug, subject, heading, body: messageBody, ctaLabel, ctaUrl, dryRun } = body;
 
   if (!campaignSlug || !subject || !messageBody) {
@@ -6222,7 +6846,11 @@ async function handleBroadcastDiary(request, env) {
   const auth = requireAdmin(request, env);
   if (!auth.ok) return auth.response;
 
-  const body = await request.json();
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
   const { campaignSlug, diaryTitle, diaryExcerpt, dryRun } = body;
 
   if (!campaignSlug || !diaryTitle) {
@@ -6296,7 +6924,12 @@ async function handleDiaryCheck(request, env) {
   const auth = requireAdmin(request, env);
   if (!auth.ok) return auth.response;
 
-  const body = await request.json().catch(() => ({}));
+  const parsedBody = await parseOptionalJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
   const { dryRun } = body;
 
   const campaignsData = await getCampaigns(env);
@@ -6398,7 +7031,11 @@ async function handleBroadcastMilestone(request, env) {
   const auth = requireAdmin(request, env);
   if (!auth.ok) return auth.response;
 
-  const body = await request.json();
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
   const { campaignSlug, milestone, stretchGoalName, dryRun } = body;
 
   if (!campaignSlug || !milestone) {
@@ -6646,7 +7283,11 @@ async function handleTestEmail(request, env) {
     }
   }
 
-  const body = await request.json();
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
   const { type, email, campaignSlug } = body;
 
   if (!type || !email) {
@@ -6861,7 +7502,11 @@ async function handleTestVotes(request, env) {
     return jsonResponse({ error: 'Test endpoints only available in test mode' }, 403);
   }
 
-  const body = await request.json();
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
   const { campaignSlug, decisions } = body;
 
   if (!campaignSlug || !decisions) {
@@ -6887,12 +7532,13 @@ async function handleAdminRebuild(request, env) {
   if (!auth.ok) return auth.response;
 
   let reason = 'admin-triggered';
-  try {
-    const body = await request.json();
-    if (body.reason) reason = body.reason;
-  } catch {
-    // No body is fine
-  }
+  const parsedBody = await parseOptionalJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
+  if (body.reason) reason = body.reason;
 
   const result = await triggerSiteRebuild(env, reason);
   
@@ -7256,12 +7902,11 @@ async function handleRecoverCheckout(request, env) {
   const auth = requireAdmin(request, env);
   if (!auth.ok) return auth.response;
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: 'Invalid JSON' }, 400);
-  }
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
 
   const { sessionId, orderId } = body;
   

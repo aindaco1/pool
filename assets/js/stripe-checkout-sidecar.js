@@ -2,85 +2,112 @@
   'use strict';
 
   const STRIPE_JS_URL = 'https://js.stripe.com/clover/stripe.js';
-  const STRIPE_APPEARANCE = {
-    theme: 'flat',
-    labels: 'floating',
-    variables: {
-      colorPrimary: '#0f2742',
-      colorText: '#111111',
-      colorTextSecondary: '#6b7280',
-      colorDanger: '#9f1239',
-      colorBackground: '#f8faff',
-      borderRadius: '10px',
-      spacingUnit: '4px',
-      fontFamily: 'Inter, sans-serif',
-      fontSizeBase: '13px',
-      fontWeightNormal: '400'
-    },
-    rules: {
-      '.Block': {
-        backgroundColor: '#ffffff',
-        border: '1px solid #d7d6d3',
-        boxShadow: 'none',
-        borderRadius: '10px'
-      },
-      '.Input': {
-        backgroundColor: '#ffffff',
-        border: '1px solid #d7d6d3',
-        boxShadow: 'none',
-        color: '#111111',
-        fontSize: '13px',
-        fontWeight: '400',
-        lineHeight: '1.4',
-        padding: '10px 12px'
-      },
-      '.Input::placeholder': {
-        color: '#6b7280'
-      },
-      '.Input:focus': {
-        borderColor: '#0f2742',
-        boxShadow: '0 0 0 1px #0f2742'
-      },
-      '.Label': {
-        fontWeight: '700',
-        color: '#111111',
-        fontSize: '12px'
-      },
-      '.Tab': {
-        backgroundColor: '#ffffff',
-        border: '1px solid #d7d6d3',
-        boxShadow: 'none',
-        borderRadius: '10px',
-        padding: '12px 14px'
-      },
-      '.Tab:hover': {
-        borderColor: '#a9b4c2'
-      },
-      '.Tab--selected': {
-        backgroundColor: '#f8fbff',
-        border: '2px solid #0f2742',
-        boxShadow: 'none'
-      },
-      '.TabLabel': {
-        color: '#7b869a',
-        fontWeight: '500',
-        fontSize: '13px'
-      },
-      '.TabLabel--selected': {
-        color: '#0f2742',
-        fontWeight: '700'
-      },
-      '.TabIcon': {
-        color: '#7b869a',
-        fill: '#7b869a'
-      },
-      '.TabIcon--selected': {
-        color: '#0f2742',
-        fill: '#0f2742'
-      }
-    }
-  };
   let stripeJsPromise = null;
+
+  function readThemeVar(name, fallback) {
+    try {
+      const computed = window.getComputedStyle(document.documentElement).getPropertyValue(name);
+      const normalized = String(computed || '').trim();
+      return normalized || fallback;
+    } catch (_error) {
+      return fallback;
+    }
+  }
+
+  function buildStripeAppearance() {
+    const radiusMd = readThemeVar('--pool-radius-md', '10px');
+    const colorPrimary = readThemeVar('--pool-color-primary', '#101215');
+    const colorPrimaryHover = readThemeVar('--pool-color-primary-hover', colorPrimary);
+    const colorText = readThemeVar('--pool-ink-default', '#252930');
+    const colorTextStrong = readThemeVar('--pool-ink-strong', '#101215');
+    const colorTextMuted = readThemeVar('--pool-ink-muted', '#5d6573');
+    const colorTextSoft = readThemeVar('--pool-ink-soft', '#7b8494');
+    const colorSurfaceBase = readThemeVar('--pool-surface-base', '#ffffff');
+    const colorSurfaceSubtle = readThemeVar('--pool-surface-subtle', '#f0f1ed');
+    const colorSurfacePage = readThemeVar('--pool-surface-page', '#f5f5f2');
+    const colorBorder = readThemeVar('--pool-border-default', '#d2d7df');
+    const colorBorderStrong = readThemeVar('--pool-border-strong', '#9ea7b5');
+    const fontFamily = readThemeVar('--pool-font-body', 'Inter, sans-serif');
+
+    return {
+      theme: 'flat',
+      labels: 'floating',
+      variables: {
+        colorPrimary: colorPrimary,
+        colorText: colorText,
+        colorTextSecondary: colorTextMuted,
+        colorDanger: '#9f1239',
+        colorBackground: colorSurfaceSubtle,
+        borderRadius: radiusMd,
+        spacingUnit: '4px',
+        fontFamily: fontFamily,
+        fontSizeBase: '13px',
+        fontWeightNormal: '400'
+      },
+      rules: {
+        '.Block': {
+          backgroundColor: colorSurfaceBase,
+          border: '1px solid ' + colorBorder,
+          boxShadow: 'none',
+          borderRadius: radiusMd
+        },
+        '.Input': {
+          backgroundColor: colorSurfaceBase,
+          border: '1px solid ' + colorBorder,
+          boxShadow: 'none',
+          color: colorText,
+          fontSize: '13px',
+          fontWeight: '400',
+          lineHeight: '1.4',
+          padding: '10px 12px'
+        },
+        '.Input::placeholder': {
+          color: colorTextMuted
+        },
+        '.Input:focus': {
+          borderColor: colorPrimary,
+          boxShadow: '0 0 0 1px ' + colorPrimary
+        },
+        '.Label': {
+          fontWeight: '700',
+          color: colorTextStrong,
+          fontSize: '12px'
+        },
+        '.Tab': {
+          backgroundColor: colorSurfaceBase,
+          border: '1px solid ' + colorBorder,
+          boxShadow: 'none',
+          borderRadius: radiusMd,
+          padding: '12px 14px'
+        },
+        '.Tab:hover': {
+          borderColor: colorBorderStrong
+        },
+        '.Tab--selected': {
+          backgroundColor: colorSurfacePage,
+          border: '2px solid ' + colorPrimary,
+          boxShadow: 'none'
+        },
+        '.TabLabel': {
+          color: colorTextSoft,
+          fontWeight: '500',
+          fontSize: '13px'
+        },
+        '.TabLabel--selected': {
+          color: colorPrimaryHover,
+          fontWeight: '700'
+        },
+        '.TabIcon': {
+          color: colorTextSoft,
+          fill: colorTextSoft
+        },
+        '.TabIcon--selected': {
+          color: colorPrimaryHover,
+          fill: colorPrimaryHover
+        }
+      }
+    };
+  }
 
   function isMountableContainer(value) {
     return value instanceof HTMLElement;
@@ -161,7 +188,7 @@
       clientSecret,
       elementsOptions: {
         syncAddressCheckbox: 'shipping',
-        appearance: STRIPE_APPEARANCE
+        appearance: buildStripeAppearance()
       }
     });
     if (!checkout || typeof checkout.loadActions !== 'function') {

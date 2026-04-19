@@ -178,6 +178,7 @@ function createEnv(overrides: Record<string, unknown> = {}) {
     MAGIC_LINK_SECRET: 'secret',
     ADMIN_SECRET: 'admin-secret',
     PLEDGES: new PaginatedKVNamespace(2),
+    RATELIMIT: new PaginatedKVNamespace(50),
     ...overrides
   };
 }
