@@ -37,8 +37,8 @@ exclude:
 # Structured platform settings for forks.
 platform:
   name: The Pool
-  version: "0.9.1"
-  release_label: "v0.9.1"
+  version: "0.9.2"
+  release_label: "v0.9.2"
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   pledges_email_from: "The Pool <pledges@dustwave.xyz>"
