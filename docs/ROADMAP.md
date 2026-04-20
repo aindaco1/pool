@@ -215,7 +215,7 @@
     - Review Pages CMS GitHub repo for a starting place
     - Block-based with the ability to preview campaign content
     - Create/edit/delete campaign content, diary, community vote, and other per-campaign variables
-- [ ] Non-Stripe tax calculator to replace flat rate sales tax
+- [ ] Further tax calculator work
   - Support USA and international
   - Target local / jurisdiction-level US rates, not just state-level rates
   - Near-term focus: finish New Mexico local gross receipts tax coverage so the calculator can be manually tested end to end with more confidence
