@@ -26,6 +26,17 @@ Write-path DoS protection now requires a `RATELIMIT` KV namespace. If that bindi
 
 Deployed Standard/Paid Workers now also set `limits.cpu_ms = 100` in [`wrangler.toml`](./wrangler.toml). That limit is not enforced in local development and is not a Workers Free override; it is a conservative denial-of-wallet ceiling for paid deployments that still leaves comfortable room above the currently observed fast-path request timings in the unit harness.
 
+Tax calculation is now routed through a provider seam in `worker/src/tax.js`:
+
+- `TAX_PROVIDER=flat` keeps the current configured-rate behavior from `SALES_TAX_RATE`
+- `TAX_PROVIDER=offline_rules` uses vendored rules for international VAT/GST and state-level fallback handling
+- `TAX_PROVIDER=nm_grt` uses the vendored New Mexico starter dataset and can refine New Mexico street-address lookups against the free EDAC GRT API
+- `TAX_PROVIDER=zip_tax` adds local / jurisdiction-level US lookups through ZIP.TAX and falls back to `offline_rules` for destinations outside US/CA
+
+Non-secret provider settings are mirrored from the repo-root `_config.yml` into [`wrangler.toml`](./wrangler.toml) as `TAX_PROVIDER`, `TAX_ORIGIN_COUNTRY`, `TAX_USE_REGIONAL_ORIGIN`, `NM_GRT_API_BASE`, and `ZIP_TAX_API_BASE`. If you enable `zip_tax`, also set `ZIP_TAX_API_KEY` as a Worker secret or in [`worker/.dev.vars`](../worker/.dev.vars). Refresh the vendored New Mexico starter file with `node ../scripts/update-nm-grt-starter.mjs`.
+
+In the current browser flow, tax previews are intentionally allowed to stay provisional. If the cart or custom checkout does not yet have enough location data, the site shows `--` and waits for `/tax/quote` or `/checkout-intent/start` to finalize the tax result. New Mexico lookups are the most exact built-in path right now and typically need full street-level address data, not just ZIP/state, before the Worker can return a reliable local GRT result.
+
 The Worker now also writes lightweight observability summaries into `PLEDGES` KV for two things:
 
 - Stripe webhook delivery outcomes and recent delivery history
@@ -85,6 +96,9 @@ wrangler secret put ADMIN_SECRET
 
 # USPS OAuth secret (keep the client id in site config)
 wrangler secret put USPS_CLIENT_SECRET
+
+# Optional: ZIP.TAX API key for local/jurisdiction-level tax lookup
+wrangler secret put ZIP_TAX_API_KEY
 ```
 
 USPS setup for this repo is split intentionally:
@@ -145,6 +159,8 @@ Canonicalize the first-party cart payload and create a Stripe setup-mode Checkou
 ```
 
 Returns either a custom-session bootstrap (`checkoutUiMode`, `sessionId`, `clientSecret`, `publishableKey`, `orderId`) or a hosted fallback URL.
+
+If the browser already has a billing tax destination, it can also include `billingAddress` in that payload so the final checkout quote does not have to fall back to shipping-only tax destination rules.
 
 The Worker rebuilds tier, bundle add-on, custom-support, shipping, and subtotal state from first-party cart items, validates campaign state and inventory, signs a short-lived checkout snapshot, reserves scarce inventory for limited tiers before the payment step completes, and confirms those reservations when the pledge is actually persisted. For physical pledges or physical add-ons, shipping is Worker-calculated from destination plus campaign/item shipping metadata, using USPS live quotes when available and deployment or campaign fallback rates when not.
 
@@ -227,6 +243,25 @@ The rendered card uses live campaign data, including current state, pledged tota
 
 ### POST /webhooks/stripe
 Stripe webhook endpoint (signature verified).
+
+### POST /tax/quote
+Return a Worker-calculated tax preview for cart / checkout UI.
+
+```json
+{
+  "subtotalCents": 1000,
+  "shippingCents": 300,
+  "billingAddress": {
+    "country": "US",
+    "postalCode": "80205",
+    "state": "CO"
+  }
+}
+```
+
+The current browser flow uses this for provisional cart / custom-checkout tax display. It is same-origin protected, rate limited, and intended for first-party UI previews rather than public third-party use.
+
+If the payload does not include enough destination detail for the configured provider, the Worker can return a provisional/no-tax-result response and let the browser keep displaying `--` until checkout has a better billing or shipping destination.
 
 ### GET /admin/observability/webhooks?days=2
 Admin-only webhook observability summary.

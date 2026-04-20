@@ -93,6 +93,8 @@ More specifically, the self-check covers:
 
 The broader merge gate additionally runs `./scripts/smoke-pledge-management.sh --podman` so the mutable modify/cancel path still gets isolated stateful coverage even when host build phases succeed.
 
+That mutable-pledge smoke now also stays compatible with provider-driven tax setups such as `tax.provider: nm_grt`: the Worker test fixture path seeds a billing address so `/test/setup` can build a real tax-aware pledge instead of assuming flat tax.
+
 From the repo root:
 
 ```bash
@@ -176,6 +178,16 @@ If the pod is already running, inspect logs with:
 podman logs -f pool-dev-site
 podman logs -f pool-dev-worker
 ```
+
+If the broader merge gate fails specifically at `7b. Podman mutable-pledge smoke`, first confirm the stack itself is healthy with:
+
+```bash
+npm run podman:doctor
+./scripts/dev.sh --podman
+./scripts/smoke-pledge-management.sh --podman
+```
+
+That sequence now exercises the same location-aware test-fixture path the merge gate relies on.
 
 If `./scripts/dev.sh --podman` never gets past Podman startup, check the machine first:
 

@@ -164,6 +164,33 @@ describe('supporter email tip breakdowns', () => {
     expect(payload.reply_to).toBe('info@pool.test');
   });
 
+  it('uses stored tax details for the email tax label', async () => {
+    const fetchMock = mockResend();
+
+    await sendSupporterEmail(env, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      subtotal: 3500,
+      tax: 311,
+      taxDetails: {
+        effectiveRate: 0.08875,
+        destination: {
+          country: 'US',
+          postalCode: '80205'
+        }
+      },
+      shipping: 300,
+      tipAmount: 210,
+      tipPercent: 6,
+      token: 'magic-token'
+    });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.html).toContain('Sales tax (8.875%)');
+    expect(payload.html).not.toContain('Sales tax (7.875%)');
+  });
+
   it('uses Spanish email copy when preferredLang is es', async () => {
     const fetchMock = mockResend();
 

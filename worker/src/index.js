@@ -52,8 +52,9 @@ import { getScopedConsole } from './logger.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
 import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput, CHECKOUT_INTENT_VERSION, DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
-import { getCampaignShippingFallbackFeeCents, getCheckoutProvider, getCheckoutUiMode, getDefaultPlatformTipPercent, getFlatShippingFeeCents, getMaxPlatformTipPercent, getSalesTaxRate, getShippingFallbackFeeCents } from './provider-config.js';
+import { getCampaignShippingFallbackFeeCents, getCheckoutProvider, getCheckoutUiMode, getDefaultPlatformTipPercent, getFlatShippingFeeCents, getMaxPlatformTipPercent, getShippingFallbackFeeCents } from './provider-config.js';
 import { normalizeShippingDestination, quoteCampaignShipment } from './shipping.js';
+import { normalizeTaxDestination, quoteTax } from './tax.js';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
 
@@ -998,6 +999,7 @@ async function getObservabilityRecentEvents(env, kind) {
 const RATE_LIMITS = {
   start: { prefix: 'rl:start', limit: 40, windowSeconds: 60 },          // 40 checkout starts/min/IP
   shipping: { prefix: 'rl:shipping', limit: 90, windowSeconds: 60 },    // 90 quote refreshes/min/IP
+  tax: { prefix: 'rl:tax', limit: 90, windowSeconds: 60 },              // 90 tax quote refreshes/min/IP
   complete: { prefix: 'rl:complete', limit: 12, windowSeconds: 60 },    // 12 recovery attempts/min/order
   abandon: { prefix: 'rl:abandon', limit: 12, windowSeconds: 60 },      // 12 abandon attempts/min/order
   votes: { prefix: 'rl:votes', limit: 45, windowSeconds: 60 },          // 45 vote reads/writes/min/IP
@@ -1058,12 +1060,54 @@ function isDeadlinePassed(dateString) {
   return new Date() > deadline;
 }
 
-function calculateTax(env, subtotalCents) {
-  return Math.round(subtotalCents * getSalesTaxRate(env));
+function sanitizeStoredTaxDetails(taxDetails, fallback = {}) {
+  if (!taxDetails || typeof taxDetails !== 'object') {
+    return {
+      provider: String(fallback.provider || 'flat'),
+      source: String(fallback.source || 'flat_rate'),
+      effectiveRate: Number(fallback.effectiveRate || 0) || 0,
+      locationCode: typeof fallback.locationCode === 'string' && fallback.locationCode.trim() ? fallback.locationCode.trim() : null,
+      destination: fallback.destination || null,
+      jurisdiction: fallback.jurisdiction || null,
+      taxableSubtotalCents: Math.max(0, Number(fallback.taxableSubtotalCents || 0) || 0),
+      taxableShippingCents: Math.max(0, Number(fallback.taxableShippingCents || 0) || 0),
+      shippingTaxed: fallback.shippingTaxed === true,
+      shippingCents: Math.max(0, Number(fallback.shippingCents || 0) || 0),
+      breakdown: Array.isArray(fallback.breakdown) ? fallback.breakdown : []
+    };
+  }
+
+  return {
+    provider: String(taxDetails.provider || fallback.provider || 'flat'),
+    source: String(taxDetails.source || fallback.source || 'flat_rate'),
+    effectiveRate: Number(taxDetails.effectiveRate ?? fallback.effectiveRate ?? 0) || 0,
+    locationCode: typeof (taxDetails.locationCode ?? fallback.locationCode) === 'string' && String(taxDetails.locationCode ?? fallback.locationCode).trim()
+      ? String(taxDetails.locationCode ?? fallback.locationCode).trim()
+      : null,
+    destination: taxDetails.destination || fallback.destination || null,
+    jurisdiction: taxDetails.jurisdiction || fallback.jurisdiction || null,
+    taxableSubtotalCents: Math.max(0, Number(taxDetails.taxableSubtotalCents ?? fallback.taxableSubtotalCents ?? 0) || 0),
+    taxableShippingCents: Math.max(0, Number(taxDetails.taxableShippingCents ?? fallback.taxableShippingCents ?? 0) || 0),
+    shippingTaxed: taxDetails.shippingTaxed === true,
+    shippingCents: Math.max(0, Number(taxDetails.shippingCents ?? fallback.shippingCents ?? 0) || 0),
+    breakdown: Array.isArray(taxDetails.breakdown) ? taxDetails.breakdown : (Array.isArray(fallback.breakdown) ? fallback.breakdown : [])
+  };
 }
 
-function calculateTotalWithTax(env, subtotalCents) {
-  return subtotalCents + calculateTax(env, subtotalCents);
+function buildStoredTaxDetailsFallback(pledgeData) {
+  const subtotal = Math.max(0, Number(pledgeData?.subtotal ?? pledgeData?.amount ?? 0) || 0);
+  const shipping = Math.max(0, Number(pledgeData?.shipping || 0) || 0);
+  return {
+    destination: pledgeData?.billingAddress || pledgeData?.shippingAddress || pledgeData?.taxDetails?.destination || null,
+    taxableSubtotalCents: subtotal,
+    taxableShippingCents: 0,
+    shippingTaxed: false,
+    shippingCents: shipping
+  };
+}
+
+function getStoredTaxDetails(pledgeData) {
+  return sanitizeStoredTaxDetails(pledgeData?.taxDetails, buildStoredTaxDetailsFallback(pledgeData));
 }
 
 function getStoredTipPercent(env, pledgeData, fallback = 0) {
@@ -1084,17 +1128,28 @@ function getStoredTipAmount(env, pledgeData) {
   return calculatePlatformTip(subtotal, getStoredTipPercent(env, pledgeData, 0), getMaxPlatformTipPercent(env));
 }
 
-function buildPledgeTotals(env, subtotalCents, { shipping = 0, tipPercent } = {}) {
+async function buildPledgeTotals(env, subtotalCents, { shipping = 0, tipPercent, taxDestination = null } = {}) {
   const normalizedSubtotal = Math.max(0, Number(subtotalCents) || 0);
   const normalizedShipping = Math.max(0, Number(shipping) || 0);
   const defaultTipPercent = getDefaultPlatformTipPercent(env);
   const maxTipPercent = getMaxPlatformTipPercent(env);
   const normalizedTipPercent = sanitizePlatformTipPercent(tipPercent, defaultTipPercent, maxTipPercent);
-  const tax = calculateTax(env, normalizedSubtotal);
+  const taxQuote = await quoteTax(env, {
+    subtotalCents: normalizedSubtotal,
+    shippingCents: normalizedShipping,
+    destination: taxDestination
+  });
+  const tax = taxQuote.taxCents;
   const tipAmount = calculatePlatformTip(normalizedSubtotal, normalizedTipPercent, maxTipPercent);
   return {
     subtotal: normalizedSubtotal,
     tax,
+    taxDetails: sanitizeStoredTaxDetails(taxQuote, {
+      taxableSubtotalCents: normalizedSubtotal,
+      taxableShippingCents: 0,
+      shippingTaxed: false,
+      shippingCents: normalizedShipping
+    }),
     shipping: normalizedShipping,
     tipPercent: normalizedTipPercent,
     tipAmount,
@@ -1833,14 +1888,15 @@ function buildDesiredSupportItems(campaign, currentSupportItems = [], requestedS
   };
 }
 
-function buildCanonicalContribution(env, campaign, {
+async function buildCanonicalContribution(env, campaign, {
   tierSelection,
   supportItems = [],
   customAmount = 0,
   bundleAddOns = [],
   tipPercent,
   shippingCents = null,
-  shippingOption = 'standard'
+  shippingOption = 'standard',
+  taxDestination = null
 }) {
   const normalizedCustomAmount = Number(customAmount);
   if (!isNonNegativeInteger(normalizedCustomAmount) || !isValidAmount(normalizedCustomAmount * 100)) {
@@ -1883,20 +1939,28 @@ function buildCanonicalContribution(env, campaign, {
       );
   const normalizedShippingOption = String(shippingOption || 'standard').trim().toLowerCase() || 'standard';
 
-  return {
-    valid: true,
-    ...tierSelection,
-    hasPhysical,
-    shippingOption: normalizedShippingOption,
-    supportItems,
-    bundleAddOns,
-    customAmount: normalizedCustomAmount,
-    goalTrackingSubtotal,
-    totals: buildPledgeTotals(env, subtotal, {
-      shipping: resolvedShippingCents,
-      tipPercent
-    })
-  };
+  try {
+    return {
+      valid: true,
+      ...tierSelection,
+      hasPhysical,
+      shippingOption: normalizedShippingOption,
+      supportItems,
+      bundleAddOns,
+      customAmount: normalizedCustomAmount,
+      goalTrackingSubtotal,
+      totals: await buildPledgeTotals(env, subtotal, {
+        shipping: resolvedShippingCents,
+        tipPercent,
+        taxDestination
+      })
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : 'Failed to calculate tax'
+    };
+  }
 }
 
 async function buildCanonicalContributionForStoredShipping(env, campaign, {
@@ -1907,16 +1971,22 @@ async function buildCanonicalContributionForStoredShipping(env, campaign, {
   tipPercent,
   shippingAddress = null,
   currentShipping = 0,
-  shippingOption = 'standard'
+  shippingOption = 'standard',
+  taxDestination = null
 }) {
-  const canonicalContribution = buildCanonicalContribution(env, campaign, {
+  const normalizedTaxDestination = taxDestination
+    ? normalizeTaxDestination(taxDestination)
+    : (shippingAddress ? normalizeTaxDestination(shippingAddress) : { valid: false, destination: null });
+  const effectiveTaxDestination = normalizedTaxDestination.valid ? normalizedTaxDestination.destination : null;
+  const canonicalContribution = await buildCanonicalContribution(env, campaign, {
     tierSelection,
     supportItems,
     customAmount,
     bundleAddOns,
     tipPercent,
     shippingCents: currentShipping,
-    shippingOption
+    shippingOption,
+    taxDestination: effectiveTaxDestination
   });
   if (!canonicalContribution.valid || !canonicalContribution.hasPhysical) {
     return canonicalContribution;
@@ -1973,9 +2043,10 @@ async function buildCanonicalContributionForStoredShipping(env, campaign, {
       (hasPlatformPhysical ? getShippingFallbackFeeCents(env) : 0);
   }
 
-  canonicalContribution.totals = buildPledgeTotals(env, canonicalContribution.totals.subtotal, {
+  canonicalContribution.totals = await buildPledgeTotals(env, canonicalContribution.totals.subtotal, {
     shipping: resolvedShippingCents,
-    tipPercent: canonicalContribution.totals.tipPercent
+    tipPercent: canonicalContribution.totals.tipPercent,
+    taxDestination: effectiveTaxDestination || (normalizedDestination.valid ? normalizedDestination.destination : null)
   });
 
   return canonicalContribution;
@@ -2443,6 +2514,12 @@ export default {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
         if (!bodyLimit.ok) return bodyLimit.response;
         return withObservedOperation(env, ctx, 'shipping_quote', () => handleShippingQuote(request, env));
+      }
+
+      if (path === '/tax/quote' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
+        if (!bodyLimit.ok) return bodyLimit.response;
+        return withObservedOperation(env, ctx, 'tax_quote', () => handleTaxQuote(request, env));
       }
 
       if (path === '/checkout-intent/summary' && method === 'GET') {
@@ -3139,6 +3216,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
     email,
     tipPercent,
     preferredLang,
+    billingAddress,
     shippingAddress,
     shippingOption,
     bundleAddOnAnchorCampaignSlug
@@ -3162,6 +3240,15 @@ async function handleFirstPartyCheckoutStart(request, env) {
     : { valid: false, destination: null };
   if (shippingAddress && !normalizedDestination.valid) {
     return privateJsonResponse({ error: normalizedDestination.error }, 400, env);
+  }
+  const normalizedShippingTaxAddress = normalizedDestination.valid
+    ? normalizeTaxDestination(normalizedDestination.destination)
+    : { valid: false, destination: null };
+  const normalizedBillingAddress = billingAddress
+    ? normalizeTaxDestination(billingAddress)
+    : { valid: false, destination: null };
+  if (billingAddress && !normalizedBillingAddress.valid) {
+    return privateJsonResponse({ error: normalizedBillingAddress.error }, 400, env);
   }
 
   const parsedCart = extractCampaignCartsFromFirstPartyItems(
@@ -3222,6 +3309,9 @@ async function handleFirstPartyCheckoutStart(request, env) {
         orderCart.campaignSlug
       ),
       tipPercent: normalizedTipPercent,
+      taxDestination: normalizedBillingAddress.valid
+        ? normalizedBillingAddress.destination
+        : (normalizedShippingTaxAddress.valid ? normalizedShippingTaxAddress.destination : null),
       shippingAddress: normalizedDestination.valid ? normalizedDestination.destination : null,
       shippingOption
     });
@@ -3315,6 +3405,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
       subtotal: bundleAddOns.reduce((sum, entry) => sum + ((Number(entry.unitPrice) || 0) * (Number(entry.quantity) || 0)), 0)
     },
     tipPercent: normalizedTipPercent,
+    billingAddress: normalizedBillingAddress.valid ? normalizedBillingAddress.destination : null,
     totals: bundleTotals,
     campaigns: checkoutGroups.map((group) => ({
       orderId: checkoutGroups.length === 1 ? orderId : buildBundleOrderId(orderId, group.campaignSlug),
@@ -3606,6 +3697,75 @@ async function handleShippingQuote(request, env) {
   }, 200, env);
 }
 
+async function handleTaxQuote(request, env) {
+  const trustedOrigin = requireTrustedSiteOrigin(request, env);
+  if (!trustedOrigin.ok) return trustedOrigin.response;
+
+  const rateLimit = await checkRateLimit(request, env, RATE_LIMITS.tax);
+  if (!rateLimit.allowed) return rateLimit.response;
+
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const body = parsedBody.body || {};
+  const subtotalCents = Math.max(0, Number(body.subtotalCents) || 0);
+  const shippingCents = Math.max(0, Number(body.shippingCents) || 0);
+
+  if (!Number.isFinite(subtotalCents) || subtotalCents <= 0) {
+    return privateJsonResponse({ error: 'Subtotal is required' }, 400, env);
+  }
+
+  const normalizedBillingAddress = body.billingAddress
+    ? normalizeTaxDestination(body.billingAddress)
+    : { valid: false, destination: null };
+  if (body.billingAddress && !normalizedBillingAddress.valid) {
+    return privateJsonResponse({ error: normalizedBillingAddress.error }, 400, env);
+  }
+
+  const normalizedShippingTaxAddress = body.shippingAddress
+    ? normalizeTaxDestination(body.shippingAddress)
+    : { valid: false, destination: null };
+  if (body.shippingAddress && !normalizedShippingTaxAddress.valid) {
+    return privateJsonResponse({ error: normalizedShippingTaxAddress.error }, 400, env);
+  }
+
+  const taxDestination = normalizedBillingAddress.valid
+    ? normalizedBillingAddress.destination
+    : (normalizedShippingTaxAddress.valid ? normalizedShippingTaxAddress.destination : null);
+  if (!taxDestination) {
+    return privateJsonResponse({ error: 'Billing or shipping address is required to calculate tax' }, 400, env);
+  }
+
+  try {
+    const taxQuote = await quoteTax(env, {
+      subtotalCents,
+      shippingCents,
+      destination: taxDestination
+    });
+
+    return privateJsonResponse({
+      subtotalCents,
+      shippingCents,
+      taxCents: taxQuote.taxCents,
+      taxDetails: sanitizeStoredTaxDetails(taxQuote, {
+        destination: taxDestination,
+        taxableSubtotalCents: subtotalCents,
+        taxableShippingCents: 0,
+        shippingTaxed: false,
+        shippingCents
+      }),
+      destination: taxDestination
+    }, 200, env);
+  } catch (error) {
+    return privateJsonResponse({
+      error: error instanceof Error ? error.message : 'Tax quote failed'
+    }, 503, env);
+  }
+}
+
 async function handleFirstPartyCheckoutSummary(request, env) {
   if (getCheckoutProvider(env) !== 'first_party') {
     return jsonResponse({ error: 'Not found' }, 404);
@@ -3811,6 +3971,7 @@ async function handleFirstPartyCheckoutComplete(request, env, ctx) {
         country: sd.address?.country || ''
       };
     }
+    const recoveredBillingAddress = normalizeTaxDestination(session.customer_details?.address || bundleManifest?.billingAddress || null);
 
     const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
     const paymentMethodId = setupIntent.payment_method;
@@ -3842,6 +4003,7 @@ async function handleFirstPartyCheckoutComplete(request, env, ctx) {
         customerId,
         paymentMethodId,
         setupIntentId,
+        billingAddress: recoveredBillingAddress.valid ? recoveredBillingAddress.destination : null,
         shippingAddress,
         normalizedTipPercent,
         checkoutCartHash: metadata.checkoutCartHash,
@@ -3903,6 +4065,7 @@ async function processFirstPartyCheckoutBundle({
   customerId,
   paymentMethodId,
   setupIntentId,
+  billingAddress,
   shippingAddress,
   normalizedTipPercent,
   checkoutCartHash,
@@ -4003,6 +4166,7 @@ async function processFirstPartyCheckoutBundle({
       customAmount: entry.customAmount || 0,
       bundleAddOns: anchorBundleAddOns,
       tipPercent: normalizedTipPercent,
+      taxDestination: billingAddress || bundleManifest?.billingAddress || null,
       shippingAddress: shippingAddress || null,
       shippingOption: entry.shippingOption || 'standard'
     });
@@ -4041,9 +4205,11 @@ async function processFirstPartyCheckoutBundle({
       customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
       goalTrackingSubtotal: canonicalContribution.goalTrackingSubtotal,
       shippingOption: canonicalContribution.shippingOption || 'standard',
+      billingAddress: billingAddress || bundleManifest?.billingAddress || undefined,
       shippingAddress: canonicalContribution.hasPhysical ? (shippingAddress || undefined) : undefined,
       subtotal: canonicalContribution.totals.subtotal,
       tax: canonicalContribution.totals.tax,
+      taxDetails: canonicalContribution.totals.taxDetails,
       shipping: canonicalContribution.totals.shipping,
       tipPercent: canonicalContribution.totals.tipPercent,
       tipAmount: canonicalContribution.totals.tipAmount,
@@ -4059,11 +4225,13 @@ async function processFirstPartyCheckoutBundle({
         type: 'created',
         subtotal: canonicalContribution.totals.subtotal,
         tax: canonicalContribution.totals.tax,
+        taxDetails: canonicalContribution.totals.taxDetails,
         shipping: canonicalContribution.totals.shipping,
         tipPercent: canonicalContribution.totals.tipPercent,
         tipAmount: canonicalContribution.totals.tipAmount,
         amount: canonicalContribution.totals.amount,
         shippingOption: canonicalContribution.shippingOption || 'standard',
+        billingAddress: billingAddress || bundleManifest?.billingAddress || undefined,
         tierId: canonicalContribution.tierId,
         tierQty: canonicalContribution.tierQty,
         additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
@@ -4302,6 +4470,11 @@ async function handleStripeWebhook(request, env, ctx) {
         };
         console.log('📨 Captured shipping address from Stripe session:', orderId);
       }
+      const recoveredBillingAddress = normalizeTaxDestination(
+        session.customer_details?.address ||
+        bundleManifest?.billingAddress ||
+        null
+      );
 
       const stripe = createStripeClient(getStripeKey(env));
       const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
@@ -4339,6 +4512,7 @@ async function handleStripeWebhook(request, env, ctx) {
           customerId,
           paymentMethodId,
           setupIntentId,
+          billingAddress: recoveredBillingAddress.valid ? recoveredBillingAddress.destination : null,
           shippingAddress,
           normalizedTipPercent,
           checkoutCartHash,
@@ -4430,6 +4604,7 @@ async function handleStripeWebhook(request, env, ctx) {
                         preferredLang: existingPledge.preferredLang || DEFAULT_I18N_LANG,
                         subtotal: existingPledge.subtotal || existingPledge.amount,
                         tax: existingPledge.tax || 0,
+                        taxDetails: getStoredTaxDetails(existingPledge),
                         shipping: existingPledge.shipping || 0,
                         tipAmount: getStoredTipAmount(env, existingPledge),
                         tipPercent: getStoredTipPercent(env, existingPledge, 0),
@@ -4513,6 +4688,7 @@ async function handleStripeWebhook(request, env, ctx) {
             customAmount,
             bundleAddOns: anchorBundleAddOns,
             tipPercent: normalizedTipPercent,
+            taxDestination: recoveredBillingAddress.valid ? recoveredBillingAddress.destination : (bundleManifest?.billingAddress || null),
             shippingAddress: shippingAddress || null,
             shippingOption: bundleManifest?.campaigns?.[0]?.shippingOption || shippingOption || 'standard'
           });
@@ -4589,9 +4765,11 @@ async function handleStripeWebhook(request, env, ctx) {
             customAmount: canonicalContribution.customAmount > 0 ? canonicalContribution.customAmount : undefined,
             goalTrackingSubtotal: canonicalContribution.goalTrackingSubtotal,
             shippingOption: canonicalContribution.shippingOption || 'standard',
+            billingAddress: recoveredBillingAddress.valid ? recoveredBillingAddress.destination : (bundleManifest?.billingAddress || undefined),
             shippingAddress: shippingAddress || undefined,
             subtotal: canonicalContribution.totals.subtotal,
             tax: canonicalContribution.totals.tax,
+            taxDetails: canonicalContribution.totals.taxDetails,
             shipping: canonicalContribution.totals.shipping,
             tipPercent: canonicalContribution.totals.tipPercent,
             tipAmount: canonicalContribution.totals.tipAmount,
@@ -4607,11 +4785,13 @@ async function handleStripeWebhook(request, env, ctx) {
               type: 'created',
               subtotal: canonicalContribution.totals.subtotal,
               tax: canonicalContribution.totals.tax,
+              taxDetails: canonicalContribution.totals.taxDetails,
               shipping: canonicalContribution.totals.shipping,
               tipPercent: canonicalContribution.totals.tipPercent,
               tipAmount: canonicalContribution.totals.tipAmount,
               amount: canonicalContribution.totals.amount,
               shippingOption: canonicalContribution.shippingOption || 'standard',
+              billingAddress: recoveredBillingAddress.valid ? recoveredBillingAddress.destination : (bundleManifest?.billingAddress || undefined),
               tierId: canonicalContribution.tierId,
               tierQty: canonicalContribution.tierQty,
               additionalTiers: canonicalContribution.additionalTiers.length > 0 ? canonicalContribution.additionalTiers : undefined,
@@ -4671,6 +4851,7 @@ async function handleStripeWebhook(request, env, ctx) {
                   preferredLang: pledgeData.preferredLang,
                   subtotal: canonicalContribution.totals.subtotal,
                   tax: canonicalContribution.totals.tax,
+                  taxDetails: canonicalContribution.totals.taxDetails,
                   shipping: canonicalContribution.totals.shipping,
                   tipAmount: canonicalContribution.totals.tipAmount,
                   tipPercent: canonicalContribution.totals.tipPercent,
@@ -4743,6 +4924,7 @@ async function handleStripeWebhook(request, env, ctx) {
         preferredLang: pledgeData?.preferredLang || DEFAULT_I18N_LANG,
         subtotal: pledgeData?.subtotal || pledgeData?.amount || 0,
         tax: pledgeData?.tax || 0,
+        taxDetails: pledgeData ? getStoredTaxDetails(pledgeData) : null,
         shipping: pledgeData?.shipping || 0,
         tipAmount: getStoredTipAmount(env, pledgeData),
         tipPercent: getStoredTipPercent(env, pledgeData, 0),
@@ -4797,6 +4979,7 @@ async function handleGetPledge(request, env) {
         pledgeStatus: pledgeData.pledgeStatus,
         subtotal: pledgeData.subtotal,
         tax: pledgeData.tax,
+        taxDetails: getStoredTaxDetails(pledgeData),
         shipping: pledgeData.shipping || 0,
         tipPercent: getStoredTipPercent(env, pledgeData, 0),
         tipAmount: getStoredTipAmount(env, pledgeData),
@@ -4810,6 +4993,7 @@ async function handleGetPledge(request, env) {
         bundleAddOnAnchorCampaignSlug: pledgeData.bundleAddOnAnchorCampaignSlug || '',
         bundleAddOnSubtotal: pledgeData.bundleAddOnSubtotal || 0,
         customAmount: pledgeData.customAmount || 0,
+        billingAddress: pledgeData.billingAddress || null,
         canModify: canChange,
         canCancel: canChange,
         canUpdatePaymentMethod: !pledgeData.charged,
@@ -4855,6 +5039,7 @@ async function handleGetPledges(request, env) {
         pledgeStatus: pledgeData.pledgeStatus,
         subtotal: pledgeData.subtotal,
         tax: pledgeData.tax,
+        taxDetails: getStoredTaxDetails(pledgeData),
         shipping: pledgeData.shipping || 0,
         tipPercent: getStoredTipPercent(env, pledgeData, 0),
         tipAmount: getStoredTipAmount(env, pledgeData),
@@ -4868,6 +5053,7 @@ async function handleGetPledges(request, env) {
         bundleAddOnAnchorCampaignSlug: pledgeData.bundleAddOnAnchorCampaignSlug || '',
         bundleAddOnSubtotal: pledgeData.bundleAddOnSubtotal || 0,
         customAmount: pledgeData.customAmount || 0,
+        billingAddress: pledgeData.billingAddress || null,
         shippingAddress: pledgeData.shippingAddress || null,
         canModify: canChange,
         canCancel: canChange,
@@ -4943,6 +5129,7 @@ async function handleCancelPledge(request, env) {
           type: 'created',
           subtotal: cancelSubtotal,
           tax: cancelTax,
+          taxDetails: getStoredTaxDetails(pledgeData),
           shipping: cancelShipping,
           tipPercent: cancelTipPercent,
           tipAmount: cancelTipAmount,
@@ -4959,6 +5146,7 @@ async function handleCancelPledge(request, env) {
         type: 'cancelled',
         subtotalDelta: -cancelSubtotal,
         taxDelta: -cancelTax,
+        taxDetails: getStoredTaxDetails(pledgeData),
         shippingDelta: -cancelShipping,
         tipPercent: cancelTipPercent,
         tipAmountDelta: -cancelTipAmount,
@@ -5036,6 +5224,7 @@ async function handleCancelPledge(request, env) {
           preferredLang: pledgeData.preferredLang,
           subtotal: cancelSubtotal,
           tax: cancelTax,
+          taxDetails: getStoredTaxDetails(pledgeData),
           shipping: cancelShipping,
           tipAmount: cancelTipAmount,
           tipPercent: cancelTipPercent,
@@ -5177,7 +5366,8 @@ async function handleModifyPledge(request, env) {
     tipPercent: normalizedTipPercent,
     shippingAddress: currentPledge.shippingAddress || null,
     currentShipping: currentPledge.shipping || 0,
-    shippingOption: hasShippingOptionChange ? shippingOption : (currentPledge.shippingOption || 'standard')
+    shippingOption: hasShippingOptionChange ? shippingOption : (currentPledge.shippingOption || 'standard'),
+    taxDestination: getStoredTaxDetails(currentPledge).destination || null
   });
   if (!canonicalContribution.valid) {
     return jsonResponse({ error: canonicalContribution.error }, 400);
@@ -5230,6 +5420,7 @@ async function handleModifyPledge(request, env) {
         shippingOption: canonicalContribution.shippingOption || pledgeData.shippingOption || 'standard',
         subtotal: canonicalContribution.totals.subtotal,
         tax: canonicalContribution.totals.tax,
+        taxDetails: canonicalContribution.totals.taxDetails,
         shipping: canonicalContribution.totals.shipping,
         tipPercent: canonicalContribution.totals.tipPercent,
         tipAmount: canonicalContribution.totals.tipAmount,
@@ -5250,6 +5441,12 @@ async function handleModifyPledge(request, env) {
           type: 'created',
           subtotal: previousSubtotal,
           tax: previousTax,
+          taxDetails: sanitizeStoredTaxDetails(originalPledgeData.taxDetails, {
+            taxableSubtotalCents: previousSubtotal,
+            taxableShippingCents: 0,
+            shippingTaxed: false,
+            shippingCents: previousShipping
+          }),
           shipping: previousShipping,
           tipPercent: currentTipPercent,
           tipAmount: previousTipAmount,
@@ -5268,6 +5465,7 @@ async function handleModifyPledge(request, env) {
         type: 'modified',
         subtotalDelta: canonicalContribution.totals.subtotal - previousSubtotal,
         taxDelta: canonicalContribution.totals.tax - previousTax,
+        taxDetails: canonicalContribution.totals.taxDetails,
         shippingDelta: canonicalContribution.totals.shipping - previousShipping,
         tipPercent: canonicalContribution.totals.tipPercent,
         tipAmount: canonicalContribution.totals.tipAmount,
@@ -5365,6 +5563,7 @@ async function handleModifyPledge(request, env) {
         previousTipAmount,
         newSubtotal: canonicalContribution.totals.subtotal,
         tax: canonicalContribution.totals.tax,
+        taxDetails: canonicalContribution.totals.taxDetails,
         shipping: canonicalContribution.totals.shipping,
         tipAmount: canonicalContribution.totals.tipAmount,
         tipPercent: canonicalContribution.totals.tipPercent,
@@ -5391,6 +5590,7 @@ async function handleModifyPledge(request, env) {
     previousTipAmount,
     subtotal: canonicalContribution.totals.subtotal,
     tax: canonicalContribution.totals.tax,
+    taxDetails: canonicalContribution.totals.taxDetails,
     shipping: canonicalContribution.totals.shipping,
     tipPercent: canonicalContribution.totals.tipPercent,
     tipAmount: canonicalContribution.totals.tipAmount,
@@ -6453,6 +6653,13 @@ async function handleTestSetup(request, env) {
   const email = body.email || 'test@example.com';
   const campaignSlug = body.campaignSlug || 'hand-relations';
   const testOrderId = getTestFixtureOrderId(email, campaignSlug);
+  const fixtureBillingAddress = body.billingAddress || {
+    country: 'US',
+    postalCode: '87048',
+    state: 'NM',
+    city: 'Corrales',
+    line1: '1228 W La Entrada'
+  };
 
   // Get campaign data to use real tier IDs
   const campaign = await getCampaign(env, campaignSlug);
@@ -6478,9 +6685,10 @@ async function handleTestSetup(request, env) {
       additionalTiers = [{ id: secondTier.id, qty: secondTierQty }];
     }
   }
-  const totals = buildPledgeTotals(env, subtotal, {
+  const totals = await buildPledgeTotals(env, subtotal, {
     shipping: getFlatShippingFeeCents(env),
-    tipPercent: getDefaultPlatformTipPercent(env)
+    tipPercent: getDefaultPlatformTipPercent(env),
+    taxDestination: fixtureBillingAddress
   });
 
   // Create a real Stripe test customer so payment method updates work
@@ -6511,6 +6719,7 @@ async function handleTestSetup(request, env) {
       customAmount: 0,
       supportItems: [],
       additionalTiers,
+      billingAddress: fixtureBillingAddress,
       stripeCustomerId: stripeCustomerId || 'cus_test_123',
       stripePaymentMethodId: null, // No payment method until they add one
       pledgeStatus: 'active',
@@ -8026,7 +8235,7 @@ async function handleRecoverCheckout(request, env) {
       return jsonResponse({ error: desiredSupportItems.error }, 409);
     }
 
-    const canonicalContribution = buildCanonicalContribution(env, campaign, {
+    const canonicalContribution = await buildCanonicalContribution(env, campaign, {
       tierSelection,
       supportItems: desiredSupportItems.supportItems,
       customAmount,
@@ -8063,6 +8272,7 @@ async function handleRecoverCheckout(request, env) {
       shippingOption: canonicalContribution.shippingOption || 'standard',
       subtotal: canonicalContribution.totals.subtotal,
       tax: canonicalContribution.totals.tax,
+      taxDetails: canonicalContribution.totals.taxDetails,
       shipping: canonicalContribution.totals.shipping,
       tipPercent: canonicalContribution.totals.tipPercent,
       tipAmount: canonicalContribution.totals.tipAmount,
@@ -8111,6 +8321,7 @@ async function handleRecoverCheckout(request, env) {
               preferredLang: pledge.preferredLang,
               subtotal: canonicalContribution.totals.subtotal,
               tax: canonicalContribution.totals.tax,
+              taxDetails: canonicalContribution.totals.taxDetails,
               shipping: canonicalContribution.totals.shipping,
               tipAmount: canonicalContribution.totals.tipAmount,
               tipPercent: canonicalContribution.totals.tipPercent,

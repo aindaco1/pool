@@ -17,8 +17,10 @@ The current baseline includes:
 - alternate-language metadata on localized public pages and localized campaign pages
 - canonical URLs on public layouts
 - locale-aware Open Graph metadata on public layouts
+- explicit language/app-name metadata on public layouts
 - page-level descriptions on core public routes
 - Open Graph and Twitter card metadata
+- secure social-image tags where the page image is already HTTPS
 - social image alt metadata
 - state-aware campaign social titles and descriptions
 - Worker-generated campaign share-card SVG images for social previews
@@ -26,7 +28,7 @@ The current baseline includes:
 - generated [`sitemap.xml`](../sitemap.xml)
 - explicit `noindex,nofollow` on tokenized or supporter-only layouts
 - conservative `Organization` / `WebSite` JSON-LD
-- conservative campaign `CreativeWork` plus breadcrumb JSON-LD
+- conservative campaign `CreativeWork` plus breadcrumb JSON-LD, both aligned with the active page language where supported
 - a public community hub that links back to public campaign pages instead of pushing crawlers into supporter-only routes
 
 The main implementation files are:
@@ -109,9 +111,12 @@ Public metadata also derives a few safe values automatically:
 
 - `og:locale` from the active page language
 - `og:locale:alternate` from the supported translated languages for that page
+- `language`, `application-name`, and `apple-mobile-web-app-title` from the active site/page identity
 - `og:image:alt` / `twitter:image:alt` from explicit image alt text when present, otherwise the page title
+- `og:image:secure_url` when the chosen social image already resolves to HTTPS
 - campaign preview copy from campaign state (`upcoming`, `live`, `funded`, `ended`)
 - campaign preview images from the Worker share-card route rather than directly from the hero image alone
+- `WebSite.availableLanguage`, localized breadcrumb roots, and campaign `CreativeWork.inLanguage` from the configured locale model
 
 Forks can override part of that behavior in a bounded way:
 
@@ -161,6 +166,7 @@ When checking a deployment manually:
 - JSON-LD validates cleanly
 - localized pages keep coherent canonical and alternate links
 - localized campaign pages keep coherent canonical and alternate links
+- localized pages keep coherent JSON-LD language and breadcrumb roots
 - metadata additions do not create accessibility or performance regressions
 
 ## Non-Goals

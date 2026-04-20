@@ -129,6 +129,8 @@ function mockManageFetch(options?: {
   paymentStartStatus?: number;
   shippingQuotePayload?: Record<string, unknown> | null;
   shippingQuoteStatus?: number;
+  taxQuotePayload?: Record<string, unknown> | null;
+  taxQuoteStatus?: number;
   addOnsInventory?: Record<string, unknown> | null;
   modifyStatus?: number;
   cancelStatus?: number;
@@ -141,6 +143,8 @@ function mockManageFetch(options?: {
     paymentStartStatus = 200,
     shippingQuotePayload = null,
     shippingQuoteStatus = 200,
+    taxQuotePayload = null,
+    taxQuoteStatus = 200,
     addOnsInventory = {
       lowStockThreshold: 5,
       products: {
@@ -216,6 +220,25 @@ function mockManageFetch(options?: {
 
     if (url === `${WORKER_BASE}/shipping/quote` && method === 'POST') {
       return jsonResponse(shippingQuotePayload || { quotes: [], totalShippingCents: 0 }, shippingQuoteStatus);
+    }
+
+    if (url === `${WORKER_BASE}/tax/quote` && method === 'POST') {
+      if (taxQuotePayload) {
+        return jsonResponse(taxQuotePayload, taxQuoteStatus);
+      }
+      const body = JSON.parse(String(init?.body || '{}'));
+      const subtotalCents = Math.max(0, Number(body?.subtotalCents) || 0);
+      const shippingCents = Math.max(0, Number(body?.shippingCents) || 0);
+      const taxCents = Math.round(subtotalCents * 0.07875);
+      return jsonResponse({
+        subtotalCents,
+        shippingCents,
+        taxCents,
+        taxDetails: {
+          effectiveRate: 0.07875,
+          destination: body?.billingAddress || body?.shippingAddress || null
+        }
+      }, taxQuoteStatus);
     }
 
     if (url === `${WORKER_BASE}/add-ons/inventory`) {
@@ -396,6 +419,12 @@ describe('manage page script', () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       `${WORKER_BASE}/shipping/quote`,
+      expect.objectContaining({
+        method: 'POST'
+      })
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${WORKER_BASE}/tax/quote`,
       expect.objectContaining({
         method: 'POST'
       })

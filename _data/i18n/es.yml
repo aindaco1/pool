@@ -383,6 +383,9 @@ home:
 
 runtime:
   cart:
+    cart_button_empty: "Abrir carrito. El carrito está vacío."
+    cart_button_summary_one: "Abrir carrito. %{count} artículo, %{total} en total."
+    cart_button_summary_other: "Abrir carrito. %{count} artículos, %{total} en total."
     untitled_item: "Artículo sin título"
     quantity: "Cant. %{count}"
     add_on_quantity_for: "Cantidad de %{item}"
@@ -396,8 +399,14 @@ runtime:
     address_line_2: "Dirección línea 2"
     city: "Ciudad"
     state_province: "Estado / provincia"
+    state_province_optional: "Estado / provincia (opcional)"
     postal_code: "Código postal"
     country: "País"
+    tax_location: "Ubicación fiscal"
+    tax_location_note: "Añade tu país y código postal de facturación para que podamos finalizar el impuesto antes de guardar tu método de pago."
+    tax_location_note_nm: "Añade tu dirección de facturación de Nuevo México, ciudad, estado y código postal para que podamos finalizar el impuesto antes de guardar tu método de pago."
+    tax_location_required: "Introduce tu país y código postal de facturación para finalizar el impuesto antes de continuar."
+    tax_location_required_nm: "Introduce tu dirección de facturación, ciudad, estado y código postal para finalizar el impuesto de Nuevo México antes de continuar."
     payment_method: "Método de pago"
     payment_consent: "Al proporcionar la información de tu tarjeta, permites que %{platform} cobre tu tarjeta si la campaña o campañas que apoyaste alcanzan su meta antes de la fecha de finalización."
     tip_label: "Propina para %{platform} para el mantenimiento de la plataforma."

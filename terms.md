@@ -28,8 +28,9 @@ description: Review pledge terms, payment processing, fulfillment, and privacy d
 - Optional platform tips support maintenance of The Pool and are included in your pledge total, but **do not count toward a campaign's funding goal**.
 - This deployment may also offer **optional platform add-ons** alongside a pledge. Platform add-ons support maintenance of The Pool, are included in your pledge total, and **do not count toward a campaign's funding goal**.
 - A campaign may also offer **optional campaign add-ons** alongside its pledge tiers. Campaign add-ons are included in your pledge total, **do count toward that campaign's funding goal**, and remain associated with that campaign for reporting and fulfillment.
-- Sales tax is applied to pledges using the rate configured for this deployment.
+- Sales tax is applied according to the tax rules configured for this deployment. Depending on the deployment, that may be a flat configured rate or a location-aware tax calculation based on the billing or shipping destination you provide during checkout or later pledge changes.
 - Physical product pledges, physical campaign add-ons, or physical platform add-ons may include deployment-configured shipping charges. Depending on this deployment and campaign settings, shipping may be quoted from USPS, use a configured fallback rate, include free-shipping overrides, or offer limited domestic signature-upgrade options. Campaign add-ons follow the owning campaign's shipping rules; physical platform add-ons may be charged as a separate platform shipment. Your shipping address is collected during checkout so physical rewards can be fulfilled.
+- For some digital-only or mixed carts, The Pool may also ask for enough billing location information to calculate tax before finalizing the pledge total. If a precise tax result is not yet available, the cart may show tax as an estimate until checkout has enough destination detail.
 - If a delivery option is available for your shipment and you change it in checkout or Manage Pledge, the stored shipping total and pledge total are recalculated from the saved pledge state before the change is persisted.
 - If you modify a pledge, The Pool recalculates totals from the saved pledge state and the campaign or add-on definitions in effect for that deployment, rather than trusting browser-submitted money fields.
 - Transactional emails and supporter access links may reflect this deployment's configured branding and localized route structure, but each emailed manage link still authorizes only the pledge tied to that specific order.
@@ -85,4 +86,4 @@ For questions about these terms or your pledge, email us at info@dustwave.xyz.
 
 ---
 
-_Last updated: April 18, 2026_
+_Last updated: April 19, 2026_

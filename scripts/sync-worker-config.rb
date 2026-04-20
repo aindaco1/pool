@@ -28,6 +28,11 @@ TOP_LEVEL_ORDER = [
   'EMAIL_COLOR_PRIMARY',
   'EMAIL_BUTTON_RADIUS',
   'SALES_TAX_RATE',
+  'TAX_PROVIDER',
+  'TAX_ORIGIN_COUNTRY',
+  'TAX_USE_REGIONAL_ORIGIN',
+  'NM_GRT_API_BASE',
+  'ZIP_TAX_API_BASE',
   'FLAT_SHIPPING_RATE',
   'SHIPPING_ORIGIN_ZIP',
   'SHIPPING_ORIGIN_COUNTRY',
@@ -66,6 +71,11 @@ DEV_ENV_ORDER = [
   'EMAIL_COLOR_PRIMARY',
   'EMAIL_BUTTON_RADIUS',
   'SALES_TAX_RATE',
+  'TAX_PROVIDER',
+  'TAX_ORIGIN_COUNTRY',
+  'TAX_USE_REGIONAL_ORIGIN',
+  'NM_GRT_API_BASE',
+  'ZIP_TAX_API_BASE',
   'FLAT_SHIPPING_RATE',
   'SHIPPING_ORIGIN_ZIP',
   'SHIPPING_ORIGIN_COUNTRY',
@@ -155,6 +165,7 @@ end
 def build_mirror_values(config, existing)
   platform = config['platform'] || {}
   pricing = config['pricing'] || {}
+  tax = config['tax'] || {}
   shipping = config['shipping'] || {}
   usps = shipping['usps'] || {}
   debug = config['debug'] || {}
@@ -180,6 +191,11 @@ def build_mirror_values(config, existing)
     'EMAIL_COLOR_PRIMARY' => design.key?('color_primary') ? design['color_primary'].to_s : existing['EMAIL_COLOR_PRIMARY'],
     'EMAIL_BUTTON_RADIUS' => design.key?('radius_lg') ? design['radius_lg'].to_s : existing['EMAIL_BUTTON_RADIUS'],
     'SALES_TAX_RATE' => pricing.key?('sales_tax_rate') ? pricing['sales_tax_rate'].to_s : existing['SALES_TAX_RATE'],
+    'TAX_PROVIDER' => tax.key?('provider') ? tax['provider'].to_s : existing['TAX_PROVIDER'],
+    'TAX_ORIGIN_COUNTRY' => tax.key?('origin_country') ? tax['origin_country'].to_s : existing['TAX_ORIGIN_COUNTRY'],
+    'TAX_USE_REGIONAL_ORIGIN' => tax.key?('use_regional_origin') ? (tax['use_regional_origin'] ? 'true' : 'false') : existing['TAX_USE_REGIONAL_ORIGIN'],
+    'NM_GRT_API_BASE' => tax.key?('nm_grt_api_base') ? tax['nm_grt_api_base'].to_s : existing['NM_GRT_API_BASE'],
+    'ZIP_TAX_API_BASE' => tax.key?('zip_tax_api_base') ? tax['zip_tax_api_base'].to_s : existing['ZIP_TAX_API_BASE'],
     'FLAT_SHIPPING_RATE' => pricing.key?('flat_shipping_rate') ? format_decimal(pricing['flat_shipping_rate'], 2) : existing['FLAT_SHIPPING_RATE'],
     'SHIPPING_ORIGIN_ZIP' => shipping['origin_zip'] || existing['SHIPPING_ORIGIN_ZIP'],
     'SHIPPING_ORIGIN_COUNTRY' => shipping['origin_country'] || existing['SHIPPING_ORIGIN_COUNTRY'],

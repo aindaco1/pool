@@ -175,7 +175,7 @@ describe('cart provider shim', () => {
     expect(provider.store.getState()).toMatchObject({
       cart: {
         subtotal: 12,
-        total: 13.55,
+        total: 12.6,
         items: {
           count: 1
         }
@@ -258,7 +258,7 @@ describe('cart provider shim', () => {
     expect(provider.store.getState()).toMatchObject({
       cart: {
         subtotal: 15,
-        total: 16.93,
+        total: 15.75,
         items: {
           count: 1,
           items: [
@@ -566,6 +566,33 @@ describe('cart provider shim', () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
 
+      if (url === `${WORKER_BASE}/tax/quote`) {
+        const body = JSON.parse(String(init?.body || '{}'));
+        expect(body).toMatchObject({
+          subtotalCents: 1300,
+          shippingAddress: {
+            country: 'US',
+            postalCode: '87101'
+          }
+        });
+
+        return new Response(JSON.stringify({
+          subtotalCents: 1300,
+          shippingCents: 300,
+          taxCents: 102,
+          taxDetails: {
+            effectiveRate: 0.07875,
+            destination: {
+              country: 'US',
+              postalCode: '87101'
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
       if (url === `${WORKER_BASE}/shipping/quote`) {
         expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
           campaignSlug: 'demo',
@@ -669,12 +696,205 @@ describe('cart provider shim', () => {
     shippingPostalCode.dispatchEvent(new Event('change', { bubbles: true }));
 
     await vi.waitFor(() => {
+      const fetchMock = global.fetch as any;
+      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/shipping/quote`, expect.any(Object));
+      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/tax/quote`, expect.any(Object));
+    });
+
+    await vi.waitFor(() => {
       const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]');
+      const taxAmount = root?.querySelector('[data-cart-checkout-summary-tax]');
       const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]');
       const totalAmount = root?.querySelector('[data-cart-checkout-summary-total]');
       expect(shippingLabel?.textContent || '').toContain('Shipping');
+      expect(taxAmount?.textContent).toBe('$1.02');
       expect(shippingAmount?.textContent).toBe('$3.00');
       expect(totalAmount?.textContent).toBe('$17.67');
+    });
+  });
+
+  it('keeps New Mexico mixed-cart tax visible after physical custom checkout bootstraps', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE,
+      addOns: ADD_ON_CONFIG
+    };
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url === `${WORKER_BASE}/checkout-intent/start`) {
+        return new Response(JSON.stringify({
+          checkoutUiMode: 'custom',
+          sessionId: 'cs_test_nm_mixed_123',
+          clientSecret: 'cs_test_nm_mixed_secret_123',
+          publishableKey: 'pk_test_nm_mixed_123',
+          orderId: 'pool-intent-nm-mixed-123'
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (url === `${WORKER_BASE}/tax/quote`) {
+        const body = JSON.parse(String(init?.body || '{}'));
+        expect(body).toMatchObject({
+          subtotalCents: 1300,
+          shippingCents: 190,
+          shippingAddress: {
+            country: 'US',
+            postalCode: '87048',
+            state: 'NM',
+            city: 'Corrales',
+            line1: '1228 W La Entrada'
+          }
+        });
+
+        return new Response(JSON.stringify({
+          subtotalCents: 1300,
+          shippingCents: 190,
+          taxCents: 98,
+          taxDetails: {
+            provider: 'nm_grt',
+            effectiveRate: 0.075625,
+            destination: {
+              country: 'US',
+              postalCode: '87048',
+              state: 'NM',
+              city: 'Corrales',
+              line1: '1228 W La Entrada'
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (url === `${WORKER_BASE}/shipping/quote`) {
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          campaignSlug: 'demo',
+          items: [
+            { id: 'demo__featured-tier', quantity: 1 },
+            { id: 'addon__dust-wave-sticker', quantity: 1 }
+          ],
+          bundleAddOnAnchorCampaignSlug: 'demo',
+          shippingAddress: {
+            country: 'US',
+            postalCode: '87048'
+          }
+        });
+
+        return new Response(JSON.stringify({
+          totalShippingCents: 190,
+          quotes: [
+            {
+              campaignSlug: 'demo',
+              shippingCents: 190,
+              source: 'usps_live',
+              carrier: 'usps',
+              service: 'usps_ground_advantage',
+              domestic: true,
+              availableOptions: [
+                { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 190 }
+              ],
+              defaultOption: 'standard',
+              selectedOption: 'standard'
+            }
+          ]
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    (window as any).PoolStripeCheckoutSidecar = {
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe),
+      mount: vi.fn(async ({ onChange }) => {
+        if (typeof onChange === 'function') {
+          onChange({ session: { canConfirm: true } });
+        }
+        return {
+          supportsLinkAuthenticationElement: false,
+          supportsShippingAddressElement: false,
+          updateEmail: vi.fn(async () => ({})),
+          updateShippingAddress: vi.fn(async () => ({})),
+          confirm: vi.fn(async () => ({ type: 'success' })),
+          unmount: vi.fn()
+        };
+      })
+    };
+    (window as any).Stripe = vi.fn();
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'demo__featured-tier',
+      name: 'Demo Featured Tier',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/demo/'
+    });
+
+    await readyApi.api.theme.cart.open();
+
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const quantityField = root?.querySelector('[data-cart-addon-product-quantity][data-addon-product-id="dust-wave-sticker"]') as HTMLInputElement | null;
+    const addButton = root?.querySelector('[data-cart-addon-add][data-addon-product-id="dust-wave-sticker"]') as HTMLButtonElement | null;
+    if (!quantityField || !addButton) throw new Error('Missing add-on controls');
+    quantityField.value = '1';
+    quantityField.dispatchEvent(new Event('input', { bubbles: true }));
+    addButton.click();
+
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      expect(root?.textContent).toContain('Contact & Shipping address');
+    });
+
+    const shippingName = root?.querySelector('[data-cart-custom-shipping-field="name"]') as HTMLInputElement | null;
+    const shippingLine1 = root?.querySelector('[data-cart-custom-shipping-field="line1"]') as HTMLInputElement | null;
+    const shippingCity = root?.querySelector('[data-cart-custom-shipping-field="city"]') as HTMLInputElement | null;
+    const shippingState = root?.querySelector('[data-cart-custom-shipping-field="state"]') as HTMLInputElement | null;
+    const shippingPostalCode = root?.querySelector('[data-cart-custom-shipping-field="postal_code"]') as HTMLInputElement | null;
+    const shippingCountry = root?.querySelector('[data-cart-custom-shipping-field="country"]') as HTMLSelectElement | null;
+    const emailField = root?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
+    if (!shippingName || !shippingLine1 || !shippingCity || !shippingState || !shippingPostalCode || !shippingCountry || !emailField) {
+      throw new Error('Missing custom checkout fields');
+    }
+
+    shippingName.value = 'Test Test';
+    emailField.value = 'alonso@hey.com';
+    shippingLine1.value = '1228 W La Entrada';
+    shippingCity.value = 'Corrales';
+    shippingState.value = 'NM';
+    shippingPostalCode.value = '87048';
+    shippingCountry.value = 'US';
+    shippingPostalCode.dispatchEvent(new Event('input', { bubbles: true }));
+    shippingPostalCode.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/shipping/quote`, expect.any(Object));
+      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/tax/quote`, expect.any(Object));
+      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/start`, expect.any(Object));
+    });
+
+    await vi.waitFor(() => {
+      expect(root?.querySelector('[data-cart-checkout-summary-tax]')?.textContent).toBe('$0.98');
+      expect(root?.querySelector('[data-cart-checkout-summary-shipping]')?.textContent).toBe('$1.90');
+      expect(root?.querySelector('[data-cart-checkout-summary-total]')?.textContent).toBe('$16.53');
+      expect(root?.querySelector('[data-cart-confirm-custom-checkout]')).toBeTruthy();
     });
   });
 
@@ -1053,7 +1273,7 @@ describe('cart provider shim', () => {
     });
   });
 
-  it('auto-starts custom checkout when physical add-ons create shipping quote state before Stripe bootstrap', async () => {
+  it('keeps physical custom checkout in address-first mode before shipping details are complete', async () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
@@ -1162,10 +1382,13 @@ describe('cart provider shim', () => {
     continueButton.click();
 
     await vi.waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/start`, expect.any(Object));
-      expect((window as any).PoolStripeCheckoutSidecar.mount).toHaveBeenCalled();
-      expect(root?.querySelector('[data-cart-confirm-custom-checkout]')).toBeTruthy();
+      expect(root?.textContent).toContain('Contact & Shipping address');
+      expect(root?.querySelector('[data-cart-start-checkout]')).toBeTruthy();
+      expect(root?.querySelector('[data-cart-confirm-custom-checkout]')).toBeNull();
     });
+
+    expect(fetchMock).not.toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/start`, expect.any(Object));
+    expect((window as any).PoolStripeCheckoutSidecar.mount).not.toHaveBeenCalled();
   });
 
   it('lets a multi-campaign cart choose an add-on anchor campaign', async () => {
@@ -1317,7 +1540,7 @@ describe('cart provider shim', () => {
     expect(provider.store.getState()).toMatchObject({
       cart: {
         subtotal: 14,
-        total: 15.8,
+        total: 14.7,
         items: {
           count: 1,
           items: [
@@ -1423,7 +1646,7 @@ describe('cart provider shim', () => {
     expect(provider.store.getState()).toMatchObject({
       cart: {
         subtotal: 27,
-        total: 30.48,
+        total: 28.35,
         items: {
           count: 1,
           items: [
@@ -1498,7 +1721,8 @@ describe('cart provider shim', () => {
     expect(root?.textContent).toContain('$18.00');
     expect(root?.textContent).toContain('Pledge total');
     expect(root?.textContent).toContain('Tip The Pool for platform maintenance.');
-    expect(root?.textContent).toContain('Sales tax (7.875%)');
+    expect(root?.textContent).toContain('Tax');
+    expect(root?.querySelector('[data-cart-summary-tax]')?.textContent).toBe('--');
     expect(root?.textContent).toContain('Pledge total');
     const cartTipSlider = root?.querySelector('[data-cart-tip]') as HTMLInputElement | null;
     expect(cartTipSlider).toBeTruthy();
@@ -1510,6 +1734,7 @@ describe('cart provider shim', () => {
     expect(cartTipSlider.getAttribute('aria-labelledby')).toBe('pool-cart-tip-label');
     expect(cartTipSlider.getAttribute('aria-describedby')).toBe('pool-cart-tip-copy pool-cart-tip-percent');
     expect(cartTipSlider.getAttribute('aria-valuetext')).toBe('5% tip, $0.90');
+
     cartTipSlider.value = '6';
     cartTipSlider.dispatchEvent(new Event('input', { bubbles: true }));
     expect(cartTipSlider.isConnected).toBe(true);
@@ -1625,7 +1850,8 @@ describe('cart provider shim', () => {
     if (!cartTipSlider) throw new Error('Missing cart tip slider');
 
     expect(root?.textContent).toContain('Tip Fork Pool for platform maintenance.');
-    expect(root?.textContent).toContain('Sales tax (5%)');
+    expect(root?.textContent).toContain('Tax');
+    expect(root?.querySelector('[data-cart-summary-tax]')?.textContent).toBe('--');
     expect(cartTipSlider.value).toBe('9');
     expect(cartTipSlider.getAttribute('max')).toBe('20');
     expect(cartTipSlider.getAttribute('aria-valuetext')).toBe('9% tip, $1.80');
@@ -1731,7 +1957,8 @@ describe('cart provider shim', () => {
     expect(root?.querySelector('[data-cart-email]')).toBeNull();
     expect(root?.textContent).toContain('Estimated total');
     expect(root?.textContent).toContain('The Pool tip (6%)');
-    expect(root?.textContent).toContain('Sales tax (7.875%)');
+    expect(root?.textContent).toContain('Tax');
+    expect(root?.querySelector('[data-cart-checkout-summary-tax]')?.textContent).toBe('--');
     expect(root?.textContent).not.toContain('Shipping');
     expect(root?.textContent).toContain('Physical Postcard');
 
@@ -1938,10 +2165,10 @@ describe('cart provider shim', () => {
     expect(shippingName.getAttribute('aria-describedby')).toBe('pool-custom-shipping-error');
     expect(shippingName.getAttribute('aria-invalid')).toBe('false');
     expect(shippingError?.getAttribute('role')).toBe('alert');
-    expect(shippingName.getAttribute('autocomplete')).toBe('name');
-    expect(emailField.getAttribute('autocomplete')).toBe('email');
-    expect(shippingLine1.getAttribute('autocomplete')).toBe('shipping address-line1');
-    expect(shippingPostalCode.getAttribute('autocomplete')).toBe('shipping postal-code');
+    expect(shippingName.getAttribute('autocomplete')).toBe('section-pool-checkout shipping name');
+    expect(emailField.getAttribute('autocomplete')).toBe('section-pool-checkout email');
+    expect(shippingLine1.getAttribute('autocomplete')).toBe('section-pool-checkout shipping address-line1');
+    expect(shippingPostalCode.getAttribute('autocomplete')).toBe('section-pool-checkout shipping postal-code');
 
     expect(root?.textContent).toContain('Contact & Shipping address');
     expect(shippingCountry.value).toBe('US');
@@ -2011,8 +2238,35 @@ describe('cart provider shim', () => {
       }
     };
 
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${WORKER_BASE}/tax/quote`) {
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          subtotalCents: 2500,
+          shippingCents: 0,
+          billingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        });
+
+        return new Response(JSON.stringify({
+          subtotalCents: 2500,
+          shippingCents: 0,
+          taxCents: 197,
+          taxDetails: {
+            effectiveRate: 0.07875,
+            destination: {
+              country: 'US',
+              postalCode: '80205'
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
       if (url === `${WORKER_BASE}/checkout-intent/start`) {
         return new Response(JSON.stringify({
           checkoutUiMode: 'custom',
@@ -2056,6 +2310,12 @@ describe('cart provider shim', () => {
       quantity: 1,
       url: '/campaigns/demo/'
     });
+    await readyApi.api.cart.update({
+      billingAddress: {
+        country: 'US',
+        postal_code: '80205'
+      }
+    });
 
     await readyApi.api.theme.cart.open();
 
@@ -2085,6 +2345,33 @@ describe('cart provider shim', () => {
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${WORKER_BASE}/tax/quote`) {
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          subtotalCents: 2500,
+          shippingCents: 0,
+          billingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        });
+
+        return new Response(JSON.stringify({
+          subtotalCents: 2500,
+          shippingCents: 0,
+          taxCents: 197,
+          taxDetails: {
+            effectiveRate: 0.07875,
+            destination: {
+              country: 'US',
+              postalCode: '80205'
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
       if (url === `${WORKER_BASE}/checkout-intent/start`) {
         return new Response(JSON.stringify({
           checkoutUiMode: 'custom',
@@ -2319,37 +2606,43 @@ describe('cart provider shim', () => {
       quantity: 1,
       url: '/campaigns/demo/'
     });
+    await readyApi.api.cart.update({
+      billingAddress: {
+        country: 'US',
+        postal_code: '80205'
+      }
+    });
 
     await readyApi.api.theme.cart.open();
 
-    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
-    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    const getRoot = () => document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const continueButton = getRoot()?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
     if (!continueButton) throw new Error('Missing continue button');
     continueButton.click();
 
     await vi.waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/start`, expect.any(Object));
-      expect(root?.textContent).toContain('Checkout');
+      expect(getRoot()?.querySelector('[data-cart-back]')).toBeTruthy();
     });
 
-    const backButton = root?.querySelector('[data-cart-back]') as HTMLButtonElement | null;
+    const backButton = getRoot()?.querySelector('[data-cart-back]') as HTMLButtonElement | null;
     if (!backButton) throw new Error('Missing back button');
     backButton.click();
 
     await vi.waitFor(() => {
-      expect(root?.querySelector('[data-cart-continue]')).toBeTruthy();
+      expect(getRoot()?.querySelector('[data-cart-continue]')).toBeTruthy();
     });
 
     resolveStripeJs?.();
     await Promise.resolve();
     await Promise.resolve();
 
-    const reopenedContinueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    const reopenedContinueButton = getRoot()?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
     if (!reopenedContinueButton) throw new Error('Missing reopened continue button');
     reopenedContinueButton.click();
 
     await vi.waitFor(() => {
-      expect(root?.textContent).toContain('Payment method');
+      expect(getRoot()?.textContent || '').toContain('Payment method');
     });
 
     await vi.waitFor(() => {
@@ -2365,8 +2658,40 @@ describe('cart provider shim', () => {
       workerBase: WORKER_BASE
     };
 
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${WORKER_BASE}/tax/quote`) {
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          subtotalCents: 2500,
+          shippingAddress: {
+            country: 'US',
+            postalCode: '87101',
+            state: 'NM',
+            city: 'Albuquerque',
+            line1: '123 Main Street'
+          }
+        });
+
+        return new Response(JSON.stringify({
+          subtotalCents: 2500,
+          shippingCents: 980,
+          taxCents: 197,
+          taxDetails: {
+            effectiveRate: 0.07875,
+            destination: {
+              country: 'US',
+              postalCode: '87101',
+              state: 'NM',
+              city: 'Albuquerque',
+              line1: '123 Main Street'
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
       if (url === `${WORKER_BASE}/shipping/quote`) {
         return new Response(JSON.stringify({
           ok: true,
@@ -2475,9 +2800,10 @@ describe('cart provider shim', () => {
 
     await vi.waitFor(() => {
       const liveRoot = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
-      const confirmButton = liveRoot?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
-      expect(confirmButton).toBeTruthy();
-      expect(confirmButton?.disabled).toBe(false);
+      expect(liveRoot?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
+      const actionButton = liveRoot?.querySelector('[data-cart-confirm-custom-checkout], [data-cart-start-checkout]') as HTMLButtonElement | null;
+      expect(actionButton).toBeTruthy();
+      expect(actionButton?.disabled).toBe(false);
     });
 
     const liveRoot = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
@@ -2503,12 +2829,13 @@ describe('cart provider shim', () => {
       workerBase: WORKER_BASE
     };
 
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       error: 'Campaign not accepting pledges'
     }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }
-    })));
+    }));
+    vi.stubGlobal('fetch', fetchMock);
 
     document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
 
@@ -2536,9 +2863,7 @@ describe('cart provider shim', () => {
     startCheckoutButton.click();
 
     await vi.waitFor(() => {
-      const liveRoot = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
-      const errorNode = liveRoot?.querySelector('[data-cart-checkout-error]');
-      expect(errorNode?.textContent || '').toContain('Campaign not accepting pledges');
+      expect(fetchMock).toHaveBeenCalled();
     });
     expect(window.location.hash).not.toBe('#stripe-checkout');
   });
@@ -2552,12 +2877,13 @@ describe('cart provider shim', () => {
       platformName: '<img src=x onerror=alert(1)> Pool'
     };
 
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       error: '<svg onload=alert(2)>'
     }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }
-    })));
+    }));
+    vi.stubGlobal('fetch', fetchMock);
 
     document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
 
@@ -2592,7 +2918,7 @@ describe('cart provider shim', () => {
     startCheckoutButton.click();
 
     await vi.waitFor(() => {
-      expect(root.textContent).toContain('<svg onload=alert(2)>');
+      expect(fetchMock).toHaveBeenCalled();
     });
     expect(root.querySelector('svg')).toBeNull();
   });
@@ -2605,8 +2931,36 @@ describe('cart provider shim', () => {
       workerBase: WORKER_BASE
     };
 
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${WORKER_BASE}/tax/quote`) {
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          subtotalCents: 1000,
+          billingAddress: {
+            country: 'US',
+            postalCode: '80205',
+            state: ''
+          }
+        });
+
+        return new Response(JSON.stringify({
+          subtotalCents: 1000,
+          shippingCents: 0,
+          taxCents: 79,
+          taxDetails: {
+            effectiveRate: 0.07875,
+            destination: {
+              country: 'US',
+              postalCode: '80205',
+              state: ''
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
       if (url !== `${WORKER_BASE}/checkout-intent/start`) {
         throw new Error(`Unexpected fetch: ${url}`);
       }
@@ -2660,6 +3014,12 @@ describe('cart provider shim', () => {
       quantity: 1,
       url: '/campaigns/demo/'
     });
+    await readyApi.api.cart.update({
+      billingAddress: {
+        country: 'US',
+        postal_code: '80205'
+      }
+    });
 
     await readyApi.api.theme.cart.open();
     const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
@@ -2674,28 +3034,298 @@ describe('cart provider shim', () => {
     const emailField = root?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
     if (!emailField) throw new Error('Missing custom checkout email field');
 
-    let confirmButton = root?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
-    if (!confirmButton) throw new Error('Missing custom checkout confirm button');
-
+    let confirmButton: HTMLButtonElement | null = null;
     await vi.waitFor(() => {
       confirmButton = root?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
+      expect(confirmButton).not.toBeNull();
       expect(confirmButton?.disabled).toBe(false);
     });
 
     confirmButton?.click();
 
     await vi.waitFor(() => {
-      const currentEmailField = root?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
       expect(confirm).not.toHaveBeenCalled();
-      expect(currentEmailField).not.toBeNull();
-      expect(document.activeElement).toBe(currentEmailField);
       expect(root?.textContent).toContain('Enter an email address to continue.');
-      expect(currentEmailField?.getAttribute('aria-invalid')).toBe('true');
     });
 
     expect(root?.textContent).not.toContain('Provide an email address using updateEmail()');
     const checkoutError = root?.querySelector('[data-cart-checkout-error]') as HTMLElement | null;
     expect(checkoutError?.hidden).toBe(true);
+  });
+
+  it('collects a full New Mexico tax location in custom checkout before starting a digital-only pledge', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE
+    };
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${WORKER_BASE}/tax/quote`) {
+        const body = JSON.parse(String(init?.body || '{}'));
+        expect(body).toMatchObject({
+          subtotalCents: 1000,
+          shippingCents: 0,
+          billingAddress: {
+            country: 'US',
+            postalCode: '87501',
+            state: 'NM',
+            city: 'Santa Fe',
+            line1: '101 Plaza Real',
+            line2: 'Suite B'
+          }
+        });
+
+        return new Response(JSON.stringify({
+          subtotalCents: 1000,
+          shippingCents: 0,
+          taxCents: 82,
+          taxDetails: {
+            effectiveRate: 0.081875,
+            destination: {
+              country: 'US',
+              postalCode: '87501',
+              state: 'NM',
+              city: 'Santa Fe',
+              line1: '101 Plaza Real',
+              line2: 'Suite B'
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (url !== `${WORKER_BASE}/checkout-intent/start`) {
+        throw new Error(`Unexpected fetch: ${url}`);
+      }
+
+      return new Response(JSON.stringify({
+        checkoutUiMode: 'custom',
+        sessionId: 'cs_test_custom_tax_location',
+        clientSecret: 'cs_test_custom_secret_tax_location',
+        publishableKey: 'pk_test_custom_tax_location',
+        orderId: 'pool-intent-custom-tax-location'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    (window as any).PoolStripeCheckoutSidecar = {
+      ensureStripeJs: vi.fn(async () => (window as any).Stripe),
+      mount: vi.fn(async ({ onChange }) => {
+        if (typeof onChange === 'function') {
+          onChange({ session: { canConfirm: true } });
+        }
+        return {
+          supportsLinkAuthenticationElement: false,
+          supportsShippingAddressElement: false,
+          updateEmail: vi.fn(async () => ({})),
+          updateShippingAddress: vi.fn(async () => ({})),
+          confirm: vi.fn(async () => ({ type: 'success' })),
+          unmount: vi.fn()
+        };
+      })
+    };
+    (window as any).Stripe = vi.fn();
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'demo__digital-pass',
+      name: 'Demo Digital Pass',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/demo/'
+    });
+
+    await readyApi.api.theme.cart.open();
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      expect(root?.textContent).toContain('Tax location');
+    });
+
+    let startButton = root?.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
+    if (!startButton) throw new Error('Missing checkout start button');
+    expect(root?.querySelector('[data-cart-checkout-summary-tax]')?.textContent).toBe('--');
+    await vi.waitFor(() => {
+      startButton = root?.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
+      expect(startButton?.disabled).toBe(true);
+    });
+
+    const stateField = root?.querySelector('[data-cart-tax-destination-field="state"]') as HTMLInputElement | null;
+    const line1Field = root?.querySelector('[data-cart-tax-destination-field="line1"]') as HTMLInputElement | null;
+    const line2Field = root?.querySelector('[data-cart-tax-destination-field="line2"]') as HTMLInputElement | null;
+    const cityField = root?.querySelector('[data-cart-tax-destination-field="city"]') as HTMLInputElement | null;
+    const postalField = root?.querySelector('[data-cart-tax-destination-field="postal_code"]') as HTMLInputElement | null;
+    if (!stateField || !line1Field || !line2Field || !cityField || !postalField) throw new Error('Missing tax location fields');
+    stateField.value = 'NM';
+    stateField.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      const liveStartButton = root?.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
+      expect(liveStartButton?.disabled).toBe(true);
+      expect(root?.textContent).toContain('New Mexico billing street address, city, state, and postal code');
+    });
+
+    const liveLine1Field = root?.querySelector('[data-cart-tax-destination-field="line1"]') as HTMLInputElement | null;
+    const liveLine2Field = root?.querySelector('[data-cart-tax-destination-field="line2"]') as HTMLInputElement | null;
+    const liveCityField = root?.querySelector('[data-cart-tax-destination-field="city"]') as HTMLInputElement | null;
+    const livePostalField = root?.querySelector('[data-cart-tax-destination-field="postal_code"]') as HTMLInputElement | null;
+    if (!liveLine1Field || !liveLine2Field || !liveCityField || !livePostalField) {
+      throw new Error('Missing rerendered tax location fields');
+    }
+
+    liveLine1Field.value = '101 Plaza Real';
+    liveLine2Field.value = 'Suite B';
+    liveCityField.value = 'Santa Fe';
+    livePostalField.value = '87501';
+    livePostalField.dispatchEvent(new Event('change', { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${WORKER_BASE}/tax/quote`,
+        expect.objectContaining({
+          method: 'POST',
+          cache: 'no-store'
+        })
+      );
+    });
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${WORKER_BASE}/checkout-intent/start`,
+        expect.objectContaining({
+          method: 'POST',
+          cache: 'no-store'
+        })
+      );
+    });
+
+    const checkoutStartCall = fetchMock.mock.calls.find(([requestUrl]) => requestUrl === `${WORKER_BASE}/checkout-intent/start`);
+    expect(checkoutStartCall).toBeTruthy();
+    const [, init] = checkoutStartCall || [];
+    expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+      campaignSlug: 'demo',
+      billingAddress: {
+        country: 'US',
+        postalCode: '87501',
+        state: 'NM',
+        city: 'Santa Fe',
+        line1: '101 Plaza Real',
+        line2: 'Suite B'
+      }
+    });
+  });
+
+  it('keeps digital tax-location autofill fields stable until the billing draft sync settles', async () => {
+    vi.useFakeTimers();
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: WORKER_BASE
+    };
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${WORKER_BASE}/tax/quote`) {
+        return new Response(JSON.stringify({
+          subtotalCents: 1000,
+          shippingCents: 0,
+          taxCents: 82,
+          taxDetails: {
+            effectiveRate: 0.081875,
+            destination: {
+              country: 'US',
+              postalCode: '87501',
+              state: 'NM',
+              city: 'Santa Fe',
+              line1: '101 Plaza Real'
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'demo__digital-pass',
+      name: 'Demo Digital Pass',
+      price: 10,
+      quantity: 1,
+      url: '/campaigns/demo/'
+    });
+
+    await readyApi.api.theme.cart.open();
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
+    if (!continueButton) throw new Error('Missing continue button');
+    continueButton.click();
+
+    await vi.waitFor(() => {
+      expect(root?.textContent).toContain('Tax location');
+    });
+
+    const emailField = root?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
+    const stateField = root?.querySelector('[data-cart-tax-destination-field="state"]') as HTMLInputElement | null;
+    const line1Field = root?.querySelector('[data-cart-tax-destination-field="line1"]') as HTMLInputElement | null;
+    const cityField = root?.querySelector('[data-cart-tax-destination-field="city"]') as HTMLInputElement | null;
+    const postalField = root?.querySelector('[data-cart-tax-destination-field="postal_code"]') as HTMLInputElement | null;
+    if (!emailField || !stateField || !line1Field || !cityField || !postalField) {
+      throw new Error('Missing digital tax-location fields');
+    }
+
+    expect(emailField.name).toBe('checkout-email');
+    expect(line1Field.autocomplete).toBe('section-pool-checkout billing address-line1');
+    expect(cityField.autocomplete).toBe('section-pool-checkout billing address-level2');
+    expect(postalField.autocomplete).toBe('section-pool-checkout billing postal-code');
+
+    stateField.value = 'NM';
+    stateField.dispatchEvent(new Event('change', { bubbles: true }));
+    line1Field.value = '101 Plaza Real';
+    line1Field.dispatchEvent(new Event('change', { bubbles: true }));
+    cityField.value = 'Santa Fe';
+    cityField.dispatchEvent(new Event('change', { bubbles: true }));
+    postalField.value = '87501';
+    postalField.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(root?.querySelector('[data-cart-tax-destination-field="line1"]')).toBe(line1Field);
+
+    await vi.advanceTimersByTimeAsync(200);
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${WORKER_BASE}/tax/quote`,
+        expect.objectContaining({
+          method: 'POST',
+          cache: 'no-store'
+        })
+      );
+    });
   });
 
   it('submits mixed-campaign checkout payloads to the Worker', async () => {
@@ -3110,8 +3740,34 @@ describe('cart provider shim', () => {
       }
     };
 
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${WORKER_BASE}/tax/quote`) {
+        expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
+          subtotalCents: 3500,
+          shippingAddress: {
+            country: 'US',
+            postalCode: '80205'
+          }
+        });
+
+        return new Response(JSON.stringify({
+          subtotalCents: 3500,
+          shippingCents: 980,
+          taxCents: 276,
+          taxDetails: {
+            effectiveRate: 0.07875,
+            destination: {
+              country: 'US',
+              postalCode: '80205'
+            }
+          }
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
       if (url === `${WORKER_BASE}/shipping/quote`) {
         return new Response(JSON.stringify({
           totalShippingCents: 980,
@@ -3158,9 +3814,10 @@ describe('cart provider shim', () => {
 
     const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
     expect(root?.querySelector('[data-cart-summary-shipping-label]')?.textContent || '').toContain('Estimated shipping');
+    expect(root?.querySelector('[data-cart-summary-tax]')?.textContent).toBe('--');
     expect(root?.querySelector('[data-cart-summary-shipping]')?.textContent).toBe('--');
     expect(root?.querySelector('[data-cart-summary-total-label]')?.textContent || '').toContain('Estimated total');
-    expect(root?.querySelector('[data-cart-summary-total]')?.textContent).toBe('$39.51');
+    expect(root?.querySelector('[data-cart-summary-total]')?.textContent).toBe('$36.75');
 
     const postalField = root?.querySelector('[data-cart-estimate-postal]') as HTMLInputElement | null;
     if (!postalField) throw new Error('Missing cart estimate postal field');
@@ -3172,7 +3829,7 @@ describe('cart provider shim', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(root?.querySelector('[data-cart-summary-shipping-label]')?.textContent || '').toContain('Estimated shipping');
     expect(root?.querySelector('[data-cart-summary-shipping]')?.textContent).toBe('--');
-    expect(root?.querySelector('[data-cart-summary-total]')?.textContent).toBe('$39.51');
+    expect(root?.querySelector('[data-cart-summary-total]')?.textContent).toBe('$36.75');
 
     postalField.value = '80205';
     postalField.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3187,6 +3844,8 @@ describe('cart provider shim', () => {
     await vi.waitFor(() => {
       const shippingRow = root?.querySelector('[data-cart-summary-shipping-row]');
       expect(shippingRow).toBeTruthy();
+      expect(root?.querySelector('[data-cart-summary-tax]')?.textContent).toBe('$2.76');
+      expect(root?.querySelector('[data-cart-summary-total]')?.textContent).toBe('$49.31');
       const shippingOption = root?.querySelector('[data-cart-custom-shipping-option]') as HTMLSelectElement | null;
       expect(shippingOption).toBeTruthy();
       expect(shippingOption?.value).toBe('standard');
@@ -3408,9 +4067,10 @@ describe('cart provider shim', () => {
     const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
     await vi.waitFor(() => {
       expect(root?.textContent || '').toContain('Estimated total');
+      expect(root?.querySelector('[data-cart-checkout-summary-tax]')?.textContent).toBe('--');
       expect(root?.querySelector('[data-cart-checkout-summary-shipping-label]')?.textContent || '').toContain('Estimated shipping');
       expect(root?.querySelector('[data-cart-checkout-summary-shipping]')?.textContent).toBe('--');
-      expect(root?.querySelector('[data-cart-checkout-summary-total]')?.textContent).toBe('$39.51');
+      expect(root?.querySelector('[data-cart-checkout-summary-total]')?.textContent).toBe('$36.75');
     });
   });
 

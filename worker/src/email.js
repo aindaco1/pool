@@ -17,7 +17,6 @@ import {
   getEmailPrimaryColor,
   getEmailSurfaceColor,
   getEmailTextColor,
-  getSalesTaxRate,
   getPlatformCompanyName,
   getPlatformName,
   getPledgesEmailFrom,
@@ -454,10 +453,36 @@ function renderPledgeItems(
   </div>`;
 }
 
-function renderAmountBreakdown(env, { subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, totalLabel, totalAmount }, t = (_key, fallback) => fallback) {
+function formatTaxRatePercent(rate) {
+  return (Math.max(0, Number(rate) || 0) * 100).toFixed(3).replace(/\.?0+$/, '');
+}
+
+function renderTaxLabel(taxDetails, t = (_key, fallback) => fallback) {
+  const effectiveRate = Math.max(0, Number(taxDetails?.effectiveRate) || 0);
+  const country = String(
+    taxDetails?.destination?.country ||
+    taxDetails?.jurisdiction?.country ||
+    ''
+  ).trim().toUpperCase();
+
+  if (effectiveRate > 0 && country === 'US') {
+    return escapeHtml(t('common.sales_tax_label', 'Sales tax (%{rate}%)', {
+      rate: formatTaxRatePercent(effectiveRate)
+    }));
+  }
+
+  if (effectiveRate > 0) {
+    return escapeHtml(t('common.tax_label_with_rate', 'Tax (%{rate}%)', {
+      rate: formatTaxRatePercent(effectiveRate)
+    }));
+  }
+
+  return escapeHtml(t('common.tax_label', 'Tax'));
+}
+
+function renderAmountBreakdown(env, { subtotal = 0, tax = 0, taxDetails = null, shipping = 0, tipAmount = 0, tipPercent = 0, totalLabel, totalAmount }, t = (_key, fallback) => fallback) {
   const resolvedTotal = totalAmount ?? (subtotal + tax + shipping + tipAmount);
-  const salesTaxRate = (getSalesTaxRate(env) * 100).toFixed(3).replace(/\.?0+$/, '');
-  const salesTaxLabel = escapeHtml(t('common.sales_tax_label', 'Sales tax (%{rate}%)', { rate: salesTaxRate }));
+  const taxLabel = renderTaxLabel(taxDetails, t);
   const safeTotalLabel = escapeHtml(totalLabel);
   const subtotalLabel = escapeHtml(t('common.subtotal', 'Subtotal'));
   const shippingLabel = escapeHtml(t('common.shipping', 'Shipping'));
@@ -474,7 +499,7 @@ function renderAmountBreakdown(env, { subtotal = 0, tax = 0, shipping = 0, tipAm
   return `
     <p style="margin: 0 0 4px 0;">${subtotalLabel}: $${(subtotal / 100).toFixed(2)}</p>
     ${tipAmount > 0 ? `<p style="margin: 0 0 4px 0;">${tipLabel}</p>` : ''}
-    <p style="margin: 0 0 4px 0;">${salesTaxLabel}: $${(tax / 100).toFixed(2)}</p>
+    <p style="margin: 0 0 4px 0;">${taxLabel}: $${(tax / 100).toFixed(2)}</p>
     ${shipping > 0 ? `<p style="margin: 0 0 4px 0;">${shippingLabel}: $${(shipping / 100).toFixed(2)}</p>` : ''}
     <p style="margin: 0 0 8px 0;"><strong>${safeTotalLabel}: $${(resolvedTotal / 100).toFixed(2)}</strong></p>
   `.trim();
@@ -483,7 +508,7 @@ function renderAmountBreakdown(env, { subtotal = 0, tax = 0, shipping = 0, tipAm
 /**
  * Send supporter confirmation email after successful pledge
  */
-export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems, hasDecisions, preferredLang }) {
+export async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax = 0, taxDetails = null, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems, hasDecisions, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
@@ -496,6 +521,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
+    taxDetails,
     shipping,
     tipAmount,
     tipPercent,
@@ -560,7 +586,7 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
 /**
  * Send pledge modification confirmation email
  */
-export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campaignTitle, previousSubtotal, previousTax = 0, previousShipping = 0, previousTipAmount = 0, newSubtotal, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems, preferredLang }) {
+export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campaignTitle, previousSubtotal, previousTax = 0, previousShipping = 0, previousTipAmount = 0, newSubtotal, tax = 0, taxDetails = null, shipping = 0, tipAmount = 0, tipPercent = 0, token, instagramUrl, pledgeItems, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
@@ -578,6 +604,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal: newSubtotal,
     tax,
+    taxDetails,
     shipping,
     tipAmount,
     tipPercent,
@@ -642,7 +669,7 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
 /**
  * Send payment failure notification
  */
-export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems, preferredLang }) {
+export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, taxDetails = null, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
@@ -651,6 +678,7 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
+    taxDetails,
     shipping,
     tipAmount,
     tipPercent,
@@ -702,7 +730,7 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
 /**
  * Send charge success email after campaign settlement
  */
-export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems, hasDecisions, preferredLang }) {
+export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaignTitle, subtotal, tax, taxDetails = null, shipping = 0, tipAmount = 0, tipPercent = 0, amount, token, pledgeItems, hasDecisions, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
@@ -714,6 +742,7 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
+    taxDetails,
     shipping,
     tipAmount,
     tipPercent,
@@ -844,7 +873,7 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
 /**
  * Send pledge cancellation confirmation email
  */
-export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campaignTitle, subtotal = 0, tax = 0, shipping = 0, tipAmount = 0, tipPercent = 0, amount, preferredLang }) {
+export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campaignTitle, subtotal = 0, tax = 0, taxDetails = null, shipping = 0, tipAmount = 0, tipPercent = 0, amount, preferredLang }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
@@ -852,6 +881,7 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
   const amountBreakdownHtml = renderAmountBreakdown(env, {
     subtotal,
     tax,
+    taxDetails,
     shipping,
     tipAmount,
     tipPercent,

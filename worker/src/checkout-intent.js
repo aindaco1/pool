@@ -40,7 +40,42 @@ export function normalizeCheckoutContribution(input = {}) {
     subtotal: toNonNegativeInteger(input.subtotal),
     shipping: toNonNegativeInteger(input.shipping),
     tax: toNonNegativeInteger(input.tax),
+    taxDetails: normalizeTaxDetails(input.taxDetails),
     total: toNonNegativeInteger(input.total)
+  };
+}
+
+function normalizeTaxDetails(input = {}) {
+  if (!input || typeof input !== 'object') return null;
+
+  return {
+    provider: String(input.provider || ''),
+    source: String(input.source || ''),
+    effectiveRate: toDecimalNumber(input.effectiveRate),
+    destination: normalizeTaxAddress(input.destination),
+    jurisdiction: normalizeTaxAddress(input.jurisdiction),
+    taxableSubtotalCents: toNonNegativeInteger(input.taxableSubtotalCents),
+    taxableShippingCents: toNonNegativeInteger(input.taxableShippingCents),
+    shippingTaxed: input.shippingTaxed === true,
+    shippingCents: toNonNegativeInteger(input.shippingCents),
+    breakdown: Array.isArray(input.breakdown)
+      ? input.breakdown.map((entry) => ({
+          label: String(entry?.label || ''),
+          rate: toDecimalNumber(entry?.rate),
+          taxableSubtotalCents: toNonNegativeInteger(entry?.taxableSubtotalCents),
+          taxableShippingCents: toNonNegativeInteger(entry?.taxableShippingCents),
+          taxCents: toNonNegativeInteger(entry?.taxCents)
+        }))
+      : []
+  };
+}
+
+function normalizeTaxAddress(input = {}) {
+  if (!input || typeof input !== 'object') return null;
+  return {
+    country: String(input.country || '').trim().toUpperCase(),
+    state: String(input.state || '').trim().toUpperCase(),
+    postalCode: String(input.postalCode || input.postal_code || '').trim()
   };
 }
 
@@ -127,6 +162,7 @@ export function buildCheckoutHashInput({ campaignSlug, canonicalContribution, ti
     subtotal: canonicalContribution?.totals?.subtotal || 0,
     shipping: canonicalContribution?.totals?.shipping || 0,
     tax: canonicalContribution?.totals?.tax || 0,
+    taxDetails: canonicalContribution?.totals?.taxDetails || null,
     total: canonicalContribution?.totals?.amount || 0
   };
 }
@@ -237,6 +273,11 @@ function toNonNegativeInteger(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return Math.round(parsed);
+}
+
+function toDecimalNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 function compareTierEntries(a, b) {

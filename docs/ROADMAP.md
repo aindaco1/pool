@@ -136,6 +136,7 @@
   - stronger dialog, tab, tip-slider, error, and live-region semantics
   - axe-backed critical-surface coverage
   - broader browser accessibility coverage across campaign, community, pledge-result, About, and Terms states
+  - shared public shells now keep skip links and stable `main-content` anchors, and the cart trigger exposes clearer accessible labels and expanded state
 - [x] Typography, elements, and layouts redesign
   - shared tokens, typography, buttons, fields, and surfaces
   - aligned public pages, campaign pages, cart / checkout, and Manage Pledge styling
@@ -144,6 +145,7 @@
   - focused audit-and-polish work rather than a redesign
   - shared responsive fixes across campaign pages, cart / checkout, Manage Pledge, Update Card, community pages, and long-form content
   - mobile browser regressions for overflow, scrollability, and reachable primary actions
+  - safe-area-aware cart/nav overlays, better small-screen summary wrapping, and larger remove/close tap targets are now part of the baseline
 - [x] Zero-regression styles reorganization to be cleaner, more efficient, and as DRY as possible
   - shared Sass primitives now cover repeated card shells, stacked sections, responsive surfaces, tab lists, pill states, media-object grids, quantity steppers, and primary action buttons
   - cart / checkout, Manage Pledge, campaign pages, community pages, and long-form content now lean on those shared patterns instead of carrying parallel near-duplicate styling
@@ -155,11 +157,13 @@
   - auto-synced Worker mirroring from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`
   - curated CSS theme-variable bridge via `assets/theme-vars.css`
   - configurable core brand assets and documented no-code customization surface
+  - branded Stripe Elements and supporter emails now follow the shared design/config surface instead of a separate checkout/email theme path
 - [x] i18n completion with a Spanish language translation available
   - `_config.yml` now owns supported languages, language labels, and curated localized public-page routes
   - English + Spanish routes now exist for `/`, `/about/`, `/terms/`, `/pledge-success/`, `/pledge-cancelled/`, `/manage/`, `/community/`, and supporter community pages
   - a quieter footer language switcher plus shared route helpers preserve query strings and hashes for tokenized routes such as `/manage/?t=...`
   - shared public campaign/community labels, site-owned cart/community/Manage Pledge runtime strings, campaign countdown/gallery/live-stats edge copy, and Worker supporter emails now read from locale data plus persisted `preferredLang`
+  - cart-button summaries, checkout tax-location helper copy, and localized public metadata now follow the same shared locale model
 - [x] SEO fundamentals baseline
   - shared metadata now covers titles, descriptions, canonicals, OG/Twitter tags, and default social images across public layouts
   - `robots.txt`, `sitemap.xml`, and explicit `noindex,nofollow` handling keep private/tokenized/supporter-only flows out of search intent
@@ -168,6 +172,7 @@
   - stronger merge-gate and unit coverage now protect alternate-language metadata, sitemap inclusion, and the public crawl surface
   - bounded fork-facing SEO config now covers `seo.x_handle`, `seo.same_as`, `seo.default_social_image_alt`, `seo.og_locale_overrides`, and whether the public community hub should remain indexable
   - structured browser and Worker debug logging now ships as a config-driven developer aid with timestamps, severity labels, scoped prefixes, and browser global error capture
+  - public metadata now also emits language/app-name hints, secure social-image tags where possible, and locale-aware JSON-LD language/breadcrumb roots
 - [x] Campaign embeds and richer share previews
   - campaign pages now link to a hosted locale-aware embed builder that generates copy-paste iframe code with layout, theme, media, and CTA options
   - the embed widget uses live Worker-backed campaign state, auto-resizes after paste, and supports localized return links plus localized builder/runtime copy
@@ -182,6 +187,12 @@
   - `/checkout-intent/abandon` uses an order-scoped retry budget instead of a naive per-IP limiter
   - deployed Standard/Paid Workers now declare a conservative `cpu_ms = 100` ceiling as a denial-of-wallet backstop
   - admin-only observability endpoints and `scripts/check-observability.sh` now expose webhook outcome summaries and sampled mutation timings for tuning
+- [x] Tax groundwork and checkout UX pass
+  - Worker/provider seam, provisional tax UI, and final-tax destination plumbing are now in place across cart, checkout, Manage Pledge, stored pledge data, and supporter emails
+  - current browser UX now keeps tax at `--` until checkout has enough destination data, instead of inventing a fake precise value too early
+  - custom checkout now collects billing tax location for digital-only carts, while physical/mixed carts stay address-first and support browser autofill again
+  - a free-first New Mexico path now exists through a vendored starter dataset plus optional EDAC refinement
+  - local smoke fixtures and merge-gate coverage now work under location-aware tax providers instead of assuming flat tax
 
 ## Planned
 
@@ -206,6 +217,12 @@
     - Create/edit/delete campaign content, diary, community vote, and other per-campaign variables
 - [ ] Non-Stripe tax calculator to replace flat rate sales tax
   - Support USA and international
+  - Target local / jurisdiction-level US rates, not just state-level rates
+  - Near-term focus: finish New Mexico local gross receipts tax coverage so the calculator can be manually tested end to end with more confidence
+  - Add stronger offline/in-repo coverage for more free local-jurisdiction state datasets after New Mexico
+  - Decide how much international logic should stay vendored offline versus optional provider-backed
+  - Add a documented tax-data refresh/import workflow for future jurisdiction datasets
+  - Future consideration: business tax handling such as VAT ID validation, reverse-charge flows, exemptions, and product tax classes
 - [ ] Support different prices per add-on variation
 
 ## Known Issues

@@ -90,6 +90,14 @@ async function addCartItemViaClient(page: any, item: Record<string, any>) {
   }, item);
 }
 
+async function fillDefaultCustomCheckoutTaxLocation(page: any) {
+  await page.locator('[data-cart-tax-destination-field="line1"]').fill('1228 W La Entrada');
+  await page.locator('[data-cart-tax-destination-field="city"]').fill('Corrales');
+  await page.locator('[data-cart-tax-destination-field="state"]').fill('NM');
+  await page.locator('[data-cart-tax-destination-field="postal_code"]').fill('87048');
+  await page.locator('[data-cart-tax-destination-field="postal_code"]').dispatchEvent('change');
+}
+
 async function getActiveRuntime(page: any) {
   return page.evaluate(() => {
     return (window as any).PoolCartProvider?.activeRuntime || (window as any).POOL_CONFIG?.cartRuntime || 'first_party';
@@ -645,7 +653,8 @@ test.describe('Cart Flow', () => {
       await expect(page.locator('.pool-first-party-cart__checkout-summary')).toBeVisible();
       await expect(page.locator('.pool-first-party-cart__tip-percent')).toHaveText('5%');
       await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('tip (5%)');
-      await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('Sales tax (7.625%)');
+      await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('Tax');
+      await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('--');
       await expect(page.locator('.pool-first-party-cart__checkout-summary')).toContainText('Estimated total');
       return;
     }
@@ -712,7 +721,17 @@ test.describe('Cart Flow', () => {
     await expect(page.locator('[data-cart-email]')).toHaveCount(0);
     await expect(page.locator('[data-cart-tip]')).toHaveCount(0);
 
-    if (checkoutUiMode !== 'custom') {
+    if (checkoutUiMode === 'custom') {
+      await expect(page.locator('[data-cart-custom-checkout-email]')).toBeVisible();
+      await page.locator('[data-cart-custom-checkout-email]').fill('canonical-payload@example.com');
+      await fillDefaultCustomCheckoutTaxLocation(page);
+      await expect(page.locator('[data-cart-start-checkout]')).toBeVisible();
+      await expect(page.locator('[data-cart-start-checkout]')).toBeEnabled();
+      await page.evaluate(() => {
+        const button = document.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
+        button?.click();
+      });
+    } else {
       await expect(page.locator('[data-cart-start-checkout]')).toBeVisible();
       await page.evaluate(() => {
         const button = document.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
@@ -730,7 +749,14 @@ test.describe('Cart Flow', () => {
           quantity: 1
         }
       ],
-      customAmount: 0
+      customAmount: 0,
+      billingAddress: {
+        country: 'US',
+        postalCode: '87048',
+        state: 'NM',
+        city: 'Corrales',
+        line1: '1228 W La Entrada'
+      }
     });
 
     const pendingPledge = await page.evaluate(() => {
@@ -1232,6 +1258,15 @@ test.describe('Checkout Flow', () => {
     const emailField = page.locator('[data-cart-custom-checkout-email]');
     await expect(emailField).toBeVisible();
     await emailField.fill('e2e-supporter@example.com');
+    await fillDefaultCustomCheckoutTaxLocation(page);
+
+    const continueToPledgeButton = page.locator('[data-cart-start-checkout]');
+    await expect(continueToPledgeButton).toBeVisible();
+    await expect(continueToPledgeButton).toBeEnabled();
+    await page.evaluate(() => {
+      const button = document.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
+      button?.click();
+    });
 
     const saveButton = page.locator('[data-cart-confirm-custom-checkout]');
     await expect(saveButton).toBeVisible();
@@ -1513,7 +1548,7 @@ test.describe('Checkout Flow', () => {
     await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Estimated shipping');
     await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('--');
     await expect(page.locator('[data-cart-summary-total-label]')).toContainText('Estimated total');
-    await expect(page.locator('[data-cart-summary-total]')).toHaveText('$39.42');
+    await expect(page.locator('[data-cart-summary-total]')).toHaveText('$36.75');
   });
 
   test('campaign add-ons keep the campaign shipping override in mixed carts', async ({ page }) => {
@@ -1658,14 +1693,37 @@ test.describe('Checkout Flow', () => {
     await expect(page.locator('[data-cart-custom-checkout-email]')).toBeVisible();
     await expect(cartDialog).toBeVisible();
     await expect(page.locator('[data-cart-custom-checkout-email]')).toHaveAttribute('type', 'email');
-    await expect(page.locator('[data-cart-confirm-custom-checkout]')).toBeVisible();
 
     const emailField = page.locator('[data-cart-custom-checkout-email]');
     await expect(emailField).toBeVisible();
     await emailField.focus();
     await page.keyboard.type('keyboard-supporter@example.com');
 
+    const line1Field = page.locator('[data-cart-tax-destination-field="line1"]');
+    await line1Field.focus();
+    await page.keyboard.type('1228 W La Entrada');
+
+    const cityField = page.locator('[data-cart-tax-destination-field="city"]');
+    await cityField.focus();
+    await page.keyboard.type('Corrales');
+
+    const stateField = page.locator('[data-cart-tax-destination-field="state"]');
+    await stateField.focus();
+    await page.keyboard.type('NM');
+
+    const postalField = page.locator('[data-cart-tax-destination-field="postal_code"]');
+    await postalField.focus();
+    await page.keyboard.type('87048');
+    await postalField.dispatchEvent('change');
+
+    const continueToPledgeButton = page.locator('[data-cart-start-checkout]');
+    await expect(continueToPledgeButton).toBeVisible();
+    await continueToPledgeButton.focus();
+    await expect(continueToPledgeButton).toBeFocused();
+    await page.keyboard.press('Enter');
+
     const saveButton = page.locator('[data-cart-confirm-custom-checkout]');
+    await expect(saveButton).toBeVisible();
     await saveButton.focus();
     await expect(saveButton).toBeFocused();
     await page.keyboard.press('Enter');
@@ -1735,10 +1793,11 @@ test.describe('Checkout Flow', () => {
 
     await page.locator('[data-cart-continue]').click();
 
-    const saveButton = page.locator('[data-cart-confirm-custom-checkout]');
     await expect(page.locator('[data-cart-custom-checkout-email]')).toBeVisible();
-    await expect(saveButton).toBeVisible();
-    await expect(saveButton).toBeInViewport();
+    await fillDefaultCustomCheckoutTaxLocation(page);
+    const continueToPledgeButton = page.locator('[data-cart-start-checkout]');
+    await expect(continueToPledgeButton).toBeVisible();
+    await expect(continueToPledgeButton).toBeInViewport();
     await expectNoHorizontalOverflow(page);
   });
 

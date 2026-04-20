@@ -455,11 +455,17 @@ function initCartRuntime() {
     }, 2000);
   }
  
-  function getCartTotalCents(state) {
-    const numericTotal = Number(state?.cart?.total);
-    if (Number.isFinite(numericTotal) && numericTotal >= 0) {
-      return Math.round(numericTotal * 100);
-    }
+function getCartTotalCents(state) {
+  const displayedSummary = getCartProvider()?.getDisplaySummary?.() ||
+    getCartClient()?.summary?.getDisplay?.();
+  if (displayedSummary && Number.isFinite(Number(displayedSummary.totalCents))) {
+    return Math.max(0, Math.round(Number(displayedSummary.totalCents)));
+  }
+
+  const numericTotal = Number(state?.cart?.total);
+  if (Number.isFinite(numericTotal) && numericTotal >= 0) {
+    return Math.round(numericTotal * 100);
+  }
     return getCartSubtotalCents(state);
   }
 
@@ -481,6 +487,9 @@ function initCartRuntime() {
   }
   updateHeaderPrice();
   subscribeCartStore(() => {
+    updateHeaderPrice();
+  });
+  onCartEvent('summary.updated', () => {
     updateHeaderPrice();
   });
   onCartEvent(CART_EVENT_NAMES.summaryCheckoutClicked, () => {

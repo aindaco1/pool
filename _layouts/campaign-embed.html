@@ -25,7 +25,8 @@
   <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
 </head>
 <body class="campaign-embed-page">
-  <main class="campaign-embed-shell">
+  <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
+  <main id="main-content" class="campaign-embed-shell" tabindex="-1">
     <a href="/" class="campaign-embed-shell__close pool-first-party-cart__close" data-campaign-embed-close aria-label="{% include t.html key='embed.back_to_campaign' lang=current_lang %}" title="{% include t.html key='embed.back_to_campaign' lang=current_lang %}" hidden>&times;</a>
     {{ content }}
   </main>

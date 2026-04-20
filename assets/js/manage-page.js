@@ -104,6 +104,7 @@
   let activeManageDialogCleanup = null;
   let activeManageDialogReturnFocus = null;
   const shippingQuoteState = new Map();
+  const taxQuoteState = new Map();
   const shippingOptionUtils = window.PoolShippingOptionUtils || {
     normalizeSelection: function(availableOptions, selectedOption, defaultOption) {
       const options = Array.isArray(availableOptions) ? availableOptions : [];
@@ -1273,6 +1274,128 @@
 
   function getSalesTaxLabel() {
     return `Sales tax (${(SALES_TAX_RATE * 100).toFixed(3).replace(/\.?0+$/, '')}%)`;
+  }
+
+  function getTaxLabelFromDetails(taxDetails) {
+    const effectiveRate = Math.max(0, Number(taxDetails?.effectiveRate) || 0);
+    const country = String(taxDetails?.destination?.country || '').trim().toUpperCase();
+    if (effectiveRate > 0 && country === 'US') {
+      return `Sales tax (${(effectiveRate * 100).toFixed(3).replace(/\.?0+$/, '')}%)`;
+    }
+    if (effectiveRate > 0) {
+      return `Tax (${(effectiveRate * 100).toFixed(3).replace(/\.?0+$/, '')}%)`;
+    }
+    return country === 'US' ? getSalesTaxLabel() : getRuntimeMessage('manage.tax', 'Tax');
+  }
+
+  function normalizeManageTaxDestination(value) {
+    if (!value || typeof value !== 'object') return null;
+    const country = String(value.country || value.countryCode || '').trim().toUpperCase();
+    const postalCode = String(value.postalCode || value.postal_code || '').trim();
+    if (!country || !postalCode) return null;
+    return {
+      country,
+      postalCode,
+      state: String(value.state || value.province || value.region || value.stateCode || '').trim().toUpperCase(),
+      city: String(value.city || '').trim(),
+      line1: String(value.line1 || value.address1 || value.street || '').trim(),
+      line2: String(value.line2 || value.address2 || '').trim()
+    };
+  }
+
+  function getPledgeTaxDestination(pledge) {
+    return normalizeManageTaxDestination(
+      pledge?.billingAddress ||
+      pledge?.taxDetails?.destination ||
+      pledge?.shippingAddress ||
+      null
+    );
+  }
+
+  function getPledgeTaxAmount(pledge, subtotalOverride = null) {
+    const explicitTax = Number(pledge?.tax);
+    if (subtotalOverride === null && Number.isFinite(explicitTax) && explicitTax >= 0) {
+      return Math.round(explicitTax);
+    }
+
+    const effectiveRate = Math.max(0, Number(pledge?.taxDetails?.effectiveRate) || 0);
+    const subtotalCents = Math.max(0, Number(subtotalOverride !== null ? subtotalOverride : getPledgeSubtotal(pledge)) || 0);
+    if (effectiveRate > 0) {
+      return Math.round(subtotalCents * effectiveRate);
+    }
+
+    return calculateTax(subtotalCents);
+  }
+
+  function getPledgeTaxLabel(pledge) {
+    return getTaxLabelFromDetails(pledge?.taxDetails || null);
+  }
+
+  function buildFallbackTaxQuote(pledge, subtotalCents, shippingCents) {
+    const destination = getPledgeTaxDestination(pledge);
+    const effectiveRate = Math.max(0, Number(pledge?.taxDetails?.effectiveRate) || SALES_TAX_RATE);
+    const taxableSubtotalCents = Math.max(0, Number(subtotalCents) || 0);
+    const taxableShippingCents = 0;
+    const taxCents = Math.round(taxableSubtotalCents * effectiveRate);
+    return {
+      taxCents,
+      taxDetails: {
+        provider: String(pledge?.taxDetails?.provider || 'flat'),
+        source: String(pledge?.taxDetails?.source || 'flat_rate'),
+        effectiveRate,
+        destination,
+        jurisdiction: pledge?.taxDetails?.jurisdiction || null,
+        taxableSubtotalCents,
+        taxableShippingCents,
+        shippingTaxed: false,
+        shippingCents: Math.max(0, Number(shippingCents) || 0),
+        breakdown: Array.isArray(pledge?.taxDetails?.breakdown) ? pledge.taxDetails.breakdown : []
+      }
+    };
+  }
+
+  async function fetchQuotedTaxQuote(pledge, subtotalCents, shippingCents) {
+    const destination = getPledgeTaxDestination(pledge);
+    if (!destination) {
+      return buildFallbackTaxQuote(pledge, subtotalCents, shippingCents);
+    }
+
+    const signature = JSON.stringify({
+      orderId: pledge?.orderId || '',
+      subtotalCents: Math.max(0, Number(subtotalCents) || 0),
+      shippingCents: Math.max(0, Number(shippingCents) || 0),
+      destination
+    });
+    const cached = taxQuoteState.get(signature);
+    if (cached && Number.isFinite(Number(cached?.taxCents))) {
+      return cached;
+    }
+
+    const billingAddress = normalizeManageTaxDestination(pledge?.billingAddress || pledge?.taxDetails?.destination || null);
+    const shippingAddress = normalizeManageTaxDestination(pledge?.shippingAddress || null);
+
+    try {
+      const response = await fetch(`${WORKER_BASE}/tax/quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subtotalCents: Math.max(0, Number(subtotalCents) || 0),
+          shippingCents: Math.max(0, Number(shippingCents) || 0),
+          billingAddress: billingAddress || undefined,
+          shippingAddress: shippingAddress || undefined
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Tax quote failed with ${response.status}`);
+      }
+
+      const data = await response.json();
+      taxQuoteState.set(signature, data);
+      return data;
+    } catch (_error) {
+      return buildFallbackTaxQuote(pledge, subtotalCents, shippingCents);
+    }
   }
 
   function sanitizeTipPercent(value, fallback = DEFAULT_PLATFORM_TIP_PERCENT) {
@@ -2843,7 +2966,7 @@
               const tipAmount = getPledgeTipAmount(pledge);
               const tipPercent = getPledgeTipPercent(pledge);
               const shipping = pledge.shipping || 0;
-              const tax = calculateTax(subtotal);
+              const tax = getPledgeTaxAmount(pledge);
               const total = subtotal + tax + shipping + tipAmount;
               return `
                 <div class="pledge-summary__row">
@@ -2855,7 +2978,7 @@
                   <span class="value" id="tip-${index}">${formatMoney(tipAmount)}</span>
                 </div>
                 <div class="pledge-summary__row pledge-summary__row--tax">
-                  <span class="label">${getSalesTaxLabel()}</span>
+                  <span class="label" id="tax-label-${index}">${escapeHtml(getPledgeTaxLabel(pledge))}</span>
                   <span class="value" id="tax-${index}">${formatMoney(tax)}</span>
                 </div>
                 <div class="pledge-summary__row pledge-summary__row--shipping" id="shipping-row-${index}" ${shipping > 0 ? '' : 'hidden'}>
@@ -3626,7 +3749,8 @@
           `${formatMoney(currentTipAmount)} → ${formatMoney(newTipAmount)} (${tipDiffLabel}, ${selectedTipPercent}%)`
         );
       }
-      const newTax = calculateTax(newSubtotal);
+      const confirmTaxQuote = await fetchQuotedTaxQuote(pledge, newSubtotal, confirmShipping);
+      const newTax = Math.max(0, Number(confirmTaxQuote?.taxCents || 0));
       const newTotalWithTax = newSubtotal + newTax + confirmShipping + newTipAmount;
       const totalsNode = document.createElement('p');
       totalsNode.className = 'confirm-totals';
@@ -3642,7 +3766,11 @@
           `${PLATFORM_NAME} tip (${selectedTipPercent}%): ${formatMoney(newTipAmount)}`
         );
       }
-      appendTextElement(totalsNode, 'span', `${getSalesTaxLabel()}: ${formatMoney(newTax)}`);
+      appendTextElement(
+        totalsNode,
+        'span',
+        `${getTaxLabelFromDetails(confirmTaxQuote?.taxDetails)}: ${formatMoney(newTax)}`
+      );
       if (confirmShipping > 0) {
         appendTextElement(
           totalsNode,
@@ -3674,6 +3802,7 @@
           await new Promise((resolve) => setTimeout(resolve, 500));
           pledge.subtotal = newSubtotal;
           pledge.tax = newTax;
+          pledge.taxDetails = confirmTaxQuote?.taxDetails || buildFallbackTaxQuote(pledge, newSubtotal, confirmShipping).taxDetails;
           pledge.shipping = confirmShipping;
           pledge.tipPercent = selectedTipPercent;
           pledge.tipAmount = newTipAmount;
@@ -3919,7 +4048,7 @@
     const saveBtn = document.querySelector(`[data-action="save"][data-index="${index}"]`);
 
     const originalSubtotal = getPledgeSubtotal(pledge);
-    const originalTax = calculateTax(originalSubtotal);
+    const originalTax = getPledgeTaxAmount(pledge);
     const originalShipping = pledge.shipping || 0;
     const originalTipAmount = getPledgeTipAmount(pledge);
     const originalTotal = originalSubtotal + originalTax + originalShipping + originalTipAmount;
@@ -4036,13 +4165,14 @@
     const tipRow = document.getElementById(`tip-row-${index}`);
     const tipRowPercent = document.getElementById(`tip-row-percent-${index}`);
     const tipAmountLabel = document.getElementById(`tip-amount-label-${index}`);
+    const taxLabelEl = document.getElementById(`tax-label-${index}`);
     const taxEl = document.getElementById(`tax-${index}`);
     const shippingEl = document.getElementById(`shipping-${index}`);
     const shippingRow = document.getElementById(`shipping-row-${index}`);
     const shippingOptionRow = document.getElementById(`shipping-option-row-${index}`);
     const shippingOptionSelect = document.getElementById(`shipping-option-${index}`);
     const newTipAmount = calculatePlatformTip(newSubtotal, tipPercent);
-    const newTax = calculateTax(newSubtotal);
+    const newTax = getPledgeTaxAmount(pledge, newSubtotal);
     const newTotalWithTax = newSubtotal + newTax + newShipping + newTipAmount;
     const originalShippingOption = String(pledge.shippingOption || 'standard').trim().toLowerCase() || 'standard';
     const baseHasChanges = hasChanges;
@@ -4067,6 +4197,9 @@
     const tipInput = document.getElementById(`tip-percent-${index}`);
     if (tipInput) {
       tipInput.setAttribute('aria-valuetext', formatTipSliderValueText(tipPercent, newTipAmount));
+    }
+    if (taxLabelEl) {
+      taxLabelEl.textContent = getPledgeTaxLabel(pledge);
     }
     taxEl.textContent = formatMoney(newTax);
     if (shippingRow) {
@@ -4112,7 +4245,7 @@
       signature: quoteSignature
     });
 
-    void fetchQuotedShippingQuote(pledge, campaign, selectedTierEntries, selectedSupportItemEntries, selectedBundleAddOnEntries, shippingOption).then((quotedQuote) => {
+    void fetchQuotedShippingQuote(pledge, campaign, selectedTierEntries, selectedSupportItemEntries, selectedBundleAddOnEntries, shippingOption).then(async (quotedQuote) => {
       const latestState = shippingQuoteState.get(index);
       if (!latestState || latestState.requestId !== requestId || latestState.signature !== quoteSignature) {
         return;
@@ -4120,11 +4253,17 @@
 
       const quotedShipping = Math.max(0, Number(quotedQuote?.shippingCents || 0));
       const resolvedShippingOption = String(quotedQuote?.selectedOption || shippingOption || 'standard').trim().toLowerCase() || 'standard';
-      const quotedTotal = newSubtotal + newTax + quotedShipping + newTipAmount;
+      const taxQuote = await fetchQuotedTaxQuote(pledge, newSubtotal, quotedShipping);
+      const quotedTax = Math.max(0, Number(taxQuote?.taxCents || newTax));
+      const quotedTotal = newSubtotal + quotedTax + quotedShipping + newTipAmount;
       if (shippingRow) {
         shippingRow.hidden = quotedShipping === 0;
         shippingEl.textContent = formatMoney(quotedShipping);
       }
+      if (taxLabelEl) {
+        taxLabelEl.textContent = getTaxLabelFromDetails(taxQuote?.taxDetails);
+      }
+      taxEl.textContent = formatMoney(quotedTax);
       if (shippingOptionRow && shippingOptionSelect instanceof HTMLSelectElement) {
         const availableOptions = Array.isArray(quotedQuote?.availableOptions) ? quotedQuote.availableOptions : [];
         const showShippingOptions = shouldShowManageShippingOptions(quotedQuote);

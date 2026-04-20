@@ -13,9 +13,10 @@
   {% include seo-meta.html lang=current_lang title=community_title description=campaign.short_blurb image=campaign.hero_image indexable=false %}
 </head>
 <body>
+  <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
   {% include header.html hide_cart=true %}
 
-  <main class="community-page">
+  <main id="main-content" class="community-page" tabindex="-1">
     <div class="community-page__container">
       <!-- Loading state -->
       <div id="community-loading" class="community-page__loading">

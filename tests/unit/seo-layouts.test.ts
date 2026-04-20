@@ -61,7 +61,11 @@ describe('SEO templates', () => {
     expect(seoMeta).toContain('og:locale');
     expect(seoMeta).toContain('og:locale:alternate');
     expect(seoMeta).toContain('og:image:alt');
+    expect(seoMeta).toContain('og:image:secure_url');
     expect(seoMeta).toContain('twitter:image:alt');
+    expect(seoMeta).toContain('application-name');
+    expect(seoMeta).toContain('apple-mobile-web-app-title');
+    expect(seoMeta).toContain('meta name="language"');
     expect(seoMeta).toContain('site.seo.default_social_image_alt');
     expect(seoMeta).toContain('site.seo.og_locale_overrides');
     expect(campaignLayout).toContain('campaign_preview_state');
@@ -112,6 +116,7 @@ describe('SEO templates', () => {
     const switcher = readRepoFile('_includes', 'language-switcher.html');
     const localizedUrl = readRepoFile('_includes', 'localized-url.html');
     const campaignLayout = readRepoFile('_layouts', 'campaign.html');
+    const seoJsonLd = readRepoFile('_includes', 'seo-json-ld.html');
     const localizedCampaignPlugin = readRepoFile('_plugins', 'localized_campaign_pages.rb');
 
     expect(footer).toContain('translation_key=current_translation_key');
@@ -120,6 +125,9 @@ describe('SEO templates', () => {
     expect(switcher).toContain('include.localized_paths | default: page.localized_paths');
     expect(localizedUrl).toContain('include.translation_key and include.translation_key != page.translation_key');
     expect(campaignLayout).toContain('translation_key=page.translation_key localized_paths=page.localized_paths');
+    expect(seoJsonLd).toContain("localized-url.html lang=current_lang translation_key='home'");
+    expect(seoJsonLd).toContain('availableLanguage');
+    expect(seoJsonLd).toContain('"inLanguage": {{ current_lang | jsonify }}');
     expect(localizedCampaignPlugin).toContain('class LocalizedCampaignPage < PageWithoutAFile');
     expect(localizedCampaignPlugin).toContain("campaign.data['localized_paths'] = localized_paths");
     expect(localizedCampaignPlugin).toContain("File.join(lang.to_s, 'campaigns', slug.to_s)");

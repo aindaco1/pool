@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v0.9.2**. The Pool will treat **v1.0** as the wider public launch milestone once the remaining roadmap items are complete.
+Current release milestone: **v0.9.3**. The Pool will treat **v1.0** as the wider public launch milestone once the remaining roadmap items are complete.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -18,7 +18,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Platform add-ons with inventory awareness** — Bundle-level merch add-ons can be attached to a checkout, stay editable in Manage Pledge, support per-variant stock, and ride the same canonical shipping/reporting/email flow without counting toward campaign funding goals
 - **Campaign add-ons with campaign-aware accounting** — Campaign markdown can also define campaign-scoped add-ons that render in the same cart / Manage UI, count toward that campaign’s funding subtotal, follow campaign shipping overrides, and disappear automatically when the owning campaign pledge leaves the cart
 - **On-site Stripe payment step** — The existing second checkout sidecar hosts secure Stripe payment UI, and Manage Pledge uses the same pattern for `Update Card`
-- **Configurable pricing settings** — `pricing.sales_tax_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` live in `_config.yml`, and the required Worker vars are auto-synced into `worker/wrangler.toml` for server-side enforcement
+- **Configurable pricing and tax-provider settings** — `pricing.*` and `tax.*` live in `_config.yml`, and the mirrored Worker vars are auto-synced into `worker/wrangler.toml` so browser previews, provisional tax states, and server-side totals stay aligned
 - **Physical & digital tiers** — Physical items trigger shipping address capture during checkout plus Worker-calculated USPS quotes, configured fallback rates, and optional domestic signature upgrades when enabled
 - **Order-scoped magic links** — Each supporter link only manages its own pledge/order
 - **Safer supporter sessions** — Community pages keep supporter access in browser session storage instead of a long-lived token cookie
@@ -39,11 +39,12 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Tip-aware emails + reports** — Supporter emails, pledge reports, and fulfillment exports all include the platform tip when present
 - **Projection drift diagnostics** — Read-only admin checks and a local CLI can compare stored stats, inventory, and campaign indexes against saved pledge truth before any repair path mutates data
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
-- **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, stacking, and overflow fixes instead of a separate mobile-only UI
+- **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, safe-area-aware drawers, larger tap targets, and overflow fixes instead of a separate mobile-only UI
+- **Accessibility baseline** — Public shells now keep skip links and stable main landmarks, while cart / checkout flows use stronger dialog semantics, live-region updates, and clearer accessible labels without moving payment fields out of Stripe-owned secure UI
 - **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, curated design variables, themed Stripe Elements, and branded supporter emails without requiring custom code for normal fork rebranding
 - **Hosted live campaign embeds** — Campaign pages now link to a locale-aware embed builder that generates copy-paste iframe code with layout/theme/media/CTA options, live Worker-backed data, and auto-resize behavior
-- **English + Spanish i18n foundation** — `_config.yml` now drives supported languages, static locale routes, generated localized campaign routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, public campaign pages, embed pages, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge/embed runtime copy, campaign countdown/gallery/live-stats labels, hero video/community teaser/diary chrome, localized campaign dates, and localized Worker supporter emails
-- **SEO fundamentals baseline** — Public pages and campaign pages now emit consistent titles, descriptions, canonicals, OG/Twitter tags, honest JSON-LD, Worker-generated campaign share-card images, and alternate-language metadata where supported, while `robots.txt`, `sitemap.xml`, and explicit noindex rules keep private/tokenized flows out of search intent
+- **English + Spanish i18n foundation** — `_config.yml` now drives supported languages, static locale routes, generated localized campaign routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, public campaign pages, embed pages, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge/embed runtime copy, campaign countdown/gallery/live-stats labels, cart-button summaries, checkout tax-location helper copy, hero video/community teaser/diary chrome, localized campaign dates, and localized Worker supporter emails
+- **SEO fundamentals baseline** — Public pages and campaign pages now emit consistent titles, descriptions, canonicals, OG/Twitter tags, localized language metadata, honest JSON-LD, Worker-generated campaign share-card images, and alternate-language metadata where supported, while `robots.txt`, `sitemap.xml`, and explicit noindex rules keep private/tokenized flows out of search intent
 - **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
 ## Architecture
@@ -79,6 +80,16 @@ Fork-friendly pricing settings live in:
 - `pricing.sales_tax_rate`, `pricing.default_tip_percent`, and `pricing.max_tip_percent` in [`_config.yml`](_config.yml)
 - auto-synced Worker vars `SALES_TAX_RATE`, `DEFAULT_PLATFORM_TIP_PERCENT`, and `MAX_PLATFORM_TIP_PERCENT` in [`worker/wrangler.toml`](worker/wrangler.toml)
 
+Fork-friendly tax-engine settings live in:
+- `tax.provider`, `tax.origin_country`, `tax.use_regional_origin`, `tax.nm_grt_api_base`, and `tax.zip_tax_api_base` in [`_config.yml`](_config.yml)
+- mirrored Worker vars `TAX_PROVIDER`, `TAX_ORIGIN_COUNTRY`, `TAX_USE_REGIONAL_ORIGIN`, `NM_GRT_API_BASE`, and `ZIP_TAX_API_BASE` in [`worker/wrangler.toml`](worker/wrangler.toml)
+- `tax.provider: flat` keeps the legacy configured-rate baseline from `pricing.sales_tax_rate`
+- `tax.provider: offline_rules` uses vendored international VAT/GST rules plus state-level fallback behavior
+- `tax.provider: nm_grt` uses the vendored New Mexico starter dataset first and can refine New Mexico street-address lookups against the free EDAC GRT API
+- optional Worker secret `ZIP_TAX_API_KEY` when `tax.provider: zip_tax` is enabled for local/jurisdiction-level US tax lookups
+
+Current checkout behavior is intentionally conservative: if the browser does not yet have enough destination data, the cart shows provisional tax as `--` and the final tax quote is resolved once the Worker has enough billing or shipping location detail.
+
 Fork-friendly shipping settings live in:
 - `shipping.origin_*`, `shipping.fallback_flat_rate`, `shipping.free_shipping_default`, and `shipping.usps.*` in [`_config.yml`](_config.yml)
 - auto-synced Worker vars like `SHIPPING_ORIGIN_ZIP`, `SHIPPING_FALLBACK_FLAT_RATE`, `USPS_ENABLED`, `USPS_CLIENT_ID`, and the USPS timeout/cache/cooldown knobs in [`worker/wrangler.toml`](worker/wrangler.toml)
@@ -101,7 +112,8 @@ Fork-facing settings now use a structured config model in [`_config.yml`](_confi
 - `platform` also covers brand assets like logo, footer logo, favicon, and default social image
 - top-level `title` / `description` for Jekyll's site identity and default SEO copy
 - `seo` for bounded SEO identity knobs like `x_handle`, `same_as`, `default_social_image_alt`, `og_locale_overrides`, and whether the public community hub should remain indexable
-- `pricing` for tax, the legacy flat-shipping compatibility baseline, and platform-tip defaults
+- `pricing` for the flat-rate compatibility baseline and platform-tip defaults
+- `tax` for choosing the Worker tax engine and its non-secret lookup settings
 - `shipping` for origin settings, USPS quote behavior, fallback policy, free-shipping defaults, shipping presets, and limited shipping-option policy
 - `add_ons` for a small global merch catalog, fixed-price products, and simple variants like shirt sizes
 - campaign front matter `campaign_add_ons` for campaign-scoped merch that should use the same card UI but count toward that campaign’s subtotal and shipping rules
@@ -116,6 +128,8 @@ Fork-facing settings now use a structured config model in [`_config.yml`](_confi
 
 See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for the supported no-code customization surface and which settings are automatically mirrored to the Worker.
 See [docs/SEO.md](docs/SEO.md) for the current SEO fundamentals implementation and supported SEO surface.
+See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) for the current accessibility baseline and verified critical flows.
+See [docs/I18N.md](docs/I18N.md) for the locale model, shared translation sources, and localized route behavior.
 
 For localization, the supported model is:
 
@@ -177,8 +191,8 @@ The Pool is intentionally shaped so most traffic stays cheap:
 
 Fork knobs worth knowing:
 
-- site config: `cache.live_stats_ttl_seconds`, `cache.live_inventory_ttl_seconds`, `pricing.sales_tax_rate`, `pricing.flat_shipping_rate`
-- Worker env: auto-synced pricing values in [`worker/wrangler.toml`](worker/wrangler.toml)
+- site config: `cache.live_stats_ttl_seconds`, `cache.live_inventory_ttl_seconds`, `pricing.sales_tax_rate`, `pricing.flat_shipping_rate`, `tax.*`
+- Worker env: auto-synced pricing and tax-provider values in [`worker/wrangler.toml`](worker/wrangler.toml)
 
 ### Practical Scalability Scenarios
 

@@ -49,7 +49,7 @@ body.pool-cart-open {
   flex-direction: column;
   width: min(580px, 100%);
   height: 100%;
-  padding: 24px 20px 20px;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)) 20px;
   background: $surface--page;
   border-left: 1px solid $border--default;
   box-shadow: 0 18px 40px rgba($color--black, 0.16);
@@ -89,6 +89,8 @@ body.pool-cart-open {
   cursor: pointer;
   font: inherit;
   padding: 0;
+  min-width: 44px;
+  min-height: 44px;
 
   &:hover {
     color: $color--primary;
@@ -802,7 +804,7 @@ body.pool-cart-open {
 @include xsm {
   .pool-first-party-cart__panel {
     width: 100%;
-    padding: 16px 14px 14px;
+    padding: max(16px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)) 14px;
   }
 
   .pool-first-party-cart__title {
@@ -861,6 +863,10 @@ body.pool-cart-open {
     grid-template-columns: 1fr;
   }
 
+  .pool-first-party-cart__action {
+    white-space: normal;
+  }
+
   .pool-first-party-cart__line-item,
   .pool-first-party-cart__tip-header {
     flex-direction: column;
@@ -891,6 +897,23 @@ body.pool-cart-open {
 
   .pool-first-party-cart__shipping-grid {
     grid-template-columns: 1fr;
+  }
+
+  .pool-first-party-cart__summary-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .pool-first-party-cart__summary-row > strong,
+  .pool-first-party-cart__summary-value {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .pool-first-party-cart__summary-value--shipping-option {
+    flex-basis: 100%;
+    width: 100%;
   }
 }
 

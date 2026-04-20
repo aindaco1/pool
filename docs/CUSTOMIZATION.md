@@ -83,6 +83,7 @@ These values feed:
 - header / footer branding
 - release metadata for docs/public copy when a fork wants to surface its current milestone
 - page titles and meta tags
+- app-title metadata for mobile/share surfaces
 - default social-card image
 - campaign creator fallback copy
 - checkout / Manage Pledge UI copy and bootstrapped client config
@@ -91,7 +92,7 @@ These values feed:
 Notes:
 
 - `platform.*` is the primary branding surface.
-- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v0.9.2`.
+- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v0.9.3`.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
 - `platform.logo_path` is also the mirrored brand mark used in supporter emails.
@@ -101,8 +102,8 @@ Example:
 ```yml
 platform:
   name: My Fork
-  version: 0.9.2
-  release_label: v0.9.2
+  version: 0.9.3
+  release_label: v0.9.3
   company_name: Example Studio
   support_email: support@example.com
   pledges_email_from: "My Fork <pledges@example.com>"
@@ -118,7 +119,7 @@ platform:
 
 ### `pricing`
 
-Use `pricing` for the shared tax/tip math that must stay consistent across the site and Worker.
+Use `pricing` for the flat-rate compatibility math and platform-tip defaults that must stay consistent across the site and Worker.
 
 Supported keys:
 
@@ -135,6 +136,49 @@ pricing:
   flat_shipping_rate: 4.50
   default_tip_percent: 5
   max_tip_percent: 15
+```
+
+### `tax`
+
+Use `tax` for the Worker-side tax engine selection and its non-secret lookup settings.
+
+Supported keys:
+
+- `provider`
+- `origin_country`
+- `use_regional_origin`
+- `nm_grt_api_base`
+- `zip_tax_api_base`
+
+Current provider values:
+
+- `flat` keeps the legacy configured `pricing.sales_tax_rate`
+- `offline_rules` uses vendored rules for international VAT/GST and state-level fallback handling
+- `nm_grt` uses a vendored New Mexico starter dataset and can refine full NM street-address lookups against the free EDAC GRT API
+- `zip_tax` uses ZIP.TAX for local / jurisdiction-level US tax lookups and falls back to `offline_rules` for non-US/CA destinations
+
+Current UX note:
+
+- cart and checkout can display provisional tax as `--` until the browser has enough destination detail for the configured provider
+- `nm_grt` is currently the most complete built-in local-data path for US jurisdictional tax and generally needs full New Mexico street-level destination data before it can return a precise result
+
+Example:
+
+```yml
+tax:
+  provider: nm_grt
+  origin_country: US
+  use_regional_origin: false
+  nm_grt_api_base: https://grt.edacnm.org
+  zip_tax_api_base: https://api.zip-tax.com
+```
+
+If you enable `zip_tax`, also set the Worker secret `ZIP_TAX_API_KEY`. Keep that secret out of `_config.yml`.
+
+The vendored New Mexico starter file lives in [`worker/src/tax-data/nm-grt-starter.js`](../worker/src/tax-data/nm-grt-starter.js). Refresh it with:
+
+```bash
+node ./scripts/update-nm-grt-starter.mjs
 ```
 
 ### `i18n`
@@ -179,9 +223,10 @@ Current supported pattern:
 - non-default public pages live under a locale prefix like `/es/`
 - shared runtime/browser messages are emitted through `assets/i18n.json`
 - Worker supporter emails reuse that shared locale catalog plus persisted `preferredLang`
-- campaign chrome such as the hero video button/loading text, supporter-community teaser copy, diary tabs, production-phase controls, and gallery accessibility labels also now comes from `_data/i18n/{lang}.yml`
+- campaign chrome such as the hero video button/loading text, supporter-community teaser copy, diary tabs, production-phase controls, gallery accessibility labels, cart-button summaries, and checkout tax-location helper copy also now comes from `_data/i18n/{lang}.yml`
 - the shared footer language switcher is automatic when more than one language is configured
 - long-form pages such as `about` and `terms` should use localized source pages rather than trying to store every paragraph in YAML
+- public metadata and structured-data language hints also follow the same locale model, so localized public pages do not need a second SEO-only translation system
 
 What this means in practice:
 
@@ -606,6 +651,10 @@ These site-config values are also reflected into the Worker env values in [`work
 - `design.color_primary` -> `EMAIL_COLOR_PRIMARY`
 - `design.radius_lg` -> `EMAIL_BUTTON_RADIUS`
 - `pricing.sales_tax_rate` -> `SALES_TAX_RATE`
+- `tax.provider` -> `TAX_PROVIDER`
+- `tax.origin_country` -> `TAX_ORIGIN_COUNTRY`
+- `tax.use_regional_origin` -> `TAX_USE_REGIONAL_ORIGIN`
+- `tax.zip_tax_api_base` -> `ZIP_TAX_API_BASE`
 - `pricing.flat_shipping_rate` -> `FLAT_SHIPPING_RATE`
 - `pricing.default_tip_percent` -> `DEFAULT_PLATFORM_TIP_PERCENT`
 - `pricing.max_tip_percent` -> `MAX_PLATFORM_TIP_PERCENT`

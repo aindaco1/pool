@@ -396,6 +396,9 @@ home:
 
 runtime:
   cart:
+    cart_button_empty: "Open cart. Cart is empty."
+    cart_button_summary_one: "Open cart. %{count} item, %{total} total."
+    cart_button_summary_other: "Open cart. %{count} items, %{total} total."
     untitled_item: "Untitled item"
     quantity: "Qty %{count}"
     add_on_quantity_for: "Quantity for %{item}"
@@ -409,8 +412,14 @@ runtime:
     address_line_2: "Address line 2"
     city: "City"
     state_province: "State / Province"
+    state_province_optional: "State / Province (optional)"
     postal_code: "Postal code"
     country: "Country"
+    tax_location: "Tax location"
+    tax_location_note: "Add your billing country and postal code so we can finalize tax before you save your payment method."
+    tax_location_note_nm: "Add your New Mexico billing street address, city, state, and postal code so we can finalize tax before you save your payment method."
+    tax_location_required: "Enter your billing country and postal code to finalize tax before continuing."
+    tax_location_required_nm: "Enter your billing street address, city, state, and postal code to finalize New Mexico tax before continuing."
     payment_method: "Payment method"
     payment_consent: "By providing your card information, you allow %{platform} to charge your card if the campaign(s) you backed reaches its goal before its end date."
     tip_label: "Tip %{platform} for platform maintenance."

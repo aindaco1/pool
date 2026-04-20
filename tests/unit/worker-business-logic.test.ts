@@ -1286,6 +1286,69 @@ describe('Worker business logic hardening', () => {
     });
   });
 
+  it('returns a tax quote for preview requests with a billing destination', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/tax/quote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://pool.test'
+        },
+        body: JSON.stringify({
+          subtotalCents: 1000,
+          shippingCents: 300,
+          billingAddress: {
+            country: 'US',
+            postalCode: '80205',
+            state: 'CO'
+          }
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      subtotalCents: 1000,
+      shippingCents: 300,
+      taxCents: 79,
+      taxDetails: {
+        destination: {
+          country: 'US',
+          postalCode: '80205',
+          state: 'CO'
+        }
+      }
+    });
+  });
+
+  it('rejects tax quote requests without a usable destination', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/tax/quote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://pool.test'
+        },
+        body: JSON.stringify({
+          subtotalCents: 1000
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Billing or shipping address is required to calculate tax'
+    });
+  });
+
   it('returns a shipping quote with shipment data for physical support items', async () => {
     const env = createEnv();
 
@@ -2728,6 +2791,57 @@ describe('Worker business logic hardening', () => {
     expect(pledges[0].orderId).toBe('order-scope-1');
   });
 
+  it('returns normalized tax details and billing address on pledge reads', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as MockKVNamespace;
+    const billingAddress = {
+      country: 'US',
+      state: 'CO',
+      postalCode: '80205'
+    };
+
+    await kv.put('pledge:order-tax-read-1', JSON.stringify({
+      orderId: 'order-tax-read-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      tierId: 'frame-slot',
+      tierName: 'Buy 1 Frame',
+      tierQty: 1,
+      billingAddress,
+      subtotal: 500,
+      tax: 39,
+      shipping: 0,
+      tipPercent: 0,
+      tipAmount: 0,
+      amount: 539,
+      pledgeStatus: 'active',
+      charged: false
+    }));
+
+    mockVerifyToken.mockResolvedValue({
+      orderId: 'order-tax-read-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge?token=valid-token'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.billingAddress).toEqual(billingAddress);
+    expect(payload.taxDetails).toMatchObject({
+      destination: billingAddress,
+      taxableSubtotalCents: 500,
+      taxableShippingCents: 0,
+      shippingTaxed: false,
+      shippingCents: 0
+    });
+  });
+
   it('returns not found when a valid magic link points to a missing pledge record', async () => {
     const env = createEnv({
       CHECKOUT_PROVIDER: 'first_party'
@@ -2872,6 +2986,87 @@ describe('Worker business logic hardening', () => {
     );
 
     expect(response.status).toBe(200);
+  });
+
+  it('preserves the stored billing tax destination when modifying a pledge', async () => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      SALES_TAX_RATE: '0.05'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    const billingAddress = {
+      country: 'US',
+      state: 'CO',
+      postalCode: '80205'
+    };
+
+    await kv.put('pledge:order-first-party-modify-tax-1', JSON.stringify({
+      orderId: 'order-first-party-modify-tax-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      stripeCustomerId: 'cus_existing',
+      billingAddress,
+      tierId: 'frame-slot',
+      tierName: 'Buy 1 Frame',
+      tierQty: 1,
+      subtotal: 500,
+      tax: 25,
+      shipping: 0,
+      tipPercent: 0,
+      tipAmount: 0,
+      amount: 525,
+      pledgeStatus: 'active',
+      charged: false,
+      createdAt: '2026-03-30T00:00:00.000Z',
+      updatedAt: '2026-03-30T00:00:00.000Z',
+      history: []
+    }));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 500,
+      pledgeCount: 1,
+      tierCounts: { 'frame-slot': 1 },
+      supportItems: {},
+      updatedAt: '2026-03-30T00:00:00.000Z'
+    }));
+
+    mockVerifyToken.mockResolvedValue({
+      orderId: 'order-first-party-modify-tax-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/pledge/modify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: 'valid-token',
+          supportItems: [
+            {
+              id: 'location-scouting',
+              amount: 1
+            }
+          ]
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.taxDetails).toMatchObject({
+      destination: billingAddress
+    });
+
+    const storedPledge = await kv.get('pledge:order-first-party-modify-tax-1', { type: 'json' });
+    expect(storedPledge.taxDetails).toMatchObject({
+      destination: billingAddress
+    });
+    expect(storedPledge.history.at(-1)?.taxDetails).toMatchObject({
+      destination: billingAddress
+    });
   });
 
   it('returns custom checkout bootstrap data for payment-method updates when custom UI mode is enabled', async () => {
@@ -3434,6 +3629,24 @@ describe('Worker business logic hardening', () => {
           subtotal: 12000,
           shipping: 0,
           tax: 945,
+          taxDetails: {
+            provider: 'flat',
+            source: 'flat_rate',
+            effectiveRate: 0.07875,
+            destination: null,
+            jurisdiction: null,
+            taxableSubtotalCents: 12000,
+            taxableShippingCents: 0,
+            shippingTaxed: false,
+            shippingCents: 0,
+            breakdown: [{
+              label: 'sales_tax',
+              rate: 0.07875,
+              taxableSubtotalCents: 12000,
+              taxableShippingCents: 0,
+              taxCents: 945
+            }]
+          },
           amount: 13545
         }
       },
@@ -3817,7 +4030,8 @@ describe('Worker business logic hardening', () => {
 
   it('adds test setup pledges to the campaign index used by stats and inventory rebuilds', async () => {
     const env = createEnv({
-      ADMIN_SECRET: 'admin-secret'
+      ADMIN_SECRET: 'admin-secret',
+      TAX_PROVIDER: 'nm_grt'
     });
     const kv = env.PLEDGES as MockKVNamespace;
 
@@ -3838,6 +4052,16 @@ describe('Worker business logic hardening', () => {
     expect(await kv.get('campaign-pledges:smoke-editable', { type: 'json' })).toContain(
       'test-order-smoke-editable-smoke-local-example-com'
     );
+    const storedPledge = await kv.get('pledge:test-order-smoke-editable-smoke-local-example-com', { type: 'json' });
+    expect(storedPledge).toMatchObject({
+      billingAddress: {
+        country: 'US',
+        state: 'NM',
+        city: 'Corrales',
+        postalCode: '87048',
+        line1: '1228 W La Entrada'
+      }
+    });
   });
 
   it('repairs stale campaign indexes when recalculating stats', async () => {
@@ -4178,8 +4402,26 @@ describe('Worker business logic hardening', () => {
           totals: {
             subtotal: 500,
             tax: 39,
-            shipping: 0,
-            tipPercent: 5,
+            taxDetails: {
+              provider: 'flat',
+              source: 'flat_rate',
+              effectiveRate: 0.07875,
+            destination: null,
+            jurisdiction: null,
+            taxableSubtotalCents: 500,
+            taxableShippingCents: 0,
+            shippingTaxed: false,
+            shippingCents: 0,
+            breakdown: [{
+              label: 'sales_tax',
+              rate: 0.07875,
+              taxableSubtotalCents: 500,
+              taxableShippingCents: 0,
+              taxCents: 39
+            }]
+          },
+          shipping: 0,
+          tipPercent: 5,
             tipAmount: 25,
             amount: 564
           }
@@ -4196,6 +4438,24 @@ describe('Worker business logic hardening', () => {
       totals: {
         subtotal: 500,
         tax: 39,
+        taxDetails: {
+          provider: 'flat',
+          source: 'flat_rate',
+          effectiveRate: 0.07875,
+          destination: null,
+          jurisdiction: null,
+          taxableSubtotalCents: 500,
+          taxableShippingCents: 0,
+          shippingTaxed: false,
+          shippingCents: 0,
+          breakdown: [{
+            label: 'sales_tax',
+            rate: 0.07875,
+            taxableSubtotalCents: 500,
+            taxableShippingCents: 0,
+            taxCents: 39
+          }]
+        },
         shipping: 0,
         tipAmount: 25,
         amount: 564
@@ -4213,6 +4473,24 @@ describe('Worker business logic hardening', () => {
         totals: {
           subtotal: 500,
           tax: 39,
+          taxDetails: {
+            provider: 'flat',
+            source: 'flat_rate',
+            effectiveRate: 0.07875,
+            destination: null,
+            jurisdiction: null,
+            taxableSubtotalCents: 500,
+            taxableShippingCents: 0,
+            shippingTaxed: false,
+            shippingCents: 0,
+            breakdown: [{
+              label: 'sales_tax',
+              rate: 0.07875,
+              taxableSubtotalCents: 500,
+              taxableShippingCents: 0,
+              taxCents: 39
+            }]
+          },
           shipping: 0,
           tipAmount: 25,
           amount: 564
@@ -4299,6 +4577,24 @@ describe('Worker business logic hardening', () => {
           totals: {
             subtotal: 500,
             tax: 39,
+            taxDetails: {
+              provider: 'flat',
+              source: 'flat_rate',
+              effectiveRate: 0.07875,
+              destination: null,
+              jurisdiction: null,
+              taxableSubtotalCents: 500,
+              taxableShippingCents: 0,
+              shippingTaxed: false,
+              shippingCents: 0,
+              breakdown: [{
+                label: 'sales_tax',
+                rate: 0.07875,
+                taxableSubtotalCents: 500,
+                taxableShippingCents: 0,
+                taxCents: 39
+              }]
+            },
             shipping: 0,
             tipPercent: 5,
             tipAmount: 25,
@@ -4317,6 +4613,24 @@ describe('Worker business logic hardening', () => {
       totals: {
         subtotal: 500,
         tax: 39,
+        taxDetails: {
+          provider: 'flat',
+          source: 'flat_rate',
+          effectiveRate: 0.07875,
+          destination: null,
+          jurisdiction: null,
+          taxableSubtotalCents: 500,
+          taxableShippingCents: 0,
+          shippingTaxed: false,
+          shippingCents: 0,
+          breakdown: [{
+            label: 'sales_tax',
+            rate: 0.07875,
+            taxableSubtotalCents: 500,
+            taxableShippingCents: 0,
+            taxCents: 39
+          }]
+        },
         shipping: 0,
         tipAmount: 25,
         amount: 564
@@ -4334,6 +4648,24 @@ describe('Worker business logic hardening', () => {
         totals: {
           subtotal: 500,
           tax: 39,
+          taxDetails: {
+            provider: 'flat',
+            source: 'flat_rate',
+            effectiveRate: 0.07875,
+            destination: null,
+            jurisdiction: null,
+            taxableSubtotalCents: 500,
+            taxableShippingCents: 0,
+            shippingTaxed: false,
+            shippingCents: 0,
+            breakdown: [{
+              label: 'sales_tax',
+              rate: 0.07875,
+              taxableSubtotalCents: 500,
+              taxableShippingCents: 0,
+              taxCents: 39
+            }]
+          },
           shipping: 0,
           tipAmount: 25,
           amount: 564
@@ -4434,6 +4766,24 @@ describe('Worker business logic hardening', () => {
           totals: {
             subtotal: 500,
             tax: 39,
+            taxDetails: {
+              provider: 'flat',
+              source: 'flat_rate',
+              effectiveRate: 0.07875,
+              destination: null,
+              jurisdiction: null,
+              taxableSubtotalCents: 500,
+              taxableShippingCents: 0,
+              shippingTaxed: false,
+              shippingCents: 0,
+              breakdown: [{
+                label: 'sales_tax',
+                rate: 0.07875,
+                taxableSubtotalCents: 500,
+                taxableShippingCents: 0,
+                taxCents: 39
+              }]
+            },
             shipping: 0,
             tipPercent: 5,
             tipAmount: 25,
@@ -4452,6 +4802,24 @@ describe('Worker business logic hardening', () => {
       totals: {
         subtotal: 500,
         tax: 39,
+        taxDetails: {
+          provider: 'flat',
+          source: 'flat_rate',
+          effectiveRate: 0.07875,
+          destination: null,
+          jurisdiction: null,
+          taxableSubtotalCents: 500,
+          taxableShippingCents: 0,
+          shippingTaxed: false,
+          shippingCents: 0,
+          breakdown: [{
+            label: 'sales_tax',
+            rate: 0.07875,
+            taxableSubtotalCents: 500,
+            taxableShippingCents: 0,
+            taxCents: 39
+          }]
+        },
         shipping: 0,
         tipAmount: 25,
         amount: 564
@@ -4469,6 +4837,24 @@ describe('Worker business logic hardening', () => {
         totals: {
           subtotal: 500,
           tax: 39,
+          taxDetails: {
+            provider: 'flat',
+            source: 'flat_rate',
+            effectiveRate: 0.07875,
+            destination: null,
+            jurisdiction: null,
+            taxableSubtotalCents: 500,
+            taxableShippingCents: 0,
+            shippingTaxed: false,
+            shippingCents: 0,
+            breakdown: [{
+              label: 'sales_tax',
+              rate: 0.07875,
+              taxableSubtotalCents: 500,
+              taxableShippingCents: 0,
+              taxCents: 39
+            }]
+          },
           shipping: 0,
           tipAmount: 25,
           amount: 564

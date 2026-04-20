@@ -68,9 +68,10 @@
   {% include seo-json-ld.html lang=current_lang kind="campaign" translation_key=page.translation_key localized_paths=page.localized_paths %}
 </head>
 <body>
+  <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
   {% include header.html %}
 
-  <main class="campaign-container" data-campaign-slug="{{ page.slug }}" data-single-tier-only="{{ page.single_tier_only | default: false }}" data-state="{{ campaign_render_state }}">
+  <main id="main-content" class="campaign-container" data-campaign-slug="{{ page.slug }}" data-single-tier-only="{{ page.single_tier_only | default: false }}" data-state="{{ campaign_render_state }}" tabindex="-1">
     {% if page.campaign_background %}
     <div class="campaign-background" aria-hidden="true">
       <img src="{{ page.campaign_background }}" alt="" class="campaign-background__image">

@@ -112,6 +112,9 @@
       flex-direction: column;
       justify-content: center;
       gap: $space-2xl;
+      padding: max(24px, env(safe-area-inset-top)) $space-lg max(24px, env(safe-area-inset-bottom));
+      overflow-y: auto;
+      overscroll-behavior: contain;
       z-index: 100;
       opacity: 0;
       visibility: hidden;

@@ -10,6 +10,8 @@
   {%- assign default_description = site.description | strip_html | strip_newlines | replace: '  ', ' ' | strip -%}
   {%- assign campaign_image = page.hero_image_wide | default: page.hero_image | default: default_image -%}
   {%- assign same_as = site.seo.same_as | default: empty -%}
+  {%- capture localized_home_path -%}{% include localized-url.html lang=current_lang translation_key='home' %}{%- endcapture -%}
+  {%- assign available_languages = site.i18n.supported_langs | default: current_lang | split: '|' -%}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -32,6 +34,7 @@
       "description": {{ page.short_blurb | default: default_description | strip_html | strip_newlines | replace: '  ', ' ' | strip | jsonify }},
       "image": {{ site_base | append: campaign_image | jsonify }},
       "genre": {{ page.category | default: '' | jsonify }},
+      "inLanguage": {{ current_lang | jsonify }},
       "creator": {
         "@type": "Organization",
         "name": {{ page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author | jsonify }}
@@ -48,7 +51,7 @@
           "@type": "ListItem",
           "position": 1,
           "name": {{ platform_title | jsonify }},
-          "item": {{ site_base | append: "/" | jsonify }}
+          "item": {{ site_base | append: localized_home_path | jsonify }}
         },
         {
           "@type": "ListItem",
@@ -77,7 +80,8 @@
       "publisher": {
         "@id": {{ org_id | jsonify }}
       },
-      "inLanguage": {{ current_lang | jsonify }}
+      "inLanguage": {{ current_lang | jsonify }},
+      "availableLanguage": {{ available_languages | jsonify }}
     }
     {%- if page.translation_key and page.translation_key != "home" -%},
     {
@@ -88,7 +92,7 @@
           "@type": "ListItem",
           "position": 1,
           "name": {{ platform_title | jsonify }},
-          "item": {{ site_base | append: "/" | jsonify }}
+          "item": {{ site_base | append: localized_home_path | jsonify }}
         },
         {
           "@type": "ListItem",

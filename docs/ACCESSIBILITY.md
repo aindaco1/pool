@@ -19,6 +19,8 @@ The site already includes:
 - ARIA landmarks (`main`, `contentinfo`, live regions where appropriate)
 - visible focus states through the existing design system
 - screen-reader helper utilities
+- stable `main-content` anchors on the main public shells so skip links and keyboard focus land consistently
+- cart trigger labeling that reflects both item count and displayed total for assistive technology instead of exposing only icon chrome
 
 The recent accessibility hardening pass added:
 
@@ -39,6 +41,10 @@ The recent accessibility hardening pass added:
   - `aria-describedby`
   - dynamic `aria-valuetext`
 - live-region and alert semantics for key status/error surfaces
+- safer small-screen affordances for mobile-heavy flows:
+  - larger close/remove tap targets in the cart sidecar
+  - safe-area-aware cart and nav overlays
+  - better wrapping behavior for localized action text and summary rows
 
 ## Critical Surfaces
 
@@ -69,6 +75,10 @@ Current automated accessibility-related coverage includes:
 - unit coverage for dialog semantics and keyboard handling in:
   - `tests/unit/cart-provider.test.ts`
   - `tests/unit/manage-page.test.ts`
+- unit coverage for public-shell skip links and main landmarks in:
+  - `tests/unit/layout-accessibility.test.ts`
+- unit coverage for cart-trigger accessible labels and expanded state in:
+  - `tests/unit/cart-icon.test.ts`
 - unit coverage for keyboard tabs in:
   - `tests/unit/diary-tabs.test.ts`
   - `tests/unit/campaign-tabs.test.ts`
@@ -152,6 +162,7 @@ npm run podman:doctor
 Automated checks help, but these manual accessibility checks are still important before merge for meaningful UI changes:
 
 - cart drawer can be opened, navigated, and closed with keyboard only
+- cart trigger announces a useful label and expanded/collapsed state to assistive technology
 - checkout sidecar keeps focus behavior stable while Stripe mounts and validates fields
 - `Update Card` modal is usable with keyboard only
 - tabbed campaign interfaces respond correctly to keyboard navigation
@@ -181,4 +192,4 @@ Good next accessibility improvements include:
 
 ---
 
-_Last updated: Apr 9, 2026_
+_Last updated: Apr 19, 2026_
