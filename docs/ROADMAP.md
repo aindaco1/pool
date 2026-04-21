@@ -225,6 +225,11 @@
   - Future consideration: business tax handling such as VAT ID validation, reverse-charge flows, exemptions, and product tax classes
 - [ ] Support different prices per add-on variation
 - [ ] Reward fulfillment support
+- [ ] Reports for campaign runners
+  - Email address(es) associated with specific campaigns
+    - Support for no email address and therefore no reports
+  - Daily email reports at 7am MT mirroring pledge report during the campaign, with stats only for the specific campaign
+  - End of campaign fulfillment report (with stats only for the specific campaign) sent at 7am MT after campaign deadline
 
 ## Known Issues
 
