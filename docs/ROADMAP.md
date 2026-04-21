@@ -224,6 +224,7 @@
   - Add a documented tax-data refresh/import workflow for future jurisdiction datasets
   - Future consideration: business tax handling such as VAT ID validation, reverse-charge flows, exemptions, and product tax classes
 - [ ] Support different prices per add-on variation
+- [ ] Reward fulfillment support
 
 ## Known Issues
 
