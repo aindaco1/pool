@@ -17,6 +17,7 @@ import {
   getEmailPrimaryColor,
   getEmailSurfaceColor,
   getEmailTextColor,
+  getCampaignRunnerEmailSubjectPrefix,
   getPlatformCompanyName,
   getPlatformName,
   getPledgesEmailFrom,
@@ -1085,5 +1086,83 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
   }, {
     errorLabel: 'Resend error (announcement)',
     failureLabel: 'Failed to send announcement email'
+  });
+}
+
+export async function sendCampaignRunnerReportEmail(
+  env,
+  {
+    email,
+    campaignSlug,
+    campaignTitle,
+    reportKind,
+    reportDateLabel,
+    statsSummary = [],
+    csvFilename,
+    csvContent,
+    includeCsvAttachment = true
+  }
+) {
+  configureEmailLogging(env);
+
+  const theme = getEmailTheme(env);
+  const normalizedReportKind = String(reportKind || 'campaign report').trim();
+  const subjectPrefix = String(getCampaignRunnerEmailSubjectPrefix(env) || '').trim();
+  const subjectBase = `${normalizedReportKind} for ${campaignTitle}`;
+  const subject = subjectPrefix ? `${subjectPrefix} ${subjectBase}` : subjectBase;
+  const statsRows = Array.isArray(statsSummary)
+    ? statsSummary.filter((line) => String(line || '').trim())
+    : [];
+  const statsMarkup = statsRows.length
+    ? `
+  <div style="${getEmailCardStyle(theme)}">
+    <h2 style="margin: 0 0 12px 0; font-size: 18px; font-family: ${theme.headingFontFamily};">Summary</h2>
+    <ul style="margin: 0; padding-left: 18px;">
+      ${statsRows.map((line) => `<li style="margin: 0 0 8px 0;">${escapeHtml(line)}</li>`).join('')}
+    </ul>
+  </div>`
+    : '';
+  const attachmentNote = includeCsvAttachment && csvFilename
+    ? `<p style="margin: 0;">Attached: <strong>${escapeHtml(csvFilename)}</strong></p>`
+    : '<p style="margin: 0;">CSV attachment disabled for this deployment.</p>';
+
+  const html = `
+  <div style="${getEmailBodyStyle(theme)}">
+    ${renderEmailHeader(theme, escapeHtml(`${campaignTitle} report`), { emoji: '📊' })}
+
+    <div style="${getEmailCardStyle(theme)}">
+      <p style="margin: 0 0 12px 0;">Campaign: <strong>${escapeHtml(campaignTitle)}</strong></p>
+      <p style="margin: 0 0 12px 0;">Report type: <strong>${escapeHtml(normalizedReportKind)}</strong></p>
+      <p style="margin: 0;">Report date: <strong>${escapeHtml(reportDateLabel)}</strong></p>
+    </div>
+
+    ${statsMarkup}
+
+    <div style="${getEmailCardStyle(theme)}">
+      <p style="margin: 0 0 12px 0;">This report is for <code>${escapeHtml(campaignSlug)}</code> only.</p>
+      ${attachmentNote}
+    </div>
+
+    <div style="${getEmailFooterStyle(theme)}">
+      <p style="margin: 0;">Sent by <a href="${theme.siteHomeUrl}" style="color: ${theme.primaryColor};">${theme.platformName}</a>.</p>
+    </div>
+  </div>`;
+
+  const attachments = includeCsvAttachment && csvFilename && csvContent
+    ? [{
+      filename: csvFilename,
+      content: Buffer.from(String(csvContent), 'utf8').toString('base64')
+    }]
+    : undefined;
+
+  return sendResendEmail(env, {
+    from: getUpdatesEmailFrom(env),
+    to: email,
+    subject,
+    html,
+    ...(attachments ? { attachments } : {})
+  }, {
+    errorLabel: `Resend error (${normalizedReportKind})`,
+    failureLabel: `Failed to send ${normalizedReportKind}`
   });
 }

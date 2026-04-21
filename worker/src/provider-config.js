@@ -29,6 +29,13 @@ const DEFAULT_USPS_TIMEOUT_MS = 5000;
 const DEFAULT_USPS_QUOTE_CACHE_TTL_SECONDS = 600;
 const DEFAULT_USPS_FAILURE_COOLDOWN_SECONDS = 300;
 const DEFAULT_USPS_RATE_LIMIT_COOLDOWN_SECONDS = 1800;
+const DEFAULT_CAMPAIGN_RUNNER_REPORTS_ENABLED = true;
+const DEFAULT_CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED = true;
+const DEFAULT_CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED = true;
+const DEFAULT_CAMPAIGN_RUNNER_REPORT_HOUR_MT = 7;
+const DEFAULT_CAMPAIGN_RUNNER_REPORT_MINUTE_MT = 0;
+const DEFAULT_CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY = true;
+const DEFAULT_CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT = true;
 const DEFAULT_PLATFORM_TIP_PERCENT = 5;
 const MAX_PLATFORM_TIP_PERCENT = 15;
 const DEFAULT_CONSOLE_LOGGING_ENABLED = true;
@@ -58,6 +65,13 @@ export {
   DEFAULT_USPS_RATE_LIMIT_COOLDOWN_SECONDS,
   DEFAULT_USPS_TEST_API_BASE,
   DEFAULT_USPS_TIMEOUT_MS,
+  DEFAULT_CAMPAIGN_RUNNER_REPORTS_ENABLED,
+  DEFAULT_CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED,
+  DEFAULT_CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED,
+  DEFAULT_CAMPAIGN_RUNNER_REPORT_HOUR_MT,
+  DEFAULT_CAMPAIGN_RUNNER_REPORT_MINUTE_MT,
+  DEFAULT_CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY,
+  DEFAULT_CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT,
   DEFAULT_SHIPPING_FALLBACK_FLAT_RATE,
   DEFAULT_SHIPPING_ORIGIN_COUNTRY,
   DEFAULT_SHIPPING_ORIGIN_ZIP,
@@ -165,6 +179,53 @@ export function getUspsRateLimitCooldownMs(env = {}) {
     ? parsed
     : DEFAULT_USPS_RATE_LIMIT_COOLDOWN_SECONDS;
   return seconds * 1000;
+}
+
+export function getCampaignRunnerReportsEnabled(env = {}) {
+  const normalized = normalizeBooleanish(env.CAMPAIGN_RUNNER_REPORTS_ENABLED);
+  return normalized === null ? DEFAULT_CAMPAIGN_RUNNER_REPORTS_ENABLED : normalized;
+}
+
+export function getCampaignRunnerDailyPledgeReportEnabled(env = {}) {
+  const normalized = normalizeBooleanish(env.CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED);
+  return normalized === null ? DEFAULT_CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED : normalized;
+}
+
+export function getCampaignRunnerFulfillmentReportEnabled(env = {}) {
+  const normalized = normalizeBooleanish(env.CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED);
+  return normalized === null ? DEFAULT_CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED : normalized;
+}
+
+export function getCampaignRunnerReportHourMt(env = {}) {
+  const parsed = Number(env.CAMPAIGN_RUNNER_REPORT_HOUR_MT);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 23
+    ? parsed
+    : DEFAULT_CAMPAIGN_RUNNER_REPORT_HOUR_MT;
+}
+
+export function getCampaignRunnerReportMinuteMt(env = {}) {
+  const parsed = Number(env.CAMPAIGN_RUNNER_REPORT_MINUTE_MT);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 59
+    ? parsed
+    : DEFAULT_CAMPAIGN_RUNNER_REPORT_MINUTE_MT;
+}
+
+export function getCampaignRunnerIncludeStatsSummary(env = {}) {
+  const normalized = normalizeBooleanish(env.CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY);
+  return normalized === null ? DEFAULT_CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY : normalized;
+}
+
+export function getCampaignRunnerIncludeCsvAttachment(env = {}) {
+  const normalized = normalizeBooleanish(env.CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT);
+  return normalized === null ? DEFAULT_CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT : normalized;
+}
+
+export function getCampaignRunnerEmailSubjectPrefix(env = {}) {
+  const configured = normalizeNullableString(env.CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX);
+  if (configured !== null) {
+    return configured;
+  }
+  return `[${getPlatformName(env)}]`;
 }
 
 export function getFreeShippingDefault(env = {}) {
@@ -294,6 +355,13 @@ function normalizeFlag(value, allowedValues, fallback) {
 function normalizeString(value, fallback) {
   const normalized = String(value || '').trim();
   return normalized || fallback;
+}
+
+function normalizeNullableString(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return String(value).trim();
 }
 
 function normalizeBooleanish(value) {

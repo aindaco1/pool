@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   sendAnnouncementEmail,
+  sendCampaignRunnerReportEmail,
   sendDiaryUpdateEmail,
   sendMilestoneEmail,
   sendSupporterEmail
@@ -257,5 +258,38 @@ describe('email HTML security', () => {
     const payload = getEmailPayload(fetchMock);
     expect(payload.html).toContain('Stretch Goal Unlocked: &lt;img src=x onerror=alert(1)&gt;');
     expect(payload.html).not.toContain('<img src=x onerror=alert(1)>');
+  });
+
+  it('sends campaign runner reports with attachment payloads and customizable subject prefixes', async () => {
+    const fetchMock = mockResend();
+
+    await sendCampaignRunnerReportEmail(
+      {
+        ...env,
+        CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX: '[Fork Pool]'
+      },
+      {
+        email: 'runner@example.com',
+        campaignSlug: 'sunder',
+        campaignTitle: 'sunder',
+        reportKind: 'Daily pledge report',
+        reportDateLabel: 'April 21, 2026 7:00 AM MT',
+        statsSummary: ['Pledged total: $42.86'],
+        csvFilename: 'sunder-pledge-report-2026-04-21.csv',
+        csvContent: 'email,campaign\nrunner@example.com,sunder',
+        includeCsvAttachment: true
+      }
+    );
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.subject).toBe('[Fork Pool] Daily pledge report for sunder');
+    expect(payload.attachments).toEqual([
+      expect.objectContaining({
+        filename: 'sunder-pledge-report-2026-04-21.csv',
+        content: Buffer.from('email,campaign\nrunner@example.com,sunder', 'utf8').toString('base64')
+      })
+    ]);
+    expect(payload.from).toBe('The Pool <updates@pool.test>');
+    expect(payload.reply_to).toBe('info@pool.test');
   });
 });

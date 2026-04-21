@@ -15,6 +15,12 @@ If you specifically work from the `worker/` directory, the Worker npm scripts no
 
 Treat `_config.local.yml` as an override-only file for localhost-specific values. The canonical fork-facing settings should live in the repo-root `_config.yml`, and the Worker mirror will follow from there.
 
+Campaign-runner report delivery follows that same pattern:
+
+- campaign-level recipients live in campaign front matter as `runner_report_emails`
+- deployment-wide timing and email/report behavior live in `_config.yml` under `reports.campaign_runner`
+- the Worker mirror carries those non-secret settings into `wrangler.toml`
+
 The mirrored Worker config now also includes the shared debug flags:
 
 - `DEBUG_CONSOLE_LOGGING_ENABLED`
@@ -41,6 +47,8 @@ The Worker now also writes lightweight observability summaries into `PLEDGES` KV
 
 - Stripe webhook delivery outcomes and recent delivery history
 - sampled wall-clock timings for a small set of mutation routes used to tune the `cpu_ms` cap
+
+Campaign-runner reports now use dedicated scheduled runs at 7:00 AM Mountain Time. The Worker keeps that window MT-aware in code, while `wrangler.toml` includes the paired UTC cron entries needed to cover both MST and MDT safely.
 
 The sampling rate defaults to `0.1` and can be overridden with `OBSERVABILITY_SAMPLE_RATE=0.05` (or any `0-1` value) if a fork wants fewer or more sampled timing writes.
 
@@ -319,6 +327,49 @@ Send milestone notification to all campaign supporters. Requires `x-admin-key` h
   "dryRun": true
 }
 ```
+
+### POST /admin/report/campaign-runner
+Preview or manually send a campaign-runner report for one campaign. Requires `x-admin-key` header.
+
+```json
+{
+  "campaignSlug": "hand-relations",
+  "reportType": "pledge",   // "pledge" or "fulfillment"
+  "dryRun": true,
+  "markAsSent": false
+}
+```
+
+Notes:
+
+- `dryRun: true` returns recipients, row counts, filename, and marker status without sending
+- omitting `markAsSent` defaults it to `true` for live sends so the matching cron run does not immediately duplicate the report
+- campaign recipients still come from campaign front matter `runner_report_emails`
+- `reportType: "pledge"` is the daily live-campaign ledger report; `reportType: "fulfillment"` is the one-time post-deadline shipment/export report
+
+Dry-run example:
+
+```bash
+curl -X POST https://pledge.dustwave.xyz/admin/report/campaign-runner \
+  -H "Content-Type: application/json" \
+  -H "x-admin-key: YOUR_ADMIN_SECRET" \
+  -d '{"campaignSlug":"hand-relations","reportType":"pledge","dryRun":true}'
+```
+
+Manual send example:
+
+```bash
+curl -X POST https://pledge.dustwave.xyz/admin/report/campaign-runner \
+  -H "Content-Type: application/json" \
+  -H "x-admin-key: YOUR_ADMIN_SECRET" \
+  -d '{"campaignSlug":"hand-relations","reportType":"fulfillment","dryRun":false,"markAsSent":true}'
+```
+
+Operational guidance:
+
+- prefer `dryRun: true` first when checking a new campaign, recipient list, or customization change
+- set `markAsSent: false` only when you intentionally want a manual send without consuming the scheduled-send marker
+- deployment-wide behavior comes from `_config.yml` under `reports.campaign_runner`, while per-campaign recipients stay in front matter
 
 ### POST /test/email
 Send a test email of any type. In test mode (`APP_MODE=test`), no auth required. In production, requires `x-admin-key` header.

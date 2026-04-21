@@ -25,6 +25,15 @@ function getRuntimeMessage(path, fallback) {
   return typeof value === 'string' && value ? value : fallback;
 }
 
+function formatRuntimeMessage(template, replacements) {
+  return String(template || '').replace(/%\{([^}]+)\}/g, (match, key) => {
+    if (Object.prototype.hasOwnProperty.call(replacements, key)) {
+      return String(replacements[key]);
+    }
+    return match;
+  });
+}
+
 function setCountdownHeading(messageEl, text, modifierClass) {
   if (!messageEl) return;
   messageEl.textContent = '';
@@ -70,7 +79,14 @@ function initSupportScroll() {
       button.setAttribute('aria-controls', targetId);
     }
     button.addEventListener('click', () => {
-      target?.scrollIntoView({ behavior: 'smooth' });
+      if (!target) return;
+      if (!target.hasAttribute('tabindex')) {
+        target.setAttribute('tabindex', '-1');
+      }
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (typeof target.focus === 'function') {
+        target.focus({ preventScroll: true });
+      }
     });
   });
 }
@@ -115,6 +131,7 @@ function initCampaignCountdown() {
   const state = el.getAttribute('data-state');
   const goalMet = el.getAttribute('data-goal-met') === 'true';
   const messageEl = el.querySelector('.campaign-countdown__message');
+  const statusEl = document.getElementById('campaign-countdown-status');
   if (messageEl) {
     messageEl.setAttribute('role', 'status');
     messageEl.setAttribute('aria-live', 'polite');
@@ -158,6 +175,20 @@ function initCampaignCountdown() {
     }, 150);
   }
 
+  function updateCountdownStatus(days, hours, mins, secs) {
+    if (!statusEl) return;
+    const template = getRuntimeMessage(
+      'campaign.countdownRemaining',
+      '%{days} days, %{hours} hours, %{minutes} minutes, %{seconds} seconds remaining'
+    );
+    statusEl.textContent = formatRuntimeMessage(template, {
+      days,
+      hours,
+      minutes: mins,
+      seconds: secs
+    });
+  }
+
   function update() {
     const now = new Date();
     const diff = targetDate - now;
@@ -172,18 +203,27 @@ function initCampaignCountdown() {
       if (headingEl) headingEl.hidden = true;
       if (messageEl) {
         if (state === 'upcoming') {
+          if (statusEl) {
+            statusEl.textContent = getRuntimeMessage('campaign.countdownLive', 'Campaign is now live!');
+          }
           setCountdownHeading(
             messageEl,
             getRuntimeMessage('campaign.countdownLive', 'Campaign is now live!'),
             'campaign-countdown__message--funded'
           );
         } else if (goalMet) {
+          if (statusEl) {
+            statusEl.textContent = getRuntimeMessage('campaign.countdownFunded', 'Project Funded');
+          }
           setCountdownHeading(
             messageEl,
             getRuntimeMessage('campaign.countdownFunded', 'Project Funded'),
             'campaign-countdown__message--funded'
           );
         } else {
+          if (statusEl) {
+            statusEl.textContent = getRuntimeMessage('campaign.countdownEnded', 'Campaign Ended');
+          }
           setCountdownHeading(
             messageEl,
             getRuntimeMessage('campaign.countdownEnded', 'Campaign Ended'),
@@ -203,6 +243,7 @@ function initCampaignCountdown() {
     updateCard('hours', hours);
     updateCard('mins', mins);
     updateCard('secs', secs);
+    updateCountdownStatus(days, hours, mins, secs);
 
     setTimeout(update, 1000);
   }
@@ -233,6 +274,7 @@ function initHeroVideo() {
 
   function showLoading() {
     isWaiting = true;
+    wrapper?.setAttribute('aria-busy', 'true');
     playBtn.hidden = true;
     loading.hidden = false;
     overlay.hidden = false;
@@ -240,6 +282,7 @@ function initHeroVideo() {
 
   function hideLoading() {
     isWaiting = false;
+    wrapper?.setAttribute('aria-busy', 'false');
     loading.hidden = true;
     if (hasStarted) {
       overlay.hidden = true;
@@ -267,6 +310,7 @@ function initHeroVideo() {
   });
   video.addEventListener('pause', () => {
     if (!video.ended) {
+      wrapper?.setAttribute('aria-busy', 'false');
       overlay.hidden = false;
       playBtn.hidden = false;
       loading.hidden = true;
@@ -274,6 +318,7 @@ function initHeroVideo() {
   });
   video.addEventListener('ended', () => {
     hasStarted = false;
+    wrapper?.setAttribute('aria-busy', 'false');
     overlay.hidden = false;
     playBtn.hidden = false;
     loading.hidden = true;

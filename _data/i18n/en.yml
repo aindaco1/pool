@@ -33,6 +33,7 @@ campaign:
   tiers_heading: "Tiers"
   no_reward_heading: "No Reward"
   play_video: "Play video"
+  video_embed_title: "%{title} campaign video"
   supporters_only_cta: "🔒 Supporters Only"
   supporter_community_unlocked: "You have access! Join your fellow supporters to vote on creative decisions."
 
@@ -486,6 +487,7 @@ runtime:
     countdown_live: "Campaign is now live!"
     countdown_funded: "Project Funded"
     countdown_ended: "Campaign Ended"
+    countdown_remaining: "%{days} days, %{hours} hours, %{minutes} minutes, %{seconds} seconds remaining"
   live_stats:
     project_funded: "Project Funded"
     support: "Support"

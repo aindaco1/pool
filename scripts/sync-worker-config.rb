@@ -45,6 +45,14 @@ TOP_LEVEL_ORDER = [
   'USPS_QUOTE_CACHE_TTL_SECONDS',
   'USPS_FAILURE_COOLDOWN_SECONDS',
   'USPS_RATE_LIMIT_COOLDOWN_SECONDS',
+  'CAMPAIGN_RUNNER_REPORTS_ENABLED',
+  'CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED',
+  'CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED',
+  'CAMPAIGN_RUNNER_REPORT_HOUR_MT',
+  'CAMPAIGN_RUNNER_REPORT_MINUTE_MT',
+  'CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY',
+  'CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT',
+  'CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX',
   'DEBUG_CONSOLE_LOGGING_ENABLED',
   'DEBUG_VERBOSE_CONSOLE_LOGGING',
   'DEFAULT_PLATFORM_TIP_PERCENT',
@@ -88,6 +96,14 @@ DEV_ENV_ORDER = [
   'USPS_QUOTE_CACHE_TTL_SECONDS',
   'USPS_FAILURE_COOLDOWN_SECONDS',
   'USPS_RATE_LIMIT_COOLDOWN_SECONDS',
+  'CAMPAIGN_RUNNER_REPORTS_ENABLED',
+  'CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED',
+  'CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED',
+  'CAMPAIGN_RUNNER_REPORT_HOUR_MT',
+  'CAMPAIGN_RUNNER_REPORT_MINUTE_MT',
+  'CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY',
+  'CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT',
+  'CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX',
   'DEBUG_CONSOLE_LOGGING_ENABLED',
   'DEBUG_VERBOSE_CONSOLE_LOGGING',
   'DEFAULT_PLATFORM_TIP_PERCENT',
@@ -168,6 +184,8 @@ def build_mirror_values(config, existing)
   tax = config['tax'] || {}
   shipping = config['shipping'] || {}
   usps = shipping['usps'] || {}
+  reports = config['reports'] || {}
+  campaign_runner_reports = reports['campaign_runner'] || {}
   debug = config['debug'] || {}
   design = config['design'] || {}
 
@@ -208,6 +226,14 @@ def build_mirror_values(config, existing)
     'USPS_QUOTE_CACHE_TTL_SECONDS' => usps.key?('quote_cache_ttl_seconds') ? format_int(usps['quote_cache_ttl_seconds']) : existing['USPS_QUOTE_CACHE_TTL_SECONDS'],
     'USPS_FAILURE_COOLDOWN_SECONDS' => usps.key?('failure_cooldown_seconds') ? format_int(usps['failure_cooldown_seconds']) : existing['USPS_FAILURE_COOLDOWN_SECONDS'],
     'USPS_RATE_LIMIT_COOLDOWN_SECONDS' => usps.key?('rate_limit_cooldown_seconds') ? format_int(usps['rate_limit_cooldown_seconds']) : existing['USPS_RATE_LIMIT_COOLDOWN_SECONDS'],
+    'CAMPAIGN_RUNNER_REPORTS_ENABLED' => campaign_runner_reports.key?('enabled') ? (campaign_runner_reports['enabled'] ? 'true' : 'false') : existing['CAMPAIGN_RUNNER_REPORTS_ENABLED'],
+    'CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED' => campaign_runner_reports.key?('daily_pledge_report_enabled') ? (campaign_runner_reports['daily_pledge_report_enabled'] ? 'true' : 'false') : existing['CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED'],
+    'CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED' => campaign_runner_reports.key?('fulfillment_report_enabled') ? (campaign_runner_reports['fulfillment_report_enabled'] ? 'true' : 'false') : existing['CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED'],
+    'CAMPAIGN_RUNNER_REPORT_HOUR_MT' => campaign_runner_reports.key?('send_hour_mt') ? format_int(campaign_runner_reports['send_hour_mt']) : existing['CAMPAIGN_RUNNER_REPORT_HOUR_MT'],
+    'CAMPAIGN_RUNNER_REPORT_MINUTE_MT' => campaign_runner_reports.key?('send_minute_mt') ? format_int(campaign_runner_reports['send_minute_mt']) : existing['CAMPAIGN_RUNNER_REPORT_MINUTE_MT'],
+    'CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY' => campaign_runner_reports.key?('include_stats_summary') ? (campaign_runner_reports['include_stats_summary'] ? 'true' : 'false') : existing['CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY'],
+    'CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT' => campaign_runner_reports.key?('include_csv_attachment') ? (campaign_runner_reports['include_csv_attachment'] ? 'true' : 'false') : existing['CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT'],
+    'CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX' => campaign_runner_reports.key?('email_subject_prefix') ? campaign_runner_reports['email_subject_prefix'].to_s : existing['CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX'],
     'DEBUG_CONSOLE_LOGGING_ENABLED' => debug.key?('console_logging_enabled') ? (debug['console_logging_enabled'] ? 'true' : 'false') : existing['DEBUG_CONSOLE_LOGGING_ENABLED'],
     'DEBUG_VERBOSE_CONSOLE_LOGGING' => debug.key?('verbose_console_logging') ? (debug['verbose_console_logging'] ? 'true' : 'false') : existing['DEBUG_VERBOSE_CONSOLE_LOGGING'],
     'DEFAULT_PLATFORM_TIP_PERCENT' => pricing.key?('default_tip_percent') ? format_int(pricing['default_tip_percent']) : existing['DEFAULT_PLATFORM_TIP_PERCENT'],

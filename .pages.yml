@@ -151,6 +151,12 @@ content:
         type: boolean
         default: false
         description: "Set to true after backers have been charged (post-campaign)"
+
+      - name: runner_report_emails
+        label: Campaign Runner Report Emails
+        type: string
+        list: true
+        description: "Optional recipient list for campaign-runner reports. Leave empty to disable reports for this campaign."
       
       # --- Content ---
       - name: short_blurb

@@ -179,6 +179,17 @@ shipping:
           - USPS_GROUND_ADVANTAGE
           - PRIORITY_MAIL
 
+reports:
+  campaign_runner:
+    enabled: true
+    daily_pledge_report_enabled: true
+    fulfillment_report_enabled: true
+    send_hour_mt: 7
+    send_minute_mt: 0
+    include_stats_summary: true
+    include_csv_attachment: true
+    email_subject_prefix: "[The Pool]"
+
 checkout:
   stripe_publishable_key: ""
 

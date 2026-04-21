@@ -17,7 +17,7 @@ function renderCampaignPage() {
         <span class="unlocked-text" hidden>Unlocked</span>
       </a>
     </section>
-    <div id="campaign-tiers"></div>
+    <section id="campaign-tiers"></section>
     <script data-campaign-page-script="true" data-campaign-slug="demo"></script>
   `;
 }
@@ -26,6 +26,7 @@ function renderCampaignPageWithVideo() {
   document.body.innerHTML = `
     <div class="campaign-countdown" id="campaign-countdown" data-deadline="2000-01-01" data-state="live" data-goal-met="false">
       <h2 class="campaign-countdown__heading">Ends in</h2>
+      <p class="sr-only" id="campaign-countdown-status"></p>
       <div class="flip-countdown">
         <div class="flip-card" data-unit="days"><span class="flip-card__value">00</span></div>
         <div class="flip-card" data-unit="hours"><span class="flip-card__value">00</span></div>
@@ -34,10 +35,10 @@ function renderCampaignPageWithVideo() {
       </div>
       <div class="campaign-countdown__message"></div>
     </div>
-    <div class="hero__video-wrapper" id="hero-video-wrapper">
+    <div class="hero__video-wrapper" id="hero-video-wrapper" aria-busy="false">
       <video class="hero__video" id="hero-video"></video>
       <div class="hero__video-overlay" id="hero-video-overlay">
-        <button class="hero__video-play" id="hero-video-play" aria-label="Play video"></button>
+        <button class="hero__video-play" id="hero-video-play" aria-label="Play video" aria-controls="hero-video"></button>
         <div class="hero__video-loading" id="hero-video-loading" hidden></div>
       </div>
       <div class="hero__video-buffer" id="hero-video-buffer">
@@ -74,9 +75,15 @@ describe('campaign page script', () => {
   });
 
   it('binds support scrolling and unlocks the community teaser in dev mode', async () => {
-    const tiers = document.getElementById('campaign-tiers') as HTMLElement;
+    const tiers = document.getElementById('campaign-tiers') as HTMLElement & { focus: (options?: { preventScroll?: boolean }) => void };
     const scrollSpy = vi.fn();
     (tiers as any).scrollIntoView = scrollSpy;
+    tiers.focus = vi.fn(function focus() {
+      Object.defineProperty(document, 'activeElement', {
+        configurable: true,
+        value: tiers
+      });
+    });
     const gallery = document.querySelector('.gallery__container') as HTMLElement;
     const scrollBySpy = vi.fn();
     const scrollToSpy = vi.fn();
@@ -88,7 +95,9 @@ describe('campaign page script', () => {
     const supportButton = document.querySelector('[data-scroll-target="campaign-tiers"]') as HTMLButtonElement;
     expect(supportButton.getAttribute('aria-controls')).toBe('campaign-tiers');
     supportButton.click();
-    expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth' });
+    expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(tiers.getAttribute('tabindex')).toBe('-1');
+    expect(document.activeElement).toBe(tiers);
 
     expect((document.querySelector('.teaser-locked') as HTMLElement).hidden).toBe(true);
     expect((document.querySelector('.teaser-unlocked') as HTMLElement).hidden).toBe(false);
@@ -144,6 +153,7 @@ describe('campaign page script', () => {
     expect((document.querySelector('.campaign-countdown__message') as HTMLElement).getAttribute('role')).toBe('status');
     expect((document.querySelector('.campaign-countdown__message') as HTMLElement).getAttribute('aria-live')).toBe('polite');
     expect((document.querySelector('.campaign-countdown__message h2') as HTMLElement).textContent).toBe('Campaign Ended');
+    expect((document.getElementById('campaign-countdown-status') as HTMLElement).textContent).toBe('Campaign Ended');
 
     video.dispatchEvent(new Event('progress'));
     const bufferBar = document.querySelector('.hero__video-buffer-bar') as HTMLElement;
@@ -152,13 +162,16 @@ describe('campaign page script', () => {
     const playButton = document.getElementById('hero-video-play') as HTMLButtonElement;
     const loading = document.getElementById('hero-video-loading') as HTMLElement;
     const overlay = document.getElementById('hero-video-overlay') as HTMLElement;
+    const wrapper = document.getElementById('hero-video-wrapper') as HTMLElement;
 
     playButton.click();
+    expect(wrapper.getAttribute('aria-busy')).toBe('true');
     expect(loading.hidden).toBe(false);
     expect(playButton.hidden).toBe(true);
     expect(overlay.hidden).toBe(false);
 
     video.dispatchEvent(new Event('playing'));
+    expect(wrapper.getAttribute('aria-busy')).toBe('false');
     expect(loading.hidden).toBe(true);
     expect(playButton.hidden).toBe(true);
     expect(overlay.hidden).toBe(true);
@@ -175,7 +188,8 @@ describe('campaign page script', () => {
             imageGallery: 'Galeria de imagenes',
             countdownLive: 'La campana ya esta activa',
             countdownFunded: 'Proyecto financiado',
-            countdownEnded: 'Campana finalizada'
+            countdownEnded: 'Campana finalizada',
+            countdownRemaining: 'Quedan %{days} dias, %{hours} horas, %{minutes} minutos y %{seconds} segundos'
           }
         }
       }
@@ -210,6 +224,7 @@ describe('campaign page script', () => {
 
     expect(document.querySelector('.gallery__container')).toBeNull();
     expect((document.querySelector('.campaign-countdown__message h2') as HTMLElement).textContent).toBe('Campana finalizada');
+    expect((document.getElementById('campaign-countdown-status') as HTMLElement).textContent).toBe('Campana finalizada');
 
     document.body.innerHTML = `
       <section class="gallery gallery--carousel">

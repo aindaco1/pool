@@ -23,6 +23,7 @@ const mockStripeClient = {
 };
 
 const mockSendAnnouncementEmail = vi.fn(async () => {});
+const mockSendCampaignRunnerReportEmail = vi.fn(async () => {});
 const mockSendMilestoneEmail = vi.fn(async () => {});
 const mockSendSupporterEmail = vi.fn(async () => {});
 
@@ -44,7 +45,8 @@ vi.mock('../../worker/src/email.js', () => ({
   sendDiaryUpdateEmail: vi.fn(async () => {}),
   sendMilestoneEmail: mockSendMilestoneEmail,
   sendChargeSuccessEmail: vi.fn(async () => {}),
-  sendAnnouncementEmail: mockSendAnnouncementEmail
+  sendAnnouncementEmail: mockSendAnnouncementEmail,
+  sendCampaignRunnerReportEmail: mockSendCampaignRunnerReportEmail
 }));
 
 vi.mock('../../worker/src/github.js', () => ({
@@ -177,6 +179,7 @@ function createEnv(overrides: Record<string, unknown> = {}) {
     STRIPE_WEBHOOK_SECRET_TEST: 'whsec_test_123',
     MAGIC_LINK_SECRET: 'secret',
     ADMIN_SECRET: 'admin-secret',
+    RESEND_API_KEY: 'test_resend_key',
     PLEDGES: new PaginatedKVNamespace(2),
     RATELIMIT: new PaginatedKVNamespace(50),
     ...overrides
@@ -188,8 +191,11 @@ let worker: {
   scheduled: (controller: unknown, env: Record<string, unknown>, ctx: { waitUntil: (promise: Promise<unknown>) => void }) => Promise<void>;
 };
 
+let resetCampaignRuntimeStateForTests: () => void;
+
 beforeAll(async () => {
   ({ default: worker } = await import('../../worker/src/index.js'));
+  ({ __resetCampaignRuntimeStateForTests: resetCampaignRuntimeStateForTests } = await import('../../worker/src/campaigns.js'));
 });
 
 beforeEach(() => {
@@ -197,6 +203,8 @@ beforeEach(() => {
   mockStripeClient.customers.create.mockImplementation(async ({ email }: { email: string }) => ({ id: `cus_${email}` }));
   mockStripeClient.paymentMethods.attach.mockResolvedValue({});
   mockStripeClient.paymentIntents.create.mockResolvedValue({ id: 'pi_test', status: 'succeeded' });
+  vi.useRealTimers();
+  resetCampaignRuntimeStateForTests();
 
   global.fetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -248,6 +256,250 @@ describe('worker operational integrity', () => {
       emailError: null
     });
     await expect(kv.get('cron:lastEmailRetryRun')).resolves.toBeTruthy();
+  });
+
+  it('sends a daily campaign-runner pledge report at 7am Mountain Time', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-21T13:00:00.000Z'));
+
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-report-1']));
+    await kv.put('pledge:order-report-1', JSON.stringify({
+      orderId: 'order-report-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      tierId: 'frame-slot',
+      tierQty: 1,
+      subtotal: 500,
+      tipPercent: 5,
+      tipAmount: 25,
+      tax: 39,
+      shipping: 0,
+      amount: 564,
+      pledgeStatus: 'active',
+      charged: false,
+      createdAt: '2026-04-20T12:00:00.000Z',
+      history: [
+        {
+          type: 'created',
+          tierId: 'frame-slot',
+          tierQty: 1,
+          subtotal: 500,
+          tipPercent: 5,
+          tipAmount: 25,
+          tax: 39,
+          shipping: 0,
+          amount: 564,
+          at: '2026-04-20T12:00:00.000Z'
+        }
+      ]
+    }));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 500,
+      pledgeCount: 1,
+      tierCounts: { 'frame-slot': 1 },
+      supportItems: {},
+      updatedAt: '2026-04-21T12:59:00.000Z'
+    }));
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [{
+            ...campaignFixture,
+            runner_report_emails: ['runner@example.com']
+          }]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    await worker.scheduled({ cron: '0 13 * * *' }, env, { waitUntil: () => {} });
+
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      email: 'runner@example.com',
+      campaignSlug: 'hand-relations',
+      reportKind: 'Daily pledge report',
+      csvFilename: 'hand-relations-pledge-report-2026-04-21.csv',
+      includeCsvAttachment: true
+    }));
+    await expect(kv.get('campaign-runner-report:pledge:hand-relations:2026-04-21')).resolves.toBeTruthy();
+    await expect(kv.get('cron:lastCampaignRunnerReportRun')).resolves.toBeTruthy();
+  });
+
+  it('dry-runs a campaign-runner report without sending email', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-report-1']));
+    await kv.put('pledge:order-report-1', JSON.stringify({
+      orderId: 'order-report-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      tierId: 'frame-slot',
+      tierQty: 1,
+      subtotal: 500,
+      tipPercent: 5,
+      tipAmount: 25,
+      tax: 39,
+      shipping: 0,
+      amount: 564,
+      pledgeStatus: 'active',
+      charged: false,
+      createdAt: '2026-04-20T12:00:00.000Z',
+      history: [
+        {
+          type: 'created',
+          tierId: 'frame-slot',
+          tierQty: 1,
+          subtotal: 500,
+          tipPercent: 5,
+          tipAmount: 25,
+          tax: 39,
+          shipping: 0,
+          amount: 564,
+          at: '2026-04-20T12:00:00.000Z'
+        }
+      ]
+    }));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 500,
+      pledgeCount: 1,
+      tierCounts: { 'frame-slot': 1 },
+      supportItems: {},
+      updatedAt: '2026-04-21T12:59:00.000Z'
+    }));
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [{
+            ...campaignFixture,
+            runner_report_emails: ['runner@example.com']
+          }]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(new Request('https://pool.test/admin/report/campaign-runner', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': 'admin-secret'
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        reportType: 'pledge',
+        dryRun: true
+      })
+    }), env, { waitUntil: () => {} });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      dryRun: true,
+      campaignSlug: 'hand-relations',
+      reportType: 'pledge',
+      recipientCount: 1,
+      recipients: ['runner@example.com'],
+      rowCount: 1,
+      includeCsvAttachment: true
+    });
+    expect(mockSendCampaignRunnerReportEmail).not.toHaveBeenCalled();
+  });
+
+  it('manually sends and marks a campaign-runner report from the admin endpoint', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-21T13:00:00.000Z'));
+
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-report-1']));
+    await kv.put('pledge:order-report-1', JSON.stringify({
+      orderId: 'order-report-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      tierId: 'frame-slot',
+      tierQty: 1,
+      subtotal: 500,
+      tipPercent: 5,
+      tipAmount: 25,
+      tax: 39,
+      shipping: 0,
+      amount: 564,
+      pledgeStatus: 'active',
+      charged: false,
+      createdAt: '2026-04-20T12:00:00.000Z',
+      history: [
+        {
+          type: 'created',
+          tierId: 'frame-slot',
+          tierQty: 1,
+          subtotal: 500,
+          tipPercent: 5,
+          tipAmount: 25,
+          tax: 39,
+          shipping: 0,
+          amount: 564,
+          at: '2026-04-20T12:00:00.000Z'
+        }
+      ]
+    }));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 500,
+      pledgeCount: 1,
+      tierCounts: { 'frame-slot': 1 },
+      supportItems: {},
+      updatedAt: '2026-04-21T12:59:00.000Z'
+    }));
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [{
+            ...campaignFixture,
+            runner_report_emails: ['runner@example.com']
+          }]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(new Request('https://pool.test/admin/report/campaign-runner', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': 'admin-secret'
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        reportType: 'pledge'
+      })
+    }), env, { waitUntil: () => {} });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      campaignSlug: 'hand-relations',
+      reportType: 'pledge',
+      sent: 1,
+      markedAsSent: true
+    });
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledTimes(1);
+    await expect(kv.get('campaign-runner-report:pledge:hand-relations:2026-04-21', { type: 'json' })).resolves.toMatchObject({
+      source: 'admin_manual',
+      sent: 1
+    });
   });
 
   it('does not mark direct settlement complete when active pledges are skipped for missing customers', async () => {

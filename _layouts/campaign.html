@@ -64,7 +64,7 @@
       {% capture campaign_social_description %}{% include t.html key="campaign_preview.ended_description" lang=current_lang category=campaign_category creator=campaign_creator blurb=campaign_blurb_plain %}{% endcapture %}
   {% endcase %}
   {% capture campaign_social_image_alt %}{% include t.html key="campaign_preview.image_alt" lang=current_lang title=page.title category=campaign_category creator=campaign_creator %}{% endcapture %}
-  {% include seo-meta.html lang=current_lang title=campaign_social_title description=campaign_social_description image=campaign_social_image image_alt=campaign_social_image_alt og_type="website" translation_key=page.translation_key localized_paths=page.localized_paths %}
+  {% include seo-meta.html lang=current_lang title=campaign_social_title description=campaign_social_description image=campaign_social_image image_alt=campaign_social_image_alt og_type="article" translation_key=page.translation_key localized_paths=page.localized_paths %}
   {% include seo-json-ld.html lang=current_lang kind="campaign" translation_key=page.translation_key localized_paths=page.localized_paths %}
 </head>
 <body>
@@ -84,9 +84,10 @@
       {% endif %}
       {% if page.goal_deadline %}
       {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
-      <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-state="{{ campaign_render_state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}">
+      <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-state="{{ campaign_render_state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}" role="timer" aria-labelledby="campaign-countdown-heading" aria-describedby="campaign-countdown-status">
         {% if campaign_render_state == "upcoming" or campaign_render_state == "live" %}
-          <h2 class="campaign-countdown__heading">{% if campaign_render_state == "upcoming" %}{% include t.html key="campaign.starts_in" lang=current_lang %}{% else %}{% include t.html key="campaign.ends_in" lang=current_lang %}{% endif %}</h2>
+          <h2 class="campaign-countdown__heading" id="campaign-countdown-heading">{% if campaign_render_state == "upcoming" %}{% include t.html key="campaign.starts_in" lang=current_lang %}{% else %}{% include t.html key="campaign.ends_in" lang=current_lang %}{% endif %}</h2>
+          <p class="sr-only" id="campaign-countdown-status"></p>
           {% assign target_date = page.goal_deadline %}
           {% if campaign_render_state == "upcoming" %}{% assign target_date = page.start_date %}{% endif %}
           {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
@@ -104,7 +105,7 @@
           {% assign remainder = remainder | modulo: 3600 %}
           {% assign init_mins = remainder | divided_by: 60 %}
           {% assign init_secs = remainder | modulo: 60 %}
-          <div class="flip-countdown">
+          <div class="flip-countdown" aria-hidden="true">
             <div class="flip-countdown__group">
               <div class="flip-card" data-unit="days">
                 <span class="flip-card__value">{% if init_days < 10 %}0{% endif %}{{ init_days }}</span>
@@ -135,6 +136,7 @@
           </div>
           <div class="campaign-countdown__message"></div>
         {% else %}
+          <p class="sr-only" id="campaign-countdown-status">{% if pledged_num >= page.goal_amount %}{% include t.html key="runtime.campaign.countdown_funded" lang=current_lang %}{% else %}{% include t.html key="runtime.campaign.countdown_ended" lang=current_lang %}{% endif %}</p>
           <div class="campaign-countdown__message {% if pledged_num >= page.goal_amount %}campaign-countdown__message--funded{% else %}campaign-countdown__message--not-funded{% endif %}">
             <h2>{% if pledged_num >= page.goal_amount %}{% include t.html key="runtime.campaign.countdown_funded" lang=current_lang %}{% else %}{% include t.html key="runtime.campaign.countdown_ended" lang=current_lang %}{% endif %}</h2>
           </div>
@@ -157,7 +159,7 @@
               {% assign yt_id = page.hero_video | split: "/embed/" | last | split: "?" | first %}
             {% endif %}
             <div class="hero__video hero__video--youtube">
-              <iframe src="https://www.youtube.com/embed/{{ yt_id }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+              <iframe src="https://www.youtube.com/embed/{{ yt_id }}" title="{% include t.html key='campaign.video_embed_title' lang=current_lang title=page.title %}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
             </div>
           {% elsif page.hero_video contains "instagram.com" %}
             <div class="hero__video hero__video--instagram">
@@ -165,17 +167,17 @@
               <script async src="//www.instagram.com/embed.js"></script>
             </div>
           {% else %}
-            <div class="hero__video-wrapper" id="hero-video-wrapper">
+            <div class="hero__video-wrapper" id="hero-video-wrapper" role="group" aria-label="{% include t.html key='campaign.video_embed_title' lang=current_lang title=page.title %}" aria-busy="false">
               <video class="hero__video" id="hero-video" controls preload="metadata" playsinline poster="{% if page.hero_image_wide %}{{ page.hero_image_wide }}{% else %}{{ page.hero_image }}{% endif %}">
                 <source src="{{ page.hero_video }}" type="video/webm">
                 {% include t.html key="misc.video_not_supported" lang=current_lang %}
               </video>
               <div class="hero__video-overlay" id="hero-video-overlay">
-                <button class="hero__video-play" id="hero-video-play" type="button" aria-label="{% include t.html key='campaign.play_video' lang=current_lang %}">
+                <button class="hero__video-play" id="hero-video-play" type="button" aria-label="{% include t.html key='campaign.play_video' lang=current_lang %}" aria-controls="hero-video">
                   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                 </button>
                 <div class="hero__video-loading" id="hero-video-loading" role="status" aria-live="polite" hidden>
-                  <div class="hero__video-spinner"></div>
+                  <div class="hero__video-spinner" aria-hidden="true"></div>
                   <span class="hero__video-loading-text">{% include t.html key="misc.loading" lang=current_lang %}</span>
                 </div>
               </div>
@@ -200,8 +202,8 @@
       </section>
 
     {% if page.decisions and page.decisions.size > 0 %}
-    <section class="community-teaser" id="community-teaser">
-      <h3>{% include t.html key="campaign.supporter_community" lang=current_lang %}</h3>
+    <section class="community-teaser" id="community-teaser" aria-labelledby="community-teaser-heading">
+      <h3 id="community-teaser-heading">{% include t.html key="campaign.supporter_community" lang=current_lang %}</h3>
       <p class="teaser-locked">{% include t.html key="campaign.supporters_only" lang=current_lang %}</p>
       <p class="teaser-unlocked" hidden>{% include t.html key="campaign.supporter_community_unlocked" lang=current_lang %}</p>
       {%- capture community_path -%}/community/{{ page.slug }}/{%- endcapture -%}
@@ -262,8 +264,8 @@
 
 
       {% if page.tiers %}
-      <section class="sidebar-tiers" id="campaign-tiers">
-        <h4>{% include t.html key="campaign.tiers_heading" lang=current_lang %}</h4>
+      <section class="sidebar-tiers" id="campaign-tiers" aria-labelledby="campaign-tiers-heading" tabindex="-1">
+        <h4 id="campaign-tiers-heading">{% include t.html key="campaign.tiers_heading" lang=current_lang %}</h4>
         
         {% assign featured_tier = page.tiers | where: "id", page.featured_tier_id | first %}
         {% if featured_tier %}

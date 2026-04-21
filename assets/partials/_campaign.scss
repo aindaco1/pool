@@ -73,7 +73,9 @@
     display: none;
     
     @include xsm {
-      display: inline-block;
+      display: inline-flex;
+      justify-content: center;
+      width: min(100%, 20rem);
       margin-top: $space-xl;
       margin-bottom: $space-xl;
       padding: $space-md $space-2xl;
@@ -228,6 +230,10 @@
     &:hover {
       background: rgba(0, 0, 0, 0.3);
     }
+
+    &:focus-within {
+      background: rgba(0, 0, 0, 0.28);
+    }
   }
   
   &__video-play {
@@ -257,6 +263,10 @@
     &:hover {
       transform: scale(1.1);
       background: #fff;
+    }
+
+    &:focus-visible {
+      transform: scale(1.05);
     }
     
     @include xsm {
@@ -367,6 +377,7 @@
       @include type-ui;
       font-weight: 600;
       color: $color--primary;
+      overflow-wrap: anywhere;
     }
   }
   
@@ -775,6 +786,13 @@
     
     &:hover {
       opacity: 0.7;
+    }
+  }
+
+  .btn {
+    @include xsm {
+      width: 100%;
+      justify-content: center;
     }
   }
 }

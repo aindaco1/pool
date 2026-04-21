@@ -31,6 +31,7 @@ campaign:
   tiers_heading: "Niveles"
   no_reward_heading: "Sin recompensa"
   play_video: "Reproducir video"
+  video_embed_title: "Video de la campaña %{title}"
   supporters_only_cta: "🔒 Solo patrocinadores"
   supporter_community_unlocked: "¡Tienes acceso! Únete a otras personas que apoyan para votar en decisiones creativas."
 
@@ -473,6 +474,7 @@ runtime:
     countdown_live: "¡La campaña ya está activa!"
     countdown_funded: "Proyecto financiado"
     countdown_ended: "Campaña finalizada"
+    countdown_remaining: "Quedan %{days} días, %{hours} horas, %{minutes} minutos y %{seconds} segundos"
   live_stats:
     project_funded: "Proyecto financiado"
     support: "Apoyar"

@@ -150,6 +150,12 @@ Key sections:
 
 To add a new field to campaigns, edit `.pages.yml` and add to the `fields` array under `campaigns`.
 
+Current campaign-ops field note:
+
+- `runner_report_emails` is the per-campaign recipient list for campaign-runner reports
+- leaving it empty means that campaign does not receive campaign-runner report emails
+- this field only controls recipients; timing, attachments, summary copy, and subject-prefix behavior still come from `_config.yml` under `reports.campaign_runner`
+
 ## Troubleshooting
 
 ### Changes Not Appearing

@@ -34,6 +34,7 @@ The site config is organized around these fork-facing sections:
 - `platform`
 - `pricing`
 - `shipping`
+- `reports`
 - `i18n`
 - `design`
 - `debug`
@@ -516,6 +517,59 @@ By contrast, global `add_ons.products` remain platform merch:
 - they do not count toward campaign funding totals
 - physical global add-ons combine into one separate platform shipment / shipping charge
 
+### `reports`
+
+Use `reports` for campaign-runner report delivery behavior that must stay aligned with Worker scheduling and email generation.
+
+Supported keys today:
+
+- `campaign_runner.enabled`
+- `campaign_runner.daily_pledge_report_enabled`
+- `campaign_runner.fulfillment_report_enabled`
+- `campaign_runner.send_hour_mt`
+- `campaign_runner.send_minute_mt`
+- `campaign_runner.include_stats_summary`
+- `campaign_runner.include_csv_attachment`
+- `campaign_runner.email_subject_prefix`
+
+Current behavior:
+
+- campaign-level recipients live in campaign front matter as `runner_report_emails`
+- if that campaign field is missing or empty, no campaign-runner emails are sent for that campaign
+- the send window is still interpreted in Mountain Time so report timing stays aligned with the rest of the campaign lifecycle model
+- `email_subject_prefix` can be set to an empty string to disable the prefix entirely
+- when the prefix is omitted at runtime, the Worker falls back to `[platform.name]`
+
+Example:
+
+```yml
+reports:
+  campaign_runner:
+    enabled: true
+    daily_pledge_report_enabled: true
+    fulfillment_report_enabled: true
+    send_hour_mt: 7
+    send_minute_mt: 0
+    include_stats_summary: true
+    include_csv_attachment: true
+    email_subject_prefix: "[My Fork]"
+```
+
+What this enables:
+
+- daily campaign-scoped pledge-ledger emails during live campaigns
+- one-time fulfillment exports after a campaign deadline passes
+- optional body summaries and optional CSV attachments without changing campaign content files
+- a consistent subject prefix, which defaults to `"[The Pool]"` in this repo and falls back to `[platform.name]` if omitted at runtime
+
+Per-campaign recipient example:
+
+```yml
+runner_report_emails:
+  - producer@example.com
+  - ops@example.com
+```
+
 ### `design`
 
 Use `design` for curated design-system overrides that do not require Sass edits.
@@ -669,6 +723,14 @@ These site-config values are also reflected into the Worker env values in [`work
 - `shipping.usps.quote_cache_ttl_seconds` -> `USPS_QUOTE_CACHE_TTL_SECONDS`
 - `shipping.usps.failure_cooldown_seconds` -> `USPS_FAILURE_COOLDOWN_SECONDS`
 - `shipping.usps.rate_limit_cooldown_seconds` -> `USPS_RATE_LIMIT_COOLDOWN_SECONDS`
+- `reports.campaign_runner.enabled` -> `CAMPAIGN_RUNNER_REPORTS_ENABLED`
+- `reports.campaign_runner.daily_pledge_report_enabled` -> `CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED`
+- `reports.campaign_runner.fulfillment_report_enabled` -> `CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED`
+- `reports.campaign_runner.send_hour_mt` -> `CAMPAIGN_RUNNER_REPORT_HOUR_MT`
+- `reports.campaign_runner.send_minute_mt` -> `CAMPAIGN_RUNNER_REPORT_MINUTE_MT`
+- `reports.campaign_runner.include_stats_summary` -> `CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY`
+- `reports.campaign_runner.include_csv_attachment` -> `CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT`
+- `reports.campaign_runner.email_subject_prefix` -> `CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX`
 
 The repo keeps those values aligned automatically through the main local/dev/test paths. After changing them, restart the local stack so the site and Worker both pick up the new values:
 

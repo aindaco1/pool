@@ -40,6 +40,11 @@ function getDeadlineMT(dateString) {
   return new Date(Date.UTC(year, month - 1, day, 23 + offset, 59, 59));
 }
 
+export function __resetCampaignRuntimeStateForTests() {
+  cachedCampaigns = null;
+  cacheTime = 0;
+}
+
 /**
  * Fetch campaigns from the site
  */

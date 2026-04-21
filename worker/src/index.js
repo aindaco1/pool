@@ -27,6 +27,7 @@
  *   POST /admin/broadcast/diary     - Send diary update to all campaign supporters
  *   POST /admin/diary/check         - Check all campaigns for new diary entries and broadcast
  *   POST /admin/broadcast/milestone - Send milestone notification to all campaign supporters
+ *   POST /admin/report/campaign-runner - Dry-run or send a campaign-runner report for one campaign
  *   POST /admin/milestone-check/:slug - Check and trigger any pending milestones for a campaign
  *   POST /admin/settle/:slug        - Settle campaign: charge pledges if funded + deadline passed
  *   POST /admin/settle-batch        - Settle specific pledges by order ID (batched, max 6)
@@ -41,7 +42,7 @@
  */
 
 import { generateToken, verifyToken } from './token.js';
-import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail } from './email.js';
+import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail, sendCampaignRunnerReportEmail } from './email.js';
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
@@ -52,9 +53,26 @@ import { getScopedConsole } from './logger.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
 import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput, CHECKOUT_INTENT_VERSION, DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
-import { getCampaignShippingFallbackFeeCents, getCheckoutProvider, getCheckoutUiMode, getDefaultPlatformTipPercent, getFlatShippingFeeCents, getMaxPlatformTipPercent, getShippingFallbackFeeCents } from './provider-config.js';
+import {
+  getCampaignRunnerDailyPledgeReportEnabled,
+  getCampaignRunnerFulfillmentReportEnabled,
+  getCampaignRunnerIncludeCsvAttachment,
+  getCampaignRunnerIncludeStatsSummary,
+  getCampaignRunnerReportHourMt,
+  getCampaignRunnerReportMinuteMt,
+  getCampaignRunnerReportsEnabled,
+  getCampaignShippingFallbackFeeCents,
+  getCheckoutProvider,
+  getCheckoutUiMode,
+  getDefaultPlatformTipPercent,
+  getFlatShippingFeeCents,
+  getMaxPlatformTipPercent,
+  getPlatformCompanyName,
+  getShippingFallbackFeeCents
+} from './provider-config.js';
 import { normalizeShippingDestination, quoteCampaignShipment } from './shipping.js';
 import { normalizeTaxDestination, quoteTax } from './tax.js';
+import { buildFulfillmentReport, buildPledgeLedgerReport } from './reports.js';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
 
@@ -72,6 +90,7 @@ const DEFAULT_I18N_LANG = 'en';
 const ADD_ON_ITEM_PREFIX = 'addon__';
 const SUPPORTER_EMAIL_RETRY_PREFIX = 'supporter-email-retry:';
 const SUPPORTER_EMAIL_RETRY_CRON = '*/15 * * * *';
+const CAMPAIGN_RUNNER_REPORT_CRONS = new Set(['0 13 * * *', '0 14 * * *']);
 const SUPPORTER_EMAIL_RETRY_BATCH_SIZE = 10;
 const SUPPORTER_EMAIL_RETRY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SHARE_CARD_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=3600';
@@ -82,6 +101,7 @@ const OBSERVABILITY_RETENTION_SECONDS = 14 * 24 * 60 * 60;
 const OBSERVABILITY_RECENT_EVENT_LIMIT = 25;
 const OBSERVABILITY_MAX_DAYS = 7;
 const DEFAULT_OBSERVABILITY_SAMPLE_RATE = 0.1;
+const CAMPAIGN_RUNNER_REPORT_MARKER_TTL_SECONDS = 180 * 24 * 60 * 60;
 
 // Extract plain text excerpt from diary entry (supports both legacy body and content blocks)
 function getDiaryExcerpt(entry, maxLength = 200) {
@@ -1058,6 +1078,89 @@ function getDeadlineMT(dateString) {
 function isDeadlinePassed(dateString) {
   const deadline = getDeadlineMT(dateString);
   return new Date() > deadline;
+}
+
+function getMountainTimeParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Denver',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(date);
+  const map = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  return {
+    year: Number(map.year || 0) || 0,
+    month: Number(map.month || 0) || 0,
+    day: Number(map.day || 0) || 0,
+    hour: Number(map.hour || 0) || 0,
+    minute: Number(map.minute || 0) || 0
+  };
+}
+
+function getMountainDateKey(date = new Date()) {
+  const parts = getMountainTimeParts(date);
+  return [
+    String(parts.year).padStart(4, '0'),
+    String(parts.month).padStart(2, '0'),
+    String(parts.day).padStart(2, '0')
+  ].join('-');
+}
+
+function formatCampaignRunnerReportDateLabel(date = new Date()) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Denver',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  }).format(date) + ' MT';
+}
+
+function shouldRunCampaignRunnerReportsNow(env, date = new Date()) {
+  const parts = getMountainTimeParts(date);
+  return (
+    parts.hour === getCampaignRunnerReportHourMt(env) &&
+    parts.minute === getCampaignRunnerReportMinuteMt(env)
+  );
+}
+
+function normalizeCampaignRunnerReportRecipients(campaign = {}) {
+  const seen = new Set();
+  const recipients = [];
+  for (const rawValue of campaign?.runner_report_emails || []) {
+    const email = String(rawValue || '').trim().toLowerCase();
+    if (!email || seen.has(email) || !isValidEmail(email)) {
+      continue;
+    }
+    seen.add(email);
+    recipients.push(email);
+  }
+  return recipients;
+}
+
+function normalizeCampaignRunnerReportType(value) {
+  const normalized = String(value || 'pledge').trim().toLowerCase();
+  return normalized === 'fulfillment' ? 'fulfillment' : 'pledge';
+}
+
+function getCampaignRunnerReportKindLabel(reportType) {
+  return normalizeCampaignRunnerReportType(reportType) === 'fulfillment'
+    ? 'Fulfillment report'
+    : 'Daily pledge report';
+}
+
+function getCampaignRunnerReportMarkerKey(reportType, campaignSlug, reportDateKey) {
+  const normalizedType = normalizeCampaignRunnerReportType(reportType);
+  if (normalizedType === 'fulfillment') {
+    return `campaign-runner-report:fulfillment:${campaignSlug}`;
+  }
+  return `campaign-runner-report:pledge:${campaignSlug}:${reportDateKey}`;
 }
 
 function sanitizeStoredTaxDetails(taxDetails, fallback = {}) {
@@ -2647,6 +2750,14 @@ export default {
         return handleBroadcastMilestone(request, env);
       }
 
+      if (path === '/admin/report/campaign-runner' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        if (!rl.allowed) return rl.response;
+        return handleCampaignRunnerReport(request, env);
+      }
+
       if (path.startsWith('/admin/milestone-check/') && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
@@ -2837,6 +2948,7 @@ export default {
 
   // Cron triggers:
   // - `0 7 * * *`: daily campaign transitions + settlement checks
+  // - `0 13 * * *` / `0 14 * * *`: 7:00 AM Mountain Time campaign-runner reports
   // - `*/15 * * * *`: retry failed supporter confirmation emails
   async scheduled(event, env, ctx) {
     configureWorkerLogging(env);
@@ -2857,6 +2969,25 @@ export default {
         console.log('📧 Supporter email retry complete:', retryResults);
       } catch (err) {
         console.error('📧 Supporter email retry failed:', err);
+        if (env.PLEDGES) {
+          await env.PLEDGES.put('cron:lastError', JSON.stringify({
+            at: new Date().toISOString(),
+            error: err.message
+          }), { expirationTtl: 604800 });
+        }
+      }
+      return;
+    }
+
+    if (CAMPAIGN_RUNNER_REPORT_CRONS.has(cronExpression)) {
+      try {
+        const reportResults = await processCampaignRunnerReports(env);
+        if (env.PLEDGES && reportResults.attempted) {
+          await env.PLEDGES.put('cron:lastCampaignRunnerReportRun', new Date().toISOString(), { expirationTtl: 172800 });
+        }
+        console.log('📊 Campaign runner report cron complete:', reportResults);
+      } catch (err) {
+        console.error('📊 Campaign runner report cron failed:', err);
         if (env.PLEDGES) {
           await env.PLEDGES.put('cron:lastError', JSON.stringify({
             at: new Date().toISOString(),
@@ -6862,6 +6993,281 @@ async function getCampaignSupporters(env, campaignSlug) {
   }
   
   return supporters;
+}
+
+async function getCampaignReportPledges(env, campaignSlug) {
+  if (!env.PLEDGES) {
+    return [];
+  }
+
+  const pledges = [];
+  const orderIds = await getCampaignOrderIds(env, campaignSlug);
+
+  if (Array.isArray(orderIds)) {
+    for (const orderId of orderIds) {
+      const pledgeData = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+      if (!pledgeData) continue;
+      if (pledgeData.campaignSlug !== campaignSlug) continue;
+      pledges.push(pledgeData);
+    }
+    return pledges;
+  }
+
+  const pledgeKeys = await listAllPledgeKeys(env);
+  for (const key of pledgeKeys) {
+    const pledgeData = await env.PLEDGES.get(key.name, { type: 'json' });
+    if (!pledgeData) continue;
+    if (pledgeData.campaignSlug !== campaignSlug) continue;
+    pledges.push(pledgeData);
+  }
+
+  return pledges;
+}
+
+function getCampaignRunnerStatsSummary(campaign, stats, env, reportKind, pledgeCount) {
+  const summary = [];
+  const goalAmountCents = Math.round((Number(campaign?.goal_amount || 0) || 0) * 100);
+  const pledgedAmountCents = Number(stats?.pledgedAmount || 0) || 0;
+  const percentFunded = goalAmountCents > 0
+    ? ((pledgedAmountCents / goalAmountCents) * 100).toFixed(1).replace(/\.0$/, '')
+    : '0';
+
+  summary.push(`Campaign slug: ${campaign?.slug || ''}`);
+  summary.push(`Campaign state: ${getEffectiveState(campaign) || campaign?.state || 'unknown'}`);
+  summary.push(`Report rows derived from ${pledgeCount} pledge record${pledgeCount === 1 ? '' : 's'}`);
+  summary.push(`Pledged total: $${(pledgedAmountCents / 100).toFixed(2)}`);
+  if (goalAmountCents > 0) {
+    summary.push(`Goal progress: $${(goalAmountCents / 100).toFixed(2)} goal (${percentFunded}% funded)`);
+  }
+  if (campaign?.goal_deadline) {
+    summary.push(`Campaign deadline: ${campaign.goal_deadline} 11:59:59 PM MT`);
+  }
+  if (reportKind === 'Fulfillment report') {
+    summary.push(`Platform fulfiller label: ${getPlatformCompanyName(env)}`);
+  }
+
+  return summary;
+}
+
+async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges) {
+  const recipients = normalizeCampaignRunnerReportRecipients(campaign);
+  if (!recipients.length || !pledges.length) {
+    return {
+      attempted: false,
+      sent: 0,
+      skipped: recipients.length ? 'no-pledges' : 'no-recipients',
+      recipients
+    };
+  }
+
+  const report = reportKind === 'Fulfillment report'
+    ? buildFulfillmentReport(pledges, {
+      campaign,
+      platformFulfiller: getPlatformCompanyName(env)
+    })
+    : buildPledgeLedgerReport(pledges, { campaign });
+  const stats = await getCampaignStats(env, campaign.slug);
+  const summary = getCampaignRunnerIncludeStatsSummary(env)
+    ? getCampaignRunnerStatsSummary(campaign, stats, env, reportKind, pledges.length)
+    : [];
+  const slugPart = String(campaign?.slug || 'campaign-report').trim() || 'campaign-report';
+  const datePart = String(reportDateKey || '').trim() || getMountainDateKey();
+  const csvFilename = `${slugPart}-${reportKind === 'Fulfillment report' ? 'fulfillment-report' : 'pledge-report'}-${datePart}.csv`;
+
+  let sent = 0;
+  for (let index = 0; index < recipients.length; index += 1) {
+    if (index > 0) {
+      await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+    }
+
+    await sendCampaignRunnerReportEmail(env, {
+      email: recipients[index],
+      campaignSlug: campaign.slug,
+      campaignTitle: campaign.title || campaign.slug,
+      reportKind,
+      reportDateLabel,
+      statsSummary: summary,
+      csvFilename,
+      csvContent: report.csv,
+      includeCsvAttachment: getCampaignRunnerIncludeCsvAttachment(env)
+    });
+    sent += 1;
+  }
+
+  return { attempted: true, sent, rowCount: report.rows.length, recipients };
+}
+
+async function processCampaignRunnerReports(env, now = new Date()) {
+  if (!env.PLEDGES || !getCampaignRunnerReportsEnabled(env) || !shouldRunCampaignRunnerReportsNow(env, now)) {
+    return { attempted: false, sent: 0, skipped: 'disabled-or-outside-window' };
+  }
+
+  const campaignsData = await getCampaigns(env);
+  const campaigns = campaignsData?.campaigns || campaignsData || [];
+  const reportDateKey = getMountainDateKey(now);
+  const reportDateLabel = formatCampaignRunnerReportDateLabel(now);
+  const results = {
+    attempted: true,
+    checked: 0,
+    sent: 0,
+    reports: [],
+    errors: []
+  };
+
+  for (const campaign of campaigns) {
+    const recipients = normalizeCampaignRunnerReportRecipients(campaign);
+    if (!recipients.length) {
+      continue;
+    }
+
+    results.checked += 1;
+
+    try {
+      const effectiveState = getEffectiveState(campaign);
+      const pledges = await getCampaignReportPledges(env, campaign.slug);
+
+      if (effectiveState === 'live' && getCampaignRunnerDailyPledgeReportEnabled(env)) {
+        const markerKey = `campaign-runner-report:pledge:${campaign.slug}:${reportDateKey}`;
+        const alreadySent = await env.PLEDGES.get(markerKey);
+        if (!alreadySent) {
+          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Daily pledge report', reportDateKey, reportDateLabel, pledges);
+          if (outcome.attempted && outcome.sent > 0) {
+            await env.PLEDGES.put(markerKey, JSON.stringify({
+              sentAt: new Date().toISOString(),
+              sent: outcome.sent,
+              reportDateKey
+            }), { expirationTtl: CAMPAIGN_RUNNER_REPORT_MARKER_TTL_SECONDS });
+            results.sent += outcome.sent;
+            results.reports.push({ campaignSlug: campaign.slug, type: 'pledge', sent: outcome.sent, rowCount: outcome.rowCount });
+          }
+        }
+      }
+
+      if (effectiveState === 'post' && getCampaignRunnerFulfillmentReportEnabled(env)) {
+        const markerKey = `campaign-runner-report:fulfillment:${campaign.slug}`;
+        const alreadySent = await env.PLEDGES.get(markerKey);
+        if (!alreadySent) {
+          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Fulfillment report', reportDateKey, reportDateLabel, pledges);
+          if (outcome.attempted && outcome.sent > 0) {
+            await env.PLEDGES.put(markerKey, JSON.stringify({
+              sentAt: new Date().toISOString(),
+              sent: outcome.sent,
+              reportDateKey
+            }), { expirationTtl: CAMPAIGN_RUNNER_REPORT_MARKER_TTL_SECONDS });
+            results.sent += outcome.sent;
+            results.reports.push({ campaignSlug: campaign.slug, type: 'fulfillment', sent: outcome.sent, rowCount: outcome.rowCount });
+          }
+        }
+      }
+    } catch (error) {
+      results.errors.push({
+        campaignSlug: campaign.slug,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  return results;
+}
+
+async function handleCampaignRunnerReport(request, env) {
+  const auth = requireAdmin(request, env);
+  if (!auth.ok) return auth.response;
+
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const body = parsedBody.body || {};
+  const campaignSlug = String(body.campaignSlug || '').trim();
+  const reportType = normalizeCampaignRunnerReportType(body.reportType);
+  const dryRun = body.dryRun === true;
+  const markAsSent = body.markAsSent === undefined ? !dryRun : body.markAsSent === true;
+
+  if (!campaignSlug) {
+    return jsonResponse({ error: 'Missing campaignSlug' }, 400);
+  }
+
+  const campaign = await getCampaign(env, campaignSlug);
+  if (!campaign) {
+    return jsonResponse({ error: 'Campaign not found' }, 404);
+  }
+
+  const recipients = normalizeCampaignRunnerReportRecipients(campaign);
+  const reportDate = new Date();
+  const reportDateKey = getMountainDateKey(reportDate);
+  const reportDateLabel = formatCampaignRunnerReportDateLabel(reportDate);
+  const markerKey = getCampaignRunnerReportMarkerKey(reportType, campaignSlug, reportDateKey);
+  const markerPayload = await env.PLEDGES?.get(markerKey, { type: 'json' });
+  const reportKind = getCampaignRunnerReportKindLabel(reportType);
+  const pledges = await getCampaignReportPledges(env, campaignSlug);
+  const report = reportType === 'fulfillment'
+    ? buildFulfillmentReport(pledges, {
+      campaign,
+      platformFulfiller: getPlatformCompanyName(env)
+    })
+    : buildPledgeLedgerReport(pledges, { campaign });
+  const summary = getCampaignRunnerIncludeStatsSummary(env)
+    ? getCampaignRunnerStatsSummary(
+      campaign,
+      await getCampaignStats(env, campaignSlug),
+      env,
+      reportKind,
+      pledges.length
+    )
+    : [];
+  const csvFilename = `${campaignSlug}-${reportType === 'fulfillment' ? 'fulfillment-report' : 'pledge-report'}-${reportDateKey}.csv`;
+
+  if (dryRun) {
+    return jsonResponse({
+      dryRun: true,
+      campaignSlug,
+      reportType,
+      reportKind,
+      effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown',
+      recipientCount: recipients.length,
+      recipients,
+      rowCount: report.rows.length,
+      csvFilename,
+      reportDateKey,
+      reportDateLabel,
+      includeStatsSummary: getCampaignRunnerIncludeStatsSummary(env),
+      includeCsvAttachment: getCampaignRunnerIncludeCsvAttachment(env),
+      alreadyMarked: Boolean(markerPayload),
+      markerKey,
+      markAsSentDefault: !dryRun,
+      statsSummary: summary
+    });
+  }
+
+  const outcome = await maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges);
+
+  if (markAsSent && outcome.attempted && outcome.sent > 0 && env.PLEDGES) {
+    await env.PLEDGES.put(markerKey, JSON.stringify({
+      sentAt: new Date().toISOString(),
+      sent: outcome.sent,
+      reportDateKey,
+      source: 'admin_manual'
+    }), { expirationTtl: CAMPAIGN_RUNNER_REPORT_MARKER_TTL_SECONDS });
+  }
+
+  return jsonResponse({
+    success: true,
+    campaignSlug,
+    reportType,
+    reportKind,
+    effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown',
+    recipientCount: recipients.length,
+    recipients,
+    rowCount: report.rows.length,
+    csvFilename,
+    reportDateKey,
+    reportDateLabel,
+    markedAsSent: markAsSent && outcome.attempted && outcome.sent > 0,
+    alreadyMarked: Boolean(markerPayload),
+    ...outcome
+  });
 }
 
 /**

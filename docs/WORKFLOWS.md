@@ -342,6 +342,49 @@ Send a custom announcement email with optional CTA link to all campaign supporte
 - `ctaLabel` + `ctaUrl` (optional) — Adds a prominent button linking to the URL
 - `dryRun` (optional) — Returns recipient list without sending
 
+### `POST /admin/report/campaign-runner`
+Preview or manually send a campaign-runner report for one campaign.
+
+**Headers:** `Authorization: Bearer ADMIN_SECRET`  
+**Request:**
+```json
+{
+  "campaignSlug": "hand-relations",
+  "reportType": "pledge",
+  "dryRun": true,
+  "markAsSent": false
+}
+```
+
+**Fields:**
+- `campaignSlug` (required) — Campaign to report on
+- `reportType` (optional) — `pledge` or `fulfillment` (`pledge` by default)
+- `dryRun` (optional) — Returns recipients, row counts, filename, and marker state without sending
+- `markAsSent` (optional) — On live sends, writes the matching report marker so the scheduled run does not immediately duplicate the email; defaults to `true` when `dryRun` is false
+
+Recipients still come from the campaign’s `runner_report_emails` front matter field.
+
+**Dry-run example:**
+```bash
+curl -X POST http://localhost:8787/admin/report/campaign-runner \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_ADMIN_SECRET' \
+  -d '{"campaignSlug":"hand-relations","reportType":"pledge","dryRun":true}'
+```
+
+**Manual send example:**
+```bash
+curl -X POST http://localhost:8787/admin/report/campaign-runner \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_ADMIN_SECRET' \
+  -d '{"campaignSlug":"hand-relations","reportType":"fulfillment","dryRun":false,"markAsSent":true}'
+```
+
+**Operational notes:**
+- run a dry run first when validating recipients, CSV shape, or subject-prefix customization
+- use `reportType=pledge` for the daily live-campaign ledger and `reportType=fulfillment` for the one-time post-deadline export
+- keep `markAsSent=false` only for deliberate preview-style sends that should not suppress the next scheduled report
+
 ### `POST /admin/recover-checkout`
 Recover a missed Stripe webhook by manually creating a pledge from a completed checkout session.
 
