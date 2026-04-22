@@ -93,7 +93,7 @@ These values feed:
 Notes:
 
 - `platform.*` is the primary branding surface.
-- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v0.9.3`.
+- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v0.9.4`.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
 - `platform.logo_path` is also the mirrored brand mark used in supporter emails.
@@ -103,8 +103,8 @@ Example:
 ```yml
 platform:
   name: My Fork
-  version: 0.9.3
-  release_label: v0.9.3
+  version: 0.9.4
+  release_label: v0.9.4
   company_name: Example Studio
   support_email: support@example.com
   pledges_email_from: "My Fork <pledges@example.com>"
@@ -539,6 +539,13 @@ Current behavior:
 - the send window is still interpreted in Mountain Time so report timing stays aligned with the rest of the campaign lifecycle model
 - `email_subject_prefix` can be set to an empty string to disable the prefix entirely
 - when the prefix is omitted at runtime, the Worker falls back to `[platform.name]`
+- report subjects stay concise and deliverability-oriented: no emoji, short report labels, and a consistent prefix + report-kind + campaign-title pattern
+- daily pledge emails use a campaign-only summary with total pledges, new pledges in the previous 24 hours, pledged total, goal progress, and deadline countdown/passed time
+- fulfillment sends are split by fulfiller:
+  - campaign-runner recipients receive only the campaign-fulfilled rows
+  - `platform.support_email` receives a separate platform-fulfillment email when platform add-on rows exist
+- fulfillment summaries are intentionally concise and fulfillment-oriented; they do not reuse the daily pledge-report body summary
+- both report types can include a short guidance note in the body so runners get campaign-stage-specific encouragement or fulfillment communication reminders alongside the CSV
 
 Example:
 
@@ -559,6 +566,7 @@ What this enables:
 
 - daily campaign-scoped pledge-ledger emails during live campaigns
 - one-time fulfillment exports after a campaign deadline passes
+- separate campaign-runner and platform fulfillment emails when both campaign and platform items need delivery
 - optional body summaries and optional CSV attachments without changing campaign content files
 - a consistent subject prefix, which defaults to `"[The Pool]"` in this repo and falls back to `[platform.name]` if omitted at runtime
 

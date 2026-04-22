@@ -1,12 +1,5 @@
 #!/bin/bash
-# Seed local-only pledge fixtures for the current campaign catalog.
-#
-# Usage:
-#   ./scripts/seed-all-campaigns.sh
-#   ./scripts/seed-all-campaigns.sh --podman
-#
-# This clears local pledge/index/stats/inventory/report-marker data and reseeds
-# representative fixtures for the main campaigns plus the local smoke campaign.
+# Seed diverse local-only report fixtures for the hand-relations campaign.
 
 set -euo pipefail
 
@@ -50,7 +43,7 @@ if [[ "$USE_PODMAN" == "true" && "$PODMAN_INTERNAL" != "1" ]]; then
 
   if ! podman exec pool-dev-worker true >/dev/null 2>&1; then
     echo "📦 Starting shared Podman dev stack..." >&2
-    PODMAN_SEED_LOG="${PODMAN_SEED_LOG:-/tmp/pool-seed-all-campaigns-podman.log}"
+    PODMAN_SEED_LOG="${PODMAN_SEED_LOG:-/tmp/pool-hand-relations-seed-podman.log}"
     PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_SEED_LOG" 2>&1
     PODMAN_STARTED_BY_SCRIPT=true
 
@@ -68,7 +61,7 @@ if [[ "$USE_PODMAN" == "true" && "$PODMAN_INTERNAL" != "1" ]]; then
     fi
   fi
 
-  exec podman exec pool-dev-worker bash -lc "cd /workspace && PODMAN_INTERNAL=1 node ./scripts/seed-all-campaigns.mjs"
+  exec podman exec pool-dev-worker bash -lc "cd /workspace && PODMAN_INTERNAL=1 node ./scripts/seed-hand-relations.mjs"
 fi
 
 if [[ -f "$HOME/.nvm/nvm.sh" ]]; then
@@ -78,4 +71,4 @@ if [[ -f "$HOME/.nvm/nvm.sh" ]]; then
 fi
 
 cd "$(dirname "$0")/.."
-node ./scripts/seed-all-campaigns.mjs
+node ./scripts/seed-hand-relations.mjs

@@ -1718,12 +1718,14 @@ test.describe('Checkout Flow', () => {
 
     const continueToPledgeButton = page.locator('[data-cart-start-checkout]');
     await expect(continueToPledgeButton).toBeVisible();
+    await expect(continueToPledgeButton).toBeEnabled();
     await continueToPledgeButton.focus();
     await expect(continueToPledgeButton).toBeFocused();
     await page.keyboard.press('Enter');
 
     const saveButton = page.locator('[data-cart-confirm-custom-checkout]');
     await expect(saveButton).toBeVisible();
+    await expect(saveButton).toBeEnabled();
     await saveButton.focus();
     await expect(saveButton).toBeFocused();
     await page.keyboard.press('Enter');

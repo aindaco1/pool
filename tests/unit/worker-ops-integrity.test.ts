@@ -265,7 +265,7 @@ describe('worker operational integrity', () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;
 
-    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-report-1']));
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-report-1', 'order-report-2']));
     await kv.put('pledge:order-report-1', JSON.stringify({
       orderId: 'order-report-1',
       email: 'buyer@example.com',
@@ -296,11 +296,41 @@ describe('worker operational integrity', () => {
         }
       ]
     }));
+    await kv.put('pledge:order-report-2', JSON.stringify({
+      orderId: 'order-report-2',
+      email: 'newbuyer@example.com',
+      campaignSlug: 'hand-relations',
+      tierId: 'sfx-slot',
+      tierQty: 1,
+      subtotal: 1000,
+      tipPercent: 5,
+      tipAmount: 50,
+      tax: 79,
+      shipping: 0,
+      amount: 1129,
+      pledgeStatus: 'active',
+      charged: false,
+      createdAt: '2026-04-21T05:00:00.000Z',
+      history: [
+        {
+          type: 'created',
+          tierId: 'sfx-slot',
+          tierQty: 1,
+          subtotal: 1000,
+          tipPercent: 5,
+          tipAmount: 50,
+          tax: 79,
+          shipping: 0,
+          amount: 1129,
+          at: '2026-04-21T05:00:00.000Z'
+        }
+      ]
+    }));
     await kv.put('stats:hand-relations', JSON.stringify({
       campaignSlug: 'hand-relations',
-      pledgedAmount: 500,
-      pledgeCount: 1,
-      tierCounts: { 'frame-slot': 1 },
+      pledgedAmount: 1500,
+      pledgeCount: 2,
+      tierCounts: { 'frame-slot': 1, 'sfx-slot': 1 },
       supportItems: {},
       updatedAt: '2026-04-21T12:59:00.000Z'
     }));
@@ -326,7 +356,16 @@ describe('worker operational integrity', () => {
       campaignSlug: 'hand-relations',
       reportKind: 'Daily pledge report',
       csvFilename: 'hand-relations-pledge-report-2026-04-21.csv',
-      includeCsvAttachment: true
+      includeCsvAttachment: true,
+      encouragement: expect.objectContaining({
+        title: 'Momentum note'
+      }),
+      statsSummary: expect.arrayContaining([
+        'Total pledges: 2',
+        'New pledges in the previous 24 hours: 1',
+        'Pledged total: $15.00',
+        'Goal progress: $25,000.00 goal (0.1% funded)'
+      ])
     }));
     await expect(kv.get('campaign-runner-report:pledge:hand-relations:2026-04-21')).resolves.toBeTruthy();
     await expect(kv.get('cron:lastCampaignRunnerReportRun')).resolves.toBeTruthy();
@@ -499,6 +538,148 @@ describe('worker operational integrity', () => {
     await expect(kv.get('campaign-runner-report:pledge:hand-relations:2026-04-21', { type: 'json' })).resolves.toMatchObject({
       source: 'admin_manual',
       sent: 1
+    });
+  });
+
+  it('splits fulfillment sends between campaign runner and platform support email', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-21T13:00:00.000Z'));
+
+    const env = createEnv({
+      SUPPORT_EMAIL: 'support@example.com'
+    });
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-fulfillment-1']));
+    await kv.put('pledge:order-fulfillment-1', JSON.stringify({
+      orderId: 'order-fulfillment-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      tierId: 'frame-slot',
+      tierQty: 1,
+      subtotal: 1800,
+      goalTrackingSubtotal: 1200,
+      bundleAddOnSubtotal: 600,
+      bundleAddOns: [
+        {
+          productId: 'campaign-poster',
+          name: 'Campaign Poster',
+          quantity: 1,
+          unitPrice: 400,
+          scope: 'campaign',
+          campaignSlug: 'hand-relations'
+        },
+        {
+          productId: 'pool-shirt',
+          name: 'The Pool Shirt',
+          variantLabel: 'L',
+          quantity: 1,
+          unitPrice: 600,
+          scope: 'platform'
+        }
+      ],
+      tipPercent: 5,
+      tipAmount: 90,
+      tax: 141,
+      shipping: 300,
+      amount: 2331,
+      pledgeStatus: 'active',
+      charged: false,
+      shippingAddress: {
+        name: 'Buyer Example',
+        address1: '123 Example St',
+        city: 'Denver',
+        province: 'CO',
+        postalCode: '80205',
+        country: 'US'
+      },
+      createdAt: '2026-04-20T12:00:00.000Z'
+    }));
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [{
+            ...campaignFixture,
+            state: 'post',
+            runner_report_emails: ['runner@example.com']
+          }]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const responsePromise = worker.fetch(new Request('https://pool.test/admin/report/campaign-runner', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': 'admin-secret'
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        reportType: 'fulfillment',
+        markAsSent: true
+      })
+    }), env, { waitUntil: () => {} });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const response = await responsePromise;
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      campaignSlug: 'hand-relations',
+      reportType: 'fulfillment',
+      recipientCount: 1,
+      recipients: ['runner@example.com'],
+      platformRecipient: 'support@example.com',
+      campaignRowCount: 1,
+      platformRowCount: 1,
+      sent: 2,
+      markedAsSent: true
+    });
+
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledTimes(2);
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenNthCalledWith(1, expect.anything(), expect.objectContaining({
+      email: 'runner@example.com',
+      reportKind: 'Fulfillment report',
+      csvFilename: 'hand-relations-fulfillment-report-2026-04-21.csv',
+      csvContent: expect.stringContaining('buyer@example.com,hand-relations,hand-relations'),
+      encouragement: expect.objectContaining({
+        title: 'Fulfillment note'
+      }),
+      statsSummary: expect.arrayContaining([
+        'Supporters to fulfill: 1',
+        'Items to fulfill: 2',
+        'Total raised: $12.00'
+      ])
+    }));
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenNthCalledWith(2, expect.anything(), expect.objectContaining({
+      email: 'support@example.com',
+      reportKind: 'Platform fulfillment report',
+      csvFilename: 'hand-relations-platform-fulfillment-report-2026-04-21.csv',
+      csvContent: expect.stringContaining('buyer@example.com,,Dust Wave'),
+      encouragement: expect.objectContaining({
+        title: 'Fulfillment note'
+      }),
+      statsSummary: expect.arrayContaining([
+        'Supporters to fulfill: 1',
+        'Items to fulfill: 1',
+        'Total raised: $6.00'
+      ])
+    }));
+
+    const runnerCsv = mockSendCampaignRunnerReportEmail.mock.calls[0][1].csvContent as string;
+    const platformCsv = mockSendCampaignRunnerReportEmail.mock.calls[1][1].csvContent as string;
+    expect(runnerCsv).toContain('Campaign Poster');
+    expect(runnerCsv).not.toContain('The Pool Shirt');
+    expect(platformCsv).toContain('The Pool Shirt');
+    expect(platformCsv).not.toContain('Campaign Poster');
+
+    await expect(kv.get('campaign-runner-report:fulfillment:hand-relations', { type: 'json' })).resolves.toMatchObject({
+      source: 'admin_manual',
+      sent: 2
     });
   });
 

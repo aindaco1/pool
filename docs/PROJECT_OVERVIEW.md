@@ -79,6 +79,10 @@ For current Cloudflare limits, see:
    - Charges are aggregated by email within each campaign — one charge per supporter per campaign.
    - Updates pledge status to `charged` or `payment_failed` in KV.
    - Triggers GitHub Pages rebuild and Cloudflare cache purge on state transitions.
+5. **Worker report pass** runs at 7:00 AM Mountain Time:
+   - Sends daily campaign-scoped pledge-ledger emails for live campaigns that configure `runner_report_emails`.
+   - Sends one post-deadline fulfillment flow per campaign, splitting campaign-runner rows from platform-fulfillment rows when needed.
+   - Supports manual preview/send through `POST /admin/report/campaign-runner`, including dry-run responses for recipients, campaign/platform row counts, filenames, and idempotency-marker state.
 
 **Pricing rules:**
 - Campaign progress uses subtotal only.

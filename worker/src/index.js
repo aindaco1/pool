@@ -68,11 +68,12 @@ import {
   getFlatShippingFeeCents,
   getMaxPlatformTipPercent,
   getPlatformCompanyName,
+  getSupportEmail,
   getShippingFallbackFeeCents
 } from './provider-config.js';
 import { normalizeShippingDestination, quoteCampaignShipment } from './shipping.js';
 import { normalizeTaxDestination, quoteTax } from './tax.js';
-import { buildFulfillmentReport, buildPledgeLedgerReport } from './reports.js';
+import { buildFulfillmentReport, buildPledgeLedgerReport, rebuildCsvReport } from './reports.js';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
 
@@ -1120,6 +1121,143 @@ function formatCampaignRunnerReportDateLabel(date = new Date()) {
     minute: '2-digit',
     hour12: true
   }).format(date) + ' MT';
+}
+
+function formatUsdCents(cents = 0) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD'
+  }).format((Number(cents || 0) || 0) / 100);
+}
+
+function countRecentCampaignPledges(pledges = [], now = new Date(), windowMs = 24 * 60 * 60 * 1000) {
+  const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  if (!Number.isFinite(nowMs)) {
+    return 0;
+  }
+
+  return (pledges || []).filter((pledge) => {
+    const createdAtMs = new Date(pledge?.createdAt || 0).getTime();
+    return Number.isFinite(createdAtMs) && createdAtMs >= (nowMs - windowMs) && createdAtMs <= nowMs;
+  }).length;
+}
+
+function formatDeadlineCountdown(dateString, now = new Date()) {
+  if (!dateString) {
+    return '';
+  }
+
+  const deadline = getDeadlineMT(dateString);
+  const diffMs = deadline.getTime() - now.getTime();
+  const absDiffMs = Math.abs(diffMs);
+  const totalHours = Math.floor(absDiffMs / (60 * 60 * 1000));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  const dayLabel = `${days} day${days === 1 ? '' : 's'}`;
+  const hourLabel = `${hours} hour${hours === 1 ? '' : 's'}`;
+
+  if (diffMs >= 0) {
+    return `${dayLabel}, ${hourLabel} left until deadline`;
+  }
+
+  return `Deadline passed ${dayLabel}, ${hourLabel} ago`;
+}
+
+function getDaysUntilDeadline(dateString, now = new Date()) {
+  if (!dateString) {
+    return null;
+  }
+  const diffMs = getDeadlineMT(dateString).getTime() - now.getTime();
+  return diffMs / (24 * 60 * 60 * 1000);
+}
+
+function buildCampaignRunnerEncouragement(campaign, reportKind, pledges = [], now = new Date()) {
+  const normalizedReportKind = String(reportKind || '').trim().toLowerCase();
+
+  if (normalizedReportKind.includes('fulfillment report')) {
+    const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
+    const deadlineLine = campaign?.goal_deadline
+      ? formatDeadlineCountdown(campaign.goal_deadline, now)
+      : null;
+
+    return {
+      title: 'Fulfillment note',
+      intro: `**Communication above everything.** Delivery timing matters, but supporters stay with you when they understand what is happening and can see that you are still moving.`,
+      tips: [
+        'If anything slips, **announce it within 48-72 hours of knowing**. Silence damages trust faster than a realistic delay.',
+        'Be **specific and honest** about the cause, the fix, and the next update date. A concrete plan beats a vague apology every time.',
+        'Set a **realistic timeline with buffer**, then stay visible with regular updates until every item is fulfilled.'
+      ],
+      closing: effectiveState === 'post' && deadlineLine
+        ? `Supporters are usually patient when communication is clear. ${deadlineLine}, so now is the time to keep fulfillment **predictable, visible, and human**.`
+        : 'Trust is the real deliverable here. Consistent updates, realistic dates, and quick replies are what keep supporters on your side.'
+    };
+  }
+
+  if (reportKind !== 'Daily pledge report') {
+    return null;
+  }
+
+  const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
+  const newPledgesLast24Hours = countRecentCampaignPledges(pledges, now);
+  const daysUntilDeadline = getDaysUntilDeadline(campaign?.goal_deadline, now);
+  const recentMomentumLine = newPledgesLast24Hours > 0
+    ? `You picked up **${newPledgesLast24Hours} new pledge${newPledgesLast24Hours === 1 ? '' : 's'}** in the previous 24 hours, which is a strong prompt to give people one more fresh reason to pay attention today.`
+    : 'If momentum feels quiet right now, that is normal. The middle stretch of a campaign is rarely won by repeating the launch ask; it is won by giving people **something new to care about**.';
+
+  if (effectiveState === 'live' && daysUntilDeadline !== null && daysUntilDeadline <= 5) {
+    return {
+      title: 'Momentum note',
+      intro: `Most campaigns get their biggest natural surges at **launch** and **close**. You are in one of those windows now. ${recentMomentumLine}`,
+      tips: [
+        '**Follow up** with people who already heard from you but have not replied yet, and be specific about what is left to raise and when the campaign ends.',
+        'Increase campaign updates with **something worth clicking and sharing**, like a candid video, a new image, or a behind-the-scenes story beat.',
+        'Give the team **one focused push today**: personal outreach, a limited-time reason to act now, or a matching-contribution style moment.'
+      ],
+      closing: 'Fresh stories and direct follow-up are often what turn *last-minute attention* into **real momentum**.'
+    };
+  }
+
+  if (effectiveState === 'live' && campaign?.start_date) {
+    const startDate = new Date(`${campaign.start_date}T00:00:00Z`);
+    const daysSinceStart = (now.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000);
+    if (Number.isFinite(daysSinceStart) && daysSinceStart <= 5) {
+      return {
+        title: 'Momentum note',
+        intro: `Most campaigns naturally spike at **launch** and **close**. Early on, the job is not to say the same thing louder. It is to keep giving people **fresh proof that the campaign is alive**. ${recentMomentumLine}`,
+        tips: [
+          'Send **short personal outreach in small batches** instead of emailing everyone at once, so new visitors see visible activity when they land.',
+          'Post campaign updates that are **worth opening**, not just funding totals. Supporters stay engaged when they get story, texture, and something shareable.',
+          'Celebrate the next visible milestone early so supporters feel **progress before the finish line**.'
+        ],
+        closing: '**New information** and visible movement are what keep launch energy from fading too fast.'
+      };
+    }
+  }
+
+  if (effectiveState === 'post') {
+    return {
+      title: 'Momentum note',
+      intro: 'Campaigns usually surge at **launch** and **close**, but the real lesson lives in what kept people listening between those moments.',
+      tips: [
+        'Review which updates, outreach, and story beats **created movement**, then reuse those patterns for your next launch or final-week push.',
+        'The strongest campaigns keep giving supporters **new things to say, share, and celebrate** instead of repeating the same ask for weeks.',
+        'Momentum compounds when the whole team has a **clear plan** for outreach, updates, and follow-through.'
+      ],
+      closing: 'Treat this report like a map of what resonated, then turn those lessons into your next burst of **momentum**.'
+    };
+  }
+
+  return {
+    title: 'Momentum note',
+    intro: `Most campaigns get their natural spikes at **launch** and **close**. The middle stretch is where creators keep attention by having **new things to say**. ${recentMomentumLine}`,
+    tips: [
+      'Make updates **worth clicking**: share images, video, story context, milestones, or progress people can actually pass along.',
+      'Give supporters **something new to rally around**, like a milestone celebration, a fresh incentive, an event, or a time-boxed push.',
+      'Keep outreach **personal and specific**. Short direct notes, texts, and asks usually outperform generic repeated blasts.'
+    ],
+    closing: 'Every day is a fresh chance to make the campaign feel **active, specific, and worth sharing**.'
+  };
 }
 
 function shouldRunCampaignRunnerReportsNow(env, date = new Date()) {
@@ -7024,34 +7162,100 @@ async function getCampaignReportPledges(env, campaignSlug) {
   return pledges;
 }
 
-function getCampaignRunnerStatsSummary(campaign, stats, env, reportKind, pledgeCount) {
+function getCampaignRunnerStatsSummary(campaign, stats, env, reportKind, pledges = [], now = new Date()) {
+  if (reportKind === 'Fulfillment report') {
+    return [];
+  }
+
   const summary = [];
   const goalAmountCents = Math.round((Number(campaign?.goal_amount || 0) || 0) * 100);
   const pledgedAmountCents = Number(stats?.pledgedAmount || 0) || 0;
+  const totalPledges = Number(stats?.pledgeCount || 0) || pledges.length || 0;
+  const newPledgesLast24Hours = countRecentCampaignPledges(pledges, now);
   const percentFunded = goalAmountCents > 0
     ? ((pledgedAmountCents / goalAmountCents) * 100).toFixed(1).replace(/\.0$/, '')
     : '0';
 
-  summary.push(`Campaign slug: ${campaign?.slug || ''}`);
-  summary.push(`Campaign state: ${getEffectiveState(campaign) || campaign?.state || 'unknown'}`);
-  summary.push(`Report rows derived from ${pledgeCount} pledge record${pledgeCount === 1 ? '' : 's'}`);
-  summary.push(`Pledged total: $${(pledgedAmountCents / 100).toFixed(2)}`);
+  summary.push(`Total pledges: ${totalPledges}`);
+  summary.push(`New pledges in the previous 24 hours: ${newPledgesLast24Hours}`);
+  summary.push(`Pledged total: ${formatUsdCents(pledgedAmountCents)}`);
   if (goalAmountCents > 0) {
-    summary.push(`Goal progress: $${(goalAmountCents / 100).toFixed(2)} goal (${percentFunded}% funded)`);
+    summary.push(`Goal progress: ${formatUsdCents(goalAmountCents)} goal (${percentFunded}% funded)`);
   }
   if (campaign?.goal_deadline) {
-    summary.push(`Campaign deadline: ${campaign.goal_deadline} 11:59:59 PM MT`);
-  }
-  if (reportKind === 'Fulfillment report') {
-    summary.push(`Platform fulfiller label: ${getPlatformCompanyName(env)}`);
+    summary.push(formatDeadlineCountdown(campaign.goal_deadline, now));
   }
 
   return summary;
 }
 
-async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges) {
+function getFulfillmentReportColumnIndex(report, columnName) {
+  return Array.isArray(report?.header) ? report.header.indexOf(columnName) : -1;
+}
+
+function filterFulfillmentReportRows(report, predicate) {
+  if (!Array.isArray(report?.rows) || !Array.isArray(report?.header)) {
+    return rebuildCsvReport({ header: [], rows: [] });
+  }
+
+  return rebuildCsvReport({
+    header: report.header,
+    rows: report.rows.filter((row) => predicate(Array.isArray(row) ? row : []))
+  });
+}
+
+function countFulfillmentItemEntries(itemsValue = '') {
+  return String(itemsValue || '')
+    .split(';')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .length;
+}
+
+function getFulfillmentSummary(report, {
+  audienceLabel,
+  fulfillerLabel,
+  includeDeadline = false,
+  campaign = null,
+  now = new Date()
+} = {}) {
+  const rows = Array.isArray(report?.rows) ? report.rows : [];
+  const emailIndex = getFulfillmentReportColumnIndex(report, 'email');
+  const itemsIndex = getFulfillmentReportColumnIndex(report, 'items');
+  const addOnItemsIndex = getFulfillmentReportColumnIndex(report, 'add_on_items');
+  const subtotalIndex = getFulfillmentReportColumnIndex(report, 'subtotal');
+  const uniqueSupporters = new Set();
+  let lineItems = 0;
+  let subtotalCents = 0;
+
+  for (const row of rows) {
+    if (emailIndex >= 0) {
+      const email = String(row[emailIndex] || '').trim().toLowerCase();
+      if (email) uniqueSupporters.add(email);
+    }
+    if (itemsIndex >= 0) {
+      lineItems += countFulfillmentItemEntries(row[itemsIndex]);
+    }
+    if (addOnItemsIndex >= 0) {
+      lineItems += countFulfillmentItemEntries(row[addOnItemsIndex]);
+    }
+    if (subtotalIndex >= 0) {
+      subtotalCents += Math.round((Number(row[subtotalIndex] || 0) || 0) * 100);
+    }
+  }
+
+  const summary = [];
+  summary.push(`Supporters to fulfill: ${uniqueSupporters.size}`);
+  summary.push(`Items to fulfill: ${lineItems}`);
+  summary.push(`Total raised: ${formatUsdCents(subtotalCents)}`);
+
+  return summary;
+}
+
+async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges, reportDate = new Date()) {
   const recipients = normalizeCampaignRunnerReportRecipients(campaign);
-  if (!recipients.length || !pledges.length) {
+  const isFulfillmentReport = reportKind === 'Fulfillment report';
+  if ((!recipients.length && !isFulfillmentReport) || !pledges.length) {
     return {
       attempted: false,
       sent: 0,
@@ -7066,13 +7270,112 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
       platformFulfiller: getPlatformCompanyName(env)
     })
     : buildPledgeLedgerReport(pledges, { campaign });
-  const stats = await getCampaignStats(env, campaign.slug);
-  const summary = getCampaignRunnerIncludeStatsSummary(env)
-    ? getCampaignRunnerStatsSummary(campaign, stats, env, reportKind, pledges.length)
-    : [];
   const slugPart = String(campaign?.slug || 'campaign-report').trim() || 'campaign-report';
   const datePart = String(reportDateKey || '').trim() || getMountainDateKey();
-  const csvFilename = `${slugPart}-${reportKind === 'Fulfillment report' ? 'fulfillment-report' : 'pledge-report'}-${datePart}.csv`;
+  const includeStatsSummary = getCampaignRunnerIncludeStatsSummary(env);
+  const includeCsvAttachment = getCampaignRunnerIncludeCsvAttachment(env);
+  const campaignTitle = campaign.title || campaign.slug;
+
+  if (isFulfillmentReport) {
+    const fulfillerIndex = getFulfillmentReportColumnIndex(report, 'fulfiller');
+    const campaignFulfillmentReport = filterFulfillmentReportRows(
+      report,
+      (row) => fulfillerIndex >= 0 && String(row[fulfillerIndex] || '').trim() === campaign.slug
+    );
+    const platformFulfillerLabel = getPlatformCompanyName(env);
+    const platformFulfillmentReport = filterFulfillmentReportRows(
+      report,
+      (row) => fulfillerIndex >= 0 && String(row[fulfillerIndex] || '').trim() === platformFulfillerLabel
+    );
+    const supportEmail = String(getSupportEmail(env) || '').trim().toLowerCase();
+    let sent = 0;
+    let platformSent = 0;
+
+    if (campaignFulfillmentReport.rows.length > 0) {
+      const runnerSummary = includeStatsSummary
+        ? getFulfillmentSummary(campaignFulfillmentReport, {
+          audienceLabel: 'Campaign runner fulfillment',
+          fulfillerLabel: campaign.slug,
+          includeDeadline: true,
+          campaign,
+          now: reportDate
+        })
+        : [];
+      const fulfillmentEncouragement = buildCampaignRunnerEncouragement(campaign, reportKind, pledges, reportDate);
+      const runnerCsvFilename = `${slugPart}-fulfillment-report-${datePart}.csv`;
+
+      for (let index = 0; index < recipients.length; index += 1) {
+        if (sent > 0) {
+          await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+        }
+
+        await sendCampaignRunnerReportEmail(env, {
+          email: recipients[index],
+          campaignSlug: campaign.slug,
+          campaignTitle,
+          reportKind,
+          reportDateLabel,
+          statsSummary: runnerSummary,
+          encouragement: fulfillmentEncouragement,
+          csvFilename: runnerCsvFilename,
+          csvContent: campaignFulfillmentReport.csv,
+          includeCsvAttachment
+        });
+        sent += 1;
+      }
+    }
+
+    if (supportEmail && platformFulfillmentReport.rows.length > 0) {
+      if (sent > 0) {
+        await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+      }
+
+      const platformSummary = includeStatsSummary
+        ? getFulfillmentSummary(platformFulfillmentReport, {
+          audienceLabel: 'Platform fulfillment',
+          fulfillerLabel: platformFulfillerLabel,
+          includeDeadline: true,
+          campaign,
+          now: reportDate
+        })
+        : [];
+      const platformEncouragement = buildCampaignRunnerEncouragement(campaign, 'Platform fulfillment report', pledges, reportDate);
+      const platformCsvFilename = `${slugPart}-platform-fulfillment-report-${datePart}.csv`;
+
+      await sendCampaignRunnerReportEmail(env, {
+        email: supportEmail,
+        campaignSlug: campaign.slug,
+        campaignTitle,
+        reportKind: 'Platform fulfillment report',
+        reportDateLabel,
+        statsSummary: platformSummary,
+        encouragement: platformEncouragement,
+        csvFilename: platformCsvFilename,
+        csvContent: platformFulfillmentReport.csv,
+        includeCsvAttachment
+      });
+      sent += 1;
+      platformSent = 1;
+    }
+
+    return {
+      attempted: campaignFulfillmentReport.rows.length > 0 || platformFulfillmentReport.rows.length > 0,
+      sent,
+      rowCount: campaignFulfillmentReport.rows.length,
+      recipients,
+      platformRecipient: supportEmail || null,
+      platformRowCount: platformFulfillmentReport.rows.length,
+      campaignRowCount: campaignFulfillmentReport.rows.length,
+      platformSent
+    };
+  }
+
+  const stats = await getCampaignStats(env, campaign.slug);
+  const summary = includeStatsSummary
+    ? getCampaignRunnerStatsSummary(campaign, stats, env, reportKind, pledges, reportDate)
+    : [];
+  const encouragement = buildCampaignRunnerEncouragement(campaign, reportKind, pledges, reportDate);
+  const csvFilename = `${slugPart}-pledge-report-${datePart}.csv`;
 
   let sent = 0;
   for (let index = 0; index < recipients.length; index += 1) {
@@ -7083,13 +7386,14 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
     await sendCampaignRunnerReportEmail(env, {
       email: recipients[index],
       campaignSlug: campaign.slug,
-      campaignTitle: campaign.title || campaign.slug,
+      campaignTitle,
       reportKind,
       reportDateLabel,
       statsSummary: summary,
+      encouragement,
       csvFilename,
       csvContent: report.csv,
-      includeCsvAttachment: getCampaignRunnerIncludeCsvAttachment(env)
+      includeCsvAttachment
     });
     sent += 1;
   }
@@ -7116,7 +7420,10 @@ async function processCampaignRunnerReports(env, now = new Date()) {
 
   for (const campaign of campaigns) {
     const recipients = normalizeCampaignRunnerReportRecipients(campaign);
-    if (!recipients.length) {
+    const supportEmail = String(getSupportEmail(env) || '').trim().toLowerCase();
+    const shouldCheckPledgeReport = recipients.length > 0;
+    const shouldCheckFulfillmentReport = Boolean(supportEmail || recipients.length > 0);
+    if (!shouldCheckPledgeReport && !shouldCheckFulfillmentReport) {
       continue;
     }
 
@@ -7126,11 +7433,11 @@ async function processCampaignRunnerReports(env, now = new Date()) {
       const effectiveState = getEffectiveState(campaign);
       const pledges = await getCampaignReportPledges(env, campaign.slug);
 
-      if (effectiveState === 'live' && getCampaignRunnerDailyPledgeReportEnabled(env)) {
+      if (effectiveState === 'live' && shouldCheckPledgeReport && getCampaignRunnerDailyPledgeReportEnabled(env)) {
         const markerKey = `campaign-runner-report:pledge:${campaign.slug}:${reportDateKey}`;
         const alreadySent = await env.PLEDGES.get(markerKey);
         if (!alreadySent) {
-          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Daily pledge report', reportDateKey, reportDateLabel, pledges);
+          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Daily pledge report', reportDateKey, reportDateLabel, pledges, now);
           if (outcome.attempted && outcome.sent > 0) {
             await env.PLEDGES.put(markerKey, JSON.stringify({
               sentAt: new Date().toISOString(),
@@ -7143,11 +7450,11 @@ async function processCampaignRunnerReports(env, now = new Date()) {
         }
       }
 
-      if (effectiveState === 'post' && getCampaignRunnerFulfillmentReportEnabled(env)) {
+      if (effectiveState === 'post' && shouldCheckFulfillmentReport && getCampaignRunnerFulfillmentReportEnabled(env)) {
         const markerKey = `campaign-runner-report:fulfillment:${campaign.slug}`;
         const alreadySent = await env.PLEDGES.get(markerKey);
         if (!alreadySent) {
-          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Fulfillment report', reportDateKey, reportDateLabel, pledges);
+          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Fulfillment report', reportDateKey, reportDateLabel, pledges, now);
           if (outcome.attempted && outcome.sent > 0) {
             await env.PLEDGES.put(markerKey, JSON.stringify({
               sentAt: new Date().toISOString(),
@@ -7195,6 +7502,7 @@ async function handleCampaignRunnerReport(request, env) {
   }
 
   const recipients = normalizeCampaignRunnerReportRecipients(campaign);
+  const supportEmail = String(getSupportEmail(env) || '').trim().toLowerCase();
   const reportDate = new Date();
   const reportDateKey = getMountainDateKey(reportDate);
   const reportDateLabel = formatCampaignRunnerReportDateLabel(reportDate);
@@ -7214,10 +7522,26 @@ async function handleCampaignRunnerReport(request, env) {
       await getCampaignStats(env, campaignSlug),
       env,
       reportKind,
-      pledges.length
+      pledges,
+      reportDate
     )
     : [];
   const csvFilename = `${campaignSlug}-${reportType === 'fulfillment' ? 'fulfillment-report' : 'pledge-report'}-${reportDateKey}.csv`;
+  const fulfillerIndex = reportType === 'fulfillment'
+    ? getFulfillmentReportColumnIndex(report, 'fulfiller')
+    : -1;
+  const campaignRowCount = reportType === 'fulfillment'
+    ? filterFulfillmentReportRows(
+      report,
+      (row) => fulfillerIndex >= 0 && String(row[fulfillerIndex] || '').trim() === campaign.slug
+    ).rows.length
+    : report.rows.length;
+  const platformRowCount = reportType === 'fulfillment'
+    ? filterFulfillmentReportRows(
+      report,
+      (row) => fulfillerIndex >= 0 && String(row[fulfillerIndex] || '').trim() === getPlatformCompanyName(env)
+    ).rows.length
+    : 0;
 
   if (dryRun) {
     return jsonResponse({
@@ -7228,7 +7552,10 @@ async function handleCampaignRunnerReport(request, env) {
       effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown',
       recipientCount: recipients.length,
       recipients,
-      rowCount: report.rows.length,
+      platformRecipient: reportType === 'fulfillment' ? supportEmail || null : null,
+      rowCount: campaignRowCount,
+      campaignRowCount,
+      platformRowCount,
       csvFilename,
       reportDateKey,
       reportDateLabel,
@@ -7241,7 +7568,7 @@ async function handleCampaignRunnerReport(request, env) {
     });
   }
 
-  const outcome = await maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges);
+  const outcome = await maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges, reportDate);
 
   if (markAsSent && outcome.attempted && outcome.sent > 0 && env.PLEDGES) {
     await env.PLEDGES.put(markerKey, JSON.stringify({
@@ -7260,7 +7587,10 @@ async function handleCampaignRunnerReport(request, env) {
     effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown',
     recipientCount: recipients.length,
     recipients,
-    rowCount: report.rows.length,
+    platformRecipient: reportType === 'fulfillment' ? supportEmail || null : null,
+    rowCount: outcome.campaignRowCount ?? campaignRowCount,
+    campaignRowCount: outcome.campaignRowCount ?? campaignRowCount,
+    platformRowCount: outcome.platformRowCount ?? platformRowCount,
     csvFilename,
     reportDateKey,
     reportDateLabel,

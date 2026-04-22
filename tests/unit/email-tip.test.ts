@@ -68,6 +68,94 @@ describe('supporter email tip breakdowns', () => {
     expect(payload.text).toContain('Total (if funded): $42.86');
   });
 
+  it('uses a consistent subject format across transactional pledge emails', async () => {
+    let fetchMock = mockResend();
+
+    await sendSupporterEmail(env, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      subtotal: 3500,
+      tax: 276,
+      shipping: 300,
+      tipAmount: 210,
+      tipPercent: 6,
+      token: 'magic-token'
+    });
+
+    expect(getEmailPayload(fetchMock).subject).toBe('Pledge confirmed | sunder');
+
+    fetchMock = mockResend();
+
+    await sendPledgeModifiedEmail(env, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      previousSubtotal: 3500,
+      previousTax: 276,
+      previousShipping: 300,
+      previousTipAmount: 175,
+      newSubtotal: 3500,
+      tax: 276,
+      shipping: 300,
+      tipAmount: 210,
+      tipPercent: 6,
+      token: 'magic-token'
+    });
+
+    expect(getEmailPayload(fetchMock).subject).toBe('Pledge updated | sunder');
+
+    fetchMock = mockResend();
+
+    await sendPaymentFailedEmail(env, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      subtotal: 3500,
+      tax: 276,
+      shipping: 300,
+      tipAmount: 210,
+      tipPercent: 6,
+      amount: 4286,
+      token: 'magic-token'
+    });
+
+    expect(getEmailPayload(fetchMock).subject).toBe('Update payment method | sunder');
+
+    fetchMock = mockResend();
+
+    await sendChargeSuccessEmail(env, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      subtotal: 3500,
+      tax: 276,
+      shipping: 300,
+      tipAmount: 210,
+      tipPercent: 6,
+      amount: 4286,
+      token: 'magic-token'
+    });
+
+    expect(getEmailPayload(fetchMock).subject).toBe('Payment confirmed | sunder');
+
+    fetchMock = mockResend();
+
+    await sendPledgeCancelledEmail(env, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      subtotal: 3500,
+      tax: 276,
+      shipping: 300,
+      tipAmount: 210,
+      tipPercent: 6,
+      amount: 4286
+    });
+
+    expect(getEmailPayload(fetchMock).subject).toBe('Pledge cancelled | sunder');
+  });
+
   it('includes the platform tip line in pledge modified emails', async () => {
     const fetchMock = mockResend();
 
@@ -201,7 +289,7 @@ describe('supporter email tip breakdowns', () => {
           en: { email: {} },
           es: {
             email: {
-              subjects: { pledge_confirmed: 'Tu aporte a %{campaign}' },
+              subjects: { pledge_confirmed: 'Aporte confirmado' },
               supporter: { thanks_heading: '¡Gracias por apoyar %{campaign}!' },
               common: {
                 total_if_funded: 'Total (si se financia)',
@@ -226,7 +314,7 @@ describe('supporter email tip breakdowns', () => {
     );
 
     const payload = getEmailPayload(fetchMock);
-    expect(payload.subject).toBe('Tu aporte a sunder');
+    expect(payload.subject).toBe('Aporte confirmado | sunder');
     expect(payload.html).toContain('¡Gracias por apoyar sunder!');
     expect(payload.html).toContain('Gestiona tu aporte');
     expect(payload.html).toContain('Total (si se financia): $42.86');

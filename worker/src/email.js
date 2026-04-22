@@ -51,6 +51,63 @@ function formatEmailText(value) {
   return escapeHtml(value).replace(/\r?\n/g, '<br>');
 }
 
+function renderInlineEmphasis(value) {
+  return escapeHtml(value)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+}
+
+function buildEmailSubject(primary, secondary, prefix = '') {
+  const normalizedPrefix = String(prefix || '').trim();
+  const normalizedPrimary = String(primary || '').trim();
+  const normalizedSecondary = String(secondary || '').trim();
+  const core = [normalizedPrimary, normalizedSecondary].filter(Boolean).join(' | ');
+  return [normalizedPrefix, core].filter(Boolean).join(' ').trim();
+}
+
+function renderSummaryLine(value) {
+  const text = String(value ?? '');
+  const escaped = escapeHtml(text);
+
+  if (text.startsWith('Total pledges: ')) {
+    return escaped.replace(/^(Total pledges:\s+)(\d+)$/, '$1<strong>$2</strong>');
+  }
+
+  if (text.startsWith('New pledges in the previous 24 hours: ')) {
+    return escaped.replace(/^(New pledges in the previous 24 hours:\s+)(\d+)$/, '$1<strong>$2</strong>');
+  }
+
+  if (text.startsWith('Pledged total: ')) {
+    return escaped.replace(/^(Pledged total:\s+)(\$[\d,]+(?:\.\d{2})?)$/, '$1<strong>$2</strong>');
+  }
+
+  if (text.startsWith('Total raised: ')) {
+    return escaped.replace(/^(Total raised:\s+)(\$[\d,]+(?:\.\d{2})?)$/, '$1<strong>$2</strong>');
+  }
+
+  if (text.startsWith('Supporters to fulfill: ')) {
+    return escaped.replace(/^(Supporters to fulfill:\s+)(\d+)$/, '$1<strong>$2</strong>');
+  }
+
+  if (text.startsWith('Items to fulfill: ')) {
+    return escaped.replace(/^(Items to fulfill:\s+)(\d+)$/, '$1<strong>$2</strong>');
+  }
+
+  if (text.startsWith('Goal progress: ')) {
+    return escaped.replace(/(\([^)]+\))$/, '<strong>$1</strong>');
+  }
+
+  if (text.startsWith('Deadline passed ')) {
+    return escaped.replace(/^(Deadline passed\s+)(.+)$/, '$1<strong>$2</strong>');
+  }
+
+  if (text.endsWith(' left until deadline')) {
+    return escaped.replace(/^(.+?)(\s+left until deadline)$/, '<strong>$1</strong>$2');
+  }
+
+  return escaped;
+}
+
 function decodeHtmlEntities(value) {
   return String(value ?? '')
     .replace(/&nbsp;/gi, ' ')
@@ -579,7 +636,10 @@ export async function sendSupporterEmail(env, { email, campaignSlug, campaignTit
   return sendResendEmail(env, {
     from: getPledgesEmailFrom(env),
     to: email,
-    subject: t('subjects.pledge_confirmed', 'Your pledge to %{campaign}', { campaign: campaignTitle }),
+    subject: buildEmailSubject(
+      t('subjects.pledge_confirmed', 'Pledge confirmed', { campaign: campaignTitle }),
+      campaignTitle
+    ),
     html
   });
 }
@@ -662,7 +722,10 @@ export async function sendPledgeModifiedEmail(env, { email, campaignSlug, campai
   return sendResendEmail(env, {
     from: getPledgesEmailFrom(env),
     to: email,
-    subject: t('subjects.pledge_updated', 'Pledge updated for %{campaign}', { campaign: campaignTitle }),
+    subject: buildEmailSubject(
+      t('subjects.pledge_updated', 'Pledge updated', { campaign: campaignTitle }),
+      campaignTitle
+    ),
     html
   });
 }
@@ -723,7 +786,10 @@ export async function sendPaymentFailedEmail(env, { email, campaignSlug, campaig
   return sendResendEmail(env, {
     from: getPledgesEmailFrom(env),
     to: email,
-    subject: t('subjects.payment_failed', 'Action needed: Update payment for %{campaign}', { campaign: campaignTitle }),
+    subject: buildEmailSubject(
+      t('subjects.payment_failed', 'Update payment method', { campaign: campaignTitle }),
+      campaignTitle
+    ),
     html
   });
 }
@@ -794,7 +860,10 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
   return sendResendEmail(env, {
     from: getPledgesEmailFrom(env),
     to: email,
-    subject: t('subjects.charge_success', 'Payment confirmed for %{campaign}', { campaign: campaignTitle }),
+    subject: buildEmailSubject(
+      t('subjects.charge_success', 'Payment confirmed', { campaign: campaignTitle }),
+      campaignTitle
+    ),
     html
   });
 }
@@ -863,7 +932,10 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
   return sendResendEmail(env, {
     from: getUpdatesEmailFrom(env),
     to: email,
-    subject: t('subjects.diary_update', '📝 %{title} — %{campaign}', { title: diaryTitle, campaign: campaignTitle }),
+    subject: buildEmailSubject(
+      t('subjects.diary_update', '%{title}', { title: diaryTitle, campaign: campaignTitle }),
+      campaignTitle
+    ),
     html
   }, {
     errorLabel: 'Resend error (diary)',
@@ -926,7 +998,10 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
   return sendResendEmail(env, {
     from: getPledgesEmailFrom(env),
     to: email,
-    subject: t('subjects.pledge_cancelled', 'Pledge cancelled for %{campaign}', { campaign: campaignTitle }),
+    subject: buildEmailSubject(
+      t('subjects.pledge_cancelled', 'Pledge cancelled', { campaign: campaignTitle }),
+      campaignTitle
+    ),
     html
   }, {
     errorLabel: 'Resend error (cancelled)',
@@ -949,21 +1024,25 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
   const milestoneConfig = {
     'one-third': {
       emoji: '🚀',
+      subjectLabel: t('milestone.one_third_subject', '33% funded'),
       heading: t('milestone.one_third_heading', "We're 1/3 of the way there!"),
       message: t('milestone.one_third_message', '%{campaign} has reached 33% of its funding goal. Thanks for being part of this journey!', { campaign: campaignTitle })
     },
     'two-thirds': {
       emoji: '🔥',
+      subjectLabel: t('milestone.two_thirds_subject', '66% funded'),
       heading: t('milestone.two_thirds_heading', "We're 2/3 funded!"),
       message: t('milestone.two_thirds_message', '%{campaign} is at 66% of its goal. The finish line is in sight!', { campaign: campaignTitle })
     },
     'goal': {
       emoji: '🎉',
+      subjectLabel: t('milestone.goal_subject', 'Goal reached'),
       heading: t('milestone.goal_heading', 'Goal Reached!'),
       message: t('milestone.goal_message', '%{campaign} has hit its funding goal! This project is happening. Your pledge will be charged soon.', { campaign: campaignTitle })
     },
     'stretch': {
       emoji: '⭐',
+      subjectLabel: t('milestone.stretch_subject', 'Stretch goal unlocked'),
       heading: t('milestone.stretch_heading', 'Stretch Goal Unlocked: %{stretch}', { stretch: stretchGoalName || t('milestone.default_stretch_name', 'New Reward') }),
       message: t('milestone.stretch_message', '%{campaign} keeps growing! A new stretch goal has been unlocked.', { campaign: campaignTitle })
     }
@@ -1008,7 +1087,15 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
   return sendResendEmail(env, {
     from: getUpdatesEmailFrom(env),
     to: email,
-    subject: t('subjects.milestone', '%{emoji} %{heading} — %{campaign}', { emoji: config.emoji, heading: config.heading, campaign: campaignTitle }),
+    subject: buildEmailSubject(
+      t('subjects.milestone', '%{milestone_label}', {
+        emoji: config.emoji,
+        heading: config.heading,
+        milestone_label: config.subjectLabel,
+        campaign: campaignTitle
+      }),
+      campaignTitle
+    ),
     html
   }, {
     errorLabel: 'Resend error (milestone)',
@@ -1081,7 +1168,10 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
   return sendResendEmail(env, {
     from: getUpdatesEmailFrom(env),
     to: email,
-    subject: t('subjects.announcement', '📢 %{subject} — %{campaign}', { subject, campaign: campaignTitle }),
+    subject: buildEmailSubject(
+      t('subjects.announcement', '%{subject}', { subject, campaign: campaignTitle }),
+      campaignTitle
+    ),
     html
   }, {
     errorLabel: 'Resend error (announcement)',
@@ -1098,6 +1188,7 @@ export async function sendCampaignRunnerReportEmail(
     reportKind,
     reportDateLabel,
     statsSummary = [],
+    encouragement = null,
     csvFilename,
     csvContent,
     includeCsvAttachment = true
@@ -1108,8 +1199,7 @@ export async function sendCampaignRunnerReportEmail(
   const theme = getEmailTheme(env);
   const normalizedReportKind = String(reportKind || 'campaign report').trim();
   const subjectPrefix = String(getCampaignRunnerEmailSubjectPrefix(env) || '').trim();
-  const subjectBase = `${normalizedReportKind} for ${campaignTitle}`;
-  const subject = subjectPrefix ? `${subjectPrefix} ${subjectBase}` : subjectBase;
+  const subject = buildEmailSubject(normalizedReportKind, campaignTitle, subjectPrefix);
   const statsRows = Array.isArray(statsSummary)
     ? statsSummary.filter((line) => String(line || '').trim())
     : [];
@@ -1118,8 +1208,23 @@ export async function sendCampaignRunnerReportEmail(
   <div style="${getEmailCardStyle(theme)}">
     <h2 style="margin: 0 0 12px 0; font-size: 18px; font-family: ${theme.headingFontFamily};">Summary</h2>
     <ul style="margin: 0; padding-left: 18px;">
-      ${statsRows.map((line) => `<li style="margin: 0 0 8px 0;">${escapeHtml(line)}</li>`).join('')}
+      ${statsRows.map((line) => `<li style="margin: 0 0 8px 0;">${renderSummaryLine(line)}</li>`).join('')}
     </ul>
+  </div>`
+    : '';
+  const encouragementTitle = String(encouragement?.title || '').trim();
+  const encouragementIntro = String(encouragement?.intro || '').trim();
+  const encouragementTips = Array.isArray(encouragement?.tips)
+    ? encouragement.tips.filter((tip) => String(tip || '').trim())
+    : [];
+  const encouragementClosing = String(encouragement?.closing || '').trim();
+  const encouragementMarkup = encouragementTitle || encouragementIntro || encouragementTips.length || encouragementClosing
+    ? `
+  <div style="${getEmailCardStyle(theme)}">
+    ${encouragementTitle ? `<h2 style="margin: 0 0 12px 0; font-size: 18px; font-family: ${theme.headingFontFamily};">${escapeHtml(encouragementTitle)}</h2>` : ''}
+    ${encouragementIntro ? `<p style="margin: 0 0 12px 0;">${renderInlineEmphasis(encouragementIntro)}</p>` : ''}
+    ${encouragementTips.length ? `<ul style="margin: 0 0 12px 0; padding-left: 18px;">${encouragementTips.map((tip) => `<li style="margin: 0 0 8px 0;">${renderInlineEmphasis(tip)}</li>`).join('')}</ul>` : ''}
+    ${encouragementClosing ? `<p style="margin: 0;">${renderInlineEmphasis(encouragementClosing)}</p>` : ''}
   </div>`
     : '';
   const attachmentNote = includeCsvAttachment && csvFilename
@@ -1128,18 +1233,12 @@ export async function sendCampaignRunnerReportEmail(
 
   const html = `
   <div style="${getEmailBodyStyle(theme)}">
-    ${renderEmailHeader(theme, escapeHtml(`${campaignTitle} report`), { emoji: '📊' })}
-
-    <div style="${getEmailCardStyle(theme)}">
-      <p style="margin: 0 0 12px 0;">Campaign: <strong>${escapeHtml(campaignTitle)}</strong></p>
-      <p style="margin: 0 0 12px 0;">Report type: <strong>${escapeHtml(normalizedReportKind)}</strong></p>
-      <p style="margin: 0;">Report date: <strong>${escapeHtml(reportDateLabel)}</strong></p>
-    </div>
+    ${renderEmailHeader(theme, escapeHtml(`${campaignTitle} ${normalizedReportKind.toLowerCase()}`))}
 
     ${statsMarkup}
+    ${encouragementMarkup}
 
     <div style="${getEmailCardStyle(theme)}">
-      <p style="margin: 0 0 12px 0;">This report is for <code>${escapeHtml(campaignSlug)}</code> only.</p>
       ${attachmentNote}
     </div>
 

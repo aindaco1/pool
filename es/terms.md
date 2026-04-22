@@ -29,10 +29,12 @@ description: Revisa los términos de aporte, el procesamiento de pagos, el cumpl
 - Las propinas opcionales ayudan al mantenimiento de The Pool y se incluyen en el total de tu aporte, pero **no cuentan para la meta de financiación de la campaña**.
 - Esta implementación también puede ofrecer **complementos opcionales de la plataforma** junto con un aporte. Los complementos de la plataforma ayudan al mantenimiento de The Pool, se incluyen en el total de tu aporte y **no cuentan para la meta de financiación de la campaña**.
 - Una campaña también puede ofrecer **complementos opcionales de campaña** junto con sus niveles. Los complementos de campaña se incluyen en el total de tu aporte, **sí cuentan para la meta de financiación de esa campaña** y permanecen asociados a esa campaña para informes y cumplimiento.
-- El impuesto sobre las ventas se aplica a los aportes usando la tasa configurada para esta implementación.
+- El impuesto sobre las ventas se aplica según las reglas fiscales configuradas para esta implementación. Dependiendo de la implementación, eso puede significar una tasa fija configurada o un cálculo fiscal según la ubicación basado en la dirección de facturación o envío que proporciones durante el pago o más tarde al modificar el aporte.
 - Los aportes con productos físicos, los complementos físicos de campaña o los complementos físicos de la plataforma pueden incluir cargos de envío configurados para esta implementación. Según la configuración de esta implementación y de la campaña, el envío puede cotizarse desde USPS, usar una tarifa de respaldo configurada, incluir anulaciones de envío gratis u ofrecer opciones limitadas de mejora con firma para envíos nacionales. Los complementos de campaña siguen las reglas de envío de su campaña; los complementos físicos de la plataforma pueden cobrarse como un envío de plataforma separado. Tu dirección de envío se recoge durante el pago para poder completar esas recompensas.
+- En algunos carritos solo digitales o mixtos, The Pool también puede pedir suficiente información de ubicación de facturación para calcular el impuesto antes de finalizar el total del aporte. Si todavía no hay un resultado fiscal preciso, el carrito puede mostrar el impuesto como una estimación hasta que el pago tenga suficiente detalle de destino.
 - Si hay una opción de entrega disponible para tu envío y la cambias en el pago o en Gestionar aporte, el total de envío guardado y el total del aporte se recalculan a partir del estado guardado del aporte antes de persistir el cambio.
 - Si modificas un aporte, The Pool recalcula los totales a partir del estado guardado del aporte y de las definiciones de campaña o complemento vigentes en esa implementación, en lugar de confiar en importes enviados por el navegador.
+- Los correos transaccionales y los enlaces de acceso para patrocinadores pueden reflejar la marca configurada para esta implementación y su estructura de rutas localizadas, pero cada enlace de gestión enviado por correo sigue autorizando solo el aporte vinculado a ese pedido específico.
 
 ## Control creativo y envíos
 
@@ -62,6 +64,8 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Solo recopilamos la información necesaria para procesar aportes y completar recompensas: correo electrónico, nombre, detalles del aporte o pedido y, para recompensas físicas, complementos físicos de campaña o complementos físicos de la plataforma, una dirección de envío.
 - Los datos completos de tarjeta son gestionados y almacenados por Stripe. The Pool no almacena números completos de tarjeta ni valores CVC.
 - Las direcciones de correo electrónico y cualquier dato de envío necesario para el cumplimiento pueden almacenarse en nuestro sistema para la gestión del aporte, confirmaciones específicas de campaña, actualizaciones de campaña y cumplimiento de recompensas.
+- Las personas organizadoras de campañas pueden recibir informes por campaña o exportaciones de cumplimiento con los datos de apoyo y pedido necesarios para operar esa campaña concreta, coordinar la entrega o enviar actualizaciones relacionadas con la producción. Esos informes se limitan a la campaña que apoyaste y no exponen aportes de campañas no relacionadas.
+- Cuando un aporte incluye complementos cumplidos por la plataforma, las operadoras de la plataforma pueden recibir por separado exportaciones de cumplimiento limitadas únicamente a los artículos que deben entregar.
 - Los complementos de la plataforma con inventario limitado usan el estado de los aportes guardados, no los borradores en curso del carrito, para determinar el stock restante.
 - Los complementos de campaña con inventario limitado también usan el estado de los aportes guardados, no los borradores en curso del carrito, para determinar el stock restante.
 - El acceso a la comunidad de patrocinadores en el navegador puede recordarse durante la sesión actual como una comodidad, pero el enlace mágico enviado por correo sigue siendo la fuente de verdad para el acceso.
@@ -69,7 +73,7 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 
 ## Plataforma y tecnología
 
-The Pool es una [plataforma de crowdfunding de código abierto](https://github.com/aindaco1/pool) construida con:
+The Pool es una [plataforma de crowdfunding de código abierto](https://github.com/aindaco1/pool) creada con:
 
 - **Jekyll en [GitHub Pages](https://docs.github.com/en/pages)**: generación de sitio estático
 - **El runtime de carrito de The Pool**: gestión propia del carrito, sidecars de pago y revisión del aporte
@@ -85,4 +89,4 @@ Si tienes preguntas sobre estos términos o sobre tu aporte, escribe a info@dust
 
 ---
 
-_Última actualización: abril de 2026_
+_Última actualización: 21 de abril de 2026_

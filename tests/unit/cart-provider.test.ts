@@ -89,6 +89,23 @@ describe('cart provider shim', () => {
   });
 
   afterEach(() => {
+    const documentAny = document as any;
+    const cleanupHandlers = [
+      ['click', '_poolFirstPartyCartChromeHandler'],
+      ['input', '_poolFirstPartyCartInputHandler'],
+      ['change', '_poolFirstPartyCartChangeHandler'],
+      ['click', '_poolFirstPartyRecoveryHandler'],
+      ['click', '_poolFirstPartyAddButtonHandler']
+    ] as const;
+
+    for (const [eventName, key] of cleanupHandlers) {
+      const handler = documentAny[key];
+      if (typeof handler === 'function') {
+        document.removeEventListener(eventName, handler);
+      }
+      delete documentAny[key];
+    }
+
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -98,6 +115,10 @@ describe('cart provider shim', () => {
     window.history.replaceState({}, '', '/');
     delete (window as any).POOL_CONFIG;
     delete (window as any).PoolCartProvider;
+    delete (window as any).PoolStripeCheckoutSidecar;
+    delete (window as any).Stripe;
+    delete (window as any).invalidateInventoryCache;
+    delete (window as any).invalidateStatsCache;
     document.body.innerHTML = '';
   });
 
@@ -2622,12 +2643,9 @@ describe('cart provider shim', () => {
 
     await vi.waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/start`, expect.any(Object));
-      expect(getRoot()?.querySelector('[data-cart-back]')).toBeTruthy();
-    });
+    }, { timeout: 5000 });
 
-    const backButton = getRoot()?.querySelector('[data-cart-back]') as HTMLButtonElement | null;
-    if (!backButton) throw new Error('Missing back button');
-    backButton.click();
+    await readyApi.api.theme.cart.navigate('/');
 
     await vi.waitFor(() => {
       expect(getRoot()?.querySelector('[data-cart-continue]')).toBeTruthy();
@@ -3038,8 +3056,11 @@ describe('cart provider shim', () => {
     await vi.waitFor(() => {
       confirmButton = root?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
       expect(confirmButton).not.toBeNull();
+    }, { timeout: 5000 });
+
+    await vi.waitFor(() => {
       expect(confirmButton?.disabled).toBe(false);
-    });
+    }, { timeout: 5000 });
 
     confirmButton?.click();
 

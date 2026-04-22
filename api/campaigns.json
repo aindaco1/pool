@@ -30,6 +30,7 @@ layout: null
       "charged": {{ campaign.charged | default: false }},
       "single_tier_only": {{ campaign.single_tier_only | default: false }},
       "custom_late_support": {{ campaign.custom_late_support | default: false }},
+      "runner_report_emails": {{ campaign.runner_report_emails | default: empty | jsonify }},
       "shipping_fallback_flat_rate": {% if campaign.shipping_fallback_flat_rate != nil %}{{ campaign.shipping_fallback_flat_rate }}{% else %}null{% endif %},
       "free_shipping": {% if campaign.free_shipping != nil %}{{ campaign.free_shipping | jsonify }}{% else %}null{% endif %},
       "shipping_options": {{ campaign.shipping_options | default: empty | jsonify }},

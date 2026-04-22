@@ -11,7 +11,7 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
-El hito de lanzamiento actual de la plataforma es **v0.9.1**. Dust Wave reserva **v1.0** para el lanzamiento público más amplio una vez que se completen los elementos restantes de la hoja de ruta.
+El hito de lanzamiento actual de la plataforma es **v0.9.4**. Dust Wave reserva **v1.0** para el lanzamiento público más amplio una vez que se completen los elementos restantes de la hoja de ruta.
 
 ## Aportes de todo o nada
 
@@ -44,7 +44,7 @@ Para el acceso a la comunidad de patrocinadores, The Pool mantiene la sesión ve
 ## Entonces, ¿cómo funciona exactamente?
 
 1. **Explora**: encuentra un proyecto que quieras apoyar
-2. **Aporta**: añade una o más campañas a tu carrito, añade opcionalmente una propina del 0% al 15% para el mantenimiento de la plataforma y continúa al paso de pago seguro de The Pool con Stripe. Las recompensas físicas pueden añadir envío calculado por el Worker durante el pago, incluidas cotizaciones respaldadas por USPS, tarifas de respaldo configuradas u opciones de envío gratis cuando una implementación las habilita. Algunas implementaciones también pueden mostrar un selector limitado de opción de entrega para mejoras nacionales con firma.
+2. **Aporta**: añade una o más campañas a tu carrito, añade opcionalmente una propina del 0% al 15% para el mantenimiento de la plataforma y continúa al paso de pago seguro de The Pool con Stripe. Las recompensas físicas pueden añadir envío calculado por el sistema durante el pago, incluidas cotizaciones respaldadas por USPS, tarifas de respaldo configuradas u opciones de envío gratis cuando una implementación las habilita. Algunas implementaciones también pueden mostrar un selector limitado de opción de entrega para mejoras nacionales con firma.
    También puedes ver complementos opcionales de la plataforma. Esos complementos apoyan directamente a Dust Wave, no cuentan para la meta de financiación de una campaña y pueden ser digitales o físicos. Cuando su inventario es limitado, el stock refleja los aportes guardados, no los carritos en curso.
    Algunas campañas también pueden ofrecer complementos de campaña. Esos complementos usan la misma interfaz de tarjetas de complementos, pero sí cuentan para el total de financiación de esa campaña y siguen las reglas de envío de esa campaña.
 3. **Guarda la tarjeta**: Stripe guarda de forma segura tu método de pago dentro de ese flujo (todavía no se realiza ningún cobro)
@@ -55,13 +55,14 @@ Los múltiples aportes desde el mismo correo se combinan en un único cobro cuan
 
 ## Para creadores
 
-The Pool está diseñado para cineastas y otros creativos, con funciones como:
+La plataforma está diseñada para cineastas y otras personas creativas, con funciones como:
 
 - **0% de comisión de plataforma para organizadores**: los patrocinadores pueden añadir opcionalmente una propina del 0% al 15% para ayudar a sostener la plataforma sin reducir los fondos de la campaña
 - **Pago de primera parte**: The Pool controla el carrito, los sidecars de pago y el flujo de revisión del aporte, mientras Stripe gestiona de forma segura los datos del pago
 - **Niveles físicos y digitales**: ofrece recompensas tangibles con captura de dirección de envío durante el pago, soporte para cotizaciones respaldadas por USPS, controles de política de envío de respaldo o gratuito, mejoras limitadas de opción de entrega e impuesto sobre ventas configurable
 - **Complementos opcionales de la plataforma**: ofrece un pequeño catálogo global de merch junto con los aportes de campaña, con inventario por variante, avisos de poco stock basados en aportes guardados y soporte de envío para complementos físicos
 - **Complementos opcionales de campaña**: permite que una campaña ofrezca merch propio mediante la misma interfaz de complementos en carrito y Gestionar aporte, mientras ese merch sigue contando para el subtotal de la campaña y usa sus reglas de envío
+- **Informes para responsables de campaña**: envía libros diarios de aportes por campaña mientras la campaña está activa y exportaciones de cumplimiento después de la fecha límite, separando también los artículos cumplidos por la plataforma cuando haga falta, para que quienes organizan puedan seguir el apoyo y la entrega sin depender de paneles con cuenta
 - **Widgets de campaña en vivo para incrustar**: ofrece a quienes organizan campañas un generador alojado que produce código `iframe` para copiar y pegar y así compartir el progreso en vivo en otros sitios
 - **Fases de producción**: divide tu presupuesto en fases que los patrocinadores puedan financiar directamente
 - **Metas ampliadas**: desbloquea posibilidades creativas adicionales a medida que crece la financiación
@@ -75,7 +76,7 @@ The Pool está diseñado para cineastas y otros creativos, con funciones como:
 
 ## La tecnología
 
-The Pool funciona sobre una arquitectura estática moderna:
+The Pool se apoya en una arquitectura estática moderna:
 
 | Capa | Plataforma | Función |
 |-------|----------|------|
@@ -89,16 +90,18 @@ La plataforma está construida sobre servicios que ofrecen niveles gratuitos, y 
 
 Para los forks, eso significa que las páginas estáticas permanecen en GitHub Pages, las lecturas públicas en vivo se combinan de forma agresiva y se cachean en el navegador, y la mayor parte del uso de Cloudflare Workers se reserva para las partes del ciclo de vida del aporte que son sensibles desde el punto de vista de la seguridad, mientras que la configuración de impuestos, envío, SEO y logging se mantiene reflejada o acotada mediante la configuración para que la interfaz local, el pago, los informes y los correos se mantengan alineados.
 
+Los forks también pueden adaptar mediante configuración el sitio público, el estilo del pago en el propio sitio y los correos para patrocinadores sin cambiar la mecánica subyacente del aporte. El objetivo es permitir que creadoras, creadores o estudios ajusten la presentación manteniendo constante el modelo de financiación de todo o nada y el flujo de acceso para patrocinadores.
+
 Esa arquitectura también deja margen para endurecer la accesibilidad sin sacrificar el modelo de seguridad de la plataforma: los flujos de carrito, pago y gestión usan semántica reforzada para diálogos, foco, teclado y regiones en vivo, mientras Stripe sigue siendo el dueño de los campos sensibles de pago dentro de su interfaz segura.
 
 La parte pública también está pensada para ser rastreable sin exponer el acceso exclusivo para patrocinadores: las páginas públicas y las páginas de campaña emiten metadatos coherentes y datos estructurados conservadores, mientras que las páginas privadas con enlaces mágicos, como Gestionar aporte y los flujos de comunidad para patrocinadores, quedan fuera de la indexación de búsqueda.
 
 ## Código abierto
 
-The Pool es de código abierto. Toda la plataforma, frontend, Worker y automatización, está disponible en GitHub.
+The Pool es de código abierto. Toda la plataforma, el frontend, el Worker, la automatización y la superficie de personalización para forks están disponibles en GitHub.
 
 **Código fuente:** [github.com/aindaco1/pool](https://github.com/aindaco1/pool)
 
 ---
 
-*The Pool es creado y mantenido por [Dust Wave](https://dustwave.xyz).*
+*The Pool ha sido creado y es mantenido por [Dust Wave](https://dustwave.xyz).*

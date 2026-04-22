@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v0.9.3**. The Pool will treat **v1.0** as the wider public launch milestone once the remaining roadmap items are complete.
+Current release milestone: **v0.9.4**. The Pool will treat **v1.0** as the wider public launch milestone once the remaining roadmap items are complete.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -37,6 +37,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Ongoing funding** — Post-campaign support section
 - **Manage Pledge dashboard** — Desktop-friendly Active / Closed sections with locked-state read-only controls after deadline
 - **Tip-aware emails + reports** — Supporter emails, pledge reports, and fulfillment exports all include the platform tip when present
+- **Campaign-runner reports** — Configurable campaign-scoped daily pledge-ledger emails and post-deadline fulfillment exports can go to each campaign’s configured runner recipients, while platform-fulfilled rows can route separately to `support_email`, with concise deliverability-first subjects, campaign-specific guidance notes, and a dry-run/manual-send admin path for operations
 - **Projection drift diagnostics** — Read-only admin checks and a local CLI can compare stored stats, inventory, and campaign indexes against saved pledge truth before any repair path mutates data
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
 - **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, safe-area-aware drawers, larger tap targets, and overflow fixes instead of a separate mobile-only UI
@@ -116,6 +117,7 @@ Fork-facing settings now use a structured config model in [`_config.yml`](_confi
 - `tax` for choosing the Worker tax engine and its non-secret lookup settings
 - `shipping` for origin settings, USPS quote behavior, fallback policy, free-shipping defaults, shipping presets, and limited shipping-option policy
 - `add_ons` for a small global merch catalog, fixed-price products, and simple variants like shirt sizes
+- `reports` for campaign-runner report timing, attachments, summaries, subject-prefix behavior, and the split fulfillment-email workflow alongside `platform.support_email`
 - campaign front matter `campaign_add_ons` for campaign-scoped merch that should use the same card UI but count toward that campaign’s subtotal and shipping rules
 - `i18n` for default/supported languages, language labels, and localized public-page routes
 - `design` for curated typography, radius, layout-width, and theme-token overrides
@@ -222,6 +224,7 @@ npm run test:secrets   # Secret exposure audit against local env files, tracked 
 npm run test:unit      # Unit tests (Vitest)
 npm run test:e2e       # E2E tests (Playwright) — fully automated browser coverage
 npm run test:e2e:headless # CI-style automated browser suite
+npm run test:e2e:headless:podman -- tests/e2e/accessibility-public-pages.spec.ts --project=chromium # Podman-backed public accessibility slice
 npm run test:security  # Security tests — pen testing the Worker API
 npm run test:security:podman # Security tests with a Podman-backed local stack in one invocation
 npm test               # Run unit + e2e

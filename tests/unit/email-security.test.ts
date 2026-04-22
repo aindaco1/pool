@@ -274,7 +274,19 @@ describe('email HTML security', () => {
         campaignTitle: 'sunder',
         reportKind: 'Daily pledge report',
         reportDateLabel: 'April 21, 2026 7:00 AM MT',
-        statsSummary: ['Pledged total: $42.86'],
+        statsSummary: [
+          'Total pledges: 8',
+          'New pledges in the previous 24 hours: 0',
+          'Pledged total: $1,203.00',
+          'Goal progress: $25,000.00 goal (4.8% funded)',
+          'Deadline passed 79 days, 15 hours ago'
+        ],
+        encouragement: {
+          title: 'Momentum note',
+          intro: 'Most campaigns naturally spike at launch and close.',
+          tips: ['Make updates worth clicking.'],
+          closing: 'Fresh stories keep people listening.'
+        },
         csvFilename: 'sunder-pledge-report-2026-04-21.csv',
         csvContent: 'email,campaign\nrunner@example.com,sunder',
         includeCsvAttachment: true
@@ -282,14 +294,106 @@ describe('email HTML security', () => {
     );
 
     const payload = getEmailPayload(fetchMock);
-    expect(payload.subject).toBe('[Fork Pool] Daily pledge report for sunder');
+    expect(payload.subject).toBe('[Fork Pool] Daily pledge report | sunder');
     expect(payload.attachments).toEqual([
       expect.objectContaining({
         filename: 'sunder-pledge-report-2026-04-21.csv',
         content: Buffer.from('email,campaign\nrunner@example.com,sunder', 'utf8').toString('base64')
       })
     ]);
+    expect(payload.html).toContain('sunder daily pledge report');
+    expect(payload.html).toContain('Total pledges: <strong>8</strong>');
+    expect(payload.html).toContain('New pledges in the previous 24 hours: <strong>0</strong>');
+    expect(payload.html).toContain('Pledged total: <strong>$1,203.00</strong>');
+    expect(payload.html).toContain('Goal progress: $25,000.00 goal <strong>(4.8% funded)</strong>');
+    expect(payload.html).toContain('Deadline passed <strong>79 days, 15 hours ago</strong>');
+    expect(payload.html).toContain('Momentum note');
+    expect(payload.html).toContain('Most campaigns naturally spike at launch and close.');
+    expect(payload.html).toContain('Make updates worth clicking.');
+    expect(payload.html).not.toContain('Campaign: <strong>sunder</strong>');
+    expect(payload.html).not.toContain('Report type:');
+    expect(payload.html).not.toContain('This report is for');
+    expect(payload.html).not.toContain('📊');
     expect(payload.from).toBe('The Pool <updates@pool.test>');
     expect(payload.reply_to).toBe('info@pool.test');
+  });
+
+  it('uses a consistent subject format across supporter update emails', async () => {
+    let fetchMock = mockResend();
+
+    await sendDiaryUpdateEmail(env, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      diaryTitle: 'Production is underway',
+      diaryExcerpt: 'A quick note',
+      token: 'magic-token'
+    });
+
+    expect(getEmailPayload(fetchMock).subject).toBe('Production is underway | sunder');
+
+    fetchMock = mockResend();
+
+    await sendMilestoneEmail(env, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      milestone: 'goal',
+      pledgedAmount: 250000,
+      goalAmount: 250000,
+      token: 'magic-token'
+    });
+
+    expect(getEmailPayload(fetchMock).subject).toBe('Goal reached | sunder');
+
+    fetchMock = mockResend();
+
+    await sendAnnouncementEmail(env, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      subject: 'Premiere this Thursday',
+      heading: 'Premiere this Thursday',
+      body: 'Join us for the premiere.',
+      token: 'magic-token'
+    });
+
+    expect(getEmailPayload(fetchMock).subject).toBe('Premiere this Thursday | sunder');
+  });
+
+  it('renders fulfillment summary values with the same emphasis treatment', async () => {
+    const fetchMock = mockResend();
+
+    await sendCampaignRunnerReportEmail(env, {
+      email: 'runner@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      reportKind: 'Fulfillment report',
+      reportDateLabel: 'April 21, 2026 7:00 AM MT',
+      statsSummary: [
+        'Supporters to fulfill: 8',
+        'Items to fulfill: 12',
+        'Total raised: $1,203.00'
+      ],
+      encouragement: {
+        title: 'Fulfillment note',
+        intro: '**Communication above everything.**',
+        tips: ['Be *specific and honest*.']
+      },
+      csvFilename: 'sunder-fulfillment-report-2026-04-21.csv',
+      csvContent: 'email,campaign\nrunner@example.com,sunder',
+      includeCsvAttachment: true
+    });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.html).toContain('Supporters to fulfill: <strong>8</strong>');
+    expect(payload.html).toContain('Items to fulfill: <strong>12</strong>');
+    expect(payload.html).toContain('Total raised: <strong>$1,203.00</strong>');
+    expect(payload.html).not.toContain('Audience:');
+    expect(payload.html).not.toContain('Fulfillment rows:');
+    expect(payload.html).not.toContain('Fulfiller:');
+    expect(payload.html).not.toContain('Deadline passed');
+    expect(payload.html).toContain('<strong>Communication above everything.</strong>');
+    expect(payload.html).toContain('Be <em>specific and honest</em>.');
   });
 });

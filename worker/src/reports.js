@@ -29,6 +29,16 @@ function buildCsv(header, rows) {
   return [header, ...rows].map((row) => row.map(escapeCsvValue).join(',')).join('\n');
 }
 
+export function rebuildCsvReport(report = {}) {
+  const header = Array.isArray(report?.header) ? report.header : [];
+  const rows = Array.isArray(report?.rows) ? report.rows : [];
+  return {
+    header,
+    rows,
+    csv: buildCsv(header, rows)
+  };
+}
+
 function getTierDisplayName(tierId, campaign = null, fallback = '') {
   const normalizedTierId = String(tierId || '').trim();
   if (!normalizedTierId && fallback) {

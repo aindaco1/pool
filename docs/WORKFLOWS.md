@@ -336,7 +336,7 @@ Send a custom announcement email with optional CTA link to all campaign supporte
 **Response:** `{ success, campaignSlug, subject, sent, failed, errors }`
 
 **Fields:**
-- `subject` (required) — Email subject line (prefixed with 📢 emoji)
+- `subject` (required) — Email subject line body; delivery formats it as `{Subject} | {Campaign Title}`
 - `heading` (optional) — Email heading (defaults to subject if omitted)
 - `body` (required) — Message body text
 - `ctaLabel` + `ctaUrl` (optional) — Adds a prominent button linking to the URL
@@ -363,6 +363,7 @@ Preview or manually send a campaign-runner report for one campaign.
 - `markAsSent` (optional) — On live sends, writes the matching report marker so the scheduled run does not immediately duplicate the email; defaults to `true` when `dryRun` is false
 
 Recipients still come from the campaign’s `runner_report_emails` front matter field.
+For `reportType: "fulfillment"`, the Worker may also send a separate platform-fulfillment email to `platform.support_email` when platform add-on rows exist.
 
 **Dry-run example:**
 ```bash
@@ -383,6 +384,10 @@ curl -X POST http://localhost:8787/admin/report/campaign-runner \
 **Operational notes:**
 - run a dry run first when validating recipients, CSV shape, or subject-prefix customization
 - use `reportType=pledge` for the daily live-campaign ledger and `reportType=fulfillment` for the one-time post-deadline export
+- report subjects stay concise and emoji-free for deliverability, using the configured prefix plus report kind and campaign title
+- pledge emails and fulfillment emails intentionally use different summary/body content so fulfillment sends stay focused on delivery work instead of campaign-momentum stats
+- fulfillment dry runs now expose `campaignRowCount`, `platformRowCount`, and `platformRecipient` so operators can confirm both fulfillment audiences before sending
+- fulfillment live sends split by fulfiller: campaign-runner recipients get only campaign rows, while `support_email` gets the platform slice when present
 - keep `markAsSent=false` only for deliberate preview-style sends that should not suppress the next scheduled report
 
 ### `POST /admin/recover-checkout`
@@ -550,7 +555,7 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
     body: JSON.stringify({
       from: 'The Pool <pledges@dustwave.xyz>',
       to: email,
-      subject: `Your pledge to ${campaignTitle}`,
+      subject: `Pledge confirmed | ${campaignTitle}`,
       html: `
         <h1>Thanks for backing ${campaignTitle}!</h1>
         <p><strong>Pledge amount:</strong> $${(amount / 100).toFixed(0)}</p>
@@ -573,41 +578,41 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
 All emails show exact amounts with 2 decimal places (no rounding).
 
 **Pledge Confirmation** (sent after the setup-mode Stripe session completes successfully)
-- Subject: "Your pledge to {Campaign Title}"
+- Subject: "Pledge confirmed | {Campaign Title}"
 - Contains: Full breakdown (subtotal, optional The Pool tip, tax, shipping if physical, total), pledge items, manage link, community link
 - Includes: Instagram CTA (if campaign has Instagram URL)
 - Community link shown only if campaign has active decisions
 
 **Pledge Modified** (sent when supporter changes their pledge)
-- Subject: "Pledge updated for {Campaign Title}"
+- Subject: "Pledge updated | {Campaign Title}"
 - Contains: Previous subtotal, new subtotal, change amount (+/-), optional The Pool tip, tax, shipping (if physical), new total, updated pledge items
 - Includes: Instagram CTA (if campaign has Instagram URL)
 - Community link shown only if campaign has active decisions
 
 **Charge Success** (sent when pledge is charged at settlement)
-- Subject: "Payment confirmed for {Campaign Title}"
+- Subject: "Payment confirmed | {Campaign Title}"
 - Contains: Full breakdown (subtotal + tip + tax + shipping + total charged), pledge items
 - Community link shown only if campaign has active decisions
 - Note: No Instagram CTA (campaign is over)
 
 **Payment Failed** (sent when off-session charge fails)
-- Subject: "Action needed: Update payment for {Campaign Title}"
+- Subject: "Update payment method | {Campaign Title}"
 - Contains: Full breakdown (subtotal + tip + tax + shipping + amount due), pledge items, manage link to update card
 - Note: No Instagram CTA (campaign is over)
 
 **Pledge Cancelled** (sent when supporter cancels their pledge)
-- Subject: "Pledge cancelled for {Campaign Title}"
+- Subject: "Pledge cancelled | {Campaign Title}"
 - Contains: Breakdown including optional tip, confirmation card wasn't charged, link to view campaign (can re-pledge)
 - Note: Supporter is removed from future campaign email updates
 
 **Diary Update** (sent when new diary entry is added to campaign)
-- Subject: "📝 {Diary Title} — {Campaign Title}"
+- Subject: "{Diary Title} | {Campaign Title}"
 - Contains: Diary title, plain-text excerpt (200 chars + ellipsis), "Read Full Update" button linking to campaign diary
 - Includes: Supporter access links (community + manage), Instagram CTA (if campaign has Instagram URL)
 - Note: Excerpts strip markdown formatting; the full content is on the campaign page
 
 **Announcement** (sent via admin broadcast with optional CTA link)
-- Subject: "📢 {Subject} — {Campaign Title}"
+- Subject: "{Subject} | {Campaign Title}"
 - Contains: Custom heading, message body, optional highlighted CTA button (custom label + URL)
 - Includes: Supporter access links (community + manage), Instagram CTA (if campaign has Instagram URL)
 - Endpoint: `POST /admin/broadcast/announcement`

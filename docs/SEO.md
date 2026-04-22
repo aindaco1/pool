@@ -17,6 +17,7 @@ The current baseline includes:
 - alternate-language metadata on localized public pages and localized campaign pages
 - canonical URLs on public layouts
 - locale-aware Open Graph metadata on public layouts
+- campaign pages now use `og:type=article` plus bounded article publish/modified timestamps derived from campaign content dates
 - explicit language/app-name metadata on public layouts
 - page-level descriptions on core public routes
 - Open Graph and Twitter card metadata
@@ -29,6 +30,7 @@ The current baseline includes:
 - explicit `noindex,nofollow` on tokenized or supporter-only layouts
 - conservative `Organization` / `WebSite` JSON-LD
 - conservative campaign `CreativeWork` plus breadcrumb JSON-LD, both aligned with the active page language where supported
+- campaign `CreativeWork` JSON-LD now also includes `headline`, `mainEntityOfPage`, `isPartOf`, and published/modified timestamps so public campaign pages read more like real editorial landing pages than anonymous blobs
 - a public community hub that links back to public campaign pages instead of pushing crawlers into supporter-only routes
 
 The main implementation files are:
@@ -114,6 +116,7 @@ Public metadata also derives a few safe values automatically:
 - `language`, `application-name`, and `apple-mobile-web-app-title` from the active site/page identity
 - `og:image:alt` / `twitter:image:alt` from explicit image alt text when present, otherwise the page title
 - `og:image:secure_url` when the chosen social image already resolves to HTTPS
+- `article:published_time` / `article:modified_time` on campaign pages when campaign dates are available
 - campaign preview copy from campaign state (`upcoming`, `live`, `funded`, `ended`)
 - campaign preview images from the Worker share-card route rather than directly from the hero image alone
 - `WebSite.availableLanguage`, localized breadcrumb roots, and campaign `CreativeWork.inLanguage` from the configured locale model

@@ -39,6 +39,12 @@ For the accessibility-focused browser slice, use:
   --grep "Public Page Accessibility|keyboard-only|Community Flows|Public Page Keyboard Controls"
 ```
 
+If you want just the public accessibility regression sweep and do not want to depend on host Ruby/Bundler, prefer the Podman-backed path:
+
+```bash
+npm run test:e2e:headless:podman -- tests/e2e/accessibility-public-pages.spec.ts --project=chromium
+```
+
 ---
 
 ## Unit Tests (Vitest)
@@ -221,6 +227,7 @@ Run these against staging before merge when a staging environment exists. If no 
 4. Cancel an uncharged pledge and verify stats and inventory are released correctly.
 5. Run settlement dry-run and live-run on seeded pledges, confirming campaigns only mark settled when nothing needs attention.
 6. Trigger diary, announcement, and milestone broadcasts on a campaign large enough to cross pagination boundaries.
+7. Trigger a fulfillment report on a campaign with both campaign and platform items, confirming that runner recipients receive only campaign rows and `support_email` receives the platform-only attachment.
 
 For checkout or Worker business-logic changes, a smoke pass is still required before merge:
 

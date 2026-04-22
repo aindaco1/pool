@@ -1,6 +1,6 @@
 {
   "name": "pledge-worker",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Cloudflare Worker for The Pool pledge management",
   "main": "src/index.js",
   "type": "module",

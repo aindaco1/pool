@@ -45,6 +45,11 @@ The recent accessibility hardening pass added:
   - larger close/remove tap targets in the cart sidecar
   - safe-area-aware cart and nav overlays
   - better wrapping behavior for localized action text and summary rows
+- campaign-page semantics and keyboard polish for:
+  - focus handoff from the mobile support CTA into the tiers section
+  - screen-reader countdown status text that mirrors the visual timer state
+  - clearer hero-video grouping and loading semantics
+  - safer small-screen wrapping for countdown tiles, creator metadata, and community teaser actions
 
 ## Critical Surfaces
 
@@ -102,6 +107,7 @@ Current automated accessibility-related coverage includes:
     - the community index page
     - the supporter-community denied page
     - the supporter-community content page
+  - the Podman-backed public-page accessibility sweep is the preferred final check when branches change public content, docs-backed public pages, or campaign-page chrome without needing host Bundler/Jekyll
 - ARIA snapshot coverage in Playwright for:
   - key public-page main regions
   - the cart / checkout dialog during keyboard-only flows
@@ -150,6 +156,12 @@ For the broader browser accessibility slice, use:
   --grep "Public Page Accessibility|keyboard-only|Community Flows|Public Page Keyboard Controls"
 ```
 
+For the narrower Podman-backed public-page accessibility sweep that avoids host Bundler/Jekyll setup, use:
+
+```bash
+npm run test:e2e:headless:podman -- tests/e2e/accessibility-public-pages.spec.ts --project=chromium
+```
+
 For the recommended local-dev stack, prefer:
 
 ```bash
@@ -192,4 +204,4 @@ Good next accessibility improvements include:
 
 ---
 
-_Last updated: Apr 19, 2026_
+_Last updated: Apr 21, 2026_

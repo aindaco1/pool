@@ -193,6 +193,12 @@
   - custom checkout now collects billing tax location for digital-only carts, while physical/mixed carts stay address-first and support browser autofill again
   - a free-first New Mexico path now exists through a vendored starter dataset plus optional EDAC refinement
   - local smoke fixtures and merge-gate coverage now work under location-aware tax providers instead of assuming flat tax
+- [x] Reports for campaign runners
+  - campaign front matter now supports `runner_report_emails`, with empty/missing meaning no runner reports for that campaign
+  - `_config.yml` now exposes a bounded `reports.campaign_runner` customization surface for enablement, MT send time, summaries, attachments, and subject prefix
+  - the Worker sends daily campaign-scoped pledge-ledger emails at 7am MT for live campaigns and split post-deadline fulfillment emails for campaign vs. platform fulfillers
+  - `POST /admin/report/campaign-runner` supports dry-run previews and manual sends without waiting for cron, including split fulfillment row counts and platform-recipient previews
+  - local CLI exports and scheduled Worker emails now share the same JS report core to avoid CSV drift
 
 ## Planned
 
@@ -200,6 +206,7 @@
   - Super admin and per-campaign users
   - Magic link auth
   - Variable customizability
+  - Reward fulfillment support
   - add-on inventory baseline override / reset controls so admins can restock sold-out products without editing `_config.yml`
   - decide what the platform-merch admin/reporting surface should look like alongside campaign-facing data
   - Light CRM for creators to segment and manage their supporters
@@ -224,12 +231,7 @@
   - Add a documented tax-data refresh/import workflow for future jurisdiction datasets
   - Future consideration: business tax handling such as VAT ID validation, reverse-charge flows, exemptions, and product tax classes
 - [ ] Support different prices per add-on variation
-- [ ] Reward fulfillment support
-- [ ] Reports for campaign runners
-  - Email address(es) associated with specific campaigns
-    - Support for no email address and therefore no reports
-  - Daily email reports at 7am MT mirroring pledge report during the campaign, with stats only for the specific campaign
-  - End of campaign fulfillment report (with stats only for the specific campaign) sent at 7am MT after campaign deadline
+
 
 ## Known Issues
 

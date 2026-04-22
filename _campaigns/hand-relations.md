@@ -18,6 +18,8 @@ show_ongoing: false
 single_tier_only: false
 stretch_hidden: true
 custom_late_support: true
+runner_report_emails:
+  - alonso@hey.com
 long_content:
   - type: text
     body: |

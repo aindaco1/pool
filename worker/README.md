@@ -20,6 +20,7 @@ Campaign-runner report delivery follows that same pattern:
 - campaign-level recipients live in campaign front matter as `runner_report_emails`
 - deployment-wide timing and email/report behavior live in `_config.yml` under `reports.campaign_runner`
 - the Worker mirror carries those non-secret settings into `wrangler.toml`
+- the shared report core in `worker/src/reports.js` now powers both scheduled runner emails and the local shell export helpers so CSV logic stays in one place
 
 The mirrored Worker config now also includes the shared debug flags:
 
@@ -345,7 +346,15 @@ Notes:
 - `dryRun: true` returns recipients, row counts, filename, and marker status without sending
 - omitting `markAsSent` defaults it to `true` for live sends so the matching cron run does not immediately duplicate the report
 - campaign recipients still come from campaign front matter `runner_report_emails`
-- `reportType: "pledge"` is the daily live-campaign ledger report; `reportType: "fulfillment"` is the one-time post-deadline shipment/export report
+- `reportType: "pledge"` is the daily live-campaign ledger report
+- `reportType: "fulfillment"` is the one-time post-deadline shipment/export report
+- report emails use short, emoji-free, deliverability-first subjects with the configured prefix plus report kind and campaign title
+- daily pledge emails include campaign-only totals plus a short momentum/coaching note in the body
+- fulfillment sends split by fulfiller:
+  - campaign-runner recipients get only the campaign-fulfilled rows
+  - `platform.support_email` gets a separate platform-fulfillment email when platform rows exist
+- fulfillment emails use a fulfillment-specific summary/body note rather than reusing the daily pledge-report summary
+- fulfillment dry runs/report responses expose `campaignRowCount`, `platformRowCount`, and `platformRecipient`
 
 Dry-run example:
 
@@ -370,6 +379,7 @@ Operational guidance:
 - prefer `dryRun: true` first when checking a new campaign, recipient list, or customization change
 - set `markAsSent: false` only when you intentionally want a manual send without consuming the scheduled-send marker
 - deployment-wide behavior comes from `_config.yml` under `reports.campaign_runner`, while per-campaign recipients stay in front matter
+- for fulfillment, validate both the runner and platform slices before sending if a campaign includes platform add-ons
 
 ### POST /test/email
 Send a test email of any type. In test mode (`APP_MODE=test`), no auth required. In production, requires `x-admin-key` header.
