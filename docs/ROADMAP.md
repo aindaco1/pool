@@ -232,7 +232,6 @@
   - Future consideration: business tax handling such as VAT ID validation, reverse-charge flows, exemptions, and product tax classes
 - [ ] Support different prices per add-on variation
 
-
 ## Known Issues
 
 **Credit Card Autofill**: CC number, expiry, and CVV fields are inside Stripe's iframe for PCI compliance — not accessible to our autofill scripts.
