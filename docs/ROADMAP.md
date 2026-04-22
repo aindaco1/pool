@@ -222,6 +222,10 @@
     - Review Pages CMS GitHub repo for a starting place
     - Block-based with the ability to preview campaign content
     - Create/edit/delete campaign content, diary, community vote, and other per-campaign variables
+    - Prefer a shared block schema plus shared renderer as the source of truth so admin previews match the public campaign templates instead of drifting into a dashboard-only rendering path
+    - Prefer real preview panes or iframes at desktop/mobile widths over custom JS text layout for ordinary campaign editing, responsiveness checks, and Markdown/rich-text preview
+    - Keep `pretext` optional and scoped to specialized preview/validation helpers such as share-card text fitting, fixed-area headline warnings, or future art-directed text blocks that need manual line control
+    - Do not make `pretext` a core dependency of the editor unless a later dashboard feature proves that production preview fidelity or performance actually depends on programmatic text measurement
 - [ ] Further tax calculator work
   - Support USA and international
   - Target local / jurisdiction-level US rates, not just state-level rates
