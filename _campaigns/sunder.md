@@ -184,22 +184,22 @@ diary:
         body: That being said, making *youtube poop kickstarter promos* isn’t all we’ve
           been up to, we’ve been doing a lot of boring stuff too. I’ve been
           working with **Chance, our director of photography**, to crank out
-          that shotlist. gotta lot of cool imagery in store for you, and our
-          cast has been finalized since before we even opened this fundraiser!
-          We’ve also done some **location scouting!** Attached are some photos
-          from our most recent scout of a house that’ll play a pretty important
-          role in the film *honk honk.*
-      - type: image
-        src: /assets/images/campaigns/sunder/diary-1-2.png
-        alt: location scouting
-      - type: image
-        src: /assets/images/campaigns/sunder/diary-1-3.png
-        alt: location scouting
+          that shotlist.
       - type: image
         src: /assets/images/campaigns/sunder/diary-1-4.png
         alt: location scouting
+        caption: Chance and Jerome scouting
+      - type: text
+        body: Gotta lot of cool imagery in store for you, and our cast has been
+          finalized since before we even opened this fundraiser! We’ve also done
+          some **location scouting!** Attached are some photos from our most
+          recent scout of a house that’ll play a pretty important role in the
+          film *honk honk.*
       - type: image
         src: /assets/images/campaigns/sunder/diary-1-5.png
+        alt: location scouting
+      - type: image
+        src: /assets/images/campaigns/sunder/diary-1-2.png
         alt: location scouting
       - type: text
         body: Everything’s starting to take a tangible form rather than just vague
@@ -210,6 +210,9 @@ diary:
           right now! We just need a little more help getting through this
           **final stretch.** So, if you know a guy who just came into **$400**
           and doesn’t know what to do with it, you know where to send them to!
+      - type: image
+        src: /assets/images/campaigns/sunder/diary-1-3.png
+        alt: location scouting
 tiers:
   - id: screw-goodies
     name: screw goodies!
