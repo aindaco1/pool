@@ -203,18 +203,20 @@ diary:
       - type: image
         src: /assets/images/campaigns/sunder/diary-1-5.png
         alt: location scouting
-      - type: image
-        src: /assets/images/campaigns/sunder/diary-1-2.png
-        alt: location scouting
       - type: text
         body: Everything’s starting to take a tangible form rather than just vague
           rattlings in my head. That’s thanks to my **endlessly talented
           producers** who have kept the project's momentum rolling despite our
           insanely crowded schedules. With all the work my **awesome team** has
           been doing, I’ve never been more excited about this project than I am
-          right now! We just need a little more help getting through this
-          **final stretch.** So, if you know a guy who just came into **$400**
-          and doesn’t know what to do with it, you know where to send them to!
+          right now!
+      - type: image
+        src: /assets/images/campaigns/sunder/diary-1-2.png
+        alt: location scouting
+      - type: text
+        body: We just need a little more help getting through this **final stretch.**
+          So, if you know a guy who just came into **$400** and doesn’t know
+          what to do with it, you know where to send them to!
       - type: image
         src: /assets/images/campaigns/sunder/diary-1-3.png
         alt: location scouting
