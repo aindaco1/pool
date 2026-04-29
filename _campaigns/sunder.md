@@ -220,6 +220,56 @@ diary:
       - type: image
         src: /assets/images/campaigns/sunder/diary-1-3.png
         alt: location scouting
+  - date: 2026-04-29T10:13:00Z
+    title: We did it!
+    phase: fundraising
+    content:
+      - type: image
+        src: /assets/images/defaults/celebration.gif
+        alt: celebration
+      - type: text
+        body: >-
+          **Oh em eff gee. Guys. We reached our fundraising goal!** And with **3
+          days to spare!**
+
+
+          Thank all of you so much for believing in this project, believing in
+          me, and believing in my team. I swear on the *Old Testament God*, the
+          *New Testament God*, *Allah*, the *entire Greek pantheon*, the *entire
+          Sumerian pantheon*, and the *Egyptian pantheon* that we will **NOT**
+          let you down!
+
+
+          I’m sure you’re all eager to know what’s next for ***Sunder***, and
+          you should be happy to know that *your* work here is done!
+
+
+          For us, on the other hand, **May’s gonna be a busy month:**
+
+
+          - **Actor rehearsals**
+
+          - **Finalizing locations**
+
+          - **Gathering equipment**
+
+          - **Completing the monster costume**
+
+          - **Shooting the damn thing by the end of May**
+
+
+          After the animators work their magic and we get **Robin’s thumping
+          score** in, we’ll have a film.
+
+
+          All thanks to you guys who’ve trusted *little old me* with all this
+          money.
+
+
+          **Thanks, guys. I won’t let you down!**
+
+
+          -- Aidan
 ongoing_items: []
 tiers:
   - id: screw-goodies
