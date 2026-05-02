@@ -5,12 +5,12 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "dev": "ruby ../scripts/sync-worker-config.rb && wrangler dev",
-    "deploy": "ruby ../scripts/sync-worker-config.rb && wrangler deploy",
+    "dev": "ruby ../scripts/sync-worker-config.rb && wrangler dev --env dev",
+    "deploy": "ruby ../scripts/sync-worker-config.rb && wrangler deploy --env=\"\"",
     "tail": "wrangler tail"
   },
   "devDependencies": {
-    "wrangler": "^3.0.0"
+    "wrangler": "^4.87.0"
   },
   "dependencies": {
     "sales-tax": "^2.21.0"

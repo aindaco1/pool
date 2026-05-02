@@ -263,6 +263,7 @@ function initHeroVideo() {
 
   let isWaiting = false;
   let hasStarted = false;
+  let playbackRequested = false;
 
   function updateBuffer() {
     if (video.buffered.length > 0 && video.duration > 0) {
@@ -273,6 +274,22 @@ function initHeroVideo() {
   }
 
   function showLoading() {
+    if (hasStarted) {
+      wrapper?.setAttribute('aria-busy', 'false');
+      playBtn.hidden = true;
+      loading.hidden = true;
+      overlay.hidden = true;
+      return;
+    }
+
+    if (!playbackRequested) {
+      wrapper?.setAttribute('aria-busy', 'false');
+      playBtn.hidden = false;
+      loading.hidden = true;
+      overlay.hidden = false;
+      return;
+    }
+
     isWaiting = true;
     wrapper?.setAttribute('aria-busy', 'true');
     playBtn.hidden = true;
@@ -285,6 +302,7 @@ function initHeroVideo() {
     wrapper?.setAttribute('aria-busy', 'false');
     loading.hidden = true;
     if (hasStarted) {
+      playBtn.hidden = true;
       overlay.hidden = true;
     } else {
       overlay.hidden = false;
@@ -305,11 +323,12 @@ function initHeroVideo() {
   video.addEventListener('canplaythrough', hideLoading);
   video.addEventListener('playing', () => {
     hasStarted = true;
+    playbackRequested = false;
     hideLoading();
     bufferEl.classList.add('hero__video-buffer--playing');
   });
   video.addEventListener('pause', () => {
-    if (!video.ended) {
+    if (!video.ended && !hasStarted) {
       wrapper?.setAttribute('aria-busy', 'false');
       overlay.hidden = false;
       playBtn.hidden = false;
@@ -325,8 +344,15 @@ function initHeroVideo() {
     bufferEl.classList.remove('hero__video-buffer--playing');
   });
   playBtn.addEventListener('click', () => {
+    playbackRequested = true;
     showLoading();
-    video.play().then(hideLoading).catch(hideLoading);
+    video.play().then(() => {
+      playbackRequested = false;
+      hideLoading();
+    }).catch(() => {
+      playbackRequested = false;
+      hideLoading();
+    });
   });
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay && hasStarted && !isWaiting) {
@@ -334,6 +360,7 @@ function initHeroVideo() {
     }
   });
 
+  hideLoading();
   video.load();
 }
 

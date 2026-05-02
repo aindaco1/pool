@@ -176,6 +176,17 @@ describe('campaign page script', () => {
     expect(playButton.hidden).toBe(true);
     expect(overlay.hidden).toBe(true);
 
+    video.dispatchEvent(new Event('waiting'));
+    expect(wrapper.getAttribute('aria-busy')).toBe('false');
+    expect(loading.hidden).toBe(true);
+    expect(playButton.hidden).toBe(true);
+    expect(overlay.hidden).toBe(true);
+
+    video.dispatchEvent(new Event('pause'));
+    expect(loading.hidden).toBe(true);
+    expect(playButton.hidden).toBe(true);
+    expect(overlay.hidden).toBe(true);
+
     vi.useRealTimers();
   });
 
