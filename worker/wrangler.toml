@@ -78,11 +78,11 @@ class_name = "TierInventoryCoordinator"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["CheckoutIntentNonceCoordinator"]
+new_sqlite_classes = ["CheckoutIntentNonceCoordinator"]
 
 [[migrations]]
 tag = "v2"
-new_classes = ["TierInventoryCoordinator"]
+new_sqlite_classes = ["TierInventoryCoordinator"]
 
 # KV Namespaces - update IDs after running:
 #   wrangler kv:namespace create "VOTES"
