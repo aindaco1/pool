@@ -104,8 +104,16 @@ jobs:
         if: success()
         run: |
           sleep 30  # Wait for CDN propagation after cache purge
-          curl -sf -X POST \
+          DIARY_RESPONSE="$(mktemp)"
+          DIARY_STATUS="$(curl -sS -o "$DIARY_RESPONSE" -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${{ secrets.ADMIN_SECRET }}" \
             -H "Content-Type: application/json" \
-            https://pledge.dustwave.xyz/admin/diary/check \
-            || echo "Diary check failed (non-fatal)"
+            https://pledge.dustwave.xyz/admin/diary/check || true)"
+
+          if [ "$DIARY_STATUS" -ge 200 ] && [ "$DIARY_STATUS" -lt 300 ]; then
+            echo "Diary check completed (HTTP $DIARY_STATUS):"
+            cat "$DIARY_RESPONSE"
+          else
+            echo "Diary check failed (non-fatal, HTTP ${DIARY_STATUS:-curl-error}):"
+            cat "$DIARY_RESPONSE"
+          fi
