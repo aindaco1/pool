@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Campaign Creator Checklist
-description: A complete prep checklist for creators launching a campaign on The Pool, including image, video, copy, tiers, and optional campaign materials.
+description: A complete prep checklist for creators launching a campaign on The Pool, including image, video, copy, tiers, add-ons, embeds, tax, shipping, fulfillment, and optional campaign materials.
 permalink: /creator-campaign-checklist/
 lang: en
 indexable: false
@@ -21,7 +21,10 @@ This checklist covers:
 - image and video deliverables
 - copy and word-count guidance
 - tier and reward strategy
+- campaign and platform add-on planning
 - physical reward and shipping requirements
+- tax, free-shipping, and fallback expectations
+- promotion, embeds, reporting, and fulfillment handoff
 - optional materials that make a campaign feel richer and more persuasive
 
 ## The Short Version
@@ -42,6 +45,7 @@ If a creator only reads one section, it should be this one.
 - wide hero image or campaign video
 - at least one tier
 - tier name, price, and description for each tier
+- report recipient email addresses, if the campaign runner wants automatic reports
 
 ### Strongly recommended
 
@@ -49,15 +53,19 @@ If a creator only reads one section, it should be this one.
 - long-form campaign description
 - 3 to 6 tiers total
 - 1 to 3 support items, if relevant
+- campaign add-ons, if the campaign has fixed-price merch or extras
 - 1 campaign pitch video
 - 3 to 8 additional stills or gallery images
+- a launch promotion plan that includes the campaign embed code
 
 ### Required if anything is physical
 
 - identify the reward as physical
 - provide a shipping preset or explicit shipping metadata
+- decide whether shipping is free, carrier-rated, manually flat-rated, or allowed to use the platform fallback
 - provide inventory counts
 - provide variation details, if applicable
+- provide fulfillment owner and any packing/handling notes
 
 ## What Makes a Campaign Feel Complete
 
@@ -91,6 +99,8 @@ These are the foundational fields every campaign should have.
 | Goal deadline | Yes | Real end date. |
 | Short blurb | Yes | One clear sentence, ideally 12 to 24 words. |
 | Featured tier | Recommended | Choose the clearest entry-point tier. |
+| Runner report emails | Recommended | One or more campaign-runner recipients for pledge and fulfillment reports. |
+| Fulfillment owner | Recommended | Who is responsible for campaign rewards after a successful charge. |
 
 ### Short Blurb Guidance
 
@@ -418,6 +428,8 @@ Provide:
 - title
 - optional caption
 
+Approved structured embeds should use `https://` URLs from supported providers such as YouTube, Vimeo, Spotify, or Instagram. If a creator wants to include a different embed provider, flag it before launch so it can be reviewed for security, layout, and mobile behavior.
+
 ## Reward and Tier Strategy
 
 Rewards are one of the clearest opportunities to turn a campaign from pure fundraising into audience-building.
@@ -558,6 +570,74 @@ Good examples:
 - `Studio time + session musicians`
 - `Archival footage licensing`
 
+## Add-On Products
+
+Add-ons are best for fixed-price extras, merch, or optional upgrades that should use a product-card UI instead of becoming a pledge tier.
+
+The platform supports two add-on scopes:
+
+- **Campaign add-ons** belong to one campaign and count toward that campaign's funding subtotal.
+- **Platform add-ons** belong to The Pool operator and do not count toward any campaign goal.
+
+Campaign creators usually only need to define campaign add-ons. Platform add-ons are useful when The Pool itself is selling global merch alongside pledges.
+
+### When to use a campaign add-on
+
+Use a campaign add-on when:
+
+- the item is fixed-price
+- the item is campaign-owned
+- supporters may want it in addition to a tier
+- it should appear in cart and Manage Pledge as a product card
+- it should count toward the campaign's funding progress
+
+Examples:
+
+- poster
+- soundtrack download
+- zine
+- sticker pack
+- signed script
+- prop replica
+- extra ticket
+
+### Campaign add-on deliverables
+
+For each campaign add-on, provide:
+
+- add-on ID
+- name
+- description
+- price
+- category: `digital` or `physical`
+- image
+- inventory count, if limited
+- variant list, if applicable
+- per-variant inventory, if applicable
+- shipping preset or explicit shipping metadata, if physical
+- fulfillment owner
+
+### Add-on copy guidance
+
+#### Add-on name
+
+- **Ideal length:** `2 to 6 words`
+- **Maximum target:** about `45 characters`
+
+#### Add-on description
+
+- **Ideal length:** `8 to 22 words`
+- explain what the supporter receives
+- mention format, size, or delivery method if that affects expectations
+
+### Add-on accounting and fulfillment notes
+
+- campaign add-ons count toward the campaign subtotal and funding progress
+- platform add-ons stay separate as platform merch
+- physical campaign add-ons ship with the owning campaign's shipment rules
+- physical platform add-ons combine into a separate platform shipment
+- fulfillment reports separate campaign rows from platform rows so the right person receives the right work
+
 ## Stretch Goals
 
 Optional, but most effective when they represent meaningful, real upgrades.
@@ -630,6 +710,38 @@ For each diary entry, provide:
 
 Diary entries should feel like real updates, not press releases.
 
+## Promotion and Embeds
+
+Creators should plan promotion before launch, not after the page is live.
+
+The Pool includes a hosted campaign embed builder at:
+
+- `/embed/campaign/?slug=your-campaign-slug`
+- `/es/embed/campaign/?slug=your-campaign-slug`, for Spanish-language pages
+
+The embed is a live `iframe` widget for websites that allow pasted HTML. It reflects current campaign state, pledged total, countdown/progress, media settings, and the campaign call to action.
+
+### Promotion materials to prepare
+
+Creators should provide or confirm:
+
+- primary campaign URL
+- embed-code destinations, such as personal site, venue site, newsletter page, partner blog, or press page
+- preferred embed mode: full or compact
+- whether the embed should show campaign media
+- launch-day social copy
+- 3 to 5 short share captions
+- 1 short email/newsletter blurb
+- press or partner contacts, if relevant
+
+### Embed expectations
+
+- the embed is for websites and HTML-friendly hosts
+- social platforms use rich previews instead of rendering the iframe
+- campaign pages generate share-card metadata for social previews
+- creators should test the embed on mobile wherever they paste it
+- if a host strips iframe code, use a normal campaign link plus the share-card preview instead
+
 ## Physical Rewards and Shipping
 
 Physical rewards can work well, but only when they are intentional.
@@ -661,6 +773,11 @@ They usually make the most sense when:
 - inventory count
 - variant list, if applicable
 - per-variant inventory, if applicable
+- whether the item is eligible for free shipping
+- whether it needs a campaign-specific flat shipping override
+- whether it can use the deployment fallback shipping rate if USPS is unavailable
+- whether domestic signature or adult-signature delivery options should be offered
+- fulfillment owner and shipping-from constraints
 
 ### Physical reward guidance
 
@@ -668,6 +785,77 @@ They usually make the most sense when:
 - envelope-friendly items are much easier to justify than bulky items
 - shipping and manufacturing cost must be priced in
 - physical tiers work best when paired with a digital reward layer so supporters receive something sooner
+
+### Shipping model creators should understand
+
+Shipping is calculated by the Worker, not by hand in the browser.
+
+The current platform can support:
+
+- USPS-backed live shipping quotes
+- configured fallback flat rates when USPS is unavailable or returns no usable rate
+- campaign-specific flat-rate overrides
+- manual preset rates for simple envelope-friendly items
+- deployment-wide free-shipping defaults
+- item-level or campaign-level free-shipping decisions
+- domestic delivery upgrades when configured, such as signature-required options
+
+The important planning rule:
+
+> Do not promise a shipping price in campaign copy unless the campaign configuration actually enforces it.
+
+If a creator wants free shipping, that should be explicit during setup. If the campaign should use carrier-rated shipping, the item weights, dimensions, origin, and destination assumptions need to be complete enough for a reliable quote.
+
+### Mixed carts and add-on shipping
+
+In multi-item carts:
+
+- campaign tiers and campaign add-ons follow the owning campaign's shipping rules
+- physical platform add-ons use a separate platform shipment
+- digital rewards and digital add-ons do not affect shipping
+- saved pledge totals, Manage Pledge, emails, reports, and fulfillment exports all use the stored Worker-calculated shipping amount
+
+## Tax and Checkout Expectations
+
+The Pool's checkout is server-verified. The Worker rebuilds cart contents, shipping, tax, tips, add-ons, and totals before starting the Stripe payment step.
+
+Creators do not need to calculate sales tax themselves, but they should avoid campaign copy that promises tax-inclusive pricing unless that has been configured deliberately.
+
+Current tax behavior can include:
+
+- a configured flat sales tax rate
+- offline rules for broader fallback handling
+- New Mexico GRT lookup support
+- optional ZIP.TAX local lookup support for forks
+- provisional browser display when the cart does not yet have enough destination detail
+
+In practice:
+
+- the cart may show tax as `--` until there is enough address information
+- final checkout totals are recalculated by the Worker
+- physical rewards should collect enough address detail for shipping and tax calculation
+- fulfillment reports include the saved tax and shipping totals, so operators can reconcile what supporters actually paid
+
+## Campaign Reports and Fulfillment Handoff
+
+Campaign-runner reports help operators and creators keep pledge and fulfillment work aligned.
+
+Creators should provide:
+
+- campaign-runner report recipient emails
+- the person or team responsible for fulfillment
+- whether any platform-operated add-ons are present
+- any special fulfillment notes for physical tiers or add-ons
+- expected delivery timing or delivery windows
+- whether rewards should be grouped, split, or handled in a particular order
+
+Report behavior to understand:
+
+- pledge reports are a ledger/history export
+- fulfillment reports are a merged current-state view per supporter and campaign
+- campaign add-ons stay with the campaign fulfillment slice
+- platform add-ons are sent to the platform fulfillment slice
+- modified and canceled pledge rows may appear in pledge history, while fulfillment uses current supporter state
 
 ## Recommended Asset Bundle for a Strong Campaign
 
@@ -682,8 +870,11 @@ If a creator wants a simple target package, this is a strong one:
 - `1` long-form campaign description of `300 to 900 words`
 - `5 to 7` tiers
 - `0 to 3` support items
+- `0 to 5` campaign add-ons, if fixed-price extras make sense
 - `0 to 3` stretch goals
 - `0 to 2` launch-ready community decisions
+- report recipient emails and fulfillment owner
+- embed/promotion destinations for launch week
 
 ## Delivery Recommendations
 
@@ -703,6 +894,8 @@ Suggested naming patterns:
 - `gallery-01.webp`
 - `gallery-02.webp`
 - `campaign-pitch.webm`
+- `addon-poster.webp`
+- `addon-shirt.webp`
 
 ## Readiness Checklist
 
@@ -714,8 +907,13 @@ A campaign is usually ready when:
 - the long-form page explains the project well
 - the pitch video is concise and persuasive
 - every tier is understandable at a glance
+- any add-ons are clearly scoped as campaign add-ons or platform add-ons
 - the reward mix feels intentional
-- any physical reward has shipping and inventory data
+- any physical reward or add-on has shipping, inventory, variants, and fulfillment data
+- free shipping, flat fallback, USPS quote, and campaign override expectations are explicit
+- tax wording does not overpromise beyond configured checkout behavior
+- report recipients and fulfillment owners are set
+- the campaign embed has been checked for launch-promotion destinations
 - image alt text exists where needed
 - no section feels like placeholder copy
 
@@ -736,6 +934,7 @@ If someone needs the shortest possible prep version, send them this:
 - square hero image
 - wide hero image or campaign video
 - at least one tier
+- report recipient emails, if the creator wants campaign-runner reports
 
 ### Strongly recommended
 
@@ -744,16 +943,20 @@ If someone needs the shortest possible prep version, send them this:
 - 5 to 7 tiers
 - tier images for premium or physical rewards
 - support items
+- campaign add-ons for fixed-price extras or campaign merch
 - stretch goals
 - 3 to 8 gallery images
 - campaign pitch video
+- embed destinations and launch-promotion copy
 
 ### If anything is physical
 
 - mark it as physical
 - provide shipping preset or explicit size/weight metadata
+- decide whether it is free-shipping, carrier-rated, manually flat-rated, or fallback-eligible
 - provide inventory
 - provide variants and per-variant inventory if relevant
+- provide fulfillment owner and delivery notes
 
 ---
 
