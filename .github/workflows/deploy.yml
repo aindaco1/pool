@@ -69,7 +69,7 @@ jobs:
         if: ${{ github.event_name == 'push' }}
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: worker/package-lock.json
 
