@@ -753,6 +753,12 @@ History types:
 Generate CSV reports of pledges from Cloudflare KV:
 
 ```bash
+# Remote production/dev reports require Wrangler auth.
+cd worker && npx wrangler login
+
+# Or, for non-interactive shells and Podman-backed report runs:
+export CLOUDFLARE_API_TOKEN="your-token"
+
 # All pledges, production KV
 ./scripts/pledge-report.sh
 
@@ -765,6 +771,27 @@ Generate CSV reports of pledges from Cloudflare KV:
 # Save to file
 ./scripts/pledge-report.sh worst-movie-ever > pledges.csv
 ```
+
+For Podman-backed remote reports, put `CLOUDFLARE_API_TOKEN` in the host shell or an ignored local env file such as `.env.local`, `.env.cloudflare`, or `worker/.dev.vars`; the report wrappers pass Cloudflare auth values through to `podman exec`.
+
+Fork setup for production reports:
+
+1. In Cloudflare, go to **My Profile -> API Tokens -> Create Token**.
+2. Create a user token with **Account / Workers KV Storage / Read** scoped to the account that owns this fork's `PLEDGES` KV namespace.
+3. Store it in `worker/.dev.vars` or another ignored env file:
+
+```bash
+CLOUDFLARE_API_TOKEN=your-token
+```
+
+4. Run production exports through the same Podman worker environment used by local tests:
+
+```bash
+./scripts/pledge-report.sh --podman --env production --remote > ~/Desktop/pool-pledge-report.csv
+./scripts/fulfillment-report.sh --podman --env production --remote > ~/Desktop/pool-fulfillment-report.csv
+```
+
+Progress is written to stderr while CSV data is written only to stdout, so file redirects stay clean.
 
 **Output format:** One row per history entry (ledger-style). This means:
 - New pledges: 1 row (created)

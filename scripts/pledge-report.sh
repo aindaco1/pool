@@ -4,11 +4,12 @@
 # Usage:
 #   ./scripts/pledge-report.sh [campaign-slug] [--env dev|production] [--local]
 
-set -e
+set -eo pipefail
 
 USE_PODMAN=false
 PODMAN_REPORT_INTERNAL="${PODMAN_REPORT_INTERNAL:-0}"
 PODMAN_STARTED_BY_SCRIPT=false
+REPORT_JSON_TMP=""
 ORIGINAL_ARGS=()
 
 for arg in "$@"; do
@@ -37,7 +38,50 @@ prefer_podman_path() {
   return 1
 }
 
+load_cloudflare_report_env_file() {
+  local env_file="$1"
+  local line=""
+  local key=""
+  local value=""
+
+  [[ -f "$env_file" ]] || return 0
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    [[ -z "$line" || "$line" == \#* || "$line" != *=* ]] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    key="${key%"${key##*[![:space:]]}"}"
+    key="${key#export }"
+    case "$key" in
+      CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|CLOUDFLARE_EMAIL|CLOUDFLARE_KEY)
+        if [[ -z "${!key:-}" ]]; then
+          value="${value#"${value%%[![:space:]]*}"}"
+          value="${value%"${value##*[![:space:]]}"}"
+          value="${value%\"}"
+          value="${value#\"}"
+          value="${value%\'}"
+          value="${value#\'}"
+          export "$key=$value"
+        fi
+        ;;
+    esac
+  done < "$env_file"
+}
+
+load_cloudflare_report_env() {
+  [[ "${POOL_REPORT_LOAD_ENV:-1}" == "0" ]] && return 0
+  load_cloudflare_report_env_file ".env"
+  load_cloudflare_report_env_file ".env.local"
+  load_cloudflare_report_env_file ".env.cloudflare"
+  load_cloudflare_report_env_file "worker/.dev.vars"
+}
+
 cleanup() {
+  if [[ -n "$REPORT_JSON_TMP" ]]; then
+    rm -f "$REPORT_JSON_TMP" >/dev/null 2>&1 || true
+  fi
+
   if [[ "$PODMAN_STARTED_BY_SCRIPT" == "true" ]]; then
     podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
     podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
@@ -45,6 +89,7 @@ cleanup() {
 }
 
 trap cleanup EXIT
+load_cloudflare_report_env
 
 if [[ "$USE_PODMAN" == "true" && "$PODMAN_REPORT_INTERNAL" != "1" ]]; then
   prefer_podman_path || true
@@ -74,7 +119,14 @@ if [[ "$USE_PODMAN" == "true" && "$PODMAN_REPORT_INTERNAL" != "1" ]]; then
     QUOTED_ARGS+=" $(printf '%q' "$arg")"
   done
 
-  exec podman exec pool-dev-worker bash -lc "cd /workspace && PODMAN_REPORT_INTERNAL=1 ./scripts/pledge-report.sh${QUOTED_ARGS}"
+  PODMAN_ENV_ARGS=()
+  for env_name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_EMAIL CLOUDFLARE_KEY; do
+    if [[ -n "${!env_name:-}" ]]; then
+      PODMAN_ENV_ARGS+=(-e "$env_name")
+    fi
+  done
+
+  exec podman exec "${PODMAN_ENV_ARGS[@]}" pool-dev-worker bash -lc "cd /workspace && PODMAN_REPORT_INTERNAL=1 ./scripts/pledge-report.sh${QUOTED_ARGS}"
 fi
 
 if [ -f "$HOME/.nvm/nvm.sh" ]; then
@@ -125,4 +177,6 @@ if [[ "$USE_LOCAL" == "true" ]]; then
   FETCH_ARGS+=(--local)
 fi
 
-python3 ./scripts/fetch-pledges-json.py "${FETCH_ARGS[@]}" | node ./worker/src/report-cli.js --type pledge
+REPORT_JSON_TMP="$(mktemp "${TMPDIR:-/tmp}/pool-pledge-report.XXXXXX")"
+python3 ./scripts/fetch-pledges-json.py "${FETCH_ARGS[@]}" > "$REPORT_JSON_TMP"
+node ./worker/src/report-cli.js --type pledge < "$REPORT_JSON_TMP"

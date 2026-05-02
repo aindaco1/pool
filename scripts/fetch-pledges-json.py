@@ -8,11 +8,14 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
 WORKER_DIR = ROOT / 'worker'
+SUPPORTS_REMOTE_FLAG = None
+PROGRESS_WIDTH = 24
 
 
 def parse_args():
@@ -41,21 +44,108 @@ def resolve_wrangler_cmd():
     configured = os.environ.get('WRANGLER_BIN', '').strip()
     if configured:
         return shlex.split(configured)
-    if os.environ.get('MOCK_WRANGLER_DATA') and shutil.which('wrangler'):
+    if shutil.which('wrangler'):
         return ['wrangler']
     return ['npx', 'wrangler']
 
 
-def run_wrangler_json(args):
+def wrangler_supports_remote_flag():
+    global SUPPORTS_REMOTE_FLAG
+    if SUPPORTS_REMOTE_FLAG is not None:
+        return SUPPORTS_REMOTE_FLAG
+    if os.environ.get('MOCK_WRANGLER_DATA'):
+        SUPPORTS_REMOTE_FLAG = False
+        return SUPPORTS_REMOTE_FLAG
+
     result = subprocess.run(
-        resolve_wrangler_cmd() + args,
+        resolve_wrangler_cmd() + ['kv', 'key', 'list', '--help'],
         cwd=str(WORKER_DIR),
         capture_output=True,
         text=True,
         check=False
     )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or 'wrangler command failed')
+    SUPPORTS_REMOTE_FLAG = '--remote' in f'{result.stdout}\n{result.stderr}'
+    return SUPPORTS_REMOTE_FLAG
+
+
+def wrangler_failure_message(output):
+    if 'CLOUDFLARE_API_TOKEN' in output or 'Not logged in' in output or 'Authentication error [code: 10000]' in output:
+        podman_note = ''
+        if os.environ.get('PODMAN_REPORT_INTERNAL') == '1':
+            podman_note = (
+                '\nThis report is running inside the Podman worker container. '
+                'For reproducible remote production exports through Podman, '
+                'use CLOUDFLARE_API_TOKEN rather than host Wrangler browser '
+                'login. Put it in the host shell, .env.local, .env.cloudflare, '
+                'or worker/.dev.vars before rerunning.\n'
+            )
+        return (
+            'Remote report export could not authenticate with Wrangler.\n'
+            'Either log in for this machine or provide a Cloudflare API token, '
+            'then rerun the export:\n\n'
+            '  cd worker && npx wrangler login\n\n'
+            'or:\n\n'
+            '  export CLOUDFLARE_API_TOKEN="your-token"\n'
+            '  ./scripts/pledge-report.sh --env production --remote > '
+            '~/Desktop/pool-pledge-report.csv\n'
+            '  ./scripts/fulfillment-report.sh --env production --remote > '
+            '~/Desktop/pool-fulfillment-report.csv\n\n'
+            'For local Wrangler state instead, use --local.'
+            f'{podman_note}'
+        )
+    return output or 'wrangler command failed'
+
+
+def progress_enabled():
+    return os.environ.get('POOL_REPORT_PROGRESS', '').strip() != '0'
+
+
+def render_progress(current, total):
+    ratio = current / total if total else 1
+    filled = min(PROGRESS_WIDTH, max(0, round(PROGRESS_WIDTH * ratio)))
+    return f"[{'#' * filled}{'.' * (PROGRESS_WIDTH - filled)}] {current}/{total}"
+
+
+def report_progress(label, current, total, final=False):
+    if not progress_enabled() or total <= 0:
+        return
+
+    message = f"{label}: {render_progress(current, total)}"
+    if sys.stderr.isatty():
+        print(f"\r{message}", end='\n' if final else '', file=sys.stderr, flush=True)
+        return
+
+    step = max(1, total // 10)
+    if final or current == 1 or current % step == 0:
+        print(message, file=sys.stderr, flush=True)
+
+
+def run_wrangler_json(args):
+    attempts = 3
+    result = None
+    output = ''
+    for attempt in range(1, attempts + 1):
+        result = subprocess.run(
+            resolve_wrangler_cmd() + args,
+            cwd=str(WORKER_DIR),
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if result.returncode == 0:
+            break
+
+        output = result.stderr.strip() or result.stdout.strip()
+        if 'fetch failed' not in output or attempt == attempts:
+            break
+        print(f"Wrangler fetch failed; retrying ({attempt + 1}/{attempts})...", file=sys.stderr)
+        time.sleep(attempt)
+
+    if result is not None and result.returncode != 0:
+        message = wrangler_failure_message(output)
+        if message != output:
+            raise SystemExit(message)
+        raise RuntimeError(message)
     output = result.stdout.strip()
     return json.loads(output) if output else None
 
@@ -131,6 +221,8 @@ def collect_local_pledges(campaign_slug):
 
 def collect_remote_pledges(campaign_slug, env_name):
     wrangler_flags = []
+    if wrangler_supports_remote_flag():
+        wrangler_flags.append('--remote')
     if env_name == 'dev':
         wrangler_flags.extend(['--env', 'dev', '--preview'])
 
@@ -157,12 +249,17 @@ def collect_remote_pledges(campaign_slug, env_name):
         pledge_keys = [item.get('name', '') for item in key_list if item.get('name')]
 
     pledges = []
-    for key in pledge_keys:
+    total_keys = len(pledge_keys)
+    if total_keys > 0:
+        print(f'Found {total_keys} pledge keys. Fetching details...', file=sys.stderr)
+
+    for index, key in enumerate(pledge_keys, start=1):
         pledge = run_wrangler_json([
             'kv', 'key', 'get', key,
             '--binding', 'PLEDGES',
             *wrangler_flags
         ])
+        report_progress('Fetched pledge details', index, total_keys, final=index == total_keys)
         if not pledge:
             continue
         if campaign_slug and pledge.get('campaignSlug') != campaign_slug:

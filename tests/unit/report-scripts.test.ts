@@ -150,10 +150,40 @@ process.exit(1);
   return result.stdout.trim().split(/\r?\n/);
 }
 
+function runReportScriptWithoutCloudflareToken(scriptName: string) {
+  const tempDir = mkdtempSync(join(tmpdir(), 'pool-report-auth-test-'));
+  const result = spawnSync('bash', [join(repoRoot, 'scripts', scriptName), '--env', 'production', '--remote'], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      HOME: tempDir,
+      CLOUDFLARE_API_TOKEN: '',
+      MOCK_WRANGLER_DATA: '',
+      POOL_REPORT_LOAD_ENV: '0'
+    },
+    encoding: 'utf8'
+  });
+  rmSync(tempDir, { recursive: true, force: true });
+
+  return result;
+}
+
 describe('pledge and fulfillment reports', () => {
   afterEach(() => {
     // no-op, temp dirs are removed per test
   });
+
+  it.each(['pledge-report.sh', 'fulfillment-report.sh'])(
+    'fails %s remote exports clearly when Wrangler auth is missing',
+    (scriptName) => {
+      const result = runReportScriptWithoutCloudflareToken(scriptName);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain('Remote report export could not authenticate with Wrangler');
+      expect(result.stderr).not.toContain('Traceback');
+    }
+  );
 
   it('outputs one pledge-report row per campaign with per-campaign totals for bundled checkout pledges', () => {
     const lines = runReportScript('pledge-report.sh', {

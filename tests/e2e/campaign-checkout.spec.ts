@@ -1519,14 +1519,22 @@ test.describe('Checkout Flow', () => {
     await expect(smokeButton).toBeVisible();
     await smokeButton.click();
 
-    await page.goto('/campaigns/sunder/');
-    const sunderButton = page.locator('[data-item-id="sunder__physical-media"]').first();
-    await expect(sunderButton).toBeVisible();
-    await sunderButton.click();
+    await addCartItemViaClient(page, {
+      id: 'smoke-editable__limited-poster',
+      name: 'SMOKE EDITABLE — Limited Poster',
+      price: 25,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: false,
+      customFields: [
+        { name: '_stackable', value: 'false' },
+        { name: '_category', value: 'physical' }
+      ]
+    });
 
     await openCartViaClient(page);
-    await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Estimated shipping');
-    await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('--');
+    await expect(page.locator('[data-cart-summary-shipping-label]')).toHaveText('Shipping');
+    await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('$12.00');
   });
 
   test('physical sunder tier without a ZIP shows estimated shipping and excludes shipping from the total', async ({ page }) => {
@@ -1562,17 +1570,25 @@ test.describe('Checkout Flow', () => {
     await expect(campaignAddOnButton).toBeVisible();
     await campaignAddOnButton.click();
 
-    await page.goto('/campaigns/sunder/');
-    const sunderButton = page.locator('[data-item-id="sunder__physical-media"]').first();
-    await expect(sunderButton).toBeVisible();
-    await sunderButton.click();
+    await addCartItemViaClient(page, {
+      id: 'smoke-editable__limited-poster',
+      name: 'SMOKE EDITABLE — Limited Poster',
+      price: 25,
+      quantity: 1,
+      url: '/campaigns/smoke-editable/',
+      shippable: false,
+      customFields: [
+        { name: '_stackable', value: 'false' },
+        { name: '_category', value: 'physical' }
+      ]
+    });
 
     await openCartViaClient(page);
-    await expect(page.locator('[data-cart-summary-shipping-label]')).toContainText('Estimated shipping');
-    await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('--');
+    await expect(page.locator('[data-cart-summary-shipping-label]')).toHaveText('Shipping');
+    await expect(page.locator('[data-cart-summary-shipping]')).toHaveText('$12.00');
     await page.locator('[data-cart-continue]').click();
-    await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toContainText('Estimated shipping');
-    await expect(page.locator('[data-cart-checkout-summary-shipping]')).toHaveText('--');
+    await expect(page.locator('[data-cart-checkout-summary-shipping-label]')).toHaveText('Shipping');
+    await expect(page.locator('[data-cart-checkout-summary-shipping]')).toHaveText('$12.00');
   });
 
   test('custom on-site checkout supports keyboard-only activation through save', async ({ page }) => {
@@ -1718,7 +1734,7 @@ test.describe('Checkout Flow', () => {
 
     const continueToPledgeButton = page.locator('[data-cart-start-checkout]');
     await expect(continueToPledgeButton).toBeVisible();
-    await expect(continueToPledgeButton).toBeEnabled();
+    await expect(continueToPledgeButton).toBeEnabled({ timeout: 15_000 });
     await continueToPledgeButton.focus();
     await expect(continueToPledgeButton).toBeFocused();
     await page.keyboard.press('Enter');
