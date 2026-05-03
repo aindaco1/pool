@@ -118,11 +118,15 @@
 }
 
 .creator-checklist-screenshot--narrow {
-  max-width: 520px;
+  max-width: 476px;
 }
 
 .creator-checklist-screenshot--compact {
-  max-width: 430px;
+  max-width: 318px;
+}
+
+.creator-checklist-screenshot--medium {
+  max-width: 414px;
 }
 
 .creator-checklist-example-grid {
@@ -161,10 +165,50 @@
   }
 }
 
+.creator-checklist-example--standalone {
+  margin: $space-2xl auto;
+  max-width: 640px;
+}
+
+.creator-checklist-example--standalone.creator-checklist-example--square {
+  max-width: 360px;
+}
+
 .creator-checklist-example--wide img {
   aspect-ratio: 16 / 9;
 }
 
 .creator-checklist-example--square img {
   aspect-ratio: 1;
+}
+
+.creator-checklist-copy-examples,
+.creator-checklist-guidance-examples {
+  display: grid;
+  gap: $space-lg;
+  margin: $space-2xl 0;
+}
+
+.creator-checklist-copy-example,
+.creator-checklist-guidance-example {
+  @include surface-panel($space-lg, $surface-tint-soft);
+
+  h4 {
+    margin: 0 0 $space-sm;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  blockquote {
+    margin: 0 0 $space-sm;
+    padding: 0 0 0 $space-md;
+    background: transparent;
+    border-left: 3px solid $border--strong;
+
+    p {
+      @include type-ui;
+    }
+  }
 }

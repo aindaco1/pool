@@ -162,7 +162,7 @@ These copied examples come from existing campaigns, but they live in this checkl
   </figure>
 </div>
 
-## 1. Square Hero Image
+### 1. Square Hero Image
 
 This is the most important still image in the package.
 
@@ -180,7 +180,7 @@ Best practices:
 - make sure it still reads well at small sizes
 - prioritize mood, clarity, and strong contrast
 
-## 2. Wide Hero Image
+### 2. Wide Hero Image
 
 This is the main fallback visual at the top of the campaign page and the poster frame for self-hosted video.
 
@@ -197,7 +197,7 @@ Best practices:
 - avoid placing critical details in the extreme corners
 - treat it like a cinematic banner, not a stretched poster
 
-## 3. Creator Image
+### 3. Creator Image
 
 Optional, but strongly recommended for creator-led campaigns.
 
@@ -214,7 +214,7 @@ Best practices:
 - keep the face or main subject readable at smaller sizes
 - avoid text overlays
 
-## 4. Tier Images
+### 4. Tier Images
 
 Optional, but useful for premium, physical, or highly visual rewards.
 
@@ -231,7 +231,7 @@ Best practices:
 - otherwise use the clearest visual shorthand
 - keep the image simple enough that the tier name and price still do the real work
 
-## 5. Long-Form Content and Gallery Images
+### 5. Long-Form Content and Gallery Images
 
 Use these for concept art, stills, behind-the-scenes images, moodboards, process images, or reward previews.
 
@@ -247,7 +247,7 @@ Each public-facing image should also include:
 - alt text
 - optional caption
 
-### Alt Text Guidance
+#### Alt Text Guidance
 
 - **Ideal length:** `6 to 18 words`
 - describe what matters most
@@ -406,12 +406,52 @@ The strongest campaign copy works in layers:
 - tier copy
 - optional support item, stretch goal, and diary copy
 
-## 1. Campaign Title
+### Best Practice Examples
+
+These examples are culled from existing campaigns and shortened where needed. The point is not to copy the voice, but to notice what each example does quickly.
+
+<div class="creator-checklist-copy-examples">
+  <section class="creator-checklist-copy-example">
+    <h4>Short Blurb</h4>
+    <blockquote>
+      <p>In 1873, a witch marks a family for death.</p>
+    </blockquote>
+    <p>Works because it gives period, threat, and genre in one sentence.</p>
+  </section>
+  <section class="creator-checklist-copy-example">
+    <h4>Project Premise</h4>
+    <blockquote>
+      <p>mina's not a bad person, but when it really counted, she made a terrible choice.</p>
+    </blockquote>
+    <p>Works because it opens with character conflict instead of production logistics.</p>
+  </section>
+  <section class="creator-checklist-copy-example">
+    <h4>Why Support Matters</h4>
+    <blockquote>
+      <p>Principal photography on TECOLOTE is wrapped -- but that doesn't mean it can get out into the world without you.</p>
+    </blockquote>
+    <p>Works because it explains the campaign gap: the film exists, but finishing and release still need support.</p>
+  </section>
+  <section class="creator-checklist-copy-example">
+    <h4>Creator Voice</h4>
+    <blockquote>
+      <p>Traditional financing wanted us to soften the satire. We refused.</p>
+    </blockquote>
+    <p>Works because it gives the campaign a point of view, not just a budget request.</p>
+  </section>
+</div>
+
+<figure class="creator-checklist-example creator-checklist-example--wide creator-checklist-example--standalone">
+  <img src="/assets/images/checklists/creator-campaign-checklist/examples/gallery-still-example.webp" alt="A warm low-angle film still of a person lying in bed." loading="lazy">
+  <figcaption>Strong campaign copy gets easier when the next image reinforces the same tone, stakes, or world.</figcaption>
+</figure>
+
+### 1. Campaign Title
 
 - **Ideal length:** `2 to 8 words`
 - **Maximum target:** about `60 characters`
 
-## 2. Long-Form Campaign Description
+### 2. Long-Form Campaign Description
 
 This is the main body of the campaign page.
 
@@ -435,20 +475,20 @@ Strong section headings:
 - `The Visual Approach`
 - `Where We Are Now`
 
-## 3. Content Blocks
+### 3. Content Blocks
 
 The long-form campaign body can include rich blocks.
 
-### Text blocks
+#### Text blocks
 
 - **Ideal length:** `80 to 250 words`
 - most blocks should be `1 to 4 short paragraphs`
 
-### Quote blocks
+#### Quote blocks
 
 - **Ideal length:** `10 to 35 words`
 
-### Image blocks
+#### Image blocks
 
 Provide:
 
@@ -456,7 +496,7 @@ Provide:
 - alt text
 - optional caption
 
-### Gallery blocks
+#### Gallery blocks
 
 Provide:
 
@@ -464,7 +504,7 @@ Provide:
 - alt text for each image
 - optional caption
 
-### Embed blocks
+#### Embed blocks
 
 Provide:
 
@@ -650,6 +690,11 @@ Examples:
 - prop replica
 - extra ticket
 
+<figure class="creator-checklist-example creator-checklist-example--square creator-checklist-example--standalone">
+  <img src="/assets/images/checklists/creator-campaign-checklist/examples/tier-image-example.webp" alt="A black campaign T-shirt product mockup." loading="lazy">
+  <figcaption>Add-on images should show the actual item or the clearest possible product mockup.</figcaption>
+</figure>
+
 ### Campaign add-on deliverables
 
 For each campaign add-on, provide:
@@ -707,6 +752,25 @@ For each stretch goal, provide:
 
 - **Ideal length:** `8 to 25 words`
 
+Good examples:
+
+<div class="creator-checklist-guidance-examples">
+  <section class="creator-checklist-guidance-example">
+    <h4>Meaningful Upgrade</h4>
+    <blockquote>
+      <p><strong>Extra Sound Design Week:</strong> More Foley and ambience layers.</p>
+    </blockquote>
+    <p>Works because the extra money buys a clear improvement to the finished work.</p>
+  </section>
+  <section class="creator-checklist-guidance-example">
+    <h4>Audience Participation</h4>
+    <blockquote>
+      <p><strong>Silly Accent:</strong> Directors must give all notes in a supporter-chosen accent for one scene.</p>
+    </blockquote>
+    <p>Works because the reward is specific, playful, and easy for supporters to picture.</p>
+  </section>
+</div>
+
 ## Community Decisions
 
 Optional. Best used for questions that are fun, specific, and genuinely flexible.
@@ -724,13 +788,25 @@ For each decision, provide:
 - **Decision title:** `4 to 10 words`
 - **Option length:** `1 to 5 words`
 
+Good example:
+
+<div class="creator-checklist-guidance-examples">
+  <section class="creator-checklist-guidance-example">
+    <h4>Main Villain's Name</h4>
+    <blockquote>
+      <p>Options: Dr. Badguy McEvilface, The Dark Inconvenience, Susan</p>
+    </blockquote>
+    <p>Works because the choice is low-risk, funny, and meaningfully tied to the project’s tone.</p>
+  </section>
+</div>
+
 Good decisions are:
 
 - concrete
 - low-friction
 - creatively flexible
 
-<figure class="creator-checklist-screenshot creator-checklist-screenshot--compact">
+<figure class="creator-checklist-screenshot creator-checklist-screenshot--medium">
   <img src="/assets/images/checklists/creator-campaign-checklist/community-decision.png" alt="A supporter community decision card with poll options and a submit vote button." loading="lazy">
   <figcaption>Community decisions should be specific enough that supporters can vote quickly without needing extra context.</figcaption>
 </figure>
@@ -764,6 +840,32 @@ For each diary entry, provide:
 
 Diary entries should feel like real updates, not press releases.
 
+Good examples:
+
+<div class="creator-checklist-guidance-examples">
+  <section class="creator-checklist-guidance-example">
+    <h4>Milestone Update</h4>
+    <blockquote>
+      <p><strong>We hit $1K!</strong> Thanks to all our backers for your support.</p>
+    </blockquote>
+    <p>Works because it celebrates progress, thanks supporters, and creates momentum for the next share.</p>
+  </section>
+  <section class="creator-checklist-guidance-example">
+    <h4>Final Stretch Update</h4>
+    <blockquote>
+      <p>We have reached the final week of our fundraiser, and we only need $400 left to go.</p>
+    </blockquote>
+    <p>Works because it gives supporters a concrete number and a reason to act now.</p>
+  </section>
+  <section class="creator-checklist-guidance-example">
+    <h4>Next-Step Update</h4>
+    <blockquote>
+      <p>Now comes the fun part -- YOUR part. If you backed a reward tier, it's time to submit your materials.</p>
+    </blockquote>
+    <p>Works because it turns campaign success into a clear supporter action.</p>
+  </section>
+</div>
+
 ## Promotion and Embeds
 
 Creators should plan promotion before launch, not after the page is live.
@@ -792,6 +894,25 @@ Creators should provide or confirm:
 - 3 to 5 short share captions
 - 1 short email/newsletter blurb
 - press or partner contacts, if relevant
+
+Good examples:
+
+<div class="creator-checklist-guidance-examples">
+  <section class="creator-checklist-guidance-example">
+    <h4>Share Caption</h4>
+    <blockquote>
+      <p>Every share counts. Let's bring this thing home.</p>
+    </blockquote>
+    <p>Works because it is short, direct, and easy to paste into a launch-week post.</p>
+  </section>
+  <section class="creator-checklist-guidance-example">
+    <h4>Email Blurb</h4>
+    <blockquote>
+      <p>Principal photography is wrapped, but finishing the film and getting it in front of audiences still needs support.</p>
+    </blockquote>
+    <p>Works because it explains why the campaign exists after production is already underway.</p>
+  </section>
+</div>
 
 ### Embed expectations
 
