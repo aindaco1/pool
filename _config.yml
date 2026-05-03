@@ -37,8 +37,8 @@ exclude:
 # Structured platform settings for forks.
 platform:
   name: The Pool
-  version: "0.9.4"
-  release_label: "v0.9.4"
+  version: "0.9.5"
+  release_label: "v0.9.5"
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   pledges_email_from: "The Pool <pledges@dustwave.xyz>"
@@ -270,6 +270,9 @@ i18n:
     community_index:
       en: /community/
       es: /es/community/
+    creator_campaign_checklist:
+      en: /creator-campaign-checklist/
+      es: /es/creator-campaign-checklist/
 
 design:
   font_body: '"Inter", sans-serif'

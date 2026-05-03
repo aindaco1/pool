@@ -17,11 +17,11 @@ STRIPE_LOG="/tmp/pool-stripe-listen.log"
 USES_FIRST_PARTY_LOCAL=true
 SKIP_STRIPE=false
 
-prefer_node20_path() {
+prefer_current_node_path() {
   local candidate=""
   for candidate in \
-    "$HOME/.nvm/versions/node/v20.19.6/bin" \
-    "$HOME/.nvm/versions/node/v20.*/bin"
+    "$HOME/.nvm/versions/node/v24.*/bin" \
+    "$HOME/.nvm/versions/node/v22.*/bin"
   do
     for resolved in $candidate; do
       if [ -x "$resolved/node" ]; then
@@ -127,7 +127,7 @@ kill_port_if_busy() {
 
 echo "🚀 Starting development environment..."
 
-prefer_node20_path || true
+prefer_current_node_path || true
 prefer_stripe_path || true
 
 ruby ./scripts/sync-worker-config.rb
@@ -156,7 +156,7 @@ bundle exec jekyll serve --config _config.yml,_config.local.yml --port "$JEKYLL_
 # Note: Real pledges from Stripe go to remote KV. Use --remote flag if you need them.
 echo "⚡ Starting Wrangler (local KV)..."
 (cd worker && {
-  prefer_node20_path || true
+  prefer_current_node_path || true
   npx wrangler dev --env dev --port "$WORKER_PORT"
 }) &
 

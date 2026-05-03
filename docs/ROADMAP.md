@@ -199,6 +199,13 @@
   - the Worker sends daily campaign-scoped pledge-ledger emails at 7am MT for live campaigns and split post-deadline fulfillment emails for campaign vs. platform fulfillers
   - `POST /admin/report/campaign-runner` supports dry-run previews and manual sends without waiting for cron, including split fulfillment row counts and platform-recipient previews
   - local CLI exports and scheduled Worker emails now share the same JS report core to avoid CSV drift
+- [x] v0.9.5 local-runtime parity and creator launch handoff
+  - Podman Worker development now runs on Node 24 to match GitHub Actions deployments
+  - host and Podman helper scripts now prefer Node 24 and no longer force the obsolete Node 20 Wrangler path
+  - Wrangler 4 local development runs against Worker compatibility date `2026-05-03`, avoiding the older local-runtime polyfill crash under Node 24
+  - Podman Worker dependency setup now uses `npm ci` so local container starts do not mutate `worker/package-lock.json`
+  - the public Campaign Creator Checklist now covers campaign add-ons, embed-code promotion, shipping fallback/free-shipping decisions, tax expectations, report recipients, and fulfillment handoff
+  - a Spanish creator checklist route now exists at `/es/creator-campaign-checklist/`
 
 ## Planned
 

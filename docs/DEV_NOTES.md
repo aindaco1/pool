@@ -72,6 +72,8 @@ Current mirrored Worker values worth treating as part of the supported customiza
 
 The repo now includes `npm run sync:worker-config`, which syncs those mirrored values from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`. The main local dev, test, Worker-only, and pre-merge paths call it automatically. The merge gate’s first-party artifact check also falls back to the Podman-backed build path when host Bundler/Jekyll is unavailable.
 
+Local Worker development now targets Node 24 to match GitHub Actions. The Podman Worker image defaults to Node 24, while host helper scripts prefer Node 24 and fall back to Node 22 rather than forcing the old Node 20 path that Wrangler 4 no longer supports. The shared Worker `compatibility_date` should move deliberately with Wrangler/runtime updates so local Miniflare behavior and deployed Workers behavior stay aligned.
+
 USPS OAuth secrets are intentionally separate from that mirrored config surface. Keep `USPS_CLIENT_SECRET` in Worker secrets or `worker/.dev.vars`, not in `_config.yml`.
 
 SEO fundamentals now follow a similarly bounded model:
@@ -616,7 +618,7 @@ npm run podman:doctor
 
 This starts:
 - **Jekyll** at http://127.0.0.1:4000 (with `_config.local.yml` overrides)
-- **Worker** at http://127.0.0.1:8787
+- **Worker** at http://127.0.0.1:8787, running under Node 24 in the dev container
 - **Stripe CLI** forwarding webhooks to the local Worker when available
 - local containerized dependencies for the supported Podman dev/test path
 

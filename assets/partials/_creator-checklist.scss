@@ -1,0 +1,170 @@
+.creator-checklist-layout {
+  display: grid;
+  grid-template-areas: "content" "toc";
+  gap: $space-3xl;
+  align-items: start;
+
+  @media (min-width: 725px) {
+    grid-template-areas: "toc content";
+    grid-template-columns: minmax(168px, 220px) minmax(0, 1fr);
+  }
+}
+
+.creator-checklist-article {
+  grid-area: content;
+  min-width: 0;
+
+  > *:last-child {
+    margin-bottom: 0;
+  }
+
+  p,
+  li {
+    @include type-body-copy;
+  }
+
+  h1 {
+    margin-bottom: $space-xl;
+  }
+
+  h2 {
+    margin-top: $space-4xl;
+  }
+
+  h3 {
+    margin-top: $space-2xl;
+  }
+
+  h4 {
+    margin-top: $space-xl;
+  }
+
+  blockquote {
+    margin: $space-xl 0;
+    padding: $space-md $space-lg;
+    border-left: 4px solid $color--primary;
+    background: $surface-tint-soft;
+
+    p {
+      margin: 0;
+    }
+  }
+
+  table {
+    background: $surface--page;
+  }
+}
+
+.creator-checklist-toc {
+  grid-area: toc;
+  padding-top: $space-lg;
+  border-top: 1px solid $border--default;
+  color: $color--secondary;
+
+  @media (min-width: 725px) {
+    position: sticky;
+    top: $space-lg;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  h2 {
+    @include type-label;
+    margin: 0 0 $space-md;
+    color: $color--primary;
+  }
+
+  ol {
+    display: grid;
+    gap: $space-sm;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  a {
+    @include type-ui;
+    display: inline-block;
+    text-decoration: none;
+    color: inherit;
+
+    &:hover,
+    &:focus-visible {
+      color: $color--primary;
+      text-decoration: underline;
+      text-underline-offset: 0.18em;
+    }
+  }
+}
+
+.creator-checklist-screenshot {
+  margin: $space-2xl auto;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid $border--default;
+    border-radius: $radius--lg;
+    background: $surface--base;
+    box-shadow: 0 12px 32px rgba($color--black, 0.08);
+  }
+
+  figcaption {
+    margin-top: $space-sm;
+    @include type-meta;
+    text-align: center;
+  }
+}
+
+.creator-checklist-screenshot--narrow {
+  max-width: 520px;
+}
+
+.creator-checklist-screenshot--compact {
+  max-width: 430px;
+}
+
+.creator-checklist-example-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $space-lg;
+  margin: $space-2xl 0;
+
+  @include xsm {
+    grid-template-columns: 1fr;
+  }
+}
+
+.creator-checklist-example {
+  margin: 0;
+
+  @media (min-width: 725px) {
+    &:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid $border--default;
+    border-radius: $radius--lg;
+    background: $surface--base;
+    object-fit: cover;
+  }
+
+  figcaption {
+    margin-top: $space-xs;
+    @include type-meta;
+  }
+}
+
+.creator-checklist-example--wide img {
+  aspect-ratio: 16 / 9;
+}
+
+.creator-checklist-example--square img {
+  aspect-ratio: 1;
+}

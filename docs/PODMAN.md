@@ -17,6 +17,7 @@ Included today:
   - `http://127.0.0.1:8787`
 - bind-mounted repo source for fast iteration without image rebuilds on normal code changes
 - local Wrangler state persisted in the repo worktree
+- Worker dev image based on Node 24, matching the GitHub Actions deployment runtime
 - local `worker/.dev.vars` usage, including auto-generation of `CHECKOUT_INTENT_SECRET`
 - optional host Stripe CLI forwarding to the local Worker
 - automatic Stripe CLI discovery from common macOS/Homebrew install paths
@@ -120,6 +121,7 @@ Rebuild when you change:
 - `worker/Containerfile.dev`
 - system package requirements
 - dependency bootstrap assumptions
+- Node/Wrangler runtime assumptions such as the Worker `compatibility_date`
 
 Use:
 
@@ -160,6 +162,8 @@ The report wrappers load Cloudflare auth from `.env`, `.env.local`, `.env.cloudf
 `./scripts/test-e2e.sh --podman` is now fully automated browser coverage. The dedicated `./scripts/test-checkout.sh --podman` helper remains the manual interactive path when you specifically want to drive a real checkout in your own browser. The automated headless browser suite runs in its own Playwright container and reuses the already-running site/Worker instead of trying to boot Jekyll inside the test container.
 
 For host-side commands that need a Podman-backed site/Worker without assuming detached stack persistence, use [`scripts/podman-stack-run.sh`](../scripts/podman-stack-run.sh). `npm run test:security:podman` uses that wrapper to boot the stack, run the security suite, and tear the stack down in one invocation.
+
+The Worker container defaults to `node:24-bookworm-slim`. If a local Podman image pull stalls but the Playwright image is already cached, the launcher can reuse `mcr.microsoft.com/playwright:v1.57.0-noble` as a Node 24 base so development still matches the GitHub Actions Node 24 runtime.
 
 For the host-side headless browser path, Playwright now builds a clean static `_site` and serves it with a lightweight HTTP server instead of relying on `jekyll serve`. That keeps browser regressions closer to the real published asset shape and avoids some WEBrick instability during parallel runs.
 
@@ -249,6 +253,8 @@ Podman mode is not meant to perfectly clone Cloudflare production, but it does p
 
 - separate site and Worker processes
 - local Wrangler simulation for KV / Durable Objects
+- Node 24 in the Worker container, matching GitHub Actions
+- the same Worker compatibility date used by deployment
 - the same Worker env/dev config used by the host flow
 - the same first-party cart and checkout path
 - the same static-build browser path used by the host headless harness

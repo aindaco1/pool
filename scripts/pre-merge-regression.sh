@@ -31,11 +31,11 @@ prefer_podman_path() {
   return 1
 }
 
-prefer_node20_path() {
+prefer_current_node_path() {
   local candidate=""
   for candidate in \
-    "$HOME/.nvm/versions/node/v20.19.6/bin" \
-    "$HOME/.nvm/versions/node/v20.*/bin"
+    "$HOME/.nvm/versions/node/v24.*/bin" \
+    "$HOME/.nvm/versions/node/v22.*/bin"
   do
     for resolved in $candidate; do
       if [[ -x "$resolved/node" ]]; then
@@ -230,7 +230,7 @@ stop_worker() {
 
 start_worker() {
   (
-    export PATH="$HOME/.nvm/versions/node/v20.19.6/bin:$PATH"
+    prefer_current_node_path || true
     cd worker && npx wrangler dev --env dev --port 8787 >/tmp/pool-premerge-worker.log 2>&1
   ) &
   WORKER_PID=$!
@@ -344,7 +344,7 @@ export MAGIC_LINK_SECRET="${MAGIC_LINK_SECRET:-test-magic-link-secret}"
 export RESEND_API_KEY="${RESEND_API_KEY:-re_test_smoke}"
 SMOKE_ADMIN_SECRET="${ADMIN_SECRET}"
 
-prefer_node20_path || true
+prefer_current_node_path || true
 stabilize_podman_connection
 
 if [[ -f worker/.dev.vars ]]; then
@@ -375,7 +375,13 @@ else
   print_host_jekyll_fallback_reason
   USE_PODMAN_JEKYLL=true
   run_phase "5. First-party build artifact checks" bash -lc '
-    PATH="$HOME/.nvm/versions/node/v20.19.6/bin:/opt/podman/bin:$PATH"
+    for candidate in "$HOME"/.nvm/versions/node/v24.*/bin "$HOME"/.nvm/versions/node/v22.*/bin; do
+      if [[ -x "$candidate/node" ]]; then
+        PATH="$candidate:$PATH"
+        break
+      fi
+    done
+    PATH="/opt/podman/bin:$PATH"
     scripts/pre-merge-regression.sh __podman_build_check
   '
 fi

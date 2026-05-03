@@ -11,6 +11,8 @@ npm run podman:doctor
 
 That boots the site and Worker together on the standard local ports and is the easiest way to exercise the full on-site checkout and `Update Card` flows locally.
 
+The repo-root Podman path runs the Worker with Node 24, matching GitHub Actions. Host-only Worker development should also use Node 24 when possible; Wrangler 4 requires at least Node 22. The Worker compatibility date is intentionally shared across local and deployed environments so Miniflare/Workers runtime behavior does not drift.
+
 If you specifically work from the `worker/` directory, the Worker npm scripts now auto-run the config mirror first so `worker/wrangler.toml` stays aligned with the repo-root `_config.yml` / `_config.local.yml`.
 
 Treat `_config.local.yml` as an override-only file for localhost-specific values. The canonical fork-facing settings should live in the repo-root `_config.yml`, and the Worker mirror will follow from there.

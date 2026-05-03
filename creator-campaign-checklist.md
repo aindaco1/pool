@@ -5,7 +5,11 @@ description: A complete prep checklist for creators launching a campaign on The 
 permalink: /creator-campaign-checklist/
 lang: en
 indexable: false
+translation_key: creator_campaign_checklist
 ---
+
+<div class="creator-checklist-layout">
+<article class="creator-checklist-article" markdown="1">
 
 # Campaign Creator Checklist
 
@@ -67,6 +71,11 @@ If a creator only reads one section, it should be this one.
 - provide variation details, if applicable
 - provide fulfillment owner and any packing/handling notes
 
+<figure class="creator-checklist-screenshot creator-checklist-screenshot--narrow">
+  <img src="/assets/images/checklists/creator-campaign-checklist/campaign-card.png" alt="A campaign card showing title, blurb, progress, and featured tier." loading="lazy">
+  <figcaption>A finished campaign card needs a readable image, crisp blurb, progress context, and one clear next action.</figcaption>
+</figure>
+
 ## What Makes a Campaign Feel Complete
 
 A complete campaign on The Pool usually has four things working together:
@@ -83,6 +92,11 @@ The best campaigns do not overwhelm people with information. They make it easy t
 - why this creator is the right person to make it
 - what a supporter gets
 - why someone should join now
+
+<figure class="creator-checklist-screenshot">
+  <img src="/assets/images/checklists/creator-campaign-checklist/campaign-hero-progress.png" alt="Campaign hero media with progress and goal markers beneath it." loading="lazy">
+  <figcaption>The campaign hero should make the project feel real before the supporter reaches the tier list.</figcaption>
+</figure>
 
 ## Core Campaign Information
 
@@ -102,6 +116,11 @@ These are the foundational fields every campaign should have.
 | Runner report emails | Recommended | One or more campaign-runner recipients for pledge and fulfillment reports. |
 | Fulfillment owner | Recommended | Who is responsible for campaign rewards after a successful charge. |
 
+<figure class="creator-checklist-screenshot creator-checklist-screenshot--compact">
+  <img src="/assets/images/checklists/creator-campaign-checklist/creator-facts.png" alt="Creator facts panel showing creator image, name, category, and embed link." loading="lazy">
+  <figcaption>The creator facts panel pulls from the core metadata, so missing basics become visible on the public page.</figcaption>
+</figure>
+
 ### Short Blurb Guidance
 
 Think of the short blurb as the project’s logline, not its full pitch.
@@ -117,6 +136,31 @@ Good pattern:
 ## Image Deliverables
 
 The Pool leans heavily on visuals. Even a simple campaign feels much more convincing when the images are intentional, clean, and consistent.
+
+These copied examples come from existing campaigns, but they live in this checklist’s own image folder so forks can delete or replace campaign media without breaking this guide.
+
+<div class="creator-checklist-example-grid">
+  <figure class="creator-checklist-example creator-checklist-example--square">
+    <img src="/assets/images/checklists/creator-campaign-checklist/examples/square-hero-example.webp" alt="A centered revolver illustration on a pale background." loading="lazy">
+    <figcaption><strong>Square hero:</strong> centered subject, strong contrast, readable at card size.</figcaption>
+  </figure>
+  <figure class="creator-checklist-example creator-checklist-example--wide">
+    <img src="/assets/images/checklists/creator-campaign-checklist/examples/wide-hero-example.webp" alt="A wide illustrated scene with a large white hand and office objects." loading="lazy">
+    <figcaption><strong>Wide hero:</strong> cinematic composition with room for responsive cropping.</figcaption>
+  </figure>
+  <figure class="creator-checklist-example creator-checklist-example--square">
+    <img src="/assets/images/checklists/creator-campaign-checklist/examples/creator-image-example.webp" alt="A clean red circular Maiz production company mark." loading="lazy">
+    <figcaption><strong>Creator image:</strong> simple mark that still reads in a small sidebar.</figcaption>
+  </figure>
+  <figure class="creator-checklist-example creator-checklist-example--square">
+    <img src="/assets/images/checklists/creator-campaign-checklist/examples/tier-image-example.webp" alt="A black campaign T-shirt product mockup." loading="lazy">
+    <figcaption><strong>Tier image:</strong> actual reward imagery beats a vague mood image.</figcaption>
+  </figure>
+  <figure class="creator-checklist-example creator-checklist-example--wide">
+    <img src="/assets/images/checklists/creator-campaign-checklist/examples/gallery-still-example.webp" alt="A warm low-angle film still of a person lying in bed." loading="lazy">
+    <figcaption><strong>Gallery still:</strong> specific, tonal, and useful for communicating the finished work.</figcaption>
+  </figure>
+</div>
 
 ## 1. Square Hero Image
 
@@ -441,6 +485,11 @@ Good incentives should feel:
 - aligned with the project
 - worth sharing
 
+<figure class="creator-checklist-screenshot creator-checklist-screenshot--compact">
+  <img src="/assets/images/checklists/creator-campaign-checklist/tier-card.png" alt="A campaign tier card with a reward image, tier name, price, description, and disabled ended-state button." loading="lazy">
+  <figcaption>Tier cards work best when the name, price, image, and description can be understood at a glance.</figcaption>
+</figure>
+
 ### Supporter Psychology
 
 Supporters usually want some mix of the following:
@@ -681,6 +730,11 @@ Good decisions are:
 - low-friction
 - creatively flexible
 
+<figure class="creator-checklist-screenshot creator-checklist-screenshot--compact">
+  <img src="/assets/images/checklists/creator-campaign-checklist/community-decision.png" alt="A supporter community decision card with poll options and a submit vote button." loading="lazy">
+  <figcaption>Community decisions should be specific enough that supporters can vote quickly without needing extra context.</figcaption>
+</figure>
+
 Bad decisions are:
 
 - vague
@@ -720,6 +774,11 @@ The Pool includes a hosted campaign embed builder at:
 - `/es/embed/campaign/?slug=your-campaign-slug`, for Spanish-language pages
 
 The embed is a live `iframe` widget for websites that allow pasted HTML. It reflects current campaign state, pledged total, countdown/progress, media settings, and the campaign call to action.
+
+<figure class="creator-checklist-screenshot">
+  <img src="/assets/images/checklists/creator-campaign-checklist/embed-builder.png" alt="The campaign embed builder with layout, theme, media, call-to-action controls, embed code, and preview area." loading="lazy">
+  <figcaption>The embed builder turns promotion planning into concrete choices: layout, theme, media visibility, CTA, and destinations.</figcaption>
+</figure>
 
 ### Promotion materials to prepare
 
@@ -961,3 +1020,32 @@ If someone needs the shortest possible prep version, send them this:
 ---
 
 This checklist is meant to help creators deliver everything needed for a campaign that feels polished, legible, and ready to support on **The Pool**.
+
+</article>
+
+<nav class="creator-checklist-toc" aria-labelledby="creator-checklist-toc-title">
+  <h2 id="creator-checklist-toc-title">Contents</h2>
+  <ol>
+    <li><a href="#the-short-version">The Short Version</a></li>
+    <li><a href="#what-makes-a-campaign-feel-complete">What Makes a Campaign Feel Complete</a></li>
+    <li><a href="#core-campaign-information">Core Campaign Information</a></li>
+    <li><a href="#image-deliverables">Image Deliverables</a></li>
+    <li><a href="#campaign-pitch-video">Campaign Pitch Video</a></li>
+    <li><a href="#campaign-copy">Campaign Copy</a></li>
+    <li><a href="#reward-and-tier-strategy">Reward and Tier Strategy</a></li>
+    <li><a href="#support-items">Support Items</a></li>
+    <li><a href="#add-on-products">Add-On Products</a></li>
+    <li><a href="#stretch-goals">Stretch Goals</a></li>
+    <li><a href="#community-decisions">Community Decisions</a></li>
+    <li><a href="#production-diary">Production Diary</a></li>
+    <li><a href="#promotion-and-embeds">Promotion and Embeds</a></li>
+    <li><a href="#physical-rewards-and-shipping">Physical Rewards and Shipping</a></li>
+    <li><a href="#tax-and-checkout-expectations">Tax and Checkout Expectations</a></li>
+    <li><a href="#campaign-reports-and-fulfillment-handoff">Reports and Fulfillment</a></li>
+    <li><a href="#recommended-asset-bundle-for-a-strong-campaign">Recommended Asset Bundle</a></li>
+    <li><a href="#delivery-recommendations">Delivery Recommendations</a></li>
+    <li><a href="#readiness-checklist">Readiness Checklist</a></li>
+    <li><a href="#fast-creator-worksheet">Fast Creator Worksheet</a></li>
+  </ol>
+</nav>
+</div>

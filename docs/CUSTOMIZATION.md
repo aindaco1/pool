@@ -93,7 +93,7 @@ These values feed:
 Notes:
 
 - `platform.*` is the primary branding surface.
-- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v0.9.4`.
+- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v0.9.5`.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
 - `platform.logo_path` is also the mirrored brand mark used in supporter emails.
@@ -103,8 +103,8 @@ Example:
 ```yml
 platform:
   name: My Fork
-  version: 0.9.4
-  release_label: v0.9.4
+  version: 0.9.5
+  release_label: v0.9.5
   company_name: Example Studio
   support_email: support@example.com
   pledges_email_from: "My Fork <pledges@example.com>"

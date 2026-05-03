@@ -5,7 +5,7 @@
 ### Prerequisites
 - Podman for the recommended local path, or:
 - Ruby + Bundler (for host Jekyll)
-- Node.js (for Worker + scripts)
+- Node.js 24 preferred, Node.js 22 minimum for Wrangler 4 (for Worker + scripts)
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (for host Worker development)
 - optional: [Stripe CLI](https://stripe.com/docs/stripe-cli) (for webhook testing)
 
@@ -17,6 +17,8 @@ npm run podman:doctor
 ```
 
 That is the default local development path. It keeps the standard local ports and local state files, but runs Jekyll and Wrangler inside containers so new forks do not need host Ruby or host Wrangler just to boot the app.
+
+The Podman Worker container runs Node 24, matching GitHub Actions. Host-only Worker development should use Node 24 when possible; Node 22 is the minimum supported runtime for Wrangler 4.
 
 If you need the host-only path instead:
 
@@ -131,6 +133,7 @@ bundle exec jekyll clean
 
 - [ ] Clone repo, run `npm run podman:doctor`
 - [ ] Start local dev with `./scripts/dev.sh --podman`
+- [ ] Confirm Worker local dev is running on Node 24 through the Podman path
 - [ ] Only use the host-only Jekyll/Wrangler path if you intentionally need it
 - [ ] Skim `_layouts/` & `_includes/` to see first-party cart integration
 - [ ] Review `assets/js/` cart & pledge scripts

@@ -16,11 +16,11 @@ done
 
 USES_FIRST_PARTY_LOCAL=true
 
-prefer_node20_path() {
+prefer_current_node_path() {
     local candidate=""
     for candidate in \
-        "$HOME/.nvm/versions/node/v20.19.6/bin" \
-        "$HOME/.nvm/versions/node/v20.*/bin"
+        "$HOME/.nvm/versions/node/v24.*/bin" \
+        "$HOME/.nvm/versions/node/v22.*/bin"
     do
         for resolved in $candidate; do
             if [ -x "$resolved/node" ]; then
@@ -32,7 +32,7 @@ prefer_node20_path() {
     return 1
 }
 
-prefer_node20_path || true
+prefer_current_node_path || true
 
 prefer_podman_path() {
     local candidate=""

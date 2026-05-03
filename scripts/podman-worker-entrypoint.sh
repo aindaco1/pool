@@ -15,7 +15,7 @@ if [ ! -d node_modules ] || \
    [ ! -x node_modules/.bin/wrangler ] || \
    [ ! -d node_modules/sales-tax ] || \
    [ "$CURRENT_PACKAGE_LOCK_HASH" != "$INSTALLED_PACKAGE_LOCK_HASH" ]; then
-  npm install
+  npm ci
   mkdir -p node_modules
   printf '%s\n' "$CURRENT_PACKAGE_LOCK_HASH" > "$PACKAGE_LOCK_HASH_FILE"
 fi

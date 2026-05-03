@@ -14,6 +14,7 @@ SITE_CONTAINER="pool-dev-site"
 WORKER_CONTAINER="pool-dev-worker"
 SITE_IMAGE="localhost/pool-dev-site:latest"
 WORKER_IMAGE="localhost/pool-dev-worker:latest"
+WORKER_NODE_IMAGE="${PODMAN_WORKER_NODE_IMAGE:-}"
 SITE_VOLUME="pool-dev-bundle"
 WORKER_NODE_MODULES_VOLUME="pool-dev-worker-node-modules"
 SKIP_STRIPE="${SKIP_STRIPE:-false}"
@@ -99,11 +100,11 @@ detect_os_family() {
   esac
 }
 
-prefer_node20_path() {
+prefer_current_node_path() {
   local candidate=""
   for candidate in \
-    "$HOME/.nvm/versions/node/v20.19.6/bin" \
-    "$HOME/.nvm/versions/node/v20.*/bin"
+    "$HOME/.nvm/versions/node/v24.*/bin" \
+    "$HOME/.nvm/versions/node/v22.*/bin"
   do
     for resolved in $candidate; do
       if [ -x "$resolved/node" ]; then
@@ -336,10 +337,11 @@ build_image_if_needed() {
   local image="$1"
   local context="$2"
   local file="$3"
+  shift 3
 
   if [ "$PODMAN_REBUILD" = "1" ] || ! podman image exists "$image"; then
     echo "🔨 Building $image..."
-    podman build -t "$image" -f "$file" "$context"
+    podman build "$@" -t "$image" -f "$file" "$context"
   fi
 }
 
@@ -390,7 +392,7 @@ if [ "$PODMAN_DETACH" != "true" ]; then
   trap 'cleanup' EXIT
 fi
 
-prefer_node20_path || true
+prefer_current_node_path || true
 prefer_podman_path || true
 prefer_stripe_path || true
 ensure_podman_ready
@@ -401,7 +403,19 @@ kill_port_if_busy "$JEKYLL_PORT" "Jekyll"
 kill_port_if_busy "$WORKER_PORT" "Worker"
 
 build_image_if_needed "$SITE_IMAGE" "$ROOT_DIR" "$ROOT_DIR/Containerfile.dev"
-build_image_if_needed "$WORKER_IMAGE" "$ROOT_DIR/worker" "$ROOT_DIR/worker/Containerfile.dev"
+if [ -z "$WORKER_NODE_IMAGE" ] && \
+   ! podman image exists "docker.io/library/node:24-bookworm-slim" && \
+   podman image exists "mcr.microsoft.com/playwright:v1.57.0-noble"; then
+  WORKER_NODE_IMAGE="mcr.microsoft.com/playwright:v1.57.0-noble"
+  echo "ℹ️  Using cached Playwright Node 24 image for the Worker dev base."
+fi
+
+if [ -n "$WORKER_NODE_IMAGE" ]; then
+  build_image_if_needed "$WORKER_IMAGE" "$ROOT_DIR/worker" "$ROOT_DIR/worker/Containerfile.dev" \
+    --build-arg "WORKER_NODE_IMAGE=$WORKER_NODE_IMAGE"
+else
+  build_image_if_needed "$WORKER_IMAGE" "$ROOT_DIR/worker" "$ROOT_DIR/worker/Containerfile.dev"
+fi
 
 podman volume exists "$SITE_VOLUME" >/dev/null 2>&1 || podman volume create "$SITE_VOLUME" >/dev/null
 podman volume exists "$WORKER_NODE_MODULES_VOLUME" >/dev/null 2>&1 || podman volume create "$WORKER_NODE_MODULES_VOLUME" >/dev/null

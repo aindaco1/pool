@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v0.9.4**. The Pool will treat **v1.0** as the wider public launch milestone once the remaining roadmap items are complete.
+Current release milestone: **v0.9.5**. The Pool will treat **v1.0** as the wider public launch milestone once the remaining roadmap items are complete.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -72,6 +72,8 @@ npm run podman:doctor
 
 That is the recommended local development path. It boots Jekyll, the Worker, optional Stripe CLI forwarding, and the local support services together with the repo's current defaults.
 
+The Worker dev container now runs on Node 24 to match GitHub Actions. Wrangler 4.87 also runs against the shared Worker `compatibility_date = "2026-05-03"` so local Miniflare/Workers behavior stays aligned with deployed runtime semantics.
+
 If you want to rebuild the Podman dev images after dependency or base-image changes:
 ```bash
 PODMAN_REBUILD=1 ./scripts/dev.sh --podman
@@ -132,6 +134,8 @@ See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for the supported no-code cus
 See [docs/SEO.md](docs/SEO.md) for the current SEO fundamentals implementation and supported SEO surface.
 See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) for the current accessibility baseline and verified critical flows.
 See [docs/I18N.md](docs/I18N.md) for the locale model, shared translation sources, and localized route behavior.
+
+Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It now covers campaign add-ons, hosted embeds, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
 
 For localization, the supported model is:
 
@@ -315,6 +319,7 @@ See [`docs/`](docs/) for full documentation:
 Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md), [CUSTOMIZATION.md](docs/CUSTOMIZATION.md), [SECURITY.md](docs/SECURITY.md), and [TESTING.md](docs/TESTING.md).
 
 - [CONTRIBUTING.md](docs/CONTRIBUTING.md) — Getting started, setup & contribution guide
+- [CHANGELOG.md](CHANGELOG.md) — Release notes
 - [PODMAN.md](docs/PODMAN.md) — Rootless Podman local dev path for Jekyll + Worker
 - [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) — System architecture
 - [WORKFLOWS.md](docs/WORKFLOWS.md) — Pledge lifecycle, magic links & charge flow
@@ -330,6 +335,7 @@ Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT
 - [ADD_ON_PRODUCTS.md](docs/ADD_ON_PRODUCTS.md) — Current global add-on catalog structure and initial merch import model
 - [ROADMAP.md](docs/ROADMAP.md) — Planned features
 - [CMS.md](docs/CMS.md) — Pages CMS setup & campaign editing guide
+- [Campaign Creator Checklist](creator-campaign-checklist.md) — Public creator launch-prep worksheet, with Spanish route at `/es/creator-campaign-checklist/`
 
 ## Key Directories
 
