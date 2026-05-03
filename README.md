@@ -393,6 +393,22 @@ Required GitHub repository secrets for automatic Worker deployment:
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 - `ADMIN_SECRET` for the post-deploy diary check
+- optional `DIARY_CHECK_BYPASS_SECRET` if Cloudflare WAF challenges the post-deploy diary check
+
+If the diary check logs an HTTP `403` Cloudflare challenge page, the request is being stopped before it reaches the Worker. Add a Cloudflare WAF custom rule that skips managed challenges for:
+
+- host equals `pledge.dustwave.xyz`
+- path equals `/admin/diary/check`
+- method equals `POST`
+- header `X-Pool-Diary-Check` equals the `DIARY_CHECK_BYPASS_SECRET` value
+
+Suggested expression:
+
+```text
+(http.host eq "pledge.dustwave.xyz" and http.request.method eq "POST" and http.request.uri.path eq "/admin/diary/check" and any(http.request.headers["x-pool-diary-check"][*] eq "your-bypass-secret"))
+```
+
+The Worker still requires `Authorization: Bearer ADMIN_SECRET`; the bypass header only lets the GitHub Actions automation reach that authenticated endpoint.
 
 Temporary fallback: the workflow also supports legacy Cloudflare auth via
 - `CLOUDFLARE_EMAIL`

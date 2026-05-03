@@ -102,17 +102,30 @@ jobs:
 
       - name: Check for new diary entries
         if: success()
+        env:
+          ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+          DIARY_CHECK_BYPASS_SECRET: ${{ secrets.DIARY_CHECK_BYPASS_SECRET }}
         run: |
           sleep 30  # Wait for CDN propagation after cache purge
           DIARY_RESPONSE="$(mktemp)"
+          DIARY_CURL_HEADERS=(
+            -H "Authorization: Bearer $ADMIN_SECRET"
+            -H "Content-Type: application/json"
+          )
+          if [ -n "$DIARY_CHECK_BYPASS_SECRET" ]; then
+            DIARY_CURL_HEADERS+=(-H "X-Pool-Diary-Check: $DIARY_CHECK_BYPASS_SECRET")
+          fi
+
           DIARY_STATUS="$(curl -sS -o "$DIARY_RESPONSE" -w "%{http_code}" -X POST \
-            -H "Authorization: Bearer ${{ secrets.ADMIN_SECRET }}" \
-            -H "Content-Type: application/json" \
+            "${DIARY_CURL_HEADERS[@]}" \
             https://pledge.dustwave.xyz/admin/diary/check || true)"
 
           if [ "$DIARY_STATUS" -ge 200 ] && [ "$DIARY_STATUS" -lt 300 ]; then
             echo "Diary check completed (HTTP $DIARY_STATUS):"
             cat "$DIARY_RESPONSE"
+          elif grep -qiE 'Just a moment|challenge-platform|__cf_chl' "$DIARY_RESPONSE"; then
+            echo "Diary check was blocked by a Cloudflare challenge (non-fatal, HTTP ${DIARY_STATUS:-curl-error})."
+            echo "Configure a Cloudflare WAF skip rule for POST /admin/diary/check with the X-Pool-Diary-Check header, while keeping Worker ADMIN_SECRET auth enabled."
           else
             echo "Diary check failed (non-fatal, HTTP ${DIARY_STATUS:-curl-error}):"
             cat "$DIARY_RESPONSE"
