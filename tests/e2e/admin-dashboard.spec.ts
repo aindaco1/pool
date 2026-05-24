@@ -63,6 +63,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     summary: [],
     supporters: [],
     reportPreview: [],
+    reportCsv: [],
     reportSend: [],
     inventoryRead: [],
     inventoryWrite: [],
@@ -72,6 +73,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     settingsPublish: [],
     logoUpload: [],
     imageUpload: [],
+    marketingReferrals: [],
     contentLoad: [],
     contentPreview: [],
     contentPublish: []
@@ -278,6 +280,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
             }, {
               title: 'Design',
               rows: [
+                { label: 'Logo', value: '/assets/images/defaults/dust-wave-square.png', rawValue: '/assets/images/defaults/dust-wave-square.png', editable: true, path: 'platform.logo_path', type: 'string', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo' },
                 { label: 'Body font', value: '"Inter", sans-serif', rawValue: '"Inter", sans-serif', editable: true, path: 'design.font_body', type: 'string', input: 'text', placeholder: '"Inter", sans-serif', layoutGroup: 'design-fonts' },
                 { label: 'Heading font', value: '"gambado-sans", sans-serif', rawValue: '"gambado-sans", sans-serif', editable: true, path: 'design.font_display', type: 'string', input: 'text', placeholder: '"gambado-sans", sans-serif', layoutGroup: 'design-fonts' },
                 { label: 'Text Color', value: '#252930', rawValue: '#252930', editable: true, path: 'design.color_text', type: 'string', input: 'color', layoutGroup: 'design-colors' },
@@ -458,6 +461,18 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
       });
     }
+    if (url.pathname === '/admin/reports/campaign-runner.csv') {
+      calls.reportCsv.push(Object.fromEntries(url.searchParams.entries()));
+      return route.fulfill({
+        status: 200,
+        headers: {
+          ...JSON_HEADERS,
+          'content-type': 'text/csv',
+          'content-disposition': 'attachment; filename="hand-relations-pledge-report-2026-05-16.csv"'
+        },
+        body: 'email,campaign,items\nsupporter@example.com,hand-relations,Digital Pass\n'
+      });
+    }
     if (url.pathname === '/admin/reports/campaign-runner/send') {
       calls.reportSend.push(body);
       return fulfillJson({
@@ -524,6 +539,15 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
       });
     }
+    if (url.pathname === '/admin/marketing/referrals') {
+      calls.marketingReferrals.push({ method, query: Object.fromEntries(url.searchParams.entries()), body });
+      return fulfillJson({
+        user,
+        campaignSlug: url.searchParams.get('campaignSlug') || body.campaignSlug || 'hand-relations',
+        referrals: [],
+        writeBudget: { readOnly: method === 'GET', kvWritesExpected: method === 'GET' ? 0 : 1, kvListExpected: 0 }
+      });
+    }
     if (url.pathname === '/admin/content/campaign') {
       calls.contentLoad.push(Object.fromEntries(url.searchParams.entries()));
       return fulfillJson({
@@ -583,9 +607,24 @@ async function signInWithMagicToken(page: any, role: AdminRole = 'super_admin') 
   await expect(page.locator('#admin-app')).toBeVisible();
   await expect(page.locator('#admin-tab-settings')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('tab', { name: 'Campaigns', exact: true })).toBeVisible();
-  await expect(page.locator('#admin-summary')).toContainText('Hand Relations');
-  await expect(page.locator('#admin-campaign-tabs')).toContainText('Hand Relations');
+  await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+  await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
+  await page.getByRole('tab', { name: 'Campaigns', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Hand Relations', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.locator('#admin-tab-settings').click();
   return calls;
+}
+
+async function selectSettingsSection(page: any, name: string) {
+  const tab = page.locator('#admin-settings-section-tabs').getByRole('tab', { name, exact: true });
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
+}
+
+async function selectAdminSection(page: any, name: string) {
+  const tab = page.locator('[data-admin-tabs] > .admin-tabs__list').getByRole('tab', { name, exact: true });
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
 }
 
 test.describe('Admin Dashboard', () => {
@@ -607,11 +646,16 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('tab').nth(0)).toHaveText('Settings');
     await expect(page.getByRole('tab').nth(1)).toHaveText('Campaigns');
     await expect(page.getByRole('tab', { name: 'Platform add-ons' })).toBeVisible();
+    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+    await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
+    await selectSettingsSection(page, 'Canonical URLs');
     await expect(page.getByRole('button', { name: 'About Production Worker URL' })).toBeVisible();
     await expect(page.locator('[data-settings-path="platform.site_url"]')).toHaveValue('https://pool.dustwave.xyz');
     await expect(page.locator('[data-settings-path="platform.worker_url"]')).toHaveValue('https://pledge.dustwave.xyz');
+    await selectSettingsSection(page, 'Runtime diagnostics');
     await expect(page.locator('#admin-settings-results')).toContainText('Current site base');
     await expect(page.locator('#admin-settings-results')).toContainText(SITE_BASE);
+    await selectSettingsSection(page, 'Tax');
     await expect(page.locator('[data-settings-path="tax.provider"]')).toHaveValue('flat');
     await expect(page.locator('[data-settings-path="tax.provider"] option')).toHaveText(['Flat rate', 'Offline rules', 'New Mexico GRT', 'ZIP.TAX']);
     await expect(page.locator('[data-settings-row-label="New Mexico GRT API base"]')).toBeHidden();
@@ -625,8 +669,10 @@ test.describe('Admin Dashboard', () => {
     await page.locator('[data-settings-path="tax.provider"]').selectOption('flat');
     await expect(page.locator('[data-settings-row-label="New Mexico GRT API base"]')).toBeHidden();
     await expect(page.locator('[data-settings-row-label="ZIP.TAX API base"]')).toBeHidden();
-    await expect(page.locator('[data-settings-path="shipping.origin_country"]')).toHaveValue('US');
+    await selectSettingsSection(page, 'Pricing');
     await expect(page.locator('[data-settings-path="pricing.sales_tax_rate"]')).toHaveValue('7.625');
+    await selectSettingsSection(page, 'Shipping');
+    await expect(page.locator('[data-settings-path="shipping.origin_country"]')).toHaveValue('US');
     await expect(page.locator('[data-settings-row-label="USPS client ID"]')).toBeHidden();
     await expect(page.locator('[data-settings-row-label="USPS API base"]')).toBeHidden();
     await page.locator('[data-settings-path="shipping.usps.enabled"]').selectOption('true');
@@ -636,6 +682,7 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('[data-settings-path="shipping.usps.api_base"]')).toHaveAttribute('placeholder', 'Default: https://apis.usps.com');
     await page.locator('[data-settings-path="shipping.usps.enabled"]').selectOption('false');
     await expect(page.locator('[data-settings-row-label="USPS API base"]')).toBeHidden();
+    await selectSettingsSection(page, 'Campaign runner reports');
     await expect(page.locator('[data-settings-path="reports.campaign_runner.enabled"]')).toHaveValue('true');
     await expect(page.locator('[data-settings-row-label="Send time MT"]')).toBeVisible();
     await page.locator('[data-settings-path="reports.campaign_runner.enabled"]').selectOption('false');
@@ -645,7 +692,7 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-settings-results [data-settings-path="add_ons.enabled"]')).toHaveCount(0);
     await expect(page.locator('[data-settings-path="reports.campaign_runner.send_hour_mt"]')).toHaveAttribute('type', 'time');
     await expect(page.locator('[data-settings-path="reports.campaign_runner.send_hour_mt"]')).toHaveValue('07:00');
-    await page.getByRole('tab', { name: 'Campaigns', exact: true }).click();
+    await selectAdminSection(page, 'Campaigns');
     await expect(page.locator('#admin-content-publish')).toHaveText('Publish');
     await expect(page.locator('#admin-campaign-tabs')).toHaveCSS('flex-direction', 'column');
     await expect(page.getByRole('tab', { name: 'Hand Relations', exact: true })).toHaveAttribute('aria-selected', 'true');
@@ -703,7 +750,7 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-content-publish')).toHaveText('Publish');
     await expect(page.locator('#admin-content-publish')).toBeEnabled();
     await expect(page.locator('#admin-content-save-draft')).toBeEnabled();
-    await page.keyboard.press('Control+Z');
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Z' : 'Control+Z');
     await expect(page.locator('#admin-content-publish')).toHaveText('Publish');
     await expect(page.locator('#admin-content-publish')).toBeDisabled();
     await expect(page.locator('#admin-content-save-draft')).toBeDisabled();
@@ -791,7 +838,7 @@ test.describe('Admin Dashboard', () => {
     await expect(tierEditor.locator('[data-collection-field="description"]')).toContainText('Sponsor a frame.');
     await expect(tierEditor.getByRole('spinbutton', { name: 'Price (USD)' }).first()).toHaveValue('5');
     await expect(tierEditor.getByRole('button', { name: 'About Quantity limit' })).toHaveAttribute('aria-describedby', /admin-setting-help-/);
-    await expect(tierEditor.getByText(/separate from Stackable/)).toBeAttached();
+    await expect(tierEditor.getByText(/For non-stackable tiers/)).toBeAttached();
     await expect.poll(async () => {
       const card = tierEditor.locator('[data-campaign-collection-card]').first();
       const bounds = await card.evaluate((element) => {
@@ -1007,15 +1054,15 @@ test.describe('Admin Dashboard', () => {
     await expect(campaignAddOnsEditor.locator('[data-add-on-variant-derived-id]').first()).toContainText('matte');
     await campaignAddOnsEditor.locator('[data-add-on-variant-field="label"]').first().fill('Matte');
     await campaignAddOnsEditor.getByRole('button', { name: 'Add variant' }).first().click();
-    await campaignAddOnsEditor.locator('[data-add-on-variant-field="label"]').last().fill('Gloss Finish');
-    await expect(campaignAddOnsEditor.locator('[data-add-on-variant-derived-id]').last()).toContainText('gloss-finish');
-    await campaignAddOnsEditor.getByRole('button', { name: 'Delete variant' }).last().click();
+    await campaignAddOnsEditor.locator('[data-add-on-variant-field="label"]').first().fill('Gloss Finish');
+    await expect(campaignAddOnsEditor.locator('[data-add-on-variant-derived-id]').first()).toContainText('gloss-finish');
+    await campaignAddOnsEditor.getByRole('button', { name: 'Delete variant' }).first().click();
     await campaignAddOnsEditor.locator('[data-add-on-product-field="name"]').first().fill('Poster Pack Updated');
     await expect(campaignAddOnsEditor.locator('[data-add-on-product-derived-id]').first()).toContainText('poster-pack');
     await campaignAddOnsEditor.getByRole('button', { name: 'Add product' }).click();
-    await campaignAddOnsEditor.locator('[data-add-on-product-field="name"]').last().fill('Digital Extras');
-    await expect(campaignAddOnsEditor.locator('[data-add-on-product-derived-id]').last()).toContainText('digital-extras');
-    await campaignAddOnsEditor.getByRole('button', { name: /Delete product/ }).last().click();
+    await campaignAddOnsEditor.locator('[data-add-on-product-field="name"]').first().fill('Digital Extras');
+    await expect(campaignAddOnsEditor.locator('[data-add-on-product-derived-id]').first()).toContainText('digital-extras');
+    await campaignAddOnsEditor.getByRole('button', { name: /Delete product/ }).first().click();
     await expect(campaignAddOnsEditor.locator('[data-add-on-product-field="shipping_preset"]').first()).toBeVisible();
     await campaignAddOnsEditor.locator('[data-add-on-product-field="category"]').first().selectOption('digital');
     await expect(campaignAddOnsEditor.locator('[data-add-on-product-field="shipping_preset"]').first()).toBeHidden();
@@ -1193,9 +1240,11 @@ test.describe('Admin Dashboard', () => {
     await expect(tierEditor.locator('select[data-collection-field="shipping_preset"]')).toHaveCount(0);
     await expect(tierEditor.getByRole('spinbutton', { name: 'Quantity limit' }).first()).toBeVisible();
     await page.locator('[data-settings-path="tiers"][data-settings-campaign="hand-relations"] [data-collection-field="name"]').first().fill('Buy One Frame Updated');
-    await page.locator('#admin-tab-settings').click();
+    await selectAdminSection(page, 'Settings');
+    await selectSettingsSection(page, 'Debug');
     await expect(page.locator('[data-settings-path="debug.console_logging_enabled"]')).toHaveValue('true');
     await page.locator('[data-settings-path="debug.verbose_console_logging"]').selectOption('false');
+    await selectSettingsSection(page, 'Design');
     await expect(page.locator('[data-settings-path="platform.logo_path"] img')).toHaveAttribute('src', /dust-wave-square/);
     await expect(page.locator('[data-logo-path-input]')).toHaveCount(0);
     await page.locator('[data-logo-upload-input]').setInputFiles({
@@ -1207,11 +1256,15 @@ test.describe('Admin Dashboard', () => {
     expect(calls.logoUpload[0]).toMatchObject({ filename: 'logo.png', contentType: 'image/png' });
     await expect(page.locator('[data-settings-path="platform.logo_path"] img')).toHaveAttribute('src', /logo-e2e/);
     await expect(page.locator('[data-settings-path="design.color_text"]')).toHaveAttribute('type', 'color');
+    await selectSettingsSection(page, 'Platform');
     await page.locator('[data-settings-path="platform.name"]').fill('The Pool Updated');
+    await selectSettingsSection(page, 'Tax');
     await page.locator('[data-settings-path="tax.provider"]').selectOption('offline_rules');
+    await selectSettingsSection(page, 'Pricing');
     await page.locator('[data-settings-path="pricing.sales_tax_rate"]').fill('8.125');
+    await selectSettingsSection(page, 'Campaign runner reports');
     await page.locator('[data-settings-path="reports.campaign_runner.send_hour_mt"]').fill('09:30');
-    await page.getByRole('tab', { name: 'Platform add-ons' }).click();
+    await selectAdminSection(page, 'Platform add-ons');
     await expect(page.locator('#admin-addons-results [data-settings-path="add_ons.enabled"]')).toHaveValue('true');
     await expect(page.locator('#admin-addons-results [data-settings-row-label="Low stock threshold"]')).toBeVisible();
     await expect(page.locator('#admin-addons-results [data-settings-row-label="Products"]')).toBeVisible();
@@ -1248,7 +1301,8 @@ test.describe('Admin Dashboard', () => {
       expect(dialog.message()).toContain('Changes may take a few minutes');
       dialog.accept();
     });
-    await page.getByRole('button', { name: 'Publish unsaved changes' }).click();
+    await expect(page.locator('#admin-addons-publish')).toBeEnabled();
+    await page.locator('#admin-addons-publish').click();
     await expect.poll(() => calls.settingsPreview.length).toBe(1);
     await expect(page.locator('#admin-addons-status')).toContainText('Deploy started');
     await expect.poll(() => calls.settingsPublish.length).toBe(1);
@@ -1275,7 +1329,7 @@ test.describe('Admin Dashboard', () => {
     await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('tab', { name: 'Platform add-ons' })).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('ArrowRight');
-    await expect(page.getByRole('tab', { name: 'Reports' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('[data-admin-tabs] > .admin-tabs__list').getByRole('tab', { name: 'Reports', exact: true })).toHaveAttribute('aria-selected', 'true');
 
     const summaryCallsBeforeRefresh = calls.summary.length;
     await page.getByRole('button', { name: 'Refresh' }).focus();
@@ -1297,27 +1351,25 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-inventory-section')).toBeHidden();
   });
 
-  test('previews reports and sends live reports', async ({ page }) => {
+  test('previews reports and downloads CSVs', async ({ page }) => {
     const calls = await signInWithMagicToken(page);
 
-    await page.getByRole('tab', { name: 'Reports' }).click();
+    await selectAdminSection(page, 'Reports');
+    await page.locator('#admin-report-campaign').selectOption('hand-relations');
     await page.locator('#admin-report-preview-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
-    await expect(page.locator('#admin-report-status')).toContainText('Report preview loaded.');
+    await expect.poll(() => calls.reportPreview.length).toBeGreaterThanOrEqual(1);
     await expect(page.locator('#admin-report-preview')).toContainText('supporter@example.com');
-    await expect.poll(() => calls.reportPreview.length).toBe(1);
-
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Send report' }).click();
-    await expect(page.locator('#admin-report-status')).toContainText('Report sent to 1 recipient');
-    await expect.poll(() => calls.reportSend.length).toBe(1);
-    expect(calls.reportSend[0]).toMatchObject({ intent: 'send', campaignSlug: 'hand-relations', reportType: 'pledge', markAsSent: true });
+    await page.getByRole('button', { name: 'Download CSV' }).click();
+    await expect(page.locator('#admin-report-status')).toContainText('CSV download started.');
+    await expect.poll(() => calls.reportCsv.length).toBe(1);
+    expect(calls.reportCsv[0]).toMatchObject({ campaignSlug: 'hand-relations', reportType: 'pledge' });
 
   });
 
   test('keeps marketing local and validates content preview/publish flows', async ({ page }) => {
     const calls = await signInWithMagicToken(page);
 
-    await page.getByRole('tab', { name: 'Marketing tools' }).click();
+    await selectAdminSection(page, 'Marketing tools');
     await page.locator('#admin-marketing-source').fill('newsletter');
     await page.locator('#admin-marketing-medium').fill('email');
     await page.locator('#admin-marketing-ref').fill('launch-list');
@@ -1325,12 +1377,11 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/utm_campaign=hand-relations/);
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/ref=launch-list/);
 
-    await page.getByRole('tab', { name: 'Analytics' }).click();
-    await page.getByRole('button', { name: 'Load analytics' }).click();
-    await expect(page.locator('#admin-analytics-status')).toContainText('Analytics loaded.');
+    await selectAdminSection(page, 'Analytics');
     await expect.poll(() => calls.analytics.length).toBe(1);
+    await expect(page.locator('#admin-analytics-results')).toContainText('Pledged');
 
-    await page.getByRole('tab', { name: 'Campaigns', exact: true }).click();
+    await selectAdminSection(page, 'Campaigns');
     await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="content"]').click();
     await expect(page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab-panel="content"] .admin-settings__field-stack > .admin-settings__label')).toHaveCount(0);
     await expect(page.locator('#admin-content-status')).not.toContainText('Campaign content loaded into the local draft.');

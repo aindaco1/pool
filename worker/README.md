@@ -84,6 +84,16 @@ Update `wrangler.toml` with the returned IDs.
 
 ### 2. Configure Secrets
 
+Local development secrets live in ignored [`worker/.dev.vars`](../worker/.dev.vars). The safest setup path is:
+
+```bash
+npm run secrets:dev
+```
+
+The helper creates `worker/.dev.vars` from [`worker/.dev.vars.example`](./.dev.vars.example) when needed, applies local-only permissions, generates signing secrets for local development, and prompts for optional provider keys without echoing values back to the terminal. The dev launchers also run this helper in non-interactive mode so local signing secrets exist before Wrangler starts.
+
+Production secrets belong in Cloudflare Worker secrets:
+
 ```bash
 # Stripe API Keys
 wrangler secret put STRIPE_SECRET_KEY_LIVE
@@ -105,12 +115,20 @@ wrangler secret put RESEND_API_KEY
 # Admin endpoints
 wrangler secret put ADMIN_SECRET
 
+# Browser admin sessions and bootstrap access
+wrangler secret put ADMIN_SESSION_SECRET
+# Local dev defaults ADMIN_BOOTSTRAP_EMAILS to alonso@dustwave.xyz.
+# Override ADMIN_BOOTSTRAP_EMAILS as a comma-separated env var in Worker secrets,
+# wrangler.toml, or worker/.dev.vars for other environments.
+
 # USPS OAuth secret (keep the client id in site config)
 wrangler secret put USPS_CLIENT_SECRET
 
 # Optional: ZIP.TAX API key for local/jurisdiction-level tax lookup
 wrangler secret put ZIP_TAX_API_KEY
 ```
+
+Do not store these values in `_config.yml`, campaign YAML, KV, admin setting drafts, or committed documentation. The admin dashboard only reports whether runtime credentials appear configured; it does not read or persist secret values.
 
 USPS setup for this repo is split intentionally:
 
@@ -283,6 +301,35 @@ Returns recent per-day webhook delivery counts, outcomes, event-type rollups, du
 Admin-only sampled performance summary.
 
 Returns sampled wall-clock timings for key mutation routes such as checkout start, checkout completion, Manage Pledge writes, shipping quotes, and checkout abandon. This is intended as a tuning aid for the deployed `cpu_ms` cap, not as a high-cardinality tracing system.
+
+### Browser Admin Dashboard
+
+The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes instead of exposing `ADMIN_SECRET` in browser code:
+
+- `POST /admin/auth/start` sends a short-lived localized magic link for an authorized admin email
+- `POST /admin/auth/exchange` exchanges that one-time token for the `pool_admin_session` cookie
+- `GET /admin/session` reads the current session without refreshing or writing it
+- `POST /admin/logout` clears the session
+- `GET /admin/dashboard/summary` reads role-scoped campaign summaries
+- `GET /admin/analytics` reads role-scoped pledge-derived revenue, status, language, referral, and campaign/platform split metrics without writing analytics state
+- `GET /admin/content/campaign?campaignSlug=...` loads role-scoped campaign content into the browser editor without persisting a draft
+- `POST /admin/content/preview` validates and renders role-scoped campaign content drafts without publishing, auditing, or writing KV
+- `POST /admin/content/publish` validates the same draft, updates the campaign Markdown file through GitHub, triggers the normal rebuild workflow, and writes one audit event
+- `GET /admin/supporters?campaignSlug=...` reads campaign-scoped supporter rows from `campaign-pledges:{slug}` only
+- `GET /admin/reports/campaign-runner/preview?campaignSlug=...&reportType=pledge|fulfillment` previews shared campaign-runner report output without sending email or writing markers
+- `GET /admin/reports/campaign-runner.csv?campaignSlug=...&reportType=pledge|fulfillment` downloads the same shared report CSV without sending email or writing markers
+- `GET /admin/marketing/referrals?campaignSlug=...` lists saved campaign referral codes without writing or scanning pledge truth
+- `POST /admin/marketing/referrals` explicitly saves or updates a campaign referral code with CSRF protection and one campaign-scoped KV write
+- `GET /admin/add-ons/inventory` reads platform add-on baseline, sold, remaining, and override state for super admins
+- `POST /admin/add-ons/inventory` explicitly sets, restocks, or resets platform add-on inventory baseline overrides with CSRF protection and audit logging
+
+Normal dashboard reads, supporter filters, pagination, pledge-derived analytics, marketing referral lists, report previews, CSV downloads, content loads, and content previews are designed to add zero KV writes and zero KV list operations. Browser-initiated marketing referral saves, content publishes, and inventory changes are explicit mutations: referral saves write one campaign-scoped referral list, content publishes commit to GitHub, trigger the rebuild workflow, and write one audit event. If an older campaign is missing its `campaign-pledges:{slug}` projection, the dashboard endpoints return `campaign_index_required` instead of falling back to a namespace scan; run the existing projection repair/rebuild tools explicitly when that happens.
+
+Admin auth starts/exchanges and browser-admin mutations are rate limited through the `RATELIMIT` binding and return private/no-store failures when throttled. Normal authenticated reads such as session checks, dashboard summaries, supporter filters, report previews, analytics views, and content previews are intentionally not KV-rate-limited. Magic-link login tokens are one-time use, and session reads do not refresh near-expiry sessions or clean up expired sessions on the read path. Cookie-backed admin mutations require both the session CSRF token and a trusted same-site `Origin`/`Referer` or non-cross-site fetch context before durable writes.
+
+Platform add-on inventory uses `_config.yml` as the configured baseline, optional `add-on-inventory-overrides` KV state for operator restocks, and saved pledge truth for sold counts. Admin inventory page views do not load the inventory table automatically; the super-admin inventory read is explicit and may scan pledge truth, while set/restock/reset actions write only the override state plus an audit event.
+
+The marketing-tool slice keeps campaign URL building, UTM/referral parameters, embed-builder shortcuts, local field preferences, and copy snippets in browser state. Saved referral codes are separate: listing them is a read-only campaign-scoped Worker call, and saving one is an explicit mutation.
 
 ### POST /admin/broadcast/diary
 Send diary update notification to all campaign supporters. Requires `x-admin-key` header.
@@ -511,6 +558,15 @@ The `dev` environment:
 - Sets `APP_MODE=test`
 - Uses `STRIPE_SECRET_KEY_TEST`
 - Points `SITE_BASE` to localhost
+- Sets `CORS_ALLOWED_ORIGIN` to the local Jekyll origin
+- Allows `alonso@dustwave.xyz` as a local bootstrap super admin
+- Uses `hand-relations` and `smoke-editable` as the default `/test/setup` campaigns
+
+To seed both admin dashboard test campaigns against a running local Worker:
+
+```bash
+../scripts/seed-admin-test-campaigns.sh
+```
 
 Add `?dev` to the manage page URL for mock data: `http://127.0.0.1:4000/manage/?dev`
 

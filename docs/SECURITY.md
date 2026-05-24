@@ -69,6 +69,18 @@ Scarce limited-tier reservation and committed-count truth is no longer stored in
 
 ## Applied Hardening Notes
 
+### Secret Storage Boundaries
+
+Runtime credentials are intentionally separated from editable site configuration:
+
+- Non-secret settings belong in `_config.yml`, `_config.local.yml`, or admin setting drafts.
+- Local development secrets belong in ignored `worker/.dev.vars`; run `npm run secrets:dev` to create/update that file safely.
+- Production Worker credentials belong in Cloudflare Worker secrets through `wrangler secret put`.
+- Deploy credentials such as `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `DIARY_CHECK_BYPASS_SECRET` belong in GitHub repository secrets or ignored local env files used by operator scripts.
+- The admin dashboard may show Configured/Missing status for runtime credentials, but it must not expose, edit, serialize, or publish secret values.
+
+This boundary prevents the admin dashboard from becoming a credential store and keeps forks from accidentally committing Stripe, Resend, USPS, ZIP.TAX, or Cloudflare tokens while still making missing setup visible to operators.
+
 ### SEC-001: Lock Down Dev-Token Bypass (✅ FIXED)
 
 **File:** `worker/src/routes/votes.js`

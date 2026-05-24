@@ -55,11 +55,14 @@
   var marketingMedium = document.getElementById('admin-marketing-medium');
   var marketingContent = document.getElementById('admin-marketing-content');
   var marketingRef = document.getElementById('admin-marketing-ref');
+  var marketingReferrer = document.getElementById('admin-marketing-referrer');
   var marketingUrl = document.getElementById('admin-marketing-url');
   var marketingCopyUrl = document.getElementById('admin-marketing-copy-url');
+  var marketingSaveReferral = document.getElementById('admin-marketing-save-referral');
   var marketingEmbedLink = document.getElementById('admin-marketing-embed-link');
   var marketingStatus = document.getElementById('admin-marketing-status');
   var marketingSnippets = document.getElementById('admin-marketing-snippets');
+  var marketingReferralsRoot = document.getElementById('admin-marketing-referrals');
   var analyticsCampaign = document.getElementById('admin-analytics-campaign');
   var analyticsStatus = document.getElementById('admin-analytics-status');
   var analyticsRoot = document.getElementById('admin-analytics-results');
@@ -2829,6 +2832,7 @@
     renderAnalyticsOptions(campaigns);
     hydrateMarketingDraft();
     updateMarketingBuilder();
+    loadMarketingReferrals();
     hydrateContentDraft();
   }
 
@@ -2866,7 +2870,8 @@
         source: marketingSource?.value || '',
         medium: marketingMedium?.value || '',
         content: marketingContent?.value || '',
-        ref: marketingRef?.value || ''
+        ref: marketingRef?.value || '',
+        referrer: marketingReferrer?.value || ''
       }));
     } catch (_error) {
     }
@@ -2878,6 +2883,7 @@
     if (marketingMedium instanceof HTMLInputElement) marketingMedium.value = draft.medium || '';
     if (marketingContent instanceof HTMLInputElement) marketingContent.value = draft.content || '';
     if (marketingRef instanceof HTMLInputElement) marketingRef.value = draft.ref || '';
+    if (marketingReferrer instanceof HTMLInputElement) marketingReferrer.value = draft.referrer || '';
     if (
       marketingCampaign instanceof HTMLSelectElement &&
       draft.campaignSlug &&
@@ -2955,6 +2961,101 @@
       card.append(title, copy, button);
       marketingSnippets.append(card);
     });
+  }
+
+  function renderMarketingReferrals(referrals) {
+    if (!marketingReferralsRoot) return;
+    marketingReferralsRoot.replaceChildren();
+    var heading = document.createElement('h3');
+    heading.textContent = t('marketing_referrals_title', 'Saved referral codes');
+    var rows = Array.isArray(referrals) ? referrals : [];
+    if (!rows.length) {
+      var empty = document.createElement('p');
+      empty.className = 'admin-app__muted';
+      empty.textContent = t('marketing_referrals_empty', 'No saved referral codes for this campaign yet.');
+      marketingReferralsRoot.append(heading, empty);
+      return;
+    }
+    var wrap = document.createElement('div');
+    wrap.className = 'admin-marketing__referrals-table-wrap';
+    var table = document.createElement('table');
+    table.className = 'admin-marketing__referrals-table';
+    var thead = document.createElement('thead');
+    var headerRow = document.createElement('tr');
+    appendTableHeader(headerRow, [
+      t('marketing_ref_code_header', 'Code'),
+      t('marketing_referrer_header', 'Referrer'),
+      t('marketing_ref_created_header', 'Created')
+    ]);
+    thead.append(headerRow);
+    var tbody = document.createElement('tbody');
+    rows.forEach(function(row) {
+      var tr = document.createElement('tr');
+      appendTextCells(tr, [
+        row.code || '',
+        row.name || '',
+        row.createdAt ? new Date(row.createdAt).toLocaleDateString(lang || 'en') : ''
+      ]);
+      tbody.append(tr);
+    });
+    table.append(thead, tbody);
+    wrap.append(table);
+    marketingReferralsRoot.append(heading, wrap);
+  }
+
+  async function loadMarketingReferrals() {
+    if (!marketingReferralsRoot) return;
+    var campaign = selectedMarketingCampaign();
+    if (!campaign?.slug) {
+      renderMarketingReferrals([]);
+      return;
+    }
+    try {
+      var params = new URLSearchParams({ campaignSlug: campaign.slug });
+      var data = await requestJson('/admin/marketing/referrals?' + params.toString(), { method: 'GET' });
+      renderMarketingReferrals(data.referrals || []);
+    } catch (error) {
+      logger.error('Failed to load saved referral codes', error);
+      setText(marketingStatus, t('marketing_referrals_load_failed', 'Unable to load saved referral codes.'));
+    }
+  }
+
+  function normalizeMarketingReferralCode(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 64);
+  }
+
+  async function saveMarketingReferral() {
+    var campaign = selectedMarketingCampaign();
+    var code = normalizeMarketingReferralCode(marketingRef?.value || '');
+    var name = String(marketingReferrer?.value || '').trim();
+    if (!campaign?.slug || !code || !name) {
+      setText(marketingStatus, t('marketing_referral_required', 'Choose a campaign, enter a referral code, and add the referrer name.'));
+      return;
+    }
+    if (marketingRef instanceof HTMLInputElement) marketingRef.value = code;
+    writeMarketingDraft();
+    updateMarketingBuilder();
+    setText(marketingStatus, t('marketing_referral_saving', 'Saving referral code...'));
+    try {
+      var data = await requestJson('/admin/marketing/referrals', {
+        method: 'POST',
+        body: JSON.stringify({
+          campaignSlug: campaign.slug,
+          code: code,
+          name: name
+        })
+      });
+      renderMarketingReferrals(data.referrals || []);
+      setText(marketingStatus, t('marketing_referral_saved', 'Referral code saved.'));
+    } catch (error) {
+      logger.error('Failed to save referral code', error);
+      setText(marketingStatus, error?.data?.error || t('marketing_referral_save_failed', 'Unable to save referral code.'));
+    }
   }
 
   function updateMarketingBuilder() {
@@ -5622,9 +5723,10 @@
       writeMarketingDraft();
       updateMarketingBuilder();
     });
-    marketingForm.addEventListener('change', function() {
+    marketingForm.addEventListener('change', function(event) {
       writeMarketingDraft();
       updateMarketingBuilder();
+      if (event.target === marketingCampaign) loadMarketingReferrals();
     });
   }
 
@@ -5632,6 +5734,10 @@
     marketingCopyUrl.addEventListener('click', function() {
       copyMarketingText(marketingUrl?.value || '');
     });
+  }
+
+  if (marketingSaveReferral) {
+    marketingSaveReferral.addEventListener('click', saveMarketingReferral);
   }
 
   if (marketingSnippets) {

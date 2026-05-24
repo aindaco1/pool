@@ -120,12 +120,11 @@ platform:
 
 ### `pricing`
 
-Use `pricing` for the flat-rate compatibility math and platform-tip defaults that must stay consistent across the site and Worker.
+Use `pricing` for tax and platform-tip defaults that must stay consistent across the site and Worker. Shipping fallback fees live under `shipping`.
 
 Supported keys:
 
 - `sales_tax_rate`
-- `flat_shipping_rate` (legacy compatibility baseline; use `shipping.*` for the current carrier/fallback model)
 - `default_tip_percent`
 - `max_tip_percent`
 
@@ -134,7 +133,6 @@ Example:
 ```yml
 pricing:
   sales_tax_rate: 0.0825
-  flat_shipping_rate: 4.50
   default_tip_percent: 5
   max_tip_percent: 15
 ```
@@ -717,7 +715,7 @@ These site-config values are also reflected into the Worker env values in [`work
 - `tax.origin_country` -> `TAX_ORIGIN_COUNTRY`
 - `tax.use_regional_origin` -> `TAX_USE_REGIONAL_ORIGIN`
 - `tax.zip_tax_api_base` -> `ZIP_TAX_API_BASE`
-- `pricing.flat_shipping_rate` -> `FLAT_SHIPPING_RATE`
+- `pricing.flat_shipping_rate` -> `FLAT_SHIPPING_RATE` (legacy compatibility only; prefer `shipping.fallback_flat_rate`)
 - `pricing.default_tip_percent` -> `DEFAULT_PLATFORM_TIP_PERCENT`
 - `pricing.max_tip_percent` -> `MAX_PLATFORM_TIP_PERCENT`
 - `shipping.origin_zip` -> `SHIPPING_ORIGIN_ZIP`

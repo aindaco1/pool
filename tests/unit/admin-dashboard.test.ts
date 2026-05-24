@@ -314,8 +314,11 @@ describe('admin dashboard foundation', () => {
     expect(layout).not.toContain('id="admin-inventory-section"');
     expect(layout).not.toContain('id="admin-inventory-load"');
     expect(layout).toContain('id="admin-marketing-builder"');
+    expect(layout).toContain('id="admin-marketing-referrer"');
+    expect(layout).toContain('id="admin-marketing-save-referral"');
     expect(layout).toContain('id="admin-marketing-url"');
     expect(layout).toContain('id="admin-marketing-snippets"');
+    expect(layout).toContain('id="admin-marketing-referrals"');
     expect(layout).toContain('id="admin-analytics-campaign"');
     expect(layout).not.toContain('id="admin-analytics-load"');
     expect(layout).toContain('id="admin-analytics-results"');
@@ -336,7 +339,7 @@ describe('admin dashboard foundation', () => {
     expect(mainScss).toContain('@import "partials/admin";');
     expect(adminScript).toContain('pool-admin-marketing-builder');
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");
-    expect(adminScript).not.toContain('/admin/marketing');
+    expect(adminScript).toContain('/admin/marketing/referrals');
     expect(adminScript).toContain('/admin/analytics');
     expect(adminScript).toContain('/admin/settings');
     expect(adminScript).toContain('/admin/content/preview');
@@ -1290,7 +1293,7 @@ runner_report_emails:
     const adminScript = readRepoFile('assets', 'js', 'admin-dashboard.js');
     expect(adminScript).toContain('pool-admin-marketing-builder');
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");
-    expect(adminScript).not.toContain('/admin/marketing');
+    expect(adminScript).toContain('/admin/marketing/referrals');
   });
 
   it('rejects replayed admin login tokens without creating another session', async () => {
@@ -1811,6 +1814,68 @@ runner_report_emails:
     expect(ratelimit.putCalls).toBe(0);
     expect(ratelimit.deleteCalls).toBe(0);
     expect(ratelimit.listCalls).toBe(0);
+  });
+
+  it('stores and lists saved marketing referral codes only on explicit save', async () => {
+    const env = createEnv();
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    const ratelimit = env.RATELIMIT as CountingKVNamespace;
+    resetKvCounters(env);
+
+    const emptyResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/referrals?campaignSlug=hand-relations', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(emptyResponse.status).toBe(200);
+    expect(await emptyResponse.json()).toMatchObject({
+      campaignSlug: 'hand-relations',
+      referrals: [],
+      writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
+    });
+    expectNoKvWritesOrLists(env, 'marketing referrals read');
+
+    const saveResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/referrals', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        code: 'Launch List!',
+        name: 'Launch list'
+      })
+    }), env, ctx);
+    expect(saveResponse.status).toBe(200);
+    const saveBody = await saveResponse.json();
+    expect(saveBody.referral).toMatchObject({
+      campaignSlug: 'hand-relations',
+      code: 'launch-list',
+      name: 'Launch list'
+    });
+    expect(saveBody.referrals).toEqual([
+      expect.objectContaining({ code: 'launch-list', name: 'Launch list' })
+    ]);
+    expect(pledges.putCalls).toBe(1);
+    expect(pledges.deleteCalls).toBe(0);
+    expect(pledges.listCalls).toBe(0);
+    expect(ratelimit.putCalls).toBe(1);
+    expect(ratelimit.deleteCalls).toBe(0);
+    expect(ratelimit.listCalls).toBe(0);
+
+    resetKvCounters(env);
+    const listResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/referrals?campaignSlug=hand-relations', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(listResponse.status).toBe(200);
+    const listBody = await listResponse.json();
+    expect(listBody.referrals).toEqual([
+      expect.objectContaining({ code: 'launch-list', name: 'Launch list' })
+    ]);
+    expectNoKvWritesOrLists(env, 'marketing referrals read after save');
   });
 
   it('deduplicates portfolio supporter counts across campaign analytics', async () => {

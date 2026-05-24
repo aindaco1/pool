@@ -427,6 +427,8 @@ decisions:
     status: open            # open | closed
 ```
 
+`vote` and `poll` currently use the same supporter-only submission and tallying mechanics. Use `vote` when the result is intended to decide an outcome, and use `poll` when the result is advisory feedback or preference-gathering. The distinction is intentionally semantic/display-facing for now; future versions can layer different public copy, reporting, or outcome workflows on top of the same stored data.
+
 ### Production Diary
 
 Diary entries support rich content blocks (same as `long_content`):

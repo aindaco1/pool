@@ -61,6 +61,22 @@ has_secret_value() {
   [ -n "$(secret_value "$key")" ]
 }
 
+wrangler_dev_var() {
+  local key="$1"
+  ruby -e '
+    content = File.read(ARGV[0])
+    key = ARGV[1]
+    match = content.match(/^\[env\.dev\]\s*\nvars\s*=\s*\{([^}]*)\}/m)
+    exit 0 unless match
+
+    match[1].scan(/([A-Z_]+)\s*=\s*"((?:\\.|[^"])*)"/) do |name, value|
+      next unless name == key
+      puts value.gsub(/\\"/, "\"").gsub(/\\\\/, "\\")
+      exit 0
+    end
+  ' "worker/wrangler.toml" "$key"
+}
+
 set_secret_value() {
   local key="$1"
   local value="$2"
@@ -86,6 +102,25 @@ set_secret_value() {
 
   mv "$tmp_file" "$DEV_VARS"
   chmod 600 "$DEV_VARS" 2>/dev/null || true
+}
+
+ensure_local_default() {
+  local key="$1"
+  local value=""
+
+  if has_secret_value "$key"; then
+    echo "$key already configured."
+    return 0
+  fi
+
+  value="$(wrangler_dev_var "$key")"
+  if [ -z "$value" ]; then
+    echo "$key skipped."
+    return 0
+  fi
+
+  set_secret_value "$key" "$value"
+  echo "Configured local default $key."
 }
 
 ensure_generated_secret() {
@@ -129,6 +164,15 @@ prompt_optional_secret() {
 }
 
 ensure_dev_vars_file
+
+ensure_local_default "SITE_BASE"
+ensure_local_default "WORKER_BASE"
+ensure_local_default "CANONICAL_SITE_BASE"
+ensure_local_default "CANONICAL_WORKER_BASE"
+ensure_local_default "CORS_ALLOWED_ORIGIN"
+ensure_local_default "APP_MODE"
+ensure_local_default "ADMIN_BOOTSTRAP_EMAILS"
+ensure_local_default "ADMIN_TEST_CAMPAIGNS"
 
 ensure_generated_secret "ADMIN_SECRET"
 ensure_generated_secret "CHECKOUT_INTENT_SECRET"

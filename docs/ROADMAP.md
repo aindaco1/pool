@@ -210,29 +210,113 @@
 ## Planned
 
 - [ ] Admin dashboard page using Cloudflare Workers data, integrated with Stripe and Resend, following crowdfunding best practices
-  - Super admin and per-campaign users
-  - Magic link auth
-  - Variable customizability
-  - Reward fulfillment support
-  - add-on inventory baseline override / reset controls so admins can restock sold-out products without editing `_config.yml`
-  - decide what the platform-merch admin/reporting surface should look like alongside campaign-facing data
-  - Light CRM for creators to segment and manage their supporters
-    - Abandoned cart follow-up
-  - Marketing tools in-platform to help creators promote their campaigns based on crowdfunding best practices
-  - Digital product delivery in-platform
-  - Visitor and Referral Analytics
-    - Platform analytics for super admin
-    - Platform observability stats for super admin
-    - Campaign analytics for per-campaign users
-    - Generate referral links for per-campaign users
-  - Replace Pages CMS with dedicated content editor (integrated with GitHub Pages) and per-campaign permissions
-    - Review Pages CMS GitHub repo for a starting place
-    - Block-based with the ability to preview campaign content
-    - Create/edit/delete campaign content, diary, community vote, and other per-campaign variables
-    - Prefer a shared block schema plus shared renderer as the source of truth so admin previews match the public campaign templates instead of drifting into a dashboard-only rendering path
+  - North star:
+    - Build `/admin/` and `/es/admin/` as private static Jekyll shells backed by role-scoped Worker APIs rather than a separate app server
+    - Keep mutable truth in the Worker / Cloudflare storage layer and continue treating `_config.yml` plus campaign Markdown as the canonical fork-facing configuration and content surfaces
+    - Preserve existing checkout, Manage Pledge, reporting, email, inventory, tax, shipping, SEO, accessibility, and security invariants while making operator workflows easier
+    - Keep the existing shared-secret admin endpoints available for CLI and backward compatibility, but do not expose `ADMIN_SECRET` to browser code
+  - Free-tier KV write target:
+    - Design for Workers KV Free by default, where the scarce resource is writes rather than reads
+    - Normal campaign browsing, admin page views, dashboard summary reads, supporter filtering, report previews, referral-link generation, analytics viewing, and editor drafting should add zero KV writes
+    - Reserve KV writes for durable product events such as completed pledges, pledge modifications/cancellations, explicit admin mutations, live email sends, inventory restocks, auth/session creation, and audit records for mutations
+    - Avoid per-pageview, per-click, per-filter, per-preview, per-keystroke, `lastSeen`, session-touch, and UI-preference writes
+    - Store admin UI preferences such as selected campaign, collapsed panels, table columns, filter state, and sort order in browser storage
+    - Avoid KV list operations on normal dashboard paths; prefer existing `campaign-pledges:{slug}` indexes and explicit repair/diagnostic flows when scans are unavoidable
+    - Keep report dry-runs, content previews, referral builders, and marketing drafts ephemeral unless the admin explicitly sends, publishes, or saves a durable change
+    - Consider a SQLite-backed Durable Object for high-churn rate limiting later only if KV rate-limit writes become a measured free-tier bottleneck
+  - Phase 0: Admin shell, routing, and i18n groundwork
+    - Add static admin pages and layout files for `/admin/` and `/es/admin/`
+    - Add `i18n.pages.admin` entries in `_config.yml`
+    - Add a new `admin:` namespace to both `_data/i18n/en.yml` and `_data/i18n/es.yml`
+    - Make admin pages `noindex,nofollow`, keep them out of `sitemap.xml`, and avoid public JSON-LD or social-preview intent
+    - Use the same skip-link, stable `main-content`, landmark, live-region, visible-focus, and footer language-switching patterns as existing public and Manage Pledge surfaces
+  - Phase 1: Admin magic-link auth
+    - Add Worker admin auth helpers for one-time short-lived login links, session exchange, session reads, logout, CSRF tokens, and safe cookie handling
+    - Seed first super admins from an environment variable such as `ADMIN_BOOTSTRAP_EMAILS`
+    - Store admin users, one-time login nonces, sessions, and mutation audit events in KV with hashed keys and bounded TTLs where appropriate
+    - Keep `GET /admin/session` read-only and avoid refreshing session expiry on every request; refresh only near expiry if sliding sessions are needed
+    - Strip login tokens from URLs with `history.replaceState` after exchange, including on `/es/admin/`
+    - Localize admin login pages and login emails in English and Spanish
+  - Phase 2: Roles, permissions, and audit model
+    - Support `super_admin` users with platform-wide access and `campaign_user` users scoped to assigned campaigns
+    - Implement action-based permissions such as `campaign:read`, `campaign:edit_content`, `supporters:read`, `reports:send`, `fulfillment:manage`, `marketing:send`, `platform_inventory:manage`, `observability:read`, and `system:mutate`
+    - Require exact origin checks and CSRF tokens for cookie-backed admin mutations
+    - Audit only durable mutations: invites, role changes, live report sends, fulfillment changes, inventory overrides, content publishes, settlement/rebuild/repair operations, and similar state changes
+    - Do not audit ordinary reads, dashboard visits, table filters, previews, or local draft edits
+  - Phase 3: Admin dashboard overview
+    - Add a dashboard summary API that reads from existing campaign stats, campaign indexes, add-on inventory snapshots, cron status, report state, projection drift checks, and observability summaries
+    - Super admins should see all campaigns, platform add-on warnings, webhook health, sampled mutation performance, cron/report status, projection drift alerts, and platform-level operational summaries
+    - Campaign users should see only assigned campaign summaries, supporter totals, report status, fulfillment state, and scoped marketing/referral tools
+    - Dashboard summary and interaction paths should be zero-KV-write
+  - Phase 4: Light supporter CRM for creators
+    - Add campaign-scoped supporter listing and segmentation using `campaign-pledges:{slug}` instead of namespace scans
+    - Support filters for active, cancelled, charged, payment failed, physical rewards, digital-only pledges, add-ons, high-value supporters, missing shipping details, and other fulfillment or communication needs
+    - Keep paging and filtering read-only; do not persist server-side search sessions
+    - Show useful payment and fulfillment status without exposing raw Stripe payment method IDs unnecessarily
+    - Add exports only behind explicit permissions and audit live export/send mutations if they reveal sensitive supporter data
+  - Phase 5: Reports and reward fulfillment support
+    - Reuse the existing shared JS report core for pledge-ledger and fulfillment CSVs instead of creating a dashboard-only report path
+    - Initial dashboard slice now provides report preview and CSV download; browser manual send and marker/idempotency controls remain a later UI layer on top of the existing shared-secret manual-send endpoint
+    - Keep report previews and CSV generation zero-KV-write
+    - Only live sends should write idempotency markers and audit events
+    - Preserve campaign-runner versus platform-fulfillment separation so campaign runners receive campaign rows and platform operators receive platform add-on rows
+    - Add explicit confirmation dialogs before live sends or fulfillment state changes
+  - Phase 6: Add-on inventory admin
+    - Add platform add-on inventory baseline override / reset controls so super admins can restock sold-out platform products without editing `_config.yml`
+    - Compute effective inventory from config baseline plus optional KV override minus saved pledge truth
+    - Write only on explicit restock, exact-baseline set, or reset-to-config actions
+    - Keep platform-merch inventory and reporting visible in a super-admin platform tab while keeping campaign add-ons attached to campaign dashboards and campaign totals
+    - Audit all inventory mutations with safe before/after summaries
+  - Phase 7: Marketing tools
+    - Start with zero-write tools: referral link generator, UTM builder, embed/share shortcut, campaign promotion checklist, milestone prompts, and copyable social/email snippets
+    - Initial dashboard slice now keeps the URL builder, referral parameters, embed-builder shortcut, local field preferences, and copy snippets in browser state
+    - Saved referral-code listing is a read-only campaign-scoped Worker call; saving a referral code is an explicit mutation that writes one campaign-scoped referral list
+    - Generate deterministic referral URLs without writing to KV; persist referral attribution only when checkout or pledge state is already being written, or when an admin explicitly saves a reusable referral code
+    - Add an announcement composer that stores drafts locally, keeps dry-runs read-only, and writes only for live sends and audit markers
+    - Treat abandoned cart follow-up as a later subfeature that needs consent, retention, duplicate-send prevention, and free-tier-aware storage before launch
+    - Do not write an abandoned-cart record on cart open; only consider follow-up after email and checkout intent state already exist, and consider Queues or another low-churn delayed-check model instead of KV-heavy schedules
+  - Phase 8: Analytics
+    - Launch with analytics derived from existing durable truth: pledge totals, supporter counts, add-on revenue split, campaign/platform revenue split, report state, payment-failure state, and referral attribution captured during checkout/pledge writes
+    - Initial dashboard slice now reads pledge-derived analytics from `campaign-pledges:{slug}` indexes only, with zero KV writes and zero KV list operations
+    - Show an estimated Stripe fee card for planning using the standard US domestic card estimate; label it clearly as an estimate rather than settled processor data
+    - Follow-up: store actual Stripe balance transaction fee and net amounts on successful charge writes by retrieving/expanding the PaymentIntent charge balance transaction, then replace or pair the estimate with actual processor fee/net analytics once historical pledge records can be backfilled safely
+    - Keep actual processor fee capture tied to existing durable payment writes and webhook/settlement writes; do not add background analytics writes or per-view recomputation writes
+    - Do not write KV records for page views, admin views, referral clicks, or chart loads
+    - Keep visitor analytics optional and provider-backed or batched/sampled if it grows beyond pledge-derived analytics
+    - Super admins can see platform analytics and observability; campaign users can see only assigned campaign analytics
+  - Phase 9: Dedicated content editor replacing Pages CMS
+    - Review Pages CMS patterns for useful schema/editor ideas, but build the dedicated editor around repo-owned campaign Markdown and GitHub Pages deployment
+    - Integrate with GitHub through the Worker for create/edit/delete of campaign content, diary entries, community votes, tiers, campaign add-ons, and per-campaign variables
+    - Initial dashboard slice now loads campaign content into browser-local drafts and validates/renders preview HTML through role-scoped `GET /admin/content/campaign` and `POST /admin/content/preview` endpoints with zero KV writes and zero KV list operations
+    - Publish slice now validates the same draft, updates only `title`, `short_blurb`, and `long_content` in the existing campaign Markdown via GitHub Contents API, triggers the normal rebuild workflow, and writes one audit event
+    - Prefer a shared block schema plus shared renderer as the source of truth so admin previews match public campaign templates instead of drifting into a dashboard-only rendering path
     - Prefer real preview panes or iframes at desktop/mobile widths over custom JS text layout for ordinary campaign editing, responsiveness checks, and Markdown/rich-text preview
+    - Store editor drafts in `localStorage` or IndexedDB and avoid KV writes while typing
+    - Keep preview validation zero-KV-write; publish should validate schema/content safety, commit to GitHub, trigger rebuild, and write only the needed audit state
     - Keep `pretext` optional and scoped to specialized preview/validation helpers such as share-card text fitting, fixed-area headline warnings, or future art-directed text blocks that need manual line control
     - Do not make `pretext` a core dependency of the editor unless a later dashboard feature proves that production preview fidelity or performance actually depends on programmatic text measurement
+  - Phase 10: Spanish launch parity
+    - Ship English and Spanish admin UI together rather than treating Spanish as a follow-up
+    - Localize auth screens, login emails, dashboard copy, CRM filters, report actions, fulfillment states, inventory controls, marketing tools, analytics labels, validation errors, empty/loading/error states, and destructive confirmations
+    - Keep `_data/i18n/en.yml` and `_data/i18n/es.yml` key parity as a required acceptance gate
+    - Admin language switching now preserves safe query/hash state while stripping raw `admin_login` magic-link tokens before building the alternate-language URL
+    - Preserve query strings and hashes during admin language switching where safe, while stripping raw login tokens after exchange
+    - Do not automatically translate creator-authored campaign bodies, diary entries, or community content unless localized campaign content exists
+  - Phase 11: Rate limiting and abuse controls
+    - Keep tight KV-backed rate limits for unauthenticated admin auth starts/exchanges, dangerous admin mutations, checkout, pledge writes, and votes
+    - Avoid KV-backed rate limiting for normal authenticated admin reads unless abuse patterns require it
+    - Keep request-size caps, origin checks, CSRF checks, timing-safe comparisons, and private/no-store responses on sensitive admin paths
+    - Initial hardening slice now applies private/no-store rate-limit failures on admin auth/mutation paths, rejects oversized admin auth payloads before rate-limit or auth KV writes, and requires trusted same-site origins for cookie-backed admin mutations alongside CSRF tokens
+    - Add abuse-path tests without turning dashboard browsing itself into write traffic
+  - Phase 12: Testing and release gates
+    - Add unit coverage for admin auth, token replay prevention, fixed or near-expiry session behavior, RBAC, CSRF, supporter filtering, report preview no-write behavior, add-on override math, content validation, and i18n key parity
+    - Add security coverage for privilege escalation, cross-campaign access, login token replay, mutation without CSRF, oversized admin payloads, and admin rate limits
+    - Initial release-gate slice now covers one-time admin login token replay, near-expiry session reads without refresh writes, expired session rejection without cleanup writes, admin auth throttling, oversized payload rejection, cross-campaign RBAC, CSRF, report preview no-write behavior, add-on override math, content validation, and admin i18n key parity in unit tests
+    - Add browser coverage for super-admin login, campaign-user login, Spanish admin route, keyboard-only dashboard navigation, axe checks, report preview/download, future live-send controls, inventory restock, and content preview/publish validation
+    - Admin browser release-gate coverage now runs through the Podman Playwright dev stack for magic-link login start/exchange, super-admin dashboard refresh, campaign-user Spanish access, platform inventory hiding, report preview/download, inventory restock, marketing URL/referral-code tools, analytics load, and content preview/publish validation
+    - Add a KV-write budget test harness using a mock KV wrapper that counts `put`, `delete`, and `list`; assert that admin session reads, dashboard summaries, supporter filters, report previews, referral generation, analytics views, and content previews remain zero-write
+    - KV-write budget harness now resets and asserts `PLEDGES` and `RATELIMIT` `put`, `delete`, and `list` counters for admin session reads, dashboard summaries, supporter filters, report previews, analytics views, marketing referral reads, content loads, content previews, and the client-local marketing builder
+    - Validate with focused tests during implementation and the broader merge gate before landing
 - [ ] Further tax calculator work
   - Support USA and international
   - Target local / jurisdiction-level US rates, not just state-level rates
@@ -242,6 +326,7 @@
   - Add a documented tax-data refresh/import workflow for future jurisdiction datasets
   - Future consideration: business tax handling such as VAT ID validation, reverse-charge flows, exemptions, and product tax classes
 - [ ] Support different prices per add-on variation
+- [ ] "Share to" platform links for campaigns modeled off dust-wave-new news items "share to" platform links
 
 ## Known Issues
 

@@ -27,6 +27,8 @@ The main content type. Each campaign includes:
 | **Diary** | Production updates with rich content |
 | **Decisions** | Community polls for backers |
 
+Decision `type` values are semantic for launch: choose `vote` when the result is meant to decide an outcome, and choose `poll` when the result is advisory supporter feedback. Both use the same supporter submission and tallying flow today.
+
 ### Pages
 
 - **About Page** (`about.md`) — Platform explanation

@@ -2851,6 +2851,22 @@ export default {
         return handleAdminAnalytics(request, env);
       }
 
+      if (path === '/admin/marketing/referrals' && method === 'GET') {
+        return handleAdminMarketingReferrals(request, env);
+      }
+
+      if (path === '/admin/marketing/referrals' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminMarketingReferralSave(request, env, parsedBody.body || {});
+      }
+
       if (path === '/admin/content/campaign' && method === 'GET') {
         return handleAdminContentCampaign(request, env);
       }
@@ -10496,6 +10512,89 @@ async function handleAdminAnalytics(request, env) {
     utmSourceBreakdown: mapAdminAnalyticsBreakdown(utmSourceBreakdown),
     writeBudget: adminReadBudget(),
     generatedAt: new Date().toISOString()
+  }, 200, env);
+}
+
+function adminMarketingReferralKey(campaignSlug) {
+  return `admin-marketing-referrals:${campaignSlug}`;
+}
+
+function normalizeAdminReferralCode(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
+
+function publicAdminMarketingReferral(record = {}) {
+  return {
+    code: String(record.code || ''),
+    name: String(record.name || ''),
+    campaignSlug: String(record.campaignSlug || ''),
+    createdAt: record.createdAt || null,
+    updatedAt: record.updatedAt || null,
+    createdBy: String(record.createdBy || '')
+  };
+}
+
+async function readAdminMarketingReferrals(env, campaignSlug) {
+  const rows = await env.PLEDGES.get(adminMarketingReferralKey(campaignSlug), { type: 'json' });
+  return Array.isArray(rows)
+    ? rows.map(publicAdminMarketingReferral).filter((row) => row.code)
+    : [];
+}
+
+async function handleAdminMarketingReferrals(request, env) {
+  const url = new URL(request.url);
+  const campaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'campaign:read');
+  if (!scoped.ok) return scoped.response;
+  const referrals = await readAdminMarketingReferrals(env, campaignSlug);
+  return privateJsonResponse({
+    user: scoped.auth.user,
+    campaignSlug,
+    referrals,
+    writeBudget: adminReadBudget()
+  }, 200, env);
+}
+
+async function handleAdminMarketingReferralSave(request, env, body = {}) {
+  const campaignSlug = String(body.campaignSlug || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'marketing:send', { requireCsrf: true });
+  if (!scoped.ok) return scoped.response;
+
+  const code = normalizeAdminReferralCode(body.code);
+  const name = String(body.name || '').trim().slice(0, 120);
+  if (!code || !name) {
+    return privateJsonResponse({ error: 'Referral code and referrer name are required.' }, 400, env);
+  }
+
+  const now = new Date().toISOString();
+  const referrals = await readAdminMarketingReferrals(env, campaignSlug);
+  const existingIndex = referrals.findIndex((row) => row.code === code);
+  const nextRecord = {
+    code,
+    name,
+    campaignSlug,
+    createdAt: existingIndex >= 0 ? referrals[existingIndex].createdAt || now : now,
+    updatedAt: now,
+    createdBy: existingIndex >= 0 ? referrals[existingIndex].createdBy || scoped.auth.user.email : scoped.auth.user.email
+  };
+  if (existingIndex >= 0) {
+    referrals[existingIndex] = nextRecord;
+  } else {
+    referrals.unshift(nextRecord);
+  }
+  referrals.sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
+  await env.PLEDGES.put(adminMarketingReferralKey(campaignSlug), JSON.stringify(referrals.map(publicAdminMarketingReferral)));
+
+  return privateJsonResponse({
+    user: scoped.auth.user,
+    campaignSlug,
+    referral: publicAdminMarketingReferral(nextRecord),
+    referrals: referrals.map(publicAdminMarketingReferral)
   }, 200, env);
 }
 

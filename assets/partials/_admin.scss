@@ -1106,7 +1106,7 @@ textarea.admin-settings__input {
 }
 
 .admin-marketing__form {
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
 }
 
 .admin-content__form {
@@ -1831,6 +1831,20 @@ textarea.admin-settings__input {
   margin: 0;
 }
 
+.admin-marketing__referrals {
+  margin-top: 12px;
+
+  h3 {
+    font-size: $type--ui;
+    line-height: 1.2;
+    margin: 0 0 8px;
+  }
+}
+
+.admin-marketing__referrals-table-wrap {
+  overflow-x: auto;
+}
+
 .admin-reports__checkbox {
   align-items: center;
   color: $color--secondary;
@@ -1974,6 +1988,7 @@ textarea.admin-settings__input {
 .admin-reports__table,
 .admin-inventory__table,
 .admin-analytics__table,
+.admin-marketing__referrals-table,
 .admin-supporters__table {
   @include admin-table;
 }

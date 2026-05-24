@@ -130,17 +130,23 @@
               <label for="admin-marketing-ref">{% include t.html key="admin.marketing_ref_label" lang=current_lang %}</label>
               <input id="admin-marketing-ref" name="ref" type="text" autocomplete="off" inputmode="text">
             </div>
+            <div class="admin-marketing__field">
+              <label for="admin-marketing-referrer">{% include t.html key="admin.marketing_referrer_label" lang=current_lang %}</label>
+              <input id="admin-marketing-referrer" name="referrer" type="text" autocomplete="name" inputmode="text">
+            </div>
             <div class="admin-marketing__field admin-marketing__field--full">
               <label for="admin-marketing-url">{% include t.html key="admin.marketing_url_label" lang=current_lang %}</label>
               <textarea id="admin-marketing-url" rows="3" readonly></textarea>
             </div>
             <div class="admin-marketing__actions">
               <button id="admin-marketing-copy-url" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_copy_url" lang=current_lang %}</button>
+              <button id="admin-marketing-save-referral" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_save_referral" lang=current_lang %}</button>
               <a id="admin-marketing-embed-link" class="btn btn--secondary" href="/embed/campaign/">{% include t.html key="admin.marketing_open_embed" lang=current_lang %}</a>
             </div>
           </form>
           <div id="admin-marketing-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
           <div id="admin-marketing-snippets" class="admin-marketing__snippets" aria-live="polite"></div>
+          <div id="admin-marketing-referrals" class="admin-marketing__referrals"></div>
         </section>
 
         <section id="admin-panel-analytics" class="admin-analytics admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-analytics" data-admin-tab-panel="analytics" hidden>

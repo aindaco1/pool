@@ -33,6 +33,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Strict missing-pledge handling** — Magic-link pledge reads fail closed with `404` when the backing pledge record is missing
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
 - **Announcements** — Admin broadcast emails with custom CTA links to supporters
+- **Private admin dashboard** — Magic-link admin access for role-scoped summaries, supporters, reports, inventory, marketing links, analytics, and campaign content previews/publishes without exposing admin secrets in browser code
 - **Instagram integration** — Optional social CTA in supporter emails
 - **Ongoing funding** — Post-campaign support section
 - **Manage Pledge dashboard** — Desktop-friendly Active / Closed sections with locked-state read-only controls after deadline
@@ -158,6 +159,22 @@ bundle exec jekyll serve --config _config.yml,_config.local.yml
 
 For a full host-only stack, run the Worker separately with `cd worker && wrangler dev --env dev --port 8787`.
 
+Local admin dashboard testing uses the repo's dev Worker defaults: `ADMIN_BOOTSTRAP_EMAILS=alonso@dustwave.xyz`, `CORS_ALLOWED_ORIGIN=http://127.0.0.1:4000`, and the two test-only campaigns `hand-relations,smoke-editable`. Those values are mirrored into the Wrangler `dev` environment from `_config.yml`; machine-specific secrets still belong in ignored `worker/.dev.vars`.
+
+To create or update local secrets safely, run:
+
+```bash
+npm run secrets:dev
+```
+
+That helper creates `worker/.dev.vars` from `worker/.dev.vars.example` when needed, locks it down with local-only file permissions, generates local signing secrets, and prompts for optional provider keys without printing them back to the terminal. The admin dashboard shows a read-only **Secrets & credentials** status section, but it never stores secret values in `_config.yml`, KV, GitHub commits, or admin setting drafts.
+
+To seed both admin test campaigns against a running local Worker:
+
+```bash
+./scripts/seed-admin-test-campaigns.sh
+```
+
 See [docs/PODMAN.md](docs/PODMAN.md) for the current scope and limitations.
 
 The Podman path is host-validated on macOS. Linux and Windows are supported by design and have doctor/self-check coverage, but were not host-validated in this thread.
@@ -179,6 +196,8 @@ npm run podman:self-check
 
 If you want to exercise the on-site Stripe checkout locally, add `STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...` to [`worker/.dev.vars`](worker/.dev.vars) before starting the stack.
 
+For production, use Cloudflare Worker secrets for runtime credentials and GitHub repository secrets for deploy credentials. Do not put Stripe secret keys, webhook secrets, Resend keys, USPS client secrets, ZIP.TAX keys, or Cloudflare API tokens in `_config.yml`.
+
 ## Cloudflare Plan Guidance For Forks
 
 The Pool is intentionally shaped so most traffic stays cheap:
@@ -197,7 +216,7 @@ The Pool is intentionally shaped so most traffic stays cheap:
 
 Fork knobs worth knowing:
 
-- site config: `cache.live_stats_ttl_seconds`, `cache.live_inventory_ttl_seconds`, `pricing.sales_tax_rate`, `pricing.flat_shipping_rate`, `tax.*`
+- site config: `cache.live_stats_ttl_seconds`, `cache.live_inventory_ttl_seconds`, `pricing.sales_tax_rate`, `shipping.fallback_flat_rate`, `tax.*`
 - Worker env: auto-synced pricing and tax-provider values in [`worker/wrangler.toml`](worker/wrangler.toml)
 
 ### Practical Scalability Scenarios
