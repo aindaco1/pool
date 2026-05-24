@@ -7,6 +7,8 @@ Allow: /
 
 Disallow: /manage/
 Disallow: /es/manage/
+Disallow: /admin/
+Disallow: /es/admin/
 {% if site.seo.index_public_community_hub == false %}
 Disallow: /community/
 Disallow: /es/community/

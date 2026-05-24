@@ -1,7 +1,8 @@
 {% assign block = include.block %}
+{% assign alignment = block.align | default: 'left' %}
 {% assign image_width = block.width | plus: 0 %}
 {% assign image_height = block.height | plus: 0 %}
-<figure class="content-block content-block--image">
+<figure class="content-block content-block--image content-block--align-{{ alignment | escape }}">
   <img 
     src="{{ block.src | escape }}"
     alt="{{ block.alt | default: '' | escape }}"

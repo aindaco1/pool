@@ -10,7 +10,7 @@ module.exports = defineConfig({
   retries: 1,
   workers: Number.isFinite(configuredWorkers) && configuredWorkers > 0 ? configuredWorkers : undefined,
   use: {
-    baseURL: 'http://127.0.0.1:4000',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4000',
     headless: true,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',

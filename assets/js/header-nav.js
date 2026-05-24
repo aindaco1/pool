@@ -3,19 +3,34 @@
 
   var toggle = document.getElementById('menu-toggle');
   var nav = document.getElementById('mobile-nav');
-  if (!toggle || !nav) return;
-  var openLabel = toggle.getAttribute('data-open-label') || 'Open menu';
-  var closeLabel = toggle.getAttribute('data-close-label') || 'Close menu';
   var langLinks = document.querySelectorAll('[data-lang-switcher-link="true"]');
 
+  function currentSearchForLanguageSwitch() {
+    var search = window.location.search || '';
+    var isAdminPage = /^\/(?:[a-z]{2}\/)?admin\/?$/i.test(window.location.pathname || '');
+    if (!isAdminPage || !search) {
+      return search;
+    }
+
+    var params = new URLSearchParams(search);
+    params.delete('admin_login');
+    var sanitized = params.toString();
+    return sanitized ? '?' + sanitized : '';
+  }
+
   if (langLinks.length > 0 && (window.location.search || window.location.hash)) {
+    var safeSearch = currentSearchForLanguageSwitch();
     langLinks.forEach(function(link) {
       if (!(link instanceof HTMLAnchorElement)) return;
       var rawHref = link.getAttribute('href') || '';
       if (!rawHref || rawHref.indexOf('?') !== -1 || rawHref.indexOf('#') !== -1) return;
-      link.setAttribute('href', rawHref + window.location.search + window.location.hash);
+      link.setAttribute('href', rawHref + safeSearch + window.location.hash);
     });
   }
+
+  if (!toggle || !nav) return;
+  var openLabel = toggle.getAttribute('data-open-label') || 'Open menu';
+  var closeLabel = toggle.getAttribute('data-close-label') || 'Close menu';
 
   function closeMenu() {
     nav.classList.remove('is-open');

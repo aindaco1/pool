@@ -4064,6 +4064,44 @@ describe('Worker business logic hardening', () => {
     });
   });
 
+  it('seeds both configured admin test campaigns when no campaign is specified', async () => {
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret',
+      ADMIN_TEST_CAMPAIGNS: 'hand-relations,smoke-editable',
+      TAX_PROVIDER: 'nm_grt'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    const setupResponse = await worker.fetch(
+      new Request('https://pool.test/test/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'admin-smoke@example.com'
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(setupResponse.status).toBe(200);
+    const body = await setupResponse.json();
+    expect(body.pledges.map((pledge: { campaignSlug: string }) => pledge.campaignSlug)).toEqual([
+      'hand-relations',
+      'smoke-editable'
+    ]);
+    expect(body.manageLinks.map((link: { campaignSlug: string }) => link.campaignSlug)).toEqual([
+      'hand-relations',
+      'smoke-editable'
+    ]);
+    expect(await kv.get('campaign-pledges:hand-relations', { type: 'json' })).toContain(
+      'test-order-hand-relations-admin-smoke-example-com'
+    );
+    expect(await kv.get('campaign-pledges:smoke-editable', { type: 'json' })).toContain(
+      'test-order-smoke-editable-admin-smoke-example-com'
+    );
+  });
+
   it('repairs stale campaign indexes when recalculating stats', async () => {
     const env = createEnv({
       ADMIN_SECRET: 'admin-secret'

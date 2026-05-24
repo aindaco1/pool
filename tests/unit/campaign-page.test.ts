@@ -70,6 +70,8 @@ describe('campaign page script', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
+    delete (document as any).activeElement;
     delete (window as any).POOL_CONFIG;
     document.body.innerHTML = '';
   });

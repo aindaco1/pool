@@ -35,7 +35,7 @@
                 data-item-name="{{ include.campaign.title | escape }} — {{ featured.name | escape }}"
                 data-item-price="{{ featured.price }}"
                 data-item-url="{{ site.url }}{{ campaign_url | strip }}#tier-{{ featured.id }}"
-                data-item-description="Pledge (charged only if funded) — {{ featured.description | escape }}"
+                data-item-description="Pledge (charged only if funded) — {{ featured.description | strip_html | escape }}"
                 data-item-max-quantity="{% if featured.stackable %}{% if featured.max_per_person %}{{ featured.max_per_person }}{% else %}99{% endif %}{% else %}1{% endif %}"
                 data-item-stackable="{% if featured.stackable %}always{% else %}never{% endif %}"
                 data-item-shippable="false"
@@ -59,7 +59,7 @@
                 {% endif %}>
           <div class="featured-tier__info">
             <div class="featured-tier__name">{{ featured.name | escape }}</div>
-            <p class="featured-tier__description">{{ featured.description | escape }}</p>
+            <p class="featured-tier__description">{{ featured.description | safe_rich_text }}</p>
           </div>
           <div class="featured-tier__price">{{ featured.price | money }}</div>
         </button>
@@ -71,7 +71,7 @@
                 data-item-name="{{ include.campaign.title | escape }} — {{ featured.name | escape }}"
                 data-item-price="{{ featured.price }}"
                 data-item-url="{{ site.url }}{{ campaign_url | strip }}#tier-{{ featured.id }}"
-                data-item-description="Late support — {{ featured.description | escape }}"
+                data-item-description="Late support — {{ featured.description | strip_html | escape }}"
                 data-item-max-quantity="{% if featured.stackable %}{% if featured.max_per_person %}{{ featured.max_per_person }}{% else %}99{% endif %}{% else %}1{% endif %}"
                 data-item-stackable="{% if featured.stackable %}always{% else %}never{% endif %}"
                 data-item-shippable="false"
@@ -86,7 +86,7 @@
                 data-item-custom2-value="{{ featured.category | default: 'digital' }}">
           <div class="featured-tier__info">
             <div class="featured-tier__name">{{ featured.name | escape }}</div>
-            <p class="featured-tier__description">{{ featured.description | escape }}</p>
+            <p class="featured-tier__description">{{ featured.description | safe_rich_text }}</p>
           </div>
           <div class="featured-tier__price">{{ featured.price | money }}</div>
         </button>
@@ -94,7 +94,7 @@
         <a href="{{ campaign_url | strip }}#tier-{{ featured.id }}" class="campaign-card__featured-tier campaign-card__featured-tier--disabled">
           <div class="featured-tier__info">
             <div class="featured-tier__name">{{ featured.name | escape }}</div>
-            <p class="featured-tier__description">{{ featured.description | escape }}</p>
+            <p class="featured-tier__description">{{ featured.description | safe_rich_text }}</p>
           </div>
           <div class="featured-tier__price">{{ featured.price | money }}</div>
         </a>

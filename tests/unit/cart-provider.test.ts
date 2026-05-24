@@ -2748,9 +2748,14 @@ describe('cart provider shim', () => {
       });
     }));
 
-    const mount = vi.fn(async ({ onChange }) => {
+    const mount = vi.fn(async ({ onChange, paymentContainer }) => {
       if (typeof onChange === 'function') {
         onChange({ session: { canConfirm: true } });
+      }
+      if (paymentContainer instanceof HTMLElement) {
+        const mountedElement = document.createElement('div');
+        mountedElement.setAttribute('data-test-stripe-payment-element', 'true');
+        paymentContainer.appendChild(mountedElement);
       }
 
       return {
@@ -2787,55 +2792,73 @@ describe('cart provider shim', () => {
     });
 
     await readyApi.api.theme.cart.open();
+    await readyApi.api.theme.cart.navigate('/checkout');
 
-    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
-    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
-    if (!continueButton) throw new Error('Missing continue button');
-    continueButton.click();
+    const getLiveRoot = () => document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    await vi.waitFor(() => {
+      const liveRoot = getLiveRoot();
+      expect(liveRoot?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
+      expect(liveRoot?.querySelector('[data-cart-custom-checkout-email]')).toBeTruthy();
+      expect(liveRoot?.querySelector('[data-cart-custom-shipping-field="name"]')).toBeTruthy();
+      expect(liveRoot?.querySelector('[data-cart-custom-shipping-field="line1"]')).toBeTruthy();
+      expect(liveRoot?.querySelector('[data-cart-custom-shipping-field="city"]')).toBeTruthy();
+      expect(liveRoot?.querySelector('[data-cart-custom-shipping-field="state"]')).toBeTruthy();
+      expect(liveRoot?.querySelector('[data-cart-custom-shipping-field="postal_code"]')).toBeTruthy();
+    });
 
-    const emailField = root?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
-    const shippingName = root?.querySelector('[data-cart-custom-shipping-field="name"]') as HTMLInputElement | null;
-    const shippingLine1 = root?.querySelector('[data-cart-custom-shipping-field="line1"]') as HTMLInputElement | null;
-    const shippingCity = root?.querySelector('[data-cart-custom-shipping-field="city"]') as HTMLInputElement | null;
-    const shippingState = root?.querySelector('[data-cart-custom-shipping-field="state"]') as HTMLInputElement | null;
-    const shippingPostalCode = root?.querySelector('[data-cart-custom-shipping-field="postal_code"]') as HTMLInputElement | null;
+    const emailField = getLiveRoot()?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
+    const shippingName = getLiveRoot()?.querySelector('[data-cart-custom-shipping-field="name"]') as HTMLInputElement | null;
+    const shippingLine1 = getLiveRoot()?.querySelector('[data-cart-custom-shipping-field="line1"]') as HTMLInputElement | null;
+    const shippingCity = getLiveRoot()?.querySelector('[data-cart-custom-shipping-field="city"]') as HTMLInputElement | null;
+    const shippingState = getLiveRoot()?.querySelector('[data-cart-custom-shipping-field="state"]') as HTMLInputElement | null;
+    const shippingPostalCode = getLiveRoot()?.querySelector('[data-cart-custom-shipping-field="postal_code"]') as HTMLInputElement | null;
     if (!emailField || !shippingName || !shippingLine1 || !shippingCity || !shippingState || !shippingPostalCode) {
       throw new Error('Missing custom checkout fields');
     }
 
-    emailField.value = 'supporter@example.com';
-    emailField.dispatchEvent(new Event('change', { bubbles: true }));
-    shippingName.value = 'Supporter Example';
-    shippingLine1.value = '123 Main Street';
-    shippingCity.value = 'Albuquerque';
-    shippingState.value = 'NM';
-    shippingPostalCode.value = '87101';
-    shippingPostalCode.dispatchEvent(new Event('change', { bubbles: true }));
+    const setFieldValue = (field: HTMLInputElement, value: string) => {
+      field.value = value;
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    setFieldValue(emailField, 'supporter@example.com');
+    setFieldValue(shippingName, 'Supporter Example');
+    setFieldValue(shippingLine1, '123 Main Street');
+    setFieldValue(shippingCity, 'Albuquerque');
+    setFieldValue(shippingState, 'NM');
+    setFieldValue(shippingPostalCode, '87101');
 
     await vi.waitFor(() => {
       expect(mount).toHaveBeenCalled();
     });
 
+    await readyApi.api.theme.cart.navigate('/checkout');
+
+    const startButton = getLiveRoot()?.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
+    if (startButton) {
+      startButton.click();
+    }
+
     await vi.waitFor(() => {
-      const liveRoot = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+      const liveRoot = getLiveRoot();
       expect(liveRoot?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
-      const actionButton = liveRoot?.querySelector('[data-cart-confirm-custom-checkout], [data-cart-start-checkout]') as HTMLButtonElement | null;
-      expect(actionButton).toBeTruthy();
-      expect(actionButton?.disabled).toBe(false);
+      const confirmAction = liveRoot?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
+      expect(confirmAction).toBeTruthy();
+      expect(confirmAction?.disabled).toBe(false);
     });
 
-    const liveRoot = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
-    const confirmButton = liveRoot?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
+    const confirmButton = getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
     confirmButton?.click();
 
     await vi.waitFor(() => {
       expect(mount).toHaveBeenCalled();
     });
 
-    expect(root?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
-    expect(root?.querySelector('[data-cart-confirm-custom-checkout]')).toBeTruthy();
-    expect(root?.textContent?.includes('Your card number is incomplete.')).toBe(false);
-    expect(root?.querySelector('[data-cart-custom-checkout-region="link"]')).toBeNull();
+    expect(getLiveRoot()?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
+    expect(getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]')).toBeTruthy();
+    expect(getLiveRoot()?.textContent?.includes('Your card number is incomplete.')).toBe(false);
+    expect(getLiveRoot()?.querySelector('[data-cart-custom-checkout-region="link"]')).toBeNull();
   });
 
 
@@ -2949,7 +2972,7 @@ describe('cart provider shim', () => {
       workerBase: WORKER_BASE
     };
 
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url === `${WORKER_BASE}/tax/quote`) {
         expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
@@ -2993,7 +3016,8 @@ describe('cart provider shim', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
-    }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
     const confirm = vi.fn(async () => ({
       type: 'error',
@@ -3002,21 +3026,28 @@ describe('cart provider shim', () => {
       }
     }));
 
+    const mount = vi.fn(async ({ onChange, paymentContainer }) => {
+      if (typeof onChange === 'function') {
+        onChange({ session: { canConfirm: true } });
+      }
+      if (paymentContainer instanceof HTMLElement) {
+        const mountedElement = document.createElement('div');
+        mountedElement.setAttribute('data-test-stripe-payment-element', 'true');
+        paymentContainer.appendChild(mountedElement);
+      }
+      return {
+        supportsLinkAuthenticationElement: false,
+        supportsShippingAddressElement: false,
+        updateEmail: vi.fn(async () => ({})),
+        updateShippingAddress: vi.fn(async () => ({})),
+        confirm,
+        unmount: vi.fn()
+      };
+    });
+
     (window as any).PoolStripeCheckoutSidecar = {
       ensureStripeJs: vi.fn(async () => (window as any).Stripe),
-      mount: vi.fn(async ({ onChange }) => {
-        if (typeof onChange === 'function') {
-          onChange({ session: { canConfirm: true } });
-        }
-        return {
-          supportsLinkAuthenticationElement: false,
-          supportsShippingAddressElement: false,
-          updateEmail: vi.fn(async () => ({})),
-          updateShippingAddress: vi.fn(async () => ({})),
-          confirm,
-          unmount: vi.fn()
-        };
-      })
+      mount
     };
     (window as any).Stripe = vi.fn();
     document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
@@ -3040,39 +3071,43 @@ describe('cart provider shim', () => {
     });
 
     await readyApi.api.theme.cart.open();
-    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
-    const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
-    if (!continueButton) throw new Error('Missing continue button');
-    continueButton.click();
+    await readyApi.api.theme.cart.navigate('/checkout');
+    const getLiveRoot = () => document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
 
     await vi.waitFor(() => {
-      expect(root?.textContent).toContain('Contact');
+      expect(getLiveRoot()?.textContent).toContain('Contact');
+      expect(getLiveRoot()?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
     });
 
-    const emailField = root?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
+    const emailField = getLiveRoot()?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
     if (!emailField) throw new Error('Missing custom checkout email field');
 
-    let confirmButton: HTMLButtonElement | null = null;
     await vi.waitFor(() => {
-      confirmButton = root?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
-      expect(confirmButton).not.toBeNull();
-    }, { timeout: 5000 });
+      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/start`, expect.any(Object));
+      expect(mount).toHaveBeenCalled();
+    }, { timeout: 10000 });
 
     await vi.waitFor(() => {
-      expect(confirmButton?.disabled).toBe(false);
-    }, { timeout: 5000 });
+      const liveConfirmButton = getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
+      expect(liveConfirmButton).not.toBeNull();
+      expect(liveConfirmButton?.disabled).toBe(false);
+    }, { timeout: 10000 });
 
+    const confirmButton = getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
+    if (!confirmButton) throw new Error('Missing custom checkout confirm button');
     confirmButton?.click();
 
     await vi.waitFor(() => {
       expect(confirm).not.toHaveBeenCalled();
-      expect(root?.textContent).toContain('Enter an email address to continue.');
+      const error = getLiveRoot()?.querySelector('[data-cart-custom-checkout-email-error]') as HTMLElement | null;
+      expect(error?.hidden).toBe(false);
+      expect(error?.textContent).toContain('Enter an email address to continue.');
     });
 
-    expect(root?.textContent).not.toContain('Provide an email address using updateEmail()');
-    const checkoutError = root?.querySelector('[data-cart-checkout-error]') as HTMLElement | null;
+    expect(getLiveRoot()?.textContent).not.toContain('Provide an email address using updateEmail()');
+    const checkoutError = getLiveRoot()?.querySelector('[data-cart-checkout-error]') as HTMLElement | null;
     expect(checkoutError?.hidden).toBe(true);
-  });
+  }, 15000);
 
   it('collects a full New Mexico tax location in custom checkout before starting a digital-only pledge', async () => {
     (window as any).POOL_CONFIG = {

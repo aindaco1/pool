@@ -22,6 +22,8 @@ const DEFAULT_SHIPPING_ORIGIN_ZIP = '87120';
 const DEFAULT_SHIPPING_ORIGIN_COUNTRY = 'US';
 const DEFAULT_SHIPPING_FALLBACK_FLAT_RATE = 3;
 const DEFAULT_FREE_SHIPPING_DEFAULT = false;
+const DEFAULT_SHIPPING_DEFAULT_OPTION = 'standard';
+const SHIPPING_DEFAULT_OPTIONS = ['standard', 'signature_required', 'adult_signature_required'];
 const DEFAULT_USPS_ENABLED = true;
 const DEFAULT_USPS_API_BASE = 'https://apis.usps.com';
 const DEFAULT_USPS_TEST_API_BASE = 'https://apis-tem.usps.com';
@@ -73,6 +75,7 @@ export {
   DEFAULT_CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY,
   DEFAULT_CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT,
   DEFAULT_SHIPPING_FALLBACK_FLAT_RATE,
+  DEFAULT_SHIPPING_DEFAULT_OPTION,
   DEFAULT_SHIPPING_ORIGIN_COUNTRY,
   DEFAULT_SHIPPING_ORIGIN_ZIP,
   DEFAULT_SITE_BASE,
@@ -231,6 +234,11 @@ export function getCampaignRunnerEmailSubjectPrefix(env = {}) {
 export function getFreeShippingDefault(env = {}) {
   const normalized = normalizeBooleanish(env.FREE_SHIPPING_DEFAULT);
   return normalized === null ? DEFAULT_FREE_SHIPPING_DEFAULT : normalized;
+}
+
+export function getShippingDefaultOption(env = {}) {
+  const configured = normalizeNullableString(env.SHIPPING_DEFAULT_OPTION);
+  return SHIPPING_DEFAULT_OPTIONS.includes(configured) ? configured : DEFAULT_SHIPPING_DEFAULT_OPTION;
 }
 
 export function isCampaignFreeShippingEnabled(campaign = {}, env = {}) {

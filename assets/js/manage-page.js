@@ -1225,7 +1225,12 @@
       : (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     const unlockBackground = lockManageDialogBackground(dialog);
     const handleKeydown = function(event) {
-      if (activeManageDialog !== dialog || dialog.hidden) return;
+      if (activeManageDialog !== dialog) return;
+      if (!dialog.isConnected) {
+        teardownManageDialog(false);
+        return;
+      }
+      if (dialog.hidden) return;
 
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -2479,7 +2484,10 @@
   }
 
   function hideConfirmModal() {
-    document.getElementById('confirm-modal').hidden = true;
+    const modal = document.getElementById('confirm-modal');
+    if (modal) {
+      modal.hidden = true;
+    }
     pendingConfirmCallback = null;
     teardownManageDialog(true);
   }

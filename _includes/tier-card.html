@@ -43,7 +43,7 @@
     <img src="{{ include.tier.image }}" alt="{{ include.tier.name | escape }}" class="tier-card__image">
   {% endif %}
   <h3>{{ include.tier.name | escape }} — {{ include.tier.price | money }}</h3>
-  <p>{{ include.tier.description | escape }}</p>
+  <p>{{ include.tier.description | safe_rich_text }}</p>
   {% if include.tier.limit_total %}
     <p class="limit">{% include t.html key="tiers.limit_label" lang=current_lang %} <span data-live-limit>{{ include.tier.limit_total }}</span> · {% include t.html key="tiers.remaining_label" lang=current_lang %} <span data-live-remaining>{{ include.tier.remaining }}</span></p>
   {% endif %}
@@ -55,7 +55,7 @@
     data-item-name="{{ include.campaign.title | escape }} — {{ include.tier.name | escape }}"
     data-item-price="{{ include.tier.price }}"
     data-item-url="{{ site.url }}{{ include.campaign.url }}#tier-{{ include.tier.id }}"
-    data-item-description="{{ include.tier.description | escape }}"
+    data-item-description="{{ include.tier.description | strip_html | escape }}"
     data-item-max-quantity="{% if include.tier.stackable %}{% if include.tier.max_per_person %}{{ include.tier.max_per_person }}{% else %}99{% endif %}{% else %}1{% endif %}"
     data-item-stackable="{% if include.tier.stackable %}always{% else %}never{% endif %}"
     data-item-shippable="false"

@@ -132,7 +132,7 @@ prefer_stripe_path || true
 
 ruby ./scripts/sync-worker-config.rb
 
-ensure_local_secret "CHECKOUT_INTENT_SECRET"
+"$(cd "$(dirname "$0")" && pwd)/configure-dev-secrets.sh" --non-interactive
 
 # Check Stripe CLI login
 if ! stripe config --list &>/dev/null; then

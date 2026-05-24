@@ -25,10 +25,12 @@ describe('SEO templates', () => {
     const manageLayout = readRepoFile('_layouts', 'manage.html');
     const communityLayout = readRepoFile('_layouts', 'community.html');
     const pledgeResultLayout = readRepoFile('_layouts', 'pledge-result.html');
+    const adminLayout = readRepoFile('_layouts', 'admin.html');
 
     expect(manageLayout).toContain('indexable=false');
     expect(communityLayout).toContain('indexable=false');
     expect(pledgeResultLayout).toContain('indexable=false');
+    expect(adminLayout).toContain('indexable=false');
   });
 
   it('publishes crawl files with a sitemap and private-route exclusions', () => {
@@ -37,6 +39,7 @@ describe('SEO templates', () => {
 
     expect(robots).toContain('Sitemap: {{ site.platform.site_url | default: site.url }}/sitemap.xml');
     expect(robots).toContain('Disallow: /manage/');
+    expect(robots).toContain('Disallow: /admin/');
     expect(robots).toContain('Disallow: /pledge-success/');
     expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
     expect(sitemap).toContain("item.layout == 'default'");

@@ -49,4 +49,30 @@ describe('header nav script', () => {
     const langLink = document.querySelector('[data-lang-switcher-link="true"]') as HTMLAnchorElement;
     expect(langLink.getAttribute('href')).toBe('/es/manage/?t=token-123#section');
   });
+
+  it('strips admin magic-link tokens while preserving safe admin switcher state', async () => {
+    vi.resetModules();
+    window.history.replaceState({}, '', '/admin/?admin_login=secret-token&campaignSlug=hand-relations#content');
+    document.body.innerHTML = `
+      <nav id="mobile-nav" class="site-header__nav"></nav>
+      <a href="/es/admin/" data-lang-switcher-link="true">Español</a>
+      <button id="menu-toggle" data-open-label="Open menu" data-close-label="Close menu" type="button"></button>
+    `;
+
+    await import('../../assets/js/header-nav.js');
+
+    const langLink = document.querySelector('[data-lang-switcher-link="true"]') as HTMLAnchorElement;
+    expect(langLink.getAttribute('href')).toBe('/es/admin/?campaignSlug=hand-relations#content');
+  });
+
+  it('updates language switcher links even without the mobile nav controls', async () => {
+    vi.resetModules();
+    window.history.replaceState({}, '', '/es/admin/?admin_login=secret-token#reports');
+    document.body.innerHTML = '<a href="/admin/" data-lang-switcher-link="true">English</a>';
+
+    await import('../../assets/js/header-nav.js');
+
+    const langLink = document.querySelector('[data-lang-switcher-link="true"]') as HTMLAnchorElement;
+    expect(langLink.getAttribute('href')).toBe('/admin/#reports');
+  });
 });

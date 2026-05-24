@@ -51,6 +51,24 @@ platform:
   favicon_path: /assets/images/defaults/favicon.png
   default_social_image_path: /assets/images/defaults/dust-wave-square.png
 
+admin:
+  # Canonical production URLs surfaced in the local admin UI even when
+  # platform.site_url / platform.worker_url are overridden for development.
+  production_site_url: "https://pool.dustwave.xyz"
+  production_worker_url: "https://pledge.dustwave.xyz"
+  # Local-only bootstrap defaults mirrored into the Worker `dev` environment.
+  # Deployed admin access should use Worker secrets or explicit environment vars.
+  local_bootstrap_emails:
+    - alonso@dustwave.xyz
+  local_test_campaigns:
+    - hand-relations
+    - smoke-editable
+
+# Top-level mirrors used by Liquid layouts because some local build paths do not
+# expose the nested `admin` config object reliably.
+admin_production_site_url: "https://pool.dustwave.xyz"
+admin_production_worker_url: "https://pledge.dustwave.xyz"
+
 pricing:
   sales_tax_rate: 0.07625
   flat_shipping_rate: 3.00
@@ -267,6 +285,9 @@ i18n:
     manage:
       en: /manage/
       es: /es/manage/
+    admin:
+      en: /admin/
+      es: /es/admin/
     community_index:
       en: /community/
       es: /es/community/

@@ -13,6 +13,7 @@ describe('layout accessibility scaffolding', () => {
     const campaignLayout = readRepoFile('_layouts', 'campaign.html');
     const communityLayout = readRepoFile('_layouts', 'community.html');
     const embedLayout = readRepoFile('_layouts', 'campaign-embed.html');
+    const adminLayout = readRepoFile('_layouts', 'admin.html');
 
     expect(campaignLayout).toContain('href="#main-content"');
     expect(campaignLayout).toContain('<main id="main-content"');
@@ -20,5 +21,7 @@ describe('layout accessibility scaffolding', () => {
     expect(communityLayout).toContain('<main id="main-content"');
     expect(embedLayout).toContain('href="#main-content"');
     expect(embedLayout).toContain('<main id="main-content"');
+    expect(adminLayout).toContain('href="#main-content"');
+    expect(adminLayout).toContain('<main id="main-content"');
   });
 });

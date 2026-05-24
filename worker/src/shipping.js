@@ -1,6 +1,7 @@
 import {
   getCampaignShippingFallbackFeeCents,
   getShippingFallbackFeeCents,
+  getShippingDefaultOption,
   getShippingOriginCountry,
   getUspsApiBase,
   getUspsClientId,
@@ -632,6 +633,7 @@ export async function quoteCampaignShipment(
   selectedOption = SHIPPING_OPTION_STANDARD,
   bundleAddOns = []
 ) {
+  const configuredDefaultOption = getShippingDefaultOption(env);
   const shipmentSummary = summarizeShipmentFromTierSelection(tierSelection, supportItems, campaign, bundleAddOns);
   if (!shipmentSummary.valid) {
     if (!isShippingMetadataError(shipmentSummary.error)) {
@@ -646,14 +648,14 @@ export async function quoteCampaignShipment(
     const shipment = coarseShipmentSummary.shipment;
     const fallbackQuote = buildFallbackShippingQuote(env, destination, shipment, campaign);
     const availableOptions = buildStandardOnlyShippingOptions(shipment, fallbackQuote.shippingCents);
-    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, SHIPPING_OPTION_STANDARD);
-    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, SHIPPING_OPTION_STANDARD);
+    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, configuredDefaultOption);
+    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, configuredDefaultOption);
     return {
       valid: true,
       campaignSlug: campaign?.slug || '',
       shipment,
       availableOptions,
-      defaultOption: SHIPPING_OPTION_STANDARD,
+      defaultOption: configuredDefaultOption,
       selectedOption: resolvedOption,
       selectedOptionDetails,
       quote: {
@@ -669,14 +671,14 @@ export async function quoteCampaignShipment(
   if (isCampaignFreeShippingEnabled(campaign, env)) {
     const freeQuote = buildFreeShippingQuote(env, destination, shipment);
     const availableOptions = buildStandardOnlyShippingOptions(shipment, 0);
-    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, SHIPPING_OPTION_STANDARD);
-    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, SHIPPING_OPTION_STANDARD);
+    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, configuredDefaultOption);
+    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, configuredDefaultOption);
     return {
       valid: true,
       campaignSlug: campaign?.slug || '',
       shipment,
       availableOptions,
-      defaultOption: SHIPPING_OPTION_STANDARD,
+      defaultOption: configuredDefaultOption,
       selectedOption: resolvedOption,
       selectedOptionDetails,
       quote: {
@@ -701,7 +703,7 @@ export async function quoteCampaignShipment(
       campaignSlug: campaign?.slug || '',
       shipment,
       availableOptions: [],
-      defaultOption: SHIPPING_OPTION_STANDARD,
+      defaultOption: configuredDefaultOption,
       selectedOption: SHIPPING_OPTION_STANDARD,
       selectedOptionDetails: null,
       quote: fallbackQuote
@@ -710,14 +712,14 @@ export async function quoteCampaignShipment(
 
   if (hasExplicitCampaignFallbackRate) {
     const availableOptions = buildStandardOnlyShippingOptions(shipment, fallbackQuote.shippingCents);
-    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, SHIPPING_OPTION_STANDARD);
-    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, SHIPPING_OPTION_STANDARD);
+    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, configuredDefaultOption);
+    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, configuredDefaultOption);
     return {
       valid: true,
       campaignSlug: campaign?.slug || '',
       shipment,
       availableOptions,
-      defaultOption: SHIPPING_OPTION_STANDARD,
+      defaultOption: configuredDefaultOption,
       selectedOption: resolvedOption,
       selectedOptionDetails,
       quote: {
@@ -730,14 +732,14 @@ export async function quoteCampaignShipment(
   const manualDomesticQuote = buildManualDomesticRateQuote(destination, shipment);
   if (manualDomesticQuote.valid) {
     const availableOptions = buildStandardOnlyShippingOptions(shipment, manualDomesticQuote.quote.shippingCents);
-    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, SHIPPING_OPTION_STANDARD);
-    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, SHIPPING_OPTION_STANDARD);
+    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, configuredDefaultOption);
+    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, configuredDefaultOption);
     return {
       valid: true,
       campaignSlug: campaign?.slug || '',
       shipment,
       availableOptions,
-      defaultOption: SHIPPING_OPTION_STANDARD,
+      defaultOption: configuredDefaultOption,
       selectedOption: resolvedOption,
       selectedOptionDetails,
       quote: {
@@ -756,14 +758,14 @@ export async function quoteCampaignShipment(
       shipment,
       liveQuote.quote.shippingCents
     );
-    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, SHIPPING_OPTION_STANDARD);
-    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, SHIPPING_OPTION_STANDARD);
+    const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, configuredDefaultOption);
+    const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, configuredDefaultOption);
     return {
       valid: true,
       campaignSlug: campaign?.slug || '',
       shipment,
       availableOptions,
-      defaultOption: SHIPPING_OPTION_STANDARD,
+      defaultOption: configuredDefaultOption,
       selectedOption: resolvedOption,
       selectedOptionDetails,
       quote: {
@@ -774,14 +776,14 @@ export async function quoteCampaignShipment(
   }
 
   const availableOptions = buildStandardOnlyShippingOptions(shipment, fallbackQuote.shippingCents);
-  const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, SHIPPING_OPTION_STANDARD);
-  const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, SHIPPING_OPTION_STANDARD);
+  const resolvedOption = resolveSelectedShippingOption(availableOptions, selectedOption, configuredDefaultOption);
+  const selectedOptionDetails = getSelectedShippingOptionDetails(availableOptions, resolvedOption, configuredDefaultOption);
   return {
     valid: true,
     campaignSlug: campaign?.slug || '',
     shipment,
     availableOptions,
-    defaultOption: SHIPPING_OPTION_STANDARD,
+    defaultOption: configuredDefaultOption,
     selectedOption: resolvedOption,
     selectedOptionDetails,
     quote: {

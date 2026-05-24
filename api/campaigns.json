@@ -13,15 +13,19 @@ layout: null
       "slug": {{ campaign.slug | jsonify }},
       "url": {{ campaign.url | jsonify }},
       "title": {{ campaign.title | jsonify }},
+      "test_only": {{ campaign.test_only | default: false }},
       "state": {{ campaign.state | jsonify }},
       "creator_name": {{ campaign.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author | jsonify }},
+      "creator_image": {{ campaign.creator_image | jsonify }},
       "category": {{ campaign.category | default: site.data.i18n[site.i18n.default_lang].campaign.default_category | default: "Feature Film" | jsonify }},
       "short_blurb": {{ campaign.short_blurb | jsonify }},
       "short_blurb_html": {{ campaign.short_blurb | default: "" | safe_rich_text | strip_newlines | jsonify }},
+      "long_content": {{ campaign.long_content | default: empty | jsonify }},
       "hero_image": {{ campaign.hero_image | jsonify }},
       "hero_image_wide": {{ campaign.hero_image_wide | jsonify }},
       "hero_image_alt": {{ campaign.hero_image_alt | default: campaign.title | jsonify }},
       "hero_video": {{ campaign.hero_video | jsonify }},
+      "campaign_background": {{ campaign.campaign_background | jsonify }},
       "progress_background": {{ campaign.progress_background | jsonify }},
       "goal_amount": {{ campaign.goal_amount | default: 0 }},
       "pledged_amount": {{ campaign.pledged_amount | default: 0 }},
@@ -31,11 +35,14 @@ layout: null
       "single_tier_only": {{ campaign.single_tier_only | default: false }},
       "custom_late_support": {{ campaign.custom_late_support | default: false }},
       "runner_report_emails": {{ campaign.runner_report_emails | default: empty | jsonify }},
+      "featured_tier_id": {{ campaign.featured_tier_id | jsonify }},
       "shipping_fallback_flat_rate": {% if campaign.shipping_fallback_flat_rate != nil %}{{ campaign.shipping_fallback_flat_rate }}{% else %}null{% endif %},
       "free_shipping": {% if campaign.free_shipping != nil %}{{ campaign.free_shipping | jsonify }}{% else %}null{% endif %},
       "shipping_options": {{ campaign.shipping_options | default: empty | jsonify }},
       "stretch_goals": {{ campaign.stretch_goals | default: empty | jsonify }},
       "stretch_hidden": {% if campaign.stretch_hidden == false %}false{% else %}true{% endif %},
+      "show_ongoing": {{ campaign.show_ongoing | default: false }},
+      "ongoing_items": {{ campaign.ongoing_items | default: empty | jsonify }},
       "tiers": [
         {% for tier in campaign.tiers %}
         {% assign resolved_shipping = tier.shipping %}
@@ -46,6 +53,7 @@ layout: null
           "id": {{ tier.id | jsonify }},
           "name": {{ tier.name | jsonify }},
           "price": {{ tier.price | default: 0 }},
+          "image": {{ tier.image | jsonify }},
           "description": {{ tier.description | jsonify }},
           "limit_total": {% if tier.limit_total %}{{ tier.limit_total }}{% else %}null{% endif %},
           "remaining": {{ tier.remaining | default: tier.limit_total | default: 999 }},
@@ -53,6 +61,8 @@ layout: null
           "stackable": {{ tier.stackable | default: false }},
           "category": {{ tier.category | default: "digital" | jsonify }},
           "shipping_preset": {{ tier.shipping_preset | jsonify }},
+          "late_support": {{ tier.late_support | default: false }},
+          "requires_threshold": {% if tier.requires_threshold %}{{ tier.requires_threshold }}{% else %}null{% endif %},
           "shipping": {% if resolved_shipping %}{{ resolved_shipping | jsonify }}{% else %}null{% endif %}
         }{% unless forloop.last %},{% endunless %}
         {% endfor %}
@@ -98,6 +108,7 @@ layout: null
         }{% unless forloop.last %},{% endunless %}
         {% endfor %}
       ],
+      "decisions": {{ campaign.decisions | default: empty | jsonify }},
       "has_decisions": {% if campaign.decisions and campaign.decisions.size > 0 %}true{% else %}false{% endif %},
       "instagram": {{ campaign.instagram | jsonify }},
       "diary": [
@@ -105,7 +116,9 @@ layout: null
         {
           "date": {{ entry.date | date_to_xmlschema | jsonify }},
           "title": {{ entry.title | jsonify }},
-          "phase": {{ entry.phase | jsonify }}
+          "phase": {{ entry.phase | jsonify }},
+          "body": {{ entry.body | jsonify }},
+          "content": {{ entry.content | default: empty | jsonify }}
         }{% unless forloop.last %},{% endunless %}
         {% endfor %}
       ]

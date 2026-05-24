@@ -1,8 +1,9 @@
 {% assign block = include.block %}
 {% assign provider = block.provider | downcase %}
+{% assign alignment = block.align | default: 'left' %}
 {% assign embed_height = block.height | default: 152 | plus: 0 %}
 {% assign safe_src = block.src | approved_embed_src: provider %}
-<figure class="content-block content-block--embed">
+<figure class="content-block content-block--embed content-block--align-{{ alignment | escape }}">
   {% if provider == 'spotify' and safe_src != '' %}
     <div class="embed-container embed-container--spotify">
       <iframe

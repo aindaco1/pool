@@ -1,0 +1,450 @@
+import { getAllowedOrigin, isValidEmail, SECURITY_HEADERS } from './validation.js';
+
+export const ADMIN_SESSION_COOKIE = 'pool_admin_session';
+
+const ADMIN_LOGIN_TTL_SECONDS = 15 * 60;
+const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60;
+
+function privateAdminJsonResponse(data, status = 200, env = null, extraHeaders = {}) {
+  const origin = getAllowedOrigin(env, false);
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key, x-pool-admin-csrf',
+      'Cache-Control': 'private, no-store, max-age=0',
+      ...extraHeaders,
+      ...SECURITY_HEADERS
+    }
+  });
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function normalizeLang(lang) {
+  const value = String(lang || '').trim().toLowerCase();
+  return value === 'es' ? 'es' : 'en';
+}
+
+function getBootstrapEmails(env) {
+  return String(env?.ADMIN_BOOTSTRAP_EMAILS || '')
+    .split(',')
+    .map(normalizeEmail)
+    .filter(Boolean);
+}
+
+function getAdminSecret(env) {
+  return env?.ADMIN_SESSION_SECRET || env?.MAGIC_LINK_SECRET || env?.ADMIN_SECRET || '';
+}
+
+async function sha256Hex(value) {
+  const data = new TextEncoder().encode(String(value || ''));
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function randomToken(byteLength = 32) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return base64urlEncode(bytes);
+}
+
+function base64urlEncode(bytes) {
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function hmacSign(secret, data) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
+  return base64urlEncode(new Uint8Array(signature));
+}
+
+async function signLoginToken(env, nonce, email) {
+  const payload = {
+    nonce,
+    email,
+    exp: Math.floor(Date.now() / 1000) + ADMIN_LOGIN_TTL_SECONDS
+  };
+  const payloadJson = JSON.stringify(payload);
+  const payloadB64 = btoa(payloadJson).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const signature = await hmacSign(getAdminSecret(env), payloadB64);
+  return `${payloadB64}.${signature}`;
+}
+
+async function verifyLoginToken(env, token) {
+  if (!getAdminSecret(env)) return null;
+  const [payloadB64, signature] = String(token || '').split('.');
+  if (!payloadB64 || !signature) return null;
+  const expected = await hmacSign(getAdminSecret(env), payloadB64);
+  if (signature.length !== expected.length) return null;
+  let result = 0;
+  for (let index = 0; index < signature.length; index += 1) {
+    result |= signature.charCodeAt(index) ^ expected.charCodeAt(index);
+  }
+  if (result !== 0) return null;
+
+  try {
+    const normalized = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=');
+    const payload = JSON.parse(atob(padded));
+    if (!payload?.nonce || !payload?.email) return null;
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function getCookie(request, name) {
+  const cookieHeader = request.headers.get('Cookie') || '';
+  for (const part of cookieHeader.split(';')) {
+    const [rawName, ...rawValue] = part.trim().split('=');
+    if (rawName === name) {
+      return decodeURIComponent(rawValue.join('=') || '');
+    }
+  }
+  return '';
+}
+
+function getAdminCsrfHeader(request) {
+  return String(request.headers.get('x-pool-admin-csrf') || '').trim();
+}
+
+function timingSafeEqual(a, b) {
+  const left = String(a || '');
+  const right = String(b || '');
+  if (!left || !right || left.length !== right.length) return false;
+  let result = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    result |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return result === 0;
+}
+
+function getAdminSiteOrigin(env) {
+  const configured = String(env?.CORS_ALLOWED_ORIGIN || env?.SITE_BASE || '').trim();
+  if (!configured || configured === '*') return '';
+  try {
+    return new URL(configured).origin;
+  } catch {
+    return '';
+  }
+}
+
+function isTrustedAdminOriginRequest(request, env) {
+  const expectedOrigin = getAdminSiteOrigin(env);
+  if (!expectedOrigin) return true;
+
+  const secFetchSite = String(request.headers.get('Sec-Fetch-Site') || '').trim().toLowerCase();
+  if (secFetchSite === 'cross-site') {
+    return false;
+  }
+
+  const origin = String(request.headers.get('Origin') || '').trim();
+  if (origin) {
+    return timingSafeEqual(origin, expectedOrigin);
+  }
+
+  const referer = String(request.headers.get('Referer') || '').trim();
+  if (!referer) return true;
+
+  try {
+    return timingSafeEqual(new URL(referer).origin, expectedOrigin);
+  } catch {
+    return false;
+  }
+}
+
+function getSiteAdminPath(lang) {
+  return normalizeLang(lang) === 'es' ? '/es/admin/' : '/admin/';
+}
+
+function buildAdminUrl(env, token, lang) {
+  const base = String(env?.SITE_BASE || '').replace(/\/$/, '');
+  const url = new URL(`${base}${getSiteAdminPath(lang)}`);
+  url.searchParams.set('admin_login', token);
+  return url.toString();
+}
+
+function getSessionCookie(token, request, maxAge = ADMIN_SESSION_TTL_SECONDS) {
+  const secure = new URL(request.url).protocol === 'https:';
+  const parts = [
+    `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}`,
+    'Path=/admin',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${Math.max(0, maxAge)}`
+  ];
+  if (secure) parts.push('Secure');
+  return parts.join('; ');
+}
+
+function clearSessionCookie(request) {
+  return getSessionCookie('', request, 0);
+}
+
+async function getStoredAdminUser(env, email) {
+  if (!env?.PLEDGES) return null;
+  const key = `admin-user:${await sha256Hex(email)}`;
+  return env.PLEDGES.get(key, { type: 'json' });
+}
+
+async function resolveAdminUser(env, email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!isValidEmail(normalizedEmail)) return null;
+
+  const storedUser = await getStoredAdminUser(env, normalizedEmail);
+  if (storedUser?.email) {
+    return {
+      email: normalizeEmail(storedUser.email),
+      role: storedUser.role === 'super_admin' ? 'super_admin' : 'campaign_user',
+      campaignSlugs: Array.isArray(storedUser.campaignSlugs) ? storedUser.campaignSlugs.map(String) : [],
+      source: 'kv'
+    };
+  }
+
+  if (getBootstrapEmails(env).includes(normalizedEmail)) {
+    return {
+      email: normalizedEmail,
+      role: 'super_admin',
+      campaignSlugs: [],
+      source: 'bootstrap'
+    };
+  }
+
+  return null;
+}
+
+function publicUser(user) {
+  return {
+    email: user.email,
+    role: user.role,
+    campaignSlugs: user.role === 'super_admin' ? [] : (user.campaignSlugs || [])
+  };
+}
+
+async function sendAdminLoginEmail(env, { email, loginUrl, lang }) {
+  if (!env?.RESEND_API_KEY) {
+    return { sent: false, reason: 'RESEND_API_KEY not configured' };
+  }
+
+  const platformName = env.PLATFORM_NAME || 'The Pool';
+  const from = env.UPDATES_EMAIL_FROM || env.PLEDGES_EMAIL_FROM || `${platformName} <updates@example.com>`;
+  const isSpanish = normalizeLang(lang) === 'es';
+  const subject = isSpanish
+    ? `Tu enlace de administración | ${platformName}`
+    : `Your admin sign-in link | ${platformName}`;
+  const heading = isSpanish ? 'Inicia sesión en administración' : 'Sign in to admin';
+  const body = isSpanish
+    ? 'Este enlace caduca en 15 minutos. Si no lo solicitaste, puedes ignorar este correo.'
+    : 'This link expires in 15 minutes. If you did not request it, you can ignore this email.';
+  const cta = isSpanish ? 'Abrir administración' : 'Open admin';
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from,
+      to: email,
+      subject,
+      html: `<h1>${heading}</h1><p>${body}</p><p><a href="${loginUrl}">${cta}</a></p>`
+    })
+  });
+
+  if (!response.ok) {
+    return { sent: false, reason: `Resend returned ${response.status}` };
+  }
+  return { sent: true };
+}
+
+export async function handleAdminAuthStart(request, env, body = {}) {
+  const email = normalizeEmail(body.email);
+  const preferredLang = normalizeLang(body.preferredLang);
+
+  if (!isValidEmail(email)) {
+    return privateAdminJsonResponse({ error: 'Invalid email' }, 400, env);
+  }
+
+  const user = await resolveAdminUser(env, email);
+  if (!user) {
+    return privateAdminJsonResponse({ success: true, sent: true }, 200, env);
+  }
+
+  if (!env?.PLEDGES || !getAdminSecret(env)) {
+    return privateAdminJsonResponse({ error: 'Admin auth not configured' }, 503, env);
+  }
+
+  const nonce = randomToken(24);
+  const token = await signLoginToken(env, nonce, email);
+  const loginUrl = buildAdminUrl(env, token, preferredLang);
+  await env.PLEDGES.put(`admin-login:${await sha256Hex(nonce)}`, JSON.stringify({
+    email,
+    role: user.role,
+    campaignSlugs: user.campaignSlugs || [],
+    preferredLang,
+    createdAt: new Date().toISOString()
+  }), { expirationTtl: ADMIN_LOGIN_TTL_SECONDS });
+
+  const emailResult = env.APP_MODE === 'test'
+    ? { sent: false, reason: 'test mode' }
+    : await sendAdminLoginEmail(env, { email, loginUrl, lang: preferredLang });
+
+  return privateAdminJsonResponse({
+    success: true,
+    sent: emailResult.sent !== false,
+    loginUrl: env.APP_MODE === 'test' ? loginUrl : undefined
+  }, 200, env);
+}
+
+export async function handleAdminAuthExchange(request, env, body = {}) {
+  const payload = await verifyLoginToken(env, body.token);
+  if (!payload || !env?.PLEDGES) {
+    return privateAdminJsonResponse({ error: 'Invalid or expired token' }, 401, env);
+  }
+
+  const nonceKey = `admin-login:${await sha256Hex(payload.nonce)}`;
+  const loginRecord = await env.PLEDGES.get(nonceKey, { type: 'json' });
+  if (!loginRecord || normalizeEmail(loginRecord.email) !== normalizeEmail(payload.email)) {
+    return privateAdminJsonResponse({ error: 'Invalid or expired token' }, 401, env);
+  }
+
+  const user = await resolveAdminUser(env, loginRecord.email);
+  if (!user) {
+    return privateAdminJsonResponse({ error: 'Unauthorized' }, 401, env);
+  }
+
+  const sessionToken = randomToken(32);
+  const csrfToken = randomToken(24);
+  const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_SECONDS * 1000).toISOString();
+  await env.PLEDGES.delete(nonceKey);
+  await env.PLEDGES.put(`admin-session:${await sha256Hex(sessionToken)}`, JSON.stringify({
+    email: user.email,
+    role: user.role,
+    campaignSlugs: user.campaignSlugs || [],
+    csrfToken,
+    preferredLang: normalizeLang(loginRecord.preferredLang),
+    createdAt: new Date().toISOString(),
+    expiresAt
+  }), { expirationTtl: ADMIN_SESSION_TTL_SECONDS });
+
+  return privateAdminJsonResponse({
+    success: true,
+    user: publicUser(user),
+    csrfToken,
+    expiresAt
+  }, 200, env, {
+    'Set-Cookie': getSessionCookie(sessionToken, request)
+  });
+}
+
+export async function requireAdminSession(request, env, permission = 'campaign:read', options = {}) {
+  const sessionToken = getCookie(request, ADMIN_SESSION_COOKIE);
+  if (!sessionToken || !env?.PLEDGES) {
+    return { ok: false, response: privateAdminJsonResponse({ error: 'Unauthorized' }, 401, env) };
+  }
+
+  const session = await env.PLEDGES.get(`admin-session:${await sha256Hex(sessionToken)}`, { type: 'json' });
+  if (!session?.email || !session?.expiresAt || new Date(session.expiresAt).getTime() <= Date.now()) {
+    return { ok: false, response: privateAdminJsonResponse({ error: 'Unauthorized' }, 401, env) };
+  }
+
+  if (options.requireCsrf === true) {
+    if (!isTrustedAdminOriginRequest(request, env)) {
+      return { ok: false, response: privateAdminJsonResponse({ error: 'Origin not allowed' }, 403, env) };
+    }
+    if (!timingSafeEqual(getAdminCsrfHeader(request), session.csrfToken)) {
+      return { ok: false, response: privateAdminJsonResponse({ error: 'Invalid CSRF token' }, 403, env) };
+    }
+  }
+
+  const user = await resolveAdminUser(env, session.email);
+  if (!user) {
+    return { ok: false, response: privateAdminJsonResponse({ error: 'Unauthorized' }, 401, env) };
+  }
+
+  const campaignSlug = options.campaignSlug ? String(options.campaignSlug) : '';
+  const allowedCampaign = user.role === 'super_admin' || !campaignSlug || user.campaignSlugs.includes(campaignSlug);
+  const allowed = user.role === 'super_admin' || (
+    allowedCampaign &&
+    ['campaign:read', 'supporters:read', 'reports:send', 'fulfillment:manage', 'marketing:send', 'campaign:edit_content'].includes(permission)
+  );
+
+  if (!allowed) {
+    return { ok: false, response: privateAdminJsonResponse({ error: 'Forbidden' }, 403, env) };
+  }
+
+  return {
+    ok: true,
+    user: publicUser(user),
+    session,
+    csrfToken: session.csrfToken
+  };
+}
+
+export async function handleAdminSession(request, env) {
+  const auth = await requireAdminSession(request, env, 'campaign:read');
+  if (!auth.ok) return auth.response;
+  return privateAdminJsonResponse({
+    user: auth.user,
+    csrfToken: auth.csrfToken,
+    expiresAt: auth.session.expiresAt
+  }, 200, env);
+}
+
+export async function handleAdminLogout(request, env) {
+  const sessionToken = getCookie(request, ADMIN_SESSION_COOKIE);
+  if (!sessionToken) {
+    return privateAdminJsonResponse({ success: true }, 200, env, {
+      'Set-Cookie': clearSessionCookie(request)
+    });
+  }
+
+  if (sessionToken && env?.PLEDGES) {
+    const sessionKey = `admin-session:${await sha256Hex(sessionToken)}`;
+    const session = await env.PLEDGES.get(sessionKey, { type: 'json' });
+    if (session?.csrfToken && !isTrustedAdminOriginRequest(request, env)) {
+      return privateAdminJsonResponse({ error: 'Origin not allowed' }, 403, env);
+    }
+    if (session?.csrfToken && !timingSafeEqual(getAdminCsrfHeader(request), session.csrfToken)) {
+      return privateAdminJsonResponse({ error: 'Invalid CSRF token' }, 403, env);
+    }
+    await env.PLEDGES.delete(sessionKey);
+  }
+  return privateAdminJsonResponse({ success: true }, 200, env, {
+    'Set-Cookie': clearSessionCookie(request)
+  });
+}
+
+export function adminCorsResponse(env = null) {
+  const origin = getAllowedOrigin(env, false);
+  return new Response(null, {
+    headers: {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key, x-pool-admin-csrf',
+      ...SECURITY_HEADERS
+    }
+  });
+}

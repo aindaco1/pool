@@ -2969,6 +2969,7 @@
     let customCheckoutShippingQuoteToken = 0;
     let customCheckoutTaxQuoteToken = 0;
     let customCheckoutTaxDraftSyncTimer = 0;
+    let pendingCustomCheckoutTaxDraft = null;
     let customCheckoutFlowToken = 0;
     let lastCustomCheckoutShippingSignature = '';
     let persistedCustomCheckoutEmailDraft = '';
@@ -3585,7 +3586,7 @@
             <div class="pool-first-party-cart__callout pool-first-party-cart__callout--stripe">
               <p class="pool-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.taxLocation', 'Tax location'))}</p>
               <div class="pool-first-party-cart__stripe-shell">
-                <p class="pool-first-party-cart__note">${escapeHtml(getTaxLocationNote(taxLocationDraft))}</p>
+                <p class="pool-first-party-cart__note" data-cart-tax-location-note>${escapeHtml(getTaxLocationNote(taxLocationDraft))}</p>
                 <div class="pool-first-party-cart__shipping-grid">
                   <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
                     <label class="pool-first-party-cart__field-label" for="pool-custom-tax-line1">${escapeHtml(getRuntimeMessage('cart.addressLine1', 'Address line 1'))}${requiresDetailedTaxLocation ? ' <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span>' : ''}</label>
@@ -4388,6 +4389,13 @@
       });
     }
 
+    function syncCustomCheckoutTaxLocationNote(destination) {
+      const root = getCartRoot();
+      const note = root?.querySelector('[data-cart-tax-location-note]');
+      if (!(note instanceof HTMLElement)) return;
+      note.textContent = getTaxLocationNote(destination || readCustomCheckoutTaxDraft());
+    }
+
     function setCheckoutUiError(message) {
       const root = getCartRoot();
       const errorNode = root?.querySelector('[data-cart-checkout-error]');
@@ -4513,7 +4521,9 @@
 
     function syncCustomCheckoutTaxDraft(options) {
       const settings = options && typeof options === 'object' ? options : {};
-      const nextBillingAddress = readCustomCheckoutTaxDraft();
+      const nextBillingAddress = settings.draft && typeof settings.draft === 'object'
+        ? { ...settings.draft }
+        : readCustomCheckoutTaxDraft();
       return apiRoot.api.cart.update({
         billingAddress: nextBillingAddress
       }).then(() => {
@@ -4529,11 +4539,16 @@
       });
     }
 
-    function scheduleCustomCheckoutTaxDraftSync() {
+    function scheduleCustomCheckoutTaxDraftSync(draft) {
+      pendingCustomCheckoutTaxDraft = draft && typeof draft === 'object'
+        ? { ...draft }
+        : readCustomCheckoutTaxDraft();
       clearCustomCheckoutTaxDraftSyncTimer();
       customCheckoutTaxDraftSyncTimer = window.setTimeout(() => {
+        const nextDraft = pendingCustomCheckoutTaxDraft;
+        pendingCustomCheckoutTaxDraft = null;
         customCheckoutTaxDraftSyncTimer = 0;
-        void syncCustomCheckoutTaxDraft();
+        void syncCustomCheckoutTaxDraft({ draft: nextDraft });
       }, 180);
     }
 
@@ -5589,11 +5604,13 @@
 
         const taxDestinationField = event.target?.closest?.('[data-cart-tax-destination-field]');
         if (taxDestinationField instanceof HTMLInputElement || taxDestinationField instanceof HTMLSelectElement) {
+          const taxDraft = readCustomCheckoutTaxDraft();
           checkoutUiState.customCheckout = {
             ...(checkoutUiState.customCheckout || {}),
             taxError: ''
           };
           setCustomCheckoutTaxError('');
+          syncCustomCheckoutTaxLocationNote(taxDraft);
           syncCheckoutStartButton();
           return;
         }
@@ -5724,13 +5741,15 @@
 
         const taxDestinationField = event.target?.closest?.('[data-cart-tax-destination-field]');
         if (taxDestinationField instanceof HTMLInputElement || taxDestinationField instanceof HTMLSelectElement) {
+          const taxDraft = readCustomCheckoutTaxDraft();
           checkoutUiState.customCheckout = {
             ...(checkoutUiState.customCheckout || {}),
             taxError: ''
           };
           setCustomCheckoutTaxError('');
+          syncCustomCheckoutTaxLocationNote(taxDraft);
           syncCheckoutStartButton();
-          scheduleCustomCheckoutTaxDraftSync();
+          scheduleCustomCheckoutTaxDraftSync(taxDraft);
           return;
         }
 

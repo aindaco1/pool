@@ -1,1 +1,2 @@
-<hr class="content-block content-block--divider">
+{% assign alignment = include.block.align | default: 'left' %}
+<hr class="content-block content-block--divider content-block--align-{{ alignment | escape }}">

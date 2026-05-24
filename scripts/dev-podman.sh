@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
 ruby ./scripts/sync-worker-config.rb
+./scripts/configure-dev-secrets.sh --non-interactive
 
 JEKYLL_PORT=4000
 WORKER_PORT=8787

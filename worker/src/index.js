@@ -21,6 +21,20 @@
  *   GET  /inventory/:slug    - Get tier inventory (remaining counts) for a campaign
  *   POST /inventory/:slug/recalculate - Recalculate tier inventory from pledges (admin)
  *   POST /admin/projections/check - Check projection drift across campaigns (admin)
+ *   GET  /admin/session         - Read current browser admin session
+ *   GET  /admin/dashboard/summary - Read role-scoped admin dashboard summary
+ *   GET  /admin/settings      - Read role-scoped admin settings/config snapshot
+ *   POST /admin/settings/preview - Validate admin settings changes without writes
+ *   POST /admin/settings/publish - Publish admin settings changes through GitHub
+ *   GET  /admin/analytics       - Read role-scoped pledge-derived analytics
+ *   GET  /admin/content/campaign - Read a role-scoped editable campaign content snapshot
+ *   POST /admin/content/preview - Validate and render a role-scoped campaign content preview
+ *   POST /admin/content/publish - Publish validated campaign content through GitHub
+ *   GET  /admin/supporters      - Read role-scoped campaign supporters
+ *   GET  /admin/reports/campaign-runner/preview - Preview campaign-runner reports
+ *   GET  /admin/reports/campaign-runner.csv - Download campaign-runner CSVs
+ *   GET  /admin/add-ons/inventory - Read platform add-on inventory for super admins
+ *   POST /admin/add-ons/inventory - Override or reset platform add-on inventory baselines
  *   POST /admin/inventory/init-all    - Initialize inventory for all campaigns (admin)
  *   POST /admin/rebuild      - Trigger GitHub Pages rebuild (admin)
  *   POST /admin/broadcast/announcement - Send announcement with CTA link to campaign supporters
@@ -46,9 +60,9 @@ import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, se
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
-import { getAddOns, getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot } from './add-ons.js';
+import { getAddOns, getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
 import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges, checkCampaignProjectionDrift } from './stats.js';
-import { triggerSiteRebuild } from './github.js';
+import { getGitHubTextFile, putGitHubBase64File, putGitHubTextFile, triggerSiteRebuild } from './github.js';
 import { getScopedConsole } from './logger.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
@@ -74,6 +88,14 @@ import {
 import { normalizeShippingDestination, quoteCampaignShipment } from './shipping.js';
 import { normalizeTaxDestination, quoteTax } from './tax.js';
 import { buildFulfillmentReport, buildPledgeLedgerReport, rebuildCsvReport } from './reports.js';
+import {
+  adminCorsResponse,
+  handleAdminAuthExchange,
+  handleAdminAuthStart,
+  handleAdminLogout,
+  handleAdminSession,
+  requireAdminSession
+} from './admin-auth.js';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
 
@@ -96,6 +118,8 @@ const SUPPORTER_EMAIL_RETRY_BATCH_SIZE = 10;
 const SUPPORTER_EMAIL_RETRY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SHARE_CARD_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=3600';
 const MAX_STANDARD_JSON_BODY_BYTES = 64 * 1024;
+const MAX_ADMIN_LOGO_UPLOAD_BODY_BYTES = 1024 * 1024;
+const MAX_ADMIN_VIDEO_UPLOAD_BODY_BYTES = 140 * 1024 * 1024;
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 256 * 1024;
 const RATELIMIT_REQUIRED_ERROR = 'Rate limit storage not configured';
 const OBSERVABILITY_RETENTION_SECONDS = 14 * 24 * 60 * 60;
@@ -103,6 +127,7 @@ const OBSERVABILITY_RECENT_EVENT_LIMIT = 25;
 const OBSERVABILITY_MAX_DAYS = 7;
 const DEFAULT_OBSERVABILITY_SAMPLE_RATE = 0.1;
 const CAMPAIGN_RUNNER_REPORT_MARKER_TTL_SECONDS = 180 * 24 * 60 * 60;
+const ADMIN_AUDIT_EVENT_TTL_SECONDS = 400 * 24 * 60 * 60;
 
 // Extract plain text excerpt from diary entry (supports both legacy body and content blocks)
 function getDiaryExcerpt(entry, maxLength = 200) {
@@ -546,13 +571,23 @@ async function checkRateLimit(request, env, options = {}) {
     prefix = 'ratelimit',
     limit = 60,
     windowSeconds = 60,
-    keyFn = null
+    keyFn = null,
+    privateResponse: usePrivateResponse = false
   } = options;
+
+  const rateLimitResponse = (data, status = 429, headers = {}) => {
+    const responseHeaders = {
+      ...headers
+    };
+    return usePrivateResponse
+      ? privateJsonResponse(data, status, env, responseHeaders)
+      : jsonResponse(data, status, env, false, responseHeaders);
+  };
   
   if (!env.RATELIMIT) {
     return {
       allowed: false,
-      response: jsonResponse({ error: RATELIMIT_REQUIRED_ERROR }, 503, env)
+      response: rateLimitResponse({ error: RATELIMIT_REQUIRED_ERROR }, 503)
     };
   }
   
@@ -577,18 +612,14 @@ async function checkRateLimit(request, env, options = {}) {
       const retryAfter = Math.max(0, record.reset - now);
       return {
         allowed: false,
-        response: new Response(JSON.stringify({
+        response: rateLimitResponse({
           error: 'Too many requests',
           retryAfter
-        }), {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'Retry-After': String(retryAfter),
-            'X-RateLimit-Limit': String(limit),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': String(record.reset)
-          }
+        }, 429, {
+          'Retry-After': String(retryAfter),
+          'X-RateLimit-Limit': String(limit),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(record.reset)
         })
       };
     }
@@ -604,18 +635,14 @@ async function checkRateLimit(request, env, options = {}) {
       const retryAfter = record.reset - now;
       return {
         allowed: false,
-        response: new Response(JSON.stringify({ 
+        response: rateLimitResponse({
           error: 'Too many requests',
           retryAfter 
-        }), {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'Retry-After': String(retryAfter),
-            'X-RateLimit-Limit': String(limit),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': String(record.reset)
-          }
+        }, 429, {
+          'Retry-After': String(retryAfter),
+          'X-RateLimit-Limit': String(limit),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(record.reset)
         })
       };
     }
@@ -629,7 +656,7 @@ async function checkRateLimit(request, env, options = {}) {
     console.error('Rate limit check failed:', err);
     return {
       allowed: false,
-      response: jsonResponse({ error: 'Rate limiting unavailable' }, 503, env)
+      response: rateLimitResponse({ error: 'Rate limiting unavailable' }, 503)
     };
   }
 }
@@ -1027,6 +1054,11 @@ const RATE_LIMITS = {
   admin: { prefix: 'rl:admin', limit: 5, windowSeconds: 60 },       // 5 admin calls/min
   pledgeRead: { prefix: 'rl:pledge-read', limit: 120, windowSeconds: 60 },   // 120 manage reads/min/IP
   pledgeWrite: { prefix: 'rl:pledge-write', limit: 30, windowSeconds: 60 }   // 30 manage mutations/min/IP
+};
+
+const ADMIN_RATE_LIMIT_OPTIONS = {
+  ...RATE_LIMITS.admin,
+  privateResponse: true
 };
 
 // SEC-006: Admin authentication helper with timing-safe comparison
@@ -2728,6 +2760,10 @@ export default {
     const path = url.pathname;
     const method = request.method;
 
+    if (method === 'OPTIONS' && path.startsWith('/admin/')) {
+      return adminCorsResponse(env);
+    }
+
     if (method === 'OPTIONS') {
       return corsResponse(env);
     }
@@ -2743,6 +2779,118 @@ export default {
         if (!auth.ok) {
           return jsonResponse({ error: 'Not found' }, 404);
         }
+      }
+
+      if (path === '/admin/auth/start' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminAuthStart(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/admin/auth/exchange' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminAuthExchange(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/admin/session' && method === 'GET') {
+        return handleAdminSession(request, env);
+      }
+
+      if (path === '/admin/logout' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
+        if (!bodyLimit.ok) return bodyLimit.response;
+        return handleAdminLogout(request, env);
+      }
+
+      if (path === '/admin/dashboard/summary' && method === 'GET') {
+        return handleAdminDashboardSummary(request, env);
+      }
+
+      if (path === '/admin/settings' && method === 'GET') {
+        return handleAdminSettings(request, env);
+      }
+
+      if (path === '/admin/settings/preview' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        return handleAdminSettingsPreview(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/admin/settings/logo-upload' && method === 'POST') {
+        return handleAdminLogoUpload(request, env);
+      }
+
+      if (path === '/admin/settings/image-upload' && method === 'POST') {
+        return handleAdminLogoUpload(request, env);
+      }
+
+      if (path === '/admin/settings/video-upload' && method === 'POST') {
+        return handleAdminVideoUpload(request, env);
+      }
+
+      if (path === '/admin/settings/publish' && method === 'POST') {
+        return handleAdminSettingsPublish(request, env);
+      }
+
+      if (path === '/admin/analytics' && method === 'GET') {
+        return handleAdminAnalytics(request, env);
+      }
+
+      if (path === '/admin/content/campaign' && method === 'GET') {
+        return handleAdminContentCampaign(request, env);
+      }
+
+      if (path === '/admin/content/preview' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        return handleAdminContentPreview(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/admin/content/publish' && method === 'POST') {
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminContentPublish(request, env);
+      }
+
+      if (path === '/admin/supporters' && method === 'GET') {
+        return handleAdminSupporters(request, env);
+      }
+
+      if (path === '/admin/reports/campaign-runner/preview' && method === 'GET') {
+        return handleAdminCampaignRunnerReportPreview(request, env);
+      }
+
+      if (path === '/admin/reports/campaign-runner.csv' && method === 'GET') {
+        return handleAdminCampaignRunnerReportCsv(request, env);
+      }
+
+      if (path === '/admin/add-ons/inventory' && method === 'GET') {
+        return handleAdminAddOnInventory(request, env);
+      }
+
+      if (path === '/admin/add-ons/inventory' && method === 'POST') {
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminAddOnInventoryMutation(request, env);
       }
 
       if (path === '/checkout-intent/start' && method === 'POST') {
@@ -2851,7 +2999,7 @@ export default {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
         // SEC-005: Rate limit admin endpoints aggressively
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminRebuild(request, env);
       }
@@ -2859,7 +3007,7 @@ export default {
       if (path === '/admin/broadcast/announcement' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleBroadcastAnnouncement(request, env);
       }
@@ -2867,7 +3015,7 @@ export default {
       if (path === '/admin/broadcast/diary' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleBroadcastDiary(request, env);
       }
@@ -2875,7 +3023,7 @@ export default {
       if (path === '/admin/diary/check' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleDiaryCheck(request, env);
       }
@@ -2883,7 +3031,7 @@ export default {
       if (path === '/admin/broadcast/milestone' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleBroadcastMilestone(request, env);
       }
@@ -2891,7 +3039,7 @@ export default {
       if (path === '/admin/report/campaign-runner' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleCampaignRunnerReport(request, env);
       }
@@ -2899,7 +3047,7 @@ export default {
       if (path.startsWith('/admin/milestone-check/') && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/admin/milestone-check/', '');
         return handleMilestoneCheck(request, campaignSlug, env);
@@ -2908,7 +3056,7 @@ export default {
       if (path.startsWith('/admin/settle/') && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/admin/settle/', '');
         return handleSettleCampaign(request, campaignSlug, env);
@@ -2967,7 +3115,7 @@ export default {
       if (path.startsWith('/stats/') && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/stats/', '').replace(/\/(check|recalculate)$/, '');
         if (path.endsWith('/check')) {
@@ -2989,7 +3137,7 @@ export default {
       if (path.startsWith('/inventory/') && path.endsWith('/recalculate') && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/inventory/', '').replace('/recalculate', '');
         return handleRecalculateInventory(request, campaignSlug, env);
@@ -2998,7 +3146,7 @@ export default {
       if (path === '/admin/inventory/init-all' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleInitAllInventory(request, env);
       }
@@ -3006,7 +3154,7 @@ export default {
       if (path === '/admin/projections/check' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleCheckAllProjectionDrift(request, env);
       }
@@ -3015,7 +3163,7 @@ export default {
       if (path === '/admin/recover-checkout' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleRecoverCheckout(request, env);
       }
@@ -3024,7 +3172,7 @@ export default {
       if (path.startsWith('/admin/campaign-index/rebuild/') && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/admin/campaign-index/rebuild/', '');
         return handleRebuildCampaignIndex(request, campaignSlug, env);
@@ -3033,7 +3181,7 @@ export default {
       if (path.startsWith('/admin/backfill-customers/') && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/admin/backfill-customers/', '');
         return handleBackfillCustomers(request, campaignSlug, env);
@@ -3043,7 +3191,7 @@ export default {
       if (path === '/admin/settle-batch' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleSettleBatch(request, env);
       }
@@ -3052,7 +3200,7 @@ export default {
       if (path.startsWith('/admin/settle-dispatch/') && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         const campaignSlug = path.replace('/admin/settle-dispatch/', '');
         return handleSettleDispatch(request, campaignSlug, env);
@@ -3060,19 +3208,19 @@ export default {
 
       // Admin: Check cron heartbeat status
       if (path === '/admin/cron/status' && method === 'GET') {
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleCronStatus(request, env);
       }
 
       if (path === '/admin/observability/webhooks' && method === 'GET') {
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleWebhookObservability(request, env);
       }
 
       if (path === '/admin/observability/performance' && method === 'GET') {
-        const rl = await checkRateLimit(request, env, RATE_LIMITS.admin);
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handlePerformanceObservability(request, env);
       }
@@ -6920,8 +7068,7 @@ async function handleTestSetup(request, env) {
   if (!parsedBody.ok) return parsedBody.response;
   const body = parsedBody.body || {};
   const email = body.email || 'test@example.com';
-  const campaignSlug = body.campaignSlug || 'hand-relations';
-  const testOrderId = getTestFixtureOrderId(email, campaignSlug);
+  const campaignSlugs = getTestSetupCampaignSlugs(body, env);
   const fixtureBillingAddress = body.billingAddress || {
     country: 'US',
     postalCode: '87048',
@@ -6929,36 +7076,6 @@ async function handleTestSetup(request, env) {
     city: 'Corrales',
     line1: '1228 W La Entrada'
   };
-
-  // Get campaign data to use real tier IDs
-  const campaign = await getCampaign(env, campaignSlug);
-  const tiers = campaign?.tiers || [];
-  const isSingleTier = campaign?.single_tier_only === true;
-  const firstTier = tiers[0];
-  const secondTier = tiers[1];
-  
-  // Calculate amounts with tax
-  const firstTierPrice = firstTier?.price || 5;
-  const firstTierQty = body.tierQty || 2;
-  
-  // For single_tier_only campaigns, don't include additional tiers
-  let subtotal;
-  let additionalTiers = [];
-  if (isSingleTier) {
-    subtotal = firstTierPrice * firstTierQty * 100;
-  } else {
-    const secondTierPrice = secondTier?.price || 0;
-    const secondTierQty = 1;
-    subtotal = (firstTierPrice * firstTierQty + secondTierPrice * secondTierQty) * 100;
-    if (secondTier) {
-      additionalTiers = [{ id: secondTier.id, qty: secondTierQty }];
-    }
-  }
-  const totals = await buildPledgeTotals(env, subtotal, {
-    shipping: getFlatShippingFeeCents(env),
-    tipPercent: getDefaultPlatformTipPercent(env),
-    taxDestination: fixtureBillingAddress
-  });
 
   // Create a real Stripe test customer so payment method updates work
   let stripeCustomerId = null;
@@ -6971,9 +7088,37 @@ async function handleTestSetup(request, env) {
     console.error('Failed to create Stripe customer:', err.message);
   }
 
-  const testPledges = [
-    {
-      orderId: testOrderId,
+  const testPledges = [];
+  for (const campaignSlug of campaignSlugs) {
+    const campaign = await getCampaign(env, campaignSlug);
+    const tiers = campaign?.tiers || [];
+    const isSingleTier = campaign?.single_tier_only === true;
+    const firstTier = tiers[0];
+    const secondTier = tiers[1];
+
+    const firstTierPrice = firstTier?.price || 5;
+    const firstTierQty = body.tierQty || 2;
+
+    let subtotal;
+    let additionalTiers = [];
+    if (isSingleTier) {
+      subtotal = firstTierPrice * firstTierQty * 100;
+    } else {
+      const secondTierPrice = secondTier?.price || 0;
+      const secondTierQty = 1;
+      subtotal = (firstTierPrice * firstTierQty + secondTierPrice * secondTierQty) * 100;
+      if (secondTier) {
+        additionalTiers = [{ id: secondTier.id, qty: secondTierQty }];
+      }
+    }
+    const totals = await buildPledgeTotals(env, subtotal, {
+      shipping: getFlatShippingFeeCents(env),
+      tipPercent: getDefaultPlatformTipPercent(env),
+      taxDestination: fixtureBillingAddress
+    });
+
+    testPledges.push({
+      orderId: getTestFixtureOrderId(email, campaignSlug),
       email,
       campaignSlug,
       tierId: firstTier?.id || 'frame',
@@ -6995,8 +7140,8 @@ async function handleTestSetup(request, env) {
       charged: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    }
-  ];
+    });
+  }
 
   const orderIds = [];
   for (const pledge of testPledges) {
@@ -7008,13 +7153,21 @@ async function handleTestSetup(request, env) {
   const emailKey = `email:${email.toLowerCase()}`;
   await env.PLEDGES.put(emailKey, JSON.stringify(orderIds));
 
-  const token = await generateToken(env.MAGIC_LINK_SECRET, {
-    orderId: testOrderId,
-    email,
-    campaignSlug
-  });
-
-  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
+  const manageLinks = [];
+  for (const pledge of testPledges) {
+    const token = await generateToken(env.MAGIC_LINK_SECRET, {
+      orderId: pledge.orderId,
+      email,
+      campaignSlug: pledge.campaignSlug
+    });
+    manageLinks.push({
+      campaignSlug: pledge.campaignSlug,
+      orderId: pledge.orderId,
+      token,
+      manageUrl: `${env.SITE_BASE}/manage/?t=${token}`
+    });
+  }
+  const primaryLink = manageLinks[0] || {};
 
   return jsonResponse({
     success: true,
@@ -7032,9 +7185,22 @@ async function handleTestSetup(request, env) {
       tipAmount: p.tipAmount,
       amount: p.amount
     })),
-    token,
-    manageUrl
+    token: primaryLink.token,
+    manageUrl: primaryLink.manageUrl,
+    manageLinks
   });
+}
+
+function getTestSetupCampaignSlugs(body = {}, env = {}) {
+  const configured = String(env.ADMIN_TEST_CAMPAIGNS || 'hand-relations,smoke-editable').split(',');
+  const requested = Array.isArray(body.campaignSlugs)
+    ? body.campaignSlugs
+    : (body.campaignSlug ? [body.campaignSlug] : configured);
+  const slugs = requested
+    .map((slug) => String(slug || '').trim())
+    .filter(Boolean);
+  const uniqueSlugs = Array.from(new Set(slugs));
+  return uniqueSlugs.length ? uniqueSlugs : ['hand-relations', 'smoke-editable'];
 }
 
 async function handleTestCleanup(request, env) {
@@ -7053,11 +7219,10 @@ async function handleTestCleanup(request, env) {
   if (!parsedBody.ok) return parsedBody.response;
   const body = parsedBody.body || {};
   const email = body.email || 'test@example.com';
-  const campaignSlug = body.campaignSlug || 'hand-relations';
-  const testOrderId = getTestFixtureOrderId(email, campaignSlug);
+  const campaignSlugs = getTestSetupCampaignSlugs(body, env);
 
   const testOrderIds = [
-    testOrderId,
+    ...campaignSlugs.map((campaignSlug) => getTestFixtureOrderId(email, campaignSlug)),
     'test-order-active-1'
   ];
 
@@ -7160,6 +7325,34 @@ async function getCampaignReportPledges(env, campaignSlug) {
   }
 
   return pledges;
+}
+
+async function getIndexedCampaignReportPledges(env, campaignSlug) {
+  if (!env.PLEDGES) {
+    return { ok: true, pledges: [] };
+  }
+
+  const orderIds = await getCampaignOrderIds(env, campaignSlug);
+  if (!Array.isArray(orderIds)) {
+    return {
+      ok: false,
+      error: 'Campaign pledge index is required for dashboard report previews',
+      code: 'campaign_index_required',
+      pledges: []
+    };
+  }
+
+  const pledges = [];
+  for (const orderId of orderIds) {
+    const normalizedOrderId = String(orderId || '').trim();
+    if (!normalizedOrderId) continue;
+    const pledgeData = await env.PLEDGES.get(`pledge:${normalizedOrderId}`, { type: 'json' });
+    if (!pledgeData) continue;
+    if (String(pledgeData?.campaignSlug || '') !== campaignSlug) continue;
+    pledges.push(pledgeData);
+  }
+
+  return { ok: true, pledges, indexed: orderIds.length };
 }
 
 function getCampaignRunnerStatsSummary(campaign, stats, env, reportKind, pledges = [], now = new Date()) {
@@ -8497,6 +8690,2936 @@ async function handleAdminRebuild(request, env) {
   }, 500);
 }
 
+async function handleAdminDashboardSummary(request, env) {
+  const auth = await requireAdminSession(request, env, 'campaign:read');
+  if (!auth.ok) return auth.response;
+
+  const { campaigns } = await getCampaigns(env);
+  const allowedCampaigns = (campaigns || []).filter((campaign) => (
+    auth.user.role === 'super_admin' ||
+    auth.user.campaignSlugs.includes(String(campaign?.slug || ''))
+  ));
+
+  const campaignSummaries = [];
+  const totals = {
+    campaignCount: allowedCampaigns.length,
+    liveCampaigns: 0,
+    pledgedAmount: 0,
+    pledgeCount: 0
+  };
+
+  for (const campaign of allowedCampaigns) {
+    const stats = await getCampaignStats(env, campaign.slug);
+    const pledgedAmount = Number(stats?.pledgedAmount || 0);
+    const pledgeCount = Number(stats?.pledgeCount || 0);
+    const goalAmount = Number(campaign?.goal_amount || 0);
+    const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
+    if (effectiveState === 'live') {
+      totals.liveCampaigns += 1;
+    }
+    totals.pledgedAmount += pledgedAmount;
+    totals.pledgeCount += pledgeCount;
+
+    campaignSummaries.push({
+      slug: campaign.slug,
+      title: campaign.title || campaign.slug,
+      state: campaign.state || 'unknown',
+      effectiveState,
+      goalAmount,
+      pledgedAmount,
+      pledgeCount,
+      percentFunded: goalAmount > 0
+        ? Math.round((pledgedAmount / (goalAmount * 100)) * 100)
+        : 0,
+      runnerReportConfigured: Array.isArray(campaign.runner_report_emails) && campaign.runner_report_emails.length > 0
+    });
+  }
+
+  return privateJsonResponse({
+    user: auth.user,
+    totals,
+    campaigns: campaignSummaries,
+    writeBudget: adminWriteBudget({ readOnly: true, kvWritesExpected: 0 }),
+    generatedAt: new Date().toISOString()
+  }, 200, env);
+}
+
+function stringifyAdminSettingValue(value) {
+  if (value === undefined || value === null || value === '') return 'Not configured';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (Array.isArray(value)) return value.length ? value.join(', ') : 'None';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+function adminSettingsSection(title, entries) {
+  return {
+    title,
+    rows: entries.map(([label, value, options = {}]) => ({
+      label,
+      value: stringifyAdminSettingValue(value),
+      rawValue: value ?? '',
+      editable: Boolean(options.editable),
+      path: options.path || '',
+      type: options.type || 'string',
+      input: options.input || options.type || 'text',
+      min: options.min,
+      max: options.max,
+      step: options.step,
+      displayMultiplier: options.displayMultiplier,
+      submitDivisor: options.submitDivisor,
+      placeholder: options.placeholder || '',
+      options: Array.isArray(options.options) ? options.options : [],
+      timeParts: options.timeParts && typeof options.timeParts === 'object' ? options.timeParts : null,
+      visibleWhen: options.visibleWhen && typeof options.visibleWhen === 'object' ? options.visibleWhen : null,
+      layoutGroup: options.layoutGroup || '',
+      campaignSlug: options.campaignSlug || '',
+      help: options.help || ''
+    }))
+  };
+}
+
+const ADMIN_TAX_PROVIDER_OPTIONS = [
+  { value: 'flat', label: 'Flat rate' },
+  { value: 'offline_rules', label: 'Offline rules' },
+  { value: 'nm_grt', label: 'New Mexico GRT' },
+  { value: 'zip_tax', label: 'ZIP.TAX' },
+  { value: 'external', label: 'External/custom' }
+];
+
+const ADMIN_ORIGIN_COUNTRY_OPTIONS = [
+  { value: 'US', label: 'United States' },
+  { value: 'CA', label: 'Canada' },
+  { value: 'GB', label: 'United Kingdom' },
+  { value: 'AU', label: 'Australia' },
+  { value: 'NZ', label: 'New Zealand' },
+  { value: 'MX', label: 'Mexico' },
+  { value: 'FR', label: 'France' },
+  { value: 'DE', label: 'Germany' },
+  { value: 'ES', label: 'Spain' },
+  { value: 'IT', label: 'Italy' },
+  { value: 'NL', label: 'Netherlands' },
+  { value: 'SE', label: 'Sweden' }
+];
+
+const ADMIN_SHIPPING_DEFAULT_OPTION_OPTIONS = [
+  { value: 'standard', label: 'Standard' },
+  { value: 'signature_required', label: 'Signature required' },
+  { value: 'adult_signature_required', label: 'Adult signature required' }
+];
+
+const ADMIN_CAMPAIGN_STATE_OPTIONS = [
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'live', label: 'Live' },
+  { value: 'post', label: 'Post-campaign' },
+  { value: 'pre', label: 'Pre-launch (legacy)' }
+];
+
+const ADMIN_USPS_ENABLED_VISIBLE_WHEN = { path: 'shipping.usps.enabled', value: 'true' };
+const ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN = { path: 'reports.campaign_runner.enabled', value: 'true' };
+
+const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
+  ['title', { label: 'Site title', type: 'string', input: 'text', layoutGroup: 'platform-title-name', help: 'Default site title used in browser metadata, SEO fallbacks, and fork-facing platform identity.' }],
+  ['author', { label: 'Site author', type: 'string', input: 'text', layoutGroup: 'platform-company-author', help: 'The top-level site author used in metadata, feeds, and fork-facing branding.' }],
+  ['description', { label: 'Site description', type: 'string', input: 'textarea', help: 'Default SEO description used when a page or campaign does not provide a more specific summary.' }],
+  ['platform.name', { label: 'Name', type: 'string', input: 'text', layoutGroup: 'platform-title-name', help: 'The public platform name shown in site chrome, emails, and admin headings.' }],
+  ['platform.company_name', { label: 'Company', type: 'string', input: 'text', layoutGroup: 'platform-company-author', help: 'The organization name used for ownership, fulfillment, and platform-facing copy.' }],
+  ['platform.default_creator_name', { label: 'Default creator name', type: 'string', input: 'text', layoutGroup: 'platform-creator-support', help: 'Fallback creator name shown on campaigns that do not define their own creator.' }],
+  ['platform.support_email', { label: 'Support email', type: 'string', input: 'email', layoutGroup: 'platform-creator-support', help: 'The public email address users should contact for pledge or platform support.' }],
+  ['platform.pledges_email_from', { label: 'Pledges email from', type: 'string', input: 'email-sender', layoutGroup: 'platform-email-from', help: 'Sender identity used for pledge confirmation and pledge status emails. The sending domain must still be authorized by the email provider.' }],
+  ['platform.updates_email_from', { label: 'Updates email from', type: 'string', input: 'email-sender', layoutGroup: 'platform-email-from', help: 'Sender identity used for campaign update and announcement emails. The sending domain must still be authorized by the email provider.' }],
+  ['platform.site_url', { label: 'Production site URL', type: 'string', input: 'url', help: 'The canonical public website URL used in generated links, metadata, and deploy-time config.' }],
+  ['platform.worker_url', { label: 'Production Worker URL', type: 'string', input: 'url', help: 'The canonical production Worker API URL used by the live site for pledge and admin requests.' }],
+  ['platform.footer_logo_path', { label: 'Footer logo', type: 'string', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo', help: 'Logo image used in the site footer. A square or horizontal PNG, JPEG, or WebP works best.' }],
+  ['platform.favicon_path', { label: 'Favicon', type: 'string', input: 'image-upload', layoutGroup: 'brand-favicon-social-image', help: 'Small browser-tab icon for the site. Use a simple square PNG for the most reliable display.' }],
+  ['platform.default_social_image_path', { label: 'Default social image', type: 'string', input: 'image-upload', layoutGroup: 'brand-favicon-social-image', help: 'Fallback image used for social share cards when a page or campaign does not provide its own image. Recommended: 1200 x 630 px.' }],
+  ['seo.default_social_image_alt', { label: 'Default social image alt', type: 'string', input: 'text', layoutGroup: 'brand-x-social-alt', help: 'Fallback alt text that describes the default social share image for screen readers and metadata consumers.' }],
+  ['seo.x_handle', { label: 'X handle', type: 'string', input: 'text', layoutGroup: 'brand-x-social-alt', help: 'Optional X/Twitter handle used for Twitter card metadata. Include or omit the @ sign.' }],
+  ['seo.same_as', { label: 'Same-as links', type: 'list', input: 'url-list', placeholder: 'https://www.instagram.com/your-handle\nhttps://www.youtube.com/@your-channel', help: 'Official public profile URLs for this platform or organization, used in structured SEO data to connect the site to its social/web presence. Add one URL per line.' }],
+  ['seo.index_public_community_hub', { label: 'Index public community hub', type: 'boolean', help: 'Whether search engines may index the public supporter-community hub.' }],
+  ['checkout.stripe_publishable_key', { label: 'Stripe publishable key', type: 'string', input: 'stripe-publishable-key', help: 'Non-secret Stripe publishable key used by the browser checkout UI. Stripe secret and webhook keys must remain Worker secrets.' }],
+  ['pricing.sales_tax_rate', { label: 'Sales Tax Rate', type: 'number', input: 'percent', min: 0, max: 1, step: 0.0001, displayMultiplier: 100, submitDivisor: 100, layoutGroup: 'pricing-tax-shipping', help: 'The fallback sales tax rate shown as a percentage, such as 7.625 for a 7.625% rate.' }],
+  ['pricing.default_tip_percent', { label: 'Default Platform Tip Percent', type: 'number', input: 'percent', min: 0, max: 100, step: 1, layoutGroup: 'pricing-tip-percent', help: 'The default optional platform tip percentage shown during checkout.' }],
+  ['pricing.max_tip_percent', { label: 'Max Platform Tip Percent', type: 'number', input: 'percent', min: 0, max: 100, step: 1, layoutGroup: 'pricing-tip-percent', help: 'The highest platform tip percentage the checkout UI should allow.' }],
+  ['tax.provider', { label: 'Provider', type: 'string', input: 'select', options: ADMIN_TAX_PROVIDER_OPTIONS, layoutGroup: 'tax-provider-origin', help: 'The tax calculation mode used by checkout, such as flat rate, offline rules, New Mexico GRT, or ZIP.TAX.' }],
+  ['tax.origin_country', { label: 'Origin country', type: 'string', input: 'select', options: ADMIN_ORIGIN_COUNTRY_OPTIONS, layoutGroup: 'tax-provider-origin', help: 'The country used as the tax origin for fallback and regional tax calculations.' }],
+  ['tax.use_regional_origin', { label: 'Use regional origin', type: 'boolean', layoutGroup: 'tax-regional-provider-base', help: 'Whether tax calculations should use regional origin details when the provider supports them.' }],
+  ['tax.nm_grt_api_base', { label: 'New Mexico GRT API base', type: 'string', input: 'url', layoutGroup: 'tax-regional-provider-base', visibleWhen: { path: 'tax.provider', value: 'nm_grt' }, help: 'API base URL for New Mexico GRT lookup when the New Mexico tax provider is active.' }],
+  ['tax.zip_tax_api_base', { label: 'ZIP.TAX API base', type: 'string', input: 'url', layoutGroup: 'tax-regional-provider-base', visibleWhen: { path: 'tax.provider', value: 'zip_tax' }, help: 'API base URL for ZIP.TAX lookup when the ZIP.TAX provider is active.' }],
+  ['shipping.origin_zip', { label: 'Origin postal code', type: 'string', layoutGroup: 'shipping-origin', help: 'The postal code packages ship from, used for shipping quotes and fallback shipping logic.' }],
+  ['shipping.origin_country', { label: 'Origin country', type: 'string', input: 'select', options: ADMIN_ORIGIN_COUNTRY_OPTIONS, layoutGroup: 'shipping-origin', help: 'The country packages ship from, used for shipping quotes and destination validation.' }],
+  ['shipping.fallback_flat_rate', { label: 'Fallback Shipping Fee (USD)', type: 'number', input: 'decimal', min: 0, step: 0.01, layoutGroup: 'shipping-fallback-free', help: 'The fallback shipping fee in USD used when carrier quotes are disabled or unavailable.' }],
+  ['shipping.free_shipping_default', { label: 'Free shipping default', type: 'boolean', layoutGroup: 'shipping-fallback-free', help: 'Whether new or unspecified physical items should default to free shipping.' }],
+  ['shipping.default_option', { label: 'Default shipping option', type: 'string', input: 'select', options: ADMIN_SHIPPING_DEFAULT_OPTION_OPTIONS, layoutGroup: 'shipping-default-usps', help: 'Preferred delivery option selected by default when it is available. This is a single default, while campaign Shipping controls which optional requirements are available.' }],
+  ['shipping.usps.enabled', { label: 'USPS enabled', type: 'boolean', layoutGroup: 'shipping-default-usps', help: 'Whether checkout should try USPS live shipping quotes when USPS credentials are configured.' }],
+  ['shipping.usps.client_id', { label: 'USPS client ID', type: 'string', layoutGroup: 'shipping-usps-auth', visibleWhen: ADMIN_USPS_ENABLED_VISIBLE_WHEN, help: 'The non-secret USPS OAuth client ID used for live USPS rate quotes.' }],
+  ['shipping.usps.api_base', { label: 'USPS API base', type: 'string', input: 'url', placeholder: 'Default: https://apis.usps.com', layoutGroup: 'shipping-usps-auth', visibleWhen: ADMIN_USPS_ENABLED_VISIBLE_WHEN, help: 'Optional override for the USPS API base URL. Leave blank to use the production USPS default: https://apis.usps.com.' }],
+  ['shipping.usps.timeout_ms', { label: 'USPS timeout ms', type: 'number', input: 'integer', min: 100, step: 100, layoutGroup: 'shipping-usps-timeout-cache', visibleWhen: ADMIN_USPS_ENABLED_VISIBLE_WHEN, help: 'How long the Worker waits for USPS before falling back or failing the quote attempt.' }],
+  ['shipping.usps.quote_cache_ttl_seconds', { label: 'USPS quote cache TTL seconds', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'shipping-usps-timeout-cache', visibleWhen: ADMIN_USPS_ENABLED_VISIBLE_WHEN, help: 'How long successful USPS shipping quotes are cached to reduce external API calls.' }],
+  ['shipping.usps.failure_cooldown_seconds', { label: 'USPS failure cooldown seconds', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'shipping-usps-cooldowns', visibleWhen: ADMIN_USPS_ENABLED_VISIBLE_WHEN, help: 'How long to pause USPS quote attempts after a transient USPS failure.' }],
+  ['shipping.usps.rate_limit_cooldown_seconds', { label: 'USPS rate limit cooldown seconds', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'shipping-usps-cooldowns', visibleWhen: ADMIN_USPS_ENABLED_VISIBLE_WHEN, help: 'How long to pause USPS quote attempts after a USPS rate-limit response.' }],
+  ['reports.campaign_runner.enabled', { label: 'Enabled', type: 'boolean', layoutGroup: 'reports-enabled-time', help: 'Whether scheduled campaign-runner reports are enabled for the platform.' }],
+  ['reports.campaign_runner.daily_pledge_report_enabled', { label: 'Daily pledge report enabled', type: 'boolean', layoutGroup: 'reports-daily-fulfillment', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'Whether campaign admins should receive daily pledge ledger reports.' }],
+  ['reports.campaign_runner.fulfillment_report_enabled', { label: 'Fulfillment report enabled', type: 'boolean', layoutGroup: 'reports-daily-fulfillment', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'Whether campaign admins should receive fulfillment-focused reports.' }],
+  ['reports.campaign_runner.send_hour_mt', { label: 'Send Time (Mountain Time)', type: 'number', input: 'integer', min: 0, max: 23, step: 1, layoutGroup: 'reports-enabled-time', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'The Mountain Time clock time when scheduled campaign-runner reports should be sent.' }],
+  ['reports.campaign_runner.send_minute_mt', { label: 'Send minute MT', type: 'number', input: 'integer', min: 0, max: 59, step: 1, visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'The minute within the scheduled Mountain Time hour when reports should be sent.' }],
+  ['reports.campaign_runner.include_stats_summary', { label: 'Include stats summary', type: 'boolean', layoutGroup: 'reports-stats-csv', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'Whether report emails should include campaign totals and performance summary details.' }],
+  ['reports.campaign_runner.include_csv_attachment', { label: 'Include CSV attachment', type: 'boolean', layoutGroup: 'reports-stats-csv', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'Whether report emails should include downloadable CSV attachments.' }],
+  ['reports.campaign_runner.email_subject_prefix', { label: 'Email subject prefix', type: 'string', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'The prefix added to campaign-runner report email subject lines.' }],
+  ['add_ons.enabled', { label: 'Enabled', type: 'boolean', layoutGroup: 'add-ons-enabled-stock', help: 'Whether platform-level add-ons are enabled for checkout.' }],
+  ['add_ons.low_stock_threshold', { label: 'Low stock threshold', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'add-ons-enabled-stock', visibleWhen: { path: 'add_ons.enabled', value: 'true' }, help: 'The inventory count where platform add-ons should be treated as low stock.' }],
+  ['add_ons.products', { label: 'Products', type: 'add_on_products', input: 'add-on-products', visibleWhen: { path: 'add_ons.enabled', value: 'true' }, help: 'The platform add-on product catalog shown during checkout.' }],
+  ['platform.logo_path', { label: 'Logo', type: 'string', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo', help: 'The logo image used in platform emails. For best results upload a square PNG, JPEG, or WebP at 512 x 512 px or larger, under 512 KB, with transparent or solid background.' }],
+  ['debug.console_logging_enabled', { label: 'Console logging enabled', type: 'boolean', layoutGroup: 'debug-logging', help: 'Whether browser and Worker console logging is enabled for diagnostics.' }],
+  ['debug.verbose_console_logging', { label: 'Verbose console logging', type: 'boolean', layoutGroup: 'debug-logging', help: 'Whether extra diagnostic detail should be logged during troubleshooting.' }],
+  ['design.font_body', { label: 'Body font', type: 'string', input: 'text', placeholder: '"Inter", sans-serif', layoutGroup: 'design-fonts', help: 'The primary font stack used across the site. Font names only work if the font is loaded by the site CSS or available on the visitor\'s device. Supporter emails reuse this value where email clients allow it.' }],
+  ['design.font_display', { label: 'Heading font', type: 'string', input: 'text', placeholder: '"gambado-sans", sans-serif', layoutGroup: 'design-fonts', help: 'The display font stack used for headings and prominent text. Font names only work if the font is loaded by the site CSS or available on the visitor\'s device. Supporter emails reuse this value where supported.' }],
+  ['design.color_text', { label: 'Text Color', type: 'string', input: 'color', layoutGroup: 'design-colors', help: 'Main body-copy color used across public pages, admin previews, checkout UI, and supporter emails.' }],
+  ['design.color_text_muted', { label: 'Muted Color', type: 'string', input: 'color', layoutGroup: 'design-colors', help: 'Lower-emphasis text color used for metadata, helper copy, captions, and secondary labels.' }],
+  ['design.color_surface_subtle', { label: 'Surface Color', type: 'string', input: 'color', layoutGroup: 'design-colors', help: 'Subtle panel background color used for quiet surfaces, cards, and email containers.' }],
+  ['design.color_border', { label: 'Border Color', type: 'string', input: 'color', layoutGroup: 'design-colors', help: 'Divider and control-border color used across the site, admin UI, checkout UI, and supporter emails.' }],
+  ['design.color_primary', { label: 'Primary Color', type: 'string', input: 'color', layoutGroup: 'design-colors', help: 'Primary action and brand accent color used for links, buttons, progress accents, and email calls to action.' }],
+  ['design.radius_lg', { label: 'Button Radius', type: 'string', input: 'text', help: 'The large border radius used for major buttons and rounded elements across the site and supporter emails.' }],
+  ['cache.live_stats_ttl_seconds', { label: 'Live stats cache TTL seconds', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'cache-live-ttl', help: 'How long browsers cache live campaign stats before asking the Worker again.' }],
+  ['cache.live_inventory_ttl_seconds', { label: 'Live inventory cache TTL seconds', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'cache-live-ttl', help: 'How long browsers cache live inventory before asking the Worker again.' }]
+]);
+
+const ADMIN_CAMPAIGN_CATEGORY_OPTIONS = [
+  { label: 'Short Film', value: 'Short Film' },
+  { label: 'Feature Film', value: 'Feature Film' },
+  { label: 'Documentary', value: 'Documentary' },
+  { label: 'Web Series', value: 'Web Series' },
+  { label: 'Music Video', value: 'Music Video' },
+  { label: 'Album', value: 'Album' },
+  { label: 'Other', value: 'Other' }
+];
+
+const ADMIN_CAMPAIGN_FREE_SHIPPING_OPTIONS = [
+  { label: 'Inherit deployment default', value: 'inherit' },
+  { label: 'Free shipping', value: 'true' },
+  { label: 'Paid shipping', value: 'false' }
+];
+
+const ADMIN_CAMPAIGN_SHIPPING_CHOICE_OPTIONS = [
+  { label: 'Signature required', value: 'signature_required' },
+  { label: 'Adult signature required', value: 'adult_signature_required' }
+];
+
+const ADMIN_CAMPAIGN_SETTING_SCHEMA = new Map([
+  ['title', { label: 'Title', type: 'string', layoutGroup: 'campaign-title-creator', help: 'Public campaign title shown on campaign pages, cards, checkout, reports, and admin lists.' }],
+  ['test_only', { label: 'Test campaign', type: 'boolean', layoutGroup: 'campaign-test-state', help: 'Keeps this campaign out of public production lists unless test campaigns are explicitly enabled.' }],
+  ['creator_name', { label: 'Creator name', type: 'string', layoutGroup: 'campaign-title-creator', help: 'Public person, team, or organization credited as the campaign creator.' }],
+  ['creator_image', { label: 'Creator image', type: 'string', input: 'image-upload', layoutGroup: 'campaign-hero-video-creator-image', help: 'Square creator or team image shown on the campaign page. Recommended: 400 x 400 px or larger.' }],
+  ['category', { label: 'Category', type: 'string', input: 'select', options: ADMIN_CAMPAIGN_CATEGORY_OPTIONS, layoutGroup: 'campaign-category-instagram', help: 'Public category shown on campaign cards and campaign pages.' }],
+  ['instagram', { label: 'Instagram URL', type: 'string', input: 'url', layoutGroup: 'campaign-category-instagram', help: 'Optional Instagram profile or post URL used for campaign links and sharing.' }],
+  ['short_blurb', { label: 'Short blurb', type: 'string', input: 'rich-text-inline', help: 'Brief formatted campaign summary used on cards, previews, and the campaign-page lead. Supports bold, italic, and underline.' }],
+  ['hero_image', { label: 'Hero image', type: 'string', input: 'image-upload', layoutGroup: 'hero-images', help: 'Primary square campaign image used on cards and as fallback campaign media. Recommended: 1000 x 1000 px.' }],
+  ['hero_image_wide', { label: 'Hero image wide', type: 'string', input: 'image-upload', layoutGroup: 'hero-images', help: 'Wide campaign hero image used where the layout has horizontal space. Recommended: 1600 x 900 px.' }],
+  ['hero_video', { label: 'Hero video', type: 'string', input: 'video-upload', layoutGroup: 'campaign-hero-video-creator-image', help: 'Optional uploaded campaign hero video. MP4, WebM, or MOV; maximum 100 MB.' }],
+  ['campaign_background', { label: 'Campaign background', type: 'string', input: 'image-upload', layoutGroup: 'background-images', help: 'Optional campaign page background image. Recommended: 1920 x 1080 px, compressed, and subtle enough to keep text readable.' }],
+  ['progress_background', { label: 'Progress background', type: 'string', input: 'image-upload', layoutGroup: 'background-images', help: 'Optional image used behind campaign progress areas when the campaign template supports it.' }],
+  ['start_date', { label: 'Start date', type: 'string', input: 'date', layoutGroup: 'campaign-dates', help: 'Date the campaign is scheduled to start. Used with state and deadline for public messaging.' }],
+  ['goal_deadline', { label: 'Goal deadline', type: 'string', input: 'date', layoutGroup: 'campaign-dates', help: 'Fundraising deadline used for countdowns, effective state, and closing the primary campaign.' }],
+  ['goal_amount', { label: 'Goal amount', type: 'number', input: 'currency', min: 0, step: 1, layoutGroup: 'campaign-goal-charged', help: 'Funding target in USD used for progress bars, summaries, checkout context, and reports.' }],
+  ['runner_report_emails', { label: 'Runner report emails', type: 'list', input: 'email-list', help: 'Recipients for campaign-runner pledge and fulfillment reports. Type an email and press comma or Enter to add it.' }],
+  ['featured_tier_id', { label: 'Featured tier', type: 'string', input: 'select', help: 'Existing pledge tier to highlight first or more prominently on campaign pages.' }],
+  ['single_tier_only', { label: 'Single tier mode', type: 'boolean', layoutGroup: 'campaign-tier-ongoing', help: 'Limits each pledge to one tier selection. Tier quantity is still controlled by each tier\'s Stackable setting.' }],
+  ['stretch_goals', { label: 'Stretch goals', type: 'campaign_collection', input: 'campaign-collection', collection: 'stretch_goals', help: 'Funding milestones shown on the campaign page and unlocked as pledge totals grow.' }],
+  ['stretch_hidden', { label: 'Hide locked stretch goals', type: 'boolean', layoutGroup: 'campaign-stretch-late-support', help: 'Hides locked stretch-goal details until their thresholds are reached.' }],
+  ['custom_late_support', { label: 'Custom late support', type: 'boolean', layoutGroup: 'campaign-stretch-late-support', help: 'Allows supporters to enter a custom support amount after the primary campaign has ended.' }],
+  ['shipping_fallback_flat_rate', { label: 'Shipping fallback flat rate', type: 'number', input: 'currency', min: 0, step: 0.01, layoutGroup: 'campaign-shipping-free', help: 'Campaign-specific flat shipping amount used when live carrier quotes are unavailable. Leave blank to use the platform default.' }],
+  ['free_shipping', { label: 'Free shipping override', type: 'string', input: 'select', options: ADMIN_CAMPAIGN_FREE_SHIPPING_OPTIONS, layoutGroup: 'campaign-shipping-free', help: 'Per-campaign free-shipping override. Inherit follows the platform default.' }],
+  ['shipping_options', { label: 'Shipping', type: 'list', input: 'checkbox-list', options: ADMIN_CAMPAIGN_SHIPPING_CHOICE_OPTIONS, help: 'Optional shipping requirements for physical rewards, such as signature requirements. Standard shipping remains available.' }],
+  ['show_ongoing', { label: 'Show ongoing support', type: 'boolean', layoutGroup: 'campaign-tier-ongoing', help: 'Shows ongoing support items after or alongside the main campaign support flow.' }],
+  ['ongoing_items', { label: 'Ongoing items', type: 'campaign_collection', input: 'campaign-collection', collection: 'ongoing_items', help: 'Ongoing support needs shown when ongoing support is enabled for this campaign.' }],
+  ['campaign_add_ons', { label: 'Campaign add-ons', type: 'add_on_products', input: 'add-on-products', help: 'Optional products attached to this campaign. They count toward this campaign and follow this campaign\'s shipping rules.' }],
+  ['content_editor', { label: 'Content editor', type: 'content_editor', input: 'content-editor', help: 'WYSIWYG block editor for the campaign page long-form content.' }],
+  ['tiers', { label: 'Tiers', type: 'campaign_collection', input: 'campaign-collection', collection: 'tiers', help: 'Pledge tiers supporters can select, including pricing, limits, images, and fulfillment behavior.' }],
+  ['support_items', { label: 'Support items', type: 'campaign_collection', input: 'campaign-collection', collection: 'support_items', help: 'Standalone support goals shown outside the main pledge tiers.' }],
+  ['diary', { label: 'Diary entries', type: 'campaign_collection', input: 'campaign-collection', collection: 'diary', help: 'Campaign updates or diary posts shown newest first.' }],
+  ['decisions', { label: 'Decisions', type: 'campaign_collection', input: 'campaign-collection', collection: 'decisions', help: 'Supporter vote or poll questions, including eligibility, deadlines, options, and option images.' }]
+]);
+
+function editableAdminSetting(path, type = 'string', campaignSlug = '') {
+  const schema = campaignSlug
+    ? ADMIN_CAMPAIGN_SETTING_SCHEMA.get(path)
+    : ADMIN_PLATFORM_SETTING_SCHEMA.get(path);
+  return {
+    editable: true,
+    path,
+    type: schema?.type || type,
+    input: schema?.input || type || 'text',
+    min: schema?.min,
+    max: schema?.max,
+    step: schema?.step,
+    displayMultiplier: schema?.displayMultiplier,
+    submitDivisor: schema?.submitDivisor,
+    placeholder: schema?.placeholder || '',
+    options: schema?.options || [],
+    visibleWhen: schema?.visibleWhen || null,
+    layoutGroup: schema?.layoutGroup || '',
+    help: schema?.help || '',
+    campaignSlug
+  };
+}
+
+function readOnlyAdminSettingHelp(help, layoutGroup = '') {
+  return { help, layoutGroup };
+}
+
+function derivedCampaignSetting(path, input, help, layoutGroup = '') {
+  return { path, input, type: 'string', derived: true, help, layoutGroup };
+}
+
+function readOnlyConditionalAdminSettingHelp(help, visibleWhen) {
+  return { help, visibleWhen };
+}
+
+function campaignRunnerSendTimeSetting(hour, minute) {
+  return {
+    ...editableAdminSetting('reports.campaign_runner.send_hour_mt', 'number'),
+    input: 'time',
+    help: 'The Mountain Time clock time when scheduled campaign-runner reports should be sent.',
+    timeParts: {
+      hourPath: 'reports.campaign_runner.send_hour_mt',
+      minutePath: 'reports.campaign_runner.send_minute_mt',
+      hour: Number(hour || 0),
+      minute: Number(minute || 0)
+    }
+  };
+}
+
+function publicCampaignSettings(campaign = {}) {
+  return {
+    slug: campaign.slug || '',
+    title: campaign.title || campaign.slug || '',
+    testOnly: campaign.test_only === true,
+    creatorName: campaign.creator_name || '',
+    creatorImage: campaign.creator_image || '',
+    category: campaign.category || '',
+    instagram: campaign.instagram || '',
+    state: campaign.state || 'unknown',
+    effectiveState: getEffectiveState(campaign) || campaign.state || 'unknown',
+    url: campaign.url || `/campaigns/${encodeURIComponent(campaign.slug || '')}/`,
+    startDate: campaign.start_date || '',
+    goalDeadline: campaign.goal_deadline || '',
+    goalAmount: campaign.goal_amount ?? '',
+    charged: Boolean(campaign.charged),
+    shortBlurb: campaign.short_blurb || '',
+    heroImage: campaign.hero_image || '',
+    heroImageWide: campaign.hero_image_wide || '',
+    heroVideo: campaign.hero_video || '',
+    campaignBackground: campaign.campaign_background || '',
+    progressBackground: campaign.progress_background || '',
+    runnerReportEmails: Array.isArray(campaign.runner_report_emails) ? campaign.runner_report_emails : [],
+    featuredTierId: campaign.featured_tier_id || '',
+    singleTierOnly: campaign.single_tier_only === true,
+    stretchGoals: Array.isArray(campaign.stretch_goals) ? campaign.stretch_goals : [],
+    stretchHidden: campaign.stretch_hidden !== false,
+    customLateSupport: campaign.custom_late_support === true,
+    shippingFallbackFlatRate: campaign.shipping_fallback_flat_rate ?? '',
+    freeShipping: campaign.free_shipping === true || campaign.free_shipping === false ? String(campaign.free_shipping) : String(campaign.free_shipping || 'inherit'),
+    shippingOptions: Array.isArray(campaign.shipping_options) ? campaign.shipping_options : [],
+    showOngoing: campaign.show_ongoing === true,
+    ongoingItems: Array.isArray(campaign.ongoing_items) ? campaign.ongoing_items : [],
+    campaignAddOns: Array.isArray(campaign.campaign_add_ons) ? campaign.campaign_add_ons : [],
+    tiers: Array.isArray(campaign.tiers) ? campaign.tiers : [],
+    supportItems: Array.isArray(campaign.support_items) ? campaign.support_items : [],
+    diary: Array.isArray(campaign.diary) ? campaign.diary : [],
+    decisions: Array.isArray(campaign.decisions) ? campaign.decisions : []
+  };
+}
+
+function campaignTierSelectOptions(tiers = []) {
+  const options = [{ label: 'None', value: '' }];
+  if (!Array.isArray(tiers)) return options;
+  tiers.forEach((tier) => {
+    const id = String(tier?.id || '').trim();
+    if (!id) return;
+    const name = String(tier?.name || id).trim();
+    const price = Number(tier?.price);
+    const priceLabel = Number.isFinite(price) ? `$${price} - ` : '';
+    options.push({
+      label: `${priceLabel}${name} (${id})`,
+      value: id
+    });
+  });
+  return options;
+}
+
+function campaignSettingsSection(campaign = {}) {
+  const settings = publicCampaignSettings(campaign);
+  const featuredTierSetting = {
+    ...editableAdminSetting('featured_tier_id', 'string', settings.slug),
+    options: campaignTierSelectOptions(settings.tiers)
+  };
+  return adminSettingsSection(settings.title || settings.slug || 'Campaign', [
+    ['Title', settings.title, editableAdminSetting('title', 'string', settings.slug)],
+    ['Creator name', settings.creatorName, editableAdminSetting('creator_name', 'string', settings.slug)],
+    ['Short blurb', settings.shortBlurb, editableAdminSetting('short_blurb', 'string', settings.slug)],
+    ['Slug', settings.slug, derivedCampaignSetting('slug', 'slug-derived', 'URL-safe campaign identifier. Existing campaigns keep their current slug; new campaigns derive it from the title.', 'campaign-slug-url')],
+    ['URL', settings.url, derivedCampaignSetting('url', 'url-derived', 'Public campaign page URL. Existing campaigns keep their current URL; new campaigns derive it from the title.', 'campaign-slug-url')],
+    ['Hero video', settings.heroVideo, editableAdminSetting('hero_video', 'string', settings.slug)],
+    ['Creator image', settings.creatorImage, editableAdminSetting('creator_image', 'string', settings.slug)],
+    ['Category', settings.category, editableAdminSetting('category', 'string', settings.slug)],
+    ['Instagram URL', settings.instagram, editableAdminSetting('instagram', 'string', settings.slug)],
+    ['Start date', settings.startDate, editableAdminSetting('start_date', 'string', settings.slug)],
+    ['Goal deadline', settings.goalDeadline, editableAdminSetting('goal_deadline', 'string', settings.slug)],
+    ['Goal amount', settings.goalAmount, editableAdminSetting('goal_amount', 'number', settings.slug)],
+    ['Charged', settings.charged, readOnlyAdminSettingHelp('Read-only flag showing whether this campaign has been marked as charged after fundraising.', 'campaign-goal-charged')],
+    ['Test campaign', settings.testOnly, editableAdminSetting('test_only', 'boolean', settings.slug)],
+    ['State', settings.state, readOnlyAdminSettingHelp('Read-only configured lifecycle state. Public behavior also depends on dates and campaign operations.', 'campaign-test-state')],
+    ['Single tier mode', settings.singleTierOnly, editableAdminSetting('single_tier_only', 'boolean', settings.slug)],
+    ['Show ongoing support', settings.showOngoing, editableAdminSetting('show_ongoing', 'boolean', settings.slug)],
+    ['Hide locked stretch goals', settings.stretchHidden, editableAdminSetting('stretch_hidden', 'boolean', settings.slug)],
+    ['Custom late support', settings.customLateSupport, editableAdminSetting('custom_late_support', 'boolean', settings.slug)],
+    ['Shipping fallback flat rate', settings.shippingFallbackFlatRate, editableAdminSetting('shipping_fallback_flat_rate', 'number', settings.slug)],
+    ['Free shipping override', settings.freeShipping, editableAdminSetting('free_shipping', 'string', settings.slug)],
+    ['Shipping', settings.shippingOptions, editableAdminSetting('shipping_options', 'list', settings.slug)],
+    ['Runner report emails', settings.runnerReportEmails, editableAdminSetting('runner_report_emails', 'list', settings.slug)],
+    ['Hero image', settings.heroImage, editableAdminSetting('hero_image', 'string', settings.slug)],
+    ['Hero image wide', settings.heroImageWide, editableAdminSetting('hero_image_wide', 'string', settings.slug)],
+    ['Campaign background', settings.campaignBackground, editableAdminSetting('campaign_background', 'string', settings.slug)],
+    ['Progress background', settings.progressBackground, editableAdminSetting('progress_background', 'string', settings.slug)],
+    ['Stretch goals', settings.stretchGoals, editableAdminSetting('stretch_goals', 'campaign_collection', settings.slug)],
+    ['Ongoing items', settings.ongoingItems, editableAdminSetting('ongoing_items', 'campaign_collection', settings.slug)],
+    ['Campaign add-ons', settings.campaignAddOns, editableAdminSetting('campaign_add_ons', 'add_on_products', settings.slug)],
+    ['Content editor', '', editableAdminSetting('content_editor', 'content_editor', settings.slug)],
+    ['Featured tier', settings.featuredTierId, featuredTierSetting],
+    ['Tiers', settings.tiers, editableAdminSetting('tiers', 'campaign_collection', settings.slug)],
+    ['Support items', settings.supportItems, editableAdminSetting('support_items', 'campaign_collection', settings.slug)],
+    ['Diary entries', settings.diary, editableAdminSetting('diary', 'campaign_collection', settings.slug)],
+    ['Decisions', settings.decisions, editableAdminSetting('decisions', 'campaign_collection', settings.slug)]
+  ]);
+}
+
+function parseAdminDelimitedList(value) {
+  return String(value || '')
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function adminSecretStatusRows(env) {
+  const isConfigured = (value) => String(value || '').trim().length > 0;
+  const status = (value, required = true) => {
+    if (isConfigured(value)) return 'Configured';
+    return required ? 'Missing' : 'Optional / not configured';
+  };
+  const activeStripeSecret = getStripeKey(env);
+  const activeStripeWebhookSecret = getStripeWebhookSecret(env);
+  const uspsRequired = String(env.USPS_ENABLED || '').toLowerCase() === 'true';
+  const zipTaxRequired = String(env.TAX_PROVIDER || '').toLowerCase() === 'zip_tax';
+
+  return [
+    ['Stripe secret key', status(activeStripeSecret), readOnlyAdminSettingHelp('Secret Stripe API key for the current Worker mode. Store it in Worker secrets for production or worker/.dev.vars for local development.')],
+    ['Stripe webhook secret', status(activeStripeWebhookSecret), readOnlyAdminSettingHelp('Stripe webhook signing secret for the current Worker mode. This must stay outside site config and admin setting drafts.')],
+    ['Checkout intent secret', status(env.CHECKOUT_INTENT_SECRET), readOnlyAdminSettingHelp('Signing secret for first-party checkout intent payloads and reservation recovery. Generate a unique value per environment.')],
+    ['Magic link secret', status(env.MAGIC_LINK_SECRET), readOnlyAdminSettingHelp('Signing secret for supporter magic links and scoped pledge-management access. Generate a unique value per environment.')],
+    ['Admin session secret', status(env.ADMIN_SESSION_SECRET, false), readOnlyAdminSettingHelp('Dedicated signing secret for browser admin sessions. Optional in development because the Worker has fallbacks, but production should set it explicitly.')],
+    ['Admin recovery secret', status(env.ADMIN_SECRET), readOnlyAdminSettingHelp('Bearer secret used by protected admin automation and recovery endpoints. Keep this in Worker or GitHub secrets only.')],
+    ['Resend API key', status(env.RESEND_API_KEY), readOnlyAdminSettingHelp('Email provider API key used for admin magic links, pledge emails, and campaign notifications. Never store it in _config.yml.')],
+    ['USPS client secret', status(env.USPS_CLIENT_SECRET, uspsRequired), readOnlyAdminSettingHelp('USPS OAuth client secret for live shipping quotes. Required only when USPS is enabled; the client ID remains non-secret config.')],
+    ['ZIP.TAX API key', status(env.ZIP_TAX_API_KEY || env.TAX_API_KEY, zipTaxRequired), readOnlyAdminSettingHelp('ZIP.TAX API key for jurisdiction-level tax lookup. Required only when the ZIP.TAX provider is selected.')],
+    ['Cloudflare deploy credentials', 'GitHub secret / local shell only', readOnlyAdminSettingHelp('Cloudflare API tokens are not visible to the Worker runtime. Store deploy credentials in GitHub repository secrets or ignored local env files.')]
+  ];
+}
+
+async function handleAdminSettings(request, env) {
+  const auth = await requireAdminSession(request, env, 'campaign:read');
+  if (!auth.ok) return auth.response;
+
+  const [{ campaigns }, addOns] = await Promise.all([
+    getCampaigns(env),
+    auth.user.role === 'super_admin' ? getAddOns(env) : Promise.resolve(null)
+  ]);
+  const allowedCampaigns = (campaigns || []).filter((campaign) => (
+    auth.user.role === 'super_admin' ||
+    auth.user.campaignSlugs.includes(String(campaign?.slug || ''))
+  ));
+
+  const campaignSections = allowedCampaigns.map(campaignSettingsSection);
+  const sections = [];
+  const canonicalSiteBase = env.CANONICAL_SITE_BASE || env.SITE_BASE;
+  const canonicalWorkerBase = env.CANONICAL_WORKER_BASE || env.WORKER_BASE;
+  const platformAddOnProducts = Array.isArray(addOns?.products)
+    ? addOns.products.filter((product) => String(product?.scope || 'platform') === 'platform')
+    : [];
+  const seoSameAs = parseAdminDelimitedList(env.SEO_SAME_AS);
+  const platformLogoPath = env.EMAIL_LOGO_PATH || '/assets/images/defaults/dust-wave-square.png';
+  const platformFooterLogoPath = env.PLATFORM_FOOTER_LOGO_PATH || platformLogoPath;
+  const platformFaviconPath = env.PLATFORM_FAVICON_PATH || '/assets/images/defaults/favicon.png';
+  const platformDefaultSocialImagePath = env.PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH || platformLogoPath;
+
+  if (auth.user.role === 'super_admin') {
+    sections.push(
+      adminSettingsSection('Platform', [
+        ['Site title', env.SITE_TITLE || env.PLATFORM_NAME, editableAdminSetting('title')],
+        ['Name', env.PLATFORM_NAME, editableAdminSetting('platform.name')],
+        ['Company', env.PLATFORM_COMPANY_NAME, editableAdminSetting('platform.company_name')],
+        ['Site author', env.PLATFORM_AUTHOR, editableAdminSetting('author')],
+        ['Default creator name', env.PLATFORM_DEFAULT_CREATOR_NAME || env.PLATFORM_COMPANY_NAME || env.PLATFORM_AUTHOR, editableAdminSetting('platform.default_creator_name')],
+        ['Support email', env.SUPPORT_EMAIL, editableAdminSetting('platform.support_email')],
+        ['Site description', env.SITE_DESCRIPTION, editableAdminSetting('description')],
+        ['Pledges email from', env.PLEDGES_EMAIL_FROM, editableAdminSetting('platform.pledges_email_from')],
+        ['Updates email from', env.UPDATES_EMAIL_FROM, editableAdminSetting('platform.updates_email_from')],
+        ['App mode', env.APP_MODE, readOnlyAdminSettingHelp('The runtime environment mode currently used by the Worker, such as live or test.')]
+      ]),
+      adminSettingsSection('Brand & SEO', [
+        ['Logo', platformLogoPath, editableAdminSetting('platform.logo_path')],
+        ['Footer logo', platformFooterLogoPath, editableAdminSetting('platform.footer_logo_path')],
+        ['Favicon', platformFaviconPath, editableAdminSetting('platform.favicon_path')],
+        ['Default social image', platformDefaultSocialImagePath, editableAdminSetting('platform.default_social_image_path')],
+        ['X handle', env.SEO_X_HANDLE, editableAdminSetting('seo.x_handle')],
+        ['Default social image alt', env.SEO_DEFAULT_SOCIAL_IMAGE_ALT || env.PLATFORM_NAME, editableAdminSetting('seo.default_social_image_alt')],
+        ['Same-as links', seoSameAs, editableAdminSetting('seo.same_as', 'list')],
+        ['Index public community hub', env.SEO_INDEX_PUBLIC_COMMUNITY_HUB ?? 'true', editableAdminSetting('seo.index_public_community_hub', 'boolean')]
+      ]),
+      adminSettingsSection('Canonical URLs', [
+        ['Production site URL', canonicalSiteBase, editableAdminSetting('platform.site_url')],
+        ['Production Worker URL', canonicalWorkerBase, editableAdminSetting('platform.worker_url')]
+      ]),
+      adminSettingsSection('Checkout', [
+        ['Stripe publishable key', env.STRIPE_PUBLISHABLE_KEY || '', editableAdminSetting('checkout.stripe_publishable_key')]
+      ]),
+      adminSettingsSection('Pricing', [
+        ['Sales Tax Rate', env.SALES_TAX_RATE, editableAdminSetting('pricing.sales_tax_rate', 'number')],
+        ['Default Platform Tip Percent', env.DEFAULT_PLATFORM_TIP_PERCENT, editableAdminSetting('pricing.default_tip_percent', 'number')],
+        ['Max Platform Tip Percent', env.MAX_PLATFORM_TIP_PERCENT, editableAdminSetting('pricing.max_tip_percent', 'number')]
+      ]),
+      adminSettingsSection('Tax', [
+        ['Provider', env.TAX_PROVIDER, editableAdminSetting('tax.provider')],
+        ['Origin country', env.TAX_ORIGIN_COUNTRY, editableAdminSetting('tax.origin_country')],
+        ['Use regional origin', env.TAX_USE_REGIONAL_ORIGIN, editableAdminSetting('tax.use_regional_origin', 'boolean')],
+        ['New Mexico GRT API base', env.NM_GRT_API_BASE, editableAdminSetting('tax.nm_grt_api_base')],
+        ['ZIP.TAX API base', env.ZIP_TAX_API_BASE, editableAdminSetting('tax.zip_tax_api_base')]
+      ]),
+      adminSettingsSection('Shipping', [
+        ['Origin postal code', env.SHIPPING_ORIGIN_ZIP, editableAdminSetting('shipping.origin_zip')],
+        ['Origin country', env.SHIPPING_ORIGIN_COUNTRY, editableAdminSetting('shipping.origin_country')],
+        ['Fallback Shipping Fee (USD)', env.SHIPPING_FALLBACK_FLAT_RATE, editableAdminSetting('shipping.fallback_flat_rate', 'number')],
+        ['Free shipping default', env.FREE_SHIPPING_DEFAULT, editableAdminSetting('shipping.free_shipping_default', 'boolean')],
+        ['Default shipping option', env.SHIPPING_DEFAULT_OPTION || 'standard', editableAdminSetting('shipping.default_option')],
+        ['USPS enabled', env.USPS_ENABLED, editableAdminSetting('shipping.usps.enabled', 'boolean')],
+        ['USPS client ID', env.USPS_CLIENT_ID, editableAdminSetting('shipping.usps.client_id')],
+        ['USPS API base', env.USPS_API_BASE, editableAdminSetting('shipping.usps.api_base')],
+        ['USPS timeout ms', env.USPS_TIMEOUT_MS, editableAdminSetting('shipping.usps.timeout_ms', 'number')],
+        ['USPS quote cache TTL seconds', env.USPS_QUOTE_CACHE_TTL_SECONDS, editableAdminSetting('shipping.usps.quote_cache_ttl_seconds', 'number')],
+        ['USPS failure cooldown seconds', env.USPS_FAILURE_COOLDOWN_SECONDS, editableAdminSetting('shipping.usps.failure_cooldown_seconds', 'number')],
+        ['USPS rate limit cooldown seconds', env.USPS_RATE_LIMIT_COOLDOWN_SECONDS, editableAdminSetting('shipping.usps.rate_limit_cooldown_seconds', 'number')]
+      ]),
+      adminSettingsSection('Campaign runner reports', [
+        ['Enabled', env.CAMPAIGN_RUNNER_REPORTS_ENABLED, editableAdminSetting('reports.campaign_runner.enabled', 'boolean')],
+        ['Send Time (Mountain Time)', env.CAMPAIGN_RUNNER_REPORT_HOUR_MT, campaignRunnerSendTimeSetting(env.CAMPAIGN_RUNNER_REPORT_HOUR_MT, env.CAMPAIGN_RUNNER_REPORT_MINUTE_MT)],
+        ['Email Subject Prefix', env.CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX, editableAdminSetting('reports.campaign_runner.email_subject_prefix')],
+        ['Daily pledge report enabled', env.CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED, editableAdminSetting('reports.campaign_runner.daily_pledge_report_enabled', 'boolean')],
+        ['Fulfillment report enabled', env.CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED, editableAdminSetting('reports.campaign_runner.fulfillment_report_enabled', 'boolean')],
+        ['Include stats summary', env.CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY, editableAdminSetting('reports.campaign_runner.include_stats_summary', 'boolean')],
+        ['Include CSV attachment', env.CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT, editableAdminSetting('reports.campaign_runner.include_csv_attachment', 'boolean')]
+      ]),
+      adminSettingsSection('Design', [
+        ['Body font', env.EMAIL_FONT_FAMILY, editableAdminSetting('design.font_body')],
+        ['Heading font', env.EMAIL_HEADING_FONT_FAMILY, editableAdminSetting('design.font_display')],
+        ['Text Color', env.EMAIL_COLOR_TEXT, editableAdminSetting('design.color_text')],
+        ['Muted Color', env.EMAIL_COLOR_MUTED, editableAdminSetting('design.color_text_muted')],
+        ['Surface Color', env.EMAIL_COLOR_SURFACE, editableAdminSetting('design.color_surface_subtle')],
+        ['Border Color', env.EMAIL_COLOR_BORDER, editableAdminSetting('design.color_border')],
+        ['Primary Color', env.EMAIL_COLOR_PRIMARY, editableAdminSetting('design.color_primary')],
+        ['Button Radius', env.EMAIL_BUTTON_RADIUS, editableAdminSetting('design.radius_lg')]
+      ]),
+      adminSettingsSection('Platform add-ons', [
+        ['Enabled', addOns?.enabled === true, editableAdminSetting('add_ons.enabled', 'boolean')],
+        ['Low stock threshold', addOns?.low_stock_threshold ?? 5, editableAdminSetting('add_ons.low_stock_threshold', 'number')],
+        ['Products', platformAddOnProducts, editableAdminSetting('add_ons.products', 'add_on_products')]
+      ]),
+      adminSettingsSection('Advanced performance', [
+        ['Live stats cache TTL seconds', env.LIVE_STATS_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_stats_ttl_seconds', 'number')],
+        ['Live inventory cache TTL seconds', env.LIVE_INVENTORY_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_inventory_ttl_seconds', 'number')]
+      ]),
+      adminSettingsSection('Debug', [
+        ['Console logging enabled', env.DEBUG_CONSOLE_LOGGING_ENABLED, editableAdminSetting('debug.console_logging_enabled', 'boolean')],
+        ['Verbose console logging', env.DEBUG_VERBOSE_CONSOLE_LOGGING, editableAdminSetting('debug.verbose_console_logging', 'boolean')]
+      ]),
+      adminSettingsSection('Secrets & credentials', adminSecretStatusRows(env)),
+      adminSettingsSection('Runtime diagnostics', [
+        ['Current site base', env.SITE_BASE, readOnlyAdminSettingHelp('The site origin the current Worker runtime is configured to trust for browser requests.')],
+        ['Current Worker base', env.WORKER_BASE, readOnlyAdminSettingHelp('The Worker API base URL used by the current runtime environment.')],
+        ['CORS allowed origin', env.CORS_ALLOWED_ORIGIN, readOnlyAdminSettingHelp('The browser origin allowed to make credentialed admin and checkout requests to the Worker.')]
+      ])
+    );
+  }
+
+  return privateJsonResponse({
+    user: auth.user,
+    scope: auth.user.role === 'super_admin' ? 'platform' : 'campaign',
+    sections,
+    campaigns: campaignSections,
+    writeBudget: adminReadBudget(),
+    generatedAt: new Date().toISOString()
+  }, 200, env);
+}
+
+function normalizeAdminSettingsValue(value, schema = {}) {
+  if (schema.type === 'boolean') {
+    if (value === true || value === 'true') return { ok: true, value: true };
+    if (value === false || value === 'false') return { ok: true, value: false };
+    return { ok: false, error: `${schema.label || 'Value'} must be true or false.` };
+  }
+  if (schema.type === 'add_on_products') {
+    return normalizeAdminAddOnProducts(value, schema);
+  }
+  if (schema.type === 'campaign_collection') {
+    return normalizeAdminCampaignCollection(value, schema);
+  }
+  if (schema.type === 'number') {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return { ok: false, error: `${schema.label || 'Value'} must be a number.` };
+    if (schema.input === 'integer' && !Number.isInteger(number)) return { ok: false, error: `${schema.label || 'Value'} must be a whole number.` };
+    if (schema.min !== undefined && number < schema.min) return { ok: false, error: `${schema.label || 'Value'} must be at least ${schema.min}.` };
+    if (schema.max !== undefined && number > schema.max) return { ok: false, error: `${schema.label || 'Value'} must be no more than ${schema.max}.` };
+    return { ok: true, value: number };
+  }
+  if (schema.input === 'select' && Array.isArray(schema.options) && schema.options.length > 0) {
+    const text = String(value ?? '').trim();
+    const allowed = new Set(schema.options.map((option) => String(option?.value ?? '').trim()));
+    if (!allowed.has(text)) {
+      return { ok: false, error: `${schema.label || 'Value'} must be one of the available options.` };
+    }
+    return { ok: true, value: text };
+  }
+  if (schema.type === 'list') {
+    const items = Array.isArray(value)
+      ? value
+      : String(value || '').split(/[\n,]+/);
+    const normalizedItems = items.map((item) => String(item || '').trim()).filter(Boolean);
+    if (Array.isArray(schema.options) && schema.options.length > 0) {
+      const allowed = new Set(schema.options.map((option) => String(option?.value ?? '').trim()).filter(Boolean));
+      const invalid = normalizedItems.find((item) => !allowed.has(item));
+      if (invalid) return { ok: false, error: `${schema.label || 'List'} contains an unavailable option.` };
+    }
+    if (schema.input === 'email-list') {
+      const invalid = normalizedItems.find((item) => !isValidEmail(item));
+      if (invalid) return { ok: false, error: `${schema.label || 'Email list'} contains an invalid email address.` };
+    }
+    if (schema.input === 'url-list') {
+      const invalid = normalizedItems.find((item) => !/^https?:\/\//i.test(item));
+      if (invalid) return { ok: false, error: `${schema.label || 'URL list'} contains an invalid URL.` };
+    }
+    return {
+      ok: true,
+      value: normalizedItems
+    };
+  }
+  const text = String(value ?? '').trim();
+  if (schema.input === 'date' && text && !/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return { ok: false, error: `${schema.label || 'Date'} must use YYYY-MM-DD.` };
+  }
+  if (schema.input === 'slug' && !isValidSlug(text)) {
+    return { ok: false, error: `${schema.label || 'Slug'} must use lowercase letters, numbers, and hyphens only.` };
+  }
+  if (schema.input === 'color' && text && !/^#[0-9a-f]{6}$/i.test(text)) {
+    return { ok: false, error: `${schema.label || 'Color'} must use a hex color like #101215.` };
+  }
+  if (schema.input === 'url' && text && !/^(https?:\/\/|\/)/i.test(text)) {
+    return { ok: false, error: `${schema.label || 'URL'} must be an absolute URL or root-relative path.` };
+  }
+  if (schema.input === 'email' && text && !isValidEmail(text)) {
+    return { ok: false, error: `${schema.label || 'Email'} must be a valid email address.` };
+  }
+  if (schema.input === 'email-sender' && text) {
+    const senderEmail = text.match(/<([^<>]+)>$/)?.[1] || text;
+    if (!isValidEmail(senderEmail.trim())) {
+      return { ok: false, error: `${schema.label || 'Sender'} must be an email address or Name <email@example.com>.` };
+    }
+  }
+  if (schema.input === 'stripe-publishable-key' && text && !/^pk_(test|live)_[A-Za-z0-9_]+$/.test(text)) {
+    return { ok: false, error: `${schema.label || 'Stripe publishable key'} must start with pk_test_ or pk_live_.` };
+  }
+  if (text.length > 500) return { ok: false, error: `${schema.label || 'Value'} is too long.` };
+  return { ok: true, value: text };
+}
+
+function normalizeAdminAddOnProducts(value, schema = {}) {
+  let products;
+  try {
+    products = Array.isArray(value) ? value : JSON.parse(String(value || '[]'));
+  } catch {
+    return { ok: false, error: `${schema.label || 'Products'} must be valid product JSON.` };
+  }
+  if (!Array.isArray(products)) {
+    return { ok: false, error: `${schema.label || 'Products'} must be a list.` };
+  }
+  if (products.length > 50) {
+    return { ok: false, error: `${schema.label || 'Products'} can include at most 50 products.` };
+  }
+
+  const seen = new Set();
+  const normalized = [];
+  for (const [index, product] of products.entries()) {
+    if (!product || typeof product !== 'object' || Array.isArray(product)) {
+      return { ok: false, error: `Product ${index + 1} must be an object.` };
+    }
+    const id = String(product.id || '').trim();
+    if (!isValidSlug(id)) return { ok: false, error: `Product ${index + 1} needs a URL-safe id.` };
+    if (seen.has(id)) return { ok: false, error: `Product id "${id}" is duplicated.` };
+    seen.add(id);
+
+    const name = String(product.name || '').trim();
+    if (!name) return { ok: false, error: `Product "${id}" needs a name.` };
+    const category = String(product.category || 'physical').trim().toLowerCase();
+    if (!['physical', 'digital'].includes(category)) return { ok: false, error: `Product "${id}" category must be physical or digital.` };
+    const price = Number(product.price);
+    if (!Number.isFinite(price) || price < 0) return { ok: false, error: `Product "${id}" needs a non-negative price.` };
+
+    const normalizedProduct = {
+      id,
+      name,
+      description: String(product.description || '').trim(),
+      image_url: String(product.image_url || product.imageUrl || '').trim(),
+      price: Number(price.toFixed(2)),
+      category
+    };
+    const shippingPreset = String(product.shipping_preset || product.shippingPreset || '').trim();
+    if (shippingPreset) normalizedProduct.shipping_preset = shippingPreset;
+    const sourceUrl = String(product.source_url || product.sourceUrl || '').trim();
+    if (sourceUrl) normalizedProduct.source_url = sourceUrl;
+    const variantOptionName = String(product.variant_option_name || product.variantOptionName || '').trim();
+    if (variantOptionName) normalizedProduct.variant_option_name = variantOptionName;
+    const inventory = product.inventory === '' || product.inventory === undefined || product.inventory === null
+      ? null
+      : Number(product.inventory);
+    if (inventory !== null) {
+      if (!Number.isInteger(inventory) || inventory < 0) return { ok: false, error: `Product "${id}" inventory must be a non-negative whole number.` };
+      normalizedProduct.inventory = inventory;
+    }
+
+    const variants = Array.isArray(product.variants) ? product.variants : [];
+    if (variants.length > 30) return { ok: false, error: `Product "${id}" can include at most 30 variants.` };
+    const seenVariants = new Set();
+    normalizedProduct.variants = [];
+    for (const [variantIndex, variant] of variants.entries()) {
+      const variantId = String(variant?.id || '').trim();
+      if (!isValidSlug(variantId)) return { ok: false, error: `Variant ${variantIndex + 1} for "${id}" needs a URL-safe id.` };
+      if (seenVariants.has(variantId)) return { ok: false, error: `Variant id "${variantId}" is duplicated for "${id}".` };
+      seenVariants.add(variantId);
+      const label = String(variant?.label || '').trim();
+      if (!label) return { ok: false, error: `Variant "${variantId}" for "${id}" needs a label.` };
+      const variantInventory = variant.inventory === '' || variant.inventory === undefined || variant.inventory === null
+        ? null
+        : Number(variant.inventory);
+      const normalizedVariant = { id: variantId, label };
+      if (variantInventory !== null) {
+        if (!Number.isInteger(variantInventory) || variantInventory < 0) return { ok: false, error: `Variant "${variantId}" inventory must be a non-negative whole number.` };
+        normalizedVariant.inventory = variantInventory;
+      }
+      normalizedProduct.variants.push(normalizedVariant);
+    }
+    normalized.push(normalizedProduct);
+  }
+  return { ok: true, value: normalized };
+}
+
+function parseAdminJsonArray(value, label) {
+  try {
+    const parsed = Array.isArray(value) ? value : JSON.parse(String(value || '[]'));
+    if (!Array.isArray(parsed)) return { ok: false, error: `${label} must be a list.` };
+    return { ok: true, value: parsed };
+  } catch {
+    return { ok: false, error: `${label} must be valid JSON.` };
+  }
+}
+
+function optionalAdminNumber(value, field, { integer = false } = {}) {
+  if (value === '' || value === undefined || value === null) return { ok: true, value: undefined };
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0 || (integer && !Number.isInteger(number))) {
+    return { ok: false, error: `${field} must be a non-negative ${integer ? 'whole ' : ''}number.` };
+  }
+  return { ok: true, value: number };
+}
+
+function normalizeAdminCampaignCollection(value, schema = {}) {
+  const label = schema.label || 'Items';
+  const parsed = parseAdminJsonArray(value, label);
+  if (!parsed.ok) return parsed;
+  if (parsed.value.length > 100) return { ok: false, error: `${label} can include at most 100 items.` };
+
+  const collection = schema.collection;
+  const normalized = [];
+  for (const [index, item] of parsed.value.entries()) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return { ok: false, error: `${label} item ${index + 1} must be an object.` };
+    }
+    const out = {};
+    if (collection === 'diary') {
+      out.title = String(item.title || '').trim();
+      if (!out.title) return { ok: false, error: `Diary entry ${index + 1} needs a title.` };
+      out.date = String(item.date || '').trim();
+      out.phase = String(item.phase || '').trim();
+      const rawContent = Array.isArray(item.content) && item.content.length
+        ? item.content
+        : [{ type: 'text', body: String(item.body || '').trim(), align: 'left' }];
+      const errors = [];
+      const warnings = [];
+      out.content = rawContent.slice(0, ADMIN_CONTENT_MAX_BLOCKS).map((block, blockIndex) => validateAdminContentBlock(block, blockIndex, errors, warnings)).filter(Boolean);
+      if (rawContent.length > ADMIN_CONTENT_MAX_BLOCKS) warnings.push(`Diary entry "${out.title}" was limited to ${ADMIN_CONTENT_MAX_BLOCKS} blocks.`);
+      if (errors.length) return { ok: false, error: `Diary entry "${out.title}" content is invalid: ${errors.join(' ')}` };
+      if (!out.content.length) return { ok: false, error: `Diary entry "${out.title}" needs body text.` };
+      normalized.push(out);
+      continue;
+    }
+
+    if (collection === 'stretch_goals') {
+      const threshold = optionalAdminNumber(item.threshold, `Stretch goal ${index + 1} threshold`);
+      if (!threshold.ok || threshold.value === undefined) return { ok: false, error: threshold.error || `Stretch goal ${index + 1} needs a threshold.` };
+      out.threshold = threshold.value;
+      out.title = String(item.title || '').trim();
+      if (!out.title) return { ok: false, error: `Stretch goal ${index + 1} needs a title.` };
+      out.description = String(item.description || '').trim();
+      out.status = String(item.status || '').trim();
+      normalized.push(out);
+      continue;
+    }
+
+    if (collection === 'ongoing_items') {
+      out.label = String(item.label || '').trim();
+      if (!out.label) return { ok: false, error: `Ongoing item ${index + 1} needs a label.` };
+      const remaining = optionalAdminNumber(item.remaining, `Ongoing item "${out.label}" remaining`);
+      if (!remaining.ok) return { ok: false, error: remaining.error };
+      if (remaining.value !== undefined) out.remaining = remaining.value;
+      normalized.push(out);
+      continue;
+    }
+
+    out.id = String(item.id || '').trim();
+    if (!isValidSlug(out.id)) return { ok: false, error: `${label} item ${index + 1} needs a URL-safe id.` };
+
+    if (collection === 'tiers') {
+      out.name = String(item.name || '').trim();
+      if (!out.name) return { ok: false, error: `Tier "${out.id}" needs a name.` };
+      const price = optionalAdminNumber(item.price, `Tier "${out.id}" price`);
+      if (!price.ok || price.value === undefined) return { ok: false, error: price.error || `Tier "${out.id}" needs a price.` };
+      out.price = price.value;
+      out.image = String(item.image || item.image_url || '').trim();
+      out.description = String(item.description || '').trim();
+      const limit = optionalAdminNumber(item.limit_total, `Tier "${out.id}" limit`, { integer: true });
+      if (!limit.ok) return { ok: false, error: limit.error };
+      if (limit.value !== undefined) out.limit_total = limit.value;
+      const remaining = optionalAdminNumber(item.remaining, `Tier "${out.id}" remaining`, { integer: true });
+      if (!remaining.ok) return { ok: false, error: remaining.error };
+      if (remaining.value !== undefined) out.remaining = remaining.value;
+      out.stackable = item.stackable === true || item.stackable === 'true';
+      out.category = ['physical', 'digital'].includes(String(item.category || '').trim()) ? String(item.category).trim() : 'digital';
+      out.shipping_preset = String(item.shipping_preset || '').trim();
+      out.late_support = item.late_support === true || item.late_support === 'true';
+      const threshold = optionalAdminNumber(item.requires_threshold, `Tier "${out.id}" threshold`);
+      if (!threshold.ok) return { ok: false, error: threshold.error };
+      if (threshold.value !== undefined) out.requires_threshold = threshold.value;
+      normalized.push(out);
+      continue;
+    }
+
+    if (collection === 'support_items') {
+      out.label = String(item.label || '').trim();
+      if (!out.label) return { ok: false, error: `Support item "${out.id}" needs a label.` };
+      out.need = String(item.need || '').trim();
+      const target = optionalAdminNumber(item.target, `Support item "${out.id}" target`);
+      if (!target.ok || target.value === undefined) return { ok: false, error: target.error || `Support item "${out.id}" needs a target.` };
+      out.target = target.value;
+      out.category = String(item.category || '').trim();
+      out.shipping_preset = String(item.shipping_preset || '').trim();
+      out.late_support = item.late_support === true || item.late_support === 'true';
+      normalized.push(out);
+      continue;
+    }
+
+    if (collection === 'decisions') {
+      out.type = ['vote', 'poll'].includes(String(item.type || '').trim()) ? String(item.type).trim() : 'vote';
+      out.title = String(item.title || '').trim();
+      if (!out.title) return { ok: false, error: `Decision "${out.id}" needs a title.` };
+      out.deadline = String(item.deadline || '').trim();
+      out.eligible = String(item.eligible || 'backers').trim();
+      out.status = String(item.status || 'open').trim();
+      const options = Array.isArray(item.options)
+        ? item.options
+        : String(item.optionsText || '').split('\n').map((line) => line.trim()).filter(Boolean);
+      out.options = options.map((option) => {
+        if (option && typeof option === 'object') {
+          return {
+            label: String(option.label || '').trim(),
+            image: String(option.image || '').trim()
+          };
+        }
+        const [optionLabel, image] = String(option || '').split('|').map((part) => part.trim());
+        return image ? { label: optionLabel, image } : optionLabel;
+      }).filter((option) => typeof option === 'string' ? option : option.label);
+      if (!out.options.length) return { ok: false, error: `Decision "${out.id}" needs at least one option.` };
+      normalized.push(out);
+      continue;
+    }
+
+    normalized.push(out);
+  }
+  return { ok: true, value: normalized };
+}
+
+async function validateAdminSettingsChanges(request, env, body = {}, options = {}) {
+  const auth = await requireAdminSession(request, env, 'campaign:read', options);
+  if (!auth.ok) return { ok: false, response: auth.response };
+
+  const changes = Array.isArray(body?.changes) ? body.changes : [];
+  if (changes.length > 80) {
+    return { ok: false, response: privateJsonResponse({ error: 'Too many settings changes.' }, 400, env) };
+  }
+
+  const { campaigns } = await getCampaigns(env);
+  const campaignMap = new Map((campaigns || []).map((campaign) => [String(campaign?.slug || ''), campaign]));
+  const normalized = [];
+  const errors = [];
+  const warnings = [];
+
+  changes.forEach((change, index) => {
+    const path = String(change?.path || '').trim();
+    const campaignSlug = String(change?.campaignSlug || '').trim();
+    const schema = campaignSlug
+      ? ADMIN_CAMPAIGN_SETTING_SCHEMA.get(path)
+      : ADMIN_PLATFORM_SETTING_SCHEMA.get(path);
+
+    if (!schema) {
+      errors.push(`changes[${index}] is not an editable setting.`);
+      return;
+    }
+    if (!campaignSlug && auth.user.role !== 'super_admin') {
+      errors.push(`changes[${index}] requires super admin access.`);
+      return;
+    }
+    if (campaignSlug) {
+      if (!isValidSlug(campaignSlug) || !campaignMap.has(campaignSlug)) {
+        errors.push(`changes[${index}] references an unknown campaign.`);
+        return;
+      }
+      if (auth.user.role !== 'super_admin' && !auth.user.campaignSlugs.includes(campaignSlug)) {
+        errors.push(`changes[${index}] is outside this admin account's campaign scope.`);
+        return;
+      }
+    }
+
+    const normalizedValue = normalizeAdminSettingsValue(change?.value, schema);
+    if (!normalizedValue.ok) {
+      errors.push(`changes[${index}]: ${normalizedValue.error}`);
+      return;
+    }
+    if (campaignSlug && path === 'featured_tier_id') {
+      const campaign = campaignMap.get(campaignSlug) || {};
+      const tierIds = new Set((Array.isArray(campaign?.tiers) ? campaign.tiers : [])
+        .map((tier) => String(tier?.id || '').trim())
+        .filter(Boolean));
+      const nextTierId = String(normalizedValue.value || '').trim();
+      if (nextTierId && !tierIds.has(nextTierId)) {
+        errors.push(`changes[${index}]: Featured tier must be one of this campaign's existing tiers.`);
+        return;
+      }
+    }
+    if (campaignSlug && path === 'slug') {
+      const nextSlug = String(normalizedValue.value || '').trim();
+      const duplicate = (campaigns || []).find((campaign) => (
+        String(campaign?.slug || '') !== campaignSlug &&
+        String(campaign?.slug || '') === nextSlug
+      ));
+      if (duplicate) {
+        errors.push(`changes[${index}]: Slug "${nextSlug}" is already used by another campaign.`);
+        return;
+      }
+      if (nextSlug !== campaignSlug) {
+        warnings.push('Changing a campaign slug does not migrate existing pledge, stats, or inventory KV keys.');
+      }
+    }
+
+    normalized.push({
+      path,
+      campaignSlug,
+      label: schema.label,
+      type: schema.type,
+      value: normalizedValue.value
+    });
+  });
+
+  return {
+    ok: errors.length === 0,
+    auth,
+    changes: normalized,
+    errors,
+    warnings: normalized.length
+      ? Array.from(new Set(['Publishing starts a deploy. Changes may take a few minutes to appear.', ...warnings]))
+      : []
+  };
+}
+
+async function handleAdminSettingsPreview(request, env, body = {}) {
+  const result = await validateAdminSettingsChanges(request, env, body);
+  if (!result.ok && result.response) return result.response;
+  return privateJsonResponse({
+    user: result.auth.user,
+    dryRun: true,
+    valid: result.errors.length === 0,
+    changeCount: result.changes.length,
+    changes: result.changes.map((change) => ({
+      path: change.path,
+      campaignSlug: change.campaignSlug,
+      label: change.label
+    })),
+    errors: result.errors,
+    warnings: result.warnings,
+    writeBudget: adminReadBudget()
+  }, result.errors.length ? 422 : 200, env);
+}
+
+function yamlAdminValue(value, type = 'string') {
+  if (type === 'boolean') return value ? 'true' : 'false';
+  if (type === 'number') return Number(value).toString();
+  return yamlQuoteAdminString(value);
+}
+
+function yamlAdminInlineObject(entry = {}) {
+  return `{ ${Object.entries(entry).map(([key, value]) => `${key}: ${yamlAdminValue(value, typeof value === 'number' ? 'number' : 'string')}`).join(', ')} }`;
+}
+
+function serializeAdminAddOnProductsYaml(products = [], indent = '  ') {
+  if (!Array.isArray(products) || !products.length) return `${indent}products: []`;
+  const lines = [`${indent}products:`];
+  for (const product of products) {
+    lines.push(`${indent}  - id: ${yamlQuoteAdminString(product.id)}`);
+    lines.push(`${indent}    name: ${yamlQuoteAdminString(product.name)}`);
+    lines.push(`${indent}    description: ${yamlQuoteAdminString(product.description || '')}`);
+    lines.push(`${indent}    image_url: ${yamlQuoteAdminString(product.image_url || '')}`);
+    lines.push(`${indent}    price: ${Number(product.price).toFixed(2)}`);
+    lines.push(`${indent}    category: ${yamlQuoteAdminString(product.category || 'physical')}`);
+    if (product.shipping_preset) lines.push(`${indent}    shipping_preset: ${yamlQuoteAdminString(product.shipping_preset)}`);
+    if (product.inventory !== undefined) lines.push(`${indent}    inventory: ${Number(product.inventory)}`);
+    if (product.source_url) lines.push(`${indent}    source_url: ${yamlQuoteAdminString(product.source_url)}`);
+    if (product.variant_option_name) lines.push(`${indent}    variant_option_name: ${yamlQuoteAdminString(product.variant_option_name)}`);
+    if (Array.isArray(product.variants) && product.variants.length) {
+      lines.push(`${indent}    variants:`);
+      for (const variant of product.variants) {
+        const entry = { id: variant.id, label: variant.label };
+        if (variant.inventory !== undefined) entry.inventory = Number(variant.inventory);
+        lines.push(`${indent}      - ${yamlAdminInlineObject(entry)}`);
+      }
+    } else {
+      lines.push(`${indent}    variants: []`);
+    }
+  }
+  return lines.join('\n');
+}
+
+function serializeAdminCampaignAddOnsYaml(key, products = []) {
+  return serializeAdminAddOnProductsYaml(products, '').replace(/^products:/, `${key}:`);
+}
+
+function replaceYamlBlockAtPath(source, path, replacement) {
+  const parts = String(path || '').split('.').filter(Boolean);
+  if (!parts.length) return { ok: false, error: 'Missing settings path.' };
+  const lines = String(source || '').split(/\r?\n/);
+  let start = 0;
+  let end = lines.length;
+  let indent = 0;
+
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const key = parts[index];
+    const pattern = new RegExp(`^ {${indent}}${key}:\\s*(?:#.*)?$`);
+    const sectionStart = lines.findIndex((line, lineIndex) => lineIndex >= start && lineIndex < end && pattern.test(line));
+    if (sectionStart < 0) return { ok: false, error: `Missing settings section: ${parts.slice(0, index + 1).join('.')}` };
+    start = sectionStart + 1;
+    indent += 2;
+    end = lines.findIndex((line, lineIndex) => (
+      lineIndex >= start &&
+      line.trim() &&
+      !line.startsWith(' '.repeat(indent))
+    ));
+    if (end < 0) end = lines.length;
+  }
+
+  const key = parts[parts.length - 1];
+  const keyPattern = new RegExp(`^ {${indent}}${key}:`);
+  const lineIndex = lines.findIndex((line, index) => index >= start && index < end && keyPattern.test(line));
+  const indentedReplacement = String(replacement || '')
+    .split('\n')
+    .map((line) => line ? `${' '.repeat(indent)}${line}` : line)
+    .join('\n');
+  if (lineIndex < 0) {
+    lines.splice(end, 0, indentedReplacement);
+    return { ok: true, content: lines.join('\n') };
+  }
+  let blockEnd = lineIndex + 1;
+  while (blockEnd < lines.length && (!lines[blockEnd].trim() || lines[blockEnd].startsWith(' '.repeat(indent + 2)))) {
+    blockEnd += 1;
+  }
+  lines.splice(lineIndex, blockEnd - lineIndex, indentedReplacement);
+  return { ok: true, content: lines.join('\n') };
+}
+
+function replaceYamlScalarAtPath(source, path, value, type = 'string') {
+  const parts = String(path || '').split('.').filter(Boolean);
+  if (!parts.length) return source;
+  const lines = String(source || '').split(/\r?\n/);
+  let start = 0;
+  let end = lines.length;
+  let indent = 0;
+
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const key = parts[index];
+    const pattern = new RegExp(`^ {${indent}}${key}:\\s*(?:#.*)?$`);
+    const sectionStart = lines.findIndex((line, lineIndex) => lineIndex >= start && lineIndex < end && pattern.test(line));
+    if (sectionStart < 0) return { ok: false, error: `Missing settings section: ${parts.slice(0, index + 1).join('.')}` };
+    start = sectionStart + 1;
+    indent += 2;
+    end = lines.findIndex((line, lineIndex) => (
+      lineIndex >= start &&
+      line.trim() &&
+      !line.startsWith(' '.repeat(indent))
+    ));
+    if (end < 0) end = lines.length;
+  }
+
+  const key = parts[parts.length - 1];
+  const keyPattern = new RegExp(`^ {${indent}}${key}:`);
+  const lineIndex = lines.findIndex((line, index) => index >= start && index < end && keyPattern.test(line));
+  const replacement = `${' '.repeat(indent)}${key}: ${yamlAdminValue(value, type)}`;
+  if (lineIndex >= 0) {
+    lines[lineIndex] = replacement;
+  } else {
+    lines.splice(end, 0, replacement);
+  }
+  return { ok: true, content: lines.join('\n') };
+}
+
+function yamlAdminListLine(key, values = []) {
+  if (!Array.isArray(values) || !values.length) return `${key}: []`;
+  return `${key}:\n${values.map((value) => `  - ${yamlQuoteAdminString(value)}`).join('\n')}`;
+}
+
+function yamlAdminMaybeLine(lines, key, value, indent = '    ') {
+  if (value === '' || value === undefined || value === null) return;
+  lines.push(`${indent}${key}: ${yamlAdminValue(value, typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : 'string')}`);
+}
+
+function yamlAdminBlockLine(lines, key, value, indent = '    ') {
+  const text = String(value || '').trim();
+  if (!text) return;
+  lines.push(`${indent}${key}: |`);
+  text.split(/\r?\n/).forEach((line) => lines.push(`${indent}  ${line}`));
+}
+
+function serializeAdminCampaignCollectionYaml(key, items = []) {
+  if (!Array.isArray(items) || !items.length) return `${key}: []`;
+  const lines = [`${key}:`];
+  for (const item of items) {
+    if (key === 'diary') {
+      lines.push(`  - title: ${yamlQuoteAdminString(item.title)}`);
+      yamlAdminMaybeLine(lines, 'date', item.date);
+      yamlAdminMaybeLine(lines, 'phase', item.phase);
+      if (Array.isArray(item.content) && item.content.length) {
+        lines.push('    content:');
+        item.content.forEach((block) => {
+          serializeAdminContentBlockToYaml(block).split('\n').forEach((line) => {
+            lines.push(`    ${line}`);
+          });
+        });
+      } else {
+        lines.push('    content:');
+        lines.push('      - type: text');
+        yamlAdminBlockLine(lines, 'body', item.body, '        ');
+      }
+      continue;
+    }
+    if (key === 'stretch_goals') {
+      lines.push(`  - threshold: ${Number(item.threshold || 0)}`);
+      yamlAdminMaybeLine(lines, 'title', item.title);
+      yamlAdminMaybeLine(lines, 'description', item.description);
+      yamlAdminMaybeLine(lines, 'status', item.status);
+      continue;
+    }
+    if (key === 'ongoing_items') {
+      lines.push(`  - label: ${yamlQuoteAdminString(item.label || '')}`);
+      yamlAdminMaybeLine(lines, 'remaining', item.remaining);
+      continue;
+    }
+    lines.push(`  - id: ${yamlQuoteAdminString(item.id)}`);
+    if (key === 'tiers') {
+      yamlAdminMaybeLine(lines, 'name', item.name);
+      yamlAdminMaybeLine(lines, 'price', item.price);
+      yamlAdminMaybeLine(lines, 'image', item.image);
+      yamlAdminMaybeLine(lines, 'description', item.description);
+      yamlAdminMaybeLine(lines, 'limit_total', item.limit_total);
+      yamlAdminMaybeLine(lines, 'remaining', item.remaining);
+      yamlAdminMaybeLine(lines, 'stackable', item.stackable);
+      yamlAdminMaybeLine(lines, 'category', item.category);
+      yamlAdminMaybeLine(lines, 'shipping_preset', item.shipping_preset);
+      yamlAdminMaybeLine(lines, 'late_support', item.late_support);
+      yamlAdminMaybeLine(lines, 'requires_threshold', item.requires_threshold);
+      continue;
+    }
+    if (key === 'support_items') {
+      yamlAdminMaybeLine(lines, 'label', item.label);
+      yamlAdminMaybeLine(lines, 'need', item.need);
+      yamlAdminMaybeLine(lines, 'target', item.target);
+      yamlAdminMaybeLine(lines, 'category', item.category);
+      yamlAdminMaybeLine(lines, 'shipping_preset', item.shipping_preset);
+      yamlAdminMaybeLine(lines, 'late_support', item.late_support);
+      continue;
+    }
+    if (key === 'decisions') {
+      yamlAdminMaybeLine(lines, 'type', item.type);
+      yamlAdminMaybeLine(lines, 'title', item.title);
+      yamlAdminMaybeLine(lines, 'deadline', item.deadline);
+      lines.push('    options:');
+      for (const option of item.options || []) {
+        if (option && typeof option === 'object') {
+          lines.push(`      - label: ${yamlQuoteAdminString(option.label)}`);
+          yamlAdminMaybeLine(lines, 'image', option.image, '        ');
+        } else {
+          lines.push(`      - ${yamlQuoteAdminString(option)}`);
+        }
+      }
+      yamlAdminMaybeLine(lines, 'eligible', item.eligible);
+      yamlAdminMaybeLine(lines, 'status', item.status);
+    }
+  }
+  return lines.join('\n');
+}
+
+function applyAdminCampaignSettingsPatchToMarkdown(source, changes = []) {
+  const match = String(source || '').match(/^---\r?\n([\s\S]*?)\r?\n---(\r?\n[\s\S]*)?$/);
+  if (!match) {
+    return { ok: false, error: 'Campaign Markdown must contain YAML front matter.' };
+  }
+
+  let frontMatter = match[1];
+  changes.forEach((change) => {
+    const replacement = change.type === 'campaign_collection'
+      ? serializeAdminCampaignCollectionYaml(change.path, change.value)
+      : change.type === 'add_on_products'
+        ? serializeAdminCampaignAddOnsYaml(change.path, change.value)
+      : change.type === 'list'
+        ? yamlAdminListLine(change.path, change.value)
+        : `${change.path}: ${yamlAdminValue(change.value, change.type)}`;
+    frontMatter = replaceAdminFrontMatterBlock(frontMatter, change.path, replacement);
+  });
+
+  return {
+    ok: true,
+    content: `---\n${frontMatter.replace(/\s*$/, '')}\n---${match[2] || '\n'}`
+  };
+}
+
+function normalizeAdminMediaUpload(body = {}, options = {}) {
+  const label = options.label || 'Media upload';
+  const filename = String(body.filename || options.defaultFilename || 'upload').trim().toLowerCase();
+  const contentType = String(body.contentType || '').trim().toLowerCase();
+  const content = String(body.content || body.dataBase64 || '').trim();
+  const allowedTypes = options.allowedTypes || new Map();
+  const extension = allowedTypes.get(contentType);
+  if (!extension) {
+    return { ok: false, error: options.typeError || `${label} uses an unsupported file type.` };
+  }
+  const base64 = content.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) {
+    return { ok: false, error: `${label} content must be base64 encoded.` };
+  }
+  const estimatedBytes = Math.floor((base64.length * 3) / 4);
+  if (estimatedBytes <= 0) {
+    return { ok: false, error: `${label} is empty.` };
+  }
+  if (estimatedBytes > options.maxFileBytes) {
+    return { ok: false, error: options.sizeError || `${label} is too large.` };
+  }
+  const safeBase = filename
+    .replace(/\.[a-z0-9]+$/, '')
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || options.defaultFilename || 'upload';
+  const directory = String(options.directory || 'assets/images/admin').replace(/\/+$/, '');
+  const filePath = `${directory}/${safeBase}-${Date.now()}.${extension}`;
+  return {
+    ok: true,
+    base64,
+    filePath,
+    publicPath: `/${filePath}`,
+    estimatedBytes,
+    contentType
+  };
+}
+
+async function handleAdminMediaUpload(request, env, options = {}) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: options.maxBodyBytes || MAX_ADMIN_LOGO_UPLOAD_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const auth = await requireAdminSession(request, env, 'settings:publish', { requireCsrf: true });
+  if (!auth.ok) return auth.response;
+
+  const normalized = normalizeAdminMediaUpload(parsedBody.body || {}, options);
+  if (!normalized.ok) {
+    return privateJsonResponse({ error: normalized.error }, 400, env);
+  }
+
+  const uploaded = await putGitHubBase64File(
+    env,
+    normalized.filePath,
+    normalized.base64,
+    `Upload ${options.commitLabel || 'admin media'} ${normalized.filePath}`
+  );
+  if (!uploaded.ok) {
+    return privateJsonResponse({
+      error: uploaded.error || 'Unable to upload media',
+      code: uploaded.code || 'github_upload_failed'
+    }, uploaded.status || 502, env);
+  }
+
+  return privateJsonResponse({
+    success: true,
+    path: normalized.publicPath,
+    githubPath: normalized.filePath,
+    commitSha: uploaded.commitSha,
+    commitUrl: uploaded.commitUrl,
+    contentType: normalized.contentType,
+    bytes: normalized.estimatedBytes,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
+  }, 200, env);
+}
+
+function handleAdminLogoUpload(request, env) {
+  return handleAdminMediaUpload(request, env, {
+    label: 'Logo upload',
+    defaultFilename: 'logo',
+    directory: 'assets/images/admin',
+    maxBodyBytes: MAX_ADMIN_LOGO_UPLOAD_BODY_BYTES,
+    maxFileBytes: 512 * 1024,
+    allowedTypes: new Map([
+      ['image/png', 'png'],
+      ['image/jpeg', 'jpg'],
+      ['image/webp', 'webp']
+    ]),
+    typeError: 'Logo upload must be a PNG, JPEG, or WebP image.',
+    sizeError: 'Logo upload must be 512 KB or smaller.',
+    commitLabel: 'admin logo'
+  });
+}
+
+function handleAdminVideoUpload(request, env) {
+  return handleAdminMediaUpload(request, env, {
+    label: 'Video upload',
+    defaultFilename: 'hero-video',
+    directory: 'assets/videos/admin',
+    maxBodyBytes: MAX_ADMIN_VIDEO_UPLOAD_BODY_BYTES,
+    maxFileBytes: 100 * 1024 * 1024,
+    allowedTypes: new Map([
+      ['video/mp4', 'mp4'],
+      ['video/webm', 'webm'],
+      ['video/quicktime', 'mov']
+    ]),
+    typeError: 'Video upload must be an MP4, WebM, or MOV file.',
+    sizeError: 'Video upload must be 100 MB or smaller.',
+    commitLabel: 'admin video'
+  });
+}
+
+async function handleAdminSettingsPublish(request, env) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const result = await validateAdminSettingsChanges(request, env, parsedBody.body || {}, { requireCsrf: true });
+  if (!result.ok && result.response) return result.response;
+  if (result.errors.length) {
+    return privateJsonResponse({
+      valid: false,
+      errors: result.errors,
+      warnings: result.warnings,
+      writeBudget: adminReadBudget()
+    }, 422, env);
+  }
+  if (!result.changes.length) {
+    return privateJsonResponse({
+      success: true,
+      published: false,
+      message: 'No settings changes to publish.',
+      rebuild: { triggered: false, reason: 'No changes' },
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
+    }, 200, env);
+  }
+
+  const commits = [];
+  const platformChanges = result.changes.filter((change) => !change.campaignSlug);
+  if (platformChanges.length) {
+    const githubFile = await getGitHubTextFile(env, '_config.yml');
+    if (!githubFile.ok) {
+      return privateJsonResponse({ error: githubFile.error, code: githubFile.code || 'github_error' }, githubFile.status || 502, env);
+    }
+    let content = githubFile.content;
+    for (const change of platformChanges) {
+      const applied = change.type === 'add_on_products'
+        ? replaceYamlBlockAtPath(content, change.path, serializeAdminAddOnProductsYaml(change.value, ''))
+        : change.type === 'list'
+          ? replaceYamlBlockAtPath(content, change.path, yamlAdminListLine(change.path.split('.').pop(), change.value))
+        : replaceYamlScalarAtPath(content, change.path, change.value, change.type);
+      if (!applied.ok) return privateJsonResponse({ error: applied.error }, 422, env);
+      content = applied.content;
+    }
+    const saved = await putGitHubTextFile(env, '_config.yml', content, `Update admin platform settings (${platformChanges.length})`, githubFile.sha);
+    if (!saved.ok) return privateJsonResponse({ error: saved.error, code: saved.code || 'github_error' }, saved.status || 502, env);
+    commits.push(saved);
+  }
+
+  const campaignGroups = new Map();
+  result.changes.filter((change) => change.campaignSlug).forEach((change) => {
+    const group = campaignGroups.get(change.campaignSlug) || [];
+    group.push(change);
+    campaignGroups.set(change.campaignSlug, group);
+  });
+  for (const [campaignSlug, changes] of campaignGroups.entries()) {
+    const filePath = getAdminCampaignMarkdownPath(campaignSlug);
+    const githubFile = await getGitHubTextFile(env, filePath);
+    if (!githubFile.ok) {
+      return privateJsonResponse({ error: githubFile.error, code: githubFile.code || 'github_error' }, githubFile.status || 502, env);
+    }
+    const applied = applyAdminCampaignSettingsPatchToMarkdown(githubFile.content, changes);
+    if (!applied.ok) return privateJsonResponse({ error: applied.error }, 422, env);
+    const saved = await putGitHubTextFile(env, filePath, applied.content, `Update ${campaignSlug} admin settings (${changes.length})`, githubFile.sha);
+    if (!saved.ok) return privateJsonResponse({ error: saved.error, code: saved.code || 'github_error' }, saved.status || 502, env);
+    commits.push(saved);
+  }
+
+  const rebuild = await triggerSiteRebuild(env, 'admin-settings-publish');
+  return privateJsonResponse({
+    success: true,
+    published: true,
+    changeCount: result.changes.length,
+    commits,
+    rebuild,
+    deployNotice: 'Publishing starts a deploy. Changes may take a few minutes to appear.',
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
+  }, 200, env);
+}
+
+function adminWriteBudget({ readOnly = true, kvWritesExpected = 0, kvListExpected } = {}) {
+  const budget = {
+    readOnly: Boolean(readOnly),
+    kvWritesExpected: Number(kvWritesExpected || 0)
+  };
+  if (kvListExpected !== undefined) {
+    budget.kvListExpected = Number(kvListExpected || 0);
+  }
+  return budget;
+}
+
+function adminReadBudget({ kvListExpected = 0 } = {}) {
+  return adminWriteBudget({ readOnly: true, kvWritesExpected: 0, kvListExpected });
+}
+
+function adminIndexRequiredResponse(env, {
+  error = 'Campaign pledge index is required for this admin operation',
+  campaignSlug = '',
+  readOnly = true,
+  kvListExpected = 0,
+  extra = {}
+} = {}) {
+  return privateJsonResponse({
+    error,
+    code: 'campaign_index_required',
+    campaignSlug,
+    writeBudget: adminWriteBudget({ readOnly, kvWritesExpected: 0, kvListExpected }),
+    ...extra
+  }, 409, env);
+}
+
+function clampAdminPageLimit(value) {
+  const parsed = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 25;
+  return Math.min(parsed, 100);
+}
+
+function getPledgeDisplayName(pledge = {}) {
+  return String(
+    pledge?.shippingAddress?.name ||
+    pledge?.billingAddress?.name ||
+    ''
+  ).trim();
+}
+
+function getPledgeStatusLabel(pledge = {}) {
+  const rawStatus = String(pledge?.pledgeStatus || 'active').trim().toLowerCase();
+  if (pledge?.charged === true) return 'charged';
+  return rawStatus || 'active';
+}
+
+function hasPhysicalReward(pledge = {}) {
+  if (pledge?.shippingAddress) return true;
+  const addOns = Array.isArray(pledge?.bundleAddOns) ? pledge.bundleAddOns : [];
+  return addOns.some((addOn) => String(addOn?.category || '').trim().toLowerCase() === 'physical');
+}
+
+function hasPlatformAddOns(pledge = {}) {
+  const addOns = Array.isArray(pledge?.bundleAddOns) ? pledge.bundleAddOns : [];
+  return addOns.some((addOn) => !isCampaignScopedBundleAddOn(addOn));
+}
+
+function pledgeMatchesAdminSupporterFilters(pledge = {}, filters = {}) {
+  const status = getPledgeStatusLabel(pledge);
+  if (filters.status && filters.status !== 'all' && status !== filters.status) {
+    return false;
+  }
+
+  if (filters.fulfillment === 'physical' && !hasPhysicalReward(pledge)) {
+    return false;
+  }
+  if (filters.fulfillment === 'digital' && hasPhysicalReward(pledge)) {
+    return false;
+  }
+  if (filters.fulfillment === 'platform_addons' && !hasPlatformAddOns(pledge)) {
+    return false;
+  }
+
+  if (filters.query) {
+    const haystack = [
+      pledge?.email,
+      pledge?.orderId,
+      getPledgeDisplayName(pledge)
+    ].join(' ').toLowerCase();
+    if (!haystack.includes(filters.query)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function publicAdminSupporterRecord(pledge = {}) {
+  return {
+    orderId: String(pledge?.orderId || ''),
+    campaignSlug: String(pledge?.campaignSlug || ''),
+    email: String(pledge?.email || ''),
+    displayName: getPledgeDisplayName(pledge),
+    pledgeStatus: getPledgeStatusLabel(pledge),
+    amount: Number(pledge?.amount || 0),
+    subtotal: Number(pledge?.subtotal || 0),
+    tax: Number(pledge?.tax || 0),
+    shipping: Number(pledge?.shipping || 0),
+    tipAmount: Number(pledge?.tipAmount || 0),
+    preferredLang: normalizePreferredLang(pledge?.preferredLang, DEFAULT_I18N_LANG),
+    hasPhysicalReward: hasPhysicalReward(pledge),
+    hasPlatformAddOns: hasPlatformAddOns(pledge),
+    createdAt: pledge?.createdAt || null,
+    updatedAt: pledge?.updatedAt || null,
+    chargedAt: pledge?.chargedAt || null
+  };
+}
+
+function emptyAdminAnalyticsTotals() {
+  return {
+    campaignCount: 0,
+    indexedPledgeCount: 0,
+    pledgeCount: 0,
+    uniqueSupporters: 0,
+    activePledgeCount: 0,
+    chargedPledgeCount: 0,
+    cancelledPledgeCount: 0,
+    paymentFailedPledgeCount: 0,
+    pledgedAmount: 0,
+    chargedAmount: 0,
+    paymentFailedAmount: 0,
+    campaignRevenue: 0,
+    campaignAddOnRevenue: 0,
+    platformAddOnRevenue: 0,
+    platformTipRevenue: 0,
+    taxTotal: 0,
+    shippingTotal: 0,
+    estimatedStripeFeeAmount: 0,
+    estimatedStripeFeePledgeCount: 0,
+    physicalPledgeCount: 0,
+    physicalPledgeAmount: 0,
+    digitalPledgeCount: 0,
+    digitalPledgeAmount: 0,
+    platformAddOnPledgeCount: 0
+  };
+}
+
+const ADMIN_STRIPE_FEE_ESTIMATE_BPS = 290;
+const ADMIN_STRIPE_FEE_ESTIMATE_FIXED_CENTS = 30;
+
+function estimateAdminStripeFeeCents(amountCents) {
+  const amount = Number(amountCents || 0) || 0;
+  if (amount <= 0) return 0;
+  return Math.round((amount * ADMIN_STRIPE_FEE_ESTIMATE_BPS) / 10000) + ADMIN_STRIPE_FEE_ESTIMATE_FIXED_CENTS;
+}
+
+function incrementAdminAnalyticsBreakdown(map, key, amount = 0) {
+  const normalizedKey = String(key || '').trim() || 'unknown';
+  const current = map.get(normalizedKey) || { key: normalizedKey, count: 0, amount: 0 };
+  current.count += 1;
+  current.amount += Number(amount || 0);
+  map.set(normalizedKey, current);
+}
+
+function mapAdminAnalyticsBreakdown(map) {
+  return Array.from(map.values()).sort((a, b) => (
+    b.count - a.count ||
+    b.amount - a.amount ||
+    a.key.localeCompare(b.key)
+  ));
+}
+
+function getAdminReferralKey(pledge = {}) {
+  return String(
+    pledge?.referralCode ||
+    pledge?.referral ||
+    pledge?.ref ||
+    pledge?.attribution?.ref ||
+    pledge?.marketing?.ref ||
+    ''
+  ).trim() || 'direct';
+}
+
+function getAdminUtmSourceKey(pledge = {}) {
+  return String(
+    pledge?.utmSource ||
+    pledge?.utm?.source ||
+    pledge?.attribution?.utmSource ||
+    pledge?.marketing?.utmSource ||
+    ''
+  ).trim() || 'none';
+}
+
+function applyPledgeToAdminAnalytics(analytics, campaign, pledge = {}, supporterEmails) {
+  const campaignSlug = String(campaign?.slug || pledge?.campaignSlug || '');
+  const status = getPledgeStatusLabel(pledge);
+  const subtotal = Number(pledge?.subtotal || 0) || 0;
+  const amount = Number(pledge?.amount || 0) || 0;
+  const bundleAddOns = Array.isArray(pledge?.bundleAddOns) ? pledge.bundleAddOns : [];
+  const platformAddOnRevenue = getPlatformBundleAddOnSubtotal(bundleAddOns);
+  const campaignAddOnRevenue = getCampaignBundleAddOnSubtotal(bundleAddOns, campaignSlug);
+  const campaignRevenue = Math.max(0, subtotal - platformAddOnRevenue);
+  const isCancelled = status === 'cancelled';
+  const countsTowardPledged = !isCancelled;
+  const countsTowardStripeFeeEstimate = status === 'active' || status === 'charged';
+
+  analytics.totals.pledgeCount += 1;
+  if (countsTowardPledged) {
+    analytics.totals.activePledgeCount += status === 'active' || status === 'charged' ? 1 : 0;
+    analytics.totals.pledgedAmount += amount;
+    analytics.totals.campaignRevenue += campaignRevenue;
+    analytics.totals.campaignAddOnRevenue += campaignAddOnRevenue;
+    analytics.totals.platformAddOnRevenue += platformAddOnRevenue;
+    analytics.totals.platformTipRevenue += Number(pledge?.tipAmount || 0) || 0;
+    analytics.totals.taxTotal += Number(pledge?.tax || 0) || 0;
+    analytics.totals.shippingTotal += Number(pledge?.shipping || 0) || 0;
+  } else {
+    analytics.totals.cancelledPledgeCount += 1;
+  }
+
+  if (countsTowardStripeFeeEstimate) {
+    analytics.totals.estimatedStripeFeePledgeCount += 1;
+    analytics.totals.estimatedStripeFeeAmount += estimateAdminStripeFeeCents(amount);
+  }
+
+  if (status === 'charged') {
+    analytics.totals.chargedPledgeCount += 1;
+    analytics.totals.chargedAmount += amount;
+  }
+  if (status === 'payment_failed') {
+    analytics.totals.paymentFailedPledgeCount += 1;
+    analytics.totals.paymentFailedAmount += amount;
+  }
+
+  if (hasPhysicalReward(pledge)) {
+    analytics.totals.physicalPledgeCount += 1;
+    if (countsTowardPledged) analytics.totals.physicalPledgeAmount += amount;
+  } else {
+    analytics.totals.digitalPledgeCount += 1;
+    if (countsTowardPledged) analytics.totals.digitalPledgeAmount += amount;
+  }
+  if (hasPlatformAddOns(pledge)) {
+    analytics.totals.platformAddOnPledgeCount += 1;
+  }
+
+  const normalizedEmail = String(pledge?.email || '').trim().toLowerCase();
+  if (normalizedEmail) {
+    supporterEmails.add(normalizedEmail);
+  }
+
+  incrementAdminAnalyticsBreakdown(analytics.statusBreakdown, status, amount);
+  incrementAdminAnalyticsBreakdown(
+    analytics.languageBreakdown,
+    normalizePreferredLang(pledge?.preferredLang, DEFAULT_I18N_LANG),
+    amount
+  );
+  incrementAdminAnalyticsBreakdown(analytics.referralBreakdown, getAdminReferralKey(pledge), amount);
+  incrementAdminAnalyticsBreakdown(analytics.utmSourceBreakdown, getAdminUtmSourceKey(pledge), amount);
+}
+
+async function buildAdminCampaignAnalytics(env, campaign) {
+  const campaignSlug = String(campaign?.slug || '').trim();
+  const orderIds = await getCampaignOrderIds(env, campaignSlug);
+  const normalizedOrderIds = Array.isArray(orderIds) ? orderIds : [];
+
+  const analytics = {
+    slug: campaignSlug,
+    title: campaign?.title || campaignSlug,
+    state: campaign?.state || 'unknown',
+    effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown',
+    goalAmount: Number(campaign?.goal_amount || 0),
+    indexedPledgeCount: normalizedOrderIds.length,
+    totals: emptyAdminAnalyticsTotals(),
+    statusBreakdown: new Map(),
+    languageBreakdown: new Map(),
+    referralBreakdown: new Map(),
+    utmSourceBreakdown: new Map(),
+    pledgeIndexPresent: Array.isArray(orderIds)
+  };
+  analytics.totals.campaignCount = 1;
+  analytics.totals.indexedPledgeCount = normalizedOrderIds.length;
+
+  const supporterEmails = new Set();
+  for (const orderId of normalizedOrderIds) {
+    const normalizedOrderId = String(orderId || '').trim();
+    if (!normalizedOrderId) continue;
+    const pledge = await env.PLEDGES.get(`pledge:${normalizedOrderId}`, { type: 'json' });
+    if (!pledge || String(pledge?.campaignSlug || '') !== campaignSlug) continue;
+    applyPledgeToAdminAnalytics(analytics, campaign, pledge, supporterEmails);
+  }
+  analytics.totals.uniqueSupporters = supporterEmails.size;
+
+  return {
+    ok: true,
+    supporterEmails: Array.from(supporterEmails),
+    analytics: {
+      slug: analytics.slug,
+      title: analytics.title,
+      state: analytics.state,
+      effectiveState: analytics.effectiveState,
+      goalAmount: analytics.goalAmount,
+      indexedPledgeCount: analytics.indexedPledgeCount,
+      pledgeIndexPresent: analytics.pledgeIndexPresent,
+      totals: analytics.totals,
+      statusBreakdown: mapAdminAnalyticsBreakdown(analytics.statusBreakdown),
+      languageBreakdown: mapAdminAnalyticsBreakdown(analytics.languageBreakdown),
+      referralBreakdown: mapAdminAnalyticsBreakdown(analytics.referralBreakdown),
+      utmSourceBreakdown: mapAdminAnalyticsBreakdown(analytics.utmSourceBreakdown)
+    }
+  };
+}
+
+function mergeAdminAnalyticsTotals(target, source) {
+  for (const key of Object.keys(target)) {
+    if (key === 'campaignCount' || key === 'uniqueSupporters') continue;
+    target[key] += Number(source?.[key] || 0);
+  }
+}
+
+function mergeAdminAnalyticsBreakdowns(target, rows) {
+  for (const row of rows || []) {
+    const current = target.get(row.key) || { key: row.key, count: 0, amount: 0 };
+    current.count += Number(row.count || 0);
+    current.amount += Number(row.amount || 0);
+    target.set(row.key, current);
+  }
+}
+
+async function handleAdminAnalytics(request, env) {
+  const url = new URL(request.url);
+  const requestedCampaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
+  const allCampaignsRequested = !requestedCampaignSlug || requestedCampaignSlug.toLowerCase() === 'all';
+  const auth = await requireAdminSession(request, env, 'campaign:read', {
+    campaignSlug: allCampaignsRequested ? '' : requestedCampaignSlug
+  });
+  if (!auth.ok) return auth.response;
+
+  const { campaigns } = await getCampaigns(env);
+  const allowedCampaigns = (campaigns || []).filter((campaign) => (
+    auth.user.role === 'super_admin' ||
+    auth.user.campaignSlugs.includes(String(campaign?.slug || ''))
+  ));
+  const selectedCampaigns = allCampaignsRequested
+    ? allowedCampaigns
+    : requestedCampaignSlug
+    ? allowedCampaigns.filter((campaign) => String(campaign?.slug || '') === requestedCampaignSlug)
+    : allowedCampaigns;
+
+  if (!allCampaignsRequested && selectedCampaigns.length === 0) {
+    return privateJsonResponse({ error: 'Campaign not found' }, 404, env);
+  }
+
+  const campaignAnalytics = [];
+  const supporterEmails = new Set();
+  for (const campaign of selectedCampaigns) {
+    const built = await buildAdminCampaignAnalytics(env, campaign);
+    for (const email of built.supporterEmails || []) {
+      supporterEmails.add(email);
+    }
+    campaignAnalytics.push(built.analytics);
+  }
+  const missingCampaigns = campaignAnalytics
+    .filter((campaign) => campaign.pledgeIndexPresent === false)
+    .map((campaign) => ({ slug: campaign.slug, title: campaign.title }));
+
+  const totals = emptyAdminAnalyticsTotals();
+  totals.campaignCount = campaignAnalytics.length;
+  totals.uniqueSupporters = supporterEmails.size;
+  const statusBreakdown = new Map();
+  const languageBreakdown = new Map();
+  const referralBreakdown = new Map();
+  const utmSourceBreakdown = new Map();
+  for (const campaign of campaignAnalytics) {
+    mergeAdminAnalyticsTotals(totals, campaign.totals);
+    mergeAdminAnalyticsBreakdowns(statusBreakdown, campaign.statusBreakdown);
+    mergeAdminAnalyticsBreakdowns(languageBreakdown, campaign.languageBreakdown);
+    mergeAdminAnalyticsBreakdowns(referralBreakdown, campaign.referralBreakdown);
+    mergeAdminAnalyticsBreakdowns(utmSourceBreakdown, campaign.utmSourceBreakdown);
+  }
+
+  return privateJsonResponse({
+    user: auth.user,
+    scope: allCampaignsRequested ? 'portfolio' : 'campaign',
+    campaignSlug: allCampaignsRequested ? null : requestedCampaignSlug,
+    totals,
+    campaigns: campaignAnalytics,
+    missingCampaigns,
+    statusBreakdown: mapAdminAnalyticsBreakdown(statusBreakdown),
+    languageBreakdown: mapAdminAnalyticsBreakdown(languageBreakdown),
+    referralBreakdown: mapAdminAnalyticsBreakdown(referralBreakdown),
+    utmSourceBreakdown: mapAdminAnalyticsBreakdown(utmSourceBreakdown),
+    writeBudget: adminReadBudget(),
+    generatedAt: new Date().toISOString()
+  }, 200, env);
+}
+
+const ADMIN_CONTENT_ALLOWED_BLOCK_TYPES = new Set([
+  'text',
+  'video',
+  'image',
+  'gallery',
+  'audio',
+  'embed',
+  'divider',
+  'quote'
+]);
+const ADMIN_CONTENT_ALLOWED_EMBED_PROVIDERS = new Set(['spotify', 'youtube', 'vimeo']);
+const ADMIN_CONTENT_ALLOWED_INLINE_TAGS = new Set(['b', 'br', 'em', 'i', 'strong', 'u']);
+const ADMIN_CONTENT_ALLOWED_ALIGNMENTS = new Set(['left', 'center', 'right', 'justify']);
+const ADMIN_CONTENT_MAX_TEXT_LENGTH = 8000;
+const ADMIN_CONTENT_MAX_BLOCKS = 40;
+const ADMIN_CONTENT_MAX_GALLERY_IMAGES = 12;
+
+function escapeAdminPreviewHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAdminPreviewAttribute(value) {
+  return escapeAdminPreviewHtml(value).replace(/`/g, '&#96;');
+}
+
+function sanitizeAdminRichText(value, errors, fieldName) {
+  const text = String(value ?? '');
+  if (text.length > ADMIN_CONTENT_MAX_TEXT_LENGTH) {
+    errors.push(`${fieldName} is too long.`);
+  }
+  if (/\bstyle\s*=\s*["']/i.test(text)) {
+    errors.push(`${fieldName} includes inline style attributes, which are not allowed.`);
+  }
+  if (/<script\b/i.test(text)) {
+    errors.push(`${fieldName} includes raw <script> HTML, which is not allowed.`);
+  }
+  const inlineEvents = text.match(/\son[a-z]+\s*=\s*["']/ig) || [];
+  for (const match of inlineEvents) {
+    errors.push(`${fieldName} includes an inline event handler (${match.trim()}).`);
+  }
+  if (/<iframe\b/i.test(text)) {
+    errors.push(`${fieldName} includes raw <iframe> HTML, which is not allowed.`);
+  }
+
+  return text.replace(/<\s*\/?\s*([a-z0-9]+)(?:\s[^>]*)?>/ig, (match, tagName) => {
+    const tag = String(tagName || '').toLowerCase();
+    if (ADMIN_CONTENT_ALLOWED_INLINE_TAGS.has(tag)) {
+      const closing = /^<\s*\//.test(match) ? '/' : '';
+      return `__POOL_INLINE_${closing}${tag}__`;
+    }
+    errors.push(`${fieldName} includes raw <${tag}> HTML; use Markdown or approved content blocks instead.`);
+    return '';
+  });
+}
+
+function restoreAdminPreviewInlineTags(value) {
+  return String(value || '')
+    .replace(/__POOL_INLINE_br__/g, '<br>')
+    .replace(/__POOL_INLINE_em__/g, '<em>')
+    .replace(/__POOL_INLINE_\/em__/g, '</em>')
+    .replace(/__POOL_INLINE_strong__/g, '<strong>')
+    .replace(/__POOL_INLINE_\/strong__/g, '</strong>')
+    .replace(/__POOL_INLINE_i__/g, '<i>')
+    .replace(/__POOL_INLINE_\/i__/g, '</i>')
+    .replace(/__POOL_INLINE_b__/g, '<b>')
+    .replace(/__POOL_INLINE_\/b__/g, '</b>')
+    .replace(/__POOL_INLINE_u__/g, '<u>')
+    .replace(/__POOL_INLINE_\/u__/g, '</u>');
+}
+
+function isAdminPreviewAllowedLink(href) {
+  const normalized = String(href || '').trim();
+  if (!normalized) return false;
+  if (normalized.startsWith('#') || normalized.startsWith('/') || normalized.startsWith('?') || normalized.startsWith('./') || normalized.startsWith('../')) {
+    return true;
+  }
+  try {
+    const parsed = new URL(normalized);
+    return ['http:', 'https:', 'mailto:'].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function renderAdminPreviewInlineMarkdown(value, errors, fieldName) {
+  let html = escapeAdminPreviewHtml(sanitizeAdminRichText(value, errors, fieldName));
+  html = restoreAdminPreviewInlineTags(html);
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  html = html.replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) => {
+    const safeLabel = String(label || '');
+    const safeHref = String(href || '').trim();
+    if (!isAdminPreviewAllowedLink(safeHref)) {
+      errors.push(`${fieldName} includes an unsafe link URL.`);
+      return safeLabel;
+    }
+    let attrs = `href="${escapeAdminPreviewAttribute(safeHref)}"`;
+    if (/^https?:\/\//i.test(safeHref)) {
+      attrs += ' target="_blank" rel="noopener noreferrer"';
+    }
+    return `<a ${attrs}>${safeLabel}</a>`;
+  });
+  return html;
+}
+
+function renderAdminPreviewTextBlock(body, errors, fieldName) {
+  const lines = String(body || '').split(/\r?\n/);
+  const chunks = [];
+  let paragraph = [];
+  let listItems = [];
+  let listTag = 'ul';
+  function flushParagraph() {
+    if (!paragraph.length) return;
+    chunks.push(`<p>${renderAdminPreviewInlineMarkdown(paragraph.join(' '), errors, fieldName)}</p>`);
+    paragraph = [];
+  }
+  function flushList() {
+    if (!listItems.length) return;
+    const items = listItems.map((item) => `<li>${renderAdminPreviewInlineMarkdown(item, errors, fieldName)}</li>`).join('');
+    chunks.push(`<${listTag}>${items}</${listTag}>`);
+    listItems = [];
+    listTag = 'ul';
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+    const heading = trimmed.match(/^(#{2,4})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      const level = Math.min(4, Math.max(2, heading[1].length));
+      chunks.push(`<h${level}>${renderAdminPreviewInlineMarkdown(heading[2], errors, fieldName)}</h${level}>`);
+      continue;
+    }
+    const unorderedListItem = trimmed.match(/^[-*]\s+(.+)$/);
+    if (unorderedListItem) {
+      flushParagraph();
+      if (listItems.length && listTag !== 'ul') flushList();
+      listTag = 'ul';
+      listItems.push(unorderedListItem[1]);
+      continue;
+    }
+    const orderedListItem = trimmed.match(/^\d+[.)]\s+(.+)$/);
+    if (orderedListItem) {
+      flushParagraph();
+      if (listItems.length && listTag !== 'ol') flushList();
+      listTag = 'ol';
+      listItems.push(orderedListItem[1]);
+      continue;
+    }
+    flushList();
+    paragraph.push(trimmed);
+  }
+  flushParagraph();
+  flushList();
+  return chunks.join('\n');
+}
+
+function normalizeAdminContentAlignment(value) {
+  const align = String(value || '').trim().toLowerCase();
+  return ADMIN_CONTENT_ALLOWED_ALIGNMENTS.has(align) ? align : 'left';
+}
+
+function adminContentAlignClass(block) {
+  return ` admin-content-preview__block--align-${normalizeAdminContentAlignment(block?.align)}`;
+}
+
+function isApprovedAdminEmbedSrc(provider, src) {
+  try {
+    const parsed = new URL(String(src || '').trim());
+    if (parsed.protocol !== 'https:') return false;
+    if (provider === 'spotify') return parsed.host === 'open.spotify.com' && parsed.pathname.startsWith('/embed/');
+    if (provider === 'youtube') {
+      return (parsed.host === 'www.youtube.com' || parsed.host === 'www.youtube-nocookie.com') && parsed.pathname.startsWith('/embed/');
+    }
+    if (provider === 'vimeo') return parsed.host === 'player.vimeo.com' && parsed.pathname.startsWith('/video/');
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function validateAdminContentBlock(block, index, errors, warnings) {
+  const path = `longContent[${index}]`;
+  if (!block || typeof block !== 'object' || Array.isArray(block)) {
+    errors.push(`${path} must be an object.`);
+    return null;
+  }
+
+  const type = String(block.type || '').trim();
+  if (!ADMIN_CONTENT_ALLOWED_BLOCK_TYPES.has(type)) {
+    errors.push(`${path}.type is not supported.`);
+    return null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(block, 'html')) {
+    errors.push(`${path}.html is not allowed; use structured blocks instead.`);
+  }
+
+  if (type === 'text') {
+    if (!String(block.body || '').trim()) errors.push(`${path}.body is required.`);
+    return { type, body: String(block.body || ''), align: normalizeAdminContentAlignment(block.align) };
+  }
+
+  if (type === 'video') {
+    const provider = String(block.provider || '').trim().toLowerCase();
+    if (!['youtube', 'vimeo'].includes(provider)) errors.push(`${path}.provider must be youtube or vimeo.`);
+    if (!String(block.video_id || '').trim()) errors.push(`${path}.video_id is required.`);
+    return {
+      type,
+      provider,
+      video_id: String(block.video_id || '').trim(),
+      caption: String(block.caption || ''),
+      align: normalizeAdminContentAlignment(block.align)
+    };
+  }
+
+  if (type === 'image') {
+    if (!String(block.src || '').trim()) errors.push(`${path}.src is required.`);
+    if (!String(block.alt || '').trim()) warnings.push(`${path}.alt should describe the image.`);
+    return {
+      type,
+      src: String(block.src || '').trim(),
+      alt: String(block.alt || ''),
+      caption: String(block.caption || ''),
+      align: normalizeAdminContentAlignment(block.align)
+    };
+  }
+
+  if (type === 'gallery') {
+    const images = Array.isArray(block.images) ? block.images.slice(0, ADMIN_CONTENT_MAX_GALLERY_IMAGES) : [];
+    if (!Array.isArray(block.images) || block.images.length === 0) errors.push(`${path}.images must include at least one image.`);
+    if (Array.isArray(block.images) && block.images.length > ADMIN_CONTENT_MAX_GALLERY_IMAGES) warnings.push(`${path}.images was limited to ${ADMIN_CONTENT_MAX_GALLERY_IMAGES} images for preview.`);
+    return {
+      type,
+      layout: String(block.layout || 'grid').trim() || 'grid',
+      images: images.map((image, imageIndex) => ({
+        src: String(image?.src || '').trim(),
+        alt: String(image?.alt || ''),
+        _fieldName: `${path}.images[${imageIndex}]`
+      })),
+      caption: String(block.caption || ''),
+      align: normalizeAdminContentAlignment(block.align)
+    };
+  }
+
+  if (type === 'audio') {
+    if (!String(block.src || '').trim()) errors.push(`${path}.src is required.`);
+    if (!String(block.title || '').trim()) warnings.push(`${path}.title helps make audio previews accessible.`);
+    return {
+      type,
+      src: String(block.src || '').trim(),
+      title: String(block.title || ''),
+      caption: String(block.caption || ''),
+      align: normalizeAdminContentAlignment(block.align)
+    };
+  }
+
+  if (type === 'embed') {
+    const provider = String(block.provider || '').trim().toLowerCase();
+    if (!ADMIN_CONTENT_ALLOWED_EMBED_PROVIDERS.has(provider)) {
+      errors.push(`${path}.provider is not approved.`);
+    }
+    if (!isApprovedAdminEmbedSrc(provider, block.src)) {
+      errors.push(`${path}.src must be an approved ${provider || 'embed'} URL.`);
+    }
+    return {
+      type,
+      provider,
+      src: String(block.src || '').trim(),
+      title: String(block.title || ''),
+      caption: String(block.caption || ''),
+      align: normalizeAdminContentAlignment(block.align)
+    };
+  }
+
+  if (type === 'quote') {
+    if (!String(block.text || '').trim()) errors.push(`${path}.text is required.`);
+    return {
+      type,
+      text: String(block.text || ''),
+      author: String(block.author || ''),
+      align: normalizeAdminContentAlignment(block.align)
+    };
+  }
+
+  return { type, align: normalizeAdminContentAlignment(block.align) };
+}
+
+function renderAdminContentBlock(block, index, errors) {
+  const path = `longContent[${index}]`;
+  if (!block) return '';
+
+  if (block.type === 'text') {
+    return `<section class="admin-content-preview__block admin-content-preview__block--text${adminContentAlignClass(block)}">${renderAdminPreviewTextBlock(block.body, errors, `${path}.body`)}</section>`;
+  }
+
+  if (block.type === 'video') {
+    const title = block.caption || `${block.provider} video`;
+    const provider = block.provider === 'vimeo' ? 'vimeo' : 'youtube';
+    const src = provider === 'vimeo'
+      ? `https://player.vimeo.com/video/${encodeURIComponent(block.video_id)}?dnt=1`
+      : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(block.video_id)}`;
+    const allow = provider === 'vimeo'
+      ? 'autoplay; fullscreen; picture-in-picture'
+      : 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    return `<figure class="admin-content-preview__block admin-content-preview__block--video${adminContentAlignClass(block)}"><div class="video-embed video-embed--${provider}"><iframe src="${escapeAdminPreviewAttribute(src)}" title="${escapeAdminPreviewAttribute(title)}" loading="lazy" allow="${escapeAdminPreviewAttribute(allow)}" allowfullscreen></iframe></div>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+  }
+
+  if (block.type === 'image') {
+    return `<figure class="admin-content-preview__block admin-content-preview__block--image${adminContentAlignClass(block)}"><img src="${escapeAdminPreviewAttribute(block.src)}" alt="${escapeAdminPreviewAttribute(block.alt)}">${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+  }
+
+  if (block.type === 'gallery') {
+    const images = block.images.map((image) => `<img src="${escapeAdminPreviewAttribute(image.src)}" alt="${escapeAdminPreviewAttribute(image.alt)}">`).join('');
+    return `<figure class="admin-content-preview__block admin-content-preview__block--gallery${adminContentAlignClass(block)}"><div class="admin-content-preview__gallery">${images}</div>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+  }
+
+  if (block.type === 'audio') {
+    return `<figure class="admin-content-preview__block admin-content-preview__block--audio${adminContentAlignClass(block)}"><p><strong>${escapeAdminPreviewHtml(block.title || 'Audio')}</strong></p><audio controls src="${escapeAdminPreviewAttribute(block.src)}"></audio>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+  }
+
+  if (block.type === 'embed') {
+    return `<figure class="admin-content-preview__block admin-content-preview__block--embed${adminContentAlignClass(block)}"><iframe src="${escapeAdminPreviewAttribute(block.src)}" title="${escapeAdminPreviewAttribute(block.title || block.provider || 'Embedded content')}" loading="lazy"></iframe>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+  }
+
+  if (block.type === 'quote') {
+    return `<blockquote class="admin-content-preview__block admin-content-preview__block--quote${adminContentAlignClass(block)}"><p>${renderAdminPreviewInlineMarkdown(block.text, errors, `${path}.text`)}</p>${block.author ? `<cite>— ${escapeAdminPreviewHtml(block.author)}</cite>` : ''}</blockquote>`;
+  }
+
+  if (block.type === 'divider') {
+    return `<div class="admin-content-preview__divider${adminContentAlignClass(block)}" role="separator" aria-hidden="true"></div>`;
+  }
+
+  return '';
+}
+
+function normalizeAdminContentDraft(body = {}) {
+  const draft = body.draft && typeof body.draft === 'object' ? body.draft : body;
+  return {
+    campaignSlug: String(body.campaignSlug || draft.campaignSlug || '').trim(),
+    title: String(draft.title || '').trim(),
+    shortBlurb: String(draft.shortBlurb ?? draft.short_blurb ?? ''),
+    longContent: Array.isArray(draft.longContent)
+      ? draft.longContent
+      : Array.isArray(draft.long_content)
+        ? draft.long_content
+        : []
+  };
+}
+
+function buildAdminContentPreview(draft, campaign) {
+  const errors = [];
+  const warnings = [];
+  const title = draft.title || campaign?.title || '';
+  if (!title.trim()) errors.push('title is required.');
+  if (!draft.shortBlurb.trim()) warnings.push('shortBlurb is empty.');
+
+  const blocks = draft.longContent.slice(0, ADMIN_CONTENT_MAX_BLOCKS).map((block, index) => validateAdminContentBlock(block, index, errors, warnings));
+  if (draft.longContent.length > ADMIN_CONTENT_MAX_BLOCKS) {
+    warnings.push(`longContent was limited to ${ADMIN_CONTENT_MAX_BLOCKS} blocks for preview.`);
+  }
+  if (!draft.longContent.length) {
+    warnings.push('longContent is empty.');
+  }
+
+  const renderErrors = [];
+  const shortBlurbHtml = `<p>${renderAdminPreviewInlineMarkdown(draft.shortBlurb, renderErrors, 'shortBlurb')}</p>`;
+  const blocksHtml = blocks.map((block, index) => renderAdminContentBlock(block, index, renderErrors)).join('\n');
+  errors.push(...renderErrors);
+
+  const previewHtml = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/assets/main.css">
+</head>
+<body class="admin-content-preview">
+  <main>
+    <h1>${escapeAdminPreviewHtml(title)}</h1>
+    <div class="admin-content-preview__short-blurb">${shortBlurbHtml}</div>
+    <div class="admin-content-preview__long-content">${blocksHtml}</div>
+  </main>
+</body>
+</html>`;
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    normalizedDraft: {
+      title,
+      shortBlurb: draft.shortBlurb,
+      longContent: blocks.filter(Boolean)
+    },
+    preview: {
+      title,
+      shortBlurbHtml,
+      longContentHtml: blocksHtml,
+      html: previewHtml
+    }
+  };
+}
+
+async function getRoleScopedAdminCampaign(request, env, campaignSlug, permission = 'campaign:edit_content', options = {}) {
+  const auth = await requireAdminSession(request, env, permission, { ...options, campaignSlug });
+  if (!auth.ok) return { ok: false, response: auth.response };
+
+  if (!isValidSlug(campaignSlug)) {
+    return { ok: false, response: privateJsonResponse({ error: 'Invalid campaign slug' }, 400, env) };
+  }
+
+  const campaign = await getCampaign(env, campaignSlug);
+  if (!campaign) {
+    return { ok: false, response: privateJsonResponse({ error: 'Campaign not found' }, 404, env) };
+  }
+
+  return { ok: true, auth, campaign };
+}
+
+async function handleAdminContentCampaign(request, env) {
+  const url = new URL(request.url);
+  const campaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug);
+  if (!scoped.ok) return scoped.response;
+
+  const campaign = scoped.campaign;
+  return privateJsonResponse({
+    user: scoped.auth.user,
+    campaign: {
+      slug: campaign.slug,
+      title: campaign.title || campaign.slug,
+      shortBlurb: campaign.short_blurb || '',
+      longContent: Array.isArray(campaign.long_content) ? campaign.long_content : [],
+      diaryCount: Array.isArray(campaign.diary) ? campaign.diary.length : 0,
+      tierCount: Array.isArray(campaign.tiers) ? campaign.tiers.length : 0,
+      decisionCount: Array.isArray(campaign.decisions) ? campaign.decisions.length : 0
+    },
+    writeBudget: adminReadBudget()
+  }, 200, env);
+}
+
+async function handleAdminContentPreview(request, env, body = {}) {
+  const draft = normalizeAdminContentDraft(body);
+  const scoped = await getRoleScopedAdminCampaign(request, env, draft.campaignSlug);
+  if (!scoped.ok) return scoped.response;
+
+  const preview = buildAdminContentPreview(draft, scoped.campaign);
+  return privateJsonResponse({
+    user: scoped.auth.user,
+    campaignSlug: scoped.campaign.slug,
+    dryRun: true,
+    ...preview,
+    writeBudget: adminReadBudget()
+  }, preview.valid ? 200 : 422, env);
+}
+
+function yamlQuoteAdminString(value) {
+  return JSON.stringify(String(value ?? ''));
+}
+
+function yamlBlockAdminString(value, indent = '  ') {
+  const text = String(value ?? '');
+  if (!text) return '""';
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  return `|\n${lines.map((line) => `${indent}${line}`).join('\n')}`;
+}
+
+function yamlAdminScalarLine(key, value) {
+  return `${key}: ${yamlQuoteAdminString(value)}`;
+}
+
+function yamlAdminOptionalScalar(lines, key, value, indent) {
+  const text = String(value ?? '');
+  if (text) {
+    lines.push(`${indent}${key}: ${yamlQuoteAdminString(text)}`);
+  }
+}
+
+function yamlAdminOptionalAlignment(lines, block, indent) {
+  const align = normalizeAdminContentAlignment(block?.align);
+  if (align !== 'left') {
+    lines.push(`${indent}align: ${yamlQuoteAdminString(align)}`);
+  }
+}
+
+function serializeAdminContentBlockToYaml(block = {}) {
+  const lines = [`  - type: ${yamlQuoteAdminString(block.type || '')}`];
+  yamlAdminOptionalAlignment(lines, block, '    ');
+  if (block.type === 'text') {
+    lines.push(`    body: ${yamlBlockAdminString(block.body, '      ')}`);
+  } else if (block.type === 'video') {
+    lines.push(`    provider: ${yamlQuoteAdminString(block.provider || '')}`);
+    lines.push(`    video_id: ${yamlQuoteAdminString(block.video_id || '')}`);
+    yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
+  } else if (block.type === 'image') {
+    lines.push(`    src: ${yamlQuoteAdminString(block.src || '')}`);
+    lines.push(`    alt: ${yamlQuoteAdminString(block.alt || '')}`);
+    yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
+  } else if (block.type === 'gallery') {
+    yamlAdminOptionalScalar(lines, 'layout', block.layout || 'grid', '    ');
+    lines.push('    images:');
+    for (const image of block.images || []) {
+      lines.push(`      - src: ${yamlQuoteAdminString(image.src || '')}`);
+      lines.push(`        alt: ${yamlQuoteAdminString(image.alt || '')}`);
+    }
+    yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
+  } else if (block.type === 'audio') {
+    lines.push(`    src: ${yamlQuoteAdminString(block.src || '')}`);
+    yamlAdminOptionalScalar(lines, 'title', block.title, '    ');
+    yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
+  } else if (block.type === 'embed') {
+    lines.push(`    provider: ${yamlQuoteAdminString(block.provider || '')}`);
+    lines.push(`    src: ${yamlQuoteAdminString(block.src || '')}`);
+    yamlAdminOptionalScalar(lines, 'title', block.title, '    ');
+    yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
+  } else if (block.type === 'quote') {
+    lines.push(`    text: ${yamlBlockAdminString(block.text, '      ')}`);
+    yamlAdminOptionalScalar(lines, 'author', block.author, '    ');
+  }
+  return lines.join('\n');
+}
+
+function serializeAdminLongContentYaml(blocks = []) {
+  if (!blocks.length) return 'long_content: []';
+  return `long_content:\n${blocks.map(serializeAdminContentBlockToYaml).join('\n')}`;
+}
+
+function replaceAdminFrontMatterBlock(frontMatter, key, replacement) {
+  const lines = String(frontMatter || '').split(/\r?\n/);
+  const start = lines.findIndex((line) => new RegExp(`^${key}:`).test(line));
+  if (start < 0) {
+    return `${frontMatter.replace(/\s*$/, '')}\n${replacement}`;
+  }
+  let end = start + 1;
+  while (end < lines.length && !/^[A-Za-z0-9_-]+:/.test(lines[end])) {
+    end += 1;
+  }
+  lines.splice(start, end - start, ...replacement.split('\n'));
+  return lines.join('\n');
+}
+
+function applyAdminCampaignContentDraftToMarkdown(source, draft) {
+  const match = String(source || '').match(/^---\r?\n([\s\S]*?)\r?\n---(\r?\n[\s\S]*)?$/);
+  if (!match) {
+    return { ok: false, error: 'Campaign Markdown must contain YAML front matter.' };
+  }
+
+  let frontMatter = match[1];
+  frontMatter = replaceAdminFrontMatterBlock(frontMatter, 'title', yamlAdminScalarLine('title', draft.title));
+  frontMatter = replaceAdminFrontMatterBlock(frontMatter, 'short_blurb', yamlAdminScalarLine('short_blurb', draft.shortBlurb));
+  frontMatter = replaceAdminFrontMatterBlock(frontMatter, 'long_content', serializeAdminLongContentYaml(draft.longContent || []));
+
+  return {
+    ok: true,
+    content: `---\n${frontMatter.replace(/\s*$/, '')}\n---${match[2] || '\n'}`
+  };
+}
+
+function getAdminCampaignMarkdownPath(campaignSlug) {
+  return `_campaigns/${String(campaignSlug || '').trim()}.md`;
+}
+
+async function handleAdminContentPublish(request, env) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const body = parsedBody.body || {};
+  const draft = normalizeAdminContentDraft(body);
+  const scoped = await getRoleScopedAdminCampaign(request, env, draft.campaignSlug, 'campaign:edit_content', { requireCsrf: true });
+  if (!scoped.ok) return scoped.response;
+
+  if (body.intent !== 'publish') {
+    return privateJsonResponse({ error: 'Missing publish intent' }, 400, env);
+  }
+
+  const preview = buildAdminContentPreview(draft, scoped.campaign);
+  if (!preview.valid) {
+    return privateJsonResponse({
+      user: scoped.auth.user,
+      campaignSlug: scoped.campaign.slug,
+      dryRun: false,
+      ...preview,
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0, kvListExpected: 0 })
+    }, 422, env);
+  }
+
+  const githubPath = getAdminCampaignMarkdownPath(scoped.campaign.slug);
+  const existing = await getGitHubTextFile(env, githubPath);
+  if (!existing.ok) {
+    return privateJsonResponse({
+      error: existing.error || 'Unable to load campaign Markdown from GitHub',
+      code: existing.code || 'github_load_failed'
+    }, existing.status || 502, env);
+  }
+
+  const nextMarkdown = applyAdminCampaignContentDraftToMarkdown(existing.content, preview.normalizedDraft);
+  if (!nextMarkdown.ok) {
+    return privateJsonResponse({ error: nextMarkdown.error }, 422, env);
+  }
+
+  const commitMessage = String(body.message || '').trim() || `Update ${scoped.campaign.slug} campaign content`;
+  const committed = await putGitHubTextFile(env, githubPath, nextMarkdown.content, commitMessage, existing.sha);
+  if (!committed.ok) {
+    return privateJsonResponse({
+      error: committed.error || 'Unable to publish campaign content',
+      code: committed.code || 'github_commit_failed'
+    }, committed.status || 502, env);
+  }
+
+  const rebuild = await triggerSiteRebuild(env, `admin-content-publish:${scoped.campaign.slug}`);
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'campaign:publish_content',
+    adminEmail: scoped.auth.user.email,
+    campaignSlug: scoped.campaign.slug,
+    githubPath,
+    commitSha: committed.commitSha,
+    rebuildTriggered: rebuild.triggered === true
+  });
+
+  return privateJsonResponse({
+    success: true,
+    campaignSlug: scoped.campaign.slug,
+    githubPath,
+    commitSha: committed.commitSha,
+    commitUrl: committed.commitUrl,
+    rebuild,
+    auditKey,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 1, kvListExpected: 0 })
+  }, 200, env);
+}
+
+async function handleAdminSupporters(request, env) {
+  const url = new URL(request.url);
+  const requestedCampaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
+  const allCampaignsRequested = !requestedCampaignSlug || requestedCampaignSlug === 'all';
+  const auth = await requireAdminSession(request, env, 'supporters:read', {
+    campaignSlug: allCampaignsRequested ? '' : requestedCampaignSlug
+  });
+  if (!auth.ok) return auth.response;
+
+  const { campaigns } = await getCampaigns(env);
+  const allowedCampaigns = (campaigns || []).filter((campaign) => (
+    auth.user.role === 'super_admin' ||
+    auth.user.campaignSlugs.includes(String(campaign?.slug || ''))
+  ));
+  const selectedCampaigns = allCampaignsRequested
+    ? allowedCampaigns
+    : allowedCampaigns.filter((campaign) => String(campaign?.slug || '') === requestedCampaignSlug);
+
+  if (!allCampaignsRequested && selectedCampaigns.length === 0) {
+    return privateJsonResponse({ error: 'Campaign not found' }, 404, env);
+  }
+
+  const indexedCampaigns = [];
+  const missingCampaigns = [];
+  let indexed = 0;
+  for (const campaign of selectedCampaigns) {
+    const campaignSlug = String(campaign?.slug || '').trim();
+    const orderIds = await getCampaignOrderIds(env, campaignSlug);
+    if (!Array.isArray(orderIds)) {
+      missingCampaigns.push({
+        slug: campaignSlug,
+        title: campaign?.title || campaignSlug
+      });
+      continue;
+    }
+    indexed += orderIds.length;
+    indexedCampaigns.push({ campaign, campaignSlug, orderIds });
+  }
+
+  if (!allCampaignsRequested && missingCampaigns.length > 0) {
+    return adminIndexRequiredResponse(env, {
+      error: 'Campaign pledge index is required for dashboard supporter reads',
+      campaignSlug: allCampaignsRequested ? '' : requestedCampaignSlug,
+      extra: { missingCampaigns }
+    });
+  }
+
+  const limit = clampAdminPageLimit(url.searchParams.get('limit'));
+  const cursor = Math.max(0, Number.parseInt(String(url.searchParams.get('cursor') || '0'), 10) || 0);
+  const filters = {
+    status: String(url.searchParams.get('status') || 'all').trim().toLowerCase(),
+    fulfillment: String(url.searchParams.get('fulfillment') || 'all').trim().toLowerCase(),
+    query: String(url.searchParams.get('q') || '').trim().toLowerCase()
+  };
+
+  const supporters = [];
+  let matched = 0;
+  let scanned = 0;
+
+  for (const entry of indexedCampaigns) {
+    for (let index = 0; index < entry.orderIds.length; index += 1) {
+      const orderId = String(entry.orderIds[index] || '').trim();
+      if (!orderId) continue;
+      const pledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+      scanned += 1;
+      if (!pledge || String(pledge?.campaignSlug || '') !== entry.campaignSlug) continue;
+      if (!pledgeMatchesAdminSupporterFilters(pledge, filters)) continue;
+
+      if (matched >= cursor && supporters.length < limit) {
+        supporters.push({
+          ...publicAdminSupporterRecord(pledge),
+          campaignTitle: entry.campaign?.title || entry.campaignSlug
+        });
+      }
+      matched += 1;
+    }
+  }
+  const nextCursor = matched > cursor + supporters.length ? cursor + supporters.length : null;
+
+  return privateJsonResponse({
+    user: auth.user,
+    scope: allCampaignsRequested ? 'portfolio' : 'campaign',
+    campaign: allCampaignsRequested ? null : {
+      slug: selectedCampaigns[0]?.slug || requestedCampaignSlug,
+      title: selectedCampaigns[0]?.title || requestedCampaignSlug,
+      effectiveState: getEffectiveState(selectedCampaigns[0]) || selectedCampaigns[0]?.state || 'unknown'
+    },
+    campaigns: selectedCampaigns.map((campaign) => ({
+      slug: campaign.slug,
+      title: campaign.title || campaign.slug,
+      effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown'
+    })),
+    supporters,
+    missingCampaigns,
+    page: {
+      limit,
+      cursor,
+      nextCursor,
+      returned: supporters.length,
+      matched,
+      indexed,
+      scanned
+    },
+    filters,
+    writeBudget: adminReadBudget(),
+    generatedAt: new Date().toISOString()
+  }, 200, env);
+}
+
+function getReportPreviewRows(report = {}, limit = Number.POSITIVE_INFINITY) {
+  const rows = Array.isArray(report?.rows) ? report.rows : [];
+  return rows.slice(0, limit).map((row) => (
+    Array.isArray(row) ? row.map((cell) => String(cell ?? '')) : []
+  ));
+}
+
+async function buildAdminCampaignRunnerSingleReportPayload(env, auth, campaign, reportType, reportDate = new Date()) {
+  const campaignSlug = String(campaign?.slug || '').trim();
+  const indexedPledges = await getIndexedCampaignReportPledges(env, campaignSlug);
+  if (!indexedPledges.ok) {
+    return {
+      ok: false,
+      error: indexedPledges.error,
+      campaignSlug
+    };
+  }
+
+  const reportDateKey = getMountainDateKey(reportDate);
+  const reportDateLabel = formatCampaignRunnerReportDateLabel(reportDate);
+  const reportKind = getCampaignRunnerReportKindLabel(reportType);
+  const markerKey = getCampaignRunnerReportMarkerKey(reportType, campaignSlug, reportDateKey);
+  const markerPayload = await env.PLEDGES?.get(markerKey, { type: 'json' });
+  const pledges = indexedPledges.pledges || [];
+  const report = reportType === 'fulfillment'
+    ? buildFulfillmentReport(pledges, {
+      campaign,
+      platformFulfiller: getPlatformCompanyName(env)
+    })
+    : buildPledgeLedgerReport(pledges, { campaign });
+  const fulfillerIndex = reportType === 'fulfillment'
+    ? getFulfillmentReportColumnIndex(report, 'fulfiller')
+    : -1;
+  const campaignRowCount = reportType === 'fulfillment'
+    ? filterFulfillmentReportRows(
+      report,
+      (row) => fulfillerIndex >= 0 && String(row[fulfillerIndex] || '').trim() === campaign.slug
+    ).rows.length
+    : report.rows.length;
+  const platformRowCount = reportType === 'fulfillment'
+    ? filterFulfillmentReportRows(
+      report,
+      (row) => fulfillerIndex >= 0 && String(row[fulfillerIndex] || '').trim() === getPlatformCompanyName(env)
+    ).rows.length
+    : 0;
+  const summary = getCampaignRunnerIncludeStatsSummary(env)
+    ? getCampaignRunnerStatsSummary(
+      campaign,
+      await getCampaignStats(env, campaignSlug),
+      env,
+      reportKind,
+      pledges,
+      reportDate
+    )
+    : [];
+
+  return {
+    ok: true,
+    payload: {
+      user: auth.user,
+      dryRun: true,
+      campaignSlug,
+      campaignTitle: campaign.title || campaign.slug,
+      reportType,
+      reportKind,
+      effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown',
+      recipientCount: normalizeCampaignRunnerReportRecipients(campaign).length,
+      platformRecipient: reportType === 'fulfillment' ? String(getSupportEmail(env) || '').trim().toLowerCase() || null : null,
+      rowCount: campaignRowCount,
+      campaignRowCount,
+      platformRowCount,
+      totalRowCount: Array.isArray(report.rows) ? report.rows.length : 0,
+      csvFilename: `${campaignSlug}-${reportType === 'fulfillment' ? 'fulfillment-report' : 'pledge-report'}-${reportDateKey}.csv`,
+      reportDateKey,
+      reportDateLabel,
+      includeStatsSummary: getCampaignRunnerIncludeStatsSummary(env),
+      includeCsvAttachment: getCampaignRunnerIncludeCsvAttachment(env),
+      alreadyMarked: Boolean(markerPayload),
+      markerKey,
+      indexedPledgeCount: indexedPledges.indexed || 0,
+      header: Array.isArray(report.header) ? report.header : [],
+      rows: Array.isArray(report.rows) ? report.rows : [],
+      previewRows: getReportPreviewRows(report),
+      csv: report.csv || '',
+      statsSummary: summary,
+      writeBudget: adminReadBudget(),
+      generatedAt: new Date().toISOString()
+    }
+  };
+}
+
+async function buildAdminCampaignRunnerReportPayload(request, env) {
+  const url = new URL(request.url);
+  const requestedCampaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
+  const allCampaignsRequested = !requestedCampaignSlug || requestedCampaignSlug.toLowerCase() === 'all';
+  const reportType = normalizeCampaignRunnerReportType(url.searchParams.get('reportType'));
+
+  if (!allCampaignsRequested) {
+    const scoped = await getRoleScopedAdminCampaign(request, env, requestedCampaignSlug, 'reports:send');
+    if (!scoped.ok) return { ok: false, response: scoped.response };
+    const built = await buildAdminCampaignRunnerSingleReportPayload(env, scoped.auth, scoped.campaign, reportType);
+    if (!built.ok) {
+      return {
+        ok: false,
+        response: adminIndexRequiredResponse(env, {
+          error: built.error,
+          campaignSlug: requestedCampaignSlug
+        })
+      };
+    }
+    return built;
+  }
+
+  const auth = await requireAdminSession(request, env, 'reports:send', { campaignSlug: '' });
+  if (!auth.ok) return { ok: false, response: auth.response };
+
+  const { campaigns } = await getCampaigns(env);
+  const allowedCampaigns = (campaigns || []).filter((campaign) => (
+    auth.user.role === 'super_admin' ||
+    auth.user.campaignSlugs.includes(String(campaign?.slug || ''))
+  ));
+  const reportDate = new Date();
+  const reports = [];
+  const missingCampaigns = [];
+
+  for (const campaign of allowedCampaigns) {
+    const built = await buildAdminCampaignRunnerSingleReportPayload(env, auth, campaign, reportType, reportDate);
+    if (!built.ok) {
+      missingCampaigns.push({ campaignSlug: campaign.slug, error: built.error });
+      continue;
+    }
+    reports.push(built.payload);
+  }
+
+  const header = reports.find((report) => Array.isArray(report.header) && report.header.length)?.header || [];
+  const rows = reports.flatMap((report) => Array.isArray(report.rows) ? report.rows : []);
+  const csv = rebuildCsvReport({ header, rows }).csv;
+  const reportDateKey = getMountainDateKey(reportDate);
+  const reportKind = getCampaignRunnerReportKindLabel(reportType);
+  const alreadyMarkedCount = reports.filter((report) => report.alreadyMarked).length;
+
+  return {
+    ok: true,
+    payload: {
+      user: auth.user,
+      dryRun: true,
+      scope: 'portfolio',
+      campaignSlug: '',
+      campaignTitle: 'All campaigns',
+      campaigns: reports.map((report) => ({
+        slug: report.campaignSlug,
+        title: report.campaignTitle,
+        rowCount: report.rowCount,
+        recipientCount: report.recipientCount,
+        alreadyMarked: report.alreadyMarked
+      })),
+      reportType,
+      reportKind,
+      effectiveState: 'multiple',
+      recipientCount: reports.reduce((sum, report) => sum + Number(report.recipientCount || 0), 0),
+      platformRecipient: reportType === 'fulfillment' ? String(getSupportEmail(env) || '').trim().toLowerCase() || null : null,
+      rowCount: reports.reduce((sum, report) => sum + Number(report.rowCount || 0), 0),
+      campaignRowCount: reports.reduce((sum, report) => sum + Number(report.campaignRowCount || 0), 0),
+      platformRowCount: reports.reduce((sum, report) => sum + Number(report.platformRowCount || 0), 0),
+      totalRowCount: reports.reduce((sum, report) => sum + Number(report.totalRowCount || 0), 0),
+      csvFilename: `all-campaigns-${reportType === 'fulfillment' ? 'fulfillment-report' : 'pledge-report'}-${reportDateKey}.csv`,
+      reportDateKey,
+      reportDateLabel: formatCampaignRunnerReportDateLabel(reportDate),
+      includeStatsSummary: getCampaignRunnerIncludeStatsSummary(env),
+      includeCsvAttachment: getCampaignRunnerIncludeCsvAttachment(env),
+      alreadyMarked: reports.length > 0 && alreadyMarkedCount === reports.length,
+      alreadyMarkedCount,
+      indexedPledgeCount: reports.reduce((sum, report) => sum + Number(report.indexedPledgeCount || 0), 0),
+      missingCampaigns,
+      header,
+      rows,
+      previewRows: getReportPreviewRows({ rows }),
+      csv,
+      statsSummary: [],
+      writeBudget: adminReadBudget(),
+      generatedAt: new Date().toISOString()
+    }
+  };
+}
+
+async function handleAdminCampaignRunnerReportPreview(request, env) {
+  const built = await buildAdminCampaignRunnerReportPayload(request, env);
+  if (!built.ok) return built.response;
+  const { csv, ...payload } = built.payload;
+  return privateJsonResponse(payload, 200, env);
+}
+
+function csvResponse(csv, filename, env = null) {
+  const safeFilename = String(filename || 'campaign-runner-report.csv')
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'campaign-runner-report.csv';
+  return new Response(String(csv || ''), {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${safeFilename}"`,
+      'Cache-Control': PRIVATE_NO_STORE_CACHE_CONTROL,
+      'Access-Control-Allow-Origin': getAllowedOrigin(env, false),
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key, x-pool-admin-csrf',
+      'Access-Control-Expose-Headers': 'Content-Disposition',
+      ...SECURITY_HEADERS
+    }
+  });
+}
+
+async function handleAdminCampaignRunnerReportCsv(request, env) {
+  const built = await buildAdminCampaignRunnerReportPayload(request, env);
+  if (!built.ok) return built.response;
+  return csvResponse(built.payload.csv, built.payload.csvFilename, env);
+}
+
+function getAdminAuditEventKey(action, now = new Date()) {
+  const dateKey = now.toISOString().slice(0, 10);
+  const safeAction = String(action || 'admin_event')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9:_-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'admin_event';
+  const id = typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `admin-audit:${dateKey}:${safeAction}:${id}`;
+}
+
+async function recordAdminAuditEvent(env, event = {}) {
+  if (!env?.PLEDGES) return null;
+  const now = new Date();
+  const action = String(event.action || 'admin_event').trim() || 'admin_event';
+  const key = getAdminAuditEventKey(action, now);
+  await env.PLEDGES.put(key, JSON.stringify({
+    ...event,
+    action,
+    createdAt: now.toISOString()
+  }), { expirationTtl: ADMIN_AUDIT_EVENT_TTL_SECONDS });
+  return key;
+}
+
+function flattenAdminAddOnInventory(snapshot = {}, catalog = {}) {
+  const products = new Map((catalog.products || []).map((product) => [String(product?.id || ''), product]));
+  const rows = [];
+
+  for (const [productId, productState] of Object.entries(snapshot.products || {})) {
+    const product = products.get(productId) || {};
+    if (String(product?.scope || productState?.scope || 'platform') !== 'platform') {
+      continue;
+    }
+
+    const variants = Array.isArray(product?.variants) ? product.variants : [];
+    if (variants.length > 0) {
+      for (const variant of variants) {
+        const variantId = String(variant?.id || '');
+        const variantState = productState.variants?.[variantId] || {};
+        rows.push({
+          productId,
+          variantId,
+          label: `${String(product?.name || productId)} (${String(variant?.label || variantId)})`,
+          productName: String(product?.name || productId),
+          variantLabel: String(variant?.label || variantId),
+          category: String(product?.category || 'digital'),
+          configuredInventory: variantState.configuredInventory ?? null,
+          inventory: variantState.inventory ?? null,
+          overrideInventory: variantState.overrideInventory ?? null,
+          hasOverride: Boolean(variantState.hasOverride),
+          sold: Number(variantState.sold || 0),
+          remaining: variantState.remaining ?? null,
+          soldOut: Boolean(variantState.soldOut)
+        });
+      }
+      continue;
+    }
+
+    rows.push({
+      productId,
+      variantId: '',
+      label: String(product?.name || productId),
+      productName: String(product?.name || productId),
+      variantLabel: '',
+      category: String(product?.category || 'digital'),
+      configuredInventory: productState.configuredInventory ?? null,
+      inventory: productState.inventory ?? null,
+      overrideInventory: productState.overrideInventory ?? null,
+      hasOverride: Boolean(productState.hasOverride),
+      sold: Number(productState.sold || 0),
+      remaining: productState.remaining ?? null,
+      soldOut: Boolean(productState.soldOut)
+    });
+  }
+
+  rows.sort((a, b) => a.productName.localeCompare(b.productName) || a.variantLabel.localeCompare(b.variantLabel));
+  return rows;
+}
+
+async function handleAdminAddOnInventory(request, env) {
+  const auth = await requireAdminSession(request, env, 'platform_inventory:manage');
+  if (!auth.ok) return auth.response;
+
+  const [catalog, snapshot] = await Promise.all([
+    getAddOns(env),
+    getAddOnInventorySnapshot(env, { force: true })
+  ]);
+
+  return privateJsonResponse({
+    rows: flattenAdminAddOnInventory(snapshot, catalog),
+    lowStockThreshold: snapshot.lowStockThreshold ?? catalog.low_stock_threshold ?? 5,
+    overridesUpdatedAt: snapshot.overridesUpdatedAt || null,
+    updatedAt: snapshot.updatedAt,
+    writeBudget: adminReadBudget({ kvListExpected: 1 })
+  }, 200, env);
+}
+
+async function handleAdminAddOnInventoryMutation(request, env) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const body = parsedBody.body || {};
+  const auth = await requireAdminSession(request, env, 'platform_inventory:manage', {
+    requireCsrf: true
+  });
+  if (!auth.ok) return auth.response;
+
+  try {
+    const mutation = await mutateAddOnInventoryOverride(env, {
+      action: body.action,
+      productId: body.productId,
+      variantId: body.variantId,
+      inventory: body.inventory,
+      quantity: body.quantity
+    });
+
+    const auditKey = await recordAdminAuditEvent(env, {
+      action: 'platform_inventory:manage',
+      adminEmail: auth.user.email,
+      adminRole: auth.user.role,
+      productId: mutation.productId,
+      variantId: mutation.variantId,
+      inventoryAction: mutation.action,
+      before: mutation.before,
+      after: mutation.after
+    });
+
+    return privateJsonResponse({
+      success: true,
+      mutation,
+      auditKey,
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: mutation.storageWrite ? 2 : 1, kvListExpected: 2 })
+    }, 200, env);
+  } catch (error) {
+    return privateJsonResponse({
+      error: error instanceof Error ? error.message : String(error || 'Inventory mutation failed')
+    }, 400, env);
+  }
+}
+
 async function handleGetStats(campaignSlug, env) {
   if (!campaignSlug) {
     return jsonResponse({ error: 'Missing campaign slug' }, 400, env, true);
@@ -9107,13 +12230,17 @@ const PUBLIC_READ_CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=30
 
 function jsonResponse(data, status = 200, env = null, isPublic = false, extraHeaders = {}) {
   const origin = getAllowedOrigin(env, isPublic);
+  const credentialHeaders = origin && origin !== '*'
+    ? { 'Access-Control-Allow-Credentials': 'true' }
+    : {};
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key, x-pool-admin-csrf',
+      ...credentialHeaders,
       ...extraHeaders,
       ...SECURITY_HEADERS
     }
@@ -9135,11 +12262,15 @@ function cacheablePublicJsonResponse(data, status = 200, env = null) {
 
 function corsResponse(env = null, isPublic = false) {
   const origin = getAllowedOrigin(env, isPublic);
+  const credentialHeaders = origin && origin !== '*'
+    ? { 'Access-Control-Allow-Credentials': 'true' }
+    : {};
   return new Response(null, {
     headers: {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key, x-pool-admin-csrf',
+      ...credentialHeaders,
       ...SECURITY_HEADERS
     }
   });

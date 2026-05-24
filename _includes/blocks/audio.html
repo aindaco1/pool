@@ -1,5 +1,6 @@
 {% assign block = include.block %}
-<figure class="content-block content-block--audio">
+{% assign alignment = block.align | default: 'left' %}
+<figure class="content-block content-block--audio content-block--align-{{ alignment | escape }}">
   <div class="audio-player">
     {% if block.title %}
       <span class="audio-player__title">{{ block.title | safe_rich_text }}</span>

@@ -23,7 +23,7 @@ worker/.wrangler/
 worker/node_modules/
 
 # Local config overrides
-_config.local.yml
+_config.local*.yml
 
 # Environment files
 .env

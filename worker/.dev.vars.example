@@ -1,0 +1,24 @@
+# Local Worker defaults. Copy to worker/.dev.vars for machine-specific secrets,
+# or run `npm run secrets:dev`.
+# The dev launchers also generate missing checkout signing secrets in worker/.dev.vars.
+
+ADMIN_BOOTSTRAP_EMAILS=alonso@dustwave.xyz
+ADMIN_TEST_CAMPAIGNS=hand-relations,smoke-editable
+CORS_ALLOWED_ORIGIN=http://127.0.0.1:4000
+
+# Required local secrets use placeholders here; real values belong only in worker/.dev.vars.
+ADMIN_SECRET=
+ADMIN_SESSION_SECRET=
+CHECKOUT_INTENT_SECRET=
+MAGIC_LINK_SECRET=
+RESEND_API_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_SECRET_KEY_TEST=
+STRIPE_PUBLISHABLE_KEY_TEST=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_WEBHOOK_SECRET_TEST=
+
+# Optional provider/deploy credentials.
+USPS_CLIENT_SECRET=
+ZIP_TAX_API_KEY=
+CLOUDFLARE_API_TOKEN=

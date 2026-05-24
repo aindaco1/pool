@@ -37,6 +37,15 @@ describe('campaign content security audit', () => {
     expect(cardTemplate).toContain('{{ include.campaign.short_blurb | safe_rich_text }}');
   });
 
+  it('keeps visible tier descriptions on the safe rich text filter', () => {
+    const tierTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'tier-card.html'), 'utf8');
+    const cardTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'campaign-card.html'), 'utf8');
+    expect(tierTemplate).toContain('{{ include.tier.description | safe_rich_text }}');
+    expect(tierTemplate).toContain('{{ include.tier.description | strip_html | escape }}');
+    expect(cardTemplate).toContain('{{ featured.description | safe_rich_text }}');
+    expect(cardTemplate).toContain('{{ featured.description | strip_html | escape }}');
+  });
+
   it('keeps external markdown links opening in a new tab from the safe markdown filter', () => {
     const pluginSource = fs.readFileSync(
       path.join(repoRoot, '_plugins', 'content_safety_filter.rb'),

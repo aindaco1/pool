@@ -11,13 +11,27 @@ WRANGLER_PATH = File.join(ROOT, 'worker', 'wrangler.toml')
 TOP_LEVEL_ORDER = [
   'SITE_BASE',
   'WORKER_BASE',
+  'CANONICAL_SITE_BASE',
+  'CANONICAL_WORKER_BASE',
+  'CORS_ALLOWED_ORIGIN',
   'APP_MODE',
+  'SITE_TITLE',
+  'SITE_DESCRIPTION',
   'PLATFORM_NAME',
   'PLATFORM_COMPANY_NAME',
   'PLATFORM_AUTHOR',
+  'PLATFORM_DEFAULT_CREATOR_NAME',
   'SUPPORT_EMAIL',
   'PLEDGES_EMAIL_FROM',
   'UPDATES_EMAIL_FROM',
+  'PLATFORM_FOOTER_LOGO_PATH',
+  'PLATFORM_FAVICON_PATH',
+  'PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH',
+  'SEO_DEFAULT_SOCIAL_IMAGE_ALT',
+  'SEO_X_HANDLE',
+  'SEO_SAME_AS',
+  'SEO_INDEX_PUBLIC_COMMUNITY_HUB',
+  'STRIPE_PUBLISHABLE_KEY',
   'EMAIL_LOGO_PATH',
   'EMAIL_FONT_FAMILY',
   'EMAIL_HEADING_FONT_FAMILY',
@@ -38,6 +52,7 @@ TOP_LEVEL_ORDER = [
   'SHIPPING_ORIGIN_COUNTRY',
   'SHIPPING_FALLBACK_FLAT_RATE',
   'FREE_SHIPPING_DEFAULT',
+  'SHIPPING_DEFAULT_OPTION',
   'USPS_ENABLED',
   'USPS_CLIENT_ID',
   'USPS_API_BASE',
@@ -55,6 +70,8 @@ TOP_LEVEL_ORDER = [
   'CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX',
   'DEBUG_CONSOLE_LOGGING_ENABLED',
   'DEBUG_VERBOSE_CONSOLE_LOGGING',
+  'LIVE_STATS_CACHE_TTL_SECONDS',
+  'LIVE_INVENTORY_CACHE_TTL_SECONDS',
   'DEFAULT_PLATFORM_TIP_PERCENT',
   'MAX_PLATFORM_TIP_PERCENT'
 ].freeze
@@ -62,13 +79,29 @@ TOP_LEVEL_ORDER = [
 DEV_ENV_ORDER = [
   'SITE_BASE',
   'WORKER_BASE',
+  'CANONICAL_SITE_BASE',
+  'CANONICAL_WORKER_BASE',
+  'CORS_ALLOWED_ORIGIN',
   'APP_MODE',
+  'ADMIN_BOOTSTRAP_EMAILS',
+  'ADMIN_TEST_CAMPAIGNS',
+  'SITE_TITLE',
+  'SITE_DESCRIPTION',
   'PLATFORM_NAME',
   'PLATFORM_COMPANY_NAME',
   'PLATFORM_AUTHOR',
+  'PLATFORM_DEFAULT_CREATOR_NAME',
   'SUPPORT_EMAIL',
   'PLEDGES_EMAIL_FROM',
   'UPDATES_EMAIL_FROM',
+  'PLATFORM_FOOTER_LOGO_PATH',
+  'PLATFORM_FAVICON_PATH',
+  'PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH',
+  'SEO_DEFAULT_SOCIAL_IMAGE_ALT',
+  'SEO_X_HANDLE',
+  'SEO_SAME_AS',
+  'SEO_INDEX_PUBLIC_COMMUNITY_HUB',
+  'STRIPE_PUBLISHABLE_KEY',
   'EMAIL_LOGO_PATH',
   'EMAIL_FONT_FAMILY',
   'EMAIL_HEADING_FONT_FAMILY',
@@ -89,6 +122,7 @@ DEV_ENV_ORDER = [
   'SHIPPING_ORIGIN_COUNTRY',
   'SHIPPING_FALLBACK_FLAT_RATE',
   'FREE_SHIPPING_DEFAULT',
+  'SHIPPING_DEFAULT_OPTION',
   'USPS_ENABLED',
   'USPS_CLIENT_ID',
   'USPS_API_BASE',
@@ -106,6 +140,8 @@ DEV_ENV_ORDER = [
   'CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX',
   'DEBUG_CONSOLE_LOGGING_ENABLED',
   'DEBUG_VERBOSE_CONSOLE_LOGGING',
+  'LIVE_STATS_CACHE_TTL_SECONDS',
+  'LIVE_INVENTORY_CACHE_TTL_SECONDS',
   'DEFAULT_PLATFORM_TIP_PERCENT',
   'MAX_PLATFORM_TIP_PERCENT'
 ].freeze
@@ -163,6 +199,16 @@ def toml_escape(value)
   String(value).gsub('\\', '\\\\').gsub('"', '\"')
 end
 
+def csv_value(value, fallback = nil)
+  source = value.nil? || value == '' ? fallback : value
+  Array(source)
+    .flat_map { |entry| String(entry).split(',') }
+    .map(&:strip)
+    .reject(&:empty?)
+    .uniq
+    .join(',')
+end
+
 def replace_toml_section(content, section_header, body_lines)
   lines = content.lines
   start_index = lines.index { |line| line.strip == section_header }
@@ -180,6 +226,7 @@ end
 
 def build_mirror_values(config, existing)
   platform = config['platform'] || {}
+  admin = config['admin'] || {}
   pricing = config['pricing'] || {}
   tax = config['tax'] || {}
   shipping = config['shipping'] || {}
@@ -188,17 +235,34 @@ def build_mirror_values(config, existing)
   campaign_runner_reports = reports['campaign_runner'] || {}
   debug = config['debug'] || {}
   design = config['design'] || {}
+  seo = config['seo'] || {}
+  checkout = config['checkout'] || {}
+  cache = config['cache'] || {}
 
   {
     'SITE_BASE' => platform['site_url'] || config['url'] || existing['SITE_BASE'],
     'WORKER_BASE' => platform['worker_url'] || existing['WORKER_BASE'],
+    'CORS_ALLOWED_ORIGIN' => platform['site_url'] || config['url'] || existing['CORS_ALLOWED_ORIGIN'],
     'APP_MODE' => existing['APP_MODE'] || 'live',
+    'ADMIN_BOOTSTRAP_EMAILS' => csv_value(admin['local_bootstrap_emails'], existing['ADMIN_BOOTSTRAP_EMAILS']),
+    'ADMIN_TEST_CAMPAIGNS' => csv_value(admin['local_test_campaigns'], existing['ADMIN_TEST_CAMPAIGNS']),
+    'SITE_TITLE' => config['title'] || platform['name'] || existing['SITE_TITLE'],
+    'SITE_DESCRIPTION' => config['description'] || existing['SITE_DESCRIPTION'],
     'PLATFORM_NAME' => platform['name'] || config['title'] || existing['PLATFORM_NAME'],
     'PLATFORM_COMPANY_NAME' => platform['company_name'] || config['author'] || existing['PLATFORM_COMPANY_NAME'],
-    'PLATFORM_AUTHOR' => platform['company_name'] || config['author'] || existing['PLATFORM_AUTHOR'],
+    'PLATFORM_AUTHOR' => config['author'] || platform['company_name'] || existing['PLATFORM_AUTHOR'],
+    'PLATFORM_DEFAULT_CREATOR_NAME' => platform['default_creator_name'] || platform['company_name'] || existing['PLATFORM_DEFAULT_CREATOR_NAME'],
     'SUPPORT_EMAIL' => platform['support_email'] || existing['SUPPORT_EMAIL'],
     'PLEDGES_EMAIL_FROM' => platform['pledges_email_from'] || existing['PLEDGES_EMAIL_FROM'],
     'UPDATES_EMAIL_FROM' => platform['updates_email_from'] || existing['UPDATES_EMAIL_FROM'],
+    'PLATFORM_FOOTER_LOGO_PATH' => platform.key?('footer_logo_path') ? platform['footer_logo_path'].to_s : existing['PLATFORM_FOOTER_LOGO_PATH'],
+    'PLATFORM_FAVICON_PATH' => platform.key?('favicon_path') ? platform['favicon_path'].to_s : existing['PLATFORM_FAVICON_PATH'],
+    'PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH' => platform.key?('default_social_image_path') ? platform['default_social_image_path'].to_s : existing['PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH'],
+    'SEO_DEFAULT_SOCIAL_IMAGE_ALT' => seo.key?('default_social_image_alt') ? seo['default_social_image_alt'].to_s : existing['SEO_DEFAULT_SOCIAL_IMAGE_ALT'],
+    'SEO_X_HANDLE' => seo.key?('x_handle') ? seo['x_handle'].to_s : existing['SEO_X_HANDLE'],
+    'SEO_SAME_AS' => csv_value(seo['same_as'], existing['SEO_SAME_AS']),
+    'SEO_INDEX_PUBLIC_COMMUNITY_HUB' => seo.key?('index_public_community_hub') ? (seo['index_public_community_hub'] ? 'true' : 'false') : existing['SEO_INDEX_PUBLIC_COMMUNITY_HUB'],
+    'STRIPE_PUBLISHABLE_KEY' => checkout.key?('stripe_publishable_key') ? checkout['stripe_publishable_key'].to_s : existing['STRIPE_PUBLISHABLE_KEY'],
     'EMAIL_LOGO_PATH' => platform.key?('logo_path') ? platform['logo_path'].to_s : existing['EMAIL_LOGO_PATH'],
     'EMAIL_FONT_FAMILY' => design.key?('font_body') ? design['font_body'].to_s : existing['EMAIL_FONT_FAMILY'],
     'EMAIL_HEADING_FONT_FAMILY' => design.key?('font_display') ? design['font_display'].to_s : existing['EMAIL_HEADING_FONT_FAMILY'],
@@ -219,6 +283,7 @@ def build_mirror_values(config, existing)
     'SHIPPING_ORIGIN_COUNTRY' => shipping['origin_country'] || existing['SHIPPING_ORIGIN_COUNTRY'],
     'SHIPPING_FALLBACK_FLAT_RATE' => shipping.key?('fallback_flat_rate') ? format_decimal(shipping['fallback_flat_rate'], 2) : existing['SHIPPING_FALLBACK_FLAT_RATE'],
     'FREE_SHIPPING_DEFAULT' => shipping.key?('free_shipping_default') ? (shipping['free_shipping_default'] ? 'true' : 'false') : existing['FREE_SHIPPING_DEFAULT'],
+    'SHIPPING_DEFAULT_OPTION' => shipping.key?('default_option') ? shipping['default_option'].to_s : existing['SHIPPING_DEFAULT_OPTION'],
     'USPS_ENABLED' => usps.key?('enabled') ? (usps['enabled'] ? 'true' : 'false') : existing['USPS_ENABLED'],
     'USPS_CLIENT_ID' => usps.key?('client_id') ? usps['client_id'].to_s : existing['USPS_CLIENT_ID'],
     'USPS_API_BASE' => usps.key?('api_base') ? usps['api_base'].to_s : existing['USPS_API_BASE'],
@@ -236,6 +301,8 @@ def build_mirror_values(config, existing)
     'CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX' => campaign_runner_reports.key?('email_subject_prefix') ? campaign_runner_reports['email_subject_prefix'].to_s : existing['CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX'],
     'DEBUG_CONSOLE_LOGGING_ENABLED' => debug.key?('console_logging_enabled') ? (debug['console_logging_enabled'] ? 'true' : 'false') : existing['DEBUG_CONSOLE_LOGGING_ENABLED'],
     'DEBUG_VERBOSE_CONSOLE_LOGGING' => debug.key?('verbose_console_logging') ? (debug['verbose_console_logging'] ? 'true' : 'false') : existing['DEBUG_VERBOSE_CONSOLE_LOGGING'],
+    'LIVE_STATS_CACHE_TTL_SECONDS' => cache.key?('live_stats_ttl_seconds') ? format_int(cache['live_stats_ttl_seconds']) : existing['LIVE_STATS_CACHE_TTL_SECONDS'],
+    'LIVE_INVENTORY_CACHE_TTL_SECONDS' => cache.key?('live_inventory_ttl_seconds') ? format_int(cache['live_inventory_ttl_seconds']) : existing['LIVE_INVENTORY_CACHE_TTL_SECONDS'],
     'DEFAULT_PLATFORM_TIP_PERCENT' => pricing.key?('default_tip_percent') ? format_int(pricing['default_tip_percent']) : existing['DEFAULT_PLATFORM_TIP_PERCENT'],
     'MAX_PLATFORM_TIP_PERCENT' => pricing.key?('max_tip_percent') ? format_int(pricing['max_tip_percent']) : existing['MAX_PLATFORM_TIP_PERCENT']
   }.compact
@@ -251,6 +318,10 @@ existing_dev = parse_inline_vars(content)
 
 top_values = build_mirror_values(base_config, existing_top)
 dev_values = build_mirror_values(dev_config, existing_dev).merge('APP_MODE' => 'test')
+top_values['CANONICAL_SITE_BASE'] = top_values['SITE_BASE']
+top_values['CANONICAL_WORKER_BASE'] = top_values['WORKER_BASE']
+dev_values['CANONICAL_SITE_BASE'] = top_values['SITE_BASE']
+dev_values['CANONICAL_WORKER_BASE'] = top_values['WORKER_BASE']
 
 updated = content.dup
 

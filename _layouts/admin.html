@@ -1,0 +1,275 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
+{%- assign asset_version = site.time | date: "%s" -%}
+{%- assign admin_config = site["admin"] | default: empty -%}
+<!doctype html>
+<html lang="{{ current_lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
+  {% include first-party-admin-csp.html %}
+  {% include cart-head.html %}
+  {% capture admin_title %}{% include t.html key="admin.page_title" lang=current_lang %}{% endcapture %}
+  {% include seo-meta.html lang=current_lang title=admin_title indexable=false translation_key=page.translation_key %}
+</head>
+<body>
+  <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
+  {% include header.html hide_cart=true %}
+
+  <main id="main-content" class="admin-dashboard" role="main" tabindex="-1">
+    <div class="admin-dashboard__container">
+      <section id="admin-auth-panel" class="admin-auth admin-auth--plain" aria-labelledby="admin-auth-title">
+        <h1 id="admin-auth-title" class="admin-auth__title">{% include t.html key="admin.login_title" lang=current_lang %}</h1>
+        <form id="admin-login-form" class="admin-auth__form">
+          <label for="admin-email" class="sr-only">{% include t.html key="admin.email_label" lang=current_lang %}</label>
+          <div class="admin-auth__row">
+            <input id="admin-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com">
+            <button class="btn" type="submit">{% include t.html key="admin.send_link" lang=current_lang %}</button>
+          </div>
+        </form>
+        <p id="admin-auth-status" class="admin-dashboard__status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section id="admin-app" class="admin-app" hidden aria-labelledby="admin-overview-title">
+        <div class="admin-app__toolbar">
+          <div>
+            <h1 id="admin-overview-title">{% include t.html key="admin.overview_title" lang=current_lang %}</h1>
+            <p id="admin-session-summary" class="admin-app__muted"></p>
+          </div>
+          <div class="admin-app__toolbar-actions">
+            <button id="admin-refresh" class="btn btn--secondary" type="button">{% include t.html key="admin.refresh" lang=current_lang %}</button>
+            <button id="admin-logout" class="btn btn--secondary admin-dashboard__logout" hidden>{% include t.html key="admin.logout" lang=current_lang %}</button>
+          </div>
+        </div>
+
+        <div class="admin-tabs" data-admin-tabs>
+          <div class="admin-tabs__list" role="tablist" aria-label="{% include t.html key='admin.tabs_label' lang=current_lang %}">
+            <button id="admin-tab-settings" class="admin-tabs__tab" type="button" role="tab" aria-selected="true" aria-controls="admin-panel-settings" data-admin-tab="settings">{% include t.html key="admin.settings_title" lang=current_lang %}</button>
+            <button id="admin-tab-campaigns" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-campaigns" data-admin-tab="campaigns" tabindex="-1">{% include t.html key="admin.campaign_settings_title" lang=current_lang %}</button>
+            <button id="admin-tab-addons" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-addons" data-admin-tab="addons" tabindex="-1">{% include t.html key="admin.addons_title" lang=current_lang %}</button>
+            <button id="admin-tab-reports" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-reports" data-admin-tab="reports" tabindex="-1">{% include t.html key="admin.reports_title" lang=current_lang %}</button>
+            <button id="admin-tab-marketing" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-marketing" data-admin-tab="marketing" tabindex="-1">{% include t.html key="admin.marketing_title" lang=current_lang %}</button>
+            <button id="admin-tab-analytics" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-analytics" data-admin-tab="analytics" tabindex="-1">{% include t.html key="admin.analytics_title" lang=current_lang %}</button>
+            <button id="admin-tab-supporters" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-supporters" data-admin-tab="supporters" tabindex="-1">{% include t.html key="admin.supporters_title" lang=current_lang %}</button>
+          </div>
+
+          <section id="admin-panel-settings" class="admin-settings admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-settings" data-admin-tab-panel="settings">
+            <div class="admin-settings__header">
+              <div>
+                <p class="admin-app__muted">{% include t.html key="admin.settings_intro" lang=current_lang %}</p>
+              </div>
+              <div class="admin-settings__actions">
+                <button id="admin-settings-publish" class="btn" type="button" disabled>{% include t.html key="admin.settings_publish" lang=current_lang %}</button>
+              </div>
+            </div>
+            <div id="admin-settings-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+            <div id="admin-settings-section-tabs" class="admin-campaign-tabs admin-settings-section-tabs" role="tablist" aria-label="{% include t.html key='admin.settings_sections_label' lang=current_lang %}"></div>
+            <div id="admin-settings-results" class="admin-settings__results"></div>
+          </section>
+
+        <section id="admin-panel-addons" class="admin-addons admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-addons" data-admin-tab-panel="addons" hidden>
+          <div class="admin-addons__header">
+            <div>
+              <p class="admin-app__muted">{% include t.html key="admin.addons_intro" lang=current_lang %}</p>
+            </div>
+            <div class="admin-settings__actions">
+              <button id="admin-addons-publish" class="btn" type="button" disabled>{% include t.html key="admin.settings_publish" lang=current_lang %}</button>
+            </div>
+          </div>
+          <div id="admin-addons-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+          <div id="admin-addons-results" class="admin-settings__results admin-addons__results"></div>
+        </section>
+
+        <section id="admin-panel-reports" class="admin-reports admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-reports" data-admin-tab-panel="reports" hidden>
+          <div>
+            <p class="admin-app__muted">{% include t.html key="admin.reports_intro" lang=current_lang %}</p>
+          </div>
+          <form id="admin-report-preview-form" class="admin-reports__form">
+            <div class="admin-reports__field">
+              <label for="admin-report-campaign">{% include t.html key="admin.campaign_label" lang=current_lang %}</label>
+              <select id="admin-report-campaign" class="admin-settings__input" name="campaignSlug"></select>
+            </div>
+            <div class="admin-reports__field">
+              <label for="admin-report-type">{% include t.html key="admin.report_type_label" lang=current_lang %}</label>
+              <select id="admin-report-type" class="admin-settings__input" name="reportType">
+                <option value="pledge">{% include t.html key="admin.report_type_pledge" lang=current_lang %}</option>
+                <option value="fulfillment">{% include t.html key="admin.report_type_fulfillment" lang=current_lang %}</option>
+              </select>
+            </div>
+            <div class="admin-reports__actions">
+              <button id="admin-report-download" class="btn btn--secondary" type="button">{% include t.html key="admin.download_csv" lang=current_lang %}</button>
+            </div>
+          </form>
+          <div id="admin-report-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+          <div id="admin-report-preview" class="admin-reports__preview"></div>
+        </section>
+
+        <section id="admin-panel-marketing" class="admin-marketing admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-marketing" data-admin-tab-panel="marketing" hidden>
+          <div>
+            <p class="admin-app__muted">{% include t.html key="admin.marketing_intro" lang=current_lang %}</p>
+          </div>
+          <form id="admin-marketing-builder" class="admin-marketing__form">
+            <div class="admin-marketing__field">
+              <label for="admin-marketing-campaign">{% include t.html key="admin.campaign_label" lang=current_lang %}</label>
+              <select id="admin-marketing-campaign" name="campaignSlug"></select>
+            </div>
+            <div class="admin-marketing__field">
+              <label for="admin-marketing-source">{% include t.html key="admin.marketing_source_label" lang=current_lang %}</label>
+              <input id="admin-marketing-source" name="utmSource" type="text" autocomplete="off" inputmode="text">
+            </div>
+            <div class="admin-marketing__field">
+              <label for="admin-marketing-medium">{% include t.html key="admin.marketing_medium_label" lang=current_lang %}</label>
+              <input id="admin-marketing-medium" name="utmMedium" type="text" autocomplete="off" inputmode="text">
+            </div>
+            <div class="admin-marketing__field">
+              <label for="admin-marketing-content">{% include t.html key="admin.marketing_content_label" lang=current_lang %}</label>
+              <input id="admin-marketing-content" name="utmContent" type="text" autocomplete="off" inputmode="text">
+            </div>
+            <div class="admin-marketing__field">
+              <label for="admin-marketing-ref">{% include t.html key="admin.marketing_ref_label" lang=current_lang %}</label>
+              <input id="admin-marketing-ref" name="ref" type="text" autocomplete="off" inputmode="text">
+            </div>
+            <div class="admin-marketing__field admin-marketing__field--full">
+              <label for="admin-marketing-url">{% include t.html key="admin.marketing_url_label" lang=current_lang %}</label>
+              <textarea id="admin-marketing-url" rows="3" readonly></textarea>
+            </div>
+            <div class="admin-marketing__actions">
+              <button id="admin-marketing-copy-url" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_copy_url" lang=current_lang %}</button>
+              <a id="admin-marketing-embed-link" class="btn btn--secondary" href="/embed/campaign/">{% include t.html key="admin.marketing_open_embed" lang=current_lang %}</a>
+            </div>
+          </form>
+          <div id="admin-marketing-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+          <div id="admin-marketing-snippets" class="admin-marketing__snippets" aria-live="polite"></div>
+        </section>
+
+        <section id="admin-panel-analytics" class="admin-analytics admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-analytics" data-admin-tab-panel="analytics" hidden>
+          <div class="admin-analytics__header">
+            <div>
+              <p class="admin-app__muted">{% include t.html key="admin.analytics_intro" lang=current_lang %}</p>
+            </div>
+            <div class="admin-analytics__controls">
+              <label for="admin-analytics-campaign">{% include t.html key="admin.campaign_label" lang=current_lang %}</label>
+              <select id="admin-analytics-campaign" class="admin-settings__input" name="campaignSlug"></select>
+            </div>
+          </div>
+          <div id="admin-analytics-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+          <div id="admin-analytics-results" class="admin-analytics__results"></div>
+        </section>
+
+        <section id="admin-panel-campaigns" class="admin-campaigns admin-content admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-campaigns" data-admin-tab-panel="campaigns" hidden>
+          <div class="admin-settings__header admin-campaigns__header">
+            <div>
+              <p class="admin-app__muted">{% include t.html key="admin.campaign_settings_intro" lang=current_lang %}</p>
+            </div>
+            <div class="admin-settings__actions">
+              <select id="admin-content-campaign" name="campaignSlug" aria-label="{% include t.html key='admin.campaign_label' lang=current_lang %}" hidden></select>
+              <button id="admin-content-publish" class="btn" type="button" disabled>{% include t.html key="admin.content_publish" lang=current_lang %}</button>
+            </div>
+          </div>
+          <div id="admin-campaign-tabs" class="admin-campaign-tabs" role="tablist" aria-label="{% include t.html key='admin.campaign_settings_tabs_label' lang=current_lang %}"></div>
+          <div id="admin-campaign-settings-results" class="admin-settings__results admin-campaign-settings__results"></div>
+          <form id="admin-content-editor" class="admin-content__form">
+            <input id="admin-content-title-field" name="title" type="hidden">
+            <textarea id="admin-content-short-blurb" name="shortBlurb" rows="3" hidden></textarea>
+            <div class="admin-content__field">
+              <div id="admin-content-blocks" class="admin-content__blocks long-content" aria-label="{% include t.html key='admin.content_blocks_label' lang=current_lang %}"></div>
+              <textarea id="admin-content-long-content" name="longContent" rows="12" spellcheck="false" hidden></textarea>
+            </div>
+            <div class="admin-content__actions">
+              <button id="admin-content-save-draft" class="btn btn--secondary" type="button" disabled>{% include t.html key="admin.content_save_draft" lang=current_lang %}</button>
+            </div>
+          </form>
+          <div id="admin-content-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+          <div id="admin-content-validation" class="admin-content__validation" aria-live="polite"></div>
+          <div class="admin-content__preview-grid">
+            <section class="admin-content__preview-shell admin-content__preview-shell--mobile" aria-labelledby="admin-content-preview-mobile-title">
+              <h3 id="admin-content-preview-mobile-title">{% include t.html key="admin.content_preview_mobile" lang=current_lang %}</h3>
+              <iframe id="admin-content-preview-mobile" title="{% include t.html key='admin.content_preview_mobile' lang=current_lang %}" sandbox="allow-scripts allow-popups allow-presentation"></iframe>
+            </section>
+          </div>
+        </section>
+
+        <section id="admin-panel-supporters" class="admin-supporters admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-supporters" data-admin-tab-panel="supporters" hidden>
+          <div class="admin-supporters__header">
+            <div>
+              <p class="admin-app__muted">{% include t.html key="admin.supporters_intro" lang=current_lang %}</p>
+            </div>
+          </div>
+          <form id="admin-supporter-filters" class="admin-supporters__filters">
+            <div class="admin-supporters__field">
+              <label for="admin-supporter-campaign">{% include t.html key="admin.campaign_label" lang=current_lang %}</label>
+              <select id="admin-supporter-campaign" class="admin-settings__input" name="campaignSlug"></select>
+            </div>
+
+            <div class="admin-supporters__field">
+              <label for="admin-supporter-status">{% include t.html key="admin.status_label" lang=current_lang %}</label>
+              <select id="admin-supporter-status" class="admin-settings__input" name="status">
+                <option value="all">{% include t.html key="admin.filter_all" lang=current_lang %}</option>
+                <option value="active">{% include t.html key="admin.filter_active" lang=current_lang %}</option>
+                <option value="charged">{% include t.html key="admin.filter_charged" lang=current_lang %}</option>
+                <option value="payment_failed">{% include t.html key="admin.filter_payment_failed" lang=current_lang %}</option>
+                <option value="cancelled">{% include t.html key="admin.filter_cancelled" lang=current_lang %}</option>
+              </select>
+            </div>
+
+            <div class="admin-supporters__field">
+              <label for="admin-supporter-fulfillment">{% include t.html key="admin.fulfillment_label" lang=current_lang %}</label>
+              <select id="admin-supporter-fulfillment" class="admin-settings__input" name="fulfillment">
+                <option value="all">{% include t.html key="admin.filter_all" lang=current_lang %}</option>
+                <option value="physical">{% include t.html key="admin.filter_physical" lang=current_lang %}</option>
+                <option value="digital">{% include t.html key="admin.filter_digital" lang=current_lang %}</option>
+                <option value="platform_addons">{% include t.html key="admin.filter_platform_addons" lang=current_lang %}</option>
+              </select>
+            </div>
+
+            <div class="admin-supporters__field">
+              <label for="admin-supporter-query">{% include t.html key="admin.search_label" lang=current_lang %}</label>
+              <input id="admin-supporter-query" class="admin-settings__input" name="q" type="search" autocomplete="off">
+            </div>
+
+            <button id="admin-supporters-export" class="btn btn--secondary admin-supporters__export" type="button">{% include t.html key="admin.export_csv" lang=current_lang %}</button>
+          </form>
+          <div id="admin-supporters-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+          <div id="admin-supporters-results" class="admin-supporters__results"></div>
+          <button id="admin-supporters-next" class="btn btn--secondary" type="button" hidden>{% include t.html key="admin.load_more" lang=current_lang %}</button>
+        </section>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  {% include site-footer.html lang=current_lang translation_key=page.translation_key %}
+  <div id="aria-live-region" class="aria-live" aria-live="polite" aria-atomic="true"></div>
+  <script
+    src="/assets/js/pool-config.js?v={{ asset_version }}"
+    defer
+    data-pool-config-script="true"
+    data-current-lang="{{ current_lang }}"
+    data-runtime-messages="{{ runtime_messages_json | strip | escape }}"
+    data-site-url="{{ site.platform.site_url | default: site.url }}"
+    data-worker-base="{{ site.platform.worker_url }}"
+    data-platform-name="{{ site.platform.name | default: site.title | escape }}"
+    data-platform-company-name="{{ site.platform.company_name | default: site.author | escape }}"
+    data-platform-author="{{ site.author | default: site.platform.company_name | escape }}"
+    data-platform-support-email="{{ site.platform.support_email | default: '' | escape }}"
+    data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"
+    data-sales-tax-rate="{{ site.pricing.sales_tax_rate | default: 0.07875 }}"
+    data-flat-shipping-rate="{{ site.pricing.flat_shipping_rate | default: 3.00 }}"
+    data-default-tip-percent="{{ site.pricing.default_tip_percent | default: 5 }}"
+    data-max-tip-percent="{{ site.pricing.max_tip_percent | default: 15 }}"
+    data-live-stats-cache-ttl-seconds="{{ site.cache.live_stats_ttl_seconds | default: 300 }}"
+    data-live-inventory-cache-ttl-seconds="{{ site.cache.live_inventory_ttl_seconds | default: 300 }}"
+    data-seo-x-handle="{{ site.seo.x_handle | default: '' | escape }}"
+    data-seo-index-public-community-hub="{{ site.seo.index_public_community_hub | default: true }}"
+    data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
+    data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"></script>
+  <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
+  <script
+    src="/assets/js/admin-dashboard.js?v={{ asset_version }}"
+    defer
+    data-admin-dashboard-script="true"
+    data-canonical-site-url="{{ site.admin_production_site_url | default: admin_config.production_site_url | default: site.platform.site_url | default: site.url | escape }}"
+    data-canonical-worker-base="{{ site.admin_production_worker_url | default: admin_config.production_worker_url | default: site.platform.worker_url | escape }}"></script>
+</body>
+</html>
