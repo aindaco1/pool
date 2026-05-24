@@ -1,10 +1,15 @@
 {% assign block = include.block %}
 {% assign layout = block.layout | default: 'grid' %}
+{% assign alignment = block.align | default: 'left' %}
+{% assign caption_style = block.caption_style | default: 'inline' %}
 {% assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" %}
 {% unless layout == 'carousel' %}
   {% assign layout = 'grid' %}
 {% endunless %}
-<figure class="content-block content-block--gallery gallery--{{ layout }}">
+{% unless caption_style == 'overlay' %}
+  {% assign caption_style = 'inline' %}
+{% endunless %}
+<figure class="content-block content-block--gallery gallery--{{ layout }} gallery--caption-{{ caption_style }} content-block--align-{{ alignment | escape }}">
   <div
     class="gallery__container"
     {% if layout == 'carousel' %}
@@ -12,13 +17,13 @@
       aria-label="{% include t.html key='runtime.campaign.image_gallery' lang=current_lang %}"
     {% endif %}>
     {% for img in block.images %}
-      <div class="gallery__item">
+      <div class="gallery__item"{% if caption_style == 'overlay' and img.caption %} tabindex="0"{% endif %}>
         <img 
           src="{{ img.src | escape }}"
           alt="{{ img.alt | default: '' | escape }}"
           loading="lazy">
         {% if img.caption %}
-          <span class="gallery__item-caption">{{ img.caption | safe_rich_text }}</span>
+          <span class="gallery__item-caption"><span class="gallery__item-caption-text">{{ img.caption | safe_rich_text }}</span></span>
         {% endif %}
       </div>
     {% endfor %}

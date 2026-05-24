@@ -7,6 +7,40 @@
 
 .content-block {
   @include section-spacing($space-2xl, $space-xl);
+
+  &--align-left {
+    text-align: left;
+  }
+
+  &--align-center {
+    text-align: center;
+
+    img,
+    .video-embed,
+    .audio-player,
+    .embed-container,
+    .gallery__container {
+      margin-left: auto;
+      margin-right: auto;
+    }
+  }
+
+  &--align-right {
+    text-align: right;
+
+    img,
+    .video-embed,
+    .audio-player,
+    .embed-container,
+    .gallery__container {
+      margin-left: auto;
+      margin-right: 0;
+    }
+  }
+
+  &--align-justify {
+    text-align: justify;
+  }
   
   &:last-child {
     margin-bottom: 0;
@@ -147,12 +181,17 @@
   border-radius: $radius--md;
   overflow: hidden;
   
-  iframe {
+  iframe,
+  video {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
+  }
+
+  video {
+    object-fit: contain;
   }
 }
 
@@ -190,6 +229,7 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
+      transition: opacity 0.2s ease, transform 0.2s ease;
     }
   }
   
@@ -203,6 +243,70 @@
     color: $color--white;
     font-size: $font-size-xs;
   }
+
+  &--caption-overlay {
+    .gallery__item {
+      background: $surface--subtle;
+
+      &:focus {
+        outline: 2px solid $color--primary;
+        outline-offset: 3px;
+      }
+
+      &:hover,
+      &:focus,
+      &:focus-within,
+      &:active {
+        img {
+          opacity: 0.35;
+          transform: scale(1.02);
+        }
+
+        .gallery__item-caption {
+          opacity: 1;
+          transform: translateY(0);
+          pointer-events: auto;
+        }
+      }
+    }
+
+    .gallery__item-caption {
+      @include type-meta;
+      top: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: $space-sm;
+      background: rgba($color--black, 0.48);
+      color: $color--white;
+      font-size: 10px;
+      font-style: italic;
+      line-height: 1.3;
+      opacity: 0;
+      overflow-y: auto;
+      pointer-events: none;
+      transform: translateY($space-xxs);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .gallery__item-caption-text {
+      display: block;
+      max-width: min(100%, 42rem);
+      text-align: left;
+
+      p {
+        text-align: left;
+      }
+
+      strong {
+        display: block;
+        margin-bottom: $space-xxs;
+        font-size: 10px;
+        line-height: 1.2;
+      }
+    }
+  }
   
   &--grid {
     .gallery__container {
@@ -211,6 +315,12 @@
       @include xsm {
         grid-template-columns: 1fr;
       }
+    }
+  }
+
+  &--grid.gallery--caption-overlay {
+    .gallery__item {
+      aspect-ratio: 4 / 5;
     }
   }
   

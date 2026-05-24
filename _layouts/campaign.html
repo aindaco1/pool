@@ -223,7 +223,8 @@
 
 
       {% unless page.diary or page.diary_entries %}
-        {% if content != "" %}
+        {% assign fallback_updates_content = content | strip %}
+        {% if fallback_updates_content != "" %}
         <section class="updates">
           {{ content }}
         </section>

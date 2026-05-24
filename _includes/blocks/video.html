@@ -1,11 +1,23 @@
 {% assign block = include.block %}
 {% assign provider = block.provider | downcase %}
-{% unless provider == 'vimeo' %}
+{% assign alignment = block.align | default: 'left' %}
+{% unless provider == 'vimeo' or provider == 'local' %}
   {% assign provider = 'youtube' %}
 {% endunless %}
-<figure class="content-block content-block--video">
+<figure class="content-block content-block--video content-block--align-{{ alignment | escape }}">
   <div class="video-embed video-embed--{{ provider }}">
-    {% if provider == 'vimeo' %}
+    {% if provider == 'local' and block.src %}
+      {% assign video_type = 'video/webm' %}
+      {% if block.src contains '.mp4' %}
+        {% assign video_type = 'video/mp4' %}
+      {% elsif block.src contains '.mov' %}
+        {% assign video_type = 'video/quicktime' %}
+      {% endif %}
+      <video controls preload="metadata" playsinline{% if block.poster %} poster="{{ block.poster | escape }}"{% endif %}>
+        <source src="{{ block.src | escape }}" type="{{ video_type }}">
+        {% include t.html key="misc.video_not_supported" %}
+      </video>
+    {% elsif provider == 'vimeo' %}
       <iframe 
         src="https://player.vimeo.com/video/{{ block.video_id | uri_escape | escape }}?dnt=1"
         frameborder="0" 
