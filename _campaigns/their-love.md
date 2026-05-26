@@ -20,8 +20,7 @@ custom_late_support: true
 free_shipping: true
 runner_report_emails:
   - theirlovemovie@gmail.com
-instagram: https://www.instagram.com/darling.film.co/
-
+instagram: "https://www.instagram.com/their_love_movie/"
 long_content:
   - type: image
     src: /assets/images/campaigns/their-love/hero-wide.png
