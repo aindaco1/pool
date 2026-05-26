@@ -64,7 +64,7 @@
       {% capture campaign_social_description %}{% include t.html key="campaign_preview.ended_description" lang=current_lang category=campaign_category creator=campaign_creator blurb=campaign_blurb_plain %}{% endcapture %}
   {% endcase %}
   {% capture campaign_social_image_alt %}{% include t.html key="campaign_preview.image_alt" lang=current_lang title=page.title category=campaign_category creator=campaign_creator %}{% endcapture %}
-  {% include seo-meta.html lang=current_lang title=campaign_social_title description=campaign_social_description image=campaign_social_image image_alt=campaign_social_image_alt og_type="article" translation_key=page.translation_key localized_paths=page.localized_paths %}
+  {% include seo-meta.html lang=current_lang title=campaign_social_title description=campaign_social_description image=campaign_social_image image_alt=campaign_social_image_alt image_width=1200 image_height=630 image_type="image/svg+xml" og_type="article" translation_key=page.translation_key localized_paths=page.localized_paths %}
   {% include seo-json-ld.html lang=current_lang kind="campaign" translation_key=page.translation_key localized_paths=page.localized_paths %}
 </head>
 <body>

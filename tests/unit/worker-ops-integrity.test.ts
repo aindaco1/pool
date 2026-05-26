@@ -1066,6 +1066,31 @@ describe('worker operational integrity', () => {
     expect(body).toContain('https://pool.test');
   });
 
+  it('serves campaign share-card metadata for HEAD requests', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 1250000,
+      pledgeCount: 7,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/share/campaign/hand-relations.svg', { method: 'HEAD' }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toContain('image/svg+xml');
+    expect(response.headers.get('Content-Length')).toBeTruthy();
+    expect(await response.text()).toBe('');
+  });
+
   it('localizes the campaign share-card footer link for non-default languages', async () => {
     const env = createEnv();
 

@@ -76,6 +76,9 @@ describe('SEO templates', () => {
     expect(seoMeta).toContain('og:locale:alternate');
     expect(seoMeta).toContain('og:image:alt');
     expect(seoMeta).toContain('og:image:secure_url');
+    expect(seoMeta).toContain('og:image:width');
+    expect(seoMeta).toContain('og:image:height');
+    expect(seoMeta).toContain('og:image:type');
     expect(seoMeta).toContain('twitter:image:alt');
     expect(seoMeta).toContain('application-name');
     expect(seoMeta).toContain('apple-mobile-web-app-title');
@@ -86,6 +89,9 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('title=campaign_social_title');
     expect(campaignLayout).toContain('description=campaign_social_description');
     expect(campaignLayout).toContain('image_alt=campaign_social_image_alt');
+    expect(campaignLayout).toContain('image_width=1200');
+    expect(campaignLayout).toContain('image_height=630');
+    expect(campaignLayout).toContain('image_type="image/svg+xml"');
     expect(campaignLayout).toContain('/share/campaign/{{ page.slug | uri_escape }}.svg?lang={{ current_lang | uri_escape }}');
     expect(seoMeta).toContain("unless image_url contains '://' or image_url contains 'data:'");
     expect(translationsEn).toContain('campaign_preview:');

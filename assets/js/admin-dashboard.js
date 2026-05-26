@@ -245,17 +245,17 @@
       appearance: 'always',
       execution: 'render',
       size: 'flexible',
-      theme: 'auto',
+      theme: 'light',
       callback: function(token) {
         turnstileToken = String(token || '');
       },
       'expired-callback': function() {
         turnstileToken = '';
-        setText(authStatus, t('challenge_expired', 'Verification expired. Please try again.'));
+        setText(authStatus, t('challenge_expired', 'Security check expired. Please try again.'));
       },
       'error-callback': function() {
         turnstileToken = '';
-        setText(authStatus, t('challenge_failed', 'Verification failed. Please try again.'));
+        setText(authStatus, t('challenge_failed', 'Security check failed. Please try again.'));
       }
     });
   }
@@ -6942,7 +6942,7 @@
     if (hasAdminTurnstile()) {
       ensureAdminTurnstile().catch(function(error) {
         logger.warn('Admin challenge failed to load', error);
-        setText(authStatus, t('challenge_failed', 'Verification failed. Please try again.'));
+        setText(authStatus, t('challenge_failed', 'Security check failed. Please try again.'));
       });
     }
 
@@ -6954,7 +6954,7 @@
       try {
         var challengeToken = await adminTurnstileTokenForSubmit();
         if (hasAdminTurnstile() && !challengeToken) {
-          setText(authStatus, t('challenge_required', 'Complete the verification before requesting a sign-in link.'));
+          setText(authStatus, t('challenge_required', 'Complete the security check before requesting a sign-in link.'));
           return;
         }
         var result = await requestJson('/admin/auth/start', {
@@ -6972,9 +6972,9 @@
         resetAdminTurnstile();
         var code = error?.data?.code || '';
         if (code === 'admin_challenge_required') {
-          setText(authStatus, t('challenge_required', 'Complete the verification before requesting a sign-in link.'));
+          setText(authStatus, t('challenge_required', 'Complete the security check before requesting a sign-in link.'));
         } else if (String(code).indexOf('admin_challenge') === 0) {
-          setText(authStatus, t('challenge_failed', 'Verification failed. Please try again.'));
+          setText(authStatus, t('challenge_failed', 'Security check failed. Please try again.'));
         } else {
           setText(authStatus, t('login_failed', 'Unable to start admin sign-in.'));
         }

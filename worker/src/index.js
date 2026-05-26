@@ -3158,7 +3158,7 @@ export default {
         return handleGetLiveCampaign(campaignSlug, env);
       }
 
-      if (path.startsWith('/share/campaign/') && method === 'GET' && path.endsWith('.svg')) {
+      if (path.startsWith('/share/campaign/') && (method === 'GET' || method === 'HEAD') && path.endsWith('.svg')) {
         const campaignSlug = path.replace('/share/campaign/', '').replace(/\.svg$/, '');
         return handleGetCampaignShareCard(campaignSlug, request, env);
       }
@@ -12727,11 +12727,13 @@ async function handleGetCampaignShareCard(campaignSlug, request, env) {
     ? PRIVATE_NO_STORE_CACHE_CONTROL
     : SHARE_CARD_CACHE_CONTROL;
 
-  return new Response(svg, {
+  const isHeadRequest = request.method === 'HEAD';
+  return new Response(isHeadRequest ? null : svg, {
     status: 200,
     headers: {
       'Content-Type': 'image/svg+xml; charset=utf-8',
       'Cache-Control': shareCardCacheControl,
+      'Content-Length': String(new TextEncoder().encode(svg).byteLength),
       ...SECURITY_HEADERS
     }
   });
