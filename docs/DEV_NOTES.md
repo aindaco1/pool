@@ -275,7 +275,7 @@ Quote strings with special characters to avoid YAML parsing issues.
 - **`creator_image`** (optional): Square image for creator (48px circle in sidebar)
 - **Tier `image`** (optional): Wide image shown above tier name
 
-**Video requirements:** WebM, 16:9, max 1920x1080. The admin dashboard accepts hero video uploads up to 100 MB and previews existing video files through the same content-security policy as the public campaign page. Local content video blocks may specify an optional `poster`; when omitted, public/admin editor views generate a transient poster from the video's first frame and keep the playable video lazy-loaded until play.
+**Video requirements:** WebM is preferred for uploaded campaign videos, with 16:9 and max 1920x1080 recommended. The admin dashboard accepts hero video uploads up to 100 MB or YouTube/Vimeo URLs, and previews existing video files or embeds through the same content-security policy as the public campaign page. Local content video blocks may specify an optional `poster`; when omitted, public/admin editor views generate a transient poster from the video's first frame and keep the playable video lazy-loaded until play.
 
 **Dashboard upload paths:** The dashboard writes uploaded assets into the current static asset model:
 

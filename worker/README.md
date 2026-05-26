@@ -309,7 +309,7 @@ Returns sampled wall-clock timings for key mutation routes such as checkout star
 
 The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes instead of exposing `ADMIN_SECRET` in browser code:
 
-- `POST /admin/auth/start` sends a short-lived localized magic link for an authorized admin email
+- `POST /admin/auth/start` sends a short-lived localized magic link for an authorized admin email. Deployed Workers email the link through Resend; local development may expose the link in the JSON response only for localhost/test setups or explicit `ADMIN_EXPOSE_LOGIN_LINK=true`.
 - `POST /admin/auth/exchange` exchanges that one-time token for the `pool_admin_session` cookie
 - `GET /admin/session` reads the current session without refreshing or writing it
 - `POST /admin/logout` clears the session
@@ -509,8 +509,9 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `USPS_RATE_LIMIT_COOLDOWN_SECONDS` | Cooldown after USPS `429` responses |
 | `DEFAULT_PLATFORM_TIP_PERCENT` | Default platform tip percent mirrored from `pricing.default_tip_percent` |
 | `MAX_PLATFORM_TIP_PERCENT` | Max platform tip percent mirrored from `pricing.max_tip_percent` |
-| `APP_MODE` | `"test"` or `"live"` - determines which API keys to use |
+| `APP_MODE` | `"test"` or `"live"` - determines which API keys to use. Production deployments should use `"live"`; local `dev` uses `"test"`. |
 | `CORS_ALLOWED_ORIGIN` | Browser origin allowed to call the Worker from the dashboard/site |
+| `ADMIN_EXPOSE_LOGIN_LINK` | Optional local-only escape hatch to return admin login URLs in `/admin/auth/start` responses. Do not enable on deployed Workers. |
 | `ADMIN_SESSION_SECRET` | Secret used for browser admin session cookies |
 | `ADMIN_BOOTSTRAP_EMAILS` | Optional bootstrap/recovery super-admin emails, mostly for local dev and recovery |
 | `ADMIN_USERS_JSON` | Seed/recovery admin users mirrored from `_config.yml`; runtime dashboard edits save to KV at `admin-users:v1` |
@@ -575,6 +576,7 @@ The `dev` environment:
 - Uses `STRIPE_SECRET_KEY_TEST`
 - Points `SITE_BASE` to localhost
 - Sets `CORS_ALLOWED_ORIGIN` to the local Jekyll origin
+- Allows the admin sign-in route to return the local development login URL instead of requiring email delivery
 - Mirrors `_config.yml` `admin.users` into `ADMIN_USERS_JSON` as the seed/recovery user list
 - Saves dashboard user-management edits directly to the PLEDGES KV key `admin-users:v1`
 - Allows `alonso@dustwave.xyz` as a local bootstrap super admin

@@ -268,6 +268,29 @@ function buildAdminUrl(env, token, lang) {
   return url.toString();
 }
 
+function isTruthyAdminEnv(value) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function isLocalAdminUrl(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  try {
+    const hostname = new URL(text).hostname.toLowerCase();
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  } catch {
+    return false;
+  }
+}
+
+function shouldExposeAdminLoginUrl(env) {
+  if (isTruthyAdminEnv(env?.ADMIN_EXPOSE_LOGIN_LINK) || isTruthyAdminEnv(env?.ADMIN_DEV_LOGIN_LINKS)) {
+    return true;
+  }
+  if (String(env?.APP_MODE || '').trim().toLowerCase() !== 'test') return false;
+  return isLocalAdminUrl(env?.SITE_BASE) || isLocalAdminUrl(env?.WORKER_BASE) || isLocalAdminUrl(env?.CORS_ALLOWED_ORIGIN);
+}
+
 function getSessionCookie(token, request, maxAge = ADMIN_SESSION_TTL_SECONDS) {
   const secure = new URL(request.url).protocol === 'https:';
   const parts = [
@@ -437,14 +460,15 @@ export async function handleAdminAuthStart(request, env, body = {}) {
     createdAt: new Date().toISOString()
   }), { expirationTtl: ADMIN_LOGIN_TTL_SECONDS });
 
-  const emailResult = env.APP_MODE === 'test'
-    ? { sent: false, reason: 'test mode' }
+  const exposeLoginUrl = shouldExposeAdminLoginUrl(env);
+  const emailResult = exposeLoginUrl
+    ? { sent: false, reason: 'development login link exposed' }
     : await sendAdminLoginEmail(env, { email, loginUrl, lang: preferredLang });
 
   return privateAdminJsonResponse({
     success: true,
     sent: emailResult.sent !== false,
-    loginUrl: env.APP_MODE === 'test' ? loginUrl : undefined
+    loginUrl: exposeLoginUrl ? loginUrl : undefined
   }, 200, env);
 }
 

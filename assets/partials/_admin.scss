@@ -765,15 +765,22 @@ textarea.admin-settings__input--readonly {
   padding: 8px;
 
   img,
-  video {
+  video,
+  iframe {
     display: block;
     height: auto;
     max-height: 12rem;
     max-width: 100%;
   }
 
-  video {
+  video,
+  iframe {
     width: 100%;
+  }
+
+  iframe {
+    aspect-ratio: 16 / 9;
+    border: 0;
   }
 
   span {
@@ -806,7 +813,8 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-settings__field-grid .admin-settings__image-preview img,
-  .admin-settings__field-grid .admin-settings__image-preview video {
+  .admin-settings__field-grid .admin-settings__image-preview video,
+  .admin-settings__field-grid .admin-settings__image-preview iframe {
     max-height: 100%;
   }
 }
@@ -2571,6 +2579,10 @@ textarea.admin-settings__input--readonly {
 
   .admin-content-block.is-active > .admin-content-block__settings-button {
     display: none;
+  }
+
+  .admin-content-block.is-active:has(.admin-content-block__settings-panel:not([hidden])) > .admin-content-block__settings-button {
+    display: inline-flex;
   }
 
   .admin-content-block.is-active .admin-content-block__chrome,

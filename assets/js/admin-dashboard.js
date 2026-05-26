@@ -77,6 +77,7 @@
   if (contentBlocksRoot) contentBlocksRoot.dataset.contentEditorId = 'campaign';
   var contentSaveDraft = document.getElementById('admin-content-save-draft');
   var contentPublish = document.getElementById('admin-content-publish');
+  var campaignStatus = document.getElementById('admin-campaign-status');
   var contentStatus = document.getElementById('admin-content-status');
   var contentValidation = document.getElementById('admin-content-validation');
   var contentPreviewGrid = document.querySelector('.admin-content__preview-grid');
@@ -386,6 +387,45 @@
     return absoluteSiteUrl(value).toString();
   }
 
+  function parseExternalVideoUrl(value) {
+    var text = String(value || '').trim();
+    if (!/^https?:\/\//i.test(text)) return null;
+    try {
+      var url = new URL(text);
+      var hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+      var parts = url.pathname.split('/').filter(Boolean);
+      if (hostname === 'youtu.be') {
+        var shortId = parts[0] || '';
+        return /^[A-Za-z0-9_-]+$/.test(shortId) ? { provider: 'youtube', id: shortId } : null;
+      }
+      if (['youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com'].includes(hostname)) {
+        var youtubeId = '';
+        if (url.pathname === '/watch') youtubeId = url.searchParams.get('v') || '';
+        if (!youtubeId && ['embed', 'shorts', 'live'].includes(parts[0])) youtubeId = parts[1] || '';
+        return /^[A-Za-z0-9_-]+$/.test(youtubeId) ? { provider: 'youtube', id: youtubeId } : null;
+      }
+      if (hostname === 'vimeo.com' || hostname.endsWith('.vimeo.com')) {
+        var vimeoId = parts.find(function(part, index) {
+          return part === 'video' && /^\d+$/.test(parts[index + 1] || '');
+        });
+        var numericId = vimeoId ? parts[parts.indexOf(vimeoId) + 1] : parts.find(function(part) {
+          return /^\d+$/.test(part);
+        });
+        return numericId ? { provider: 'vimeo', id: numericId } : null;
+      }
+    } catch (_error) {
+      return null;
+    }
+    return null;
+  }
+
+  function externalVideoEmbedUrl(video) {
+    if (!video?.id) return '';
+    if (video.provider === 'vimeo') return 'https://player.vimeo.com/video/' + encodeURIComponent(video.id) + '?dnt=1';
+    if (video.provider === 'youtube') return 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(video.id);
+    return '';
+  }
+
   async function requestJson(path, options) {
     var headers = Object.assign({ 'Content-Type': 'application/json' }, options?.headers || {});
     if (currentCsrf && options?.method && options.method !== 'GET') {
@@ -512,7 +552,7 @@
       return button instanceof HTMLButtonElement && button.getAttribute('aria-selected') === 'true';
     })?.dataset?.adminTab || 'settings';
     if (activeTab === 'settings') return settingsStatus;
-    if (activeTab === 'campaigns') return contentStatus;
+    if (activeTab === 'campaigns') return campaignStatus || contentStatus;
     if (activeTab === 'addons') return addOnsStatus;
     if (activeTab === 'reports') return reportStatus;
     if (activeTab === 'marketing') return marketingStatus;
@@ -1306,6 +1346,7 @@
     previewWrap.className = 'admin-settings__image-preview';
     var preview = document.createElement(options?.previewType === 'video' ? 'video' : 'img');
     preview.alt = options?.previewAlt || t('settings_image_preview_alt', 'Current image preview');
+    var embedPreview = null;
     if (preview instanceof HTMLImageElement) {
       preview.loading = 'lazy';
     } else if (preview instanceof HTMLVideoElement) {
@@ -1314,10 +1355,32 @@
       preview.muted = true;
       preview.playsInline = true;
       preview.setAttribute('aria-label', options?.previewAlt || t('settings_video_preview_alt', 'Current video preview'));
+      embedPreview = document.createElement('iframe');
+      embedPreview.className = 'admin-settings__video-embed-preview';
+      embedPreview.title = options?.previewAlt || t('settings_video_preview_alt', 'Current video preview');
+      embedPreview.loading = 'lazy';
+      embedPreview.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+      embedPreview.allowFullscreen = true;
+      embedPreview.hidden = true;
     }
     var previewEmpty = document.createElement('span');
     previewEmpty.textContent = options?.emptyText || t('settings_image_no_preview', 'No image preview');
-    previewWrap.append(preview, previewEmpty);
+    previewWrap.append(preview);
+    if (embedPreview) previewWrap.append(embedPreview);
+    previewWrap.append(previewEmpty);
+
+    var urlInput = null;
+    if (options?.allowUrlInput) {
+      urlInput = document.createElement('input');
+      urlInput.className = 'admin-settings__input admin-settings__image-url';
+      urlInput.type = 'text';
+      urlInput.inputMode = 'url';
+      urlInput.autocomplete = 'off';
+      urlInput.spellcheck = false;
+      urlInput.value = currentPath;
+      urlInput.placeholder = options?.urlPlaceholder || t('settings_media_url_placeholder', 'Paste a URL or uploaded asset path');
+      urlInput.setAttribute('aria-label', options?.urlLabel || t('settings_media_url_label', 'Media URL or uploaded path'));
+    }
 
     var uploadRow = document.createElement('div');
     uploadRow.className = 'admin-settings__image-upload';
@@ -1338,10 +1401,11 @@
     uploadStatus.setAttribute('role', 'status');
     uploadRow.append(fileLabel, uploadStatus);
 
-    function setValue(value) {
+    function setValue(value, eventType) {
       root.value = String(value || '');
+      if (urlInput && urlInput.value !== root.value) urlInput.value = root.value;
       updatePreview(root.value);
-      root.dispatchEvent(new Event('change', { bubbles: true }));
+      root.dispatchEvent(new Event(eventType || 'change', { bubbles: true }));
     }
 
     function updatePreview(value) {
@@ -1349,11 +1413,29 @@
       if (!path) {
         preview.removeAttribute('src');
         if (preview instanceof HTMLVideoElement) preview.replaceChildren();
+        if (embedPreview) {
+          embedPreview.removeAttribute('src');
+          embedPreview.hidden = true;
+        }
         preview.hidden = true;
         previewEmpty.hidden = false;
         return;
       }
       try {
+        var externalVideo = preview instanceof HTMLVideoElement ? parseExternalVideoUrl(path) : null;
+        if (externalVideo && embedPreview) {
+          preview.removeAttribute('src');
+          preview.replaceChildren();
+          preview.hidden = true;
+          embedPreview.src = externalVideoEmbedUrl(externalVideo);
+          embedPreview.hidden = false;
+          previewEmpty.hidden = true;
+          return;
+        }
+        if (embedPreview) {
+          embedPreview.removeAttribute('src');
+          embedPreview.hidden = true;
+        }
         var previewUrl = mediaPreviewUrl(path);
         if (preview instanceof HTMLVideoElement) {
           if (preview.querySelector('source')?.getAttribute('src') === previewUrl) {
@@ -1377,9 +1459,22 @@
       } catch (_error) {
         preview.removeAttribute('src');
         if (preview instanceof HTMLVideoElement) preview.replaceChildren();
+        if (embedPreview) {
+          embedPreview.removeAttribute('src');
+          embedPreview.hidden = true;
+        }
         preview.hidden = true;
         previewEmpty.hidden = false;
       }
+    }
+
+    if (urlInput) {
+      urlInput.addEventListener('input', function() {
+        setValue(urlInput.value, 'input');
+      });
+      urlInput.addEventListener('change', function() {
+        setValue(urlInput.value, 'change');
+      });
     }
 
     fileInput.addEventListener('change', async function() {
@@ -1413,7 +1508,7 @@
             filenameBase: filenameBase || uploadContext?.filenameBase || ''
           })
         });
-        setValue(result.path || '');
+        setValue(result.path || '', 'change');
         setText(uploadStatus, options?.uploadedText || t('settings_image_uploaded', 'Image uploaded. Publish settings to use it.'));
       } catch (error) {
         logger.error('Failed to upload admin image', error);
@@ -1423,6 +1518,7 @@
       }
     });
 
+    if (urlInput) root.append(urlInput);
     root.append(previewWrap, uploadRow);
     updatePreview(currentPath);
     return root;
@@ -1470,6 +1566,9 @@
       previewType: 'video',
       previewAlt: t('settings_video_preview_alt', 'Current video preview'),
       emptyText: t('settings_video_no_preview', 'No video preview'),
+      allowUrlInput: true,
+      urlPlaceholder: t('settings_video_url_placeholder', 'Paste a YouTube, Vimeo, or uploaded video path'),
+      urlLabel: t('settings_video_url_label', 'Video URL or uploaded path'),
       uploadLabel: t('settings_video_upload', 'Upload video'),
       uploadedText: t('settings_video_uploaded', 'Video uploaded. Publish settings to use it.'),
       uploadPath: '/admin/settings/video-upload',
@@ -3520,7 +3619,9 @@
       return true;
     } catch (error) {
       logger.error('Failed to publish admin settings', error);
-      setText(statusNode, error?.data?.errors?.join(' ') || error?.data?.error || t('settings_publish_failed', 'Unable to publish settings.'));
+      setText(statusNode, error?.data?.code === 'github_not_configured'
+        ? t('settings_publish_not_configured', 'GitHub publishing is not configured. Add GITHUB_TOKEN to the deployed Worker before publishing.')
+        : (error?.data?.errors?.join(' ') || error?.data?.error || t('settings_publish_failed', 'Unable to publish settings.')));
       return false;
     }
   }
@@ -6061,14 +6162,15 @@
   }
 
   async function publishCampaignChanges() {
+    var statusNode = campaignStatus || contentStatus;
     var campaignSettingsChanges = collectCampaignSettingsChanges();
     if (!campaignSettingsChanges.length && !contentHasUnsavedChanges) {
-      setText(contentStatus, t('settings_no_changes', 'No settings changes to publish.'));
+      setText(statusNode, t('settings_no_changes', 'No settings changes to publish.'));
       updateDirtyIndicators();
       return;
     }
     if (campaignSettingsChanges.length) {
-      var settingsPublished = await publishSettingsChanges(contentStatus, campaignSettingsChanges);
+      var settingsPublished = await publishSettingsChanges(statusNode, campaignSettingsChanges);
       if (!settingsPublished) return;
     }
     if (contentHasUnsavedChanges) {

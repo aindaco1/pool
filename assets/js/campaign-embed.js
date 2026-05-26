@@ -382,7 +382,24 @@ function renderMedia(campaign, embedOptions) {
         videoId = heroVideo.split('/embed/').pop().split('?')[0];
       }
       if (videoId) {
-        return '<iframe src="https://www.youtube.com/embed/' + encodeURIComponent(videoId) + '?autoplay=1&mute=1&loop=1&playlist=' + encodeURIComponent(videoId) + '&controls=0&modestbranding=1&playsinline=1" title="' + imageAlt + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+        return '<iframe src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(videoId) + '?autoplay=1&mute=1&loop=1&playlist=' + encodeURIComponent(videoId) + '&controls=0&modestbranding=1&playsinline=1" title="' + imageAlt + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+      }
+    }
+
+    if (/vimeo\.com\//i.test(heroVideo)) {
+      let videoId = '';
+      try {
+        const parsed = new URL(heroVideo);
+        const parts = parsed.pathname.split('/').filter(Boolean);
+        const videoIndex = parts.indexOf('video');
+        videoId = videoIndex >= 0 && /^\d+$/.test(parts[videoIndex + 1] || '')
+          ? parts[videoIndex + 1]
+          : (parts.find((part) => /^\d+$/.test(part)) || '');
+      } catch (_error) {
+        videoId = '';
+      }
+      if (videoId) {
+        return '<iframe src="https://player.vimeo.com/video/' + encodeURIComponent(videoId) + '?dnt=1&autoplay=1&muted=1&loop=1&background=1" title="' + imageAlt + '" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
       }
     }
 

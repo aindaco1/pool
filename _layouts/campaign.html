@@ -159,7 +159,17 @@
               {% assign yt_id = page.hero_video | split: "/embed/" | last | split: "?" | first %}
             {% endif %}
             <div class="hero__video hero__video--youtube">
-              <iframe src="https://www.youtube.com/embed/{{ yt_id }}" title="{% include t.html key='campaign.video_embed_title' lang=current_lang title=page.title %}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+              <iframe src="https://www.youtube-nocookie.com/embed/{{ yt_id }}" title="{% include t.html key='campaign.video_embed_title' lang=current_lang title=page.title %}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
+          {% elsif page.hero_video contains "vimeo.com" %}
+            {% assign vimeo_id = "" %}
+            {% if page.hero_video contains "player.vimeo.com/video/" %}
+              {% assign vimeo_id = page.hero_video | split: "player.vimeo.com/video/" | last | split: "?" | first | split: "/" | first %}
+            {% elsif page.hero_video contains "vimeo.com/" %}
+              {% assign vimeo_id = page.hero_video | split: "vimeo.com/" | last | split: "?" | first | split: "/" | first %}
+            {% endif %}
+            <div class="hero__video hero__video--vimeo">
+              <iframe src="https://player.vimeo.com/video/{{ vimeo_id }}?dnt=1" title="{% include t.html key='campaign.video_embed_title' lang=current_lang title=page.title %}" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
             </div>
           {% elsif page.hero_video contains "instagram.com" %}
             <div class="hero__video hero__video--instagram">

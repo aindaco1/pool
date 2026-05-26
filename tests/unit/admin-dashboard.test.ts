@@ -91,6 +91,7 @@ function createEnv() {
     CANONICAL_SITE_BASE: 'https://pool.dustwave.xyz',
     CANONICAL_WORKER_BASE: 'https://pledge.dustwave.xyz',
     APP_MODE: 'test',
+    ADMIN_EXPOSE_LOGIN_LINK: 'true',
     PLATFORM_AUTHOR: 'Dust Wave',
     SALES_TAX_RATE: '0.07625',
     MAGIC_LINK_SECRET: 'test-admin-session-secret',
@@ -379,6 +380,7 @@ describe('admin dashboard foundation', () => {
     expect(layout).not.toContain('id="admin-content-load"');
     expect(layout).not.toContain('admin.content_advanced_json');
     expect(layout).toContain('id="admin-content-publish"');
+    expect(layout).toContain('id="admin-campaign-status"');
     expect(layout).toContain('sandbox="allow-scripts allow-popups allow-presentation"');
     expect(csp).toContain("frame-src 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
@@ -687,6 +689,7 @@ describe('admin dashboard foundation', () => {
       body: JSON.stringify({
         changes: [
           { path: 'platform.logo_path', value: 'javascript:alert(1)' },
+          { path: 'hero_video', campaignSlug: 'hand-relations', value: 'https://example.test/not-a-video' },
           { path: 'seo.same_as', value: 'https://example.test/profile\njavascript:alert(1)' },
           { path: 'design.font_body', value: 'Inter; background:url(javascript:alert(1))' },
           { path: 'short_blurb', campaignSlug: 'hand-relations', value: 'Help us [win](javascript:alert(1)).' },
@@ -709,6 +712,7 @@ describe('admin dashboard foundation', () => {
     const body = await previewResponse.json();
     const errors = body.errors.join('\n');
     expect(errors).toContain('Logo must use http or https');
+    expect(errors).toContain('Hero video must be an uploaded MP4, WebM, or MOV video path, or a YouTube or Vimeo URL');
     expect(errors).toContain('Same-as links contains an invalid URL');
     expect(errors).toContain('Body font must be a simple CSS font stack');
     expect(errors).toContain('Short blurb includes an unsafe link URL');
@@ -1272,6 +1276,8 @@ layout: campaign
 title: "Hand Relations"
 slug: hand-relations
 short_blurb: "Old blurb"
+instagram: "https://instagram.com/old"
+hero_video: "/assets/videos/defaults/hand-relations.webm"
 runner_report_emails:
   - "runner@example.com"
 ---
@@ -1408,7 +1414,9 @@ runner_report_emails:
           late_support: false
         }])
       },
-      { path: 'title', campaignSlug: 'hand-relations', value: 'Hand Relations Updated' }
+      { path: 'title', campaignSlug: 'hand-relations', value: 'Hand Relations Updated' },
+      { path: 'instagram', campaignSlug: 'hand-relations', value: 'https://instagram.com/updated' },
+      { path: 'hero_video', campaignSlug: 'hand-relations', value: 'https://www.youtube.com/watch?v=XCQWR9cNsgY' }
     ];
 
     const previewResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/preview', {
@@ -1449,6 +1457,8 @@ runner_report_emails:
     const campaignContent = Buffer.from(campaignPut?.body.content || '', 'base64').toString('utf8');
     expect(campaignContent).toContain('slug: hand-relations');
     expect(campaignContent).toContain('title: "Hand Relations Updated"');
+    expect(campaignContent).toContain('instagram: "https://instagram.com/updated"');
+    expect(campaignContent).toContain('hero_video: "https://www.youtube.com/watch?v=XCQWR9cNsgY"');
     expect(campaignContent).toContain('campaign_add_ons:');
     expect(campaignContent).toContain('id: "campaign-poster"');
     expect(campaignContent).toContain('shipping:\n      weight_oz: 6\n      length_in: 19\n      width_in: 4\n      height_in: 4');
@@ -2689,6 +2699,7 @@ runner_report_emails:
     const env = {
       ...createEnv(),
       APP_MODE: 'production',
+      ADMIN_EXPOSE_LOGIN_LINK: '',
       RESEND_API_KEY: 'resend-test',
       PLATFORM_NAME: 'Pool\r\nBCC: evil@example.com',
       UPDATES_EMAIL_FROM: 'Pool Admin <admin@example.com>\r\nBCC: evil@example.com'
@@ -2711,6 +2722,35 @@ runner_report_emails:
     expect(payload.subject).not.toMatch(/[\r\n]/);
     expect(payload.html).toContain('<a href="https://pool.test/admin/?admin_login=');
     expect(payload.html).not.toMatch(/[\r\n]/);
+  });
+
+  it('emails admin sign-in links on deployed test-mode Workers instead of exposing them in the response', async () => {
+    const env = {
+      ...createEnv(),
+      APP_MODE: 'test',
+      ADMIN_EXPOSE_LOGIN_LINK: '',
+      SITE_BASE: 'https://pool.dustwave.xyz',
+      WORKER_BASE: 'https://pledge.dustwave.xyz',
+      CORS_ALLOWED_ORIGIN: 'https://pool.dustwave.xyz',
+      RESEND_API_KEY: 'resend-test'
+    };
+
+    const response = await worker.fetch(new Request('https://pledge.dustwave.xyz/admin/auth/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@example.com', preferredLang: 'en' })
+    }), env, { waitUntil: vi.fn() });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.loginUrl).toBeUndefined();
+    expect(body.sent).toBe(true);
+    const resendCall = (global.fetch as unknown as { mock: { calls: Array<[RequestInfo | URL, RequestInit?]> } }).mock.calls
+      .find(([input]) => input === 'https://api.resend.com/emails');
+    expect(resendCall).toBeTruthy();
+    const payload = JSON.parse(String(resendCall?.[1]?.body || '{}'));
+    expect(payload.to).toBe('admin@example.com');
+    expect(payload.html).toContain('<a href="https://pool.dustwave.xyz/admin/?admin_login=');
   });
 
   it('publishes validated campaign content through GitHub with CSRF and one audit write', async () => {

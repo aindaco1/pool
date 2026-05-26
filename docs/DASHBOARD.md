@@ -17,7 +17,7 @@ The dashboard is available at:
 - `/admin/`
 - `/es/admin/`
 
-Admins sign in with an email magic link. The local development defaults seed `alonso@dustwave.xyz` as a super admin through `ADMIN_BOOTSTRAP_EMAILS` and `_config.yml` `admin.users`.
+Admins sign in with an email magic link. Deployed Workers email the link through Resend and do not return it in the browser response. Local development can expose the link only when the site/Worker base is localhost or when `ADMIN_EXPOSE_LOGIN_LINK=true` is set explicitly. The local development defaults seed `alonso@dustwave.xyz` as a super admin through `ADMIN_BOOTSTRAP_EMAILS` and `_config.yml` `admin.users`.
 
 Admin users have two roles:
 
@@ -59,6 +59,8 @@ The dashboard intentionally separates read-only browsing, local drafting, KV wri
 | Secrets & credentials | Read-only status only; secret values are never shown, edited, serialized, or published |
 
 Normal dashboard reads must stay within the KV-write budget described in `worker/README.md` and covered by tests.
+
+GitHub-backed publish actions require the deployed Worker to have `GITHUB_TOKEN` plus the repo metadata variables configured. Without that token, the dashboard can still browse, draft, preview, manage runtime users, and save referral codes, but publish actions will fail with a GitHub configuration message.
 
 ## Top-Level Tabs
 
@@ -281,7 +283,7 @@ Recommended campaign media:
 - Hero image wide: 16:9, around 1600x900px
 - Creator image: square, around 400x400px
 - Default social image: large 16:9 or Open Graph-friendly image
-- Hero video: direct video upload, max 100 MB
+- Hero video: direct MP4/WebM/MOV upload up to 100 MB, or a YouTube/Vimeo URL
 
 The Worker upload endpoint is source-preserving. It validates type, size, campaign scope, directory, and filename, but it does not run native image optimizers or FFmpeg. Lossless image compression and video transcoding to WebM should happen in a dedicated build/CI/media pipeline so quality settings, generated derivatives, and rollback behavior are explicit. The dashboard response reports whether an upload was source-preserved or already WebM.
 

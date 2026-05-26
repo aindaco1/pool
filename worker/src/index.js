@@ -8961,7 +8961,7 @@ const ADMIN_CAMPAIGN_SETTING_SCHEMA = new Map([
   ['short_blurb', { label: 'Short blurb', type: 'string', input: 'rich-text-inline', help: 'Brief formatted campaign summary used on cards, previews, and the campaign-page lead. Supports bold, italic, and underline.' }],
   ['hero_image', { label: 'Hero image', type: 'string', input: 'image-upload', layoutGroup: 'hero-images', help: 'Primary square campaign image used on cards and as fallback campaign media. Recommended: 1000 x 1000 px.' }],
   ['hero_image_wide', { label: 'Hero image wide', type: 'string', input: 'image-upload', layoutGroup: 'hero-images', help: 'Wide campaign hero image used where the layout has horizontal space. Recommended: 1600 x 900 px.' }],
-  ['hero_video', { label: 'Hero video', type: 'string', input: 'video-upload', layoutGroup: 'campaign-hero-video-creator-image', help: 'Optional uploaded campaign hero video. MP4, WebM, or MOV; maximum 100 MB.' }],
+  ['hero_video', { label: 'Hero video', type: 'string', input: 'video-upload', layoutGroup: 'campaign-hero-video-creator-image', help: 'Optional campaign hero video. Upload an MP4, WebM, or MOV file up to 100 MB, or paste a YouTube or Vimeo URL.' }],
   ['campaign_background', { label: 'Campaign background', type: 'string', input: 'image-upload', layoutGroup: 'background-images', help: 'Optional campaign page background image. Recommended: 1920 x 1080 px, compressed, and subtle enough to keep text readable.' }],
   ['progress_background', { label: 'Progress background', type: 'string', input: 'image-upload', layoutGroup: 'background-images', help: 'Optional image used behind campaign progress areas when the campaign template supports it.' }],
   ['start_date', { label: 'Start date', type: 'string', input: 'date', layoutGroup: 'campaign-dates', help: 'Date the campaign is scheduled to start. Used with state and deadline for public messaging.' }],
@@ -9434,6 +9434,47 @@ function normalizeAdminAssetReference(value, label = 'Asset') {
   return normalizeAdminUrlReference(value, label, { allowRelative: true });
 }
 
+function parseAdminExternalVideoReference(value) {
+  try {
+    const parsed = new URL(String(value || '').trim());
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (host === 'youtu.be') {
+      const id = parts[0] || '';
+      return /^[A-Za-z0-9_-]+$/.test(id) ? { provider: 'youtube', id } : null;
+    }
+    if (['youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com'].includes(host)) {
+      let id = parsed.pathname === '/watch' ? parsed.searchParams.get('v') || '' : '';
+      if (!id && ['embed', 'shorts', 'live'].includes(parts[0])) id = parts[1] || '';
+      return /^[A-Za-z0-9_-]+$/.test(id) ? { provider: 'youtube', id } : null;
+    }
+    if (host === 'vimeo.com' || host.endsWith('.vimeo.com')) {
+      const videoIndex = parts.indexOf('video');
+      const id = videoIndex >= 0 && /^\d+$/.test(parts[videoIndex + 1] || '')
+        ? parts[videoIndex + 1]
+        : parts.find((part) => /^\d+$/.test(part));
+      return id ? { provider: 'vimeo', id } : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function normalizeAdminHeroVideoReference(value, label = 'Hero video') {
+  const normalized = normalizeAdminAssetReference(value, label);
+  if (!normalized.ok || !normalized.value) return normalized;
+  if (parseAdminExternalVideoReference(normalized.value)) return normalized;
+  const path = normalized.value.startsWith('/')
+    ? normalized.value.split(/[?#]/)[0]
+    : new URL(normalized.value).pathname;
+  if (/\.(mp4|webm|mov)$/i.test(path)) return normalized;
+  return {
+    ok: false,
+    error: `${label} must be an uploaded MP4, WebM, or MOV video path, or a YouTube or Vimeo URL.`
+  };
+}
+
 function collectAdminRichTextErrors(value, fieldName, { maxLength = 8000 } = {}) {
   const text = stripAdminControlCharacters(value, { allowNewlines: true }).trim();
   const errors = [];
@@ -9622,6 +9663,9 @@ function normalizeAdminSettingsValue(value, schema = {}) {
       'shipping.usps.api_base'
     ].includes(schema.path);
     return normalizeAdminUrlReference(text, label, { allowRelative: !requireAbsolute, requireAbsolute });
+  }
+  if (schema.input === 'video-upload' && schema.path === 'hero_video') {
+    return normalizeAdminHeroVideoReference(text, label);
   }
   if (schema.input === 'image-upload' || schema.input === 'video-upload') {
     return normalizeAdminAssetReference(text, label);
