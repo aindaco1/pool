@@ -397,6 +397,26 @@ function buildResendPayload(env, payload) {
   };
 }
 
+function summarizeProviderError(raw) {
+  const text = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+
+  try {
+    const parsed = JSON.parse(text);
+    const values = [
+      parsed.message,
+      parsed.error,
+      parsed.name,
+      parsed.code
+    ].filter(Boolean).map(value => String(value).trim());
+    if (values.length) {
+      return values.join(' ');
+    }
+  } catch (_error) {}
+
+  return text.slice(0, 320);
+}
+
 async function sendResendEmail(env, payload, { errorLabel = 'Resend error', failureLabel = 'Failed to send email' } = {}) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -408,9 +428,10 @@ async function sendResendEmail(env, payload, { errorLabel = 'Resend error', fail
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error(`${errorLabel}:`, error);
-    throw new Error(`${failureLabel}: ${response.status}`);
+    const rawError = await response.text();
+    const error = summarizeProviderError(rawError);
+    console.error(`${errorLabel}:`, { status: response.status, error: error || 'No response body' });
+    throw new Error(`${failureLabel}: ${response.status}${error ? ` (${error})` : ''}`);
   }
 
   return response.json();

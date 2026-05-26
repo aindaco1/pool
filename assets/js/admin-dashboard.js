@@ -190,7 +190,29 @@
   }
 
   function setText(node, value) {
-    if (node) node.textContent = value || '';
+    if (!node) return;
+    node.removeAttribute('data-admin-platform-status');
+    node.textContent = value || '';
+  }
+
+  function setPlatformStatus(node, value) {
+    if (!node) return;
+    node.textContent = '';
+    if (!value) {
+      node.removeAttribute('data-admin-platform-status');
+      return;
+    }
+    node.setAttribute('data-admin-platform-status', 'true');
+
+    var label = document.createElement('span');
+    label.className = 'admin-dashboard__status-label';
+    label.textContent = t('platform_message_label', 'Platform message');
+
+    var message = document.createElement('span');
+    message.className = 'admin-dashboard__status-message';
+    message.textContent = value;
+
+    node.append(label, message);
   }
 
   function syncMobileTabSelect(tablist, options) {
@@ -3642,9 +3664,9 @@
         method: 'POST',
         body: JSON.stringify({ changes: changes })
       });
-      setText(statusNode, result?.rebuild?.triggered
-        ? t('settings_published', 'Settings published to GitHub. Deploy started; changes may take a few minutes to appear.')
-        : t('settings_published_no_deploy', 'Settings published, but deploy did not start automatically.'));
+      setPlatformStatus(statusNode, result?.rebuild?.triggered
+        ? t('settings_published', 'Changes published. They may take a few minutes to appear.')
+        : t('settings_published_no_deploy', 'Changes were saved, but the site did not start updating automatically.'));
       resetSettingsDirtyBaseline(undefined, changes);
       updateDirtyIndicators();
       return true;

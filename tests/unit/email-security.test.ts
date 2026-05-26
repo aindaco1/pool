@@ -72,6 +72,30 @@ describe('email HTML security', () => {
     expect(payload.html).not.toContain('Share to your Story!');
   });
 
+  it('includes sanitized provider details when Resend rejects an email', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 403,
+      json: async () => ({}),
+      text: async () => JSON.stringify({
+        message: 'The sender domain is not verified.',
+        name: 'validation_error'
+      })
+    })));
+
+    await expect(sendSupporterEmail(env, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      subtotal: 3500,
+      tax: 276,
+      shipping: 300,
+      tipAmount: 210,
+      tipPercent: 6,
+      token: 'magic-token'
+    })).rejects.toThrow('Failed to send email: 403 (The sender domain is not verified. validation_error)');
+  });
+
   it('keeps supporter Instagram CTAs lightweight in local dev', async () => {
     const fetchMock = mockResend();
 

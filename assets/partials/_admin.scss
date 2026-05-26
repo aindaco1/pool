@@ -109,6 +109,25 @@
   min-height: 1.5em;
 }
 
+.admin-dashboard__status[data-admin-platform-status="true"] {
+  @include admin-surface(12px 14px);
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.admin-dashboard__status-label {
+  @include admin-label;
+  border-right: 1px solid $border--default;
+  flex: 0 0 auto;
+  padding-right: 10px;
+}
+
+.admin-dashboard__status-message {
+  min-width: 0;
+}
+
 .admin-app__toolbar-actions {
   @include admin-action-row($space-sm);
   justify-content: flex-end;
