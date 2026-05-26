@@ -41,7 +41,7 @@ platform:
   release_label: "v1.0.0"
   company_name: Dust Wave
   support_email: info@dustwave.xyz
-  pledges_email_from: "The Pool <pledges@dustwave.xyz>"
+  pledges_email_from: "The Pool <pledges@pool.dustwave.xyz>"
   updates_email_from: "The Pool <updates@pool.dustwave.xyz>"
   site_url: "https://pool.dustwave.xyz"
   worker_url: "https://pledge.dustwave.xyz"
