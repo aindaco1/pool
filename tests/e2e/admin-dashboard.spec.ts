@@ -1435,13 +1435,13 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('button', { name: 'Validate changes' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Load settings' })).toHaveCount(0);
     page.once('dialog', (dialog) => {
-      expect(dialog.message()).toContain('Changes may take a few minutes');
+      expect(dialog.message()).toContain('They may take a few minutes to appear.');
       dialog.accept();
     });
     await expect(page.locator('#admin-addons-publish')).toBeEnabled();
     await page.locator('#admin-addons-publish').click();
     await expect.poll(() => calls.settingsPreview.length).toBe(1);
-    await expect(page.locator('#admin-addons-status')).toContainText('Deploy started');
+    await expect(page.locator('#admin-addons-status')).toContainText('Changes published');
     await expect.poll(() => calls.settingsPublish.length).toBe(1);
     expect(calls.settingsPublish[0].changes[0]).toMatchObject({ path: 'platform.name', value: 'The Pool Updated' });
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'pricing.sales_tax_rate', value: '0.08125' }));

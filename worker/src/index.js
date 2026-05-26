@@ -96,7 +96,8 @@ import {
   handleAdminLogout,
   handleAdminSession,
   requireAdminSession,
-  saveStoredAdminUsers
+  saveStoredAdminUsers,
+  verifyAdminAuthStartChallenge
 } from './admin-auth.js';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
@@ -2801,6 +2802,8 @@ export default {
           privateResponse: true
         });
         if (!parsedBody.ok) return parsedBody.response;
+        const challengeResponse = await verifyAdminAuthStartChallenge(request, env, parsedBody.body || {});
+        if (challengeResponse) return challengeResponse;
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminAuthStart(request, env, parsedBody.body || {});
@@ -9168,6 +9171,7 @@ function adminSecretStatusRows(env) {
   const activeStripeWebhookSecret = getStripeWebhookSecret(env);
   const uspsRequired = String(env.USPS_ENABLED || '').toLowerCase() === 'true';
   const zipTaxRequired = String(env.TAX_PROVIDER || '').toLowerCase() === 'zip_tax';
+  const turnstileRequired = ['1', 'true', 'yes', 'on'].includes(String(env.ADMIN_TURNSTILE_REQUIRED || '').toLowerCase());
 
   return [
     ['Stripe secret key', status(activeStripeSecret), readOnlyAdminSettingHelp('Secret Stripe API key for the current Worker mode. Store it in Worker secrets for production or worker/.dev.vars for local development.')],
@@ -9176,6 +9180,7 @@ function adminSecretStatusRows(env) {
     ['Magic link secret', status(env.MAGIC_LINK_SECRET), readOnlyAdminSettingHelp('Signing secret for supporter magic links and scoped pledge-management access. Generate a unique value per environment.')],
     ['Admin session secret', status(env.ADMIN_SESSION_SECRET, false), readOnlyAdminSettingHelp('Dedicated signing secret for browser admin sessions. Optional in development because the Worker has fallbacks, but production should set it explicitly.')],
     ['Admin recovery secret', status(env.ADMIN_SECRET), readOnlyAdminSettingHelp('Bearer secret used by protected admin automation and recovery endpoints. Keep this in Worker or GitHub secrets only.')],
+    ['Admin Turnstile secret', status(env.TURNSTILE_SECRET_KEY || env.ADMIN_TURNSTILE_SECRET_KEY, turnstileRequired), readOnlyAdminSettingHelp('Cloudflare Turnstile secret used to verify admin email sign-in challenges. Required when the admin Turnstile widget is enabled.')],
     ['Resend API key', status(env.RESEND_API_KEY), readOnlyAdminSettingHelp('Email provider API key used for admin magic links, pledge emails, and campaign notifications. Never store it in _config.yml.')],
     ['USPS client secret', status(env.USPS_CLIENT_SECRET, uspsRequired), readOnlyAdminSettingHelp('USPS OAuth client secret for live shipping quotes. Required only when USPS is enabled; the client ID remains non-secret config.')],
     ['ZIP.TAX API key', status(env.ZIP_TAX_API_KEY || env.TAX_API_KEY, zipTaxRequired), readOnlyAdminSettingHelp('ZIP.TAX API key for jurisdiction-level tax lookup. Required only when the ZIP.TAX provider is selected.')],

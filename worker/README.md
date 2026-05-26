@@ -318,7 +318,7 @@ Returns sampled wall-clock timings for key mutation routes such as checkout star
 
 The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes instead of exposing `ADMIN_SECRET` in browser code:
 
-- `POST /admin/auth/start` sends a short-lived localized magic link for an authorized admin email. Deployed Workers email the link through Resend; local development may expose the link in the JSON response only for localhost/test setups or explicit `ADMIN_EXPOSE_LOGIN_LINK=true`.
+- `POST /admin/auth/start` verifies Cloudflare Turnstile first when `TURNSTILE_SECRET_KEY` is configured, then sends a short-lived localized magic link for an authorized admin email. Deployed Workers email the link through Resend; local development may expose the link in the JSON response only for localhost/test setups or explicit `ADMIN_EXPOSE_LOGIN_LINK=true`.
 - `POST /admin/auth/exchange` exchanges that one-time token for the `pool_admin_session` cookie
 - `GET /admin/session` reads the current session without refreshing or writing it
 - `POST /admin/logout` clears the session
@@ -525,6 +525,9 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `ADMIN_BOOTSTRAP_EMAILS` | Optional bootstrap/recovery super-admin emails, mostly for local dev and recovery |
 | `ADMIN_USERS_JSON` | Seed/recovery admin users mirrored from `_config.yml`; runtime dashboard edits save to KV at `admin-users:v1` |
 | `ADMIN_TEST_CAMPAIGNS` | Optional comma-separated campaign slugs exposed to the local admin dashboard test setup |
+| `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile secret key for admin email sign-in challenge verification |
+| `ADMIN_TURNSTILE_REQUIRED` | Optional fail-closed flag for deployments that expect Turnstile to be configured |
+| `ADMIN_TURNSTILE_BYPASS` | Local/test-only bypass for automated admin auth tests; do not enable on deployed Workers |
 | `RESEND_RATE_LIMIT_DELAY` | Delay between emails in ms (default: 600ms to stay under Resend's 2 req/sec limit) |
 
 When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email images still fall back to the public `https://pool.dustwave.xyz` asset base so inbox clients do not receive broken localhost image URLs.

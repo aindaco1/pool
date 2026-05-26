@@ -23,6 +23,8 @@
   var loginForm = document.getElementById('admin-login-form');
   var emailInput = document.getElementById('admin-email');
   var authStatus = document.getElementById('admin-auth-status');
+  var turnstileSiteKey = String(loginForm?.dataset?.adminTurnstileSiteKey || '').trim();
+  var turnstileWidgetRoot = document.querySelector('[data-admin-turnstile-widget]');
   var app = document.getElementById('admin-app');
   var logoutButton = document.getElementById('admin-logout');
   var sessionSummary = document.getElementById('admin-session-summary');
@@ -132,6 +134,9 @@
   var activeSettingsSectionHasPublishableControls = true;
   var mobileTabSelectIdCounter = 0;
   var mobileTabSelects = new WeakMap();
+  var turnstileLoadPromise = null;
+  var turnstileWidgetId = null;
+  var turnstileToken = '';
 
   function t(key, fallback, replacements) {
     var text = messages[key] || fallback || key;
@@ -213,6 +218,80 @@
     message.textContent = value;
 
     node.append(label, message);
+  }
+
+  function hasAdminTurnstile() {
+    return Boolean(turnstileSiteKey && turnstileWidgetRoot);
+  }
+
+  function resetAdminTurnstile() {
+    turnstileToken = '';
+    if (turnstileWidgetId !== null && window.turnstile?.reset) {
+      try {
+        window.turnstile.reset(turnstileWidgetId);
+      } catch (error) {
+        logger.warn('Unable to reset admin challenge', error);
+      }
+    }
+  }
+
+  function renderAdminTurnstile() {
+    if (!hasAdminTurnstile() || turnstileWidgetId !== null || !window.turnstile?.render) {
+      return;
+    }
+    turnstileWidgetId = window.turnstile.render(turnstileWidgetRoot, {
+      sitekey: turnstileSiteKey,
+      action: 'admin_login',
+      appearance: 'always',
+      execution: 'render',
+      size: 'flexible',
+      theme: 'auto',
+      callback: function(token) {
+        turnstileToken = String(token || '');
+      },
+      'expired-callback': function() {
+        turnstileToken = '';
+        setText(authStatus, t('challenge_expired', 'Verification expired. Please try again.'));
+      },
+      'error-callback': function() {
+        turnstileToken = '';
+        setText(authStatus, t('challenge_failed', 'Verification failed. Please try again.'));
+      }
+    });
+  }
+
+  function ensureAdminTurnstile() {
+    if (!hasAdminTurnstile()) return Promise.resolve();
+    if (turnstileWidgetId !== null) return Promise.resolve();
+    if (window.turnstile?.render) {
+      renderAdminTurnstile();
+      return Promise.resolve();
+    }
+    if (turnstileLoadPromise) return turnstileLoadPromise;
+    turnstileLoadPromise = new Promise(function(resolve, reject) {
+      var scriptNode = document.createElement('script');
+      scriptNode.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      scriptNode.async = true;
+      scriptNode.defer = true;
+      scriptNode.onload = function() {
+        renderAdminTurnstile();
+        resolve();
+      };
+      scriptNode.onerror = function() {
+        reject(new Error('Turnstile failed to load'));
+      };
+      document.head.appendChild(scriptNode);
+    });
+    return turnstileLoadPromise;
+  }
+
+  async function adminTurnstileTokenForSubmit() {
+    if (!hasAdminTurnstile()) return '';
+    await ensureAdminTurnstile();
+    if (!turnstileToken && turnstileWidgetId !== null && window.turnstile?.getResponse) {
+      turnstileToken = String(window.turnstile.getResponse(turnstileWidgetId) || '');
+    }
+    return turnstileToken;
   }
 
   function syncMobileTabSelect(tablist, options) {
@@ -6851,16 +6930,29 @@
   }
 
   if (loginForm) {
+    if (hasAdminTurnstile()) {
+      ensureAdminTurnstile().catch(function(error) {
+        logger.warn('Admin challenge failed to load', error);
+        setText(authStatus, t('challenge_failed', 'Verification failed. Please try again.'));
+      });
+    }
+
     loginForm.addEventListener('submit', async function(event) {
       event.preventDefault();
       var email = String(emailInput?.value || '').trim();
       if (!email) return;
       setText(authStatus, t('sending_link', 'Sending magic link...'));
       try {
+        var challengeToken = await adminTurnstileTokenForSubmit();
+        if (hasAdminTurnstile() && !challengeToken) {
+          setText(authStatus, t('challenge_required', 'Complete the verification before requesting a sign-in link.'));
+          return;
+        }
         var result = await requestJson('/admin/auth/start', {
           method: 'POST',
-          body: JSON.stringify({ email: email, preferredLang: lang })
+          body: JSON.stringify({ email: email, preferredLang: lang, turnstileToken: challengeToken || undefined })
         });
+        resetAdminTurnstile();
         if (result.loginUrl) {
           setText(authStatus, t('dev_link_ready', 'Development login link is ready.') + ' ' + result.loginUrl);
         } else {
@@ -6868,7 +6960,15 @@
         }
       } catch (error) {
         logger.error('Admin sign-in start failed', error);
-        setText(authStatus, t('login_failed', 'Unable to start admin sign-in.'));
+        resetAdminTurnstile();
+        var code = error?.data?.code || '';
+        if (code === 'admin_challenge_required') {
+          setText(authStatus, t('challenge_required', 'Complete the verification before requesting a sign-in link.'));
+        } else if (String(code).indexOf('admin_challenge') === 0) {
+          setText(authStatus, t('challenge_failed', 'Verification failed. Please try again.'));
+        } else {
+          setText(authStatus, t('login_failed', 'Unable to start admin sign-in.'));
+        }
       }
     });
   }

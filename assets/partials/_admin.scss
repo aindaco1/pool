@@ -105,6 +105,25 @@
   margin-top: 8px;
 }
 
+.admin-auth__challenge {
+  margin-top: 16px;
+}
+
+.admin-auth__challenge-label {
+  @include admin-label;
+  margin: 0 0 8px;
+}
+
+.admin-auth__challenge-help {
+  color: $color--secondary;
+  font-size: $type--ui;
+  margin: 8px 0 0;
+}
+
+.admin-auth__turnstile {
+  min-height: 65px;
+}
+
 .admin-dashboard__status {
   min-height: 1.5em;
 }

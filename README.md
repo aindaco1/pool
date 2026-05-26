@@ -161,6 +161,8 @@ For a full host-only stack, run the Worker separately with `cd worker && wrangle
 
 Local admin dashboard testing uses the repo's dev Worker defaults: `ADMIN_BOOTSTRAP_EMAILS=alonso@dustwave.xyz`, `CORS_ALLOWED_ORIGIN=http://127.0.0.1:4000`, and the two test-only campaigns `hand-relations,smoke-editable`. `_config.yml` `admin.users` is a fork-friendly seed/recovery list mirrored into the Worker as `ADMIN_USERS_JSON`; admin user edits made in the dashboard are saved directly to Worker KV under `admin-users:v1`, take effect immediately, and do not publish to GitHub. The bootstrap email remains a local/recovery super-admin path. Machine-specific secrets still belong in ignored `worker/.dev.vars`.
 
+Admin email sign-in can also use Cloudflare Turnstile. Set the public widget key in `_config.yml` as `admin.turnstile_site_key`, and store the matching `TURNSTILE_SECRET_KEY` as a Worker secret. Local/test automation can use `ADMIN_TURNSTILE_BYPASS=true`, but that bypass should stay out of deployed Workers.
+
 Dashboard publish paths are intentionally split:
 
 - Settings, Add-ons, Campaigns, and content publishes validate through the Worker and commit changes back to GitHub before the normal deploy flow.

@@ -224,7 +224,7 @@ The v1.0 feature set is now in place. The roadmap should treat remaining work as
 
 ## v1.0 Release Hardening
 
-- [ ] Add bot/challenge protection to the admin email sign-in field
+- [x] Add bot/challenge protection to the admin email sign-in field
   - Prefer Cloudflare Turnstile or an equivalent privacy-preserving CAPTCHA/challenge that works with Cloudflare Workers and does not require a separate app server
   - Verify the challenge in `POST /admin/auth/start` before sending a magic-link email
   - Keep existing admin auth rate limits, request-size caps, origin checks, and private/no-store responses

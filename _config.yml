@@ -56,6 +56,9 @@ admin:
   # platform.site_url / platform.worker_url are overridden for development.
   production_site_url: "https://pool.dustwave.xyz"
   production_worker_url: "https://pledge.dustwave.xyz"
+  # Optional Cloudflare Turnstile site key for the admin sign-in challenge.
+  # Keep the matching secret key in Worker secrets as TURNSTILE_SECRET_KEY.
+  turnstile_site_key: ""
   # Seed/recovery dashboard users mirrored into ADMIN_USERS_JSON. Runtime edits
   # made from the dashboard are stored in Worker KV at admin-users:v1.
   users:

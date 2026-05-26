@@ -19,6 +19,8 @@ The dashboard is available at:
 
 Admins sign in with an email magic link. Deployed Workers email the link through Resend and do not return it in the browser response. Local development can expose the link only when the site/Worker base is localhost or when `ADMIN_EXPOSE_LOGIN_LINK=true` is set explicitly. The local development defaults seed `alonso@dustwave.xyz` as a super admin through `ADMIN_BOOTSTRAP_EMAILS` and `_config.yml` `admin.users`.
 
+Admin sign-in can require Cloudflare Turnstile. Configure the public widget key in `_config.yml` as `admin.turnstile_site_key`, and store the matching `TURNSTILE_SECRET_KEY` as a Worker secret. When the secret is configured, `POST /admin/auth/start` verifies the challenge token before rate-limit writes, login-nonce writes, or magic-link email delivery. `ADMIN_TURNSTILE_BYPASS=true` is available only for local/test automation and should not be enabled on deployed Workers.
+
 Admin users have two roles:
 
 - **Super admin**: can manage platform settings, platform add-ons, all campaigns, analytics, reports, supporters, marketing tools, and admin users.
@@ -331,6 +333,8 @@ Check:
 - `CORS_ALLOWED_ORIGIN` matches the site origin
 - the email is present in `_config.yml` `admin.users`, `ADMIN_USERS_JSON`, `ADMIN_BOOTSTRAP_EMAILS`, or the KV-backed users list
 - local secrets exist in `worker/.dev.vars`
+- if Turnstile is enabled, `_config.yml` has `admin.turnstile_site_key` and the Worker has `TURNSTILE_SECRET_KEY`
+- if testing locally with Turnstile enabled, use Cloudflare's test keys or set `ADMIN_TURNSTILE_BYPASS=true` only in a local/test Worker environment
 
 ### Changes Do Not Appear On The Public Site
 

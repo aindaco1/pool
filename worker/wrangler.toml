@@ -129,6 +129,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - CHECKOUT_INTENT_SECRET     (HMAC secret for first-party checkout intent signing)
 # - RESEND_API_KEY             (Resend email API key)
 # - ADMIN_SECRET               (Admin API key for broadcast/rebuild endpoints)
+# - TURNSTILE_SECRET_KEY       (Cloudflare Turnstile secret for admin sign-in challenge)
 #
 # Optional (for separate test/live keys):
 # - STRIPE_SECRET_KEY_LIVE / STRIPE_SECRET_KEY_TEST
@@ -141,6 +142,8 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - GITHUB_OWNER               (defaults to 'aindaco1')
 # - GITHUB_REPO                (defaults to 'pool')
 # - GITHUB_WORKFLOW            (defaults to 'deploy.yml')
+# - ADMIN_TURNSTILE_REQUIRED   (set true to fail closed when Turnstile is expected)
+# - ADMIN_TURNSTILE_BYPASS     (local/test-only bypass for automated admin auth tests)
 
 # Development overrides
 # Keep local Worker defaults aligned with `_config.local.yml` so local

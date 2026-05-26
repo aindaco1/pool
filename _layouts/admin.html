@@ -2,6 +2,7 @@
 {%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
 {%- assign asset_version = site.time | date: "%s" -%}
 {%- assign admin_config = site["admin"] | default: empty -%}
+{%- assign admin_turnstile_site_key = admin_config.turnstile_site_key | default: "" | strip -%}
 <!doctype html>
 <html lang="{{ current_lang }}">
 <head>
@@ -21,12 +22,19 @@
     <div class="admin-dashboard__container">
       <section id="admin-auth-panel" class="admin-auth admin-auth--plain" aria-labelledby="admin-auth-title">
         <h1 id="admin-auth-title" class="admin-auth__title">{% include t.html key="admin.login_title" lang=current_lang %}</h1>
-        <form id="admin-login-form" class="admin-auth__form">
+        <form id="admin-login-form" class="admin-auth__form"{% if admin_turnstile_site_key != "" %} data-admin-turnstile-site-key="{{ admin_turnstile_site_key | escape }}"{% endif %}>
           <label for="admin-email" class="sr-only">{% include t.html key="admin.email_label" lang=current_lang %}</label>
           <div class="admin-auth__row">
             <input id="admin-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com">
             <button class="btn" type="submit">{% include t.html key="admin.send_link" lang=current_lang %}</button>
           </div>
+          {% if admin_turnstile_site_key != "" %}
+          <div class="admin-auth__challenge" role="group" aria-labelledby="admin-turnstile-label" aria-describedby="admin-turnstile-help">
+            <p id="admin-turnstile-label" class="admin-auth__challenge-label">{% include t.html key="admin.challenge_label" lang=current_lang %}</p>
+            <div id="admin-turnstile" class="admin-auth__turnstile" data-admin-turnstile-widget></div>
+            <p id="admin-turnstile-help" class="admin-auth__challenge-help">{% include t.html key="admin.challenge_help" lang=current_lang %}</p>
+          </div>
+          {% endif %}
         </form>
         <p id="admin-auth-status" class="admin-dashboard__status" role="status" aria-live="polite"></p>
       </section>

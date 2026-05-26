@@ -258,6 +258,9 @@ beforeEach(() => {
     if (url === 'https://api.resend.com/emails') {
       return jsonResponse({ id: 'email-test' });
     }
+    if (url === 'https://challenges.cloudflare.com/turnstile/v0/siteverify') {
+      return jsonResponse({ success: true, action: 'admin_login' });
+    }
     throw new Error(`Unexpected fetch: ${url}`);
   }) as typeof fetch;
 });
@@ -1857,6 +1860,124 @@ runner_report_emails:
     await expect(lastResponse?.json()).resolves.toMatchObject({ error: 'Too many requests' });
     expect(ratelimit.putCalls).toBe(5);
     expect(pledges.putCalls).toBe(5);
+  });
+
+  it('requires admin Turnstile verification before rate-limit or login KV writes when configured', async () => {
+    const env = {
+      ...createEnv(),
+      TURNSTILE_SECRET_KEY: 'turnstile-test-secret',
+      ADMIN_TURNSTILE_REQUIRED: 'true'
+    };
+    const ctx = { waitUntil: vi.fn() };
+    const ratelimit = env.RATELIMIT as CountingKVNamespace;
+    const pledges = env.PLEDGES as CountingKVNamespace;
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/auth/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@example.com', preferredLang: 'en' })
+    }), env, ctx);
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Admin challenge required',
+      code: 'admin_challenge_required'
+    });
+    expect(ratelimit.putCalls).toBe(0);
+    expect(pledges.putCalls).toBe(0);
+  });
+
+  it('validates admin Turnstile tokens before creating login nonces', async () => {
+    const env = {
+      ...createEnv(),
+      TURNSTILE_SECRET_KEY: 'turnstile-test-secret'
+    };
+    const ctx = { waitUntil: vi.fn() };
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/auth/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'CF-Connecting-IP': '203.0.113.15'
+      },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        preferredLang: 'en',
+        turnstileToken: 'turnstile-client-token'
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.loginUrl).toContain('/admin/?admin_login=');
+    const fetchCalls = (global.fetch as unknown as { mock: { calls: Array<[RequestInfo | URL, RequestInit?]> } }).mock.calls;
+    const turnstileCall = fetchCalls.find(([input]) => input === 'https://challenges.cloudflare.com/turnstile/v0/siteverify');
+    expect(turnstileCall).toBeTruthy();
+    const payload = JSON.parse(String(turnstileCall?.[1]?.body || '{}'));
+    expect(payload).toMatchObject({
+      secret: 'turnstile-test-secret',
+      response: 'turnstile-client-token',
+      remoteip: '203.0.113.15'
+    });
+    expect(payload.idempotency_key).toBeTruthy();
+    expect((env.RATELIMIT as CountingKVNamespace).putCalls).toBe(1);
+    expect((env.PLEDGES as CountingKVNamespace).putCalls).toBe(1);
+  });
+
+  it('rejects failed admin Turnstile verification before rate-limit or login KV writes', async () => {
+    const env = {
+      ...createEnv(),
+      TURNSTILE_SECRET_KEY: 'turnstile-test-secret'
+    };
+    const ctx = { waitUntil: vi.fn() };
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://challenges.cloudflare.com/turnstile/v0/siteverify') {
+        return jsonResponse({ success: false, 'error-codes': ['invalid-input-response'] });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/auth/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        preferredLang: 'en',
+        turnstileToken: 'bad-token'
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Admin challenge verification failed',
+      code: 'admin_challenge_failed'
+    });
+    expect((env.RATELIMIT as CountingKVNamespace).putCalls).toBe(0);
+    expect((env.PLEDGES as CountingKVNamespace).putCalls).toBe(0);
+  });
+
+  it('allows explicit admin Turnstile bypass only in local/test mode', async () => {
+    const env = {
+      ...createEnv(),
+      TURNSTILE_SECRET_KEY: 'turnstile-test-secret',
+      ADMIN_TURNSTILE_BYPASS: 'true'
+    };
+    const ctx = { waitUntil: vi.fn() };
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/auth/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@example.com', preferredLang: 'en' })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true });
+    const fetchCalls = (global.fetch as unknown as { mock: { calls: Array<[RequestInfo | URL, RequestInit?]> } }).mock.calls;
+    expect(fetchCalls.some(([input]) => input === 'https://challenges.cloudflare.com/turnstile/v0/siteverify')).toBe(false);
+    expect((env.RATELIMIT as CountingKVNamespace).putCalls).toBe(1);
+    expect((env.PLEDGES as CountingKVNamespace).putCalls).toBe(1);
   });
 
   it('rejects oversized admin auth payloads before rate-limit or auth KV writes', async () => {
