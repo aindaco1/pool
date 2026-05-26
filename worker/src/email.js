@@ -490,6 +490,88 @@ export async function sendAdminLoginEmail(env, { email, loginUrl, lang }) {
   }
 }
 
+export async function sendAdminUserCreatedEmail(env, { email, name = '', role = 'campaign_user', campaignNames = [], createdBy = '', lang } = {}) {
+  configureEmailLogging(env);
+  if (!env?.RESEND_API_KEY) {
+    return { sent: false, reason: 'RESEND_API_KEY not configured' };
+  }
+
+  const normalizedLang = normalizeLang(lang);
+  const translator = await getEmailTranslator(env, normalizedLang);
+  const theme = getEmailTheme(env);
+  const platformName = safeEmailHeaderText(getPlatformName(env) || 'The Pool') || 'The Pool';
+  const from = safeEmailHeaderText(getUpdatesEmailFrom(env) || getPledgesEmailFrom(env));
+  const roleKey = role === 'super_admin' ? 'admin_user_created.role_super_admin' : 'admin_user_created.role_campaign_user';
+  const roleLabel = translator.t(roleKey, role === 'super_admin' ? 'super admin' : 'campaign user');
+  const adminUrl = safeSiteUrl(getLocalizedPath('/admin/', normalizedLang), getResolvedSiteBase(env));
+  const displayName = String(name || '').trim();
+  const greetingName = displayName || email;
+  const campaignList = Array.isArray(campaignNames)
+    ? campaignNames.map((campaignName) => String(campaignName || '').trim()).filter(Boolean)
+    : [];
+  const campaignBlock = role === 'campaign_user' && campaignList.length
+    ? `
+    <p style="margin: 16px 0 8px 0; font-weight: 600;">${escapeHtml(translator.t('admin_user_created.campaigns_heading', 'Campaign access'))}</p>
+    <ul style="margin: 0; padding-left: 20px;">
+      ${campaignList.map((campaignName) => `<li>${escapeHtml(campaignName)}</li>`).join('')}
+    </ul>`
+    : '';
+  const createdByLine = createdBy
+    ? `<p style="margin: 16px 0 0 0; font-size: 13px; color: ${theme.mutedTextColor};">${escapeHtml(translator.t('admin_user_created.created_by', 'Added by %{email}', { email: createdBy }))}</p>`
+    : '';
+  const subject = safeEmailHeaderText(buildEmailSubject(
+    translator.t('subjects.admin_user_created', 'Admin access added'),
+    platformName
+  ));
+  const heading = translator.t('admin_user_created.heading', 'Admin access added');
+  const intro = translator.t('admin_user_created.intro', 'You have been added as a %{role} for %{platform}.', {
+    role: roleLabel,
+    platform: platformName
+  });
+  const instructions = translator.t(
+    'admin_user_created.instructions',
+    'Use the admin sign-in page and enter this email address to receive a magic link. There is no password to set.'
+  );
+  const cta = translator.t('admin_user_created.cta', 'Open admin sign-in');
+  const footer = translator.t(
+    'admin_user_created.footer',
+    'If you were not expecting this access, ignore this email or contact the platform owner.'
+  );
+
+  const html = `
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(heading))}
+  <div style="${getEmailCardStyle(theme)}">
+    <p style="margin: 0 0 8px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(translator.t('admin_user_created.greeting', 'Hi %{name},', { name: greetingName }))}</p>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(intro)}</p>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(instructions)}</p>
+    <p style="margin: 0;">
+      <a href="${escapeHtml(adminUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(cta)}</a>
+    </p>
+    ${campaignBlock}
+    ${createdByLine}
+  </div>
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(footer)}</p>
+  </div>
+</body>`;
+
+  try {
+    await sendResendEmail(env, {
+      from,
+      to: email,
+      subject,
+      html
+    }, {
+      errorLabel: 'Resend error (admin user created)',
+      failureLabel: 'Failed to send admin user email'
+    });
+    return { sent: true };
+  } catch (error) {
+    return { sent: false, reason: error?.message || 'Failed to send admin user email' };
+  }
+}
+
 // Instagram CTA block for emails (when campaign has instagram field)
 function getInstagramCTA(instagramUrl, siteBase = FALLBACK_SITE_BASE, t = (_key, fallback) => fallback, { variant = 'prominent', theme = null } = {}) {
   const safeInstagramHref = safeInstagramUrl(instagramUrl);

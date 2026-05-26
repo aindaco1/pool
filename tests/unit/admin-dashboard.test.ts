@@ -656,6 +656,82 @@ describe('admin dashboard foundation', () => {
     expect(deletedOtherUser.status).toBe(200);
   });
 
+  it('emails newly created admin users after saving user changes', async () => {
+    const env = {
+      ...createEnv(),
+      RESEND_API_KEY: 'resend-test',
+      UPDATES_EMAIL_FROM: 'Pool Admin <admin@pool.test>',
+      I18N_CATALOG: {}
+    };
+    const { cookie, ctx, csrfToken } = await signInAdmin(env);
+    const fetchMock = global.fetch as unknown as { mockClear: () => void, mock: { calls: Array<[RequestInfo | URL, RequestInit?]> } };
+
+    async function saveUsers(users: unknown[]) {
+      return worker.fetch(new Request('https://pledge.pool.test/admin/users', {
+        method: 'POST',
+        headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+        body: JSON.stringify({ users, preferredLang: 'en' })
+      }), env, ctx);
+    }
+
+    fetchMock.mockClear();
+    const createResponse = await saveUsers([{
+      name: 'Admin Person',
+      email: 'admin@example.com',
+      role: 'super_admin',
+      campaigns: []
+    }, {
+      name: 'Creator Person',
+      email: 'creator@example.com',
+      role: 'campaign_user',
+      campaigns: ['hand-relations']
+    }]);
+    expect(createResponse.status).toBe(200);
+    await expect(createResponse.json()).resolves.toMatchObject({
+      notifications: {
+        newUserEmails: ['creator@example.com'],
+        sent: ['creator@example.com'],
+        failed: []
+      }
+    });
+
+    const resendCalls = fetchMock.mock.calls.filter(([input]) => input === 'https://api.resend.com/emails');
+    expect(resendCalls).toHaveLength(1);
+    const payload = JSON.parse(String(resendCalls[0]?.[1]?.body || '{}'));
+    expect(payload).toMatchObject({
+      from: 'Pool Admin <admin@pool.test>',
+      to: 'creator@example.com',
+      subject: 'Admin access added | The Pool'
+    });
+    expect(payload.html).toContain('You have been added as a campaign user');
+    expect(payload.html).toContain('Campaign access');
+    expect(payload.html).toContain('Hand Relations');
+    expect(payload.html).toContain('Open admin sign-in');
+    expect(payload.text).toContain('Open admin sign-in (https://pool.test/admin/');
+
+    fetchMock.mockClear();
+    const editExistingResponse = await saveUsers([{
+      name: 'Admin Person',
+      email: 'admin@example.com',
+      role: 'super_admin',
+      campaigns: []
+    }, {
+      name: 'Creator Renamed',
+      email: 'creator@example.com',
+      role: 'campaign_user',
+      campaigns: ['hand-relations']
+    }]);
+    expect(editExistingResponse.status).toBe(200);
+    await expect(editExistingResponse.json()).resolves.toMatchObject({
+      notifications: {
+        newUserEmails: [],
+        sent: [],
+        failed: []
+      }
+    });
+    expect(fetchMock.mock.calls.some(([input]) => input === 'https://api.resend.com/emails')).toBe(false);
+  });
+
   it('keeps admin users out of GitHub-backed settings publishing', async () => {
     const env = createEnv();
     const { cookie, ctx } = await signInAdmin(env);

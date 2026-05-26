@@ -126,6 +126,7 @@ Rules:
 - You can demote or delete other super admins.
 - Campaign users must have at least one assigned campaign.
 - User changes save to KV immediately through the Users save button; they do not use the Settings publish button.
+- Newly created users are emailed sign-in instructions when Resend is configured. Edits to existing users do not resend the email.
 
 ### Secrets & Credentials
 

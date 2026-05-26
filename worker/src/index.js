@@ -56,7 +56,7 @@
  */
 
 import { generateToken, verifyToken } from './token.js';
-import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail, sendCampaignRunnerReportEmail } from './email.js';
+import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail, sendCampaignRunnerReportEmail, sendAdminUserCreatedEmail } from './email.js';
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
@@ -10152,6 +10152,50 @@ async function handleAdminSettingsPreview(request, env, body = {}) {
   }, result.errors.length ? 422 : 200, env);
 }
 
+function campaignNamesForAdminUser(user = {}, campaigns = []) {
+  if (user.role === 'super_admin') return [];
+  const campaignMap = new Map((campaigns || []).map((campaign) => [
+    String(campaign?.slug || ''),
+    String(campaign?.title || campaign?.slug || '').trim()
+  ]));
+  return (user.campaignSlugs || user.campaigns || [])
+    .map((campaignSlug) => campaignMap.get(String(campaignSlug || '')) || String(campaignSlug || '').trim())
+    .filter(Boolean);
+}
+
+async function notifyNewAdminUsers(env, users = [], previousUsers = [], campaigns = [], options = {}) {
+  const previousEmails = new Set((previousUsers || [])
+    .map((user) => String(user?.email || '').trim().toLowerCase())
+    .filter(Boolean));
+  const newUsers = (users || []).filter((user) => user?.email && !previousEmails.has(String(user.email).trim().toLowerCase()));
+  const results = [];
+
+  for (const user of newUsers) {
+    const result = await sendAdminUserCreatedEmail(env, {
+      email: user.email,
+      name: user.name || '',
+      role: user.role,
+      campaignNames: campaignNamesForAdminUser(user, campaigns),
+      createdBy: options.createdBy || '',
+      lang: options.lang || 'en'
+    });
+    results.push({
+      email: user.email,
+      sent: result.sent !== false,
+      reason: result.sent === false ? result.reason || 'Email unavailable' : undefined
+    });
+  }
+
+  return {
+    newUserEmails: newUsers.map((user) => user.email),
+    sent: results.filter((result) => result.sent).map((result) => result.email),
+    failed: results.filter((result) => !result.sent).map((result) => ({
+      email: result.email,
+      reason: result.reason
+    }))
+  };
+}
+
 async function handleAdminUsersSave(request, env, body = {}) {
   const auth = await requireAdminSession(request, env, 'settings:publish', { requireCsrf: true });
   if (!auth.ok) return auth.response;
@@ -10160,6 +10204,7 @@ async function handleAdminUsersSave(request, env, body = {}) {
   }
 
   const { campaigns } = await getCampaigns(env);
+  const previousUsers = await getEffectiveAdminUsers(env);
   const normalized = normalizeAdminUsers(body.users ?? body.value ?? [], {
     label: 'Users',
     availableCampaignSlugs: (campaigns || []).map((campaign) => campaign?.slug),
@@ -10177,6 +10222,10 @@ async function handleAdminUsersSave(request, env, body = {}) {
   if (!saved.ok) {
     return privateJsonResponse({ error: saved.error }, saved.status || 500, env);
   }
+  const notifications = await notifyNewAdminUsers(env, saved.users, previousUsers || [], campaigns || [], {
+    createdBy: auth.user.email,
+    lang: body.preferredLang
+  });
 
   return privateJsonResponse({
     success: true,
@@ -10186,6 +10235,7 @@ async function handleAdminUsersSave(request, env, body = {}) {
       role: user.role === 'super_admin' ? 'super_admin' : 'campaign_user',
       campaigns: user.role === 'super_admin' ? [] : (user.campaignSlugs || [])
     })),
+    notifications,
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 1 })
   }, 200, env);
 }

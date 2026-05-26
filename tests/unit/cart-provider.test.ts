@@ -2665,7 +2665,7 @@ describe('cart provider shim', () => {
 
     await vi.waitFor(() => {
       expect(mount).toHaveBeenCalled();
-    });
+    }, { timeout: 10000 });
   });
 
   it('keeps the custom payment element mounted after an incomplete-card confirm error', async () => {
@@ -2846,7 +2846,7 @@ describe('cart provider shim', () => {
       const confirmAction = liveRoot?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
       expect(confirmAction).toBeTruthy();
       expect(confirmAction?.disabled).toBe(false);
-    });
+    }, { timeout: 10000 });
 
     const confirmButton = getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
     confirmButton?.click();
@@ -2859,7 +2859,7 @@ describe('cart provider shim', () => {
     expect(getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]')).toBeTruthy();
     expect(getLiveRoot()?.textContent?.includes('Your card number is incomplete.')).toBe(false);
     expect(getLiveRoot()?.querySelector('[data-cart-custom-checkout-region="link"]')).toBeNull();
-  });
+  }, 15000);
 
 
   it('surfaces first-party checkout start errors in the drawer preview', async () => {

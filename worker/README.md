@@ -327,7 +327,7 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `POST /admin/settings/preview` validates settings changes without publishing
 - `POST /admin/settings/logo-upload`, `POST /admin/settings/image-upload`, and `POST /admin/settings/video-upload` stage dashboard uploads through the same GitHub-backed publish path as their owning settings/content fields
 - `POST /admin/settings/publish` validates and publishes platform settings, platform add-ons, campaign variables, and campaign structured data through GitHub-backed commits
-- `POST /admin/users` saves dashboard-managed admin users directly to `admin-users:v1` in Worker KV
+- `POST /admin/users` saves dashboard-managed admin users directly to `admin-users:v1` in Worker KV and emails newly created users sign-in instructions when Resend is configured
 - `GET /admin/analytics` reads role-scoped pledge-derived revenue, status, language, referral, and campaign/platform split metrics without writing analytics state; dashboard currency presentation keeps exact cents
 - `GET /admin/content/campaign?campaignSlug=...` loads role-scoped campaign content into the browser editor without persisting a draft
 - `POST /admin/content/preview` validates and renders role-scoped campaign content drafts without publishing, auditing, or writing KV
@@ -345,7 +345,7 @@ Normal dashboard reads, supporter filters, pagination, pledge-derived analytics,
 
 Admin auth starts/exchanges and browser-admin mutations are rate limited through the `RATELIMIT` binding and return private/no-store failures when throttled. Normal authenticated reads such as session checks, dashboard summaries, supporter filters, report previews, analytics views, and content previews are intentionally not KV-rate-limited. Magic-link login tokens are one-time use, and session reads do not refresh near-expiry sessions or clean up expired sessions on the read path. Cookie-backed admin mutations require both the session CSRF token and a trusted same-site `Origin`/`Referer` or non-cross-site fetch context before durable writes.
 
-The v1.0 release-hardening roadmap includes adding Cloudflare Turnstile or equivalent CAPTCHA/challenge validation to `POST /admin/auth/start` before sending magic-link email. Keep that protection on the submit path only so it does not add dashboard pageview or typing-time KV writes.
+When `TURNSTILE_SECRET_KEY` is configured, `POST /admin/auth/start` verifies the Cloudflare Turnstile challenge before sending magic-link email. Keep that protection on the submit path only so it does not add dashboard pageview or typing-time KV writes.
 
 Platform add-on inventory uses `_config.yml` as the configured baseline, optional `add-on-inventory-overrides` KV state for operator restocks, and saved pledge truth for sold counts. Admin inventory page views do not load the inventory table automatically; the super-admin inventory read is explicit and may scan pledge truth, while set/restock/reset actions write only the override state plus an audit event.
 

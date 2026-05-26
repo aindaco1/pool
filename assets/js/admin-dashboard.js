@@ -2736,14 +2736,23 @@
     try {
       var result = await requestJson('/admin/users', {
         method: 'POST',
-        body: JSON.stringify({ users: users })
+        body: JSON.stringify({ users: users, preferredLang: lang })
       });
       root.value = JSON.stringify(result.users || users);
       root.dataset.adminUsersSavedValue = root.value;
       root.dataset.settingsOriginal = root.value;
       updateAdminUsersSaveState(root);
       updateAdminDirtyIndicatorsSoon();
-      setText(status, t('admin_user_saved', 'Users saved. Changes take effect immediately.'));
+      var notifications = result.notifications || {};
+      var newUserCount = Array.isArray(notifications.newUserEmails) ? notifications.newUserEmails.length : 0;
+      var failedCount = Array.isArray(notifications.failed) ? notifications.failed.length : 0;
+      if (newUserCount && failedCount) {
+        setText(status, t('admin_user_saved_email_failed', 'Users saved, but one or more new-user emails could not be sent.'));
+      } else if (newUserCount) {
+        setText(status, t('admin_user_saved_email_sent', 'Users saved. New users were emailed sign-in instructions.'));
+      } else {
+        setText(status, t('admin_user_saved', 'Users saved. Changes take effect immediately.'));
+      }
     } catch (error) {
       logger.error('Failed to save admin users', error);
       setText(status, error?.data?.errors?.join(' ') || error?.data?.error || t('admin_user_save_failed', 'Unable to save users.'));
