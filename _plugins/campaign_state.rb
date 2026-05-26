@@ -1,15 +1,19 @@
 # Automatically sets campaign state based on start_date and goal_deadline
 # States: upcoming (before start_date), live (between dates), post (after goal_deadline)
-# Uses Mountain Time (MST = UTC-7) so campaigns don't end early on UTC-based CI servers
+# Uses America/Denver so campaigns transition at midnight Mountain Time,
+# including daylight saving time.
 
-Jekyll::Hooks.register :campaigns, :pre_render do |campaign|
-  # Use Mountain Standard Time (UTC-7) for date comparison
-  # This ensures the campaign stays "live" until the end of the deadline day in MT,
-  # even when the build runs on a UTC-based server (e.g., GitHub Actions)
-  utc_now = Time.now.utc
-  mt_offset = -7 * 3600  # MST = UTC-7 (conservative; covers both MST and MDT)
-  today = (utc_now + mt_offset).to_date
+require 'date'
 
+def pool_mountain_today
+  original_tz = ENV['TZ']
+  ENV['TZ'] = 'America/Denver'
+  Time.now.to_date
+ensure
+  ENV['TZ'] = original_tz
+end
+
+def pool_apply_campaign_state(campaign, today)
   start_date = campaign.data['start_date']
   goal_deadline = campaign.data['goal_deadline']
 
@@ -26,4 +30,14 @@ Jekyll::Hooks.register :campaigns, :pre_render do |campaign|
     campaign.data['state'] = 'live'
   end
   # If dates are missing, leave state as manually set in front matter
+end
+
+Jekyll::Hooks.register :site, :post_read do |site|
+  today = pool_mountain_today
+  campaigns = site.collections['campaigns']
+  next unless campaigns
+
+  campaigns.docs.each do |campaign|
+    pool_apply_campaign_state(campaign, today)
+  end
 end

@@ -808,6 +808,10 @@ textarea.admin-settings__input--readonly {
     height: 100%;
   }
 
+  .admin-settings__field-grid .admin-settings__image-field--with-url {
+    grid-template-rows: auto minmax(14rem, auto) auto;
+  }
+
   .admin-settings__field-grid .admin-settings__image-preview {
     height: 14rem;
   }

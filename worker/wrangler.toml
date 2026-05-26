@@ -9,11 +9,11 @@ routes = [
 ]
 
 # Cron triggers:
-# - `0 7 * * *`: daily campaign transition + settlement checks
+# - `0 6 * * *` / `0 7 * * *`: daily campaign transition + settlement checks at midnight Mountain Time
 # - `0 13 * * *` / `0 14 * * *`: 7:00 AM Mountain Time campaign-runner reports
 # - `*/15 * * * *`: retry failed supporter confirmation emails
 [triggers]
-crons = ["0 7 * * *", "0 13 * * *", "0 14 * * *", "*/15 * * * *"]
+crons = ["0 6 * * *", "0 7 * * *", "0 13 * * *", "0 14 * * *", "*/15 * * * *"]
 
 [vars]
 SITE_BASE = "https://pool.dustwave.xyz"
@@ -21,7 +21,7 @@ WORKER_BASE = "https://pledge.dustwave.xyz"
 CANONICAL_SITE_BASE = "https://pool.dustwave.xyz"
 CANONICAL_WORKER_BASE = "https://pledge.dustwave.xyz"
 CORS_ALLOWED_ORIGIN = "https://pool.dustwave.xyz"
-APP_MODE = "live"
+APP_MODE = "test"
 ADMIN_USERS_JSON = "[{\"name\":\"Alonso\",\"email\":\"alonso@dustwave.xyz\",\"role\":\"super_admin\",\"campaignSlugs\":[]}]"
 SITE_TITLE = "The Pool"
 SITE_DESCRIPTION = "The Pool is Dust Wave's crowdfunding platform for independent film and creative projects."

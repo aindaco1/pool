@@ -240,7 +240,7 @@ long_content:
 
 The `_plugins/campaign_state.rb` plugin sets state at build time. The Worker cron triggers a site rebuild when dates cross midnight MT.
 
-**Mountain Time enforcement**: The Jekyll plugin converts UTC to Mountain Time before comparing dates, so campaigns don't end early on UTC-based CI servers. The Worker cron and GitHub Actions cron both run at 7 AM UTC (midnight MT) to trigger state transitions.
+**Mountain Time enforcement**: The Jekyll plugin evaluates dates in the `America/Denver` timezone before comparing dates, so campaigns transition at midnight Mountain Time on UTC-based CI servers and still respect daylight saving time. The Worker and GitHub Actions rebuild schedules should account for both MST and MDT launch/deadline boundaries.
 
 ### Countdown Timer Timezone
 
@@ -890,12 +890,12 @@ worker/src/
 
 ### Cron Trigger (Auto-Settle)
 
-The Worker has a scheduled trigger that runs daily at **7:00 AM UTC** (midnight Mountain Standard Time):
+The Worker has scheduled triggers at **6:00 AM UTC** and **7:00 AM UTC** so lifecycle checks run at midnight Mountain Time in both MDT and MST:
 
 ```toml
 # wrangler.toml
 [triggers]
-crons = ["0 7 * * *"]
+crons = ["0 6 * * *", "0 7 * * *"]
 ```
 
 **What it does:**
@@ -906,7 +906,7 @@ crons = ["0 7 * * *"]
 3. Aggregates pledges by email within each campaign so each supporter gets ONE charge per campaign
 4. Sends charge-success / payment-failed emails as appropriate
 
-**Timezone note:** During daylight saving time (MDT), the cron runs at 1:00 AM MT instead of midnight.
+**Timezone note:** The duplicate UTC schedules are intentional. One aligns with midnight MDT, the other aligns with midnight MST. The settlement/state logic still checks campaign dates before doing any durable work, so the off-season run is harmless.
 
 ### Token Module
 
@@ -1020,7 +1020,7 @@ The Worker automatically settles campaigns via a daily cron trigger (runs at mid
 Cancelled pledges are never charged. You can also manually trigger settlement via `POST /admin/settle/:slug`.
 
 **What timezone are deadlines in?**  
-All deadlines use **Mountain Time (MST/MDT)**. A campaign with `goal_deadline: 2025-12-20` ends at 11:59:59 PM MST on that date. The cron trigger runs at 7:00 AM UTC (midnight MST). The countdown timer on campaign pages automatically detects DST and uses -06:00 (MDT) during summer months and -07:00 (MST) the rest of the year.
+All deadlines use **Mountain Time (MST/MDT)**. A campaign with `goal_deadline: 2025-12-20` ends at 11:59:59 PM MST on that date. Cron triggers run at both 6:00 AM UTC and 7:00 AM UTC so daily checks cover midnight MDT and midnight MST. The countdown timer on campaign pages automatically detects DST and uses -06:00 (MDT) during summer months and -07:00 (MST) the rest of the year.
 
 ---
 

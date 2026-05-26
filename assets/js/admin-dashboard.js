@@ -342,6 +342,32 @@
     }
   }
 
+  function resetSettingsDirtyBaseline(roots, changes) {
+    var changedKeys = Array.isArray(changes) && changes.length
+      ? new Set(changes.map(function(change) {
+        return String(change.campaignSlug || '') + '\n' + String(change.path || '');
+      }))
+      : null;
+    (roots || settingsContainers()).forEach(function(root) {
+      if (!(root instanceof HTMLElement)) return;
+      root.querySelectorAll('[data-settings-path]').forEach(function(control) {
+        var campaignSlug = String(control.dataset.settingsCampaign || '');
+        var path = String(control.dataset.settingsPath || '');
+        var matchesChangedPath = !changedKeys
+          || changedKeys.has(campaignSlug + '\n' + path)
+          || changedKeys.has(campaignSlug + '\n' + String(control.dataset.settingsTimeHourPath || ''))
+          || changedKeys.has(campaignSlug + '\n' + String(control.dataset.settingsTimeMinutePath || ''));
+        if (!matchesChangedPath) return;
+        control.dataset.settingsOriginal = String(control.value || '');
+        if (control.dataset.settingsInput === 'time' && control.dataset.settingsTimeHourPath) {
+          var parts = parseSettingsTimeValue(control.value || '');
+          control.dataset.settingsTimeOriginalHour = String(parts.hour);
+          control.dataset.settingsTimeOriginalMinute = String(parts.minute);
+        }
+      });
+    });
+  }
+
   function updateDirtyIndicators() {
     var settingsDirty = settingsHaveUnsavedChanges();
     var campaignDirty = contentHasUnsavedChanges || campaignSettingsHaveUnsavedChanges();
@@ -1371,6 +1397,7 @@
 
     var urlInput = null;
     if (options?.allowUrlInput) {
+      root.classList.add('admin-settings__image-field--with-url');
       urlInput = document.createElement('input');
       urlInput.className = 'admin-settings__input admin-settings__image-url';
       urlInput.type = 'text';
@@ -2988,6 +3015,14 @@
     return String(normalizeTimePart(hour, 0, 23)).padStart(2, '0') + ':' + String(normalizeTimePart(minute, 0, 59)).padStart(2, '0');
   }
 
+  function parseSettingsTimeValue(value) {
+    var match = String(value || '').match(/^(\d{2}):(\d{2})$/);
+    return {
+      hour: match ? normalizeTimePart(Number(match[1]), 0, 23) : 0,
+      minute: match ? normalizeTimePart(Number(match[2]), 0, 59) : 0
+    };
+  }
+
   function collectCompoundTimeChanges(control) {
     var value = String(control.value || '');
     var match = value.match(/^(\d{2}):(\d{2})$/);
@@ -3610,11 +3645,7 @@
       setText(statusNode, result?.rebuild?.triggered
         ? t('settings_published', 'Settings published to GitHub. Deploy started; changes may take a few minutes to appear.')
         : t('settings_published_no_deploy', 'Settings published, but deploy did not start automatically.'));
-      settingsContainers().forEach(function(root) {
-        root.querySelectorAll('[data-settings-path]').forEach(function(control) {
-          control.dataset.settingsOriginal = String(control.value || '');
-        });
-      });
+      resetSettingsDirtyBaseline(undefined, changes);
       updateDirtyIndicators();
       return true;
     } catch (error) {
@@ -6117,21 +6148,21 @@
     if (activeDiaryContentField instanceof HTMLTextAreaElement) {
       syncActiveDiaryContentField();
       setText(contentStatus, t('content_diary_publish_blocked', 'Finish editing the diary entry before publishing campaign page content.'));
-      return;
+      return false;
     }
     var confirmed = window.confirm(t('content_publish_confirm', 'Publish this campaign content to GitHub and trigger a rebuild?'));
-    if (!confirmed) return;
+    if (!confirmed) return false;
 
     var draft;
     try {
       draft = readContentEditorDraft();
     } catch (_error) {
       setText(contentStatus, t('content_json_invalid', 'Content blocks must be valid JSON.'));
-      return;
+      return false;
     }
     if (!draft.campaignSlug) {
       setText(contentStatus, currentCampaigns.length ? '' : t('no_campaigns', 'No campaigns are available for this admin account.'));
-      return;
+      return false;
     }
 
     writeContentDraft();
@@ -6149,6 +6180,7 @@
         status: data?.rebuild?.triggered ? t('yes', 'Yes') : t('no', 'No')
       }));
       resetContentDirtyBaseline();
+      return true;
     } catch (error) {
       if (error?.data?.preview) {
         renderContentPreview(error.data);
@@ -6158,6 +6190,7 @@
       setText(contentStatus, error?.data?.code === 'github_not_configured'
         ? t('content_publish_not_configured', 'GitHub publishing is not configured.')
         : t('content_publish_failed', 'Unable to publish content.'));
+      return false;
     }
   }
 
@@ -6174,8 +6207,10 @@
       if (!settingsPublished) return;
     }
     if (contentHasUnsavedChanges) {
-      await publishContentDraft();
+      var contentPublished = await publishContentDraft();
+      if (!contentPublished) return;
     }
+    updateDirtyIndicators();
   }
 
   function reportQueryParams() {

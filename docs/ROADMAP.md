@@ -231,6 +231,7 @@ The v1.0 feature set is now in place. The roadmap should treat remaining work as
   - Provide English and Spanish field/help/error copy, including an accessible retry path for keyboard and screen-reader users
   - Add local/dev and automated-test bypass support through explicit test configuration, not by weakening production validation
   - Avoid per-keystroke or per-pageview KV writes; challenge validation should only run when the admin submits the sign-in form
+- [ ] Send an email to new user accounts when created
 - [ ] Run final v1.0 release verification
   - `node --check assets/js/admin-dashboard.js`
   - `npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium`
@@ -263,6 +264,7 @@ The v1.0 feature set is now in place. The roadmap should treat remaining work as
 - [ ] "Share to" platform links for campaigns modeled off dust-wave-new news items "share to" platform links
 - [ ] Allow super admins and campaign users to publish email-protected campaign preview pages
 - [ ] Allow potential pledgers to sign up for email launch reminders for upcoming campaigns
+- [ ] Allow super admins to set a default timezone for the platform rather than hardcoding Mountain Time
 
 ## Known Issues
 

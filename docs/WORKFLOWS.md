@@ -447,12 +447,12 @@ Supporter-only community page:
 
 ## Charging Flow (Worker Cron)
 
-The Worker has a scheduled trigger that runs daily at **7:00 AM UTC** (midnight Mountain Time):
+The Worker has scheduled triggers at **6:00 AM UTC** and **7:00 AM UTC** so daily checks line up with midnight Mountain Time in both MDT and MST:
 
 ```toml
 # wrangler.toml
 [triggers]
-crons = ["0 7 * * *"]
+crons = ["0 6 * * *", "0 7 * * *"]
 ```
 
 **What it does:**

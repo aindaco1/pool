@@ -65,6 +65,13 @@ function buildEmailSubject(primary, secondary, prefix = '') {
   return [normalizedPrefix, core].filter(Boolean).join(' ').trim();
 }
 
+function safeEmailHeaderText(value) {
+  return String(value ?? '')
+    .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function renderSummaryLine(value) {
   const text = String(value ?? '');
   const escaped = escapeHtml(text);
@@ -407,6 +414,59 @@ async function sendResendEmail(env, payload, { errorLabel = 'Resend error', fail
   }
 
   return response.json();
+}
+
+export async function sendAdminLoginEmail(env, { email, loginUrl, lang }) {
+  configureEmailLogging(env);
+  if (!env?.RESEND_API_KEY) {
+    return { sent: false, reason: 'RESEND_API_KEY not configured' };
+  }
+
+  const normalizedLang = normalizeLang(lang);
+  const isSpanish = normalizedLang === 'es';
+  const theme = getEmailTheme(env);
+  const platformName = safeEmailHeaderText(getPlatformName(env) || 'The Pool') || 'The Pool';
+  const from = safeEmailHeaderText(getUpdatesEmailFrom(env) || getPledgesEmailFrom(env));
+  const subject = safeEmailHeaderText(isSpanish
+    ? buildEmailSubject('Tu enlace de administración', platformName)
+    : buildEmailSubject('Your admin sign-in link', platformName));
+  const heading = isSpanish ? 'Inicia sesión en administración' : 'Sign in to admin';
+  const body = isSpanish
+    ? 'Este enlace caduca en 15 minutos. Si no lo solicitaste, puedes ignorar este correo.'
+    : 'This link expires in 15 minutes. If you did not request it, you can ignore this email.';
+  const cta = isSpanish ? 'Abrir administración' : 'Open admin';
+  const footer = isSpanish
+    ? 'Este correo se envió porque alguien solicitó acceso al panel de administración.'
+    : 'This email was sent because someone requested access to the admin dashboard.';
+
+  const html = `
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(heading))}
+  <div style="${getEmailCardStyle(theme)}">
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(body)}</p>
+    <p style="margin: 0;">
+      <a href="${escapeHtml(loginUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(cta)}</a>
+    </p>
+  </div>
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(footer)}</p>
+  </div>
+</body>`;
+
+  try {
+    await sendResendEmail(env, {
+      from,
+      to: email,
+      subject,
+      html
+    }, {
+      errorLabel: 'Resend error (admin login)',
+      failureLabel: 'Failed to send admin login email'
+    });
+    return { sent: true };
+  } catch (error) {
+    return { sent: false, reason: error?.message || 'Failed to send admin login email' };
+  }
 }
 
 // Instagram CTA block for emails (when campaign has instagram field)

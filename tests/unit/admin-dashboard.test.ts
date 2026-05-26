@@ -2720,8 +2720,11 @@ runner_report_emails:
     expect(payload.subject).toBe('Your admin sign-in link | Pool BCC: evil@example.com');
     expect(payload.from).not.toMatch(/[\r\n]/);
     expect(payload.subject).not.toMatch(/[\r\n]/);
+    expect(payload.reply_to).toBeTruthy();
     expect(payload.html).toContain('<a href="https://pool.test/admin/?admin_login=');
-    expect(payload.html).not.toMatch(/[\r\n]/);
+    expect(payload.html).toContain('border-radius:');
+    expect(payload.html).toContain('Open admin');
+    expect(payload.text).toContain('Open admin (https://pool.test/admin/?admin_login=');
   });
 
   it('emails admin sign-in links on deployed test-mode Workers instead of exposing them in the response', async () => {
@@ -2751,6 +2754,8 @@ runner_report_emails:
     const payload = JSON.parse(String(resendCall?.[1]?.body || '{}'));
     expect(payload.to).toBe('admin@example.com');
     expect(payload.html).toContain('<a href="https://pool.dustwave.xyz/admin/?admin_login=');
+    expect(payload.html).toContain('Open admin');
+    expect(payload.text).toContain('Open admin (https://pool.dustwave.xyz/admin/?admin_login=');
   });
 
   it('publishes validated campaign content through GitHub with CSRF and one audit write', async () => {

@@ -1,4 +1,5 @@
 import { getAllowedOrigin, isValidEmail, SECURITY_HEADERS } from './validation.js';
+import { sendAdminLoginEmail } from './email.js';
 
 export const ADMIN_SESSION_COOKIE = 'pool_admin_session';
 export const ADMIN_USERS_KV_KEY = 'admin-users:v1';
@@ -376,60 +377,6 @@ function publicUser(user) {
     role: user.role,
     campaignSlugs: user.role === 'super_admin' ? [] : (user.campaignSlugs || [])
   };
-}
-
-function safeAdminEmailHeaderText(value) {
-  return String(value ?? '')
-    .replace(/[\u0000-\u001F\u007F]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function escapeAdminEmailHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-async function sendAdminLoginEmail(env, { email, loginUrl, lang }) {
-  if (!env?.RESEND_API_KEY) {
-    return { sent: false, reason: 'RESEND_API_KEY not configured' };
-  }
-
-  const platformName = safeAdminEmailHeaderText(env.PLATFORM_NAME || 'The Pool') || 'The Pool';
-  const from = safeAdminEmailHeaderText(env.UPDATES_EMAIL_FROM || env.PLEDGES_EMAIL_FROM || `${platformName} <updates@example.com>`);
-  const isSpanish = normalizeLang(lang) === 'es';
-  const subject = safeAdminEmailHeaderText(isSpanish
-    ? `Tu enlace de administración | ${platformName}`
-    : `Your admin sign-in link | ${platformName}`);
-  const heading = isSpanish ? 'Inicia sesión en administración' : 'Sign in to admin';
-  const body = isSpanish
-    ? 'Este enlace caduca en 15 minutos. Si no lo solicitaste, puedes ignorar este correo.'
-    : 'This link expires in 15 minutes. If you did not request it, you can ignore this email.';
-  const cta = isSpanish ? 'Abrir administración' : 'Open admin';
-  const html = `<h1>${escapeAdminEmailHtml(heading)}</h1><p>${escapeAdminEmailHtml(body)}</p><p><a href="${escapeAdminEmailHtml(loginUrl)}">${escapeAdminEmailHtml(cta)}</a></p>`;
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from,
-      to: email,
-      subject,
-      html
-    })
-  });
-
-  if (!response.ok) {
-    return { sent: false, reason: `Resend returned ${response.status}` };
-  }
-  return { sent: true };
 }
 
 export async function handleAdminAuthStart(request, env, body = {}) {

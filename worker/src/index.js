@@ -3276,7 +3276,7 @@ export default {
   },
 
   // Cron triggers:
-  // - `0 7 * * *`: daily campaign transitions + settlement checks
+  // - `0 6 * * *` / `0 7 * * *`: daily campaign transitions + settlement checks at midnight Mountain Time
   // - `0 13 * * *` / `0 14 * * *`: 7:00 AM Mountain Time campaign-runner reports
   // - `*/15 * * * *`: retry failed supporter confirmation emails
   async scheduled(event, env, ctx) {

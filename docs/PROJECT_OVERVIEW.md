@@ -150,7 +150,7 @@ For current Cloudflare limits, see:
 3. ✅ Cloudflare Worker deployed (`pledge.dustwave.xyz`) with Stripe + Worker signing secrets.  
 4. ✅ Stripe webhook configured → Worker `/webhooks/stripe`.  
 5. ✅ Repo secrets set: `STRIPE_SECRET_KEY`, `CHECKOUT_INTENT_SECRET`, and admin/email secrets.  
-6. ✅ Daily Worker cron enabled (7 AM UTC / midnight MT) — check via `GET /admin/cron/status`.  
+6. ✅ Daily Worker cron enabled (6 AM UTC and 7 AM UTC for MDT/MST midnight checks) — check via `GET /admin/cron/status`.
 7. ✅ Cloudflare cache purge configured (preferred: API token/account ID; legacy email/key auth still works if explicitly configured).  
 8. ✅ Test campaign runs end-to-end in Stripe test mode.
 9. ✅ Long-form content sanitizes Markdown link schemes and only renders structured embeds from exact approved origins.
