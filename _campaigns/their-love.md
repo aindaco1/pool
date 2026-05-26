@@ -29,8 +29,6 @@ long_content:
 
   - type: text
     body: |
-      *Their Love* follows Eric and Sam from first hello to last goodbye, asking what it means to truly love.
-
       Most great films originate from human experience, and *Their Love* is no exception. The goal is to create a story for everyone, no matter their background, and to give viewers a way to explore heartbreak without feeling alone.
 
   - type: image
