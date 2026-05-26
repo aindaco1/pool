@@ -520,7 +520,7 @@ The Worker handles all pledge-related email via Resend.
 
 ### Resend Integration (Worker)
 
-The Worker sends supporter emails after Stripe webhook confirms the setup-mode session:
+The Worker sends supporter emails after Stripe webhook confirms the setup-mode session. The sender domain must be authorized for the configured Resend API key; for this deployment, pledge confirmations use `The Pool <pledges@pool.dustwave.xyz>` because `pool.dustwave.xyz` is the authorized sending domain.
 
 ```js
 // In Worker: POST /webhooks/stripe handler
@@ -535,12 +535,12 @@ async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amo
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: 'The Pool <pledges@dustwave.xyz>',
+      from: env.PLEDGES_EMAIL_FROM,
       to: email,
       subject: `Pledge confirmed | ${campaignTitle}`,
       html: `
         <h1>Thanks for backing ${campaignTitle}!</h1>
-        <p><strong>Pledge amount:</strong> $${(amount / 100).toFixed(0)}</p>
+        <p><strong>Pledge amount:</strong> $${(amount / 100).toFixed(2)}</p>
         <p><strong>Remember:</strong> Your card is saved but won't be charged unless this campaign reaches its goal.</p>
         <hr>
         <h2>Your Supporter Access</h2>

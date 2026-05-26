@@ -205,6 +205,8 @@ If you want to exercise the on-site Stripe checkout locally, add `STRIPE_PUBLISH
 
 For production, use Cloudflare Worker secrets for runtime credentials and GitHub repository secrets for deploy credentials. Do not put Stripe secret keys, webhook secrets, Resend keys, USPS client secrets, ZIP.TAX keys, or Cloudflare API tokens in `_config.yml`.
 
+Resend sender domains must match the configured sender addresses. For this deployment, pledge and update emails use `pool.dustwave.xyz` senders such as `The Pool <pledges@pool.dustwave.xyz>`, so the Resend API key must be authorized for `pool.dustwave.xyz`.
+
 ## Cloudflare Plan Guidance For Forks
 
 The Pool is intentionally shaped so most traffic stays cheap:
@@ -430,6 +432,8 @@ Required GitHub repository secrets for automatic Worker deployment:
 - `CLOUDFLARE_ACCOUNT_ID`
 - `ADMIN_SECRET` for the post-deploy diary check
 - optional `DIARY_CHECK_BYPASS_SECRET` if Cloudflare WAF challenges the post-deploy diary check
+
+The workflow also needs GitHub Pages deployment permissions. Keep `pages: write` and `id-token: write` explicit on the Pages deploy job if you copy or refactor `.github/workflows/deploy.yml`.
 
 If the diary check logs an HTTP `403` Cloudflare challenge page, the request is being stopped before it reaches the Worker. Add a Cloudflare WAF custom rule that skips managed challenges for:
 

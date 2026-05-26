@@ -107,6 +107,7 @@ Notes:
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
 - `platform.logo_path` is also the mirrored brand mark used in supporter emails.
+- The domain in `platform.pledges_email_from` and `platform.updates_email_from` must be authorized by the configured email provider. With Resend, authorizing `pool.example.com` does not authorize `example.com`, and vice versa.
 
 Example:
 
@@ -117,8 +118,8 @@ platform:
   release_label: v1.0.0
   company_name: Example Studio
   support_email: support@example.com
-  pledges_email_from: "My Fork <pledges@example.com>"
-  updates_email_from: "My Fork <updates@example.com>"
+  pledges_email_from: "My Fork <pledges@pool.example.com>"
+  updates_email_from: "My Fork <updates@pool.example.com>"
   site_url: https://crowdfund.example.com
   worker_url: https://pledge.example.com
   default_creator_name: Example Studio

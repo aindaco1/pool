@@ -516,7 +516,7 @@ npx wrangler dev --env dev --port 8787
 ### Verify Domain (for production)
 
 1. Go to **Domains** → **Add Domain**
-2. Add `dustwave.xyz`
+2. Add the exact sender domain used by `PLEDGES_EMAIL_FROM` / `UPDATES_EMAIL_FROM` (for this deployment, `pool.dustwave.xyz`)
 3. Add the DNS records Resend provides
 4. Wait for verification
 
@@ -839,7 +839,7 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 ## 8. Production Checklist
 
 - [ ] Switch Stripe to live keys
-- [ ] Verify `dustwave.xyz` domain in Resend
+- [ ] Verify the Resend sender domain used by `PLEDGES_EMAIL_FROM` and `UPDATES_EMAIL_FROM` (for this deployment, `pool.dustwave.xyz`)
 - [ ] Deploy Worker: `wrangler deploy`
 - [ ] Set up Stripe webhook in dashboard → `https://pledge.dustwave.xyz/webhooks/stripe`
 - [ ] Test with a real $1 pledge
@@ -880,7 +880,7 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 - Product catalog not required; amounts come from Worker-canonicalized first-party cart items
 
 ### Resend Dashboard
-- **Domain**: Verify `dustwave.xyz` for sending from `pledges@dustwave.xyz`
+- **Domain**: Verify the domain portion of the sender addresses configured in `_config.yml` / Worker env. For this deployment, `PLEDGES_EMAIL_FROM` is `The Pool <pledges@pool.dustwave.xyz>`, so Resend must authorize `pool.dustwave.xyz`.
 - **API Key**: Create key with "Sending access" permission
 - Used for: All supporter-facing pledge email (confirmation, manage/community access, diary updates, announcements, charge success, payment failure, cancellations)
 - Local dev note: even when `SITE_BASE` points at `127.0.0.1`, embedded email images still use the public `https://pool.dustwave.xyz` asset base so inbox previews do not show broken localhost image URLs.

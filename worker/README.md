@@ -137,6 +137,8 @@ wrangler secret put ZIP_TAX_API_KEY
 
 Do not store secret values in `_config.yml`, campaign YAML, KV, admin setting drafts, or committed documentation. Stripe publishable keys are public browser keys and may be stored in dashboard Settings or deployment vars. The admin dashboard only reports whether runtime credentials appear configured; it does not read or persist secret values.
 
+The Resend API key must be allowed to send from the domain configured in `PLEDGES_EMAIL_FROM` and `UPDATES_EMAIL_FROM`. For the live Dust Wave deployment, those sender addresses use `pool.dustwave.xyz`; authorizing only a root domain does not authorize subdomain senders, and authorizing only a subdomain does not authorize root-domain senders.
+
 Custom checkout requires the matching Stripe publishable key for the current `APP_MODE`. If the Worker is configured for custom checkout but no publishable key is available, checkout falls back to Stripe-hosted Checkout instead of returning `503`, so pledges can still continue while the publishable key is being configured.
 
 USPS setup for this repo is split intentionally:
@@ -172,7 +174,7 @@ npm run deploy
 npm run deploy:worker
 ```
 
-On GitHub, pushes to `main` also deploy the Worker automatically through `.github/workflows/deploy.yml`. The preferred setup uses repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. As a temporary fallback, the workflow also accepts legacy Cloudflare auth via `CLOUDFLARE_EMAIL` and `CLOUDFLARE_KEY`.
+On GitHub, pushes to `main` also deploy the Worker automatically through `.github/workflows/deploy.yml`. The preferred setup uses repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. As a temporary fallback, the workflow also accepts legacy Cloudflare auth via `CLOUDFLARE_EMAIL` and `CLOUDFLARE_KEY`. The Pages deploy job requires `pages: write` and `id-token: write`; keep those permissions explicit if the workflow is copied into a fork.
 
 ## API Endpoints
 
@@ -326,11 +328,11 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `POST /admin/settings/logo-upload`, `POST /admin/settings/image-upload`, and `POST /admin/settings/video-upload` stage dashboard uploads through the same GitHub-backed publish path as their owning settings/content fields
 - `POST /admin/settings/publish` validates and publishes platform settings, platform add-ons, campaign variables, and campaign structured data through GitHub-backed commits
 - `POST /admin/users` saves dashboard-managed admin users directly to `admin-users:v1` in Worker KV
-- `GET /admin/analytics` reads role-scoped pledge-derived revenue, status, language, referral, and campaign/platform split metrics without writing analytics state
+- `GET /admin/analytics` reads role-scoped pledge-derived revenue, status, language, referral, and campaign/platform split metrics without writing analytics state; dashboard currency presentation keeps exact cents
 - `GET /admin/content/campaign?campaignSlug=...` loads role-scoped campaign content into the browser editor without persisting a draft
 - `POST /admin/content/preview` validates and renders role-scoped campaign content drafts without publishing, auditing, or writing KV
 - `POST /admin/content/publish` validates the same draft, updates the campaign Markdown file through GitHub, triggers the normal rebuild workflow, and writes one audit event
-- `GET /admin/supporters?campaignSlug=...` reads campaign-scoped supporter rows from `campaign-pledges:{slug}` only
+- `GET /admin/supporters?campaignSlug=...` reads campaign-scoped supporter rows from `campaign-pledges:{slug}` only; dashboard amount presentation keeps exact cents
 - `GET /admin/reports/campaign-runner/preview?campaignSlug=...&reportType=pledge|fulfillment` previews shared campaign-runner report output without sending email or writing markers
 - `GET /admin/reports/campaign-runner.csv?campaignSlug=...&reportType=pledge|fulfillment` downloads the same shared report CSV without sending email or writing markers
 - `GET /admin/marketing/referrals?campaignSlug=...` lists saved campaign referral codes without writing or scanning pledge truth
@@ -489,8 +491,8 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `PLATFORM_NAME` | Public platform name used in Worker responses and email copy |
 | `PLATFORM_COMPANY_NAME` | Company/platform-author name used for platform-tip copy |
 | `SUPPORT_EMAIL` | Support contact mirrored from site config |
-| `PLEDGES_EMAIL_FROM` | Sender identity for pledge-related emails |
-| `UPDATES_EMAIL_FROM` | Sender identity for update / milestone / announcement emails |
+| `PLEDGES_EMAIL_FROM` | Sender identity for pledge-related emails; its domain must be authorized in Resend |
+| `UPDATES_EMAIL_FROM` | Sender identity for update / milestone / announcement emails; its domain must be authorized in Resend |
 | `EMAIL_LOGO_PATH` | Supporter-email logo path mirrored from `platform.logo_path` |
 | `EMAIL_FONT_FAMILY` | Supporter-email body font stack mirrored from `design.font_body` |
 | `EMAIL_HEADING_FONT_FAMILY` | Supporter-email heading font stack mirrored from `design.font_display` |

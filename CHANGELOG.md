@@ -11,8 +11,10 @@
 - Added dashboard upload handling for campaign media, brand assets, add-on images, and hero videos using convention-based asset directories and slug-style filenames.
 - Added dashboard Users management backed by Worker KV at `admin-users:v1`, separate from GitHub-backed publish flows.
 - Added dashboard Marketing tools for referral/UTM URL building, saved referral codes, reusable embed-builder UI, and copyable launch snippets.
-- Added role-scoped dashboard Analytics, Reports, and Supporters views with sortable/filterable tables and CSV downloads; report previews/downloads do not send email or write sent markers.
+- Added role-scoped dashboard Analytics, Reports, and Supporters views with sortable/filterable tables, exact-cent dollar display, and CSV downloads; report previews/downloads do not send email or write sent markers.
 - Preserved the Cloudflare Workers KV free-tier target by keeping normal dashboard reads, previews, filters, analytics, and local drafts at zero KV writes.
+- Aligned pledge email sender configuration with the authorized Resend sender domain and documented sender-domain setup for forks.
+- Made GitHub Pages deploy permissions explicit for the production deploy workflow.
 - Added admin dashboard accessibility, i18n, SEO/noindex, security, mobile/tablet responsiveness, and DRY UI passes, plus focused unit, Playwright, and KV-write-budget coverage.
 - Updated release metadata to `1.0.0`.
 

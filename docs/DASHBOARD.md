@@ -52,7 +52,7 @@ The dashboard intentionally separates read-only browsing, local drafting, KV wri
 | Dashboard summary, analytics, reports, supporters, table filtering, and content preview | Read-only; should add zero KV writes |
 | Content editor **Save draft** | Browser-local draft only |
 | Campaign content/settings publish | Worker validates input, writes to GitHub-backed files, triggers the normal rebuild/deploy path, and records an audit event |
-| Platform settings and platform add-ons publish | Worker validates input, writes to GitHub-backed config/assets, triggers the normal rebuild/deploy path |
+| Platform settings and platform add-ons publish | Worker validates input, writes to GitHub-backed config/assets, triggers the normal rebuild/deploy path, and shows the result as a dashboard platform message |
 | Image/video uploads | Worker validates media, commits the asset path through GitHub, and updates the relevant field locally until publish |
 | Marketing referral save/edit/delete | Campaign-scoped KV mutation for saved referral codes |
 | Settings -> Users save | Single KV write to `admin-users:v1` |
@@ -60,7 +60,7 @@ The dashboard intentionally separates read-only browsing, local drafting, KV wri
 
 Normal dashboard reads must stay within the KV-write budget described in `worker/README.md` and covered by tests.
 
-GitHub-backed publish actions require the deployed Worker to have `GITHUB_TOKEN` plus the repo metadata variables configured. Without that token, the dashboard can still browse, draft, preview, manage runtime users, and save referral codes, but publish actions will fail with a GitHub configuration message.
+GitHub-backed publish actions require the deployed Worker to have `GITHUB_TOKEN` plus the repo metadata variables configured. Without that token, the dashboard can still browse, draft, preview, manage runtime users, and save referral codes, but publish actions will fail with a GitHub configuration message. Successful publish actions should leave the Publish button disabled again once the saved server state matches the local form state.
 
 ## Top-Level Tabs
 
@@ -81,6 +81,8 @@ Settings are grouped in a left sidebar. Super admins can edit publishable config
 ### Platform
 
 Platform identity fields include site title, platform name, company, author, default creator name, support email, site description, email sender names, and app mode.
+
+The pledge and update sender fields must use domains authorized for the configured Resend API key. For this deployment, pledge confirmations use `The Pool <pledges@pool.dustwave.xyz>` so the sender domain matches the authorized `pool.dustwave.xyz` Resend domain.
 
 ### Brand & SEO
 
@@ -243,13 +245,13 @@ The browser report UI is download-oriented. It does not need manual email-send o
 
 ## Supporters
 
-The Supporters tab shows role-scoped supporter rows with live filtering, sorting, campaign scoping, and CSV export for the currently visible result set. Super admins can choose **All** campaigns; campaign users can choose from assigned campaigns.
+The Supporters tab shows role-scoped supporter rows with live filtering, sorting, campaign scoping, exact-cent dollar amounts, and CSV export for the currently visible result set. Super admins can choose **All** campaigns; campaign users can choose from assigned campaigns.
 
 ## Analytics
 
 Analytics is derived from existing pledge indexes and campaign summaries. It should not create analytics-specific KV writes on view.
 
-The dashboard shows cards for pledge totals, revenue categories, tax, shipping, estimated Stripe fees, pledge status, supporters, average pledge, campaign add-ons, referral attribution, UTM source, fulfillment type, language, and other pledge-derived breakdowns.
+The dashboard shows cards for pledge totals, revenue categories, tax, shipping, estimated Stripe fees, pledge status, supporters, average pledge, campaign add-ons, referral attribution, UTM source, fulfillment type, language, and other pledge-derived breakdowns. Money values display exact cents.
 
 Estimated Stripe fees are planning estimates until actual Stripe balance transaction fee/net values are stored during payment writes.
 
