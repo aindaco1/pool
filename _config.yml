@@ -216,7 +216,7 @@ reports:
     email_subject_prefix: "[The Pool]"
 
 checkout:
-  stripe_publishable_key: ""
+  stripe_publishable_key: "pk_live_51N48NKK9nUOzi4tvVuw9UdqVYGLyre50ex4s4giogLQDgUfejp0lfSxV6ZXRdiqN8RY7t0IDIRjiWQ192hcXWVSl00Htn02Ci3"
 
 add_ons:
   enabled: true
@@ -224,7 +224,7 @@ add_ons:
   products:
     - id: dust-wave-tshirt
       name: "DUST WAVE T-Shirt"
-      description: 'Our official t-shirt. 100% cotton.'
+      description: "Our official t-shirt. 100% cotton."
       image_url: "/assets/images/add-ons/dustwave-tshirt.png"
       price: 25.00
       category: physical
