@@ -68,7 +68,7 @@ export function jsonResponse(data, status = 200, env = null, isPublic = false) {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key',
       ...SECURITY_HEADERS
     }

@@ -7,7 +7,7 @@
 - **Cloudflare Worker** — Backend API, pledge storage (KV), email sending
 - **Stripe** — Checkout Sessions in setup mode for the on-site payment step, plus PaymentIntents for later charging
 - **Resend** — Transactional emails (supporter confirmation, milestones, failures)
-- **Pages CMS** — Visual campaign editing via [app.pagescms.org](https://app.pagescms.org)
+- **Private admin dashboard** — Role-scoped campaign editing, settings, add-ons, reports, analytics, supporters, and marketing tools
 
 ### Fork-Friendly Free-Plan Knobs
 
@@ -197,56 +197,19 @@ This applies to ALL include parameters. Without `include.`, Jekyll can't properl
 
 This applies to `support_items`, `decisions`, `stretch_goals`, `diary`, and any other array field.
 
-## Pages CMS Configuration
+## Admin Dashboard Editing
 
-The CMS is configured in `.pages.yml` at the repo root. It defines:
+The private dashboard at `/admin/` is now the supported browser-based editor and operations surface. It reads from `_config.yml`, `_campaigns/*.md`, Worker KV pledge indexes, and Worker runtime settings, then writes through the correct persistence path for each workflow.
 
-- **Media paths** — Where uploads go (`assets/images/campaigns/`)
-- **Collections** — Content types (campaigns, pages)
-- **Fields** — Form fields for each content type
+- GitHub-backed settings and campaign content publish through Worker validation and the normal rebuild/deploy path.
+- Users save directly to Worker KV at `admin-users:v1`.
+- Marketing referral codes save to campaign-scoped KV.
+- Draft content saves in the browser until published.
+- Secrets stay in Worker secrets or ignored `.dev.vars`; the dashboard only shows configured/missing status.
+- Reports, analytics, supporter browsing, content previews, table filtering, and CSV downloads are read-only dashboard flows and should not add KV writes.
+- Image/video uploads use the existing asset directories, normalize filenames, and then publish through the same GitHub-backed path as the field they update.
 
-### Adding a New Campaign Field
-
-1. Edit `.pages.yml`
-2. Find the `campaigns` collection
-3. Add a new field to the `fields` array:
-
-```yaml
-- name: my_new_field
-  label: My New Field
-  type: string
-  description: "Help text for editors"
-```
-
-4. Commit and push — Pages CMS will reload the config
-
-### Field Types
-
-| Type | Use For |
-|------|---------|
-| `string` | Short text |
-| `number` | Integers or decimals |
-| `boolean` | Toggles (true/false) |
-| `date` | Date picker |
-| `select` | Dropdown with options |
-| `image` | Image upload |
-| `rich-text` | Markdown editor |
-| `object` | Nested fields |
-| `object` + `list: true` | Repeatable items (tiers, diary entries) |
-
-### Per-Field Media Paths
-
-Override the global media path for specific fields:
-
-```yaml
-- name: hero_image
-  type: image
-  media:
-    input: assets/images/campaigns
-    output: /assets/images/campaigns
-```
-
-See [CMS.md](CMS.md) for the full editing guide.
+See [DASHBOARD.md](DASHBOARD.md) for the full dashboard reference.
 
 ## Campaign Content Model
 
@@ -312,7 +275,16 @@ Quote strings with special characters to avoid YAML parsing issues.
 - **`creator_image`** (optional): Square image for creator (48px circle in sidebar)
 - **Tier `image`** (optional): Wide image shown above tier name
 
-**Video requirements:** WebM, 16:9, max 1920x1080
+**Video requirements:** WebM, 16:9, max 1920x1080. The admin dashboard accepts hero video uploads up to 100 MB and previews existing video files through the same content-security policy as the public campaign page. Local content video blocks may specify an optional `poster`; when omitted, public/admin editor views generate a transient poster from the video's first frame and keep the playable video lazy-loaded until play.
+
+**Dashboard upload paths:** The dashboard writes uploaded assets into the current static asset model:
+
+- campaign images/videos: `assets/images/campaigns/<slug>/` and `assets/videos/campaigns/<slug>/`
+- tier/support/diary/decision images: the owning campaign asset directory unless a more specific existing path is already present
+- platform add-ons: `assets/images/add-ons/`
+- campaign add-ons: `assets/images/campaign-add-ons/`
+
+Keep upload handling lossless where possible. Image optimization should reduce bytes without changing visible quality, and video conversion should prefer WebM without degrading source quality.
 
 ### Featured Tier
 
@@ -337,6 +309,10 @@ long_content:
     provider: youtube
     video_id: "abc123"
     caption: "Behind the scenes"
+  - type: video
+    provider: local
+    src: /assets/videos/campaigns/example/proof.webm
+    caption: "Proof of concept"
   - type: gallery
     layout: grid
     images:
@@ -393,6 +369,8 @@ tiers:
 - optional `shipping_fallback_flat_rate` at the campaign level when a specific campaign needs a different flat fallback than the global deployment default
 - optional `shipping_options` at the campaign level for the limited backer-facing shipping policy set (`signature_required`, `adult_signature_required`)
 
+In the admin dashboard, tier IDs are read-only for editors: legacy IDs are preserved, while new tier IDs derive from the name. `shipping_preset` hides for digital tiers. If a physical tier has no preset, explicit package weight/dimension fields are shown.
+
 **Platform add-on products**: Global merch or upsell items now have a separate config path under `add_ons` in [/_config.yml](../_config.yml). That catalog is intended for fixed-price platform-wide products with simple variants, like shirt sizes, and should not be modeled as campaign `support_items`. The Worker mirrors the catalog through [/api/add-ons.json](../api/add-ons.json), exposes a current inventory snapshot through `/add-ons/inventory`, carries bundle-level add-on selections plus an anchor campaign through checkout, persists those anchor-bound add-ons on the pledge without counting them toward campaign-goal totals, and now exposes them separately in pledge and fulfillment exports. Cart and Manage Pledge both consume the same inventory-aware product-state logic, including low-stock messaging and sold-out variant filtering.
 
 - `category: digital` add-ons never contribute to shipping
@@ -400,7 +378,7 @@ tiers:
 - physical add-ons can use `shipping_preset` for shared presets like `tshirt` and `sticker`
 - or they can define explicit `shipping.weight_oz`, `shipping.packaging_weight_oz`, `shipping.length_in`, `shipping.width_in`, `shipping.height_in`, and `shipping.stack_height_in`
 
-The first-party cart still carries the physical category through the checkout-intent payload, and future Worker-side shipping quotes will use the preset or explicit shipping measurements rather than a hardcoded flat-fee assumption.
+The first-party cart still carries the physical category through the checkout-intent payload, and Worker-side shipping quotes use the preset or explicit shipping measurements rather than a hardcoded flat-fee assumption. The dashboard uses the same product editor for platform add-ons and campaign add-ons, preserves legacy IDs, derives new product/variant IDs from names/labels, and shows package fields only for physical products with no preset.
 
 ### Production Phases
 
@@ -1299,6 +1277,7 @@ npm run test:e2e:ui        # Interactive UI mode
 
 **Test coverage includes:**
 - Campaign navigation and tier buttons
+- Admin dashboard tabs, role-scoped campaign/settings visibility, content editor behavior, media settings, uploads, analytics/reports/supporters/marketing views, responsive tablet/mobile menus, and Spanish route coverage
 - Custom amount input → first-party cart price sync
 - Support item input → first-party cart price sync
 - Disabled states on non-live campaigns

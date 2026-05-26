@@ -51,6 +51,8 @@ That script starts:
 
 Use local rehearsal to sanity-check checkout, webhook delivery, manage-link behavior, and admin endpoints before running the same flow against staging.
 
+For dashboard-heavy branches, open the local dashboard at `http://127.0.0.1:4000/admin/`. The dev stack seeds the bootstrap admin defaults documented in `README.md` and `worker/README.md`; user-management changes made in the dashboard save to local Worker KV and are reset with local KV state.
+
 For local-only pledge management checks, use the `smoke-editable` campaign. It is defined as `test_only: true`, so it shows up in local development when `_config.local.yml` enables `show_test_campaigns`, while staying excluded from the production homepage and production `/api/campaigns.json`.
 
 Recommended local setup for modify/cancel smoke:
@@ -246,6 +248,21 @@ curl -s -X POST \
   "$STAGING_WORKER_URL/admin/milestone-check/<campaign-slug>" | jq
 ```
 
+### 12. Admin Dashboard Smoke
+
+Run this section when the branch changes dashboard UI, admin Worker routes, campaign configuration, add-ons, uploads, reporting, analytics, supporters, marketing tools, or user management.
+
+1. Sign in to `/admin/` with an authorized admin email.
+2. Verify the main tabs render without horizontal overflow at desktop, tablet, and mobile widths.
+3. In **Settings**, confirm publishable sections show a disabled `Publish` button until a real change is made. Confirm **Users**, **Secrets & credentials**, and **Runtime diagnostics** do not show an unused publish action.
+4. In **Settings -> Users**, create or edit a campaign user, save, and confirm the change takes effect without a GitHub publish flow.
+5. In **Campaigns**, switch campaign subtabs and verify content, tiers, campaign add-ons, diary entries, and decisions load for the selected campaign only.
+6. In **Content** and **Diary Entries**, add/edit a content block, verify WYSIWYG preview behavior, and confirm `Save Draft` only enables when the local draft differs from the saved value.
+7. In **Add-ons** and campaign **Add-Ons**, verify physical products show shipping preset / package fields, digital products hide shipping fields, and product/variant IDs derive from names/labels for new entries.
+8. In **Analytics**, **Reports**, and **Supporters**, verify the default `All` view only shows campaigns available to the current admin and CSV export matches the visible rows.
+9. In **Marketing**, save/edit/delete a referral code, verify the URL builder clears after save/refresh, and confirm the embedded campaign builder still works.
+10. For `/es/admin/`, verify translated tab labels and tablet/mobile navigation do not overflow.
+
 ## Sign-Off Template
 
 Record the smoke result in the PR or release notes:
@@ -261,6 +278,7 @@ Smoke completed on <date> in <staging|local>.
 - Settlement dry/live: pass
 - Backfill: pass
 - Broadcast pagination/milestones: pass
+- Admin dashboard smoke, if relevant: pass
 
 Notes:
 - <any intentional behavior observed>

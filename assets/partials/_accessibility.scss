@@ -85,12 +85,13 @@ a:focus-visible {
 }
 
 // Form element focus states
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: 2px solid $goback--accent;
-  outline-offset: 0;
-  border-color: $goback--accent;
+input:focus,
+textarea:focus,
+select:focus {
+  background: $surface--base;
+  border-color: $border--strong;
+  box-shadow: 0 0 0 3px $color--primary-focus-ring;
+  outline: 0;
 }
 
 // Disabled state - ensure sufficient contrast

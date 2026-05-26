@@ -16,6 +16,14 @@ For most forks, the main customization files are:
 
 Use `./scripts/dev.sh --podman` for local verification after config changes.
 
+For normal operator edits, use the private admin dashboard at `/admin/` or `/es/admin/`:
+
+- **Settings** edits platform-wide configuration and runtime admin tools for super admins.
+- **Add-ons** edits platform add-on products for super admins.
+- **Campaigns** edits campaign settings, page content, tiers, support items, campaign add-ons, stretch goals, ongoing items, diary entries, and decisions.
+- **Settings -> Users** is runtime-only and saves directly to Worker KV at `admin-users:v1`; it does not publish to GitHub.
+- **Secrets & credentials** is read-only status. Secret values still belong in Worker secrets, GitHub repository secrets, or ignored local env files.
+
 Treat [`_config.local.yml`](../_config.local.yml) as an override-only file. Keep canonical fork settings in [`_config.yml`](../_config.yml), and use the local file only for things that should differ on your machine, like localhost URLs or local-only campaign visibility.
 
 The normal local path is now localhost-based:
@@ -33,11 +41,13 @@ The site config is organized around these fork-facing sections:
 - `seo`
 - `platform`
 - `pricing`
+- `tax`
 - `shipping`
 - `reports`
 - `i18n`
 - `design`
 - `debug`
+- `add_ons`
 - `checkout`
 - `cache`
 
@@ -93,7 +103,7 @@ These values feed:
 Notes:
 
 - `platform.*` is the primary branding surface.
-- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v0.9.5`.
+- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v1.0.0`.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
 - `platform.logo_path` is also the mirrored brand mark used in supporter emails.
@@ -103,8 +113,8 @@ Example:
 ```yml
 platform:
   name: My Fork
-  version: 0.9.5
-  release_label: v0.9.5
+  version: 1.0.0
+  release_label: v1.0.0
   company_name: Example Studio
   support_email: support@example.com
   pledges_email_from: "My Fork <pledges@example.com>"
@@ -486,6 +496,8 @@ add_ons:
 
 This is meant for fixed-price catalog items and simple variants like shirt sizes. It is separate from campaign `support_items`, which remain campaign-scoped and amount-based.
 
+In the admin dashboard, platform add-ons live in the top-level **Add-ons** tab, while campaign-scoped add-ons live in the owning campaign's **Add-Ons** subtab. Legacy IDs are preserved. New product IDs derive from the product name, and new variant IDs derive from the variant label, so editors do not need to type slug values by hand.
+
 Add-on shipping behavior:
 
 - `category: digital` means the add-on never contributes to shipping
@@ -493,6 +505,7 @@ Add-on shipping behavior:
 - physical add-ons can either:
   - reference a shared `shipping_preset`
   - or provide explicit `shipping.weight_oz`, `shipping.packaging_weight_oz`, `shipping.length_in`, `shipping.width_in`, `shipping.height_in`, and `shipping.stack_height_in`
+- in the dashboard, those explicit weight/dimension fields appear only for physical add-ons when the shipping preset is `none`
 
 Current add-on inventory behavior:
 
@@ -517,7 +530,7 @@ By contrast, global `add_ons.products` remain platform merch:
 
 ### `reports`
 
-Use `reports` for campaign-runner report delivery behavior that must stay aligned with Worker scheduling and email generation.
+Use `reports` for campaign-runner report behavior that must stay aligned with Worker scheduling and dashboard report generation.
 
 Supported keys today:
 
@@ -738,6 +751,8 @@ These site-config values are also reflected into the Worker env values in [`work
 - `reports.campaign_runner.include_csv_attachment` -> `CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT`
 - `reports.campaign_runner.email_subject_prefix` -> `CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX`
 
+The browser dashboard **Reports** tab previews and downloads pledge/fulfillment CSVs for campaigns the admin can access. It does not send report emails and does not write “sent” markers.
+
 The repo keeps those values aligned automatically through the main local/dev/test paths. After changing them, restart the local stack so the site and Worker both pick up the new values:
 
 ```bash
@@ -774,7 +789,7 @@ Still code-level today:
 - changing supported embed providers
 - expanding CSP allowlists for arbitrary external hosts
 - changing Stripe-owned field styling beyond the supported design-token bridge and Stripe’s appearance API
-- introducing brand-new layout structures, page templates, or content blocks
+- introducing brand-new layout structures, page templates, or content block types
 - changing font hosting/CSP behavior beyond the currently supported font stacks
 
 Also note:
@@ -782,19 +797,21 @@ Also note:
 - not every Sass token is exposed on purpose
 - not every Worker env var belongs in `_config.yml`
 - the supported surface is curated to avoid security and maintenance regressions
+- dashboard uploads commit files into the existing asset directories and update config/campaign fields; adding a new upload category or storage backend is still code-level work
 
 ## Safe Workflow For Forks
 
-1. Update `_config.yml`.
-2. Run `npm run sync:worker-config` if you are editing config outside the normal entry points and want to refresh `worker/wrangler.toml` immediately.
-3. Run:
+1. Prefer the admin dashboard for supported settings/campaign/add-on edits. Use direct file edits when reviewing generated changes, changing unsupported fields, or working without the Worker.
+2. If editing files directly, update `_config.yml` or the relevant `_campaigns/*.md`.
+3. Run `npm run sync:worker-config` if you are editing config outside the normal entry points and want to refresh `worker/wrangler.toml` immediately.
+4. Run:
 
 ```bash
 npm run podman:doctor
 ./scripts/dev.sh --podman
 ```
 
-4. Verify:
+5. Verify:
 
 - header/footer branding
 - meta image / favicon
@@ -804,8 +821,9 @@ npm run podman:doctor
 - Stripe payment UI styling
 - Manage Pledge
 - supporter emails
+- admin dashboard publish state, read-only secrets status, and role-scoped campaign visibility when dashboard fields changed
 
-5. Run the relevant checks:
+6. Run the relevant checks:
 
 ```bash
 npx vitest run tests/unit/config-boot.test.ts tests/unit/cart-provider.test.ts tests/unit/manage-page.test.ts tests/unit/worker-business-logic.test.ts

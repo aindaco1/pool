@@ -5,6 +5,8 @@
 {%- assign raw_title = include.title | default: page.title -%}
 {%- assign indexable = include.indexable -%}
 {%- if indexable == nil -%}{%- assign indexable = true -%}{%- endif -%}
+{%- assign social = include.social -%}
+{%- if social == nil -%}{%- assign social = true -%}{%- endif -%}
 {%- assign og_type = include.og_type | default: "website" -%}
 {%- assign translation_key = include.translation_key | default: page.translation_key -%}
 {%- assign localized_paths = include.localized_paths | default: page.localized_paths -%}
@@ -68,6 +70,7 @@
   {% capture default_path %}{% include localized-url.html lang=default_lang translation_key=translation_key localized_paths=localized_paths path=explicit_path %}{% endcapture %}
   <link rel="alternate" hreflang="x-default" href="{{ site_base }}{{ default_path | strip }}">
 {% endif %}
+{% if social %}
 <meta property="og:title" content="{{ seo_title }}">
 <meta property="og:type" content="{{ og_type }}">
 {% if canonical_path != "" %}<meta property="og:url" content="{{ site_base }}{{ canonical_path | strip }}">{% endif %}
@@ -97,3 +100,4 @@
 {% if image_url and image_url != "" %}<meta name="twitter:image" content="{{ image_url }}">{% endif %}
 {% if image_url and image_url != "" and image_alt != "" %}<meta name="twitter:image:alt" content="{{ image_alt | escape }}">{% endif %}
 {% if twitter_handle != "" %}<meta name="twitter:site" content="@{{ twitter_handle }}">{% endif %}
+{% endif %}

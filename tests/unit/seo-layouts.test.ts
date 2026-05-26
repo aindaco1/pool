@@ -26,11 +26,21 @@ describe('SEO templates', () => {
     const communityLayout = readRepoFile('_layouts', 'community.html');
     const pledgeResultLayout = readRepoFile('_layouts', 'pledge-result.html');
     const adminLayout = readRepoFile('_layouts', 'admin.html');
+    const adminPage = readRepoFile('admin.md');
+    const spanishAdminPage = readRepoFile('es', 'admin', 'index.html');
+    const seoMeta = readRepoFile('_includes', 'seo-meta.html');
 
     expect(manageLayout).toContain('indexable=false');
     expect(communityLayout).toContain('indexable=false');
     expect(pledgeResultLayout).toContain('indexable=false');
     expect(adminLayout).toContain('indexable=false');
+    expect(adminLayout).toContain('social=false');
+    expect(adminPage).toContain('indexable: false');
+    expect(adminPage).toContain('sitemap: false');
+    expect(spanishAdminPage).toContain('indexable: false');
+    expect(spanishAdminPage).toContain('sitemap: false');
+    expect(seoMeta).toContain('assign social = include.social');
+    expect(seoMeta).toContain('{% if social %}');
   });
 
   it('publishes crawl files with a sitemap and private-route exclusions', () => {
@@ -40,6 +50,7 @@ describe('SEO templates', () => {
     expect(robots).toContain('Sitemap: {{ site.platform.site_url | default: site.url }}/sitemap.xml');
     expect(robots).toContain('Disallow: /manage/');
     expect(robots).toContain('Disallow: /admin/');
+    expect(robots).toContain('Disallow: /es/admin/');
     expect(robots).toContain('Disallow: /pledge-success/');
     expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
     expect(sitemap).toContain("item.layout == 'default'");
@@ -91,9 +102,11 @@ describe('SEO templates', () => {
     const campaignCard = readRepoFile('_includes', 'campaign-card.html');
 
     expect(campaignLayout).toContain("key='campaign.play_video'");
+    expect(campaignLayout).toContain('video-first-frame-poster.js');
     expect(campaignLayout).toContain('key="campaign.supporter_community_unlocked"');
     expect(campaignLayout).toContain('key="campaign.supporters_only_cta"');
     expect(campaignLayout).toContain('key="misc.video_not_supported"');
+    expect(readRepoFile('_includes', 'blocks', 'video.html')).toContain('data-first-frame-poster="true"');
     expect(campaignLayout).toContain('{% if campaign_render_state == "upcoming" or campaign_render_state == "live" %}');
     expect(campaignLayout).toContain('key="runtime.campaign.countdown_funded"');
     expect(campaignLayout).toContain('key="runtime.campaign.countdown_ended"');

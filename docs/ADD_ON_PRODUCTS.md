@@ -78,6 +78,11 @@ Each product currently supports:
 - `variant_option_name`
 - `variants`
 
+The private admin dashboard exposes platform add-ons under **Add-ons** and campaign add-ons under each campaign's **Add-Ons** subtab. The dashboard keeps legacy product and variant IDs intact, but new products and variants derive read-only IDs from their name/label so forks do not need to hand-author slugs. Product images uploaded through the dashboard are committed into the relevant asset directory:
+
+- platform add-ons: `assets/images/add-ons/`
+- campaign add-ons: `assets/images/campaign-add-ons/`
+
 Example:
 
 ```yml
@@ -119,6 +124,7 @@ Physical vs. digital add-ons:
 - for physical add-ons, forks can either:
   - reference a shared `shipping_preset` like `tshirt` or `sticker`
   - or provide explicit `shipping` metadata inline
+- when a physical add-on has no shipping preset, the admin dashboard exposes explicit weight and package-dimension fields on the row below the preset selector
 
 Example explicit shipping metadata:
 
@@ -168,6 +174,7 @@ The current add-on flow is intentionally inventory-aware:
 - low-stock messaging appears when remaining quantity is at or below `low_stock_threshold`
 - sold-out variants are removed from the shared product-state surface unless they are already selected on an existing pledge
 - add-on inventory is counted from persisted pledge records, not in-progress cart drafts
+- super admins can set platform add-on inventory overrides in the dashboard without editing `_config.yml`; those overrides are stored separately from the configured baseline
 
 ## UI Model
 
@@ -269,5 +276,4 @@ This keeps operational ownership clear without changing the supporter-facing add
 The biggest remaining slices are:
 
 - support different prices per add-on variation
-- consider whether campaign-specific add-ons need a stronger creator/admin editing surface
 - keep accessibility, mobile responsiveness, and i18n support at the same standard as the rest of the platform as the catalog grows

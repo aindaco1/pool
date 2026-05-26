@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Lista para creadores de campañas
-description: "Una lista práctica para preparar una campaña en The Pool: imágenes, video, textos, niveles, add-ons, embeds, impuestos, envío, reportes y fulfillment."
+description: "Una lista práctica para preparar una campaña en The Pool: panel de administración, imágenes, video, textos, niveles, add-ons, embeds, impuestos, envío, reportes y fulfillment."
 permalink: /es/creator-campaign-checklist/
 lang: es
 indexable: false
@@ -30,6 +30,7 @@ La lista cubre:
 - expectativas de impuestos y checkout
 - embeds para promoción
 - reportes, fulfillment y entrega final
+- acceso al panel, borradores y expectativas de publicación
 
 ## Versión rápida
 
@@ -48,6 +49,7 @@ La lista cubre:
 - al menos un nivel de recompensa
 - nombre, precio y descripción de cada nivel
 - correos de reportes si la persona responsable quiere recibir reportes automáticos
+- correos de editoras o editores del panel, si el equipo creador editará directamente
 
 ### Muy recomendado
 
@@ -106,11 +108,37 @@ La campaña debe explicar rápido:
 | Nivel destacado | Recomendado | El nivel de entrada más claro. |
 | Correos de reportes | Recomendado | Correos que recibirán reportes de pledges y fulfillment. |
 | Responsable de fulfillment | Recomendado | Quién entrega las recompensas si la campaña se cobra con éxito. |
+| Editores del panel | Recomendado | Correos autorizados del equipo creador que deberían tener acceso solo a esta campaña. |
 
 <figure class="creator-checklist-screenshot creator-checklist-screenshot--compact">
   <img src="/assets/images/checklists/creator-campaign-checklist/creator-facts.png" alt="Panel de datos de creador con imagen, nombre, categoría y enlace de embed." loading="lazy">
   <figcaption>Los metadatos básicos aparecen en la página pública, así que los huecos se notan.</figcaption>
 </figure>
+
+## Handoff del panel de administración
+
+The Pool usa un panel privado para la edición normal de campañas y operaciones. Las personas creadoras no necesitan acceso directo al repositorio para los cambios soportados.
+
+El panel puede gestionar:
+
+- ajustes de campaña, fechas, blurbs, imágenes, video y opciones de envío
+- contenido largo mediante el editor WYSIWYG de bloques
+- niveles, artículos de apoyo, add-ons de campaña, stretch goals, entradas de diario y decisiones
+- vistas previas de reportes, listas de patrocinadores, analytics, enlaces de marketing/referencia y accesos al constructor de embeds
+
+Antes del lanzamiento, confirma:
+
+- qué correos del equipo creador deben tener acceso específico a la campaña
+- quién puede publicar cambios de campaña
+- si una administradora de plataforma debe revisar los cambios antes del lanzamiento
+- qué campos deben quedarse estables cuando ya existan enlaces públicos, especialmente slug, URL, precios, inventario, envío e impuestos
+
+Notas operativas:
+
+- Los IDs nuevos de niveles, artículos, add-ons, decisiones y variantes pueden derivarse del nombre o label en el panel; los IDs heredados deben mantenerse estables.
+- Los borradores del editor son locales hasta que se guarden o publiquen, así que no deben tratarse como fuente de verdad.
+- Publicar cambios de campaña o configuración pasa por el flujo de la plataforma y puede tardar en desplegarse.
+- La gestión de usuarios es separada: los usuarios del panel se guardan en Worker KV y no crean commits en GitHub.
 
 ## Imágenes y video
 
@@ -277,7 +305,7 @@ The Pool incluye un constructor de embed:
 - `/embed/campaign/?slug=tu-campaign-slug`
 - `/es/embed/campaign/?slug=tu-campaign-slug`
 
-El embed es un `iframe` vivo para sitios que aceptan HTML. Refleja el estado actual de la campaña, monto pledged, progreso, countdown, media y CTA.
+El embed es un `iframe` vivo para sitios que aceptan HTML. Refleja el estado actual de la campaña, monto pledged, progreso, countdown, media y CTA. El mismo constructor también aparece dentro del tab Marketing del panel junto con herramientas para códigos de referencia y enlaces UTM guardados.
 
 <figure class="creator-checklist-screenshot">
   <img src="/assets/images/checklists/creator-campaign-checklist/embed-builder.png" alt="Constructor de embed con controles de layout, tema, media, CTA, código y vista previa." loading="lazy">
@@ -360,6 +388,7 @@ Comportamiento:
 
 - el reporte de pledges es historial/ledger
 - el reporte de fulfillment es vista actual por supporter y campaña
+- el panel puede previsualizar y descargar CSVs de pledges o fulfillment sin enviar correos
 - los add-ons de campaña se quedan con la campaña
 - los add-ons de plataforma van al fulfillment de plataforma
 - cambios y cancelaciones pueden aparecer como filas históricas, mientras fulfillment usa el estado actual
@@ -379,6 +408,7 @@ Comportamiento:
 - `0 a 3` stretch goals
 - `0 a 2` decisiones comunitarias listas para lanzar
 - correos de reportes y responsable de fulfillment
+- correos de editoras o editores del panel, si el equipo creador necesita acceso directo
 - destinos de embed/promoción para la semana de lanzamiento
 
 ## Checklist final
@@ -396,6 +426,7 @@ La campaña suele estar lista cuando:
 - envío gratis, tarifa plana, fallback y USPS están decididos
 - la copia sobre impuestos no promete más que el checkout configurado
 - reportes y fulfillment tienen responsables
+- el acceso al panel y la responsabilidad de publicación están confirmados
 - el embed fue probado en destinos de promoción
 - las imágenes tienen alt text
 - no quedan secciones placeholder
@@ -408,6 +439,7 @@ La campaña suele estar lista cuando:
     <li><a href="#versión-rápida">Versión rápida</a></li>
     <li><a href="#qué-hace-que-una-campaña-se-sienta-completa">Campaña completa</a></li>
     <li><a href="#información-central">Información central</a></li>
+    <li><a href="#handoff-del-panel-de-administración">Panel</a></li>
     <li><a href="#imágenes-y-video">Imágenes y video</a></li>
     <li><a href="#niveles-y-recompensas">Niveles</a></li>
     <li><a href="#add-ons">Add-ons</a></li>

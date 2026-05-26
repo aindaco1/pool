@@ -25,7 +25,6 @@
   var authStatus = document.getElementById('admin-auth-status');
   var app = document.getElementById('admin-app');
   var logoutButton = document.getElementById('admin-logout');
-  var refreshButton = document.getElementById('admin-refresh');
   var sessionSummary = document.getElementById('admin-session-summary');
   var tabButtons = Array.from(document.querySelectorAll('[data-admin-tab]'));
   var tabPanels = Array.from(document.querySelectorAll('[data-admin-tab-panel]'));
@@ -59,10 +58,11 @@
   var marketingUrl = document.getElementById('admin-marketing-url');
   var marketingCopyUrl = document.getElementById('admin-marketing-copy-url');
   var marketingSaveReferral = document.getElementById('admin-marketing-save-referral');
-  var marketingEmbedLink = document.getElementById('admin-marketing-embed-link');
+  var marketingCancelEdit = document.getElementById('admin-marketing-cancel-edit');
   var marketingStatus = document.getElementById('admin-marketing-status');
   var marketingSnippets = document.getElementById('admin-marketing-snippets');
   var marketingReferralsRoot = document.getElementById('admin-marketing-referrals');
+  var marketingEmbedBuilder = document.querySelector('[data-admin-marketing-embed]');
   var analyticsCampaign = document.getElementById('admin-analytics-campaign');
   var analyticsStatus = document.getElementById('admin-analytics-status');
   var analyticsRoot = document.getElementById('admin-analytics-results');
@@ -104,6 +104,8 @@
   var supporterNextCursor = null;
   var supporterFilterTimer = 0;
   var marketingStorageKey = 'pool-admin-marketing-builder';
+  var marketingEditingOriginalCode = '';
+  var marketingEmbedSyncedSlug = '';
   var contentStoragePrefix = 'pool-admin-content-draft:';
   var loadedContentCampaignSlug = '';
   var contentBlocks = [];
@@ -113,6 +115,9 @@
   var activeContentEditable = null;
   var activeContentLink = null;
   var activeContentJsonField = contentLongContent;
+  var deferredContentTouchActivationTimer = 0;
+  var deferContentTouchActivationUntil = 0;
+  var suppressContentSettingsClickUntil = 0;
   var contentHistory = [];
   var lastContentMutation = '';
   var activeDiaryContentField = null;
@@ -123,6 +128,9 @@
   var contentHasUnsavedChanges = false;
   var collectionFieldIdCounter = 0;
   var contentEditorInstanceCounter = 0;
+  var activeSettingsSectionHasPublishableControls = true;
+  var mobileTabSelectIdCounter = 0;
+  var mobileTabSelects = new WeakMap();
 
   function t(key, fallback, replacements) {
     var text = messages[key] || fallback || key;
@@ -132,12 +140,187 @@
     return text;
   }
 
+  function i18nFragment(value, fallback) {
+    return String(value || fallback || '')
+      .trim()
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/\+/g, ' plus ')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+  }
+
+  function optionTranslationKeyPrefix(row, scope) {
+    var path = i18nFragment(row?.path || row?.label || '');
+    return (scope === 'campaign' ? 'campaign_option_' : 'settings_option_') + path;
+  }
+
+  function localizeSettingsOption(optionConfig, row, scope) {
+    var value = String(optionConfig?.value ?? '');
+    var label = String(optionConfig?.label ?? value);
+    var valueKey = i18nFragment(value || label, 'blank');
+    var fieldKey = optionTranslationKeyPrefix(row, scope) + '_' + valueKey;
+    var genericKey = 'option_' + valueKey;
+    return Object.assign({}, optionConfig, {
+      label: t(fieldKey, t(genericKey, label))
+    });
+  }
+
+  function settingsFieldTranslationKey(row, scope) {
+    var path = i18nFragment(row?.path || '');
+    if (path) return (scope === 'campaign' ? 'campaign_field_' : 'settings_field_') + path;
+    return (scope === 'campaign' ? 'campaign_readonly_' : 'settings_readonly_') + i18nFragment(row?.label || '', 'value');
+  }
+
+  function localizeReadOnlySettingsValue(row) {
+    if (row?.editable) return row?.value;
+    if (typeof row?.rawValue === 'boolean') return t(row.rawValue ? 'yes' : 'no', row.rawValue ? 'Yes' : 'No');
+    var value = String(row?.value ?? '');
+    var exact = {
+      Configured: 'settings_status_configured',
+      Missing: 'settings_status_missing',
+      'Not configured': 'settings_status_not_configured',
+      'Optional / not configured': 'settings_status_optional_not_configured',
+      'GitHub secret / local shell only': 'settings_status_github_secret_or_local_shell'
+    };
+    if (exact[value]) return t(exact[value], value);
+    if (row?.path === 'state' || String(row?.sourceLabel || row?.label || '') === 'State') return campaignStateLabel(value);
+    return value;
+  }
+
   function setText(node, value) {
     if (node) node.textContent = value || '';
   }
 
+  function syncMobileTabSelect(tablist, options) {
+    if (!(tablist instanceof HTMLElement)) return;
+    var buttons = Array.from(tablist.querySelectorAll(options?.buttonSelector || '[role="tab"]'))
+      .filter(function(button) {
+        return button instanceof HTMLButtonElement && !button.hidden;
+      });
+    var state = mobileTabSelects.get(tablist);
+    if (!state) {
+      var wrapper = document.createElement('div');
+      wrapper.className = 'admin-mobile-tab-select';
+      var selectId = (tablist.id || 'admin-mobile-tab-select') + '-' + String(++mobileTabSelectIdCounter);
+      var label = document.createElement('label');
+      label.className = 'admin-mobile-tab-select__label';
+      label.setAttribute('for', selectId);
+      var select = document.createElement('select');
+      select.id = selectId;
+      select.className = 'admin-settings__input admin-mobile-tab-select__control';
+      wrapper.append(label, select);
+      tablist.insertAdjacentElement('afterend', wrapper);
+      state = { wrapper: wrapper, label: label, select: select };
+      mobileTabSelects.set(tablist, state);
+    }
+
+    state.label.textContent = options?.label || tablist.getAttribute('aria-label') || t('mobile_menu_label', 'Choose section');
+    state.wrapper.hidden = tablist.hidden || buttons.length < 2;
+    state.select.replaceChildren();
+    var selectedValue = '';
+    buttons.forEach(function(button) {
+      var value = String(options?.value ? options.value(button) : button.id || button.textContent || '');
+      var option = document.createElement('option');
+      option.value = value;
+      option.textContent = (button.textContent || value).trim();
+      state.select.append(option);
+      if (button.getAttribute('aria-selected') === 'true') selectedValue = value;
+    });
+    if (selectedValue) state.select.value = selectedValue;
+    state.select.onchange = function() {
+      var value = state.select.value;
+      var targetButton = buttons.find(function(button) {
+        return String(options?.value ? options.value(button) : button.id || button.textContent || '') === value;
+      });
+      if (!(targetButton instanceof HTMLButtonElement)) return;
+      if (typeof options?.activate === 'function') {
+        options.activate(value, targetButton);
+      } else {
+        targetButton.click();
+      }
+    };
+  }
+
+  function syncAdminMobileTabs() {
+    syncMobileTabSelect(document.querySelector('[data-admin-tabs] > .admin-tabs__list'), {
+      label: t('tabs_label', 'Admin sections'),
+      buttonSelector: '[data-admin-tab]',
+      value: function(button) { return button.dataset.adminTab || ''; },
+      activate: function(value) { activateAdminTab(value); }
+    });
+  }
+
+  function adminTabCompactLabel(tabName, fallback) {
+    var labels = {
+      settings: t('settings_short_title', 'Settings'),
+      addons: t('addons_short_title', 'Add-ons'),
+      campaigns: t('campaign_settings_short_title', 'Campaigns'),
+      analytics: t('analytics_short_title', 'Analytics'),
+      reports: t('reports_short_title', 'Reports'),
+      supporters: t('supporters_short_title', 'Supporters'),
+      marketing: t('marketing_short_title', 'Marketing')
+    };
+    return labels[tabName] || fallback || tabName;
+  }
+
+  function applyAdminTabCompactLabels() {
+    tabButtons.forEach(function(button) {
+      if (!(button instanceof HTMLButtonElement)) return;
+      var fullLabel = (button.getAttribute('aria-label') || button.textContent || '').trim();
+      if (!button.querySelector('.admin-tabs__label')) {
+        button.replaceChildren();
+        var label = document.createElement('span');
+        label.className = 'admin-tabs__label';
+        label.textContent = fullLabel;
+        button.append(label);
+      }
+      button.setAttribute('aria-label', fullLabel);
+      button.title = fullLabel;
+      button.dataset.compactLabel = adminTabCompactLabel(button.dataset.adminTab || '', fullLabel);
+    });
+  }
+
+  function syncSettingsSectionMobileTabs() {
+    syncMobileTabSelect(settingsSectionTabsRoot, {
+      label: t('settings_sections_label', 'Settings sections'),
+      buttonSelector: '[data-settings-section-tab]',
+      value: function(button) { return button.dataset.settingsSectionTab || ''; },
+      activate: function(value) { selectSettingsSection(value); }
+    });
+  }
+
+  function syncCampaignSettingsMobileTabs() {
+    syncMobileTabSelect(campaignTabsRoot, {
+      label: t('campaign_settings_tabs_label', 'Campaign settings sections'),
+      buttonSelector: '[data-campaign-settings-tab]',
+      value: function(button) { return button.dataset.campaignSettingsTab || ''; },
+      activate: function(value) { selectCampaignSettings(value); }
+    });
+  }
+
+  function syncCampaignSubtabMobileTabs(panel) {
+    if (!(panel instanceof HTMLElement)) return;
+    var subtabList = panel.querySelector('.admin-campaign-section-tabs');
+    syncMobileTabSelect(subtabList, {
+      label: subtabList?.getAttribute('aria-label') || t('campaign_settings_subtabs_label', 'sections'),
+      buttonSelector: '[data-campaign-settings-subtab]',
+      value: function(button) { return button.dataset.campaignSettingsSubtab || ''; },
+      activate: function(value) { selectCampaignSettingsSubtab(panel, value); }
+    });
+  }
+
   function settingsHaveUnsavedChanges(roots) {
     return collectSettingsChanges(roots).length > 0;
+  }
+
+  function adminUsersEditor() {
+    return settingsRoot?.querySelector?.('[data-admin-users-editor]');
+  }
+
+  function adminUsersHaveUnsavedChanges() {
+    var editor = adminUsersEditor();
+    return Boolean(editor && String(editor.value || '') !== String(editor.dataset.adminUsersSavedValue || ''));
   }
 
   function campaignSettingsHaveUnsavedChanges() {
@@ -145,7 +328,7 @@
   }
 
   function adminHasUnsavedChanges() {
-    return contentHasUnsavedChanges || settingsHaveUnsavedChanges();
+    return contentHasUnsavedChanges || settingsHaveUnsavedChanges() || adminUsersHaveUnsavedChanges();
   }
 
   function setDirtyButtonState(button, dirty, cleanText, dirtyText, options) {
@@ -163,8 +346,11 @@
     var campaignDirty = contentHasUnsavedChanges || campaignSettingsHaveUnsavedChanges();
     var settingsCleanText = t('settings_publish', 'Publish');
     var settingsDirtyText = t('settings_publish_unsaved', 'Publish');
-    setDirtyButtonState(settingsPublish, settingsDirty, settingsCleanText, settingsDirtyText);
+    setDirtyButtonState(settingsPublish, settingsDirty, settingsCleanText, settingsDirtyText, {
+      forceDisabled: !activeSettingsSectionHasPublishableControls
+    });
     setDirtyButtonState(addOnsPublish, settingsDirty, settingsCleanText, settingsDirtyText);
+    updateAdminUsersSaveState(adminUsersEditor());
     setDirtyButtonState(contentPublish, campaignDirty, t('content_publish', 'Publish'), t('content_publish', 'Publish'), {
       forceDisabled: activeDiaryContentField instanceof HTMLTextAreaElement
     });
@@ -273,6 +459,10 @@
 
   function syncAdminTabsForRole(user) {
     var canManagePlatform = user?.role === 'super_admin';
+    var settingsTab = document.querySelector('[data-admin-tab="settings"]');
+    if (settingsTab instanceof HTMLButtonElement) settingsTab.hidden = !canManagePlatform;
+    var settingsPanel = document.querySelector('[data-admin-tab-panel="settings"]');
+    if (settingsPanel instanceof HTMLElement) settingsPanel.dataset.adminRestricted = canManagePlatform ? 'false' : 'true';
     var addOnsTab = document.querySelector('[data-admin-tab="addons"]');
     if (addOnsTab instanceof HTMLButtonElement) addOnsTab.hidden = !canManagePlatform;
     var addOnsPanel = document.querySelector('[data-admin-tab-panel="addons"]');
@@ -280,10 +470,11 @@
     var activeButton = tabButtons.find(function(button) {
       return button instanceof HTMLButtonElement && button.getAttribute('aria-selected') === 'true';
     });
-    if (activeButton?.dataset?.adminTab === 'addons' && !canManagePlatform) {
-      activateAdminTab('settings');
+    var activeTab = activeButton?.dataset?.adminTab || '';
+    if (!canManagePlatform && (activeTab === 'settings' || activeTab === 'addons')) {
+      activateAdminTab('campaigns');
     } else {
-      activateAdminTab(activeButton?.dataset?.adminTab || 'settings');
+      activateAdminTab(activeTab || (canManagePlatform ? 'settings' : 'campaigns'));
     }
   }
 
@@ -293,11 +484,10 @@
       return button instanceof HTMLButtonElement && button.dataset.adminTab === targetName && !button.hidden;
     });
     if (!(targetButton instanceof HTMLButtonElement)) {
-      targetName = 'settings';
-      targetButton = tabButtons.find(function(button) {
-        return button instanceof HTMLButtonElement && button.dataset.adminTab === targetName;
-      });
+      targetButton = visibleAdminTabButtons()[0];
+      targetName = targetButton?.dataset?.adminTab || 'settings';
     }
+    if (!(targetButton instanceof HTMLButtonElement)) return;
     tabButtons.forEach(function(button) {
       if (!(button instanceof HTMLButtonElement)) return;
       var selected = button === targetButton;
@@ -313,6 +503,7 @@
       mountContentEditorForCampaign(selectedCampaignSettingsSlug);
       loadContentCampaign({ skipIfLoaded: true });
     }
+    syncAdminMobileTabs();
     if (options?.focus === true) targetButton?.focus();
   }
 
@@ -407,10 +598,12 @@
   }
 
   function appendSettingsControl(parent, row, section, index) {
+    var describedById = settingsHelpId(row, section?.title, index);
     if (row?.input === 'content-editor') {
       var slot = document.createElement('div');
       slot.className = 'admin-settings__content-editor-slot';
       slot.dataset.contentEditorSlot = row.campaignSlug || campaignSettingsSlug(section) || '';
+      describeCompositeControl(slot, describedById, row?.label || row?.path || '');
       parent.append(slot);
       return;
     }
@@ -418,6 +611,8 @@
       var derived = createSettingsInput(row);
       derived.dataset.settingsDerivedCampaign = row.campaignSlug || campaignSettingsSlug(section) || '';
       derived.dataset.settingsDerivedOriginal = String(row.rawValue || row.value || '');
+      derived.setAttribute('aria-label', row.label || row.path);
+      appendDescribedBy(derived, describedById);
       parent.append(derived);
       return;
     }
@@ -425,11 +620,12 @@
       var fieldId = 'admin-setting-' + String(row.campaignSlug || 'platform') + '-' + String(row.path).replace(/[^a-z0-9_-]+/gi, '-');
       var control = createSettingsInput(row);
       control.id = fieldId;
-      if (!['add-on-products', 'campaign-collection', 'image-upload', 'video-upload', 'rich-text-inline', 'email-list', 'checkbox-list'].includes(row.input)) control.classList.add('admin-settings__input');
+      if (!['add-on-products', 'admin-users', 'campaign-collection', 'image-upload', 'video-upload', 'rich-text-inline', 'email-list', 'checkbox-list'].includes(row.input)) control.classList.add('admin-settings__input');
       control.classList.add('admin-settings__input--' + String(row.input || row.type || 'text').replace(/[^a-z0-9_-]+/gi, '-'));
       control.dataset.settingsPath = row.path;
       control.dataset.settingsType = row.type || 'string';
       control.dataset.settingsInput = row.input || row.type || 'text';
+      if (row.input === 'admin-users') control.dataset.settingsRuntimeOnly = 'true';
       if (row.submitDivisor !== undefined) control.dataset.settingsSubmitDivisor = String(row.submitDivisor);
       if (row.timeParts?.hourPath && row.timeParts?.minutePath) {
         control.dataset.settingsTimeHourPath = row.timeParts.hourPath;
@@ -440,6 +636,7 @@
       control.dataset.settingsOriginal = String(control.value || '');
       if (row.campaignSlug) control.dataset.settingsCampaign = row.campaignSlug;
       control.setAttribute('aria-label', row.label || row.path);
+      describeCompositeControl(control, describedById, row.label || row.path);
       if (row.input === 'currency') {
         var prefix = document.createElement('span');
         prefix.className = 'admin-settings__affix';
@@ -511,7 +708,7 @@
           applySettingsVisibleWhenDataset(field, childRow);
           var label = renderSettingsLabel(childRow, section?.title, String(index) + '-' + String(childIndex));
           var controlWrap = document.createElement('div');
-          appendSettingsControl(controlWrap, childRow, section, childIndex);
+          appendSettingsControl(controlWrap, childRow, section, String(index) + '-' + String(childIndex));
           field.append(label, controlWrap);
           fieldGrid.append(field);
         });
@@ -549,12 +746,18 @@
       .replace(/^-+|-+$/g, '');
   }
 
+  function settingsHelpId(row, sectionTitle, index) {
+    if (!String(row?.help || '').trim()) return '';
+    return safeHelpId('admin-setting-help', String(sectionTitle || 'settings') + '-' + String(row?.path || row?.label || index));
+  }
+
   function createHelpControl(label, helpText, idBase) {
     var text = String(helpText || '').trim();
     if (!text) return null;
     var helpId = safeHelpId('admin-setting-help', idBase || label, collectionFieldIdCounter);
     var help = document.createElement('span');
     help.className = 'admin-settings__help';
+    help.dataset.adminHelpId = helpId;
     var button = document.createElement('button');
     button.className = 'admin-settings__help-button';
     button.type = 'button';
@@ -570,6 +773,99 @@
     return help;
   }
 
+  function appendDescribedBy(element, describedById) {
+    if (!(element instanceof HTMLElement) || !describedById) return;
+    var ids = new Set(String(element.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean));
+    ids.add(describedById);
+    element.setAttribute('aria-describedby', Array.from(ids).join(' '));
+  }
+
+  function describeCompositeControl(control, describedById, label) {
+    if (!(control instanceof HTMLElement) || !describedById) return;
+    appendDescribedBy(control, describedById);
+    control.querySelectorAll('input, select, textarea, [role="textbox"]').forEach(function(child) {
+      appendDescribedBy(child, describedById);
+    });
+    if (control.tagName === 'DIV' && label && !control.getAttribute('role')) {
+      control.setAttribute('role', 'group');
+    }
+    if (!control.getAttribute('aria-label') && label && ['DIV', 'FIELDSET'].includes(control.tagName)) {
+      control.setAttribute('aria-label', label);
+    }
+  }
+
+  function appendRequiredMarker(label) {
+    var marker = document.createElement('span');
+    marker.className = 'admin-settings__required';
+    marker.setAttribute('aria-hidden', 'true');
+    marker.textContent = ' *';
+    var sr = document.createElement('span');
+    sr.className = 'sr-only';
+    sr.textContent = ' ' + t('required_label', 'required');
+    label.append(marker, sr);
+  }
+
+  function createProductLabelRow(labelText, helpText, idBase, options) {
+    var row = document.createElement('span');
+    row.className = 'admin-settings__product-label';
+    if (options?.className) row.classList.add(options.className);
+    var label = document.createElement(options?.htmlFor ? 'label' : 'span');
+    if (options?.htmlFor) label.htmlFor = options.htmlFor;
+    if (options?.labelId) label.id = options.labelId;
+    label.append(document.createTextNode(labelText));
+    if (options?.required) appendRequiredMarker(label);
+    row.append(label);
+    var help = createHelpControl(labelText, helpText || '', idBase);
+    if (help) row.append(help);
+    return { row, label, helpId: help?.dataset?.adminHelpId || '' };
+  }
+
+  function createAdminControl(options) {
+    var input;
+    if (options?.textarea) {
+      input = document.createElement('textarea');
+      input.rows = options.rows || 3;
+    } else if (options?.select) {
+      input = document.createElement('select');
+      options.select.forEach(function(optionConfig) {
+        var option = document.createElement('option');
+        option.value = optionConfig.value;
+        option.textContent = optionConfig.label;
+        input.append(option);
+      });
+    } else {
+      input = document.createElement('input');
+      input.type = options?.type || 'text';
+    }
+    return input;
+  }
+
+  function createAdminField(labelText, key, value, options, config) {
+    var wrap = document.createElement('div');
+    wrap.className = config?.className || 'admin-settings__product-field';
+    if (options?.wide) wrap.classList.add('admin-settings__product-field--wide');
+    if (options?.alignWithMedia) wrap.classList.add('admin-settings__product-field--media-paired');
+    var input = createAdminControl(options);
+    input.dataset[config.datasetKey] = key;
+    input.value = value ?? '';
+    input.id = config.idPrefix + '-' + String(collectionFieldIdCounter++);
+    if (options?.step) input.step = options.step;
+    if (options?.min !== undefined) input.min = String(options.min);
+    if (options?.disabled) input.disabled = true;
+    if (options?.readonly && 'readOnly' in input) {
+      input.readOnly = true;
+      input.classList.add('admin-settings__input--readonly');
+    }
+    var helpText = options?.help || (typeof config.helpFor === 'function' ? config.helpFor(key) : '');
+    var labelRow = createProductLabelRow(labelText, helpText, input.id, {
+      htmlFor: input.id,
+      required: options?.required
+    });
+    if (labelRow.helpId) appendDescribedBy(input, labelRow.helpId);
+    wrap.append(labelRow.row, input);
+    return wrap;
+  }
+
   function renderSettingsLabel(row, sectionTitle, index) {
     var wrap = document.createElement('span');
     wrap.className = 'admin-settings__label';
@@ -578,7 +874,10 @@
     wrap.append(text);
 
     var help = createHelpControl(row?.label || '', row?.help || '', String(sectionTitle || 'settings') + '-' + String(row?.path || row?.label || index));
-    if (help) wrap.append(help);
+    if (help) {
+      wrap.dataset.adminHelpId = help.dataset.adminHelpId || '';
+      wrap.append(help);
+    }
 
     return wrap;
   }
@@ -650,6 +949,10 @@
       return createAddOnProductsEditor(row);
     }
 
+    if (inputType === 'admin-users') {
+      return createAdminUsersEditor(row);
+    }
+
     if (inputType === 'campaign-collection') {
       return createCampaignCollectionEditor(row);
     }
@@ -712,7 +1015,7 @@
     var toolbar = document.createElement('div');
     toolbar.className = 'admin-settings__rich-inline-toolbar';
     toolbar.setAttribute('role', 'toolbar');
-    toolbar.setAttribute('aria-label', row.label || t('content_format_group', 'Text styling'));
+    toolbar.setAttribute('aria-label', row.toolbarLabel || row.label || t('content_format_group', 'Text styling'));
     [
       { action: 'bold', label: t('content_format_bold', 'Bold'), text: 'B' },
       { action: 'italic', label: t('content_format_italic', 'Italic'), text: 'I' },
@@ -734,9 +1037,11 @@
     editor.setAttribute('aria-label', row.label || '');
     editor.innerHTML = renderEditorInlineMarkdown(row.rawValue ?? row.value ?? '');
     root.value = nodeToMarkdown(editor).trim();
+    var savedSelectionRange = null;
     function syncValue() {
       root.value = nodeToMarkdown(editor).trim();
       updateAdminDirtyIndicatorsSoon();
+      root.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
     function selectionIsInsideEditor() {
@@ -746,8 +1051,52 @@
       var node = range.commonAncestorContainer;
       return editor.contains(node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode);
     }
+    function saveEditorSelection() {
+      var selection = window.getSelection?.();
+      if (!selection || selection.rangeCount === 0 || !selectionIsInsideEditor()) return;
+      savedSelectionRange = selection.getRangeAt(0).cloneRange();
+    }
+    function restoreEditorSelection() {
+      if (!savedSelectionRange) return;
+      var selection = window.getSelection?.();
+      if (!selection) return;
+      editor.focus({ preventScroll: true });
+      selection.removeAllRanges();
+      selection.addRange(savedSelectionRange);
+    }
+    function inlineActionTag(action) {
+      if (action === 'bold') return 'strong';
+      if (action === 'italic') return 'em';
+      if (action === 'underline') return 'u';
+      return '';
+    }
+    function currentEditorRange() {
+      var selection = window.getSelection?.();
+      if (!selection || selection.rangeCount === 0) return null;
+      var range = selection.getRangeAt(0);
+      var node = range.commonAncestorContainer;
+      return editor.contains(node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode) ? range : null;
+    }
+    function applyManualInlineAction(action, activeBefore) {
+      var tag = inlineActionTag(action);
+      var range = currentEditorRange() || savedSelectionRange;
+      if (!tag || !range || range.collapsed || activeBefore) return false;
+      var wrapper = document.createElement(tag);
+      wrapper.append(range.extractContents());
+      range.insertNode(wrapper);
+      var nextRange = document.createRange();
+      nextRange.selectNodeContents(wrapper);
+      var selection = window.getSelection?.();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(nextRange);
+      }
+      savedSelectionRange = nextRange.cloneRange();
+      return true;
+    }
     function updateButtonState() {
       var selectionInside = selectionIsInsideEditor();
+      if (selectionInside) saveEditorSelection();
       toolbar.querySelectorAll('[data-rich-inline-action]').forEach(function(button) {
         if (!(button instanceof HTMLButtonElement)) return;
         var isActive = false;
@@ -773,7 +1122,6 @@
       document.execCommand('insertHTML', false, sanitized);
       syncValue();
       updateButtonState();
-      root.dispatchEvent(new Event('input', { bubbles: true }));
     });
     editor.addEventListener('focus', updateButtonState);
     editor.addEventListener('keyup', updateButtonState);
@@ -787,16 +1135,23 @@
     }
     document.addEventListener('selectionchange', handleDocumentSelectionChange);
     toolbar.addEventListener('mousedown', function(event) {
-      if (event.target instanceof HTMLButtonElement) event.preventDefault();
+      if (event.target?.closest?.('[data-rich-inline-action]')) {
+        saveEditorSelection();
+        event.preventDefault();
+      }
     });
     toolbar.addEventListener('click', function(event) {
       var button = event.target?.closest?.('[data-rich-inline-action]');
       if (!(button instanceof HTMLButtonElement)) return;
-      editor.focus();
-      document.execCommand(button.dataset.richInlineAction, false, null);
+      var action = button.dataset.richInlineAction || '';
+      var activeBefore = button.getAttribute('aria-pressed') === 'true';
+      saveEditorSelection();
+      restoreEditorSelection();
+      var before = nodeToMarkdown(editor).trim();
+      document.execCommand(action, false, null);
+      if (nodeToMarkdown(editor).trim() === before) applyManualInlineAction(action, activeBefore);
       syncValue();
       updateButtonState();
-      root.dispatchEvent(new Event('input', { bubbles: true }));
     });
     updateButtonState();
     root.append(toolbar, editor);
@@ -813,7 +1168,7 @@
     input.inputMode = 'email';
     input.autocomplete = 'email';
     input.className = 'admin-settings__email-list-input';
-    input.setAttribute('aria-label', row.label || 'Email');
+    input.setAttribute('aria-label', row.label || t('email_label_generic', 'Email'));
     root.value = '';
 
     function values() {
@@ -878,17 +1233,25 @@
   function createCheckboxListInput(row) {
     var root = document.createElement('fieldset');
     root.className = 'admin-settings__checkbox-list';
+    var legend = document.createElement('legend');
+    legend.className = 'sr-only';
+    legend.textContent = row.label || t('checkbox_options_label', 'Options');
+    root.append(legend);
+    var optionCount = 0;
     var selected = new Set((Array.isArray(row.rawValue) ? row.rawValue : String(row.rawValue || '').split(',')).map(function(item) {
       return String(item || '').trim();
     }).filter(Boolean));
-    var standard = document.createElement('label');
-    standard.className = 'admin-settings__checkbox-option';
-    var standardInput = document.createElement('input');
-    standardInput.type = 'checkbox';
-    standardInput.checked = true;
-    standardInput.disabled = true;
-    standard.append(standardInput, document.createTextNode(t('shipping_option_standard', 'Standard')));
-    root.append(standard);
+    if (row.includeStandardOption !== false) {
+      var standard = document.createElement('label');
+      standard.className = 'admin-settings__checkbox-option';
+      var standardInput = document.createElement('input');
+      standardInput.type = 'checkbox';
+      standardInput.checked = true;
+      standardInput.disabled = true;
+      standard.append(standardInput, document.createTextNode(t('shipping_option_standard', 'Standard')));
+      root.append(standard);
+      optionCount += 1;
+    }
 
     function checkedValues() {
       return Array.from(root.querySelectorAll('input[data-checkbox-list-value]')).filter(function(input) {
@@ -910,12 +1273,20 @@
       checkbox.type = 'checkbox';
       checkbox.value = value;
       checkbox.dataset.checkboxListValue = value;
+      if (row.checkboxDatasetKey) checkbox.dataset[row.checkboxDatasetKey] = value;
       checkbox.checked = selected.has(value);
       checkbox.disabled = optionConfig?.disabled === true;
       checkbox.addEventListener('change', syncValue);
       label.append(checkbox, document.createTextNode(optionConfig?.label || value));
       root.append(label);
+      optionCount += 1;
     });
+    if (!optionCount && row.emptyText) {
+      var empty = document.createElement('p');
+      empty.className = 'admin-settings__empty-note';
+      empty.textContent = row.emptyText;
+      root.append(empty);
+    }
     syncValue();
     return root;
   }
@@ -942,6 +1313,7 @@
       preview.preload = 'auto';
       preview.muted = true;
       preview.playsInline = true;
+      preview.setAttribute('aria-label', options?.previewAlt || t('settings_video_preview_alt', 'Current video preview'));
     }
     var previewEmpty = document.createElement('span');
     previewEmpty.textContent = options?.emptyText || t('settings_image_no_preview', 'No image preview');
@@ -954,7 +1326,7 @@
     fileLabel.textContent = options?.uploadLabel || t('settings_image_upload', 'Upload image');
     var fileInput = document.createElement('input');
     fileInput.type = 'file';
-    fileInput.accept = options?.accept || 'image/png,image/jpeg,image/webp';
+    fileInput.accept = options?.accept || 'image/png,image/jpeg,image/webp,image/gif';
     if (options?.uploadDataset) {
       Object.entries(options.uploadDataset).forEach(function(entry) {
         fileInput.dataset[entry[0]] = entry[1];
@@ -1013,26 +1385,32 @@
     fileInput.addEventListener('change', async function() {
       var file = fileInput.files && fileInput.files[0];
       if (!file) return;
-      var allowedTypes = options?.allowedTypes || ['image/png', 'image/jpeg', 'image/webp'];
+      var allowedTypes = options?.allowedTypes || ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
       if (!allowedTypes.includes(file.type)) {
         setText(uploadStatus, options?.typeErrorText || t('settings_image_upload_type_error', 'Use a PNG, JPEG, or WebP image.'));
         return;
       }
-      var maxBytes = options?.maxBytes || 512 * 1024;
+      var maxBytes = options?.maxBytes || 8 * 1024 * 1024;
       if (file.size > maxBytes) {
-        setText(uploadStatus, options?.sizeErrorText || t('settings_image_upload_size_error', 'Image must be 512 KB or smaller.'));
+        setText(uploadStatus, options?.sizeErrorText || t('settings_image_upload_size_error', 'Image must be 8 MB or smaller.'));
         return;
       }
       setText(uploadStatus, options?.uploadingText || t('settings_image_uploading', 'Uploading image...'));
       try {
         var dataUrl = await readFileAsDataUrl(file);
+        var uploadContext = typeof options?.uploadContext === 'function' ? options.uploadContext(root) : {};
+        var filenameBase = typeof options?.filenameBase === 'function' ? options.filenameBase(root) : options?.filenameBase;
         var result = await requestJson(options?.uploadPath || '/admin/settings/image-upload', {
           method: 'POST',
           body: JSON.stringify({
             filename: file.name,
             contentType: file.type,
             content: dataUrl,
-            kind: options?.kind || 'admin'
+            kind: options?.kind || 'admin',
+            campaignSlug: options?.campaignSlug || uploadContext?.campaignSlug || '',
+            collection: options?.collection || uploadContext?.collection || '',
+            fieldPath: options?.fieldPath || uploadContext?.fieldPath || '',
+            filenameBase: filenameBase || uploadContext?.filenameBase || ''
           })
         });
         setValue(result.path || '');
@@ -1059,6 +1437,13 @@
       uploadedText: t('settings_logo_uploaded', 'Logo uploaded. Publish settings to use it.'),
       uploadPath: '/admin/settings/logo-upload',
       kind: 'logo',
+      fieldPath: row?.path || 'platform.logo_path',
+      filenameBase: 'logo',
+      accept: 'image/png,image/jpeg,image/webp',
+      allowedTypes: ['image/png', 'image/jpeg', 'image/webp'],
+      maxBytes: 512 * 1024,
+      typeErrorText: t('settings_logo_upload_type_error', 'Use a PNG, JPEG, or WebP logo.'),
+      sizeErrorText: t('settings_logo_upload_size_error', 'Logo must be 512 KB or smaller.'),
       uploadDataset: { logoUploadInput: 'true' }
     });
   }
@@ -1072,6 +1457,9 @@
       uploadLabel: t('settings_image_upload', 'Upload image'),
       uploadedText: t('settings_image_uploaded', 'Image uploaded. Publish settings to use it.'),
       kind: row?.campaignSlug ? 'campaign' : 'admin',
+      campaignSlug: row?.campaignSlug || '',
+      fieldPath: row?.path || '',
+      filenameBase: row?.label || row?.path || '',
       uploadDataset: { settingsImageUploadInput: 'true' }
     });
   }
@@ -1086,6 +1474,9 @@
       uploadedText: t('settings_video_uploaded', 'Video uploaded. Publish settings to use it.'),
       uploadPath: '/admin/settings/video-upload',
       kind: row?.campaignSlug ? 'campaign-video' : 'admin-video',
+      campaignSlug: row?.campaignSlug || '',
+      fieldPath: row?.path || '',
+      filenameBase: row?.label || row?.path || 'video',
       accept: 'video/mp4,video/webm,video/quicktime',
       allowedTypes: ['video/mp4', 'video/webm', 'video/quicktime'],
       maxBytes: 100 * 1024 * 1024,
@@ -1110,40 +1501,29 @@
   }
 
   function createEditorField(labelText, key, value, options) {
-    var wrap = document.createElement('div');
-    wrap.className = 'admin-settings__product-field';
-    if (options?.wide) wrap.classList.add('admin-settings__product-field--wide');
-    var input;
-    if (options?.textarea) {
-      input = document.createElement('textarea');
-      input.rows = options.rows || 3;
-    } else if (options?.select) {
-      input = document.createElement('select');
-      options.select.forEach(function(optionConfig) {
-        var option = document.createElement('option');
-        option.value = optionConfig.value;
-        option.textContent = optionConfig.label;
-        input.append(option);
-      });
-    } else {
-      input = document.createElement('input');
-      input.type = options?.type || 'text';
-    }
-    input.dataset.collectionField = key;
-    input.value = value ?? '';
-    input.id = 'admin-collection-field-' + String(collectionFieldIdCounter++);
-    if (options?.step) input.step = options.step;
-    if (options?.min !== undefined) input.min = String(options.min);
-    var labelRow = document.createElement('span');
-    labelRow.className = 'admin-settings__product-label';
-    var label = document.createElement('label');
-    label.htmlFor = input.id;
-    label.textContent = labelText;
-    labelRow.append(label);
-    var help = createHelpControl(labelText, options?.help || '', input.id);
-    if (help) labelRow.append(help);
-    wrap.append(labelRow, input);
-    return wrap;
+    return createAdminField(labelText, key, value, options, {
+      datasetKey: 'collectionField',
+      idPrefix: 'admin-collection-field'
+    });
+  }
+
+  function collectionFieldLabel(key, fallback) {
+    return t('collection_field_' + key, fallback);
+  }
+
+  function addOnFieldLabel(key, fallback) {
+    return t('add_on_field_' + key, fallback);
+  }
+
+  function productCategoryOptions() {
+    return [
+      { value: 'physical', label: t('option_physical', 'Physical') },
+      { value: 'digital', label: t('option_digital', 'Digital') }
+    ];
+  }
+
+  function optionalProductCategoryOptions() {
+    return [{ value: '', label: t('none', 'None') }].concat(productCategoryOptions().slice().reverse());
   }
 
   function shippingPresetOptions(currentValue) {
@@ -1161,6 +1541,72 @@
     return presets;
   }
 
+  var SHIPPING_PACKAGE_FIELDS = [
+    { key: 'weight_oz', labelKey: 'shipping_weight_oz', label: 'Weight (oz)', required: true },
+    { key: 'packaging_weight_oz', labelKey: 'shipping_packaging_weight_oz', label: 'Packaging weight (oz)' },
+    { key: 'length_in', labelKey: 'shipping_length_in', label: 'Length (in)', required: true },
+    { key: 'width_in', labelKey: 'shipping_width_in', label: 'Width (in)', required: true },
+    { key: 'height_in', labelKey: 'shipping_height_in', label: 'Height (in)', required: true },
+    { key: 'stack_height_in', labelKey: 'shipping_stack_height_in', label: 'Stack height (in)' }
+  ];
+
+  function readShippingPackageFields(root, selector, datasetKey) {
+    var shipping = {};
+    root.querySelectorAll(selector).forEach(function(field) {
+      var key = field.dataset[datasetKey];
+      if (!key || field.value === '') return;
+      shipping[key] = Number(field.value);
+    });
+    return shipping;
+  }
+
+  function createShippingPackageFields(source, options) {
+    var shipping = source?.shipping && typeof source.shipping === 'object' ? source.shipping : {};
+    var wrap = document.createElement('div');
+    wrap.className = 'admin-settings__shipping-fields admin-settings__product-field--wide';
+    wrap.dataset[options.containerDataset] = 'true';
+    SHIPPING_PACKAGE_FIELDS.forEach(function(field) {
+      wrap.append(createAdminField(t(field.labelKey, field.label), field.key, shipping[field.key] ?? '', {
+        type: 'number',
+        min: 0,
+        step: '0.01',
+        required: field.required,
+        help: typeof options.helpFor === 'function' ? options.helpFor(field.labelKey) : ''
+      }, {
+        className: 'admin-settings__product-field admin-settings__shipping-field',
+        datasetKey: options.fieldDataset,
+        idPrefix: options.idPrefix
+      }));
+    });
+    return wrap;
+  }
+
+  function adminSortIndicatorText(isActive, direction) {
+    return isActive ? (direction === 'asc' ? '↑' : '↓') : '↕';
+  }
+
+  function compareAdminSortValues(aValue, bValue, direction, type) {
+    if (type === 'number') return ((Number(aValue) || 0) - (Number(bValue) || 0)) * direction;
+    var aNumeric = Number(aValue);
+    var bNumeric = Number(bValue);
+    if (Number.isFinite(aNumeric) && Number.isFinite(bNumeric)) return (aNumeric - bNumeric) * direction;
+    return String(aValue || '').localeCompare(String(bValue || ''), lang || 'en', { sensitivity: 'base' }) * direction;
+  }
+
+  function createAdminSortButton(label, buttonClassName, indicatorClassName, onClick) {
+    var button = document.createElement('button');
+    var indicator = document.createElement('span');
+    button.type = 'button';
+    button.className = buttonClassName;
+    button.setAttribute('aria-label', t('sort_by_label', 'Sort by') + ' ' + String(label || ''));
+    indicator.className = indicatorClassName;
+    indicator.setAttribute('aria-hidden', 'true');
+    indicator.textContent = '↕';
+    button.append(document.createTextNode(String(label || '')), indicator);
+    button.addEventListener('click', onClick);
+    return button;
+  }
+
   function normalizeDateTimeLocalValue(value) {
     var text = String(value || '').trim();
     var match = text.match(/^(\d{4}-\d{2}-\d{2})[T\s](\d{2}:\d{2})/);
@@ -1174,10 +1620,10 @@
 
   function diaryPhaseOptions(currentValue) {
     var phases = [
-      { value: 'launch', label: 'Launch' },
-      { value: 'fundraising', label: 'Fundraising' },
-      { value: 'production', label: 'Production' },
-      { value: 'fulfillment', label: 'Fulfillment' }
+      { value: 'launch', label: t('diary_phase_launch', 'Launch') },
+      { value: 'fundraising', label: t('diary_phase_fundraising', 'Fundraising') },
+      { value: 'production', label: t('diary_phase_production', 'Production') },
+      { value: 'fulfillment', label: t('diary_phase_fulfillment', 'Fulfillment') }
     ];
     var current = String(currentValue || '').trim();
     if (current && !phases.some(function(option) { return option.value === current; })) {
@@ -1188,8 +1634,8 @@
 
   function decisionEligibleOptions(currentValue) {
     var options = [
-      { value: 'backers', label: 'Campaign supporters' },
-      { value: 'charged_backers', label: 'Charged campaign supporters' }
+      { value: 'backers', label: t('decision_eligible_backers', 'Campaign supporters') },
+      { value: 'charged_backers', label: t('decision_eligible_charged_backers', 'Charged campaign supporters') }
     ];
     var current = String(currentValue || '').trim();
     if (current && !options.some(function(option) { return option.value === current; })) {
@@ -1207,7 +1653,7 @@
   }
 
   function decisionStatusLabel(status) {
-    return String(status || '') === 'closed' ? 'Closed' : 'Open';
+    return String(status || '') === 'closed' ? t('decision_status_closed', 'Closed') : t('decision_status_open', 'Open');
   }
 
   function readCollectionCard(card) {
@@ -1235,6 +1681,12 @@
         item[key] = field.value || '';
       }
     });
+    if (item.category !== 'physical') {
+      delete item.shipping_preset;
+    } else if (!String(item.shipping_preset || '').trim()) {
+      var shipping = readShippingPackageFields(card, '[data-collection-shipping-field]', 'collectionShippingField');
+      if (Object.keys(shipping).length) item.shipping = shipping;
+    }
     return item;
   }
 
@@ -1267,7 +1719,7 @@
     }
 
     function createDiaryDateTimeField(value) {
-      var wrap = createEditorField('Date', 'dateDisplay', normalizeDateTimeLocalValue(value), {
+      var wrap = createEditorField(collectionFieldLabel('date', 'Date'), 'dateDisplay', normalizeDateTimeLocalValue(value), {
         type: 'datetime-local',
         help: collectionFieldHelp('date')
       });
@@ -1296,6 +1748,12 @@
           price: t('collection_help_tier_price', 'Price in USD charged for one unit of this tier when the campaign succeeds.'),
           category: t('collection_help_tier_category', 'Digital tiers do not need shipping. Physical tiers can use shipping presets. Any tier can have a quantity limit.'),
           shipping_preset: t('collection_help_tier_shipping_preset', 'Reusable package definition for physical reward fulfillment and shipping estimates.'),
+          shipping_weight_oz: t('collection_help_tier_shipping_weight_oz', 'Reward weight, in ounces, before packaging. Required when a physical tier does not use a shipping preset.'),
+          shipping_packaging_weight_oz: t('collection_help_tier_shipping_packaging_weight_oz', 'Extra package or mailer weight, in ounces. Leave blank or 0 if it is already included in the reward weight.'),
+          shipping_length_in: t('collection_help_tier_shipping_length_in', 'Package length, in inches. Required when a physical tier does not use a shipping preset.'),
+          shipping_width_in: t('collection_help_tier_shipping_width_in', 'Package width, in inches. Required when a physical tier does not use a shipping preset.'),
+          shipping_height_in: t('collection_help_tier_shipping_height_in', 'Package height, in inches. Required when a physical tier does not use a shipping preset.'),
+          shipping_stack_height_in: t('collection_help_tier_shipping_stack_height_in', 'Additional height added for each extra unit in the same shipment. Leave blank to reuse the package height.'),
           limit_total: t('collection_help_tier_limit_total', 'Maximum units available across all supporters. Leave blank for unlimited. For non-stackable tiers, this limits how many supporters can claim the tier; for stackable tiers, it limits total units.'),
           stackable: t('collection_help_tier_stackable', 'Allows one supporter to choose more than one unit of this tier in the same pledge.'),
           late_support: t('collection_help_tier_late_support', 'Keeps this tier available during late support after the primary campaign has ended.'),
@@ -1347,18 +1805,23 @@
         emptyText: t('campaign_item_image_no_preview', 'No item image'),
         uploadLabel: t('campaign_item_image_upload', 'Upload item image'),
         uploadedText: t('campaign_item_image_uploaded', 'Item image uploaded. Publish settings to use it.'),
-        kind: 'campaign-item',
+        kind: collection === 'campaign_add_ons' ? 'campaign-add-on' : 'campaign-item',
+        campaignSlug: row?.campaignSlug || '',
+        collection: collection,
+        filenameBase: function(rootNode) {
+          var card = rootNode?.closest?.('[data-campaign-collection-card]');
+          return card?.querySelector?.('[data-collection-field="name"]')?.value ||
+            card?.querySelector?.('[data-collection-field="label"]')?.value ||
+            card?.querySelector?.('[data-collection-field="title"]')?.value ||
+            item.name || item.label || item.title || collection;
+        },
         dataset: { collectionField: 'image' },
         uploadDataset: { campaignItemImageUpload: 'true' }
       });
-      var labelRow = document.createElement('span');
-      labelRow.className = 'admin-settings__product-label admin-settings__product-image-label';
-      var label = document.createElement('span');
-      label.textContent = t('campaign_item_image_label', 'Image');
-      labelRow.append(label);
-      var help = createHelpControl(t('campaign_item_image_label', 'Image'), collectionFieldHelp('image'), 'campaign-item-image-' + collectionFieldIdCounter++);
-      if (help) labelRow.append(help);
-      image.prepend(labelRow);
+      var labelText = t('campaign_item_image_label', 'Image');
+      image.prepend(createProductLabelRow(labelText, collectionFieldHelp('image'), 'campaign-item-image-' + collectionFieldIdCounter++, {
+        className: 'admin-settings__product-image-label'
+      }).row);
       return image;
     }
 
@@ -1367,13 +1830,8 @@
       var initialId = originalId || slugifyTitle(item[sourceKey] || '', fallback);
       var wrap = document.createElement('div');
       wrap.className = 'admin-settings__product-field';
-      var labelRow = document.createElement('span');
-      labelRow.className = 'admin-settings__product-label';
-      var label = document.createElement('span');
-      label.textContent = 'ID';
-      labelRow.append(label);
-      var help = createHelpControl('ID', collectionFieldHelp('id'), 'tier-id-' + collectionFieldIdCounter++);
-      if (help) labelRow.append(help);
+      var labelId = 'tier-id-label-' + collectionFieldIdCounter++;
+      var labelInfo = createProductLabelRow(collectionFieldLabel('id', 'ID'), collectionFieldHelp('id'), labelId, { labelId });
       var output = document.createElement('output');
       output.className = 'admin-settings__derived-value admin-settings__collection-derived-id';
       output.dataset.collectionDerivedId = 'true';
@@ -1383,8 +1841,10 @@
       output.value = initialId;
       output.textContent = initialId;
       output.setAttribute('aria-live', 'polite');
+      output.setAttribute('aria-labelledby', labelId);
+      appendDescribedBy(output, labelInfo.helpId);
       var input = hiddenCollectionField('id', initialId);
-      wrap.append(labelRow, output, input);
+      wrap.append(labelInfo.row, output, input);
       return wrap;
     }
 
@@ -1407,20 +1867,15 @@
       wrap.className = 'admin-settings__product-field';
       if (options?.wide !== false) wrap.classList.add('admin-settings__product-field--wide');
       if (options?.alignWithMedia) wrap.classList.add('admin-settings__product-field--media-paired');
-      var labelRow = document.createElement('span');
-      labelRow.className = 'admin-settings__product-label';
-      var label = document.createElement('span');
       var fieldId = 'admin-collection-rich-inline-' + String(collectionFieldIdCounter++);
-      label.id = fieldId + '-label';
-      label.textContent = labelText;
-      labelRow.append(label);
-      var help = createHelpControl(labelText, helpText || '', fieldId);
-      if (help) labelRow.append(help);
+      var labelInfo = createProductLabelRow(labelText, helpText || '', fieldId, {
+        labelId: fieldId + '-label'
+      });
       var control = createInlineRichTextInput({ label: labelText, value, rawValue: value });
       control.classList.add('admin-settings__rich-inline--collection');
       control.dataset.collectionField = key;
-      control.setAttribute('aria-labelledby', label.id);
-      wrap.append(labelRow, control);
+      control.setAttribute('aria-labelledby', labelInfo.label.id);
+      wrap.append(labelInfo.row, control);
       return wrap;
     }
 
@@ -1451,13 +1906,27 @@
 
     function updateTierCardConditionalFields(card) {
       var category = card.querySelector('[data-collection-field="category"]')?.value || 'digital';
+      var shippingPreset = String(card.querySelector('[data-collection-field="shipping_preset"]')?.value || '').trim();
       var isDigital = category !== 'physical';
       setCollectionFieldHidden(card, 'shipping_preset', isDigital);
+      var shippingFields = card.querySelector('[data-collection-shipping-fields]');
+      if (shippingFields instanceof HTMLElement) {
+        shippingFields.hidden = isDigital || Boolean(shippingPreset);
+      }
     }
 
     function updateSupportItemCardConditionalFields(card) {
       var category = card.querySelector('[data-collection-field="category"]')?.value || '';
       setCollectionFieldHidden(card, 'shipping_preset', category === 'digital');
+    }
+
+    function collectionShippingFields(item) {
+      return createShippingPackageFields(item, {
+        containerDataset: 'collectionShippingFields',
+        fieldDataset: 'collectionShippingField',
+        idPrefix: 'admin-collection-shipping-field',
+        helpFor: collectionFieldHelp
+      });
     }
 
     function collectionSupportsManualOrder() {
@@ -1536,9 +2005,9 @@
       var heading = document.createElement('span');
       heading.className = 'admin-settings__product-label admin-settings__decision-options-label';
       var headingText = document.createElement('span');
-      headingText.textContent = 'Options';
+      headingText.textContent = collectionFieldLabel('options', 'Options');
       heading.append(headingText);
-      var help = createHelpControl('Options', collectionFieldHelp('optionsJson'), 'decision-options-' + collectionFieldIdCounter++);
+      var help = createHelpControl(collectionFieldLabel('options', 'Options'), collectionFieldHelp('optionsJson'), 'decision-options-' + collectionFieldIdCounter++);
       if (help) heading.append(help);
       var hidden = hiddenCollectionField('optionsJson', JSON.stringify(normalizeDecisionOptions(item.options)));
       var editor = document.createElement('div');
@@ -1579,6 +2048,12 @@
           uploadLabel: t('decision_option_image_upload', 'Upload image'),
           uploadedText: t('decision_option_image_uploaded', 'Option image uploaded. Publish settings to use it.'),
           kind: 'decision-option',
+          campaignSlug: row?.campaignSlug || '',
+          collection: 'decisions',
+          filenameBase: function(rootNode) {
+            return rootNode?.closest?.('[data-decision-option-row]')?.querySelector?.('[data-decision-option-field="label"]')?.value ||
+              option?.label || 'decision-option';
+          },
           dataset: { decisionOptionField: 'image' },
           uploadDataset: { decisionOptionImageUpload: 'true' }
         });
@@ -1598,7 +2073,7 @@
           syncOptionsField();
           syncValue();
         });
-        optionRow.append(optionField('Label', 'label', option?.label || ''), optionImageField(option?.image || ''), remove);
+        optionRow.append(optionField(collectionFieldLabel('label', 'Label'), 'label', option?.label || ''), optionImageField(option?.image || ''), remove);
         optionRow.addEventListener('input', function() {
           syncOptionsField();
           syncValue();
@@ -1631,13 +2106,8 @@
     function createDerivedDecisionStatusField(item) {
       var wrap = document.createElement('div');
       wrap.className = 'admin-settings__product-field';
-      var labelRow = document.createElement('span');
-      labelRow.className = 'admin-settings__product-label';
-      var label = document.createElement('span');
-      label.textContent = 'Status';
-      labelRow.append(label);
-      var help = createHelpControl('Status', collectionFieldHelp('status'), 'decision-status-' + collectionFieldIdCounter++);
-      if (help) labelRow.append(help);
+      var labelId = 'decision-status-label-' + collectionFieldIdCounter++;
+      var labelInfo = createProductLabelRow(collectionFieldLabel('status', 'Status'), collectionFieldHelp('status'), labelId, { labelId });
       var status = decisionStatusFromDeadline(item.deadline || '');
       var output = document.createElement('output');
       output.className = 'admin-settings__derived-value';
@@ -1645,8 +2115,10 @@
       output.value = status;
       output.textContent = decisionStatusLabel(status);
       output.setAttribute('aria-live', 'polite');
+      output.setAttribute('aria-labelledby', labelId);
+      appendDescribedBy(output, labelInfo.helpId);
       var input = hiddenCollectionField('status', status);
-      wrap.append(labelRow, output, input);
+      wrap.append(labelInfo.row, output, input);
       return wrap;
     }
 
@@ -1671,41 +2143,43 @@
       }
       if (collection === 'tiers') {
         card.append(
-          createEditorField('Name', 'name', item.name || '', { type: 'text', help: collectionFieldHelp('name') }),
+          createEditorField(collectionFieldLabel('name', 'Name'), 'name', item.name || '', { type: 'text', help: collectionFieldHelp('name') }),
           derivedCollectionIdField(item, 'name', 'new-tier'),
-          richInlineCollectionField('Description', 'description', item.description || '', collectionFieldHelp('description'), { wide: false, alignWithMedia: true }),
+          richInlineCollectionField(collectionFieldLabel('description', 'Description'), 'description', item.description || '', collectionFieldHelp('description'), { wide: false, alignWithMedia: true }),
           imageField(item, { wide: false }),
-          createEditorField('Price (USD)', 'price', item.price ?? 0, { type: 'number', min: 0, step: '0.01', help: collectionFieldHelp('price') }),
-          createEditorField('Requires threshold', 'requires_threshold', item.requires_threshold ?? '', { type: 'number', min: 0, step: '1', help: collectionFieldHelp('requires_threshold') }),
-          createEditorField('Category', 'category', item.category || 'digital', { select: [{ value: 'digital', label: 'Digital' }, { value: 'physical', label: 'Physical' }], help: collectionFieldHelp('category') }),
-          createEditorField('Stackable', 'stackable', String(item.stackable === true), { select: [{ value: 'true', label: t('yes', 'Yes') }, { value: 'false', label: t('no', 'No') }], help: collectionFieldHelp('stackable') }),
-          createEditorField('Quantity limit', 'limit_total', item.limit_total ?? '', { type: 'number', min: 0, step: '1', help: collectionFieldHelp('limit_total') }),
-          createEditorField('Late support', 'late_support', String(item.late_support === true), { select: [{ value: 'true', label: t('yes', 'Yes') }, { value: 'false', label: t('no', 'No') }], help: collectionFieldHelp('late_support') }),
-          hiddenCollectionField('shipping_preset', item.shipping_preset || '')
+          createEditorField(collectionFieldLabel('price_usd', 'Price (USD)'), 'price', item.price ?? 0, { type: 'number', min: 0, step: '0.01', help: collectionFieldHelp('price') }),
+          createEditorField(collectionFieldLabel('requires_threshold', 'Requires threshold'), 'requires_threshold', item.requires_threshold ?? '', { type: 'number', min: 0, step: '1', help: collectionFieldHelp('requires_threshold') }),
+          createEditorField(collectionFieldLabel('category', 'Category'), 'category', item.category || 'digital', { select: productCategoryOptions().slice().reverse(), help: collectionFieldHelp('category') }),
+          createEditorField(collectionFieldLabel('stackable', 'Stackable'), 'stackable', String(item.stackable === true), { select: [{ value: 'true', label: t('yes', 'Yes') }, { value: 'false', label: t('no', 'No') }], help: collectionFieldHelp('stackable') }),
+          createEditorField(collectionFieldLabel('shipping_preset', 'Shipping preset'), 'shipping_preset', item.shipping_preset || '', { select: shippingPresetOptions(item.shipping_preset || ''), help: collectionFieldHelp('shipping_preset') }),
+          collectionShippingFields(item),
+          createEditorField(collectionFieldLabel('quantity_limit', 'Quantity limit'), 'limit_total', item.limit_total ?? '', { type: 'number', min: 0, step: '1', help: collectionFieldHelp('limit_total') }),
+          createEditorField(collectionFieldLabel('late_support', 'Late support'), 'late_support', String(item.late_support === true), { select: [{ value: 'true', label: t('yes', 'Yes') }, { value: 'false', label: t('no', 'No') }], help: collectionFieldHelp('late_support') })
         );
         updateCollectionDerivedId(card);
+        updateTierCardConditionalFields(card);
       } else if (collection === 'support_items') {
         card.append(
-          createEditorField('Name', 'label', item.label || '', { type: 'text', help: collectionFieldHelp('label') }),
+          createEditorField(collectionFieldLabel('name', 'Name'), 'label', item.label || '', { type: 'text', help: collectionFieldHelp('label') }),
           derivedCollectionIdField(item, 'label', 'new-support-item'),
-          createEditorField('Description', 'need', item.need || '', { type: 'text', help: collectionFieldHelp('need') }),
-          createEditorField('Target (USD)', 'target', item.target ?? 0, { type: 'number', min: 0, step: '0.01', help: collectionFieldHelp('target') }),
-          createEditorField('Late support', 'late_support', String(item.late_support === true), { select: [{ value: 'true', label: t('yes', 'Yes') }, { value: 'false', label: t('no', 'No') }], help: collectionFieldHelp('late_support') }),
-          createEditorField('Category', 'category', item.category || '', { select: [{ value: '', label: t('none', 'None') }, { value: 'digital', label: 'Digital' }, { value: 'physical', label: 'Physical' }], help: collectionFieldHelp('category') }),
-          createEditorField('Shipping preset', 'shipping_preset', item.shipping_preset || '', { select: shippingPresetOptions(item.shipping_preset || ''), wide: true, help: collectionFieldHelp('shipping_preset') })
+          createEditorField(collectionFieldLabel('description', 'Description'), 'need', item.need || '', { type: 'text', help: collectionFieldHelp('need') }),
+          createEditorField(collectionFieldLabel('target_usd', 'Target (USD)'), 'target', item.target ?? 0, { type: 'number', min: 0, step: '0.01', help: collectionFieldHelp('target') }),
+          createEditorField(collectionFieldLabel('late_support', 'Late support'), 'late_support', String(item.late_support === true), { select: [{ value: 'true', label: t('yes', 'Yes') }, { value: 'false', label: t('no', 'No') }], help: collectionFieldHelp('late_support') }),
+          createEditorField(collectionFieldLabel('category', 'Category'), 'category', item.category || '', { select: optionalProductCategoryOptions(), help: collectionFieldHelp('category') }),
+          createEditorField(collectionFieldLabel('shipping_preset', 'Shipping preset'), 'shipping_preset', item.shipping_preset || '', { select: shippingPresetOptions(item.shipping_preset || ''), wide: true, help: collectionFieldHelp('shipping_preset') })
         );
         updateSupportItemCardConditionalFields(card);
       } else if (collection === 'stretch_goals') {
         card.append(
-          createEditorField('Title', 'title', item.title || '', { type: 'text', help: collectionFieldHelp('title') }),
-          createEditorField('Threshold (USD)', 'threshold', item.threshold ?? 0, { type: 'number', min: 0, step: '0.01', help: collectionFieldHelp('threshold') }),
-          createEditorField('Description', 'description', item.description || '', { textarea: true, wide: true, help: collectionFieldHelp('description') }),
-          createEditorField('Status', 'status', item.status || 'locked', { select: [{ value: 'locked', label: 'Locked' }, { value: 'unlocked', label: 'Unlocked' }, { value: 'revealed', label: 'Revealed' }, { value: '', label: t('none', 'None') }], help: collectionFieldHelp('status') })
+          createEditorField(collectionFieldLabel('title', 'Title'), 'title', item.title || '', { type: 'text', help: collectionFieldHelp('title') }),
+          createEditorField(collectionFieldLabel('threshold_usd', 'Threshold (USD)'), 'threshold', item.threshold ?? 0, { type: 'number', min: 0, step: '0.01', help: collectionFieldHelp('threshold') }),
+          createEditorField(collectionFieldLabel('description', 'Description'), 'description', item.description || '', { textarea: true, wide: true, help: collectionFieldHelp('description') }),
+          createEditorField(collectionFieldLabel('status', 'Status'), 'status', item.status || 'locked', { select: [{ value: 'locked', label: t('stretch_status_locked', 'Locked') }, { value: 'unlocked', label: t('stretch_status_unlocked', 'Unlocked') }, { value: 'revealed', label: t('stretch_status_revealed', 'Revealed') }, { value: '', label: t('none', 'None') }], help: collectionFieldHelp('status') })
         );
       } else if (collection === 'ongoing_items') {
         card.append(
-          createEditorField('Label', 'label', item.label || '', { type: 'text', help: collectionFieldHelp('label') }),
-          createEditorField('Remaining (USD)', 'remaining', item.remaining ?? '', { type: 'number', min: 0, step: '0.01', help: collectionFieldHelp('remaining') })
+          createEditorField(collectionFieldLabel('label', 'Label'), 'label', item.label || '', { type: 'text', help: collectionFieldHelp('label') }),
+          createEditorField(collectionFieldLabel('remaining_usd', 'Remaining (USD)'), 'remaining', item.remaining ?? '', { type: 'number', min: 0, step: '0.01', help: collectionFieldHelp('remaining') })
         );
       } else if (collection === 'diary') {
         var contentField = document.createElement('textarea');
@@ -1749,9 +2223,9 @@
         contentControl.append(diaryEditor, diaryActions, contentField);
         contentTools.append(contentLabel, contentControl);
         card.append(
-          createEditorField('Title', 'title', item.title || '', { type: 'text', help: collectionFieldHelp('title') }),
+          createEditorField(collectionFieldLabel('title', 'Title'), 'title', item.title || '', { type: 'text', help: collectionFieldHelp('title') }),
           createDiaryDateTimeField(item.date || ''),
-          createEditorField('Phase', 'phase', item.phase || 'fundraising', { select: diaryPhaseOptions(item.phase), help: collectionFieldHelp('phase') }),
+          createEditorField(collectionFieldLabel('phase', 'Phase'), 'phase', item.phase || 'fundraising', { select: diaryPhaseOptions(item.phase), help: collectionFieldHelp('phase') }),
           contentTools
         );
         withContentEditorContext(diaryEditor, contentField, function() {
@@ -1760,11 +2234,11 @@
         attachContentBlockEditor(diaryEditor, contentField);
       } else if (collection === 'decisions') {
         card.append(
-          createEditorField('Title', 'title', item.title || '', { type: 'text', help: collectionFieldHelp('title') }),
+          createEditorField(collectionFieldLabel('title', 'Title'), 'title', item.title || '', { type: 'text', help: collectionFieldHelp('title') }),
           derivedCollectionIdField(item, 'title', 'new-decision'),
-          createEditorField('Type', 'type', item.type || 'vote', { select: [{ value: 'vote', label: 'Vote' }, { value: 'poll', label: 'Poll' }], help: collectionFieldHelp('type') }),
-          createEditorField('Deadline', 'deadline', item.deadline || '', { type: 'date', help: collectionFieldHelp('deadline') }),
-          createEditorField('Eligible', 'eligible', item.eligible || 'backers', { select: decisionEligibleOptions(item.eligible), help: collectionFieldHelp('eligible') }),
+          createEditorField(collectionFieldLabel('type', 'Type'), 'type', item.type || 'vote', { select: [{ value: 'vote', label: t('decision_type_vote', 'Vote') }, { value: 'poll', label: t('decision_type_poll', 'Poll') }], help: collectionFieldHelp('type') }),
+          createEditorField(collectionFieldLabel('deadline', 'Deadline'), 'deadline', item.deadline || '', { type: 'date', help: collectionFieldHelp('deadline') }),
+          createEditorField(collectionFieldLabel('eligible', 'Eligible'), 'eligible', item.eligible || 'backers', { select: decisionEligibleOptions(item.eligible), help: collectionFieldHelp('eligible') }),
           createDerivedDecisionStatusField(item),
           createDecisionOptionsEditor(item)
         );
@@ -1781,7 +2255,7 @@
       });
       card.append(remove);
       card.addEventListener('change', function(event) {
-        if (collection === 'tiers' && event.target?.dataset?.collectionField === 'category') {
+        if (collection === 'tiers' && ['category', 'shipping_preset'].includes(event.target?.dataset?.collectionField || '')) {
           updateTierCardConditionalFields(card);
         }
         if (collection === 'support_items' && event.target?.dataset?.collectionField === 'category') {
@@ -1838,13 +2312,224 @@
     return root;
   }
 
+  function createAdminUsersEditor(row) {
+    var root = document.createElement('div');
+    root.className = 'admin-settings__products-editor admin-settings__users-editor';
+    root.dataset.adminUsersEditor = 'true';
+    var list = document.createElement('div');
+    list.className = 'admin-settings__products-list';
+    var users = Array.isArray(row.rawValue) ? row.rawValue : [];
+    var campaignOptions = Array.isArray(row.campaignOptions) ? row.campaignOptions : [];
+    var currentUserEmail = String(row.currentUserEmail || '').trim().toLowerCase();
+
+    function normalizeUserEmail(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    function isCurrentUser(user) {
+      return currentUserEmail && normalizeUserEmail(user?.email) === currentUserEmail;
+    }
+
+    function normalizeUserCampaigns(user) {
+      return new Set((Array.isArray(user?.campaigns) ? user.campaigns : user?.campaignSlugs || [])
+        .map(function(campaignSlug) { return String(campaignSlug || '').trim(); })
+        .filter(Boolean));
+    }
+
+    function adminUserHelp(key) {
+      var help = {
+        name: t('admin_user_help_name', 'Internal display name for this admin account. It helps super admins identify who has access.'),
+        email: t('admin_user_help_email', 'Email address used for admin magic-link sign-in. Use the exact address this person will enter.'),
+        role: t('admin_user_help_role', 'Super admins can manage all dashboard sections. Campaign users can manage only selected campaigns.'),
+        campaigns: t('admin_user_help_campaigns', 'Campaigns this campaign user can view and manage. Super admins automatically have access to every campaign.')
+      };
+      return help[key] || '';
+    }
+
+    function userField(labelText, key, value, options) {
+      return createAdminField(labelText, key, value, options, {
+        datasetKey: 'adminUserField',
+        idPrefix: 'admin-user-field',
+        helpFor: adminUserHelp
+      });
+    }
+
+    function readUserCard(card) {
+      var user = { name: '', email: '', role: 'campaign_user', campaigns: [] };
+      card.querySelectorAll('[data-admin-user-field]').forEach(function(field) {
+        var key = field.dataset.adminUserField;
+        if (!key) return;
+        user[key] = field.value || '';
+      });
+      if (user.role === 'super_admin') {
+        user.campaigns = [];
+      } else {
+        user.campaigns = String(card.querySelector('[data-admin-user-campaigns-list]')?.value || '')
+          .split(',')
+          .map(function(campaignSlug) { return campaignSlug.trim(); })
+          .filter(Boolean);
+      }
+      return user;
+    }
+
+    function syncValue() {
+      root.value = JSON.stringify(Array.from(list.querySelectorAll('[data-admin-user-card]')).map(readUserCard));
+      updateAdminUsersSaveState(root);
+      updateAdminDirtyIndicatorsSoon();
+    }
+
+    function campaignCheckboxes(user) {
+      var wrap = document.createElement('div');
+      wrap.className = 'admin-settings__product-field admin-settings__user-campaigns admin-settings__product-field--wide';
+      var legendId = 'admin-user-campaigns-' + String(collectionFieldIdCounter++);
+      var labelRow = createProductLabelRow(t('admin_user_campaigns', 'Campaigns'), adminUserHelp('campaigns'), legendId, {
+        labelId: legendId,
+        required: true
+      });
+      var selected = normalizeUserCampaigns(user);
+      var options = createCheckboxListInput({
+        label: t('admin_user_campaigns', 'Campaigns'),
+        rawValue: Array.from(selected),
+        options: campaignOptions,
+        includeStandardOption: false,
+        checkboxDatasetKey: 'adminUserCampaign',
+        emptyText: t('admin_user_no_campaigns', 'No campaigns are available.')
+      });
+      options.dataset.adminUserCampaignsList = 'true';
+      options.setAttribute('aria-labelledby', legendId);
+      wrap.append(labelRow.row, options);
+      return wrap;
+    }
+
+    function updateUserCardConditionalFields(card) {
+      var role = card.querySelector('[data-admin-user-field="role"]')?.value || 'campaign_user';
+      var campaigns = card.querySelector('.admin-settings__user-campaigns');
+      if (campaigns instanceof HTMLElement) campaigns.hidden = role === 'super_admin';
+    }
+
+    function renderUser(user) {
+      var card = document.createElement('section');
+      var isSelf = isCurrentUser(user);
+      card.className = 'admin-settings__product-card admin-settings__user-card';
+      card.dataset.adminUserCard = 'true';
+      if (isSelf) card.dataset.adminCurrentUser = 'true';
+      card.append(
+        userField(t('admin_user_name', 'Name'), 'name', user?.name || '', { type: 'text' }),
+        userField(t('admin_user_email', 'Email'), 'email', user?.email || '', { type: 'email', required: true, readonly: isSelf }),
+        userField(t('admin_user_role', 'Role'), 'role', user?.role || 'campaign_user', {
+          select: [
+            { value: 'campaign_user', label: t('admin_user_role_campaign_user', 'Campaign user') },
+            { value: 'super_admin', label: t('admin_user_role_super_admin', 'Super admin') }
+          ],
+          required: true,
+          disabled: isSelf
+        }),
+        campaignCheckboxes(user)
+      );
+      updateUserCardConditionalFields(card);
+      var remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn--secondary admin-settings__collection-delete';
+      remove.textContent = t('delete', 'Delete');
+      remove.setAttribute('aria-label', t('admin_user_delete', 'Delete admin user') + ' ' + (user?.email || ''));
+      if (isSelf) {
+        remove.disabled = true;
+        remove.title = t('admin_user_self_protected', 'You cannot delete or demote your own super admin account.');
+      }
+      remove.addEventListener('click', function() {
+        if (remove.disabled) return;
+        card.remove();
+        syncValue();
+      });
+      card.append(remove);
+      card.addEventListener('input', syncValue);
+      card.addEventListener('change', function(event) {
+        if (event.target?.dataset?.adminUserField === 'role') updateUserCardConditionalFields(card);
+        syncValue();
+      });
+      return card;
+    }
+
+    users.forEach(function(user) {
+      list.append(renderUser(user));
+    });
+    var add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'btn btn--secondary';
+    add.textContent = t('admin_user_add', 'Add user');
+    add.addEventListener('click', function() {
+      list.prepend(renderUser({ name: '', email: '', role: 'campaign_user', campaigns: [] }));
+      syncValue();
+    });
+    var actions = document.createElement('div');
+    actions.className = 'admin-settings__actions admin-settings__user-actions';
+    var status = document.createElement('p');
+    status.className = 'admin-dashboard__status';
+    status.dataset.adminUsersStatus = 'true';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    var save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'btn';
+    save.dataset.adminUsersSave = 'true';
+    save.textContent = t('admin_user_save', 'Save users');
+    save.disabled = true;
+    save.addEventListener('click', function() {
+      saveAdminUsers(root);
+    });
+    actions.append(status, save);
+    root.append(add, list, actions);
+    syncValue();
+    root.dataset.adminUsersSavedValue = root.value;
+    updateAdminUsersSaveState(root);
+    return root;
+  }
+
+  function updateAdminUsersSaveState(root) {
+    if (!(root instanceof HTMLElement)) return;
+    var dirty = String(root.value || '') !== String(root.dataset.adminUsersSavedValue || '');
+    var save = root.querySelector('[data-admin-users-save]');
+    setDirtyButtonState(save, dirty, t('admin_user_save', 'Save users'), t('admin_user_save', 'Save users'));
+  }
+
+  async function saveAdminUsers(root) {
+    if (!(root instanceof HTMLElement)) return;
+    var status = root.querySelector('[data-admin-users-status]');
+    var save = root.querySelector('[data-admin-users-save]');
+    var users = [];
+    try {
+      users = JSON.parse(String(root.value || '[]'));
+    } catch (_error) {
+      setText(status, t('admin_user_save_invalid', 'User changes need updates before saving.'));
+      return;
+    }
+    if (save instanceof HTMLButtonElement) save.disabled = true;
+    setText(status, t('admin_user_saving', 'Saving users...'));
+    try {
+      var result = await requestJson('/admin/users', {
+        method: 'POST',
+        body: JSON.stringify({ users: users })
+      });
+      root.value = JSON.stringify(result.users || users);
+      root.dataset.adminUsersSavedValue = root.value;
+      root.dataset.settingsOriginal = root.value;
+      updateAdminUsersSaveState(root);
+      updateAdminDirtyIndicatorsSoon();
+      setText(status, t('admin_user_saved', 'Users saved. Changes take effect immediately.'));
+    } catch (error) {
+      logger.error('Failed to save admin users', error);
+      setText(status, error?.data?.errors?.join(' ') || error?.data?.error || t('admin_user_save_failed', 'Unable to save users.'));
+      updateAdminUsersSaveState(root);
+    }
+  }
+
   function createAddOnProductsEditor(row) {
     var root = document.createElement('div');
     root.className = 'admin-settings__products-editor';
     var list = document.createElement('div');
     list.className = 'admin-settings__products-list';
     var products = Array.isArray(row.rawValue) ? row.rawValue : [];
-    var deriveProductIds = Boolean(row.campaignSlug);
+    var deriveProductIds = true;
     var deriveVariantIds = true;
 
     function syncValue() {
@@ -1861,6 +2546,12 @@
             product[key] = field.value || '';
           }
         });
+        if (product.category !== 'physical') {
+          delete product.shipping_preset;
+        }
+        if (product.category === 'physical' && !String(product.shipping_preset || '').trim()) {
+          product.shipping = readShippingPackageFields(card, '[data-add-on-product-shipping-field]', 'addOnProductShippingField');
+        }
         product.variants = Array.from(card.querySelectorAll('[data-add-on-variant-row]')).map(function(row) {
           var variant = {};
           row.querySelectorAll('[data-add-on-variant-field]').forEach(function(field) {
@@ -1886,6 +2577,12 @@
         price: t('add_on_help_price', 'Dollar amount charged for one unit of this add-on.'),
         category: t('add_on_help_category', 'Digital add-ons do not need shipping. Physical add-ons can use shipping presets and inventory.'),
         shipping_preset: t('add_on_help_shipping_preset', 'Reusable shipping package definition for physical add-on fulfillment and shipping estimates.'),
+        shipping_weight_oz: t('add_on_help_shipping_weight_oz', 'Product weight, in ounces, before packaging. Required when a physical add-on does not use a shipping preset.'),
+        shipping_packaging_weight_oz: t('add_on_help_shipping_packaging_weight_oz', 'Extra package or mailer weight, in ounces. Leave blank or 0 if it is already included in the product weight.'),
+        shipping_length_in: t('add_on_help_shipping_length_in', 'Package length, in inches. Required when a physical add-on does not use a shipping preset.'),
+        shipping_width_in: t('add_on_help_shipping_width_in', 'Package width, in inches. Required when a physical add-on does not use a shipping preset.'),
+        shipping_height_in: t('add_on_help_shipping_height_in', 'Package height, in inches. Required when a physical add-on does not use a shipping preset.'),
+        shipping_stack_height_in: t('add_on_help_shipping_stack_height_in', 'Additional height added for each extra unit in the same shipment. Leave blank to reuse the package height.'),
         inventory: t('add_on_help_inventory', 'Optional stock count available for this add-on. Leave blank when inventory is unlimited or managed elsewhere.'),
         source_url: t('add_on_help_source_url', 'Optional product or storefront link for reference and integrations. Use it when this add-on maps to an external product page; leave it blank when it only exists inside this campaign.'),
         variant_option_name: t('add_on_help_variant_option_name', 'Optional label for the variant selector, such as Size, Color, or Format.'),
@@ -1898,41 +2595,20 @@
     }
 
     function productField(labelText, key, value, options) {
-      var wrap = document.createElement('div');
-      wrap.className = 'admin-settings__product-field';
-      if (options?.wide) wrap.classList.add('admin-settings__product-field--wide');
-      if (options?.alignWithMedia) wrap.classList.add('admin-settings__product-field--media-paired');
-      var input;
-      if (options?.textarea) {
-        input = document.createElement('textarea');
-        input.rows = options.rows || 3;
-      } else if (options?.select) {
-        input = document.createElement('select');
-        options.select.forEach(function(optionConfig) {
-          var option = document.createElement('option');
-          option.value = optionConfig.value;
-          option.textContent = optionConfig.label;
-          input.append(option);
-        });
-      } else {
-        input = document.createElement('input');
-        input.type = options?.type || 'text';
-      }
-      input.dataset.addOnProductField = key;
-      input.value = value ?? '';
-      input.id = 'admin-add-on-product-field-' + String(collectionFieldIdCounter++);
-      if (options?.step) input.step = options.step;
-      if (options?.min !== undefined) input.min = String(options.min);
-      var labelRow = document.createElement('span');
-      labelRow.className = 'admin-settings__product-label';
-      var label = document.createElement('label');
-      label.htmlFor = input.id;
-      label.textContent = labelText;
-      labelRow.append(label);
-      var help = createHelpControl(labelText, options?.help || addOnProductHelp(key), input.id);
-      if (help) labelRow.append(help);
-      wrap.append(labelRow, input);
-      return wrap;
+      return createAdminField(labelText, key, value, options, {
+        datasetKey: 'addOnProductField',
+        idPrefix: 'admin-add-on-product-field',
+        helpFor: addOnProductHelp
+      });
+    }
+
+    function productShippingFields(product) {
+      return createShippingPackageFields(product, {
+        containerDataset: 'addOnShippingFields',
+        fieldDataset: 'addOnProductShippingField',
+        idPrefix: 'admin-add-on-product-shipping-field',
+        helpFor: addOnProductHelp
+      });
     }
 
     function productImageField(product, options) {
@@ -1944,17 +2620,18 @@
         uploadLabel: t('add_on_image_upload', 'Upload product image'),
         uploadedText: t('add_on_image_uploaded', 'Product image uploaded. Publish settings to use it.'),
         kind: 'add-on',
+        campaignSlug: product.campaign_slug || product.campaignSlug || '',
+        filenameBase: function(rootNode) {
+          return rootNode?.closest?.('[data-add-on-product-card]')?.querySelector?.('[data-add-on-product-field="name"]')?.value ||
+            product.name || product.id || 'add-on';
+        },
         dataset: { addOnProductField: 'image_url' },
         uploadDataset: { addOnProductImageUpload: 'true' }
       });
-      var label = document.createElement('span');
-      label.className = 'admin-settings__product-label admin-settings__product-image-label';
-      var labelText = document.createElement('span');
-      labelText.textContent = t('add_on_image_label', 'Image');
-      label.append(labelText);
-      var help = createHelpControl(t('add_on_image_label', 'Image'), addOnProductHelp('image_url'), 'add-on-product-image-' + collectionFieldIdCounter++);
-      if (help) label.append(help);
-      image.prepend(label);
+      var labelText = t('add_on_image_label', 'Image');
+      image.prepend(createProductLabelRow(labelText, addOnProductHelp('image_url'), 'add-on-product-image-' + collectionFieldIdCounter++, {
+        className: 'admin-settings__product-image-label'
+      }).row);
       return image;
     }
 
@@ -1971,13 +2648,8 @@
       var initialId = originalId || slugifyTitle(product.name || '', 'new-add-on');
       var wrap = document.createElement('div');
       wrap.className = 'admin-settings__product-field';
-      var labelRow = document.createElement('span');
-      labelRow.className = 'admin-settings__product-label';
-      var label = document.createElement('span');
-      label.textContent = 'ID';
-      labelRow.append(label);
-      var help = createHelpControl('ID', addOnProductHelp('id'), 'add-on-product-id-' + collectionFieldIdCounter++);
-      if (help) labelRow.append(help);
+      var labelId = 'add-on-product-id-label-' + collectionFieldIdCounter++;
+      var labelInfo = createProductLabelRow(addOnFieldLabel('id', 'ID'), addOnProductHelp('id'), labelId, { labelId });
       var output = document.createElement('output');
       output.className = 'admin-settings__derived-value admin-settings__add-on-derived-id';
       output.dataset.addOnProductDerivedId = 'true';
@@ -1985,7 +2657,9 @@
       output.value = initialId;
       output.textContent = initialId;
       output.setAttribute('aria-live', 'polite');
-      wrap.append(labelRow, output, hiddenAddOnProductField('id', initialId));
+      output.setAttribute('aria-labelledby', labelId);
+      appendDescribedBy(output, labelInfo.helpId);
+      wrap.append(labelInfo.row, output, hiddenAddOnProductField('id', initialId));
       return wrap;
     }
 
@@ -2002,25 +2676,12 @@
     }
 
     function variantField(labelText, key, value, options) {
-      var wrap = document.createElement('div');
-      wrap.className = 'admin-settings__variant-field';
-      var input = document.createElement('input');
-      input.type = options?.type || 'text';
-      input.dataset.addOnVariantField = key;
-      input.value = value ?? '';
-      input.id = 'admin-add-on-variant-field-' + String(collectionFieldIdCounter++);
-      if (options?.step) input.step = options.step;
-      if (options?.min !== undefined) input.min = String(options.min);
-      var labelRow = document.createElement('span');
-      labelRow.className = 'admin-settings__product-label';
-      var label = document.createElement('label');
-      label.htmlFor = input.id;
-      label.textContent = labelText;
-      labelRow.append(label);
-      var help = createHelpControl(labelText, options?.help || addOnProductHelp(key), input.id);
-      if (help) labelRow.append(help);
-      wrap.append(labelRow, input);
-      return wrap;
+      return createAdminField(labelText, key, value, options, {
+        className: 'admin-settings__variant-field',
+        datasetKey: 'addOnVariantField',
+        idPrefix: 'admin-add-on-variant-field',
+        helpFor: addOnProductHelp
+      });
     }
 
     function hiddenAddOnVariantField(key, value) {
@@ -2036,13 +2697,8 @@
       var initialId = originalId || slugifyTitle(variant?.label || '', 'new-variant');
       var wrap = document.createElement('div');
       wrap.className = 'admin-settings__variant-field';
-      var labelRow = document.createElement('span');
-      labelRow.className = 'admin-settings__product-label';
-      var label = document.createElement('span');
-      label.textContent = 'ID';
-      labelRow.append(label);
-      var help = createHelpControl('ID', addOnProductHelp('variant_id'), 'add-on-variant-id-' + collectionFieldIdCounter++);
-      if (help) labelRow.append(help);
+      var labelId = 'add-on-variant-id-label-' + collectionFieldIdCounter++;
+      var labelInfo = createProductLabelRow(addOnFieldLabel('id', 'ID'), addOnProductHelp('variant_id'), labelId, { labelId });
       var output = document.createElement('output');
       output.className = 'admin-settings__derived-value admin-settings__add-on-derived-id';
       output.dataset.addOnVariantDerivedId = 'true';
@@ -2050,7 +2706,9 @@
       output.value = initialId;
       output.textContent = initialId;
       output.setAttribute('aria-live', 'polite');
-      wrap.append(labelRow, output, hiddenAddOnVariantField('id', initialId));
+      output.setAttribute('aria-labelledby', labelId);
+      appendDescribedBy(output, labelInfo.helpId);
+      wrap.append(labelInfo.row, output, hiddenAddOnVariantField('id', initialId));
       return wrap;
     }
 
@@ -2072,16 +2730,16 @@
       row.dataset.addOnVariantRow = 'true';
       if (deriveVariantIds) {
         row.append(
-          variantField('Label', 'label', variant?.label || '', { type: 'text', help: addOnProductHelp('variant_label') }),
+          variantField(addOnFieldLabel('label', 'Label'), 'label', variant?.label || '', { type: 'text', help: addOnProductHelp('variant_label') }),
           derivedAddOnVariantIdField(variant),
-          variantField('Inventory', 'inventory', variant?.inventory ?? '', { type: 'number', min: 0, step: '1', help: addOnProductHelp('variant_inventory') })
+          variantField(addOnFieldLabel('inventory', 'Inventory'), 'inventory', variant?.inventory ?? '', { type: 'number', min: 0, step: '1', help: addOnProductHelp('variant_inventory') })
         );
         updateAddOnVariantDerivedId(row);
       } else {
         row.append(
-          variantField('Label', 'label', variant?.label || '', { type: 'text', help: addOnProductHelp('variant_label') }),
-          variantField('ID', 'id', variant?.id || '', { type: 'text', help: addOnProductHelp('variant_id') }),
-          variantField('Inventory', 'inventory', variant?.inventory ?? '', { type: 'number', min: 0, step: '1', help: addOnProductHelp('variant_inventory') })
+          variantField(addOnFieldLabel('label', 'Label'), 'label', variant?.label || '', { type: 'text', help: addOnProductHelp('variant_label') }),
+          variantField(addOnFieldLabel('id', 'ID'), 'id', variant?.id || '', { type: 'text', help: addOnProductHelp('variant_id') }),
+          variantField(addOnFieldLabel('inventory', 'Inventory'), 'inventory', variant?.inventory ?? '', { type: 'number', min: 0, step: '1', help: addOnProductHelp('variant_inventory') })
         );
       }
       var remove = document.createElement('button');
@@ -2137,7 +2795,12 @@
 
     function updateAddOnProductConditionalFields(card) {
       var category = card.querySelector('[data-add-on-product-field="category"]')?.value || 'physical';
+      var shippingPreset = String(card.querySelector('[data-add-on-product-field="shipping_preset"]')?.value || '').trim();
       setAddOnProductFieldHidden(card, 'shipping_preset', category === 'digital');
+      var shippingFields = card.querySelector('[data-add-on-shipping-fields]');
+      if (shippingFields instanceof HTMLElement) {
+        shippingFields.hidden = category !== 'physical' || Boolean(shippingPreset);
+      }
     }
 
     function renderProduct(product) {
@@ -2145,23 +2808,21 @@
       card.className = 'admin-settings__product-card';
       card.dataset.addOnProductCard = 'true';
       card.append(
-        productField('Name', 'name', product.name || '', { type: 'text' }),
+        productField(addOnFieldLabel('name', 'Name'), 'name', product.name || '', { type: 'text' }),
         deriveProductIds
           ? derivedAddOnProductIdField(product)
-          : productField('ID', 'id', product.id || '', { type: 'text' }),
-        productField('Description', 'description', product.description || '', { textarea: true, alignWithMedia: true }),
+          : productField(addOnFieldLabel('id', 'ID'), 'id', product.id || '', { type: 'text' }),
+        productField(addOnFieldLabel('description', 'Description'), 'description', product.description || '', { textarea: true, alignWithMedia: true }),
         productImageField(product, { wide: false }),
-        productField('Price', 'price', product.price ?? 0, { type: 'number', min: 0, step: '0.01' }),
-        productField('Category', 'category', product.category || 'physical', {
-          select: [
-            { value: 'physical', label: 'Physical' },
-            { value: 'digital', label: 'Digital' }
-          ]
+        productField(addOnFieldLabel('price', 'Price'), 'price', product.price ?? 0, { type: 'number', min: 0, step: '0.01' }),
+        productField(addOnFieldLabel('category', 'Category'), 'category', product.category || 'physical', {
+          select: productCategoryOptions()
         }),
-        productField('Shipping preset', 'shipping_preset', product.shipping_preset || product.shippingPreset || '', { select: shippingPresetOptions(product.shipping_preset || product.shippingPreset || '') }),
-        productField('Inventory', 'inventory', product.inventory ?? '', { type: 'number', min: 0, step: '1' }),
-        productField('Source URL', 'source_url', product.source_url || product.sourceUrl || '', { type: 'url' }),
-        productField('Variant option name', 'variant_option_name', product.variant_option_name || product.variantOptionName || '', { type: 'text' }),
+        productField(addOnFieldLabel('shipping_preset', 'Shipping preset'), 'shipping_preset', product.shipping_preset || product.shippingPreset || '', { select: shippingPresetOptions(product.shipping_preset || product.shippingPreset || '') }),
+        productShippingFields(product),
+        productField(addOnFieldLabel('inventory', 'Inventory'), 'inventory', product.inventory ?? '', { type: 'number', min: 0, step: '1' }),
+        productField(addOnFieldLabel('source_url', 'Source URL'), 'source_url', product.source_url || product.sourceUrl || '', { type: 'url' }),
+        productField(addOnFieldLabel('variant_option_name', 'Variant option name'), 'variant_option_name', product.variant_option_name || product.variantOptionName || '', { type: 'text' }),
         renderVariantsEditor(product)
       );
       if (deriveProductIds) updateAddOnProductDerivedId(card);
@@ -2181,7 +2842,9 @@
         syncValue();
       });
       card.addEventListener('change', function(event) {
-        if (event.target?.dataset?.addOnProductField === 'category') updateAddOnProductConditionalFields(card);
+        if (['category', 'shipping_preset'].includes(event.target?.dataset?.addOnProductField || '')) {
+          updateAddOnProductConditionalFields(card);
+        }
         syncValue();
       });
       return card;
@@ -2256,34 +2919,53 @@
     return changes;
   }
 
-  function normalizeSettingsRow(row) {
+  function normalizeSettingsRow(row, scope) {
     if (!row || typeof row !== 'object') return row;
+    var next = Object.assign({}, row);
     if (row.path === 'platform.site_url' && canonicalSiteUrl) {
-      return Object.assign({}, row, {
+      next = Object.assign({}, next, {
         value: canonicalSiteUrl,
         rawValue: canonicalSiteUrl
       });
     }
     if (row.path === 'platform.worker_url' && canonicalWorkerBase) {
-      return Object.assign({}, row, {
+      next = Object.assign({}, next, {
         value: canonicalWorkerBase,
         rawValue: canonicalWorkerBase
       });
     }
-    return row;
+    var fieldKey = settingsFieldTranslationKey(next, scope);
+    next.sourceLabel = row.label || '';
+    next.label = t(fieldKey + '_label', row.label || '');
+    next.help = t(fieldKey + '_help', row.help || '');
+    next.value = localizeReadOnlySettingsValue(next);
+    if (next.placeholder) next.placeholder = t(fieldKey + '_placeholder', next.placeholder);
+    if (Array.isArray(next.options)) {
+      next.options = next.options.map(function(optionConfig) {
+        return localizeSettingsOption(optionConfig, next, scope);
+      });
+    }
+    return next;
   }
 
-  function normalizeSettingsSection(section) {
+  function normalizeSettingsSection(section, options) {
     if (!section || typeof section !== 'object') return section;
     if (!Array.isArray(section.rows)) return section;
+    var scope = options?.scope || 'platform';
+    var sourceTitle = section.title || '';
+    var title = scope === 'campaign'
+      ? sourceTitle
+      : t('settings_section_' + i18nFragment(sourceTitle, 'settings'), sourceTitle);
     return Object.assign({}, section, {
-      rows: section.rows.map(normalizeSettingsRow)
+      sourceTitle,
+      title,
+      rows: section.rows.map(function(row) { return normalizeSettingsRow(row, scope); })
     });
   }
 
   function campaignSettingsSlug(section) {
     var slugRow = Array.isArray(section?.rows)
-      ? section.rows.find(function(row) { return row?.label === 'Slug'; })
+      ? section.rows.find(function(row) { return row?.path === 'slug' || row?.sourceLabel === 'Slug' || row?.label === 'Slug'; })
       : null;
     return String(slugRow?.value || slugRow?.rawValue || '').trim();
   }
@@ -2300,6 +2982,21 @@
       { id: 'diary', label: t('campaign_subtab_diary', 'Diary Entries') },
       { id: 'decisions', label: t('campaign_subtab_decisions', 'Decisions') }
     ];
+  }
+
+  function campaignSettingsSubtabCompactLabel(subtabId, fallback) {
+    var labels = {
+      settings: t('campaign_subtab_short_settings', 'Settings'),
+      content: t('campaign_subtab_short_content', 'Content'),
+      tiers: t('campaign_subtab_short_tiers', 'Tiers'),
+      support_items: t('campaign_subtab_short_support_items', 'Support'),
+      campaign_add_ons: t('campaign_subtab_short_campaign_add_ons', 'Add-Ons'),
+      stretch_goals: t('campaign_subtab_short_stretch_goals', 'Goals'),
+      ongoing_items: t('campaign_subtab_short_ongoing_items', 'Ongoing'),
+      diary: t('campaign_subtab_short_diary', 'Diary'),
+      decisions: t('campaign_subtab_short_decisions', 'Decisions')
+    };
+    return labels[subtabId] || fallback || subtabId;
   }
 
   function campaignSettingsSubtabDescription(subtabId) {
@@ -2366,6 +3063,7 @@
     panel.querySelectorAll('[data-campaign-settings-subtab-panel]').forEach(function(subPanel) {
       subPanel.hidden = subPanel.dataset.campaignSettingsSubtabPanel !== nextSubtabId;
     });
+    syncCampaignSubtabMobileTabs(panel);
   }
 
   function handleCampaignSettingsSubtabKeydown(event, panel, button) {
@@ -2406,6 +3104,7 @@
     if (document.querySelector('[data-admin-tab-panel="campaigns"]')?.hidden === false) {
       loadContentCampaign({ skipIfLoaded: true });
     }
+    syncCampaignSettingsMobileTabs();
   }
 
   function renderCampaignSettingsTabs(campaignSections) {
@@ -2462,7 +3161,13 @@
         subtabButton.dataset.campaignSettingsSubtab = subtab.id;
         subtabButton.setAttribute('role', 'tab');
         subtabButton.setAttribute('aria-controls', subtabPanelId);
-        subtabButton.textContent = subtab.label;
+        subtabButton.setAttribute('aria-label', subtab.label);
+        subtabButton.title = subtab.label;
+        subtabButton.dataset.compactLabel = campaignSettingsSubtabCompactLabel(subtab.id, subtab.label);
+        var subtabLabel = document.createElement('span');
+        subtabLabel.className = 'admin-campaign-section-tabs__label';
+        subtabLabel.textContent = subtab.label;
+        subtabButton.append(subtabLabel);
         subtabButton.addEventListener('click', function() {
           selectCampaignSettingsSubtab(panel, subtab.id);
         });
@@ -2525,6 +3230,21 @@
     settingsRoot.querySelectorAll('[data-settings-section-panel]').forEach(function(panel) {
       panel.hidden = panel.dataset.settingsSectionPanel !== selectedSettingsSectionId;
     });
+    var activePanel = settingsRoot.querySelector('[data-settings-section-panel="' + cssEscape(selectedSettingsSectionId) + '"]');
+    var hasPublishableControls = Boolean(activePanel?.querySelector?.('[data-settings-path]:not([data-settings-runtime-only="true"])'));
+    activeSettingsSectionHasPublishableControls = hasPublishableControls;
+    var settingsPublishActions = settingsPublish?.closest?.('.admin-settings__actions');
+    if (settingsPublishActions instanceof HTMLElement) {
+      settingsPublishActions.hidden = false;
+      settingsPublishActions.classList.toggle('is-placeholder', !hasPublishableControls);
+      if (hasPublishableControls) {
+        settingsPublishActions.removeAttribute('aria-hidden');
+      } else {
+        settingsPublishActions.setAttribute('aria-hidden', 'true');
+      }
+    }
+    updateDirtyIndicators();
+    syncSettingsSectionMobileTabs();
   }
 
   function handleSettingsSectionTabKeydown(event, button) {
@@ -2597,14 +3317,18 @@
     if (addOnsRoot) addOnsRoot.replaceChildren();
     if (campaignTabsRoot) campaignTabsRoot.replaceChildren();
     if (campaignSettingsRoot) campaignSettingsRoot.replaceChildren();
-    var sections = Array.isArray(data?.sections) ? data.sections.map(normalizeSettingsSection) : [];
+    var sections = Array.isArray(data?.sections)
+      ? data.sections.map(function(section) { return normalizeSettingsSection(section, { scope: 'platform' }); })
+      : [];
     var addOnsSections = sections.filter(function(section) {
-      return section?.title === 'Platform add-ons';
+      return (section?.sourceTitle || section?.title) === 'Platform add-ons';
     });
     sections = sections.filter(function(section) {
-      return section?.title !== 'Platform add-ons';
+      return (section?.sourceTitle || section?.title) !== 'Platform add-ons';
     });
-    var campaignSections = Array.isArray(data?.campaigns) ? data.campaigns.map(normalizeSettingsSection) : [];
+    var campaignSections = Array.isArray(data?.campaigns)
+      ? data.campaigns.map(function(section) { return normalizeSettingsSection(section, { scope: 'campaign' }); })
+      : [];
     renderSettingsSectionTabs(sections);
     renderCampaignSettingsTabs(campaignSections);
     if (addOnsRoot) {
@@ -2705,6 +3429,7 @@
     return (roots || settingsContainers()).flatMap(function(root) {
       return Array.from(root.querySelectorAll('[data-settings-path]'));
     }).filter(function(control) {
+      if (control.dataset.settingsRuntimeOnly === 'true') return false;
       var row = control.closest('tr');
       return !row || !row.hidden;
     }).flatMap(function(control) {
@@ -2757,7 +3482,7 @@
         method: 'POST',
         body: JSON.stringify({ changes: changes })
       });
-      setText(statusNode, t('settings_valid', 'Settings changes are valid. Publishing will start a deploy.'));
+      setText(statusNode, t('settings_valid', 'Settings changes are valid. Publishing will commit them to GitHub and start a deploy.'));
       return result;
     } catch (error) {
       logger.error('Failed to validate admin settings', error);
@@ -2784,7 +3509,7 @@
         body: JSON.stringify({ changes: changes })
       });
       setText(statusNode, result?.rebuild?.triggered
-        ? t('settings_published', 'Settings published. Deploy started; changes may take a few minutes to appear.')
+        ? t('settings_published', 'Settings published to GitHub. Deploy started; changes may take a few minutes to appear.')
         : t('settings_published_no_deploy', 'Settings published, but deploy did not start automatically.'));
       settingsContainers().forEach(function(root) {
         root.querySelectorAll('[data-settings-path]').forEach(function(control) {
@@ -2830,8 +3555,7 @@
       }
     });
     renderAnalyticsOptions(campaigns);
-    hydrateMarketingDraft();
-    updateMarketingBuilder();
+    resetMarketingBuilderFields();
     loadMarketingReferrals();
     hydrateContentDraft();
   }
@@ -2870,11 +3594,29 @@
         source: marketingSource?.value || '',
         medium: marketingMedium?.value || '',
         content: marketingContent?.value || '',
-        ref: marketingRef?.value || '',
+        ref: normalizeMarketingReferralCode(marketingReferrer?.value || marketingRef?.value || ''),
         referrer: marketingReferrer?.value || ''
       }));
     } catch (_error) {
     }
+  }
+
+  function clearMarketingDraft() {
+    try {
+      localStorage.removeItem(marketingStorageKey);
+    } catch (_error) {
+    }
+  }
+
+  function resetMarketingBuilderFields(options) {
+    if (marketingSource instanceof HTMLInputElement) marketingSource.value = '';
+    if (marketingMedium instanceof HTMLInputElement) marketingMedium.value = '';
+    if (marketingContent instanceof HTMLInputElement) marketingContent.value = '';
+    if (marketingReferrer instanceof HTMLInputElement) marketingReferrer.value = '';
+    if (marketingRef instanceof HTMLInputElement) marketingRef.value = '';
+    setMarketingEditingState('');
+    clearMarketingDraft();
+    if (options?.update !== false) updateMarketingBuilder();
   }
 
   function hydrateMarketingDraft() {
@@ -2882,8 +3624,8 @@
     if (marketingSource instanceof HTMLInputElement) marketingSource.value = draft.source || '';
     if (marketingMedium instanceof HTMLInputElement) marketingMedium.value = draft.medium || '';
     if (marketingContent instanceof HTMLInputElement) marketingContent.value = draft.content || '';
-    if (marketingRef instanceof HTMLInputElement) marketingRef.value = draft.ref || '';
     if (marketingReferrer instanceof HTMLInputElement) marketingReferrer.value = draft.referrer || '';
+    if (marketingRef instanceof HTMLInputElement) marketingRef.value = normalizeMarketingReferralCode(draft.referrer || draft.ref || '');
     if (
       marketingCampaign instanceof HTMLSelectElement &&
       draft.campaignSlug &&
@@ -2900,10 +3642,6 @@
 
   function localizedCampaignPath(slug) {
     return (lang === 'es' ? '/es/campaigns/' : '/campaigns/') + encodeURIComponent(slug) + '/';
-  }
-
-  function localizedEmbedPath() {
-    return lang === 'es' ? '/es/embed/campaign/' : '/embed/campaign/';
   }
 
   function buildMarketingUrl(campaign) {
@@ -2924,6 +3662,15 @@
   function buildMarketingSnippets(campaign, url) {
     var title = campaign?.title || campaign?.slug || '';
     var platform = config.platform?.name || config.platformName || 'The Pool';
+    var emailCopy = t('marketing_email_copy', 'I thought you might like %{title}. See the campaign, rewards, and progress here: %{url}', { title: title, url: url });
+    var emailHtml = t(
+      'marketing_email_copy_html',
+      'I thought you might like <strong>%{title}</strong>. See the <a href="%{url}">campaign, rewards, and progress</a>.',
+      {
+        title: escapeEditorHtml(title),
+        url: escapeEditorAttribute(url)
+      }
+    );
     return [
       {
         title: t('marketing_snippet_social', 'Social post'),
@@ -2931,7 +3678,8 @@
       },
       {
         title: t('marketing_snippet_email', 'Email intro'),
-        copy: t('marketing_email_copy', 'I thought you might like %{title}. See the campaign, rewards, and progress here: %{url}', { title: title, url: url })
+        copy: emailCopy,
+        html: emailHtml
       },
       {
         title: t('marketing_snippet_milestone', 'Milestone nudge'),
@@ -2952,15 +3700,84 @@
       title.textContent = snippet.title;
       var copy = document.createElement('p');
       copy.className = 'admin-marketing__snippet-copy';
-      copy.textContent = snippet.copy;
+      var safeHtml = snippet.html ? sanitizeClipboardHtml(snippet.html, false) : '';
+      if (safeHtml) {
+        copy.innerHTML = safeHtml;
+      } else {
+        copy.textContent = snippet.copy;
+      }
       var button = document.createElement('button');
       button.className = 'btn btn--secondary';
       button.type = 'button';
       button.dataset.marketingCopy = snippet.copy;
+      if (safeHtml) button.dataset.marketingCopyHtml = safeHtml;
       button.textContent = t('marketing_copy_snippet', 'Copy snippet');
       card.append(title, copy, button);
       marketingSnippets.append(card);
     });
+  }
+
+  function setMarketingEditingState(code) {
+    marketingEditingOriginalCode = String(code || '');
+    if (marketingSaveReferral) {
+      marketingSaveReferral.textContent = marketingEditingOriginalCode
+        ? t('marketing_update_referral', 'Update referral code')
+        : t('marketing_save_referral', 'Save referral code');
+    }
+    if (marketingCancelEdit) marketingCancelEdit.hidden = !marketingEditingOriginalCode;
+  }
+
+  function applyMarketingUrlToFields(url) {
+    try {
+      var parsed = new URL(String(url || ''));
+      if (marketingSource instanceof HTMLInputElement) marketingSource.value = parsed.searchParams.get('utm_source') || '';
+      if (marketingMedium instanceof HTMLInputElement) marketingMedium.value = parsed.searchParams.get('utm_medium') || '';
+      if (marketingContent instanceof HTMLInputElement) marketingContent.value = parsed.searchParams.get('utm_content') || '';
+      if (marketingRef instanceof HTMLInputElement) marketingRef.value = parsed.searchParams.get('ref') || '';
+    } catch (_error) {
+    }
+  }
+
+  function editMarketingReferral(row) {
+    var campaignSlug = String(row?.campaignSlug || '').trim();
+    if (
+      campaignSlug &&
+      marketingCampaign instanceof HTMLSelectElement &&
+      Array.from(marketingCampaign.options).some(function(option) { return option.value === campaignSlug; })
+    ) {
+      marketingCampaign.value = campaignSlug;
+    }
+    applyMarketingUrlToFields(row?.url || '');
+    if (marketingRef instanceof HTMLInputElement && !marketingRef.value) marketingRef.value = row?.code || '';
+    if (marketingReferrer instanceof HTMLInputElement) marketingReferrer.value = row?.referrer || row?.name || '';
+    setMarketingEditingState(row?.code || '');
+    updateMarketingBuilder();
+    writeMarketingDraft();
+    marketingReferrer?.focus?.();
+    setText(marketingStatus, t('marketing_referral_editing', 'Editing saved referral code.'));
+  }
+
+  async function deleteMarketingReferral(row) {
+    var campaign = selectedMarketingCampaign();
+    var code = String(row?.code || '').trim();
+    if (!campaign?.slug || !code) return;
+    if (!window.confirm(t('marketing_referral_delete_confirm', 'Delete this saved referral code?'))) return;
+    setText(marketingStatus, t('marketing_referral_deleting', 'Deleting referral code...'));
+    try {
+      var data = await requestJson('/admin/marketing/referrals', {
+        method: 'DELETE',
+        body: JSON.stringify({
+          campaignSlug: campaign.slug,
+          code: code
+        })
+      });
+      if (marketingEditingOriginalCode === code) setMarketingEditingState('');
+      renderMarketingReferrals(data.referrals || []);
+      setText(marketingStatus, t('marketing_referral_deleted', 'Referral code deleted.'));
+    } catch (error) {
+      logger.error('Failed to delete referral code', error);
+      setText(marketingStatus, error?.data?.error || t('marketing_referral_delete_failed', 'Unable to delete referral code.'));
+    }
   }
 
   function renderMarketingReferrals(referrals) {
@@ -2982,20 +3799,52 @@
     table.className = 'admin-marketing__referrals-table';
     var thead = document.createElement('thead');
     var headerRow = document.createElement('tr');
-    appendTableHeader(headerRow, [
-      t('marketing_ref_code_header', 'Code'),
-      t('marketing_referrer_header', 'Referrer'),
-      t('marketing_ref_created_header', 'Created')
-    ]);
+    var referrerHeader = t('marketing_referrer_header', 'Referrer');
+    var urlHeader = t('marketing_ref_url_header', 'URL');
+    var createdHeader = t('marketing_ref_created_header', 'Created');
+    var actionsHeader = t('marketing_ref_actions_header', 'Actions');
+    appendTableHeader(headerRow, [referrerHeader, urlHeader, createdHeader, actionsHeader]);
     thead.append(headerRow);
     var tbody = document.createElement('tbody');
     rows.forEach(function(row) {
       var tr = document.createElement('tr');
-      appendTextCells(tr, [
-        row.code || '',
-        row.name || '',
-        row.createdAt ? new Date(row.createdAt).toLocaleDateString(lang || 'en') : ''
-      ]);
+      var referrerCell = document.createElement('td');
+      referrerCell.setAttribute('data-label', referrerHeader);
+      referrerCell.textContent = row.referrer || row.name || '';
+      var urlCell = document.createElement('td');
+      urlCell.setAttribute('data-label', urlHeader);
+      var url = String(row.url || '').trim();
+      if (url) {
+        var link = document.createElement('a');
+        link.className = 'admin-marketing__referral-url';
+        link.href = url;
+        link.textContent = url;
+        urlCell.append(link);
+      }
+      var createdCell = document.createElement('td');
+      createdCell.setAttribute('data-label', createdHeader);
+      createdCell.textContent = row.createdAt ? new Date(row.createdAt).toLocaleDateString(lang || 'en') : '';
+      var actionsCell = document.createElement('td');
+      actionsCell.setAttribute('data-label', actionsHeader);
+      var actions = document.createElement('div');
+      actions.className = 'admin-marketing__referral-actions';
+      var edit = document.createElement('button');
+      edit.className = 'btn btn--secondary btn--small';
+      edit.type = 'button';
+      edit.textContent = t('marketing_referral_edit', 'Edit');
+      edit.addEventListener('click', function() {
+        editMarketingReferral(row);
+      });
+      var remove = document.createElement('button');
+      remove.className = 'btn btn--secondary btn--small';
+      remove.type = 'button';
+      remove.textContent = t('marketing_referral_delete', 'Delete');
+      remove.addEventListener('click', function() {
+        deleteMarketingReferral(row);
+      });
+      actions.append(edit, remove);
+      actionsCell.append(actions);
+      tr.append(referrerCell, urlCell, createdCell, actionsCell);
       tbody.append(tr);
     });
     table.append(thead, tbody);
@@ -3029,17 +3878,24 @@
       .slice(0, 64);
   }
 
+  function syncMarketingReferralCode() {
+    if (!(marketingRef instanceof HTMLInputElement)) return '';
+    var code = normalizeMarketingReferralCode(marketingReferrer?.value || '');
+    marketingRef.value = code;
+    return code;
+  }
+
   async function saveMarketingReferral() {
     var campaign = selectedMarketingCampaign();
-    var code = normalizeMarketingReferralCode(marketingRef?.value || '');
+    var code = syncMarketingReferralCode();
     var name = String(marketingReferrer?.value || '').trim();
-    if (!campaign?.slug || !code || !name) {
-      setText(marketingStatus, t('marketing_referral_required', 'Choose a campaign, enter a referral code, and add the referrer name.'));
+    updateMarketingBuilder();
+    var url = String(marketingUrl?.value || '').trim();
+    if (!campaign?.slug || !code || !name || !url) {
+      setText(marketingStatus, t('marketing_referral_required', 'Choose a campaign, add the referrer name, and generate a campaign URL.'));
       return;
     }
-    if (marketingRef instanceof HTMLInputElement) marketingRef.value = code;
     writeMarketingDraft();
-    updateMarketingBuilder();
     setText(marketingStatus, t('marketing_referral_saving', 'Saving referral code...'));
     try {
       var data = await requestJson('/admin/marketing/referrals', {
@@ -3047,10 +3903,15 @@
         body: JSON.stringify({
           campaignSlug: campaign.slug,
           code: code,
-          name: name
+          originalCode: marketingEditingOriginalCode || undefined,
+          name: name,
+          referrer: name,
+          url: url
         })
       });
+      setMarketingEditingState('');
       renderMarketingReferrals(data.referrals || []);
+      resetMarketingBuilderFields();
       setText(marketingStatus, t('marketing_referral_saved', 'Referral code saved.'));
     } catch (error) {
       logger.error('Failed to save referral code', error);
@@ -3059,11 +3920,12 @@
   }
 
   function updateMarketingBuilder() {
+    syncMarketingReferralCode();
     var campaign = selectedMarketingCampaign();
     if (!campaign) {
       if (marketingUrl) marketingUrl.value = '';
-      if (marketingEmbedLink) marketingEmbedLink.href = absoluteSiteUrl(localizedEmbedPath()).toString();
       if (marketingSnippets) marketingSnippets.replaceChildren();
+      syncMarketingEmbedBuilder(null);
       return;
     }
     if (
@@ -3075,12 +3937,18 @@
     }
     var campaignUrl = buildMarketingUrl(campaign);
     if (marketingUrl) marketingUrl.value = campaignUrl;
-    if (marketingEmbedLink) {
-      var embedUrl = absoluteSiteUrl(localizedEmbedPath());
-      embedUrl.searchParams.set('slug', campaign.slug);
-      marketingEmbedLink.href = embedUrl.toString();
-    }
+    syncMarketingEmbedBuilder(campaign);
     renderMarketingSnippets(campaign, campaignUrl);
+  }
+
+  function syncMarketingEmbedBuilder(campaign) {
+    if (!marketingEmbedBuilder) return;
+    var slug = String(campaign?.slug || '').trim();
+    if (marketingEmbedSyncedSlug === slug) return;
+    marketingEmbedSyncedSlug = slug;
+    window.dispatchEvent(new CustomEvent('pool-campaign-embed:set-campaign', {
+      detail: { slug: slug }
+    }));
   }
 
   async function copyText(text) {
@@ -3102,9 +3970,41 @@
     return copied;
   }
 
-  async function copyMarketingText(text) {
+  async function copyRichText(html, plainText) {
+    var htmlValue = String(html || '');
+    var textValue = String(plainText || '');
+    if (!htmlValue) return copyText(textValue);
+    if (navigator.clipboard?.write && window.ClipboardItem && window.Blob) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([htmlValue], { type: 'text/html' }),
+          'text/plain': new Blob([textValue], { type: 'text/plain' })
+        })
+      ]);
+      return true;
+    }
+    var field = document.createElement('div');
+    field.contentEditable = 'true';
+    field.setAttribute('aria-hidden', 'true');
+    field.style.position = 'fixed';
+    field.style.left = '-9999px';
+    field.style.top = '0';
+    field.innerHTML = htmlValue;
+    document.body.append(field);
+    var selection = window.getSelection?.();
+    var range = document.createRange();
+    range.selectNodeContents(field);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    var copied = document.execCommand('copy');
+    selection?.removeAllRanges();
+    field.remove();
+    return copied || copyText(textValue);
+  }
+
+  async function copyMarketingText(text, html) {
     try {
-      var copied = await copyText(text);
+      var copied = html ? await copyRichText(html, text) : await copyText(text);
       setText(marketingStatus, copied
         ? t('marketing_copied', 'Copied.')
         : t('marketing_copy_failed', 'Unable to copy.'));
@@ -3122,7 +4022,7 @@
       .replace(/\b\w/g, function(character) { return character.toUpperCase(); });
   }
 
-  function analyticsBreakdownLabel(group, key) {
+  function analyticsBreakdownLabel(group, key, options) {
     var normalized = String(key || '').trim().toLowerCase();
     if (group === 'status') {
       return t('analytics_status_' + normalized, titleCaseAnalyticsKey(normalized));
@@ -3131,7 +4031,12 @@
       return t('analytics_language_' + normalized, normalized ? normalized.toUpperCase() : t('analytics_unknown', 'Unknown'));
     }
     if (group === 'referral') {
-      if (!normalized || normalized === 'direct') return t('analytics_referral_direct', 'Direct');
+      if (!normalized || normalized === 'direct') return t('analytics_referral_direct', 'No referral code');
+      var referralLabels = options?.referralLabels || {};
+      var savedLabel = String(referralLabels[normalized] || '').trim();
+      if (savedLabel) {
+        return savedLabel.toLowerCase() === normalized ? savedLabel : savedLabel + ' (' + normalized + ')';
+      }
       return titleCaseAnalyticsKey(normalized);
     }
     if (group === 'utm') {
@@ -3157,10 +4062,17 @@
     return normalized ? titleCaseAnalyticsKey(normalized) : t('analytics_unknown', 'Unknown');
   }
 
-  function renderAnalyticsBreakdown(title, rows, group) {
+  function campaignStateLabel(state) {
+    var normalized = String(state || '').trim().toLowerCase();
+    if (normalized === 'pre') return t('campaign_state_pre', 'Pre-launch (legacy)');
+    return analyticsStateLabel(normalized);
+  }
+
+  function renderAnalyticsBreakdown(title, rows, group, options) {
     var card = document.createElement('section');
     card.className = 'admin-analytics__card';
-    var heading = document.createElement('h3');
+    var heading = document.createElement('div');
+    heading.className = 'admin-analytics__breakdown-title';
     heading.textContent = title;
     card.append(heading);
     var list = document.createElement('ul');
@@ -3168,7 +4080,7 @@
     (rows || []).slice(0, 5).forEach(function(row) {
       var item = document.createElement('li');
       item.textContent = t('analytics_breakdown_item', '%{key}: %{count} (%{amount})', {
-        key: analyticsBreakdownLabel(group, row.key),
+        key: analyticsBreakdownLabel(group, row.key, options),
         count: formatNumber(row.count),
         amount: formatMoney(row.amount)
       });
@@ -3199,7 +4111,7 @@
       header.setAttribute('aria-sort', isActive ? analyticsSort.direction + 'ending' : 'none');
       var indicator = header.querySelector('.admin-analytics__sort-indicator');
       if (indicator) {
-        indicator.textContent = isActive ? (analyticsSort.direction === 'asc' ? '↑' : '↓') : '↕';
+        indicator.textContent = adminSortIndicatorText(isActive, analyticsSort.direction);
         indicator.classList.toggle('is-active', isActive);
       }
     });
@@ -3218,10 +4130,7 @@
     rows.sort(function(a, b) {
       var aValue = a.children[analyticsSort.index]?.dataset.analyticsSortValue || '';
       var bValue = b.children[analyticsSort.index]?.dataset.analyticsSortValue || '';
-      var aNumeric = Number(aValue);
-      var bNumeric = Number(bValue);
-      if (Number.isFinite(aNumeric) && Number.isFinite(bNumeric)) return (aNumeric - bNumeric) * direction;
-      return aValue.localeCompare(bValue, lang || 'en', { sensitivity: 'base' }) * direction;
+      return compareAdminSortValues(aValue, bValue, direction);
     });
     tbody.append.apply(tbody, rows);
     updateAnalyticsSortIndicators(table);
@@ -3230,20 +4139,11 @@
   function appendAnalyticsHeader(row, labels) {
     labels.forEach(function(label, index) {
       var th = document.createElement('th');
-      var button = document.createElement('button');
-      var indicator = document.createElement('span');
       th.scope = 'col';
       th.dataset.analyticsSortIndex = String(index);
       th.dataset.exportLabel = String(label || '');
       th.setAttribute('aria-sort', 'none');
-      button.type = 'button';
-      button.className = 'admin-analytics__sort';
-      button.setAttribute('aria-label', String(label || ''));
-      indicator.className = 'admin-analytics__sort-indicator';
-      indicator.setAttribute('aria-hidden', 'true');
-      indicator.textContent = '↕';
-      button.append(document.createTextNode(String(label || '')), indicator);
-      button.addEventListener('click', function() {
+      var button = createAdminSortButton(label, 'admin-analytics__sort', 'admin-analytics__sort-indicator', function() {
         analyticsSort.direction = analyticsSort.index === index && analyticsSort.direction === 'asc' ? 'desc' : 'asc';
         analyticsSort.index = index;
         sortAnalyticsRows(row.closest('table'));
@@ -3301,12 +4201,13 @@
     );
     summary.append(metrics);
 
+    var referralLabels = data?.referralLabels || {};
     var breakdowns = document.createElement('div');
     breakdowns.className = 'admin-analytics__breakdowns';
     breakdowns.append(
-      renderAnalyticsBreakdown(t('analytics_referral_breakdown', 'Referral code'), data?.referralBreakdown || [], 'referral'),
+      renderAnalyticsBreakdown(t('analytics_referral_breakdown', 'Referral codes'), data?.referralBreakdown || [], 'referral', { referralLabels: referralLabels }),
       renderAnalyticsBreakdown(t('analytics_language_breakdown', 'Language'), data?.languageBreakdown || [], 'language'),
-      renderAnalyticsBreakdown(t('analytics_utm_breakdown', 'UTM source'), data?.utmSourceBreakdown || [], 'utm'),
+      renderAnalyticsBreakdown(t('analytics_utm_breakdown', 'UTM sources'), data?.utmSourceBreakdown || [], 'utm'),
       renderAnalyticsBreakdown(t('analytics_fulfillment_breakdown', 'Fulfillment type'), analyticsFulfillmentBreakdown(totals), 'fulfillment')
     );
     summary.append(breakdowns);
@@ -3445,6 +4346,29 @@
     return contentAlignments.indexOf(align) >= 0 ? align : 'left';
   }
 
+  function contentGalleryLayout(value) {
+    var layout = String(value || '').trim().toLowerCase();
+    return layout === 'carousel' ? 'carousel' : 'grid';
+  }
+
+  function contentGalleryCaptionStyle(value) {
+    var style = String(value || '').trim().toLowerCase();
+    return style === 'overlay' ? 'overlay' : 'inline';
+  }
+
+  function contentVideoProvider(value) {
+    var provider = String(value || '').trim().toLowerCase();
+    return ['youtube', 'vimeo', 'local'].indexOf(provider) >= 0 ? provider : 'youtube';
+  }
+
+  function contentVideoSourceType(src) {
+    var path = String(src || '');
+    if (/\.webm(?:[?#].*)?$/i.test(path)) return 'video/webm';
+    if (/\.mp4(?:[?#].*)?$/i.test(path)) return 'video/mp4';
+    if (/\.mov(?:[?#].*)?$/i.test(path)) return 'video/quicktime';
+    return '';
+  }
+
   function cloneContentBlocks(blocks) {
     return JSON.parse(JSON.stringify(blocks || []));
   }
@@ -3485,9 +4409,9 @@
       case 'image':
         return { type: 'image', src: '', alt: '', caption: '', align: align };
       case 'gallery':
-        return { type: 'gallery', layout: 'grid', images: [], caption: '', align: align };
+        return { type: 'gallery', layout: 'grid', caption_style: 'inline', images: [], caption: '', align: align };
       case 'video':
-        return { type: 'video', provider: 'youtube', video_id: '', caption: '', align: align };
+        return { type: 'video', provider: 'youtube', video_id: '', src: '', poster: '', caption: '', align: align };
       case 'audio':
         return { type: 'audio', src: '', title: '', caption: '', align: align };
       case 'embed':
@@ -3515,6 +4439,18 @@
             };
           })
           : [];
+        return;
+      }
+      if (key === 'layout') {
+        normalized.layout = contentGalleryLayout(block.layout);
+        return;
+      }
+      if (key === 'caption_style') {
+        normalized.caption_style = contentGalleryCaptionStyle(block.caption_style);
+        return;
+      }
+      if (key === 'provider' && type === 'video') {
+        normalized.provider = contentVideoProvider(block.provider);
         return;
       }
       normalized[key] = String(block[key] || '');
@@ -3617,7 +4553,8 @@
 
   function renderEditorInlineMarkdown(value) {
     var html = escapeEditorHtml(value);
-    html = html.replace(/&lt;(\/?(?:u|strong|em|b|i|br))&gt;/gi, '<$1>');
+    html = html.replace(/&lt;br\s*\/?&gt;/gi, '<br>');
+    html = html.replace(/&lt;(\/?(?:u|strong|em|b|i))&gt;/gi, '<$1>');
     html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|mailto:[^)\s]+|\/(?!\/)[^)\s]+|#[^)\s]+)\)/gi, function(match, label, href) {
       var normalizedHref = String(href || '').replace(/&amp;/g, '&');
       return isSafeEditorHref(normalizedHref) ? '<a href="' + escapeEditorAttribute(normalizedHref) + '">' + label + '</a>' : match;
@@ -3626,6 +4563,44 @@
     html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
     html = html.replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
     return html;
+  }
+
+  function createSafeRichTextSpan(value, className) {
+    var span = document.createElement('span');
+    span.className = className || '';
+    span.innerHTML = renderEditorInlineMarkdown(value);
+    return span;
+  }
+
+  function directChildWithClass(parent, className) {
+    if (!(parent instanceof HTMLElement)) return null;
+    return Array.from(parent.children).find(function(child) {
+      return child instanceof HTMLElement && child.classList.contains(className);
+    }) || null;
+  }
+
+  function renderGalleryImageCaption(galleryItem, caption) {
+    if (!(galleryItem instanceof HTMLElement)) return;
+    directChildWithClass(galleryItem, 'gallery__item-caption')?.remove();
+    if (!caption) return;
+    var itemCaption = document.createElement('span');
+    itemCaption.className = 'gallery__item-caption';
+    itemCaption.append(createSafeRichTextSpan(caption, 'gallery__item-caption-text'));
+    var settingsButton = directChildWithClass(galleryItem, 'admin-content-block__settings-button--gallery-image');
+    galleryItem.insertBefore(itemCaption, settingsButton || null);
+  }
+
+  function isContentSettingsTarget(node) {
+    var element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+    return Boolean(element?.closest?.(
+      '[data-content-action="toggle-media-settings"], [data-content-action="toggle-gallery-image-settings"], [data-content-media-settings], [data-content-gallery-image-settings]'
+    ));
+  }
+
+  function contentSettingsButtonForNode(node) {
+    var element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+    var button = element?.closest?.('[data-content-action="toggle-media-settings"], [data-content-action="toggle-gallery-image-settings"]');
+    return button instanceof HTMLButtonElement ? button : null;
   }
 
   function markdownToEditorHtml(value, blockMode) {
@@ -3851,6 +4826,7 @@
       : labelText);
     control.setAttribute('aria-label', labelText);
     control.setAttribute('role', 'textbox');
+    control.setAttribute('aria-multiline', options?.blockMode ? 'true' : 'false');
     control.setAttribute('tabindex', '0');
     setEditableText(control, block[field] || '', options?.blockMode);
     return control;
@@ -3864,9 +4840,52 @@
     var control = document.createElement(tagName);
     control.dataset.contentIndex = String(index);
     control.dataset.contentField = field;
+    if (tagName === 'select') {
+      (options?.options || []).forEach(function(optionConfig) {
+        var option = document.createElement('option');
+        option.value = optionConfig.value;
+        option.textContent = optionConfig.label;
+        control.append(option);
+      });
+    }
     control.value = field === 'images' ? galleryImagesToText(block.images) : String(block[field] || '');
     if (tagName === 'textarea') control.rows = options?.rows || 3;
     if (options?.placeholder) control.placeholder = options.placeholder;
+    wrap.append(label, control);
+    return wrap;
+  }
+
+  function createGalleryImageInput(tagName, block, index, imageIndex, field, labelText, options) {
+    var wrap = document.createElement('label');
+    wrap.className = 'admin-content-block__field';
+    var label = document.createElement('span');
+    label.textContent = labelText;
+    var control = document.createElement(tagName);
+    control.dataset.contentIndex = String(index);
+    control.dataset.contentImageIndex = String(imageIndex);
+    control.dataset.contentField = field;
+    control.value = String(block.images?.[imageIndex]?.[field] || '');
+    if (tagName === 'textarea') control.rows = options?.rows || 3;
+    if (options?.placeholder) control.placeholder = options.placeholder;
+    wrap.append(label, control);
+    return wrap;
+  }
+
+  function createGalleryImageCaptionInput(block, index, imageIndex) {
+    var wrap = document.createElement('div');
+    wrap.className = 'admin-content-block__field';
+    var label = document.createElement('span');
+    label.textContent = t('content_field_hover_caption', 'Hover caption');
+    var control = createInlineRichTextInput({
+      label: t('content_field_hover_caption', 'Hover caption'),
+      toolbarLabel: t('content_field_hover_caption_formatting', 'Caption text styling'),
+      rawValue: block.images?.[imageIndex]?.caption || '',
+      value: block.images?.[imageIndex]?.caption || ''
+    });
+    control.classList.add('admin-content-block__rich-inline');
+    control.dataset.contentIndex = String(index);
+    control.dataset.contentImageIndex = String(imageIndex);
+    control.dataset.contentField = 'caption';
     wrap.append(label, control);
     return wrap;
   }
@@ -3913,6 +4932,8 @@
   function createContentChrome(block, index) {
     var chrome = document.createElement('div');
     chrome.className = 'admin-content-block__chrome';
+    chrome.dataset.contentChrome = 'true';
+    chrome.setAttribute('aria-hidden', 'true');
     chrome.addEventListener('mousedown', function(event) {
       if (event.target?.closest?.('button')) {
         event.preventDefault();
@@ -3961,6 +4982,7 @@
         button.dataset.contentIndex = String(index);
         button.dataset.contentAction = config.action;
         button.setAttribute('aria-label', config.label);
+        button.setAttribute('aria-pressed', 'false');
         if (config.icon) {
           button.append(createIcon(config.icon));
         } else {
@@ -4006,6 +5028,7 @@
       button.dataset.contentAction = 'align';
       button.dataset.contentAlign = align;
       button.setAttribute('aria-label', t('content_align_' + align, align));
+      button.setAttribute('aria-pressed', contentBlockAlignment(block.align) === align ? 'true' : 'false');
       button.append(createIcon(align === 'left' ? 'alignLeft' : align === 'center' ? 'alignCenter' : align === 'right' ? 'alignRight' : 'alignJustify'));
       alignGroup.append(button);
     });
@@ -4042,6 +5065,8 @@
       var linkPanel = document.createElement('div');
       linkPanel.className = 'admin-content-block__link-panel';
       linkPanel.dataset.contentLinkPanel = String(index);
+      linkPanel.setAttribute('role', 'group');
+      linkPanel.setAttribute('aria-label', t('content_link_label', 'Link URL'));
       linkPanel.hidden = true;
       var linkLabel = document.createElement('label');
       var linkLabelText = document.createElement('span');
@@ -4079,7 +5104,7 @@
   }
 
   function renderMediaSettings(card, block, index) {
-    if (block.type === 'divider' || block.type === 'text' || block.type === 'quote') return;
+    if (block.type === 'divider' || block.type === 'text' || block.type === 'quote' || block.type === 'gallery') return;
     var editorId = contentBlocksRoot?.dataset?.contentEditorId || 'campaign';
     var panelId = 'admin-content-media-settings-' + editorId + '-' + index;
     var button = document.createElement('button');
@@ -4095,9 +5120,12 @@
     panel.id = panelId;
     panel.className = 'admin-content-block__settings-panel';
     panel.dataset.contentMediaSettings = String(index);
+    panel.setAttribute('role', 'group');
     panel.hidden = true;
     var heading = document.createElement('h3');
+    heading.id = panelId + '-title';
     heading.textContent = t('content_media_settings', 'Media settings');
+    panel.setAttribute('aria-labelledby', heading.id);
     panel.append(heading);
     var fields = document.createElement('div');
     fields.className = 'admin-content-block__fields';
@@ -4106,18 +5134,26 @@
         createContentInput('input', block, index, 'src', t('content_field_src', 'Source URL or path')),
         createContentInput('input', block, index, 'alt', t('content_field_alt', 'Alt text'))
       );
-    } else if (block.type === 'gallery') {
-      fields.append(
-        createContentInput('textarea', block, index, 'images', t('content_field_gallery_images', 'Images'), {
-          rows: 5,
-          placeholder: t('content_gallery_help', 'One image per line: src | alt text | caption')
-        })
-      );
     } else if (block.type === 'video') {
-      fields.append(
-        createContentInput('input', block, index, 'provider', t('content_field_provider', 'Provider')),
-        createContentInput('input', block, index, 'video_id', t('content_field_video_id', 'Video ID'))
-      );
+      var providerInput = createContentInput('select', block, index, 'provider', t('content_field_provider', 'Provider'), {
+        options: [
+          { value: 'youtube', label: t('content_provider_youtube', 'YouTube') },
+          { value: 'vimeo', label: t('content_provider_vimeo', 'Vimeo') },
+          { value: 'local', label: t('content_provider_local', 'Uploaded video') }
+        ]
+      });
+      if (contentVideoProvider(block.provider) === 'local') {
+        fields.append(
+          providerInput,
+          createContentInput('input', block, index, 'src', t('content_field_video_src', 'Video file path')),
+          createContentInput('input', block, index, 'poster', t('content_field_poster', 'Poster image path'))
+        );
+      } else {
+        fields.append(
+          providerInput,
+          createContentInput('input', block, index, 'video_id', t('content_field_video_id', 'Video ID'))
+        );
+      }
     } else if (block.type === 'audio') {
       fields.append(
         createContentInput('input', block, index, 'src', t('content_field_src', 'Source URL or path')),
@@ -4132,6 +5168,37 @@
     }
     panel.append(fields);
     card.append(button, panel);
+  }
+
+  function renderGalleryImageSettings(galleryItem, block, index, imageIndex) {
+    if (!(galleryItem instanceof HTMLElement)) return;
+    var editorId = contentBlocksRoot?.dataset?.contentEditorId || 'campaign';
+    var panelId = 'admin-content-gallery-image-settings-' + editorId + '-' + index + '-' + imageIndex;
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn--secondary btn--small admin-content-block__settings-button admin-content-block__settings-button--gallery-image';
+    button.dataset.contentIndex = String(index);
+    button.dataset.contentImageIndex = String(imageIndex);
+    button.dataset.contentAction = 'toggle-gallery-image-settings';
+    button.setAttribute('aria-controls', panelId);
+    button.setAttribute('aria-expanded', 'false');
+    button.setAttribute('aria-label', t('content_gallery_image_settings', 'Gallery image caption settings'));
+    button.append(createIcon('settings'));
+    var panel = document.createElement('div');
+    panel.id = panelId;
+    panel.className = 'admin-content-block__settings-panel admin-content-block__settings-panel--gallery-image';
+    panel.dataset.contentGalleryImageSettings = String(index) + '-' + String(imageIndex);
+    panel.setAttribute('role', 'group');
+    panel.hidden = true;
+    var heading = document.createElement('h3');
+    heading.id = panelId + '-title';
+    heading.textContent = t('content_gallery_image_settings', 'Gallery image caption settings');
+    panel.setAttribute('aria-labelledby', heading.id);
+    var fields = document.createElement('div');
+    fields.className = 'admin-content-block__fields';
+    fields.append(createGalleryImageCaptionInput(block, index, imageIndex));
+    panel.append(heading, fields);
+    galleryItem.append(button, panel);
   }
 
   function appendEditableCaption(card, block, index) {
@@ -4168,20 +5235,17 @@
       var container = document.createElement('div');
       container.className = 'gallery__container';
       if (block.images?.length) {
-        block.images.forEach(function(item) {
+        block.images.forEach(function(item, imageIndex) {
           var galleryItem = document.createElement('div');
           galleryItem.className = 'gallery__item';
+          galleryItem.dataset.contentImageIndex = String(imageIndex);
           var image = document.createElement('img');
           image.src = item.src || '';
           image.alt = item.alt || '';
           image.loading = 'lazy';
           galleryItem.append(image);
-          if (item.caption) {
-            var itemCaption = document.createElement('span');
-            itemCaption.className = 'gallery__item-caption';
-            itemCaption.textContent = item.caption;
-            galleryItem.append(itemCaption);
-          }
+          renderGalleryImageCaption(galleryItem, item.caption);
+          renderGalleryImageSettings(galleryItem, block, index, imageIndex);
           container.append(galleryItem);
         });
       } else {
@@ -4191,15 +5255,33 @@
       appendEditableCaption(card, block, index);
       renderMediaSettings(card, block, index);
     } else if (block.type === 'video') {
-      if (block.video_id) {
+      var provider = contentVideoProvider(block.provider);
+      if (provider === 'local' && block.src) {
+        var localVideo = document.createElement('div');
+        localVideo.className = 'video-embed video-embed--local';
+        var videoElement = document.createElement('video');
+        videoElement.controls = true;
+        videoElement.preload = 'none';
+        videoElement.playsInline = true;
+        if (block.poster) videoElement.poster = block.poster;
+        else videoElement.setAttribute('data-first-frame-poster', 'true');
+        var videoSource = document.createElement('source');
+        videoSource.src = block.src;
+        var sourceType = contentVideoSourceType(block.src);
+        if (sourceType) videoSource.type = sourceType;
+        videoElement.append(videoSource);
+        localVideo.append(videoElement);
+        card.append(localVideo);
+        if (window.PoolVideoPosters?.init) window.PoolVideoPosters.init(localVideo);
+      } else if (block.video_id) {
         var video = document.createElement('div');
-        video.className = 'video-embed video-embed--' + (block.provider === 'vimeo' ? 'vimeo' : 'youtube');
+        video.className = 'video-embed video-embed--' + (provider === 'vimeo' ? 'vimeo' : 'youtube');
         var iframe = document.createElement('iframe');
-        iframe.src = block.provider === 'vimeo'
+        iframe.src = provider === 'vimeo'
           ? 'https://player.vimeo.com/video/' + encodeURIComponent(block.video_id) + '?dnt=1'
           : 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(block.video_id);
         iframe.loading = 'lazy';
-        iframe.title = block.caption || 'Video';
+        iframe.title = block.caption || t('content_video_title', 'Video');
         video.append(iframe);
         card.append(video);
       } else {
@@ -4238,7 +5320,7 @@
         var embed = document.createElement('iframe');
         embed.src = block.src;
         embed.loading = 'lazy';
-        embed.title = block.title || block.caption || 'Embedded content';
+        embed.title = block.title || block.caption || t('content_embed_title', 'Embedded content');
         embedWrap.append(embed);
         card.append(embedWrap);
       } else {
@@ -4271,7 +5353,7 @@
     contentBlocks.forEach(function(block, index) {
       if (index > 0) contentBlocksRoot.append(createContentInsertControl(index));
       var card = document.createElement(blockElementName(block.type));
-      card.className = 'admin-content-block content-block content-block--' + block.type + ' content-block--align-' + contentBlockAlignment(block.align) + (block.type === 'gallery' ? ' gallery--grid' : '');
+      card.className = 'admin-content-block content-block content-block--' + block.type + ' content-block--align-' + contentBlockAlignment(block.align) + (block.type === 'gallery' ? ' gallery--' + contentGalleryLayout(block.layout) + ' gallery--caption-' + contentGalleryCaptionStyle(block.caption_style) : '');
       card.dataset.contentIndex = String(index);
       card.append(createContentChrome(block, index));
       renderContentBlockBody(card, block, index);
@@ -4279,6 +5361,7 @@
     });
     contentBlocksRoot.append(createContentInsertControl(contentBlocks.length));
     syncContentJsonFromBlocks();
+    syncContentChromeAccessibility(contentBlocksRoot);
     if (typeof focusIndex === 'number') {
       contentBlocksRoot.querySelector('[data-content-index="' + focusIndex + '"][data-content-field]')?.focus();
     }
@@ -4289,8 +5372,21 @@
     var field = control.dataset.contentField || '';
     var block = contentBlocks[index];
     if (!block || !field) return;
-    if (field === 'images') {
+    if (control.dataset.contentImageIndex !== undefined && block.type === 'gallery') {
+      var imageIndex = Number(control.dataset.contentImageIndex);
+      if (!Number.isInteger(imageIndex) || !block.images?.[imageIndex]) return;
+      block.images[imageIndex][field] = control.value;
+      if (field === 'caption') {
+        var galleryItem = contentBlocksRoot?.querySelector?.('[data-content-index="' + index + '"] .gallery__item[data-content-image-index="' + imageIndex + '"]');
+        renderGalleryImageCaption(galleryItem, control.value);
+      }
+    } else if (field === 'images') {
       block.images = galleryTextToImages(control.value);
+    } else if (field === 'provider') {
+      block.provider = contentVideoProvider(control.value);
+      syncContentJsonFromBlocks();
+      renderContentBlocks(index);
+      return;
     } else if (control.isContentEditable) {
       block[field] = field === 'body' ? editorHtmlToMarkdown(control) : nodeToMarkdown(control).trim();
     } else {
@@ -4309,6 +5405,7 @@
     if (block instanceof HTMLElement && contentBlocksRoot.contains(block)) {
       block.classList.add('is-active');
     }
+    syncContentChromeAccessibility(contentBlocksRoot);
   }
 
   function deactivateContentBlocks(root) {
@@ -4316,13 +5413,37 @@
     scope?.querySelectorAll?.('.admin-content-block.is-active').forEach(function(item) {
       item.classList.remove('is-active');
     });
+    syncContentChromeAccessibility(scope);
+  }
+
+  function setContentChromeInteractive(chrome, active) {
+    if (!(chrome instanceof HTMLElement)) return;
+    chrome.setAttribute('aria-hidden', active ? 'false' : 'true');
+    chrome.querySelectorAll('button, input, select, textarea').forEach(function(control) {
+      if (!(control instanceof HTMLElement)) return;
+      if (active) {
+        control.removeAttribute('tabindex');
+      } else {
+        control.tabIndex = -1;
+      }
+    });
+  }
+
+  function syncContentChromeAccessibility(root) {
+    var scope = root instanceof HTMLElement ? root : contentBlocksRoot;
+    if (!(scope instanceof HTMLElement)) return;
+    scope.querySelectorAll('.admin-content-block').forEach(function(block) {
+      setContentChromeInteractive(block.querySelector('[data-content-chrome]'), block.classList.contains('is-active'));
+    });
   }
 
   function updateActiveEditable() {
     var active = document.activeElement;
     if (active instanceof HTMLElement && active.isContentEditable && contentBlocksRoot?.contains(active)) {
       activeContentEditable = active;
-      activateContentBlockForNode(active);
+      if (Date.now() >= deferContentTouchActivationUntil) {
+        activateContentBlockForNode(active);
+      }
     }
     updateContentLinkInspector();
     updateContentFormatState();
@@ -4545,21 +5666,31 @@
     updateContentLinkInspector();
   }
 
+  function closeContentSettingsPanels(root) {
+    var scope = root instanceof HTMLElement ? root : contentBlocksRoot;
+    scope?.querySelectorAll?.('[data-content-media-settings], [data-content-gallery-image-settings]').forEach(function(panel) {
+      panel.hidden = true;
+    });
+    scope?.querySelectorAll?.('[data-content-action="toggle-media-settings"], [data-content-action="toggle-gallery-image-settings"]').forEach(function(button) {
+      button.setAttribute('aria-expanded', 'false');
+    });
+  }
+
   function toggleMediaSettings(button) {
     if (!(button instanceof HTMLButtonElement)) return;
     var panelId = button.getAttribute('aria-controls');
     var panel = panelId ? document.getElementById(panelId) : null;
     if (!(panel instanceof HTMLElement)) return;
     var opening = panel.hidden;
-    contentBlocksRoot?.querySelectorAll('[data-content-media-settings]').forEach(function(otherPanel) {
-      otherPanel.hidden = true;
-    });
-    contentBlocksRoot?.querySelectorAll('[data-content-action="toggle-media-settings"]').forEach(function(otherButton) {
-      otherButton.setAttribute('aria-expanded', 'false');
-    });
+    closeContentSettingsPanels(contentBlocksRoot);
     panel.hidden = !opening;
     button.setAttribute('aria-expanded', opening ? 'true' : 'false');
-    if (opening) panel.querySelector('input, textarea, select, button')?.focus();
+    if (opening) {
+      panel.querySelector('input, textarea, select, button')?.focus();
+    } else {
+      button.blur();
+      deactivateContentBlocks(contentBlocksRoot);
+    }
   }
 
   function applyContentBlockFormat(value) {
@@ -4967,7 +6098,7 @@
       header.setAttribute('aria-sort', isActive ? reportSort.direction + 'ending' : 'none');
       var indicator = header.querySelector('.admin-reports__sort-indicator');
       if (indicator) {
-        indicator.textContent = isActive ? (reportSort.direction === 'asc' ? '↑' : '↓') : '↕';
+        indicator.textContent = adminSortIndicatorText(isActive, reportSort.direction);
         indicator.classList.toggle('is-active', isActive);
       }
     });
@@ -4986,12 +6117,7 @@
     rows.sort(function(a, b) {
       var aValue = a.children[reportSort.index]?.dataset.reportSortValue || '';
       var bValue = b.children[reportSort.index]?.dataset.reportSortValue || '';
-      var aNumeric = Number(aValue);
-      var bNumeric = Number(bValue);
-      if (Number.isFinite(aNumeric) && Number.isFinite(bNumeric)) {
-        return (aNumeric - bNumeric) * direction;
-      }
-      return aValue.localeCompare(bValue, lang || 'en', { sensitivity: 'base' }) * direction;
+      return compareAdminSortValues(aValue, bValue, direction);
     });
     tbody.append.apply(tbody, rows);
     updateReportSortIndicators(table);
@@ -5000,19 +6126,10 @@
   function appendReportHeader(row, header) {
     header.forEach(function(label, index) {
       var th = document.createElement('th');
-      var button = document.createElement('button');
-      var indicator = document.createElement('span');
       th.scope = 'col';
       th.dataset.reportSortIndex = String(index);
       th.setAttribute('aria-sort', 'none');
-      button.type = 'button';
-      button.className = 'admin-reports__sort';
-      button.setAttribute('aria-label', String(label || ''));
-      indicator.className = 'admin-reports__sort-indicator';
-      indicator.setAttribute('aria-hidden', 'true');
-      indicator.textContent = '↕';
-      button.append(document.createTextNode(String(label || '')), indicator);
-      button.addEventListener('click', function() {
+      var button = createAdminSortButton(label, 'admin-reports__sort', 'admin-reports__sort-indicator', function() {
         reportSort.direction = reportSort.index === index && reportSort.direction === 'asc' ? 'desc' : 'asc';
         reportSort.index = index;
         sortReportRows(row.closest('table'));
@@ -5370,7 +6487,7 @@
       header.setAttribute('aria-sort', isActive ? supporterSort.direction + 'ending' : 'none');
       var indicator = header.querySelector('.admin-supporters__sort-indicator');
       if (indicator) {
-        indicator.textContent = isActive ? (supporterSort.direction === 'asc' ? '↑' : '↓') : '↕';
+        indicator.textContent = adminSortIndicatorText(isActive, supporterSort.direction);
         indicator.classList.toggle('is-active', isActive);
       }
     });
@@ -5390,10 +6507,7 @@
     rows.sort(function(a, b) {
       var aValue = a.querySelector('[data-supporter-sort-key="' + supporterSort.key + '"]')?.dataset.supporterSortValue || '';
       var bValue = b.querySelector('[data-supporter-sort-key="' + supporterSort.key + '"]')?.dataset.supporterSortValue || '';
-      if (type === 'number') {
-        return ((Number(aValue) || 0) - (Number(bValue) || 0)) * direction;
-      }
-      return aValue.localeCompare(bValue, lang || 'en', { sensitivity: 'base' }) * direction;
+      return compareAdminSortValues(aValue, bValue, direction, type);
     });
     tbody.append.apply(tbody, rows);
     updateSupporterSortIndicators(table);
@@ -5402,25 +6516,16 @@
   function appendSupporterHeader(row, columns) {
     columns.forEach(function(column) {
       var th = document.createElement('th');
-      var button = document.createElement('button');
-      var indicator = document.createElement('span');
       th.scope = 'col';
       th.dataset.supporterSortKey = column.key;
       th.dataset.exportLabel = column.label;
       th.setAttribute('aria-sort', 'none');
-      button.type = 'button';
-      button.className = 'admin-supporters__sort';
-      button.dataset.supporterSortKey = column.key;
-      button.setAttribute('aria-label', column.label);
-      indicator.className = 'admin-supporters__sort-indicator';
-      indicator.setAttribute('aria-hidden', 'true');
-      indicator.textContent = '↕';
-      button.append(document.createTextNode(column.label), indicator);
-      button.addEventListener('click', function() {
+      var button = createAdminSortButton(column.label, 'admin-supporters__sort', 'admin-supporters__sort-indicator', function() {
         supporterSort.direction = supporterSort.key === column.key && supporterSort.direction === 'asc' ? 'desc' : 'asc';
         supporterSort.key = column.key;
         sortSupporterRows(row.closest('table'));
       });
+      button.dataset.supporterSortKey = column.key;
       th.append(button);
       row.append(th);
     });
@@ -5608,10 +6713,6 @@
     });
   }
 
-  if (refreshButton) {
-    refreshButton.addEventListener('click', loadSummary);
-  }
-
   window.addEventListener('beforeunload', function(event) {
     if (!adminHasUnsavedChanges()) return;
     event.preventDefault();
@@ -5619,6 +6720,7 @@
   });
 
   if (tabButtons.length) {
+    applyAdminTabCompactLabels();
     tabButtons.forEach(function(button) {
       if (!(button instanceof HTMLButtonElement)) return;
       button.addEventListener('click', function() {
@@ -5716,17 +6818,20 @@
   if (marketingForm) {
     marketingForm.addEventListener('submit', function(event) {
       event.preventDefault();
-      writeMarketingDraft();
       updateMarketingBuilder();
+      writeMarketingDraft();
     });
     marketingForm.addEventListener('input', function() {
-      writeMarketingDraft();
       updateMarketingBuilder();
+      writeMarketingDraft();
     });
     marketingForm.addEventListener('change', function(event) {
-      writeMarketingDraft();
       updateMarketingBuilder();
-      if (event.target === marketingCampaign) loadMarketingReferrals();
+      writeMarketingDraft();
+      if (event.target === marketingCampaign) {
+        setMarketingEditingState('');
+        loadMarketingReferrals();
+      }
     });
   }
 
@@ -5740,11 +6845,18 @@
     marketingSaveReferral.addEventListener('click', saveMarketingReferral);
   }
 
+  if (marketingCancelEdit) {
+    marketingCancelEdit.addEventListener('click', function() {
+      setMarketingEditingState('');
+      setText(marketingStatus, '');
+    });
+  }
+
   if (marketingSnippets) {
     marketingSnippets.addEventListener('click', function(event) {
       var button = event.target?.closest?.('[data-marketing-copy]');
       if (button instanceof HTMLButtonElement) {
-        copyMarketingText(button.dataset.marketingCopy || '');
+        copyMarketingText(button.dataset.marketingCopy || '', button.dataset.marketingCopyHtml || '');
       }
     });
   }
@@ -5768,6 +6880,7 @@
     if (!(root instanceof HTMLElement)) return;
     document.addEventListener('pointerdown', function(event) {
       if (event.target instanceof Node && root.contains(event.target)) return;
+      closeContentSettingsPanels(root);
       deactivateContentBlocks(root);
     });
     root.addEventListener('focusin', function() {
@@ -5785,13 +6898,38 @@
     });
     root.addEventListener('pointerdown', function(event) {
       runContentEditorAction(root, field, function() {
+        var settingsButton = contentSettingsButtonForNode(event.target);
+        if (settingsButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          suppressContentSettingsClickUntil = Date.now() + 600;
+          toggleMediaSettings(settingsButton);
+          return;
+        }
+        if (isContentSettingsTarget(event.target)) return;
+        closeContentSettingsPanels(root);
+        if (event.pointerType === 'touch' && editableForNode(event.target)) {
+          deferContentTouchActivationUntil = Date.now() + 500;
+          if (deferredContentTouchActivationTimer) window.clearTimeout(deferredContentTouchActivationTimer);
+          var target = event.target;
+          deferredContentTouchActivationTimer = window.setTimeout(function() {
+            deferContentTouchActivationUntil = 0;
+            runContentEditorAction(root, field, function() {
+              activateContentBlockForNode(target);
+              updateContentLinkInspector();
+              updateContentFormatState();
+            });
+          }, 500);
+          return;
+        }
         activateContentBlockForNode(event.target);
       });
     });
     root.addEventListener('input', function(event) {
       runContentEditorAction(root, field, function() {
         var control = event.target;
-        if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLElement && control.isContentEditable) {
+        if (control instanceof HTMLElement && control.isContentEditable && !control.dataset.contentField) return;
+        if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLElement && (control.isContentEditable || control.dataset.contentField)) {
           updateContentBlockField(control);
           lastContentMutation = control instanceof HTMLElement && control.isContentEditable ? 'text' : 'field';
           writeContentDraft();
@@ -5807,7 +6945,7 @@
           applyContentBlockFormat(control.value);
         } else if (control instanceof HTMLInputElement && control.dataset.contentAction === 'link-url') {
           applyContentLinkPanel(control);
-        } else if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) {
+        } else if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement) {
           updateContentBlockField(control);
           writeContentDraft();
         }
@@ -5815,7 +6953,14 @@
     });
     root.addEventListener('click', function(event) {
       runContentEditorAction(root, field, function() {
-        activateContentBlockForNode(event.target);
+        var settingsButton = contentSettingsButtonForNode(event.target);
+        if (settingsButton && Date.now() < suppressContentSettingsClickUntil) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        var deferActivation = Date.now() < deferContentTouchActivationUntil && editableForNode(event.target);
+        if (!deferActivation && !isContentSettingsTarget(event.target)) activateContentBlockForNode(event.target);
         var link = event.target?.closest?.('a');
         if (link instanceof HTMLAnchorElement && editableForNode(link)) {
           event.preventDefault();
@@ -5843,6 +6988,8 @@
         } else if (action === 'link-remove') {
           removeActiveContentLink();
         } else if (action === 'toggle-media-settings') {
+          toggleMediaSettings(button);
+        } else if (action === 'toggle-gallery-image-settings') {
           toggleMediaSettings(button);
         } else if (action === 'align') {
           applyContentBlockAlignment(index, button.dataset.contentAlign);
@@ -5887,7 +7034,7 @@
           return;
         }
         if (event.key === 'Escape') {
-          var panel = control instanceof HTMLElement ? control.closest('[data-content-media-settings]') : null;
+          var panel = control instanceof HTMLElement ? control.closest('[data-content-media-settings], [data-content-gallery-image-settings]') : null;
           if (panel instanceof HTMLElement) {
             var button = contentBlocksRoot.querySelector('[aria-controls="' + panel.id + '"]');
             panel.hidden = true;

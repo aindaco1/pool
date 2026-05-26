@@ -1,0 +1,75 @@
+{%- assign embed_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign embed_heading_tag = include.heading_tag | default: "h1" -%}
+{%- assign embed_autoload = include.autoload | default: "true" -%}
+{%- assign embed_sync_query = include.sync_query | default: "true" -%}
+{%- capture embed_builder_path -%}{% include localized-url.html lang=embed_lang path='/embed/campaign/' %}{%- endcapture -%}
+<section
+  class="campaign-embed-builder{% if include.class %} {{ include.class }}{% endif %}"
+  data-campaign-embed-builder
+  data-campaign-embed-path="{{ embed_builder_path | strip | escape }}"
+  data-campaign-embed-autoload="{{ embed_autoload }}"
+  data-campaign-embed-sync-query="{{ embed_sync_query }}"
+  {% if include.admin_marketing %}data-admin-marketing-embed="true"{% endif %}>
+  <div class="campaign-embed-builder__intro">
+    <{{ embed_heading_tag }} data-embed-builder-title>{% include t.html key="embed.builder_title" lang=embed_lang %}</{{ embed_heading_tag }}>
+    <p data-embed-builder-intro>{% include t.html key="embed.builder_intro" lang=embed_lang %}</p>
+  </div>
+  <div class="campaign-embed-builder__controls">
+    <div class="campaign-embed-builder__option-grid">
+      <div class="campaign-embed-builder__field">
+        <label for="campaign-embed-layout" data-embed-layout-label>{% include t.html key="embed.layout_label" lang=embed_lang %}</label>
+        <select id="campaign-embed-layout" class="pool-first-party-cart__input pool-first-party-cart__input--select" data-campaign-embed-layout>
+          <option value="full" data-embed-layout-full>{% include t.html key="embed.layout_full" lang=embed_lang %}</option>
+          <option value="compact" data-embed-layout-compact>{% include t.html key="embed.layout_compact" lang=embed_lang %}</option>
+        </select>
+      </div>
+      <div class="campaign-embed-builder__field">
+        <label for="campaign-embed-theme" data-embed-theme-label>{% include t.html key="embed.theme_label" lang=embed_lang %}</label>
+        <select id="campaign-embed-theme" class="pool-first-party-cart__input pool-first-party-cart__input--select" data-campaign-embed-theme>
+          <option value="default" data-embed-theme-default>{% include t.html key="embed.theme_default" lang=embed_lang %}</option>
+          <option value="warm" data-embed-theme-warm>{% include t.html key="embed.theme_warm" lang=embed_lang %}</option>
+          <option value="ocean" data-embed-theme-ocean>{% include t.html key="embed.theme_ocean" lang=embed_lang %}</option>
+        </select>
+      </div>
+      <div class="campaign-embed-builder__field">
+        <label for="campaign-embed-media" data-embed-media-label>{% include t.html key="embed.media_label" lang=embed_lang %}</label>
+        <select id="campaign-embed-media" class="pool-first-party-cart__input pool-first-party-cart__input--select" data-campaign-embed-media>
+          <option value="show" data-embed-media-show>{% include t.html key="embed.media_show" lang=embed_lang %}</option>
+          <option value="hide" data-embed-media-hide>{% include t.html key="embed.media_hide" lang=embed_lang %}</option>
+        </select>
+      </div>
+      <div class="campaign-embed-builder__field">
+        <label for="campaign-embed-cta" data-embed-cta-label>{% include t.html key="embed.cta_label" lang=embed_lang %}</label>
+        <select id="campaign-embed-cta" class="pool-first-party-cart__input pool-first-party-cart__input--select" data-campaign-embed-cta>
+          <option value="show" data-embed-cta-show>{% include t.html key="embed.cta_show" lang=embed_lang %}</option>
+          <option value="hide" data-embed-cta-hide>{% include t.html key="embed.cta_hide" lang=embed_lang %}</option>
+        </select>
+      </div>
+    </div>
+    <div class="campaign-embed-builder__field">
+      <label for="campaign-embed-code" data-embed-code-label>{% include t.html key="embed.code_label" lang=embed_lang %}</label>
+      <p id="campaign-embed-code-help" class="campaign-embed-builder__help" data-embed-code-help>{% include t.html key="embed.code_help" lang=embed_lang %}</p>
+      <textarea id="campaign-embed-code" readonly spellcheck="false" aria-readonly="true" aria-describedby="campaign-embed-code-help campaign-embed-copy-status" data-campaign-embed-code></textarea>
+    </div>
+    <div class="campaign-embed-builder__actions">
+      <button type="button" class="btn btn--primary" data-campaign-embed-copy>{% include t.html key="embed.copy_button" lang=embed_lang %}</button>
+      <span id="campaign-embed-copy-status" class="campaign-embed-builder__status" data-campaign-embed-copy-status role="status" aria-live="polite"></span>
+    </div>
+  </div>
+</section>
+
+<section class="campaign-embed-preview{% if include.preview_class %} {{ include.preview_class }}{% endif %}">
+  <div class="campaign-embed-preview__label" data-embed-preview-label>{% include t.html key="embed.preview_label" lang=embed_lang %}</div>
+  <div
+    class="campaign-embed-widget"
+    data-campaign-embed-root
+    data-campaign-embed-path="{{ embed_builder_path | strip | escape }}"
+    data-campaign-embed-autoload="{{ embed_autoload }}"
+    data-campaign-embed-sync-query="{{ embed_sync_query }}"
+    role="region"
+    aria-label="{% include t.html key='embed.preview_region' lang=embed_lang %}"
+    aria-live="polite"
+    aria-busy="true">
+    <div class="campaign-embed-widget__loading" data-campaign-embed-loading role="status">{% include t.html key="embed.loading" lang=embed_lang %}</div>
+  </div>
+</section>

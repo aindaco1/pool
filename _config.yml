@@ -37,8 +37,8 @@ exclude:
 # Structured platform settings for forks.
 platform:
   name: The Pool
-  version: "0.9.5"
-  release_label: "v0.9.5"
+  version: "1.0.0"
+  release_label: "v1.0.0"
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   pledges_email_from: "The Pool <pledges@dustwave.xyz>"
@@ -56,6 +56,13 @@ admin:
   # platform.site_url / platform.worker_url are overridden for development.
   production_site_url: "https://pool.dustwave.xyz"
   production_worker_url: "https://pledge.dustwave.xyz"
+  # Seed/recovery dashboard users mirrored into ADMIN_USERS_JSON. Runtime edits
+  # made from the dashboard are stored in Worker KV at admin-users:v1.
+  users:
+    - name: Alonso
+      email: alonso@dustwave.xyz
+      role: super_admin
+      campaigns: []
   # Local-only bootstrap defaults mirrored into the Worker `dev` environment.
   # Deployed admin access should use Worker secrets or explicit environment vars.
   local_bootstrap_emails:

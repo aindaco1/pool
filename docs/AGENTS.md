@@ -10,6 +10,7 @@ Use this alongside:
 - [docs/I18N.md](./I18N.md) for locale routing and translation rules
 - [docs/SEO.md](./SEO.md) for metadata, share cards, and indexing behavior
 - [docs/EMBEDS.md](./EMBEDS.md) for the hosted campaign embed system
+- [docs/DASHBOARD.md](./DASHBOARD.md) for the browser admin dashboard and editing model
 
 ## Project Shape
 
@@ -19,6 +20,7 @@ The Pool is a split system:
 - the API/payment/runtime side is a Cloudflare Worker in `worker/`
 - Stripe handles payment collection and saved payment methods
 - content and campaign configuration mostly live in markdown/front matter under `_campaigns/`
+- the private admin dashboard is the supported browser editing and operations surface for settings, add-ons, campaigns, reports, analytics, supporters, marketing links, and users
 
 The important boundary is:
 
@@ -41,6 +43,7 @@ When you need to understand or change behavior, start here:
 - [`worker/wrangler.toml`](../worker/wrangler.toml): Worker env wiring mirrored from site config plus local/dev defaults
 - [`tests/`](../tests): unit, security, and E2E expectations
 - [`scripts/`](../scripts): local dev, merge gate, smoke tests, reports, and sync helpers
+- [`docs/DASHBOARD.md`](./DASHBOARD.md): private admin dashboard editing and operations reference
 
 ## Safe Workflow
 
@@ -64,6 +67,8 @@ Useful focused checks:
 - `bundle exec jekyll build --quiet`
 - `npx vitest run <targeted test files>`
 - `node --check <js file>`
+- `node --check assets/js/admin-dashboard.js` when the dashboard script changed
+- `npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium` when dashboard UI or admin Worker contracts changed
 - `./scripts/test-worker.sh --podman`
 - `./scripts/test-e2e.sh --podman`
 
@@ -73,9 +78,10 @@ Useful focused checks:
 
 Start with:
 
+- the dashboard **Campaigns** tab for normal browser edits
 - [`_campaigns/<slug>.md`](../_campaigns)
 - campaign assets under [`assets/images/campaigns/<slug>/`](../assets/images/campaigns)
-- supporting docs in [docs/CMS.md](./CMS.md)
+- supporting docs in [docs/DASHBOARD.md](./DASHBOARD.md)
 
 Check:
 
@@ -89,10 +95,13 @@ Check:
 
 Start with:
 
+- the dashboard **Settings** and **Add-ons** tabs for normal browser edits
 - [`_config.yml`](../_config.yml)
 - [docs/CUSTOMIZATION.md](./CUSTOMIZATION.md)
 
 Do not put canonical fork settings in `_config.local.yml`. Keep that file for machine-local overrides like localhost URLs and local-only flags.
+
+Dashboard publish buttons write GitHub-backed settings through the Worker-controlled GitHub path and start the normal deploy flow. Dashboard user management is different: **Settings -> Users** saves directly to Worker KV at `admin-users:v1`, does not commit to GitHub, and does not use the Settings publish button.
 
 If you change values that are mirrored into the Worker, restart the local stack or run:
 
@@ -141,6 +150,7 @@ If you touch deliverability-sensitive behavior, also sanity-check:
 
 Start with:
 
+- dashboard **Marketing** tab if the task is only building a campaign embed snippet or saved referral URL
 - embed routes and layout in [`embed/`](../embed) and [`_layouts/campaign-embed.html`](../_layouts/campaign-embed.html)
 - embed client/runtime in [`assets/js/campaign-embed.js`](../assets/js/campaign-embed.js)
 - embed styles in [`assets/partials/_embed.scss`](../assets/partials/_embed.scss)
@@ -170,6 +180,8 @@ These are the easiest places for forks or LLMs to accidentally cause drift.
 ### 1. `_config.yml` is canonical
 
 Do not treat `_config.local.yml` as a second source of truth.
+
+Admin dashboard changes that publish platform settings or platform add-ons should ultimately land back in `_config.yml` through the Worker-controlled GitHub path. Runtime-only admin users and saved marketing referral codes are the exception; those live in Worker KV.
 
 ### 2. Worker-mirrored settings must stay in sync
 
@@ -205,7 +217,7 @@ Countdowns, pledge controls, and embed/share-preview state should respect the ef
 - Campaign embeds: [docs/EMBEDS.md](./EMBEDS.md)
 - Shipping and USPS behavior: [docs/SHIPPING.md](./SHIPPING.md)
 - Add-on product model: [docs/ADD_ON_PRODUCTS.md](./ADD_ON_PRODUCTS.md)
-- CMS/editor flow: [docs/CMS.md](./CMS.md)
+- Dashboard/editor flow: [docs/DASHBOARD.md](./DASHBOARD.md)
 - Security posture and guardrails: [docs/SECURITY.md](./SECURITY.md)
 - Release/merge checklist mindset: [docs/MERGE_SMOKE_CHECKLIST.md](./MERGE_SMOKE_CHECKLIST.md)
 

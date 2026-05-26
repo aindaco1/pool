@@ -10,7 +10,7 @@ description: Learn how The Pool works, from all-or-nothing pledging to magic-lin
 
 **The Pool** is Dust Wave's crowdfunding platform for independent film and creative projects, built on open-source technology.
 
-The current platform release milestone is **v0.9.4**. Dust Wave is reserving **v1.0** for the wider public launch once the remaining roadmap items are complete.
+The current platform release milestone is **v1.0.0 release candidate**. The v1.0 feature set is in place, with final launch hardening focused on admin sign-in bot protection and release smoke verification.
 
 ## All-or-Nothing Pledging
 
@@ -42,58 +42,60 @@ For supporter-community access, The Pool keeps the verified supporter session in
 
 ## Umm, So How Does It Work Again?
 
-1. **Browse** — Find a project you want to support
-2. **Pledge** — Add one or more campaigns to your cart, optionally add a 0% to 15% tip for platform upkeep, and continue into The Pool's secure payment step powered by Stripe. Physical rewards can add Worker-calculated shipping during checkout, including USPS-backed quotes, configured fallback rates, or free-shipping overrides when a deployment enables them. Some deployments may also show a limited delivery-option selector for domestic signature upgrades. Tax may appear as an estimate until checkout has enough billing or shipping location detail to calculate a final total.
-   You may also see optional platform add-ons. Those support Dust Wave directly, do not count toward a campaign's funding goal, and can be digital or physical. When they are inventory-limited, stock reflects saved pledges rather than in-progress carts.
-   Some campaigns may also offer campaign add-ons. Those use the same add-on card UI, but they count toward that campaign's funding total and follow that campaign's shipping rules.
-3. **Save card** — Stripe securely saves your payment method inside that checkout flow (no charge yet)
-4. **Wait** — Campaign runs until its deadline (all times in Mountain Time)
-5. **Result** — If a campaign is funded, your pledge for that campaign is charged. If it isn't, nothing happens.
+1. **Browse** — Find a campaign you want to help bring to life.
+2. **Build your pledge** — Add one or more campaigns to your cart, choose any rewards or add-ons you want, and decide whether to include an optional platform tip. If your pledge includes physical items, checkout shows shipping and tax details as soon as it has enough information to calculate them.
+3. **Save your payment method** — Enter payment details through Stripe. Your card is saved securely, but you are not charged when you pledge.
+4. **Follow the campaign** — The campaign stays open until its deadline, shown in the site's configured time zone.
+5. **See the result** — If the campaign reaches its goal, your pledge is charged after the campaign ends. If it does not reach its goal, you are not charged.
 
-Multiple pledges from the same email are combined into a single charge when the same campaign succeeds. Optional platform tips and platform add-ons go to Dust Wave to help maintain The Pool and do not count toward a project's funding goal.
+Some checkouts may include platform add-ons, campaign add-ons, delivery upgrades, shipping fees, taxes, or an optional platform tip. The checkout explains what counts toward the campaign's goal and what supports the platform separately.
+
+Multiple pledges from the same email are combined into one charge when the same campaign succeeds. Optional platform tips and platform add-ons support the team operating the platform and do not count toward a project's funding goal.
 
 ## For Creators
 
-The Pool is designed for filmmakers and other creatives with features like:
+The Pool is designed for filmmakers and creative teams that need a campaign they can run without sending supporters through a maze of accounts, plugins, or disconnected tools.
 
-- **0% platform fee for organizers** — Supporters can optionally add a 0% to 15% platform tip to help sustain the platform without reducing campaign funds
-- **First-party checkout** — The Pool controls the cart, checkout sidecars, and pledge review flow while Stripe securely handles payment details
-- **Physical & digital tiers** — Offer tangible rewards with checkout-time shipping address capture, USPS-backed quote support, fallback/free-shipping policy controls, limited delivery-option upgrades, and deployment-configured tax rules that can range from a flat rate to provider-backed location-aware calculation
-- **Optional platform add-ons** — Offer a small global merch catalog alongside campaign pledges, with per-variant inventory, low-stock awareness based on saved pledges, and shipping support for physical add-ons
-- **Optional campaign add-ons** — Let a campaign offer campaign-owned merch through the same cart / Manage Pledge add-on UI while still counting that merch toward the campaign subtotal and using campaign-specific shipping rules
-- **Campaign-runner reports** — Send opt-in campaign-scoped daily pledge ledgers during live campaigns plus post-deadline fulfillment exports, with platform-fulfilled items routed separately when needed, so creators can track support and delivery without account dashboards
-- **Embeddable live campaign widgets** — Give campaign owners a hosted embed builder that generates copy-paste iframe code for sharing live campaign progress on other sites
-- **Production phases** — Break your budget into phases supporters can fund directly
-- **Stretch goals** — Unlock additional creative possibilities as funding grows
-- **Community decisions** — Let your backers vote on published creative choices
-- **Production diary** — Keep your community engaged with updates
-- **Ongoing support** — Accept contributions after your main campaign ends
-- **No-account supporter access** — Backers manage pledges and join supporter-only community pages through email magic links instead of creating accounts
-- **Locale-ready supporter flows** — Shared UI strings, pledge-result pages, `/manage/`, supporter community routes, and supporter emails can all follow the deployment's configured language model, with English as the default and additional locales layered in through config plus translated content
-- **Safer rich content** — Campaign text and diary entries support Markdown and approved embeds, while unsafe raw HTML and dangerous link or embed schemes are blocked at render time
-- **Accessibility-conscious UI** — Keyboard-friendly dialogs, skip links, tabs, sliders, supporter-community flows, and public campaign interactions are part of the platform baseline, with automated accessibility checks covering critical public pages, pledge-result states, and checkout flows
+- **No organizer platform fee** — Campaign funds stay with the project. Supporters can choose an optional 0% to 15% platform tip that helps sustain The Pool without reducing campaign funding.
+- **Built-in pledge checkout** — Supporters pledge through The Pool's cart and review flow, while Stripe securely handles payment details for any later campaign charge.
+- **Reward tiers that fit the project** — Offer digital or physical tiers, collect shipping details when needed, set quantity limits, and use the campaign's configured tax and shipping rules.
+- **Optional platform add-ons** — Offer platform merch alongside pledges when enabled, with separate inventory and shipping handling that does not count toward a campaign's funding goal.
+- **Campaign add-ons** — Sell campaign-specific merch or extras in the same pledge flow while keeping revenue, inventory, and shipping tied to that campaign.
+- **Private admin dashboard** — Give trusted team members a focused workspace for campaign settings, page content, rewards, updates, decisions, reports, supporters, analytics, and marketing links.
+- **Reports when you need them** — Preview and download pledge or fulfillment CSVs from the dashboard, with optional campaign-runner emails during active campaigns.
+- **Embeds for promotion** — Generate live campaign widgets for partner sites, press pages, creator portfolios, or sponsor pages.
+- **Production phases** — Show supporters which parts of the budget they can help fund.
+- **Stretch goals** — Make additional creative milestones visible as support grows.
+- **Community decisions** — Invite backers to vote on selected creative choices.
+- **Production diary** — Share updates that keep supporters engaged from launch through fulfillment.
+- **Ongoing support** — Keep accepting support after the main campaign ends, when the campaign is configured for it.
+- **No-account supporter access** — Backers manage pledges and visit supporter-only pages through secure email links instead of creating another password.
+- **Multilingual-ready supporter flows** — Start with English and add translated supporter pages, emails, campaign content, and management screens when a deployment needs more languages.
+- **Safer rich content** — Write campaign pages and diary posts with Markdown and approved media embeds, with unsafe HTML and dangerous links blocked at render time.
+- **Accessibility-minded experience** — Campaign pages, checkout, dialogs, tabs, sliders, and supporter flows are built and tested for keyboard and screen-reader use.
 
 ## The Technology
 
-The Pool runs on a modern static architecture:
+The Pool is a static-first crowdfunding stack. Public pages are generated ahead of time, while trusted server work stays behind Cloudflare Workers for pricing, pledges, admin access, fulfillment data, and settlement.
 
-| Layer | Platform | Role |
-|-------|----------|------|
-| Frontend | [GitHub Pages](https://docs.github.com/en/pages) | Jekyll static site |
-| Cart | The Pool | First-party cart, checkout sidecars, and pledge review |
-| Payments | [Stripe](https://stripe.com) | Secure payment fields, saved cards, and off-session charges |
-| Backend | [Cloudflare Workers](https://workers.cloudflare.com) | Canonical pricing, pledge storage, live stats, fulfillment data, settlement |
-| Email | [Resend](https://resend.com) | Confirmations, updates, notifications |
+| Area | What runs it | Why it matters for forks |
+|------|--------------|--------------------------|
+| Public site | [GitHub Pages](https://docs.github.com/en/pages) and Jekyll | Campaign pages, docs, translated content, and public metadata stay easy to host and review in Git. |
+| Pledge experience | The Pool cart runtime | The cart, reward selection, add-ons, pledge review, and magic-link management stay first-party. |
+| Payments | [Stripe](https://stripe.com) | Stripe owns the sensitive payment fields, saved payment methods, and later charges. |
+| Backend | [Cloudflare Workers](https://workers.cloudflare.com) and KV | The Worker validates totals, stores pledges, serves live stats, powers admin APIs, and handles fulfillment/settlement state. |
+| Admin dashboard | The Pool private dashboard | Authorized users can manage campaigns, content, reports, supporters, analytics, marketing links, add-ons, and users without editing files directly. |
+| Email | [Resend](https://resend.com) | Confirmation emails, supporter links, campaign updates, and charge notifications use one transactional email path. |
 
-The platform is built on services that all offer free tiers, and The Pool was designed from the start to operate effectively within those free tiers whenever possible.
+The stack is designed to be practical for small teams and forks. Each major service has a free tier, and the platform avoids unnecessary dynamic work wherever possible. Public campaign pages are static, public live data is combined and browser-cached, and the Worker is reserved for operations that need server-side trust.
 
-For forks, that means static pages stay on GitHub Pages, public live reads are aggressively combined and browser-cached, and most Cloudflare Worker usage is reserved for the security-sensitive parts of the pledge lifecycle, while tax, shipping, SEO, localization, and logging settings stay mirrored or bounded through config so local UI, checkout, reports, emails, and public metadata all remain aligned.
+The admin dashboard follows the same cost discipline. Browsing, filtering, previews, analytics, reports, and local drafts avoid KV writes. Durable writes happen only when an admin explicitly saves dashboard-only state or publishes a campaign/platform change.
 
-Forks can also rebrand the public site, on-site checkout styling, and supporter emails through config without changing the underlying pledge mechanics. The goal is to let creators or studios adapt the presentation while keeping the all-or-nothing funding model and supporter access flow consistent.
+Customization is mostly configuration-driven. Tax, shipping, SEO, localization, logging, email identity, dashboard settings, public branding, checkout styling, and supporter email presentation are kept aligned through config so a fork can change the presentation without rewriting the pledge model.
 
-That architecture also leaves room for accessibility hardening without sacrificing the platform's security model: the surrounding cart, checkout, and management flows use stronger dialog, focus, keyboard, live-region, and landmark semantics, while Stripe continues to own the sensitive payment fields inside its secure UI.
+For developers, the boundaries are intentionally clear: static content belongs in the site, trusted pledge math belongs in the Worker, payment details belong in Stripe, transactional email belongs in Resend, and role-scoped operations belong in the admin dashboard.
 
-The public side is also intentionally crawl-friendly without exposing supporter-only access: public pages and campaign pages emit consistent metadata and conservative structured data, while private magic-link pages such as Manage Pledge and supporter community flows stay out of search indexing.
+The same architecture supports accessibility and SEO without weakening security. Public pages emit crawlable metadata and conservative structured data, while private magic-link pages such as Manage Pledge, supporter community pages, and the admin dashboard stay out of search indexing. Checkout and management flows add keyboard, focus, dialog, live-region, and landmark behavior around Stripe's secure payment UI rather than replacing it.
 
 ## Open Source
 

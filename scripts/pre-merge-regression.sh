@@ -209,6 +209,26 @@ verify_build_artifacts() {
     echo "Manage page is missing noindex robots metadata"
     return 1
   fi
+  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/admin/index.html >/dev/null; then
+    echo "Admin page is missing noindex robots metadata"
+    return 1
+  fi
+  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/es/admin/index.html >/dev/null; then
+    echo "Spanish admin page is missing noindex robots metadata"
+    return 1
+  fi
+  if rg -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/admin/index.html >/dev/null; then
+    echo "Admin page is emitting public social or structured-data metadata"
+    return 1
+  fi
+  if rg -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/es/admin/index.html >/dev/null; then
+    echo "Spanish admin page is emitting public social or structured-data metadata"
+    return 1
+  fi
+  if rg -n '<loc>.+/admin/' _site/sitemap.xml >/dev/null; then
+    echo "sitemap.xml unexpectedly includes the admin route"
+    return 1
+  fi
 }
 
 reset_podman_dev_artifacts() {

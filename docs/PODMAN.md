@@ -19,6 +19,7 @@ Included today:
 - local Wrangler state persisted in the repo worktree
 - Worker dev image based on Node 24, matching the GitHub Actions deployment runtime
 - local `worker/.dev.vars` usage, including auto-generation of `CHECKOUT_INTENT_SECRET`
+- local admin dashboard defaults, including bootstrap admin email and CORS origin wiring for `http://127.0.0.1:4000`
 - optional host Stripe CLI forwarding to the local Worker
 - automatic Stripe CLI discovery from common macOS/Homebrew install paths
 - automated headless Playwright execution in a dedicated Podman container
@@ -111,6 +112,14 @@ That will:
 - auto-generate `worker/.dev.vars` secrets if needed
 - optionally start Stripe webhook forwarding from the host
 
+After boot, the local admin dashboard is available at:
+
+```text
+http://127.0.0.1:4000/admin/
+```
+
+The local Worker serves dashboard APIs at `http://127.0.0.1:8787`, with `CORS_ALLOWED_ORIGIN` derived for the local site. The dashboard can exercise the seeded local test campaigns and local KV. Dashboard user-management saves write to local KV (`admin-users:v1`) rather than committing to GitHub.
+
 ## Rebuild Images
 
 Normal code changes do not need an image rebuild because the repo is bind-mounted.
@@ -160,6 +169,12 @@ Run:
 The report wrappers load Cloudflare auth from `.env`, `.env.local`, `.env.cloudflare`, and `worker/.dev.vars`, pass it into `podman exec`, and print progress to stderr so redirected CSV files remain clean.
 
 `./scripts/test-e2e.sh --podman` is now fully automated browser coverage. The dedicated `./scripts/test-checkout.sh --podman` helper remains the manual interactive path when you specifically want to drive a real checkout in your own browser. The automated headless browser suite runs in its own Playwright container and reuses the already-running site/Worker instead of trying to boot Jekyll inside the test container.
+
+For focused dashboard browser coverage against the Podman-backed stack, use:
+
+```bash
+npm run test:e2e:headless:podman -- tests/e2e/admin-dashboard.spec.ts --project=chromium
+```
 
 For host-side commands that need a Podman-backed site/Worker without assuming detached stack persistence, use [`scripts/podman-stack-run.sh`](../scripts/podman-stack-run.sh). `npm run test:security:podman` uses that wrapper to boot the stack, run the security suite, and tear the stack down in one invocation.
 

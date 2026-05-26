@@ -12,6 +12,18 @@
   text-transform: uppercase;
 }
 
+@mixin admin-control-focus($background: null) {
+  &:focus {
+    @if $background != null {
+      background: $background;
+    }
+
+    border-color: $border--strong;
+    box-shadow: 0 0 0 3px $color--primary-focus-ring;
+    outline: 0;
+  }
+}
+
 @mixin admin-section-divider($margin-top: 28px, $padding-top: 24px) {
   border-top: 1px solid $border--default;
   margin-top: $margin-top;
@@ -44,9 +56,12 @@
   padding-right: $space-lg;
 }
 
-.admin-dashboard__header,
-.admin-app__toolbar {
+.admin-dashboard__header {
   @include cluster-between($space-lg, flex-start);
+}
+
+.admin-app__toolbar {
+  @include cluster-between($space-lg, center);
 }
 
 .admin-dashboard__eyebrow {
@@ -107,8 +122,13 @@
   margin: 0;
 }
 
+.admin-app__session-summary {
+  margin: 6px 0 0;
+}
+
 .admin-tabs {
   margin-top: $space-xl;
+  min-width: 0;
 }
 
 .admin-tabs__list {
@@ -116,7 +136,11 @@
   display: flex;
   gap: $space-sm;
   justify-content: space-between;
-  overflow-x: visible;
+  overflow-x: auto;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .admin-tabs__tab {
@@ -144,7 +168,22 @@
 }
 
 .admin-tabs__panel {
+  min-width: 0;
   padding-top: $space-xl;
+}
+
+.admin-mobile-tab-select {
+  display: none;
+  gap: 6px;
+  margin-top: $space-md;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.admin-mobile-tab-select__label {
+  @include admin-label;
 }
 
 .admin-settings__header,
@@ -162,6 +201,11 @@
   @include admin-action-row($space-sm);
   align-items: center;
   justify-content: flex-end;
+
+  &.is-placeholder {
+    pointer-events: none;
+    visibility: hidden;
+  }
 }
 
 .admin-settings__results {
@@ -169,10 +213,16 @@
   gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 16px;
+  min-width: 0;
+  width: 100%;
 }
 
 .admin-settings > .admin-settings__results {
   grid-template-columns: 1fr;
+}
+
+.admin-settings__results > * {
+  min-width: 0;
 }
 
 .admin-settings > .admin-dashboard__status:empty,
@@ -182,6 +232,13 @@
 
 .admin-addons__results {
   grid-template-columns: 1fr;
+  width: 100%;
+}
+
+.admin-addons__results > *,
+.admin-settings__results > [data-settings-section-panel] {
+  max-width: 100%;
+  width: 100%;
 }
 
 .admin-campaign-tabs {
@@ -189,6 +246,8 @@
   display: flex;
   gap: 4px;
   margin-top: $space-md;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
 }
 
@@ -216,9 +275,17 @@
 
 .admin-campaign-settings__results {
   grid-template-columns: 1fr;
+  min-width: 0;
 }
 
-@media (min-width: 725px) {
+.admin-campaign-settings__results > section,
+.admin-campaign-section-panels {
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+@media (min-width: 900px) {
   .admin-settings {
     align-items: start;
     column-gap: $space-md;
@@ -315,7 +382,12 @@
   gap: $space-sm;
   justify-content: space-between;
   margin-top: 0;
-  overflow-x: visible;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-gutter: stable;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 
 .admin-campaign-section-tabs__tab {
@@ -344,6 +416,7 @@
 }
 
 .admin-campaign-section-panel {
+  min-width: 0;
   padding-top: $space-sm;
 }
 
@@ -362,6 +435,9 @@
 
 .admin-settings__group {
   @include admin-surface($space-md);
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
 }
 
 .admin-settings__group h3 {
@@ -370,6 +446,7 @@
 
 .admin-settings__table {
   @include prose-table(0);
+  width: 100%;
 
   th {
     @include admin-label;
@@ -389,6 +466,12 @@
   min-width: 0;
 }
 
+.admin-settings__field-stack > div,
+.admin-settings__field-grid-item > div {
+  min-width: 0;
+  width: 100%;
+}
+
 .admin-settings__row--full > td {
   padding-left: 0;
 }
@@ -399,6 +482,11 @@
   display: inline-flex;
   gap: 6px;
   position: relative;
+}
+
+.admin-settings__required {
+  color: $color--primary;
+  font-weight: 700;
 }
 
 .admin-settings__help {
@@ -437,6 +525,7 @@
   border-radius: $radius--lg;
   box-shadow: $shadow--soft;
   color: $surface--base;
+  display: none;
   font-size: $type--ui;
   font-weight: 500;
   left: 50%;
@@ -456,6 +545,7 @@
 
 .admin-settings__help:hover .admin-settings__help-tooltip,
 .admin-settings__help:focus-within .admin-settings__help-tooltip {
+  display: block;
   opacity: 1;
 }
 
@@ -471,11 +561,20 @@
   padding: 8px 10px;
   width: 100%;
 
+  @include admin-control-focus($surface--base);
+}
+
+.admin-settings__input--readonly,
+.admin-settings__input[readonly] {
+  background: $surface--subtle;
+  color: $color--secondary;
+  cursor: text;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: $type--ui;
+  font-weight: 500;
+
   &:focus {
-    background: $surface--base;
-    border-color: $border--strong;
-    box-shadow: 0 0 0 3px $color--primary-focus-ring;
-    outline: 0;
+    background: $surface--subtle;
   }
 }
 
@@ -506,6 +605,10 @@
 textarea.admin-settings__input {
   min-height: 4.5rem;
   resize: vertical;
+}
+
+textarea.admin-settings__input--readonly {
+  resize: none;
 }
 
 .admin-settings__derived-value {
@@ -553,11 +656,7 @@ textarea.admin-settings__input {
 .admin-settings__rich-inline-editor {
   min-height: 4.5rem;
 
-  &:focus {
-    border-color: $border--strong;
-    box-shadow: 0 0 0 3px $color--primary-focus-ring;
-    outline: 0;
-  }
+  @include admin-control-focus;
 }
 
 .admin-settings__rich-inline--collection .admin-settings__rich-inline-editor {
@@ -621,13 +720,19 @@ textarea.admin-settings__input {
   border-radius: $radius--sm;
   color: $color--default;
   display: flex;
+  font-size: $type--ui;
+  font-weight: 500;
   gap: 8px;
+  justify-content: flex-start;
+  line-height: 1.35;
   min-height: 44px;
   padding: 8px 10px;
+  text-transform: none;
 }
 
 .admin-settings__checkbox-option input {
   accent-color: $color--primary;
+  flex: 0 0 auto;
 }
 
 .admin-settings__checkbox-option:has(input:disabled) {
@@ -684,7 +789,7 @@ textarea.admin-settings__input {
   }
 
   .admin-settings__field-grid--count-5 {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
   }
 
   .admin-settings__field-grid-item:has(.admin-settings__image-field) {
@@ -703,6 +808,12 @@ textarea.admin-settings__input {
   .admin-settings__field-grid .admin-settings__image-preview img,
   .admin-settings__field-grid .admin-settings__image-preview video {
     max-height: 100%;
+  }
+}
+
+@media (min-width: 72rem) {
+  .admin-settings__field-grid--count-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
@@ -765,21 +876,27 @@ textarea.admin-settings__input {
 .admin-settings__products-editor {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  width: 100%;
 }
 
 .admin-settings__products-list {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  width: 100%;
 }
 
 .admin-settings__product-card {
   background: $surface--subtle;
   border: 1px solid $border--default;
   border-radius: $radius--lg;
+  box-sizing: border-box;
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 12px;
+  width: 100%;
 }
 
 .admin-settings__product-field {
@@ -805,17 +922,22 @@ textarea.admin-settings__input {
     text-transform: none;
     width: 100%;
 
-    &:focus {
-      border-color: $border--strong;
-      box-shadow: 0 0 0 3px $color--primary-focus-ring;
-      outline: 0;
-    }
+    @include admin-control-focus;
   }
 
   textarea {
     min-height: 4.5rem;
     resize: vertical;
   }
+}
+
+.admin-settings__product-field .admin-settings__checkbox-option input {
+  background: initial;
+  border: initial;
+  border-radius: 0;
+  min-height: 0;
+  padding: 0;
+  width: auto;
 }
 
 .admin-settings__product-field--media-paired {
@@ -836,10 +958,12 @@ textarea.admin-settings__input {
 }
 
 .admin-settings__product-field--wide,
+.admin-settings__shipping-fields,
 .admin-settings__variants,
 .admin-settings__diary-content,
 .admin-settings__collection-card-header,
 .admin-settings__collection-actions,
+.admin-settings__user-actions,
 .admin-settings__collection-delete {
   grid-column: 1 / -1;
 }
@@ -850,6 +974,12 @@ textarea.admin-settings__input {
   gap: 12px;
   justify-content: space-between;
   margin-bottom: 2px;
+}
+
+.admin-settings__shipping-fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .admin-settings__collection-card-title {
@@ -880,6 +1010,14 @@ textarea.admin-settings__input {
 .admin-settings__collection-delete {
   margin-top: 6px;
   width: 100%;
+}
+
+.admin-settings__empty-note {
+  color: $color--secondary;
+  font-size: $type--ui;
+  font-weight: 500;
+  margin: 0;
+  text-transform: none;
 }
 
 .admin-settings__diary-content {
@@ -1055,6 +1193,8 @@ textarea.admin-settings__input {
 .admin-campaigns,
 .admin-supporters,
 .admin-settings {
+  min-width: 0;
+
   &[hidden] {
     display: none;
   }
@@ -1248,6 +1388,17 @@ textarea.admin-settings__input {
   }
 }
 
+.admin-content-block:has(.admin-content-block__settings-panel:not([hidden])) .admin-content-block__chrome {
+  opacity: 0;
+  pointer-events: none;
+
+  button,
+  input,
+  select {
+    pointer-events: none;
+  }
+}
+
 .admin-content-block__chrome-row {
   align-items: center;
   display: flex;
@@ -1398,13 +1549,10 @@ textarea.admin-settings__input {
   outline: 0;
   padding: 4px 6px;
   transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  user-select: text;
+  -webkit-user-select: text;
 
-  &:focus {
-    background: $surface--base;
-    border-color: $border--strong;
-    box-shadow: 0 0 0 3px $color--primary-focus-ring;
-    outline: 0;
-  }
+  @include admin-control-focus($surface--base);
 
   &:focus-visible {
     outline: 0;
@@ -1464,6 +1612,18 @@ textarea.admin-settings__input {
 .admin-content-block {
   .video-embed iframe,
   .embed-container iframe {
+    pointer-events: none;
+  }
+
+  .gallery__item-caption,
+  .gallery__item-caption-text {
+    pointer-events: auto;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  .gallery__item:has(.admin-content-block__settings-panel--gallery-image:not([hidden])) .gallery__item-caption {
+    opacity: 0;
     pointer-events: none;
   }
 }
@@ -1558,6 +1718,13 @@ textarea.admin-settings__input {
   z-index: 1;
 }
 
+.admin-content-block__settings-button--gallery-image {
+  background: $surface--base;
+  right: 8px;
+  top: 8px;
+  z-index: 4;
+}
+
 .admin-content-block__settings-panel {
   @include admin-surface(10px);
   position: absolute;
@@ -1572,6 +1739,25 @@ textarea.admin-settings__input {
   }
 }
 
+.admin-content-block__settings-panel--gallery-image {
+  bottom: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  left: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  right: 0;
+  top: 0;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+  z-index: 5;
+}
+
+.admin-content-block__settings-panel--gallery-image[hidden] {
+  display: none;
+}
+
 .admin-content-block__fields {
   display: grid;
   gap: 10px;
@@ -1580,6 +1766,14 @@ textarea.admin-settings__input {
 .admin-content-block__field {
   display: grid;
   gap: 4px;
+}
+
+.admin-content-block__rich-inline {
+  width: 100%;
+
+  .admin-settings__rich-inline-editor {
+    min-height: 5rem;
+  }
 }
 
 .admin-content-block__field input,
@@ -1592,11 +1786,7 @@ textarea.admin-settings__input {
   padding: 8px 10px;
   width: 100%;
 
-  &:focus {
-    border-color: $border--strong;
-    box-shadow: 0 0 0 3px $color--primary-focus-ring;
-    outline: 0;
-  }
+  @include admin-control-focus;
 }
 
 .admin-content-block__field textarea {
@@ -1619,6 +1809,8 @@ textarea.admin-settings__input {
 
 .admin-marketing__field--full,
 .admin-marketing__actions,
+.admin-marketing__status,
+.admin-marketing__referrals,
 .admin-marketing__snippets {
   grid-column: 1 / -1;
 }
@@ -1820,29 +2012,61 @@ textarea.admin-settings__input {
   @include admin-surface(14px);
   display: grid;
   gap: 10px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.admin-marketing__snippet .btn {
+  justify-self: stretch;
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  width: 100%;
 }
 
 .admin-marketing__snippet-title {
   font-weight: 700;
+  min-width: 0;
 }
 
 .admin-marketing__snippet-copy {
   color: $color--secondary;
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-marketing__referrals {
-  margin-top: 12px;
+  margin-top: 4px;
 
-  h3 {
+  .admin-analytics__breakdown-title {
     font-size: $type--ui;
+    font-weight: 700;
     line-height: 1.2;
     margin: 0 0 8px;
   }
 }
 
+.admin-marketing__embed {
+  margin-top: 24px;
+}
+
 .admin-marketing__referrals-table-wrap {
   overflow-x: auto;
+}
+
+.admin-marketing__referral-url {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.admin-marketing__referral-actions {
+  @include admin-action-row(6px);
+  flex-wrap: nowrap;
 }
 
 .admin-reports__checkbox {
@@ -2056,6 +2280,121 @@ textarea.admin-settings__input {
   }
 }
 
+@media (max-width: 1100px) {
+  .admin-tabs__list,
+  .admin-campaign-section-tabs {
+    gap: clamp(12px, 3vw, 28px);
+    justify-content: flex-start;
+    padding-bottom: 2px;
+  }
+
+  .admin-tabs__tab,
+  .admin-campaign-section-tabs__tab {
+    flex: 0 0 auto;
+  }
+
+  .admin-supporters__filters {
+    grid-template-columns: repeat(2, minmax(180px, 1fr)) auto;
+  }
+
+  .admin-marketing__snippets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1100px) {
+  .admin-tabs__list,
+  .admin-campaign-section-tabs {
+    gap: clamp(3px, 0.5vw, 6px);
+    justify-content: space-between;
+    overflow-x: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .admin-tabs__tab,
+  .admin-campaign-section-tabs__tab {
+    flex: 1 1 0;
+    font-size: clamp(0.68rem, 0.9vw, 0.78rem);
+    line-height: 1.1;
+    min-width: 0;
+    padding: 6px 2px 5px;
+  }
+
+  .admin-tabs__tab {
+    font-size: clamp(0.72rem, 1vw, 0.85rem);
+    padding-bottom: 8px;
+    padding-top: 8px;
+  }
+
+  .admin-campaign-section-tabs__tab,
+  .admin-tabs__tab {
+    &::after {
+      content: attr(data-compact-label);
+    }
+  }
+
+  .admin-tabs__label,
+  .admin-campaign-section-tabs__label {
+    display: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .admin-settings__product-card,
+  .admin-settings__shipping-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-settings__product-field--media-paired {
+    padding-top: 0;
+  }
+
+  .admin-settings__product-field--media-paired .admin-settings__rich-inline,
+  .admin-settings__product-field--media-paired .admin-settings__rich-inline-editor {
+    min-height: 8rem;
+  }
+
+  .admin-reports__form,
+  .admin-marketing__form {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  .admin-content-block__chrome {
+    max-width: calc(100vw - 32px);
+    width: min(100%, 680px);
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-settings__help-tooltip {
+    bottom: 16px;
+    left: 16px;
+    max-width: none;
+    position: fixed;
+    right: 16px;
+    top: auto;
+    transform: none;
+    width: auto;
+    z-index: 1000;
+  }
+}
+
+@media (max-width: 899px) {
+  .admin-tabs__list,
+  .admin-campaign-section-tabs,
+  .admin-campaign-tabs {
+    display: none;
+  }
+
+  .admin-mobile-tab-select {
+    display: grid;
+  }
+
+  .admin-settings__variant-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 @include xsm {
   .admin-dashboard {
     padding: 28px 0 40px;
@@ -2089,6 +2428,10 @@ textarea.admin-settings__input {
     justify-content: flex-start;
   }
 
+  .admin-settings__actions.is-placeholder {
+    display: none;
+  }
+
   .admin-analytics__controls,
   .admin-content__controls {
     grid-template-columns: 1fr;
@@ -2113,6 +2456,7 @@ textarea.admin-settings__input {
   .admin-settings__results,
   .admin-settings__image-field,
   .admin-settings__product-card,
+  .admin-settings__shipping-fields,
   .admin-settings__variant-row,
   .admin-content__preview-grid {
     grid-template-columns: 1fr;
@@ -2122,12 +2466,123 @@ textarea.admin-settings__input {
     grid-column: 1;
   }
 
+  .admin-settings__table,
+  .admin-settings__table tbody,
+  .admin-settings__table tr,
+  .admin-settings__table th,
+  .admin-settings__table td {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-settings__table {
+    overflow: visible;
+  }
+
+  .admin-marketing__referrals-table-wrap {
+    overflow: visible;
+  }
+
+  .admin-marketing__referrals-table {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    display: block;
+    overflow: visible;
+
+    thead {
+      border: 0;
+      clip: rect(0, 0, 0, 0);
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      padding: 0;
+      position: absolute;
+      white-space: nowrap;
+      width: 1px;
+    }
+
+    tbody {
+      display: grid;
+      gap: 10px;
+    }
+
+    tbody tr {
+      @include admin-surface($space-sm);
+      display: grid;
+      gap: 10px;
+    }
+
+    th,
+    td {
+      display: grid;
+      gap: 4px;
+      padding: 0;
+      width: 100%;
+    }
+
+    td::before {
+      @include admin-label;
+      content: attr(data-label);
+    }
+  }
+
+  .admin-marketing__referral-url {
+    display: block;
+    font-size: 0.95rem;
+    line-height: 1.35;
+    width: 100%;
+  }
+
+  .admin-marketing__referral-actions {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+
+    .btn {
+      justify-content: center;
+      width: 100%;
+    }
+  }
+
+  .admin-settings__field-stack,
+  .admin-settings__field-stack > div,
+  .admin-settings__field-grid,
+  .admin-settings__field-grid-item,
+  .admin-settings__field-grid-item > div,
+  .admin-settings__image-field,
+  .admin-settings__image-preview,
+  .admin-settings__image-upload,
+  .admin-settings__input-wrap {
+    width: 100%;
+  }
+
   .admin-content-block__chrome {
-    opacity: 1;
+    display: none;
+    gap: 6px;
+    opacity: 0;
     pointer-events: auto;
     position: static;
     transform: none;
     width: 100%;
+  }
+
+  .admin-content-block.is-active > .admin-content-block__settings-button {
+    display: none;
+  }
+
+  .admin-content-block.is-active .admin-content-block__chrome,
+  .admin-content-block:focus-within .admin-content-block__chrome {
+    display: grid;
+    opacity: 1;
+  }
+
+  .admin-content-block:has(.admin-content-block__settings-panel:not([hidden])) .admin-content-block__chrome {
+    display: none;
+    opacity: 0;
+    pointer-events: none;
   }
 
   .admin-content__preview-grid {
@@ -2138,9 +2593,63 @@ textarea.admin-settings__input {
     grid-template-columns: 1fr;
   }
 
+  .admin-content-block__chrome-row,
+  .admin-content-block__actions {
+    gap: 6px;
+  }
+
+  .admin-content-block__chrome-row--header {
+    align-items: stretch;
+  }
+
+  .admin-content-block__toolbar-group {
+    border-radius: var(--pool-radius-md, 5px);
+    min-height: 36px;
+    padding: 2px;
+  }
+
+  .admin-content-block__toolbar-group--type {
+    flex: 1 1 7.5rem;
+    min-width: 0;
+  }
+
+  .admin-content-block__toolbar-group--block-actions {
+    flex: 0 0 auto;
+    margin-left: 0;
+  }
+
+  .admin-content-block__actions .btn {
+    height: 30px;
+    min-width: 30px;
+    padding: 0 0.42rem;
+  }
+
+  .admin-content-block__select {
+    font-size: 0.72rem;
+    letter-spacing: 0;
+    line-height: 0.95;
+    min-height: 30px;
+    padding: 0 1.05rem 0 0.3rem;
+    width: 100%;
+  }
+
+  .admin-content-block__format-select {
+    min-width: 7.5rem;
+  }
+
   .admin-content-block__settings-panel {
     position: static;
     width: 100%;
+  }
+
+  .admin-content-block__settings-panel--gallery-image {
+    bottom: 0;
+    height: 100%;
+    left: 0;
+    max-height: 100%;
+    position: absolute;
+    right: 0;
+    top: 0;
   }
 
   .admin-content__blocks.long-content {

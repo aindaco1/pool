@@ -14,6 +14,7 @@ npm run test:e2e           # E2E tests (Playwright) — fully automated browser 
 npm run test:e2e:headless  # CI mode
 npm run test:e2e:headless:podman  # Automated browser suite with Playwright in Podman
 npm run test:e2e:parity    # First-party critical-path browser flows
+npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium  # Focused admin dashboard browser suite
 npm run podman:doctor      # Cross-platform Podman readiness check
 npm run test:security      # Security pen tests (Worker must be running)
 npm run test:security:podman  # Security pen tests with a one-shot Podman-backed stack
@@ -64,6 +65,7 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | `email-broadcasts` | Diary excerpt extraction (with ellipsis truncation), diary/milestone tracking helpers, milestone checking logic, rate limiting |
 | `email-tip` | Tip-aware supporter email breakdowns across confirmation / modified / cancelled / failed / charged emails |
 | `votes` | Email-based vote storage/dedup, vote status retrieval, campaign results, result aggregation |
+| `admin-dashboard` | Dashboard dirty-state tracking, settings serialization, content/editor normalization, referral URL helpers, responsive/i18n support utilities |
 
 ### Running
 
@@ -375,6 +377,14 @@ Browser-based tests for full user flows in `tests/e2e/`.
 - Verify checkout order summary preview appears immediately and resolves to tip-aware totals
 - Worker API integration test coverage for live stats and checkout bootstrap
 
+**Admin Dashboard Coverage Highlights:**
+- Magic-link sign-in, role-scoped tabs, and campaign-user access restrictions
+- Settings, Add-ons, Campaigns, Analytics, Reports, Supporters, and Marketing tab behavior
+- Content editor WYSIWYG block editing, link/media settings, diary editor reuse, draft state, publish state, and mobile preview
+- Saved marketing referral codes, campaign URL builder, CSV exports, sorting, and zero-write read flows
+- Desktop/tablet/mobile responsiveness, including compact Spanish tablet menus
+- Axe checks for the authenticated dashboard shell
+
 ### Running
 
 ```bash
@@ -383,6 +393,7 @@ npm run test:e2e:quick     # Headed mode (requires running server)
 npm run test:e2e:headless  # CI mode (headless)
 npm run test:e2e:parity    # Critical cart/manage browser regressions
 npm run test:e2e:ui        # Interactive UI mode
+npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium
 ```
 
 ### Adding Tests
@@ -411,7 +422,7 @@ Penetration tests for the Worker API. Located in `tests/security/`.
 | Auth Bypass | Dev-token bypass, token validation, expiry, tampering |
 | Webhook Security | Stripe signature verification, duplicate-event handling, shipping address injection, removed legacy webhook handling |
 | Authorization | Admin endpoints, cross-user access, test endpoint guards |
-| Input Validation | XSS, injection, overflow, malformed input, hasPhysical flag abuse, shipping fee manipulation, additionalTiers/supportItems injection |
+| Input Validation | XSS, injection, overflow, malformed input, dashboard field normalization, hasPhysical flag abuse, shipping fee manipulation, additionalTiers/supportItems injection |
 | Rate Limiting | Burst requests, DoS resilience |
 
 ### Running
@@ -850,6 +861,9 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 - `RESEND_API_KEY` — Resend API key for supporter emails (re_...)
 - `ADMIN_SECRET` — Random string for admin API endpoints
 - `GITHUB_TOKEN` — (optional) GitHub PAT with `workflow` scope for rebuild triggers
+- `ADMIN_BOOTSTRAP_EMAILS` — Optional local/recovery super-admin email list for dashboard sign-in
+- `ADMIN_USERS_JSON` — Optional seed/recovery admin user list mirrored from `_config.yml`; dashboard Users edits save to KV at `admin-users:v1`
+- `CORS_ALLOWED_ORIGIN` — Must match the site origin for browser dashboard requests; local Podman derives this for `http://127.0.0.1:4000`
 
 ### Cloudflare KV
 - **Namespace**: `PLEDGES` — Stores pledge data and aggregated stats

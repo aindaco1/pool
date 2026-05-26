@@ -56,7 +56,9 @@ bundle exec jekyll clean
 4. `docs/DEV_NOTES.md` — Integration notes, content model & gotchas
 5. `docs/TESTING.md` — Full testing guide (includes secrets setup)
 6. `docs/ROADMAP.md` — Planned features
-7. `docs/CMS.md` — Pages CMS setup & campaign editing
+7. `docs/DASHBOARD.md` — Admin dashboard editing and operations
+
+For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `docs/SECURITY.md`, and `docs/SEO.md`; the admin shell has explicit requirements for keyboard access, Spanish strings, input normalization, and `noindex`.
 
 ### GitHub Pages Setup
 
@@ -74,7 +76,7 @@ bundle exec jekyll clean
 
 ---
 
-## Current Status (Apr 2026)
+## Current Status (May 2026)
 
 ✅ **Completed:**
 - Jekyll + first-party cart site structure
@@ -100,7 +102,7 @@ bundle exec jekyll clean
 - Production campaign launch (Hand Relations)
 - Podman-backed local dev/testing path
 - More explicit inventory overselling protection via Durable Object coordination
-- Pages CMS integration for visual campaign editing
+- Private admin dashboard for role-scoped campaign editing, settings, add-ons, analytics, reports, supporters, marketing links, and user management
 
 🚧 **In Progress:**
 - Typography, elements, and layouts redesign
@@ -121,7 +123,7 @@ bundle exec jekyll clean
 
 ### Pull Requests
 - Keep PRs focused and under ~300 lines when possible
-- Fill out the PR template, include screenshots for UI changes
+- Fill out the PR template, include screenshots for UI changes, and include desktop/tablet/mobile screenshots for admin dashboard layout changes
 - Link issues with `Closes #123`
 
 ### Labels
@@ -138,6 +140,7 @@ bundle exec jekyll clean
 - [ ] Skim `_layouts/` & `_includes/` to see first-party cart integration
 - [ ] Review `assets/js/` cart & pledge scripts
 - [ ] Read `worker/src/` to understand the backend (pledge storage, stats, charging)
+- [ ] Open `/admin/` locally with the default dev admin email path and understand the dashboard publish vs KV-save split
 - [ ] Verify `CNAME` is set to `pool.dustwave.xyz`
 
 ---
@@ -148,6 +151,7 @@ bundle exec jekyll clean
 - **Cloudflare Worker**: Same secrets as env vars; set `SITE_BASE`
 - **Stripe**: For hosted environments, create a webhook to `https://pledge.dustwave.xyz/webhooks/stripe`
 - **Local custom checkout**: add `STRIPE_PUBLISHABLE_KEY_TEST` to `worker/.dev.vars`
+- **Admin dashboard**: local dev seeds `alonso@dustwave.xyz` through `ADMIN_BOOTSTRAP_EMAILS`; fork admins should move production access into `_config.yml` `admin.users`, `ADMIN_USERS_JSON`, or the dashboard Users screen. The Users screen saves to KV, not GitHub.
 
 See [TESTING.md](TESTING.md) for full secrets reference.
 
@@ -156,6 +160,7 @@ See [TESTING.md](TESTING.md) for full secrets reference.
 ## Security Notes
 
 - Secrets live only in GitHub Actions + Cloudflare vars; never in repo
+- The dashboard **Secrets & credentials** section is read-only status. Do not add secret editing or secret persistence to `_config.yml`, campaign YAML, KV user records, or dashboard drafts.
 - Validate Stripe webhook signatures
 - Never commit API keys or tokens
 

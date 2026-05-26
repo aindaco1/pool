@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v0.9.5**. The Pool will treat **v1.0** as the wider public launch milestone once the remaining roadmap items are complete.
+Current release milestone: **v1.0.0 release candidate**. The v1.0 feature set is in place; the tracked launch hardening item is bot/challenge protection for the admin email sign-in form plus final smoke verification.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -27,18 +27,18 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement with published option allowlists and closed-decision lockout
-- **Sanitized campaign content blocks** — Long-form campaign and diary content accepts Markdown plus a tiny safe inline subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`), neutralizes unsafe Markdown link schemes, automatically opens external links in a new tab, and escapes or rejects other raw HTML
+- **Sanitized campaign content blocks** — Long-form campaign and diary content accepts Markdown plus a tiny safe inline subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`), supports local videos with optional posters, neutralizes unsafe Markdown link schemes, automatically opens external links in a new tab, and escapes or rejects other raw HTML
 - **Strict structured embeds** — Approved `spotify`, `youtube`, and `vimeo` embeds are validated against exact trusted origins and embed paths instead of substring matching
 - **Serialized limited-tier inventory** — Scarce rewards reserve through a per-campaign Durable Object at checkout start and confirm through that same coordinator at persistence time, so limited tiers do not oversell under concurrent demand
 - **Strict missing-pledge handling** — Magic-link pledge reads fail closed with `404` when the backing pledge record is missing
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
 - **Announcements** — Admin broadcast emails with custom CTA links to supporters
-- **Private admin dashboard** — Magic-link admin access for role-scoped summaries, supporters, reports, inventory, marketing links, analytics, and campaign content previews/publishes without exposing admin secrets in browser code
+- **Private admin dashboard** — Magic-link admin access for role-scoped settings, campaign editing, add-ons, supporters, reports, analytics, marketing/referral tools, users, and read-only secrets/diagnostics without exposing admin secrets in browser code
 - **Instagram integration** — Optional social CTA in supporter emails
 - **Ongoing funding** — Post-campaign support section
 - **Manage Pledge dashboard** — Desktop-friendly Active / Closed sections with locked-state read-only controls after deadline
 - **Tip-aware emails + reports** — Supporter emails, pledge reports, and fulfillment exports all include the platform tip when present
-- **Campaign-runner reports** — Configurable campaign-scoped daily pledge-ledger emails and post-deadline fulfillment exports can go to each campaign’s configured runner recipients, while platform-fulfilled rows can route separately to `support_email`, with concise deliverability-first subjects, campaign-specific guidance notes, and a dry-run/manual-send admin path for operations
+- **Campaign-runner reports** — Configurable campaign-scoped daily pledge-ledger emails and post-deadline fulfillment exports can go to each campaign’s configured runner recipients, while the dashboard previews/downloads pledge and fulfillment CSVs without sending email or writing sent markers
 - **Projection drift diagnostics** — Read-only admin checks and a local CLI can compare stored stats, inventory, and campaign indexes against saved pledge truth before any repair path mutates data
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
 - **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, safe-area-aware drawers, larger tap targets, and overflow fixes instead of a separate mobile-only UI
@@ -47,7 +47,6 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Hosted live campaign embeds** — Campaign pages now link to a locale-aware embed builder that generates copy-paste iframe code with layout/theme/media/CTA options, live Worker-backed data, and auto-resize behavior
 - **English + Spanish i18n foundation** — `_config.yml` now drives supported languages, static locale routes, generated localized campaign routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, public campaign pages, embed pages, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge/embed runtime copy, campaign countdown/gallery/live-stats labels, cart-button summaries, checkout tax-location helper copy, hero video/community teaser/diary chrome, localized campaign dates, and localized Worker supporter emails
 - **SEO fundamentals baseline** — Public pages and campaign pages now emit consistent titles, descriptions, canonicals, OG/Twitter tags, localized language metadata, honest JSON-LD, Worker-generated campaign share-card images, and alternate-language metadata where supported, while `robots.txt`, `sitemap.xml`, and explicit noindex rules keep private/tokenized flows out of search intent
-- **CMS Integration** — [Pages CMS](https://pagescms.org) for visual campaign editing
 
 ## Architecture
 
@@ -61,7 +60,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 | Frontend | GitHub Pages | Jekyll + Sass + first-party cart runtime |
 | Payments | Stripe | Secure payment fields, saved payment methods, off-session charges |
 | API | Cloudflare Worker | Checkout-session bootstrap, webhook, tip-aware totals, stats, auto-settle, cache purge |
-| CMS | Pages CMS | Visual campaign editing (commits to GitHub) |
+| Admin UI | Private dashboard | Role-scoped campaign editing, settings, add-ons, reports, analytics, supporters, marketing tools, and users |
 
 ## Quick Start
 
@@ -114,6 +113,7 @@ Fork-facing settings now use a structured config model in [`_config.yml`](_confi
 
 - `platform` for identity, URLs, and support contact
 - `platform` also covers brand assets like logo, footer logo, favicon, and default social image
+- `admin` for production admin URLs plus seed/recovery users mirrored into the Worker as `ADMIN_USERS_JSON`
 - top-level `title` / `description` for Jekyll's site identity and default SEO copy
 - `seo` for bounded SEO identity knobs like `x_handle`, `same_as`, `default_social_image_alt`, `og_locale_overrides`, and whether the public community hub should remain indexable
 - `pricing` for the flat-rate compatibility baseline and platform-tip defaults
@@ -159,7 +159,14 @@ bundle exec jekyll serve --config _config.yml,_config.local.yml
 
 For a full host-only stack, run the Worker separately with `cd worker && wrangler dev --env dev --port 8787`.
 
-Local admin dashboard testing uses the repo's dev Worker defaults: `ADMIN_BOOTSTRAP_EMAILS=alonso@dustwave.xyz`, `CORS_ALLOWED_ORIGIN=http://127.0.0.1:4000`, and the two test-only campaigns `hand-relations,smoke-editable`. Those values are mirrored into the Wrangler `dev` environment from `_config.yml`; machine-specific secrets still belong in ignored `worker/.dev.vars`.
+Local admin dashboard testing uses the repo's dev Worker defaults: `ADMIN_BOOTSTRAP_EMAILS=alonso@dustwave.xyz`, `CORS_ALLOWED_ORIGIN=http://127.0.0.1:4000`, and the two test-only campaigns `hand-relations,smoke-editable`. `_config.yml` `admin.users` is a fork-friendly seed/recovery list mirrored into the Worker as `ADMIN_USERS_JSON`; admin user edits made in the dashboard are saved directly to Worker KV under `admin-users:v1`, take effect immediately, and do not publish to GitHub. The bootstrap email remains a local/recovery super-admin path. Machine-specific secrets still belong in ignored `worker/.dev.vars`.
+
+Dashboard publish paths are intentionally split:
+
+- Settings, Add-ons, Campaigns, and content publishes validate through the Worker and commit changes back to GitHub before the normal deploy flow.
+- Settings -> Users saves directly to Worker KV and does not use the publish button.
+- Marketing saved referral codes write one campaign-scoped KV record only when explicitly saved.
+- Reports, Analytics, Supporters, content loads/previews, local drafts, filters, sorting, and CSV downloads are read-only browsing flows.
 
 To create or update local secrets safely, run:
 
@@ -206,7 +213,8 @@ The Pool is intentionally shaped so most traffic stays cheap:
 - public live data now prefers one combined `/live/:slug` request instead of separate stats + inventory calls
 - campaign pages cache live stats and inventory in `localStorage` for `cache.live_stats_ttl_seconds` / `cache.live_inventory_ttl_seconds` (default `300`)
 - background tabs stop refreshing until the page becomes visible again
-- single-campaign reports, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans, and stats/inventory rebuilds now repair stale campaign indexes when they detect drift
+- dashboard reports, supporters, analytics, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans, and stats/inventory rebuilds now repair stale campaign indexes when they detect drift
+- normal dashboard reads, content previews, report previews/downloads, supporter filters, analytics views, marketing URL building, and local editor drafts are designed to add zero KV writes
 - the new read-only drift checks make it easier to confirm when projections are stale before running a repair path
 - limited-tier write paths now ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
 - public read paths stay intentionally permissive so a legitimately popular campaign does not hit artificial anti-DoS ceilings, while the expensive checkout / Manage / admin writes carry the tighter rate limits and request-size caps
@@ -248,6 +256,8 @@ npm run test:unit      # Unit tests (Vitest)
 npm run test:e2e       # E2E tests (Playwright) — fully automated browser coverage
 npm run test:e2e:headless # CI-style automated browser suite
 npm run test:e2e:headless:podman -- tests/e2e/accessibility-public-pages.spec.ts --project=chromium # Podman-backed public accessibility slice
+npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium # Focused admin dashboard browser suite
+node --check assets/js/admin-dashboard.js # Dashboard JavaScript syntax check
 npm run test:security  # Security tests — pen testing the Worker API
 npm run test:security:podman # Security tests with a Podman-backed local stack in one invocation
 npm test               # Run unit + e2e
@@ -352,14 +362,14 @@ Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT
 - [SHIPPING.md](docs/SHIPPING.md) — Current shipping model, USPS setup, and fallback policy
 - [SEO.md](docs/SEO.md) — Current crawl, metadata, JSON-LD, and noindex model
 - [ADD_ON_PRODUCTS.md](docs/ADD_ON_PRODUCTS.md) — Current global add-on catalog structure and initial merch import model
-- [ROADMAP.md](docs/ROADMAP.md) — Planned features
-- [CMS.md](docs/CMS.md) — Pages CMS setup & campaign editing guide
+- [DASHBOARD.md](docs/DASHBOARD.md) — Private admin dashboard reference for campaign editing and operations
+- [ROADMAP.md](docs/ROADMAP.md) — v1.0 release status and post-v1.0 follow-ups
 - [Campaign Creator Checklist](creator-campaign-checklist.md) — Public creator launch-prep worksheet, with Spanish route at `/es/creator-campaign-checklist/`
 
 ## Key Directories
 
 ```
-.pages.yml            # Pages CMS configuration
+admin.md              # Private admin dashboard route
 _campaigns/           # Markdown campaign files
 _layouts/             # Page templates (campaign, community, manage, etc.)
 _includes/            # Reusable components
@@ -385,6 +395,7 @@ assets/
   └── js/             # Client-side scripts
       ├── cart.js             # Pledge flow (tiers, support items, tip UI, shipping detection)
       ├── campaign.js         # Phase tabs, toasts
+      ├── admin-dashboard.js  # Private dashboard UI, editors, tables, and publish flows
       ├── buy-buttons.js      # Button handlers
       ├── live-stats.js       # Real-time stats, inventory, tier unlocks, late support
       └── cart-provider.js    # First-party cart/runtime provider
@@ -452,7 +463,7 @@ The Worker powers:
 - tip-aware total calculation
 - supporter email delivery via Resend
 - batched settlement and retry flows
-- admin recovery and reporting endpoints
+- browser admin dashboard auth, read APIs, publish APIs, user management, marketing referral saves, and legacy shared-secret admin endpoints
 
 ---
 

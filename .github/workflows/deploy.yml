@@ -73,10 +73,20 @@ jobs:
           cache: npm
           cache-dependency-path: worker/package-lock.json
 
+      - name: Setup Ruby
+        if: ${{ github.event_name == 'push' }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+
       - name: Install Worker dependencies
         if: ${{ github.event_name == 'push' }}
         working-directory: worker
         run: npm ci
+
+      - name: Sync Worker config
+        if: ${{ github.event_name == 'push' }}
+        run: ruby ./scripts/sync-worker-config.rb
 
       - name: Deploy Worker
         if: ${{ github.event_name == 'push' }}

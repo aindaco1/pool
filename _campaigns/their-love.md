@@ -12,7 +12,7 @@ hero_video: https://www.youtube.com/watch?v=XCQWR9cNsgY
 creator_image: /assets/images/campaigns/their-love/crew-james.png
 creator_name: "James Clare"
 category: "Drama, Romance, Short Film"
-short_blurb: "Eric and Sam, from first hello to last goodbye, ask what it means to truly love."
+short_blurb: "Eric and Sam, from exciting beginnings to uncertain horizons, ask what it means to truly love."
 show_ongoing: false
 single_tier_only: false
 stretch_hidden: false
@@ -20,6 +20,7 @@ custom_late_support: true
 free_shipping: true
 runner_report_emails:
   - theirlovemovie@gmail.com
+instagram: https://www.instagram.com/darling.film.co/
 
 long_content:
   - type: image
@@ -152,8 +153,8 @@ decisions: []
 ongoing_items: []
 
 tiers:
-  - id: just-for-the-game
-    name: "Just for the Game"
+  - id: just-for-love
+    name: "Just for Love"
     price: 10
     image: /assets/images/campaigns/their-love/tier-just-for-the-game.jpg
     description: "Special thank-you on social media and in the end credits."
@@ -182,32 +183,32 @@ tiers:
     shipping_preset: tshirt
     late_support: false
 
-  - id: beauty-with-no-beast
-    name: "Beauty With No Beast"
-    price: 75
-    image: /assets/images/campaigns/their-love/tier-rose-box.png
-    description: "Dried rose in a custom box with a glass viewing panel, signed by the cast. Free shipping."
-    limit_total: 5
-    stackable: false
-    category: physical
-    shipping:
-      weight_oz: 12
-      packaging_weight_oz: 4
-      length_in: 8
-      width_in: 8
-      height_in: 4
-      stack_height_in: 4
-    late_support: false
-
   - id: it-takes-a-village
     name: "It Takes a Village"
-    price: 100
+    price: 75
     image: /assets/images/campaigns/their-love/tier-screening-party.jpg
     description: "Screening party with the cast and crew."
     limit_total: 10
     stackable: false
     category: digital
     late_support: true
+
+  - id: beauty-with-no-beast
+    name: "Beauty With No Beast"
+    price: 100
+    image: /assets/images/campaigns/their-love/tier-rose-box.png
+    description: "Dried rose in a custom box with a glass viewing panel, signed by the cast. Free shipping."
+    limit_total: 5
+    stackable: false
+    category: physical
+    shipping:
+      weight_oz: 20
+      packaging_weight_oz: 8
+      length_in: 10
+      width_in: 8
+      height_in: 5
+      stack_height_in: 5
+    late_support: false
 
   - id: going-big-time
     name: "Going Big Time"
@@ -228,8 +229,8 @@ tiers:
     stackable: false
     category: physical
     shipping:
-      weight_oz: 96
-      packaging_weight_oz: 16
+      weight_oz: 128
+      packaging_weight_oz: 32
       length_in: 24
       width_in: 18
       height_in: 18

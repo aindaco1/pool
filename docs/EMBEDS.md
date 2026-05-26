@@ -11,7 +11,7 @@ The builder lives on:
 - `/embed/campaign/`
 - `/es/embed/campaign/`
 
-Campaign pages link into that builder through the campaign sidebar, and the builder generates a copy-paste snippet for the current campaign.
+Campaign pages link into that builder through the campaign sidebar, and the builder generates a copy-paste snippet for the current campaign. The private admin dashboard also embeds the same builder UI in the **Marketing** tab so admins can build referral/UTM links and campaign embed snippets from one workspace without duplicating embed logic.
 
 ## What It Is Not
 
@@ -84,7 +84,10 @@ That share card is the social-preview companion to the embed, not a replacement 
 - `_layouts/campaign-embed.html`
 - `embed/campaign/index.html`
 - `es/embed/campaign/index.html`
+- `_includes/campaign-embed-builder.html`
+- `_layouts/admin.html`
 - `assets/js/campaign-embed.js`
+- `assets/js/admin-dashboard.js`
 - `assets/partials/_embed.scss`
 - `worker/src/index.js`
 
@@ -94,6 +97,7 @@ When validating the embed manually:
 
 - the campaign sidebar button opens the correct locale builder
 - the copied iframe snippet preserves locale and selected options
+- the Marketing tab renders the same builder controls below saved referral codes
 - the widget auto-resizes after paste
 - the widget CTA and close `X` point back to the correct localized campaign page
 - compact/full and media-hidden states still render cleanly on mobile

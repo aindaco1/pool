@@ -90,11 +90,13 @@ import { normalizeTaxDestination, quoteTax } from './tax.js';
 import { buildFulfillmentReport, buildPledgeLedgerReport, rebuildCsvReport } from './reports.js';
 import {
   adminCorsResponse,
+  getEffectiveAdminUsers,
   handleAdminAuthExchange,
   handleAdminAuthStart,
   handleAdminLogout,
   handleAdminSession,
-  requireAdminSession
+  requireAdminSession,
+  saveStoredAdminUsers
 } from './admin-auth.js';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
@@ -119,6 +121,7 @@ const SUPPORTER_EMAIL_RETRY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SHARE_CARD_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=3600';
 const MAX_STANDARD_JSON_BODY_BYTES = 64 * 1024;
 const MAX_ADMIN_LOGO_UPLOAD_BODY_BYTES = 1024 * 1024;
+const MAX_ADMIN_IMAGE_UPLOAD_BODY_BYTES = 12 * 1024 * 1024;
 const MAX_ADMIN_VIDEO_UPLOAD_BODY_BYTES = 140 * 1024 * 1024;
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 256 * 1024;
 const RATELIMIT_REQUIRED_ERROR = 'Rate limit storage not configured';
@@ -2836,7 +2839,7 @@ export default {
       }
 
       if (path === '/admin/settings/image-upload' && method === 'POST') {
-        return handleAdminLogoUpload(request, env);
+        return handleAdminImageUpload(request, env);
       }
 
       if (path === '/admin/settings/video-upload' && method === 'POST') {
@@ -2845,6 +2848,18 @@ export default {
 
       if (path === '/admin/settings/publish' && method === 'POST') {
         return handleAdminSettingsPublish(request, env);
+      }
+
+      if (path === '/admin/users' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminUsersSave(request, env, parsedBody.body || {});
       }
 
       if (path === '/admin/analytics' && method === 'GET') {
@@ -2865,6 +2880,18 @@ export default {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminMarketingReferralSave(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/admin/marketing/referrals' && method === 'DELETE') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminMarketingReferralDelete(request, env, parsedBody.body || {});
       }
 
       if (path === '/admin/content/campaign' && method === 'GET') {
@@ -8786,6 +8813,8 @@ function adminSettingsSection(title, entries) {
       submitDivisor: options.submitDivisor,
       placeholder: options.placeholder || '',
       options: Array.isArray(options.options) ? options.options : [],
+      campaignOptions: Array.isArray(options.campaignOptions) ? options.campaignOptions : [],
+      currentUserEmail: options.currentUserEmail || '',
       timeParts: options.timeParts && typeof options.timeParts === 'object' ? options.timeParts : null,
       visibleWhen: options.visibleWhen && typeof options.visibleWhen === 'object' ? options.visibleWhen : null,
       layoutGroup: options.layoutGroup || '',
@@ -8896,6 +8925,7 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['design.color_border', { label: 'Border Color', type: 'string', input: 'color', layoutGroup: 'design-colors', help: 'Divider and control-border color used across the site, admin UI, checkout UI, and supporter emails.' }],
   ['design.color_primary', { label: 'Primary Color', type: 'string', input: 'color', layoutGroup: 'design-colors', help: 'Primary action and brand accent color used for links, buttons, progress accents, and email calls to action.' }],
   ['design.radius_lg', { label: 'Button Radius', type: 'string', input: 'text', help: 'The large border radius used for major buttons and rounded elements across the site and supporter emails.' }],
+  ['admin.users', { label: 'Users', type: 'admin_users', input: 'admin-users', help: 'Admin accounts allowed to sign in. Super admins can manage the whole platform; campaign users can manage only the campaigns selected here.' }],
   ['cache.live_stats_ttl_seconds', { label: 'Live stats cache TTL seconds', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'cache-live-ttl', help: 'How long browsers cache live campaign stats before asking the Worker again.' }],
   ['cache.live_inventory_ttl_seconds', { label: 'Live inventory cache TTL seconds', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'cache-live-ttl', help: 'How long browsers cache live inventory before asking the Worker again.' }]
 ]);
@@ -9116,6 +9146,25 @@ function parseAdminDelimitedList(value) {
     .filter(Boolean);
 }
 
+async function adminUserSettingsRows(env) {
+  const users = await getEffectiveAdminUsers(env);
+  return users.map((user) => ({
+    name: user.name || '',
+    email: user.email,
+    role: user.role === 'super_admin' ? 'super_admin' : 'campaign_user',
+    campaigns: user.role === 'super_admin' ? [] : (user.campaignSlugs || [])
+  }));
+}
+
+function adminCampaignOptions(campaigns = []) {
+  return (Array.isArray(campaigns) ? campaigns : [])
+    .map((campaign) => ({
+      label: String(campaign?.title || campaign?.slug || '').trim(),
+      value: String(campaign?.slug || '').trim()
+    }))
+    .filter((campaign) => campaign.value);
+}
+
 function adminSecretStatusRows(env) {
   const isConfigured = (value) => String(value || '').trim().length > 0;
   const status = (value, required = true) => {
@@ -9243,6 +9292,13 @@ async function handleAdminSettings(request, env) {
         ['Primary Color', env.EMAIL_COLOR_PRIMARY, editableAdminSetting('design.color_primary')],
         ['Button Radius', env.EMAIL_BUTTON_RADIUS, editableAdminSetting('design.radius_lg')]
       ]),
+      adminSettingsSection('Users', [
+        ['Users', await adminUserSettingsRows(env), {
+          ...editableAdminSetting('admin.users', 'admin_users'),
+          campaignOptions: adminCampaignOptions(campaigns),
+          currentUserEmail: auth.user.email
+        }]
+      ]),
       adminSettingsSection('Platform add-ons', [
         ['Enabled', addOns?.enabled === true, editableAdminSetting('add_ons.enabled', 'boolean')],
         ['Low stock threshold', addOns?.low_stock_threshold ?? 5, editableAdminSetting('add_ons.low_stock_threshold', 'number')],
@@ -9275,11 +9331,220 @@ async function handleAdminSettings(request, env) {
   }, 200, env);
 }
 
+function normalizeAdminUserCampaigns(value) {
+  const source = Array.isArray(value)
+    ? value
+    : String(value || '').split(',');
+  return Array.from(new Set(source
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)));
+}
+
+const ADMIN_TEXT_DEFAULT_MAX_LENGTH = 500;
+const ADMIN_URL_MAX_LENGTH = 2048;
+const ADMIN_FONT_STACK_MAX_LENGTH = 200;
+const ADMIN_CSS_LENGTH_MAX_LENGTH = 50;
+const ADMIN_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const ADMIN_DATE_TIME_REGEX = /^\d{4}-\d{2}-\d{2}(?:[T ][0-2]\d:[0-5]\d(?::[0-5]\d)?(?:Z|[+-][0-2]\d:[0-5]\d)?)?$/;
+const ADMIN_SAFE_SLUG_VALUES = /^[a-z0-9_-]+$/;
+
+function stripAdminControlCharacters(value, { allowNewlines = false } = {}) {
+  const text = String(value ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return allowNewlines
+    ? text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    : text.replace(/[\u0000-\u001F\u007F]/g, '');
+}
+
+function hasAdminRawHtml(value) {
+  const text = String(value || '');
+  return /<!--|<\?|<\s*\/?\s*[a-z][^>]*>/i.test(text);
+}
+
+function normalizeAdminPlainText(value, label = 'Value', {
+  maxLength = ADMIN_TEXT_DEFAULT_MAX_LENGTH,
+  allowNewlines = false,
+  allowRawHtml = false
+} = {}) {
+  const text = stripAdminControlCharacters(value, { allowNewlines }).trim();
+  if (text.length > maxLength) return { ok: false, error: `${label} is too long.` };
+  if (!allowRawHtml && hasAdminRawHtml(text)) {
+    return { ok: false, error: `${label} cannot include raw HTML.` };
+  }
+  return { ok: true, value: text };
+}
+
+function normalizeAdminSlugValue(value, label = 'ID', { required = true } = {}) {
+  const text = stripAdminControlCharacters(value).trim().toLowerCase();
+  if (!text && !required) return { ok: true, value: '' };
+  if (!isValidSlug(text)) return { ok: false, error: `${label} must use lowercase letters, numbers, and hyphens only.` };
+  return { ok: true, value: text };
+}
+
+function normalizeAdminSafeToken(value, label = 'Value', { maxLength = 80, required = false } = {}) {
+  const text = stripAdminControlCharacters(value).trim().toLowerCase();
+  if (!text && !required) return { ok: true, value: '' };
+  if (!text || text.length > maxLength || !ADMIN_SAFE_SLUG_VALUES.test(text)) {
+    return { ok: false, error: `${label} must use letters, numbers, hyphens, or underscores only.` };
+  }
+  return { ok: true, value: text };
+}
+
+function isSafeAdminRootRelativePath(value) {
+  const text = String(value || '').trim();
+  if (!text.startsWith('/') || text.startsWith('//') || text.includes('\\')) return false;
+  if (/[\u0000-\u001F\u007F<>"'`\s]/.test(text)) return false;
+  const pathOnly = text.split(/[?#]/)[0];
+  let decoded = pathOnly;
+  try {
+    decoded = decodeURIComponent(pathOnly);
+  } catch {
+    return false;
+  }
+  return !decoded.split('/').some((segment) => segment === '..');
+}
+
+function normalizeAdminUrlReference(value, label = 'URL', {
+  allowRelative = true,
+  requireAbsolute = false
+} = {}) {
+  const text = stripAdminControlCharacters(value).trim();
+  if (!text) return { ok: true, value: '' };
+  if (text.length > ADMIN_URL_MAX_LENGTH) return { ok: false, error: `${label} is too long.` };
+  if (/[\u0000-\u001F\u007F<>"'`\s]/.test(text)) return { ok: false, error: `${label} contains unsafe characters.` };
+  if (text.startsWith('/')) {
+    if (requireAbsolute || !allowRelative) return { ok: false, error: `${label} must be an absolute http or https URL.` };
+    if (!isSafeAdminRootRelativePath(text)) return { ok: false, error: `${label} must be a safe root-relative path.` };
+    return { ok: true, value: text };
+  }
+  try {
+    const parsed = new URL(text);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return { ok: false, error: `${label} must use http or https.` };
+    }
+    if (parsed.username || parsed.password) {
+      return { ok: false, error: `${label} cannot include embedded credentials.` };
+    }
+    return { ok: true, value: parsed.toString() };
+  } catch {
+    return { ok: false, error: `${label} must be a valid URL.` };
+  }
+}
+
+function normalizeAdminAssetReference(value, label = 'Asset') {
+  return normalizeAdminUrlReference(value, label, { allowRelative: true });
+}
+
+function collectAdminRichTextErrors(value, fieldName, { maxLength = 8000 } = {}) {
+  const text = stripAdminControlCharacters(value, { allowNewlines: true }).trim();
+  const errors = [];
+  if (text.length > maxLength) errors.push(`${fieldName} is too long.`);
+  if (/\bstyle\s*=\s*["']/i.test(text)) errors.push(`${fieldName} includes inline style attributes, which are not allowed.`);
+  if (/<script\b/i.test(text)) errors.push(`${fieldName} includes raw <script> HTML, which is not allowed.`);
+  const inlineEvents = text.match(/\son[a-z]+\s*=\s*["']/ig) || [];
+  for (const match of inlineEvents) {
+    errors.push(`${fieldName} includes an inline event handler (${match.trim()}).`);
+  }
+  if (/<iframe\b/i.test(text)) errors.push(`${fieldName} includes raw <iframe> HTML, which is not allowed.`);
+  text.replace(/<\s*\/?\s*([a-z0-9]+)(?:\s[^>]*)?>/ig, (_match, tagName) => {
+    const tag = String(tagName || '').toLowerCase();
+    if (!ADMIN_CONTENT_ALLOWED_INLINE_TAGS.has(tag)) {
+      errors.push(`${fieldName} includes raw <${tag}> HTML; use Markdown or approved content blocks instead.`);
+    }
+    return '';
+  });
+  text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, _label, href) => {
+    if (!isAdminPreviewAllowedLink(href)) errors.push(`${fieldName} includes an unsafe link URL.`);
+    return '';
+  });
+  return { text, errors };
+}
+
+function normalizeAdminRichTextStorageValue(value, label = 'Text', { maxLength = 8000, required = false } = {}) {
+  const normalized = collectAdminRichTextErrors(value, label, { maxLength });
+  if (required && !normalized.text) return { ok: false, error: `${label} is required.` };
+  if (normalized.errors.length) return { ok: false, error: normalized.errors.join(' ') };
+  return { ok: true, value: normalized.text };
+}
+
+function normalizeAdminCssFontStack(value, label = 'Font') {
+  const normalized = normalizeAdminPlainText(value, label, { maxLength: ADMIN_FONT_STACK_MAX_LENGTH });
+  if (!normalized.ok || !normalized.value) return normalized;
+  if (/[;{}()<>\\]/.test(normalized.value) || /\b(?:url|expression)\s*\(/i.test(normalized.value) || !/^[A-Za-z0-9\s'",._-]+$/.test(normalized.value)) {
+    return { ok: false, error: `${label} must be a simple CSS font stack without CSS functions or declarations.` };
+  }
+  return normalized;
+}
+
+function normalizeAdminCssLength(value, label = 'CSS length') {
+  const normalized = normalizeAdminPlainText(value, label, { maxLength: ADMIN_CSS_LENGTH_MAX_LENGTH });
+  if (!normalized.ok || !normalized.value) return normalized;
+  if (!/^(?:0|[0-9]+(?:\.[0-9]+)?(?:px|rem|em|%)?)$/.test(normalized.value)) {
+    return { ok: false, error: `${label} must be a CSS length like 6px, 0.5rem, or 50%.` };
+  }
+  return normalized;
+}
+
+function normalizeAdminUsers(value, schema = {}) {
+  let users;
+  try {
+    users = Array.isArray(value) ? value : JSON.parse(String(value || '[]'));
+  } catch {
+    return { ok: false, error: `${schema.label || 'Users'} must be valid user JSON.` };
+  }
+  if (!Array.isArray(users)) return { ok: false, error: `${schema.label || 'Users'} must be a list.` };
+  if (users.length > 100) return { ok: false, error: `${schema.label || 'Users'} can include at most 100 users.` };
+
+  const availableCampaigns = new Set((schema.availableCampaignSlugs || []).map((campaignSlug) => String(campaignSlug || '').trim()).filter(Boolean));
+  const currentUserEmail = String(schema.currentUserEmail || '').trim().toLowerCase();
+  const seenEmails = new Set();
+  const superAdminEmails = new Set();
+  const normalized = [];
+
+  for (const [index, user] of users.entries()) {
+    if (!user || typeof user !== 'object' || Array.isArray(user)) {
+      return { ok: false, error: `User ${index + 1} must be an object.` };
+    }
+    const normalizedName = normalizeAdminPlainText(user.name || '', `User ${index + 1} name`, { maxLength: 100 });
+    if (!normalizedName.ok) return normalizedName;
+    const name = normalizedName.value;
+    const email = String(user.email || '').trim().toLowerCase();
+    if (!isValidEmail(email)) return { ok: false, error: `User ${index + 1} needs a valid email address.` };
+    if (seenEmails.has(email)) return { ok: false, error: `User email "${email}" is duplicated.` };
+    seenEmails.add(email);
+
+    const role = String(user.role || '').trim() === 'super_admin' ? 'super_admin' : 'campaign_user';
+    const campaigns = role === 'super_admin'
+      ? []
+      : normalizeAdminUserCampaigns(user.campaigns ?? user.campaignSlugs ?? user.campaign_slugs);
+    if (role === 'campaign_user' && !campaigns.length) {
+      return { ok: false, error: `Campaign user "${email}" needs at least one campaign.` };
+    }
+    const invalidCampaign = campaigns.find((campaignSlug) => !isValidSlug(campaignSlug));
+    if (invalidCampaign) return { ok: false, error: `User "${email}" references an invalid campaign "${invalidCampaign}".` };
+    const unknownCampaign = campaigns.find((campaignSlug) => availableCampaigns.size && !availableCampaigns.has(campaignSlug));
+    if (unknownCampaign) return { ok: false, error: `User "${email}" references unknown campaign "${unknownCampaign}".` };
+    if (role === 'super_admin') superAdminEmails.add(email);
+
+    normalized.push({ name, email, role, campaigns });
+  }
+
+  if (!superAdminEmails.size) return { ok: false, error: 'Users must include at least one super admin.' };
+  if (currentUserEmail && !superAdminEmails.has(currentUserEmail)) {
+    return { ok: false, error: 'Your account must stay a super admin before publishing user changes.' };
+  }
+
+  return { ok: true, value: normalized };
+}
+
 function normalizeAdminSettingsValue(value, schema = {}) {
+  const label = schema.label || 'Value';
   if (schema.type === 'boolean') {
     if (value === true || value === 'true') return { ok: true, value: true };
     if (value === false || value === 'false') return { ok: true, value: false };
-    return { ok: false, error: `${schema.label || 'Value'} must be true or false.` };
+    return { ok: false, error: `${label} must be true or false.` };
+  }
+  if (schema.type === 'admin_users') {
+    return normalizeAdminUsers(value, schema);
   }
   if (schema.type === 'add_on_products') {
     return normalizeAdminAddOnProducts(value, schema);
@@ -9287,19 +9552,22 @@ function normalizeAdminSettingsValue(value, schema = {}) {
   if (schema.type === 'campaign_collection') {
     return normalizeAdminCampaignCollection(value, schema);
   }
+  if (schema.type === 'content_editor') {
+    return { ok: false, error: `${label} is saved through the Content tab, not settings publishing.` };
+  }
   if (schema.type === 'number') {
     const number = Number(value);
-    if (!Number.isFinite(number)) return { ok: false, error: `${schema.label || 'Value'} must be a number.` };
-    if (schema.input === 'integer' && !Number.isInteger(number)) return { ok: false, error: `${schema.label || 'Value'} must be a whole number.` };
-    if (schema.min !== undefined && number < schema.min) return { ok: false, error: `${schema.label || 'Value'} must be at least ${schema.min}.` };
-    if (schema.max !== undefined && number > schema.max) return { ok: false, error: `${schema.label || 'Value'} must be no more than ${schema.max}.` };
+    if (!Number.isFinite(number)) return { ok: false, error: `${label} must be a number.` };
+    if (schema.input === 'integer' && !Number.isInteger(number)) return { ok: false, error: `${label} must be a whole number.` };
+    if (schema.min !== undefined && number < schema.min) return { ok: false, error: `${label} must be at least ${schema.min}.` };
+    if (schema.max !== undefined && number > schema.max) return { ok: false, error: `${label} must be no more than ${schema.max}.` };
     return { ok: true, value: number };
   }
   if (schema.input === 'select' && Array.isArray(schema.options) && schema.options.length > 0) {
     const text = String(value ?? '').trim();
     const allowed = new Set(schema.options.map((option) => String(option?.value ?? '').trim()));
     if (!allowed.has(text)) {
-      return { ok: false, error: `${schema.label || 'Value'} must be one of the available options.` };
+      return { ok: false, error: `${label} must be one of the available options.` };
     }
     return { ok: true, value: text };
   }
@@ -9307,52 +9575,99 @@ function normalizeAdminSettingsValue(value, schema = {}) {
     const items = Array.isArray(value)
       ? value
       : String(value || '').split(/[\n,]+/);
-    const normalizedItems = items.map((item) => String(item || '').trim()).filter(Boolean);
+    let normalizedItems = items.map((item) => stripAdminControlCharacters(item).trim()).filter(Boolean);
     if (Array.isArray(schema.options) && schema.options.length > 0) {
       const allowed = new Set(schema.options.map((option) => String(option?.value ?? '').trim()).filter(Boolean));
       const invalid = normalizedItems.find((item) => !allowed.has(item));
-      if (invalid) return { ok: false, error: `${schema.label || 'List'} contains an unavailable option.` };
+      if (invalid) return { ok: false, error: `${label} contains an unavailable option.` };
     }
     if (schema.input === 'email-list') {
+      normalizedItems = normalizedItems.map((item) => item.toLowerCase());
       const invalid = normalizedItems.find((item) => !isValidEmail(item));
-      if (invalid) return { ok: false, error: `${schema.label || 'Email list'} contains an invalid email address.` };
+      if (invalid) return { ok: false, error: `${label} contains an invalid email address.` };
     }
     if (schema.input === 'url-list') {
-      const invalid = normalizedItems.find((item) => !/^https?:\/\//i.test(item));
-      if (invalid) return { ok: false, error: `${schema.label || 'URL list'} contains an invalid URL.` };
+      const normalizedUrls = [];
+      for (const item of normalizedItems) {
+        const normalizedUrl = normalizeAdminUrlReference(item, label, { allowRelative: false, requireAbsolute: true });
+        if (!normalizedUrl.ok) return { ok: false, error: `${label} contains an invalid URL.` };
+        normalizedUrls.push(normalizedUrl.value);
+      }
+      normalizedItems = normalizedUrls;
+    } else {
+      const invalid = normalizedItems.find((item) => hasAdminRawHtml(item));
+      if (invalid) return { ok: false, error: `${label} cannot include raw HTML.` };
     }
     return {
       ok: true,
       value: normalizedItems
     };
   }
-  const text = String(value ?? '').trim();
-  if (schema.input === 'date' && text && !/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    return { ok: false, error: `${schema.label || 'Date'} must use YYYY-MM-DD.` };
+  const text = stripAdminControlCharacters(value, { allowNewlines: schema.input === 'textarea' }).trim();
+  if (schema.input === 'date' && text && !ADMIN_DATE_REGEX.test(text)) {
+    return { ok: false, error: `${label} must use YYYY-MM-DD.` };
   }
   if (schema.input === 'slug' && !isValidSlug(text)) {
-    return { ok: false, error: `${schema.label || 'Slug'} must use lowercase letters, numbers, and hyphens only.` };
+    return { ok: false, error: `${label} must use lowercase letters, numbers, and hyphens only.` };
   }
   if (schema.input === 'color' && text && !/^#[0-9a-f]{6}$/i.test(text)) {
-    return { ok: false, error: `${schema.label || 'Color'} must use a hex color like #101215.` };
+    return { ok: false, error: `${label} must use a hex color like #101215.` };
   }
-  if (schema.input === 'url' && text && !/^(https?:\/\/|\/)/i.test(text)) {
-    return { ok: false, error: `${schema.label || 'URL'} must be an absolute URL or root-relative path.` };
+  if (schema.input === 'url') {
+    const requireAbsolute = [
+      'platform.site_url',
+      'platform.worker_url',
+      'tax.nm_grt_api_base',
+      'tax.zip_tax_api_base',
+      'shipping.usps.api_base'
+    ].includes(schema.path);
+    return normalizeAdminUrlReference(text, label, { allowRelative: !requireAbsolute, requireAbsolute });
+  }
+  if (schema.input === 'image-upload' || schema.input === 'video-upload') {
+    return normalizeAdminAssetReference(text, label);
   }
   if (schema.input === 'email' && text && !isValidEmail(text)) {
-    return { ok: false, error: `${schema.label || 'Email'} must be a valid email address.` };
+    return { ok: false, error: `${label} must be a valid email address.` };
+  }
+  if (schema.input === 'email') {
+    return { ok: true, value: text };
   }
   if (schema.input === 'email-sender' && text) {
+    if (text.length > 200 || /[\n\r]/.test(text) || /<\s*\/?\s*[a-z][^>]*>/i.test(text.replace(/<[^<>]+>$/, ''))) {
+      return { ok: false, error: `${label} must be a single sender identity.` };
+    }
     const senderEmail = text.match(/<([^<>]+)>$/)?.[1] || text;
     if (!isValidEmail(senderEmail.trim())) {
-      return { ok: false, error: `${schema.label || 'Sender'} must be an email address or Name <email@example.com>.` };
+      return { ok: false, error: `${label} must be an email address or Name <email@example.com>.` };
     }
   }
-  if (schema.input === 'stripe-publishable-key' && text && !/^pk_(test|live)_[A-Za-z0-9_]+$/.test(text)) {
-    return { ok: false, error: `${schema.label || 'Stripe publishable key'} must start with pk_test_ or pk_live_.` };
+  if (schema.input === 'email-sender') {
+    return { ok: true, value: text };
   }
-  if (text.length > 500) return { ok: false, error: `${schema.label || 'Value'} is too long.` };
-  return { ok: true, value: text };
+  if (schema.input === 'stripe-publishable-key' && text && !/^pk_(test|live)_[A-Za-z0-9_]+$/.test(text)) {
+    return { ok: false, error: `${label} must start with pk_test_ or pk_live_.` };
+  }
+  if (schema.input === 'stripe-publishable-key') {
+    return { ok: true, value: text };
+  }
+  if (schema.input === 'rich-text-inline') {
+    return normalizeAdminRichTextStorageValue(text, label, { maxLength: 2000 });
+  }
+  if (schema.path === 'design.font_body' || schema.path === 'design.font_display') {
+    return normalizeAdminCssFontStack(text, label);
+  }
+  if (schema.path === 'design.radius_lg') {
+    return normalizeAdminCssLength(text, label);
+  }
+  const maxLength = schema.input === 'textarea' ? 1000 : 500;
+  const normalized = normalizeAdminPlainText(text, label, {
+    maxLength,
+    allowNewlines: schema.input === 'textarea'
+  });
+  if (!normalized.ok) {
+    return normalized;
+  }
+  return { ok: true, value: normalized.value };
 }
 
 function normalizeAdminAddOnProducts(value, schema = {}) {
@@ -9375,31 +9690,50 @@ function normalizeAdminAddOnProducts(value, schema = {}) {
     if (!product || typeof product !== 'object' || Array.isArray(product)) {
       return { ok: false, error: `Product ${index + 1} must be an object.` };
     }
-    const id = String(product.id || '').trim();
-    if (!isValidSlug(id)) return { ok: false, error: `Product ${index + 1} needs a URL-safe id.` };
+    const idResult = normalizeAdminSlugValue(product.id || '', `Product ${index + 1} id`);
+    if (!idResult.ok) return idResult;
+    const id = idResult.value;
     if (seen.has(id)) return { ok: false, error: `Product id "${id}" is duplicated.` };
     seen.add(id);
 
-    const name = String(product.name || '').trim();
+    const normalizedName = normalizeAdminPlainText(product.name || '', `Product "${id}" name`, { maxLength: 120 });
+    if (!normalizedName.ok) return normalizedName;
+    const name = normalizedName.value;
     if (!name) return { ok: false, error: `Product "${id}" needs a name.` };
     const category = String(product.category || 'physical').trim().toLowerCase();
     if (!['physical', 'digital'].includes(category)) return { ok: false, error: `Product "${id}" category must be physical or digital.` };
     const price = Number(product.price);
     if (!Number.isFinite(price) || price < 0) return { ok: false, error: `Product "${id}" needs a non-negative price.` };
+    const description = normalizeAdminRichTextStorageValue(product.description || '', `Product "${id}" description`, { maxLength: 2000 });
+    if (!description.ok) return description;
+    const imageUrl = normalizeAdminAssetReference(product.image_url || product.imageUrl || '', `Product "${id}" image`);
+    if (!imageUrl.ok) return imageUrl;
 
     const normalizedProduct = {
       id,
       name,
-      description: String(product.description || '').trim(),
-      image_url: String(product.image_url || product.imageUrl || '').trim(),
+      description: description.value,
+      image_url: imageUrl.value,
       price: Number(price.toFixed(2)),
       category
     };
-    const shippingPreset = String(product.shipping_preset || product.shippingPreset || '').trim();
-    if (shippingPreset) normalizedProduct.shipping_preset = shippingPreset;
-    const sourceUrl = String(product.source_url || product.sourceUrl || '').trim();
+    const shippingPresetResult = normalizeAdminSafeToken(product.shipping_preset || product.shippingPreset || '', `Product "${id}" shipping preset`);
+    if (!shippingPresetResult.ok) return shippingPresetResult;
+    const shippingPreset = shippingPresetResult.value;
+    if (category === 'physical' && shippingPreset) {
+      normalizedProduct.shipping_preset = shippingPreset;
+    } else if (category === 'physical') {
+      const shipping = normalizeAdminShippingPackage(product.shipping, `Product "${id}"`);
+      if (!shipping.ok) return shipping;
+      normalizedProduct.shipping = shipping.value;
+    }
+    const sourceUrlResult = normalizeAdminUrlReference(product.source_url || product.sourceUrl || '', `Product "${id}" source URL`, { allowRelative: true });
+    if (!sourceUrlResult.ok) return sourceUrlResult;
+    const sourceUrl = sourceUrlResult.value;
     if (sourceUrl) normalizedProduct.source_url = sourceUrl;
-    const variantOptionName = String(product.variant_option_name || product.variantOptionName || '').trim();
+    const variantOptionNameResult = normalizeAdminPlainText(product.variant_option_name || product.variantOptionName || '', `Product "${id}" variant option name`, { maxLength: 80 });
+    if (!variantOptionNameResult.ok) return variantOptionNameResult;
+    const variantOptionName = variantOptionNameResult.value;
     if (variantOptionName) normalizedProduct.variant_option_name = variantOptionName;
     const inventory = product.inventory === '' || product.inventory === undefined || product.inventory === null
       ? null
@@ -9414,11 +9748,14 @@ function normalizeAdminAddOnProducts(value, schema = {}) {
     const seenVariants = new Set();
     normalizedProduct.variants = [];
     for (const [variantIndex, variant] of variants.entries()) {
-      const variantId = String(variant?.id || '').trim();
-      if (!isValidSlug(variantId)) return { ok: false, error: `Variant ${variantIndex + 1} for "${id}" needs a URL-safe id.` };
+      const variantIdResult = normalizeAdminSlugValue(variant?.id || '', `Variant ${variantIndex + 1} for "${id}" id`);
+      if (!variantIdResult.ok) return variantIdResult;
+      const variantId = variantIdResult.value;
       if (seenVariants.has(variantId)) return { ok: false, error: `Variant id "${variantId}" is duplicated for "${id}".` };
       seenVariants.add(variantId);
-      const label = String(variant?.label || '').trim();
+      const normalizedLabel = normalizeAdminPlainText(variant?.label || '', `Variant "${variantId}" label`, { maxLength: 120 });
+      if (!normalizedLabel.ok) return normalizedLabel;
+      const label = normalizedLabel.value;
       if (!label) return { ok: false, error: `Variant "${variantId}" for "${id}" needs a label.` };
       const variantInventory = variant.inventory === '' || variant.inventory === undefined || variant.inventory === null
         ? null
@@ -9431,6 +9768,35 @@ function normalizeAdminAddOnProducts(value, schema = {}) {
       normalizedProduct.variants.push(normalizedVariant);
     }
     normalized.push(normalizedProduct);
+  }
+  return { ok: true, value: normalized };
+}
+
+const ADMIN_SHIPPING_PACKAGE_FIELDS = [
+  ['weight_oz', 'weight', true],
+  ['packaging_weight_oz', 'packaging weight', false],
+  ['length_in', 'length', true],
+  ['width_in', 'width', true],
+  ['height_in', 'height', true],
+  ['stack_height_in', 'stack height', false]
+];
+
+function normalizeAdminShippingPackage(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: `${label} needs package weight and dimensions when Shipping preset is None.` };
+  }
+  const normalized = {};
+  for (const [key, fieldLabel, required] of ADMIN_SHIPPING_PACKAGE_FIELDS) {
+    const raw = value[key];
+    if (raw === '' || raw === undefined || raw === null) {
+      if (required) return { ok: false, error: `${label} needs package ${fieldLabel}.` };
+      continue;
+    }
+    const number = Number(raw);
+    if (!Number.isFinite(number) || number < 0 || (required && number <= 0)) {
+      return { ok: false, error: `${label} package ${fieldLabel} must be ${required ? 'greater than 0' : '0 or greater'}.` };
+    }
+    normalized[key] = Number(number.toFixed(3));
   }
   return { ok: true, value: normalized };
 }
@@ -9468,10 +9834,15 @@ function normalizeAdminCampaignCollection(value, schema = {}) {
     }
     const out = {};
     if (collection === 'diary') {
-      out.title = String(item.title || '').trim();
+      const title = normalizeAdminPlainText(item.title || '', `Diary entry ${index + 1} title`, { maxLength: 160 });
+      if (!title.ok) return title;
+      out.title = title.value;
       if (!out.title) return { ok: false, error: `Diary entry ${index + 1} needs a title.` };
-      out.date = String(item.date || '').trim();
-      out.phase = String(item.phase || '').trim();
+      out.date = stripAdminControlCharacters(item.date || '').trim();
+      if (out.date && !ADMIN_DATE_TIME_REGEX.test(out.date)) return { ok: false, error: `Diary entry "${out.title}" date must be a valid date/time.` };
+      const phase = normalizeAdminSafeToken(item.phase || '', `Diary entry "${out.title}" phase`);
+      if (!phase.ok) return phase;
+      out.phase = phase.value;
       const rawContent = Array.isArray(item.content) && item.content.length
         ? item.content
         : [{ type: 'text', body: String(item.body || '').trim(), align: 'left' }];
@@ -9489,16 +9860,24 @@ function normalizeAdminCampaignCollection(value, schema = {}) {
       const threshold = optionalAdminNumber(item.threshold, `Stretch goal ${index + 1} threshold`);
       if (!threshold.ok || threshold.value === undefined) return { ok: false, error: threshold.error || `Stretch goal ${index + 1} needs a threshold.` };
       out.threshold = threshold.value;
-      out.title = String(item.title || '').trim();
+      const title = normalizeAdminPlainText(item.title || '', `Stretch goal ${index + 1} title`, { maxLength: 160 });
+      if (!title.ok) return title;
+      out.title = title.value;
       if (!out.title) return { ok: false, error: `Stretch goal ${index + 1} needs a title.` };
-      out.description = String(item.description || '').trim();
-      out.status = String(item.status || '').trim();
+      const description = normalizeAdminRichTextStorageValue(item.description || '', `Stretch goal "${out.title}" description`, { maxLength: 1000 });
+      if (!description.ok) return description;
+      out.description = description.value;
+      const status = normalizeAdminSafeToken(item.status || '', `Stretch goal "${out.title}" status`);
+      if (!status.ok) return status;
+      out.status = status.value;
       normalized.push(out);
       continue;
     }
 
     if (collection === 'ongoing_items') {
-      out.label = String(item.label || '').trim();
+      const labelText = normalizeAdminPlainText(item.label || '', `Ongoing item ${index + 1} label`, { maxLength: 160 });
+      if (!labelText.ok) return labelText;
+      out.label = labelText.value;
       if (!out.label) return { ok: false, error: `Ongoing item ${index + 1} needs a label.` };
       const remaining = optionalAdminNumber(item.remaining, `Ongoing item "${out.label}" remaining`);
       if (!remaining.ok) return { ok: false, error: remaining.error };
@@ -9511,13 +9890,19 @@ function normalizeAdminCampaignCollection(value, schema = {}) {
     if (!isValidSlug(out.id)) return { ok: false, error: `${label} item ${index + 1} needs a URL-safe id.` };
 
     if (collection === 'tiers') {
-      out.name = String(item.name || '').trim();
+      const name = normalizeAdminPlainText(item.name || '', `Tier "${out.id}" name`, { maxLength: 160 });
+      if (!name.ok) return name;
+      out.name = name.value;
       if (!out.name) return { ok: false, error: `Tier "${out.id}" needs a name.` };
       const price = optionalAdminNumber(item.price, `Tier "${out.id}" price`);
       if (!price.ok || price.value === undefined) return { ok: false, error: price.error || `Tier "${out.id}" needs a price.` };
       out.price = price.value;
-      out.image = String(item.image || item.image_url || '').trim();
-      out.description = String(item.description || '').trim();
+      const image = normalizeAdminAssetReference(item.image || item.image_url || '', `Tier "${out.id}" image`);
+      if (!image.ok) return image;
+      out.image = image.value;
+      const description = normalizeAdminRichTextStorageValue(item.description || '', `Tier "${out.id}" description`, { maxLength: 3000 });
+      if (!description.ok) return description;
+      out.description = description.value;
       const limit = optionalAdminNumber(item.limit_total, `Tier "${out.id}" limit`, { integer: true });
       if (!limit.ok) return { ok: false, error: limit.error };
       if (limit.value !== undefined) out.limit_total = limit.value;
@@ -9525,8 +9910,18 @@ function normalizeAdminCampaignCollection(value, schema = {}) {
       if (!remaining.ok) return { ok: false, error: remaining.error };
       if (remaining.value !== undefined) out.remaining = remaining.value;
       out.stackable = item.stackable === true || item.stackable === 'true';
-      out.category = ['physical', 'digital'].includes(String(item.category || '').trim()) ? String(item.category).trim() : 'digital';
-      out.shipping_preset = String(item.shipping_preset || '').trim();
+      const category = String(item.category || '').trim().toLowerCase();
+      out.category = ['physical', 'digital'].includes(category) ? category : 'digital';
+      const shippingPresetResult = normalizeAdminSafeToken(item.shipping_preset || '', `Tier "${out.id}" shipping preset`);
+      if (!shippingPresetResult.ok) return shippingPresetResult;
+      const shippingPreset = shippingPresetResult.value;
+      if (out.category === 'physical' && shippingPreset) {
+        out.shipping_preset = shippingPreset;
+      } else if (out.category === 'physical') {
+        const shipping = normalizeAdminShippingPackage(item.shipping, `Tier "${out.id}"`);
+        if (!shipping.ok) return shipping;
+        out.shipping = shipping.value;
+      }
       out.late_support = item.late_support === true || item.late_support === 'true';
       const threshold = optionalAdminNumber(item.requires_threshold, `Tier "${out.id}" threshold`);
       if (!threshold.ok) return { ok: false, error: threshold.error };
@@ -9536,14 +9931,21 @@ function normalizeAdminCampaignCollection(value, schema = {}) {
     }
 
     if (collection === 'support_items') {
-      out.label = String(item.label || '').trim();
+      const labelText = normalizeAdminPlainText(item.label || '', `Support item "${out.id}" name`, { maxLength: 160 });
+      if (!labelText.ok) return labelText;
+      out.label = labelText.value;
       if (!out.label) return { ok: false, error: `Support item "${out.id}" needs a label.` };
-      out.need = String(item.need || '').trim();
+      const need = normalizeAdminRichTextStorageValue(item.need || '', `Support item "${out.id}" description`, { maxLength: 2000 });
+      if (!need.ok) return need;
+      out.need = need.value;
       const target = optionalAdminNumber(item.target, `Support item "${out.id}" target`);
       if (!target.ok || target.value === undefined) return { ok: false, error: target.error || `Support item "${out.id}" needs a target.` };
       out.target = target.value;
-      out.category = String(item.category || '').trim();
-      out.shipping_preset = String(item.shipping_preset || '').trim();
+      const category = String(item.category || '').trim().toLowerCase();
+      out.category = ['physical', 'digital'].includes(category) ? category : '';
+      const shippingPreset = normalizeAdminSafeToken(item.shipping_preset || '', `Support item "${out.id}" shipping preset`);
+      if (!shippingPreset.ok) return shippingPreset;
+      if (out.category === 'physical' && shippingPreset.value) out.shipping_preset = shippingPreset.value;
       out.late_support = item.late_support === true || item.late_support === 'true';
       normalized.push(out);
       continue;
@@ -9551,24 +9953,39 @@ function normalizeAdminCampaignCollection(value, schema = {}) {
 
     if (collection === 'decisions') {
       out.type = ['vote', 'poll'].includes(String(item.type || '').trim()) ? String(item.type).trim() : 'vote';
-      out.title = String(item.title || '').trim();
+      const title = normalizeAdminPlainText(item.title || '', `Decision "${out.id}" title`, { maxLength: 160 });
+      if (!title.ok) return title;
+      out.title = title.value;
       if (!out.title) return { ok: false, error: `Decision "${out.id}" needs a title.` };
-      out.deadline = String(item.deadline || '').trim();
-      out.eligible = String(item.eligible || 'backers').trim();
-      out.status = String(item.status || 'open').trim();
+      out.deadline = stripAdminControlCharacters(item.deadline || '').trim();
+      if (out.deadline && !ADMIN_DATE_REGEX.test(out.deadline)) return { ok: false, error: `Decision "${out.id}" deadline must use YYYY-MM-DD.` };
+      const eligible = normalizeAdminSafeToken(item.eligible || 'backers', `Decision "${out.id}" eligible`, { required: true });
+      if (!eligible.ok) return eligible;
+      out.eligible = eligible.value;
+      const status = String(item.status || 'open').trim().toLowerCase();
+      out.status = status === 'closed' ? 'closed' : 'open';
       const options = Array.isArray(item.options)
         ? item.options
         : String(item.optionsText || '').split('\n').map((line) => line.trim()).filter(Boolean);
-      out.options = options.map((option) => {
+      if (options.length > 50) return { ok: false, error: `Decision "${out.id}" can include at most 50 options.` };
+      const decisionOptions = [];
+      for (const [optionIndex, option] of options.entries()) {
         if (option && typeof option === 'object') {
-          return {
-            label: String(option.label || '').trim(),
-            image: String(option.image || '').trim()
-          };
+          const optionLabel = normalizeAdminPlainText(option.label || '', `Decision "${out.id}" option ${optionIndex + 1}`, { maxLength: 160 });
+          if (!optionLabel.ok) return optionLabel;
+          const image = normalizeAdminAssetReference(option.image || '', `Decision "${out.id}" option ${optionIndex + 1} image`);
+          if (!image.ok) return image;
+          if (optionLabel.value) decisionOptions.push(image.value ? { label: optionLabel.value, image: image.value } : optionLabel.value);
+          continue;
         }
         const [optionLabel, image] = String(option || '').split('|').map((part) => part.trim());
-        return image ? { label: optionLabel, image } : optionLabel;
-      }).filter((option) => typeof option === 'string' ? option : option.label);
+        const normalizedLabel = normalizeAdminPlainText(optionLabel, `Decision "${out.id}" option ${optionIndex + 1}`, { maxLength: 160 });
+        if (!normalizedLabel.ok) return normalizedLabel;
+        const normalizedImage = normalizeAdminAssetReference(image || '', `Decision "${out.id}" option ${optionIndex + 1} image`);
+        if (!normalizedImage.ok) return normalizedImage;
+        if (normalizedLabel.value) decisionOptions.push(normalizedImage.value ? { label: normalizedLabel.value, image: normalizedImage.value } : normalizedLabel.value);
+      }
+      out.options = decisionOptions;
       if (!out.options.length) return { ok: false, error: `Decision "${out.id}" needs at least one option.` };
       normalized.push(out);
       continue;
@@ -9597,7 +10014,7 @@ async function validateAdminSettingsChanges(request, env, body = {}, options = {
   changes.forEach((change, index) => {
     const path = String(change?.path || '').trim();
     const campaignSlug = String(change?.campaignSlug || '').trim();
-    const schema = campaignSlug
+    let schema = campaignSlug
       ? ADMIN_CAMPAIGN_SETTING_SCHEMA.get(path)
       : ADMIN_PLATFORM_SETTING_SCHEMA.get(path);
 
@@ -9607,6 +10024,10 @@ async function validateAdminSettingsChanges(request, env, body = {}, options = {
     }
     if (!campaignSlug && auth.user.role !== 'super_admin') {
       errors.push(`changes[${index}] requires super admin access.`);
+      return;
+    }
+    if (!campaignSlug && path === 'admin.users') {
+      errors.push(`changes[${index}] must be saved from the Users section.`);
       return;
     }
     if (campaignSlug) {
@@ -9619,8 +10040,7 @@ async function validateAdminSettingsChanges(request, env, body = {}, options = {
         return;
       }
     }
-
-    const normalizedValue = normalizeAdminSettingsValue(change?.value, schema);
+    const normalizedValue = normalizeAdminSettingsValue(change?.value, { ...schema, path });
     if (!normalizedValue.ok) {
       errors.push(`changes[${index}]: ${normalizedValue.error}`);
       return;
@@ -9666,7 +10086,7 @@ async function validateAdminSettingsChanges(request, env, body = {}, options = {
     changes: normalized,
     errors,
     warnings: normalized.length
-      ? Array.from(new Set(['Publishing starts a deploy. Changes may take a few minutes to appear.', ...warnings]))
+      ? Array.from(new Set(['Publishing commits changes to GitHub and starts a deploy. Changes may take a few minutes to appear.', ...warnings]))
       : []
   };
 }
@@ -9690,6 +10110,44 @@ async function handleAdminSettingsPreview(request, env, body = {}) {
   }, result.errors.length ? 422 : 200, env);
 }
 
+async function handleAdminUsersSave(request, env, body = {}) {
+  const auth = await requireAdminSession(request, env, 'settings:publish', { requireCsrf: true });
+  if (!auth.ok) return auth.response;
+  if (auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Forbidden' }, 403, env);
+  }
+
+  const { campaigns } = await getCampaigns(env);
+  const normalized = normalizeAdminUsers(body.users ?? body.value ?? [], {
+    label: 'Users',
+    availableCampaignSlugs: (campaigns || []).map((campaign) => campaign?.slug),
+    currentUserEmail: auth.user.email
+  });
+  if (!normalized.ok) {
+    return privateJsonResponse({
+      valid: false,
+      errors: [normalized.error],
+      writeBudget: adminReadBudget()
+    }, 422, env);
+  }
+
+  const saved = await saveStoredAdminUsers(env, normalized.value, { updatedBy: auth.user.email });
+  if (!saved.ok) {
+    return privateJsonResponse({ error: saved.error }, saved.status || 500, env);
+  }
+
+  return privateJsonResponse({
+    success: true,
+    users: saved.users.map((user) => ({
+      name: user.name || '',
+      email: user.email,
+      role: user.role === 'super_admin' ? 'super_admin' : 'campaign_user',
+      campaigns: user.role === 'super_admin' ? [] : (user.campaignSlugs || [])
+    })),
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 1 })
+  }, 200, env);
+}
+
 function yamlAdminValue(value, type = 'string') {
   if (type === 'boolean') return value ? 'true' : 'false';
   if (type === 'number') return Number(value).toString();
@@ -9698,6 +10156,14 @@ function yamlAdminValue(value, type = 'string') {
 
 function yamlAdminInlineObject(entry = {}) {
   return `{ ${Object.entries(entry).map(([key, value]) => `${key}: ${yamlAdminValue(value, typeof value === 'number' ? 'number' : 'string')}`).join(', ')} }`;
+}
+
+function appendAdminShippingPackageYaml(lines, shipping, indent) {
+  if (!shipping || typeof shipping !== 'object') return;
+  lines.push(`${indent}shipping:`);
+  for (const [field] of ADMIN_SHIPPING_PACKAGE_FIELDS) {
+    yamlAdminMaybeLine(lines, field, shipping[field], `${indent}  `);
+  }
 }
 
 function serializeAdminAddOnProductsYaml(products = [], indent = '  ') {
@@ -9711,6 +10177,7 @@ function serializeAdminAddOnProductsYaml(products = [], indent = '  ') {
     lines.push(`${indent}    price: ${Number(product.price).toFixed(2)}`);
     lines.push(`${indent}    category: ${yamlQuoteAdminString(product.category || 'physical')}`);
     if (product.shipping_preset) lines.push(`${indent}    shipping_preset: ${yamlQuoteAdminString(product.shipping_preset)}`);
+    appendAdminShippingPackageYaml(lines, product.shipping, `${indent}    `);
     if (product.inventory !== undefined) lines.push(`${indent}    inventory: ${Number(product.inventory)}`);
     if (product.source_url) lines.push(`${indent}    source_url: ${yamlQuoteAdminString(product.source_url)}`);
     if (product.variant_option_name) lines.push(`${indent}    variant_option_name: ${yamlQuoteAdminString(product.variant_option_name)}`);
@@ -9871,6 +10338,7 @@ function serializeAdminCampaignCollectionYaml(key, items = []) {
       yamlAdminMaybeLine(lines, 'stackable', item.stackable);
       yamlAdminMaybeLine(lines, 'category', item.category);
       yamlAdminMaybeLine(lines, 'shipping_preset', item.shipping_preset);
+      appendAdminShippingPackageYaml(lines, item.shipping, '    ');
       yamlAdminMaybeLine(lines, 'late_support', item.late_support);
       yamlAdminMaybeLine(lines, 'requires_threshold', item.requires_threshold);
       continue;
@@ -9928,6 +10396,89 @@ function applyAdminCampaignSettingsPatchToMarkdown(source, changes = []) {
   };
 }
 
+function adminUploadSlug(value, fallback = 'upload') {
+  const slug = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+  return slug || fallback;
+}
+
+function adminUploadTimestamp() {
+  return new Date().toISOString()
+    .replace(/\.\d{3}Z$/, '')
+    .replace(/[-:]/g, '')
+    .replace('T', '-');
+}
+
+function normalizeAdminUploadCampaignSlug(value) {
+  const slug = adminUploadSlug(value, '');
+  return slug && isValidSlug(slug) ? slug : '';
+}
+
+function adminUploadBaseName(body = {}, extension = '') {
+  const kind = String(body.kind || '').trim().toLowerCase();
+  const fieldPath = String(body.fieldPath || '').trim();
+  const collection = String(body.collection || '').trim();
+  const contextName = body.filenameBase || body.contextName || body.name || body.title || body.label || '';
+  const contextSlug = adminUploadSlug(contextName || body.filename || 'upload');
+  const fieldMap = new Map([
+    ['platform.logo_path', 'logo'],
+    ['platform.footer_logo_path', 'footer-logo'],
+    ['platform.favicon_path', 'favicon'],
+    ['platform.default_social_image_path', 'default-social-image'],
+    ['creator_image', 'creator'],
+    ['hero_image', 'hero-square'],
+    ['hero_image_wide', 'hero-wide'],
+    ['hero_video', 'video'],
+    ['campaign_background', 'background'],
+    ['progress_background', 'progress']
+  ]);
+  if (fieldMap.has(fieldPath)) return fieldMap.get(fieldPath);
+  if (kind === 'decision-option') return `decision-option-${contextSlug}`;
+  if (kind === 'campaign-add-on') return `add-on-${contextSlug}`;
+  if (kind === 'add-on') return `add-on-${contextSlug}`;
+  if (kind === 'campaign-item' && collection === 'tiers') return `tier-${contextSlug}`;
+  if (kind === 'campaign-item' && collection === 'support_items') return `support-${contextSlug}`;
+  if (kind === 'campaign-item' && collection === 'diary') return `diary-${contextSlug}`;
+  if (kind === 'campaign-item') return `${adminUploadSlug(collection || 'campaign')}-${contextSlug}`;
+  if (kind.includes('video') && extension === 'webm') return `video-${contextSlug}`;
+  return contextSlug;
+}
+
+function adminUploadDirectory(body = {}, options = {}) {
+  const kind = String(body.kind || '').trim().toLowerCase();
+  const contentType = String(body.contentType || '').trim().toLowerCase();
+  const campaignSlug = normalizeAdminUploadCampaignSlug(body.campaignSlug);
+  if (contentType.startsWith('video/')) {
+    return campaignSlug ? `assets/videos/campaigns/${campaignSlug}` : 'assets/videos/defaults';
+  }
+  if (kind === 'add-on') {
+    return campaignSlug ? 'assets/images/campaign-add-ons' : 'assets/images/add-ons';
+  }
+  if (kind === 'campaign-add-on') return 'assets/images/campaign-add-ons';
+  if (campaignSlug && (kind.startsWith('campaign') || kind === 'decision-option')) {
+    return `assets/images/campaigns/${campaignSlug}`;
+  }
+  if (kind === 'logo' || kind === 'admin') return 'assets/images/defaults';
+  return String(options.directory || 'assets/images/defaults').replace(/\/+$/, '');
+}
+
+function adminUploadProcessingSummary(contentType, extension) {
+  const isImage = String(contentType || '').startsWith('image/');
+  const isVideo = String(contentType || '').startsWith('video/');
+  return {
+    imageOptimization: isImage ? 'source-preserved' : 'not-image',
+    videoTranscoding: isVideo
+      ? (extension === 'webm' ? 'already-webm' : 'source-preserved')
+      : 'not-video'
+  };
+}
+
 function normalizeAdminMediaUpload(body = {}, options = {}) {
   const label = options.label || 'Media upload';
   const filename = String(body.filename || options.defaultFilename || 'upload').trim().toLowerCase();
@@ -9937,6 +10488,10 @@ function normalizeAdminMediaUpload(body = {}, options = {}) {
   const extension = allowedTypes.get(contentType);
   if (!extension) {
     return { ok: false, error: options.typeError || `${label} uses an unsupported file type.` };
+  }
+  const dataUrlMatch = content.match(/^data:([^;]+);base64,/i);
+  if (dataUrlMatch && dataUrlMatch[1].toLowerCase() !== contentType) {
+    return { ok: false, error: `${label} content type does not match the uploaded file.` };
   }
   const base64 = content.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) {
@@ -9949,20 +10504,20 @@ function normalizeAdminMediaUpload(body = {}, options = {}) {
   if (estimatedBytes > options.maxFileBytes) {
     return { ok: false, error: options.sizeError || `${label} is too large.` };
   }
-  const safeBase = filename
-    .replace(/\.[a-z0-9]+$/, '')
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48) || options.defaultFilename || 'upload';
-  const directory = String(options.directory || 'assets/images/admin').replace(/\/+$/, '');
-  const filePath = `${directory}/${safeBase}-${Date.now()}.${extension}`;
+  const uploadBaseBody = options.forceDefaultFilename
+    ? { ...body, filename, filenameBase: options.defaultFilename || filename }
+    : { ...body, filename };
+  const safeBase = adminUploadSlug(adminUploadBaseName(uploadBaseBody, extension), options.defaultFilename || 'upload');
+  const directory = adminUploadDirectory({ ...body, contentType }, options);
+  const filePath = `${directory}/${safeBase}-${adminUploadTimestamp()}.${extension}`;
   return {
     ok: true,
     base64,
     filePath,
     publicPath: `/${filePath}`,
     estimatedBytes,
-    contentType
+    contentType,
+    processing: adminUploadProcessingSummary(contentType, extension)
   };
 }
 
@@ -10003,6 +10558,7 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     commitUrl: uploaded.commitUrl,
     contentType: normalized.contentType,
     bytes: normalized.estimatedBytes,
+    processing: normalized.processing,
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
   }, 200, env);
 }
@@ -10011,7 +10567,8 @@ function handleAdminLogoUpload(request, env) {
   return handleAdminMediaUpload(request, env, {
     label: 'Logo upload',
     defaultFilename: 'logo',
-    directory: 'assets/images/admin',
+    forceDefaultFilename: true,
+    directory: 'assets/images/defaults',
     maxBodyBytes: MAX_ADMIN_LOGO_UPLOAD_BODY_BYTES,
     maxFileBytes: 512 * 1024,
     allowedTypes: new Map([
@@ -10025,11 +10582,30 @@ function handleAdminLogoUpload(request, env) {
   });
 }
 
+function handleAdminImageUpload(request, env) {
+  return handleAdminMediaUpload(request, env, {
+    label: 'Image upload',
+    defaultFilename: 'image',
+    directory: 'assets/images/defaults',
+    maxBodyBytes: MAX_ADMIN_IMAGE_UPLOAD_BODY_BYTES,
+    maxFileBytes: 8 * 1024 * 1024,
+    allowedTypes: new Map([
+      ['image/png', 'png'],
+      ['image/jpeg', 'jpg'],
+      ['image/webp', 'webp'],
+      ['image/gif', 'gif']
+    ]),
+    typeError: 'Image upload must be a PNG, JPEG, WebP, or GIF image.',
+    sizeError: 'Image upload must be 8 MB or smaller.',
+    commitLabel: 'admin image'
+  });
+}
+
 function handleAdminVideoUpload(request, env) {
   return handleAdminMediaUpload(request, env, {
     label: 'Video upload',
     defaultFilename: 'hero-video',
-    directory: 'assets/videos/admin',
+    directory: 'assets/videos/defaults',
     maxBodyBytes: MAX_ADMIN_VIDEO_UPLOAD_BODY_BYTES,
     maxFileBytes: 100 * 1024 * 1024,
     allowedTypes: new Map([
@@ -10119,7 +10695,7 @@ async function handleAdminSettingsPublish(request, env) {
     changeCount: result.changes.length,
     commits,
     rebuild,
-    deployNotice: 'Publishing starts a deploy. Changes may take a few minutes to appear.',
+    deployNotice: 'Publishing commits changes to GitHub and starts a deploy. Changes may take a few minutes to appear.',
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
   }, 200, env);
 }
@@ -10292,14 +10868,15 @@ function mapAdminAnalyticsBreakdown(map) {
 }
 
 function getAdminReferralKey(pledge = {}) {
-  return String(
+  const raw = String(
     pledge?.referralCode ||
     pledge?.referral ||
     pledge?.ref ||
     pledge?.attribution?.ref ||
     pledge?.marketing?.ref ||
     ''
-  ).trim() || 'direct';
+  ).trim();
+  return normalizeAdminReferralCode(raw) || 'direct';
 }
 
 function getAdminUtmSourceKey(pledge = {}) {
@@ -10447,6 +11024,35 @@ function mergeAdminAnalyticsBreakdowns(target, rows) {
   }
 }
 
+function adminAnalyticsHasReferralCodes(campaignAnalytics = {}) {
+  return (campaignAnalytics.referralBreakdown || []).some((row) => {
+    const code = normalizeAdminReferralCode(row?.key);
+    return code && code !== 'direct';
+  });
+}
+
+async function readAdminAnalyticsReferralLabels(env, campaignAnalytics = []) {
+  const labels = {};
+  const conflicts = new Set();
+  for (const campaign of campaignAnalytics || []) {
+    const campaignSlug = String(campaign?.slug || '').trim();
+    if (!campaignSlug || !adminAnalyticsHasReferralCodes(campaign)) continue;
+    const referrals = await readAdminMarketingReferrals(env, campaignSlug);
+    for (const row of referrals) {
+      const code = normalizeAdminReferralCode(row?.code);
+      const label = String(row?.referrer || row?.name || '').trim();
+      if (!code || !label || conflicts.has(code)) continue;
+      if (labels[code] && labels[code] !== label) {
+        delete labels[code];
+        conflicts.add(code);
+        continue;
+      }
+      labels[code] = label;
+    }
+  }
+  return labels;
+}
+
 async function handleAdminAnalytics(request, env) {
   const url = new URL(request.url);
   const requestedCampaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
@@ -10498,6 +11104,7 @@ async function handleAdminAnalytics(request, env) {
     mergeAdminAnalyticsBreakdowns(referralBreakdown, campaign.referralBreakdown);
     mergeAdminAnalyticsBreakdowns(utmSourceBreakdown, campaign.utmSourceBreakdown);
   }
+  const referralLabels = await readAdminAnalyticsReferralLabels(env, campaignAnalytics);
 
   return privateJsonResponse({
     user: auth.user,
@@ -10509,6 +11116,7 @@ async function handleAdminAnalytics(request, env) {
     statusBreakdown: mapAdminAnalyticsBreakdown(statusBreakdown),
     languageBreakdown: mapAdminAnalyticsBreakdown(languageBreakdown),
     referralBreakdown: mapAdminAnalyticsBreakdown(referralBreakdown),
+    referralLabels,
     utmSourceBreakdown: mapAdminAnalyticsBreakdown(utmSourceBreakdown),
     writeBudget: adminReadBudget(),
     generatedAt: new Date().toISOString()
@@ -10528,10 +11136,42 @@ function normalizeAdminReferralCode(value) {
     .slice(0, 64);
 }
 
+function adminMarketingReferralAllowedOrigins(env) {
+  return [env?.SITE_BASE, env?.CANONICAL_SITE_BASE]
+    .map((value) => {
+      try {
+        return value ? new URL(String(value)).origin : '';
+      } catch {
+        return '';
+      }
+    })
+    .filter(Boolean);
+}
+
+function normalizeAdminMarketingReferralUrl(value, env, campaignSlug) {
+  const raw = String(value || '').trim().slice(0, 2048);
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    const allowedOrigins = adminMarketingReferralAllowedOrigins(env);
+    if (allowedOrigins.length > 0 && !allowedOrigins.includes(url.origin)) return '';
+    const expectedPath = `/campaigns/${encodeURIComponent(campaignSlug)}/`;
+    const expectedSpanishPath = `/es/campaigns/${encodeURIComponent(campaignSlug)}/`;
+    if (url.pathname !== expectedPath && url.pathname !== expectedSpanishPath) return '';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
 function publicAdminMarketingReferral(record = {}) {
+  const referrer = String(record.referrer || record.name || '');
   return {
     code: String(record.code || ''),
-    name: String(record.name || ''),
+    name: referrer,
+    referrer,
+    url: String(record.url || ''),
     campaignSlug: String(record.campaignSlug || ''),
     createdAt: record.createdAt || null,
     updatedAt: record.updatedAt || null,
@@ -10566,17 +11206,30 @@ async function handleAdminMarketingReferralSave(request, env, body = {}) {
   if (!scoped.ok) return scoped.response;
 
   const code = normalizeAdminReferralCode(body.code);
-  const name = String(body.name || '').trim().slice(0, 120);
-  if (!code || !name) {
-    return privateJsonResponse({ error: 'Referral code and referrer name are required.' }, 400, env);
+  const originalCode = normalizeAdminReferralCode(body.originalCode);
+  const normalizedReferrer = normalizeAdminPlainText(body.referrer || body.name || '', 'Referrer name', { maxLength: 120 });
+  if (!normalizedReferrer.ok) {
+    return privateJsonResponse({ error: normalizedReferrer.error }, 400, env);
+  }
+  const referrer = normalizedReferrer.value;
+  const url = normalizeAdminMarketingReferralUrl(body.url, env, campaignSlug);
+  if (!code || !referrer || !url) {
+    return privateJsonResponse({ error: 'Referral code, referrer name, and campaign URL are required.' }, 400, env);
   }
 
   const now = new Date().toISOString();
   const referrals = await readAdminMarketingReferrals(env, campaignSlug);
-  const existingIndex = referrals.findIndex((row) => row.code === code);
+  const originalIndex = originalCode ? referrals.findIndex((row) => row.code === originalCode) : -1;
+  const codeIndex = referrals.findIndex((row) => row.code === code);
+  if (originalIndex >= 0 && codeIndex >= 0 && codeIndex !== originalIndex) {
+    return privateJsonResponse({ error: 'That referral code is already saved for this campaign.' }, 409, env);
+  }
+  const existingIndex = originalIndex >= 0 ? originalIndex : codeIndex;
   const nextRecord = {
     code,
-    name,
+    name: referrer,
+    referrer,
+    url,
     campaignSlug,
     createdAt: existingIndex >= 0 ? referrals[existingIndex].createdAt || now : now,
     updatedAt: now,
@@ -10587,7 +11240,7 @@ async function handleAdminMarketingReferralSave(request, env, body = {}) {
   } else {
     referrals.unshift(nextRecord);
   }
-  referrals.sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
+  referrals.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   await env.PLEDGES.put(adminMarketingReferralKey(campaignSlug), JSON.stringify(referrals.map(publicAdminMarketingReferral)));
 
   return privateJsonResponse({
@@ -10595,6 +11248,35 @@ async function handleAdminMarketingReferralSave(request, env, body = {}) {
     campaignSlug,
     referral: publicAdminMarketingReferral(nextRecord),
     referrals: referrals.map(publicAdminMarketingReferral)
+  }, 200, env);
+}
+
+async function handleAdminMarketingReferralDelete(request, env, body = {}) {
+  const campaignSlug = String(body.campaignSlug || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'marketing:send', { requireCsrf: true });
+  if (!scoped.ok) return scoped.response;
+
+  const code = normalizeAdminReferralCode(body.code);
+  if (!code) {
+    return privateJsonResponse({ error: 'Referral code is required.' }, 400, env);
+  }
+
+  const referrals = await readAdminMarketingReferrals(env, campaignSlug);
+  const nextReferrals = referrals.filter((row) => row.code !== code);
+  if (nextReferrals.length === referrals.length) {
+    return privateJsonResponse({ error: 'Referral code not found.' }, 404, env);
+  }
+  if (nextReferrals.length === 0) {
+    await env.PLEDGES.delete(adminMarketingReferralKey(campaignSlug));
+  } else {
+    await env.PLEDGES.put(adminMarketingReferralKey(campaignSlug), JSON.stringify(nextReferrals.map(publicAdminMarketingReferral)));
+  }
+
+  return privateJsonResponse({
+    user: scoped.auth.user,
+    campaignSlug,
+    deletedCode: code,
+    referrals: nextReferrals.map(publicAdminMarketingReferral)
   }, 200, env);
 }
 
@@ -10609,8 +11291,11 @@ const ADMIN_CONTENT_ALLOWED_BLOCK_TYPES = new Set([
   'quote'
 ]);
 const ADMIN_CONTENT_ALLOWED_EMBED_PROVIDERS = new Set(['spotify', 'youtube', 'vimeo']);
+const ADMIN_CONTENT_ALLOWED_VIDEO_PROVIDERS = new Set(['youtube', 'vimeo', 'local']);
 const ADMIN_CONTENT_ALLOWED_INLINE_TAGS = new Set(['b', 'br', 'em', 'i', 'strong', 'u']);
 const ADMIN_CONTENT_ALLOWED_ALIGNMENTS = new Set(['left', 'center', 'right', 'justify']);
+const ADMIN_CONTENT_ALLOWED_GALLERY_LAYOUTS = new Set(['grid', 'carousel']);
+const ADMIN_CONTENT_ALLOWED_GALLERY_CAPTION_STYLES = new Set(['inline', 'overlay']);
 const ADMIN_CONTENT_MAX_TEXT_LENGTH = 8000;
 const ADMIN_CONTENT_MAX_BLOCKS = 40;
 const ADMIN_CONTENT_MAX_GALLERY_IMAGES = 12;
@@ -10629,31 +11314,14 @@ function escapeAdminPreviewAttribute(value) {
 }
 
 function sanitizeAdminRichText(value, errors, fieldName) {
-  const text = String(value ?? '');
-  if (text.length > ADMIN_CONTENT_MAX_TEXT_LENGTH) {
-    errors.push(`${fieldName} is too long.`);
-  }
-  if (/\bstyle\s*=\s*["']/i.test(text)) {
-    errors.push(`${fieldName} includes inline style attributes, which are not allowed.`);
-  }
-  if (/<script\b/i.test(text)) {
-    errors.push(`${fieldName} includes raw <script> HTML, which is not allowed.`);
-  }
-  const inlineEvents = text.match(/\son[a-z]+\s*=\s*["']/ig) || [];
-  for (const match of inlineEvents) {
-    errors.push(`${fieldName} includes an inline event handler (${match.trim()}).`);
-  }
-  if (/<iframe\b/i.test(text)) {
-    errors.push(`${fieldName} includes raw <iframe> HTML, which is not allowed.`);
-  }
-
-  return text.replace(/<\s*\/?\s*([a-z0-9]+)(?:\s[^>]*)?>/ig, (match, tagName) => {
+  const normalized = collectAdminRichTextErrors(value, fieldName, { maxLength: ADMIN_CONTENT_MAX_TEXT_LENGTH });
+  errors.push(...normalized.errors);
+  return normalized.text.replace(/<\s*\/?\s*([a-z0-9]+)(?:\s[^>]*)?>/ig, (match, tagName) => {
     const tag = String(tagName || '').toLowerCase();
     if (ADMIN_CONTENT_ALLOWED_INLINE_TAGS.has(tag)) {
       const closing = /^<\s*\//.test(match) ? '/' : '';
       return `__POOL_INLINE_${closing}${tag}__`;
     }
-    errors.push(`${fieldName} includes raw <${tag}> HTML; use Markdown or approved content blocks instead.`);
     return '';
   });
 }
@@ -10676,7 +11344,8 @@ function restoreAdminPreviewInlineTags(value) {
 function isAdminPreviewAllowedLink(href) {
   const normalized = String(href || '').trim();
   if (!normalized) return false;
-  if (normalized.startsWith('#') || normalized.startsWith('/') || normalized.startsWith('?') || normalized.startsWith('./') || normalized.startsWith('../')) {
+  if (normalized.startsWith('../')) return false;
+  if (normalized.startsWith('#') || normalized.startsWith('/') || normalized.startsWith('?') || normalized.startsWith('./')) {
     return true;
   }
   try {
@@ -10772,8 +11441,60 @@ function normalizeAdminContentAlignment(value) {
   return ADMIN_CONTENT_ALLOWED_ALIGNMENTS.has(align) ? align : 'left';
 }
 
+function normalizeAdminContentGalleryLayout(value) {
+  const layout = String(value || '').trim().toLowerCase();
+  return ADMIN_CONTENT_ALLOWED_GALLERY_LAYOUTS.has(layout) ? layout : 'grid';
+}
+
+function normalizeAdminContentGalleryCaptionStyle(value) {
+  const style = String(value || '').trim().toLowerCase();
+  return ADMIN_CONTENT_ALLOWED_GALLERY_CAPTION_STYLES.has(style) ? style : 'inline';
+}
+
+function normalizeAdminContentVideoProvider(value) {
+  const provider = String(value || '').trim().toLowerCase();
+  return ADMIN_CONTENT_ALLOWED_VIDEO_PROVIDERS.has(provider) ? provider : 'youtube';
+}
+
+function adminContentVideoType(src) {
+  const path = String(src || '');
+  if (/\.webm(?:[?#].*)?$/i.test(path)) return 'video/webm';
+  if (/\.mp4(?:[?#].*)?$/i.test(path)) return 'video/mp4';
+  if (/\.mov(?:[?#].*)?$/i.test(path)) return 'video/quicktime';
+  return '';
+}
+
 function adminContentAlignClass(block) {
   return ` admin-content-preview__block--align-${normalizeAdminContentAlignment(block?.align)}`;
+}
+
+function normalizeAdminContentRichText(value, fieldName, errors, { required = false, maxLength = ADMIN_CONTENT_MAX_TEXT_LENGTH } = {}) {
+  const normalized = normalizeAdminRichTextStorageValue(value, fieldName, { required, maxLength });
+  if (!normalized.ok) {
+    errors.push(normalized.error);
+    return stripAdminControlCharacters(value, { allowNewlines: true }).trim();
+  }
+  return normalized.value;
+}
+
+function normalizeAdminContentPlainText(value, fieldName, errors, { required = false, maxLength = 500 } = {}) {
+  const normalized = normalizeAdminPlainText(value, fieldName, { maxLength });
+  if (!normalized.ok) {
+    errors.push(normalized.error);
+    return stripAdminControlCharacters(value).trim();
+  }
+  if (required && !normalized.value) errors.push(`${fieldName} is required.`);
+  return normalized.value;
+}
+
+function normalizeAdminContentAsset(value, fieldName, errors, { required = false } = {}) {
+  const normalized = normalizeAdminAssetReference(value, fieldName);
+  if (!normalized.ok) {
+    errors.push(normalized.error);
+    return stripAdminControlCharacters(value).trim();
+  }
+  if (required && !normalized.value) errors.push(`${fieldName} is required.`);
+  return normalized.value;
 }
 
 function isApprovedAdminEmbedSrc(provider, src) {
@@ -10809,31 +11530,44 @@ function validateAdminContentBlock(block, index, errors, warnings) {
   }
 
   if (type === 'text') {
-    if (!String(block.body || '').trim()) errors.push(`${path}.body is required.`);
-    return { type, body: String(block.body || ''), align: normalizeAdminContentAlignment(block.align) };
+    return {
+      type,
+      body: normalizeAdminContentRichText(block.body || '', `${path}.body`, errors, { required: true }),
+      align: normalizeAdminContentAlignment(block.align)
+    };
   }
 
   if (type === 'video') {
     const provider = String(block.provider || '').trim().toLowerCase();
-    if (!['youtube', 'vimeo'].includes(provider)) errors.push(`${path}.provider must be youtube or vimeo.`);
-    if (!String(block.video_id || '').trim()) errors.push(`${path}.video_id is required.`);
+    if (!ADMIN_CONTENT_ALLOWED_VIDEO_PROVIDERS.has(provider)) errors.push(`${path}.provider must be youtube, vimeo, or local.`);
+    const normalizedProvider = normalizeAdminContentVideoProvider(provider);
+    const videoId = normalizedProvider === 'local' ? '' : stripAdminControlCharacters(block.video_id || '').trim();
+    if (normalizedProvider !== 'local' && !videoId) errors.push(`${path}.video_id is required.`);
+    if (videoId && !/^[A-Za-z0-9_-]{3,128}$/.test(videoId)) errors.push(`${path}.video_id contains unsafe characters.`);
+    const src = normalizedProvider === 'local'
+      ? normalizeAdminContentAsset(block.src || '', `${path}.src`, errors, { required: true })
+      : '';
+    const poster = normalizedProvider === 'local' && block.poster
+      ? normalizeAdminContentAsset(block.poster || '', `${path}.poster`, errors)
+      : '';
     return {
       type,
-      provider,
-      video_id: String(block.video_id || '').trim(),
-      caption: String(block.caption || ''),
+      provider: normalizedProvider,
+      ...(normalizedProvider === 'local' ? { src, ...(poster ? { poster } : {}) } : { video_id: videoId }),
+      caption: normalizeAdminContentRichText(block.caption || '', `${path}.caption`, errors, { maxLength: 1000 }),
       align: normalizeAdminContentAlignment(block.align)
     };
   }
 
   if (type === 'image') {
-    if (!String(block.src || '').trim()) errors.push(`${path}.src is required.`);
-    if (!String(block.alt || '').trim()) warnings.push(`${path}.alt should describe the image.`);
+    const src = normalizeAdminContentAsset(block.src || '', `${path}.src`, errors, { required: true });
+    const alt = normalizeAdminContentPlainText(block.alt || '', `${path}.alt`, errors, { maxLength: 300 });
+    if (!alt.trim()) warnings.push(`${path}.alt should describe the image.`);
     return {
       type,
-      src: String(block.src || '').trim(),
-      alt: String(block.alt || ''),
-      caption: String(block.caption || ''),
+      src,
+      alt,
+      caption: normalizeAdminContentRichText(block.caption || '', `${path}.caption`, errors, { maxLength: 1000 }),
       align: normalizeAdminContentAlignment(block.align)
     };
   }
@@ -10844,25 +11578,28 @@ function validateAdminContentBlock(block, index, errors, warnings) {
     if (Array.isArray(block.images) && block.images.length > ADMIN_CONTENT_MAX_GALLERY_IMAGES) warnings.push(`${path}.images was limited to ${ADMIN_CONTENT_MAX_GALLERY_IMAGES} images for preview.`);
     return {
       type,
-      layout: String(block.layout || 'grid').trim() || 'grid',
+      layout: normalizeAdminContentGalleryLayout(block.layout),
+      caption_style: normalizeAdminContentGalleryCaptionStyle(block.caption_style),
       images: images.map((image, imageIndex) => ({
-        src: String(image?.src || '').trim(),
-        alt: String(image?.alt || ''),
+        src: normalizeAdminContentAsset(image?.src || '', `${path}.images[${imageIndex}].src`, errors, { required: true }),
+        alt: normalizeAdminContentPlainText(image?.alt || '', `${path}.images[${imageIndex}].alt`, errors, { maxLength: 300 }),
+        caption: normalizeAdminContentRichText(image?.caption || '', `${path}.images[${imageIndex}].caption`, errors, { maxLength: 1000 }),
         _fieldName: `${path}.images[${imageIndex}]`
       })),
-      caption: String(block.caption || ''),
+      caption: normalizeAdminContentRichText(block.caption || '', `${path}.caption`, errors, { maxLength: 1000 }),
       align: normalizeAdminContentAlignment(block.align)
     };
   }
 
   if (type === 'audio') {
-    if (!String(block.src || '').trim()) errors.push(`${path}.src is required.`);
-    if (!String(block.title || '').trim()) warnings.push(`${path}.title helps make audio previews accessible.`);
+    const src = normalizeAdminContentAsset(block.src || '', `${path}.src`, errors, { required: true });
+    const title = normalizeAdminContentPlainText(block.title || '', `${path}.title`, errors, { maxLength: 200 });
+    if (!title.trim()) warnings.push(`${path}.title helps make audio previews accessible.`);
     return {
       type,
-      src: String(block.src || '').trim(),
-      title: String(block.title || ''),
-      caption: String(block.caption || ''),
+      src,
+      title,
+      caption: normalizeAdminContentRichText(block.caption || '', `${path}.caption`, errors, { maxLength: 1000 }),
       align: normalizeAdminContentAlignment(block.align)
     };
   }
@@ -10879,18 +11616,17 @@ function validateAdminContentBlock(block, index, errors, warnings) {
       type,
       provider,
       src: String(block.src || '').trim(),
-      title: String(block.title || ''),
-      caption: String(block.caption || ''),
+      title: normalizeAdminContentPlainText(block.title || '', `${path}.title`, errors, { maxLength: 200 }),
+      caption: normalizeAdminContentRichText(block.caption || '', `${path}.caption`, errors, { maxLength: 1000 }),
       align: normalizeAdminContentAlignment(block.align)
     };
   }
 
   if (type === 'quote') {
-    if (!String(block.text || '').trim()) errors.push(`${path}.text is required.`);
     return {
       type,
-      text: String(block.text || ''),
-      author: String(block.author || ''),
+      text: normalizeAdminContentRichText(block.text || '', `${path}.text`, errors, { required: true }),
+      author: normalizeAdminContentPlainText(block.author || '', `${path}.author`, errors, { maxLength: 200 }),
       align: normalizeAdminContentAlignment(block.align)
     };
   }
@@ -10908,7 +11644,14 @@ function renderAdminContentBlock(block, index, errors) {
 
   if (block.type === 'video') {
     const title = block.caption || `${block.provider} video`;
-    const provider = block.provider === 'vimeo' ? 'vimeo' : 'youtube';
+    const provider = normalizeAdminContentVideoProvider(block.provider);
+    if (provider === 'local') {
+      const type = adminContentVideoType(block.src);
+      const typeAttr = type ? ` type="${escapeAdminPreviewAttribute(type)}"` : '';
+      const posterAttr = block.poster ? ` poster="${escapeAdminPreviewAttribute(block.poster)}"` : '';
+      const firstFrameAttr = block.poster ? '' : ' data-first-frame-poster="true"';
+      return `<figure class="admin-content-preview__block admin-content-preview__block--video${adminContentAlignClass(block)}"><div class="video-embed video-embed--local"><video controls preload="none" playsinline${posterAttr}${firstFrameAttr}><source src="${escapeAdminPreviewAttribute(block.src)}"${typeAttr}>Video not supported.</video></div>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+    }
     const src = provider === 'vimeo'
       ? `https://player.vimeo.com/video/${encodeURIComponent(block.video_id)}?dnt=1`
       : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(block.video_id)}`;
@@ -10923,8 +11666,17 @@ function renderAdminContentBlock(block, index, errors) {
   }
 
   if (block.type === 'gallery') {
-    const images = block.images.map((image) => `<img src="${escapeAdminPreviewAttribute(image.src)}" alt="${escapeAdminPreviewAttribute(image.alt)}">`).join('');
-    return `<figure class="admin-content-preview__block admin-content-preview__block--gallery${adminContentAlignClass(block)}"><div class="admin-content-preview__gallery">${images}</div>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+    const layout = normalizeAdminContentGalleryLayout(block.layout);
+    const captionStyle = normalizeAdminContentGalleryCaptionStyle(block.caption_style);
+    const containerAttrs = layout === 'carousel' ? ' tabindex="0" aria-label="Image gallery"' : '';
+    const images = block.images.map((image, imageIndex) => {
+      const itemAttrs = captionStyle === 'overlay' && image.caption ? ' tabindex="0"' : '';
+      const caption = image.caption
+        ? `<span class="gallery__item-caption"><span class="gallery__item-caption-text">${renderAdminPreviewInlineMarkdown(image.caption, errors, `${path}.images[${imageIndex}].caption`)}</span></span>`
+        : '';
+      return `<div class="gallery__item"${itemAttrs}><img src="${escapeAdminPreviewAttribute(image.src)}" alt="${escapeAdminPreviewAttribute(image.alt)}">${caption}</div>`;
+    }).join('');
+    return `<figure class="admin-content-preview__block admin-content-preview__block--gallery gallery--${layout} gallery--caption-${captionStyle}${adminContentAlignClass(block)}"><div class="gallery__container"${containerAttrs}>${images}</div>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
   }
 
   if (block.type === 'audio') {
@@ -11103,18 +11855,27 @@ function serializeAdminContentBlockToYaml(block = {}) {
     lines.push(`    body: ${yamlBlockAdminString(block.body, '      ')}`);
   } else if (block.type === 'video') {
     lines.push(`    provider: ${yamlQuoteAdminString(block.provider || '')}`);
-    lines.push(`    video_id: ${yamlQuoteAdminString(block.video_id || '')}`);
+    if (normalizeAdminContentVideoProvider(block.provider) === 'local') {
+      lines.push(`    src: ${yamlQuoteAdminString(block.src || '')}`);
+      yamlAdminOptionalScalar(lines, 'poster', block.poster, '    ');
+    } else {
+      lines.push(`    video_id: ${yamlQuoteAdminString(block.video_id || '')}`);
+    }
     yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
   } else if (block.type === 'image') {
     lines.push(`    src: ${yamlQuoteAdminString(block.src || '')}`);
     lines.push(`    alt: ${yamlQuoteAdminString(block.alt || '')}`);
     yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
   } else if (block.type === 'gallery') {
-    yamlAdminOptionalScalar(lines, 'layout', block.layout || 'grid', '    ');
+    const layout = normalizeAdminContentGalleryLayout(block.layout);
+    const captionStyle = normalizeAdminContentGalleryCaptionStyle(block.caption_style);
+    yamlAdminOptionalScalar(lines, 'layout', layout, '    ');
+    if (captionStyle !== 'inline') yamlAdminOptionalScalar(lines, 'caption_style', captionStyle, '    ');
     lines.push('    images:');
     for (const image of block.images || []) {
       lines.push(`      - src: ${yamlQuoteAdminString(image.src || '')}`);
       lines.push(`        alt: ${yamlQuoteAdminString(image.alt || '')}`);
+      yamlAdminOptionalScalar(lines, 'caption', image.caption, '        ');
     }
     yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
   } else if (block.type === 'audio') {
@@ -11559,7 +12320,7 @@ function csvResponse(csv, filename, env = null) {
       'Cache-Control': PRIVATE_NO_STORE_CACHE_CONTROL,
       'Access-Control-Allow-Origin': getAllowedOrigin(env, false),
       'Access-Control-Allow-Credentials': 'true',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key, x-pool-admin-csrf',
       'Access-Control-Expose-Headers': 'Content-Disposition',
       ...SECURITY_HEADERS
@@ -12337,7 +13098,7 @@ function jsonResponse(data, status = 200, env = null, isPublic = false, extraHea
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key, x-pool-admin-csrf',
       ...credentialHeaders,
       ...extraHeaders,
@@ -12367,7 +13128,7 @@ function corsResponse(env = null, isPublic = false) {
   return new Response(null, {
     headers: {
       'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key, x-pool-admin-csrf',
       ...credentialHeaders,
       ...SECURITY_HEADERS

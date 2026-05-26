@@ -13,7 +13,7 @@
       {% elsif block.src contains '.mov' %}
         {% assign video_type = 'video/quicktime' %}
       {% endif %}
-      <video controls preload="metadata" playsinline{% if block.poster %} poster="{{ block.poster | escape }}"{% endif %}>
+      <video controls preload="none" playsinline{% if block.poster %} poster="{{ block.poster | escape }}"{% else %} data-first-frame-poster="true"{% endif %}>
         <source src="{{ block.src | escape }}" type="{{ video_type }}">
         {% include t.html key="misc.video_not_supported" %}
       </video>

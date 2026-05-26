@@ -11,7 +11,7 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
-El hito de lanzamiento actual de la plataforma es **v0.9.4**. Dust Wave reserva **v1.0** para el lanzamiento público más amplio una vez que se completen los elementos restantes de la hoja de ruta.
+El hito de lanzamiento actual de la plataforma es **v1.0.0 release candidate**. El conjunto de funciones de v1.0 ya está en su lugar; el endurecimiento final se centra en protección contra bots para el inicio de sesión del panel de administración y una verificación final de lanzamiento.
 
 ## Aportes de todo o nada
 
@@ -43,58 +43,60 @@ Para el acceso a la comunidad de patrocinadores, The Pool mantiene la sesión ve
 
 ## Entonces, ¿cómo funciona exactamente?
 
-1. **Explora**: encuentra un proyecto que quieras apoyar
-2. **Aporta**: añade una o más campañas a tu carrito, añade opcionalmente una propina del 0% al 15% para el mantenimiento de la plataforma y continúa al paso de pago seguro de The Pool con Stripe. Las recompensas físicas pueden añadir envío calculado por el sistema durante el pago, incluidas cotizaciones respaldadas por USPS, tarifas de respaldo configuradas u opciones de envío gratis cuando una implementación las habilita. Algunas implementaciones también pueden mostrar un selector limitado de opción de entrega para mejoras nacionales con firma.
-   También puedes ver complementos opcionales de la plataforma. Esos complementos apoyan directamente a Dust Wave, no cuentan para la meta de financiación de una campaña y pueden ser digitales o físicos. Cuando su inventario es limitado, el stock refleja los aportes guardados, no los carritos en curso.
-   Algunas campañas también pueden ofrecer complementos de campaña. Esos complementos usan la misma interfaz de tarjetas de complementos, pero sí cuentan para el total de financiación de esa campaña y siguen las reglas de envío de esa campaña.
-3. **Guarda la tarjeta**: Stripe guarda de forma segura tu método de pago dentro de ese flujo (todavía no se realiza ningún cobro)
-4. **Espera**: la campaña continúa hasta su fecha límite (todas las horas están en horario de montaña)
-5. **Resultado**: si una campaña se financia, se cobra tu aporte para esa campaña. Si no, no pasa nada.
+1. **Explora**: encuentra una campaña que quieras ayudar a hacer realidad.
+2. **Arma tu aporte**: añade una o más campañas a tu carrito, elige recompensas o add-ons si quieres, y decide si quieres incluir una propina opcional para la plataforma. Si tu aporte incluye artículos físicos, el checkout muestra envío e impuestos cuando tiene suficiente información para calcularlos.
+3. **Guarda tu método de pago**: ingresa los datos de pago mediante Stripe. La tarjeta se guarda de forma segura, pero no se cobra cuando haces el aporte.
+4. **Sigue la campaña**: la campaña queda abierta hasta su fecha límite, mostrada en la zona horaria configurada para el sitio.
+5. **Mira el resultado**: si la campaña alcanza su meta, tu aporte se cobra después de que termine. Si no alcanza su meta, no se te cobra.
 
-Los múltiples aportes desde el mismo correo se combinan en un único cobro cuando la misma campaña tiene éxito. Las propinas opcionales para la plataforma y los complementos de la plataforma van a Dust Wave para ayudar a mantener The Pool y no cuentan para la meta de financiación del proyecto.
+Algunos checkouts pueden incluir add-ons de plataforma, add-ons de campaña, mejoras de entrega, tarifas de envío, impuestos o una propina opcional para la plataforma. El checkout explica qué cuenta para la meta de la campaña y qué apoya a la plataforma por separado.
+
+Los múltiples aportes desde el mismo correo se combinan en un único cobro cuando la misma campaña tiene éxito. Las propinas opcionales y los add-ons de plataforma apoyan al equipo que opera la plataforma y no cuentan para la meta de financiación del proyecto.
 
 ## Para creadores
 
-La plataforma está diseñada para cineastas y otras personas creativas, con funciones como:
+La plataforma está diseñada para cineastas y equipos creativos que necesitan una campaña que puedan operar sin mandar a sus patrocinadores por un laberinto de cuentas, plugins o herramientas desconectadas.
 
-- **0% de comisión de plataforma para organizadores**: los patrocinadores pueden añadir opcionalmente una propina del 0% al 15% para ayudar a sostener la plataforma sin reducir los fondos de la campaña
-- **Pago de primera parte**: The Pool controla el carrito, los sidecars de pago y el flujo de revisión del aporte, mientras Stripe gestiona de forma segura los datos del pago
-- **Niveles físicos y digitales**: ofrece recompensas tangibles con captura de dirección de envío durante el pago, soporte para cotizaciones respaldadas por USPS, controles de política de envío de respaldo o gratuito, mejoras limitadas de opción de entrega e impuesto sobre ventas configurable
-- **Complementos opcionales de la plataforma**: ofrece un pequeño catálogo global de merch junto con los aportes de campaña, con inventario por variante, avisos de poco stock basados en aportes guardados y soporte de envío para complementos físicos
-- **Complementos opcionales de campaña**: permite que una campaña ofrezca merch propio mediante la misma interfaz de complementos en carrito y Gestionar aporte, mientras ese merch sigue contando para el subtotal de la campaña y usa sus reglas de envío
-- **Informes para responsables de campaña**: envía libros diarios de aportes por campaña mientras la campaña está activa y exportaciones de cumplimiento después de la fecha límite, separando también los artículos cumplidos por la plataforma cuando haga falta, para que quienes organizan puedan seguir el apoyo y la entrega sin depender de paneles con cuenta
-- **Widgets de campaña en vivo para incrustar**: ofrece a quienes organizan campañas un generador alojado que produce código `iframe` para copiar y pegar y así compartir el progreso en vivo en otros sitios
-- **Fases de producción**: divide tu presupuesto en fases que los patrocinadores puedan financiar directamente
-- **Metas ampliadas**: desbloquea posibilidades creativas adicionales a medida que crece la financiación
-- **Decisiones comunitarias**: permite que tus patrocinadores voten sobre decisiones creativas publicadas
-- **Diario de producción**: mantén a tu comunidad implicada con actualizaciones
-- **Apoyo continuo**: acepta contribuciones después de que tu campaña principal termine
-- **Acceso sin cuenta para patrocinadores**: los patrocinadores gestionan aportes y se unen a páginas exclusivas de la comunidad mediante enlaces mágicos por correo, en lugar de crear cuentas
-- **Flujos para patrocinadores listos para varios idiomas**: las cadenas compartidas de la interfaz, las páginas de resultado del aporte, `/manage/`, las rutas de la comunidad de patrocinadores y los correos para patrocinadores pueden seguir el modelo de idioma configurado para la implementación, con inglés como base y otros idiomas añadidos mediante configuración más contenido traducido
-- **Contenido enriquecido más seguro**: el texto de campaña y las entradas del diario admiten Markdown e incrustaciones aprobadas, mientras que el HTML sin procesar inseguro y los esquemas peligrosos de enlaces o incrustaciones se bloquean al renderizarse
-- **Interfaz con accesibilidad como base**: diálogos, pestañas, deslizadores, flujos de comunidad y acciones públicas de campaña compatibles con teclado forman parte de la base de la plataforma, con comprobaciones automatizadas de accesibilidad sobre páginas públicas críticas, estados de resultado del aporte y flujos de pago
+- **Sin comisión de plataforma para organizadores**: los fondos de campaña se quedan con el proyecto. Los patrocinadores pueden elegir una propina opcional del 0% al 15% para sostener The Pool sin reducir el financiamiento de la campaña.
+- **Checkout de aportes integrado**: los patrocinadores aportan mediante el carrito y la revisión de The Pool, mientras Stripe gestiona de forma segura los datos de pago para cualquier cobro posterior de la campaña.
+- **Niveles de recompensa que se adaptan al proyecto**: ofrece niveles digitales o físicos, recoge datos de envío cuando haga falta, define límites de cantidad y usa las reglas de impuestos y envío configuradas para la campaña.
+- **Add-ons opcionales de plataforma**: ofrece merch de plataforma junto con los aportes cuando esté habilitado, con inventario y envío separados que no cuentan para la meta de financiación de la campaña.
+- **Add-ons de campaña**: vende merch o extras específicos de la campaña en el mismo flujo de aporte, manteniendo ingresos, inventario y envío ligados a esa campaña.
+- **Panel privado de administración**: da a personas de confianza un espacio enfocado para ajustes de campaña, contenido de página, recompensas, actualizaciones, decisiones, reportes, patrocinadores, analytics y enlaces de marketing.
+- **Reportes cuando los necesites**: previsualiza y descarga CSVs de aportes o fulfillment desde el panel, con correos opcionales para responsables de campaña mientras la campaña está activa.
+- **Embeds para promoción**: genera widgets vivos de campaña para sitios aliados, páginas de prensa, portfolios de creadores o páginas de patrocinadores.
+- **Fases de producción**: muestra a los patrocinadores qué partes del presupuesto pueden ayudar a financiar.
+- **Metas ampliadas**: haz visibles hitos creativos adicionales a medida que crece el apoyo.
+- **Decisiones comunitarias**: invita a los patrocinadores a votar sobre decisiones creativas seleccionadas.
+- **Diario de producción**: comparte actualizaciones que mantienen a la comunidad implicada desde el lanzamiento hasta el fulfillment.
+- **Apoyo continuo**: sigue aceptando apoyo después de la campaña principal cuando la campaña esté configurada para ello.
+- **Acceso sin cuenta para patrocinadores**: los patrocinadores gestionan aportes y visitan páginas exclusivas mediante enlaces seguros por correo, sin crear otra contraseña.
+- **Flujos para varios idiomas**: empieza con inglés y añade páginas, correos, contenido de campaña y pantallas de gestión traducidas cuando una implementación necesite más idiomas.
+- **Contenido enriquecido más seguro**: escribe páginas de campaña y entradas de diario con Markdown e incrustaciones aprobadas, con HTML inseguro y enlaces peligrosos bloqueados al renderizar.
+- **Experiencia pensada para accesibilidad**: páginas de campaña, checkout, diálogos, pestañas, deslizadores y flujos de patrocinadores se construyen y prueban para uso con teclado y lectores de pantalla.
 
 ## La tecnología
 
-The Pool se apoya en una arquitectura estática moderna:
+The Pool es una plataforma de crowdfunding con arquitectura static-first. Las páginas públicas se generan con anticipación, mientras el trabajo confiable de servidor queda detrás de Cloudflare Workers para precios, aportes, acceso administrativo, datos de fulfillment y liquidación.
 
-| Capa | Plataforma | Función |
-|-------|----------|------|
-| Frontend | [GitHub Pages](https://docs.github.com/en/pages) | Sitio estático con Jekyll |
-| Carrito | The Pool | Carrito propio, sidecars de pago y revisión del aporte |
-| Pagos | [Stripe](https://stripe.com) | Campos de pago seguros, tarjetas guardadas y cobros fuera de sesión |
-| Backend | [Cloudflare Workers](https://workers.cloudflare.com) | Precios canónicos, almacenamiento de aportes, estadísticas en vivo, datos de cumplimiento y liquidación |
-| Correo | [Resend](https://resend.com) | Confirmaciones, actualizaciones y notificaciones |
+| Área | Qué lo ejecuta | Por qué importa para forks |
+|------|----------------|----------------------------|
+| Sitio público | [GitHub Pages](https://docs.github.com/en/pages) y Jekyll | Las páginas de campaña, docs, contenido traducido y metadatos públicos siguen siendo fáciles de alojar y revisar en Git. |
+| Experiencia de aporte | Runtime de carrito de The Pool | El carrito, selección de recompensas, add-ons, revisión del aporte y gestión por enlaces mágicos siguen siendo de primera parte. |
+| Pagos | [Stripe](https://stripe.com) | Stripe controla los campos sensibles de pago, métodos guardados y cobros posteriores. |
+| Backend | [Cloudflare Workers](https://workers.cloudflare.com) y KV | El Worker valida totales, guarda aportes, sirve estadísticas en vivo, alimenta APIs del panel y maneja estado de fulfillment/liquidación. |
+| Panel de administración | Panel privado de The Pool | Las personas autorizadas pueden gestionar campañas, contenido, reportes, patrocinadores, analytics, enlaces de marketing, add-ons y usuarios sin editar archivos directamente. |
+| Correo | [Resend](https://resend.com) | Confirmaciones, enlaces de patrocinador, actualizaciones de campaña y avisos de cobro usan una sola ruta de correo transaccional. |
 
-La plataforma está construida sobre servicios que ofrecen niveles gratuitos, y The Pool fue diseñado desde el principio para funcionar eficazmente dentro de esos niveles gratuitos siempre que sea posible.
+El stack está pensado para equipos pequeños y forks. Cada servicio principal ofrece un nivel gratuito, y la plataforma evita trabajo dinámico innecesario siempre que puede. Las páginas públicas de campaña son estáticas, los datos públicos en vivo se combinan y se cachean en el navegador, y el Worker se reserva para operaciones que necesitan confianza del servidor.
 
-Para los forks, eso significa que las páginas estáticas permanecen en GitHub Pages, las lecturas públicas en vivo se combinan de forma agresiva y se cachean en el navegador, y la mayor parte del uso de Cloudflare Workers se reserva para las partes del ciclo de vida del aporte que son sensibles desde el punto de vista de la seguridad, mientras que la configuración de impuestos, envío, SEO y logging se mantiene reflejada o acotada mediante la configuración para que la interfaz local, el pago, los informes y los correos se mantengan alineados.
+El panel de administración sigue la misma disciplina de costes. Navegación, filtros, vistas previas, analytics, reportes y borradores locales evitan escrituras a KV. Las escrituras durables ocurren solo cuando una persona administradora guarda estado propio del panel o publica cambios de campaña/plataforma.
 
-Los forks también pueden adaptar mediante configuración el sitio público, el estilo del pago en el propio sitio y los correos para patrocinadores sin cambiar la mecánica subyacente del aporte. El objetivo es permitir que creadoras, creadores o estudios ajusten la presentación manteniendo constante el modelo de financiación de todo o nada y el flujo de acceso para patrocinadores.
+La personalización se controla principalmente por configuración. Impuestos, envío, SEO, localización, logging, identidad de correo, ajustes del panel, branding público, estilo del checkout y presentación de correos para patrocinadores se mantienen alineados por config para que un fork pueda cambiar la presentación sin reescribir el modelo de aportes.
 
-Esa arquitectura también deja margen para endurecer la accesibilidad sin sacrificar el modelo de seguridad de la plataforma: los flujos de carrito, pago y gestión usan semántica reforzada para diálogos, foco, teclado y regiones en vivo, mientras Stripe sigue siendo el dueño de los campos sensibles de pago dentro de su interfaz segura.
+Para desarrolladores, los límites son intencionalmente claros: el contenido estático pertenece al sitio, los cálculos confiables de aportes pertenecen al Worker, los datos de pago pertenecen a Stripe, el correo transaccional pertenece a Resend y las operaciones por rol pertenecen al panel de administración.
 
-La parte pública también está pensada para ser rastreable sin exponer el acceso exclusivo para patrocinadores: las páginas públicas y las páginas de campaña emiten metadatos coherentes y datos estructurados conservadores, mientras que las páginas privadas con enlaces mágicos, como Gestionar aporte y los flujos de comunidad para patrocinadores, quedan fuera de la indexación de búsqueda.
+La misma arquitectura permite trabajar accesibilidad y SEO sin debilitar la seguridad. Las páginas públicas emiten metadatos rastreables y datos estructurados conservadores, mientras que las páginas privadas con enlaces mágicos, como Gestionar aporte, las comunidades de patrocinadores y el panel de administración, quedan fuera de la indexación de búsqueda. Los flujos de checkout y gestión añaden comportamiento de teclado, foco, diálogos, regiones en vivo y landmarks alrededor de la UI segura de Stripe en lugar de reemplazarla.
 
 ## Código abierto
 

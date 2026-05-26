@@ -168,7 +168,7 @@
             </div>
           {% else %}
             <div class="hero__video-wrapper" id="hero-video-wrapper" role="group" aria-label="{% include t.html key='campaign.video_embed_title' lang=current_lang title=page.title %}" aria-busy="false">
-              <video class="hero__video" id="hero-video" controls preload="metadata" playsinline poster="{% if page.hero_image_wide %}{{ page.hero_image_wide }}{% else %}{{ page.hero_image }}{% endif %}">
+              <video class="hero__video" id="hero-video" controls preload="none" playsinline poster="{% if page.hero_image_wide %}{{ page.hero_image_wide }}{% else %}{{ page.hero_image }}{% endif %}">
                 <source src="{{ page.hero_video }}" type="video/webm">
                 {% include t.html key="misc.video_not_supported" lang=current_lang %}
               </video>
@@ -296,6 +296,7 @@
   {% include cart-foot.html %}
   <script src="/assets/js/live-stats.js"></script>
   <script src="/assets/js/campaign.js"></script>
+  <script src="/assets/js/video-first-frame-poster.js" defer></script>
   <script
     src="/assets/js/campaign-page.js"
     defer

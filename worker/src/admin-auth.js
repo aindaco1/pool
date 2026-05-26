@@ -1,6 +1,7 @@
 import { getAllowedOrigin, isValidEmail, SECURITY_HEADERS } from './validation.js';
 
 export const ADMIN_SESSION_COOKIE = 'pool_admin_session';
+export const ADMIN_USERS_KV_KEY = 'admin-users:v1';
 
 const ADMIN_LOGIN_TTL_SECONDS = 15 * 60;
 const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60;
@@ -13,7 +14,7 @@ function privateAdminJsonResponse(data, status = 200, env = null, extraHeaders =
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Credentials': 'true',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key, x-pool-admin-csrf',
       'Cache-Control': 'private, no-store, max-age=0',
       ...extraHeaders,
@@ -31,11 +32,94 @@ function normalizeLang(lang) {
   return value === 'es' ? 'es' : 'en';
 }
 
-function getBootstrapEmails(env) {
+export function getAdminBootstrapEmails(env) {
   return String(env?.ADMIN_BOOTSTRAP_EMAILS || '')
     .split(',')
     .map(normalizeEmail)
     .filter(Boolean);
+}
+
+function normalizeAdminCampaignSlugs(value) {
+  const source = Array.isArray(value)
+    ? value
+    : String(value || '').split(',');
+  return Array.from(new Set(source
+    .map((campaignSlug) => String(campaignSlug || '').trim())
+    .filter(Boolean)));
+}
+
+function normalizeConfiguredAdminUser(user, source = 'config') {
+  if (!user || typeof user !== 'object' || Array.isArray(user)) return null;
+  const email = normalizeEmail(user.email);
+  if (!isValidEmail(email)) return null;
+  const role = String(user.role || '').trim() === 'super_admin' ? 'super_admin' : 'campaign_user';
+  const campaignSource = user.campaignSlugs ?? user.campaigns ?? user.campaign_slugs ?? [];
+  return {
+    name: String(user.name || '').trim(),
+    email,
+    role,
+    campaignSlugs: role === 'super_admin' ? [] : normalizeAdminCampaignSlugs(campaignSource),
+    source
+  };
+}
+
+export function getConfiguredAdminUsers(env) {
+  const raw = String(env?.ADMIN_USERS_JSON || '').trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeConfiguredAdminUser).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+export async function getStoredAdminUsers(env) {
+  if (!env?.PLEDGES) return null;
+  const stored = await env.PLEDGES.get(ADMIN_USERS_KV_KEY, { type: 'json' });
+  if (!stored) return null;
+  const users = Array.isArray(stored) ? stored : stored.users;
+  if (!Array.isArray(users)) return null;
+  const normalized = users.map((user) => normalizeConfiguredAdminUser(user, 'kv')).filter(Boolean);
+  return normalized.length ? normalized : null;
+}
+
+export async function getEffectiveAdminUsers(env) {
+  const storedUsers = await getStoredAdminUsers(env);
+  if (storedUsers?.length) return storedUsers;
+
+  const configuredUsers = getConfiguredAdminUsers(env);
+  if (configuredUsers.length) return configuredUsers;
+
+  return getAdminBootstrapEmails(env).map((email) => ({
+    name: '',
+    email,
+    role: 'super_admin',
+    campaignSlugs: [],
+    source: 'bootstrap'
+  }));
+}
+
+export async function saveStoredAdminUsers(env, users = [], meta = {}) {
+  if (!env?.PLEDGES) {
+    return { ok: false, status: 503, error: 'Admin user storage unavailable' };
+  }
+  const normalized = (Array.isArray(users) ? users : [])
+    .map((user) => normalizeConfiguredAdminUser(user, 'kv'))
+    .filter(Boolean)
+    .map((user) => ({
+      name: user.name || '',
+      email: user.email,
+      role: user.role,
+      campaignSlugs: user.role === 'super_admin' ? [] : user.campaignSlugs
+    }));
+  await env.PLEDGES.put(ADMIN_USERS_KV_KEY, JSON.stringify({
+    users: normalized,
+    updatedAt: new Date().toISOString(),
+    updatedBy: normalizeEmail(meta.updatedBy)
+  }));
+  return { ok: true, users: normalized };
 }
 
 function getAdminSecret(env) {
@@ -211,6 +295,36 @@ async function resolveAdminUser(env, email) {
   const normalizedEmail = normalizeEmail(email);
   if (!isValidEmail(normalizedEmail)) return null;
 
+  const storedUsers = await getStoredAdminUsers(env);
+  if (storedUsers?.length) {
+    const storedUser = storedUsers.find((user) => user.email === normalizedEmail);
+    if (storedUser) return storedUser;
+    if (getAdminBootstrapEmails(env).includes(normalizedEmail)) {
+      return {
+        email: normalizedEmail,
+        role: 'super_admin',
+        campaignSlugs: [],
+        source: 'bootstrap'
+      };
+    }
+    return null;
+  }
+
+  const configuredUsers = getConfiguredAdminUsers(env);
+  if (configuredUsers.length) {
+    const configuredUser = configuredUsers.find((user) => user.email === normalizedEmail);
+    if (configuredUser) return configuredUser;
+    if (getAdminBootstrapEmails(env).includes(normalizedEmail)) {
+      return {
+        email: normalizedEmail,
+        role: 'super_admin',
+        campaignSlugs: [],
+        source: 'bootstrap'
+      };
+    }
+    return null;
+  }
+
   const storedUser = await getStoredAdminUser(env, normalizedEmail);
   if (storedUser?.email) {
     return {
@@ -221,7 +335,7 @@ async function resolveAdminUser(env, email) {
     };
   }
 
-  if (getBootstrapEmails(env).includes(normalizedEmail)) {
+  if (getAdminBootstrapEmails(env).includes(normalizedEmail)) {
     return {
       email: normalizedEmail,
       role: 'super_admin',
@@ -241,22 +355,39 @@ function publicUser(user) {
   };
 }
 
+function safeAdminEmailHeaderText(value) {
+  return String(value ?? '')
+    .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function escapeAdminEmailHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function sendAdminLoginEmail(env, { email, loginUrl, lang }) {
   if (!env?.RESEND_API_KEY) {
     return { sent: false, reason: 'RESEND_API_KEY not configured' };
   }
 
-  const platformName = env.PLATFORM_NAME || 'The Pool';
-  const from = env.UPDATES_EMAIL_FROM || env.PLEDGES_EMAIL_FROM || `${platformName} <updates@example.com>`;
+  const platformName = safeAdminEmailHeaderText(env.PLATFORM_NAME || 'The Pool') || 'The Pool';
+  const from = safeAdminEmailHeaderText(env.UPDATES_EMAIL_FROM || env.PLEDGES_EMAIL_FROM || `${platformName} <updates@example.com>`);
   const isSpanish = normalizeLang(lang) === 'es';
-  const subject = isSpanish
+  const subject = safeAdminEmailHeaderText(isSpanish
     ? `Tu enlace de administración | ${platformName}`
-    : `Your admin sign-in link | ${platformName}`;
+    : `Your admin sign-in link | ${platformName}`);
   const heading = isSpanish ? 'Inicia sesión en administración' : 'Sign in to admin';
   const body = isSpanish
     ? 'Este enlace caduca en 15 minutos. Si no lo solicitaste, puedes ignorar este correo.'
     : 'This link expires in 15 minutes. If you did not request it, you can ignore this email.';
   const cta = isSpanish ? 'Abrir administración' : 'Open admin';
+  const html = `<h1>${escapeAdminEmailHtml(heading)}</h1><p>${escapeAdminEmailHtml(body)}</p><p><a href="${escapeAdminEmailHtml(loginUrl)}">${escapeAdminEmailHtml(cta)}</a></p>`;
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -268,7 +399,7 @@ async function sendAdminLoginEmail(env, { email, loginUrl, lang }) {
       from,
       to: email,
       subject,
-      html: `<h1>${heading}</h1><p>${body}</p><p><a href="${loginUrl}">${cta}</a></p>`
+      html
     })
   });
 
@@ -442,7 +573,7 @@ export function adminCorsResponse(env = null) {
     headers: {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Credentials': 'true',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-key, x-pool-admin-csrf',
       ...SECURITY_HEADERS
     }

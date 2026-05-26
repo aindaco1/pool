@@ -1,6 +1,6 @@
 # The Pool - Pledge Worker
 
-Cloudflare Worker handling first-party checkout canonicalization, Stripe integration, pledge management, and order-scoped supporter authentication.
+Cloudflare Worker handling first-party checkout canonicalization, Stripe integration, pledge management, order-scoped supporter authentication, and the private browser admin dashboard APIs.
 
 For day-to-day local development, prefer the repo-root Podman path:
 
@@ -23,6 +23,7 @@ Campaign-runner report delivery follows that same pattern:
 - deployment-wide timing and email/report behavior live in `_config.yml` under `reports.campaign_runner`
 - the Worker mirror carries those non-secret settings into `wrangler.toml`
 - the shared report core in `worker/src/reports.js` now powers both scheduled runner emails and the local shell export helpers so CSV logic stays in one place
+- the browser dashboard Reports tab previews and downloads pledge/fulfillment CSVs without sending email or writing sent markers
 
 The mirrored Worker config now also includes the shared debug flags:
 
@@ -117,9 +118,10 @@ wrangler secret put ADMIN_SECRET
 
 # Browser admin sessions and bootstrap access
 wrangler secret put ADMIN_SESSION_SECRET
-# Local dev defaults ADMIN_BOOTSTRAP_EMAILS to alonso@dustwave.xyz.
-# Override ADMIN_BOOTSTRAP_EMAILS as a comma-separated env var in Worker secrets,
-# wrangler.toml, or worker/.dev.vars for other environments.
+# _config.yml admin.users seeds ADMIN_USERS_JSON; dashboard user edits save to
+# the PLEDGES KV key admin-users:v1 and do not publish to GitHub.
+# Local dev also defaults ADMIN_BOOTSTRAP_EMAILS to alonso@dustwave.xyz as a
+# recovery/bootstrap super-admin path.
 
 # USPS OAuth secret (keep the client id in site config)
 wrangler secret put USPS_CLIENT_SECRET
@@ -249,6 +251,7 @@ This is the Worker-side endpoint that powers [`scripts/check-projections.sh`](..
 - Markdown links are rewritten unless they use an allowlisted destination scheme (`http:`, `https:`, `mailto:`, or internal links).
 - External Markdown links automatically get `target="_blank"` and `rel="noopener noreferrer"`.
 - Structured embeds only render when the provider URL is an approved `https://` Spotify, YouTube, or Vimeo embed URL.
+- Local video blocks may include an optional poster image; without one, browser UI generates a first-frame poster from the same-origin video asset without changing the stored block.
 
 ### POST /pledge/payment-method/start
 Start a Stripe session to update payment method.
@@ -311,6 +314,11 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `GET /admin/session` reads the current session without refreshing or writing it
 - `POST /admin/logout` clears the session
 - `GET /admin/dashboard/summary` reads role-scoped campaign summaries
+- `GET /admin/settings` reads a role-scoped settings/config snapshot for the dashboard
+- `POST /admin/settings/preview` validates settings changes without publishing
+- `POST /admin/settings/logo-upload`, `POST /admin/settings/image-upload`, and `POST /admin/settings/video-upload` stage dashboard uploads through the same GitHub-backed publish path as their owning settings/content fields
+- `POST /admin/settings/publish` validates and publishes platform settings, platform add-ons, campaign variables, and campaign structured data through GitHub-backed commits
+- `POST /admin/users` saves dashboard-managed admin users directly to `admin-users:v1` in Worker KV
 - `GET /admin/analytics` reads role-scoped pledge-derived revenue, status, language, referral, and campaign/platform split metrics without writing analytics state
 - `GET /admin/content/campaign?campaignSlug=...` loads role-scoped campaign content into the browser editor without persisting a draft
 - `POST /admin/content/preview` validates and renders role-scoped campaign content drafts without publishing, auditing, or writing KV
@@ -320,12 +328,15 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `GET /admin/reports/campaign-runner.csv?campaignSlug=...&reportType=pledge|fulfillment` downloads the same shared report CSV without sending email or writing markers
 - `GET /admin/marketing/referrals?campaignSlug=...` lists saved campaign referral codes without writing or scanning pledge truth
 - `POST /admin/marketing/referrals` explicitly saves or updates a campaign referral code with CSRF protection and one campaign-scoped KV write
+- `DELETE /admin/marketing/referrals` explicitly deletes a saved campaign referral code with CSRF protection and one campaign-scoped KV write
 - `GET /admin/add-ons/inventory` reads platform add-on baseline, sold, remaining, and override state for super admins
 - `POST /admin/add-ons/inventory` explicitly sets, restocks, or resets platform add-on inventory baseline overrides with CSRF protection and audit logging
 
-Normal dashboard reads, supporter filters, pagination, pledge-derived analytics, marketing referral lists, report previews, CSV downloads, content loads, and content previews are designed to add zero KV writes and zero KV list operations. Browser-initiated marketing referral saves, content publishes, and inventory changes are explicit mutations: referral saves write one campaign-scoped referral list, content publishes commit to GitHub, trigger the rebuild workflow, and write one audit event. If an older campaign is missing its `campaign-pledges:{slug}` projection, the dashboard endpoints return `campaign_index_required` instead of falling back to a namespace scan; run the existing projection repair/rebuild tools explicitly when that happens.
+Normal dashboard reads, supporter filters, pagination, pledge-derived analytics, marketing referral lists, report previews, CSV downloads, content loads, content previews, and local editor drafts are designed to add zero KV writes and zero KV list operations. Browser-initiated user saves, marketing referral saves, content publishes, and inventory changes are explicit mutations: user saves write `admin-users:v1`, referral saves write one campaign-scoped referral list, content publishes commit to GitHub, trigger the rebuild workflow, and write one audit event. If an older campaign is missing its `campaign-pledges:{slug}` projection, the dashboard endpoints return zero rows or `campaign_index_required` instead of falling back to a namespace scan; run the existing projection repair/rebuild tools explicitly when that happens.
 
 Admin auth starts/exchanges and browser-admin mutations are rate limited through the `RATELIMIT` binding and return private/no-store failures when throttled. Normal authenticated reads such as session checks, dashboard summaries, supporter filters, report previews, analytics views, and content previews are intentionally not KV-rate-limited. Magic-link login tokens are one-time use, and session reads do not refresh near-expiry sessions or clean up expired sessions on the read path. Cookie-backed admin mutations require both the session CSRF token and a trusted same-site `Origin`/`Referer` or non-cross-site fetch context before durable writes.
+
+The v1.0 release-hardening roadmap includes adding Cloudflare Turnstile or equivalent CAPTCHA/challenge validation to `POST /admin/auth/start` before sending magic-link email. Keep that protection on the submit path only so it does not add dashboard pageview or typing-time KV writes.
 
 Platform add-on inventory uses `_config.yml` as the configured baseline, optional `add-on-inventory-overrides` KV state for operator restocks, and saved pledge truth for sold counts. Admin inventory page views do not load the inventory table automatically; the super-admin inventory read is explicit and may scan pledge truth, while set/restock/reset actions write only the override state plus an audit event.
 
@@ -499,6 +510,11 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `DEFAULT_PLATFORM_TIP_PERCENT` | Default platform tip percent mirrored from `pricing.default_tip_percent` |
 | `MAX_PLATFORM_TIP_PERCENT` | Max platform tip percent mirrored from `pricing.max_tip_percent` |
 | `APP_MODE` | `"test"` or `"live"` - determines which API keys to use |
+| `CORS_ALLOWED_ORIGIN` | Browser origin allowed to call the Worker from the dashboard/site |
+| `ADMIN_SESSION_SECRET` | Secret used for browser admin session cookies |
+| `ADMIN_BOOTSTRAP_EMAILS` | Optional bootstrap/recovery super-admin emails, mostly for local dev and recovery |
+| `ADMIN_USERS_JSON` | Seed/recovery admin users mirrored from `_config.yml`; runtime dashboard edits save to KV at `admin-users:v1` |
+| `ADMIN_TEST_CAMPAIGNS` | Optional comma-separated campaign slugs exposed to the local admin dashboard test setup |
 | `RESEND_RATE_LIMIT_DELAY` | Delay between emails in ms (default: 600ms to stay under Resend's 2 req/sec limit) |
 
 When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email images still fall back to the public `https://pool.dustwave.xyz` asset base so inbox clients do not receive broken localhost image URLs.
@@ -559,6 +575,8 @@ The `dev` environment:
 - Uses `STRIPE_SECRET_KEY_TEST`
 - Points `SITE_BASE` to localhost
 - Sets `CORS_ALLOWED_ORIGIN` to the local Jekyll origin
+- Mirrors `_config.yml` `admin.users` into `ADMIN_USERS_JSON` as the seed/recovery user list
+- Saves dashboard user-management edits directly to the PLEDGES KV key `admin-users:v1`
 - Allows `alonso@dustwave.xyz` as a local bootstrap super admin
 - Uses `hand-relations` and `smoke-editable` as the default `/test/setup` campaigns
 

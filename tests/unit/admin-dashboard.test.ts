@@ -274,12 +274,17 @@ describe('admin dashboard foundation', () => {
     const adminPage = readRepoFile('admin.md');
     const spanishAdminPage = readRepoFile('es', 'admin', 'index.html');
     const layout = readRepoFile('_layouts', 'admin.html');
+    const embedBuilder = readRepoFile('_includes', 'campaign-embed-builder.html');
+    const adminFieldLabel = readRepoFile('_includes', 'admin-field-label.html');
     const csp = readRepoFile('_includes', 'first-party-admin-csp.html');
     const campaignsApi = readRepoFile('api', 'campaigns.json');
     const mainScss = readRepoFile('assets', 'main.scss');
+    const adminScss = readRepoFile('assets', 'partials', '_admin.scss');
     const adminScript = readRepoFile('assets', 'js', 'admin-dashboard.js');
 
     expect(config).toContain('admin:');
+    expect(config).toContain('users:');
+    expect(config).toContain('email: alonso@dustwave.xyz');
     expect(config).toContain('production_site_url: "https://pool.dustwave.xyz"');
     expect(config).toContain('production_worker_url: "https://pledge.dustwave.xyz"');
     expect(config).toContain('admin_production_site_url: "https://pool.dustwave.xyz"');
@@ -289,8 +294,13 @@ describe('admin dashboard foundation', () => {
     expect(robots).toContain('Disallow: /admin/');
     expect(robots).toContain('Disallow: /es/admin/');
     expect(adminPage).toContain('layout: admin');
+    expect(adminPage).toContain('indexable: false');
+    expect(adminPage).toContain('sitemap: false');
     expect(spanishAdminPage).toContain('layout: admin');
+    expect(spanishAdminPage).toContain('indexable: false');
+    expect(spanishAdminPage).toContain('sitemap: false');
     expect(layout).toContain('indexable=false');
+    expect(layout).toContain('social=false');
     expect(layout).toContain('href="#main-content"');
     expect(layout).toContain('<main id="main-content"');
     expect(layout).toContain('data-admin-dashboard-script="true"');
@@ -302,8 +312,12 @@ describe('admin dashboard foundation', () => {
     expect(layout).toContain('data-admin-tab="campaigns"');
     expect(layout).not.toContain('data-admin-tab="content"');
     expect(layout).toContain('data-admin-tab="addons"');
-    expect(layout.indexOf('data-admin-tab="settings"')).toBeLessThan(layout.indexOf('data-admin-tab="campaigns"'));
-    expect(layout.indexOf('data-admin-tab="campaigns"')).toBeLessThan(layout.indexOf('data-admin-tab="addons"'));
+    expect(layout.indexOf('data-admin-tab="settings"')).toBeLessThan(layout.indexOf('data-admin-tab="addons"'));
+    expect(layout.indexOf('data-admin-tab="addons"')).toBeLessThan(layout.indexOf('data-admin-tab="campaigns"'));
+    expect(layout.indexOf('data-admin-tab="campaigns"')).toBeLessThan(layout.indexOf('data-admin-tab="analytics"'));
+    expect(layout.indexOf('data-admin-tab="analytics"')).toBeLessThan(layout.indexOf('data-admin-tab="reports"'));
+    expect(layout.indexOf('data-admin-tab="reports"')).toBeLessThan(layout.indexOf('data-admin-tab="supporters"'));
+    expect(layout.indexOf('data-admin-tab="supporters"')).toBeLessThan(layout.indexOf('data-admin-tab="marketing"'));
     expect(layout).toContain('id="admin-settings-results"');
     expect(layout).toContain('id="admin-campaign-tabs"');
     expect(layout).toContain('id="admin-campaign-settings-results"');
@@ -314,11 +328,46 @@ describe('admin dashboard foundation', () => {
     expect(layout).not.toContain('id="admin-inventory-section"');
     expect(layout).not.toContain('id="admin-inventory-load"');
     expect(layout).toContain('id="admin-marketing-builder"');
+    expect(layout).toContain('for="admin-marketing-campaign" label_key="admin.campaign_label" help_key="admin.marketing_help_campaign" help_id="admin-marketing-help-campaign" lang=current_lang required=true');
+    expect(layout).toContain('id="admin-marketing-campaign" class="admin-settings__input" name="campaignSlug" required');
     expect(layout).toContain('id="admin-marketing-referrer"');
+    expect(layout).toContain('id="admin-marketing-referrer" class="admin-settings__input" name="referrer" type="text" autocomplete="name" inputmode="text" required');
+    expect(layout).toContain('id="admin-marketing-ref" class="admin-settings__input admin-settings__input--readonly"');
+    expect(layout).toContain('id="admin-marketing-ref" class="admin-settings__input admin-settings__input--readonly" name="ref" type="text" autocomplete="off" inputmode="text" readonly');
     expect(layout).toContain('id="admin-marketing-save-referral"');
+    expect(layout).toContain('id="admin-marketing-cancel-edit"');
+    expect(layout).not.toContain('id="admin-marketing-embed-link"');
     expect(layout).toContain('id="admin-marketing-url"');
+    expect(layout).toContain('id="admin-marketing-help-campaign"');
+    expect(layout).toContain('id="admin-marketing-help-source"');
+    expect(layout).toContain('id="admin-marketing-help-medium"');
+    expect(layout).toContain('id="admin-marketing-help-content"');
+    expect(layout).toContain('id="admin-marketing-help-ref"');
+    expect(layout).toContain('id="admin-marketing-help-referrer"');
+    expect(layout).toContain('id="admin-marketing-help-url"');
+    expect(adminFieldLabel).toContain('<div class="admin-settings__label">');
+    expect(adminFieldLabel).toContain('<label for="{{ include.for }}">');
+    expect(adminFieldLabel).not.toMatch(/<label\b[^>]*>[\s\S]*?<button\b[\s\S]*?<\/label>/);
     expect(layout).toContain('id="admin-marketing-snippets"');
     expect(layout).toContain('id="admin-marketing-referrals"');
+    expect(layout).toContain('campaign-embed-builder.html');
+    expect(layout).toContain('autoload="false"');
+    expect(layout).toContain('sync_query="false"');
+    expect(layout).toContain('admin_marketing=true');
+    expect(embedBuilder).toContain('data-admin-marketing-embed="true"');
+    expect(embedBuilder).toContain('data-campaign-embed-autoload="{{ embed_autoload }}"');
+    expect(embedBuilder).toContain('data-campaign-embed-sync-query="{{ embed_sync_query }}"');
+    expect(layout).toContain('/assets/js/campaign-embed.js');
+    expect(layout.indexOf('id="admin-marketing-campaign"')).toBeLessThan(layout.indexOf('id="admin-marketing-referrer"'));
+    expect(layout.indexOf('id="admin-marketing-referrer"')).toBeLessThan(layout.indexOf('id="admin-marketing-ref"'));
+    expect(layout.indexOf('id="admin-marketing-ref"')).toBeLessThan(layout.indexOf('id="admin-marketing-source"'));
+    expect(layout.indexOf('id="admin-marketing-source"')).toBeLessThan(layout.indexOf('id="admin-marketing-medium"'));
+    expect(layout.indexOf('id="admin-marketing-medium"')).toBeLessThan(layout.indexOf('id="admin-marketing-content"'));
+    expect(layout.indexOf('id="admin-marketing-content"')).toBeLessThan(layout.indexOf('id="admin-marketing-url"'));
+    expect(layout.indexOf('id="admin-marketing-save-referral"')).toBeLessThan(layout.indexOf('id="admin-marketing-status"'));
+    expect(layout.indexOf('id="admin-marketing-status"')).toBeLessThan(layout.indexOf('id="admin-marketing-referrals"'));
+    expect(layout.indexOf('id="admin-marketing-referrals"')).toBeLessThan(layout.indexOf('id="admin-marketing-snippets"'));
+    expect(layout.indexOf('id="admin-marketing-snippets"')).toBeLessThan(layout.indexOf('campaign-embed-builder.html'));
     expect(layout).toContain('id="admin-analytics-campaign"');
     expect(layout).not.toContain('id="admin-analytics-load"');
     expect(layout).toContain('id="admin-analytics-results"');
@@ -332,16 +381,30 @@ describe('admin dashboard foundation', () => {
     expect(layout).toContain('id="admin-content-publish"');
     expect(layout).toContain('sandbox="allow-scripts allow-popups allow-presentation"');
     expect(csp).toContain("frame-src 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain('https://www.youtube-nocookie.com');
     expect(csp).toContain('{{ site.platform.worker_url }}');
     expect(csp).toContain("media-src 'self' https: blob:");
     expect(campaignsApi).toContain('"decisions": {{ campaign.decisions | default: empty | jsonify }}');
     expect(mainScss).toContain('@import "partials/admin";');
+    expect(adminScss).toContain('@media (max-width: 1100px)');
+    expect(adminScss).toContain('.admin-tabs__list');
+    expect(adminScss).toContain('overflow-x: auto;');
+    expect(adminScss).toContain('.admin-mobile-tab-select');
+    expect(adminScss).toContain('@media (max-width: 899px)');
+    expect(adminScss).toContain('display: grid;');
+    expect(adminScss).toContain('.admin-content-block.is-active .admin-content-block__chrome');
+    expect(adminScss).toContain('.admin-settings__field-grid--count-5');
+    expect(adminScss).toContain('repeat(auto-fit, minmax(8rem, 1fr))');
     expect(adminScript).toContain('pool-admin-marketing-builder');
+    expect(adminScript).toContain('syncMobileTabSelect');
+    expect(adminScript).toContain('filenameBase');
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");
     expect(adminScript).toContain('/admin/marketing/referrals');
     expect(adminScript).toContain('/admin/analytics');
     expect(adminScript).toContain('/admin/settings');
+    expect(adminScript).toContain('admin-settings__users-editor');
+    expect(adminScript).toContain('data-admin-user-card');
     expect(adminScript).toContain('/admin/content/preview');
     expect(adminScript).toContain('/admin/content/publish');
     expect(adminScript).toContain('pool-admin-content-draft:');
@@ -353,6 +416,28 @@ describe('admin dashboard foundation', () => {
 
     expect(enAdminKeys.length).toBeGreaterThan(20);
     expect(esAdminKeys).toEqual(enAdminKeys);
+  });
+
+  it('keeps visible Spanish admin navigation labels translated', () => {
+    const spanishAdminCatalog = readRepoFile('_data', 'i18n', 'es.yml');
+
+    expect(spanishAdminCatalog).toContain('overview_title: "Panel de control"');
+    expect(spanishAdminCatalog).toContain('marketing_title: "Promoción"');
+  });
+
+  it('keeps admin dashboard runtime translation keys in the admin catalog', () => {
+    const enAdminKeys = new Set(extractTwoSpaceKeys(extractTopLevelYamlBlock(readRepoFile('_data', 'i18n', 'en.yml'), 'admin')));
+    const adminScript = readRepoFile('assets', 'js', 'admin-dashboard.js');
+    const directKeys = Array.from(adminScript.matchAll(/\bt\(\s*['"]([^'"]+)['"]/g), (match) => match[1])
+      .filter((key) => !key.endsWith('_'));
+
+    expect(directKeys.filter((key) => !enAdminKeys.has(key))).toEqual([]);
+    expect(enAdminKeys.has('settings_field_platform_name_label')).toBe(true);
+    expect(enAdminKeys.has('settings_readonly_stripe_secret_key_help')).toBe(true);
+    expect(enAdminKeys.has('campaign_field_short_blurb_help')).toBe(true);
+    expect(enAdminKeys.has('campaign_readonly_state_label')).toBe(true);
+    expect(adminScript).toContain("scope === 'campaign' ? 'campaign_field_' : 'settings_field_'");
+    expect(adminScript).toContain("scope === 'campaign' ? 'campaign_readonly_' : 'settings_readonly_'");
   });
 
   it('exposes campaign content blocks to the admin content loader', () => {
@@ -417,6 +502,221 @@ describe('admin dashboard foundation', () => {
     expect((env.RATELIMIT as CountingKVNamespace).listCalls).toBe(0);
   });
 
+  it('authorizes admin users from mirrored config', async () => {
+    const env = {
+      ...createEnv(),
+      ADMIN_BOOTSTRAP_EMAILS: '',
+      ADMIN_USERS_JSON: JSON.stringify([{
+        name: 'Admin Person',
+        email: 'admin@example.com',
+        role: 'super_admin',
+        campaignSlugs: []
+      }, {
+        name: 'Creator Person',
+        email: 'creator@example.com',
+        role: 'campaign_user',
+        campaignSlugs: ['hand-relations']
+      }])
+    };
+
+    const campaignSession = await signInAdmin(env, 'creator@example.com');
+    expect(campaignSession.response.status).toBe(200);
+    const sessionResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/session', {
+      method: 'GET',
+      headers: { Cookie: campaignSession.cookie }
+    }), env, campaignSession.ctx);
+    expect(sessionResponse.status).toBe(200);
+    const body = await sessionResponse.json();
+    expect(body.user).toMatchObject({
+      email: 'creator@example.com',
+      role: 'campaign_user',
+      campaignSlugs: ['hand-relations']
+    });
+  });
+
+  it('prefers saved admin users from KV over mirrored config', async () => {
+    const env = {
+      ...createEnv(),
+      ADMIN_BOOTSTRAP_EMAILS: '',
+      ADMIN_USERS_JSON: JSON.stringify([{
+        name: 'Admin Person',
+        email: 'admin@example.com',
+        role: 'super_admin',
+        campaignSlugs: []
+      }])
+    };
+    (env.PLEDGES as CountingKVNamespace).store.set('admin-users:v1', JSON.stringify({
+      users: [{
+        name: 'Creator Person',
+        email: 'creator@example.com',
+        role: 'campaign_user',
+        campaigns: ['hand-relations']
+      }]
+    }));
+
+    const campaignSession = await signInAdmin(env, 'creator@example.com');
+    expect(campaignSession.response.status).toBe(200);
+    const sessionResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/session', {
+      method: 'GET',
+      headers: { Cookie: campaignSession.cookie }
+    }), env, campaignSession.ctx);
+    expect(sessionResponse.status).toBe(200);
+    const body = await sessionResponse.json();
+    expect(body.user).toMatchObject({
+      email: 'creator@example.com',
+      role: 'campaign_user',
+      campaignSlugs: ['hand-relations']
+    });
+  });
+
+  it('saves admin user changes to KV and protects the current super admin', async () => {
+    const env = createEnv();
+    const { cookie, ctx, csrfToken } = await signInAdmin(env);
+
+    async function saveUsers(users: unknown[]) {
+      return worker.fetch(new Request('https://pledge.pool.test/admin/users', {
+        method: 'POST',
+        headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+        body: JSON.stringify({ users })
+      }), env, ctx);
+    }
+
+    const deletedSelf = await saveUsers([{
+      name: 'Other Admin',
+      email: 'other-admin@example.com',
+      role: 'super_admin',
+      campaigns: []
+    }]);
+    expect(deletedSelf.status).toBe(422);
+    await expect(deletedSelf.json()).resolves.toMatchObject({
+      errors: [expect.stringContaining('Your account must stay a super admin')]
+    });
+
+    const demotedSelf = await saveUsers([{
+      name: 'Admin Person',
+      email: 'admin@example.com',
+      role: 'campaign_user',
+      campaigns: ['hand-relations']
+    }, {
+      name: 'Other Admin',
+      email: 'other-admin@example.com',
+      role: 'super_admin',
+      campaigns: []
+    }]);
+    expect(demotedSelf.status).toBe(422);
+    await expect(demotedSelf.json()).resolves.toMatchObject({
+      errors: [expect.stringContaining('Your account must stay a super admin')]
+    });
+
+    resetKvCounters(env);
+    const demotedOtherAdmin = await saveUsers([{
+      name: 'Admin Person',
+      email: 'admin@example.com',
+      role: 'super_admin',
+      campaigns: []
+    }, {
+      name: 'Other Admin',
+      email: 'other-admin@example.com',
+      role: 'campaign_user',
+      campaigns: ['hand-relations']
+    }]);
+    expect(demotedOtherAdmin.status).toBe(200);
+    await expect(demotedOtherAdmin.json()).resolves.toMatchObject({
+      success: true,
+      writeBudget: { readOnly: false, kvWritesExpected: 1 },
+      users: expect.arrayContaining([
+        expect.objectContaining({ email: 'other-admin@example.com', role: 'campaign_user', campaigns: ['hand-relations'] })
+      ])
+    });
+    expect((env.PLEDGES as CountingKVNamespace).putCalls).toBe(1);
+    const savedUsers = JSON.parse((env.PLEDGES as CountingKVNamespace).store.get('admin-users:v1') || '{}');
+    expect(savedUsers).toMatchObject({
+      updatedBy: 'admin@example.com',
+      users: expect.arrayContaining([
+        expect.objectContaining({ email: 'admin@example.com', role: 'super_admin' }),
+        expect.objectContaining({ email: 'other-admin@example.com', role: 'campaign_user', campaignSlugs: ['hand-relations'] })
+      ])
+    });
+
+    (env.RATELIMIT as CountingKVNamespace).store.clear();
+    const deletedOtherUser = await saveUsers([{
+      name: 'Admin Person',
+      email: 'admin@example.com',
+      role: 'super_admin',
+      campaigns: []
+    }]);
+    expect(deletedOtherUser.status).toBe(200);
+  });
+
+  it('keeps admin users out of GitHub-backed settings publishing', async () => {
+    const env = createEnv();
+    const { cookie, ctx } = await signInAdmin(env);
+    resetKvCounters(env);
+
+    const previewResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/preview', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        changes: [{
+          path: 'admin.users',
+          value: JSON.stringify([{
+            name: 'Admin Person',
+            email: 'admin@example.com',
+            role: 'super_admin',
+            campaigns: []
+          }])
+        }]
+      })
+    }), env, ctx);
+
+    expect(previewResponse.status).toBe(422);
+    await expect(previewResponse.json()).resolves.toMatchObject({
+      errors: [expect.stringContaining('saved from the Users section')]
+    });
+    expectNoKvWritesOrLists(env, 'admin users settings preview rejection');
+  });
+
+  it('rejects unsafe admin setting values before they can be published', async () => {
+    const env = createEnv();
+    const { cookie, ctx } = await signInAdmin(env);
+    resetKvCounters(env);
+
+    const previewResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/preview', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        changes: [
+          { path: 'platform.logo_path', value: 'javascript:alert(1)' },
+          { path: 'seo.same_as', value: 'https://example.test/profile\njavascript:alert(1)' },
+          { path: 'design.font_body', value: 'Inter; background:url(javascript:alert(1))' },
+          { path: 'short_blurb', campaignSlug: 'hand-relations', value: 'Help us [win](javascript:alert(1)).' },
+          {
+            path: 'diary',
+            campaignSlug: 'hand-relations',
+            value: JSON.stringify([{
+              title: 'Unsafe diary',
+              date: '2026-05-20T10:00:00Z',
+              phase: 'fundraising',
+              content: [{ type: 'image', src: 'javascript:alert(1)', alt: 'Unsafe' }]
+            }])
+          },
+          { path: 'content_editor', campaignSlug: 'hand-relations', value: 'not publishable here' }
+        ]
+      })
+    }), env, ctx);
+
+    expect(previewResponse.status).toBe(422);
+    const body = await previewResponse.json();
+    const errors = body.errors.join('\n');
+    expect(errors).toContain('Logo must use http or https');
+    expect(errors).toContain('Same-as links contains an invalid URL');
+    expect(errors).toContain('Body font must be a simple CSS font stack');
+    expect(errors).toContain('Short blurb includes an unsafe link URL');
+    expect(errors).toContain('Diary entry "Unsafe diary" content is invalid');
+    expect(errors).toContain('Content editor is saved through the Content tab');
+    expectNoKvWritesOrLists(env, 'unsafe settings preview rejection');
+  });
+
   it('returns role-scoped admin settings without KV writes', async () => {
     const env = createEnv();
     const { ctx, cookie } = await signInAdmin(env);
@@ -438,6 +738,9 @@ describe('admin dashboard foundation', () => {
       expect.objectContaining({ title: 'Pricing' }),
       expect.objectContaining({ title: 'Platform add-ons' })
     ]));
+    const sectionTitles = body.sections.map((section: { title: string }) => section.title);
+    expect(sectionTitles.indexOf('Design')).toBeLessThan(sectionTitles.indexOf('Users'));
+    expect(sectionTitles.indexOf('Users')).toBeLessThan(sectionTitles.indexOf('Advanced performance'));
     expect(body.sections.slice(-2).map((section: { title: string }) => section.title)).toEqual([
       'Secrets & credentials',
       'Runtime diagnostics'
@@ -716,6 +1019,23 @@ describe('admin dashboard foundation', () => {
       expect.objectContaining({ label: 'Primary Color', input: 'color', path: 'design.color_primary', editable: true, layoutGroup: 'design-colors', help: expect.stringContaining('Primary action') }),
       expect.objectContaining({ label: 'Button Radius', input: 'text', path: 'design.radius_lg', editable: true })
     ]));
+    const usersRows = body.sections.find((section: { title: string }) => section.title === 'Users').rows;
+    expect(usersRows).toEqual([
+      expect.objectContaining({
+        label: 'Users',
+        path: 'admin.users',
+        input: 'admin-users',
+        type: 'admin_users',
+        editable: true,
+        currentUserEmail: 'admin@example.com',
+        rawValue: expect.arrayContaining([
+          expect.objectContaining({ email: 'admin@example.com', role: 'super_admin', campaigns: [] })
+        ]),
+        campaignOptions: expect.arrayContaining([
+          expect.objectContaining({ value: 'hand-relations', label: 'Hand Relations' })
+        ])
+      })
+    ]);
     const performanceRows = body.sections.find((section: { title: string }) => section.title === 'Advanced performance').rows;
     expect(performanceRows.map((row: { label: string }) => row.label)).toEqual([
       'Live stats cache TTL seconds',
@@ -931,9 +1251,14 @@ debug:
   verbose_console_logging: true
 seo:
   same_as: []
+admin:
+  local_bootstrap_emails:
+    - "admin@example.com"
+  users: []
 platform:
   name: The Pool
   logo_path: "/assets/images/defaults/dust-wave-square.png"
+  pledges_email_from: "The Pool <pledges@pool.test>"
   site_url: "https://pool.test"
 pricing:
   sales_tax_rate: 0.07625
@@ -1007,6 +1332,7 @@ runner_report_emails:
       { path: 'platform.name', value: 'The Pool Updated' },
       { path: 'author', value: 'Dust Wave Studio' },
       { path: 'platform.logo_path', value: '/assets/images/admin/logo-uploaded.png' },
+      { path: 'platform.pledges_email_from', value: 'The Pool <pledges@pool.test>' },
       { path: 'seo.same_as', value: 'https://example.test/profile\nhttps://social.example.test/pool' },
       { path: 'debug.verbose_console_logging', value: 'false' },
       { path: 'add_ons.low_stock_threshold', value: '3' },
@@ -1023,6 +1349,42 @@ runner_report_emails:
           inventory: 25,
           source_url: 'https://shop.example.test/new-sticker',
           variants: []
+        }, {
+          id: 'new-poster',
+          name: 'New Poster',
+          description: 'A custom poster.',
+          image_url: '/assets/images/add-ons/new-poster.png',
+          price: 12,
+          category: 'physical',
+          shipping: {
+            weight_oz: 5,
+            packaging_weight_oz: 3,
+            length_in: 18,
+            width_in: 3,
+            height_in: 3,
+            stack_height_in: 0.5
+          },
+          inventory: 10,
+          variants: []
+        }])
+      },
+      {
+        path: 'campaign_add_ons',
+        campaignSlug: 'hand-relations',
+        value: JSON.stringify([{
+          id: 'campaign-poster',
+          name: 'Campaign Poster',
+          description: 'A campaign-specific poster.',
+          image_url: '/assets/images/campaign-add-ons/campaign-poster.png',
+          price: 15,
+          category: 'physical',
+          shipping: {
+            weight_oz: 6,
+            length_in: 19,
+            width_in: 4,
+            height_in: 4
+          },
+          variants: []
         }])
       },
       {
@@ -1035,7 +1397,14 @@ runner_report_emails:
           image: '/assets/images/defaults/tier-frame.png',
           description: 'Sponsor a frame.',
           stackable: true,
-          category: 'digital',
+          category: 'physical',
+          shipping: {
+            weight_oz: 2,
+            packaging_weight_oz: 1,
+            length_in: 6,
+            width_in: 4,
+            height_in: 1
+          },
           late_support: false
         }])
       },
@@ -1068,17 +1437,25 @@ runner_report_emails:
     expect(configContent).toContain('name: "The Pool Updated"');
     expect(configContent).toContain('author: "Dust Wave Studio"');
     expect(configContent).toContain('logo_path: "/assets/images/admin/logo-uploaded.png"');
+    expect(configContent).toContain('pledges_email_from: "The Pool <pledges@pool.test>"');
     expect(configContent).toContain('same_as:\n    - "https://example.test/profile"\n    - "https://social.example.test/pool"');
     expect(configContent).toContain('verbose_console_logging: false');
+    expect(configContent).toContain('users: []');
     expect(configContent).toContain('low_stock_threshold: 3');
     expect(configContent).toContain('id: "new-sticker"');
     expect(configContent).toContain('price: 4.00');
+    expect(configContent).toContain('id: "new-poster"');
+    expect(configContent).toContain('shipping:\n        weight_oz: 5\n        packaging_weight_oz: 3\n        length_in: 18\n        width_in: 3\n        height_in: 3\n        stack_height_in: 0.5');
     const campaignContent = Buffer.from(campaignPut?.body.content || '', 'base64').toString('utf8');
     expect(campaignContent).toContain('slug: hand-relations');
     expect(campaignContent).toContain('title: "Hand Relations Updated"');
+    expect(campaignContent).toContain('campaign_add_ons:');
+    expect(campaignContent).toContain('id: "campaign-poster"');
+    expect(campaignContent).toContain('shipping:\n      weight_oz: 6\n      length_in: 19\n      width_in: 4\n      height_in: 4');
     expect(campaignContent).toContain('tiers:');
     expect(campaignContent).toContain('name: "Buy 1 Frame Updated"');
     expect(campaignContent).toContain('price: 6');
+    expect(campaignContent).toContain('shipping:\n      weight_oz: 2\n      packaging_weight_oz: 1\n      length_in: 6\n      width_in: 4\n      height_in: 1');
     expect(githubCalls.some((call) => call.url.endsWith('/actions/workflows/deploy.yml/dispatches'))).toBe(true);
     expectNoKvWritesOrLists(env, 'settings publish');
   });
@@ -1096,11 +1473,11 @@ runner_report_emails:
     global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = String(init?.method || 'GET');
-      if (url.includes('/contents/assets/images/admin/logo-') && method === 'PUT') {
+      if (url.includes('/contents/assets/images/defaults/logo-') && method === 'PUT') {
         const body = JSON.parse(String(init?.body || '{}'));
         githubCalls.push({ url, method, body });
         return jsonResponse({
-          content: { path: 'assets/images/admin/logo-test.png', sha: 'logo-sha' },
+          content: { path: 'assets/images/defaults/logo-test.png', sha: 'logo-sha' },
           commit: { sha: 'logo-commit', html_url: 'https://github.test/logo-commit' }
         });
       }
@@ -1120,12 +1497,61 @@ runner_report_emails:
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.path).toMatch(/^\/assets\/images\/admin\/logo-test-\d+\.png$/);
+    expect(body.path).toMatch(/^\/assets\/images\/defaults\/logo-\d{8}-\d{6}\.png$/);
+    expect(body.processing).toMatchObject({ imageOptimization: 'source-preserved', videoTranscoding: 'not-video' });
     expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
     expect(githubCalls).toHaveLength(1);
     expect(githubCalls[0].body.content).toBe('aGVsbG8=');
     expect(githubCalls[0].body.message).toContain('Upload admin logo');
     expectNoKvWritesOrLists(env, 'logo upload');
+  });
+
+  it('uploads campaign images to the campaign asset directory with canonical names', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_REF: 'main'
+    };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const githubCalls: Array<{ url: string; method: string; body?: any }> = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url.includes('/contents/assets/images/campaigns/hand-relations/hero-wide-') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: 'assets/images/campaigns/hand-relations/hero-wide-test.webp', sha: 'image-sha' },
+          commit: { sha: 'image-commit', html_url: 'https://github.test/image-commit' }
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/image-upload', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        filename: 'Client File Name.webp',
+        contentType: 'image/webp',
+        content: 'data:image/webp;base64,aGVsbG8=',
+        kind: 'campaign',
+        campaignSlug: 'hand-relations',
+        fieldPath: 'hero_image_wide'
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.path).toMatch(/^\/assets\/images\/campaigns\/hand-relations\/hero-wide-\d{8}-\d{6}\.webp$/);
+    expect(body.processing).toMatchObject({ imageOptimization: 'source-preserved', videoTranscoding: 'not-video' });
+    expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
+    expect(githubCalls).toHaveLength(1);
+    expect(githubCalls[0].body.message).toContain('Upload admin image');
+    expectNoKvWritesOrLists(env, 'campaign image upload');
   });
 
   it('uploads admin hero videos through GitHub without KV writes', async () => {
@@ -1141,11 +1567,11 @@ runner_report_emails:
     global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = String(init?.method || 'GET');
-      if (url.includes('/contents/assets/videos/admin/hero-test-') && method === 'PUT') {
+      if (url.includes('/contents/assets/videos/campaigns/hand-relations/video-') && method === 'PUT') {
         const body = JSON.parse(String(init?.body || '{}'));
         githubCalls.push({ url, method, body });
         return jsonResponse({
-          content: { path: 'assets/videos/admin/hero-test.mp4', sha: 'video-sha' },
+          content: { path: 'assets/videos/campaigns/hand-relations/video-test.mp4', sha: 'video-sha' },
           commit: { sha: 'video-commit', html_url: 'https://github.test/video-commit' }
         });
       }
@@ -1159,13 +1585,17 @@ runner_report_emails:
       body: JSON.stringify({
         filename: 'Hero Test.mp4',
         contentType: 'video/mp4',
-        content: 'data:video/mp4;base64,aGVsbG8='
+        content: 'data:video/mp4;base64,aGVsbG8=',
+        kind: 'campaign-video',
+        campaignSlug: 'hand-relations',
+        fieldPath: 'hero_video'
       })
     }), env, ctx);
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.path).toMatch(/^\/assets\/videos\/admin\/hero-test-\d+\.mp4$/);
+    expect(body.path).toMatch(/^\/assets\/videos\/campaigns\/hand-relations\/video-\d{8}-\d{6}\.mp4$/);
+    expect(body.processing).toMatchObject({ imageOptimization: 'not-image', videoTranscoding: 'source-preserved' });
     expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
     expect(githubCalls).toHaveLength(1);
     expect(githubCalls[0].body.content).toBe('aGVsbG8=');
@@ -1292,6 +1722,13 @@ runner_report_emails:
 
     const adminScript = readRepoFile('assets', 'js', 'admin-dashboard.js');
     expect(adminScript).toContain('pool-admin-marketing-builder');
+    expect(adminScript).toContain('localStorage.removeItem(marketingStorageKey)');
+    expect(adminScript).toContain('resetMarketingBuilderFields();');
+    expect(adminScript).toContain('data-add-on-product-shipping-field');
+    expect(adminScript).toContain('data-add-on-shipping-fields');
+    expect(adminScript).toContain('data-collection-shipping-field');
+    expect(adminScript).toContain('data-collection-shipping-fields');
+    expect(adminScript).toContain('var deriveProductIds = true;');
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");
     expect(adminScript).toContain('/admin/marketing/referrals');
   });
@@ -1767,6 +2204,10 @@ runner_report_emails:
       ref: 'creator',
       attribution: { utmSource: 'instagram' }
     }));
+    pledges.store.set('admin-marketing-referrals:hand-relations', JSON.stringify([
+      { code: 'newsletter', referrer: 'Newsletter partner', campaignSlug: 'hand-relations' },
+      { code: 'creator', referrer: 'Creator circle', campaignSlug: 'hand-relations' }
+    ]));
     pledges.resetCounts();
     ratelimit.resetCounts();
 
@@ -1807,6 +2248,10 @@ runner_report_emails:
       expect.objectContaining({ key: 'newsletter', count: 1 }),
       expect.objectContaining({ key: 'creator', count: 1 })
     ]));
+    expect(body.referralLabels).toEqual({
+      newsletter: 'Newsletter partner',
+      creator: 'Creator circle'
+    });
 
     expect(pledges.putCalls).toBe(0);
     expect(pledges.deleteCalls).toBe(0);
@@ -1823,6 +2268,16 @@ runner_report_emails:
     const ratelimit = env.RATELIMIT as CountingKVNamespace;
     resetKvCounters(env);
 
+    const preflightResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/referrals', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://pool.test',
+        'Access-Control-Request-Method': 'DELETE'
+      }
+    }), env, ctx);
+    expect(preflightResponse.status).toBe(200);
+    expect(preflightResponse.headers.get('Access-Control-Allow-Methods')).toContain('DELETE');
+
     const emptyResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/referrals?campaignSlug=hand-relations', {
       method: 'GET',
       headers: { Cookie: cookie }
@@ -1835,6 +2290,31 @@ runner_report_emails:
     });
     expectNoKvWritesOrLists(env, 'marketing referrals read');
 
+    resetKvCounters(env);
+    const unsafeSaveResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/referrals', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        code: 'unsafe',
+        name: '<img src=x onerror=alert(1)>',
+        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=unsafe'
+      })
+    }), env, ctx);
+    expect(unsafeSaveResponse.status).toBe(400);
+    await expect(unsafeSaveResponse.json()).resolves.toMatchObject({
+      error: expect.stringContaining('Referrer name cannot include raw HTML')
+    });
+    expect(pledges.putCalls).toBe(0);
+    expect(pledges.deleteCalls).toBe(0);
+    expect(pledges.listCalls).toBe(0);
+
+    (env.RATELIMIT as CountingKVNamespace).store.clear();
+    resetKvCounters(env);
     const saveResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/referrals', {
       method: 'POST',
       headers: {
@@ -1845,7 +2325,8 @@ runner_report_emails:
       body: JSON.stringify({
         campaignSlug: 'hand-relations',
         code: 'Launch List!',
-        name: 'Launch list'
+        name: 'Launch list',
+        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list'
       })
     }), env, ctx);
     expect(saveResponse.status).toBe(200);
@@ -1853,10 +2334,48 @@ runner_report_emails:
     expect(saveBody.referral).toMatchObject({
       campaignSlug: 'hand-relations',
       code: 'launch-list',
-      name: 'Launch list'
+      name: 'Launch list',
+      referrer: 'Launch list',
+      url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list'
     });
     expect(saveBody.referrals).toEqual([
-      expect.objectContaining({ code: 'launch-list', name: 'Launch list' })
+      expect.objectContaining({
+        code: 'launch-list',
+        referrer: 'Launch list',
+        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list'
+      })
+    ]);
+    expect(pledges.putCalls).toBe(1);
+    expect(pledges.deleteCalls).toBe(0);
+    expect(pledges.listCalls).toBe(0);
+    expect(ratelimit.putCalls).toBe(1);
+    expect(ratelimit.deleteCalls).toBe(0);
+    expect(ratelimit.listCalls).toBe(0);
+
+    resetKvCounters(env);
+    const editResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/referrals', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        originalCode: 'launch-list',
+        code: 'Launch List Updated',
+        referrer: 'Launch list updated',
+        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list-updated'
+      })
+    }), env, ctx);
+    expect(editResponse.status).toBe(200);
+    const editBody = await editResponse.json();
+    expect(editBody.referrals).toEqual([
+      expect.objectContaining({
+        code: 'launch-list-updated',
+        referrer: 'Launch list updated',
+        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list-updated'
+      })
     ]);
     expect(pledges.putCalls).toBe(1);
     expect(pledges.deleteCalls).toBe(0);
@@ -1873,9 +2392,37 @@ runner_report_emails:
     expect(listResponse.status).toBe(200);
     const listBody = await listResponse.json();
     expect(listBody.referrals).toEqual([
-      expect.objectContaining({ code: 'launch-list', name: 'Launch list' })
+      expect.objectContaining({
+        code: 'launch-list-updated',
+        referrer: 'Launch list updated',
+        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list-updated'
+      })
     ]);
     expectNoKvWritesOrLists(env, 'marketing referrals read after save');
+
+    resetKvCounters(env);
+    const deleteResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/referrals', {
+      method: 'DELETE',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        code: 'launch-list-updated'
+      })
+    }), env, ctx);
+    expect(deleteResponse.status).toBe(200);
+    const deleteBody = await deleteResponse.json();
+    expect(deleteBody.deletedCode).toBe('launch-list-updated');
+    expect(deleteBody.referrals).toEqual([]);
+    expect(pledges.putCalls).toBe(0);
+    expect(pledges.deleteCalls).toBe(1);
+    expect(pledges.listCalls).toBe(0);
+    expect(ratelimit.putCalls).toBe(1);
+    expect(ratelimit.deleteCalls).toBe(0);
+    expect(ratelimit.listCalls).toBe(0);
   });
 
   it('deduplicates portfolio supporter counts across campaign analytics', async () => {
@@ -2038,6 +2585,20 @@ runner_report_emails:
             { type: 'divider' },
             { type: 'quote', text: 'Make it strange.', author: 'Director' },
             { type: 'video', provider: 'youtube', video_id: 'video-demo', caption: 'Demo video' },
+            { type: 'video', provider: 'local', src: '/assets/videos/campaigns/their-love/video.webm', caption: 'Proof of concept video' },
+            {
+              type: 'gallery',
+              layout: 'grid',
+              caption_style: 'overlay',
+              images: [
+                {
+                  src: '/assets/images/campaigns/their-love/crew-james.png',
+                  alt: 'James Clare',
+                  caption: '<strong>James Clare - Writer/Director</strong><br>Lead <em>actor</em>'
+                }
+              ],
+              caption: 'Crew gallery'
+            },
             { type: 'embed', provider: 'youtube', src: 'https://www.youtube-nocookie.com/embed/demo', title: 'Demo video' }
           ]
         }
@@ -2063,6 +2624,13 @@ runner_report_emails:
     expect(preview.preview.html).toContain('https://www.youtube-nocookie.com/embed/video-demo');
     expect(preview.preview.html).toContain('allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"');
     expect(preview.preview.html).toContain('<figcaption class="admin-content-preview__caption">Demo video</figcaption>');
+    expect(preview.preview.html).toContain('video-embed--local');
+    expect(preview.preview.html).toContain('<video controls preload="none" playsinline data-first-frame-poster="true">');
+    expect(preview.preview.html).toContain('<source src="/assets/videos/campaigns/their-love/video.webm" type="video/webm">');
+    expect(preview.preview.html).toContain('<figcaption class="admin-content-preview__caption">Proof of concept video</figcaption>');
+    expect(preview.preview.html).toContain('gallery--caption-overlay');
+    expect(preview.preview.html).toContain('<span class="gallery__item-caption-text"><strong>James Clare - Writer/Director</strong><br>Lead <em>actor</em></span>');
+    expect(preview.preview.html).not.toContain('&lt;strong&gt;James Clare');
     expect(preview.preview.html).toContain('<cite>— Director</cite>');
     expect(preview.preview.html).toContain('https://www.youtube-nocookie.com/embed/demo');
 
@@ -2094,6 +2662,7 @@ runner_report_emails:
           longContent: [
             { type: 'embed', provider: 'loom', src: 'https://www.loom.com/embed/123' },
             { type: 'text', body: '<iframe src="https://example.com"></iframe>' },
+            { type: 'text', body: 'Try [private](../admin).' },
             { type: 'embed', provider: 'youtube', html: '<iframe src="https://www.youtube.com/embed/demo"></iframe>' }
           ]
         }
@@ -2107,11 +2676,41 @@ runner_report_emails:
     expect(body.errors.join('\n')).toContain('provider is not approved');
     expect(body.errors.join('\n')).toContain('raw <iframe> HTML');
     expect(body.errors.join('\n')).toContain('.html is not allowed');
+    expect(body.errors.join('\n')).toContain('unsafe link URL');
     expect(body.preview.html).not.toContain('<img');
     expect(body.preview.html).not.toContain('<script');
+    expect(body.preview.html).not.toContain('../admin');
     expect(pledges.putCalls).toBe(0);
     expect(pledges.deleteCalls).toBe(0);
     expect(pledges.listCalls).toBe(0);
+  });
+
+  it('strips header controls from admin magic-link email payloads', async () => {
+    const env = {
+      ...createEnv(),
+      APP_MODE: 'production',
+      RESEND_API_KEY: 'resend-test',
+      PLATFORM_NAME: 'Pool\r\nBCC: evil@example.com',
+      UPDATES_EMAIL_FROM: 'Pool Admin <admin@example.com>\r\nBCC: evil@example.com'
+    };
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/auth/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@example.com', preferredLang: 'en' })
+    }), env, { waitUntil: vi.fn() });
+
+    expect(response.status).toBe(200);
+    const resendCall = (global.fetch as unknown as { mock: { calls: Array<[RequestInfo | URL, RequestInit?]> } }).mock.calls
+      .find(([input]) => input === 'https://api.resend.com/emails');
+    expect(resendCall).toBeTruthy();
+    const payload = JSON.parse(String(resendCall?.[1]?.body || '{}'));
+    expect(payload.from).toBe('Pool Admin <admin@example.com> BCC: evil@example.com');
+    expect(payload.subject).toBe('Your admin sign-in link | Pool BCC: evil@example.com');
+    expect(payload.from).not.toMatch(/[\r\n]/);
+    expect(payload.subject).not.toMatch(/[\r\n]/);
+    expect(payload.html).toContain('<a href="https://pool.test/admin/?admin_login=');
+    expect(payload.html).not.toMatch(/[\r\n]/);
   });
 
   it('publishes validated campaign content through GitHub with CSRF and one audit write', async () => {
@@ -2215,7 +2814,20 @@ tiers:
           shortBlurb: 'Published blurb.',
           longContent: [
             { type: 'text', body: '## Published\n\nFresh body.', align: 'center' },
-            { type: 'quote', text: 'Make it stranger.', author: 'Director' }
+            { type: 'quote', text: 'Make it stranger.', author: 'Director' },
+            { type: 'video', provider: 'local', src: '/assets/videos/campaigns/their-love/video.webm', caption: 'Proof of concept video' },
+            {
+              type: 'gallery',
+              layout: 'grid',
+              caption_style: 'overlay',
+              images: [
+                {
+                  src: '/assets/images/campaigns/their-love/crew-james.png',
+                  alt: 'James Clare',
+                  caption: '<strong>James Clare - Writer/Director</strong><br>Lead <em>actor</em>'
+                }
+              ]
+            }
           ]
         }
       })
@@ -2245,6 +2857,10 @@ tiers:
     expect(committedMarkdown).toContain('long_content:');
     expect(committedMarkdown).toContain('align: "center"');
     expect(committedMarkdown).toContain('Fresh body.');
+    expect(committedMarkdown).toContain('provider: "local"');
+    expect(committedMarkdown).toContain('src: "/assets/videos/campaigns/their-love/video.webm"');
+    expect(committedMarkdown).toContain('caption_style: "overlay"');
+    expect(committedMarkdown).toContain('caption: "<strong>James Clare - Writer/Director</strong><br>Lead <em>actor</em>"');
     expect(committedMarkdown).toContain('tiers:');
     expect(putCall?.body).toMatchObject({
       sha: 'old-file-sha',

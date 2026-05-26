@@ -11,7 +11,7 @@
   {% include first-party-admin-csp.html %}
   {% include cart-head.html %}
   {% capture admin_title %}{% include t.html key="admin.page_title" lang=current_lang %}{% endcapture %}
-  {% include seo-meta.html lang=current_lang title=admin_title indexable=false translation_key=page.translation_key %}
+  {% include seo-meta.html lang=current_lang title=admin_title indexable=false social=false translation_key=page.translation_key %}
 </head>
 <body>
   <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
@@ -33,25 +33,22 @@
 
       <section id="admin-app" class="admin-app" hidden aria-labelledby="admin-overview-title">
         <div class="admin-app__toolbar">
-          <div>
-            <h1 id="admin-overview-title">{% include t.html key="admin.overview_title" lang=current_lang %}</h1>
-            <p id="admin-session-summary" class="admin-app__muted"></p>
-          </div>
+          <h1 id="admin-overview-title">{% include t.html key="admin.overview_title" lang=current_lang %}</h1>
           <div class="admin-app__toolbar-actions">
-            <button id="admin-refresh" class="btn btn--secondary" type="button">{% include t.html key="admin.refresh" lang=current_lang %}</button>
             <button id="admin-logout" class="btn btn--secondary admin-dashboard__logout" hidden>{% include t.html key="admin.logout" lang=current_lang %}</button>
           </div>
         </div>
+        <p id="admin-session-summary" class="admin-app__muted admin-app__session-summary"></p>
 
         <div class="admin-tabs" data-admin-tabs>
           <div class="admin-tabs__list" role="tablist" aria-label="{% include t.html key='admin.tabs_label' lang=current_lang %}">
             <button id="admin-tab-settings" class="admin-tabs__tab" type="button" role="tab" aria-selected="true" aria-controls="admin-panel-settings" data-admin-tab="settings">{% include t.html key="admin.settings_title" lang=current_lang %}</button>
-            <button id="admin-tab-campaigns" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-campaigns" data-admin-tab="campaigns" tabindex="-1">{% include t.html key="admin.campaign_settings_title" lang=current_lang %}</button>
             <button id="admin-tab-addons" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-addons" data-admin-tab="addons" tabindex="-1">{% include t.html key="admin.addons_title" lang=current_lang %}</button>
-            <button id="admin-tab-reports" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-reports" data-admin-tab="reports" tabindex="-1">{% include t.html key="admin.reports_title" lang=current_lang %}</button>
-            <button id="admin-tab-marketing" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-marketing" data-admin-tab="marketing" tabindex="-1">{% include t.html key="admin.marketing_title" lang=current_lang %}</button>
+            <button id="admin-tab-campaigns" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-campaigns" data-admin-tab="campaigns" tabindex="-1">{% include t.html key="admin.campaign_settings_title" lang=current_lang %}</button>
             <button id="admin-tab-analytics" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-analytics" data-admin-tab="analytics" tabindex="-1">{% include t.html key="admin.analytics_title" lang=current_lang %}</button>
+            <button id="admin-tab-reports" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-reports" data-admin-tab="reports" tabindex="-1">{% include t.html key="admin.reports_title" lang=current_lang %}</button>
             <button id="admin-tab-supporters" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-supporters" data-admin-tab="supporters" tabindex="-1">{% include t.html key="admin.supporters_title" lang=current_lang %}</button>
+            <button id="admin-tab-marketing" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-marketing" data-admin-tab="marketing" tabindex="-1">{% include t.html key="admin.marketing_title" lang=current_lang %}</button>
           </div>
 
           <section id="admin-panel-settings" class="admin-settings admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-settings" data-admin-tab-panel="settings">
@@ -111,42 +108,45 @@
           </div>
           <form id="admin-marketing-builder" class="admin-marketing__form">
             <div class="admin-marketing__field">
-              <label for="admin-marketing-campaign">{% include t.html key="admin.campaign_label" lang=current_lang %}</label>
-              <select id="admin-marketing-campaign" name="campaignSlug"></select>
+              {% include admin-field-label.html for="admin-marketing-campaign" label_key="admin.campaign_label" help_key="admin.marketing_help_campaign" help_id="admin-marketing-help-campaign" lang=current_lang required=true %}
+              <select id="admin-marketing-campaign" class="admin-settings__input" name="campaignSlug" required aria-describedby="admin-marketing-help-campaign"></select>
             </div>
             <div class="admin-marketing__field">
-              <label for="admin-marketing-source">{% include t.html key="admin.marketing_source_label" lang=current_lang %}</label>
-              <input id="admin-marketing-source" name="utmSource" type="text" autocomplete="off" inputmode="text">
+              {% include admin-field-label.html for="admin-marketing-referrer" label_key="admin.marketing_referrer_label" help_key="admin.marketing_help_referrer" help_id="admin-marketing-help-referrer" lang=current_lang required=true %}
+              <input id="admin-marketing-referrer" class="admin-settings__input" name="referrer" type="text" autocomplete="name" inputmode="text" required aria-describedby="admin-marketing-help-referrer">
             </div>
             <div class="admin-marketing__field">
-              <label for="admin-marketing-medium">{% include t.html key="admin.marketing_medium_label" lang=current_lang %}</label>
-              <input id="admin-marketing-medium" name="utmMedium" type="text" autocomplete="off" inputmode="text">
+              {% include admin-field-label.html for="admin-marketing-ref" label_key="admin.marketing_ref_label" help_key="admin.marketing_help_ref" help_id="admin-marketing-help-ref" lang=current_lang %}
+              <input id="admin-marketing-ref" class="admin-settings__input admin-settings__input--readonly" name="ref" type="text" autocomplete="off" inputmode="text" readonly aria-describedby="admin-marketing-help-ref">
             </div>
             <div class="admin-marketing__field">
-              <label for="admin-marketing-content">{% include t.html key="admin.marketing_content_label" lang=current_lang %}</label>
-              <input id="admin-marketing-content" name="utmContent" type="text" autocomplete="off" inputmode="text">
+              {% include admin-field-label.html for="admin-marketing-source" label_key="admin.marketing_source_label" help_key="admin.marketing_help_source" help_id="admin-marketing-help-source" lang=current_lang %}
+              <input id="admin-marketing-source" class="admin-settings__input" name="utmSource" type="text" autocomplete="off" inputmode="text" aria-describedby="admin-marketing-help-source">
             </div>
             <div class="admin-marketing__field">
-              <label for="admin-marketing-ref">{% include t.html key="admin.marketing_ref_label" lang=current_lang %}</label>
-              <input id="admin-marketing-ref" name="ref" type="text" autocomplete="off" inputmode="text">
+              {% include admin-field-label.html for="admin-marketing-medium" label_key="admin.marketing_medium_label" help_key="admin.marketing_help_medium" help_id="admin-marketing-help-medium" lang=current_lang %}
+              <input id="admin-marketing-medium" class="admin-settings__input" name="utmMedium" type="text" autocomplete="off" inputmode="text" aria-describedby="admin-marketing-help-medium">
             </div>
             <div class="admin-marketing__field">
-              <label for="admin-marketing-referrer">{% include t.html key="admin.marketing_referrer_label" lang=current_lang %}</label>
-              <input id="admin-marketing-referrer" name="referrer" type="text" autocomplete="name" inputmode="text">
+              {% include admin-field-label.html for="admin-marketing-content" label_key="admin.marketing_content_label" help_key="admin.marketing_help_content" help_id="admin-marketing-help-content" lang=current_lang %}
+              <input id="admin-marketing-content" class="admin-settings__input" name="utmContent" type="text" autocomplete="off" inputmode="text" aria-describedby="admin-marketing-help-content">
             </div>
             <div class="admin-marketing__field admin-marketing__field--full">
-              <label for="admin-marketing-url">{% include t.html key="admin.marketing_url_label" lang=current_lang %}</label>
-              <textarea id="admin-marketing-url" rows="3" readonly></textarea>
+              {% include admin-field-label.html for="admin-marketing-url" label_key="admin.marketing_url_label" help_key="admin.marketing_help_url" help_id="admin-marketing-help-url" lang=current_lang %}
+              <textarea id="admin-marketing-url" class="admin-settings__input admin-settings__input--readonly" rows="3" readonly aria-describedby="admin-marketing-help-url"></textarea>
             </div>
             <div class="admin-marketing__actions">
               <button id="admin-marketing-copy-url" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_copy_url" lang=current_lang %}</button>
               <button id="admin-marketing-save-referral" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_save_referral" lang=current_lang %}</button>
-              <a id="admin-marketing-embed-link" class="btn btn--secondary" href="/embed/campaign/">{% include t.html key="admin.marketing_open_embed" lang=current_lang %}</a>
+              <button id="admin-marketing-cancel-edit" class="btn btn--secondary" type="button" hidden>{% include t.html key="admin.marketing_cancel_edit" lang=current_lang %}</button>
             </div>
+            <div id="admin-marketing-status" class="admin-dashboard__status admin-marketing__status" role="status" aria-live="polite"></div>
+            <div id="admin-marketing-referrals" class="admin-marketing__referrals"></div>
           </form>
-          <div id="admin-marketing-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
           <div id="admin-marketing-snippets" class="admin-marketing__snippets" aria-live="polite"></div>
-          <div id="admin-marketing-referrals" class="admin-marketing__referrals"></div>
+          <div class="admin-marketing__embed">
+            {% include campaign-embed-builder.html lang=current_lang heading_tag="h3" autoload="false" sync_query="false" admin_marketing=true %}
+          </div>
         </section>
 
         <section id="admin-panel-analytics" class="admin-analytics admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-analytics" data-admin-tab-panel="analytics" hidden>
@@ -271,6 +271,8 @@
     data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
     data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"></script>
   <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
+  <script src="/assets/js/campaign-embed.js?v={{ asset_version }}" defer data-campaign-embed-script="true"></script>
+  <script src="/assets/js/video-first-frame-poster.js?v={{ asset_version }}" defer></script>
   <script
     src="/assets/js/admin-dashboard.js?v={{ asset_version }}"
     defer

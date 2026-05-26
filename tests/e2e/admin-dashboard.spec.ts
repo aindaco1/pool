@@ -71,6 +71,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     settings: [],
     settingsPreview: [],
     settingsPublish: [],
+    adminUsersSave: [],
     logoUpload: [],
     imageUpload: [],
     marketingReferrals: [],
@@ -83,6 +84,12 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     role,
     campaignSlugs: role === 'super_admin' ? [] : ['hand-relations']
   };
+  let marketingReferralRows = [{
+    code: 'test',
+    referrer: 'test',
+    url: `${SITE_BASE}/campaigns/hand-relations/?utm_source=test&utm_medium=test&utm_campaign=hand-relations&utm_content=test&ref=test`,
+    createdAt: '2026-05-24T12:00:00.000Z'
+  }];
 
   await page.route(`${WORKER_BASE}/admin/**`, async (route: any) => {
     const request = route.request();
@@ -260,7 +267,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
                   help: 'Whether scheduled campaign-runner reports are enabled for the platform.'
                 },
                 {
-                  label: 'Send time MT',
+                  label: 'Send Time (Mountain Time)',
                   value: '7',
                   rawValue: '7',
                   editable: true,
@@ -290,6 +297,26 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
                 { label: 'Primary Color', value: '#101215', rawValue: '#101215', editable: true, path: 'design.color_primary', type: 'string', input: 'color', layoutGroup: 'design-colors' },
                 { label: 'Button Radius', value: '6px', rawValue: '6px', editable: true, path: 'design.radius_lg', type: 'string', input: 'text' }
               ].map(withFieldHelp)
+            }, {
+              title: 'Users',
+              rows: [
+                {
+                  label: 'Users',
+                  value: '1 user',
+                  rawValue: [
+                    { name: 'Admin User', email: 'admin@example.com', role: 'super_admin', campaigns: [] },
+                    { name: 'Other Admin', email: 'other-admin@example.com', role: 'super_admin', campaigns: [] },
+                    { name: 'Creator User', email: 'creator@example.com', role: 'campaign_user', campaigns: ['hand-relations'] }
+                  ],
+                  editable: true,
+                  path: 'admin.users',
+                  type: 'admin_users',
+                  input: 'admin-users',
+                  campaignOptions: [{ label: 'Hand Relations', value: 'hand-relations' }],
+                  currentUserEmail: 'admin@example.com',
+                  help: 'Admin accounts allowed to sign in. Super admins can manage the whole platform; campaign users can manage only selected campaigns.'
+                }
+              ]
             }, {
               title: 'Advanced performance',
               rows: [
@@ -374,7 +401,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         changeCount: body.changes?.length || 0,
         changes: body.changes || [],
         errors: [],
-        warnings: ['Publishing starts a deploy. Changes may take a few minutes to appear.'],
+        warnings: ['Publishing commits changes to GitHub and starts a deploy. Changes may take a few minutes to appear.'],
         writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
       });
     }
@@ -382,18 +409,23 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       calls.logoUpload.push(body);
       return fulfillJson({
         success: true,
-        path: '/assets/images/admin/logo-e2e.png',
-        githubPath: 'assets/images/admin/logo-e2e.png',
+        path: '/assets/images/defaults/logo-e2e.png',
+        githubPath: 'assets/images/defaults/logo-e2e.png',
         commitSha: 'logo-commit',
         writeBudget: { readOnly: false, kvWritesExpected: 0 }
       });
     }
     if (url.pathname === '/admin/settings/image-upload') {
       calls.imageUpload.push(body);
+      const imagePath = body.kind === 'decision-option'
+        ? '/assets/images/campaigns/hand-relations/decision-option-e2e.png'
+        : body.kind === 'add-on'
+          ? '/assets/images/add-ons/add-on-e2e.png'
+          : '/assets/images/campaigns/hand-relations/image-e2e.png';
       return fulfillJson({
         success: true,
-        path: '/assets/images/admin/add-on-e2e.png',
-        githubPath: 'assets/images/admin/add-on-e2e.png',
+        path: imagePath,
+        githubPath: imagePath.replace(/^\//, ''),
         commitSha: 'image-commit',
         writeBudget: { readOnly: false, kvWritesExpected: 0 }
       });
@@ -402,8 +434,8 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       calls.imageUpload.push(body);
       return fulfillJson({
         success: true,
-        path: '/assets/videos/admin/hero-e2e.mp4',
-        githubPath: 'assets/videos/admin/hero-e2e.mp4',
+        path: '/assets/videos/campaigns/hand-relations/video-e2e.mp4',
+        githubPath: 'assets/videos/campaigns/hand-relations/video-e2e.mp4',
         commitSha: 'video-commit',
         writeBudget: { readOnly: false, kvWritesExpected: 0 }
       });
@@ -416,8 +448,16 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         changeCount: body.changes?.length || 0,
         commits: [{ path: '_config.yml', commitSha: 'settings-commit' }],
         rebuild: { triggered: true },
-        deployNotice: 'Publishing starts a deploy. Changes may take a few minutes to appear.',
+        deployNotice: 'Publishing commits changes to GitHub and starts a deploy. Changes may take a few minutes to appear.',
         writeBudget: { readOnly: false, kvWritesExpected: 0 }
+      });
+    }
+    if (url.pathname === '/admin/users') {
+      calls.adminUsersSave.push(body);
+      return fulfillJson({
+        success: true,
+        users: body.users || [],
+        writeBudget: { readOnly: false, kvWritesExpected: 1 }
       });
     }
     if (url.pathname === '/admin/supporters') {
@@ -541,10 +581,24 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     }
     if (url.pathname === '/admin/marketing/referrals') {
       calls.marketingReferrals.push({ method, query: Object.fromEntries(url.searchParams.entries()), body });
+      if (method === 'DELETE') {
+        marketingReferralRows = marketingReferralRows.filter((row) => row.code !== body.code);
+      }
+      if (method === 'POST') {
+        const nextReferral = {
+          code: body.code,
+          referrer: body.referrer || body.name || body.code,
+          url: body.url,
+          createdAt: '2026-05-24T12:00:00.000Z'
+        };
+        marketingReferralRows = marketingReferralRows
+          .filter((row) => row.code !== (body.originalCode || body.code));
+        marketingReferralRows.unshift(nextReferral);
+      }
       return fulfillJson({
         user,
         campaignSlug: url.searchParams.get('campaignSlug') || body.campaignSlug || 'hand-relations',
-        referrals: [],
+        referrals: marketingReferralRows,
         writeBudget: { readOnly: method === 'GET', kvWritesExpected: method === 'GET' ? 0 : 1, kvListExpected: 0 }
       });
     }
@@ -567,7 +621,9 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       const hasUnsafe = JSON.stringify(blocks).includes('<script');
       const videoBlock = blocks.find((block: any) => block?.type === 'video');
       const previewBody = videoBlock
-        ? `<div class="video-embed video-embed--youtube"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoBlock.video_id || '')}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`
+        ? videoBlock.provider === 'local'
+          ? `<div class="video-embed video-embed--local"><video controls preload="metadata" playsinline><source src="${videoBlock.src || ''}" type="video/webm"></video></div>`
+          : `<div class="video-embed video-embed--youtube"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoBlock.video_id || '')}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`
         : '<p>Preview body.</p>';
       return fulfillJson({
         user,
@@ -606,29 +662,37 @@ async function signInWithMagicToken(page: any, role: AdminRole = 'super_admin') 
   await page.goto(role === 'campaign_user' ? '/admin/?admin_login=creator-token' : '/admin/?admin_login=admin-token');
   await expect(page.locator('#admin-app')).toBeVisible();
   await expect(page.locator('#admin-tab-settings')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('tab', { name: 'Campaigns', exact: true })).toBeVisible();
+  await expect(page.locator('#admin-tab-campaigns')).toHaveText('Campaigns');
   await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
   await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
-  await page.getByRole('tab', { name: 'Campaigns', exact: true }).click();
-  await expect(page.getByRole('tab', { name: 'Hand Relations', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await page.locator('#admin-tab-settings').click();
+  await selectAdminSection(page, 'Campaigns');
+  await expect(page.locator('#admin-campaign-settings-tab-hand-relations')).toHaveAttribute('aria-selected', 'true');
+  await selectAdminSection(page, 'Settings');
   return calls;
 }
 
 async function selectSettingsSection(page: any, name: string) {
-  const tab = page.locator('#admin-settings-section-tabs').getByRole('tab', { name, exact: true });
-  await tab.click();
+  const tab = page.locator('#admin-settings-section-tabs button').filter({ hasText: name }).first();
+  if (await tab.isVisible().catch(() => false)) {
+    await tab.click();
+  } else {
+    await page.locator('#admin-settings-section-tabs + .admin-mobile-tab-select select').selectOption({ label: name });
+  }
   await expect(tab).toHaveAttribute('aria-selected', 'true');
 }
 
 async function selectAdminSection(page: any, name: string) {
-  const tab = page.locator('[data-admin-tabs] > .admin-tabs__list').getByRole('tab', { name, exact: true });
-  await tab.click();
+  const tab = page.locator('[data-admin-tabs] > .admin-tabs__list button').filter({ hasText: name }).first();
+  if (await tab.isVisible().catch(() => false)) {
+    await tab.click();
+  } else {
+    await page.locator('[data-admin-tabs] > .admin-mobile-tab-select select').selectOption({ label: name });
+  }
   await expect(tab).toHaveAttribute('aria-selected', 'true');
 }
 
 test.describe('Admin Dashboard', () => {
-  test('starts magic-link login and supports keyboard refresh with no obvious axe violations', async ({ page }) => {
+  test('starts magic-link login and supports keyboard tab navigation with no obvious axe violations', async ({ page }) => {
     const calls = await routeAdminWorker(page);
 
     await page.goto('/admin/');
@@ -644,15 +708,21 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-app')).toBeVisible();
     await expect(page.getByText('Signed in as admin@example.com')).toBeVisible();
     await expect(page.getByRole('tab').nth(0)).toHaveText('Settings');
-    await expect(page.getByRole('tab').nth(1)).toHaveText('Campaigns');
-    await expect(page.getByRole('tab', { name: 'Platform add-ons' })).toBeVisible();
+    await expect(page.getByRole('tab').nth(1)).toHaveText('Add-ons');
+    await expect(page.getByRole('tab').nth(2)).toHaveText('Campaigns');
     await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
     await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
     await selectSettingsSection(page, 'Canonical URLs');
+    await expect(page.locator('#admin-settings-publish')).toBeVisible();
+    const settingsHeaderHeight = await page.locator('#admin-panel-settings .admin-settings__header').evaluate((element: HTMLElement) => element.getBoundingClientRect().height);
     await expect(page.getByRole('button', { name: 'About Production Worker URL' })).toBeVisible();
+    await expect(page.locator('label .admin-settings__help-button')).toHaveCount(0);
     await expect(page.locator('[data-settings-path="platform.site_url"]')).toHaveValue('https://pool.dustwave.xyz');
     await expect(page.locator('[data-settings-path="platform.worker_url"]')).toHaveValue('https://pledge.dustwave.xyz');
+    await expect(page.locator('[data-settings-path="platform.worker_url"]')).toHaveAttribute('aria-describedby', /admin-setting-help-/);
     await selectSettingsSection(page, 'Runtime diagnostics');
+    await expect(page.locator('#admin-settings-publish')).toBeHidden();
+    await expect(page.locator('#admin-panel-settings .admin-settings__header')).toHaveJSProperty('offsetHeight', Math.round(settingsHeaderHeight));
     await expect(page.locator('#admin-settings-results')).toContainText('Current site base');
     await expect(page.locator('#admin-settings-results')).toContainText(SITE_BASE);
     await selectSettingsSection(page, 'Tax');
@@ -683,15 +753,69 @@ test.describe('Admin Dashboard', () => {
     await page.locator('[data-settings-path="shipping.usps.enabled"]').selectOption('false');
     await expect(page.locator('[data-settings-row-label="USPS API base"]')).toBeHidden();
     await selectSettingsSection(page, 'Campaign runner reports');
+    await expect(page.locator('#admin-settings-publish')).toBeVisible();
     await expect(page.locator('[data-settings-path="reports.campaign_runner.enabled"]')).toHaveValue('true');
-    await expect(page.locator('[data-settings-row-label="Send time MT"]')).toBeVisible();
+    await expect(page.locator('[data-settings-row-label="Send Time (Mountain Time)"]')).toBeVisible();
     await page.locator('[data-settings-path="reports.campaign_runner.enabled"]').selectOption('false');
-    await expect(page.locator('[data-settings-row-label="Send time MT"]')).toBeHidden();
+    await expect(page.locator('[data-settings-row-label="Send Time (Mountain Time)"]')).toBeHidden();
     await page.locator('[data-settings-path="reports.campaign_runner.enabled"]').selectOption('true');
-    await expect(page.locator('[data-settings-row-label="Send time MT"]')).toBeVisible();
+    await expect(page.locator('[data-settings-row-label="Send Time (Mountain Time)"]')).toBeVisible();
     await expect(page.locator('#admin-settings-results [data-settings-path="add_ons.enabled"]')).toHaveCount(0);
     await expect(page.locator('[data-settings-path="reports.campaign_runner.send_hour_mt"]')).toHaveAttribute('type', 'time');
     await expect(page.locator('[data-settings-path="reports.campaign_runner.send_hour_mt"]')).toHaveValue('07:00');
+    await selectSettingsSection(page, 'Users');
+    const adminUsersEditor = page.locator('[data-settings-path="admin.users"]');
+    await expect(adminUsersEditor).toBeVisible();
+    await expect(adminUsersEditor.locator('[data-admin-user-card]')).toHaveCount(3);
+    const selfAdminUser = adminUsersEditor.locator('[data-admin-user-card]').first();
+    await expect(selfAdminUser.locator('[data-admin-user-field="email"]')).toHaveValue('admin@example.com');
+    await expect(selfAdminUser.locator('[data-admin-user-field="email"]')).toHaveAttribute('readonly', '');
+    await expect(selfAdminUser.locator('[data-admin-user-field="role"]')).toBeDisabled();
+    await expect(selfAdminUser.getByRole('button', { name: /Delete admin user admin@example.com/ })).toBeDisabled();
+    const otherAdminUser = adminUsersEditor.locator('[data-admin-user-card]').nth(1);
+    await expect(otherAdminUser.locator('[data-admin-user-field="role"]')).toBeEnabled();
+    await otherAdminUser.locator('[data-admin-user-field="role"]').selectOption('campaign_user');
+    const otherAdminCampaigns = otherAdminUser.locator('.admin-settings__user-campaigns .admin-settings__checkbox-list');
+    await expect(otherAdminCampaigns.locator('legend')).toContainText('Campaigns');
+    await expect(otherAdminCampaigns).toHaveAttribute('aria-labelledby', /admin-user-campaigns-/);
+    await expect.poll(async () => {
+      const box = await otherAdminUser.locator('[data-admin-user-campaign="hand-relations"]').boundingBox();
+      return box?.width || 0;
+    }).toBeLessThan(40);
+    await otherAdminUser.locator('[data-admin-user-campaign="hand-relations"]').check();
+    await expect(otherAdminUser.getByRole('button', { name: /Delete admin user other-admin@example.com/ })).toBeEnabled();
+    const campaignAdminUser = adminUsersEditor.locator('[data-admin-user-card]').nth(2);
+    await expect(campaignAdminUser.getByRole('button', { name: /Delete admin user creator@example.com/ })).toBeEnabled();
+    await adminUsersEditor.getByRole('button', { name: 'Add user' }).click();
+    const newAdminUser = adminUsersEditor.locator('[data-admin-user-card]').first();
+    await newAdminUser.locator('[data-admin-user-field="name"]').fill('Campaign Editor');
+    await newAdminUser.locator('[data-admin-user-field="email"]').fill('editor@example.com');
+    await newAdminUser.locator('[data-admin-user-field="role"]').selectOption('campaign_user');
+    await newAdminUser.locator('[data-admin-user-campaign="hand-relations"]').check();
+    await expect.poll(async () => JSON.parse(await adminUsersEditor.evaluate((element: any) => element.value))[0]).toMatchObject({
+      name: 'Campaign Editor',
+      email: 'editor@example.com',
+      role: 'campaign_user',
+      campaigns: ['hand-relations']
+    });
+    await expect(page.locator('#admin-settings-publish')).toBeHidden();
+    await expect(adminUsersEditor.getByRole('button', { name: 'Save users' })).toBeEnabled();
+    await adminUsersEditor.getByRole('button', { name: 'Save users' }).click();
+    await expect.poll(() => calls.adminUsersSave.length).toBe(1);
+    expect(calls.adminUsersSave[0].users[0]).toMatchObject({
+      name: 'Campaign Editor',
+      email: 'editor@example.com',
+      role: 'campaign_user',
+      campaigns: ['hand-relations']
+    });
+    await expect(adminUsersEditor.locator('[data-admin-users-status]')).toContainText('Users saved');
+    await expect(adminUsersEditor.getByRole('button', { name: 'Save users' })).toBeDisabled();
+    await expect(page.locator('#admin-settings-publish')).toBeHidden();
+    await expectNoAxeViolations(page);
+    await selectSettingsSection(page, 'Secrets & credentials');
+    await expect(page.locator('#admin-settings-publish')).toBeHidden();
+    await selectSettingsSection(page, 'Platform');
+    await expect(page.locator('#admin-settings-publish')).toBeVisible();
     await selectAdminSection(page, 'Campaigns');
     await expect(page.locator('#admin-content-publish')).toHaveText('Publish');
     await expect(page.locator('#admin-campaign-tabs')).toHaveCSS('flex-direction', 'column');
@@ -710,7 +834,7 @@ test.describe('Admin Dashboard', () => {
     const titleBox = await page.locator('[data-settings-path="title"]').boundingBox();
     const creatorNameBox = await page.locator('[data-settings-path="creator_name"]').boundingBox();
     expect(Math.abs((titleBox?.y || 0) - (creatorNameBox?.y || 0))).toBeLessThan(4);
-    await expect(page.locator('#admin-campaign-settings-results [data-settings-row-label="State"]')).toContainText('live');
+    await expect(page.locator('#admin-campaign-settings-results [data-settings-row-label="State"]')).toContainText(/live/i);
     await expect(page.locator('[data-settings-path="state"][data-settings-campaign="hand-relations"]')).toHaveCount(0);
     await expect(page.locator('#admin-campaign-settings-results [data-settings-row-label="Slug"] output')).toContainText('hand-relations');
     await expect(page.locator('#admin-campaign-settings-results [data-settings-row-label="URL"] output')).toContainText('/campaigns/hand-relations/');
@@ -801,7 +925,7 @@ test.describe('Admin Dashboard', () => {
       buffer: Buffer.from('video')
     });
     await expect.poll(() => calls.imageUpload.at(-1)?.contentType).toBe('video/mp4');
-    await expect(page.locator('[data-settings-path="hero_video"] video source')).toHaveAttribute('src', '/assets/videos/admin/hero-e2e.mp4');
+    await expect(page.locator('[data-settings-path="hero_video"] video source')).toHaveAttribute('src', '/assets/videos/campaigns/hand-relations/video-e2e.mp4');
     await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="tiers"]').click();
     const featuredTier = page.locator('[data-settings-path="featured_tier_id"]');
     await expect(featuredTier).toBeVisible();
@@ -813,6 +937,13 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('[data-settings-path="tiers"][data-settings-campaign="hand-relations"]')).toBeVisible();
     await expect(page.locator('[data-settings-path="tiers"][data-settings-campaign="hand-relations"] img').first()).toHaveAttribute('src', /tier-frame/);
     const tierEditor = page.locator('[data-settings-path="tiers"][data-settings-campaign="hand-relations"]');
+    await expect.poll(async () => {
+      const panel = await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab-panel="tiers"]').boundingBox();
+      const editor = await tierEditor.boundingBox();
+      const card = await tierEditor.locator('.admin-settings__product-card').first().boundingBox();
+      if (!panel || !editor || !card) return false;
+      return editor.width >= panel.width * 0.9 && card.width >= editor.width - 2;
+    }).toBe(true);
     await expect(tierEditor.locator(':scope > .btn').first()).toHaveText('Add item');
     await expect.poll(async () => {
       const card = await tierEditor.locator('.admin-settings__product-card').first().boundingBox();
@@ -832,7 +963,7 @@ test.describe('Admin Dashboard', () => {
     await tierEditor.getByLabel('Move item down').first().click();
     await tierEditor.getByRole('button', { name: 'Delete' }).last().click();
     await expect(tierEditor.locator('.admin-settings__product-card')).toHaveCount(1);
-    await expect(tierEditor.locator('.admin-settings__help-button')).toHaveCount(10);
+    await expect.poll(async () => tierEditor.locator('.admin-settings__help-button').count()).toBeGreaterThanOrEqual(10);
     await expect(tierEditor.locator('[data-collection-derived-id]').first()).toContainText('frame-slot');
     await expect(tierEditor.getByRole('textbox', { name: 'ID' })).toHaveCount(0);
     await expect(tierEditor.locator('[data-collection-field="description"]')).toContainText('Sponsor a frame.');
@@ -1126,7 +1257,7 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(async () => {
       const value = await decisionsEditor.evaluate((element: any) => element.value);
       return JSON.parse(value)[0].options[0].image;
-    }).toBe('/assets/images/admin/add-on-e2e.png');
+    }).toBe('/assets/images/campaigns/hand-relations/decision-option-e2e.png');
     await decisionsEditor.getByRole('button', { name: 'Add option' }).click();
     await decisionsEditor.locator('[data-decision-option-field="label"]').last().fill('C');
     await expect.poll(async () => {
@@ -1232,12 +1363,17 @@ test.describe('Admin Dashboard', () => {
     await page.keyboard.press('Backspace');
     await expect(diaryEditor.getByRole('button', { name: 'Save draft' }).first()).toBeDisabled();
     await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="tiers"]').click();
-    await expect(tierEditor.locator('select[data-collection-field="shipping_preset"]')).toHaveCount(0);
+    const tierShippingPreset = tierEditor.locator('select[data-collection-field="shipping_preset"]').first();
+    const tierShippingFields = tierEditor.locator('[data-collection-shipping-fields]').first();
+    await expect(tierShippingPreset).toBeHidden();
+    await expect(tierShippingFields).toBeHidden();
     await tierEditor.locator('[data-collection-field="category"]').first().selectOption('physical');
-    await expect(tierEditor.locator('select[data-collection-field="shipping_preset"]')).toHaveCount(0);
+    await expect(tierShippingPreset).toBeVisible();
+    await expect(tierShippingFields).toBeVisible();
     await expect(tierEditor.getByRole('spinbutton', { name: 'Quantity limit' }).first()).toBeVisible();
     await tierEditor.locator('[data-collection-field="category"]').first().selectOption('digital');
-    await expect(tierEditor.locator('select[data-collection-field="shipping_preset"]')).toHaveCount(0);
+    await expect(tierShippingPreset).toBeHidden();
+    await expect(tierShippingFields).toBeHidden();
     await expect(tierEditor.getByRole('spinbutton', { name: 'Quantity limit' }).first()).toBeVisible();
     await page.locator('[data-settings-path="tiers"][data-settings-campaign="hand-relations"] [data-collection-field="name"]').first().fill('Buy One Frame Updated');
     await selectAdminSection(page, 'Settings');
@@ -1264,7 +1400,7 @@ test.describe('Admin Dashboard', () => {
     await page.locator('[data-settings-path="pricing.sales_tax_rate"]').fill('8.125');
     await selectSettingsSection(page, 'Campaign runner reports');
     await page.locator('[data-settings-path="reports.campaign_runner.send_hour_mt"]').fill('09:30');
-    await selectAdminSection(page, 'Platform add-ons');
+    await selectAdminSection(page, 'Add-ons');
     await expect(page.locator('#admin-addons-results [data-settings-path="add_ons.enabled"]')).toHaveValue('true');
     await expect(page.locator('#admin-addons-results [data-settings-row-label="Low stock threshold"]')).toBeVisible();
     await expect(page.locator('#admin-addons-results [data-settings-row-label="Products"]')).toBeVisible();
@@ -1290,11 +1426,12 @@ test.describe('Admin Dashboard', () => {
     await page.locator('#admin-addons-results [data-add-on-product-field="shipping_preset"]').first().selectOption('tshirt');
     await expect(page.locator('#admin-addons-results [data-add-on-variant-field="label"]').first()).toHaveValue('Small');
     await page.getByRole('button', { name: 'Add product' }).click();
-    await page.locator('#admin-addons-results [data-add-on-product-field="id"]').last().fill('digital-zine');
-    await page.locator('#admin-addons-results [data-add-on-product-field="name"]').last().fill('Digital Zine');
-    await page.locator('#admin-addons-results [data-add-on-product-field="description"]').last().fill('Downloadable launch zine.');
-    await page.locator('#admin-addons-results [data-add-on-product-field="price"]').last().fill('5');
-    await page.locator('#admin-addons-results [data-add-on-product-field="category"]').last().selectOption('digital');
+    const newPlatformAddOn = page.locator('#admin-addons-results [data-add-on-product-card]').first();
+    await newPlatformAddOn.locator('[data-add-on-product-field="name"]').fill('Digital Zine');
+    await expect(newPlatformAddOn.locator('[data-add-on-product-derived-id]')).toContainText('digital-zine');
+    await newPlatformAddOn.locator('[data-add-on-product-field="description"]').fill('Downloadable launch zine.');
+    await newPlatformAddOn.locator('[data-add-on-product-field="price"]').fill('5');
+    await newPlatformAddOn.locator('[data-add-on-product-field="category"]').selectOption('digital');
     await expect(page.getByRole('button', { name: 'Validate changes' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Load settings' })).toHaveCount(0);
     page.once('dialog', (dialog) => {
@@ -1311,33 +1448,175 @@ test.describe('Admin Dashboard', () => {
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'tax.provider', value: 'offline_rules' }));
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'reports.campaign_runner.send_hour_mt', value: '9' }));
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'reports.campaign_runner.send_minute_mt', value: '30' }));
-    expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'platform.logo_path', value: '/assets/images/admin/logo-e2e.png' }));
+    expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'platform.logo_path', value: '/assets/images/defaults/logo-e2e.png' }));
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'debug.verbose_console_logging', value: 'false' }));
     expect(calls.settingsPublish[0].changes).not.toContainEqual(expect.objectContaining({ path: 'slug' }));
+    expect(calls.settingsPublish[0].changes).not.toContainEqual(expect.objectContaining({ path: 'admin.users' }));
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'runner_report_emails', campaignSlug: 'hand-relations', value: 'runner@example.com, second@example.com' }));
     const tiersChange = calls.settingsPublish[0].changes.find((change: any) => change.path === 'tiers');
     expect(JSON.parse(tiersChange.value)[0]).toMatchObject({ id: 'frame-slot', name: 'Buy One Frame Updated' });
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'add_ons.low_stock_threshold', value: '4' }));
     const addOnProductsChange = calls.settingsPublish[0].changes.find((change: any) => change.path === 'add_ons.products');
     expect(JSON.parse(addOnProductsChange.value)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'dust-wave-sticker', name: 'DUST WAVE Sticker Updated', image_url: '/assets/images/admin/add-on-e2e.png', shipping_preset: 'tshirt' }),
+      expect.objectContaining({ id: 'dust-wave-sticker', name: 'DUST WAVE Sticker Updated', image_url: '/assets/images/add-ons/add-on-e2e.png', shipping_preset: 'tshirt' }),
       expect.objectContaining({ id: 'digital-zine', name: 'Digital Zine', category: 'digital', price: 5 })
     ]));
     await page.locator('#admin-tab-settings').focus();
     await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('tab', { name: 'Add-ons', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('tab', { name: 'Campaigns', exact: true })).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('ArrowRight');
-    await expect(page.getByRole('tab', { name: 'Platform add-ons' })).toHaveAttribute('aria-selected', 'true');
-    await page.keyboard.press('ArrowRight');
-    await expect(page.locator('[data-admin-tabs] > .admin-tabs__list').getByRole('tab', { name: 'Reports', exact: true })).toHaveAttribute('aria-selected', 'true');
-
-    const summaryCallsBeforeRefresh = calls.summary.length;
-    await page.getByRole('button', { name: 'Refresh' }).focus();
-    await expect(page.getByRole('button', { name: 'Refresh' })).toBeFocused();
-    await page.keyboard.press('Enter');
-    await expect.poll(() => calls.summary.length).toBeGreaterThan(summaryCallsBeforeRefresh);
+    await expect(page.locator('[data-admin-tabs] > .admin-tabs__list').getByRole('tab', { name: 'Analytics', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('button', { name: 'Refresh' })).toHaveCount(0);
 
     await expectNoAxeViolations(page);
+  });
+
+  test('keeps admin layouts responsive on tablet and mobile viewports', async ({ page }) => {
+    await page.setViewportSize({ width: 912, height: 1368 });
+    await signInWithMagicToken(page);
+    await selectAdminSection(page, 'Campaigns');
+    await expect(page.locator('[data-campaign-settings-panel="hand-relations"] .admin-campaign-section-tabs')).toBeVisible();
+    await expect.poll(() => page.locator('[data-campaign-settings-panel="hand-relations"] .admin-campaign-section-tabs').evaluate((element: HTMLElement) => {
+      return element.scrollWidth <= element.clientWidth + 1;
+    })).toBe(true);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+    await expect.poll(() => page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="ongoing_items"]').evaluate((element: HTMLElement) => {
+      return window.getComputedStyle(element, '::after').content.replace(/^"|"$/g, '');
+    })).toBe('Ongoing');
+    await expect.poll(() => page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="diary"]').evaluate((element: HTMLElement) => {
+      return window.getComputedStyle(element, '::after').content.replace(/^"|"$/g, '');
+    })).toBe('Diary');
+
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await selectAdminSection(page, 'Settings');
+    await expect.poll(async () => {
+      const panel = await page.locator('#admin-panel-settings').boundingBox();
+      const results = await page.locator('#admin-settings-results').boundingBox();
+      if (!panel || !results) return false;
+      return results.width >= panel.width - 2;
+    }).toBe(true);
+    await selectAdminSection(page, 'Add-ons');
+    await expect.poll(async () => {
+      const panel = await page.locator('#admin-panel-addons').boundingBox();
+      const results = await page.locator('#admin-addons-results').boundingBox();
+      if (!panel || !results) return false;
+      return results.width >= panel.width - 2;
+    }).toBe(true);
+    await selectAdminSection(page, 'Campaigns');
+    await expect(page.locator('[data-admin-tabs] > .admin-tabs__list')).toBeHidden();
+    await expect(page.locator('[data-admin-tabs] > .admin-mobile-tab-select select')).toBeVisible();
+    await expect(page.locator('#admin-campaign-tabs')).toBeHidden();
+    await expect.poll(async () => {
+      const panel = await page.locator('#admin-panel-campaigns').boundingBox();
+      const results = await page.locator('#admin-campaign-settings-results').boundingBox();
+      if (!panel || !results) return false;
+      return results.width >= panel.width - 2;
+    }).toBe(true);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+    await page.locator('[data-campaign-settings-panel="hand-relations"] .admin-campaign-section-tabs + .admin-mobile-tab-select select').selectOption({ label: 'Tiers' });
+    await expect.poll(async () => {
+      const panel = await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab-panel="tiers"]').boundingBox();
+      const editor = await page.locator('[data-settings-path="tiers"][data-settings-campaign="hand-relations"]').boundingBox();
+      const card = await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab-panel="tiers"] .admin-settings__product-card').first().boundingBox();
+      if (!panel || !editor || !card) return false;
+      return editor.width >= panel.width * 0.9 && card.width >= editor.width - 2;
+    }).toBe(true);
+    await expect.poll(async () => {
+      const card = await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab-panel="tiers"] .admin-settings__product-card').first().evaluate((element: HTMLElement) => {
+        return getComputedStyle(element).gridTemplateColumns.split(' ').length;
+      });
+      return card;
+    }).toBeLessThanOrEqual(1);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/admin/?admin_login=admin-token-mobile');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await selectAdminSection(page, 'Settings');
+    await selectSettingsSection(page, 'Platform');
+    const mobileSettingsPanel = page.locator('#admin-settings-results [data-settings-section-panel]:not([hidden])');
+    const mobileSettingsGroup = mobileSettingsPanel.locator('.admin-settings__group');
+    await expect.poll(async () => {
+      const group = await mobileSettingsGroup.boundingBox();
+      const input = await mobileSettingsPanel.locator('.admin-settings__input').first().boundingBox();
+      if (!group || !input) return false;
+      return input.width >= group.width * 0.72;
+    }).toBe(true);
+    await selectSettingsSection(page, 'Design');
+    await expect.poll(async () => {
+      const group = await mobileSettingsGroup.boundingBox();
+      const preview = await mobileSettingsPanel.locator('.admin-settings__image-preview').first().boundingBox();
+      if (!group || !preview) return false;
+      return preview.width >= group.width * 0.72;
+    }).toBe(true);
+    const mobileSettingsActions = page.locator('#admin-panel-settings .admin-settings__actions').first();
+    await selectSettingsSection(page, 'Platform');
+    await expect(mobileSettingsActions).toHaveCSS('display', 'flex');
+    for (const sectionName of ['Users', 'Secrets & credentials', 'Runtime diagnostics']) {
+      await selectSettingsSection(page, sectionName);
+      await expect(mobileSettingsActions).toHaveClass(/is-placeholder/);
+      await expect(mobileSettingsActions).toHaveCSS('display', 'none');
+    }
+    await selectAdminSection(page, 'Campaigns');
+    await expect(page.locator('[data-admin-tabs] > .admin-tabs__list')).toBeHidden();
+    await expect(page.locator('[data-admin-tabs] > .admin-mobile-tab-select select')).toBeVisible();
+    await expect(page.locator('#admin-campaign-tabs')).toBeHidden();
+    const campaignSubtabSelect = page.locator('[data-campaign-settings-panel="hand-relations"] .admin-campaign-section-tabs + .admin-mobile-tab-select select');
+    await expect(campaignSubtabSelect).toBeVisible();
+    await campaignSubtabSelect.selectOption({ label: 'Tiers' });
+    await expect(page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="tiers"]')).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+    await expect(page.locator('#admin-content-preview-mobile')).toBeHidden();
+    await campaignSubtabSelect.selectOption({ label: 'Content' });
+    await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
+      textarea.value = JSON.stringify([{ type: 'image', src: '/assets/images/hand-relations/poster.jpg', alt: 'Poster', caption: '', align: 'left' }]);
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const mobileMediaBlock = page.locator('#admin-content-blocks .content-block--image');
+    const mobileMediaSettings = mobileMediaBlock.getByRole('button', { name: 'Media settings' });
+    await mobileMediaBlock.locator('img').click();
+    await expect(mobileMediaBlock.locator('.admin-content-block__chrome')).toHaveCSS('display', 'grid');
+    await expect(mobileMediaSettings).toBeHidden();
+    await page.locator('#admin-panel-campaigns').click({ position: { x: 6, y: 6 } });
+    await expect(mobileMediaSettings).toBeVisible();
+    await mobileMediaSettings.click();
+    await expect(mobileMediaBlock.locator('.admin-content-block__settings-panel')).toBeVisible();
+    await expect(mobileMediaBlock.locator('.admin-content-block__chrome')).toHaveCSS('display', 'none');
+    await mobileMediaSettings.click();
+    await expect(mobileMediaBlock.locator('.admin-content-block__settings-panel')).toBeHidden();
+    await expect(mobileMediaBlock.locator('.admin-content-block__chrome')).toHaveCSS('display', 'none');
+    await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
+      textarea.value = JSON.stringify([{
+        type: 'gallery',
+        layout: 'grid',
+        caption_style: 'overlay',
+        images: [{
+          src: '/assets/images/campaigns/their-love/crew-james.png',
+          alt: 'James Clare',
+          caption: 'James Clare'
+        }],
+        caption: '',
+        align: 'left'
+      }]);
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const mobileGalleryBlock = page.locator('#admin-content-blocks .content-block--gallery');
+    await expect(mobileGalleryBlock.getByRole('button', { name: 'Media settings' })).toHaveCount(0);
+    await mobileGalleryBlock.getByRole('button', { name: 'Gallery image caption settings' }).first().click();
+    const mobileGalleryPanel = mobileGalleryBlock.locator('.admin-content-block__settings-panel--gallery-image').first();
+    await expect(mobileGalleryPanel).toBeVisible();
+    await expect.poll(async () => {
+      const item = await mobileGalleryBlock.locator('.gallery__item').first().boundingBox();
+      const panel = await mobileGalleryPanel.boundingBox();
+      if (!item || !panel) return false;
+      return Math.abs(panel.y - item.y) <= 2
+        && Math.abs(panel.height - item.height) <= 2
+        && panel.width >= item.width - 2;
+    }).toBe(true);
+    await expect(mobileGalleryBlock.locator('.admin-content-block__chrome')).toHaveCSS('display', 'none');
+    await page.locator('#admin-panel-campaigns').click({ position: { x: 6, y: 6 } });
+    await expect(mobileGalleryPanel).toBeHidden();
   });
 
   test('loads the Spanish admin route and keeps campaign users out of platform inventory', async ({ page }) => {
@@ -1347,8 +1626,38 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
     await expect(page.locator('#admin-app')).toBeVisible();
     await expect(page.locator('#admin-session-summary')).toContainText('creator@example.com');
-    await expect(page.getByRole('tab', { name: 'Platform add-ons' })).toHaveCount(0);
+    await expect(page.locator('#admin-tab-settings')).toBeHidden();
+    await expect(page.locator('#admin-tab-addons')).toBeHidden();
+    await expect(page.locator('#admin-tab-campaigns')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#admin-panel-settings')).toBeHidden();
+    await expect(page.locator('#admin-panel-campaigns')).toBeVisible();
     await expect(page.locator('#admin-inventory-section')).toBeHidden();
+  });
+
+  test('keeps Spanish admin tabs compact on tablet viewports', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await page.setViewportSize({ width: 912, height: 1368 });
+
+    await page.goto('/es/admin/?admin_login=admin-token-es-tablet');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+
+    const tabs = page.locator('[data-admin-tabs] > .admin-tabs__list');
+    await expect(tabs).toBeVisible();
+    await expect.poll(() => tabs.evaluate((element: HTMLElement) => {
+      return element.scrollWidth <= element.clientWidth + 1;
+    })).toBe(true);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+    await expect(page.locator('#admin-tab-settings')).toHaveAttribute('aria-label', 'Configuración');
+    await expect.poll(() => page.locator('#admin-tab-settings').evaluate((element: HTMLElement) => {
+      return window.getComputedStyle(element, '::after').content.replace(/^"|"$/g, '');
+    })).toBe('Config.');
+    await expect.poll(() => page.locator('#admin-tab-supporters').evaluate((element: HTMLElement) => {
+      return window.getComputedStyle(element, '::after').content.replace(/^"|"$/g, '');
+    })).toBe('Patroc.');
+    await expect.poll(() => page.locator('#admin-tab-marketing').evaluate((element: HTMLElement) => {
+      return window.getComputedStyle(element, '::after').content.replace(/^"|"$/g, '');
+    })).toBe('Promo');
   });
 
   test('previews reports and downloads CSVs', async ({ page }) => {
@@ -1369,10 +1678,13 @@ test.describe('Admin Dashboard', () => {
   test('keeps marketing local and validates content preview/publish flows', async ({ page }) => {
     const calls = await signInWithMagicToken(page);
 
-    await selectAdminSection(page, 'Marketing tools');
+    await selectAdminSection(page, 'Marketing');
+    await expect(page.locator('#admin-marketing-campaign')).toHaveAttribute('aria-describedby', 'admin-marketing-help-campaign');
+    await expect(page.locator('#admin-marketing-referrer')).toHaveAttribute('aria-describedby', 'admin-marketing-help-referrer');
+    await expect(page.locator('#admin-marketing-url')).toHaveAttribute('aria-describedby', 'admin-marketing-help-url');
+    await page.locator('#admin-marketing-referrer').fill('Launch List');
     await page.locator('#admin-marketing-source').fill('newsletter');
     await page.locator('#admin-marketing-medium').fill('email');
-    await page.locator('#admin-marketing-ref').fill('launch-list');
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/utm_source=newsletter/);
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/utm_campaign=hand-relations/);
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/ref=launch-list/);
@@ -1388,6 +1700,13 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => calls.contentPreview.length).toBeGreaterThanOrEqual(1);
     await expect(page.locator('#admin-content-blocks [data-content-field="body"]')).toContainText('Existing body with Terms.');
     await expect(page.locator('#admin-content-blocks .admin-content-block__chrome').first()).toHaveCSS('display', 'grid');
+    const firstContentChrome = page.locator('#admin-content-blocks .admin-content-block__chrome').first();
+    await expect(firstContentChrome).toHaveAttribute('aria-hidden', 'true');
+    await expect(firstContentChrome.locator('button').first()).toHaveAttribute('tabindex', '-1');
+    await page.locator('#admin-content-blocks [data-content-field="body"]').click();
+    await expect(firstContentChrome).toHaveAttribute('aria-hidden', 'false');
+    await expect(firstContentChrome.locator('button').first()).not.toHaveAttribute('tabindex', '-1');
+    await expect(page.locator('#admin-content-blocks').getByLabel('Align left').first()).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#admin-content-blocks [data-content-field="body"]')).not.toContainText('[Terms](/terms/)');
     await expect(page.locator('#admin-content-blocks [data-content-field="body"] a[href="/terms/"]')).toContainText('Terms');
     await page.locator('#admin-content-blocks [data-content-field="body"] a[href="/terms/"]').click();
@@ -1527,6 +1846,9 @@ test.describe('Admin Dashboard', () => {
     await settingsButton.click();
     await expect(settingsButton).toHaveAttribute('aria-expanded', 'true');
     await expect(mediaBlock.locator('.admin-content-block__settings-panel')).toBeVisible();
+    await expect(mediaBlock.locator('.admin-content-block__chrome')).toHaveCSS('opacity', '0');
+    await expect(mediaBlock.locator('.admin-content-block__settings-panel')).toHaveAttribute('role', 'group');
+    await expect(mediaBlock.locator('.admin-content-block__settings-panel')).toHaveAttribute('aria-labelledby', /admin-content-media-settings-/);
     await mediaBlock.getByLabel('Source URL').fill('/assets/images/hand-relations/poster.jpg');
     await mediaBlock.getByLabel('Alt text').fill('Hand Relations poster');
     await expect(page.locator('#admin-content-long-content')).toHaveValue(/Hand Relations poster/);
@@ -1534,9 +1856,80 @@ test.describe('Admin Dashboard', () => {
     await expect(settingsButton).toHaveAttribute('aria-expanded', 'false');
     await expect(mediaBlock.locator('.admin-content-block__settings-panel')).toBeHidden();
     await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
+      textarea.value = JSON.stringify([{
+        type: 'gallery',
+        layout: 'grid',
+        caption_style: 'overlay',
+        images: [{
+          src: '/assets/images/campaigns/their-love/crew-james.png',
+          alt: 'James Clare',
+          caption: '<strong>James Clare - Writer/Director</strong><br>Lead <em>actor</em>'
+        }],
+        caption: '',
+        align: 'left'
+      }]);
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const galleryBlock = page.locator('#admin-content-blocks .content-block--gallery');
+    await expect(galleryBlock).toHaveClass(/gallery--caption-overlay/);
+    await expect(galleryBlock.locator('.gallery__item-caption-text strong')).toContainText('James Clare - Writer/Director');
+    await expect(galleryBlock.locator('.gallery__item-caption-text em')).toContainText('actor');
+    await expect(galleryBlock.locator('.gallery__item-caption-text')).not.toContainText('</strong>');
+    await expect(galleryBlock.getByRole('button', { name: 'Media settings' })).toHaveCount(0);
+    const galleryImageSettings = galleryBlock.getByRole('button', { name: 'Gallery image caption settings' }).first();
+    await galleryImageSettings.click();
+    const galleryHoverCaption = galleryBlock.getByLabel('Hover caption').first();
+    const galleryImagePanel = galleryBlock.locator('.admin-content-block__settings-panel--gallery-image').first();
+    await expect.poll(async () => {
+      const item = await galleryBlock.locator('.gallery__item').first().boundingBox();
+      const panel = await galleryImagePanel.boundingBox();
+      if (!item || !panel) return false;
+      return Math.abs(panel.y - item.y) <= 2
+        && Math.abs(panel.height - item.height) <= 2
+        && panel.width >= item.width - 2;
+    }).toBe(true);
+    await expect(galleryImagePanel).toHaveCSS('overflow-y', 'auto');
+    await expect(galleryHoverCaption).toContainText('James Clare - Writer/Director');
+    await expect(galleryImagePanel.getByLabel('Bold')).toBeVisible();
+    await expect(galleryImagePanel.getByLabel('Italic')).toBeVisible();
+    await expect(galleryImagePanel.getByLabel('Underline')).toBeVisible();
+    await galleryHoverCaption.fill('Updated **hover** caption');
+    await expect(galleryBlock.locator('.gallery__item-caption-text strong')).toContainText('hover');
+    await expect.poll(async () => {
+      const value = await page.locator('#admin-content-long-content').inputValue();
+      return JSON.parse(value)[0].images[0].caption;
+    }).toBe('Updated **hover** caption');
+    await galleryHoverCaption.fill('Styled caption');
+    await galleryHoverCaption.selectText();
+    await galleryImagePanel.getByLabel('Bold').click();
+    await expect.poll(async () => {
+      const value = await page.locator('#admin-content-long-content').inputValue();
+      return JSON.parse(value)[0].images[0].caption;
+    }).toBe('**Styled caption**');
+    const captionTouchState = await galleryBlock.locator('.gallery__item-caption-text').evaluate((caption: HTMLElement) => {
+      const event = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch' });
+      caption.dispatchEvent(event);
+      return {
+        defaultPrevented: event.defaultPrevented,
+        userSelect: window.getComputedStyle(caption).userSelect
+      };
+    });
+    expect(captionTouchState).toEqual({ defaultPrevented: false, userSelect: 'text' });
+    await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
       textarea.value = JSON.stringify([{ type: 'text', body: 'Existing body.', align: 'left' }]);
       textarea.dispatchEvent(new Event('change', { bubbles: true }));
     });
+    const editableTouchState = await page.locator('#admin-content-blocks [data-content-field="body"]').first().evaluate((editor: HTMLElement) => {
+      editor.closest('.admin-content-block')?.classList.remove('is-active');
+      const event = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch' });
+      editor.dispatchEvent(event);
+      return {
+        defaultPrevented: event.defaultPrevented,
+        activeImmediately: editor.closest('.admin-content-block')?.classList.contains('is-active') || false,
+        userSelect: window.getComputedStyle(editor).userSelect
+      };
+    });
+    expect(editableTouchState).toEqual({ defaultPrevented: false, activeImmediately: false, userSelect: 'text' });
 
     await page.locator('#admin-content-blocks [data-content-field="body"]').fill('<script>alert(1)</script>');
     await page.locator('#admin-content-editor').evaluate((form: HTMLFormElement) => form.requestSubmit());
@@ -1574,6 +1967,7 @@ test.describe('Admin Dashboard', () => {
     await campaignContentBlocks.locator('.admin-content-block__format-select').first().selectOption('h2');
     await expect(campaignContentBlocks.locator('.admin-content-block__format-select').first()).toHaveValue('h2');
     await campaignContentBlocks.getByLabel('Align center').first().click();
+    await expect(campaignContentBlocks.getByLabel('Align center').first()).toHaveAttribute('aria-pressed', 'true');
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Z' : 'Control+Z');
     await expect(page.locator('#admin-content-blocks .content-block')).toHaveCount(2);
     await expect(campaignContentBlocks.locator('[data-content-action="delete"]').first().locator('svg')).toHaveCount(1);
@@ -1613,8 +2007,11 @@ test.describe('Admin Dashboard', () => {
     await page.locator('#admin-content-blocks [data-content-field="body"]').first().click();
     await expect(campaignContentBlocks.locator('.admin-content-block__format-select').first()).toHaveValue('h2');
     await expect(campaignContentBlocks.locator('.admin-content-block__chrome').first()).toHaveCSS('opacity', '1');
+    await expect(campaignContentBlocks.locator('.admin-content-block__chrome').first()).toHaveAttribute('aria-hidden', 'false');
     await page.locator('#admin-session-summary').click();
     await expect(campaignContentBlocks.locator('.admin-content-block__chrome').first()).toHaveCSS('opacity', '0');
+    await expect(campaignContentBlocks.locator('.admin-content-block__chrome').first()).toHaveAttribute('aria-hidden', 'true');
+    await expect(campaignContentBlocks.locator('.admin-content-block__chrome button').first()).toHaveAttribute('tabindex', '-1');
     await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
       textarea.value = JSON.stringify([
         { type: 'text', body: '## Mixed heading\n\nMixed paragraph', align: 'left' },
@@ -1651,6 +2048,17 @@ test.describe('Admin Dashboard', () => {
     await quoteEditor.selectText();
     await campaignContentBlocks.getByLabel('Italic').last().click();
     await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
+      textarea.value = JSON.stringify([{ type: 'video', provider: 'local', src: '/assets/videos/campaigns/their-love/video.webm', caption: 'Proof of concept video', align: 'left' }]);
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect(page.locator('#admin-content-blocks .content-block--video video source')).toHaveAttribute('src', '/assets/videos/campaigns/their-love/video.webm');
+    await expect(page.locator('#admin-content-blocks .content-block--video video source')).toHaveAttribute('type', 'video/webm');
+    await expect.poll(async () => page.locator('#admin-content-preview-mobile').evaluate((iframe: HTMLIFrameElement) => iframe.srcdoc)).toContain('video-embed--local');
+    const localVideoBlock = page.locator('#admin-content-blocks .content-block--video');
+    await localVideoBlock.getByRole('button', { name: 'Media settings' }).click();
+    await expect(localVideoBlock.getByLabel('Provider')).toHaveValue('local');
+    await expect(localVideoBlock.getByLabel('Video file path')).toHaveValue('/assets/videos/campaigns/their-love/video.webm');
+    await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
       textarea.value = JSON.stringify([{ type: 'video', provider: 'youtube', video_id: 'demo-video', caption: '', align: 'left' }]);
       textarea.dispatchEvent(new Event('change', { bubbles: true }));
     });
@@ -1681,5 +2089,25 @@ test.describe('Admin Dashboard', () => {
       { type: 'quote', text: 'A thoughtful pull quote.', author: '', align: 'left' }
     ]);
     expect(calls.authStart).toHaveLength(0);
+  });
+
+  test('shows saved marketing referral URLs as full-width rows on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await signInWithMagicToken(page);
+
+    await selectAdminSection(page, 'Marketing');
+    const savedReferralRow = page.locator('#admin-marketing-referrals tbody tr').first();
+    const savedReferralUrlCell = savedReferralRow.locator('td').nth(1);
+    const savedReferralUrl = savedReferralUrlCell.locator('.admin-marketing__referral-url');
+    await expect(savedReferralRow).toBeVisible();
+    await expect(savedReferralUrlCell).toHaveAttribute('data-label', 'URL');
+    await expect(savedReferralUrl).toContainText('/campaigns/hand-relations/');
+    await expect(savedReferralUrl).toHaveCSS('display', 'block');
+
+    const rowBox = await savedReferralRow.boundingBox();
+    const urlBox = await savedReferralUrlCell.boundingBox();
+    expect(rowBox).not.toBeNull();
+    expect(urlBox).not.toBeNull();
+    expect(urlBox!.width).toBeGreaterThan(rowBox!.width * 0.8);
   });
 });

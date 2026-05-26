@@ -31,6 +31,8 @@ const copyButton = document.querySelector('[data-campaign-embed-copy]');
 const copyStatus = document.querySelector('[data-campaign-embed-copy-status]');
 const closeLink = document.querySelector('[data-campaign-embed-close]');
 const isFramed = window.self !== window.top;
+const shouldSyncQuery = String(builder?.dataset.campaignEmbedSyncQuery || root.dataset.campaignEmbedSyncQuery || 'true') !== 'false';
+const shouldAutoload = String(builder?.dataset.campaignEmbedAutoload || root.dataset.campaignEmbedAutoload || 'true') !== 'false';
 
 let currentSlug = '';
 let currentSnapshot = null;
@@ -190,8 +192,10 @@ function formatCountdown(distanceMs) {
 }
 
 function getQuerySlug() {
+  const datasetSlug = String(builder?.dataset.campaignEmbedInitialSlug || root.dataset.campaignEmbedInitialSlug || '').trim();
+  if (!shouldSyncQuery) return datasetSlug;
   const params = new URLSearchParams(window.location.search);
-  return String(params.get('slug') || '').trim();
+  return String(params.get('slug') || datasetSlug || '').trim();
 }
 
 function normalizeLayout(value) {
@@ -230,6 +234,7 @@ function getQueryOptions() {
 }
 
 function setQueryState(slug, options) {
+  if (!shouldSyncQuery) return;
   const nextUrl = new URL(window.location.href);
   const normalizedOptions = normalizeEmbedOptions(options);
   if (slug) {
@@ -262,6 +267,11 @@ function setQueryState(slug, options) {
 
 function getEmbedHeight(options) {
   return normalizeEmbedOptions(options).layout === 'compact' ? COMPACT_EMBED_HEIGHT_PX : DEFAULT_EMBED_HEIGHT_PX;
+}
+
+function getEmbedPagePath() {
+  const configuredPath = String(builder?.dataset.campaignEmbedPath || root.dataset.campaignEmbedPath || '').trim();
+  return configuredPath || window.location.pathname;
 }
 
 function syncOptionControls(options) {
@@ -318,7 +328,7 @@ function buildResizeHelperScript(embedOrigin) {
 
 function buildEmbedCode(slug, title, options) {
   const normalizedOptions = normalizeEmbedOptions(options);
-  const embedUrl = new URL(window.location.pathname, getSiteUrl());
+  const embedUrl = new URL(getEmbedPagePath(), getSiteUrl());
   embedUrl.searchParams.set('slug', slug);
   if (normalizedOptions.layout === 'compact') {
     embedUrl.searchParams.set('layout', normalizedOptions.layout);
@@ -822,7 +832,7 @@ async function initBuilderCampaigns() {
   try {
     const campaigns = await fetchCampaignList();
     populateSelect(campaigns);
-    if (!currentSlug && campaigns.length > 0) {
+    if (shouldAutoload && !currentSlug && campaigns.length > 0) {
       currentSlug = String(campaigns[0].slug || '').trim();
       if (select) {
         select.value = currentSlug;
@@ -841,11 +851,33 @@ function initHeightObserver() {
   resizeObserver.observe(document.body);
 }
 
+function initExternalCampaignSync() {
+  window.addEventListener('pool-campaign-embed:set-campaign', function (event) {
+    const slug = String(event.detail?.slug || '').trim();
+    const nextOptions = normalizeEmbedOptions(event.detail?.embed || currentOptions || getBuilderOptions());
+    currentOptions = nextOptions;
+    syncOptionControls(nextOptions);
+    if (copyStatus) {
+      copyStatus.textContent = '';
+    }
+    if (!slug) {
+      currentSlug = '';
+      renderError(getRuntimeMessage('embed.missing_slug', 'Select a campaign to generate an embed.'));
+      if (codeField) {
+        codeField.value = '';
+      }
+      return;
+    }
+    loadSlug(slug, { embed: nextOptions });
+  });
+}
+
 async function init() {
   syncBuilderLabels();
   syncBuilderCopy();
   initSelectHandling();
   initOptionHandling();
+  initExternalCampaignSync();
   initHeightObserver();
 
   currentSlug = getQuerySlug();
@@ -858,7 +890,7 @@ async function init() {
     return;
   }
 
-  if (!isFramed && select && select.value) {
+  if (shouldAutoload && !isFramed && select && select.value) {
     loadSlug(select.value);
     return;
   }

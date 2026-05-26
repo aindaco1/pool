@@ -13,17 +13,19 @@ describe('campaign embed surface', () => {
     const embedPage = readRepoFile('embed', 'campaign', 'index.html');
     const embedPageEs = readRepoFile('es', 'embed', 'campaign', 'index.html');
     const embedLayout = readRepoFile('_layouts', 'campaign-embed.html');
+    const embedBuilder = readRepoFile('_includes', 'campaign-embed-builder.html');
 
     expect(embedPage).toContain('layout: campaign-embed');
     expect(embedPageEs).toContain('layout: campaign-embed');
     expect(embedPageEs).toContain('lang: es');
     expect(embedPage).toContain('indexable: false');
-    expect(embedPage).toContain('data-campaign-embed-root');
-    expect(embedPage).toContain('data-campaign-embed-layout');
-    expect(embedPage).toContain('data-campaign-embed-theme');
-    expect(embedPage).toContain('data-campaign-embed-media');
-    expect(embedPage).toContain('data-campaign-embed-cta');
-    expect(embedPage).toContain('campaign-embed-code-help');
+    expect(embedPage).toContain('campaign-embed-builder.html');
+    expect(embedBuilder).toContain('data-campaign-embed-root');
+    expect(embedBuilder).toContain('data-campaign-embed-layout');
+    expect(embedBuilder).toContain('data-campaign-embed-theme');
+    expect(embedBuilder).toContain('data-campaign-embed-media');
+    expect(embedBuilder).toContain('data-campaign-embed-cta');
+    expect(embedBuilder).toContain('campaign-embed-code-help');
     expect(embedLayout).toContain('indexable=false');
     expect(embedLayout).toContain('data-campaign-embed-close');
     expect(embedLayout).toContain('/assets/js/campaign-embed.js');
@@ -65,7 +67,9 @@ describe('campaign embed surface', () => {
     expect(embedScript).toContain('embed.countdown_days');
     expect(embedScript).toContain('embed.raised_label');
     expect(embedScript).toContain("'/live/'");
-    expect(embedScript).toContain('window.location.pathname');
+    expect(embedScript).toContain('getEmbedPagePath');
+    expect(embedScript).toContain('pool-campaign-embed:set-campaign');
+    expect(embedScript).toContain('campaignEmbedSyncQuery');
     expect(runtimeMessages).toContain('"embed":');
     expect(translationsEs).toContain('media_label: "Medios"');
     expect(embedStyles).toContain('.campaign-embed-builder');

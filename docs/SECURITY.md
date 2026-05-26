@@ -10,7 +10,8 @@ This document covers the security architecture, known risks, applied hardening m
 |-----------|-----------|-------------|
 | **Magic Link Tokens** | `/pledge*`, `/pledges`, `/votes` | HMAC-SHA256 signed tokens with 90-day expiry |
 | **Stripe Webhook Signature** | `/webhooks/stripe` | HMAC-SHA256 verification per Stripe spec |
-| **Admin Secret** | `/admin/*` | `Authorization: Bearer <secret>` or `x-admin-key` header |
+| **Admin Dashboard Sessions** | Browser dashboard `/admin/*` APIs | Email magic-link sign-in, signed session cookie, CSRF header on mutations, role/campaign scoping |
+| **Admin Recovery Secret** | Automation and recovery `/admin/*` endpoints | `Authorization: Bearer <secret>` or `x-admin-key` header for script-driven operations |
 | **Test Mode Guard** | `/test/*` | `APP_MODE === 'test'` environment check |
 
 ### Data Storage (Cloudflare KV)
@@ -28,6 +29,11 @@ This document covers the security architecture, known risks, applied hardening m
 | `pending-extras:{orderId}` | PLEDGES | Temporary support item / custom amount checkout extras | **Low** - ephemeral |
 | `pending-tiers:{orderId}` | PLEDGES | Temporary overflow tier metadata during checkout | **Low** - ephemeral |
 | `cron:lastRun` | PLEDGES | Last cron execution timestamp | **Low** - monitoring |
+| `admin-login:{hash}` | PLEDGES | One-time admin login nonce and email | **Medium** - ephemeral admin auth |
+| `admin-session:{hash}` | PLEDGES | Admin email, role, campaign scope, CSRF token, expiry | **High** - admin auth |
+| `admin-users:v1` | PLEDGES | Runtime admin users and campaign scopes | **High** - access control |
+| `admin-marketing-referrals:{slug}` | PLEDGES | Saved referral code metadata | **Low** - admin-authored marketing data |
+| `admin-audit:{date}:{action}:{id}` | PLEDGES | Recent admin mutation audit events | **Medium** - admin identity + operational metadata |
 | `vote:{slug}:{decision}:{email}` | VOTES | Vote choice | **Medium** - links supporter to vote |
 | `results:{slug}:{decision}` | VOTES | Vote tallies | **Low** - semi-public |
 | `rl:{endpoint}:{ip}` | RATELIMIT | Request count + reset time | **Low** - ephemeral |
@@ -64,6 +70,7 @@ Scarce limited-tier reservation and committed-count truth is no longer stored in
 | SEC-010 | Tokens in query strings (Referer leakage risk) | **Low** | Acceptable |
 | SEC-011 | Input validation on checkout-start payloads | **Low** | ✅ Fixed |
 | SEC-012 | Missing security response headers | **Low** | ✅ Fixed |
+| SEC-013 | Admin dashboard stored input normalization gaps | **Low** | ✅ Fixed |
 
 ---
 
@@ -80,6 +87,31 @@ Runtime credentials are intentionally separated from editable site configuration
 - The admin dashboard may show Configured/Missing status for runtime credentials, but it must not expose, edit, serialize, or publish secret values.
 
 This boundary prevents the admin dashboard from becoming a credential store and keeps forks from accidentally committing Stripe, Resend, USPS, ZIP.TAX, or Cloudflare tokens while still making missing setup visible to operators.
+
+### Admin Dashboard Input Security Model
+
+The browser admin dashboard has a single server-side normalization boundary before data is written to GitHub-backed YAML or Worker KV. Client-side controls exist for usability only; the Worker remains authoritative.
+
+Admin mutations use these common protections:
+
+- Browser dashboard mutations require a valid admin session cookie and `x-pool-admin-csrf` header.
+- Campaign users can mutate only campaigns in their assigned scope; super admins can mutate platform settings and all campaigns.
+- GitHub-backed settings are allowlisted through `ADMIN_PLATFORM_SETTING_SCHEMA` and `ADMIN_CAMPAIGN_SETTING_SCHEMA`. Unknown paths are rejected, and pseudo UI rows such as the campaign content editor cannot be mass-assigned through settings publishing.
+- Runtime-only admin users are saved only to KV at `admin-users:v1`; they are not serialized into `_config.yml`.
+- Marketing referral codes are saved only on explicit user action and are scoped to the campaign URL origin/path the admin account can access.
+- The static admin shell uses a restrictive CSP with no inline scripts and `frame-ancestors 'none'`; preview iframes remain sandboxed and receive only Worker-rendered preview HTML.
+- Admin magic-link emails use internally generated login URLs and strip email-header control characters from admin-configurable sender/subject values before sending.
+
+Admin field classes are normalized consistently:
+
+- Plain text strips control characters, enforces length limits, and rejects raw HTML.
+- Inline rich text allows Markdown plus a small HTML subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`), rejects scripts, iframes, inline event handlers, inline styles, unsafe Markdown links, and parent-relative links such as `../admin`.
+- URLs and media references must be safe root-relative paths or absolute `http`/`https` URLs. Canonical site/Worker URLs and external API bases must be absolute `http`/`https` URLs. Embedded credentials, unsafe schemes such as `javascript:` and `data:`, path traversal, literal whitespace, and raw markup characters are rejected.
+- CSS design inputs are narrowed to hex colors, simple font stacks, and simple length tokens so settings cannot smuggle CSS declarations or `url(...)` values.
+- Numbers, booleans, enums, IDs, slugs, dates, shipping dimensions, and package weights are parsed into canonical types with per-field bounds.
+- Structured collections such as tiers, add-ons, diary entries, decisions, and content blocks are normalized item-by-item instead of trusting raw JSON from the browser.
+
+SQL injection is not a primary threat for the current Worker because the runtime does not use SQL. The relevant injection classes are stored XSS, YAML/front-matter injection, KV key/path manipulation, URL/CSS injection, and privilege escalation through mass assignment; the admin normalizers are designed around those risks.
 
 ### SEC-001: Lock Down Dev-Token Bypass (✅ FIXED)
 
@@ -417,6 +449,24 @@ const SECURITY_HEADERS = {
 
 ---
 
+### SEC-013: Admin Dashboard Stored Input Normalization (✅ FIXED)
+
+**File:** `worker/src/index.js`
+
+The admin dashboard now validates every GitHub-backed and KV-backed dashboard write through shared admin normalization helpers before persistence.
+
+Covered write paths:
+- `/admin/settings/preview` and `/admin/settings/publish`
+- `/admin/content/preview` and `/admin/content/publish`
+- `/admin/users`
+- `/admin/marketing/referrals`
+
+The hardening rejects stored-XSS primitives such as raw `<script>`, event-handler attributes, unsafe Markdown links, parent-relative Markdown links, `javascript:`/`data:` URLs, CSS function/declaration injection, and unsafe asset paths. It also rejects settings mass assignment for dashboard-only rows and normalizes structured arrays for platform add-ons, campaign add-ons, tiers, support items, diary entries, stretch goals, ongoing items, and decisions.
+
+The browser dashboard also has defense-in-depth hardening around the editing shell: the admin page CSP blocks framing with `frame-ancestors 'none'`, avoids inline scripts, limits Worker/API connections, and keeps content previews in sandboxed iframes. Magic-link email payloads strip CRLF/control characters from configurable header values before calling Resend so platform names or sender settings cannot create header-injection payloads.
+
+---
+
 ## Secrets Checklist
 
 Before deploying to production, verify these secrets are set:
@@ -427,6 +477,7 @@ Before deploying to production, verify these secrets are set:
 | Stripe Webhook Secret | `STRIPE_WEBHOOK_SECRET_LIVE` | 32+ chars |
 | Checkout Intent Secret | `CHECKOUT_INTENT_SECRET` | 32+ chars |
 | Magic Link Secret | `MAGIC_LINK_SECRET` | 32+ chars |
+| Admin Session Secret | `ADMIN_SESSION_SECRET` | 32+ chars |
 | Admin Secret | `ADMIN_SECRET` | 32+ chars |
 | Resend API Key | `RESEND_API_KEY` | N/A |
 
@@ -464,11 +515,12 @@ If a magic link token is compromised:
 3. To invalidate: delete the pledge from KV (`GET /pledge` will then return `404` for that token)
 4. Optionally: regenerate MAGIC_LINK_SECRET (invalidates ALL tokens)
 
-### Admin Secret Compromise
+### Admin Session Or Secret Compromise
 
-1. Immediately rotate `ADMIN_SECRET` via `wrangler secret put`
-2. Review audit logs for unauthorized admin actions
-3. Re-check campaign stats and pledge data integrity
+1. Immediately rotate `ADMIN_SESSION_SECRET` and `ADMIN_SECRET` via `wrangler secret put`
+2. Clear active `admin-session:*` keys from the Worker KV namespace
+3. Review `admin-audit:*` events and GitHub commits for unauthorized admin actions
+4. Re-check campaign stats, pledge data, settings, and admin user scopes
 
 ### Stripe Webhook Secret Compromise
 
@@ -507,4 +559,4 @@ If the on-site payment step completes but the pledge doesn't appear yet (common 
 
 ---
 
-_Last updated: Apr 9, 2026_
+_Last updated: May 25, 2026_

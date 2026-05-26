@@ -50,6 +50,13 @@ The recent accessibility hardening pass added:
   - screen-reader countdown status text that mirrors the visual timer state
   - clearer hero-video grouping and loading semantics
   - safer small-screen wrapping for countdown tiles, creator metadata, and community teaser actions
+- admin-dashboard semantics and keyboard polish for:
+  - shared field labels whose help buttons are not nested inside labels
+  - field help text connected to editable controls with `aria-describedby`
+  - legend-backed checkbox groups for shipping options and admin campaign access
+  - APG-style top-level, settings-section, campaign, and campaign-subtab navigation
+  - WYSIWYG content-editor chrome that is only keyboard-reachable when the relevant block is active
+  - sortable data tables that expose `aria-sort` state and sort buttons
 
 ## Critical Surfaces
 
@@ -61,6 +68,7 @@ The most important accessibility-sensitive UI in the app right now is:
 4. Campaign phase tabs and diary tabs
 5. Platform tip sliders
 6. Public campaign-page media and long-form content blocks
+7. Admin dashboard settings, campaign editors, content editors, reports, analytics, supporters, and marketing tools
 
 These surfaces matter most because they combine custom UI, dynamic state changes, and high-value user actions.
 
@@ -72,6 +80,20 @@ Accessibility changes should preserve these constraints:
 - do not add long-lived browser persistence for accessibility state
 - do not weaken CSP or checkout hardening to support convenience behavior
 - prefer native elements and low-risk semantic improvements over custom widgets
+
+## Admin Dashboard Model
+
+The admin dashboard has enough custom UI that it needs its own accessibility rules:
+
+- Use the shared admin label/help pattern for new fields. Help buttons must sit beside labels, not inside labels, and the editable control should reference the help tooltip with `aria-describedby`.
+- Use native controls for text, date/time, select menus, file uploads, checkboxes, and buttons unless a custom control is clearly necessary.
+- Checkbox groups must have a real `legend`; visually repeated labels can use `sr-only` legends when the visible label already appears above the group.
+- Top-level tabs, Settings sidebar tabs, Campaign sidebar tabs, and Campaign subtabs should keep `role="tablist"`, `role="tab"`, `role="tabpanel"`, `aria-selected`, `aria-controls`, and roving `tabindex` behavior in sync.
+- Content-editor blocks should expose editable text as `role="textbox"` with clear labels, `aria-multiline` where appropriate, and formatting buttons with `aria-pressed` when they represent toggle state.
+- Hidden content-editor chrome must not remain in the keyboard tab order. A block's toolbar should become reachable only after that block is active.
+- Media settings panels should expose expanded/collapsed state from the gear button and a labeled group for the revealed settings.
+- Sortable admin tables should use real buttons in column headers, maintain `aria-sort`, and keep export buttons outside horizontally scrollable table regions.
+- Save/Publish status messages should use polite status regions; validation or blocking errors should remain near the relevant field or workflow.
 
 ## Automated Coverage
 
@@ -124,6 +146,9 @@ Current automated accessibility-related coverage includes:
 - keyboard-only secondary public-page control assertions in:
   - `tests/e2e/public-page-controls.spec.ts`
   - these verify diary-tab navigation, carousel-gallery navigation, custom-amount entry, support-item entry, and supporter-community teaser activation remain usable without pointer input
+- admin-dashboard keyboard, axe, and semantics assertions in:
+  - `tests/e2e/admin-dashboard.spec.ts`
+  - this covers admin sign-in, role-gated tabs, settings-section tabs, campaign subtabs, shared field help, user campaign checkbox groups, WYSIWYG editor chrome, media settings panels, sortable data surfaces, and Spanish admin route loading
 
 Run the focused accessibility slice with:
 
@@ -162,6 +187,12 @@ For the narrower Podman-backed public-page accessibility sweep that avoids host 
 npm run test:e2e:headless:podman -- tests/e2e/accessibility-public-pages.spec.ts --project=chromium
 ```
 
+For the Podman-backed admin-dashboard accessibility and interaction sweep, use:
+
+```bash
+npm run test:e2e:headless:podman -- tests/e2e/admin-dashboard.spec.ts --project=chromium
+```
+
 For the recommended local-dev stack, prefer:
 
 ```bash
@@ -184,6 +215,10 @@ Automated checks help, but these manual accessibility checks are still important
 - tip sliders remain usable with repeated arrow-key adjustments
 - community voting remains operable with keyboard-only interaction
 - error messages are understandable and appear near the right fields
+- admin dashboard tabs, Settings sidebars, Campaign sidebars, and Campaign subtabs can be traversed with keyboard only
+- admin dashboard help buttons announce useful field descriptions without interfering with the field's visible label
+- WYSIWYG editor block controls are not reachable while hidden and become reachable after the block is focused or activated
+- admin dashboard table sorting and CSV export flows are operable with keyboard only
 
 ## Accepted Limits
 
@@ -199,9 +234,10 @@ Good next accessibility improvements include:
 
 - manual screen-reader verification pass across cart, checkout, manage, and supporter-community flows
 - keeping the public-page axe/ARIA coverage current as new top-level pages and campaign archetypes are added
+- keeping the admin-dashboard axe/ARIA coverage current as new settings sections, campaign collections, and dashboard tables are added
 - adding keyboard-only assertions alongside any new public interactive widgets as they are introduced
 - keeping the i18n-aware accessibility review current as more localized public or supporter-facing copy is added
 
 ---
 
-_Last updated: Apr 21, 2026_
+_Last updated: May 25, 2026_

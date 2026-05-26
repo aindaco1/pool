@@ -2,6 +2,7 @@
 # Sync Worker-mirrored settings from _config.yml / _config.local.yml into worker/wrangler.toml.
 
 require 'yaml'
+require 'json'
 
 ROOT = File.expand_path('..', __dir__)
 BASE_CONFIG_PATH = File.join(ROOT, '_config.yml')
@@ -15,6 +16,7 @@ TOP_LEVEL_ORDER = [
   'CANONICAL_WORKER_BASE',
   'CORS_ALLOWED_ORIGIN',
   'APP_MODE',
+  'ADMIN_USERS_JSON',
   'SITE_TITLE',
   'SITE_DESCRIPTION',
   'PLATFORM_NAME',
@@ -84,6 +86,7 @@ DEV_ENV_ORDER = [
   'CORS_ALLOWED_ORIGIN',
   'APP_MODE',
   'ADMIN_BOOTSTRAP_EMAILS',
+  'ADMIN_USERS_JSON',
   'ADMIN_TEST_CAMPAIGNS',
   'SITE_TITLE',
   'SITE_DESCRIPTION',
@@ -174,15 +177,56 @@ def parse_simple_assignments(content)
   values
 end
 
-def parse_inline_vars(content)
-  env_match = content.match(/^\[env\.dev\]\s*\nvars\s*=\s*\{([^}]*)\}/m)
-  return {} unless env_match
+def toml_unescape(value)
+  value.gsub(/\\(["\\])/, '\1')
+end
+
+def parse_table_assignments(content, section_header)
+  lines = content.lines
+  start_index = lines.index { |line| line.strip == section_header }
+  return {} unless start_index
 
   values = {}
-  env_match[1].scan(/([A-Z_]+)\s*=\s*"([^"]*)"/) do |key, value|
-    values[key] = value
+  index = start_index + 1
+  while index < lines.length && !lines[index].start_with?('[')
+    if lines[index] =~ /^([A-Z_]+)\s*=\s*"((?:\\.|[^"\\])*)"\s*$/
+      values[Regexp.last_match(1)] = toml_unescape(Regexp.last_match(2))
+    end
+    index += 1
   end
   values
+end
+
+def parse_inline_env_vars(content)
+  lines = content.lines
+  env_index = lines.index { |line| line.strip == '[env.dev]' }
+  return {} unless env_index
+
+  vars_line = nil
+  index = env_index + 1
+  while index < lines.length && !lines[index].start_with?('[')
+    if lines[index].start_with?('vars = {')
+      vars_line = lines[index]
+      break
+    end
+    index += 1
+  end
+  return {} unless vars_line
+
+  vars_body = vars_line.sub(/\Avars\s*=\s*\{\s*/, '').sub(/\s*\}\s*\z/, '')
+
+  values = {}
+  vars_body.scan(/([A-Z_]+)\s*=\s*"((?:\\.|[^"\\])*)"/) do |key, value|
+    values[key] = toml_unescape(value)
+  end
+  values
+end
+
+def parse_env_dev_vars(content)
+  table_values = parse_table_assignments(content, '[env.dev.vars]')
+  return table_values unless table_values.empty?
+
+  parse_inline_env_vars(content)
 end
 
 def format_decimal(value, places)
@@ -209,6 +253,31 @@ def csv_value(value, fallback = nil)
     .join(',')
 end
 
+def admin_users_json(value, fallback = nil)
+  users = Array(value).map do |entry|
+    next unless entry.is_a?(Hash)
+
+    email = entry['email'].to_s.strip.downcase
+    next if email.empty?
+
+    role = entry['role'].to_s.strip == 'super_admin' ? 'super_admin' : 'campaign_user'
+    campaign_source = entry['campaigns'] || entry['campaignSlugs'] || entry['campaign_slugs'] || []
+    campaigns = Array(campaign_source)
+      .flat_map { |item| String(item).split(',') }
+      .map(&:strip)
+      .reject(&:empty?)
+      .uniq
+
+    {
+      name: entry['name'].to_s.strip,
+      email: email,
+      role: role,
+      campaignSlugs: role == 'super_admin' ? [] : campaigns
+    }
+  end.compact
+  users.empty? ? fallback : JSON.generate(users)
+end
+
 def replace_toml_section(content, section_header, body_lines)
   lines = content.lines
   start_index = lines.index { |line| line.strip == section_header }
@@ -222,6 +291,49 @@ def replace_toml_section(content, section_header, body_lines)
   replacement = ["#{section_header}\n", *body_lines.map { |line| "#{line}\n" }, "\n"]
   lines[start_index...end_index] = replacement
   lines.join
+end
+
+def remove_env_dev_inline_vars(content)
+  lines = content.lines
+  env_index = lines.index { |line| line.strip == '[env.dev]' }
+  return content unless env_index
+
+  index = env_index + 1
+  while index < lines.length && !lines[index].start_with?('[')
+    if lines[index].start_with?('vars = {')
+      lines.delete_at(index)
+      next
+    end
+    index += 1
+  end
+  lines.join
+end
+
+def upsert_toml_section(content, section_header, body_lines, before_section_prefix)
+  lines = content.lines
+  filtered_lines = []
+  index = 0
+  while index < lines.length
+    if lines[index].strip == section_header
+      index += 1
+      index += 1 while index < lines.length && !lines[index].start_with?('[')
+      next
+    end
+
+    filtered_lines << lines[index]
+    index += 1
+  end
+
+  env_index = filtered_lines.index { |line| line.strip == '[env.dev]' }
+  return content unless env_index
+
+  insert_index = filtered_lines.index.with_index do |line, index|
+    index > env_index && line.start_with?(before_section_prefix)
+  end || env_index + 1
+
+  insertion = ["#{section_header}\n", *body_lines.map { |line| "#{line}\n" }, "\n"]
+  filtered_lines.insert(insert_index, *insertion)
+  filtered_lines.join
 end
 
 def build_mirror_values(config, existing)
@@ -245,6 +357,7 @@ def build_mirror_values(config, existing)
     'CORS_ALLOWED_ORIGIN' => platform['site_url'] || config['url'] || existing['CORS_ALLOWED_ORIGIN'],
     'APP_MODE' => existing['APP_MODE'] || 'live',
     'ADMIN_BOOTSTRAP_EMAILS' => csv_value(admin['local_bootstrap_emails'], existing['ADMIN_BOOTSTRAP_EMAILS']),
+    'ADMIN_USERS_JSON' => admin_users_json(admin['users'], existing['ADMIN_USERS_JSON']),
     'ADMIN_TEST_CAMPAIGNS' => csv_value(admin['local_test_campaigns'], existing['ADMIN_TEST_CAMPAIGNS']),
     'SITE_TITLE' => config['title'] || platform['name'] || existing['SITE_TITLE'],
     'SITE_DESCRIPTION' => config['description'] || existing['SITE_DESCRIPTION'],
@@ -314,7 +427,7 @@ dev_config = deep_merge(base_config, local_config)
 
 content = File.read(WRANGLER_PATH)
 existing_top = parse_simple_assignments(content)
-existing_dev = parse_inline_vars(content)
+existing_dev = parse_env_dev_vars(content)
 
 top_values = build_mirror_values(base_config, existing_top)
 dev_values = build_mirror_values(dev_config, existing_dev).merge('APP_MODE' => 'test')
@@ -333,13 +446,14 @@ end.compact.join("\n")
 
 updated = replace_toml_section(updated, '[vars]', vars_block.split("\n"))
 
-dev_vars_line = "vars = { #{DEV_ENV_ORDER.map { |key|
+dev_vars_block = DEV_ENV_ORDER.map do |key|
   value = dev_values[key]
   next nil unless value
   %(#{key} = "#{toml_escape(value)}")
-}.compact.join(', ')} }"
+end.compact.join("\n")
 
-updated.gsub!(/(^\[env\.dev\]\s*\n)vars\s*=\s*\{[^}]*\}/m, "\\1#{dev_vars_line}")
+updated = remove_env_dev_inline_vars(updated)
+updated = upsert_toml_section(updated, '[env.dev.vars]', dev_vars_block.split("\n"), '[[env.dev.')
 
 if updated == content
   puts '✅ worker/wrangler.toml already in sync with _config.yml and _config.local.yml'

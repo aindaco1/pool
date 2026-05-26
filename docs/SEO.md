@@ -28,6 +28,7 @@ The current baseline includes:
 - generated [`robots.txt`](../robots.txt)
 - generated [`sitemap.xml`](../sitemap.xml)
 - explicit `noindex,nofollow` on tokenized or supporter-only layouts
+- explicit `noindex,nofollow,noarchive`, `sitemap: false`, robots disallows, and disabled social metadata on the private admin dashboard
 - conservative `Organization` / `WebSite` JSON-LD
 - conservative campaign `CreativeWork` plus breadcrumb JSON-LD, both aligned with the active page language where supported
 - campaign `CreativeWork` JSON-LD now also includes `headline`, `mainEntityOfPage`, `isPartOf`, and published/modified timestamps so public campaign pages read more like real editorial landing pages than anonymous blobs
@@ -65,6 +66,8 @@ Non-indexable by default:
 - cart and checkout flows
 - pledge success / cancelled pages
 - `/manage/`
+- `/admin/`
+- `/es/admin/`
 - supporter community pages
 - tokenized routes and user-specific query-string access paths
 
@@ -74,6 +77,14 @@ This is enforced through a mix of:
 - `robots.txt`
 - sitemap inclusion rules
 - sitemap `lastmod` hints for public pages and campaigns
+
+Admin dashboard contract:
+
+- [admin.md](../admin.md) and [es/admin/index.html](../es/admin/index.html) must keep `indexable: false` and `sitemap: false`
+- [/_layouts/admin.html](../_layouts/admin.html) must call `seo-meta.html` with `indexable=false` and `social=false`
+- [`robots.txt`](../robots.txt) must disallow `/admin/` and `/es/admin/`
+- [`sitemap.xml`](../sitemap.xml) must not include admin routes
+- the admin layout must not emit JSON-LD or Open Graph/Twitter social-preview metadata; the dashboard is a private app surface, not a public search result or share target
 
 ## Structured Data
 
@@ -166,6 +177,7 @@ When checking a deployment manually:
 - `robots.txt` is reachable and only exposes intended public crawl paths
 - `sitemap.xml` is reachable and only includes intended public URLs
 - private/tokenized pages emit `noindex` where appropriate
+- `/admin/` and `/es/admin/` emit `noindex,nofollow,noarchive`, do not appear in `sitemap.xml`, and do not emit social-preview or JSON-LD metadata
 - JSON-LD validates cleanly
 - localized pages keep coherent canonical and alternate links
 - localized campaign pages keep coherent canonical and alternate links
@@ -181,6 +193,7 @@ The current SEO model explicitly avoids:
 - hidden text or keyword stuffing
 - fake FAQ or review schema
 - indexing supporter-only, session-bound, or tokenized access flows
+- treating the admin dashboard as a public landing page, share target, or crawlable documentation surface
 
 ## Current Follow-Up Work
 

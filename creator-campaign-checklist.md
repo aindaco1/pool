@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Campaign Creator Checklist
-description: A complete prep checklist for creators launching a campaign on The Pool, including image, video, copy, tiers, add-ons, embeds, tax, shipping, fulfillment, and optional campaign materials.
+description: A complete prep checklist for creators launching a campaign on The Pool, including dashboard handoff, image, video, copy, tiers, add-ons, embeds, tax, shipping, fulfillment, and optional campaign materials.
 permalink: /creator-campaign-checklist/
 lang: en
 indexable: false
@@ -29,6 +29,7 @@ This checklist covers:
 - physical reward and shipping requirements
 - tax, free-shipping, and fallback expectations
 - promotion, embeds, reporting, and fulfillment handoff
+- dashboard access, drafts, and publishing expectations
 - optional materials that make a campaign feel richer and more persuasive
 
 ## The Short Version
@@ -50,6 +51,7 @@ If a creator only reads one section, it should be this one.
 - at least one tier
 - tier name, price, and description for each tier
 - report recipient email addresses, if the campaign runner wants automatic reports
+- dashboard editor email addresses, if the creator or team should edit the campaign directly
 
 ### Strongly recommended
 
@@ -115,11 +117,37 @@ These are the foundational fields every campaign should have.
 | Featured tier | Recommended | Choose the clearest entry-point tier. |
 | Runner report emails | Recommended | One or more campaign-runner recipients for pledge and fulfillment reports. |
 | Fulfillment owner | Recommended | Who is responsible for campaign rewards after a successful charge. |
+| Dashboard editors | Recommended | Authorized creator/team emails that should receive campaign-specific admin access. |
 
 <figure class="creator-checklist-screenshot creator-checklist-screenshot--compact">
   <img src="/assets/images/checklists/creator-campaign-checklist/creator-facts.png" alt="Creator facts panel showing creator image, name, category, and embed link." loading="lazy">
   <figcaption>The creator facts panel pulls from the core metadata, so missing basics become visible on the public page.</figcaption>
 </figure>
+
+## Admin Dashboard Handoff
+
+The Pool now uses a private admin dashboard for normal campaign editing and operations. Campaign creators do not need direct repository access for supported edits.
+
+The dashboard can manage:
+
+- campaign settings, dates, blurbs, images, video, and shipping options
+- long-form campaign content through the WYSIWYG block editor
+- tiers, support items, campaign add-ons, stretch goals, diary entries, and decisions
+- report previews, supporter lists, analytics, marketing/referral links, and embed-builder shortcuts
+
+Before launch, confirm:
+
+- which creator or team emails should have campaign-specific dashboard access
+- who is allowed to publish campaign changes
+- whether a super admin should review changes before launch
+- which fields should be treated as final once public links are shared, especially slug, URL, prices, inventory, shipping, and tax expectations
+
+Operational notes:
+
+- New tier, support item, add-on, decision, and variant IDs can be derived from names/labels in the dashboard; legacy IDs should stay stable.
+- Content editor drafts are local until saved/published, so creators should not treat unsaved browser drafts as the source of truth.
+- Publishing campaign or settings changes commits through the platform workflow and may take time to deploy.
+- User management is separate from publishing: dashboard users save to Worker KV and do not create GitHub commits.
 
 ### Short Blurb Guidance
 
@@ -875,7 +903,7 @@ The Pool includes a hosted campaign embed builder at:
 - `/embed/campaign/?slug=your-campaign-slug`
 - `/es/embed/campaign/?slug=your-campaign-slug`, for Spanish-language pages
 
-The embed is a live `iframe` widget for websites that allow pasted HTML. It reflects current campaign state, pledged total, countdown/progress, media settings, and the campaign call to action.
+The embed is a live `iframe` widget for websites that allow pasted HTML. It reflects current campaign state, pledged total, countdown/progress, media settings, and the campaign call to action. The same builder also appears inside the dashboard Marketing tab alongside saved referral-code and UTM-link tools.
 
 <figure class="creator-checklist-screenshot">
   <img src="/assets/images/checklists/creator-campaign-checklist/embed-builder.png" alt="The campaign embed builder with layout, theme, media, call-to-action controls, embed code, and preview area." loading="lazy">
@@ -1033,6 +1061,7 @@ Report behavior to understand:
 
 - pledge reports are a ledger/history export
 - fulfillment reports are a merged current-state view per supporter and campaign
+- the dashboard can preview and download pledge or fulfillment CSVs without sending email
 - campaign add-ons stay with the campaign fulfillment slice
 - platform add-ons are sent to the platform fulfillment slice
 - modified and canceled pledge rows may appear in pledge history, while fulfillment uses current supporter state
@@ -1054,6 +1083,7 @@ If a creator wants a simple target package, this is a strong one:
 - `0 to 3` stretch goals
 - `0 to 2` launch-ready community decisions
 - report recipient emails and fulfillment owner
+- dashboard editor emails, if creators need direct campaign access
 - embed/promotion destinations for launch week
 
 ## Delivery Recommendations
@@ -1093,6 +1123,7 @@ A campaign is usually ready when:
 - free shipping, flat fallback, USPS quote, and campaign override expectations are explicit
 - tax wording does not overpromise beyond configured checkout behavior
 - report recipients and fulfillment owners are set
+- dashboard editor access and publishing responsibility are confirmed
 - the campaign embed has been checked for launch-promotion destinations
 - image alt text exists where needed
 - no section feels like placeholder copy
@@ -1115,6 +1146,7 @@ If someone needs the shortest possible prep version, send them this:
 - wide hero image or campaign video
 - at least one tier
 - report recipient emails, if the creator wants campaign-runner reports
+- dashboard editor emails, if the creator/team should edit directly
 
 ### Strongly recommended
 
@@ -1150,6 +1182,7 @@ This checklist is meant to help creators deliver everything needed for a campaig
     <li><a href="#the-short-version">The Short Version</a></li>
     <li><a href="#what-makes-a-campaign-feel-complete">What Makes a Campaign Feel Complete</a></li>
     <li><a href="#core-campaign-information">Core Campaign Information</a></li>
+    <li><a href="#admin-dashboard-handoff">Admin Dashboard Handoff</a></li>
     <li><a href="#image-deliverables">Image Deliverables</a></li>
     <li><a href="#campaign-pitch-video">Campaign Pitch Video</a></li>
     <li><a href="#campaign-copy">Campaign Copy</a></li>

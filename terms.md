@@ -64,7 +64,9 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - Full card details are handled and stored by Stripe. The Pool does not store full card numbers or CVC values.
 - Email addresses and any shipping details needed for fulfillment may be stored in our system for pledge management, campaign-specific confirmations, campaign updates, and reward fulfillment.
 - Campaign organizers may receive campaign-scoped reports or fulfillment exports containing supporter/order details needed to run that specific campaign, coordinate delivery, or send production-related updates. Those reports stay limited to the campaign a supporter backed rather than exposing unrelated campaign pledges.
+- Authorized campaign operators may also view campaign-scoped supporter rows, reports, analytics, fulfillment data, and campaign content through The Pool's private admin dashboard. Dashboard access is role-scoped: campaign users see only assigned campaigns, while platform administrators may see platform-wide operational data needed to run The Pool.
 - When a pledge includes platform-fulfilled add-on items, platform operators may separately receive platform-only fulfillment exports limited to the items they must deliver.
+- Platform administrators may use the dashboard to manage campaign configuration, platform settings, add-ons, referral links, and authorized dashboard users. Secret values are not stored in campaign content or dashboard drafts.
 - Inventory-limited platform add-ons use saved pledge state, not in-progress cart drafts, to determine remaining stock.
 - Inventory-limited campaign add-ons also use saved pledge state, not in-progress cart drafts, to determine remaining stock.
 - Supporter-community access in the browser may be remembered for the current session as a convenience, but the emailed magic link remains the source of truth for access.
@@ -78,6 +80,7 @@ The Pool is an [open-source crowdfunding platform](https://github.com/aindaco1/p
 - **The Pool cart runtime** — First-party cart management, checkout sidecars, and pledge review
 - **[Stripe](https://stripe.com)** — Secure payment fields, saved payment methods, and payment processing
 - **[Cloudflare Workers](https://workers.cloudflare.com)** — Backend API for canonical pledge validation, pledge storage, live stats, and automated campaign settlement
+- **Private admin dashboard** — Role-scoped campaign editing, reports, analytics, supporter views, marketing links, user management, and platform operations
 - **[Resend](https://resend.com)** — Transactional emails (confirmations, updates, charge notifications)
 
 Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project, with optional platform tips helping cover maintenance of The Pool itself.
@@ -88,4 +91,4 @@ For questions about these terms or your pledge, email us at info@dustwave.xyz.
 
 ---
 
-_Last updated: April 21, 2026_
+_Last updated: May 26, 2026_

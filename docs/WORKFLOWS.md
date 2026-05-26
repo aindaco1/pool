@@ -35,6 +35,7 @@ upcoming → live → post
 | **Stripe** | Checkout Sessions in setup mode (custom on-site payment step) + PaymentIntents (charge later) |
 | **Cloudflare Worker** | Backend: checkout, webhooks, pledge storage (KV), combined live reads, stats, auto-settle cron |
 | **Jekyll** | Static pages + campaign markdown |
+| **Admin dashboard** | Private browser workspace for settings, campaigns, add-ons, reports, analytics, supporters, marketing links, and users |
 
 ---
 
@@ -68,6 +69,8 @@ Pledges are stored in Cloudflare KV. Key patterns:
 | `pending-extras:{orderId}` | Temporary storage for support items/custom amount during checkout |
 | `pending-tiers:{orderId}` | Temporary storage for additional tiers when Stripe metadata would be too large |
 | `checkout-intent:{orderId}` | Canonicalized checkout payload used to fan bundled checkout into campaign-scoped pledges |
+| `admin-users:v1` | Runtime dashboard users saved from **Settings -> Users** |
+| `admin-marketing-referrals:{campaignSlug}` | Saved referral code metadata for the dashboard Marketing tab |
 
 Scarce-tier reservations and committed claim state now live in the per-campaign Durable Object coordinator rather than KV. `tier-inventory:{campaignSlug}` remains the public projection used by `/inventory/:slug` and `/live/:slug`.
 
@@ -342,53 +345,30 @@ Send a custom announcement email with optional CTA link to all campaign supporte
 - `ctaLabel` + `ctaUrl` (optional) — Adds a prominent button linking to the URL
 - `dryRun` (optional) — Returns recipient list without sending
 
-### `POST /admin/report/campaign-runner`
-Preview or manually send a campaign-runner report for one campaign.
+### Browser Admin Dashboard
 
-**Headers:** `Authorization: Bearer ADMIN_SECRET`  
-**Request:**
-```json
-{
-  "campaignSlug": "hand-relations",
-  "reportType": "pledge",
-  "dryRun": true,
-  "markAsSent": false
-}
-```
+The private dashboard is available at `/admin/` and `/es/admin/`. It uses magic-link sign-in and a cookie-backed Worker session; browser code never receives `ADMIN_SECRET`.
 
-**Fields:**
-- `campaignSlug` (required) — Campaign to report on
-- `reportType` (optional) — `pledge` or `fulfillment` (`pledge` by default)
-- `dryRun` (optional) — Returns recipients, row counts, filename, and marker state without sending
-- `markAsSent` (optional) — On live sends, writes the matching report marker so the scheduled run does not immediately duplicate the email; defaults to `true` when `dryRun` is false
+Primary flows:
 
-Recipients still come from the campaign’s `runner_report_emails` front matter field.
-For `reportType: "fulfillment"`, the Worker may also send a separate platform-fulfillment email to `platform.support_email` when platform add-on rows exist.
+- Dashboard summary, analytics, reports, supporters, content loads, and content previews are read-only browsing flows.
+- Campaign content/settings and platform settings/add-ons publish through Worker validation and GitHub-backed commits.
+- **Settings -> Users** saves directly to Worker KV at `admin-users:v1`.
+- Saved referral codes in **Marketing** save to campaign-scoped KV.
+- **Reports** previews pledge/fulfillment rows and downloads CSVs; it does not send email and does not mark reports as sent.
+- **Secrets & credentials** reports configured/missing status only; it does not expose or store secret values.
 
-**Dry-run example:**
+Report preview/download endpoints used by the dashboard:
+
 ```bash
-curl -X POST http://localhost:8787/admin/report/campaign-runner \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer YOUR_ADMIN_SECRET' \
-  -d '{"campaignSlug":"hand-relations","reportType":"pledge","dryRun":true}'
+curl "http://localhost:8787/admin/reports/campaign-runner/preview?campaignSlug=hand-relations&reportType=pledge"
 ```
 
-**Manual send example:**
 ```bash
-curl -X POST http://localhost:8787/admin/report/campaign-runner \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer YOUR_ADMIN_SECRET' \
-  -d '{"campaignSlug":"hand-relations","reportType":"fulfillment","dryRun":false,"markAsSent":true}'
+curl "http://localhost:8787/admin/reports/campaign-runner.csv?campaignSlug=hand-relations&reportType=fulfillment"
 ```
 
-**Operational notes:**
-- run a dry run first when validating recipients, CSV shape, or subject-prefix customization
-- use `reportType=pledge` for the daily live-campaign ledger and `reportType=fulfillment` for the one-time post-deadline export
-- report subjects stay concise and emoji-free for deliverability, using the configured prefix plus report kind and campaign title
-- pledge emails and fulfillment emails intentionally use different summary/body content so fulfillment sends stay focused on delivery work instead of campaign-momentum stats
-- fulfillment dry runs now expose `campaignRowCount`, `platformRowCount`, and `platformRecipient` so operators can confirm both fulfillment audiences before sending
-- fulfillment live sends split by fulfiller: campaign-runner recipients get only campaign rows, while `support_email` gets the platform slice when present
-- keep `markAsSent=false` only for deliberate preview-style sends that should not suppress the next scheduled report
+For authenticated browser use these endpoints require the dashboard session cookie and CSRF/origin protections where applicable. Script-driven admin endpoints that still use `Authorization: Bearer ADMIN_SECRET` remain separate from the browser dashboard contract.
 
 ### `POST /admin/recover-checkout`
 Recover a missed Stripe webhook by manually creating a pledge from a completed checkout session.
