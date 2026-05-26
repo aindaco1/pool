@@ -1,11 +1,11 @@
-# Local Worker defaults. Copy to worker/.dev.vars for machine-specific secrets,
-# or run `npm run secrets:dev`.
-# The dev launchers can generate missing local signing secrets.
+# Local Worker defaults and machine-specific secrets.
+# Copy this file to worker/.dev.vars, or run `npm run secrets:dev`.
+# The dev helpers can generate required local signing secrets.
 #
-# Keep this file aligned with the keys used in worker/.dev.vars, but never put
-# real secret values here.
+# Keep this file aligned with local development needs, but never put real
+# secret values here. worker/.dev.vars is ignored by git and should stay local.
 
-# Local routing / mode.
+# Local routing and mode.
 APP_MODE=test
 SITE_BASE=http://127.0.0.1:4000
 WORKER_BASE=http://127.0.0.1:8787
@@ -17,19 +17,30 @@ CORS_ALLOWED_ORIGIN=http://127.0.0.1:4000
 ADMIN_BOOTSTRAP_EMAILS=alonso@dustwave.xyz
 ADMIN_TEST_CAMPAIGNS=hand-relations,smoke-editable
 
-# Required local secrets.
+# Local signing and session secrets.
 ADMIN_SECRET=
 ADMIN_SESSION_SECRET=
 CHECKOUT_INTENT_SECRET=
 MAGIC_LINK_SECRET=
-RESEND_API_KEY=
+
+# Stripe checkout and webhooks.
+# Prefer the *_TEST variables for local development. STRIPE_SECRET_KEY and
+# STRIPE_WEBHOOK_SECRET remain supported fallback names.
 STRIPE_SECRET_KEY=
+STRIPE_SECRET_KEY_TEST=
 STRIPE_PUBLISHABLE_KEY_TEST=
 STRIPE_WEBHOOK_SECRET=
+STRIPE_WEBHOOK_SECRET_TEST=
 
-# Optional local deploy/provider credentials.
+# Email delivery.
+RESEND_API_KEY=
+
+# Dashboard publish and report helpers.
 GITHUB_TOKEN=
 CLOUDFLARE_API_TOKEN=
+
+# Shipping and tax provider credentials.
 USPS_ENABLED=false
 USPS_CLIENT_ID=
 USPS_CLIENT_SECRET=
+ZIP_TAX_API_KEY=
