@@ -88,10 +88,11 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('campaign_preview_state');
     expect(campaignLayout).toContain('title=campaign_social_title');
     expect(campaignLayout).toContain('description=campaign_social_description');
+    expect(campaignLayout).toContain('page.social_image | default: campaign_worker_social_image');
     expect(campaignLayout).toContain('image_alt=campaign_social_image_alt');
-    expect(campaignLayout).toContain('image_width=1200');
-    expect(campaignLayout).toContain('image_height=630');
-    expect(campaignLayout).toContain('image_type="image/svg+xml"');
+    expect(campaignLayout).toContain('image_width=campaign_social_image_width');
+    expect(campaignLayout).toContain('image_height=campaign_social_image_height');
+    expect(campaignLayout).toContain('image_type=campaign_social_image_type');
     expect(campaignLayout).toContain('/share/campaign/{{ page.slug | uri_escape }}.svg?lang={{ current_lang | uri_escape }}');
     expect(seoMeta).toContain("unless image_url contains '://' or image_url contains 'data:'");
     expect(translationsEn).toContain('campaign_preview:');

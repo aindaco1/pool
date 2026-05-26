@@ -75,9 +75,10 @@ To keep shared links aligned with the embed’s visual language, campaign pages 
 
 - state-aware campaign title/description metadata
 - localized alternate-language metadata
-- a Worker-generated share-card SVG route at `/share/campaign/{slug}.svg?lang={lang}`
+- a crawler-friendly static `social_image` for `og:image` when configured
+- a Worker-generated share-card SVG route at `/share/campaign/{slug}.svg?lang={lang}` for live embed/share-card previews
 
-That share card is the social-preview companion to the embed, not a replacement for it.
+That share card is the live preview companion to the embed, not a replacement for a static Open Graph image.
 
 ## Main Implementation Files
 

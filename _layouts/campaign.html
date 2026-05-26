@@ -7,7 +7,11 @@
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-campaign-csp-strict.html %}
   {% include cart-head.html %}
-  {% capture campaign_social_image %}{{ site.platform.worker_url | default: site.platform.site_url | default: site.url }}/share/campaign/{{ page.slug | uri_escape }}.svg?lang={{ current_lang | uri_escape }}{% endcapture %}
+  {% capture campaign_worker_social_image %}{{ site.platform.worker_url | default: site.platform.site_url | default: site.url }}/share/campaign/{{ page.slug | uri_escape }}.svg?lang={{ current_lang | uri_escape }}{% endcapture %}
+  {% assign campaign_social_image = page.social_image | default: campaign_worker_social_image %}
+  {% assign campaign_social_image_width = page.social_image_width | default: 1200 %}
+  {% assign campaign_social_image_height = page.social_image_height | default: 630 %}
+  {% assign campaign_social_image_type = page.social_image_type | default: "image/svg+xml" %}
   {% assign campaign_creator = page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author %}
   {% assign campaign_category = page.category | default: site.data.i18n[current_lang].campaign.default_category | default: site.data.i18n.en.campaign.default_category %}
   {% capture campaign_blurb_plain %}{{ page.short_blurb | default: site.description | strip_html | strip_newlines | replace: '  ', ' ' | strip }}{% endcapture %}
@@ -64,7 +68,7 @@
       {% capture campaign_social_description %}{% include t.html key="campaign_preview.ended_description" lang=current_lang category=campaign_category creator=campaign_creator blurb=campaign_blurb_plain %}{% endcapture %}
   {% endcase %}
   {% capture campaign_social_image_alt %}{% include t.html key="campaign_preview.image_alt" lang=current_lang title=page.title category=campaign_category creator=campaign_creator %}{% endcapture %}
-  {% include seo-meta.html lang=current_lang title=campaign_social_title description=campaign_social_description image=campaign_social_image image_alt=campaign_social_image_alt image_width=1200 image_height=630 image_type="image/svg+xml" og_type="article" translation_key=page.translation_key localized_paths=page.localized_paths %}
+  {% include seo-meta.html lang=current_lang title=campaign_social_title description=campaign_social_description image=campaign_social_image image_alt=campaign_social_image_alt image_width=campaign_social_image_width image_height=campaign_social_image_height image_type=campaign_social_image_type og_type="article" translation_key=page.translation_key localized_paths=page.localized_paths %}
   {% include seo-json-ld.html lang=current_lang kind="campaign" translation_key=page.translation_key localized_paths=page.localized_paths %}
 </head>
 <body>

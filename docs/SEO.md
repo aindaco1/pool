@@ -24,7 +24,7 @@ The current baseline includes:
 - secure social-image tags where the page image is already HTTPS
 - social image alt metadata
 - state-aware campaign social titles and descriptions
-- Worker-generated campaign share-card SVG images for social previews
+- static campaign social images when configured, with Worker-generated campaign share-card SVGs retained for embed/share-card previews
 - generated [`robots.txt`](../robots.txt)
 - generated [`sitemap.xml`](../sitemap.xml)
 - explicit `noindex,nofollow` on tokenized or supporter-only layouts
@@ -43,12 +43,14 @@ The main implementation files are:
 - [/robots.txt](../robots.txt)
 - [/sitemap.xml](../sitemap.xml)
 
-Campaign social previews now use a Worker route in the shape:
+Campaign social previews prefer a campaign `social_image` when one is configured. Use a crawler-friendly raster image, ideally JPEG or PNG at `1200 x 630`.
+
+The Worker still provides live, localized share-card previews in the shape:
 
 - `/share/campaign/{slug}.svg?lang=en`
 - `/share/campaign/{slug}.svg?lang=es`
 
-That route generates a state-aware share card from live campaign data so the social image stays closer to the hosted embed’s visual language than a raw hero image alone.
+That route generates a state-aware SVG card from live campaign data so embeds and internal preview tooling can stay close to the hosted embed’s visual language. It is not the safest default for `og:image`, because some external social crawlers reject SVG images.
 
 ## Indexing Contract
 
@@ -129,7 +131,7 @@ Public metadata also derives a few safe values automatically:
 - `og:image:secure_url` when the chosen social image already resolves to HTTPS
 - `article:published_time` / `article:modified_time` on campaign pages when campaign dates are available
 - campaign preview copy from campaign state (`upcoming`, `live`, `funded`, `ended`)
-- campaign preview images from the Worker share-card route rather than directly from the hero image alone
+- campaign preview images from `social_image` when configured, otherwise the Worker share-card route
 - `WebSite.availableLanguage`, localized breadcrumb roots, and campaign `CreativeWork.inLanguage` from the configured locale model
 
 Forks can override part of that behavior in a bounded way:
@@ -173,7 +175,7 @@ Forks should not assume support for:
 When checking a deployment manually:
 
 - page source for home/about/terms/campaign pages has correct title, description, canonical, OG, and Twitter tags
-- campaign pages emit the Worker share-card SVG as the social image and include the correct locale-aware route in that image URL
+- campaign pages emit a crawler-friendly `social_image` when configured, otherwise the Worker share-card SVG route
 - `robots.txt` is reachable and only exposes intended public crawl paths
 - `sitemap.xml` is reachable and only includes intended public URLs
 - private/tokenized pages emit `noindex` where appropriate

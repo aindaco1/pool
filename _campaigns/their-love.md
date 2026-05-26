@@ -8,6 +8,10 @@ goal_amount: 2500
 charged: false
 hero_image: /assets/images/campaigns/their-love/hero-square.png
 hero_image_wide: /assets/images/campaigns/their-love/hero-wide.png
+social_image: /assets/images/campaigns/their-love/social-card.jpg
+social_image_width: 1200
+social_image_height: 630
+social_image_type: image/jpeg
 hero_video: https://www.youtube.com/watch?v=XCQWR9cNsgY
 creator_image: /assets/images/campaigns/their-love/crew-james.png
 creator_name: "James Clare"

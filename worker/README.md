@@ -280,7 +280,7 @@ Optional query params:
 
 - `lang=en|es` to localize campaign UI copy and the footer campaign link
 
-The rendered card uses live campaign data, including current state, pledged total, goal progress, and creator/category metadata. Campaign-page `og:image` / `twitter:image` tags point at this route so social previews stay aligned with live campaign and embed state.
+The rendered card uses live campaign data, including current state, pledged total, goal progress, and creator/category metadata. Campaign pages may use a static `social_image` for crawler-friendly `og:image` / `twitter:image` metadata, while this route remains the live SVG share-card endpoint used by embed previews and internal tooling.
 
 ### POST /webhooks/stripe
 Stripe webhook endpoint (signature verified).
@@ -538,7 +538,7 @@ Keep `USPS_CLIENT_SECRET` out of site config. It belongs in Worker secrets or [`
 
 Localization note: the Worker now localizes supporter-facing email subjects/body copy and localized `/manage/` / `/community/:slug/` links from the shared site locale catalog. In normal operation it fetches that catalog from `SITE_BASE/assets/i18n.json`; tests and advanced deployments can inject `I18N_CATALOG_JSON` instead. That means localized supporter emails and localized routes such as `/es/manage/` or `/es/community/:slug/` stay aligned with the site locale model when a deployment adds those routes.
 
-The Worker also serves localized campaign share-card previews at `GET /share/campaign/:slug.svg` with an optional `?lang=es` query. Campaign pages use that route for their social image metadata, and the generated SVG mirrors the campaign embed's state/progress language while linking back to the localized public campaign route.
+The Worker also serves localized campaign share-card previews at `GET /share/campaign/:slug.svg` with an optional `?lang=es` query. The generated SVG mirrors the campaign embed's state/progress language while linking back to the localized public campaign route. Campaign `og:image` metadata should prefer a static raster `social_image` when one is available because not every external crawler accepts SVG images.
 
 ## Data Flow
 
