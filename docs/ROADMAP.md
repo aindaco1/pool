@@ -2,9 +2,9 @@
 
 ## Current Milestone
 
-**v1.0 release candidate**
+**v1.0.0**
 
-The v1.0 feature set is now in place. The roadmap should treat remaining work as release hardening or post-v1.0 follow-up unless a final smoke, accessibility, security, i18n, SEO, or mobile/tablet pass finds a regression that blocks launch.
+The v1.0 feature set and release-hardening pass are complete. New roadmap items should be treated as post-v1.0 follow-up unless a critical launch regression is found.
 
 ## Completed
 
@@ -240,7 +240,7 @@ The v1.0 feature set is now in place. The roadmap should treat remaining work as
   - `npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium`
   - `npm run test:premerge`
   - local smoke through `./scripts/dev.sh --podman`, including `/admin/`, `/es/admin/`, Settings, Add-ons, Campaigns, Analytics, Reports, Supporters, Marketing, and Users
-  - final documentation and release-note pass after the CAPTCHA/challenge decision lands
+  - final documentation and release-note pass
 
 ## Post-v1.0 Follow-ups
 
