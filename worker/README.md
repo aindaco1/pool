@@ -100,6 +100,11 @@ Production secrets belong in Cloudflare Worker secrets:
 wrangler secret put STRIPE_SECRET_KEY_LIVE
 wrangler secret put STRIPE_SECRET_KEY_TEST
 
+# Browser publishable keys for on-site Stripe fields. These are not secrets;
+# set them through dashboard Settings or Worker vars, not `wrangler secret`.
+STRIPE_PUBLISHABLE_KEY_LIVE=pk_live_...
+STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...
+
 # Stripe Webhook Secrets
 wrangler secret put STRIPE_WEBHOOK_SECRET_LIVE
 wrangler secret put STRIPE_WEBHOOK_SECRET_TEST
@@ -130,7 +135,9 @@ wrangler secret put USPS_CLIENT_SECRET
 wrangler secret put ZIP_TAX_API_KEY
 ```
 
-Do not store these values in `_config.yml`, campaign YAML, KV, admin setting drafts, or committed documentation. The admin dashboard only reports whether runtime credentials appear configured; it does not read or persist secret values.
+Do not store secret values in `_config.yml`, campaign YAML, KV, admin setting drafts, or committed documentation. Stripe publishable keys are public browser keys and may be stored in dashboard Settings or deployment vars. The admin dashboard only reports whether runtime credentials appear configured; it does not read or persist secret values.
+
+Custom checkout requires the matching Stripe publishable key for the current `APP_MODE`. If the Worker is configured for custom checkout but no publishable key is available, checkout falls back to Stripe-hosted Checkout instead of returning `503`, so pledges can still continue while the publishable key is being configured.
 
 USPS setup for this repo is split intentionally:
 

@@ -11,7 +11,7 @@ import { isValidVoteOption, isValidDecisionId, jsonResponse } from '../validatio
 import { getCampaign } from '../campaigns.js';
 
 function getAppMode(env = {}) {
-  return String(env.APP_MODE || env.SNIPCART_MODE || 'live').trim().toLowerCase() === 'test'
+  return String(env.APP_MODE || 'live').trim().toLowerCase() === 'test'
     ? 'test'
     : 'live';
 }

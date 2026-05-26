@@ -171,6 +171,8 @@ Create a setup-mode Stripe Checkout Session from the first-party cart state for 
 - custom mode: `{ checkoutUiMode, sessionId, clientSecret, publishableKey, orderId }`
 - hosted fallback: `{ checkoutUiMode: "hosted", url }`
 
+If custom checkout is selected but the current environment does not have a Stripe publishable key, the Worker uses the hosted fallback response instead of failing the checkout start.
+
 **Data flow:**
 1. Cart.js passes the selected tip percent plus the current first-party cart items
 2. Worker reconstructs the cart shape from first-party items and canonical campaign rules

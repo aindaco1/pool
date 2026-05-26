@@ -1887,7 +1887,7 @@ describe('Worker business logic hardening', () => {
     expect(mockStripeClient.checkout.sessions.create).not.toHaveBeenCalled();
   });
 
-  it('fails closed on custom checkout start when the publishable key is missing', async () => {
+  it('falls back to hosted checkout when custom checkout publishable key is missing', async () => {
     const env = createEnv({
       CHECKOUT_PROVIDER: 'first_party',
       CHECKOUT_UI_MODE: 'custom',
@@ -1914,8 +1914,18 @@ describe('Worker business logic hardening', () => {
       { waitUntil: () => {} }
     );
 
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ error: 'Custom checkout unavailable' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      checkoutUiMode: 'hosted',
+      url: 'https://stripe.test/checkout'
+    });
+
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    const requestOptions = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[1];
+    expect(sessionPayload.ui_mode).toBeUndefined();
+    expect(sessionPayload.success_url).toMatch(/^https:\/\/pool\.test\/pledge-success\/\?orderId=pool-intent-/);
+    expect(sessionPayload.cancel_url).toBe('https://pool.test/pledge-cancelled/');
+    expect(requestOptions).toBeUndefined();
   });
 
   it('creates a bundled first-party checkout session for mixed-campaign carts', async () => {

@@ -551,7 +551,7 @@ function getSettlementNeedsAttention(batchResult = {}) {
   }
 
 function getAppMode(env = {}) {
-  return String(env.APP_MODE || env.SNIPCART_MODE || 'live').trim().toLowerCase() === 'test'
+  return String(env.APP_MODE || 'live').trim().toLowerCase() === 'test'
     ? 'test'
     : 'live';
 }
@@ -2756,6 +2756,17 @@ function getStripePublishableKey(env) {
   return env.STRIPE_PUBLISHABLE_KEY || '';
 }
 
+function resolveCheckoutUiRuntime(env) {
+  const requestedMode = getCheckoutUiMode(env);
+  const stripePublishableKey = getStripePublishableKey(env);
+  const usingCustomCheckoutUi = requestedMode === 'custom' && Boolean(stripePublishableKey);
+
+  return {
+    usingCustomCheckoutUi,
+    stripePublishableKey: usingCustomCheckoutUi ? stripePublishableKey : ''
+  };
+}
+
 export default {
   async fetch(request, env, ctx) {
     configureWorkerLogging(env);
@@ -3919,19 +3930,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
   }
 
   const stripe = createStripeClient(getStripeKey(env));
-  const checkoutUiMode = getCheckoutUiMode(env);
-  const usingCustomCheckoutUi = checkoutUiMode === 'custom';
-  const stripePublishableKey = getStripePublishableKey(env);
-
-  if (usingCustomCheckoutUi && !stripePublishableKey) {
-    if (env.PLEDGES) {
-      await env.PLEDGES.delete(getCheckoutBundleStorageKey(orderId));
-    }
-    for (const reservedGroup of reservedCheckoutGroups) {
-      await clearTierReservation(env, reservedGroup.campaignSlug, reservedGroup.orderId);
-    }
-    return privateJsonResponse({ error: 'Custom checkout unavailable' }, 503, env);
-  }
+  const { usingCustomCheckoutUi, stripePublishableKey } = resolveCheckoutUiRuntime(env);
 
   try {
     const allowedShippingCountries = [
@@ -6095,13 +6094,7 @@ async function handleUpdatePaymentMethod(request, env) {
   }
 
   const stripe = createStripeClient(getStripeKey(env));
-  const checkoutUiMode = getCheckoutUiMode(env);
-  const usingCustomCheckoutUi = checkoutUiMode === 'custom';
-  const stripePublishableKey = getStripePublishableKey(env);
-
-  if (usingCustomCheckoutUi && !stripePublishableKey) {
-    return privateJsonResponse({ error: 'Custom checkout unavailable' }, 503, env);
-  }
+  const { usingCustomCheckoutUi, stripePublishableKey } = resolveCheckoutUiRuntime(env);
   
   const sessionParams = {
     mode: 'setup',

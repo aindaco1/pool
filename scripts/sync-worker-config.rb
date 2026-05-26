@@ -431,6 +431,7 @@ existing_dev = parse_env_dev_vars(content)
 
 top_values = build_mirror_values(base_config, existing_top)
 dev_values = build_mirror_values(dev_config, existing_dev).merge('APP_MODE' => 'test')
+top_values['APP_MODE'] = 'live'
 top_values['CANONICAL_SITE_BASE'] = top_values['SITE_BASE']
 top_values['CANONICAL_WORKER_BASE'] = top_values['WORKER_BASE']
 dev_values['CANONICAL_SITE_BASE'] = top_values['SITE_BASE']

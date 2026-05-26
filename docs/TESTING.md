@@ -225,7 +225,7 @@ git worktree remove ../pool-main-check
 
 Run these against staging before merge when a staging environment exists. If no staging environment exists for The Pool, run the same checklist locally with `./scripts/dev.sh --podman` and record that exception in the PR/release notes.
 
-1. Start a new checkout on a live test campaign and confirm `/checkout-intent/start` returns a custom-session bootstrap in custom mode, or a hosted URL in hosted fallback mode.
+1. Start a new checkout on a live test campaign and confirm `/checkout-intent/start` returns a custom-session bootstrap when the matching Stripe publishable key is configured, or a hosted URL when hosted fallback is intentionally used.
 2. Complete a pledge and verify the webhook stores the pledge, stats update, and confirmation email path stays healthy.
 3. Modify a pledge with tier/support/custom amount changes and verify totals, history, and inventory update correctly.
 4. Cancel an uncharged pledge and verify stats and inventory are released correctly.
