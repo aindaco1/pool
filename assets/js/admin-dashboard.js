@@ -609,11 +609,12 @@
     return settingsStatus || authStatus;
   }
 
-  function formatMoney(cents) {
+  function formatMoneyExact(cents) {
     return new Intl.NumberFormat(lang || 'en', {
       style: 'currency',
       currency: 'USD',
-      maximumFractionDigits: 0
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format((Number(cents || 0) || 0) / 100);
   }
 
@@ -4236,7 +4237,7 @@
       item.textContent = t('analytics_breakdown_item', '%{key}: %{count} (%{amount})', {
         key: analyticsBreakdownLabel(group, row.key, options),
         count: formatNumber(row.count),
-        amount: formatMoney(row.amount)
+        amount: formatMoneyExact(row.amount)
       });
       list.append(item);
     });
@@ -4337,21 +4338,21 @@
     var metrics = document.createElement('div');
     metrics.className = 'admin-analytics__metrics';
     metrics.append(
-      analyticsMetricCard(t('analytics_pledged', 'Pledged'), formatMoney(totals.pledgedAmount), t('analytics_help_pledged', 'Total promised by non-cancelled pledges. This can include active pledges and payment-failed pledges, so use Charged for money actually collected.'), 'pledged'),
-      analyticsMetricCard(t('analytics_campaign_revenue', 'Campaign revenue'), formatMoney(totals.campaignRevenue), t('analytics_help_campaign_revenue', 'Pledge value that belongs to the campaign before tax, shipping, platform tips, and platform add-ons. Campaign add-ons are already included here.'), 'campaign-revenue'),
-      analyticsMetricCard(t('analytics_platform_revenue', 'Platform revenue'), formatMoney(platformRevenue), t('analytics_help_platform_revenue', 'Pledge value that belongs to the platform: platform add-ons plus platform tips. This does not include tax, shipping, campaign revenue, or processor fees.'), 'platform-revenue'),
-      analyticsMetricCard(t('analytics_tax', 'Tax'), formatMoney(totals.taxTotal), t('analytics_help_tax', 'Sales tax recorded on non-cancelled pledges. This is included in Pledged, but not in Campaign revenue or Platform revenue.'), 'tax'),
-      analyticsMetricCard(t('analytics_shipping', 'Shipping'), formatMoney(totals.shippingTotal), t('analytics_help_shipping', 'Shipping fees recorded on non-cancelled pledges. This is included in Pledged, but not in Campaign revenue or Platform revenue.'), 'shipping'),
-      analyticsMetricCard(t('analytics_estimated_stripe_fees', 'Estimated Stripe fees'), formatMoney(totals.estimatedStripeFeeAmount), t('analytics_help_estimated_stripe_fees', "Planning estimate for active or charged pledges using Stripe's standard US domestic card rate: 2.9% + $0.30 per pledge. Actual fees can differ."), 'estimated-stripe-fees'),
-      analyticsMetricCard(t('analytics_charged', 'Charged'), formatMoney(totals.chargedAmount), t('analytics_help_charged', 'Money from pledges that have successfully been charged. This is the closest card to collected gross revenue.'), 'charged'),
-      analyticsMetricCard(t('analytics_payment_failed', 'Payment failed'), formatMoney(totals.paymentFailedAmount), t('analytics_help_payment_failed', 'Value of pledges currently marked payment failed. This is not collected money.'), 'payment-failed'),
+      analyticsMetricCard(t('analytics_pledged', 'Pledged'), formatMoneyExact(totals.pledgedAmount), t('analytics_help_pledged', 'Total promised by non-cancelled pledges. This can include active pledges and payment-failed pledges, so use Charged for money actually collected.'), 'pledged'),
+      analyticsMetricCard(t('analytics_campaign_revenue', 'Campaign revenue'), formatMoneyExact(totals.campaignRevenue), t('analytics_help_campaign_revenue', 'Pledge value that belongs to the campaign before tax, shipping, platform tips, and platform add-ons. Campaign add-ons are already included here.'), 'campaign-revenue'),
+      analyticsMetricCard(t('analytics_platform_revenue', 'Platform revenue'), formatMoneyExact(platformRevenue), t('analytics_help_platform_revenue', 'Pledge value that belongs to the platform: platform add-ons plus platform tips. This does not include tax, shipping, campaign revenue, or processor fees.'), 'platform-revenue'),
+      analyticsMetricCard(t('analytics_tax', 'Tax'), formatMoneyExact(totals.taxTotal), t('analytics_help_tax', 'Sales tax recorded on non-cancelled pledges. This is included in Pledged, but not in Campaign revenue or Platform revenue.'), 'tax'),
+      analyticsMetricCard(t('analytics_shipping', 'Shipping'), formatMoneyExact(totals.shippingTotal), t('analytics_help_shipping', 'Shipping fees recorded on non-cancelled pledges. This is included in Pledged, but not in Campaign revenue or Platform revenue.'), 'shipping'),
+      analyticsMetricCard(t('analytics_estimated_stripe_fees', 'Estimated Stripe fees'), formatMoneyExact(totals.estimatedStripeFeeAmount), t('analytics_help_estimated_stripe_fees', "Planning estimate for active or charged pledges using Stripe's standard US domestic card rate: 2.9% + $0.30 per pledge. Actual fees can differ."), 'estimated-stripe-fees'),
+      analyticsMetricCard(t('analytics_charged', 'Charged'), formatMoneyExact(totals.chargedAmount), t('analytics_help_charged', 'Money from pledges that have successfully been charged. This is the closest card to collected gross revenue.'), 'charged'),
+      analyticsMetricCard(t('analytics_payment_failed', 'Payment failed'), formatMoneyExact(totals.paymentFailedAmount), t('analytics_help_payment_failed', 'Value of pledges currently marked payment failed. This is not collected money.'), 'payment-failed'),
       analyticsMetricCard(t('analytics_supporters', 'Supporters'), formatNumber(totals.uniqueSupporters), t('analytics_help_supporters', 'Unique supporter email addresses in this view. One person with multiple pledges is counted once.'), 'supporters'),
       analyticsMetricCard(t('analytics_pledges', 'Total pledges'), formatNumber(totals.pledgeCount), t('analytics_help_pledges', 'Total pledge records in this view, including active, charged, payment-failed, and cancelled pledges.'), 'pledges'),
       analyticsMetricCard(t('analytics_active_pledges', 'Active or charged pledges'), formatNumber(totals.activePledgeCount), t('analytics_help_active_pledges', 'Pledges that are still active or already charged. Cancelled pledges and payment-failed pledges are not included.'), 'active-pledges'),
-      analyticsMetricCard(t('analytics_average_pledge', 'Average pledge'), formatMoney(averagePledge), t('analytics_help_average_pledge', 'Pledged value divided by total pledge records. Cancelled pledges count as records but add no pledged dollars.'), 'average-pledge'),
-      analyticsMetricCard(t('analytics_campaign_addons', 'Campaign add-ons'), formatMoney(totals.campaignAddOnRevenue), t('analytics_help_campaign_addons', 'The part of campaign revenue that came from campaign-specific add-ons. This is already included in Campaign revenue.'), 'campaign-addons'),
-      analyticsMetricCard(t('analytics_platform_addons', 'Platform add-ons'), formatMoney(totals.platformAddOnRevenue), t('analytics_help_platform_addons', 'The part of platform revenue that came from platform-level add-on products.'), 'platform-addons'),
-      analyticsMetricCard(t('analytics_platform_tips', 'Platform tips'), formatMoney(totals.platformTipRevenue), t('analytics_help_platform_tips', 'Optional tips supporters added for the platform. These are included in Platform revenue.'), 'platform-tips')
+      analyticsMetricCard(t('analytics_average_pledge', 'Average pledge'), formatMoneyExact(averagePledge), t('analytics_help_average_pledge', 'Pledged value divided by total pledge records. Cancelled pledges count as records but add no pledged dollars.'), 'average-pledge'),
+      analyticsMetricCard(t('analytics_campaign_addons', 'Campaign add-ons'), formatMoneyExact(totals.campaignAddOnRevenue), t('analytics_help_campaign_addons', 'The part of campaign revenue that came from campaign-specific add-ons. This is already included in Campaign revenue.'), 'campaign-addons'),
+      analyticsMetricCard(t('analytics_platform_addons', 'Platform add-ons'), formatMoneyExact(totals.platformAddOnRevenue), t('analytics_help_platform_addons', 'The part of platform revenue that came from platform-level add-on products.'), 'platform-addons'),
+      analyticsMetricCard(t('analytics_platform_tips', 'Platform tips'), formatMoneyExact(totals.platformTipRevenue), t('analytics_help_platform_tips', 'Optional tips supporters added for the platform. These are included in Platform revenue.'), 'platform-tips')
     );
     summary.append(metrics);
 
@@ -4414,15 +4415,15 @@
       appendAnalyticsCells(row, [
         { value: campaign.title || campaign.slug || '', sortValue: String(campaign.title || campaign.slug || '').toLocaleLowerCase() },
         { value: analyticsStateLabel(stateValue), sortValue: stateValue.toLocaleLowerCase() },
-        { value: formatMoney(pledgedAmount), sortValue: pledgedAmount },
+        { value: formatMoneyExact(pledgedAmount), sortValue: pledgedAmount },
         { value: formatNumber(campaignTotals.uniqueSupporters), sortValue: Number(campaignTotals.uniqueSupporters || 0) },
         { value: formatPercent(percentFunded), sortValue: percentFunded },
         { value: formatNumber(campaignTotals.pledgeCount), sortValue: Number(campaignTotals.pledgeCount || 0) },
-        { value: formatMoney(campaignTotals.chargedAmount), sortValue: Number(campaignTotals.chargedAmount || 0) },
-        { value: formatMoney(campaignTotals.campaignRevenue), sortValue: Number(campaignTotals.campaignRevenue || 0) },
-        { value: formatMoney(Number(campaignTotals.platformAddOnRevenue || 0) + Number(campaignTotals.platformTipRevenue || 0)), sortValue: Number(campaignTotals.platformAddOnRevenue || 0) + Number(campaignTotals.platformTipRevenue || 0) },
-        { value: formatMoney(campaignTotals.estimatedStripeFeeAmount), sortValue: Number(campaignTotals.estimatedStripeFeeAmount || 0) },
-        { value: formatMoney(campaignTotals.paymentFailedAmount), sortValue: Number(campaignTotals.paymentFailedAmount || 0) }
+        { value: formatMoneyExact(campaignTotals.chargedAmount), sortValue: Number(campaignTotals.chargedAmount || 0) },
+        { value: formatMoneyExact(campaignTotals.campaignRevenue), sortValue: Number(campaignTotals.campaignRevenue || 0) },
+        { value: formatMoneyExact(Number(campaignTotals.platformAddOnRevenue || 0) + Number(campaignTotals.platformTipRevenue || 0)), sortValue: Number(campaignTotals.platformAddOnRevenue || 0) + Number(campaignTotals.platformTipRevenue || 0) },
+        { value: formatMoneyExact(campaignTotals.estimatedStripeFeeAmount), sortValue: Number(campaignTotals.estimatedStripeFeeAmount || 0) },
+        { value: formatMoneyExact(campaignTotals.paymentFailedAmount), sortValue: Number(campaignTotals.paymentFailedAmount || 0) }
       ]);
       tbody.append(row);
     });
@@ -6753,7 +6754,7 @@
       ] : []).concat([
         supporterCell(supporter.email || supporter.orderId || '', String(supporter.email || supporter.orderId || '').toLocaleLowerCase(), 'email'),
         supporterCell(statusLabel, statusLabel.toLocaleLowerCase(), 'status'),
-        supporterCell(formatMoney(supporter.amount), Number(supporter.amount || 0), 'amount'),
+        supporterCell(formatMoneyExact(supporter.amount), Number(supporter.amount || 0), 'amount'),
         supporterCell(fulfillmentLabel, fulfillmentLabel.toLocaleLowerCase(), 'fulfillment'),
         supporterCell(supporter.createdAt ? new Date(supporter.createdAt).toLocaleDateString(lang || 'en') : '', Number.isFinite(createdAt) ? createdAt : 0, 'created')
       ]);

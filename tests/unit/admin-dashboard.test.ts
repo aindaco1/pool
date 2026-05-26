@@ -404,6 +404,9 @@ describe('admin dashboard foundation', () => {
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");
     expect(adminScript).toContain('/admin/marketing/referrals');
     expect(adminScript).toContain('/admin/analytics');
+    expect(adminScript).toContain('function formatMoneyExact');
+    expect(adminScript).toContain('minimumFractionDigits: 2');
+    expect(adminScript).toContain('formatMoneyExact(supporter.amount)');
     expect(adminScript).toContain('/admin/settings');
     expect(adminScript).toContain('admin-settings__users-editor');
     expect(adminScript).toContain('data-admin-user-card');
