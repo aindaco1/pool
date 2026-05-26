@@ -17,6 +17,8 @@ if (!root) {
 const REFRESH_INTERVAL_MS = 60 * 1000;
 const DEFAULT_EMBED_HEIGHT_PX = 720;
 const COMPACT_EMBED_HEIGHT_PX = 560;
+const WIDTH_PERCENT_CLASS_PREFIX = 'u-width-pct-';
+const LEFT_PERCENT_CLASS_PREFIX = 'u-left-pct-';
 const EMBED_LAYOUTS = new Set(['full', 'compact']);
 const EMBED_THEMES = new Set(['default', 'warm', 'ocean']);
 const EMBED_CTA_OPTIONS = new Set(['show', 'hide']);
@@ -139,6 +141,12 @@ function formatMoneyShortFromDollars(amount) {
     return '$' + text + 'K';
   }
   return '$' + Math.round(value);
+}
+
+function getPercentClass(prefix, percent) {
+  const value = Number(percent || 0);
+  const clampedPercent = Math.max(0, Math.min(100, Math.round(Number.isFinite(value) ? value : 0)));
+  return prefix + clampedPercent;
 }
 
 function formatDate(dateString) {
@@ -462,10 +470,11 @@ function renderProgressBar(snapshot) {
     const unlocked = !stretchHidden || prevMet;
     stretchMarkersHtml += ''
       + '<div class="progress-marker progress-marker--stretch'
+      + ' ' + getPercentClass(LEFT_PERCENT_CLASS_PREFIX, stretchPct)
       + (stretchPct >= 100 ? ' progress-marker--edge-right' : '')
       + (achieved ? ' progress-marker--achieved' : '')
       + (unlocked ? '' : ' progress-marker--locked')
-      + '" style="left: ' + stretchPct + '%;">'
+      + '" data-progress-left="' + stretchPct + '">'
       + '<span class="progress-marker__dot"></span>'
       + '<span class="progress-marker__label">'
       + '<span class="progress-marker__amount">' + escapeHtml(formatMoneyShortFromDollars(threshold)) + '</span>'
@@ -481,24 +490,24 @@ function renderProgressBar(snapshot) {
     + '<div class="progress-wrap">'
     + (backgroundUrl ? '<img src="' + escapeHtml(backgroundUrl) + '" alt="" class="progress-wrap__bg" aria-hidden="true">' : '')
     + '<div class="progress-bar' + (exceededMax ? ' progress-bar--exceeded' : '') + '">'
-    + '<span style="width: ' + pct + '%;"></span>'
-    + '<div class="progress-marker progress-marker--milestone' + (pledgedDollars >= oneThird ? ' progress-marker--achieved' : '') + '" style="left: ' + oneThirdPct + '%;">'
+    + '<span class="' + getPercentClass(WIDTH_PERCENT_CLASS_PREFIX, pct) + '" data-progress-width="' + pct + '"></span>'
+    + '<div class="progress-marker progress-marker--milestone ' + getPercentClass(LEFT_PERCENT_CLASS_PREFIX, oneThirdPct) + (pledgedDollars >= oneThird ? ' progress-marker--achieved' : '') + '" data-progress-left="' + oneThirdPct + '">'
     + '<span class="progress-marker__dot"></span>'
     + '<span class="progress-marker__label"><span class="progress-marker__amount">' + escapeHtml(formatMoneyShortFromDollars(oneThird)) + '</span><span class="progress-marker__desc">1/3</span></span>'
     + '</div>'
-    + '<div class="progress-marker progress-marker--milestone' + (pledgedDollars >= twoThirds ? ' progress-marker--achieved' : '') + '" style="left: ' + twoThirdsPct + '%;">'
+    + '<div class="progress-marker progress-marker--milestone ' + getPercentClass(LEFT_PERCENT_CLASS_PREFIX, twoThirdsPct) + (pledgedDollars >= twoThirds ? ' progress-marker--achieved' : '') + '" data-progress-left="' + twoThirdsPct + '">'
     + '<span class="progress-marker__dot"></span>'
     + '<span class="progress-marker__label"><span class="progress-marker__amount">' + escapeHtml(formatMoneyShortFromDollars(twoThirds)) + '</span><span class="progress-marker__desc">2/3</span></span>'
     + '</div>'
-    + '<div class="progress-marker progress-marker--goal'
+    + '<div class="progress-marker progress-marker--goal ' + getPercentClass(LEFT_PERCENT_CLASS_PREFIX, goalPct)
     + (goalPct >= 100 ? ' progress-marker--edge-right' : '')
     + (goalMet ? ' progress-marker--achieved' : '')
-    + '" style="left: ' + goalPct + '%;">'
+    + '" data-progress-left="' + goalPct + '">'
     + '<span class="progress-marker__dot"></span>'
     + '<span class="progress-marker__label"><span class="progress-marker__amount">' + escapeHtml(formatMoneyShortFromDollars(goalAmount)) + '</span><span class="progress-marker__desc">' + escapeHtml(getRuntimeMessage('embed.goal_marker', 'Goal!')) + '</span></span>'
     + '</div>'
     + (showFinalMarker
-      ? '<div class="progress-marker progress-marker--final progress-marker--edge-right progress-marker--achieved" style="left: 100%;"><span class="progress-marker__dot"></span><span class="progress-marker__label"><span class="progress-marker__amount">' + escapeHtml(formatMoneyShortFromDollars(pledgedDollars)) + '</span><span class="progress-marker__desc">' + escapeHtml(getRuntimeMessage('embed.final_marker', 'Final')) + '</span></span></div>'
+      ? '<div class="progress-marker progress-marker--final progress-marker--edge-right progress-marker--achieved ' + getPercentClass(LEFT_PERCENT_CLASS_PREFIX, 100) + '" data-progress-left="100"><span class="progress-marker__dot"></span><span class="progress-marker__label"><span class="progress-marker__amount">' + escapeHtml(formatMoneyShortFromDollars(pledgedDollars)) + '</span><span class="progress-marker__desc">' + escapeHtml(getRuntimeMessage('embed.final_marker', 'Final')) + '</span></span></div>'
       : '')
     + stretchMarkersHtml
     + '</div>'

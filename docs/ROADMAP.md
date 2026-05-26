@@ -232,6 +232,9 @@ The v1.0 feature set is now in place. The roadmap should treat remaining work as
   - Add local/dev and automated-test bypass support through explicit test configuration, not by weakening production validation
   - Avoid per-keystroke or per-pageview KV writes; challenge validation should only run when the admin submits the sign-in form
 - [ ] Send an email to new user accounts when created
+- [x] Fix Marketing embed preview progress styling for video-led campaigns
+  - Campaigns whose embed preview uses YouTube or Vimeo hero media must keep progress fill, milestones, goal marker, and stretch-goal labels contained and readable in the admin Marketing tab
+  - Keep the embed preview compatible with the admin dashboard CSP by using shared utility classes instead of unsafe inline progress styles
 - [ ] Run final v1.0 release verification
   - `node --check assets/js/admin-dashboard.js`
   - `npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium`

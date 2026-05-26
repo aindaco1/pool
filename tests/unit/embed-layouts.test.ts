@@ -66,6 +66,13 @@ describe('campaign embed surface', () => {
     expect(embedScript).toContain('embed.creator_label');
     expect(embedScript).toContain('embed.countdown_days');
     expect(embedScript).toContain('embed.raised_label');
+    expect(embedScript).toContain('getPercentClass');
+    expect(embedScript).toContain('data-progress-width');
+    expect(embedScript).toContain('data-progress-left');
+    expect(embedScript).toContain("u-width-pct-");
+    expect(embedScript).toContain("u-left-pct-");
+    expect(embedScript).not.toContain('<span style="width: ');
+    expect(embedScript).not.toContain('" style="left: ');
     expect(embedScript).toContain("'/live/'");
     expect(embedScript).toContain('getEmbedPagePath');
     expect(embedScript).toContain('pool-campaign-embed:set-campaign');

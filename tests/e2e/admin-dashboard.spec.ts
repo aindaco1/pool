@@ -75,6 +75,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     logoUpload: [],
     imageUpload: [],
     marketingReferrals: [],
+    liveSnapshots: [],
     contentLoad: [],
     contentPreview: [],
     contentPublish: []
@@ -652,6 +653,49 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     }
 
     throw new Error(`Unexpected admin route: ${method} ${url.pathname}`);
+  });
+
+  await page.route(`${WORKER_BASE}/live/**`, async (route: any) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const slug = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() || 'hand-relations');
+    calls.liveSnapshots.push({ slug });
+    return route.fulfill({
+      status: 200,
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        campaign: {
+          slug,
+          title: slug === 'their-love' ? 'Their Love' : 'Hand Relations',
+          url: `/campaigns/${slug}/`,
+          creatorName: 'James Clare',
+          category: 'Drama, Romance, Short Film',
+          shortBlurbHtml: 'Eric and Sam ask what it means to truly love.',
+          heroVideo: 'https://www.youtube.com/watch?v=XCQWR9cNsgY',
+          heroImage: '/assets/images/campaigns/their-love/hero-square.png',
+          heroImageWide: '/assets/images/campaigns/their-love/hero-wide.png',
+          heroImageAlt: 'Their Love campaign video still',
+          goalAmount: 2500,
+          goalDeadline: '2026-07-26',
+          effectiveState: 'live',
+          stretchHidden: false,
+          stretchGoals: [
+            {
+              threshold: 5000,
+              title: 'Crew Pay + Production Polish',
+              status: 'locked'
+            }
+          ]
+        },
+        stats: {
+          pledgedAmount: 12500,
+          goalAmount: 2500,
+          goalDeadline: '2026-07-26',
+          effectiveState: 'live',
+          isFunded: false
+        }
+      })
+    });
   });
 
   return calls;
@@ -1688,6 +1732,19 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/utm_source=newsletter/);
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/utm_campaign=hand-relations/);
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/ref=launch-list/);
+    await expect.poll(() => calls.liveSnapshots.length).toBeGreaterThan(0);
+    const embedPreview = page.locator('#admin-panel-marketing .campaign-embed-widget');
+    await expect(embedPreview.locator('.campaign-embed-card__media iframe[src*="youtube-nocookie.com"]')).toBeVisible();
+    await expect(embedPreview.locator('.progress-bar > span')).toHaveClass(/u-width-pct-/);
+    await expect(embedPreview.locator('.progress-bar > span')).not.toHaveAttribute('style', /width/);
+    const embedMarkers = embedPreview.locator('.progress-marker');
+    await expect(embedMarkers.first()).toHaveClass(/u-left-pct-/);
+    await expect(embedMarkers.first()).not.toHaveAttribute('style', /left/);
+    const markerPositions = await embedMarkers.evaluateAll((markers) => markers.map((marker) => {
+      const rect = marker.getBoundingClientRect();
+      return Math.round(rect.left);
+    }));
+    expect(new Set(markerPositions).size).toBeGreaterThan(1);
 
     await selectAdminSection(page, 'Analytics');
     await expect.poll(() => calls.analytics.length).toBe(1);
