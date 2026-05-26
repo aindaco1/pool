@@ -88,7 +88,7 @@ tax:
   # `nm_grt` uses a vendored New Mexico starter dataset and can refine with the
   # free EDAC GRT API when a full street address is available.
   # `zip_tax` uses ZIP.TAX for local/jurisdiction-level US tax lookups.
-  provider: flat
+  provider: "nm_grt"
   origin_country: "US"
   use_regional_origin: false
   nm_grt_api_base: "https://grt.edacnm.org"
