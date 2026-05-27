@@ -1067,6 +1067,38 @@ describe('worker operational integrity', () => {
     expect(body).not.toContain('https://pool.test');
   });
 
+  it('keeps generated campaign share-card blurbs to two lines and shrinks long copy', async () => {
+    const env = createEnv();
+    const longBlurb = 'A deliberately overlong short blurb that should stay readable inside the social image while never taking more than two lines from the campaign share card layout.';
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [{
+            ...campaignFixture,
+            title: 'Long Blurb Test',
+            short_blurb: longBlurb,
+            short_blurb_html: longBlurb
+          }]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/share/campaign/hand-relations.svg'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    const blurbText = body.match(/<text x="620" y="[^"]+" fill="#3d4552"[^>]*>(.*?)<\/text>/s)?.[1] || '';
+    expect(body).toContain('font-size="23" font-style="italic"');
+    expect((blurbText.match(/<tspan/g) || []).length).toBeLessThanOrEqual(2);
+  });
+
   it('prefers the square hero image for generated campaign share cards', async () => {
     const env = createEnv();
     const fetchedUrls: string[] = [];

@@ -301,7 +301,15 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   const blurb = trimSvgText(stripHtmlTags(campaign?.short_blurb || ''), 180);
   const titleLines = wrapSvgText(displayTitle, 12, 2);
   const hasMultiLineTitle = titleLines.length > 1;
-  const blurbLines = wrapSvgText(blurb, hasMultiLineTitle ? 32 : 34, hasMultiLineTitle ? 2 : 3);
+  const blurbIsVeryLong = blurb.length > 135;
+  const blurbIsLong = blurb.length > 92;
+  const blurbFontSize = blurbIsVeryLong ? 23 : blurbIsLong ? 25 : 28;
+  const blurbMaxCharsPerLine = blurbIsVeryLong
+    ? (hasMultiLineTitle ? 40 : 42)
+    : blurbIsLong
+      ? (hasMultiLineTitle ? 36 : 38)
+      : (hasMultiLineTitle ? 32 : 34);
+  const blurbLines = wrapSvgText(blurb, blurbMaxCharsPerLine, 2);
   const heroImage = campaign?.hero_image || campaign?.hero_image_wide || '';
   const progressBackground = campaign?.progress_background || '';
   const heroImageUrl = heroImage ? `${siteBase}${heroImage}` : '';
@@ -331,7 +339,7 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   const titleFontSize = hasMultiLineTitle ? 60 : 86;
   const titleLineHeight = hasMultiLineTitle ? 56 : 74;
   const blurbY = titleY + ((Math.max(titleLines.length, 1) - 1) * titleLineHeight) + (hasMultiLineTitle ? 34 : 45);
-  const blurbLineHeight = hasMultiLineTitle ? 32 : 36;
+  const blurbLineHeight = blurbIsVeryLong ? 28 : blurbIsLong ? 30 : hasMultiLineTitle ? 32 : 36;
   const amountY = blurbY + ((Math.max(blurbLines.length, 1) - 1) * blurbLineHeight) + (hasMultiLineTitle ? 56 : 91);
   const progressY = amountY + 19;
   const footerY = progressY + (hasMultiLineTitle ? 48 : 56);
@@ -378,7 +386,7 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   <rect x="${panelLeft}" y="${badgeTop}" width="248" height="${badgeHeight}" rx="21" ry="21" fill="#11141c" />
   <text x="744" y="${badgeTextY}" text-anchor="middle" fill="#ffffff" font-family="Gambado Sans, Inter, sans-serif" font-size="21" font-weight="700" letter-spacing="0.6">${escapeSvgText(badgeText)}</text>
   <text x="${panelLeft}" y="${titleY}" fill="#11141c" font-family="Gambado Sans Forte, Gambado Sans, Inter, sans-serif" font-size="${titleFontSize}" font-weight="700" letter-spacing="1.2">${titleLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : titleLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
-  <text x="${panelLeft}" y="${blurbY}" fill="#3d4552" font-family="Inter, sans-serif" font-size="28" font-style="italic">${blurbLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : blurbLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
+  <text x="${panelLeft}" y="${blurbY}" fill="#3d4552" font-family="Inter, sans-serif" font-size="${blurbFontSize}" font-style="italic">${blurbLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : blurbLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
   <text x="${panelLeft}" y="${amountY}" fill="#697180" font-family="Inter, sans-serif" font-size="30" font-weight="700"><tspan fill="#11141c" font-size="42" font-weight="800">${escapeSvgText(formatSvgCurrencyFromCents(pledgedAmount))}</tspan><tspan dx="12">${escapeSvgText(messages.of)} ${escapeSvgText(formatSvgCurrencyFromCents(goalAmountCents))}</tspan></text>
   <rect x="${panelLeft}" y="${progressY}" width="${progressWidth}" height="18" rx="9" ry="9" fill="#e5e8ee" />
   ${progressBackgroundDataUrl ? `<image href="${escapeSvgText(progressBackgroundDataUrl)}" x="${panelLeft}" y="${progressY}" width="${progressWidth}" height="18" opacity="0.1" preserveAspectRatio="none" />` : ''}
@@ -772,10 +780,13 @@ function buildCampaignShareCardFallbackPng({ env, campaign, stats, effectiveStat
   });
 
   const blurbTop = titleLines.length > 1 ? 388 : 322;
-  const blurbLines = wrapShareCardText(blurb, 720, { scale: 5, maxLines: 3, letterSpacing: 1 });
+  const fallbackBlurbScale = blurb.length > 135 ? 4 : 5;
+  const fallbackBlurbLineHeight = fallbackBlurbScale === 4 ? 38 : 46;
+  const fallbackBlurbWidth = fallbackBlurbScale === 4 ? 760 : 720;
+  const blurbLines = wrapShareCardText(blurb, fallbackBlurbWidth, { scale: fallbackBlurbScale, maxLines: 2, letterSpacing: 1 });
   drawShareCardTextLines(surface, blurbLines, 90, blurbTop, {
-    scale: 5,
-    lineHeight: 46,
+    scale: fallbackBlurbScale,
+    lineHeight: fallbackBlurbLineHeight,
     color: SHARE_CARD_COLORS.fillSoft,
     letterSpacing: 1
   });
