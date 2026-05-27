@@ -1067,6 +1067,35 @@ describe('worker operational integrity', () => {
     expect(body).toContain('https://pool.test');
   });
 
+  it('prefers the square hero image for generated campaign share cards', async () => {
+    const env = createEnv();
+    const fetchedUrls: string[] = [];
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      fetchedUrls.push(url);
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture] });
+      }
+      if (url.startsWith('https://pool.test/assets/images/')) {
+        return new Response(new Uint8Array([137, 80, 78, 71]), {
+          headers: { 'Content-Type': 'image/png' }
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/share/campaign/hand-relations.svg'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchedUrls).toContain('https://pool.test/assets/images/defaults/dust-wave-square.png');
+    expect(fetchedUrls).not.toContain('https://pool.test/assets/images/campaigns/hand-relations/hand-relations-wide.png');
+  });
+
   it('serves a crawler-safe campaign share-card PNG that reflects live campaign data', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;

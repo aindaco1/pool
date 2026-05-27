@@ -50,7 +50,7 @@ The public Open Graph route is:
 - `/share/campaign/{slug}.png?lang=en`
 - `/share/campaign/{slug}.png?lang=es`
 
-That route generates a state-aware SVG card from live campaign data, then rasterizes it to PNG so shared links stay crawler-safe while still showing pledged total, goal progress, and campaign state with the richer share-card styling. The Worker also keeps the SVG version at `/share/campaign/{slug}.svg?lang={lang}` for internal preview/debug tooling, but SVG is not the public metadata default because some external crawlers reject it.
+That route generates a state-aware SVG card from live campaign data, then rasterizes it to PNG so shared links stay crawler-safe while still showing pledged total, goal progress, campaign state, and the campaign's square `hero_image` with the richer share-card styling. The Worker also keeps the SVG version at `/share/campaign/{slug}.svg?lang={lang}` for internal preview/debug tooling, but SVG is not the public metadata default because some external crawlers reject it.
 
 ## Indexing Contract
 
@@ -162,7 +162,7 @@ Forks can safely customize:
 - organization social-profile links
 - whether the public community hub should remain indexable
 - page and campaign descriptive copy that already exists in the content model
-- campaign preview inputs that already exist in the content model, such as campaign title, blurb, category, creator, and hero imagery
+- campaign preview inputs that already exist in the content model, such as campaign title, blurb, category, creator, and the square hero image used inside generated share cards
 
 Forks should not assume support for:
 

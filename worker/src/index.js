@@ -306,7 +306,7 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   const titleLines = wrapSvgText(displayTitle, 12, 2);
   const hasMultiLineTitle = titleLines.length > 1;
   const blurbLines = wrapSvgText(blurb, hasMultiLineTitle ? 32 : 34, hasMultiLineTitle ? 2 : 3);
-  const heroImage = campaign?.hero_image_wide || campaign?.hero_image || '';
+  const heroImage = campaign?.hero_image || campaign?.hero_image_wide || '';
   const progressBackground = campaign?.progress_background || '';
   const heroImageUrl = heroImage ? `${siteBase}${heroImage}` : '';
   const progressBackgroundUrl = progressBackground ? `${siteBase}${progressBackground}` : '';
