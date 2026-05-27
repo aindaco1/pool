@@ -324,9 +324,9 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   const creatorY = 126;
   const metaGap = 32;
   const categoryY = creatorY + metaGap;
-  const badgeTop = 204;
+  const badgeTop = 196;
   const badgeHeight = 42;
-  const badgeTextY = 231;
+  const badgeTextY = badgeTop + 27;
   const titleY = hasMultiLineTitle ? 300 : 332;
   const titleFontSize = hasMultiLineTitle ? 60 : 86;
   const titleLineHeight = hasMultiLineTitle ? 56 : 74;
@@ -334,7 +334,7 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   const blurbLineHeight = hasMultiLineTitle ? 32 : 36;
   const amountY = blurbY + ((Math.max(blurbLines.length, 1) - 1) * blurbLineHeight) + (hasMultiLineTitle ? 56 : 91);
   const progressY = amountY + 19;
-  const footerY = progressY + (hasMultiLineTitle ? 40 : 56);
+  const footerY = progressY + (hasMultiLineTitle ? 48 : 56);
 
   let badgeText = messages.campaign;
   if (effectiveState === 'upcoming') {
