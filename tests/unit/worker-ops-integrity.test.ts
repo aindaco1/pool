@@ -1061,6 +1061,7 @@ describe('worker operational integrity', () => {
     const body = await response.text();
     expect(body).toContain('<svg');
     expect(body).toContain('Hand Relations');
+    expect(body).toContain('Gambado Sans Forte');
     expect(body).toContain('$12,500');
     expect(body).toContain('50% funded');
     expect(body).toContain('https://pool.test');

@@ -380,8 +380,8 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   <text x="${panelLeft}" y="${creatorY}" fill="#666f7d" font-family="Inter, sans-serif" font-size="18" font-weight="700" letter-spacing="1.4">${escapeSvgText(messages.creator)}: ${escapeSvgText(creator.toUpperCase())}</text>
   <text x="${panelLeft}" y="${categoryY}" fill="#666f7d" font-family="Inter, sans-serif" font-size="18" font-weight="700" letter-spacing="1.4">${escapeSvgText(messages.category)}: ${escapeSvgText(category.toUpperCase())}</text>
   <rect x="${panelLeft}" y="${badgeTop}" width="248" height="${badgeHeight}" rx="21" ry="21" fill="#11141c" />
-  <text x="744" y="${badgeTextY}" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="21" font-weight="700">${escapeSvgText(badgeText)}</text>
-  <text x="${panelLeft}" y="${titleY}" fill="#11141c" font-family="Inter, sans-serif" font-size="${titleFontSize}" font-weight="800">${titleLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : titleLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
+  <text x="744" y="${badgeTextY}" text-anchor="middle" fill="#ffffff" font-family="Gambado Sans, Inter, sans-serif" font-size="21" font-weight="700" letter-spacing="0.6">${escapeSvgText(badgeText)}</text>
+  <text x="${panelLeft}" y="${titleY}" fill="#11141c" font-family="Gambado Sans Forte, Gambado Sans, Inter, sans-serif" font-size="${titleFontSize}" font-weight="700" letter-spacing="1.2">${titleLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : titleLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
   <text x="${panelLeft}" y="${blurbY}" fill="#3d4552" font-family="Inter, sans-serif" font-size="28" font-style="italic">${blurbLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : blurbLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
   <text x="${panelLeft}" y="${amountY}" fill="#697180" font-family="Inter, sans-serif" font-size="30" font-weight="700"><tspan fill="#11141c" font-size="42" font-weight="800">${escapeSvgText(formatSvgCurrencyFromCents(pledgedAmount))}</tspan><tspan dx="12">${escapeSvgText(messages.of)} ${escapeSvgText(formatSvgCurrencyFromCents(goalAmountCents))}</tspan></text>
   <rect x="${panelLeft}" y="${progressY}" width="${progressWidth}" height="18" rx="9" ry="9" fill="#e5e8ee" />
@@ -866,20 +866,28 @@ async function getShareCardFontBuffers() {
     shareCardFontBuffersPromise = (async () => {
       if (shouldLoadResvgWasmFromFileSystem()) {
         const { readFile } = await import('node:fs/promises');
-        const [romanFont, italicFont] = await Promise.all([
+        const [gambadoSansFont, gambadoSansForteFont, romanFont, italicFont] = await Promise.all([
+          readFile(`${process.cwd()}/worker/src/assets/fonts/gambado-sans-regular.bin`),
+          readFile(`${process.cwd()}/worker/src/assets/fonts/gambado-sans-forte.bin`),
           readFile(`${process.cwd()}/worker/src/assets/fonts/inter-roman.bin`),
           readFile(`${process.cwd()}/worker/src/assets/fonts/inter-italic.bin`)
         ]);
         return [
+          new Uint8Array(gambadoSansFont),
+          new Uint8Array(gambadoSansForteFont),
           new Uint8Array(romanFont),
           new Uint8Array(italicFont)
         ];
       }
-      const [romanFontModule, italicFontModule] = await Promise.all([
+      const [gambadoSansModule, gambadoSansForteModule, romanFontModule, italicFontModule] = await Promise.all([
+        import('./assets/fonts/gambado-sans-regular.bin'),
+        import('./assets/fonts/gambado-sans-forte.bin'),
         import('./assets/fonts/inter-roman.bin'),
         import('./assets/fonts/inter-italic.bin')
       ]);
       return Promise.all([
+        normalizeBinaryModuleData(gambadoSansModule.default || gambadoSansModule),
+        normalizeBinaryModuleData(gambadoSansForteModule.default || gambadoSansForteModule),
         normalizeBinaryModuleData(romanFontModule.default || romanFontModule),
         normalizeBinaryModuleData(italicFontModule.default || italicFontModule)
       ]);
@@ -905,7 +913,7 @@ async function rasterizeShareCardSvg(svg) {
     fitTo: { mode: 'original' },
     font: {
       fontBuffers,
-      defaultFontFamily: 'Inter',
+      defaultFontFamily: 'Gambado Sans',
       sansSerifFamily: 'Inter'
     },
     shapeRendering: 2,
