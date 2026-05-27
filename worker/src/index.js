@@ -101,6 +101,7 @@ import {
   saveStoredAdminUsers,
   verifyAdminAuthStartChallenge
 } from './admin-auth.js';
+import { initWasm, Resvg } from '@resvg/resvg-wasm';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
 
@@ -724,7 +725,7 @@ function drawShareCardMetric(surface, label, value, x, y, width) {
   });
 }
 
-function buildCampaignShareCardPng({ env, campaign, stats, effectiveState, isFunded, preferredLang }) {
+function buildCampaignShareCardFallbackPng({ env, campaign, stats, effectiveState, isFunded, preferredLang }) {
   const surface = createShareCardSurface();
   const messages = getShareCardMessages(preferredLang);
   const publicSiteBase = String(env?.CANONICAL_SITE_BASE || env?.SITE_BASE || '').replace(/\/$/, '');
@@ -815,6 +816,71 @@ function buildCampaignShareCardPng({ env, campaign, stats, effectiveState, isFun
   });
 
   return encodePngRgb(surface);
+}
+
+let shareCardRasterizerInputPromise;
+let shareCardRasterizerInitPromise;
+
+function shouldLoadResvgWasmFromFileSystem() {
+  return typeof process !== 'undefined'
+    && Boolean(process?.versions?.node)
+    && typeof globalThis.WebSocketPair === 'undefined'
+    && !String(globalThis.navigator?.userAgent || '').includes('Cloudflare-Workers');
+}
+
+async function getShareCardRasterizerInput() {
+  if (!shareCardRasterizerInputPromise) {
+    shareCardRasterizerInputPromise = (async () => {
+      if (shouldLoadResvgWasmFromFileSystem()) {
+        const { readFile } = await import('node:fs/promises');
+        return readFile(`${process.cwd()}/worker/node_modules/@resvg/resvg-wasm/index_bg.wasm`);
+      }
+      const wasmModule = await import('@resvg/resvg-wasm/index_bg.wasm');
+      return wasmModule.default || wasmModule;
+    })();
+  }
+  return shareCardRasterizerInputPromise;
+}
+
+async function ensureShareCardRasterizer() {
+  if (!shareCardRasterizerInitPromise) {
+    shareCardRasterizerInitPromise = initWasm(getShareCardRasterizerInput()).catch((error) => {
+      shareCardRasterizerInitPromise = null;
+      throw error;
+    });
+  }
+  return shareCardRasterizerInitPromise;
+}
+
+async function rasterizeShareCardSvg(svg) {
+  await ensureShareCardRasterizer();
+  const renderer = new Resvg(svg, {
+    fitTo: { mode: 'original' },
+    shapeRendering: 2,
+    textRendering: 1,
+    imageRendering: 0
+  });
+
+  try {
+    const rendered = renderer.render();
+    try {
+      return rendered.asPng();
+    } finally {
+      rendered.free();
+    }
+  } finally {
+    renderer.free();
+  }
+}
+
+async function buildCampaignShareCardPng(options) {
+  const svg = await buildCampaignShareCardSvg(options);
+  try {
+    return await rasterizeShareCardSvg(svg);
+  } catch (error) {
+    console.warn('Share-card SVG rasterization failed; using fallback PNG renderer', error);
+    return buildCampaignShareCardFallbackPng(options);
+  }
 }
 
 // SEC-006: Timing-safe string comparison to prevent timing attacks
@@ -13191,7 +13257,7 @@ async function handleGetCampaignShareCard(campaignSlug, request, env) {
 async function handleGetCampaignShareCardPng(campaignSlug, request, env) {
   const context = await getCampaignShareCardContext(campaignSlug, request, env);
   if (!context.ok) return context.response;
-  const png = buildCampaignShareCardPng({
+  const png = await buildCampaignShareCardPng({
     env,
     campaign: context.campaign,
     stats: context.stats,

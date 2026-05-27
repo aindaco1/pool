@@ -50,7 +50,7 @@ The public Open Graph route is:
 - `/share/campaign/{slug}.png?lang=en`
 - `/share/campaign/{slug}.png?lang=es`
 
-That route generates a state-aware PNG card from live campaign data so shared links stay crawler-safe while still showing pledged total, goal progress, and campaign state. The Worker also keeps an SVG version at `/share/campaign/{slug}.svg?lang={lang}` for internal preview/debug tooling, but SVG is not the public metadata default because some external crawlers reject it.
+That route generates a state-aware SVG card from live campaign data, then rasterizes it to PNG so shared links stay crawler-safe while still showing pledged total, goal progress, and campaign state with the richer share-card styling. The Worker also keeps the SVG version at `/share/campaign/{slug}.svg?lang={lang}` for internal preview/debug tooling, but SVG is not the public metadata default because some external crawlers reject it.
 
 ## Indexing Contract
 

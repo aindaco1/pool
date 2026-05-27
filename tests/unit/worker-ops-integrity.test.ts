@@ -1091,6 +1091,7 @@ describe('worker operational integrity', () => {
     const bytes = new Uint8Array(await response.arrayBuffer());
     expect(Array.from(bytes.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
     expect(bytes.byteLength).toBeGreaterThan(1000);
+    expect(bytes.byteLength).toBeLessThan(500000);
   });
 
   it('serves campaign share-card metadata for HEAD requests', async () => {

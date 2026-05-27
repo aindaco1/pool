@@ -280,7 +280,7 @@ Optional query params:
 
 - `lang=en|es` to localize campaign UI copy and the footer campaign link
 
-The rendered card uses live campaign data, including current state, pledged total, goal progress, and creator/category metadata. Campaign pages use this crawler-friendly PNG route for `og:image` / `twitter:image` metadata unless a campaign explicitly provides a static `social_image`.
+The rendered card uses live campaign data, including current state, pledged total, goal progress, and creator/category metadata. The Worker rasterizes the same SVG card design into PNG so social crawlers get a compatible image without losing the richer preview styling. Campaign pages use this crawler-friendly PNG route for `og:image` / `twitter:image` metadata unless a campaign explicitly provides a static `social_image`.
 
 ### GET /share/campaign/:slug.svg
 Return the same campaign share-card concept as SVG for internal preview/debug tooling. Use the PNG route for public social metadata because some external crawlers reject SVG images.
