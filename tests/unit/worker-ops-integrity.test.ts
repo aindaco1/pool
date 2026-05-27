@@ -1115,7 +1115,6 @@ describe('worker operational integrity', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toContain('image/svg+xml');
-    expect(response.headers.get('Content-Length')).toBeTruthy();
     expect(await response.text()).toBe('');
   });
 
@@ -1140,7 +1139,6 @@ describe('worker operational integrity', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toContain('image/png');
-    expect(response.headers.get('Content-Length')).toBeTruthy();
     expect(await response.text()).toBe('');
   });
 

@@ -13282,6 +13282,22 @@ async function getCampaignShareCardContext(campaignSlug, request, env) {
 async function handleGetCampaignShareCard(campaignSlug, request, env) {
   const context = await getCampaignShareCardContext(campaignSlug, request, env);
   if (!context.ok) return context.response;
+  const shareCardCacheControl = getAppMode(env) === 'test'
+    ? PRIVATE_NO_STORE_CACHE_CONTROL
+    : SHARE_CARD_CACHE_CONTROL;
+
+  const isHeadRequest = request.method === 'HEAD';
+  if (isHeadRequest) {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/svg+xml; charset=utf-8',
+        'Cache-Control': shareCardCacheControl,
+        ...SECURITY_HEADERS
+      }
+    });
+  }
+
   const svg = await buildCampaignShareCardSvg({
     env,
     campaign: context.campaign,
@@ -13290,12 +13306,8 @@ async function handleGetCampaignShareCard(campaignSlug, request, env) {
     isFunded: context.isFunded,
     preferredLang: context.preferredLang
   });
-  const shareCardCacheControl = getAppMode(env) === 'test'
-    ? PRIVATE_NO_STORE_CACHE_CONTROL
-    : SHARE_CARD_CACHE_CONTROL;
 
-  const isHeadRequest = request.method === 'HEAD';
-  return new Response(isHeadRequest ? null : svg, {
+  return new Response(svg, {
     status: 200,
     headers: {
       'Content-Type': 'image/svg+xml; charset=utf-8',
@@ -13309,6 +13321,22 @@ async function handleGetCampaignShareCard(campaignSlug, request, env) {
 async function handleGetCampaignShareCardPng(campaignSlug, request, env) {
   const context = await getCampaignShareCardContext(campaignSlug, request, env);
   if (!context.ok) return context.response;
+  const shareCardCacheControl = getAppMode(env) === 'test'
+    ? PRIVATE_NO_STORE_CACHE_CONTROL
+    : SHARE_CARD_CACHE_CONTROL;
+
+  const isHeadRequest = request.method === 'HEAD';
+  if (isHeadRequest) {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': shareCardCacheControl,
+        ...SECURITY_HEADERS
+      }
+    });
+  }
+
   const png = await buildCampaignShareCardPng({
     env,
     campaign: context.campaign,
@@ -13317,12 +13345,8 @@ async function handleGetCampaignShareCardPng(campaignSlug, request, env) {
     isFunded: context.isFunded,
     preferredLang: context.preferredLang
   });
-  const shareCardCacheControl = getAppMode(env) === 'test'
-    ? PRIVATE_NO_STORE_CACHE_CONTROL
-    : SHARE_CARD_CACHE_CONTROL;
 
-  const isHeadRequest = request.method === 'HEAD';
-  return new Response(isHeadRequest ? null : png, {
+  return new Response(png, {
     status: 200,
     headers: {
       'Content-Type': 'image/png',
