@@ -273,14 +273,17 @@ Start a Stripe session to update payment method.
 
 Returns either a custom-session bootstrap for the on-site `Update Card` flow or a hosted fallback URL.
 
-### GET /share/campaign/:slug.svg
-Return a public SVG share card for one campaign.
+### GET /share/campaign/:slug.png
+Return a public PNG share card for one campaign.
 
 Optional query params:
 
 - `lang=en|es` to localize campaign UI copy and the footer campaign link
 
-The rendered card uses live campaign data, including current state, pledged total, goal progress, and creator/category metadata. Campaign pages may use a static `social_image` for crawler-friendly `og:image` / `twitter:image` metadata, while this route remains the live SVG share-card endpoint used by embed previews and internal tooling.
+The rendered card uses live campaign data, including current state, pledged total, goal progress, and creator/category metadata. Campaign pages use this crawler-friendly PNG route for `og:image` / `twitter:image` metadata unless a campaign explicitly provides a static `social_image`.
+
+### GET /share/campaign/:slug.svg
+Return the same campaign share-card concept as SVG for internal preview/debug tooling. Use the PNG route for public social metadata because some external crawlers reject SVG images.
 
 ### POST /webhooks/stripe
 Stripe webhook endpoint (signature verified).
@@ -538,7 +541,7 @@ Keep `USPS_CLIENT_SECRET` out of site config. It belongs in Worker secrets or [`
 
 Localization note: the Worker now localizes supporter-facing email subjects/body copy and localized `/manage/` / `/community/:slug/` links from the shared site locale catalog. In normal operation it fetches that catalog from `SITE_BASE/assets/i18n.json`; tests and advanced deployments can inject `I18N_CATALOG_JSON` instead. That means localized supporter emails and localized routes such as `/es/manage/` or `/es/community/:slug/` stay aligned with the site locale model when a deployment adds those routes.
 
-The Worker also serves localized campaign share-card previews at `GET /share/campaign/:slug.svg` with an optional `?lang=es` query. The generated SVG mirrors the campaign embed's state/progress language while linking back to the localized public campaign route. Campaign `og:image` metadata should prefer a static raster `social_image` when one is available because not every external crawler accepts SVG images.
+The Worker also serves localized campaign share-card previews at `GET /share/campaign/:slug.png` with an optional `?lang=es` query. The generated PNG mirrors the campaign embed's state/progress language while linking back to the localized public campaign route. The SVG route remains available at `GET /share/campaign/:slug.svg` for internal preview/debug tooling, but public `og:image` metadata should use PNG or another static raster image because not every external crawler accepts SVG images.
 
 ## Data Flow
 

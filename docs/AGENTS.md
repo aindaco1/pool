@@ -25,7 +25,7 @@ The Pool is a split system:
 The important boundary is:
 
 - the site renders UI, campaign content, cart flows, localized pages, embeds, and SEO metadata
-- the Worker is the canonical source for checkout validation, pledge persistence, live stats, emails, settlement, and share-card SVG generation
+- the Worker is the canonical source for checkout validation, pledge persistence, live stats, emails, settlement, and share-card PNG/SVG generation
 
 If a change affects pricing, campaign totals, availability, pledge state, email content, or live campaign status, assume the Worker is involved even if the first symptom is on the site.
 

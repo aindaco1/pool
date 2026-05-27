@@ -20,7 +20,7 @@ The embed is not the same thing as a social rich preview.
 - the embed is a live interactive `iframe` surface meant for websites and any host that allows pasted HTML
 - the social preview is a metadata + image surface used by platforms like X, Slack, Discord, iMessage, and similar unfurl targets
 
-Those platforms will not render the full embed widget. They use page metadata and the Worker-generated campaign share-card SVG instead.
+Those platforms will not render the full embed widget. They use page metadata and the Worker-generated campaign share-card PNG instead.
 
 ## Current URL Contract
 
@@ -75,10 +75,11 @@ To keep shared links aligned with the embed’s visual language, campaign pages 
 
 - state-aware campaign title/description metadata
 - localized alternate-language metadata
-- a crawler-friendly static `social_image` for `og:image` when configured
-- a Worker-generated share-card SVG route at `/share/campaign/{slug}.svg?lang={lang}` for live embed/share-card previews
+- a Worker-generated share-card PNG route at `/share/campaign/{slug}.png?lang={lang}` for crawler-safe `og:image` metadata
+- an optional static `social_image` override when a campaign needs a fixed raster social image
+- a Worker-generated share-card SVG route at `/share/campaign/{slug}.svg?lang={lang}` for internal preview/debug tooling
 
-That share card is the live preview companion to the embed, not a replacement for a static Open Graph image.
+That share card is the live preview companion to the embed. Use the PNG route for public social metadata because it is safer for external crawlers than SVG.
 
 ## Main Implementation Files
 

@@ -7,11 +7,11 @@
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-campaign-csp-strict.html %}
   {% include cart-head.html %}
-  {% capture campaign_worker_social_image %}{{ site.platform.worker_url | default: site.platform.site_url | default: site.url }}/share/campaign/{{ page.slug | uri_escape }}.svg?lang={{ current_lang | uri_escape }}{% endcapture %}
+  {% capture campaign_worker_social_image %}{{ site.platform.worker_url | default: site.platform.site_url | default: site.url }}/share/campaign/{{ page.slug | uri_escape }}.png?lang={{ current_lang | uri_escape }}{% endcapture %}
   {% assign campaign_social_image = page.social_image | default: campaign_worker_social_image %}
   {% assign campaign_social_image_width = page.social_image_width | default: 1200 %}
   {% assign campaign_social_image_height = page.social_image_height | default: 630 %}
-  {% assign campaign_social_image_type = page.social_image_type | default: "image/svg+xml" %}
+  {% assign campaign_social_image_type = page.social_image_type | default: "image/png" %}
   {% assign campaign_creator = page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author %}
   {% assign campaign_category = page.category | default: site.data.i18n[current_lang].campaign.default_category | default: site.data.i18n.en.campaign.default_category %}
   {% capture campaign_blurb_plain %}{{ page.short_blurb | default: site.description | strip_html | strip_newlines | replace: '  ', ' ' | strip }}{% endcapture %}

@@ -93,7 +93,8 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('image_width=campaign_social_image_width');
     expect(campaignLayout).toContain('image_height=campaign_social_image_height');
     expect(campaignLayout).toContain('image_type=campaign_social_image_type');
-    expect(campaignLayout).toContain('/share/campaign/{{ page.slug | uri_escape }}.svg?lang={{ current_lang | uri_escape }}');
+    expect(campaignLayout).toContain('/share/campaign/{{ page.slug | uri_escape }}.png?lang={{ current_lang | uri_escape }}');
+    expect(campaignLayout).toContain('default: "image/png"');
     expect(seoMeta).toContain("unless image_url contains '://' or image_url contains 'data:'");
     expect(translationsEn).toContain('campaign_preview:');
     expect(translationsEs).toContain('campaign_preview:');

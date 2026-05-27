@@ -1066,6 +1066,33 @@ describe('worker operational integrity', () => {
     expect(body).toContain('https://pool.test');
   });
 
+  it('serves a crawler-safe campaign share-card PNG that reflects live campaign data', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 1250000,
+      pledgeCount: 7,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/share/campaign/hand-relations.png?lang=es'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toContain('image/png');
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    expect(Array.from(bytes.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(bytes.byteLength).toBeGreaterThan(1000);
+  });
+
   it('serves campaign share-card metadata for HEAD requests', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;
@@ -1087,6 +1114,31 @@ describe('worker operational integrity', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toContain('image/svg+xml');
+    expect(response.headers.get('Content-Length')).toBeTruthy();
+    expect(await response.text()).toBe('');
+  });
+
+  it('serves campaign PNG share-card metadata for HEAD requests', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 1250000,
+      pledgeCount: 7,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/share/campaign/hand-relations.png', { method: 'HEAD' }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toContain('image/png');
     expect(response.headers.get('Content-Length')).toBeTruthy();
     expect(await response.text()).toBe('');
   });

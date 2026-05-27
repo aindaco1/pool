@@ -24,7 +24,7 @@ The current baseline includes:
 - secure social-image tags where the page image is already HTTPS
 - social image alt metadata
 - state-aware campaign social titles and descriptions
-- static campaign social images when configured, with Worker-generated campaign share-card SVGs retained for embed/share-card previews
+- Worker-generated campaign share-card PNGs for public social metadata, with SVG retained for internal preview/debug tooling
 - generated [`robots.txt`](../robots.txt)
 - generated [`sitemap.xml`](../sitemap.xml)
 - explicit `noindex,nofollow` on tokenized or supporter-only layouts
@@ -43,14 +43,14 @@ The main implementation files are:
 - [/robots.txt](../robots.txt)
 - [/sitemap.xml](../sitemap.xml)
 
-Campaign social previews prefer a campaign `social_image` when one is configured. Use a crawler-friendly raster image, ideally JPEG or PNG at `1200 x 630`.
+Campaign social previews default to a Worker-generated, crawler-friendly PNG that uses live campaign progress. A campaign can still override that with `social_image` when it needs a fixed static raster image, ideally JPEG or PNG at `1200 x 630`.
 
-The Worker still provides live, localized share-card previews in the shape:
+The public Open Graph route is:
 
-- `/share/campaign/{slug}.svg?lang=en`
-- `/share/campaign/{slug}.svg?lang=es`
+- `/share/campaign/{slug}.png?lang=en`
+- `/share/campaign/{slug}.png?lang=es`
 
-That route generates a state-aware SVG card from live campaign data so embeds and internal preview tooling can stay close to the hosted embed’s visual language. It is not the safest default for `og:image`, because some external social crawlers reject SVG images.
+That route generates a state-aware PNG card from live campaign data so shared links stay crawler-safe while still showing pledged total, goal progress, and campaign state. The Worker also keeps an SVG version at `/share/campaign/{slug}.svg?lang={lang}` for internal preview/debug tooling, but SVG is not the public metadata default because some external crawlers reject it.
 
 ## Indexing Contract
 
@@ -131,7 +131,7 @@ Public metadata also derives a few safe values automatically:
 - `og:image:secure_url` when the chosen social image already resolves to HTTPS
 - `article:published_time` / `article:modified_time` on campaign pages when campaign dates are available
 - campaign preview copy from campaign state (`upcoming`, `live`, `funded`, `ended`)
-- campaign preview images from `social_image` when configured, otherwise the Worker share-card route
+- campaign preview images from `social_image` when configured, otherwise the Worker-generated PNG share-card route
 - `WebSite.availableLanguage`, localized breadcrumb roots, and campaign `CreativeWork.inLanguage` from the configured locale model
 
 Forks can override part of that behavior in a bounded way:
@@ -175,7 +175,7 @@ Forks should not assume support for:
 When checking a deployment manually:
 
 - page source for home/about/terms/campaign pages has correct title, description, canonical, OG, and Twitter tags
-- campaign pages emit a crawler-friendly `social_image` when configured, otherwise the Worker share-card SVG route
+- campaign pages emit a crawler-friendly `social_image` when configured, otherwise the Worker share-card PNG route
 - `robots.txt` is reachable and only exposes intended public crawl paths
 - `sitemap.xml` is reachable and only includes intended public URLs
 - private/tokenized pages emit `noindex` where appropriate

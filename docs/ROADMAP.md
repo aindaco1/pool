@@ -190,7 +190,7 @@ The v1.0 feature set and release-hardening pass are complete. New roadmap items 
 - [x] Campaign embeds and richer share previews
   - campaign pages now link to a hosted locale-aware embed builder that generates copy-paste iframe code with layout, theme, media, and CTA options
   - the embed widget uses live Worker-backed campaign state, auto-resizes after paste, and supports localized return links plus localized builder/runtime copy
-  - campaign pages now emit richer state-aware social metadata plus Worker-generated share-card SVG images that stay closer to the embed’s visual language
+  - campaign pages now emit richer state-aware social metadata plus Worker-generated PNG share-card images, with SVG retained for internal preview/debug tooling
   - localized campaign routes, localized embed routes, and locale-aware share-card URLs keep embeds and rich previews aligned across English and Spanish
 - [x] Developer FAQ based on internal documentation
 - [x] Marketing landing page for the platform on a different domain

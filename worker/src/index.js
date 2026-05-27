@@ -16,6 +16,8 @@
  *   POST /votes              - Cast a vote
  *   GET  /live/:slug         - Get combined live stats + inventory for a campaign
  *   GET  /stats/:slug        - Get live pledge stats for a campaign
+ *   GET  /share/campaign/:slug.png - Get crawler-safe campaign share-card image
+ *   GET  /share/campaign/:slug.svg - Get internal/debug campaign share-card image
  *   POST /stats/:slug/check - Check stats/index/inventory projection drift (admin)
  *   POST /stats/:slug/recalculate - Recalculate stats from KV (admin)
  *   GET  /inventory/:slug    - Get tier inventory (remaining counts) for a campaign
@@ -120,6 +122,8 @@ const CAMPAIGN_RUNNER_REPORT_CRONS = new Set(['0 13 * * *', '0 14 * * *']);
 const SUPPORTER_EMAIL_RETRY_BATCH_SIZE = 10;
 const SUPPORTER_EMAIL_RETRY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SHARE_CARD_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=3600';
+const SHARE_CARD_RASTER_WIDTH = 1200;
+const SHARE_CARD_RASTER_HEIGHT = 630;
 const MAX_STANDARD_JSON_BODY_BYTES = 64 * 1024;
 const MAX_ADMIN_LOGO_UPLOAD_BODY_BYTES = 1024 * 1024;
 const MAX_ADMIN_IMAGE_UPLOAD_BODY_BYTES = 12 * 1024 * 1024;
@@ -390,6 +394,427 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   <text x="${panelLeft}" y="${footerY}" fill="#596273" font-family="Arial, sans-serif" font-size="22" font-weight="700">${escapeSvgText(String(progressPct))}% ${escapeSvgText(messages.fundedPercent)}</text>
   <text x="1076" y="${footerY}" text-anchor="end" fill="#7d8593" font-family="Arial, sans-serif" font-size="10" font-weight="700">${escapeSvgText(campaignUrlLabel)}</text>
 </svg>`;
+}
+
+const SHARE_CARD_FONT = Object.freeze({
+  'A': ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
+  'B': ['11110', '10001', '10001', '11110', '10001', '10001', '11110'],
+  'C': ['01111', '10000', '10000', '10000', '10000', '10000', '01111'],
+  'D': ['11110', '10001', '10001', '10001', '10001', '10001', '11110'],
+  'E': ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
+  'F': ['11111', '10000', '10000', '11110', '10000', '10000', '10000'],
+  'G': ['01111', '10000', '10000', '10011', '10001', '10001', '01110'],
+  'H': ['10001', '10001', '10001', '11111', '10001', '10001', '10001'],
+  'I': ['11111', '00100', '00100', '00100', '00100', '00100', '11111'],
+  'J': ['00111', '00010', '00010', '00010', '10010', '10010', '01100'],
+  'K': ['10001', '10010', '10100', '11000', '10100', '10010', '10001'],
+  'L': ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
+  'M': ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
+  'N': ['10001', '11001', '10101', '10011', '10001', '10001', '10001'],
+  'O': ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
+  'P': ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
+  'Q': ['01110', '10001', '10001', '10001', '10101', '10010', '01101'],
+  'R': ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
+  'S': ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
+  'T': ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
+  'U': ['10001', '10001', '10001', '10001', '10001', '10001', '01110'],
+  'V': ['10001', '10001', '10001', '10001', '10001', '01010', '00100'],
+  'W': ['10001', '10001', '10001', '10101', '10101', '11011', '10001'],
+  'X': ['10001', '10001', '01010', '00100', '01010', '10001', '10001'],
+  'Y': ['10001', '10001', '01010', '00100', '00100', '00100', '00100'],
+  'Z': ['11111', '00001', '00010', '00100', '01000', '10000', '11111'],
+  '0': ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
+  '1': ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+  '2': ['01110', '10001', '00001', '00010', '00100', '01000', '11111'],
+  '3': ['11110', '00001', '00001', '01110', '00001', '00001', '11110'],
+  '4': ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
+  '5': ['11111', '10000', '10000', '11110', '00001', '00001', '11110'],
+  '6': ['01110', '10000', '10000', '11110', '10001', '10001', '01110'],
+  '7': ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+  '8': ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
+  '9': ['01110', '10001', '10001', '01111', '00001', '00001', '01110'],
+  '$': ['00100', '01111', '10100', '01110', '00101', '11110', '00100'],
+  '%': ['11001', '11010', '00010', '00100', '01000', '01011', '10011'],
+  '&': ['01100', '10010', '10100', '01000', '10101', '10010', '01101'],
+  '+': ['00000', '00100', '00100', '11111', '00100', '00100', '00000'],
+  '-': ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
+  ':': ['00000', '00100', '00100', '00000', '00100', '00100', '00000'],
+  '.': ['00000', '00000', '00000', '00000', '00000', '01100', '01100'],
+  ',': ['00000', '00000', '00000', '00000', '00100', '00100', '01000'],
+  '/': ['00001', '00010', '00010', '00100', '01000', '01000', '10000'],
+  "'": ['00100', '00100', '01000', '00000', '00000', '00000', '00000'],
+  '"': ['01010', '01010', '01010', '00000', '00000', '00000', '00000'],
+  '(': ['00010', '00100', '01000', '01000', '01000', '00100', '00010'],
+  ')': ['01000', '00100', '00010', '00010', '00010', '00100', '01000'],
+  '!': ['00100', '00100', '00100', '00100', '00100', '00000', '00100'],
+  '?': ['01110', '10001', '00001', '00010', '00100', '00000', '00100'],
+  '@': ['01110', '10001', '10111', '10101', '10111', '10000', '01110'],
+  '#': ['01010', '01010', '11111', '01010', '11111', '01010', '01010']
+});
+
+const SHARE_CARD_FONT_WIDTH = 5;
+const SHARE_CARD_FONT_HEIGHT = 7;
+const SHARE_CARD_COLORS = Object.freeze({
+  background: [248, 247, 242],
+  surface: [255, 255, 255],
+  border: [207, 214, 224],
+  text: [17, 20, 28],
+  muted: [93, 102, 117],
+  soft: [229, 232, 238],
+  fill: [17, 20, 28],
+  fillSoft: [48, 56, 70]
+});
+
+function createShareCardSurface(width = SHARE_CARD_RASTER_WIDTH, height = SHARE_CARD_RASTER_HEIGHT) {
+  const pixels = new Uint8Array(width * height * 3);
+  for (let index = 0; index < pixels.length; index += 3) {
+    pixels[index] = SHARE_CARD_COLORS.background[0];
+    pixels[index + 1] = SHARE_CARD_COLORS.background[1];
+    pixels[index + 2] = SHARE_CARD_COLORS.background[2];
+  }
+  return { width, height, pixels };
+}
+
+function fillShareCardRect(surface, x, y, width, height, color) {
+  const startX = Math.max(0, Math.floor(x));
+  const startY = Math.max(0, Math.floor(y));
+  const endX = Math.min(surface.width, Math.ceil(x + width));
+  const endY = Math.min(surface.height, Math.ceil(y + height));
+  if (endX <= startX || endY <= startY) return;
+  for (let row = startY; row < endY; row += 1) {
+    let offset = ((row * surface.width) + startX) * 3;
+    for (let col = startX; col < endX; col += 1) {
+      surface.pixels[offset] = color[0];
+      surface.pixels[offset + 1] = color[1];
+      surface.pixels[offset + 2] = color[2];
+      offset += 3;
+    }
+  }
+}
+
+function strokeShareCardRect(surface, x, y, width, height, color, thickness = 2) {
+  fillShareCardRect(surface, x, y, width, thickness, color);
+  fillShareCardRect(surface, x, y + height - thickness, width, thickness, color);
+  fillShareCardRect(surface, x, y, thickness, height, color);
+  fillShareCardRect(surface, x + width - thickness, y, thickness, height, color);
+}
+
+function normalizeBitmapText(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
+
+function getShareCardGlyph(char) {
+  if (char === ' ') return null;
+  return SHARE_CARD_FONT[char] || SHARE_CARD_FONT['?'];
+}
+
+function measureShareCardText(value, scale = 4, letterSpacing = 1) {
+  const text = normalizeBitmapText(value);
+  if (!text) return 0;
+  let width = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    width += (char === ' ' ? 3 : SHARE_CARD_FONT_WIDTH) * scale;
+    if (index < text.length - 1) width += letterSpacing * scale;
+  }
+  return width;
+}
+
+function truncateShareCardText(value, maxWidth, scale = 4, letterSpacing = 1) {
+  let text = normalizeBitmapText(value);
+  const suffix = '...';
+  if (measureShareCardText(text, scale, letterSpacing) <= maxWidth) return text;
+  while (text.length > 0 && measureShareCardText(`${text}${suffix}`, scale, letterSpacing) > maxWidth) {
+    text = text.slice(0, -1).trimEnd();
+  }
+  return text ? `${text}${suffix}` : suffix;
+}
+
+function wrapShareCardText(value, maxWidth, options = {}) {
+  const scale = options.scale || 4;
+  const letterSpacing = options.letterSpacing ?? 1;
+  const maxLines = options.maxLines || 3;
+  const words = normalizeBitmapText(value).split(' ').filter(Boolean);
+  const lines = [];
+  let wordIndex = 0;
+
+  while (wordIndex < words.length && lines.length < maxLines) {
+    let line = words[wordIndex];
+    wordIndex += 1;
+
+    while (wordIndex < words.length && measureShareCardText(`${line} ${words[wordIndex]}`, scale, letterSpacing) <= maxWidth) {
+      line = `${line} ${words[wordIndex]}`;
+      wordIndex += 1;
+    }
+
+    if (lines.length === maxLines - 1 && wordIndex < words.length) {
+      lines.push(truncateShareCardText(`${line} ${words.slice(wordIndex).join(' ')}`, maxWidth, scale, letterSpacing));
+      return lines;
+    }
+
+    lines.push(truncateShareCardText(line, maxWidth, scale, letterSpacing));
+  }
+
+  return lines;
+}
+
+function drawShareCardText(surface, value, x, y, options = {}) {
+  const scale = Math.max(1, Math.floor(options.scale || 4));
+  const color = options.color || SHARE_CARD_COLORS.text;
+  const letterSpacing = options.letterSpacing ?? 1;
+  const text = normalizeBitmapText(value);
+  let cursorX = Math.floor(x);
+
+  for (const char of text) {
+    if (char === ' ') {
+      cursorX += (3 + letterSpacing) * scale;
+      continue;
+    }
+
+    const glyph = getShareCardGlyph(char);
+    for (let row = 0; row < SHARE_CARD_FONT_HEIGHT; row += 1) {
+      for (let col = 0; col < SHARE_CARD_FONT_WIDTH; col += 1) {
+        if (glyph[row][col] === '1') {
+          fillShareCardRect(surface, cursorX + (col * scale), y + (row * scale), scale, scale, color);
+        }
+      }
+    }
+    cursorX += (SHARE_CARD_FONT_WIDTH + letterSpacing) * scale;
+  }
+}
+
+function drawShareCardTextLines(surface, lines, x, y, options = {}) {
+  const scale = options.scale || 4;
+  const lineHeight = options.lineHeight || Math.round((SHARE_CARD_FONT_HEIGHT + 2) * scale);
+  lines.forEach((line, index) => {
+    drawShareCardText(surface, line, x, y + (lineHeight * index), options);
+  });
+}
+
+function encodeUInt32Be(value) {
+  return new Uint8Array([
+    (value >>> 24) & 0xff,
+    (value >>> 16) & 0xff,
+    (value >>> 8) & 0xff,
+    value & 0xff
+  ]);
+}
+
+function concatUint8Arrays(chunks) {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const output = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return output;
+}
+
+function createCrc32Table() {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < 256; index += 1) {
+    let crc = index;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc & 1) ? (0xedb88320 ^ (crc >>> 1)) : (crc >>> 1);
+    }
+    table[index] = crc >>> 0;
+  }
+  return table;
+}
+
+const PNG_CRC32_TABLE = createCrc32Table();
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (let index = 0; index < bytes.length; index += 1) {
+    crc = PNG_CRC32_TABLE[(crc ^ bytes[index]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function adler32(bytes) {
+  let a = 1;
+  let b = 0;
+  for (let index = 0; index < bytes.length; index += 1) {
+    a = (a + bytes[index]) % 65521;
+    b = (b + a) % 65521;
+  }
+  return ((b << 16) | a) >>> 0;
+}
+
+function createPngChunk(type, data = new Uint8Array()) {
+  const typeBytes = new TextEncoder().encode(type);
+  const crcInput = concatUint8Arrays([typeBytes, data]);
+  return concatUint8Arrays([
+    encodeUInt32Be(data.length),
+    typeBytes,
+    data,
+    encodeUInt32Be(crc32(crcInput))
+  ]);
+}
+
+function zlibStore(bytes) {
+  const chunks = [new Uint8Array([0x78, 0x01])];
+  for (let offset = 0; offset < bytes.length; offset += 65535) {
+    const length = Math.min(65535, bytes.length - offset);
+    const final = offset + length >= bytes.length ? 1 : 0;
+    const nlen = (~length) & 0xffff;
+    chunks.push(new Uint8Array([
+      final,
+      length & 0xff,
+      (length >>> 8) & 0xff,
+      nlen & 0xff,
+      (nlen >>> 8) & 0xff
+    ]));
+    chunks.push(bytes.subarray(offset, offset + length));
+  }
+  chunks.push(encodeUInt32Be(adler32(bytes)));
+  return concatUint8Arrays(chunks);
+}
+
+function encodePngRgb(surface) {
+  const scanlineLength = surface.width * 3 + 1;
+  const raw = new Uint8Array(scanlineLength * surface.height);
+  for (let row = 0; row < surface.height; row += 1) {
+    const rawOffset = row * scanlineLength;
+    raw[rawOffset] = 0;
+    raw.set(
+      surface.pixels.subarray(row * surface.width * 3, (row + 1) * surface.width * 3),
+      rawOffset + 1
+    );
+  }
+
+  const ihdr = new Uint8Array(13);
+  ihdr.set(encodeUInt32Be(surface.width), 0);
+  ihdr.set(encodeUInt32Be(surface.height), 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+
+  return concatUint8Arrays([
+    new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+    createPngChunk('IHDR', ihdr),
+    createPngChunk('IDAT', zlibStore(raw)),
+    createPngChunk('IEND')
+  ]);
+}
+
+function drawShareCardMetric(surface, label, value, x, y, width) {
+  drawShareCardText(surface, label, x, y, {
+    scale: 4,
+    color: SHARE_CARD_COLORS.muted,
+    letterSpacing: 1
+  });
+  const valueText = truncateShareCardText(value, width, 7, 1);
+  drawShareCardText(surface, valueText, x, y + 44, {
+    scale: 7,
+    color: SHARE_CARD_COLORS.text,
+    letterSpacing: 1
+  });
+}
+
+function buildCampaignShareCardPng({ env, campaign, stats, effectiveState, isFunded, preferredLang }) {
+  const surface = createShareCardSurface();
+  const messages = getShareCardMessages(preferredLang);
+  const publicSiteBase = String(env?.CANONICAL_SITE_BASE || env?.SITE_BASE || '').replace(/\/$/, '');
+  const canonicalCampaignPath = String(campaign?.url || `/campaigns/${encodeURIComponent(campaign?.slug || '')}/`);
+  const campaignPath = getLocalizedPath(canonicalCampaignPath, preferredLang);
+  const campaignUrlLabel = `${publicSiteBase}${campaignPath}`.replace(/^https?:\/\//, '');
+  const pledgedAmount = Number(stats?.pledgedAmount || 0);
+  const goalAmountCents = Number(campaign?.goal_amount || 0) * 100;
+  const progressPct = goalAmountCents > 0
+    ? Math.max(0, Math.min(100, Math.round((pledgedAmount / goalAmountCents) * 100)))
+    : 0;
+  const title = campaign?.title || campaign?.slug || 'Campaign';
+  const creator = campaign?.creator_name || 'The Pool';
+  const category = campaign?.category || 'Campaign';
+  const blurb = stripHtmlTags(campaign?.short_blurb || '');
+
+  let badgeText = messages.campaign;
+  if (effectiveState === 'upcoming') {
+    badgeText = `${messages.starts} ${formatSvgDate(campaign?.start_date)}`;
+  } else if (effectiveState === 'live') {
+    badgeText = `${messages.ends} ${formatSvgDate(campaign?.goal_deadline)}`;
+  } else if (isFunded) {
+    badgeText = messages.funded;
+  } else {
+    badgeText = messages.ended;
+  }
+
+  fillShareCardRect(surface, 48, 52, 1104, 526, SHARE_CARD_COLORS.surface);
+  strokeShareCardRect(surface, 48, 52, 1104, 526, SHARE_CARD_COLORS.border, 3);
+  fillShareCardRect(surface, 48, 52, 14, 526, SHARE_CARD_COLORS.fill);
+  fillShareCardRect(surface, 90, 498, 800, 24, SHARE_CARD_COLORS.soft);
+  fillShareCardRect(surface, 90, 498, Math.max(16, Math.round(800 * (progressPct / 100))), 24, SHARE_CARD_COLORS.fill);
+
+  drawShareCardText(surface, `${messages.creator}: ${creator}`, 90, 96, {
+    scale: 4,
+    color: SHARE_CARD_COLORS.muted,
+    letterSpacing: 1
+  });
+  drawShareCardText(surface, `${messages.category}: ${category}`, 90, 138, {
+    scale: 4,
+    color: SHARE_CARD_COLORS.muted,
+    letterSpacing: 1
+  });
+
+  const titleLines = wrapShareCardText(title, 700, { scale: 11, maxLines: 2, letterSpacing: 1 });
+  drawShareCardTextLines(surface, titleLines, 90, 204, {
+    scale: 11,
+    lineHeight: 92,
+    color: SHARE_CARD_COLORS.text,
+    letterSpacing: 1
+  });
+
+  const blurbTop = titleLines.length > 1 ? 388 : 322;
+  const blurbLines = wrapShareCardText(blurb, 720, { scale: 5, maxLines: 3, letterSpacing: 1 });
+  drawShareCardTextLines(surface, blurbLines, 90, blurbTop, {
+    scale: 5,
+    lineHeight: 46,
+    color: SHARE_CARD_COLORS.fillSoft,
+    letterSpacing: 1
+  });
+
+  drawShareCardText(surface, `${formatSvgCurrencyFromCents(pledgedAmount)} ${messages.of} ${formatSvgCurrencyFromCents(goalAmountCents)}`, 90, 548, {
+    scale: 5,
+    color: SHARE_CARD_COLORS.text,
+    letterSpacing: 1
+  });
+
+  fillShareCardRect(surface, 920, 96, 178, 50, SHARE_CARD_COLORS.fill);
+  drawShareCardText(surface, truncateShareCardText(badgeText, 142, 4, 1), 946, 112, {
+    scale: 4,
+    color: SHARE_CARD_COLORS.surface,
+    letterSpacing: 1
+  });
+
+  drawShareCardMetric(surface, 'PROGRESS', `${progressPct}%`, 920, 196, 180);
+  drawShareCardMetric(surface, 'PLEDGED', formatSvgCurrencyFromCents(pledgedAmount), 920, 318, 180);
+  drawShareCardMetric(surface, 'GOAL', formatSvgCurrencyFromCents(goalAmountCents), 920, 440, 180);
+
+  drawShareCardText(surface, `${progressPct}% ${messages.fundedPercent}`, 910, 548, {
+    scale: 4,
+    color: SHARE_CARD_COLORS.muted,
+    letterSpacing: 1
+  });
+  drawShareCardText(surface, truncateShareCardText(campaignUrlLabel, 420, 3, 1), 90, 586, {
+    scale: 3,
+    color: SHARE_CARD_COLORS.muted,
+    letterSpacing: 1
+  });
+
+  return encodePngRgb(surface);
 }
 
 // SEC-006: Timing-safe string comparison to prevent timing attacks
@@ -3161,6 +3586,11 @@ export default {
       if (path.startsWith('/share/campaign/') && (method === 'GET' || method === 'HEAD') && path.endsWith('.svg')) {
         const campaignSlug = path.replace('/share/campaign/', '').replace(/\.svg$/, '');
         return handleGetCampaignShareCard(campaignSlug, request, env);
+      }
+
+      if (path.startsWith('/share/campaign/') && (method === 'GET' || method === 'HEAD') && path.endsWith('.png')) {
+        const campaignSlug = path.replace('/share/campaign/', '').replace(/\.png$/, '');
+        return handleGetCampaignShareCardPng(campaignSlug, request, env);
       }
 
       // Stats endpoints for live pledge totals
@@ -12695,9 +13125,12 @@ async function handleGetLiveCampaign(campaignSlug, env) {
   }, 200, env);
 }
 
-async function handleGetCampaignShareCard(campaignSlug, request, env) {
+async function getCampaignShareCardContext(campaignSlug, request, env) {
   if (!campaignSlug) {
-    return new Response('Missing campaign slug', { status: 400, headers: { ...SECURITY_HEADERS } });
+    return {
+      ok: false,
+      response: new Response('Missing campaign slug', { status: 400, headers: { ...SECURITY_HEADERS } })
+    };
   }
 
   const [campaign, stats] = await Promise.all([
@@ -12706,7 +13139,10 @@ async function handleGetCampaignShareCard(campaignSlug, request, env) {
   ]);
 
   if (!campaign) {
-    return new Response('Campaign not found', { status: 404, headers: { ...SECURITY_HEADERS } });
+    return {
+      ok: false,
+      response: new Response('Campaign not found', { status: 404, headers: { ...SECURITY_HEADERS } })
+    };
   }
 
   const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
@@ -12715,13 +13151,26 @@ async function handleGetCampaignShareCard(campaignSlug, request, env) {
   const isFunded = goalAmount > 0 ? pledgedAmount >= (goalAmount * 100) : false;
   const requestUrl = new URL(request.url);
   const preferredLang = normalizePreferredLang(requestUrl.searchParams.get('lang'), DEFAULT_I18N_LANG);
-  const svg = await buildCampaignShareCardSvg({
-    env,
+  return {
+    ok: true,
     campaign,
     stats,
     effectiveState,
     isFunded,
     preferredLang
+  };
+}
+
+async function handleGetCampaignShareCard(campaignSlug, request, env) {
+  const context = await getCampaignShareCardContext(campaignSlug, request, env);
+  if (!context.ok) return context.response;
+  const svg = await buildCampaignShareCardSvg({
+    env,
+    campaign: context.campaign,
+    stats: context.stats,
+    effectiveState: context.effectiveState,
+    isFunded: context.isFunded,
+    preferredLang: context.preferredLang
   });
   const shareCardCacheControl = getAppMode(env) === 'test'
     ? PRIVATE_NO_STORE_CACHE_CONTROL
@@ -12734,6 +13183,33 @@ async function handleGetCampaignShareCard(campaignSlug, request, env) {
       'Content-Type': 'image/svg+xml; charset=utf-8',
       'Cache-Control': shareCardCacheControl,
       'Content-Length': String(new TextEncoder().encode(svg).byteLength),
+      ...SECURITY_HEADERS
+    }
+  });
+}
+
+async function handleGetCampaignShareCardPng(campaignSlug, request, env) {
+  const context = await getCampaignShareCardContext(campaignSlug, request, env);
+  if (!context.ok) return context.response;
+  const png = buildCampaignShareCardPng({
+    env,
+    campaign: context.campaign,
+    stats: context.stats,
+    effectiveState: context.effectiveState,
+    isFunded: context.isFunded,
+    preferredLang: context.preferredLang
+  });
+  const shareCardCacheControl = getAppMode(env) === 'test'
+    ? PRIVATE_NO_STORE_CACHE_CONTROL
+    : SHARE_CARD_CACHE_CONTROL;
+
+  const isHeadRequest = request.method === 'HEAD';
+  return new Response(isHeadRequest ? null : png, {
+    status: 200,
+    headers: {
+      'Content-Type': 'image/png',
+      'Cache-Control': shareCardCacheControl,
+      'Content-Length': String(png.byteLength),
       ...SECURITY_HEADERS
     }
   });
