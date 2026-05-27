@@ -298,17 +298,27 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   const displayTitle = title.toLocaleUpperCase(preferredLang || DEFAULT_I18N_LANG);
   const creator = trimSvgText(campaign?.creator_name || 'The Pool', 40);
   const category = trimSvgText(campaign?.category || 'Campaign', 32);
-  const blurb = trimSvgText(stripHtmlTags(campaign?.short_blurb || ''), 180);
+  const blurb = stripHtmlTags(campaign?.short_blurb || '');
   const titleLines = wrapSvgText(displayTitle, 12, 2);
   const hasMultiLineTitle = titleLines.length > 1;
-  const blurbIsVeryLong = blurb.length > 135;
-  const blurbIsLong = blurb.length > 92;
-  const blurbFontSize = blurbIsVeryLong ? 23 : blurbIsLong ? 25 : 28;
-  const blurbMaxCharsPerLine = blurbIsVeryLong
-    ? (hasMultiLineTitle ? 40 : 42)
-    : blurbIsLong
-      ? (hasMultiLineTitle ? 36 : 38)
-      : (hasMultiLineTitle ? 32 : 34);
+  const blurbLength = blurb.length;
+  const blurbFontSize = blurbLength > 180 ? 10
+    : blurbLength > 150 ? 11
+    : blurbLength > 130 ? 14
+      : blurbLength > 112 ? 16
+        : blurbLength > 92 ? 20
+          : 28;
+  const blurbMaxCharsPerLine = blurbLength > 180
+    ? (hasMultiLineTitle ? 104 : 108)
+    : blurbLength > 150
+      ? (hasMultiLineTitle ? 90 : 94)
+      : blurbLength > 130
+        ? (hasMultiLineTitle ? 68 : 72)
+        : blurbLength > 112
+          ? (hasMultiLineTitle ? 58 : 62)
+          : blurbLength > 92
+            ? (hasMultiLineTitle ? 48 : 52)
+            : (hasMultiLineTitle ? 32 : 34);
   const blurbLines = wrapSvgText(blurb, blurbMaxCharsPerLine, 2);
   const heroImage = campaign?.hero_image || campaign?.hero_image_wide || '';
   const progressBackground = campaign?.progress_background || '';
@@ -339,7 +349,13 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   const titleFontSize = hasMultiLineTitle ? 60 : 86;
   const titleLineHeight = hasMultiLineTitle ? 56 : 74;
   const blurbY = titleY + ((Math.max(titleLines.length, 1) - 1) * titleLineHeight) + (hasMultiLineTitle ? 34 : 45);
-  const blurbLineHeight = blurbIsVeryLong ? 28 : blurbIsLong ? 30 : hasMultiLineTitle ? 32 : 36;
+  const blurbLineHeight = blurbFontSize <= 10 ? 14
+    : blurbFontSize <= 11 ? 15
+      : blurbFontSize <= 12 ? 17
+    : blurbFontSize <= 14 ? 19
+      : blurbFontSize <= 16 ? 22
+        : blurbFontSize <= 20 ? 26
+          : hasMultiLineTitle ? 32 : 36;
   const amountY = blurbY + ((Math.max(blurbLines.length, 1) - 1) * blurbLineHeight) + (hasMultiLineTitle ? 56 : 91);
   const progressY = amountY + 19;
   const footerY = progressY + (hasMultiLineTitle ? 48 : 56);
@@ -780,9 +796,9 @@ function buildCampaignShareCardFallbackPng({ env, campaign, stats, effectiveStat
   });
 
   const blurbTop = titleLines.length > 1 ? 388 : 322;
-  const fallbackBlurbScale = blurb.length > 135 ? 4 : 5;
-  const fallbackBlurbLineHeight = fallbackBlurbScale === 4 ? 38 : 46;
-  const fallbackBlurbWidth = fallbackBlurbScale === 4 ? 760 : 720;
+  const fallbackBlurbScale = blurb.length > 135 ? 2 : blurb.length > 92 ? 3 : 5;
+  const fallbackBlurbLineHeight = fallbackBlurbScale === 2 ? 24 : fallbackBlurbScale === 3 ? 32 : 46;
+  const fallbackBlurbWidth = fallbackBlurbScale === 2 ? 840 : fallbackBlurbScale === 3 ? 820 : 720;
   const blurbLines = wrapShareCardText(blurb, fallbackBlurbWidth, { scale: fallbackBlurbScale, maxLines: 2, letterSpacing: 1 });
   drawShareCardTextLines(surface, blurbLines, 90, blurbTop, {
     scale: fallbackBlurbScale,

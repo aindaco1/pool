@@ -1095,7 +1095,9 @@ describe('worker operational integrity', () => {
     expect(response.status).toBe(200);
     const body = await response.text();
     const blurbText = body.match(/<text x="620" y="[^"]+" fill="#3d4552"[^>]*>(.*?)<\/text>/s)?.[1] || '';
-    expect(body).toContain('font-size="23" font-style="italic"');
+    expect(body).toContain('font-size="11" font-style="italic"');
+    expect(blurbText).toContain('layout.');
+    expect(blurbText).not.toContain('…');
     expect((blurbText.match(/<tspan/g) || []).length).toBeLessThanOrEqual(2);
   });
 
