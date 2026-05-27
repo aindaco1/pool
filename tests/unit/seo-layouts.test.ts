@@ -86,6 +86,10 @@ describe('SEO templates', () => {
     expect(seoMeta).toContain('site.seo.default_social_image_alt');
     expect(seoMeta).toContain('site.seo.og_locale_overrides');
     expect(campaignLayout).toContain('campaign_preview_state');
+    expect(campaignLayout).toContain('campaign_preview_excerpt_source');
+    expect(campaignLayout).toContain('block.type == "text"');
+    expect(campaignLayout).toContain('safe_markdown_source | markdownify');
+    expect(campaignLayout).toContain('page.funded == true');
     expect(campaignLayout).toContain('title=campaign_social_title');
     expect(campaignLayout).toContain('description=campaign_social_description');
     expect(campaignLayout).toContain('page.social_image | default: campaign_worker_social_image');
@@ -97,7 +101,9 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('default: "image/png"');
     expect(seoMeta).toContain("unless image_url contains '://' or image_url contains 'data:'");
     expect(translationsEn).toContain('campaign_preview:');
+    expect(translationsEn).toContain('funded_title: "%{title} is funded!"');
     expect(translationsEs).toContain('campaign_preview:');
+    expect(translationsEs).toContain('funded_title: "¡%{title} está financiada!"');
   });
 
   it('routes campaign chrome strings through shared translation keys', () => {

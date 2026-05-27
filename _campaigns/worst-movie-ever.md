@@ -7,6 +7,7 @@ start_date: 2026-01-15
 goal_deadline: 2026-02-15
 goal_amount: 2500
 charged: false
+funded: true
 hero_image: /assets/images/campaigns/worst-movie-ever/revolver.png
 hero_image_wide: /assets/images/campaigns/worst-movie-ever/cutout.png
 hero_video: /assets/videos/campaigns/worst-movie-ever/video.webm

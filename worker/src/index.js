@@ -294,10 +294,6 @@ function getShareCardMessages(preferredLang = DEFAULT_I18N_LANG) {
 
 async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState, isFunded, preferredLang }) {
   const siteBase = String(env?.SITE_BASE || '').replace(/\/$/, '');
-  const publicSiteBase = String(env?.CANONICAL_SITE_BASE || env?.SITE_BASE || '').replace(/\/$/, '');
-  const canonicalCampaignPath = String(campaign?.url || `/campaigns/${encodeURIComponent(campaign?.slug || '')}/`);
-  const campaignPath = getLocalizedPath(canonicalCampaignPath, preferredLang);
-  const campaignUrlLabel = `${publicSiteBase}${campaignPath}`;
   const title = trimSvgText(campaign?.title || campaign?.slug || 'Campaign', 48);
   const displayTitle = title.toLocaleUpperCase(preferredLang || DEFAULT_I18N_LANG);
   const creator = trimSvgText(campaign?.creator_name || 'The Pool', 40);
@@ -331,14 +327,14 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   const badgeTop = 204;
   const badgeHeight = 42;
   const badgeTextY = 231;
-  const titleY = hasMultiLineTitle ? 312 : 332;
-  const titleFontSize = hasMultiLineTitle ? 72 : 86;
-  const titleLineHeight = hasMultiLineTitle ? 66 : 74;
-  const blurbY = titleY + ((Math.max(titleLines.length, 1) - 1) * titleLineHeight) + 45;
-  const blurbLineHeight = 36;
-  const amountY = blurbY + ((Math.max(blurbLines.length, 1) - 1) * blurbLineHeight) + (hasMultiLineTitle ? 66 : 91);
+  const titleY = hasMultiLineTitle ? 300 : 332;
+  const titleFontSize = hasMultiLineTitle ? 60 : 86;
+  const titleLineHeight = hasMultiLineTitle ? 56 : 74;
+  const blurbY = titleY + ((Math.max(titleLines.length, 1) - 1) * titleLineHeight) + (hasMultiLineTitle ? 34 : 45);
+  const blurbLineHeight = hasMultiLineTitle ? 32 : 36;
+  const amountY = blurbY + ((Math.max(blurbLines.length, 1) - 1) * blurbLineHeight) + (hasMultiLineTitle ? 56 : 91);
   const progressY = amountY + 19;
-  const footerY = progressY + (hasMultiLineTitle ? 44 : 56);
+  const footerY = progressY + (hasMultiLineTitle ? 40 : 56);
 
   let badgeText = messages.campaign;
   if (effectiveState === 'upcoming') {
@@ -395,7 +391,6 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   <circle cx="${goalMarkerThree}" cy="${progressY + 9}" r="8" fill="#ffffff" stroke="#657082" stroke-width="4" />
   <circle cx="${handleX}" cy="${progressY + 9}" r="12" fill="#ffffff" stroke="#596273" stroke-width="6" />
   <text x="${panelLeft}" y="${footerY}" fill="#596273" font-family="Inter, sans-serif" font-size="22" font-weight="700">${escapeSvgText(String(progressPct))}% ${escapeSvgText(messages.fundedPercent)}</text>
-  <text x="1076" y="${footerY}" text-anchor="end" fill="#7d8593" font-family="Inter, sans-serif" font-size="10" font-weight="700">${escapeSvgText(campaignUrlLabel)}</text>
 </svg>`;
 }
 
@@ -730,10 +725,6 @@ function drawShareCardMetric(surface, label, value, x, y, width) {
 function buildCampaignShareCardFallbackPng({ env, campaign, stats, effectiveState, isFunded, preferredLang }) {
   const surface = createShareCardSurface();
   const messages = getShareCardMessages(preferredLang);
-  const publicSiteBase = String(env?.CANONICAL_SITE_BASE || env?.SITE_BASE || '').replace(/\/$/, '');
-  const canonicalCampaignPath = String(campaign?.url || `/campaigns/${encodeURIComponent(campaign?.slug || '')}/`);
-  const campaignPath = getLocalizedPath(canonicalCampaignPath, preferredLang);
-  const campaignUrlLabel = `${publicSiteBase}${campaignPath}`.replace(/^https?:\/\//, '');
   const pledgedAmount = Number(stats?.pledgedAmount || 0);
   const goalAmountCents = Number(campaign?.goal_amount || 0) * 100;
   const progressPct = goalAmountCents > 0
@@ -811,12 +802,6 @@ function buildCampaignShareCardFallbackPng({ env, campaign, stats, effectiveStat
     color: SHARE_CARD_COLORS.muted,
     letterSpacing: 1
   });
-  drawShareCardText(surface, truncateShareCardText(campaignUrlLabel, 420, 3, 1), 90, 586, {
-    scale: 3,
-    color: SHARE_CARD_COLORS.muted,
-    letterSpacing: 1
-  });
-
   return encodePngRgb(surface);
 }
 

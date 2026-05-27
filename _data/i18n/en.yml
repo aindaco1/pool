@@ -81,7 +81,7 @@ progress_markers:
 campaign_preview:
   starts_title: "%{title} starts %{date}"
   ends_title: "%{title} ends %{date}"
-  funded_title: "%{title} funded"
+  funded_title: "%{title} is funded!"
   ended_title: "%{title} ended"
   starts_description: "%{category} by %{creator}. Starts %{date}. %{blurb}"
   live_description: "%{category} by %{creator}. Ends %{date}. %{blurb}"

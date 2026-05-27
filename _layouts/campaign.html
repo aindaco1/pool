@@ -14,7 +14,21 @@
   {% assign campaign_social_image_type = page.social_image_type | default: "image/png" %}
   {% assign campaign_creator = page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author %}
   {% assign campaign_category = page.category | default: site.data.i18n[current_lang].campaign.default_category | default: site.data.i18n.en.campaign.default_category %}
-  {% capture campaign_blurb_plain %}{{ page.short_blurb | default: site.description | strip_html | strip_newlines | replace: '  ', ' ' | strip }}{% endcapture %}
+  {% assign campaign_preview_excerpt_source = page.short_blurb | default: site.description %}
+  {% assign campaign_preview_excerpt_is_markdown = false %}
+  {% if page.long_content %}
+    {% for block in page.long_content %}
+      {% if campaign_preview_excerpt_is_markdown == false and block.type == "text" and block.body %}
+        {% assign campaign_preview_excerpt_source = block.body %}
+        {% assign campaign_preview_excerpt_is_markdown = true %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+  {% if campaign_preview_excerpt_is_markdown %}
+    {% capture campaign_blurb_plain %}{{ campaign_preview_excerpt_source | safe_markdown_source | markdownify | replace: '</p>', ' ' | replace: '<br />', ' ' | strip_html | strip_newlines | replace: '&nbsp;', ' ' | replace: '&amp;', '&' | replace: '  ', ' ' | replace: '  ', ' ' | strip }}{% endcapture %}
+  {% else %}
+    {% capture campaign_blurb_plain %}{{ campaign_preview_excerpt_source | strip_html | strip_newlines | replace: '&nbsp;', ' ' | replace: '&amp;', '&' | replace: '  ', ' ' | replace: '  ', ' ' | strip }}{% endcapture %}
+  {% endif %}
   {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
   {% assign goal_num = page.goal_amount | default: 0 | plus: 0 %}
   {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
@@ -32,7 +46,7 @@
     {% endif %}
   {% endif %}
   {% assign campaign_preview_state = page.state | default: '' %}
-  {% if page.charged == true %}
+  {% if page.funded == true or page.charged == true %}
     {% assign campaign_preview_state = 'funded' %}
   {% elsif campaign_preview_state == '' %}
     {% if page.start_date and now_epoch < start_epoch %}
@@ -45,7 +59,7 @@
       {% assign campaign_preview_state = 'ended' %}
     {% endif %}
   {% elsif campaign_preview_state == 'post' %}
-    {% if page.charged == true or goal_num > 0 and pledged_num >= goal_num %}
+    {% if page.funded == true or page.charged == true or goal_num > 0 and pledged_num >= goal_num %}
       {% assign campaign_preview_state = 'funded' %}
     {% else %}
       {% assign campaign_preview_state = 'ended' %}
@@ -56,17 +70,14 @@
   {% case campaign_preview_state %}
     {% when 'upcoming' %}
       {% capture campaign_social_title %}{% include t.html key="campaign_preview.starts_title" lang=current_lang title=page.title date=start_date_formatted %}{% endcapture %}
-      {% capture campaign_social_description %}{% include t.html key="campaign_preview.starts_description" lang=current_lang category=campaign_category creator=campaign_creator date=start_date_formatted blurb=campaign_blurb_plain %}{% endcapture %}
     {% when 'live' %}
       {% capture campaign_social_title %}{% include t.html key="campaign_preview.ends_title" lang=current_lang title=page.title date=deadline_date_formatted %}{% endcapture %}
-      {% capture campaign_social_description %}{% include t.html key="campaign_preview.live_description" lang=current_lang category=campaign_category creator=campaign_creator date=deadline_date_formatted blurb=campaign_blurb_plain %}{% endcapture %}
     {% when 'funded' %}
       {% capture campaign_social_title %}{% include t.html key="campaign_preview.funded_title" lang=current_lang title=page.title %}{% endcapture %}
-      {% capture campaign_social_description %}{% include t.html key="campaign_preview.funded_description" lang=current_lang category=campaign_category creator=campaign_creator blurb=campaign_blurb_plain %}{% endcapture %}
     {% else %}
       {% capture campaign_social_title %}{% include t.html key="campaign_preview.ended_title" lang=current_lang title=page.title %}{% endcapture %}
-      {% capture campaign_social_description %}{% include t.html key="campaign_preview.ended_description" lang=current_lang category=campaign_category creator=campaign_creator blurb=campaign_blurb_plain %}{% endcapture %}
   {% endcase %}
+  {% capture campaign_social_description %}{{ campaign_blurb_plain }}{% endcapture %}
   {% capture campaign_social_image_alt %}{% include t.html key="campaign_preview.image_alt" lang=current_lang title=page.title category=campaign_category creator=campaign_creator %}{% endcapture %}
   {% include seo-meta.html lang=current_lang title=campaign_social_title description=campaign_social_description image=campaign_social_image image_alt=campaign_social_image_alt image_width=campaign_social_image_width image_height=campaign_social_image_height image_type=campaign_social_image_type og_type="article" translation_key=page.translation_key localized_paths=page.localized_paths %}
   {% include seo-json-ld.html lang=current_lang kind="campaign" translation_key=page.translation_key localized_paths=page.localized_paths %}

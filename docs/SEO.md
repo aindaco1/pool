@@ -162,7 +162,7 @@ Forks can safely customize:
 - organization social-profile links
 - whether the public community hub should remain indexable
 - page and campaign descriptive copy that already exists in the content model
-- campaign preview inputs that already exist in the content model, such as campaign title, blurb, category, creator, and the square hero image used inside generated share cards
+- campaign preview inputs that already exist in the content model, such as campaign title, the first long-content text block used for social descriptions, category, creator, a `funded: true` flag for successful post-campaign metadata before settlement, and the square hero image used inside generated share cards
 
 Forks should not assume support for:
 

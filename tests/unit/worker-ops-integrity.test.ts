@@ -1064,7 +1064,7 @@ describe('worker operational integrity', () => {
     expect(body).toContain('Gambado Sans Forte');
     expect(body).toContain('$12,500');
     expect(body).toContain('50% funded');
-    expect(body).toContain('https://pool.test');
+    expect(body).not.toContain('https://pool.test');
   });
 
   it('prefers the square hero image for generated campaign share cards', async () => {
@@ -1172,7 +1172,7 @@ describe('worker operational integrity', () => {
     expect(await response.text()).toBe('');
   });
 
-  it('localizes the campaign share-card footer link for non-default languages', async () => {
+  it('localizes campaign share-card copy for non-default languages', async () => {
     const env = createEnv();
 
     const response = await worker.fetch(
@@ -1183,7 +1183,7 @@ describe('worker operational integrity', () => {
 
     expect(response.status).toBe(200);
     const body = await response.text();
-    expect(body).toContain('https://pool.test/es/campaigns/hand-relations/');
+    expect(body).not.toContain('https://pool.test/es/campaigns/hand-relations/');
     expect(body).toContain('CREADOR');
     expect(body).toContain('financiado');
   });
