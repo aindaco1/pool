@@ -299,11 +299,13 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   const campaignPath = getLocalizedPath(canonicalCampaignPath, preferredLang);
   const campaignUrlLabel = `${publicSiteBase}${campaignPath}`;
   const title = trimSvgText(campaign?.title || campaign?.slug || 'Campaign', 48);
+  const displayTitle = title.toLocaleUpperCase(preferredLang || DEFAULT_I18N_LANG);
   const creator = trimSvgText(campaign?.creator_name || 'The Pool', 40);
-  const category = trimSvgText(campaign?.category || 'Campaign', 24);
+  const category = trimSvgText(campaign?.category || 'Campaign', 32);
   const blurb = trimSvgText(stripHtmlTags(campaign?.short_blurb || ''), 180);
-  const titleLines = wrapSvgText(title, 14, 2);
-  const blurbLines = wrapSvgText(blurb, 34, 3);
+  const titleLines = wrapSvgText(displayTitle, 12, 2);
+  const hasMultiLineTitle = titleLines.length > 1;
+  const blurbLines = wrapSvgText(blurb, hasMultiLineTitle ? 32 : 34, hasMultiLineTitle ? 2 : 3);
   const heroImage = campaign?.hero_image_wide || campaign?.hero_image || '';
   const progressBackground = campaign?.progress_background || '';
   const heroImageUrl = heroImage ? `${siteBase}${heroImage}` : '';
@@ -329,14 +331,14 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   const badgeTop = 204;
   const badgeHeight = 42;
   const badgeTextY = 231;
-  const titleY = 347;
-  const titleFontSize = 94;
-  const titleLineHeight = 78;
+  const titleY = hasMultiLineTitle ? 312 : 332;
+  const titleFontSize = hasMultiLineTitle ? 72 : 86;
+  const titleLineHeight = hasMultiLineTitle ? 66 : 74;
   const blurbY = titleY + ((Math.max(titleLines.length, 1) - 1) * titleLineHeight) + 45;
   const blurbLineHeight = 36;
-  const amountY = blurbY + ((Math.max(blurbLines.length, 1) - 1) * blurbLineHeight) + 91;
+  const amountY = blurbY + ((Math.max(blurbLines.length, 1) - 1) * blurbLineHeight) + (hasMultiLineTitle ? 66 : 91);
   const progressY = amountY + 19;
-  const footerY = progressY + 56;
+  const footerY = progressY + (hasMultiLineTitle ? 44 : 56);
 
   let badgeText = messages.campaign;
   if (effectiveState === 'upcoming') {
@@ -375,13 +377,13 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   ${heroImageDataUrl ? `<image href="${escapeSvgText(heroImageDataUrl)}" x="48" y="76" width="492" height="506" preserveAspectRatio="xMidYMid slice" clip-path="url(#heroClip)" />` : ''}
   <rect x="48" y="76" width="492" height="506" rx="28" ry="28" fill="url(#panel)" opacity="${heroImageDataUrl ? '0.18' : '1'}" />
   <rect x="578" y="76" width="574" height="506" rx="34" ry="34" fill="#fbfbf7" opacity="0.93" />
-  <text x="${panelLeft}" y="${creatorY}" fill="#666f7d" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="1.4">${escapeSvgText(messages.creator)}: ${escapeSvgText(creator.toUpperCase())}</text>
-  <text x="${panelLeft}" y="${categoryY}" fill="#666f7d" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="1.4">${escapeSvgText(messages.category)}: ${escapeSvgText(category.toUpperCase())}</text>
+  <text x="${panelLeft}" y="${creatorY}" fill="#666f7d" font-family="Inter, sans-serif" font-size="18" font-weight="700" letter-spacing="1.4">${escapeSvgText(messages.creator)}: ${escapeSvgText(creator.toUpperCase())}</text>
+  <text x="${panelLeft}" y="${categoryY}" fill="#666f7d" font-family="Inter, sans-serif" font-size="18" font-weight="700" letter-spacing="1.4">${escapeSvgText(messages.category)}: ${escapeSvgText(category.toUpperCase())}</text>
   <rect x="${panelLeft}" y="${badgeTop}" width="248" height="${badgeHeight}" rx="21" ry="21" fill="#11141c" />
-  <text x="744" y="${badgeTextY}" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="21" font-weight="700">${escapeSvgText(badgeText)}</text>
-  <text x="${panelLeft}" y="${titleY}" fill="#11141c" font-family="gambado-sans, Arial Black, Arial, sans-serif" font-size="${titleFontSize}" font-weight="700">${titleLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : titleLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
-  <text x="${panelLeft}" y="${blurbY}" fill="#3d4552" font-family="Arial, sans-serif" font-size="28" font-style="italic">${blurbLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : blurbLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
-  <text x="${panelLeft}" y="${amountY}" fill="#697180" font-family="Arial, sans-serif" font-size="30" font-weight="700"><tspan fill="#11141c" font-size="42" font-weight="800">${escapeSvgText(formatSvgCurrencyFromCents(pledgedAmount))}</tspan><tspan dx="12">${escapeSvgText(messages.of)} ${escapeSvgText(formatSvgCurrencyFromCents(goalAmountCents))}</tspan></text>
+  <text x="744" y="${badgeTextY}" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-size="21" font-weight="700">${escapeSvgText(badgeText)}</text>
+  <text x="${panelLeft}" y="${titleY}" fill="#11141c" font-family="Inter, sans-serif" font-size="${titleFontSize}" font-weight="800">${titleLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : titleLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
+  <text x="${panelLeft}" y="${blurbY}" fill="#3d4552" font-family="Inter, sans-serif" font-size="28" font-style="italic">${blurbLines.map((line, index) => `<tspan x="${panelLeft}" dy="${index === 0 ? 0 : blurbLineHeight}">${escapeSvgText(line)}</tspan>`).join('')}</text>
+  <text x="${panelLeft}" y="${amountY}" fill="#697180" font-family="Inter, sans-serif" font-size="30" font-weight="700"><tspan fill="#11141c" font-size="42" font-weight="800">${escapeSvgText(formatSvgCurrencyFromCents(pledgedAmount))}</tspan><tspan dx="12">${escapeSvgText(messages.of)} ${escapeSvgText(formatSvgCurrencyFromCents(goalAmountCents))}</tspan></text>
   <rect x="${panelLeft}" y="${progressY}" width="${progressWidth}" height="18" rx="9" ry="9" fill="#e5e8ee" />
   ${progressBackgroundDataUrl ? `<image href="${escapeSvgText(progressBackgroundDataUrl)}" x="${panelLeft}" y="${progressY}" width="${progressWidth}" height="18" opacity="0.1" preserveAspectRatio="none" />` : ''}
   <rect x="${panelLeft}" y="${progressY}" width="${Math.max(12, Math.round((progressWidth * progressPct) / 100))}" height="18" rx="9" ry="9" fill="url(#progressFill)" />
@@ -392,8 +394,8 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   <circle cx="${goalMarkerTwo}" cy="${progressY + 9}" r="8" fill="#ffffff" stroke="#657082" stroke-width="4" />
   <circle cx="${goalMarkerThree}" cy="${progressY + 9}" r="8" fill="#ffffff" stroke="#657082" stroke-width="4" />
   <circle cx="${handleX}" cy="${progressY + 9}" r="12" fill="#ffffff" stroke="#596273" stroke-width="6" />
-  <text x="${panelLeft}" y="${footerY}" fill="#596273" font-family="Arial, sans-serif" font-size="22" font-weight="700">${escapeSvgText(String(progressPct))}% ${escapeSvgText(messages.fundedPercent)}</text>
-  <text x="1076" y="${footerY}" text-anchor="end" fill="#7d8593" font-family="Arial, sans-serif" font-size="10" font-weight="700">${escapeSvgText(campaignUrlLabel)}</text>
+  <text x="${panelLeft}" y="${footerY}" fill="#596273" font-family="Inter, sans-serif" font-size="22" font-weight="700">${escapeSvgText(String(progressPct))}% ${escapeSvgText(messages.fundedPercent)}</text>
+  <text x="1076" y="${footerY}" text-anchor="end" fill="#7d8593" font-family="Inter, sans-serif" font-size="10" font-weight="700">${escapeSvgText(campaignUrlLabel)}</text>
 </svg>`;
 }
 
@@ -820,6 +822,7 @@ function buildCampaignShareCardFallbackPng({ env, campaign, stats, effectiveStat
 
 let shareCardRasterizerInputPromise;
 let shareCardRasterizerInitPromise;
+let shareCardFontBuffersPromise;
 
 function shouldLoadResvgWasmFromFileSystem() {
   return typeof process !== 'undefined'
@@ -842,6 +845,49 @@ async function getShareCardRasterizerInput() {
   return shareCardRasterizerInputPromise;
 }
 
+async function normalizeBinaryModuleData(value) {
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (value instanceof Response) {
+    return new Uint8Array(await value.arrayBuffer());
+  }
+  if (typeof value === 'string' || value instanceof URL || value instanceof Request) {
+    const response = await fetch(value);
+    if (!response.ok) throw new Error(`Unable to load share-card font module: ${response.status}`);
+    return new Uint8Array(await response.arrayBuffer());
+  }
+  return value;
+}
+
+async function getShareCardFontBuffers() {
+  if (!shareCardFontBuffersPromise) {
+    shareCardFontBuffersPromise = (async () => {
+      if (shouldLoadResvgWasmFromFileSystem()) {
+        const { readFile } = await import('node:fs/promises');
+        const [romanFont, italicFont] = await Promise.all([
+          readFile(`${process.cwd()}/worker/src/assets/fonts/inter-roman.bin`),
+          readFile(`${process.cwd()}/worker/src/assets/fonts/inter-italic.bin`)
+        ]);
+        return [
+          new Uint8Array(romanFont),
+          new Uint8Array(italicFont)
+        ];
+      }
+      const [romanFontModule, italicFontModule] = await Promise.all([
+        import('./assets/fonts/inter-roman.bin'),
+        import('./assets/fonts/inter-italic.bin')
+      ]);
+      return Promise.all([
+        normalizeBinaryModuleData(romanFontModule.default || romanFontModule),
+        normalizeBinaryModuleData(italicFontModule.default || italicFontModule)
+      ]);
+    })();
+  }
+  return shareCardFontBuffersPromise;
+}
+
 async function ensureShareCardRasterizer() {
   if (!shareCardRasterizerInitPromise) {
     shareCardRasterizerInitPromise = initWasm(getShareCardRasterizerInput()).catch((error) => {
@@ -854,8 +900,14 @@ async function ensureShareCardRasterizer() {
 
 async function rasterizeShareCardSvg(svg) {
   await ensureShareCardRasterizer();
+  const fontBuffers = await getShareCardFontBuffers();
   const renderer = new Resvg(svg, {
     fitTo: { mode: 'original' },
+    font: {
+      fontBuffers,
+      defaultFontFamily: 'Inter',
+      sansSerifFamily: 'Inter'
+    },
     shapeRendering: 2,
     textRendering: 1,
     imageRendering: 0
