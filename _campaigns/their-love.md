@@ -233,5 +233,17 @@ tiers:
       height_in: 18
       stack_height_in: 18
     late_support: true
-diary: []
+diary:
+  - title: "THANK YOU!!!!"
+    date: "2026-05-27T13:42-06:00"
+    phase: "fundraising"
+    content:
+      - type: "image"
+        src: "https://drive.google.com/file/d/1mRa6BP2EfjV6iastqnyTOHkjgctZG7JM/view?usp=drive_link"
+        alt: ""
+      - type: "divider"
+      - type: "text"
+        body: |
+          In less than 48 hours, we’ve officially hit 2.5K of our 5K goal! We are incredibly grateful at Their Love to have such an amazing community rallying around us to ensure this project gets made; we’re still in shock. So, we can’t say it enough: thank you. More updates to come soon as we close in on the end of our campaign and get ready to shoot!
+      - type: "divider"
 ---
