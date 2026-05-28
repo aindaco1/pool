@@ -125,11 +125,14 @@ long_content:
 featured_tier_id: ill-never-forget-you
 
 stretch_goals:
+  - threshold: 3500
+    title: "Food For the Crew"
+    description: "While our crew will receive meals, no matter what, this goal helps ensure the crew is not only well-fed but also has an ample amount of snacks and, most importantly, is well caffeinated!"
+    status: "locked"
   - threshold: 5000
     title: "Crew Pay + Production Polish"
     description: "Secure key locations and equipment while helping pay the crew for the time and energy they are putting into the film."
-    status: locked
-
+    status: "locked"
 support_items:
   - id: festival-submissions
     label: "Festival Submission Fees"
