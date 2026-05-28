@@ -126,7 +126,7 @@ featured_tier_id: ill-never-forget-you
 
 stretch_goals:
   - threshold: 3500
-    title: "Food For the Crew"
+    title: "Snacks For the Crew"
     description: "While our crew will receive meals, no matter what, this goal helps ensure the crew is not only well-fed but also has an ample amount of snacks and, most importantly, is well caffeinated!"
     status: "locked"
   - threshold: 5000
