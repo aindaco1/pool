@@ -110,6 +110,7 @@ decisions: []
 
 diary:
   - date: 2026-02-25T12:00:00-07:00
+    id: thank-you-now-help-us-spread-the-word
     title: "Thank you -- now help us spread the word!"
     phase: fundraising
     content:

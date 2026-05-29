@@ -2477,6 +2477,7 @@
           renderContentBlocks();
         });
         attachContentBlockEditor(diaryEditor, contentField);
+        card.append(hiddenCollectionField('id', item.id || ''));
       } else if (collection === 'decisions') {
         card.append(
           createEditorField(collectionFieldLabel('title', 'Title'), 'title', item.title || '', { type: 'text', help: collectionFieldHelp('title') }),

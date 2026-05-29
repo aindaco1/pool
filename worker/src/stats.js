@@ -897,11 +897,12 @@ export async function recalculateTierInventory(env, campaignSlug, tiers, options
 /**
  * Diary Tracking - Track which diary entries have been broadcast
  * Key format: diary-sent:{campaignSlug}
- * Value: array of diary dates (YYYY-MM-DD strings)
+ * Value: array of diary tracking markers. New markers use stable
+ * `id:{entryId}` values; legacy deployments may still contain bare date strings.
  */
 
 /**
- * Get list of diary entry dates that have been broadcast for a campaign
+ * Get list of diary entry markers that have been broadcast for a campaign
  */
 export async function getSentDiaryEntries(env, campaignSlug) {
   configureStatsLogging(env);
@@ -912,15 +913,15 @@ export async function getSentDiaryEntries(env, campaignSlug) {
 }
 
 /**
- * Mark a diary entry as sent (by date)
+ * Mark a diary entry as sent
  */
-export async function markDiarySent(env, campaignSlug, diaryDate) {
+export async function markDiarySent(env, campaignSlug, diaryMarker) {
   configureStatsLogging(env);
   if (!env.PLEDGES) return;
   
   const sent = await getSentDiaryEntries(env, campaignSlug);
-  if (!sent.includes(diaryDate)) {
-    sent.push(diaryDate);
+  if (!sent.includes(diaryMarker)) {
+    sent.push(diaryMarker);
     await env.PLEDGES.put(`diary-sent:${campaignSlug}`, JSON.stringify(sent));
   }
 }

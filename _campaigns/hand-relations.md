@@ -114,6 +114,7 @@ decisions:
 
 diary:
   - title: "Campaign page live!"
+    id: campaign-page-live
     date: 2025-10-18T12:00:00-06:00
     phase: fundraising
     content:
@@ -121,6 +122,7 @@ diary:
         body: |
           We're officially launching the Hand Relations crowdfunding campaign.
   - title: "Day 14 — Principal Photography"
+    id: day-14-principal-photography
     date: 2025-10-27T19:00:00-06:00
     phase: production
     content:
@@ -128,6 +130,7 @@ diary:
         body: |
           Desert wrap. Wind, dust, and a miraculous sunset. Footage looks unreal.
   - title: "Day 7 — Equipment Woes"
+    id: day-7-equipment-woes
     date: 2025-10-20T14:30:00-06:00
     phase: production
     content:

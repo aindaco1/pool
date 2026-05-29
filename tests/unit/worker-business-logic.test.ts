@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
 import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput } from '../../worker/src/checkout-intent.js';
 import { CheckoutIntentNonceCoordinator } from '../../worker/src/checkout-intent-do.js';
+import { __resetCampaignRuntimeStateForTests } from '../../worker/src/campaigns.js';
 import { TierInventoryCoordinator } from '../../worker/src/tier-inventory-do.js';
 
 const mockStripeClient = {
@@ -5354,6 +5355,181 @@ describe('Worker business logic hardening', () => {
       dryRun: false,
       checked: 4
     });
+  });
+
+  it('does not rebroadcast diary updates when a legacy sent date only differs by seconds', async () => {
+    __resetCampaignRuntimeStateForTests();
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-diary-1']));
+    await kv.put('pledge:order-diary-1', JSON.stringify({
+      orderId: 'order-diary-1',
+      campaignSlug: 'hand-relations',
+      email: 'supporter@example.com',
+      pledgeStatus: 'active'
+    }));
+    await kv.put('diary-sent:hand-relations', JSON.stringify(['2026-05-27T13:42:00-06:00']));
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [{
+            ...campaignFixture,
+            diary: [{
+              title: 'THANK YOU!!!!',
+              date: '2026-05-27T13:42-06:00',
+              phase: 'fundraising',
+              content: [{ type: 'text', body: 'Same update body.' }]
+            }]
+          }]
+        });
+      }
+      if (url === 'https://pool.test/api/add-ons.json') {
+        return jsonResponse(addOnCatalogFixture);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/diary/check', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer admin-secret'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      newEntries: [],
+      sent: 0,
+      failed: 0
+    });
+    expect(mockSendDiaryUpdateEmail).not.toHaveBeenCalled();
+    const markers = JSON.parse(kv.store.get('diary-sent:hand-relations') || '[]');
+    expect(markers).toContain('2026-05-27T13:42:00-06:00');
+    expect(markers).toContain('date:2026-05-27T13:42-06:00');
+  });
+
+  it('tracks diary broadcasts by stable entry id so title and date edits do not resend', async () => {
+    __resetCampaignRuntimeStateForTests();
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-diary-2']));
+    await kv.put('pledge:order-diary-2', JSON.stringify({
+      orderId: 'order-diary-2',
+      campaignSlug: 'hand-relations',
+      email: 'supporter@example.com',
+      pledgeStatus: 'active'
+    }));
+    await kv.put('diary-sent:hand-relations', JSON.stringify(['id:thank-you']));
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [{
+            ...campaignFixture,
+            diary: [{
+              id: 'thank-you',
+              title: 'THANK YOU!!!!',
+              date: '2026-05-28T09:15-06:00',
+              phase: 'fundraising',
+              content: [{ type: 'text', body: 'Updated copy for the same diary entry.' }]
+            }]
+          }]
+        });
+      }
+      if (url === 'https://pool.test/api/add-ons.json') {
+        return jsonResponse(addOnCatalogFixture);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/diary/check', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer admin-secret'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      newEntries: [],
+      sent: 0,
+      failed: 0
+    });
+    expect(mockSendDiaryUpdateEmail).not.toHaveBeenCalled();
+  });
+
+  it('broadcasts and marks only genuinely new diary entry ids', async () => {
+    __resetCampaignRuntimeStateForTests();
+    const env = createEnv({
+      ADMIN_SECRET: 'admin-secret'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-diary-3']));
+    await kv.put('pledge:order-diary-3', JSON.stringify({
+      orderId: 'order-diary-3',
+      campaignSlug: 'hand-relations',
+      email: 'supporter@example.com',
+      pledgeStatus: 'active'
+    }));
+    await kv.put('diary-sent:hand-relations', JSON.stringify(['id:older-update']));
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [{
+            ...campaignFixture,
+            diary: [{
+              id: 'new-update',
+              title: 'New update',
+              date: '2026-05-29T08:00-06:00',
+              phase: 'fundraising',
+              content: [{ type: 'text', body: 'This is new.' }]
+            }]
+          }]
+        });
+      }
+      if (url === 'https://pool.test/api/add-ons.json') {
+        return jsonResponse(addOnCatalogFixture);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/diary/check', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer admin-secret'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      newEntries: [expect.objectContaining({ id: 'new-update', title: 'New update' })],
+      sent: 1,
+      failed: 0
+    });
+    expect(mockSendDiaryUpdateEmail).toHaveBeenCalledTimes(1);
+    const markers = JSON.parse(kv.store.get('diary-sent:hand-relations') || '[]');
+    expect(markers).toContain('id:new-update');
   });
 
   it('rejects checkout-intent abandon requests without application/json bodies', async () => {

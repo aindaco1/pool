@@ -45,12 +45,12 @@ async function getSentDiaryEntries(env: { PLEDGES: ReturnType<typeof createMockK
   return sent || [];
 }
 
-async function markDiarySent(env: { PLEDGES: ReturnType<typeof createMockKV> }, campaignSlug: string, diaryDate: string): Promise<void> {
+async function markDiarySent(env: { PLEDGES: ReturnType<typeof createMockKV> }, campaignSlug: string, diaryMarker: string): Promise<void> {
   if (!env.PLEDGES) return;
   
   const sent = await getSentDiaryEntries(env, campaignSlug);
-  if (!sent.includes(diaryDate)) {
-    sent.push(diaryDate);
+  if (!sent.includes(diaryMarker)) {
+    sent.push(diaryMarker);
     await env.PLEDGES.put(`diary-sent:${campaignSlug}`, JSON.stringify(sent));
   }
 }
@@ -268,51 +268,50 @@ describe('Diary tracking helpers', () => {
     expect(sent).toEqual([]);
   });
 
-  it('getSentDiaryEntries returns previously sent dates', async () => {
+  it('getSentDiaryEntries returns previously sent markers', async () => {
     const kv = createMockKV({
-      'diary-sent:test-campaign': JSON.stringify(['2026-01-10', '2026-01-12']),
+      'diary-sent:test-campaign': JSON.stringify(['id:first-update', '2026-01-12']),
     });
     const env = { PLEDGES: kv };
     
     const sent = await getSentDiaryEntries(env, 'test-campaign');
     
-    expect(sent).toEqual(['2026-01-10', '2026-01-12']);
+    expect(sent).toEqual(['id:first-update', '2026-01-12']);
   });
 
-  it('markDiarySent adds date to sent list', async () => {
+  it('markDiarySent adds marker to sent list', async () => {
     const kv = createMockKV();
     const env = { PLEDGES: kv };
     
-    await markDiarySent(env, 'test-campaign', '2026-01-15');
+    await markDiarySent(env, 'test-campaign', 'id:new-update');
     
     const sent = await getSentDiaryEntries(env, 'test-campaign');
-    expect(sent).toEqual(['2026-01-15']);
+    expect(sent).toEqual(['id:new-update']);
   });
 
-  it('markDiarySent is idempotent (does not duplicate dates)', async () => {
+  it('markDiarySent is idempotent (does not duplicate markers)', async () => {
     const kv = createMockKV({
-      'diary-sent:test-campaign': JSON.stringify(['2026-01-10']),
+      'diary-sent:test-campaign': JSON.stringify(['id:first-update']),
     });
     const env = { PLEDGES: kv };
     
-    // Mark the same date again
-    await markDiarySent(env, 'test-campaign', '2026-01-10');
+    await markDiarySent(env, 'test-campaign', 'id:first-update');
     
     const sent = await getSentDiaryEntries(env, 'test-campaign');
-    expect(sent).toEqual(['2026-01-10']);
-    expect(sent.filter(d => d === '2026-01-10').length).toBe(1);
+    expect(sent).toEqual(['id:first-update']);
+    expect(sent.filter(d => d === 'id:first-update').length).toBe(1);
   });
 
-  it('markDiarySent appends new dates to existing list', async () => {
+  it('markDiarySent appends new markers to existing list', async () => {
     const kv = createMockKV({
-      'diary-sent:test-campaign': JSON.stringify(['2026-01-10']),
+      'diary-sent:test-campaign': JSON.stringify(['id:first-update']),
     });
     const env = { PLEDGES: kv };
     
-    await markDiarySent(env, 'test-campaign', '2026-01-12');
+    await markDiarySent(env, 'test-campaign', 'id:second-update');
     
     const sent = await getSentDiaryEntries(env, 'test-campaign');
-    expect(sent).toEqual(['2026-01-10', '2026-01-12']);
+    expect(sent).toEqual(['id:first-update', 'id:second-update']);
   });
 });
 

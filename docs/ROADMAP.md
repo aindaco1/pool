@@ -133,6 +133,7 @@ The v1.0 feature set and release-hardening pass are complete. New roadmap items 
   - Reports, Analytics, Supporters, content loads/previews, marketing link generation, and table filters avoid KV writes on normal read paths
   - block-based WYSIWYG content editing
   - polymorphic block schema reused by campaign content and diary entries
+  - diary entry editing preserves stable entry IDs, and newly added diary entries receive title-based IDs during publish so automatic emails send only for genuinely new entries
   - full campaign schema for tiers, campaign add-ons, stretch goals, support items, diary, and decisions
   - dashboard uploads route to convention-based asset directories, preserve existing IDs where needed, and derive new IDs from names/labels
   - physical product editors expose shipping presets or explicit package metadata while digital products hide shipping-only fields
@@ -235,6 +236,10 @@ The v1.0 feature set and release-hardening pass are complete. New roadmap items 
 - [x] Fix Marketing embed preview progress styling for video-led campaigns
   - Campaigns whose embed preview uses YouTube or Vimeo hero media must keep progress fill, milestones, goal marker, and stretch-goal labels contained and readable in the admin Marketing tab
   - Keep the embed preview compatible with the admin dashboard CSP by using shared utility classes instead of unsafe inline progress styles
+- [x] Prevent edited diary entries from triggering duplicate automatic emails
+  - Automatic diary broadcasts now track stable `id:{entryId}` markers instead of treating display-date changes as new updates
+  - Legacy date-based markers remain recognized, including harmless `:00` seconds formatting differences
+  - The admin dashboard preserves existing diary IDs, and the Worker derives IDs for new diary entries added through the dashboard
 - [x] Run final v1.0 release verification
   - `node --check assets/js/admin-dashboard.js`
   - `npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium`

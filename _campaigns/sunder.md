@@ -167,6 +167,7 @@ support_items: []
 decisions: []
 diary:
   - date: 2026-04-27T09:42:00Z
+    id: four-days-left
     title: 4 days left!
     phase: fundraising
     content:
@@ -221,6 +222,7 @@ diary:
         src: /assets/images/campaigns/sunder/diary-1-3.png
         alt: location scouting
   - date: 2026-04-29T10:13:00Z
+    id: we-did-it
     title: We did it!
     phase: fundraising
     content:

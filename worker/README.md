@@ -614,4 +614,6 @@ Diary entries are automatically broadcast to supporters when deployed:
 3. New entries are broadcast to all campaign supporters via email
 4. Sent entries are tracked in KV (`diary-sent:{campaignSlug}`) to prevent duplicate emails
 
+Diary entries should have stable `id` values. The dashboard preserves existing IDs and the Worker derives title-based IDs when publishing entries that do not have one yet. Automatic broadcasts track `id:{entryId}` markers and still recognize legacy date markers, including date strings that only differ by `:00` seconds formatting. Updating an existing diary entry title, date display, phase, or content should not send another automatic email.
+
 **Setup:** Ensure `ADMIN_SECRET` is set as a GitHub repository secret for the deploy action to authenticate. If the post-deploy check receives a Cloudflare challenge page, also configure `DIARY_CHECK_BYPASS_SECRET` plus the matching WAF skip rule described above.

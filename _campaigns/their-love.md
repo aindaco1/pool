@@ -238,6 +238,7 @@ tiers:
     late_support: true
 diary:
   - title: "THANK YOU!!!!"
+    id: thank-you
     date: "2026-05-27T13:42-06:00"
     phase: "fundraising"
     content:

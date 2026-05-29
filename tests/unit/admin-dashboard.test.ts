@@ -1499,7 +1499,18 @@ runner_report_emails:
       },
       { path: 'title', campaignSlug: 'hand-relations', value: 'Hand Relations Updated' },
       { path: 'instagram', campaignSlug: 'hand-relations', value: 'https://instagram.com/updated' },
-      { path: 'hero_video', campaignSlug: 'hand-relations', value: 'https://www.youtube.com/watch?v=XCQWR9cNsgY' }
+      { path: 'hero_video', campaignSlug: 'hand-relations', value: 'https://www.youtube.com/watch?v=XCQWR9cNsgY' },
+      {
+        path: 'diary',
+        campaignSlug: 'hand-relations',
+        value: JSON.stringify([{
+          title: 'New diary update',
+          id: '',
+          date: '2026-05-29T10:00-06:00',
+          phase: 'fundraising',
+          content: [{ type: 'text', body: 'A freshly added update.', align: 'left' }]
+        }])
+      }
     ];
 
     const previewResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/preview', {
@@ -1549,6 +1560,9 @@ runner_report_emails:
     expect(campaignContent).toContain('name: "Buy 1 Frame Updated"');
     expect(campaignContent).toContain('price: 6');
     expect(campaignContent).toContain('shipping:\n      weight_oz: 2\n      packaging_weight_oz: 1\n      length_in: 6\n      width_in: 4\n      height_in: 1');
+    expect(campaignContent).toContain('diary:');
+    expect(campaignContent).toContain('title: "New diary update"');
+    expect(campaignContent).toContain('id: "new-diary-update"');
     expect(githubCalls.some((call) => call.url.endsWith('/actions/workflows/deploy.yml/dispatches'))).toBe(true);
     expectNoKvWritesOrLists(env, 'settings publish');
   });

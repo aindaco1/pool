@@ -175,6 +175,70 @@ function getDiaryExcerpt(entry, maxLength = 200) {
   return '';
 }
 
+function normalizeDiaryDateMarker(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const timezoneMatch = text.match(/(Z|[+-]\d{2}:?\d{2})$/);
+  const rawTimezone = timezoneMatch?.[0] || '';
+  const timezone = rawTimezone.replace(/^([+-]\d{2})(\d{2})$/, '$1:$2');
+  const body = rawTimezone ? text.slice(0, -rawTimezone.length) : text;
+  return `${body.replace(/((?:T|\s)\d{2}:\d{2}):00$/, '$1')}${timezone}`;
+}
+
+function normalizeDiarySentMarkers(markers = []) {
+  const normalized = new Set();
+  for (const marker of Array.isArray(markers) ? markers : []) {
+    const text = String(marker || '').trim();
+    if (!text) continue;
+    normalized.add(text);
+    if (text.startsWith('date:')) {
+      const dateMarker = normalizeDiaryDateMarker(text.slice(5));
+      if (dateMarker) normalized.add(`date:${dateMarker}`);
+    } else if (/^\d{4}-\d{2}-\d{2}(?:T|\s)/.test(text)) {
+      const dateMarker = normalizeDiaryDateMarker(text);
+      if (dateMarker) normalized.add(dateMarker);
+      if (dateMarker) normalized.add(`date:${dateMarker}`);
+    }
+  }
+  return normalized;
+}
+
+function diaryEntryExplicitId(entry) {
+  const id = String(entry?.id || '').trim().toLowerCase();
+  return id && isValidSlug(id) ? id : '';
+}
+
+function diaryEntrySentAliases(entry) {
+  const aliases = new Set();
+  const id = diaryEntryExplicitId(entry);
+  if (id) aliases.add(`id:${id}`);
+  const date = String(entry?.date || '').trim();
+  if (date) {
+    aliases.add(date);
+    const normalizedDate = normalizeDiaryDateMarker(date);
+    if (normalizedDate) {
+      aliases.add(normalizedDate);
+      aliases.add(`date:${normalizedDate}`);
+    }
+  }
+  return aliases;
+}
+
+function primaryDiarySentMarker(entry) {
+  const id = diaryEntryExplicitId(entry);
+  if (id) return `id:${id}`;
+  const normalizedDate = normalizeDiaryDateMarker(entry?.date || '');
+  return normalizedDate ? `date:${normalizedDate}` : '';
+}
+
+function isDiaryEntryAlreadySent(sentMarkers, entry) {
+  const normalizedSent = normalizeDiarySentMarkers(sentMarkers);
+  for (const alias of diaryEntrySentAliases(entry)) {
+    if (normalizedSent.has(alias)) return true;
+  }
+  return false;
+}
+
 function escapeSvgText(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -8700,16 +8764,24 @@ async function handleDiaryCheck(request, env) {
       continue;
     }
 
-    const sentDates = await getSentDiaryEntries(env, campaign.slug);
+    const sentEntries = await getSentDiaryEntries(env, campaign.slug);
     
     for (const entry of campaign.diary) {
       if (!entry.date || !entry.title) continue;
-      
-      if (sentDates.includes(entry.date)) continue;
+      const sentMarker = primaryDiarySentMarker(entry);
+
+      if (isDiaryEntryAlreadySent(sentEntries, entry)) {
+        if (!dryRun && sentMarker && !sentEntries.includes(sentMarker)) {
+          await markDiarySent(env, campaign.slug, sentMarker);
+          sentEntries.push(sentMarker);
+        }
+        continue;
+      }
       
       results.newEntries.push({
         campaignSlug: campaign.slug,
         campaignTitle: campaign.title,
+        id: diaryEntryExplicitId(entry) || undefined,
         date: entry.date,
         title: entry.title
       });
@@ -8719,7 +8791,10 @@ async function handleDiaryCheck(request, env) {
       const supporters = await getCampaignSupporters(env, campaign.slug);
       
       if (supporters.length === 0) {
-        await markDiarySent(env, campaign.slug, entry.date);
+        if (sentMarker) {
+          await markDiarySent(env, campaign.slug, sentMarker);
+          sentEntries.push(sentMarker);
+        }
         continue;
       }
 
@@ -8763,7 +8838,10 @@ async function handleDiaryCheck(request, env) {
         }
       }
 
-      await markDiarySent(env, campaign.slug, entry.date);
+      if (sentMarker) {
+        await markDiarySent(env, campaign.slug, sentMarker);
+        sentEntries.push(sentMarker);
+      }
     }
   }
 
@@ -9951,6 +10029,26 @@ function normalizeAdminSlugValue(value, label = 'ID', { required = true } = {}) 
   return { ok: true, value: text };
 }
 
+function slugifyAdminId(value, fallback = 'item') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || fallback;
+}
+
+function uniqueAdminId(base, usedIds) {
+  const safeBase = slugifyAdminId(base, 'item');
+  let candidate = safeBase;
+  let suffix = 2;
+  while (usedIds.has(candidate)) {
+    candidate = `${safeBase}-${suffix}`;
+    suffix += 1;
+  }
+  usedIds.add(candidate);
+  return candidate;
+}
+
 function normalizeAdminSafeToken(value, label = 'Value', { maxLength = 80, required = false } = {}) {
   const text = stripAdminControlCharacters(value).trim().toLowerCase();
   if (!text && !required) return { ok: true, value: '' };
@@ -10443,6 +10541,7 @@ function normalizeAdminCampaignCollection(value, schema = {}) {
 
   const collection = schema.collection;
   const normalized = [];
+  const usedDiaryIds = new Set();
   for (const [index, item] of parsed.value.entries()) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
       return { ok: false, error: `${label} item ${index + 1} must be an object.` };
@@ -10453,6 +10552,9 @@ function normalizeAdminCampaignCollection(value, schema = {}) {
       if (!title.ok) return title;
       out.title = title.value;
       if (!out.title) return { ok: false, error: `Diary entry ${index + 1} needs a title.` };
+      const id = normalizeAdminSlugValue(item.id || '', `Diary entry "${out.title}" id`, { required: false });
+      if (!id.ok) return id;
+      out.id = uniqueAdminId(id.value || out.title || `diary-entry-${index + 1}`, usedDiaryIds);
       out.date = stripAdminControlCharacters(item.date || '').trim();
       if (out.date && !ADMIN_DATE_TIME_REGEX.test(out.date)) return { ok: false, error: `Diary entry "${out.title}" date must be a valid date/time.` };
       const phase = normalizeAdminSafeToken(item.phase || '', `Diary entry "${out.title}" phase`);
@@ -10964,6 +11066,7 @@ function serializeAdminCampaignCollectionYaml(key, items = []) {
   for (const item of items) {
     if (key === 'diary') {
       lines.push(`  - title: ${yamlQuoteAdminString(item.title)}`);
+      yamlAdminMaybeLine(lines, 'id', item.id);
       yamlAdminMaybeLine(lines, 'date', item.date);
       yamlAdminMaybeLine(lines, 'phase', item.phase);
       if (Array.isArray(item.content) && item.content.length) {

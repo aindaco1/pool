@@ -292,6 +292,7 @@ decisions:
 
 diary:
   - date: 2026-01-15T09:00:00-07:00
+    id: doing-it-live
     title: "Ummm ... we're doing it live!"
     phase: fundraising
     content:
@@ -300,6 +301,7 @@ diary:
           Holy shit. We hope this works.
 
   - date: 2026-01-15T18:30:00-07:00
+    id: we-hit-1k
     title: "We hit $1K!"
     phase: fundraising
     content:
@@ -319,6 +321,7 @@ diary:
           Do us a favor, would you? Check out our [Instagram](https://www.instagram.com/worstmovie.evermade/) and spread the good word! We're on a mission to make the worst movie ever, and we need the world to know about it!
 
   - date: 2026-01-24T12:00:00-07:00
+    id: we-made-our-goal
     title: "WE MADE OUR GOAL!"
     phase: fundraising
     content:
@@ -353,6 +356,7 @@ diary:
           And keep spreading the word! Share on [Instagram](https://www.instagram.com/worstmovie.evermade/), tell your family, your friends, your enemies -- **everyone deserves a chance to make this film worse!**
 
   - date: 2026-02-16T12:00:00-07:00
+    id: we-did-it-now-its-your-turn
     title: "WE DID IT! Now it's your turn."
     phase: fundraising
     content:
@@ -389,6 +393,7 @@ diary:
           Let's make this the worst movie ever. *Together.*
 
   - date: 2026-03-04T12:00:00-07:00
+    id: two-days-left-to-submit
     title: "⏰ Two days left to submit!"
     phase: fundraising
     content:
