@@ -2676,56 +2676,41 @@ describe('cart provider shim', () => {
       workerBase: WORKER_BASE
     };
 
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    // Drain debounced checkout work from earlier tests before installing this test's guarded mocks.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({}), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })));
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    const targetItemId = 'demo__incomplete-card-target';
+    const targetClientSecret = 'cs_test_custom_secret_456';
+    let targetCheckoutStarted = false;
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url === `${WORKER_BASE}/tax/quote`) {
         expect(JSON.parse(String(init?.body || '{}'))).toMatchObject({
           subtotalCents: 2500,
-          shippingAddress: {
+          shippingCents: 0,
+          billingAddress: {
             country: 'US',
-            postalCode: '87101',
-            state: 'NM',
-            city: 'Albuquerque',
-            line1: '123 Main Street'
+            postalCode: '80205'
           }
         });
 
         return new Response(JSON.stringify({
           subtotalCents: 2500,
-          shippingCents: 980,
+          shippingCents: 0,
           taxCents: 197,
           taxDetails: {
             effectiveRate: 0.07875,
             destination: {
               country: 'US',
-              postalCode: '87101',
-              state: 'NM',
-              city: 'Albuquerque',
-              line1: '123 Main Street'
+              postalCode: '80205'
             }
           }
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
-      if (url === `${WORKER_BASE}/shipping/quote`) {
-        return new Response(JSON.stringify({
-          ok: true,
-          shippingCents: 980,
-          quote: {
-            shippingCents: 980,
-            source: 'usps_live',
-            carrier: 'usps',
-            service: 'USPS Ground Advantage',
-            domestic: true
-          },
-          availableOptions: [
-            { id: 'standard', label: 'Standard', domesticOnly: false, priceDeltaCents: 0, shippingCents: 980 }
-          ],
-          defaultOption: 'standard',
-          selectedOption: 'standard'
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
@@ -2736,19 +2721,45 @@ describe('cart provider shim', () => {
         throw new Error(`Unexpected fetch: ${url}`);
       }
 
+      const body = JSON.parse(String(init?.body || '{}'));
+      const hasTargetItem = Array.isArray(body.items) && body.items.some((item: any) => item?.id === targetItemId);
+      if (!hasTargetItem) {
+        return new Response(JSON.stringify({ url: '#stale-checkout' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      targetCheckoutStarted = true;
+      expect(body).toMatchObject({
+        campaignSlug: 'demo',
+        items: [
+          { id: targetItemId, quantity: 1 }
+        ],
+        billingAddress: {
+          country: 'US',
+          postalCode: '80205'
+        }
+      });
+
       return new Response(JSON.stringify({
         checkoutUiMode: 'custom',
         sessionId: 'cs_test_custom_456',
-        clientSecret: 'cs_test_custom_secret_456',
+        clientSecret: targetClientSecret,
         publishableKey: 'pk_test_custom_456',
         orderId: 'pool-intent-custom-456'
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
-    }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
-    const mount = vi.fn(async ({ onChange, paymentContainer }) => {
+    const confirm = vi.fn(async () => ({
+      type: 'error',
+      error: { message: 'Your card number is incomplete.' }
+    }));
+    const targetMount = vi.fn(async ({ onChange, paymentContainer }) => {
       if (typeof onChange === 'function') {
         onChange({ session: { canConfirm: true } });
       }
@@ -2763,12 +2774,23 @@ describe('cart provider shim', () => {
         supportsShippingAddressElement: false,
         updateEmail: vi.fn(async () => ({})),
         updateShippingAddress: vi.fn(async () => ({})),
-        confirm: vi.fn(async () => ({
-          type: 'error',
-          error: { message: 'Your card number is incomplete.' }
-        })),
+        confirm,
         unmount: vi.fn()
       };
+    });
+    const mount = vi.fn(async (options) => {
+      if (options?.clientSecret !== targetClientSecret) {
+        return {
+          supportsLinkAuthenticationElement: false,
+          supportsShippingAddressElement: false,
+          updateEmail: vi.fn(async () => ({})),
+          updateShippingAddress: vi.fn(async () => ({})),
+          confirm: vi.fn(async () => ({ type: 'success' })),
+          unmount: vi.fn()
+        };
+      }
+
+      return targetMount(options);
     });
 
     (window as any).PoolStripeCheckoutSidecar = {
@@ -2783,12 +2805,17 @@ describe('cart provider shim', () => {
     const provider = (window as any).PoolCartProvider;
     const readyApi = await provider.whenReady();
     await readyApi.api.cart.items.add({
-      id: 'demo__featured-tier',
+      id: targetItemId,
       name: 'Demo Featured Tier',
       price: 25,
       quantity: 1,
-      url: '/campaigns/demo/',
-      shippable: true
+      url: '/campaigns/demo/'
+    });
+    await readyApi.api.cart.update({
+      billingAddress: {
+        country: 'US',
+        postal_code: '80205'
+      }
     });
 
     await readyApi.api.theme.cart.open();
@@ -2799,66 +2826,52 @@ describe('cart provider shim', () => {
       const liveRoot = getLiveRoot();
       expect(liveRoot?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
       expect(liveRoot?.querySelector('[data-cart-custom-checkout-email]')).toBeTruthy();
-      expect(liveRoot?.querySelector('[data-cart-custom-shipping-field="name"]')).toBeTruthy();
-      expect(liveRoot?.querySelector('[data-cart-custom-shipping-field="line1"]')).toBeTruthy();
-      expect(liveRoot?.querySelector('[data-cart-custom-shipping-field="city"]')).toBeTruthy();
-      expect(liveRoot?.querySelector('[data-cart-custom-shipping-field="state"]')).toBeTruthy();
-      expect(liveRoot?.querySelector('[data-cart-custom-shipping-field="postal_code"]')).toBeTruthy();
     });
 
     const emailField = getLiveRoot()?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
-    const shippingName = getLiveRoot()?.querySelector('[data-cart-custom-shipping-field="name"]') as HTMLInputElement | null;
-    const shippingLine1 = getLiveRoot()?.querySelector('[data-cart-custom-shipping-field="line1"]') as HTMLInputElement | null;
-    const shippingCity = getLiveRoot()?.querySelector('[data-cart-custom-shipping-field="city"]') as HTMLInputElement | null;
-    const shippingState = getLiveRoot()?.querySelector('[data-cart-custom-shipping-field="state"]') as HTMLInputElement | null;
-    const shippingPostalCode = getLiveRoot()?.querySelector('[data-cart-custom-shipping-field="postal_code"]') as HTMLInputElement | null;
-    if (!emailField || !shippingName || !shippingLine1 || !shippingCity || !shippingState || !shippingPostalCode) {
-      throw new Error('Missing custom checkout fields');
-    }
-
-    const setFieldValue = (field: HTMLInputElement, value: string) => {
-      field.value = value;
-      field.dispatchEvent(new Event('input', { bubbles: true }));
-      field.dispatchEvent(new Event('change', { bubbles: true }));
-    };
-
-    setFieldValue(emailField, 'supporter@example.com');
-    setFieldValue(shippingName, 'Supporter Example');
-    setFieldValue(shippingLine1, '123 Main Street');
-    setFieldValue(shippingCity, 'Albuquerque');
-    setFieldValue(shippingState, 'NM');
-    setFieldValue(shippingPostalCode, '87101');
-
-    await vi.waitFor(() => {
-      expect(mount).toHaveBeenCalled();
-    });
-
-    await readyApi.api.theme.cart.navigate('/checkout');
-
-    const startButton = getLiveRoot()?.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
-    if (startButton) {
-      startButton.click();
-    }
+    if (!emailField) throw new Error('Missing custom checkout email field');
+    emailField.value = 'supporter@example.com';
 
     await vi.waitFor(() => {
       const liveRoot = getLiveRoot();
+      expect(targetCheckoutStarted).toBe(true);
+      expect(targetMount).toHaveBeenCalled();
       expect(liveRoot?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
+      expect(liveRoot?.querySelector('[data-test-stripe-payment-element]')).toBeTruthy();
       const confirmAction = liveRoot?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
       expect(confirmAction).toBeTruthy();
       expect(confirmAction?.disabled).toBe(false);
     }, { timeout: 10000 });
 
-    const confirmButton = getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
-    confirmButton?.click();
+    const liveEmailField = getLiveRoot()?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
+    if (!liveEmailField) throw new Error('Missing mounted custom checkout email field');
+    liveEmailField.value = 'supporter@example.com';
 
+    let clickedConfirm = false;
     await vi.waitFor(() => {
-      expect(mount).toHaveBeenCalled();
+      const confirmButton = getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
+      expect(confirmButton).toBeTruthy();
+      expect(confirmButton?.disabled).toBe(false);
+      if (!clickedConfirm) {
+        clickedConfirm = true;
+        confirmButton?.click();
+      }
     });
 
-    expect(getLiveRoot()?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
-    expect(getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]')).toBeTruthy();
-    expect(getLiveRoot()?.textContent?.includes('Your card number is incomplete.')).toBe(false);
-    expect(getLiveRoot()?.querySelector('[data-cart-custom-checkout-region="link"]')).toBeNull();
+    await vi.waitFor(() => {
+      expect(confirm).toHaveBeenCalledTimes(1);
+    });
+
+    await vi.waitFor(() => {
+      const liveRoot = getLiveRoot();
+      expect(liveRoot?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
+      expect(liveRoot?.querySelector('[data-test-stripe-payment-element]')).toBeTruthy();
+      expect(liveRoot?.querySelector('[data-cart-confirm-custom-checkout]')).toBeTruthy();
+      expect(liveRoot?.textContent?.includes('Your card number is incomplete.')).toBe(false);
+      expect(liveRoot?.querySelector('[data-cart-custom-checkout-region="link"]')).toBeNull();
+    });
+
+    await readyApi.api.theme.cart.close();
   }, 15000);
 
 

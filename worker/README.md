@@ -125,7 +125,7 @@ wrangler secret put ADMIN_SECRET
 wrangler secret put ADMIN_SESSION_SECRET
 # _config.yml admin.users seeds ADMIN_USERS_JSON; dashboard user edits save to
 # the PLEDGES KV key admin-users:v1 and do not publish to GitHub.
-# Local dev also defaults ADMIN_BOOTSTRAP_EMAILS to alonso@dustwave.xyz as a
+# Local dev reads ADMIN_BOOTSTRAP_EMAILS from worker/.dev.vars as a
 # recovery/bootstrap super-admin path.
 
 # USPS OAuth secret (keep the client id in site config)
@@ -526,7 +526,7 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `CORS_ALLOWED_ORIGIN` | Browser origin allowed to call the Worker from the dashboard/site |
 | `ADMIN_EXPOSE_LOGIN_LINK` | Optional local-only escape hatch to return admin login URLs in `/admin/auth/start` responses. Do not enable on deployed Workers. |
 | `ADMIN_SESSION_SECRET` | Secret used for browser admin session cookies |
-| `ADMIN_BOOTSTRAP_EMAILS` | Optional bootstrap/recovery super-admin emails, mostly for local dev and recovery |
+| `ADMIN_BOOTSTRAP_EMAILS` | Optional bootstrap/recovery super-admin emails; set this in `worker/.dev.vars` for local dev |
 | `ADMIN_USERS_JSON` | Seed/recovery admin users mirrored from `_config.yml`; runtime dashboard edits save to KV at `admin-users:v1` |
 | `ADMIN_TEST_CAMPAIGNS` | Optional comma-separated campaign slugs exposed to the local admin dashboard test setup |
 | `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile secret key for admin email sign-in challenge verification |
@@ -593,9 +593,8 @@ The `dev` environment:
 - Points `SITE_BASE` to localhost
 - Sets `CORS_ALLOWED_ORIGIN` to the local Jekyll origin
 - Allows the admin sign-in route to return the local development login URL instead of requiring email delivery
-- Mirrors `_config.yml` `admin.users` into `ADMIN_USERS_JSON` as the seed/recovery user list
+- Reads `ADMIN_BOOTSTRAP_EMAILS` from `worker/.dev.vars` for local bootstrap super-admin access
 - Saves dashboard user-management edits directly to the PLEDGES KV key `admin-users:v1`
-- Allows `alonso@dustwave.xyz` as a local bootstrap super admin
 - Uses `hand-relations` and `smoke-editable` as the default `/test/setup` campaigns
 
 To seed both admin dashboard test campaigns against a running local Worker:

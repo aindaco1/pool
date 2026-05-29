@@ -2,7 +2,7 @@
 set -euo pipefail
 
 WORKER_URL="${WORKER_URL:-http://127.0.0.1:8787}"
-EMAIL="${1:-alonso+admin-smoke@dustwave.xyz}"
+EMAIL="${1:-admin-smoke@example.com}"
 CAMPAIGNS="${ADMIN_TEST_CAMPAIGNS:-hand-relations,smoke-editable}"
 
 json_campaigns="$(node -e "console.log(JSON.stringify(process.argv[1].split(',').map((s) => s.trim()).filter(Boolean)))" "$CAMPAIGNS")"

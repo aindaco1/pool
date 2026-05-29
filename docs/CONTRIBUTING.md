@@ -151,7 +151,7 @@ For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `do
 - **Cloudflare Worker**: Same secrets as env vars; set `SITE_BASE`
 - **Stripe**: For hosted environments, create a webhook to `https://pledge.dustwave.xyz/webhooks/stripe`
 - **Local custom checkout**: add `STRIPE_PUBLISHABLE_KEY_TEST` to `worker/.dev.vars`
-- **Admin dashboard**: local dev seeds `alonso@dustwave.xyz` through `ADMIN_BOOTSTRAP_EMAILS`; fork admins should move production access into `_config.yml` `admin.users`, `ADMIN_USERS_JSON`, or the dashboard Users screen. The Users screen saves to KV, not GitHub.
+- **Admin dashboard**: local dev grants bootstrap super-admin access through `ADMIN_BOOTSTRAP_EMAILS` in ignored `worker/.dev.vars`; fork admins should put production access in `_config.yml` `admin.users`, `ADMIN_USERS_JSON`, or the dashboard Users screen. The Users screen saves to KV, not GitHub.
 
 See [TESTING.md](TESTING.md) for full secrets reference.
 

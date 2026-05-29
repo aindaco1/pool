@@ -729,7 +729,6 @@ These site-config values are also reflected into the Worker env values in [`work
 - `seo.same_as` -> `SEO_SAME_AS`
 - `seo.index_public_community_hub` -> `SEO_INDEX_PUBLIC_COMMUNITY_HUB`
 - `admin.users` -> `ADMIN_USERS_JSON`
-- `admin.local_bootstrap_emails` -> `ADMIN_BOOTSTRAP_EMAILS` in the dev env
 - `admin.local_test_campaigns` -> `ADMIN_TEST_CAMPAIGNS` in the dev env
 - `checkout.stripe_publishable_key` -> `STRIPE_PUBLISHABLE_KEY`
 - `design.font_body` -> `EMAIL_FONT_FAMILY`
@@ -773,6 +772,8 @@ These site-config values are also reflected into the Worker env values in [`work
 - `debug.verbose_console_logging` -> `DEBUG_VERBOSE_CONSOLE_LOGGING`
 - `cache.live_stats_ttl_seconds` -> `LIVE_STATS_CACHE_TTL_SECONDS`
 - `cache.live_inventory_ttl_seconds` -> `LIVE_INVENTORY_CACHE_TTL_SECONDS`
+
+Local bootstrap super-admin emails are intentionally not mirrored from `_config.yml`. Put them in ignored `worker/.dev.vars` as `ADMIN_BOOTSTRAP_EMAILS`; `npm run secrets:dev` seeds that value from `worker/.dev.vars.example` when missing.
 
 The sync script also writes derived URL values:
 

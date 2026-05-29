@@ -66,10 +66,9 @@ admin:
       email: alonso@dustwave.xyz
       role: super_admin
       campaigns: []
-  # Local-only bootstrap defaults mirrored into the Worker `dev` environment.
-  # Deployed admin access should use Worker secrets or explicit environment vars.
-  local_bootstrap_emails:
-    - alonso@dustwave.xyz
+  # Local-only bootstrap super admins belong in ignored `worker/.dev.vars` as
+  # ADMIN_BOOTSTRAP_EMAILS so forks can choose their own local sign-in email
+  # without editing committed config.
   local_test_campaigns:
     - hand-relations
     - smoke-editable

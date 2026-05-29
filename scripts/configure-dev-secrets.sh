@@ -66,6 +66,15 @@ wrangler_dev_var() {
   ruby -e '
     content = File.read(ARGV[0])
     key = ARGV[1]
+    match = content.match(/^\[env\.dev\.vars\]\s*\n(.*?)(?=^\[|\z)/m)
+    if match
+      match[1].scan(/^([A-Z_]+)\s*=\s*"((?:\\.|[^"])*)"/) do |name, value|
+        next unless name == key
+        puts value.gsub(/\\"/, "\"").gsub(/\\\\/, "\\")
+        exit 0
+      end
+    end
+
     match = content.match(/^\[env\.dev\]\s*\nvars\s*=\s*\{([^}]*)\}/m)
     exit 0 unless match
 
@@ -75,6 +84,11 @@ wrangler_dev_var() {
       exit 0
     end
   ' "worker/wrangler.toml" "$key"
+}
+
+example_dev_var() {
+  local key="$1"
+  grep -E "^${key}=" "$EXAMPLE_VARS" 2>/dev/null | tail -1 | cut -d= -f2- || true
 }
 
 set_secret_value() {
@@ -114,6 +128,9 @@ ensure_local_default() {
   fi
 
   value="$(wrangler_dev_var "$key")"
+  if [ -z "$value" ]; then
+    value="$(example_dev_var "$key")"
+  fi
   if [ -z "$value" ]; then
     echo "$key skipped."
     return 0

@@ -17,7 +17,7 @@ The dashboard is available at:
 - `/admin/`
 - `/es/admin/`
 
-Admins sign in with an email magic link. Deployed Workers email the link through Resend and do not return it in the browser response. Local development can expose the link only when the site/Worker base is localhost or when `ADMIN_EXPOSE_LOGIN_LINK=true` is set explicitly. The local development defaults seed `alonso@dustwave.xyz` as a super admin through `ADMIN_BOOTSTRAP_EMAILS` and `_config.yml` `admin.users`.
+Admins sign in with an email magic link. Deployed Workers email the link through Resend and do not return it in the browser response. Local development can expose the link only when the site/Worker base is localhost or when `ADMIN_EXPOSE_LOGIN_LINK=true` is set explicitly. Local development grants bootstrap super-admin access through `ADMIN_BOOTSTRAP_EMAILS` in ignored `worker/.dev.vars`; production seed/recovery users come from `_config.yml` `admin.users` or deployed `ADMIN_USERS_JSON`.
 
 Admin sign-in can require Cloudflare Turnstile. Configure the public widget key in `_config.yml` as `admin.turnstile_site_key`, and store the matching `TURNSTILE_SECRET_KEY` as a Worker secret. When the secret is configured, `POST /admin/auth/start` verifies the challenge token before rate-limit writes, login-nonce writes, or magic-link email delivery. `ADMIN_TURNSTILE_BYPASS=true` is available only for local/test automation and should not be enabled on deployed Workers.
 

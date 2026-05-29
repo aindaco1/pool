@@ -14,7 +14,9 @@ CANONICAL_WORKER_BASE=http://127.0.0.1:8787
 CORS_ALLOWED_ORIGIN=http://127.0.0.1:4000
 
 # Local admin access.
-ADMIN_BOOTSTRAP_EMAILS=alonso@dustwave.xyz
+# Replace with the email address you want to use for local admin sign-in.
+# Multiple local bootstrap super admins may be comma-separated.
+ADMIN_BOOTSTRAP_EMAILS=admin@example.com
 ADMIN_TEST_CAMPAIGNS=hand-relations,smoke-editable
 
 # Local signing and session secrets.

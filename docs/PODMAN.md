@@ -19,7 +19,7 @@ Included today:
 - local Wrangler state persisted in the repo worktree
 - Worker dev image based on Node 24, matching the GitHub Actions deployment runtime
 - local `worker/.dev.vars` usage, including auto-generation of `CHECKOUT_INTENT_SECRET`
-- local admin dashboard defaults, including bootstrap admin email and CORS origin wiring for `http://127.0.0.1:4000`
+- local admin dashboard defaults, including bootstrap admin email from `worker/.dev.vars` and CORS origin wiring for `http://127.0.0.1:4000`
 - optional host Stripe CLI forwarding to the local Worker
 - automatic Stripe CLI discovery from common macOS/Homebrew install paths
 - automated headless Playwright execution in a dedicated Podman container
