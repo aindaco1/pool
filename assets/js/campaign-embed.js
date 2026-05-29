@@ -390,7 +390,7 @@ function renderMedia(campaign, embedOptions) {
         videoId = heroVideo.split('/embed/').pop().split('?')[0];
       }
       if (videoId) {
-        return '<iframe src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(videoId) + '?autoplay=1&mute=1&loop=1&playlist=' + encodeURIComponent(videoId) + '&controls=0&modestbranding=1&playsinline=1" title="' + imageAlt + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+        return '<iframe src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(videoId) + '?autoplay=1&mute=1&loop=1&playlist=' + encodeURIComponent(videoId) + '&controls=0&modestbranding=1&playsinline=1" title="' + imageAlt + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe>';
       }
     }
 
@@ -407,7 +407,7 @@ function renderMedia(campaign, embedOptions) {
         videoId = '';
       }
       if (videoId) {
-        return '<iframe src="https://player.vimeo.com/video/' + encodeURIComponent(videoId) + '?dnt=1&autoplay=1&muted=1&loop=1&background=1" title="' + imageAlt + '" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>';
+        return '<iframe src="https://player.vimeo.com/video/' + encodeURIComponent(videoId) + '?dnt=1&autoplay=1&muted=1&loop=1&background=1" title="' + imageAlt + '" allow="autoplay; fullscreen; picture-in-picture"></iframe>';
       }
     }
 

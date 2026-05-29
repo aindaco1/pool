@@ -120,20 +120,17 @@
 .admin-dashboard__status[data-admin-platform-status="true"] {
   @include admin-surface(12px 14px);
   align-items: center;
-  display: flex;
+  display: inline-flex;
   gap: 10px;
+  line-height: 1.35;
   margin-top: 12px;
-}
-
-.admin-dashboard__status-label {
-  @include admin-label;
-  border-right: 1px solid $border--default;
-  flex: 0 0 auto;
-  padding-right: 10px;
+  max-width: min(100%, 42rem);
+  width: fit-content;
 }
 
 .admin-dashboard__status-message {
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .admin-app__toolbar-actions {
@@ -442,6 +439,31 @@
   }
 }
 
+@media (min-width: 900px) {
+  .admin-campaign-settings__results .admin-campaign-section-tabs {
+    gap: clamp(3px, 0.45vw, 6px);
+    justify-content: space-between;
+    overflow-x: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .admin-campaign-settings__results .admin-campaign-section-tabs__tab {
+    flex: 1 1 0;
+    font-size: clamp(0.68rem, 0.8vw, 0.78rem);
+    line-height: 1.1;
+    min-width: 0;
+    padding: 6px 2px 5px;
+
+    &::after {
+      content: attr(data-compact-label);
+    }
+  }
+
+  .admin-campaign-settings__results .admin-campaign-section-tabs__label {
+    display: none;
+  }
+}
+
 .admin-campaign-section-panel {
   min-width: 0;
   padding-top: $space-sm;
@@ -566,6 +588,7 @@
   top: calc(100% + 8px);
   transform: translateX(-50%);
   transition: opacity 120ms ease;
+  overflow-wrap: anywhere;
   width: max-content;
   z-index: 5;
 }
@@ -866,6 +889,12 @@ textarea.admin-settings__input--readonly {
   .btn {
     justify-content: center;
     width: 100%;
+
+    &:focus-within {
+      border-color: $border--strong;
+      box-shadow: 0 0 0 3px $color--primary-focus-ring;
+      outline: 0;
+    }
   }
 
   input[type="file"] {
@@ -1454,7 +1483,8 @@ textarea.admin-settings__input--readonly {
   align-items: stretch;
 }
 
-.admin-content-block__field span {
+.admin-content-block__field > span,
+.admin-content-block__field > .admin-settings__product-label {
   @include admin-label;
 }
 
@@ -1764,6 +1794,12 @@ textarea.admin-settings__input--readonly {
   z-index: 4;
 }
 
+.admin-content-block__settings-button--gallery-block {
+  left: 10px;
+  right: auto;
+  z-index: 2;
+}
+
 .admin-content-block__settings-panel {
   @include admin-surface(10px);
   position: absolute;
@@ -1776,6 +1812,11 @@ textarea.admin-settings__input--readonly {
     @include type-ui;
     margin-bottom: 8px;
   }
+}
+
+.admin-content-block__settings-panel--gallery-block {
+  left: 10px;
+  right: auto;
 }
 
 .admin-content-block__settings-panel--gallery-image {
@@ -1805,6 +1846,16 @@ textarea.admin-settings__input--readonly {
 .admin-content-block__field {
   display: grid;
   gap: 4px;
+}
+
+.admin-content-block__media-upload-field {
+  .admin-content-block__media-upload {
+    margin-top: 2px;
+  }
+
+  .btn {
+    justify-content: center;
+  }
 }
 
 .admin-content-block__rich-inline {

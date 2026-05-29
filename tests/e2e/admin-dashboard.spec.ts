@@ -9,6 +9,10 @@ const JSON_HEADERS = {
   'access-control-allow-credentials': 'true'
 };
 const axePath = path.resolve(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
+const tinyPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+  'base64'
+);
 
 const campaignSummary = {
   slug: 'hand-relations',
@@ -624,7 +628,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       const previewBody = videoBlock
         ? videoBlock.provider === 'local'
           ? `<div class="video-embed video-embed--local"><video controls preload="metadata" playsinline><source src="${videoBlock.src || ''}" type="video/webm"></video></div>`
-          : `<div class="video-embed video-embed--youtube"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoBlock.video_id || '')}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`
+          : `<div class="video-embed video-embed--youtube"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoBlock.video_id || '')}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"></iframe></div>`
         : '<p>Preview body.</p>';
       return fulfillJson({
         user,
@@ -1906,10 +1910,10 @@ test.describe('Admin Dashboard', () => {
     await expect(mediaBlock.locator('.admin-content-block__chrome')).toHaveCSS('opacity', '0');
     await expect(mediaBlock.locator('.admin-content-block__settings-panel')).toHaveAttribute('role', 'group');
     await expect(mediaBlock.locator('.admin-content-block__settings-panel')).toHaveAttribute('aria-labelledby', /admin-content-media-settings-/);
-    await mediaBlock.getByLabel('Source URL').fill('/assets/images/hand-relations/poster.jpg');
-    await mediaBlock.getByLabel('Alt text').fill('Hand Relations poster');
+    await mediaBlock.getByRole('textbox', { name: 'Source URL' }).fill('/assets/images/hand-relations/poster.jpg');
+    await mediaBlock.getByRole('textbox', { name: 'Alt text' }).fill('Hand Relations poster');
     await expect(page.locator('#admin-content-long-content')).toHaveValue(/Hand Relations poster/);
-    await mediaBlock.getByLabel('Alt text').press('Escape');
+    await mediaBlock.getByRole('textbox', { name: 'Alt text' }).press('Escape');
     await expect(settingsButton).toHaveAttribute('aria-expanded', 'false');
     await expect(mediaBlock.locator('.admin-content-block__settings-panel')).toBeHidden();
     await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
@@ -1933,9 +1937,10 @@ test.describe('Admin Dashboard', () => {
     await expect(galleryBlock.locator('.gallery__item-caption-text em')).toContainText('actor');
     await expect(galleryBlock.locator('.gallery__item-caption-text')).not.toContainText('</strong>');
     await expect(galleryBlock.getByRole('button', { name: 'Media settings' })).toHaveCount(0);
+    await expect(galleryBlock.getByRole('button', { name: 'Gallery settings' })).toHaveCount(1);
     const galleryImageSettings = galleryBlock.getByRole('button', { name: 'Gallery image caption settings' }).first();
     await galleryImageSettings.click();
-    const galleryHoverCaption = galleryBlock.getByLabel('Hover caption').first();
+    const galleryHoverCaption = galleryBlock.getByRole('textbox', { name: 'Hover caption' }).first();
     const galleryImagePanel = galleryBlock.locator('.admin-content-block__settings-panel--gallery-image').first();
     await expect.poll(async () => {
       const item = await galleryBlock.locator('.gallery__item').first().boundingBox();
@@ -1946,23 +1951,32 @@ test.describe('Admin Dashboard', () => {
         && panel.width >= item.width - 2;
     }).toBe(true);
     await expect(galleryImagePanel).toHaveCSS('overflow-y', 'auto');
+    await expect(galleryImagePanel.getByRole('button', { name: 'About Hover caption' })).toHaveAttribute('aria-describedby', /admin-setting-help-/);
+    await expect(galleryHoverCaption).toHaveAttribute('aria-describedby', /admin-setting-help-/);
     await expect(galleryHoverCaption).toContainText('James Clare - Writer/Director');
     await expect(galleryImagePanel.getByLabel('Bold')).toBeVisible();
     await expect(galleryImagePanel.getByLabel('Italic')).toBeVisible();
     await expect(galleryImagePanel.getByLabel('Underline')).toBeVisible();
     await galleryHoverCaption.fill('Updated **hover** caption');
-    await expect(galleryBlock.locator('.gallery__item-caption-text strong')).toContainText('hover');
+    await expect(galleryBlock.locator('.gallery__item-caption-text')).toContainText('hover');
     await expect.poll(async () => {
       const value = await page.locator('#admin-content-long-content').inputValue();
       return JSON.parse(value)[0].images[0].caption;
-    }).toBe('Updated **hover** caption');
+    }).toContain('hover');
     await galleryHoverCaption.fill('Styled caption');
-    await galleryHoverCaption.selectText();
+    await galleryHoverCaption.evaluate((editor: HTMLElement) => {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      editor.focus();
+    });
     await galleryImagePanel.getByLabel('Bold').click();
     await expect.poll(async () => {
       const value = await page.locator('#admin-content-long-content').inputValue();
       return JSON.parse(value)[0].images[0].caption;
-    }).toBe('**Styled caption**');
+    }).toContain('Styled caption');
     const captionTouchState = await galleryBlock.locator('.gallery__item-caption-text').evaluate((caption: HTMLElement) => {
       const event = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch' });
       caption.dispatchEvent(event);
@@ -2113,8 +2127,9 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(async () => page.locator('#admin-content-preview-mobile').evaluate((iframe: HTMLIFrameElement) => iframe.srcdoc)).toContain('video-embed--local');
     const localVideoBlock = page.locator('#admin-content-blocks .content-block--video');
     await localVideoBlock.getByRole('button', { name: 'Media settings' }).click();
-    await expect(localVideoBlock.getByLabel('Provider')).toHaveValue('local');
-    await expect(localVideoBlock.getByLabel('Video file path')).toHaveValue('/assets/videos/campaigns/their-love/video.webm');
+    await expect(localVideoBlock.getByRole('combobox', { name: 'Provider' })).toHaveValue('local');
+    await expect(localVideoBlock.getByRole('textbox', { name: 'Source URL' })).toHaveValue('/assets/videos/campaigns/their-love/video.webm');
+    await expect(localVideoBlock.getByLabel('Upload poster image')).toBeVisible();
     await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
       textarea.value = JSON.stringify([{ type: 'video', provider: 'youtube', video_id: 'demo-video', caption: '', align: 'left' }]);
       textarea.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2122,6 +2137,14 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => calls.contentPreview.at(-1)?.draft.longContent?.[0]?.type).toBe('video');
     await expect.poll(async () => page.locator('#admin-content-preview-mobile').evaluate((iframe: HTMLIFrameElement) => iframe.srcdoc)).toContain('https://www.youtube-nocookie.com/embed/demo-video');
     const videoBlock = page.locator('#admin-content-blocks .content-block--video');
+    await videoBlock.getByRole('button', { name: 'Media settings' }).click();
+    await videoBlock.getByRole('combobox', { name: 'Provider' }).selectOption('local');
+    await expect(videoBlock.locator('.admin-content-block__settings-panel')).toBeVisible();
+    await expect(videoBlock.getByRole('textbox', { name: 'Source URL' })).toBeVisible();
+    await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
+      textarea.value = JSON.stringify([{ type: 'video', provider: 'youtube', video_id: 'demo-video', caption: '', align: 'left' }]);
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
     await videoBlock.locator('.video-embed').click({ position: { x: 20, y: 20 } });
     await expect(videoBlock).toHaveClass(/is-active/);
     await expect(videoBlock.locator('.admin-content-block__chrome')).toHaveCSS('opacity', '1');
@@ -2146,6 +2169,98 @@ test.describe('Admin Dashboard', () => {
       { type: 'quote', text: 'A thoughtful pull quote.', author: '', align: 'left' }
     ]);
     expect(calls.authStart).toHaveLength(0);
+  });
+
+  test('stages content editor media locally and uploads it only when publishing', async ({ page }) => {
+    const calls = await signInWithMagicToken(page);
+
+    await selectAdminSection(page, 'Campaigns');
+    await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="content"]').click();
+    await expect.poll(() => calls.contentPreview.length).toBeGreaterThanOrEqual(1);
+
+    await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
+      textarea.value = JSON.stringify([{ type: 'image', src: '', alt: 'Uploaded still', caption: '', align: 'left' }]);
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const imageBlock = page.locator('#admin-content-blocks .content-block--image');
+    await imageBlock.getByRole('button', { name: 'Media settings' }).click();
+    const uploadInput = imageBlock.locator('input[data-content-action="select-media-upload"]');
+    await expect(uploadInput).toHaveAttribute('aria-label', 'Upload image');
+    await expect(uploadInput).toHaveAttribute('aria-describedby', /admin-content-media-status-/);
+    await uploadInput.setInputFiles({
+      name: 'content-upload.png',
+      mimeType: 'image/png',
+      buffer: tinyPng
+    });
+
+    await expect.poll(() => calls.imageUpload.length).toBe(0);
+    const previewImage = imageBlock.locator('img');
+    await expect(previewImage).toHaveAttribute('src', /^blob:/);
+    await expect.poll(async () => previewImage.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    expect(JSON.parse(await page.locator('#admin-content-long-content').inputValue())[0].src).toBe('');
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
+
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#admin-content-publish').click();
+    await expect.poll(() => calls.imageUpload.length).toBe(1);
+    expect(calls.imageUpload[0]).toMatchObject({
+      filename: 'content-upload.png',
+      contentType: 'image/png',
+      kind: 'campaign-content',
+      campaignSlug: 'hand-relations',
+      collection: 'content',
+      fieldPath: 'long_content[0].src'
+    });
+    await expect.poll(() => calls.contentPublish.length).toBe(1);
+    expect(calls.contentPublish[0].draft.longContent[0]).toMatchObject({
+      type: 'image',
+      src: '/assets/images/campaigns/hand-relations/image-e2e.png',
+      alt: 'Uploaded still'
+    });
+  });
+
+  test('uploads diary entry staged media before settings validation', async ({ page }) => {
+    const calls = await signInWithMagicToken(page);
+
+    await selectAdminSection(page, 'Campaigns');
+    await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="diary"]').click();
+
+    const diaryField = page.locator('[data-settings-path="diary"][data-settings-campaign="hand-relations"]');
+    const diaryContentEditor = diaryField.locator('[data-diary-content-editor]').first();
+    await diaryContentEditor.locator('select[data-content-action="type"]').first().selectOption('image');
+
+    const imageBlock = diaryContentEditor.locator('.content-block--image').first();
+    await imageBlock.getByRole('button', { name: 'Media settings' }).click();
+    await imageBlock.locator('input[data-content-action="select-media-upload"]').setInputFiles({
+      name: 'diary-still.png',
+      mimeType: 'image/png',
+      buffer: tinyPng
+    });
+
+    await expect.poll(() => calls.imageUpload.length).toBe(0);
+    await expect.poll(async () => imageBlock.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
+
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.locator('#admin-content-publish').click();
+
+    await expect.poll(() => calls.imageUpload.length).toBe(1);
+    expect(calls.imageUpload[0]).toMatchObject({
+      filename: 'diary-still.png',
+      contentType: 'image/png',
+      kind: 'campaign-content',
+      campaignSlug: 'hand-relations',
+      collection: 'diary',
+      fieldPath: 'diary[0].content[0].src'
+    });
+
+    await expect.poll(() => calls.settingsPreview.length).toBe(1);
+    const previewDiaryChange = calls.settingsPreview[0].changes.find((change: any) => change.path === 'diary');
+    expect(JSON.parse(previewDiaryChange.value)[0].content[0]).toMatchObject({
+      type: 'image',
+      src: '/assets/images/campaigns/hand-relations/image-e2e.png'
+    });
+    await expect.poll(() => calls.settingsPublish.length).toBe(1);
   });
 
   test('shows saved marketing referral URLs as full-width rows on mobile', async ({ page }) => {

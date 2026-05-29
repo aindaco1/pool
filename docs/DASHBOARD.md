@@ -278,8 +278,9 @@ Images and videos uploaded through the dashboard are validated before persistenc
 - Platform brand images: `assets/images/defaults/`
 - Platform add-on product images: `assets/images/add-ons/`
 - Campaign add-on product images: `assets/images/campaign-add-ons/`
-- Campaign images, tier images, diary images, and decision option images: `assets/images/campaigns/<campaign-slug>/`
+- Campaign images, content-block images, tier images, diary images, and decision option images: `assets/images/campaigns/<campaign-slug>/`
 - Campaign videos: `assets/videos/campaigns/<campaign-slug>/`
+- Campaign audio: `assets/audio/campaigns/<campaign-slug>/`
 - Platform/default videos: `assets/videos/defaults/`
 
 Recommended campaign media:
@@ -289,6 +290,10 @@ Recommended campaign media:
 - Creator image: square, around 400x400px
 - Default social image: large 16:9 or Open Graph-friendly image
 - Hero video: direct MP4/WebM/MOV upload up to 100 MB, or a YouTube/Vimeo URL
+
+The campaign Content editor and diary-entry content editors stage selected media in the browser first. The block shows the selected image, video, or audio selection immediately, but the file is not uploaded until the user publishes. During publish, the dashboard uploads staged media into the campaign asset directory, replaces the temporary browser preview with the final `/assets/...` path, and then commits the campaign YAML.
+
+Campaign-scoped media uploads require access to that campaign. Super admins can upload any campaign media and platform/default media; campaign admins can upload only media for campaigns they manage. Platform add-on and platform brand uploads stay super-admin only.
 
 The Worker upload endpoint is source-preserving. It validates type, size, campaign scope, directory, and filename, but it does not run native image optimizers or FFmpeg. Lossless image compression and video transcoding to WebM should happen in a dedicated build/CI/media pipeline so quality settings, generated derivatives, and rollback behavior are explicit. The dashboard response reports whether an upload was source-preserved or already WebM.
 
@@ -351,4 +356,4 @@ Dashboard read endpoints rely on `campaign-pledges:{slug}` indexes and intention
 
 ---
 
-_Last updated: May 25, 2026_
+_Last updated: May 28, 2026_

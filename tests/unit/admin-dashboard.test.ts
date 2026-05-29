@@ -386,9 +386,10 @@ describe('admin dashboard foundation', () => {
     expect(layout).toContain('id="admin-campaign-status"');
     expect(layout).toContain('sandbox="allow-scripts allow-popups allow-presentation"');
     expect(csp).toContain("frame-src 'self'");
-    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).not.toContain('frame-ancestors');
     expect(csp).toContain('https://www.youtube-nocookie.com');
     expect(csp).toContain('{{ site.platform.worker_url }}');
+    expect(csp).toContain("img-src 'self' data: blob:");
     expect(csp).toContain("media-src 'self' https: blob:");
     expect(campaignsApi).toContain('"decisions": {{ campaign.decisions | default: empty | jsonify }}');
     expect(mainScss).toContain('@import "partials/admin";');
@@ -1646,6 +1647,184 @@ runner_report_emails:
     expectNoKvWritesOrLists(env, 'campaign image upload');
   });
 
+  it('uploads staged content editor images to the campaign asset directory without KV writes', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_REF: 'main'
+    };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const githubCalls: Array<{ url: string; method: string; body?: any }> = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url.includes('/contents/assets/images/campaigns/hand-relations/content-image-1-') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: 'assets/images/campaigns/hand-relations/content-image-1-test.png', sha: 'image-sha' },
+          commit: { sha: 'image-commit', html_url: 'https://github.test/image-commit' }
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/image-upload', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        filename: 'Content Image.png',
+        contentType: 'image/png',
+        content: 'data:image/png;base64,aGVsbG8=',
+        kind: 'campaign-content',
+        campaignSlug: 'hand-relations',
+        collection: 'content',
+        fieldPath: 'long_content[0].src',
+        filenameBase: 'content-image-1'
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.path).toMatch(/^\/assets\/images\/campaigns\/hand-relations\/content-image-1-\d{8}-\d{6}\.png$/);
+    expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
+    expect(githubCalls).toHaveLength(1);
+    expectNoKvWritesOrLists(env, 'content editor image upload');
+  });
+
+  it('scopes campaign media uploads to campaign admins and keeps platform uploads super-admin only', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_REF: 'main'
+    };
+    (env.PLEDGES as CountingKVNamespace).store.set(`admin-user:${await sha256Hex('creator@example.com')}`, JSON.stringify({
+      email: 'creator@example.com',
+      role: 'campaign_user',
+      campaignSlugs: ['hand-relations']
+    }));
+    const { ctx, cookie, csrfToken } = await signInAdmin(env, 'creator@example.com');
+    const githubCalls: Array<{ url: string; method: string; body?: any }> = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture] });
+      }
+      if (url.includes('/contents/assets/images/campaigns/hand-relations/content-image-1-') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: 'assets/images/campaigns/hand-relations/content-image-1-test.png', sha: 'image-sha' },
+          commit: { sha: 'image-commit', html_url: 'https://github.test/image-commit' }
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetKvCounters(env);
+    const allowedResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/image-upload', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        filename: 'Content Image.png',
+        contentType: 'image/png',
+        content: 'data:image/png;base64,aGVsbG8=',
+        kind: 'campaign-content',
+        campaignSlug: 'hand-relations',
+        collection: 'content',
+        fieldPath: 'long_content[0].src',
+        filenameBase: 'content-image-1'
+      })
+    }), env, ctx);
+    expect(allowedResponse.status).toBe(200);
+
+    const blockedCampaignResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/image-upload', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        filename: 'Other Image.png',
+        contentType: 'image/png',
+        content: 'data:image/png;base64,aGVsbG8=',
+        kind: 'campaign-content',
+        campaignSlug: 'smoke-editable',
+        collection: 'content',
+        fieldPath: 'long_content[0].src'
+      })
+    }), env, ctx);
+    expect(blockedCampaignResponse.status).toBe(403);
+
+    const blockedPlatformResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/image-upload', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        filename: 'Add On Image.png',
+        contentType: 'image/png',
+        content: 'data:image/png;base64,aGVsbG8=',
+        kind: 'add-on',
+        campaignSlug: 'hand-relations'
+      })
+    }), env, ctx);
+    expect(blockedPlatformResponse.status).toBe(403);
+
+    expect(githubCalls).toHaveLength(1);
+    expectNoKvWritesOrLists(env, 'scoped campaign media upload');
+  });
+
+  it('uploads staged content editor audio to the campaign audio directory without KV writes', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_REF: 'main'
+    };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const githubCalls: Array<{ url: string; method: string; body?: any }> = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url.includes('/contents/assets/audio/campaigns/hand-relations/content-audio-1-') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: 'assets/audio/campaigns/hand-relations/content-audio-1-test.mp3', sha: 'audio-sha' },
+          commit: { sha: 'audio-commit', html_url: 'https://github.test/audio-commit' }
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/audio-upload', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        filename: 'Content Audio.mp3',
+        contentType: 'audio/mpeg',
+        content: 'data:audio/mpeg;base64,aGVsbG8=',
+        kind: 'campaign-content-audio',
+        campaignSlug: 'hand-relations',
+        collection: 'content',
+        fieldPath: 'long_content[0].src',
+        filenameBase: 'content-audio-1'
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.path).toMatch(/^\/assets\/audio\/campaigns\/hand-relations\/content-audio-1-\d{8}-\d{6}\.mp3$/);
+    expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
+    expect(githubCalls).toHaveLength(1);
+    expect(githubCalls[0].body.message).toContain('Upload admin audio');
+    expectNoKvWritesOrLists(env, 'content editor audio upload');
+  });
+
   it('uploads admin hero videos through GitHub without KV writes', async () => {
     const env = {
       ...createEnv(),
@@ -2832,7 +3011,7 @@ runner_report_emails:
     expect(preview.preview.html).not.toContain('admin-content-preview__block--divider');
     expect(preview.preview.html).toContain('class="video-embed video-embed--youtube"');
     expect(preview.preview.html).toContain('https://www.youtube-nocookie.com/embed/video-demo');
-    expect(preview.preview.html).toContain('allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"');
+    expect(preview.preview.html).toContain('allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"');
     expect(preview.preview.html).toContain('<figcaption class="admin-content-preview__caption">Demo video</figcaption>');
     expect(preview.preview.html).toContain('video-embed--local');
     expect(preview.preview.html).toContain('<video controls preload="none" playsinline data-first-frame-poster="true">');

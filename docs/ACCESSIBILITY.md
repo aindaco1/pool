@@ -56,6 +56,8 @@ The recent accessibility hardening pass added:
   - legend-backed checkbox groups for shipping options and admin campaign access
   - APG-style top-level, settings-section, campaign, and campaign-subtab navigation
   - WYSIWYG content-editor chrome that is only keyboard-reachable when the relevant block is active
+  - content-editor media upload controls with labeled native file inputs, visible focus on the styled upload button, upload status regions, and browser-local previews before publish
+  - gallery image caption settings that reuse the shared label/help pattern and expose the hover-caption editor as a labeled rich-text textbox
   - sortable data tables that expose `aria-sort` state and sort buttons
 
 ## Critical Surfaces
@@ -92,6 +94,8 @@ The admin dashboard has enough custom UI that it needs its own accessibility rul
 - Content-editor blocks should expose editable text as `role="textbox"` with clear labels, `aria-multiline` where appropriate, and formatting buttons with `aria-pressed` when they represent toggle state.
 - Hidden content-editor chrome must not remain in the keyboard tab order. A block's toolbar should become reachable only after that block is active.
 - Media settings panels should expose expanded/collapsed state from the gear button and a labeled group for the revealed settings.
+- Content-editor media uploads should use the shared upload control pattern so the native file input has an accessible name, an upload-status description, and the same focus treatment as other dashboard upload buttons.
+- Gallery block settings and individual gallery-image settings should stay visually and semantically distinct, but both should reuse the shared admin field label/help components.
 - Sortable admin tables should use real buttons in column headers, maintain `aria-sort`, and keep export buttons outside horizontally scrollable table regions.
 - Save/Publish status messages should use polite status regions; validation or blocking errors should remain near the relevant field or workflow.
 
@@ -148,7 +152,7 @@ Current automated accessibility-related coverage includes:
   - these verify diary-tab navigation, carousel-gallery navigation, custom-amount entry, support-item entry, and supporter-community teaser activation remain usable without pointer input
 - admin-dashboard keyboard, axe, and semantics assertions in:
   - `tests/e2e/admin-dashboard.spec.ts`
-  - this covers admin sign-in, role-gated tabs, settings-section tabs, campaign subtabs, shared field help, user campaign checkbox groups, WYSIWYG editor chrome, media settings panels, sortable data surfaces, and Spanish admin route loading
+  - this covers admin sign-in, role-gated tabs, settings-section tabs, campaign subtabs, shared field help, user campaign checkbox groups, WYSIWYG editor chrome, media settings panels, staged media-upload status/ARIA, gallery caption help, sortable data surfaces, and Spanish admin route loading
 
 Run the focused accessibility slice with:
 
@@ -240,4 +244,4 @@ Good next accessibility improvements include:
 
 ---
 
-_Last updated: May 25, 2026_
+_Last updated: May 28, 2026_

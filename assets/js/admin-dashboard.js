@@ -129,6 +129,7 @@
   var contentPreviewRequestId = 0;
   var contentSavedSnapshot = '';
   var contentHasUnsavedChanges = false;
+  var pendingContentUploadCounter = 0;
   var collectionFieldIdCounter = 0;
   var contentEditorInstanceCounter = 0;
   var activeSettingsSectionHasPublishableControls = true;
@@ -209,15 +210,11 @@
     }
     node.setAttribute('data-admin-platform-status', 'true');
 
-    var label = document.createElement('span');
-    label.className = 'admin-dashboard__status-label';
-    label.textContent = t('platform_message_label', 'Platform message');
-
     var message = document.createElement('span');
     message.className = 'admin-dashboard__status-message';
     message.textContent = value;
 
-    node.append(label, message);
+    node.append(message);
   }
 
   function hasAdminTurnstile() {
@@ -426,7 +423,8 @@
   }
 
   function campaignSettingsHaveUnsavedChanges() {
-    return settingsHaveUnsavedChanges(campaignSettingsRoot ? [campaignSettingsRoot] : []);
+    return settingsHaveUnsavedChanges(campaignSettingsRoot ? [campaignSettingsRoot] : [])
+      || pendingDiaryContentEditors(campaignSettingsRoot).length > 0;
   }
 
   function adminHasUnsavedChanges() {
@@ -919,6 +917,18 @@
     return safeHelpId('admin-setting-help', String(sectionTitle || 'settings') + '-' + String(row?.path || row?.label || index));
   }
 
+  function appendBreakableTooltipText(node, text) {
+    var buffer = '';
+    String(text || '').split('').forEach(function(character) {
+      buffer += character;
+      if (character === '/') {
+        node.append(document.createTextNode(buffer), document.createElement('wbr'));
+        buffer = '';
+      }
+    });
+    if (buffer) node.append(document.createTextNode(buffer));
+  }
+
   function createHelpControl(label, helpText, idBase) {
     var text = String(helpText || '').trim();
     if (!text) return null;
@@ -936,7 +946,7 @@
     tooltip.className = 'admin-settings__help-tooltip';
     tooltip.id = helpId;
     tooltip.setAttribute('role', 'tooltip');
-    tooltip.textContent = text;
+    appendBreakableTooltipText(tooltip, text);
     help.append(button, tooltip);
     return help;
   }
@@ -1245,10 +1255,15 @@
       var node = range.commonAncestorContainer;
       return editor.contains(node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode) ? range : null;
     }
+    function rangeAlreadyHasInlineTag(range, tag) {
+      var node = range?.commonAncestorContainer;
+      var element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+      return Boolean(element?.closest?.(tag));
+    }
     function applyManualInlineAction(action, activeBefore) {
       var tag = inlineActionTag(action);
       var range = currentEditorRange() || savedSelectionRange;
-      if (!tag || !range || range.collapsed || activeBefore) return false;
+      if (!tag || !range || range.collapsed || (activeBefore && rangeAlreadyHasInlineTag(range, tag))) return false;
       var wrapper = document.createElement(tag);
       wrapper.append(range.extractContents());
       range.insertNode(wrapper);
@@ -1488,7 +1503,6 @@
       embedPreview.title = options?.previewAlt || t('settings_video_preview_alt', 'Current video preview');
       embedPreview.loading = 'lazy';
       embedPreview.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
-      embedPreview.allowFullscreen = true;
       embedPreview.hidden = true;
     }
     var previewEmpty = document.createElement('span');
@@ -1519,6 +1533,7 @@
     var fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = options?.accept || 'image/png,image/jpeg,image/webp,image/gif';
+    fileInput.setAttribute('aria-label', options?.uploadLabel || t('settings_image_upload', 'Upload image'));
     if (options?.uploadDataset) {
       Object.entries(options.uploadDataset).forEach(function(entry) {
         fileInput.dataset[entry[0]] = entry[1];
@@ -1526,8 +1541,10 @@
     }
     fileLabel.append(fileInput);
     var uploadStatus = document.createElement('span');
+    uploadStatus.id = 'admin-settings-upload-status-' + String(++collectionFieldIdCounter);
     uploadStatus.className = 'admin-settings__image-status';
     uploadStatus.setAttribute('role', 'status');
+    fileInput.setAttribute('aria-describedby', uploadStatus.id);
     uploadRow.append(fileLabel, uploadStatus);
 
     function setValue(value, eventType) {
@@ -2413,7 +2430,7 @@
         var contentField = document.createElement('textarea');
         contentField.dataset.collectionField = 'contentJson';
         contentField.value = diaryContentJson(item);
-        contentField.dataset.diaryDraftOriginal = contentBlocksSnapshot(contentField.value);
+        contentField.dataset.diaryDraftOriginal = contentEditorDirtySnapshot(contentField.value);
         contentField.hidden = true;
         var contentTools = document.createElement('div');
         contentTools.className = 'admin-settings__product-field admin-settings__product-field--wide admin-settings__diary-content';
@@ -2444,7 +2461,7 @@
             syncContentJsonFromBlocks();
           });
           syncValue();
-          contentField.dataset.diaryDraftOriginal = contentBlocksSnapshot(contentField.value);
+          contentField.dataset.diaryDraftOriginal = contentEditorDirtySnapshot(contentField.value);
           markDiaryEditorDirty(diaryEditor, false);
           updateAdminDirtyIndicatorsSoon();
         });
@@ -3736,19 +3753,36 @@
     }
   }
 
-  async function publishSettingsChanges(statusNode, changesOverride) {
+  async function publishSettingsChanges(statusNode, changesOverride, options) {
     statusNode = statusNode || settingsStatus;
-    var changes = changesOverride || collectSettingsChanges();
-    if (!changes.length) {
+    var roots = options?.roots || null;
+    var changes = changesOverride || collectSettingsChanges(roots);
+    var pendingDiaryUploads = options?.uploadPendingDiaryMedia ? pendingDiaryContentEditors(roots?.[0] || campaignSettingsRoot).length : 0;
+    if (!changes.length && !pendingDiaryUploads) {
       setText(statusNode, t('settings_no_changes', 'No settings changes to publish.'));
       return false;
     }
-    var validation = await validateSettingsChanges(statusNode, changes);
-    if (!validation) return false;
+    var validation = true;
+    if (changes.length && !pendingDiaryUploads) {
+      validation = await validateSettingsChanges(statusNode, changes);
+      if (!validation) return false;
+    }
     var confirmed = window.confirm(t('settings_publish_confirm', 'Publish these settings and start a deploy? Changes may take a few minutes to appear.'));
     if (!confirmed) return false;
     setText(statusNode, t('settings_publishing', 'Publishing settings and starting deploy...'));
     try {
+      if (pendingDiaryUploads) {
+        await uploadPendingDiaryContentMedia(roots?.[0] || campaignSettingsRoot, statusNode);
+        changes = collectSettingsChanges(roots);
+        if (!changes.length) {
+          setPlatformStatus(statusNode, t('settings_published_no_deploy', 'Changes were saved, but the site did not start updating automatically.'));
+          updateDirtyIndicators();
+          return true;
+        }
+        validation = await validateSettingsChanges(statusNode, changes);
+        if (!validation) return false;
+        setText(statusNode, t('settings_publishing', 'Publishing settings and starting deploy...'));
+      }
       var result = await requestJson('/admin/settings/publish', {
         method: 'POST',
         body: JSON.stringify({ changes: changes })
@@ -4612,13 +4646,161 @@
     return '';
   }
 
+  function contentAudioSourceType(src) {
+    var path = String(src || '');
+    if (/\.mp3(?:[?#].*)?$/i.test(path)) return 'audio/mpeg';
+    if (/\.m4a(?:[?#].*)?$/i.test(path)) return 'audio/mp4';
+    if (/\.aac(?:[?#].*)?$/i.test(path)) return 'audio/aac';
+    if (/\.ogg(?:[?#].*)?$/i.test(path)) return 'audio/ogg';
+    if (/\.wav(?:[?#].*)?$/i.test(path)) return 'audio/wav';
+    if (/\.webm(?:[?#].*)?$/i.test(path)) return 'audio/webm';
+    return '';
+  }
+
+  function contentMediaUploadConfig(kind) {
+    var normalizedKind = kind === 'video' || kind === 'audio' ? kind : 'image';
+    if (normalizedKind === 'video') {
+      return {
+        kind: normalizedKind,
+        accept: 'video/mp4,video/webm,video/quicktime',
+        allowedTypes: ['video/mp4', 'video/webm', 'video/quicktime'],
+        maxBytes: 100 * 1024 * 1024,
+        typeErrorText: t('content_video_type_error', 'Use an MP4, WebM, or MOV video.'),
+        sizeErrorText: t('content_video_size_error', 'Video must be 100 MB or smaller.')
+      };
+    }
+    if (normalizedKind === 'audio') {
+      return {
+        kind: normalizedKind,
+        accept: 'audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/aac,audio/webm',
+        allowedTypes: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/webm'],
+        maxBytes: 25 * 1024 * 1024,
+        typeErrorText: t('content_audio_type_error', 'Use an MP3, M4A, WAV, OGG, AAC, or WebM audio file.'),
+        sizeErrorText: t('content_audio_size_error', 'Audio must be 25 MB or smaller.')
+      };
+    }
+    return {
+      kind: normalizedKind,
+      accept: 'image/png,image/jpeg,image/webp,image/gif',
+      allowedTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
+      maxBytes: 8 * 1024 * 1024,
+      typeErrorText: t('content_image_type_error', 'Use a PNG, JPEG, WebP, or GIF image.'),
+      sizeErrorText: t('content_image_size_error', 'Image must be 8 MB or smaller.')
+    };
+  }
+
+  function pendingUploadForContentField(item, field) {
+    if (!item || typeof item !== 'object') return null;
+    if (field === 'poster') return item._pendingPosterUpload || null;
+    return item._pendingUpload || null;
+  }
+
+  function setPendingUploadForContentField(item, field, pending) {
+    if (!item || typeof item !== 'object') return;
+    if (field === 'poster') {
+      item._pendingPosterUpload = pending;
+      return;
+    }
+    item._pendingUpload = pending;
+  }
+
+  function contentMediaPreviewSource(item, field) {
+    var key = field || 'src';
+    return pendingUploadForContentField(item, key)?.previewUrl || item?.[key] || '';
+  }
+
+  function revokePendingContentUpload(pending) {
+    if (pending?.previewUrl && /^blob:/i.test(pending.previewUrl)) {
+      try {
+        URL.revokeObjectURL(pending.previewUrl);
+      } catch (_error) {
+      }
+    }
+  }
+
+  function clearPendingContentUpload(item, field) {
+    if (!item || typeof item !== 'object') return;
+    var key = field || 'src';
+    var property = key === 'poster' ? '_pendingPosterUpload' : '_pendingUpload';
+    revokePendingContentUpload(item[property]);
+    delete item[property];
+  }
+
+  function serializableContentBlock(block) {
+    if (!block || typeof block !== 'object') return block;
+    var copy = {};
+    Object.keys(block).forEach(function(key) {
+      if (key.indexOf('_pending') === 0) return;
+      if (key === 'images' && Array.isArray(block.images)) {
+        copy.images = block.images.map(serializableContentBlock);
+        return;
+      }
+      copy[key] = block[key];
+    });
+    return copy;
+  }
+
+  function serializableContentBlocks(blocks) {
+    return (Array.isArray(blocks) ? blocks : []).map(serializableContentBlock);
+  }
+
+  function walkPendingContentUploads(blocks, callback) {
+    (Array.isArray(blocks) ? blocks : []).forEach(function(block, index) {
+      if (!block || typeof block !== 'object') return;
+      if (block._pendingUpload) callback(block, block._pendingUpload, { index: index, field: 'src', type: block.type || 'media' });
+      if (block._pendingPosterUpload) callback(block, block._pendingPosterUpload, { index: index, field: 'poster', type: 'poster-image' });
+      if (block.type === 'gallery' && Array.isArray(block.images)) {
+        block.images.forEach(function(image, imageIndex) {
+          if (image?._pendingUpload) {
+            callback(image, image._pendingUpload, {
+              index: index,
+              imageIndex: imageIndex,
+              field: 'src',
+              type: 'gallery-image'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  function pendingContentUploads(blocks) {
+    var uploads = [];
+    walkPendingContentUploads(blocks, function(target, pending, meta) {
+      uploads.push({ target: target, pending: pending, meta: meta });
+    });
+    return uploads;
+  }
+
+  function hasPendingContentUploads(blocks) {
+    return pendingContentUploads(blocks).length > 0;
+  }
+
+  function contentPendingUploadsSnapshot(blocks) {
+    return JSON.stringify(pendingContentUploads(blocks).map(function(item) {
+      return {
+        name: item.pending?.name || '',
+        type: item.pending?.type || '',
+        size: item.pending?.size || 0,
+        field: item.meta?.field || 'src',
+        index: item.meta?.index,
+        imageIndex: item.meta?.imageIndex
+      };
+    }));
+  }
+
+  function contentEditorDirtySnapshot(blocks) {
+    return contentBlocksSnapshot(blocks) + '\n' + contentPendingUploadsSnapshot(blocks);
+  }
+
   function cloneContentBlocks(blocks) {
-    return JSON.parse(JSON.stringify(blocks || []));
+    return JSON.parse(JSON.stringify(serializableContentBlocks(blocks || [])));
   }
 
   function contentBlocksSnapshot(blocks) {
     try {
-      return JSON.stringify(parseContentBlocks(blocks || []));
+      var source = Array.isArray(blocks) ? serializableContentBlocks(blocks) : blocks || [];
+      return JSON.stringify(parseContentBlocks(source));
     } catch (_error) {
       return JSON.stringify([]);
     }
@@ -4732,7 +4914,7 @@
 
   function syncContentJsonFromBlocks() {
     if (activeContentJsonField instanceof HTMLTextAreaElement) {
-      activeContentJsonField.value = JSON.stringify(contentBlocks, null, 2);
+      activeContentJsonField.value = JSON.stringify(serializableContentBlocks(contentBlocks), null, 2);
     }
   }
 
@@ -4757,7 +4939,7 @@
     var previousLink = activeContentLink;
     contentBlocksRoot = root;
     activeContentJsonField = field;
-    contentBlocks = contentBlocksFromField(field);
+    contentBlocks = Array.isArray(root.__contentBlocks) ? root.__contentBlocks : contentBlocksFromField(field);
     contentHistory = root.__contentHistory || [];
     lastContentMutation = root.__lastContentMutation || '';
     activeDiaryContentField = field;
@@ -4767,6 +4949,7 @@
       syncContentJsonFromBlocks();
       root.__contentHistory = contentHistory;
       root.__lastContentMutation = lastContentMutation;
+      root.__contentBlocks = contentBlocks;
       field.dispatchEvent(new Event('change', { bubbles: true }));
       contentBlocksRoot = previousRoot;
       activeContentJsonField = previousJsonField;
@@ -5076,11 +5259,11 @@
   }
 
   function createContentInput(tagName, block, index, field, labelText, options) {
-    var wrap = document.createElement('label');
+    var wrap = document.createElement('div');
     wrap.className = 'admin-content-block__field';
-    var label = document.createElement('span');
-    label.textContent = labelText;
+    var controlId = 'admin-content-field-' + String(index) + '-' + String(field || 'field') + '-' + (++collectionFieldIdCounter);
     var control = document.createElement(tagName);
+    control.id = controlId;
     control.dataset.contentIndex = String(index);
     control.dataset.contentField = field;
     if (tagName === 'select') {
@@ -5094,31 +5277,87 @@
     control.value = field === 'images' ? galleryImagesToText(block.images) : String(block[field] || '');
     if (tagName === 'textarea') control.rows = options?.rows || 3;
     if (options?.placeholder) control.placeholder = options.placeholder;
-    wrap.append(label, control);
+    var labelInfo = createProductLabelRow(labelText, options?.help || '', controlId, { htmlFor: controlId });
+    if (labelInfo.helpId) appendDescribedBy(control, labelInfo.helpId);
+    wrap.append(labelInfo.row, control);
+    return wrap;
+  }
+
+  function createContentMediaUploadInput(block, index, options) {
+    var kind = options?.kind || 'image';
+    var config = contentMediaUploadConfig(kind);
+    var wrap = document.createElement('div');
+    wrap.className = 'admin-content-block__field admin-content-block__media-upload-field';
+    var labelText = options?.label || (config.kind === 'video'
+      ? t('content_upload_video', 'Upload video')
+      : config.kind === 'audio'
+        ? t('content_upload_audio', 'Upload audio')
+        : t('content_upload_image', 'Upload image'));
+    var uploadRow = document.createElement('div');
+    uploadRow.className = 'admin-settings__image-upload admin-content-block__media-upload';
+    var fileLabel = document.createElement('label');
+    fileLabel.className = 'btn btn--secondary btn--small';
+    fileLabel.textContent = options?.buttonLabel || labelText;
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = config.accept;
+    fileInput.dataset.contentIndex = String(index);
+    fileInput.dataset.contentAction = options?.action || 'select-media-upload';
+    fileInput.dataset.contentMediaKind = config.kind;
+    if (options?.imageIndex !== undefined) fileInput.dataset.contentImageIndex = String(options.imageIndex);
+    if (options?.field) fileInput.dataset.contentMediaField = options.field;
+    fileInput.setAttribute('aria-label', options?.buttonLabel || labelText);
+    fileLabel.append(fileInput);
+    var status = document.createElement('span');
+    status.id = 'admin-content-media-status-' + String(index) + '-' + String(collectionFieldIdCounter++);
+    status.className = 'admin-settings__image-status admin-content-block__media-status';
+    status.setAttribute('role', 'status');
+    fileInput.setAttribute('aria-describedby', status.id);
+    var target = options?.imageIndex !== undefined ? block.images?.[options.imageIndex] : block;
+    var pending = pendingUploadForContentField(target, options?.field || 'src');
+    if (pending) {
+      status.textContent = t('content_media_selected', '%{name} selected. Publish to upload it.', {
+        name: pending.name || t('content_media_file', 'File')
+      });
+    }
+    uploadRow.append(fileLabel, status);
+    if (!options?.hideLabel) {
+      var label = document.createElement('span');
+      label.textContent = labelText;
+      wrap.append(label);
+    }
+    wrap.append(uploadRow);
     return wrap;
   }
 
   function createGalleryImageInput(tagName, block, index, imageIndex, field, labelText, options) {
-    var wrap = document.createElement('label');
+    var wrap = document.createElement('div');
     wrap.className = 'admin-content-block__field';
-    var label = document.createElement('span');
-    label.textContent = labelText;
+    var controlId = 'admin-content-gallery-field-' + String(index) + '-' + String(imageIndex) + '-' + String(field || 'field') + '-' + (++collectionFieldIdCounter);
     var control = document.createElement(tagName);
+    control.id = controlId;
     control.dataset.contentIndex = String(index);
     control.dataset.contentImageIndex = String(imageIndex);
     control.dataset.contentField = field;
     control.value = String(block.images?.[imageIndex]?.[field] || '');
     if (tagName === 'textarea') control.rows = options?.rows || 3;
     if (options?.placeholder) control.placeholder = options.placeholder;
-    wrap.append(label, control);
+    var labelInfo = createProductLabelRow(labelText, options?.help || '', controlId, { htmlFor: controlId });
+    if (labelInfo.helpId) appendDescribedBy(control, labelInfo.helpId);
+    wrap.append(labelInfo.row, control);
     return wrap;
   }
 
   function createGalleryImageCaptionInput(block, index, imageIndex) {
     var wrap = document.createElement('div');
     wrap.className = 'admin-content-block__field';
-    var label = document.createElement('span');
-    label.textContent = t('content_field_hover_caption', 'Hover caption');
+    var labelId = 'admin-content-gallery-caption-' + String(index) + '-' + String(imageIndex) + '-' + String(collectionFieldIdCounter++);
+    var labelInfo = createProductLabelRow(
+      t('content_field_hover_caption', 'Hover caption'),
+      t('content_field_hover_caption_help', 'Optional caption shown over this gallery image. Supports bold, italic, and underline.'),
+      labelId,
+      { labelId: labelId + '-label' }
+    );
     var control = createInlineRichTextInput({
       label: t('content_field_hover_caption', 'Hover caption'),
       toolbarLabel: t('content_field_hover_caption_formatting', 'Caption text styling'),
@@ -5129,7 +5368,13 @@
     control.dataset.contentIndex = String(index);
     control.dataset.contentImageIndex = String(imageIndex);
     control.dataset.contentField = 'caption';
-    wrap.append(label, control);
+    var editor = control.querySelector('[role="textbox"]');
+    if (editor instanceof HTMLElement) {
+      editor.id = labelId + '-control';
+      editor.setAttribute('aria-labelledby', labelInfo.label.id);
+      appendDescribedBy(editor, labelInfo.helpId);
+    }
+    wrap.append(labelInfo.row, control);
     return wrap;
   }
 
@@ -5347,38 +5592,77 @@
   }
 
   function renderMediaSettings(card, block, index) {
-    if (block.type === 'divider' || block.type === 'text' || block.type === 'quote' || block.type === 'gallery') return;
+    if (block.type === 'divider' || block.type === 'text' || block.type === 'quote') return;
     var editorId = contentBlocksRoot?.dataset?.contentEditorId || 'campaign';
     var panelId = 'admin-content-media-settings-' + editorId + '-' + index;
+    var settingsLabel = block.type === 'gallery'
+      ? t('content_gallery_settings', 'Gallery settings')
+      : t('content_media_settings', 'Media settings');
     var button = document.createElement('button');
     button.type = 'button';
     button.className = 'btn btn--secondary btn--small admin-content-block__settings-button';
+    if (block.type === 'gallery') button.classList.add('admin-content-block__settings-button--gallery-block');
     button.dataset.contentIndex = String(index);
     button.dataset.contentAction = 'toggle-media-settings';
     button.setAttribute('aria-controls', panelId);
     button.setAttribute('aria-expanded', 'false');
-    button.setAttribute('aria-label', t('content_media_settings', 'Media settings'));
+    button.setAttribute('aria-label', settingsLabel);
     button.append(createIcon('settings'));
     var panel = document.createElement('div');
     panel.id = panelId;
     panel.className = 'admin-content-block__settings-panel';
+    if (block.type === 'gallery') panel.classList.add('admin-content-block__settings-panel--gallery-block');
     panel.dataset.contentMediaSettings = String(index);
     panel.setAttribute('role', 'group');
     panel.hidden = true;
     var heading = document.createElement('h3');
     heading.id = panelId + '-title';
-    heading.textContent = t('content_media_settings', 'Media settings');
+    heading.textContent = settingsLabel;
     panel.setAttribute('aria-labelledby', heading.id);
     panel.append(heading);
     var fields = document.createElement('div');
     fields.className = 'admin-content-block__fields';
     if (block.type === 'image') {
       fields.append(
-        createContentInput('input', block, index, 'src', t('content_field_src', 'Source URL or path')),
-        createContentInput('input', block, index, 'alt', t('content_field_alt', 'Alt text'))
+        createContentMediaUploadInput(block, index, {
+          kind: 'image',
+          label: t('content_upload_image', 'Upload image'),
+          hideLabel: true
+        }),
+        createContentInput('input', block, index, 'src', t('content_field_src', 'Source URL'), {
+          help: t('content_field_src_help', 'Use an internal uploaded asset path, such as /assets/images/campaigns/example/image.jpg. External image URLs are not supported for this content block.')
+        }),
+        createContentInput('input', block, index, 'alt', t('content_field_alt', 'Alt text'), {
+          help: t('content_field_alt_help', 'Describe the meaningful content of the image for screen readers and people browsing without images.')
+        })
+      );
+    } else if (block.type === 'gallery') {
+      fields.append(
+        createContentInput('select', block, index, 'layout', t('content_field_gallery_layout', 'Gallery layout'), {
+          help: t('content_field_gallery_layout_help', 'Choose how gallery images are arranged on the campaign page.'),
+          options: [
+            { value: 'grid', label: t('content_gallery_layout_grid', 'Grid') },
+            { value: 'carousel', label: t('content_gallery_layout_carousel', 'Carousel') }
+          ]
+        }),
+        createContentInput('select', block, index, 'caption_style', t('content_field_gallery_caption_style', 'Caption style'), {
+          help: t('content_field_gallery_caption_style_help', 'Choose whether gallery captions appear below images or as overlays.'),
+          options: [
+            { value: 'inline', label: t('content_gallery_caption_inline', 'Inline') },
+            { value: 'overlay', label: t('content_gallery_caption_overlay', 'Overlay') }
+          ]
+        }),
+        createContentMediaUploadInput(block, index, {
+          action: 'add-gallery-image-upload',
+          kind: 'image',
+          label: t('content_upload_gallery_image', 'Add gallery image'),
+          buttonLabel: t('content_upload_gallery_image', 'Add gallery image'),
+          hideLabel: true
+        })
       );
     } else if (block.type === 'video') {
       var providerInput = createContentInput('select', block, index, 'provider', t('content_field_provider', 'Provider'), {
+        help: t('content_field_provider_help', 'Choose whether this video embeds from YouTube/Vimeo or uses an uploaded video file.'),
         options: [
           { value: 'youtube', label: t('content_provider_youtube', 'YouTube') },
           { value: 'vimeo', label: t('content_provider_vimeo', 'Vimeo') },
@@ -5388,19 +5672,44 @@
       if (contentVideoProvider(block.provider) === 'local') {
         fields.append(
           providerInput,
-          createContentInput('input', block, index, 'src', t('content_field_video_src', 'Video file path')),
-          createContentInput('input', block, index, 'poster', t('content_field_poster', 'Poster image path'))
+          createContentMediaUploadInput(block, index, {
+            kind: 'video',
+            label: t('content_upload_video', 'Upload video'),
+            hideLabel: true
+          }),
+          createContentInput('input', block, index, 'src', t('content_field_video_src', 'Source URL'), {
+            help: t('content_field_video_src_help', 'Use an internal uploaded video path from this dashboard, such as /assets/videos/campaigns/example/video.webm.')
+          }),
+          createContentMediaUploadInput(block, index, {
+            action: 'select-media-upload',
+            field: 'poster',
+            kind: 'image',
+            label: t('content_upload_poster_image', 'Upload poster image'),
+            buttonLabel: t('content_upload_poster_image', 'Upload poster image'),
+            hideLabel: true
+          })
         );
       } else {
         fields.append(
           providerInput,
-          createContentInput('input', block, index, 'video_id', t('content_field_video_id', 'Video ID'))
+          createContentInput('input', block, index, 'video_id', t('content_field_video_id', 'Video ID'), {
+            help: t('content_field_video_id_help', 'For YouTube, use the value after v= or the embed/shorts ID. For Vimeo, use the numeric video ID.')
+          })
         );
       }
     } else if (block.type === 'audio') {
       fields.append(
-        createContentInput('input', block, index, 'src', t('content_field_src', 'Source URL or path')),
-        createContentInput('input', block, index, 'title', t('content_field_title', 'Title'))
+        createContentMediaUploadInput(block, index, {
+          kind: 'audio',
+          label: t('content_upload_audio', 'Upload audio'),
+          hideLabel: true
+        }),
+        createContentInput('input', block, index, 'src', t('content_field_src', 'Source URL'), {
+          help: t('content_field_audio_src_help', 'Use an internal uploaded audio path from this dashboard, such as /assets/audio/campaigns/example/audio.mp3.')
+        }),
+        createContentInput('input', block, index, 'title', t('content_field_title', 'Title'), {
+          help: t('content_field_audio_title_help', 'Short title shown above the audio player. It helps people identify what they are about to play.')
+        })
       );
     } else if (block.type === 'embed') {
       fields.append(
@@ -5439,7 +5748,21 @@
     panel.setAttribute('aria-labelledby', heading.id);
     var fields = document.createElement('div');
     fields.className = 'admin-content-block__fields';
-    fields.append(createGalleryImageCaptionInput(block, index, imageIndex));
+    fields.append(
+      createContentMediaUploadInput(block, index, {
+        kind: 'image',
+        imageIndex: imageIndex,
+        label: t('content_upload_image', 'Upload image'),
+        hideLabel: true
+      }),
+      createGalleryImageInput('input', block, index, imageIndex, 'src', t('content_field_src', 'Source URL'), {
+        help: t('content_field_src_help', 'Use an internal uploaded asset path, such as /assets/images/campaigns/example/image.jpg. External image URLs are not supported for this content block.')
+      }),
+      createGalleryImageInput('input', block, index, imageIndex, 'alt', t('content_field_alt', 'Alt text'), {
+        help: t('content_field_alt_help', 'Describe the meaningful content of the image for screen readers and people browsing without images.')
+      }),
+      createGalleryImageCaptionInput(block, index, imageIndex)
+    );
     panel.append(heading, fields);
     galleryItem.append(button, panel);
   }
@@ -5463,9 +5786,10 @@
       card.append(createEditable('p', block, index, 'text', t('content_field_text', 'Quote text'), 'admin-content-block__editable admin-content-block__editable--quote'));
       card.append(createEditable('cite', block, index, 'author', t('content_field_author', 'Author'), 'admin-content-block__editable admin-content-block__editable--cite'));
     } else if (block.type === 'image') {
-      if (block.src) {
+      var imageSrc = contentMediaPreviewSource(block);
+      if (imageSrc) {
         var image = document.createElement('img');
-        image.src = block.src;
+        image.src = mediaPreviewUrl(imageSrc);
         image.alt = block.alt || '';
         image.loading = 'lazy';
         card.append(image);
@@ -5483,7 +5807,7 @@
           galleryItem.className = 'gallery__item';
           galleryItem.dataset.contentImageIndex = String(imageIndex);
           var image = document.createElement('img');
-          image.src = item.src || '';
+          image.src = mediaPreviewUrl(contentMediaPreviewSource(item));
           image.alt = item.alt || '';
           image.loading = 'lazy';
           galleryItem.append(image);
@@ -5499,18 +5823,20 @@
       renderMediaSettings(card, block, index);
     } else if (block.type === 'video') {
       var provider = contentVideoProvider(block.provider);
-      if (provider === 'local' && block.src) {
+      var localVideoSrc = contentMediaPreviewSource(block);
+      if (provider === 'local' && localVideoSrc) {
         var localVideo = document.createElement('div');
         localVideo.className = 'video-embed video-embed--local';
         var videoElement = document.createElement('video');
         videoElement.controls = true;
         videoElement.preload = 'none';
         videoElement.playsInline = true;
-        if (block.poster) videoElement.poster = block.poster;
+        var posterSrc = contentMediaPreviewSource(block, 'poster');
+        if (posterSrc) videoElement.poster = mediaPreviewUrl(posterSrc);
         else videoElement.setAttribute('data-first-frame-poster', 'true');
         var videoSource = document.createElement('source');
-        videoSource.src = block.src;
-        var sourceType = contentVideoSourceType(block.src);
+        videoSource.src = mediaPreviewUrl(localVideoSrc);
+        var sourceType = contentVideoSourceType(localVideoSrc) || block._pendingUpload?.type || '';
         if (sourceType) videoSource.type = sourceType;
         videoElement.append(videoSource);
         localVideo.append(videoElement);
@@ -5525,6 +5851,9 @@
           : 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(block.video_id);
         iframe.loading = 'lazy';
         iframe.title = block.caption || t('content_video_title', 'Video');
+        iframe.allow = provider === 'vimeo'
+          ? 'autoplay; fullscreen; picture-in-picture'
+          : 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
         video.append(iframe);
         card.append(video);
       } else {
@@ -5541,13 +5870,15 @@
         title.textContent = block.title;
         audioWrap.append(title);
       }
-      if (block.src) {
+      var audioSrc = contentMediaPreviewSource(block);
+      if (audioSrc) {
         var audio = document.createElement('audio');
         audio.controls = true;
         audio.preload = 'metadata';
         var source = document.createElement('source');
-        source.src = block.src;
-        source.type = 'audio/mpeg';
+        source.src = mediaPreviewUrl(audioSrc);
+        var audioSourceType = contentAudioSourceType(audioSrc) || block._pendingUpload?.type || '';
+        if (audioSourceType) source.type = audioSourceType;
         audio.append(source);
         audioWrap.append(audio);
       } else {
@@ -5590,6 +5921,7 @@
 
   function renderContentBlocks(focusIndex) {
     if (!contentBlocksRoot) return;
+    contentBlocksRoot.__contentBlocks = contentBlocks;
     contentBlocksRoot.replaceChildren();
     if (!contentBlocks.length) contentBlocks = [defaultContentBlock('text')];
     contentBlocksRoot.append(createContentInsertControl(0));
@@ -5608,6 +5940,97 @@
     if (typeof focusIndex === 'number') {
       contentBlocksRoot.querySelector('[data-content-index="' + focusIndex + '"][data-content-field]')?.focus();
     }
+  }
+
+  function contentMediaUploadTarget(control) {
+    var index = Number(control?.dataset?.contentIndex);
+    var block = contentBlocks[index];
+    if (!block) return null;
+    var field = control?.dataset?.contentMediaField || 'src';
+    if (control.dataset.contentAction === 'add-gallery-image-upload') {
+      if (block.type !== 'gallery') return null;
+      if (!Array.isArray(block.images)) block.images = [];
+      var image = { src: '', alt: '', caption: '' };
+      block.images.push(image);
+      return { block: block, target: image, index: index, imageIndex: block.images.length - 1, field: 'src' };
+    }
+    if (control.dataset.contentImageIndex !== undefined && block.type === 'gallery') {
+      var imageIndex = Number(control.dataset.contentImageIndex);
+      if (!Number.isInteger(imageIndex) || !block.images?.[imageIndex]) return null;
+      return { block: block, target: block.images[imageIndex], index: index, imageIndex: imageIndex, field: 'src' };
+    }
+    return { block: block, target: block, index: index, field: field };
+  }
+
+  function contentUploadFilenameBase(block, meta, file) {
+    var base = '';
+    if (meta?.field === 'poster') {
+      base = 'content-poster-' + String((meta?.index || 0) + 1);
+    } else if (meta?.type === 'gallery-image') {
+      base = 'gallery-' + String(meta.index + 1) + '-image-' + String((meta.imageIndex || 0) + 1);
+    } else if (block?.type === 'video') {
+      base = 'content-video-' + String((meta?.index || 0) + 1);
+    } else if (block?.type === 'audio') {
+      base = 'content-audio-' + String((meta?.index || 0) + 1);
+    } else {
+      base = 'content-image-' + String((meta?.index || 0) + 1);
+    }
+    var original = String(file?.name || '').trim().replace(/\.[a-z0-9]+$/i, '');
+    return original || base;
+  }
+
+  function selectPendingContentMedia(control) {
+    if (!(control instanceof HTMLInputElement)) return;
+    var file = control.files && control.files[0];
+    if (!file) return;
+    var config = contentMediaUploadConfig(control.dataset.contentMediaKind || 'image');
+    var kind = config.kind;
+    var status = control.closest('.admin-content-block__media-upload')?.querySelector('.admin-content-block__media-status');
+    if (!config.allowedTypes.includes(file.type)) {
+      setText(status, config.typeErrorText);
+      control.value = '';
+      return;
+    }
+    if (file.size > config.maxBytes) {
+      setText(status, config.sizeErrorText);
+      control.value = '';
+      return;
+    }
+    pushContentHistory();
+    var resolved = contentMediaUploadTarget(control);
+    if (!resolved) {
+      contentHistory.pop();
+      control.value = '';
+      return;
+    }
+    clearPendingContentUpload(resolved.target, resolved.field);
+    var previewUrl = URL.createObjectURL(file);
+    setPendingUploadForContentField(resolved.target, resolved.field, {
+      id: 'content-upload-' + String(++pendingContentUploadCounter),
+      kind: kind,
+      name: file.name || t('content_media_file', 'File'),
+      type: file.type,
+      size: file.size,
+      file: file,
+      previewUrl: previewUrl,
+      filenameBase: contentUploadFilenameBase(resolved.block, {
+        index: resolved.index,
+        imageIndex: resolved.imageIndex,
+        field: resolved.field,
+        type: resolved.imageIndex !== undefined ? 'gallery-image' : resolved.field === 'poster' ? 'poster-image' : resolved.block?.type
+      }, file)
+    });
+    if (kind === 'video' && resolved.field === 'src' && resolved.block?.type === 'video') {
+      resolved.block.provider = 'local';
+    }
+    lastContentMutation = 'field';
+    syncContentJsonFromBlocks();
+    renderContentBlocks(resolved.index);
+    writeContentDraft({ schedulePreview: false });
+    setText(contentStatus, t('content_media_selected', '%{name} selected. Publish to upload it.', {
+      name: file.name || t('content_media_file', 'File')
+    }));
+    control.value = '';
   }
 
   function updateContentBlockField(control) {
@@ -5629,6 +6052,7 @@
       block.provider = contentVideoProvider(control.value);
       syncContentJsonFromBlocks();
       renderContentBlocks(index);
+      openContentMediaSettings(index);
       return;
     } else if (control.isContentEditable) {
       block[field] = field === 'body' ? editorHtmlToMarkdown(control) : nodeToMarkdown(control).trim();
@@ -5919,6 +6343,28 @@
     });
   }
 
+  function openContentMediaSettings(index) {
+    var block = contentBlocksRoot?.querySelector?.('.admin-content-block[data-content-index="' + index + '"]');
+    var button = block?.querySelector?.('[data-content-action="toggle-media-settings"]');
+    if (!(button instanceof HTMLButtonElement)) return;
+    var panelId = button.getAttribute('aria-controls');
+    var panel = panelId ? document.getElementById(panelId) : null;
+    if (!(panel instanceof HTMLElement)) return;
+    panel.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+  }
+
+  function firstContentSettingsFocusTarget(panel) {
+    if (!(panel instanceof HTMLElement)) return null;
+    return Array.from(panel.querySelectorAll('input, textarea, select, button')).find(function(control) {
+      if (!(control instanceof HTMLElement)) return false;
+      if (control.classList.contains('admin-settings__help-button')) return false;
+      if (control instanceof HTMLInputElement && control.type === 'file') return false;
+      if (control.hasAttribute('disabled') || control.getAttribute('aria-hidden') === 'true') return false;
+      return true;
+    }) || null;
+  }
+
   function toggleMediaSettings(button) {
     if (!(button instanceof HTMLButtonElement)) return;
     var panelId = button.getAttribute('aria-controls');
@@ -5929,7 +6375,7 @@
     panel.hidden = !opening;
     button.setAttribute('aria-expanded', opening ? 'true' : 'false');
     if (opening) {
-      panel.querySelector('input, textarea, select, button')?.focus();
+      firstContentSettingsFocusTarget(panel)?.focus();
     } else {
       button.blur();
       deactivateContentBlocks(contentBlocksRoot);
@@ -6036,7 +6482,8 @@
       campaignSlug: selectedContentCampaignSlug(),
       title: contentTitleField?.value || '',
       shortBlurb: contentShortBlurb?.value || '',
-      longContent: contentBlocksSnapshot(contentBlocks)
+      longContent: contentBlocksSnapshot(contentBlocks),
+      pendingMedia: contentPendingUploadsSnapshot(contentBlocks)
     });
   }
 
@@ -6058,9 +6505,9 @@
   function syncActiveDiaryContentField() {
     if (!(activeDiaryContentField instanceof HTMLTextAreaElement)) return false;
     syncContentJsonFromBlocks();
-    activeDiaryContentField.value = JSON.stringify(contentBlocks, null, 2);
+    activeDiaryContentField.value = JSON.stringify(serializableContentBlocks(contentBlocks), null, 2);
     activeDiaryContentField.dispatchEvent(new Event('change', { bubbles: true }));
-    markDiaryEditorDirty(contentBlocksRoot, contentBlocksSnapshot(contentBlocks) !== (activeDiaryContentField.dataset.diaryDraftOriginal || contentBlocksSnapshot([])));
+    markDiaryEditorDirty(contentBlocksRoot, contentEditorDirtySnapshot(contentBlocks) !== (activeDiaryContentField.dataset.diaryDraftOriginal || contentEditorDirtySnapshot([])));
     updateAdminDirtyIndicatorsSoon();
     return true;
   }
@@ -6093,7 +6540,7 @@
         campaignSlug: slug,
         title: contentTitleField?.value || '',
         shortBlurb: contentShortBlurb?.value || '',
-        longContent: contentBlocks
+        longContent: serializableContentBlocks(contentBlocks)
       }));
     } catch (_error) {
     }
@@ -6122,6 +6569,7 @@
       contentBlocks = [];
       setText(contentStatus, t('content_json_invalid', 'Content blocks must be valid JSON.'));
     }
+    if (contentBlocksRoot) contentBlocksRoot.__contentBlocks = contentBlocks;
     renderContentBlocks();
     resetContentDirtyBaseline();
   }
@@ -6138,8 +6586,10 @@
 
   function readContentEditorDraft() {
     syncContentMetadataFromSettings();
-    var longContent = parseContentBlocks(contentLongContent?.value || contentBlocks);
-    contentBlocks = longContent;
+    var sourceBlocks = Array.isArray(contentBlocks) && contentBlocks.length
+      ? serializableContentBlocks(contentBlocks)
+      : contentLongContent?.value || [];
+    var longContent = parseContentBlocks(sourceBlocks);
     syncContentJsonFromBlocks();
     return {
       campaignSlug: selectedContentCampaignSlug(),
@@ -6229,6 +6679,11 @@
       if (!options?.silent) setText(contentStatus, currentCampaigns.length ? '' : t('no_campaigns', 'No campaigns are available for this admin account.'));
       return;
     }
+    if (hasPendingContentUploads(contentBlocks)) {
+      renderContentValidation({});
+      if (!options?.silent) setText(contentStatus, t('content_preview_pending_media', 'Selected media is previewing in the editor. Publish to upload it and refresh the mobile preview.'));
+      return;
+    }
 
     var requestId = ++contentPreviewRequestId;
     writeContentDraft({ schedulePreview: false });
@@ -6255,6 +6710,91 @@
     }
   }
 
+  function pendingContentUploadFieldPath(meta, context) {
+    var field = meta?.field || 'src';
+    if (context?.collection === 'diary') {
+      var entry = context.entryIndex !== undefined ? String(context.entryIndex) : 'entry';
+      if (meta?.imageIndex !== undefined) return 'diary[' + entry + '].content[' + meta.index + '].images[' + meta.imageIndex + '].src';
+      return 'diary[' + entry + '].content[' + meta.index + '].' + field;
+    }
+    if (meta?.imageIndex !== undefined) return 'long_content[' + meta.index + '].images[' + meta.imageIndex + '].src';
+    return 'long_content[' + meta.index + '].' + field;
+  }
+
+  async function uploadPendingContentMedia(blocks, campaignSlug, context) {
+    var uploads = pendingContentUploads(blocks);
+    for (var i = 0; i < uploads.length; i += 1) {
+      var item = uploads[i];
+      var pending = item.pending || {};
+      var file = pending.file;
+      if (!file) {
+        throw new Error(t('content_media_reselect_required', 'Select the media file again before publishing.'));
+      }
+      var kind = pending.kind === 'video' || pending.kind === 'audio' ? pending.kind : 'image';
+      var uploadPath = kind === 'video'
+        ? '/admin/settings/video-upload'
+        : kind === 'audio'
+          ? '/admin/settings/audio-upload'
+          : '/admin/settings/image-upload';
+      var result = await requestJson(uploadPath, {
+        method: 'POST',
+        body: JSON.stringify({
+          filename: file.name || pending.name || (kind === 'video' ? 'content-video' : kind === 'audio' ? 'content-audio' : 'content-image'),
+          contentType: file.type || pending.type || '',
+          content: await readFileAsDataUrl(file),
+          kind: kind === 'video' ? 'campaign-content-video' : kind === 'audio' ? 'campaign-content-audio' : 'campaign-content',
+          campaignSlug: campaignSlug || selectedContentCampaignSlug(),
+          collection: context?.collection || 'content',
+          fieldPath: pendingContentUploadFieldPath(item.meta, context),
+          filenameBase: pending.filenameBase || ''
+        })
+      });
+      item.target[item.meta?.field || 'src'] = result.path || '';
+      clearPendingContentUpload(item.target, item.meta?.field || 'src');
+    }
+    return uploads.length;
+  }
+
+  async function uploadPendingMainContentMedia(draft) {
+    if (!hasPendingContentUploads(contentBlocks)) return 0;
+    setText(contentStatus, t('content_media_uploading', 'Uploading selected media...'));
+    var count = await uploadPendingContentMedia(contentBlocks, draft.campaignSlug, { collection: 'content' });
+    syncContentJsonFromBlocks();
+    writeContentDraft({ schedulePreview: false });
+    return count;
+  }
+
+  function pendingDiaryContentEditors(root) {
+    return Array.from((root || campaignSettingsRoot)?.querySelectorAll?.('[data-diary-content-editor]') || []).filter(function(editor) {
+      return editor instanceof HTMLElement && hasPendingContentUploads(editor.__contentBlocks || []);
+    });
+  }
+
+  async function uploadPendingDiaryContentMedia(root, statusNode) {
+    var editors = pendingDiaryContentEditors(root);
+    var count = 0;
+    for (var i = 0; i < editors.length; i += 1) {
+      var editor = editors[i];
+      var field = editor.closest('.admin-settings__diary-content-control')?.querySelector('[data-collection-field="contentJson"]');
+      if (!(field instanceof HTMLTextAreaElement)) continue;
+      var card = editor.closest('[data-campaign-collection-card]');
+      var collectionRoot = editor.closest('[data-settings-path]');
+      var campaignSlug = collectionRoot?.dataset?.settingsCampaign || selectedContentCampaignSlug();
+      setText(statusNode, t('content_media_uploading', 'Uploading selected media...'));
+      var blocks = editor.__contentBlocks || contentBlocksFromField(field);
+      count += await uploadPendingContentMedia(blocks, campaignSlug, {
+        collection: 'diary',
+        entryIndex: card ? Array.from(card.parentElement?.querySelectorAll('[data-campaign-collection-card]') || []).indexOf(card) : i
+      });
+      editor.__contentBlocks = blocks;
+      field.value = JSON.stringify(serializableContentBlocks(blocks), null, 2);
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+      field.dataset.diaryDraftOriginal = contentEditorDirtySnapshot(field.value);
+      markDiaryEditorDirty(editor, false);
+    }
+    return count;
+  }
+
   async function publishContentDraft() {
     if (activeDiaryContentField instanceof HTMLTextAreaElement) {
       syncActiveDiaryContentField();
@@ -6279,6 +6819,8 @@
     writeContentDraft();
     setText(contentStatus, t('content_publishing', 'Publishing content...'));
     try {
+      await uploadPendingMainContentMedia(draft);
+      draft = readContentEditorDraft();
       var data = await requestJson('/admin/content/publish', {
         method: 'POST',
         body: JSON.stringify({
@@ -6308,13 +6850,17 @@
   async function publishCampaignChanges() {
     var statusNode = campaignStatus || contentStatus;
     var campaignSettingsChanges = collectCampaignSettingsChanges();
-    if (!campaignSettingsChanges.length && !contentHasUnsavedChanges) {
+    var pendingDiaryMedia = pendingDiaryContentEditors(campaignSettingsRoot).length > 0;
+    if (!campaignSettingsChanges.length && !pendingDiaryMedia && !contentHasUnsavedChanges) {
       setText(statusNode, t('settings_no_changes', 'No settings changes to publish.'));
       updateDirtyIndicators();
       return;
     }
-    if (campaignSettingsChanges.length) {
-      var settingsPublished = await publishSettingsChanges(statusNode, campaignSettingsChanges);
+    if (campaignSettingsChanges.length || pendingDiaryMedia) {
+      var settingsPublished = await publishSettingsChanges(statusNode, campaignSettingsChanges, {
+        roots: campaignSettingsRoot ? [campaignSettingsRoot] : [],
+        uploadPendingDiaryMedia: true
+      });
       if (!settingsPublished) return;
     }
     if (contentHasUnsavedChanges) {
@@ -7212,6 +7758,8 @@
           changeContentBlockType(Number(control.dataset.contentIndex), control.value);
         } else if (control instanceof HTMLSelectElement && control.dataset.contentAction === 'format-block') {
           applyContentBlockFormat(control.value);
+        } else if (control instanceof HTMLInputElement && ['select-media-upload', 'add-gallery-image-upload'].includes(control.dataset.contentAction || '')) {
+          selectPendingContentMedia(control);
         } else if (control instanceof HTMLInputElement && control.dataset.contentAction === 'link-url') {
           applyContentLinkPanel(control);
         } else if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement) {

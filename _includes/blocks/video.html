@@ -21,8 +21,7 @@
       <iframe 
         src="https://player.vimeo.com/video/{{ block.video_id | uri_escape | escape }}?dnt=1"
         frameborder="0" 
-        allow="autoplay; fullscreen; picture-in-picture" 
-        allowfullscreen
+        allow="autoplay; fullscreen; picture-in-picture"
         loading="lazy"
         title="{{ block.caption | default: 'Video' | strip_html | escape }}">
       </iframe>
@@ -30,8 +29,7 @@
       <iframe 
         src="https://www.youtube-nocookie.com/embed/{{ block.video_id | uri_escape | escape }}"
         frameborder="0" 
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-        allowfullscreen
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
         loading="lazy"
         title="{{ block.caption | default: 'Video' | strip_html | escape }}">
       </iframe>

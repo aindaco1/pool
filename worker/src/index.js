@@ -128,6 +128,7 @@ const SHARE_CARD_RASTER_HEIGHT = 630;
 const MAX_STANDARD_JSON_BODY_BYTES = 64 * 1024;
 const MAX_ADMIN_LOGO_UPLOAD_BODY_BYTES = 1024 * 1024;
 const MAX_ADMIN_IMAGE_UPLOAD_BODY_BYTES = 12 * 1024 * 1024;
+const MAX_ADMIN_AUDIO_UPLOAD_BODY_BYTES = 36 * 1024 * 1024;
 const MAX_ADMIN_VIDEO_UPLOAD_BODY_BYTES = 140 * 1024 * 1024;
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 256 * 1024;
 const RATELIMIT_REQUIRED_ERROR = 'Rate limit storage not configured';
@@ -3417,6 +3418,10 @@ export default {
 
       if (path === '/admin/settings/image-upload' && method === 'POST') {
         return handleAdminImageUpload(request, env);
+      }
+
+      if (path === '/admin/settings/audio-upload' && method === 'POST') {
+        return handleAdminAudioUpload(request, env);
       }
 
       if (path === '/admin/settings/video-upload' && method === 'POST') {
@@ -11099,6 +11104,9 @@ function adminUploadBaseName(body = {}, extension = '') {
     ['progress_background', 'progress']
   ]);
   if (fieldMap.has(fieldPath)) return fieldMap.get(fieldPath);
+  if (kind === 'campaign-content-video') return contextSlug.startsWith('content-video-') ? contextSlug : `content-video-${contextSlug}`;
+  if (kind === 'campaign-content-audio') return contextSlug.startsWith('content-audio-') ? contextSlug : `content-audio-${contextSlug}`;
+  if (kind === 'campaign-content') return contextSlug.startsWith('content-') ? contextSlug : `content-${contextSlug}`;
   if (kind === 'decision-option') return `decision-option-${contextSlug}`;
   if (kind === 'campaign-add-on') return `add-on-${contextSlug}`;
   if (kind === 'add-on') return `add-on-${contextSlug}`;
@@ -11116,6 +11124,9 @@ function adminUploadDirectory(body = {}, options = {}) {
   const campaignSlug = normalizeAdminUploadCampaignSlug(body.campaignSlug);
   if (contentType.startsWith('video/')) {
     return campaignSlug ? `assets/videos/campaigns/${campaignSlug}` : 'assets/videos/defaults';
+  }
+  if (contentType.startsWith('audio/')) {
+    return campaignSlug ? `assets/audio/campaigns/${campaignSlug}` : 'assets/audio/defaults';
   }
   if (kind === 'add-on') {
     return campaignSlug ? 'assets/images/campaign-add-ons' : 'assets/images/add-ons';
@@ -11137,6 +11148,32 @@ function adminUploadProcessingSummary(contentType, extension) {
       ? (extension === 'webm' ? 'already-webm' : 'source-preserved')
       : 'not-video'
   };
+}
+
+const ADMIN_CAMPAIGN_MEDIA_UPLOAD_KINDS = new Set([
+  'campaign',
+  'campaign-video',
+  'campaign-content',
+  'campaign-content-video',
+  'campaign-content-audio',
+  'campaign-add-on',
+  'campaign-item',
+  'decision-option'
+]);
+
+function adminMediaUploadScope(body = {}) {
+  const kind = String(body.kind || '').trim().toLowerCase();
+  const campaignSlug = String(body.campaignSlug || '').trim();
+  if (ADMIN_CAMPAIGN_MEDIA_UPLOAD_KINDS.has(kind)) {
+    if (!campaignSlug) {
+      return { ok: false, error: 'Campaign media uploads require a campaign slug.' };
+    }
+    if (!isValidSlug(campaignSlug)) {
+      return { ok: false, error: 'Campaign media upload references an invalid campaign slug.' };
+    }
+    return { ok: true, permission: 'campaign:edit_content', campaignSlug };
+  }
+  return { ok: true, permission: 'settings:publish', campaignSlug: '' };
 }
 
 function normalizeAdminMediaUpload(body = {}, options = {}) {
@@ -11189,10 +11226,25 @@ async function handleAdminMediaUpload(request, env, options = {}) {
   });
   if (!parsedBody.ok) return parsedBody.response;
 
-  const auth = await requireAdminSession(request, env, 'settings:publish', { requireCsrf: true });
+  const body = parsedBody.body || {};
+  const uploadScope = adminMediaUploadScope(body);
+  const authPermission = uploadScope.ok ? uploadScope.permission : 'campaign:read';
+  const auth = await requireAdminSession(request, env, authPermission, {
+    requireCsrf: true,
+    ...(uploadScope.ok && uploadScope.campaignSlug ? { campaignSlug: uploadScope.campaignSlug } : {})
+  });
   if (!auth.ok) return auth.response;
+  if (!uploadScope.ok) {
+    return privateJsonResponse({ error: uploadScope.error }, 400, env);
+  }
+  if (auth.user.role !== 'super_admin' && uploadScope.campaignSlug) {
+    const campaign = await getCampaign(env, uploadScope.campaignSlug);
+    if (!campaign) {
+      return privateJsonResponse({ error: 'Campaign media upload references an unknown campaign.' }, 404, env);
+    }
+  }
 
-  const normalized = normalizeAdminMediaUpload(parsedBody.body || {}, options);
+  const normalized = normalizeAdminMediaUpload(body, options);
   if (!normalized.ok) {
     return privateJsonResponse({ error: normalized.error }, 400, env);
   }
@@ -11258,6 +11310,29 @@ function handleAdminImageUpload(request, env) {
     typeError: 'Image upload must be a PNG, JPEG, WebP, or GIF image.',
     sizeError: 'Image upload must be 8 MB or smaller.',
     commitLabel: 'admin image'
+  });
+}
+
+function handleAdminAudioUpload(request, env) {
+  return handleAdminMediaUpload(request, env, {
+    label: 'Audio upload',
+    defaultFilename: 'audio',
+    directory: 'assets/audio/defaults',
+    maxBodyBytes: MAX_ADMIN_AUDIO_UPLOAD_BODY_BYTES,
+    maxFileBytes: 25 * 1024 * 1024,
+    allowedTypes: new Map([
+      ['audio/mpeg', 'mp3'],
+      ['audio/mp3', 'mp3'],
+      ['audio/mp4', 'm4a'],
+      ['audio/aac', 'aac'],
+      ['audio/ogg', 'ogg'],
+      ['audio/wav', 'wav'],
+      ['audio/x-wav', 'wav'],
+      ['audio/webm', 'webm']
+    ]),
+    typeError: 'Audio upload must be an MP3, M4A, WAV, OGG, AAC, or WebM audio file.',
+    sizeError: 'Audio upload must be 25 MB or smaller.',
+    commitLabel: 'admin audio'
   });
 }
 
@@ -12317,8 +12392,8 @@ function renderAdminContentBlock(block, index, errors) {
       : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(block.video_id)}`;
     const allow = provider === 'vimeo'
       ? 'autoplay; fullscreen; picture-in-picture'
-      : 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-    return `<figure class="admin-content-preview__block admin-content-preview__block--video${adminContentAlignClass(block)}"><div class="video-embed video-embed--${provider}"><iframe src="${escapeAdminPreviewAttribute(src)}" title="${escapeAdminPreviewAttribute(title)}" loading="lazy" allow="${escapeAdminPreviewAttribute(allow)}" allowfullscreen></iframe></div>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+      : 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+    return `<figure class="admin-content-preview__block admin-content-preview__block--video${adminContentAlignClass(block)}"><div class="video-embed video-embed--${provider}"><iframe src="${escapeAdminPreviewAttribute(src)}" title="${escapeAdminPreviewAttribute(title)}" loading="lazy" allow="${escapeAdminPreviewAttribute(allow)}"></iframe></div>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
   }
 
   if (block.type === 'image') {

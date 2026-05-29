@@ -99,9 +99,10 @@ Admin mutations use these common protections:
 - When `TURNSTILE_SECRET_KEY` is configured, admin email sign-in requires a server-verified Cloudflare Turnstile token before rate-limit writes, login nonce writes, or magic-link email sends. `ADMIN_TURNSTILE_BYPASS=true` is accepted only in local/test mode or local URLs for automated testing.
 - Campaign users can mutate only campaigns in their assigned scope; super admins can mutate platform settings and all campaigns.
 - GitHub-backed settings are allowlisted through `ADMIN_PLATFORM_SETTING_SCHEMA` and `ADMIN_CAMPAIGN_SETTING_SCHEMA`. Unknown paths are rejected, and pseudo UI rows such as the campaign content editor cannot be mass-assigned through settings publishing.
+- Admin media uploads are scoped server-side by upload kind. Campaign media uploads require a valid campaign slug plus `campaign:edit_content`; platform/default media uploads require the super-admin `settings:publish` path. The Worker validates file type, size, destination directory, and filename before committing an asset path.
 - Runtime-only admin users are saved only to KV at `admin-users:v1`; they are not serialized into `_config.yml`.
 - Marketing referral codes are saved only on explicit user action and are scoped to the campaign URL origin/path the admin account can access.
-- The static admin shell uses a restrictive CSP with no inline scripts and `frame-ancestors 'none'`; preview iframes remain sandboxed and receive only Worker-rendered preview HTML.
+- The static admin shell uses a restrictive meta CSP with no inline scripts, limited Worker/API connections, and sandboxed preview iframes that receive only Worker-rendered preview HTML. Framing protection must be delivered as an HTTP header, such as `Content-Security-Policy: frame-ancestors 'none'` or `X-Frame-Options: DENY`; browsers ignore `frame-ancestors` inside meta CSP.
 - Admin magic-link emails use internally generated login URLs and strip email-header control characters from admin-configurable sender/subject values before sending.
 
 Admin field classes are normalized consistently:
@@ -460,12 +461,13 @@ The admin dashboard now validates every GitHub-backed and KV-backed dashboard wr
 Covered write paths:
 - `/admin/settings/preview` and `/admin/settings/publish`
 - `/admin/content/preview` and `/admin/content/publish`
+- `/admin/settings/logo-upload`, `/admin/settings/image-upload`, `/admin/settings/audio-upload`, and `/admin/settings/video-upload`
 - `/admin/users`
 - `/admin/marketing/referrals`
 
-The hardening rejects stored-XSS primitives such as raw `<script>`, event-handler attributes, unsafe Markdown links, parent-relative Markdown links, `javascript:`/`data:` URLs, CSS function/declaration injection, and unsafe asset paths. It also rejects settings mass assignment for dashboard-only rows and normalizes structured arrays for platform add-ons, campaign add-ons, tiers, support items, diary entries, stretch goals, ongoing items, and decisions.
+The hardening rejects stored-XSS primitives such as raw `<script>`, event-handler attributes, unsafe Markdown links, parent-relative Markdown links, `javascript:`/`data:` URLs, CSS function/declaration injection, and unsafe asset paths. It also rejects settings mass assignment for dashboard-only rows and normalizes structured arrays for platform add-ons, campaign add-ons, tiers, support items, diary entries, stretch goals, ongoing items, and decisions. Media uploads are role-scoped, content-type allowlisted, size-limited, and written only to canonical dashboard asset directories.
 
-The browser dashboard also has defense-in-depth hardening around the editing shell: the admin page CSP blocks framing with `frame-ancestors 'none'`, avoids inline scripts, limits Worker/API connections, and keeps content previews in sandboxed iframes. Magic-link email payloads strip CRLF/control characters from configurable header values before calling Resend so platform names or sender settings cannot create header-injection payloads.
+The browser dashboard also has defense-in-depth hardening around the editing shell: the admin page meta CSP avoids inline scripts, limits Worker/API connections, and keeps content previews in sandboxed iframes. Deployments should add framing protection through HTTP headers, such as `Content-Security-Policy: frame-ancestors 'none'` or `X-Frame-Options: DENY`, because meta CSP cannot enforce that directive. Magic-link email payloads strip CRLF/control characters from configurable header values before calling Resend so platform names or sender settings cannot create header-injection payloads.
 
 ---
 
@@ -562,4 +564,4 @@ If the on-site payment step completes but the pledge doesn't appear yet (common 
 
 ---
 
-_Last updated: May 25, 2026_
+_Last updated: May 28, 2026_
