@@ -357,6 +357,18 @@ function getShareCardMessages(preferredLang = DEFAULT_I18N_LANG) {
   };
 }
 
+function getShareCardProgressPercents(pledgedAmount, goalAmountCents) {
+  const pledged = Number(pledgedAmount || 0);
+  const goal = Number(goalAmountCents || 0);
+  const actual = goal > 0 && Number.isFinite(pledged) && Number.isFinite(goal)
+    ? Math.max(0, Math.round((pledged / goal) * 100))
+    : 0;
+  return {
+    actual,
+    visual: Math.min(100, actual)
+  };
+}
+
 async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState, isFunded, preferredLang }) {
   const siteBase = String(env?.SITE_BASE || '').replace(/\/$/, '');
   const title = trimSvgText(campaign?.title || campaign?.slug || 'Campaign', 48);
@@ -393,16 +405,14 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   const progressBackgroundDataUrl = await fetchImageAsDataUrl(progressBackgroundUrl);
   const pledgedAmount = Number(stats?.pledgedAmount || 0);
   const goalAmountCents = Number(campaign?.goal_amount || 0) * 100;
-  const progressPct = goalAmountCents > 0
-    ? Math.max(0, Math.min(100, Math.round((pledgedAmount / goalAmountCents) * 100)))
-    : 0;
+  const progressPct = getShareCardProgressPercents(pledgedAmount, goalAmountCents);
   const messages = getShareCardMessages(preferredLang);
   const panelLeft = 620;
   const progressWidth = 456;
   const goalMarkerOne = panelLeft + Math.round(progressWidth / 3);
   const goalMarkerTwo = panelLeft + Math.round((progressWidth * 2) / 3);
   const goalMarkerThree = panelLeft + progressWidth;
-  const progressHandleX = panelLeft + Math.round((progressWidth * progressPct) / 100);
+  const progressHandleX = panelLeft + Math.round((progressWidth * progressPct.visual) / 100);
   const handleX = Math.max(632, Math.min(goalMarkerThree, progressHandleX));
   const creatorY = 126;
   const metaGap = 32;
@@ -471,7 +481,7 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   <text x="${panelLeft}" y="${amountY}" fill="#697180" font-family="Inter, sans-serif" font-size="30" font-weight="700"><tspan fill="#11141c" font-size="42" font-weight="800">${escapeSvgText(formatSvgCurrencyFromCents(pledgedAmount))}</tspan><tspan dx="12">${escapeSvgText(messages.of)} ${escapeSvgText(formatSvgCurrencyFromCents(goalAmountCents))}</tspan></text>
   <rect x="${panelLeft}" y="${progressY}" width="${progressWidth}" height="18" rx="9" ry="9" fill="#e5e8ee" />
   ${progressBackgroundDataUrl ? `<image href="${escapeSvgText(progressBackgroundDataUrl)}" x="${panelLeft}" y="${progressY}" width="${progressWidth}" height="18" opacity="0.1" preserveAspectRatio="none" />` : ''}
-  <rect x="${panelLeft}" y="${progressY}" width="${Math.max(12, Math.round((progressWidth * progressPct) / 100))}" height="18" rx="9" ry="9" fill="url(#progressFill)" />
+  <rect x="${panelLeft}" y="${progressY}" width="${Math.max(12, Math.round((progressWidth * progressPct.visual) / 100))}" height="18" rx="9" ry="9" fill="url(#progressFill)" />
   <line x1="${goalMarkerOne}" y1="${progressY - 6}" x2="${goalMarkerOne}" y2="${progressY + 24}" stroke="#7d8695" stroke-width="2" opacity="0.55" />
   <line x1="${goalMarkerTwo}" y1="${progressY - 6}" x2="${goalMarkerTwo}" y2="${progressY + 24}" stroke="#7d8695" stroke-width="2" opacity="0.55" />
   <line x1="${goalMarkerThree}" y1="${progressY - 6}" x2="${goalMarkerThree}" y2="${progressY + 24}" stroke="#7d8695" stroke-width="2" opacity="0.55" />
@@ -479,7 +489,7 @@ async function buildCampaignShareCardSvg({ env, campaign, stats, effectiveState,
   <circle cx="${goalMarkerTwo}" cy="${progressY + 9}" r="8" fill="#ffffff" stroke="#657082" stroke-width="4" />
   <circle cx="${goalMarkerThree}" cy="${progressY + 9}" r="8" fill="#ffffff" stroke="#657082" stroke-width="4" />
   <circle cx="${handleX}" cy="${progressY + 9}" r="12" fill="#ffffff" stroke="#596273" stroke-width="6" />
-  <text x="${panelLeft}" y="${footerY}" fill="#596273" font-family="Inter, sans-serif" font-size="22" font-weight="700">${escapeSvgText(String(progressPct))}% ${escapeSvgText(messages.fundedPercent)}</text>
+  <text x="${panelLeft}" y="${footerY}" fill="#596273" font-family="Inter, sans-serif" font-size="22" font-weight="700">${escapeSvgText(String(progressPct.actual))}% ${escapeSvgText(messages.fundedPercent)}</text>
 </svg>`;
 }
 
@@ -816,9 +826,7 @@ function buildCampaignShareCardFallbackPng({ env, campaign, stats, effectiveStat
   const messages = getShareCardMessages(preferredLang);
   const pledgedAmount = Number(stats?.pledgedAmount || 0);
   const goalAmountCents = Number(campaign?.goal_amount || 0) * 100;
-  const progressPct = goalAmountCents > 0
-    ? Math.max(0, Math.min(100, Math.round((pledgedAmount / goalAmountCents) * 100)))
-    : 0;
+  const progressPct = getShareCardProgressPercents(pledgedAmount, goalAmountCents);
   const title = campaign?.title || campaign?.slug || 'Campaign';
   const creator = campaign?.creator_name || 'The Pool';
   const category = campaign?.category || 'Campaign';
@@ -839,7 +847,7 @@ function buildCampaignShareCardFallbackPng({ env, campaign, stats, effectiveStat
   strokeShareCardRect(surface, 48, 52, 1104, 526, SHARE_CARD_COLORS.border, 3);
   fillShareCardRect(surface, 48, 52, 14, 526, SHARE_CARD_COLORS.fill);
   fillShareCardRect(surface, 90, 498, 800, 24, SHARE_CARD_COLORS.soft);
-  fillShareCardRect(surface, 90, 498, Math.max(16, Math.round(800 * (progressPct / 100))), 24, SHARE_CARD_COLORS.fill);
+  fillShareCardRect(surface, 90, 498, Math.max(16, Math.round(800 * (progressPct.visual / 100))), 24, SHARE_CARD_COLORS.fill);
 
   drawShareCardText(surface, `${messages.creator}: ${creator}`, 90, 96, {
     scale: 4,
@@ -885,11 +893,11 @@ function buildCampaignShareCardFallbackPng({ env, campaign, stats, effectiveStat
     letterSpacing: 1
   });
 
-  drawShareCardMetric(surface, 'PROGRESS', `${progressPct}%`, 920, 196, 180);
+  drawShareCardMetric(surface, 'PROGRESS', `${progressPct.actual}%`, 920, 196, 180);
   drawShareCardMetric(surface, 'PLEDGED', formatSvgCurrencyFromCents(pledgedAmount), 920, 318, 180);
   drawShareCardMetric(surface, 'GOAL', formatSvgCurrencyFromCents(goalAmountCents), 920, 440, 180);
 
-  drawShareCardText(surface, `${progressPct}% ${messages.fundedPercent}`, 910, 548, {
+  drawShareCardText(surface, `${progressPct.actual}% ${messages.fundedPercent}`, 910, 548, {
     scale: 4,
     color: SHARE_CARD_COLORS.muted,
     letterSpacing: 1

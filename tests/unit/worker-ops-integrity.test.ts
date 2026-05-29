@@ -1067,6 +1067,33 @@ describe('worker operational integrity', () => {
     expect(body).not.toContain('https://pool.test');
   });
 
+  it('shows the actual overfunded percentage on generated campaign share-card SVGs', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 3575000,
+      pledgeCount: 22,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/share/campaign/hand-relations.svg'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('$35,750');
+    expect(body).toContain('143% funded');
+    expect(body).not.toContain('100% funded');
+    expect(body).toContain('width="456" height="18" rx="9" ry="9" fill="url(#progressFill)"');
+  });
+
   it('keeps generated campaign share-card blurbs to two lines and shrinks long copy', async () => {
     const env = createEnv();
     const longBlurb = 'A deliberately overlong short blurb that should stay readable inside the social image while never taking more than two lines from the campaign share card layout.';
