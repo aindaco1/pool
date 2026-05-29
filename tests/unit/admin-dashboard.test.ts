@@ -2397,6 +2397,51 @@ runner_report_emails:
     expect((env.RATELIMIT as CountingKVNamespace).listCalls).toBe(0);
   });
 
+  it('returns an empty supporters view for a campaign without a pledge index', async () => {
+    resetCampaignRuntimeStateForTests();
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [
+            { ...campaignFixture, slug: 'their-love', title: 'Their Love', state: 'live' }
+          ]
+        });
+      }
+      if (url === 'https://pool.test/api/add-ons.json') return jsonResponse(addOnsFixture);
+      if (url === 'https://api.resend.com/emails') return jsonResponse({ id: 'email-test' });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const env = createEnv();
+    const { ctx, cookie } = await signInAdmin(env);
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    resetKvCounters(env);
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/supporters?campaignSlug=their-love', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      scope: 'campaign',
+      campaign: expect.objectContaining({ slug: 'their-love', title: 'Their Love' }),
+      supporters: [],
+      missingCampaigns: [expect.objectContaining({ slug: 'their-love' })],
+      page: expect.objectContaining({
+        returned: 0,
+        matched: 0,
+        indexed: 0,
+        scanned: 0
+      }),
+      writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
+    });
+    expect(pledges.putCalls).toBe(0);
+    expect(pledges.deleteCalls).toBe(0);
+    expect(pledges.listCalls).toBe(0);
+  });
+
   it('previews campaign-runner reports from the campaign index without KV writes or list scans', async () => {
     const env = createEnv();
     const { ctx, cookie } = await signInAdmin(env);
@@ -2598,6 +2643,17 @@ runner_report_emails:
       email: 'two@example.com',
       campaignSlug: 'hand-relations',
       charged: true,
+      stripePaymentIntentId: 'pi_actual_analytics',
+      stripeFinancials: {
+        source: 'actual',
+        paymentIntentId: 'pi_actual_analytics',
+        chargeId: 'ch_actual_analytics',
+        balanceTransactionId: 'txn_actual_analytics',
+        grossAmount: 5000,
+        feeAmount: 175,
+        netAmount: 4825,
+        currency: 'usd'
+      },
       amount: 5000,
       subtotal: 4500,
       tax: 250,
@@ -2632,8 +2688,12 @@ runner_report_emails:
       campaignAddOnRevenue: 1200,
       platformAddOnRevenue: 600,
       platformTipRevenue: 550,
-      estimatedStripeFeeAmount: 408,
-      estimatedStripeFeePledgeCount: 2,
+      actualStripeFeeAmount: 175,
+      actualStripeNetAmount: 4825,
+      actualStripeGrossAmount: 5000,
+      actualStripeFinancialPledgeCount: 1,
+      estimatedStripeFeeAmount: 233,
+      estimatedStripeFeePledgeCount: 1,
       physicalPledgeCount: 0,
       physicalPledgeAmount: 0,
       digitalPledgeCount: 2,
@@ -2661,6 +2721,86 @@ runner_report_emails:
     expect(pledges.listCalls).toBe(0);
     expect(ratelimit.putCalls).toBe(0);
     expect(ratelimit.deleteCalls).toBe(0);
+    expect(ratelimit.listCalls).toBe(0);
+  });
+
+  it('backfills actual Stripe financials for charged pledges without KV list scans', async () => {
+    const env = createEnv();
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    const ratelimit = env.RATELIMIT as CountingKVNamespace;
+    const defaultFetch = global.fetch;
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.startsWith('https://api.stripe.com/v1/payment_intents/pi_backfill')) {
+        return jsonResponse({
+          id: 'pi_backfill',
+          currency: 'usd',
+          latest_charge: {
+            id: 'ch_backfill',
+            balance_transaction: {
+              id: 'txn_backfill',
+              amount: 10000,
+              fee: 320,
+              net: 9680,
+              currency: 'usd',
+              status: 'available'
+            }
+          }
+        });
+      }
+      return defaultFetch(input);
+    }) as typeof fetch;
+
+    pledges.store.set('campaign-pledges:hand-relations', JSON.stringify(['order-backfill-1']));
+    pledges.store.set('pledge:order-backfill-1', JSON.stringify({
+      orderId: 'order-backfill-1',
+      email: 'backfill@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'charged',
+      charged: true,
+      amount: 10000,
+      subtotal: 10000,
+      stripePaymentIntentId: 'pi_backfill'
+    }));
+    pledges.resetCounts();
+    ratelimit.resetCounts();
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/analytics/stripe-financials/backfill', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({ campaignSlug: 'hand-relations', dryRun: false })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      success: true,
+      dryRun: false,
+      campaignsChecked: 1,
+      paymentIntentsChecked: 1,
+      pledgesMatched: 1,
+      pledgesUpdated: 1,
+      writeBudget: { readOnly: false, kvWritesExpected: 1, kvListExpected: 0 }
+    });
+    const stored = await pledges.get('pledge:order-backfill-1', { type: 'json' });
+    expect(stored.stripeFinancials).toMatchObject({
+      source: 'actual',
+      paymentIntentId: 'pi_backfill',
+      chargeId: 'ch_backfill',
+      balanceTransactionId: 'txn_backfill',
+      grossAmount: 10000,
+      feeAmount: 320,
+      netAmount: 9680
+    });
+    expect(pledges.putCalls).toBe(1);
+    expect(pledges.listCalls).toBe(0);
+    expect(ratelimit.putCalls).toBe(1);
     expect(ratelimit.listCalls).toBe(0);
   });
 

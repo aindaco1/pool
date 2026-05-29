@@ -254,9 +254,9 @@ The Supporters tab shows role-scoped supporter rows with live filtering, sorting
 
 Analytics is derived from existing pledge indexes and campaign summaries. It should not create analytics-specific KV writes on view.
 
-The dashboard shows cards for pledge totals, revenue categories, tax, shipping, estimated Stripe fees, pledge status, supporters, average pledge, campaign add-ons, referral attribution, UTM source, fulfillment type, language, and other pledge-derived breakdowns. Money values display exact cents.
+The dashboard shows cards for pledge totals, revenue categories, tax, shipping, Stripe fees, pledge status, supporters, average pledge, campaign add-ons, referral attribution, UTM source, fulfillment type, language, and other pledge-derived breakdowns. Money values display exact cents.
 
-Estimated Stripe fees are planning estimates until actual Stripe balance transaction fee/net values are stored during payment writes.
+Stripe fees use actual stored Stripe balance transaction fee/net values for charged pledges when available. Active pledges and older charged pledge rows without actual Stripe balance data continue to use the standard planning estimate. Super-admin-only backfills can safely retrieve historical balance transaction data from Stripe without KV list scans.
 
 ## Marketing
 
@@ -295,7 +295,9 @@ The campaign Content editor and diary-entry content editors stage selected media
 
 Campaign-scoped media uploads require access to that campaign. Super admins can upload any campaign media and platform/default media; campaign admins can upload only media for campaigns they manage. Platform add-on and platform brand uploads stay super-admin only.
 
-The Worker upload endpoint is source-preserving. It validates type, size, campaign scope, directory, and filename, but it does not run native image optimizers or FFmpeg. Lossless image compression and video transcoding to WebM should happen in a dedicated build/CI/media pipeline so quality settings, generated derivatives, and rollback behavior are explicit. The dashboard response reports whether an upload was source-preserved or already WebM.
+The Worker upload endpoint is source-preserving. It validates type, size, campaign scope, directory, and filename, but it does not run native image optimizers or FFmpeg. Lossless image compression and video transcoding run outside the Worker through the repository media pipeline.
+
+Use `npm run media:optimize` locally or the **Optimize dashboard media** GitHub Actions workflow after dashboard uploads land in the repository. The pipeline optimizes images in place when the optimized result is smaller, generates high-quality `.webm` derivatives beside uploaded MP4/MOV files, and rewrites literal `_campaigns` / `_config.yml` references from the uploaded source video to the generated WebM derivative. Original source videos remain in the repository for rollback and future re-encoding.
 
 Use meaningful alt text for images that communicate content. Decorative backgrounds can use empty alt text in the public templates.
 

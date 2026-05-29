@@ -798,7 +798,7 @@ Also note:
 - not every Sass token is exposed on purpose
 - not every Worker env var belongs in `_config.yml`
 - the supported surface is curated to avoid security and maintenance regressions
-- dashboard uploads commit files into the existing asset directories and update config/campaign fields; adding a new upload category or storage backend is still code-level work
+- dashboard uploads commit files into the existing asset directories and update config/campaign fields; image optimization and WebM derivative generation run in the external media pipeline, while adding a new upload category or storage backend is still code-level work
 
 ## Safe Workflow For Forks
 

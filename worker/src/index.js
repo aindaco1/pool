@@ -2033,6 +2033,154 @@ function getStoredTipAmount(env, pledgeData) {
   return calculatePlatformTip(subtotal, getStoredTipPercent(env, pledgeData, 0), getMaxPlatformTipPercent(env));
 }
 
+const STRIPE_FINANCIAL_EXPAND = Object.freeze(['latest_charge.balance_transaction']);
+
+function withStripeFinancialExpansion(data = {}) {
+  return { ...data, expand: STRIPE_FINANCIAL_EXPAND };
+}
+
+function stripeObjectId(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') return String(value.id || '');
+  return '';
+}
+
+function getStripePaymentIntentCharge(paymentIntent = {}) {
+  const latestCharge = paymentIntent?.latest_charge;
+  if (latestCharge && typeof latestCharge === 'object') return latestCharge;
+  const chargeData = paymentIntent?.charges?.data;
+  if (Array.isArray(chargeData) && chargeData.length > 0) return chargeData[0];
+  return latestCharge ? { id: String(latestCharge) } : null;
+}
+
+function getStripeBalanceTransaction(charge = {}) {
+  const balanceTransaction = charge?.balance_transaction;
+  return balanceTransaction && typeof balanceTransaction === 'object' ? balanceTransaction : null;
+}
+
+function extractStripePaymentIntentFinancials(paymentIntent = {}) {
+  const paymentIntentId = stripeObjectId(paymentIntent);
+  const charge = getStripePaymentIntentCharge(paymentIntent);
+  const chargeId = stripeObjectId(charge);
+  const balanceTransaction = getStripeBalanceTransaction(charge);
+
+  if (!balanceTransaction) {
+    if (!paymentIntentId && !chargeId) return null;
+    return {
+      source: 'pending',
+      paymentIntentId,
+      chargeId,
+      balanceTransactionId: stripeObjectId(charge?.balance_transaction)
+    };
+  }
+
+  return {
+    source: 'actual',
+    paymentIntentId,
+    chargeId,
+    balanceTransactionId: stripeObjectId(balanceTransaction),
+    grossAmount: Math.trunc(Number(balanceTransaction.amount || 0) || 0),
+    feeAmount: Math.trunc(Number(balanceTransaction.fee || 0) || 0),
+    netAmount: Math.trunc(Number(balanceTransaction.net || 0) || 0),
+    currency: String(balanceTransaction.currency || paymentIntent?.currency || '').toLowerCase() || 'usd',
+    status: String(balanceTransaction.status || ''),
+    availableOn: balanceTransaction.available_on || null,
+    reportingCategory: balanceTransaction.reporting_category || null
+  };
+}
+
+async function retrieveStripePaymentIntentFinancials(stripe, paymentIntentId) {
+  if (!stripe?.paymentIntents?.retrieve || !paymentIntentId) return null;
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+    expand: STRIPE_FINANCIAL_EXPAND
+  });
+  return extractStripePaymentIntentFinancials(paymentIntent);
+}
+
+function allocateIntegerTotal(totalCents, items = []) {
+  const total = Math.trunc(Number(totalCents || 0) || 0);
+  const count = Array.isArray(items) ? items.length : 0;
+  if (count <= 0) return [];
+  if (total === 0) return new Array(count).fill(0);
+
+  const sign = total < 0 ? -1 : 1;
+  const absTotal = Math.abs(total);
+  const weights = items.map((item) => Math.max(0, Number(item?.amount || 0) || 0));
+  const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
+  if (weightTotal <= 0) {
+    const allocations = new Array(count).fill(0);
+    allocations[0] = total;
+    return allocations;
+  }
+
+  const rows = weights.map((weight, index) => {
+    const exact = (absTotal * weight) / weightTotal;
+    const base = Math.floor(exact);
+    return { index, base, remainder: exact - base };
+  });
+  let allocated = rows.reduce((sum, row) => sum + row.base, 0);
+  rows.sort((a, b) => b.remainder - a.remainder || a.index - b.index);
+  for (let index = 0; allocated < absTotal; index += 1, allocated += 1) {
+    rows[index % rows.length].base += 1;
+  }
+  rows.sort((a, b) => a.index - b.index);
+  return rows.map((row) => row.base * sign);
+}
+
+function applyStripeFinancialsToPledges(pledges = [], paymentIntent = {}, financials = null, updatedAt = new Date().toISOString()) {
+  const normalizedFinancials = financials || extractStripePaymentIntentFinancials(paymentIntent);
+  if (!normalizedFinancials) return null;
+
+  const grossAllocations = normalizedFinancials.source === 'actual'
+    ? allocateIntegerTotal(normalizedFinancials.grossAmount, pledges)
+    : [];
+  const feeAllocations = normalizedFinancials.source === 'actual'
+    ? allocateIntegerTotal(normalizedFinancials.feeAmount, pledges)
+    : [];
+
+  pledges.forEach((pledge, index) => {
+    pledge.stripePaymentIntentId = normalizedFinancials.paymentIntentId || pledge.stripePaymentIntentId || stripeObjectId(paymentIntent);
+    if (normalizedFinancials.chargeId) pledge.stripeChargeId = normalizedFinancials.chargeId;
+    if (normalizedFinancials.balanceTransactionId) pledge.stripeBalanceTransactionId = normalizedFinancials.balanceTransactionId;
+
+    if (normalizedFinancials.source === 'actual') {
+      const grossAmount = grossAllocations[index] || 0;
+      const feeAmount = feeAllocations[index] || 0;
+      const netAmount = grossAmount - feeAmount;
+      pledge.stripeFinancials = {
+        source: 'actual',
+        paymentIntentId: normalizedFinancials.paymentIntentId,
+        chargeId: normalizedFinancials.chargeId,
+        balanceTransactionId: normalizedFinancials.balanceTransactionId,
+        grossAmount,
+        feeAmount,
+        netAmount,
+        currency: normalizedFinancials.currency,
+        status: normalizedFinancials.status,
+        availableOn: normalizedFinancials.availableOn,
+        reportingCategory: normalizedFinancials.reportingCategory,
+        updatedAt
+      };
+      pledge.stripeFinancialsSource = 'actual';
+      pledge.stripeGrossAmount = grossAmount;
+      pledge.stripeFeeAmount = feeAmount;
+      pledge.stripeNetAmount = netAmount;
+    } else if (!pledge.stripeFinancials || pledge.stripeFinancials.source !== 'actual') {
+      pledge.stripeFinancials = {
+        source: 'pending',
+        paymentIntentId: normalizedFinancials.paymentIntentId,
+        chargeId: normalizedFinancials.chargeId,
+        balanceTransactionId: normalizedFinancials.balanceTransactionId || '',
+        updatedAt
+      };
+      pledge.stripeFinancialsSource = 'pending';
+    }
+  });
+
+  return normalizedFinancials;
+}
+
 async function buildPledgeTotals(env, subtotalCents, { shipping = 0, tipPercent, taxDestination = null } = {}) {
   const normalizedSubtotal = Math.max(0, Number(subtotalCents) || 0);
   const normalizedShipping = Math.max(0, Number(shipping) || 0);
@@ -3510,6 +3658,12 @@ export default {
 
       if (path === '/admin/analytics' && method === 'GET') {
         return handleAdminAnalytics(request, env);
+      }
+
+      if (path === '/admin/analytics/stripe-financials/backfill' && method === 'POST') {
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminStripeFinancialsBackfill(request, env);
       }
 
       if (path === '/admin/marketing/referrals' && method === 'GET') {
@@ -5657,7 +5811,7 @@ async function handleStripeWebhook(request, env, ctx) {
                   
                   try {
                     const retryStripe = createStripeClient(getStripeKey(env));
-                    const paymentIntent = await retryStripe.paymentIntents.create({
+                    const paymentIntent = await retryStripe.paymentIntents.create(withStripeFinancialExpansion({
                       amount: existingPledge.amount,
                       currency: 'usd',
                       customer: customerId,
@@ -5669,14 +5823,16 @@ async function handleStripeWebhook(request, env, ctx) {
                         campaignSlug: existingPledge.campaignSlug,
                         email: existingPledge.email
                       }
-                    });
+                    }));
 
                     if (paymentIntent.status === 'succeeded') {
+                      const chargedAt = new Date().toISOString();
+                      applyStripeFinancialsToPledges([existingPledge], paymentIntent, null, chargedAt);
                       existingPledge.charged = true;
                       existingPledge.pledgeStatus = 'charged';
-                      existingPledge.chargedAt = new Date().toISOString();
+                      existingPledge.chargedAt = chargedAt;
                       existingPledge.stripePaymentIntentId = paymentIntent.id;
-                      existingPledge.updatedAt = new Date().toISOString();
+                      existingPledge.updatedAt = chargedAt;
                       await env.PLEDGES.put(`pledge:${existingPledge.orderId}`, JSON.stringify(existingPledge));
 
                       const chargeToken = await generateToken(env.MAGIC_LINK_SECRET, {
@@ -6910,7 +7066,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
   for (const supporter of supportersToCharge) {
     try {
       // Create ONE PaymentIntent for all pledges from this supporter
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await stripe.paymentIntents.create(withStripeFinancialExpansion({
         amount: supporter.totalAmount,
         currency: 'usd',
         customer: supporter.customerId,
@@ -6923,10 +7079,11 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           pledgeCount: supporter.pledges.length.toString(),
           orderIds: supporter.pledges.map(p => p.orderId).join(',')
         }
-      });
+      }));
 
       if (paymentIntent.status === 'succeeded') {
         const chargedAt = new Date().toISOString();
+        applyStripeFinancialsToPledges(supporter.pledges, paymentIntent, null, chargedAt);
         
         // Update ALL pledges for this supporter as charged
         for (const pledge of supporter.pledges) {
@@ -7508,7 +7665,7 @@ async function handleSettleBatch(request, env) {
     }
 
     try {
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await stripe.paymentIntents.create(withStripeFinancialExpansion({
         amount: data.totalAmount,
         currency: 'usd',
         customer: customerId,
@@ -7521,10 +7678,11 @@ async function handleSettleBatch(request, env) {
           pledgeCount: data.pledges.length.toString(),
           orderIds: data.pledges.map(p => p.orderId).join(',')
         }
-      });
+      }));
 
       if (paymentIntent.status === 'succeeded') {
         const chargedAt = new Date().toISOString();
+        applyStripeFinancialsToPledges(data.pledges, paymentIntent, null, chargedAt);
         for (const pledge of data.pledges) {
           pledge.charged = true;
           pledge.pledgeStatus = 'charged';
@@ -11670,6 +11828,11 @@ function emptyAdminAnalyticsTotals() {
     platformTipRevenue: 0,
     taxTotal: 0,
     shippingTotal: 0,
+    actualStripeFeeAmount: 0,
+    actualStripeNetAmount: 0,
+    actualStripeGrossAmount: 0,
+    actualStripeFinancialPledgeCount: 0,
+    pendingStripeFinancialPledgeCount: 0,
     estimatedStripeFeeAmount: 0,
     estimatedStripeFeePledgeCount: 0,
     physicalPledgeCount: 0,
@@ -11687,6 +11850,26 @@ function estimateAdminStripeFeeCents(amountCents) {
   const amount = Number(amountCents || 0) || 0;
   if (amount <= 0) return 0;
   return Math.round((amount * ADMIN_STRIPE_FEE_ESTIMATE_BPS) / 10000) + ADMIN_STRIPE_FEE_ESTIMATE_FIXED_CENTS;
+}
+
+function getStoredStripeFinancials(pledge = {}) {
+  const nested = pledge?.stripeFinancials && typeof pledge.stripeFinancials === 'object'
+    ? pledge.stripeFinancials
+    : {};
+  const source = String(nested.source || pledge?.stripeFinancialsSource || '').trim();
+  if (source !== 'actual') {
+    return source === 'pending' ? { source: 'pending' } : null;
+  }
+  const grossAmount = Number(nested.grossAmount ?? pledge?.stripeGrossAmount);
+  const feeAmount = Number(nested.feeAmount ?? pledge?.stripeFeeAmount);
+  const netAmount = Number(nested.netAmount ?? pledge?.stripeNetAmount);
+  if (!Number.isFinite(feeAmount) || !Number.isFinite(netAmount)) return null;
+  return {
+    source: 'actual',
+    grossAmount: Number.isFinite(grossAmount) ? grossAmount : feeAmount + netAmount,
+    feeAmount,
+    netAmount
+  };
 }
 
 function incrementAdminAnalyticsBreakdown(map, key, amount = 0) {
@@ -11739,6 +11922,7 @@ function applyPledgeToAdminAnalytics(analytics, campaign, pledge = {}, supporter
   const isCancelled = status === 'cancelled';
   const countsTowardPledged = !isCancelled;
   const countsTowardStripeFeeEstimate = status === 'active' || status === 'charged';
+  const storedStripeFinancials = getStoredStripeFinancials(pledge);
 
   analytics.totals.pledgeCount += 1;
   if (countsTowardPledged) {
@@ -11754,9 +11938,17 @@ function applyPledgeToAdminAnalytics(analytics, campaign, pledge = {}, supporter
     analytics.totals.cancelledPledgeCount += 1;
   }
 
-  if (countsTowardStripeFeeEstimate) {
+  if (status === 'charged' && storedStripeFinancials?.source === 'actual') {
+    analytics.totals.actualStripeFinancialPledgeCount += 1;
+    analytics.totals.actualStripeFeeAmount += Math.max(0, Number(storedStripeFinancials.feeAmount || 0) || 0);
+    analytics.totals.actualStripeNetAmount += Math.max(0, Number(storedStripeFinancials.netAmount || 0) || 0);
+    analytics.totals.actualStripeGrossAmount += Math.max(0, Number(storedStripeFinancials.grossAmount || 0) || 0);
+  } else if (countsTowardStripeFeeEstimate) {
     analytics.totals.estimatedStripeFeePledgeCount += 1;
     analytics.totals.estimatedStripeFeeAmount += estimateAdminStripeFeeCents(amount);
+    if (status === 'charged' && storedStripeFinancials?.source === 'pending') {
+      analytics.totals.pendingStripeFinancialPledgeCount += 1;
+    }
   }
 
   if (status === 'charged') {
@@ -11959,6 +12151,122 @@ async function handleAdminAnalytics(request, env) {
     writeBudget: adminReadBudget(),
     generatedAt: new Date().toISOString()
   }, 200, env);
+}
+
+async function handleAdminStripeFinancialsBackfill(request, env) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const auth = await requireAdminSession(request, env, 'settings:publish', { requireCsrf: true });
+  if (!auth.ok) return auth.response;
+  if (!env.PLEDGES) {
+    return privateJsonResponse({ error: 'PLEDGES KV not configured' }, 503, env);
+  }
+
+  const body = parsedBody.body || {};
+  const dryRun = body.dryRun !== false;
+  const requestedCampaignSlug = String(body.campaignSlug || 'all').trim();
+  const allCampaignsRequested = !requestedCampaignSlug || requestedCampaignSlug.toLowerCase() === 'all';
+  const rawLimit = Number(body.limit || 25);
+  const paymentIntentLimit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? Math.trunc(rawLimit) : 25));
+  const { campaigns } = await getCampaigns(env);
+  const selectedCampaigns = allCampaignsRequested
+    ? campaigns
+    : (campaigns || []).filter((campaign) => String(campaign?.slug || '') === requestedCampaignSlug);
+
+  if (!allCampaignsRequested && !selectedCampaigns.length) {
+    return privateJsonResponse({ error: 'Campaign not found' }, 404, env);
+  }
+
+  const stripe = createStripeClient(getStripeKey(env));
+  const summary = {
+    dryRun,
+    campaignsChecked: 0,
+    paymentIntentLimit,
+    paymentIntentsChecked: 0,
+    pledgesMatched: 0,
+    pledgesUpdated: 0,
+    pending: 0,
+    missing: 0,
+    skippedAlreadyActual: 0,
+    errors: []
+  };
+
+  for (const campaign of selectedCampaigns || []) {
+    if (summary.paymentIntentsChecked >= paymentIntentLimit) break;
+    const campaignSlug = String(campaign?.slug || '').trim();
+    if (!campaignSlug) continue;
+    summary.campaignsChecked += 1;
+    const orderIds = await getCampaignOrderIds(env, campaignSlug);
+    if (!Array.isArray(orderIds)) {
+      summary.missing += 1;
+      continue;
+    }
+
+    const pledgesByPaymentIntent = new Map();
+    for (const orderId of orderIds) {
+      const normalizedOrderId = String(orderId || '').trim();
+      if (!normalizedOrderId) continue;
+      const pledge = await env.PLEDGES.get(`pledge:${normalizedOrderId}`, { type: 'json' });
+      if (!pledge || String(pledge?.campaignSlug || '') !== campaignSlug) continue;
+      if (getPledgeStatusLabel(pledge) !== 'charged') continue;
+      if (getStoredStripeFinancials(pledge)?.source === 'actual') {
+        summary.skippedAlreadyActual += 1;
+        continue;
+      }
+      const paymentIntentId = stripeObjectId(pledge.stripePaymentIntentId || pledge.stripeFinancials?.paymentIntentId);
+      if (!paymentIntentId) {
+        summary.missing += 1;
+        continue;
+      }
+      const grouped = pledgesByPaymentIntent.get(paymentIntentId) || [];
+      grouped.push(pledge);
+      pledgesByPaymentIntent.set(paymentIntentId, grouped);
+    }
+
+    for (const [paymentIntentId, pledges] of pledgesByPaymentIntent.entries()) {
+      if (summary.paymentIntentsChecked >= paymentIntentLimit) break;
+      summary.paymentIntentsChecked += 1;
+      summary.pledgesMatched += pledges.length;
+      try {
+        const financials = await retrieveStripePaymentIntentFinancials(stripe, paymentIntentId);
+        if (!financials) {
+          summary.missing += pledges.length;
+          continue;
+        }
+        if (financials.source !== 'actual') {
+          summary.pending += pledges.length;
+          continue;
+        }
+        applyStripeFinancialsToPledges(pledges, {}, financials, new Date().toISOString());
+        if (!dryRun) {
+          for (const pledge of pledges) {
+            await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
+            summary.pledgesUpdated += 1;
+          }
+        }
+      } catch (error) {
+        summary.errors.push({
+          paymentIntentId,
+          message: error?.message || 'Unable to retrieve Stripe financial data'
+        });
+      }
+    }
+  }
+
+  return privateJsonResponse({
+    success: summary.errors.length === 0,
+    ...summary,
+    writeBudget: adminWriteBudget({
+      readOnly: dryRun,
+      kvWritesExpected: dryRun ? 0 : summary.pledgesUpdated,
+      kvListExpected: 0
+    })
+  }, summary.errors.length ? 207 : 200, env);
 }
 
 function adminMarketingReferralKey(campaignSlug) {
@@ -12882,14 +13190,6 @@ async function handleAdminSupporters(request, env) {
     }
     indexed += orderIds.length;
     indexedCampaigns.push({ campaign, campaignSlug, orderIds });
-  }
-
-  if (!allCampaignsRequested && missingCampaigns.length > 0) {
-    return adminIndexRequiredResponse(env, {
-      error: 'Campaign pledge index is required for dashboard supporter reads',
-      campaignSlug: allCampaignsRequested ? '' : requestedCampaignSlug,
-      extra: { missingCampaigns }
-    });
   }
 
   const limit = clampAdminPageLimit(url.searchParams.get('limit'));

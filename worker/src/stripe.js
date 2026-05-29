@@ -120,7 +120,11 @@ export function createStripeClient(secretKey) {
       retrieve: (id) => request('GET', `/setup_intents/${id}`)
     },
     paymentIntents: {
-      create: (data) => request('POST', '/payment_intents', data)
+      create: (data) => request('POST', '/payment_intents', data),
+      retrieve: (id, params = {}) => {
+        const query = new URLSearchParams(flattenObject(params)).toString();
+        return request('GET', `/payment_intents/${id}${query ? `?${query}` : ''}`);
+      }
     },
     customers: {
       create: (data) => request('POST', '/customers', data),

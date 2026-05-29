@@ -4,7 +4,7 @@
 
 **v1.0.0**
 
-The v1.0 feature set and release-hardening pass are complete. New roadmap items should be treated as post-v1.0 follow-up unless a critical launch regression is found.
+The v1.0 feature set and release-hardening pass are complete. Remaining unstarted work lives under **Future Features** unless a critical launch regression is found.
 
 ## Completed
 
@@ -79,6 +79,11 @@ The v1.0 feature set and release-hardening pass are complete. New roadmap items 
   - tip-aware emails with full subtotal/tip/tax/shipping breakdowns
   - ledger-style pledge reports and fulfillment CSV exports
   - shipping included in reporting
+  - automatic diary broadcasts use stable entry IDs so edited diary entries do not resend as new updates
+- [x] Actual Stripe fee/net analytics foundation
+  - successful supporter charges now capture Stripe balance transaction fee, net, gross, charge, and balance transaction IDs when available
+  - analytics uses actual stored Stripe fee values for charged pledges and keeps estimated fees for active pledges or older charged records without Stripe balance data
+  - a super-admin-only, CSRF-protected backfill path retrieves historical Stripe balance transaction data from campaign pledge indexes without KV list scans
 - [x] Projection repair follow-up work
   - read-only drift checks for per-campaign and all-campaign projection state
   - `./scripts/check-projections.sh` operator wrapper for local and Podman-backed checks
@@ -128,14 +133,17 @@ The v1.0 feature set and release-hardening pass are complete. New roadmap items 
 - [x] Private admin dashboard for campaign editing and operations
   - `/admin/` and `/es/admin/` private shells with noindex handling and localized dashboard copy
   - magic-link sign-in, role-scoped super-admin and campaign-user access, CSRF/origin checks, safe cookie handling, and read-only session checks
+  - Cloudflare Turnstile challenge support protects the admin email sign-in submission before magic-link email delivery
   - Settings, Add-ons, Campaigns, Analytics, Reports, Supporters, Marketing, Users, Secrets & credentials, and Runtime diagnostics views
-  - Settings -> Users saves directly to Worker KV at `admin-users:v1`; Secrets & credentials remains status-only
+  - Settings -> Users saves directly to Worker KV at `admin-users:v1` and emails sign-in instructions to newly created users when email is configured; Secrets & credentials remains status-only
   - Reports, Analytics, Supporters, content loads/previews, marketing link generation, and table filters avoid KV writes on normal read paths
+  - Supporters and Analytics return empty read-only campaign views for campaigns without pledge indexes instead of blocking new/empty campaign dashboards
   - block-based WYSIWYG content editing
   - polymorphic block schema reused by campaign content and diary entries
   - diary entry editing preserves stable entry IDs, and newly added diary entries receive title-based IDs during publish so automatic emails send only for genuinely new entries
   - full campaign schema for tiers, campaign add-ons, stretch goals, support items, diary, and decisions
   - dashboard uploads route to convention-based asset directories, preserve existing IDs where needed, and derive new IDs from names/labels
+  - dashboard media uploads stay source-preserving in the Worker, with external lossless image optimization and WebM derivative generation in the repository media pipeline
   - physical product editors expose shipping presets or explicit package metadata while digital products hide shipping-only fields
   - desktop/tablet/mobile responsive pass, accessibility pass, security pass, SEO noindex pass, and Spanish i18n pass
   - focused unit, browser, and KV-write-budget coverage for admin dashboard flows
@@ -147,6 +155,7 @@ The v1.0 feature set and release-hardening pass are complete. New roadmap items 
   - Vitest unit coverage
   - Playwright E2E coverage
   - stronger merge gate and local smoke coverage
+  - final v1.0 verification covered admin dashboard browser flows, premerge regression checks, and local Podman smoke through `/admin/`, `/es/admin/`, Settings, Add-ons, Campaigns, Analytics, Reports, Supporters, Marketing, and Users
 - [x] Accessibility compliance milestone
   - stronger dialog, tab, tip-slider, error, and live-region semantics
   - axe-backed critical-surface coverage
@@ -191,6 +200,7 @@ The v1.0 feature set and release-hardening pass are complete. New roadmap items 
 - [x] Campaign embeds and richer share previews
   - campaign pages now link to a hosted locale-aware embed builder that generates copy-paste iframe code with layout, theme, media, and CTA options
   - the embed widget uses live Worker-backed campaign state, auto-resizes after paste, and supports localized return links plus localized builder/runtime copy
+  - the admin Marketing embed preview keeps progress fill, milestones, goal marker, and stretch-goal labels contained for video-led campaigns
   - campaign pages now emit richer state-aware social metadata plus Worker-generated PNG share-card images, with SVG retained for internal preview/debug tooling
   - localized campaign routes, localized embed routes, and locale-aware share-card URLs keep embeds and rich previews aligned across English and Spanish
 - [x] Developer FAQ based on internal documentation
@@ -223,31 +233,7 @@ The v1.0 feature set and release-hardening pass are complete. New roadmap items 
   - the public Campaign Creator Checklist now covers campaign add-ons, embed-code promotion, shipping fallback/free-shipping decisions, tax expectations, report recipients, and fulfillment handoff
   - a Spanish creator checklist route now exists at `/es/creator-campaign-checklist/`
 
-## v1.0 Release Hardening
-
-- [x] Add bot/challenge protection to the admin email sign-in field
-  - Prefer Cloudflare Turnstile or an equivalent privacy-preserving CAPTCHA/challenge that works with Cloudflare Workers and does not require a separate app server
-  - Verify the challenge in `POST /admin/auth/start` before sending a magic-link email
-  - Keep existing admin auth rate limits, request-size caps, origin checks, and private/no-store responses
-  - Provide English and Spanish field/help/error copy, including an accessible retry path for keyboard and screen-reader users
-  - Add local/dev and automated-test bypass support through explicit test configuration, not by weakening production validation
-  - Avoid per-keystroke or per-pageview KV writes; challenge validation should only run when the admin submits the sign-in form
-- [x] Send an email to new user accounts when created
-- [x] Fix Marketing embed preview progress styling for video-led campaigns
-  - Campaigns whose embed preview uses YouTube or Vimeo hero media must keep progress fill, milestones, goal marker, and stretch-goal labels contained and readable in the admin Marketing tab
-  - Keep the embed preview compatible with the admin dashboard CSP by using shared utility classes instead of unsafe inline progress styles
-- [x] Prevent edited diary entries from triggering duplicate automatic emails
-  - Automatic diary broadcasts now track stable `id:{entryId}` markers instead of treating display-date changes as new updates
-  - Legacy date-based markers remain recognized, including harmless `:00` seconds formatting differences
-  - The admin dashboard preserves existing diary IDs, and the Worker derives IDs for new diary entries added through the dashboard
-- [x] Run final v1.0 release verification
-  - `node --check assets/js/admin-dashboard.js`
-  - `npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium`
-  - `npm run test:premerge`
-  - local smoke through `./scripts/dev.sh --podman`, including `/admin/`, `/es/admin/`, Settings, Add-ons, Campaigns, Analytics, Reports, Supporters, Marketing, and Users
-  - final documentation and release-note pass
-
-## Post-v1.0 Follow-ups
+## Future Features
 
 - [ ] Further tax calculator work
   - Support USA and international
@@ -257,22 +243,43 @@ The v1.0 feature set and release-hardening pass are complete. New roadmap items 
   - Decide how much international logic should stay vendored offline versus optional provider-backed
   - Add a documented tax-data refresh/import workflow for future jurisdiction datasets
   - Future consideration: business tax handling such as VAT ID validation, reverse-charge flows, exemptions, and product tax classes
-- [ ] Store actual Stripe fee/net values for analytics
-  - Capture Stripe balance transaction fee and net amounts during successful charge/payment webhook writes
-  - Preserve the existing estimated Stripe-fee card until actual fee data exists for the relevant pledge records
-  - Add a safe backfill path before replacing estimates in historical analytics
-- [ ] Add a media optimization pipeline for dashboard uploads
-  - Keep upload file naming and directories convention-based
-  - Run lossless image optimization outside the Worker
-  - Generate quality-controlled WebM derivatives for uploaded videos without degrading source quality
+- [ ] Add net revenue analytics after allocated processor fees
+  - Keep existing Campaign revenue and Platform revenue cards as gross category totals for clarity
+  - Add separate Net campaign revenue and Net platform revenue values
+  - Allocate actual Stripe fees proportionally across campaign revenue, platform revenue, tax, and shipping based on each component's share of the charged PaymentIntent
+  - Fall back to estimated fee allocation only for active pledges or older charged pledges without actual Stripe balance transaction data
+  - Make card/table help text explicit about gross versus net values so analytics reconcile cleanly
 - [ ] Add richer campaign marketing tools
   - announcement composer with local drafts, read-only dry runs, and explicit live-send/audit writes
   - optional abandoned-cart follow-up only after consent, retention, duplicate-send prevention, and free-tier-aware storage are designed
 - [ ] Support different prices per add-on variation
+  - Extend platform and campaign add-on variant schemas so a variant can override base price without requiring duplicate products
+  - Update cart, checkout, Manage Pledge, analytics, reports, and fulfillment exports to use the resolved variant price consistently
+  - Preserve backwards compatibility for existing add-ons whose variants only define `id`, `label`, and `inventory`
+  - Add admin dashboard validation so price overrides cannot be negative, malformed, or silently ignored
 - [ ] "Share to" platform links for campaigns modeled off dust-wave-new news items "share to" platform links
+  - Add reusable share-link generation for campaign pages and campaign share/marketing surfaces
+  - Support a curated set of destinations such as email, SMS, X, Facebook, Bluesky, Threads, and copy-link without adding tracking writes
+  - Keep URLs locale-aware, preserve campaign/referral/UTM parameters where appropriate, and avoid exposing supporter-only tokens
+  - Add responsive and accessible button/menu patterns that reuse the existing public-site button and icon language
 - [ ] Allow super admins and campaign users to publish email-protected campaign preview pages
+  - Add a preview publication state that exposes draft campaign pages only through signed, expiring links
+  - Scope preview access to super admins, assigned campaign users, or explicitly invited reviewers
+  - Keep previews out of `robots.txt`, `sitemap.xml`, public campaign indexes, and social metadata intended for live pages
+  - Reuse the existing magic-link/session validation patterns instead of introducing a separate password system
+  - Make preview publishing clear in the admin dashboard so users understand it does not make the campaign publicly live
 - [ ] Allow potential pledgers to sign up for email launch reminders for upcoming campaigns
+  - Add an opt-in form on upcoming campaign pages with explicit consent and locale-aware copy
+    - Use Cloudflare Turnstile as a CAPTCHA/challenge
+  - Store reminder signups in a campaign-scoped, deduplicated KV record keyed by normalized email
+  - Send launch reminders when the campaign transitions to live, with idempotent send markers to avoid duplicates
+  - Provide unsubscribe or suppression handling before sending any reminder email
+  - Keep signup reads/writes bounded so popular upcoming campaigns can stay within free-tier KV expectations
 - [ ] Allow super admins to set a default timezone for the platform rather than hardcoding Mountain Time
+  - Introduce a platform-level timezone setting with IANA timezone validation, defaulting to `America/Denver` for compatibility
+  - Audit campaign state transitions, countdowns, settlement scheduling, reports, emails, and dashboard date/time fields for timezone assumptions
+  - Update Jekyll plugins, Worker deadline logic, cron guidance, and documentation together so frontend and Worker behavior stay aligned
+  - Preserve existing campaign behavior unless a fork explicitly changes the platform timezone
 
 ## Known Issues
 

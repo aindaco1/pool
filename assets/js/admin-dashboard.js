@@ -4448,6 +4448,28 @@
     return card;
   }
 
+  function analyticsStripeFeeAmount(totals) {
+    return Number(totals?.actualStripeFeeAmount || 0) + Number(totals?.estimatedStripeFeeAmount || 0);
+  }
+
+  function analyticsStripeFeeLabel(totals) {
+    return Number(totals?.actualStripeFinancialPledgeCount || 0) > 0
+      ? t('analytics_stripe_fees', 'Stripe fees')
+      : t('analytics_estimated_stripe_fees', 'Estimated Stripe fees');
+  }
+
+  function analyticsStripeFeeHelp(totals) {
+    var actualCount = Number(totals?.actualStripeFinancialPledgeCount || 0);
+    var estimatedCount = Number(totals?.estimatedStripeFeePledgeCount || 0);
+    if (actualCount > 0 && estimatedCount > 0) {
+      return t('analytics_help_stripe_fees_mixed', 'Actual Stripe fees are shown for charged pledges where Stripe balance data has been stored. Remaining active or charged pledges use the standard estimate until their actual fee data is available.');
+    }
+    if (actualCount > 0) {
+      return t('analytics_help_stripe_fees_actual', 'Actual Stripe fees from stored Stripe balance transactions for charged pledges in this view.');
+    }
+    return t('analytics_help_estimated_stripe_fees', "Planning estimate for active or charged pledges using Stripe's standard US domestic card rate: 2.9% + $0.30 per pledge. Actual fees can differ.");
+  }
+
   function renderAnalytics(data) {
     if (!analyticsRoot) return;
     analyticsRoot.replaceChildren();
@@ -4466,7 +4488,7 @@
       analyticsMetricCard(t('analytics_platform_revenue', 'Platform revenue'), formatMoneyExact(platformRevenue), t('analytics_help_platform_revenue', 'Pledge value that belongs to the platform: platform add-ons plus platform tips. This does not include tax, shipping, campaign revenue, or processor fees.'), 'platform-revenue'),
       analyticsMetricCard(t('analytics_tax', 'Tax'), formatMoneyExact(totals.taxTotal), t('analytics_help_tax', 'Sales tax recorded on non-cancelled pledges. This is included in Pledged, but not in Campaign revenue or Platform revenue.'), 'tax'),
       analyticsMetricCard(t('analytics_shipping', 'Shipping'), formatMoneyExact(totals.shippingTotal), t('analytics_help_shipping', 'Shipping fees recorded on non-cancelled pledges. This is included in Pledged, but not in Campaign revenue or Platform revenue.'), 'shipping'),
-      analyticsMetricCard(t('analytics_estimated_stripe_fees', 'Estimated Stripe fees'), formatMoneyExact(totals.estimatedStripeFeeAmount), t('analytics_help_estimated_stripe_fees', "Planning estimate for active or charged pledges using Stripe's standard US domestic card rate: 2.9% + $0.30 per pledge. Actual fees can differ."), 'estimated-stripe-fees'),
+      analyticsMetricCard(analyticsStripeFeeLabel(totals), formatMoneyExact(analyticsStripeFeeAmount(totals)), analyticsStripeFeeHelp(totals), 'stripe-fees'),
       analyticsMetricCard(t('analytics_charged', 'Charged'), formatMoneyExact(totals.chargedAmount), t('analytics_help_charged', 'Money from pledges that have successfully been charged. This is the closest card to collected gross revenue.'), 'charged'),
       analyticsMetricCard(t('analytics_payment_failed', 'Payment failed'), formatMoneyExact(totals.paymentFailedAmount), t('analytics_help_payment_failed', 'Value of pledges currently marked payment failed. This is not collected money.'), 'payment-failed'),
       analyticsMetricCard(t('analytics_supporters', 'Supporters'), formatNumber(totals.uniqueSupporters), t('analytics_help_supporters', 'Unique supporter email addresses in this view. One person with multiple pledges is counted once.'), 'supporters'),
@@ -4521,7 +4543,7 @@
       t('analytics_charged', 'Charged'),
       t('analytics_campaign_revenue', 'Campaign revenue'),
       t('analytics_platform_revenue', 'Platform revenue'),
-      t('analytics_estimated_stripe_fees', 'Estimated Stripe fees'),
+      t('analytics_stripe_fees', 'Stripe fees'),
       t('analytics_payment_failed', 'Payment failed')
     ];
     if (analyticsSort.index >= headerLabels.length) analyticsSort.index = -1;
@@ -4545,7 +4567,7 @@
         { value: formatMoneyExact(campaignTotals.chargedAmount), sortValue: Number(campaignTotals.chargedAmount || 0) },
         { value: formatMoneyExact(campaignTotals.campaignRevenue), sortValue: Number(campaignTotals.campaignRevenue || 0) },
         { value: formatMoneyExact(Number(campaignTotals.platformAddOnRevenue || 0) + Number(campaignTotals.platformTipRevenue || 0)), sortValue: Number(campaignTotals.platformAddOnRevenue || 0) + Number(campaignTotals.platformTipRevenue || 0) },
-        { value: formatMoneyExact(campaignTotals.estimatedStripeFeeAmount), sortValue: Number(campaignTotals.estimatedStripeFeeAmount || 0) },
+        { value: formatMoneyExact(analyticsStripeFeeAmount(campaignTotals)), sortValue: analyticsStripeFeeAmount(campaignTotals) },
         { value: formatMoneyExact(campaignTotals.paymentFailedAmount), sortValue: Number(campaignTotals.paymentFailedAmount || 0) }
       ]);
       tbody.append(row);

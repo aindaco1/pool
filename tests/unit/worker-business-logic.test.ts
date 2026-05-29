@@ -16,6 +16,10 @@ const mockStripeClient = {
   setupIntents: {
     retrieve: vi.fn()
   },
+  paymentIntents: {
+    create: vi.fn(),
+    retrieve: vi.fn()
+  },
   customers: {
     create: vi.fn()
   },
@@ -518,6 +522,8 @@ beforeEach(() => {
     url: 'https://stripe.test/checkout'
   });
   mockStripeClient.setupIntents.retrieve.mockResolvedValue({ payment_method: 'pm_123', customer: 'cus_123' });
+  mockStripeClient.paymentIntents.create.mockResolvedValue({ id: 'pi_test_default_123', status: 'succeeded' });
+  mockStripeClient.paymentIntents.retrieve.mockResolvedValue({ id: 'pi_test_default_123', status: 'succeeded' });
   global.fetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     if (url === 'https://pool.test/api/campaigns.json') {

@@ -328,10 +328,11 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `GET /admin/dashboard/summary` reads role-scoped campaign summaries
 - `GET /admin/settings` reads a role-scoped settings/config snapshot for the dashboard
 - `POST /admin/settings/preview` validates settings changes without publishing
-- `POST /admin/settings/logo-upload`, `POST /admin/settings/image-upload`, and `POST /admin/settings/video-upload` stage dashboard uploads through the same GitHub-backed publish path as their owning settings/content fields
+- `POST /admin/settings/logo-upload`, `POST /admin/settings/image-upload`, `POST /admin/settings/audio-upload`, and `POST /admin/settings/video-upload` stage dashboard uploads through the same GitHub-backed publish path as their owning settings/content fields; native image optimization and video transcoding run later in the repository media pipeline, not inside the Worker
 - `POST /admin/settings/publish` validates and publishes platform settings, platform add-ons, campaign variables, and campaign structured data through GitHub-backed commits
 - `POST /admin/users` saves dashboard-managed admin users directly to `admin-users:v1` in Worker KV and emails newly created users sign-in instructions when Resend is configured
 - `GET /admin/analytics` reads role-scoped pledge-derived revenue, status, language, referral, and campaign/platform split metrics without writing analytics state; dashboard currency presentation keeps exact cents
+- `POST /admin/analytics/stripe-financials/backfill` lets super admins backfill actual Stripe fee/net values from Stripe balance transactions for charged pledges, using campaign pledge indexes instead of KV list scans
 - `GET /admin/content/campaign?campaignSlug=...` loads role-scoped campaign content into the browser editor without persisting a draft
 - `POST /admin/content/preview` validates and renders role-scoped campaign content drafts without publishing, auditing, or writing KV
 - `POST /admin/content/publish` validates the same draft, updates the campaign Markdown file through GitHub, triggers the normal rebuild workflow, and writes one audit event

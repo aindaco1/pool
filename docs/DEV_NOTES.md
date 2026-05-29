@@ -207,7 +207,8 @@ The private dashboard at `/admin/` is now the supported browser-based editor and
 - Draft content saves in the browser until published.
 - Secrets stay in Worker secrets or ignored `.dev.vars`; the dashboard only shows configured/missing status.
 - Reports, analytics, supporter browsing, content previews, table filtering, and CSV downloads are read-only dashboard flows and should not add KV writes.
-- Image/video uploads use the existing asset directories, normalize filenames, and then publish through the same GitHub-backed path as the field they update.
+- Image/video/audio uploads use the existing asset directories, normalize filenames, and then publish through the same GitHub-backed path as the field they update.
+- Media optimization is deliberately outside the Worker. Use `npm run media:optimize` locally, or let the `Optimize dashboard media` GitHub Actions workflow run after dashboard uploads reach `main`.
 
 See [DASHBOARD.md](DASHBOARD.md) for the full dashboard reference.
 
@@ -284,7 +285,7 @@ Quote strings with special characters to avoid YAML parsing issues.
 - platform add-ons: `assets/images/add-ons/`
 - campaign add-ons: `assets/images/campaign-add-ons/`
 
-Keep upload handling lossless where possible. Image optimization should reduce bytes without changing visible quality, and video conversion should prefer WebM without degrading source quality.
+Keep upload handling lossless where possible. Image optimization reduces bytes only when the optimized result is smaller. Video conversion generates high-quality WebM derivatives beside the uploaded source file and rewrites literal campaign/config references to the WebM path after the derivative exists; source videos stay in the repository for rollback or future re-encoding.
 
 ### Featured Tier
 
