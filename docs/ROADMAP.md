@@ -4,7 +4,7 @@
 
 **v1.0.1**
 
-The v1.0 feature set and release-hardening pass are complete. v1.0.1 adds admin content-editor media uploads, actual Stripe fee/net capture for analytics, dashboard media optimization tooling, and the latest merge-gate verification. Remaining unstarted work lives under **Future Features** unless a critical launch regression is found.
+The v1.0 feature set and release-hardening pass are complete. v1.0.1 adds admin content-editor media uploads, actual Stripe fee/net capture for analytics, and dashboard media optimization tooling. Remaining unstarted work lives under **Future Features** unless a critical launch regression is found.
 
 ## Completed
 
