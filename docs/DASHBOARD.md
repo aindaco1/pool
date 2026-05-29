@@ -55,7 +55,7 @@ The dashboard intentionally separates read-only browsing, local drafting, KV wri
 | Content editor **Save draft** | Browser-local draft only |
 | Campaign content/settings publish | Worker validates input, writes to GitHub-backed files, triggers the normal rebuild/deploy path, and records an audit event |
 | Platform settings and platform add-ons publish | Worker validates input, writes to GitHub-backed config/assets, triggers the normal rebuild/deploy path, and shows the result as a dashboard platform message |
-| Image/video uploads | Worker validates media, commits the asset path through GitHub, and updates the relevant field locally until publish |
+| Image/video/audio uploads | Worker validates media, commits the asset path through GitHub, and updates the relevant field locally until publish |
 | Marketing referral save/edit/delete | Campaign-scoped KV mutation for saved referral codes |
 | Settings -> Users save | Single KV write to `admin-users:v1` |
 | Secrets & credentials | Read-only status only; secret values are never shown, edited, serialized, or published |
@@ -96,6 +96,16 @@ Use one same-as URL per line. Use canonical public profile URLs, for example:
 https://www.instagram.com/example
 https://www.imdb.com/name/nm0000000/
 ```
+
+### Canonical URLs
+
+Canonical URL fields control the production site and Worker origins used in generated links, metadata, admin runtime settings, and Worker CORS expectations.
+
+The local stack can override `SITE_BASE` and `WORKER_BASE` from `_config.local.yml`, but `scripts/sync-worker-config.rb` keeps `CANONICAL_SITE_BASE` and `CANONICAL_WORKER_BASE` pinned to the production values from `_config.yml`. That lets the local dashboard show production publish targets without breaking localhost requests.
+
+### Checkout
+
+Checkout exposes the Stripe publishable key used by browser payment UI. This is not a secret, but it must match the current Stripe mode. Secret keys and webhook signing secrets stay in Worker secrets or ignored local env files.
 
 ### Pricing, Tax, And Shipping
 
@@ -256,7 +266,7 @@ Analytics is derived from existing pledge indexes and campaign summaries. It sho
 
 The dashboard shows cards for pledge totals, revenue categories, tax, shipping, Stripe fees, pledge status, supporters, average pledge, campaign add-ons, referral attribution, UTM source, fulfillment type, language, and other pledge-derived breakdowns. Money values display exact cents.
 
-Stripe fees use actual stored Stripe balance transaction fee/net values for charged pledges when available. Active pledges and older charged pledge rows without actual Stripe balance data continue to use the standard planning estimate. Super-admin-only backfills can safely retrieve historical balance transaction data from Stripe without KV list scans.
+Stripe fees use actual stored Stripe balance transaction fee/net values for charged pledges when available. Active pledges and older charged pledge rows without actual Stripe balance data continue to use the standard planning estimate. Super-admin-only backfills can safely retrieve historical balance transaction data from Stripe without KV list scans through `POST /admin/analytics/stripe-financials/backfill`.
 
 ## Marketing
 
@@ -297,7 +307,7 @@ Campaign-scoped media uploads require access to that campaign. Super admins can 
 
 The Worker upload endpoint is source-preserving. It validates type, size, campaign scope, directory, and filename, but it does not run native image optimizers or FFmpeg. Lossless image compression and video transcoding run outside the Worker through the repository media pipeline.
 
-Use `npm run media:optimize` locally or the **Optimize dashboard media** GitHub Actions workflow after dashboard uploads land in the repository. The pipeline optimizes images in place when the optimized result is smaller, generates high-quality `.webm` derivatives beside uploaded MP4/MOV files, and rewrites literal `_campaigns` / `_config.yml` references from the uploaded source video to the generated WebM derivative. Original source videos remain in the repository for rollback and future re-encoding.
+Use `npm run media:optimize` locally or the **Optimize dashboard media** GitHub Actions workflow after dashboard uploads land in the repository. Use `npm run media:optimize:check` when reviewing a media-heavy branch and you want to fail on pending image optimizations or missing video derivatives. The pipeline optimizes images in place when the optimized result is smaller, generates high-quality `.webm` derivatives beside uploaded MP4/MOV files, and rewrites literal `_campaigns` / `_config.yml` references from the uploaded source video to the generated WebM derivative. Original source videos remain in the repository for rollback and future re-encoding.
 
 Use meaningful alt text for images that communicate content. Decorative backgrounds can use empty alt text in the public templates.
 
@@ -348,6 +358,14 @@ Check:
 
 Dashboard publish actions commit to GitHub and start the normal deploy path. Wait for the deploy to finish, then hard refresh. Local browser drafts do not affect the public site until published.
 
+### Worker Settings Look Stale
+
+The supported entry points run `scripts/sync-worker-config.rb` automatically. If you edited `_config.yml` or `_config.local.yml` directly and are checking `worker/wrangler.toml` before restarting the stack, run:
+
+```bash
+npm run sync:worker-config
+```
+
 ### A Campaign Shows Empty Or Missing Data
 
 Check the campaign Markdown front matter and the Worker settings response. Invalid YAML or unsupported field shapes can prevent fields from rendering correctly in the dashboard.
@@ -358,4 +376,4 @@ Dashboard read endpoints rely on `campaign-pledges:{slug}` indexes and intention
 
 ---
 
-_Last updated: May 28, 2026_
+_Last updated: May 29, 2026_

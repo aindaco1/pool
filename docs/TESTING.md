@@ -66,7 +66,8 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | `email-broadcasts` | Diary excerpt extraction (with ellipsis truncation), diary/milestone tracking helpers, milestone checking logic, rate limiting |
 | `email-tip` | Tip-aware supporter email breakdowns across confirmation / modified / cancelled / failed / charged emails |
 | `votes` | Email-based vote storage/dedup, vote status retrieval, campaign results, result aggregation |
-| `admin-dashboard` | Dashboard dirty-state tracking, settings serialization, content/editor normalization, referral URL helpers, responsive/i18n support utilities |
+| `admin-dashboard` | Dashboard dirty-state tracking, settings serialization, content/editor normalization, staged media uploads, actual Stripe fee analytics/backfill, referral URL helpers, responsive/i18n support utilities |
+| `media-optimization-script` | Changed-file selection, lossless image optimization decisions, video derivative naming, and source-to-WebM reference rewrites |
 
 ### Running
 
@@ -120,6 +121,12 @@ Recent security hardening that the gate now covers includes:
 - Markdown link-scheme neutralization in long-form content
 - exact-origin validation for structured embeds (`spotify`, `youtube`, `vimeo`)
 - serialized limited-tier inventory reservations at checkout start and confirmation at successful persistence time
+
+Media optimization is intentionally separate from the pre-merge gate because it depends on native tools such as FFmpeg and image optimizers. When a branch includes dashboard-uploaded or manually-added media, run:
+
+```bash
+npm run media:optimize:check
+```
 
 The local Worker defaults in [worker/wrangler.toml](../worker/wrangler.toml) now match that first-party setup. `./scripts/dev.sh --podman` now auto-generates a local `CHECKOUT_INTENT_SECRET` in `worker/.dev.vars` if it is missing, so fresh local checkout starts do not fail closed on an uninitialized dev secret.
 

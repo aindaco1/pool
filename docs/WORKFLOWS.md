@@ -49,7 +49,7 @@ upcoming → live → post
 5. CONFIRM    → Stripe confirms the setup, then Worker persists one pledge per campaign in KV, sends campaign-specific supporter email(s), and refreshes live campaign reads before success UX completes
 6. MANAGE     → Backer uses magic link to cancel/modify/update card
 7. DEADLINE   → Worker cron (midnight MT) checks campaigns
-8. CHARGE     → If funded + deadline passed: aggregate by email within each campaign, charge once per supporter per campaign
+8. CHARGE     → If funded + deadline passed: aggregate by email within each campaign, charge once per supporter per campaign, and store actual Stripe fee/net data when Stripe returns balance transaction details
 9. COMPLETE   → Update pledge_status to 'charged' or 'payment_failed'
 ```
 
@@ -123,6 +123,18 @@ Each history entry tracks a pledge event with full context:
 - `at` — ISO timestamp
 
 **Status values:** `active`, `cancelled`, `charged`, `payment_failed`
+
+Charged pledges can also carry Stripe financial metadata:
+
+- `stripePaymentIntentId`
+- `stripeChargeId`
+- `stripeBalanceTransactionId`
+- `stripeFinancials.source`
+- `stripeFinancials.grossAmount`
+- `stripeFinancials.feeAmount`
+- `stripeFinancials.netAmount`
+
+Dashboard Analytics prefers those actual fee/net values for charged pledges and falls back to estimates only for active pledges or older charged rows that have not been backfilled.
 
 ---
 
@@ -358,6 +370,8 @@ Primary flows:
 - **Settings -> Users** saves directly to Worker KV at `admin-users:v1`.
 - Saved referral codes in **Marketing** save to campaign-scoped KV.
 - **Reports** previews pledge/fulfillment rows and downloads CSVs; it does not send email and does not mark reports as sent.
+- **Analytics** uses stored actual Stripe fee/net data when available and exposes a super-admin backfill for older charged pledges.
+- Content-editor media uploads stage files locally, upload on publish, and commit source-preserved assets through the GitHub-backed path.
 - **Secrets & credentials** reports configured/missing status only; it does not expose or store secret values.
 
 Report preview/download endpoints used by the dashboard:
@@ -371,6 +385,18 @@ curl "http://localhost:8787/admin/reports/campaign-runner.csv?campaignSlug=hand-
 ```
 
 For authenticated browser use these endpoints require the dashboard session cookie and CSRF/origin protections where applicable. Script-driven admin endpoints that still use `Authorization: Bearer ADMIN_SECRET` remain separate from the browser dashboard contract.
+
+Stripe financials backfill for super admins:
+
+```bash
+curl -X POST "http://localhost:8787/admin/analytics/stripe-financials/backfill" \
+  -H 'Content-Type: application/json' \
+  -H 'x-pool-admin-csrf: <dashboard-csrf-token>' \
+  --cookie "pool_admin_session=<session-cookie>" \
+  -d '{"campaignSlug":"hand-relations","dryRun":true}'
+```
+
+The backfill uses `campaign-pledges:{slug}` indexes and grouped PaymentIntent lookups, not KV namespace scans.
 
 ### `POST /admin/recover-checkout`
 Recover a missed Stripe webhook by manually creating a pledge from a completed checkout session.
@@ -638,4 +664,4 @@ All emails show exact amounts with 2 decimal places (no rounding).
 
 ---
 
-_Last updated: Apr 9, 2026_
+_Last updated: May 29, 2026_

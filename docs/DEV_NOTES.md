@@ -25,10 +25,14 @@ The config now uses a structured settings model in [`_config.yml`](../_config.ym
 - top-level `title` / `description`
 - `seo`
 - `platform`
+- `admin`
 - `pricing`
+- `tax`
 - `shipping`
+- `reports`
 - `design`
 - `debug`
+- `add_ons`
 - `checkout`
 - `cache`
 
@@ -40,37 +44,16 @@ See [CUSTOMIZATION.md](../docs/CUSTOMIZATION.md) for the supported no-code fork 
 
 Current mirrored Worker values worth treating as part of the supported customization surface:
 
-- `PLATFORM_NAME`
-- `PLATFORM_COMPANY_NAME`
-- `SUPPORT_EMAIL`
-- `PLEDGES_EMAIL_FROM`
-- `UPDATES_EMAIL_FROM`
-- `EMAIL_LOGO_PATH`
-- `EMAIL_FONT_FAMILY`
-- `EMAIL_HEADING_FONT_FAMILY`
-- `EMAIL_COLOR_TEXT`
-- `EMAIL_COLOR_MUTED`
-- `EMAIL_COLOR_SURFACE`
-- `EMAIL_COLOR_BORDER`
-- `EMAIL_COLOR_PRIMARY`
-- `EMAIL_BUTTON_RADIUS`
-- `SALES_TAX_RATE`
-- `FLAT_SHIPPING_RATE`
-- `SHIPPING_ORIGIN_ZIP`
-- `SHIPPING_ORIGIN_COUNTRY`
-- `SHIPPING_FALLBACK_FLAT_RATE`
-- `FREE_SHIPPING_DEFAULT`
-- `USPS_ENABLED`
-- `USPS_CLIENT_ID`
-- `USPS_API_BASE`
-- `USPS_TIMEOUT_MS`
-- `USPS_QUOTE_CACHE_TTL_SECONDS`
-- `USPS_FAILURE_COOLDOWN_SECONDS`
-- `USPS_RATE_LIMIT_COOLDOWN_SECONDS`
-- `DEFAULT_PLATFORM_TIP_PERCENT`
-- `MAX_PLATFORM_TIP_PERCENT`
+- identity, URL, and SEO vars: `SITE_TITLE`, `SITE_DESCRIPTION`, `PLATFORM_NAME`, `PLATFORM_COMPANY_NAME`, `PLATFORM_AUTHOR`, `PLATFORM_DEFAULT_CREATOR_NAME`, `SITE_BASE`, `WORKER_BASE`, `CANONICAL_SITE_BASE`, `CANONICAL_WORKER_BASE`, `CORS_ALLOWED_ORIGIN`, `SEO_*`
+- admin bootstrap vars: `ADMIN_USERS_JSON`, plus dev-only `ADMIN_BOOTSTRAP_EMAILS` and `ADMIN_TEST_CAMPAIGNS`
+- checkout and pricing vars: `STRIPE_PUBLISHABLE_KEY`, `SALES_TAX_RATE`, `FLAT_SHIPPING_RATE`, `DEFAULT_PLATFORM_TIP_PERCENT`, `MAX_PLATFORM_TIP_PERCENT`
+- tax and shipping vars: `TAX_PROVIDER`, `TAX_ORIGIN_COUNTRY`, `TAX_USE_REGIONAL_ORIGIN`, `NM_GRT_API_BASE`, `ZIP_TAX_API_BASE`, `SHIPPING_ORIGIN_ZIP`, `SHIPPING_ORIGIN_COUNTRY`, `SHIPPING_FALLBACK_FLAT_RATE`, `FREE_SHIPPING_DEFAULT`, `SHIPPING_DEFAULT_OPTION`, `USPS_*`
+- email and design vars: `SUPPORT_EMAIL`, `PLEDGES_EMAIL_FROM`, `UPDATES_EMAIL_FROM`, `EMAIL_*`, `PLATFORM_FOOTER_LOGO_PATH`, `PLATFORM_FAVICON_PATH`, `PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH`
+- campaign-runner, cache, and debug vars: `CAMPAIGN_RUNNER_*`, `LIVE_STATS_CACHE_TTL_SECONDS`, `LIVE_INVENTORY_CACHE_TTL_SECONDS`, `DEBUG_CONSOLE_LOGGING_ENABLED`, `DEBUG_VERBOSE_CONSOLE_LOGGING`
 
 The repo now includes `npm run sync:worker-config`, which syncs those mirrored values from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`. The main local dev, test, Worker-only, and pre-merge paths call it automatically. The merge gate’s first-party artifact check also falls back to the Podman-backed build path when host Bundler/Jekyll is unavailable.
+
+When adding a new Worker-visible config setting, update `scripts/sync-worker-config.rb` in three places: `TOP_LEVEL_ORDER`, `DEV_ENV_ORDER`, and `build_mirror_values`. Do not add secrets to this path; the sync script is for non-secret repo config only.
 
 Local Worker development now targets Node 24 to match GitHub Actions. The Podman Worker image defaults to Node 24, while host helper scripts prefer Node 24 and fall back to Node 22 rather than forcing the old Node 20 path that Wrangler 4 no longer supports. The shared Worker `compatibility_date` should move deliberately with Wrangler/runtime updates so local Miniflare behavior and deployed Workers behavior stay aligned.
 
@@ -208,7 +191,7 @@ The private dashboard at `/admin/` is now the supported browser-based editor and
 - Secrets stay in Worker secrets or ignored `.dev.vars`; the dashboard only shows configured/missing status.
 - Reports, analytics, supporter browsing, content previews, table filtering, and CSV downloads are read-only dashboard flows and should not add KV writes.
 - Image/video/audio uploads use the existing asset directories, normalize filenames, and then publish through the same GitHub-backed path as the field they update.
-- Media optimization is deliberately outside the Worker. Use `npm run media:optimize` locally, or let the `Optimize dashboard media` GitHub Actions workflow run after dashboard uploads reach `main`.
+- Media optimization is deliberately outside the Worker. Use `npm run media:optimize` locally, `npm run media:optimize:check` before merge when uploaded media changed, or let the `Optimize dashboard media` GitHub Actions workflow run after dashboard uploads reach `main`.
 
 See [DASHBOARD.md](DASHBOARD.md) for the full dashboard reference.
 
@@ -1378,6 +1361,7 @@ That index is still the preferred fast path for reports, settlement, and admin r
 | `POST /stats/:slug/check` | Read-only projection drift check for one campaign |
 | `POST /admin/projections/check` | Read-only projection drift check for all campaigns |
 | `POST /admin/backfill-customers/:slug` | Create Stripe customers for pledges missing them |
+| `POST /admin/analytics/stripe-financials/backfill` | Backfill actual Stripe balance transaction fee/net values for charged pledges using campaign pledge indexes |
 | `GET /admin/cron/status` | Check cron heartbeat |
 
 **Checking cron health:**
@@ -1388,4 +1372,4 @@ curl -s https://pledge.dustwave.xyz/admin/cron/status \
 
 ---
 
-_Last updated: Apr 9, 2026_
+_Last updated: May 29, 2026_

@@ -689,33 +689,49 @@ Supported keys:
 
 Some settings only affect the Jekyll build and browser-owned UI. Others are also reflected into the Worker env automatically.
 
-### Safe Site-Only Changes
+### Not Mirrored By The Sync Script
 
-These can be changed in `_config.yml` without changing Worker config or worrying about the sync step:
+These can be changed in `_config.yml` without adding new Worker env entries:
 
 - `i18n.*`
-- `checkout.stripe_publishable_key`
-- `platform.default_creator_name`
-- `platform.footer_logo_path`
-- `platform.favicon_path`
-- `platform.default_social_image_path`
-- `cache.*`
-- most `design.*` values that are only consumed by the generated site/theme CSS
+- `platform.version`
+- `platform.release_label`
+- `admin.production_site_url`
+- `admin.production_worker_url`
+- `shipping.presets`
+- `add_ons.*`
+- campaign front matter, including `campaign_add_ons`, content blocks, diary entries, tiers, support items, stretch goals, and decisions
+- design/layout tokens that are only consumed by the generated site CSS and not by supporter emails
 
-These are the safest “site generation / branding / localization without Worker-side math or email impact” knobs. They change the generated site, browser boot payload, or theme layer, but they do not need to be mirrored into Worker env.
+These values still matter to the generated site and, in some cases, to Worker-fetched static API payloads. They are simply not written into `worker/wrangler.toml` by `scripts/sync-worker-config.rb`.
 
 ### Auto-Mirrored To Worker
 
 These site-config values are also reflected into the Worker env values in [`worker/wrangler.toml`](../worker/wrangler.toml):
 
+- `title` -> `SITE_TITLE`
+- `description` -> `SITE_DESCRIPTION`
+- `author` -> `PLATFORM_AUTHOR`
 - `platform.name` -> `PLATFORM_NAME`
 - `platform.company_name` -> `PLATFORM_COMPANY_NAME`
+- `platform.default_creator_name` -> `PLATFORM_DEFAULT_CREATOR_NAME`
 - `platform.support_email` -> `SUPPORT_EMAIL`
 - `platform.pledges_email_from` -> `PLEDGES_EMAIL_FROM`
 - `platform.updates_email_from` -> `UPDATES_EMAIL_FROM`
 - `platform.logo_path` -> `EMAIL_LOGO_PATH`
-- `platform.site_url` -> `SITE_BASE`
+- `platform.footer_logo_path` -> `PLATFORM_FOOTER_LOGO_PATH`
+- `platform.favicon_path` -> `PLATFORM_FAVICON_PATH`
+- `platform.default_social_image_path` -> `PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH`
+- `platform.site_url` -> `SITE_BASE` and `CORS_ALLOWED_ORIGIN`
 - `platform.worker_url` -> `WORKER_BASE`
+- `seo.default_social_image_alt` -> `SEO_DEFAULT_SOCIAL_IMAGE_ALT`
+- `seo.x_handle` -> `SEO_X_HANDLE`
+- `seo.same_as` -> `SEO_SAME_AS`
+- `seo.index_public_community_hub` -> `SEO_INDEX_PUBLIC_COMMUNITY_HUB`
+- `admin.users` -> `ADMIN_USERS_JSON`
+- `admin.local_bootstrap_emails` -> `ADMIN_BOOTSTRAP_EMAILS` in the dev env
+- `admin.local_test_campaigns` -> `ADMIN_TEST_CAMPAIGNS` in the dev env
+- `checkout.stripe_publishable_key` -> `STRIPE_PUBLISHABLE_KEY`
 - `design.font_body` -> `EMAIL_FONT_FAMILY`
 - `design.font_display` -> `EMAIL_HEADING_FONT_FAMILY`
 - `design.color_text` -> `EMAIL_COLOR_TEXT`
@@ -728,6 +744,7 @@ These site-config values are also reflected into the Worker env values in [`work
 - `tax.provider` -> `TAX_PROVIDER`
 - `tax.origin_country` -> `TAX_ORIGIN_COUNTRY`
 - `tax.use_regional_origin` -> `TAX_USE_REGIONAL_ORIGIN`
+- `tax.nm_grt_api_base` -> `NM_GRT_API_BASE`
 - `tax.zip_tax_api_base` -> `ZIP_TAX_API_BASE`
 - `pricing.flat_shipping_rate` -> `FLAT_SHIPPING_RATE` (legacy compatibility only; prefer `shipping.fallback_flat_rate`)
 - `pricing.default_tip_percent` -> `DEFAULT_PLATFORM_TIP_PERCENT`
@@ -736,6 +753,7 @@ These site-config values are also reflected into the Worker env values in [`work
 - `shipping.origin_country` -> `SHIPPING_ORIGIN_COUNTRY`
 - `shipping.fallback_flat_rate` -> `SHIPPING_FALLBACK_FLAT_RATE`
 - `shipping.free_shipping_default` -> `FREE_SHIPPING_DEFAULT`
+- `shipping.default_option` -> `SHIPPING_DEFAULT_OPTION`
 - `shipping.usps.enabled` -> `USPS_ENABLED`
 - `shipping.usps.client_id` -> `USPS_CLIENT_ID`
 - `shipping.usps.api_base` -> `USPS_API_BASE`
@@ -751,6 +769,15 @@ These site-config values are also reflected into the Worker env values in [`work
 - `reports.campaign_runner.include_stats_summary` -> `CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY`
 - `reports.campaign_runner.include_csv_attachment` -> `CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT`
 - `reports.campaign_runner.email_subject_prefix` -> `CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX`
+- `debug.console_logging_enabled` -> `DEBUG_CONSOLE_LOGGING_ENABLED`
+- `debug.verbose_console_logging` -> `DEBUG_VERBOSE_CONSOLE_LOGGING`
+- `cache.live_stats_ttl_seconds` -> `LIVE_STATS_CACHE_TTL_SECONDS`
+- `cache.live_inventory_ttl_seconds` -> `LIVE_INVENTORY_CACHE_TTL_SECONDS`
+
+The sync script also writes derived URL values:
+
+- production `[vars]` gets `CANONICAL_SITE_BASE` / `CANONICAL_WORKER_BASE` from the production `platform.site_url` / `platform.worker_url`
+- dev `[env.dev.vars]` gets local `SITE_BASE` / `WORKER_BASE` from `_config.local.yml`, while `CANONICAL_SITE_BASE` / `CANONICAL_WORKER_BASE` stay pinned to the production values from `_config.yml`
 
 The browser dashboard **Reports** tab previews and downloads pledge/fulfillment CSVs for campaigns the admin can access. It does not send report emails and does not write “sent” markers.
 
@@ -768,7 +795,9 @@ npm run sync:worker-config
 
 That command syncs the Worker-mirrored values in [`worker/wrangler.toml`](../worker/wrangler.toml) from `_config.yml` and `_config.local.yml`.
 
-It does not write Worker secrets. USPS OAuth secrets still belong in `wrangler secret` or `worker/.dev.vars`.
+It does not write Worker secrets, media files, or optimization outputs. USPS OAuth secrets, Stripe secret keys, Resend keys, ZIP.TAX keys, Turnstile secrets, GitHub tokens, and Cloudflare deploy credentials still belong in Worker secrets, GitHub repository secrets, or ignored local env files.
+
+Dashboard-uploaded media also does not add new sync-script config. Uploads commit source files into the existing asset directories; `npm run media:optimize` / `npm run media:optimize:check` and the **Optimize dashboard media** workflow handle image compression and WebM derivatives outside the Worker.
 
 The main local/dev validation paths already call that sync automatically:
 
@@ -837,7 +866,8 @@ When adding new customization knobs, prefer this order:
 
 1. put the site-facing value in `_config.yml`
 2. mirror it to Worker env only if checkout, reports, or emails need it
-3. document it here
-4. keep the supported surface curated instead of exposing every implementation detail
+3. if it needs Worker env, update `scripts/sync-worker-config.rb` in `TOP_LEVEL_ORDER`, `DEV_ENV_ORDER`, and `build_mirror_values`
+4. document it here
+5. keep the supported surface curated instead of exposing every implementation detail
 
 That keeps customization flexible without turning the platform into an unstable free-form theme engine.

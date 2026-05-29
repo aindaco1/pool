@@ -148,7 +148,7 @@ For localization, the supported model is:
 - generated campaign pages and embed pages now participate in the locale model too, so `/campaigns/{slug}/` can switch cleanly to `/es/campaigns/{slug}/`
 - the shared footer language switcher preserves the current query string and hash, so tokenized routes like `/manage/?t=...` can switch to `/es/manage/?t=...` without dropping pledge access
 
-The main local/dev/test paths already sync those mirrored Worker values automatically. If you want to refresh the Worker config directly, run:
+The main local/dev/test paths already call the existing sync script, [`scripts/sync-worker-config.rb`](scripts/sync-worker-config.rb), to keep those mirrored Worker values aligned. If you edit `_config.yml` / `_config.local.yml` directly and want to refresh the Worker config before restarting the stack, run:
 
 ```bash
 npm run sync:worker-config
@@ -267,6 +267,7 @@ npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium # Focus
 node --check assets/js/admin-dashboard.js # Dashboard JavaScript syntax check
 npm run test:security  # Security tests — pen testing the Worker API
 npm run test:security:podman # Security tests with a Podman-backed local stack in one invocation
+npm run media:optimize:check # Check uploaded media for pending optimization/derivatives
 npm test               # Run unit + e2e
 ```
 
@@ -439,6 +440,8 @@ Required GitHub repository secrets for automatic Worker deployment:
 - optional `DIARY_CHECK_BYPASS_SECRET` if Cloudflare WAF challenges the post-deploy diary check
 
 The workflow also needs GitHub Pages deployment permissions. Keep `pages: write` and `id-token: write` explicit on the Pages deploy job if you copy or refactor `.github/workflows/deploy.yml`.
+
+Dashboard-uploaded media is source-preserving when it enters the repository. The separate **Optimize dashboard media** workflow runs on `main` for `assets/images/**`, `assets/videos/**`, `_campaigns/**`, and `_config.yml` changes; it compresses images when smaller output is available, generates WebM derivatives for uploaded videos, rewrites literal video references after derivatives exist, and commits those optimization changes back with the GitHub Actions bot.
 
 If the diary check logs an HTTP `403` Cloudflare challenge page, the request is being stopped before it reaches the Worker. Add a Cloudflare WAF custom rule that skips managed challenges for:
 
