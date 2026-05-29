@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.1 - 2026-05-29
+
+- Added actual Stripe balance transaction fee/net capture for newly charged pledges and a super-admin backfill path for older charged pledge records.
+- Updated dashboard Analytics to prefer stored actual Stripe fees when available, keep estimated fees only where needed, and label mixed/estimated values clearly.
+- Added the dashboard media optimization pipeline: `npm run media:optimize`, `npm run media:optimize:check`, and a GitHub Actions workflow that losslessly compresses uploaded images, generates high-quality WebM video derivatives, and rewrites literal campaign/config video references after derivatives exist.
+- Kept dashboard uploads source-preserving in the Worker while documenting the external optimization step for operators and forks.
+- Made Supporters and Analytics return empty read-only views for campaigns without pledge indexes instead of blocking new or empty campaign dashboards.
+- Reorganized the roadmap into completed work and Future Features, with implementation details for remaining post-1.0 follow-ups.
+- Verified the full merge gate before release, including secret audit, syntax checks, focused regressions, full unit suite, build artifact checks, security suite, host Worker smoke, Podman mutable-pledge smoke, and headless E2E.
+
 ## v1.0.0 - 2026-05-26
 
 - Added the private admin dashboard as the supported browser editing and operations surface at `/admin/` and `/es/admin/`.
