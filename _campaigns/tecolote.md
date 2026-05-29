@@ -7,6 +7,7 @@ start_date: 2026-02-17
 goal_deadline: 2026-03-20
 goal_amount: 2000
 charged: false
+funded: true
 hero_image: /assets/images/campaigns/tecolote/wide.png
 hero_image_wide: /assets/images/campaigns/tecolote/wide-alt.png
 hero_video: /assets/videos/campaigns/tecolote/video.webm
