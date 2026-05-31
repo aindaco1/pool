@@ -31,7 +31,7 @@ jobs:
       - name: Install media tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg oxipng libjpeg-turbo-progs gifsicle webp
+          sudo apt-get install -y ffmpeg optipng libjpeg-turbo-progs gifsicle webp
 
       - name: Optimize changed media
         run: node ./scripts/optimize-media.mjs --write --changed

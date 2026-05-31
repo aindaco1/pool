@@ -158,6 +158,8 @@ async function optimizeImage(repoPath, args, tools) {
 
   if (extension === '.png' && tools.oxipng) {
     if (args.write) await execFileAsync('oxipng', ['-o', 'max', '--strip', 'safe', filePath]);
+  } else if (extension === '.png' && tools.optipng) {
+    if (args.write) await execFileAsync('optipng', ['-o7', '-quiet', filePath]);
   } else if ((extension === '.jpg' || extension === '.jpeg') && tools.jpegtran) {
     const candidatePath = `${filePath}.optimized`;
     await execFileAsync('jpegtran', ['-copy', 'none', '-optimize', '-progressive', '-outfile', candidatePath, filePath]);
@@ -238,6 +240,7 @@ async function main() {
   const mediaFiles = await resolveMediaFiles(args);
   const tools = {
     oxipng: await commandExists('oxipng'),
+    optipng: await commandExists('optipng'),
     jpegtran: await commandExists('jpegtran'),
     gifsicle: await commandExists('gifsicle'),
     cwebp: await commandExists('cwebp'),
