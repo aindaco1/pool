@@ -11,7 +11,7 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
-El hito de lanzamiento actual de la plataforma es **v1.0.0 release candidate**. El conjunto de funciones de v1.0 ya está en su lugar; el endurecimiento final se centra en protección contra bots para el inicio de sesión del panel de administración y una verificación final de lanzamiento.
+El hito de lanzamiento actual de la plataforma es **v1.0.2**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente se enfoca en páginas públicas más rápidas, prefetch seguro de enlaces públicos, enlaces para compartir campañas, minificación de assets generados y controles de performance más claros en el panel.
 
 ## Aportes de todo o nada
 
@@ -53,6 +53,16 @@ Algunos checkouts pueden incluir add-ons de plataforma, add-ons de campaña, mej
 
 Los múltiples aportes desde el mismo correo se combinan en un único cobro cuando la misma campaña tiene éxito. Las propinas opcionales y los add-ons de plataforma apoyan al equipo que opera la plataforma y no cuentan para la meta de financiación del proyecto.
 
+## Compartir y performance
+
+Las páginas de campaña están diseñadas para compartirse fácilmente sin convertir flujos privados de patrocinadores en enlaces públicos.
+
+- **Enlaces integrados para compartir**: las páginas de campaña incluyen destinos para Bluesky, X, Threads, Facebook, SMS y email. Usan la URL pública de campaña y texto según el estado cuando la plataforma destino permite mensaje.
+- **Previews enriquecidos**: los enlaces públicos de campaña emiten metadatos Open Graph y Twitter, además de imágenes de share card compatibles con crawlers, para que las plataformas sociales muestren un preview útil.
+- **Los enlaces privados siguen privados**: Gestionar aporte, comunidad de patrocinadores, checkout, admin y enlaces con tokens quedan fuera de la intención pública de compartir e indexar.
+- **Primera carga más rápida**: las barras de progreso e hitos de campaña renderizan posiciones estables antes de que termine JavaScript, el CSS/JS generado se minifica para producción y el runtime completo del carrito espera hasta que haya estado de carrito o intención del patrocinador.
+- **Prefetch conservador**: las páginas públicas pueden prefetch rutas públicas probables del mismo origen después de hover, foco o toque, pero se excluyen enlaces privados, checkout, admin, comunidad de patrocinadores, externos y con parámetros sensibles.
+
 ## Para creadores
 
 La plataforma está diseñada para cineastas y equipos creativos que necesitan una campaña que puedan operar sin mandar a sus patrocinadores por un laberinto de cuentas, plugins o herramientas desconectadas.
@@ -63,8 +73,10 @@ La plataforma está diseñada para cineastas y equipos creativos que necesitan u
 - **Add-ons opcionales de plataforma**: ofrece merch de plataforma junto con los aportes cuando esté habilitado, con inventario y envío separados que no cuentan para la meta de financiación de la campaña.
 - **Add-ons de campaña**: vende merch o extras específicos de la campaña en el mismo flujo de aporte, manteniendo ingresos, inventario y envío ligados a esa campaña.
 - **Panel privado de administración**: da a personas de confianza un espacio enfocado para ajustes de campaña, contenido de página, recompensas, actualizaciones, decisiones, reportes, patrocinadores, analytics y enlaces de marketing.
+- **Cargas de media en el panel**: prepara imágenes, video y audio de campaña o diario con previews, y publícalos en las rutas de assets de campaña mediante el flujo revisable normal.
 - **Reportes cuando los necesites**: previsualiza y descarga CSVs de aportes o fulfillment desde el panel, con correos opcionales para responsables de campaña mientras la campaña está activa.
 - **Embeds para promoción**: genera widgets vivos de campaña para sitios aliados, páginas de prensa, portfolios de creadores o páginas de patrocinadores.
+- **Enlaces para compartir y previews sociales**: ofrece a patrocinadores destinos claros para compartir mientras las imágenes y descripciones de preview se mantienen alineadas con el estado actual de la campaña.
 - **Fases de producción**: muestra a los patrocinadores qué partes del presupuesto pueden ayudar a financiar.
 - **Metas ampliadas**: haz visibles hitos creativos adicionales a medida que crece el apoyo.
 - **Decisiones comunitarias**: invita a los patrocinadores a votar sobre decisiones creativas seleccionadas.
@@ -90,6 +102,8 @@ The Pool es una plataforma de crowdfunding con arquitectura static-first. Las p�
 
 El stack está pensado para equipos pequeños y forks. Cada servicio principal ofrece un nivel gratuito, y la plataforma evita trabajo dinámico innecesario siempre que puede. Las páginas públicas de campaña son estáticas, los datos públicos en vivo se combinan y se cachean en el navegador, y el Worker se reserva para operaciones que necesitan confianza del servidor.
 
+El modelo de performance pública sigue siendo static-first. El sitio minifica los assets generados, deja la compresión de transferencia a Cloudflare, reserva espacio estable para progreso y media de campaña, y retrasa el código pesado del carrito hasta que realmente hace falta.
+
 El panel de administración sigue la misma disciplina de costes. Navegación, filtros, vistas previas, analytics, reportes y borradores locales evitan escrituras a KV. Las escrituras durables ocurren solo cuando una persona administradora guarda estado propio del panel o publica cambios de campaña/plataforma.
 
 La personalización se controla principalmente por configuración. Impuestos, envío, SEO, localización, logging, identidad de correo, ajustes del panel, branding público, estilo del checkout y presentación de correos para patrocinadores se mantienen alineados por config para que un fork pueda cambiar la presentación sin reescribir el modelo de aportes.
@@ -107,3 +121,5 @@ The Pool es de código abierto. Toda la plataforma, el frontend, el Worker, la a
 ---
 
 *The Pool ha sido creado y es mantenido por [Dust Wave](https://dustwave.xyz).*
+
+_Última actualización: 31 de mayo de 2026_

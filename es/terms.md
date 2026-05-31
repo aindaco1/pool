@@ -20,6 +20,7 @@ description: Revisa los términos de aporte, el procesamiento de pagos, el cumpl
 - Todas las fechas límite de campaña usan horario de montaña (MST/MDT).
 - Los votos de comunidad se limitan a las opciones publicadas en la página de patrocinadores de la campaña, y las decisiones cerradas no aceptan nuevos votos.
 - Si un enlace de gestión apunta a un aporte que ya no existe, The Pool lo trata como no disponible en lugar de reconstruir un acceso de marcador de posición.
+- Las páginas públicas de campaña pueden incluir enlaces para compartir en plataformas externas, SMS y email. Esos enlaces son solo para URLs públicas de campaña y no incluyen tokens de gestión de aportes, checkout, comunidad de patrocinadores, admin ni magic links.
 
 ## Procesamiento de pagos
 
@@ -71,6 +72,8 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Los complementos de la plataforma con inventario limitado usan el estado de los aportes guardados, no los borradores en curso del carrito, para determinar el stock restante.
 - Los complementos de campaña con inventario limitado también usan el estado de los aportes guardados, no los borradores en curso del carrito, para determinar el stock restante.
 - El acceso a la comunidad de patrocinadores en el navegador puede recordarse durante la sesión actual como una comodidad, pero el enlace mágico enviado por correo sigue siendo la fuente de verdad para el acceso.
+- Las páginas públicas pueden prefetch páginas públicas elegibles del mismo origen después de hover, foco o toque para que la navegación normal sea más rápida. Este comportamiento excluye enlaces de admin, checkout, Gestionar aporte, comunidad de patrocinadores, enlaces con tokens, externos y con parámetros sensibles.
+- Los enlaces para compartir campañas pueden preservar parámetros públicos seguros de referencia o UTM para que responsables de campaña entiendan el origen de la promoción pública. No preservan parámetros de token, pedido, email, sesión u otros datos sensibles.
 - No vendemos tu información. Solo la compartimos cuando es necesario para el procesamiento del pago, la entrega de correos transaccionales, el cálculo de cotizaciones de envío y el cumplimiento de recompensas.
 
 ## Plataforma y tecnología
@@ -78,13 +81,13 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 The Pool es una [plataforma de crowdfunding de código abierto](https://github.com/aindaco1/pool) creada con:
 
 - **Jekyll en [GitHub Pages](https://docs.github.com/en/pages)**: generación de sitio estático
-- **El runtime de carrito de The Pool**: gestión propia del carrito, sidecars de pago y revisión del aporte
+- **El runtime de carrito de The Pool**: gestión propia del carrito, sidecars de pago, revisión del aporte y carga diferida en páginas públicas hasta que haya estado de carrito o intención del patrocinador
 - **[Stripe](https://stripe.com)**: campos de pago seguros, métodos de pago guardados y procesamiento de pagos
 - **[Cloudflare Workers](https://workers.cloudflare.com)**: API backend para validación canónica de aportes, almacenamiento de aportes, estadísticas en vivo y liquidación automatizada de campañas
 - **Panel privado de administración**: edición de campañas por rol, reportes, analytics, vistas de patrocinadores, enlaces de marketing, gestión de usuarios y operaciones de plataforma
 - **[Resend](https://resend.com)**: correos transaccionales (confirmaciones, actualizaciones y notificaciones de cobro)
 
-Los datos de los aportes se almacenan en Cloudflare KV. Esta arquitectura implica menores costes operativos y hace que una mayor parte de tu aporte vaya directamente al proyecto, con las propinas opcionales ayudando a cubrir el mantenimiento de The Pool.
+Los datos de los aportes se almacenan en Cloudflare KV. Esta arquitectura implica menores costes operativos y hace que una mayor parte de tu aporte vaya directamente al proyecto, con las propinas opcionales ayudando a cubrir el mantenimiento de The Pool. Las compilaciones de producción también minifican los assets CSS/JS generados después de crear el sitio estático, mientras Cloudflare gestiona la compresión de transferencia en el edge.
 
 ## Preguntas
 
@@ -92,4 +95,4 @@ Si tienes preguntas sobre estos términos o sobre tu aporte, escribe a info@dust
 
 ---
 
-_Última actualización: 26 de mayo de 2026_
+_Última actualización: 31 de mayo de 2026_

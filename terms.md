@@ -19,6 +19,7 @@ description: Review pledge terms, payment processing, fulfillment, and privacy d
 - All campaign deadlines use Mountain Time (MST/MDT).
 - Community votes are limited to the published options on a campaign's supporter page, and closed decisions do not accept new votes.
 - If a manage link points to a pledge that no longer exists, The Pool treats it as unavailable instead of reconstructing placeholder pledge access.
+- Public campaign pages may include share links for external platforms, SMS, and email. Those links are for public campaign URLs only and do not include pledge-management, checkout, supporter-community, admin, or magic-link tokens.
 
 ## Payment Processing
 
@@ -70,6 +71,8 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - Inventory-limited platform add-ons use saved pledge state, not in-progress cart drafts, to determine remaining stock.
 - Inventory-limited campaign add-ons also use saved pledge state, not in-progress cart drafts, to determine remaining stock.
 - Supporter-community access in the browser may be remembered for the current session as a convenience, but the emailed magic link remains the source of truth for access.
+- Public pages may prefetch eligible same-origin public pages after hover, focus, or touch intent to make normal navigation faster. This prefetch behavior excludes admin, checkout, Manage Pledge, supporter-community, tokenized, external, and sensitive-query links.
+- Campaign share links may preserve safe public referral or UTM query parameters so campaign runners can understand public promotion sources. They do not preserve token, order, email, session, or other sensitive query parameters.
 - We do not sell your information. We share it only as necessary for payment processing, transactional email delivery, shipping quote calculation, and reward fulfillment.
 
 ## Platform & Technology
@@ -77,13 +80,13 @@ This section applies only to campaigns that explicitly solicit creative submissi
 The Pool is an [open-source crowdfunding platform](https://github.com/aindaco1/pool) built with:
 
 - **Jekyll on [GitHub Pages](https://docs.github.com/en/pages)** — Static site generation
-- **The Pool cart runtime** — First-party cart management, checkout sidecars, and pledge review
+- **The Pool cart runtime** — First-party cart management, checkout sidecars, pledge review, and lazy public-page loading until cart state or supporter intent requires the full cart stack
 - **[Stripe](https://stripe.com)** — Secure payment fields, saved payment methods, and payment processing
 - **[Cloudflare Workers](https://workers.cloudflare.com)** — Backend API for canonical pledge validation, pledge storage, live stats, and automated campaign settlement
 - **Private admin dashboard** — Role-scoped campaign editing, reports, analytics, supporter views, marketing links, user management, and platform operations
 - **[Resend](https://resend.com)** — Transactional emails (confirmations, updates, charge notifications)
 
-Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project, with optional platform tips helping cover maintenance of The Pool itself.
+Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project, with optional platform tips helping cover maintenance of The Pool itself. Production builds also minify generated CSS/JS assets after static site generation, while Cloudflare handles transfer compression at the edge.
 
 ## Questions
 
@@ -91,4 +94,4 @@ For questions about these terms or your pledge, email us at info@dustwave.xyz.
 
 ---
 
-_Last updated: May 26, 2026_
+_Last updated: May 31, 2026_
