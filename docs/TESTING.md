@@ -67,6 +67,10 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | `email-tip` | Tip-aware supporter email breakdowns across confirmation / modified / cancelled / failed / charged emails |
 | `votes` | Email-based vote storage/dedup, vote status retrieval, campaign results, result aggregation |
 | `admin-dashboard` | Dashboard dirty-state tracking, settings serialization, content/editor normalization, staged media uploads, actual Stripe fee analytics/backfill, referral URL helpers, responsive/i18n support utilities |
+| `campaign-page` | Share-link URL construction, safe query preservation, state-aware share text, public campaign controls, and SEO-sensitive campaign-page behavior |
+| `page-prefetch` | Same-origin public-route allowlisting, sensitive-query exclusions, network guards, delay/limit handling, and document prefetch hint creation |
+| `cart-runtime-loader` | Lazy cart-runtime boot, persisted/recovery cart detection, idempotent loading, and user-intent triggers |
+| `site-asset-minification` | Generated `_site` CSS/JS minification behavior and check-mode failure cases |
 | `media-optimization-script` | Changed-file selection, lossless image optimization decisions, video derivative naming, and source-to-WebM reference rewrites |
 
 ### Running
@@ -107,6 +111,8 @@ This runs:
 - Full unit suite via `npm run test:unit`
 - Security suite via `npm run test:security` against an auto-started local Worker
 - Podman-backed security suite via `npm run test:security:podman` when you want the site/Worker stack booted and exercised in the same invocation
+- First-party build artifact checks that run Jekyll, minify generated `_site` CSS/JS assets, and verify the minified output has no remaining savings
+- Public-page performance and sharing regressions through unit coverage for intent prefetching, lazy cart-runtime loading, generated asset minification, and campaign share-link behavior
 - Playwright headless E2E via `npm run test:e2e:headless`
 
 The pre-merge script now auto-starts Jekyll with `_config.yml,_config.local.yml` when needed so the local-only `smoke-editable` campaign is available during merge gating, and the Playwright harness uses the same combined config locally.
@@ -182,14 +188,28 @@ If you tune free-plan read behavior, keep these in sync too:
 
 - `cache.live_stats_ttl_seconds`
 - `cache.live_inventory_ttl_seconds`
+- `performance.intent_prefetch_enabled`
+- `performance.intent_prefetch_delay_ms`
+- `performance.intent_prefetch_limit`
 
-After changing either cache TTL locally, restart `./scripts/dev.sh --podman` and rerun:
+After changing those cache or performance knobs locally, restart `./scripts/dev.sh --podman` and rerun:
 
 ```bash
 npx vitest run tests/unit/live-stats.test.ts tests/unit/manage-page.test.ts tests/unit/config-boot.test.ts
 ```
 
 Those suites protect the combined `/live/:slug` read path, the browser cache behavior, and the config boot wiring that forks rely on.
+
+For the public prefetch, share-link, and lazy cart-runtime surfaces, use:
+
+```bash
+npx vitest run \
+  tests/unit/page-prefetch.test.ts \
+  tests/unit/cart-runtime-loader.test.ts \
+  tests/unit/campaign-page.test.ts \
+  tests/unit/seo-layouts.test.ts \
+  tests/unit/site-asset-minification.test.ts
+```
 
 On GitHub, the same gate runs automatically in the `Merge Smoke` workflow for pull requests targeting `main`.
 

@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Lista para creadores de campañas
-description: "Una lista práctica para preparar una campaña en The Pool: panel de administración, imágenes, video, textos, niveles, add-ons, embeds, impuestos, envío, reportes y fulfillment."
+description: "Una lista práctica para preparar una campaña en The Pool: panel de administración, imágenes, video, textos, niveles, add-ons, enlaces para compartir, embeds, impuestos, envío, reportes y fulfillment."
 permalink: /es/creator-campaign-checklist/
 lang: es
 indexable: false
@@ -28,9 +28,22 @@ La lista cubre:
 - add-ons de campaña y add-ons de plataforma
 - recompensas físicas, envío, envío gratis y tarifas de respaldo
 - expectativas de impuestos y checkout
-- embeds para promoción
+- enlaces para compartir y embeds para promoción
 - reportes, fulfillment y entrega final
 - acceso al panel, borradores y expectativas de publicación
+
+## Qué cambió desde v0.9.5
+
+Esta lista refleja los cambios de la plataforma hasta **v1.0.2**:
+
+- las personas creadoras pueden tener acceso específico al panel para editar campañas sin acceso directo al repositorio
+- las cargas de media en el panel soportan imágenes, video, audio, previews y optimización posterior en el repositorio
+- los add-ons de campaña pueden pertenecer a una sola campaña y contar hacia su meta
+- los correos de reportes pueden recibir ledgers diarios de pledges y exports de fulfillment después de la fecha límite
+- los embeds alojados dan un widget vivo para sitios web y páginas de partners que aceptan HTML
+- las páginas de campaña incluyen enlaces para compartir en Bluesky, X, Threads, Facebook, SMS y email
+- los textos de compartir usan estado de campaña, título, blurb y URL pública cuando la plataforma destino permite texto
+- las mejoras de performance hacen más estable la primera carga, pero las campañas aún necesitan media optimizada y copy conciso
 
 ## Versión rápida
 
@@ -61,6 +74,7 @@ La lista cubre:
 - video pitch de campaña
 - 3 a 8 imágenes adicionales
 - plan de promoción con el código embed de la campaña
+- captions para compartir en lanzamiento, campaña live, empuje final, campaña funded y campaña ended
 
 ### Si algo es físico
 
@@ -125,6 +139,7 @@ El panel puede gestionar:
 - contenido largo mediante el editor WYSIWYG de bloques
 - niveles, artículos de apoyo, add-ons de campaña, stretch goals, entradas de diario y decisiones
 - vistas previas de reportes, listas de patrocinadores, analytics, enlaces de marketing/referencia y accesos al constructor de embeds
+- textos de compartir y entradas de social preview mediante los mismos campos de título, blurb, imagen hero y estado que se muestran en la página pública
 
 Antes del lanzamiento, confirma:
 
@@ -139,16 +154,18 @@ Notas operativas:
 - Los borradores del editor son locales hasta que se guarden o publiquen, así que no deben tratarse como fuente de verdad.
 - Publicar cambios de campaña o configuración pasa por el flujo de la plataforma y puede tardar en desplegarse.
 - La gestión de usuarios es separada: los usuarios del panel se guardan en Worker KV y no crean commits en GitHub.
+- El sign-in del panel puede pedir un desafío de Cloudflare Turnstile antes de enviar el magic link por email.
 
 ## Imágenes y video
 
 ### Imagen cuadrada
 
-- **Uso:** tarjetas de campaña, fallback de hero, contexto social
+- **Uso:** tarjetas de campaña, fallback de hero, share cards y contexto social
 - **Recomendado:** `1200 × 1200 px`
 - **Mínimo:** `1000 × 1000 px`
 - **Formato:** `WebP`, `JPG` o `PNG`
 - **Peso ideal:** menos de `500 KB`
+- debe seguir siendo legible cuando se recorta dentro de un preview social
 
 ### Imagen ancha
 
@@ -173,6 +190,7 @@ El video debe construir confianza, tono y urgencia. No necesita equipo caro, per
 - **Duración ideal:** `2:00 a 3:30`
 - **Máximo recomendado:** `5:00`
 - **Formato preferido para self-hosting:** `.webm`
+- **Optimización:** las cargas del panel preservan la fuente y el pipeline del repositorio puede generar imágenes comprimidas y derivados WebM antes de lanzar
 
 El video debería responder:
 
@@ -320,8 +338,16 @@ Prepara:
 - si debe mostrar media
 - copy de lanzamiento
 - 3 a 5 captions cortos
+- captions por estado:
+  - upcoming: invitar a estar pendiente del lanzamiento
+  - live: pedir apoyo ahora
+  - empuje final: nombrar el monto restante o la fecha límite
+  - funded: agradecer y explicar próximos pasos
+  - ended: resumir el resultado y dónde seguir updates
 - blurb corto para email/newsletter
 - contactos de prensa o partners, si aplican
+
+Los botones de compartir usan la URL pública de campaña y texto por estado donde se permite. Facebook y otros destinos centrados en preview dependen principalmente del Open Graph title, description e imagen de la campaña.
 
 ## Recompensas físicas y envío
 
@@ -428,6 +454,7 @@ La campaña suele estar lista cuando:
 - reportes y fulfillment tienen responsables
 - el acceso al panel y la responsabilidad de publicación están confirmados
 - el embed fue probado en destinos de promoción
+- los captions y el preview social se sienten apropiados para estados upcoming, live, funded y ended
 - las imágenes tienen alt text
 - no quedan secciones placeholder
 
@@ -436,6 +463,7 @@ La campaña suele estar lista cuando:
 <nav class="creator-checklist-toc" aria-labelledby="creator-checklist-toc-title">
   <h2 id="creator-checklist-toc-title">Contenido</h2>
   <ol>
+    <li><a href="#qué-cambió-desde-v095">Cambios desde v0.9.5</a></li>
     <li><a href="#versión-rápida">Versión rápida</a></li>
     <li><a href="#qué-hace-que-una-campaña-se-sienta-completa">Campaña completa</a></li>
     <li><a href="#información-central">Información central</a></li>

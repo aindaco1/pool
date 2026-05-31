@@ -32,6 +32,14 @@ The mirrored Worker config now also includes the shared debug flags:
 
 Those come from `debug.console_logging_enabled` and `debug.verbose_console_logging` in the repo-root [`_config.yml`](../_config.yml), and both default to `true` so local and deployed Workers stay verbose unless a fork explicitly turns logging down.
 
+The Worker mirror also carries the public intent-prefetch knobs used by generated public pages:
+
+- `INTENT_PREFETCH_ENABLED`
+- `INTENT_PREFETCH_DELAY_MS`
+- `INTENT_PREFETCH_LIMIT`
+
+Those come from `performance.intent_prefetch_*` in the repo-root config and are editable by super admins in **Settings -> Advanced performance**. They are mirrored for config parity and operational visibility; the actual prefetch runtime still loads only on public static layouts and rejects private, tokenized, checkout, admin, supporter, and sensitive-query routes in the browser.
+
 Write-path DoS protection now requires a `RATELIMIT` KV namespace. If that binding is missing, the Worker fails closed with `503` instead of running without abuse protection. Public live-data reads stay intentionally roomy for campaign spikes, while checkout, Manage Pledge, and admin mutations use the tighter per-IP caps documented in [`docs/SECURITY.md`](../docs/SECURITY.md). That requirement adds safety, not a new assumption that every fork must immediately outgrow the Workers Free plan.
 
 Deployed Standard/Paid Workers now also set `limits.cpu_ms = 100` in [`wrangler.toml`](./wrangler.toml). That limit is not enforced in local development and is not a Workers Free override; it is a conservative denial-of-wallet ceiling for paid deployments that still leaves comfortable room above the currently observed fast-path request timings in the unit harness.
@@ -532,6 +540,9 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile secret key for admin email sign-in challenge verification |
 | `ADMIN_TURNSTILE_REQUIRED` | Optional fail-closed flag for deployments that expect Turnstile to be configured |
 | `ADMIN_TURNSTILE_BYPASS` | Local/test-only bypass for automated admin auth tests; do not enable on deployed Workers |
+| `INTENT_PREFETCH_ENABLED` | Public document intent-prefetch enabled flag mirrored from site config |
+| `INTENT_PREFETCH_DELAY_MS` | Hover/focus delay before public document prefetch starts |
+| `INTENT_PREFETCH_LIMIT` | Maximum public document prefetches per page view |
 | `RESEND_RATE_LIMIT_DELAY` | Delay between emails in ms (default: 600ms to stay under Resend's 2 req/sec limit) |
 
 When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email images still fall back to the public `https://pool.dustwave.xyz` asset base so inbox clients do not receive broken localhost image URLs.

@@ -10,6 +10,24 @@ if (!bootScript) {
 }
 
 const WIDTH_CLASS_PREFIX = 'hero__video-buffer-bar--w-';
+const SHARE_QUERY_ALLOWLIST = new Set([
+  'ref',
+  'referral',
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_content',
+  'utm_term'
+]);
+
+function initInlineSvgSupportClass() {
+  const testSvg = document.createElementNS?.('http://www.w3.org/2000/svg', 'svg');
+  if (typeof SVGSVGElement !== 'undefined' && testSvg instanceof SVGSVGElement) {
+    document.documentElement.classList.add('supports-inline-svg');
+  }
+}
+
+initInlineSvgSupportClass();
 
 function getRuntimeMessages() {
   return window.POOL_CONFIG?.i18n?.messages || {};
@@ -86,6 +104,70 @@ function initSupportScroll() {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (typeof target.focus === 'function') {
         target.focus({ preventScroll: true });
+      }
+    });
+  });
+}
+
+function shareUrlWithSafeQueryParams(fallbackUrl) {
+  let shareUrl;
+  try {
+    shareUrl = new URL(fallbackUrl || window.location.href, window.location.origin);
+  } catch {
+    shareUrl = new URL(window.location.href);
+  }
+
+  let currentUrl;
+  try {
+    currentUrl = new URL(window.location.href);
+  } catch {
+    return shareUrl.toString();
+  }
+
+  SHARE_QUERY_ALLOWLIST.forEach((key) => {
+    shareUrl.searchParams.delete(key);
+    currentUrl.searchParams.getAll(key).forEach((value) => {
+      if (value) {
+        shareUrl.searchParams.append(key, value);
+      }
+    });
+  });
+
+  return shareUrl.toString();
+}
+
+function shareHrefForTarget(target, title, text, shareUrl) {
+  const shareMessage = String(text || title || '').trim();
+  const shareText = `${shareMessage} ${shareUrl}`.trim();
+  switch (target) {
+    case 'bluesky':
+      return `https://bsky.app/intent/compose?text=${encodeURIComponent(shareText)}`;
+    case 'x':
+      return `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareMessage)}&url=${encodeURIComponent(shareUrl)}`;
+    case 'threads':
+      return `https://www.threads.net/intent/post?text=${encodeURIComponent(shareText)}`;
+    case 'facebook':
+      return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+    case 'sms':
+      return `sms:?&body=${encodeURIComponent(shareText)}`;
+    case 'email':
+      return `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(shareText)}`;
+    default:
+      return '';
+  }
+}
+
+function initCampaignShareLinks() {
+  document.querySelectorAll('[data-campaign-share]').forEach((panel) => {
+    const title = panel.getAttribute('data-share-title') || document.title;
+    const text = panel.getAttribute('data-share-text') || title;
+    const shareUrl = shareUrlWithSafeQueryParams(panel.getAttribute('data-share-url'));
+
+    panel.querySelectorAll('[data-campaign-share-target]').forEach((control) => {
+      const target = control.getAttribute('data-campaign-share-target') || '';
+      const href = shareHrefForTarget(target, title, text, shareUrl);
+      if (href && control instanceof HTMLAnchorElement) {
+        control.href = href;
       }
     });
   });
@@ -393,6 +475,7 @@ function initCommunityTeaser(campaignSlug) {
 
 function init() {
   initSupportScroll();
+  initCampaignShareLinks();
   initScrollableGalleries();
   initCampaignCountdown();
   initHeroVideo();

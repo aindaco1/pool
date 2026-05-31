@@ -24,6 +24,7 @@ The current baseline includes:
 - secure social-image tags where the page image is already HTTPS
 - social image alt metadata
 - state-aware campaign social titles and descriptions
+- state-aware campaign share-link intent text for platforms that accept message copy, while Facebook and other card-first destinations keep relying on the page URL and Open Graph metadata
 - Worker-generated campaign share-card PNGs for public social metadata, with SVG retained for internal preview/debug tooling
 - generated [`robots.txt`](../robots.txt)
 - generated [`sitemap.xml`](../sitemap.xml)
@@ -51,6 +52,12 @@ The public Open Graph route is:
 - `/share/campaign/{slug}.png?lang=es`
 
 That route generates a state-aware SVG card from live campaign data, then rasterizes it to PNG so shared links stay crawler-safe while still showing pledged total, goal progress, campaign state, and the campaign's square `hero_image` with the richer share-card styling. The Worker also keeps the SVG version at `/share/campaign/{slug}.svg?lang={lang}` for internal preview/debug tooling, but SVG is not the public metadata default because some external crawlers reject it.
+
+Campaign page share links keep the same separation of concerns:
+
+- Open Graph and Twitter metadata control crawler previews and share-card images.
+- Platform share URLs include richer, state-aware intent text only where the destination supports message text.
+- Share URLs preserve only safe UTM/referral query params and do not add image URLs or private state to the shared URL.
 
 ## Indexing Contract
 
@@ -176,6 +183,7 @@ When checking a deployment manually:
 
 - page source for home/about/terms/campaign pages has correct title, description, canonical, OG, and Twitter tags
 - campaign pages emit a crawler-friendly `social_image` when configured, otherwise the Worker share-card PNG route
+- visible campaign share links use the canonical campaign URL and do not replace the metadata-driven social card contract
 - `robots.txt` is reachable and only exposes intended public crawl paths
 - `sitemap.xml` is reachable and only includes intended public URLs
 - private/tokenized pages emit `noindex` where appropriate
@@ -216,3 +224,7 @@ This implementation was guided by Google Search Central guidance around:
 - breadcrumb structured data
 
 The core rule remains simple: public metadata should reflect visible public content, and private/supporter-only flows should stay outside search intent.
+
+---
+
+_Last updated: May 31, 2026_

@@ -72,6 +72,9 @@ TOP_LEVEL_ORDER = [
   'CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX',
   'DEBUG_CONSOLE_LOGGING_ENABLED',
   'DEBUG_VERBOSE_CONSOLE_LOGGING',
+  'INTENT_PREFETCH_ENABLED',
+  'INTENT_PREFETCH_DELAY_MS',
+  'INTENT_PREFETCH_LIMIT',
   'LIVE_STATS_CACHE_TTL_SECONDS',
   'LIVE_INVENTORY_CACHE_TTL_SECONDS',
   'DEFAULT_PLATFORM_TIP_PERCENT',
@@ -141,6 +144,9 @@ DEV_ENV_ORDER = [
   'CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX',
   'DEBUG_CONSOLE_LOGGING_ENABLED',
   'DEBUG_VERBOSE_CONSOLE_LOGGING',
+  'INTENT_PREFETCH_ENABLED',
+  'INTENT_PREFETCH_DELAY_MS',
+  'INTENT_PREFETCH_LIMIT',
   'LIVE_STATS_CACHE_TTL_SECONDS',
   'LIVE_INVENTORY_CACHE_TTL_SECONDS',
   'DEFAULT_PLATFORM_TIP_PERCENT',
@@ -348,6 +354,7 @@ def build_mirror_values(config, existing)
   seo = config['seo'] || {}
   checkout = config['checkout'] || {}
   cache = config['cache'] || {}
+  performance = config['performance'] || {}
 
   {
     'SITE_BASE' => platform['site_url'] || config['url'] || existing['SITE_BASE'],
@@ -411,6 +418,9 @@ def build_mirror_values(config, existing)
     'CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX' => campaign_runner_reports.key?('email_subject_prefix') ? campaign_runner_reports['email_subject_prefix'].to_s : existing['CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX'],
     'DEBUG_CONSOLE_LOGGING_ENABLED' => debug.key?('console_logging_enabled') ? (debug['console_logging_enabled'] ? 'true' : 'false') : existing['DEBUG_CONSOLE_LOGGING_ENABLED'],
     'DEBUG_VERBOSE_CONSOLE_LOGGING' => debug.key?('verbose_console_logging') ? (debug['verbose_console_logging'] ? 'true' : 'false') : existing['DEBUG_VERBOSE_CONSOLE_LOGGING'],
+    'INTENT_PREFETCH_ENABLED' => performance.key?('intent_prefetch_enabled') ? (performance['intent_prefetch_enabled'] ? 'true' : 'false') : existing['INTENT_PREFETCH_ENABLED'],
+    'INTENT_PREFETCH_DELAY_MS' => performance.key?('intent_prefetch_delay_ms') ? format_int(performance['intent_prefetch_delay_ms']) : existing['INTENT_PREFETCH_DELAY_MS'],
+    'INTENT_PREFETCH_LIMIT' => performance.key?('intent_prefetch_limit') ? format_int(performance['intent_prefetch_limit']) : existing['INTENT_PREFETCH_LIMIT'],
     'LIVE_STATS_CACHE_TTL_SECONDS' => cache.key?('live_stats_ttl_seconds') ? format_int(cache['live_stats_ttl_seconds']) : existing['LIVE_STATS_CACHE_TTL_SECONDS'],
     'LIVE_INVENTORY_CACHE_TTL_SECONDS' => cache.key?('live_inventory_ttl_seconds') ? format_int(cache['live_inventory_ttl_seconds']) : existing['LIVE_INVENTORY_CACHE_TTL_SECONDS'],
     'DEFAULT_PLATFORM_TIP_PERCENT' => pricing.key?('default_tip_percent') ? format_int(pricing['default_tip_percent']) : existing['DEFAULT_PLATFORM_TIP_PERCENT'],

@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Campaign Creator Checklist
-description: A complete prep checklist for creators launching a campaign on The Pool, including dashboard handoff, image, video, copy, tiers, add-ons, embeds, tax, shipping, fulfillment, and optional campaign materials.
+description: A complete prep checklist for creators launching a campaign on The Pool, including dashboard handoff, image, video, copy, tiers, add-ons, embeds, share links, tax, shipping, fulfillment, and optional campaign materials.
 permalink: /creator-campaign-checklist/
 lang: en
 indexable: false
@@ -28,9 +28,22 @@ This checklist covers:
 - campaign and platform add-on planning
 - physical reward and shipping requirements
 - tax, free-shipping, and fallback expectations
-- promotion, embeds, reporting, and fulfillment handoff
+- promotion, share links, embeds, reporting, and fulfillment handoff
 - dashboard access, drafts, and publishing expectations
 - optional materials that make a campaign feel richer and more persuasive
+
+## What Changed Since v0.9.5
+
+This checklist now reflects the creator-facing platform changes through **v1.0.2**:
+
+- creators can use campaign-specific dashboard access for normal edits instead of direct repository access
+- dashboard media uploads support images, video, audio, previews, and later repository optimization
+- campaign add-ons can be attached to one campaign and count toward that campaign's goal
+- campaign-runner report recipients can receive daily pledge ledgers and post-deadline fulfillment exports
+- hosted embeds give creators a live widget for websites and HTML-friendly partner pages
+- campaign pages include built-in share links for Bluesky, X, Threads, Facebook, SMS, and email
+- share intents use the campaign's current state, title, blurb, and public URL where each platform supports message text
+- public performance work makes campaign progress, share links, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
 
 ## The Short Version
 
@@ -63,6 +76,7 @@ If a creator only reads one section, it should be this one.
 - 1 campaign pitch video
 - 3 to 8 additional stills or gallery images
 - a launch promotion plan that includes the campaign embed code
+- launch-week share captions for upcoming, live, final-push, funded, and ended states
 
 ### Required if anything is physical
 
@@ -134,6 +148,7 @@ The dashboard can manage:
 - long-form campaign content through the WYSIWYG block editor
 - tiers, support items, campaign add-ons, stretch goals, diary entries, and decisions
 - report previews, supporter lists, analytics, marketing/referral links, and embed-builder shortcuts
+- share-link copy and social-preview inputs through the same title, blurb, hero image, and campaign-state fields shown on the public page
 
 Before launch, confirm:
 
@@ -148,6 +163,7 @@ Operational notes:
 - Content editor drafts are local until saved/published, so creators should not treat unsaved browser drafts as the source of truth.
 - Publishing campaign or settings changes commits through the platform workflow and may take time to deploy.
 - User management is separate from publishing: dashboard users save to Worker KV and do not create GitHub commits.
+- Admin sign-in may include a Cloudflare Turnstile challenge before the email magic link is sent.
 
 ### Short Blurb Guidance
 
@@ -194,7 +210,7 @@ These copied examples come from existing campaigns, but they live in this checkl
 
 This is the most important still image in the package.
 
-- **Use:** campaign cards, fallback hero image, social/share contexts
+- **Use:** campaign cards, fallback hero image, share cards, social/share contexts
 - **Recommended dimensions:** `1200 × 1200 px`
 - **Minimum dimensions:** `1000 × 1000 px`
 - **Aspect ratio:** `1:1`
@@ -207,6 +223,7 @@ Best practices:
 - avoid dense text baked into the image
 - make sure it still reads well at small sizes
 - prioritize mood, clarity, and strong contrast
+- remember that the generated share card uses this image, so it should still read when cropped into a social preview
 
 ### 2. Wide Hero Image
 
@@ -325,6 +342,7 @@ If self-hosting:
 - **Preferred format in this repo:** `.webm`
 - **Poster image:** use the wide hero image
 - **Compression target:** web-friendly, fast-loading
+- **Optimization:** dashboard uploads preserve source files, and the repository media pipeline can generate compressed images and WebM derivatives before launch
 
 ### Video Best Practices
 
@@ -920,6 +938,12 @@ Creators should provide or confirm:
 - whether the embed should show campaign media
 - launch-day social copy
 - 3 to 5 short share captions
+- state-specific share copy:
+  - upcoming: invite people to watch for launch
+  - live: ask people to pledge now
+  - final push: name the remaining gap or deadline
+  - funded: thank supporters and point to next steps
+  - ended: describe the result and where people should follow updates
 - 1 short email/newsletter blurb
 - press or partner contacts, if relevant
 
@@ -947,6 +971,7 @@ Good examples:
 - the embed is for websites and HTML-friendly hosts
 - social platforms use rich previews instead of rendering the iframe
 - campaign pages generate share-card metadata for social previews
+- campaign share buttons use the public campaign URL and state-aware text where supported, but Facebook and other preview-first destinations mostly use the Open Graph image/title/description
 - creators should test the embed on mobile wherever they paste it
 - if a host strips iframe code, use a normal campaign link plus the share-card preview instead
 
@@ -1125,6 +1150,7 @@ A campaign is usually ready when:
 - report recipients and fulfillment owners are set
 - dashboard editor access and publishing responsibility are confirmed
 - the campaign embed has been checked for launch-promotion destinations
+- share captions and the generated social preview feel appropriate for upcoming, live, funded, and ended states
 - image alt text exists where needed
 - no section feels like placeholder copy
 
@@ -1160,6 +1186,7 @@ If someone needs the shortest possible prep version, send them this:
 - 3 to 8 gallery images
 - campaign pitch video
 - embed destinations and launch-promotion copy
+- share captions for the campaign's major states
 
 ### If anything is physical
 
@@ -1179,6 +1206,7 @@ This checklist is meant to help creators deliver everything needed for a campaig
 <nav class="creator-checklist-toc" aria-labelledby="creator-checklist-toc-title">
   <h2 id="creator-checklist-toc-title">Contents</h2>
   <ol>
+    <li><a href="#what-changed-since-v095">What Changed Since v0.9.5</a></li>
     <li><a href="#the-short-version">The Short Version</a></li>
     <li><a href="#what-makes-a-campaign-feel-complete">What Makes a Campaign Feel Complete</a></li>
     <li><a href="#core-campaign-information">Core Campaign Information</a></li>

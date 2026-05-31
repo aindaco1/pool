@@ -4,9 +4,19 @@
 <div class="support-items" data-campaign-slug="{{ include.campaign.slug }}" data-goal="{{ include.campaign.goal_amount }}" data-progress-bg="{% if include.campaign.progress_background %}{{ include.campaign.progress_background }}{% endif %}">
   <h5>{% include t.html key="support_items.heading" lang=current_lang %}</h5>
   {% for item in include.support_items %}
+    {% assign item_target = item.target | default: 0 | plus: 0 %}
     {% assign current_amount = item.current | default: 0 | plus: 0 %}
-    {% assign remaining = item.target | minus: current_amount %}
-    {% assign percent = current_amount | times: 100 | divided_by: item.target %}
+    {% assign remaining = item_target | minus: current_amount %}
+    {% if item_target > 0 %}
+      {% assign percent = current_amount | times: 100 | divided_by: item_target | round: 0 %}
+    {% else %}
+      {% assign percent = 0 %}
+    {% endif %}
+    {% if percent > 100 %}
+      {% assign percent = 100 %}
+    {% elsif percent < 0 %}
+      {% assign percent = 0 %}
+    {% endif %}
     {% assign item_index = forloop.index %}
     {% assign item_category = item.category | default: "digital" %}
     {% assign resolved_shipping = item.shipping %}
@@ -46,7 +56,7 @@
           {% if include.campaign.progress_background %}
           <img src="{{ include.campaign.progress_background }}" alt="" class="support-item__progress-bg" aria-hidden="true">
           {% endif %}
-          <span data-progress-width="{{ percent }}"></span>
+          <span class="u-width-pct-{{ percent }}" data-progress-width="{{ percent }}"></span>
         </div>
         {% if item.need %}
           <p class="support-item__need">{{ item.need | escape }}</p>

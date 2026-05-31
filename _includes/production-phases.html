@@ -36,9 +36,19 @@
                 <span class="registry-item__amount">{{ item.current | money }} / {{ item.target | money }}</span>
               </div>
               
-              {% assign percent = item.current | times: 100 | divided_by: item.target %}
+              {% assign item_target = item.target | default: 0 | plus: 0 %}
+              {% if item_target > 0 %}
+                {% assign percent = item.current | times: 100 | divided_by: item_target | round: 0 %}
+              {% else %}
+                {% assign percent = 0 %}
+              {% endif %}
+              {% if percent > 100 %}
+                {% assign percent = 100 %}
+              {% elsif percent < 0 %}
+                {% assign percent = 0 %}
+              {% endif %}
               <div class="progress" aria-label="{{ item.label | escape }} {% include t.html key='production_phases.progress_suffix' lang=current_lang %}">
-                <i data-progress-width="{{ percent }}"></i>
+                <i class="u-width-pct-{{ percent }}" data-progress-width="{{ percent }}"></i>
               </div>
               
               <div class="registry-item__footer">

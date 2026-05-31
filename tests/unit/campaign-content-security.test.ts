@@ -25,6 +25,19 @@ describe('campaign content security audit', () => {
     expect(progressTemplate).toContain('{{ s.title | escape }}');
   });
 
+  it('renders progress positions without waiting for live stats hydration', () => {
+    const progressTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'progress.html'), 'utf8');
+    const supportItemsTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'support-items.html'), 'utf8');
+    const productionPhasesTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'production-phases.html'), 'utf8');
+
+    expect(progressTemplate).toContain('class="u-width-pct-{{ pct }}"');
+    expect(progressTemplate).toContain('u-left-pct-{{ one_third_pct }}');
+    expect(progressTemplate).toContain('u-left-pct-{{ goal_pct }}');
+    expect(progressTemplate).toContain('u-left-pct-{{ s_pct }}');
+    expect(supportItemsTemplate).toContain('class="u-width-pct-{{ percent }}"');
+    expect(productionPhasesTemplate).toContain('class="u-width-pct-{{ percent }}"');
+  });
+
   it('keeps text blocks on the safe markdown filter', () => {
     const textTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'blocks', 'text.html'), 'utf8');
     expect(textTemplate).toContain('{{ include.block.body | safe_markdown_source | markdownify | sanitize_markdown_links: site.url }}');

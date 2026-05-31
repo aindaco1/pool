@@ -3,6 +3,9 @@ import { expectNoHorizontalOverflow } from './helpers/mobile';
 
 async function getCartSnapshot(page: any) {
   return page.evaluate(async () => {
+    if ((window as any).PoolCartRuntime?.load) {
+      await (window as any).PoolCartRuntime.load('e2e-public-cart-snapshot');
+    }
     const provider = (window as any).PoolCartProvider;
     if (provider?.whenReady) {
       await provider.whenReady();
@@ -23,7 +26,76 @@ async function getCartSnapshot(page: any) {
   });
 }
 
+async function expectHeaderShareAfterBlurb(page: any) {
+  await expect(page.locator('.campaign-header .campaign-share--mobile')).toBeVisible();
+  await expect(page.locator('.campaign-facts .campaign-share--sidebar')).toBeHidden();
+  expect(await page.locator('.campaign-header').evaluate(() => {
+    const blurb = document.querySelector('.campaign-blurb');
+    const share = document.querySelector('.campaign-header .campaign-share--mobile');
+    if (!blurb || !share) return false;
+    return blurb.compareDocumentPosition(share) & Node.DOCUMENT_POSITION_FOLLOWING;
+  })).toBeTruthy();
+}
+
 test.describe('Public Page Keyboard Controls', () => {
+  test('campaign share links use the intended responsive placements', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/campaigns/hand-relations/?utm_source=e2e&token=secret');
+
+    const sidebarShare = page.locator('.campaign-facts .campaign-share--sidebar');
+    const mobileShare = page.locator('.campaign-header .campaign-share--mobile');
+    await expect(sidebarShare).toBeVisible();
+    await expect(mobileShare).toBeHidden();
+    await expect(sidebarShare.locator('.campaign-share__label')).toHaveCount(0);
+    await expect(sidebarShare.locator('[data-campaign-share-target="copy"]')).toHaveCount(0);
+    await expect(sidebarShare).toHaveAttribute('data-share-text', /HAND RELATIONS has ended\. See what the campaign made possible:/);
+    await expect(sidebarShare.locator('[data-campaign-share-target="bluesky"]')).toHaveAttribute('href', /utm_source%3De2e/);
+    await expect(sidebarShare.locator('[data-campaign-share-target="x"]')).toHaveAttribute('href', /text=HAND%20RELATIONS%20has%20ended/);
+    await expect(sidebarShare.locator('[data-campaign-share-target="email"]')).toHaveAttribute('href', /body=HAND%20RELATIONS%20has%20ended/);
+    await expect(sidebarShare.locator('[data-campaign-share-target="bluesky"]')).not.toHaveAttribute('href', /token/);
+    await expect(sidebarShare.locator('.campaign-share__icon').first()).toBeVisible();
+    await expect(sidebarShare.locator('.campaign-share__icon-image').first()).toBeHidden();
+    await page.evaluate(() => document.documentElement.classList.remove('supports-inline-svg'));
+    await expect(sidebarShare.locator('.campaign-share__icon').first()).toBeHidden();
+    await expect(sidebarShare.locator('.campaign-share__icon-image').first()).toBeVisible();
+    expect(await sidebarShare.evaluate((share) => {
+      const embed = document.querySelector('.campaign-facts__embed');
+      return Boolean(embed && (share.compareDocumentPosition(embed) & Node.DOCUMENT_POSITION_FOLLOWING));
+    })).toBe(true);
+
+    await page.setViewportSize({ width: 1180, height: 900 });
+    await page.reload();
+    await expectHeaderShareAfterBlurb(page);
+    await expectNoHorizontalOverflow(page);
+
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.reload();
+    await expectHeaderShareAfterBlurb(page);
+    await expectNoHorizontalOverflow(page);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expectHeaderShareAfterBlurb(page);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('campaign header keeps tablet spacing before embedded video', async ({ page }) => {
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.goto('/campaigns/their-love/');
+
+    await expect(page.locator('.hero__video--youtube')).toBeVisible();
+    const gap = await page.evaluate(() => {
+      const countdown = document.querySelector('.campaign-countdown')?.getBoundingClientRect();
+      const hero = document.querySelector('.campaign-content .hero')?.getBoundingClientRect();
+      if (!countdown || !hero) return null;
+      return Math.round(hero.top - countdown.bottom);
+    });
+
+    expect(gap).not.toBeNull();
+    expect(gap as number).toBeGreaterThanOrEqual(24);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test('diary tabs stay usable on a small phone viewport', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/campaigns/hand-relations/');

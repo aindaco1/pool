@@ -1,4 +1,7 @@
-document.addEventListener('DOMContentLoaded', () => {
+function initBuyButtons() {
+  if (window.__PoolBuyButtonsLoaded) return;
+  window.__PoolBuyButtonsLoaded = true;
+
   const addButtons = document.querySelectorAll('.poolcart-add-item');
   const getCartProvider = () => window.PoolCartProvider || null;
   const logger = window.PoolLogger?.createLogger('buy-buttons') || {
@@ -24,4 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
       logger.debug('Item added to cart:', item);
     });
   });
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initBuyButtons, { once: true });
+} else {
+  initBuyButtons();
+}

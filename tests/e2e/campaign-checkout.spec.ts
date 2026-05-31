@@ -11,6 +11,9 @@ const CART_ROOT_SELECTOR = '[data-pool-cart-root]';
 
 async function getCartSnapshot(page: any) {
   return page.evaluate(async () => {
+    if ((window as any).PoolCartRuntime?.load) {
+      await (window as any).PoolCartRuntime.load('e2e-cart-snapshot');
+    }
     const provider = (window as any).PoolCartProvider;
     if (provider?.whenReady) {
       await provider.whenReady();
@@ -38,6 +41,9 @@ async function getCartSnapshot(page: any) {
 
 async function updateCartViaClient(page: any, payload: Record<string, any>) {
   return page.evaluate(async (nextPayload) => {
+    if ((window as any).PoolCartRuntime?.load) {
+      await (window as any).PoolCartRuntime.load('e2e-cart-update');
+    }
     const provider = (window as any).PoolCartProvider;
     if (provider?.whenReady) {
       await provider.whenReady();
@@ -56,6 +62,9 @@ async function updateCartViaClient(page: any, payload: Record<string, any>) {
 
 async function openCartViaClient(page: any) {
   await page.evaluate(async () => {
+    if ((window as any).PoolCartRuntime?.load) {
+      await (window as any).PoolCartRuntime.load('e2e-cart-open');
+    }
     const provider = (window as any).PoolCartProvider;
     if (provider?.whenReady) {
       await provider.whenReady();
@@ -68,6 +77,9 @@ async function openCartViaClient(page: any) {
 
 async function openCheckoutViaClient(page: any) {
   await page.evaluate(async () => {
+    if ((window as any).PoolCartRuntime?.load) {
+      await (window as any).PoolCartRuntime.load('e2e-checkout-open');
+    }
     const provider = (window as any).PoolCartProvider;
     if (provider?.whenReady) {
       await provider.whenReady();
@@ -80,6 +92,9 @@ async function openCheckoutViaClient(page: any) {
 
 async function addCartItemViaClient(page: any, item: Record<string, any>) {
   await page.evaluate(async (nextItem) => {
+    if ((window as any).PoolCartRuntime?.load) {
+      await (window as any).PoolCartRuntime.load('e2e-cart-add-item');
+    }
     const provider = (window as any).PoolCartProvider;
     if (provider?.whenReady) {
       await provider.whenReady();
@@ -490,13 +505,15 @@ test.describe('Homepage & Campaign Cards', () => {
 });
 
 test.describe('Cart Integration', () => {
-  test('cart runtime bootstrap is loaded', async ({ page }) => {
+  test('cart runtime loader is loaded without booting the provider eagerly', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
     
     const bootstrap = await page.evaluate(() => {
       const cartRoot = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
       return {
         poolConfig: (window as any).POOL_CONFIG,
+        hasRuntimeLoader: Boolean((window as any).PoolCartRuntime?.load),
+        runtimeLoaded: Boolean((window as any).PoolCartRuntime?.isLoaded?.()),
         hasProvider: Boolean((window as any).PoolCartProvider),
         hasCartRoot: Boolean(cartRoot),
         cartRootId: cartRoot?.id || null,
@@ -508,7 +525,9 @@ test.describe('Cart Integration', () => {
     });
     
     expect(bootstrap.poolConfig).toBeDefined();
-    expect(bootstrap.hasProvider).toBe(true);
+    expect(bootstrap.hasRuntimeLoader).toBe(true);
+    expect(bootstrap.runtimeLoaded).toBe(false);
+    expect(bootstrap.hasProvider).toBe(false);
     expect(bootstrap.hasCartRoot).toBe(true);
     expect(bootstrap.cartRootId).toBeNull();
     expect(bootstrap.hasVendorConfigAttributes).toBe(false);

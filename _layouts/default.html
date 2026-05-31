@@ -1,4 +1,5 @@
 {%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign asset_version = site.time | date: "%s" -%}
 {%- assign page_indexable = page.indexable -%}
 {%- if page_indexable == nil and page.translation_key == 'community_index' and site.seo.index_public_community_hub == false -%}
   {%- assign page_indexable = false -%}
@@ -31,6 +32,9 @@
   <div id="aria-live-region" class="aria-live" aria-live="polite" aria-atomic="true"></div>
 
   {% include cart-foot.html %}
-  <script src="/assets/js/live-stats.js"></script>
+  {% if page.live_stats %}
+  <script src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>
+  {% endif %}
+  {% include page-prefetch.html %}
 </body>
 </html>

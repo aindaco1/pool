@@ -37,8 +37,8 @@ exclude:
 # Structured platform settings for forks.
 platform:
   name: The Pool
-  version: "1.0.1"
-  release_label: "v1.0.1"
+  version: "1.0.2"
+  release_label: "v1.0.2"
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   pledges_email_from: "The Pool <pledges@pool.dustwave.xyz>"
@@ -272,6 +272,11 @@ add_ons:
 cache:
   live_stats_ttl_seconds: 300
   live_inventory_ttl_seconds: 300
+
+performance:
+  intent_prefetch_enabled: true
+  intent_prefetch_delay_ms: 90
+  intent_prefetch_limit: 3
 
 i18n:
   default_lang: en

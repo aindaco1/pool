@@ -117,7 +117,7 @@
   min-height: 1.5em;
 }
 
-.admin-dashboard__status[data-admin-platform-status="true"] {
+.admin-dashboard__status[data-admin-prominent-status="true"] {
   @include admin-surface(12px 14px);
   align-items: center;
   display: inline-flex;

@@ -36,6 +36,15 @@ jobs:
           ruby-version: '3.2'
           bundler-cache: true
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
       - name: Setup Pages
         uses: actions/configure-pages@v6
 
@@ -43,6 +52,9 @@ jobs:
         run: bundle exec jekyll build
         env:
           JEKYLL_ENV: production
+
+      - name: Minify generated assets
+        run: npm run assets:minify
 
       - name: Verify campaigns.json exists
         run: |

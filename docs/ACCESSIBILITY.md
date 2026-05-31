@@ -49,6 +49,7 @@ The recent accessibility hardening pass added:
   - focus handoff from the mobile support CTA into the tiers section
   - screen-reader countdown status text that mirrors the visual timer state
   - clearer hero-video grouping and loading semantics
+  - icon-only campaign share links with localized accessible names, hidden decorative icon images, below-blurb placement on mobile/tablet, and sidebar placement on desktop
   - safer small-screen wrapping for countdown tiles, creator metadata, and community teaser actions
 - admin-dashboard semantics and keyboard polish for:
   - shared field labels whose help buttons are not nested inside labels
@@ -215,6 +216,7 @@ Automated checks help, but these manual accessibility checks are still important
 - tabbed campaign interfaces respond correctly to keyboard navigation
 - secondary campaign-page controls like diary tabs and carousel galleries remain usable with keyboard only
 - public campaign widgets like custom amounts, support items, and supporter-community teasers remain usable with keyboard only
+- campaign share links have useful accessible names even though the visible UI is icon-only
 - carousel galleries remain keyboard-focusable and scroll correctly with arrow keys and Home / End
 - tip sliders remain usable with repeated arrow-key adjustments
 - community voting remains operable with keyboard-only interaction
@@ -244,4 +246,4 @@ Good next accessibility improvements include:
 
 ---
 
-_Last updated: May 28, 2026_
+_Last updated: May 31, 2026_

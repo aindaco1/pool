@@ -119,6 +119,16 @@ Campaign runner report settings control the scheduled report system: enabled sta
 
 The Reports tab is still the preferred browser UI for generating and downloading on-demand CSVs.
 
+### Advanced Performance
+
+Advanced performance settings expose the safe public intent-prefetch controls:
+
+- enable or disable public document prefetching
+- tune the hover/focus delay before prefetching starts
+- cap the number of prefetched documents per page view
+
+The defaults are intentionally conservative and apply only to public same-origin document links. Admin, checkout, Manage Pledge, supporter-community, tokenized, external, and sensitive-query links are excluded by the runtime. Publishing these settings updates `_config.yml`, mirrors the `INTENT_PREFETCH_*` Worker vars, and requires the normal static rebuild before public pages use the new values.
+
 ### Design
 
 Design settings expose curated theme variables such as body font, heading font, text colors, surface/border/primary colors, and button radius.
@@ -376,4 +386,4 @@ Dashboard read endpoints rely on `campaign-pledges:{slug}` indexes and intention
 
 ---
 
-_Last updated: May 29, 2026_
+_Last updated: May 31, 2026_

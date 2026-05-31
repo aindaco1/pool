@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 describe('buy-buttons provider integration', () => {
   beforeEach(() => {
     vi.resetModules();
+    delete (window as any).__PoolBuyButtonsLoaded;
     document.body.innerHTML = '<button class="poolcart-add-item" data-item-name="VIP Pass">Buy</button>';
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     delete (window as any).PoolCartProvider;
+    delete (window as any).__PoolBuyButtonsLoaded;
     document.body.innerHTML = '';
   });
 
