@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.0.1**. The v1.0 feature set and launch hardening pass are complete; v1.0.1 adds admin content-editor media uploads, actual Stripe fee/net analytics capture, and dashboard media optimization tooling.
+Current release milestone: **v1.0.2**. The v1.0 feature set and launch hardening pass are complete; v1.0.2 adds public-page performance work, generated asset minification, safe intent prefetching, campaign share links with state-aware CTAs, and admin performance controls.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -11,6 +11,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **No accounts required** — Backers manage pledges via email magic links
 - **Server-verified checkout** — The Worker canonicalizes cart contents from first-party cart items instead of trusting browser-submitted totals
 - **Multi-campaign checkout** — One checkout can include multiple campaigns, while storage, emails, reports, and management stay campaign-scoped after confirmation
+- **Lazy first-party cart runtime** — Public pages load a lightweight cart bootstrap first and defer the heavier cart stack until persisted cart state or clear supporter intent requires it
 - **All-or-nothing pledging** — Cards saved now, charged only if goal is met
 - **Optional platform tip** — 0% to 15% tip (default 5%) included in totals but excluded from campaign progress
 - **Tip-aware cart + checkout** — Shared pricing logic keeps subtotal, tip, tax, shipping, and total in sync across cart, checkout, Worker, reports, and emails
@@ -25,6 +26,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Stretch goals** — Auto-unlock at funding thresholds
 - **Campaign lifecycle** — `upcoming` → `live` → `post` states with automatic transitions + Cloudflare cache purge
 - **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
+- **Stable campaign progress rendering** — Funding bars and milestone markers render their positions in static HTML/CSS so first load does not wait for JavaScript to avoid layout collapse
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement with published option allowlists and closed-decision lockout
 - **Sanitized campaign content blocks** — Long-form campaign and diary content accepts Markdown plus a tiny safe inline subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`), supports local videos with optional posters, neutralizes unsafe Markdown link schemes, automatically opens external links in a new tab, and escapes or rejects other raw HTML
@@ -41,6 +43,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Actual Stripe fee analytics foundation** — Newly charged pledges store Stripe balance transaction fee/net values when available, and dashboard analytics prefer those actual values while clearly labeling estimated fallback rows
 - **Admin content-editor media uploads** — Campaign and diary content editors can stage image, video, and audio uploads with immediate previews, then publish them into the campaign asset directory with the content change
 - **Dashboard media optimization pipeline** — Dashboard-uploaded media stays source-preserving in the Worker, then repository tooling can losslessly compress images and generate high-quality WebM derivatives for uploaded videos
+- **Generated asset minification** — Production Pages builds minify generated `_site` CSS/JS after Jekyll output while leaving source files readable and Cloudflare responsible for transfer compression
 - **Campaign-runner reports** — Configurable campaign-scoped daily pledge-ledger emails and post-deadline fulfillment exports can go to each campaign’s configured runner recipients, while the dashboard previews/downloads pledge and fulfillment CSVs without sending email or writing sent markers
 - **Projection drift diagnostics** — Read-only admin checks and a local CLI can compare stored stats, inventory, and campaign indexes against saved pledge truth before any repair path mutates data
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
@@ -48,8 +51,10 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Accessibility baseline** — Public shells now keep skip links and stable main landmarks, while cart / checkout flows use stronger dialog semantics, live-region updates, and clearer accessible labels without moving payment fields out of Stripe-owned secure UI
 - **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, curated design variables, themed Stripe Elements, and branded supporter emails without requiring custom code for normal fork rebranding
 - **Hosted live campaign embeds** — Campaign pages now link to a locale-aware embed builder that generates copy-paste iframe code with layout/theme/media/CTA options, live Worker-backed data, and auto-resize behavior
+- **Campaign share links** — Campaign pages expose localized, icon-only share targets for Bluesky, X, Threads, Facebook, SMS, and email, with local image fallbacks and richer state-aware intent text where platforms allow it
 - **English + Spanish i18n foundation** — `_config.yml` now drives supported languages, static locale routes, generated localized campaign routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, public campaign pages, embed pages, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge/embed runtime copy, campaign countdown/gallery/live-stats labels, cart-button summaries, checkout tax-location helper copy, hero video/community teaser/diary chrome, localized campaign dates, and localized Worker supporter emails
 - **SEO fundamentals baseline** — Public pages and campaign pages now emit consistent titles, descriptions, canonicals, OG/Twitter tags, localized language metadata, honest JSON-LD, crawler-friendly Worker-generated PNG campaign share cards, and alternate-language metadata where supported, while `robots.txt`, `sitemap.xml`, and explicit noindex rules keep private/tokenized flows out of search intent
+- **Safe intent prefetching** — Public same-origin document links can prefetch on hover/focus/touch intent, with conservative route/query exclusions and admin-configurable defaults
 
 ## Architecture
 
@@ -129,6 +134,7 @@ Fork-facing settings now use a structured config model in [`_config.yml`](_confi
 - `design` for curated typography, radius, layout-width, and theme-token overrides
 - a small curated subset of `platform` / `design` is mirrored into the Worker so supporter emails stay aligned with fork branding too
 - `debug` for browser and Worker console logging behavior
+- `performance` for safe public intent prefetch controls
 - `checkout` for truly variable checkout settings like the Stripe publishable key
 - `cache` for live browser TTLs
 
@@ -139,7 +145,7 @@ See [docs/SEO.md](docs/SEO.md) for the current SEO fundamentals implementation a
 See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) for the current accessibility baseline and verified critical flows.
 See [docs/I18N.md](docs/I18N.md) for the locale model, shared translation sources, and localized route behavior.
 
-Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It now covers campaign add-ons, hosted embeds, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
+Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It now covers the v0.9.5 through v1.0.2 creator-facing changes, including campaign add-ons, hosted embeds, share-link/social-preview planning, dashboard media uploads, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
 
 For localization, the supported model is:
 
@@ -231,7 +237,7 @@ The Pool is intentionally shaped so most traffic stays cheap:
 
 Fork knobs worth knowing:
 
-- site config: `cache.live_stats_ttl_seconds`, `cache.live_inventory_ttl_seconds`, `pricing.sales_tax_rate`, `shipping.fallback_flat_rate`, `tax.*`
+- site config: `cache.live_stats_ttl_seconds`, `cache.live_inventory_ttl_seconds`, `performance.intent_prefetch_*`, `pricing.sales_tax_rate`, `shipping.fallback_flat_rate`, `tax.*`
 - Worker env: auto-synced pricing and tax-provider values in [`worker/wrangler.toml`](worker/wrangler.toml)
 
 ### Practical Scalability Scenarios
@@ -267,6 +273,7 @@ npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium # Focus
 node --check assets/js/admin-dashboard.js # Dashboard JavaScript syntax check
 npm run test:security  # Security tests — pen testing the Worker API
 npm run test:security:podman # Security tests with a Podman-backed local stack in one invocation
+npm run assets:minify:check # Check built _site CSS/JS for remaining minification savings
 npm run media:optimize:check # Check uploaded media for pending optimization/derivatives
 npm test               # Run unit + e2e
 ```
@@ -369,6 +376,7 @@ Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT
 - [I18N.md](docs/I18N.md) — Current localization structure, routing model, and language-addition workflow
 - [SHIPPING.md](docs/SHIPPING.md) — Current shipping model, USPS setup, and fallback policy
 - [SEO.md](docs/SEO.md) — Current crawl, metadata, JSON-LD, and noindex model
+- [PERFORMANCE.md](docs/PERFORMANCE.md) — Platform performance model, generated asset minification, Cloudflare compression, runtime loading, caching, media, and safe public prefetching
 - [ADD_ON_PRODUCTS.md](docs/ADD_ON_PRODUCTS.md) — Current global add-on catalog structure and initial merch import model
 - [DASHBOARD.md](docs/DASHBOARD.md) — Private admin dashboard reference for campaign editing and operations
 - [ROADMAP.md](docs/ROADMAP.md) — v1.0 release status and post-v1.0 follow-ups
@@ -432,6 +440,8 @@ git push origin main
 That GitHub Actions workflow now deploys both:
 - the GitHub Pages site
 - the Cloudflare Worker from `worker/wrangler.toml`
+
+The Pages build runs Jekyll first, then `npm run assets:minify` against generated `_site/assets/**/*.css` and `_site/assets/**/*.js` before uploading the artifact. Source files stay readable in the repository; Cloudflare still handles gzip/Brotli/Zstandard compression at the edge, so Cloudflare Auto Minify should stay disabled.
 
 Required GitHub repository secrets for automatic Worker deployment:
 - `CLOUDFLARE_API_TOKEN`

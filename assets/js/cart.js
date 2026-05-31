@@ -558,5 +558,6 @@ function getCartTotalCents(state) {
 
 // Initialize the cart runtime through the provider seam when available.
 bootCart(initCartRuntime);
+window.__PoolCartRuntimeCartUiLoaded = true;
 
 })(); // End IIFE

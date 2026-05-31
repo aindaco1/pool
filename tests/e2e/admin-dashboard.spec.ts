@@ -325,6 +325,9 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
             }, {
               title: 'Advanced performance',
               rows: [
+                { label: 'Intent prefetch enabled', value: 'true', rawValue: 'true', editable: true, path: 'performance.intent_prefetch_enabled', type: 'boolean', input: 'boolean', layoutGroup: 'intent-prefetch-enabled' },
+                { label: 'Intent prefetch delay ms', value: '90', rawValue: '90', editable: true, path: 'performance.intent_prefetch_delay_ms', type: 'number', input: 'integer', min: 0, step: 10, layoutGroup: 'intent-prefetch-tuning' },
+                { label: 'Intent prefetch limit', value: '3', rawValue: '3', editable: true, path: 'performance.intent_prefetch_limit', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'intent-prefetch-tuning' },
                 { label: 'Live stats cache TTL seconds', value: '300', rawValue: '300', editable: true, path: 'cache.live_stats_ttl_seconds', type: 'number', input: 'integer', layoutGroup: 'cache-live-ttl' },
                 { label: 'Live inventory cache TTL seconds', value: '300', rawValue: '300', editable: true, path: 'cache.live_inventory_ttl_seconds', type: 'number', input: 'integer', layoutGroup: 'cache-live-ttl' }
               ].map(withFieldHelp)
@@ -811,6 +814,13 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-settings-results [data-settings-path="add_ons.enabled"]')).toHaveCount(0);
     await expect(page.locator('[data-settings-path="reports.campaign_runner.send_hour_mt"]')).toHaveAttribute('type', 'time');
     await expect(page.locator('[data-settings-path="reports.campaign_runner.send_hour_mt"]')).toHaveValue('07:00');
+    await selectSettingsSection(page, 'Advanced performance');
+    await expect(page.locator('[data-settings-path="performance.intent_prefetch_enabled"]')).toHaveValue('true');
+    await expect(page.locator('[data-settings-path="performance.intent_prefetch_delay_ms"]')).toHaveValue('90');
+    await expect(page.locator('[data-settings-path="performance.intent_prefetch_limit"]')).toHaveValue('3');
+    await page.locator('[data-settings-path="performance.intent_prefetch_enabled"]').selectOption('false');
+    await expect(page.locator('#admin-settings-publish')).toBeVisible();
+    await page.locator('[data-settings-path="performance.intent_prefetch_enabled"]').selectOption('true');
     await selectSettingsSection(page, 'Users');
     const adminUsersEditor = page.locator('[data-settings-path="admin.users"]');
     await expect(adminUsersEditor).toBeVisible();

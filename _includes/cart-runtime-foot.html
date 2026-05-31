@@ -34,15 +34,13 @@
   data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"
   data-stripe-publishable-key="{{ site.checkout.stripe_publishable_key | default: '' }}"></script>
 <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
-<script src="/assets/js/add-on-utils.js?v={{ asset_version }}" defer></script>
 <link rel="preconnect" href="https://js.stripe.com" crossorigin>
 <link rel="preconnect" href="https://api.stripe.com" crossorigin>
 <link rel="dns-prefetch" href="//js.stripe.com">
 <link rel="dns-prefetch" href="//api.stripe.com">
 <div hidden data-pool-cart-root="true"></div>
-<script src="/assets/js/shipping-option-utils.js?v={{ asset_version }}" defer></script>
-<script src="/assets/js/stripe-checkout-sidecar.js?v={{ asset_version }}" defer></script>
-<script src="/assets/js/cart-provider.js?v={{ asset_version }}" defer></script>
-<script src="/assets/js/cart.js?v={{ asset_version }}" defer></script>
-<script src="/assets/js/buy-buttons.js?v={{ asset_version }}" defer></script>
-<script src="/assets/js/campaign.js?v={{ asset_version }}" defer></script>
+<script
+  src="/assets/js/cart-runtime-loader.js?v={{ asset_version }}"
+  defer
+  data-pool-cart-runtime-loader="true"
+  data-asset-version="{{ asset_version }}"></script>

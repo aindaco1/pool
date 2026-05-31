@@ -12,6 +12,13 @@ describe('SEO templates', () => {
   it('routes public layouts through the shared seo include', () => {
     const defaultLayout = readRepoFile('_layouts', 'default.html');
     const campaignLayout = readRepoFile('_layouts', 'campaign.html');
+    const cartRuntimeFoot = readRepoFile('_includes', 'cart-runtime-foot.html');
+    const pagePrefetch = readRepoFile('_includes', 'page-prefetch.html');
+    const campaignShareLinks = readRepoFile('_includes', 'campaign-share-links.html');
+    const sharePlatformIcon = readRepoFile('_includes', 'share-platform-icon.html');
+    const config = readRepoFile('_config.yml');
+    const homePage = readRepoFile('index.html');
+    const spanishHomePage = readRepoFile('es', 'index.html');
 
     expect(defaultLayout).toContain('{% include seo-meta.html');
     expect(campaignLayout).toContain('{% include seo-meta.html');
@@ -19,6 +26,51 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('{% include seo-json-ld.html');
     expect(defaultLayout).toContain('translation_key=page.translation_key');
     expect(campaignLayout).toContain('translation_key=page.translation_key');
+    expect(defaultLayout).toContain('{% if page.live_stats %}');
+    expect(defaultLayout).toContain('<script src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>');
+    expect(campaignLayout).toContain('campaign_hero_preload_image');
+    expect(campaignLayout).toContain('<link rel="preload" as="image" href="{{ campaign_hero_preload_image }}">');
+    expect(campaignLayout).toContain('fetchpriority="high" decoding="async"');
+    expect(campaignLayout).toContain('<script src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>');
+    expect(campaignLayout).toContain('<script src="/assets/js/campaign.js?v={{ asset_version }}" defer></script>');
+    expect(campaignLayout).toContain('campaign-share-links.html class="campaign-share--mobile"');
+    expect(campaignLayout).toContain('campaign-share-links.html class="campaign-share--sidebar"');
+    expect(campaignLayout).toContain('campaign_social_share_text');
+    expect(campaignLayout).toContain('text=campaign_social_share_text');
+    expect(campaignShareLinks).toContain('data-campaign-share-target="bluesky"');
+    expect(campaignShareLinks).toContain('data-share-text="{{ campaign_share_message | escape }}"');
+    expect(campaignShareLinks).toContain('{% include share-platform-icon.html icon="bluesky" %}');
+    expect(campaignShareLinks).not.toContain('campaign-share__label');
+    expect(campaignShareLinks).not.toContain('data-share-copy-label');
+    expect(campaignShareLinks).not.toContain('data-campaign-share-target="copy"');
+    expect(campaignShareLinks).toContain('sms:?&amp;body=');
+    expect(sharePlatformIcon).toContain('/assets/images/share-icons/{{ icon | uri_escape }}.png');
+    expect(sharePlatformIcon).toContain('campaign-share__icon-image');
+    expect(sharePlatformIcon).toContain('campaign-share__icon--{{ icon | escape }}');
+    expect(sharePlatformIcon).toContain('{%- when "threads" -%}');
+    expect(sharePlatformIcon).not.toContain('{%- when "copy" -%}');
+    ['bluesky', 'x', 'threads', 'facebook', 'sms', 'email'].forEach((icon) => {
+      expect(fs.existsSync(path.join(repoRoot, 'assets', 'images', 'share-icons', `${icon}.png`))).toBe(true);
+      expect(fs.existsSync(path.join(repoRoot, 'assets', 'images', 'share-icons', `${icon}.svg`))).toBe(true);
+    });
+    ['copy', 'check'].forEach((icon) => {
+      expect(fs.existsSync(path.join(repoRoot, 'assets', 'images', 'share-icons', `${icon}.png`))).toBe(false);
+      expect(fs.existsSync(path.join(repoRoot, 'assets', 'images', 'share-icons', `${icon}.svg`))).toBe(false);
+    });
+    expect(defaultLayout).toContain('{% include page-prefetch.html %}');
+    expect(campaignLayout).toContain('{% include page-prefetch.html %}');
+    expect(pagePrefetch).toContain('site.performance.intent_prefetch_enabled == true');
+    expect(pagePrefetch).toContain('/assets/js/page-prefetch.js?v={{ asset_version }}');
+    expect(config).toContain('intent_prefetch_enabled: true');
+    expect(cartRuntimeFoot).not.toContain('/assets/js/campaign.js');
+    expect(cartRuntimeFoot).toContain('/assets/js/cart-runtime-loader.js?v={{ asset_version }}');
+    expect(cartRuntimeFoot).toContain('data-pool-cart-runtime-loader="true"');
+    expect(cartRuntimeFoot).not.toContain('/assets/js/cart-provider.js');
+    expect(cartRuntimeFoot).not.toContain('/assets/js/cart.js?v={{ asset_version }}');
+    expect(cartRuntimeFoot).not.toContain('/assets/js/add-on-utils.js');
+    expect(cartRuntimeFoot).not.toContain('/assets/js/stripe-checkout-sidecar.js');
+    expect(homePage).toContain('live_stats: true');
+    expect(spanishHomePage).toContain('live_stats: true');
   });
 
   it('marks private pledge and supporter layouts as noindex', () => {
@@ -102,8 +154,10 @@ describe('SEO templates', () => {
     expect(seoMeta).toContain("unless image_url contains '://' or image_url contains 'data:'");
     expect(translationsEn).toContain('campaign_preview:');
     expect(translationsEn).toContain('funded_title: "%{title} is funded!"');
+    expect(translationsEn).toContain('live_share_text: "Help %{title} reach its goal by %{date}. Pledge or share before the deadline:"');
     expect(translationsEs).toContain('campaign_preview:');
     expect(translationsEs).toContain('funded_title: "¡%{title} está financiada!"');
+    expect(translationsEs).toContain('live_share_text: "Ayuda a que %{title} alcance su meta antes del %{date}. Apoya o comparte antes de la fecha límite:"');
   });
 
   it('routes campaign chrome strings through shared translation keys', () => {
@@ -124,6 +178,9 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('{% if campaign_render_state == "upcoming" or campaign_render_state == "live" %}');
     expect(campaignLayout).toContain('key="runtime.campaign.countdown_funded"');
     expect(campaignLayout).toContain('key="runtime.campaign.countdown_ended"');
+    expect(campaignLayout).toContain('key="campaign.embed_title"');
+    expect(readRepoFile('_includes', 'campaign-share-links.html')).toContain('key="campaign.share_label"');
+    expect(readRepoFile('_includes', 'campaign-share-links.html')).toContain('key="campaign.share_to_platform"');
     expect(diaryInclude).toContain('key="diary.heading"');
     expect(diaryInclude).toContain("key='diary.tablist_label'");
     expect(diaryInclude).toContain('key="diary.empty"');

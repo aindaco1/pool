@@ -15,6 +15,9 @@ If you are trying to keep a fork comfortable on the Cloudflare Workers free plan
 
 - `cache.live_stats_ttl_seconds`
 - `cache.live_inventory_ttl_seconds`
+- `performance.intent_prefetch_enabled`
+- `performance.intent_prefetch_delay_ms`
+- `performance.intent_prefetch_limit`
 - `pricing.sales_tax_rate`
 - `shipping.fallback_flat_rate`
 
@@ -49,7 +52,7 @@ Current mirrored Worker values worth treating as part of the supported customiza
 - checkout and pricing vars: `STRIPE_PUBLISHABLE_KEY`, `SALES_TAX_RATE`, `FLAT_SHIPPING_RATE`, `DEFAULT_PLATFORM_TIP_PERCENT`, `MAX_PLATFORM_TIP_PERCENT`
 - tax and shipping vars: `TAX_PROVIDER`, `TAX_ORIGIN_COUNTRY`, `TAX_USE_REGIONAL_ORIGIN`, `NM_GRT_API_BASE`, `ZIP_TAX_API_BASE`, `SHIPPING_ORIGIN_ZIP`, `SHIPPING_ORIGIN_COUNTRY`, `SHIPPING_FALLBACK_FLAT_RATE`, `FREE_SHIPPING_DEFAULT`, `SHIPPING_DEFAULT_OPTION`, `USPS_*`
 - email and design vars: `SUPPORT_EMAIL`, `PLEDGES_EMAIL_FROM`, `UPDATES_EMAIL_FROM`, `EMAIL_*`, `PLATFORM_FOOTER_LOGO_PATH`, `PLATFORM_FAVICON_PATH`, `PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH`
-- campaign-runner, cache, and debug vars: `CAMPAIGN_RUNNER_*`, `LIVE_STATS_CACHE_TTL_SECONDS`, `LIVE_INVENTORY_CACHE_TTL_SECONDS`, `DEBUG_CONSOLE_LOGGING_ENABLED`, `DEBUG_VERBOSE_CONSOLE_LOGGING`
+- campaign-runner, cache, performance, and debug vars: `CAMPAIGN_RUNNER_*`, `LIVE_STATS_CACHE_TTL_SECONDS`, `LIVE_INVENTORY_CACHE_TTL_SECONDS`, `INTENT_PREFETCH_ENABLED`, `INTENT_PREFETCH_DELAY_MS`, `INTENT_PREFETCH_LIMIT`, `DEBUG_CONSOLE_LOGGING_ENABLED`, `DEBUG_VERBOSE_CONSOLE_LOGGING`
 
 The repo now includes `npm run sync:worker-config`, which syncs those mirrored values from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`. The main local dev, test, Worker-only, and pre-merge paths call it automatically. The merge gate’s first-party artifact check also falls back to the Podman-backed build path when host Bundler/Jekyll is unavailable.
 
@@ -194,6 +197,24 @@ The private dashboard at `/admin/` is now the supported browser-based editor and
 - Media optimization is deliberately outside the Worker. Use `npm run media:optimize` locally, `npm run media:optimize:check` before merge when uploaded media changed, or let the `Optimize dashboard media` GitHub Actions workflow run after dashboard uploads reach `main`.
 
 See [DASHBOARD.md](DASHBOARD.md) for the full dashboard reference.
+
+## Generated Asset Minification
+
+Production Pages deploys keep repository sources readable and minify only the generated site. The deploy workflow runs Jekyll, then runs:
+
+```bash
+npm run assets:minify
+```
+
+That script rewrites smaller `_site/assets/**/*.css` and `_site/assets/**/*.js` files in place before the GitHub Pages artifact is uploaded. JavaScript minification is intentionally conservative: it removes whitespace and simplifies syntax, but does not mangle properties or rewrite identifiers. CSS is fully minified after Sass has already produced compressed output.
+
+Use this check after a local Jekyll build when changing the minification pipeline:
+
+```bash
+npm run assets:minify:check
+```
+
+Cloudflare remains responsible for transfer compression at the edge. Keep Cloudflare Auto Minify disabled so production behavior comes from this repository-controlled build step rather than edge-time rewriting.
 
 ## Campaign Content Model
 
@@ -1372,4 +1393,4 @@ curl -s https://pledge.dustwave.xyz/admin/cron/status \
 
 ---
 
-_Last updated: May 29, 2026_
+_Last updated: May 31, 2026_

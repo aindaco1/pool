@@ -10,6 +10,7 @@ Use this alongside:
 - [docs/I18N.md](./I18N.md) for locale routing and translation rules
 - [docs/SEO.md](./SEO.md) for metadata, share cards, and indexing behavior
 - [docs/EMBEDS.md](./EMBEDS.md) for the hosted campaign embed system
+- [docs/PERFORMANCE.md](./PERFORMANCE.md) for public-page performance, generated asset minification, Cloudflare compression, and safe intent prefetching
 - [docs/DASHBOARD.md](./DASHBOARD.md) for the browser admin dashboard and editing model
 
 ## Project Shape

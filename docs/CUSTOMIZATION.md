@@ -47,6 +47,7 @@ The site config is organized around these fork-facing sections:
 - `i18n`
 - `design`
 - `debug`
+- `performance`
 - `add_ons`
 - `checkout`
 - `cache`
@@ -103,7 +104,7 @@ These values feed:
 Notes:
 
 - `platform.*` is the primary branding surface.
-- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v1.0.1`.
+- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v1.0.2`.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
 - `platform.logo_path` is also the mirrored brand mark used in supporter emails.
@@ -114,8 +115,8 @@ Example:
 ```yml
 platform:
   name: My Fork
-  version: 1.0.1
-  release_label: v1.0.1
+  version: 1.0.2
+  release_label: v1.0.2
   company_name: Example Studio
   support_email: support@example.com
   pledges_email_from: "My Fork <pledges@pool.example.com>"
@@ -685,6 +686,20 @@ Supported keys:
 - `live_stats_ttl_seconds`
 - `live_inventory_ttl_seconds`
 
+### `performance`
+
+Use `performance` for public-page performance knobs that a fork may need to tune without code changes.
+
+Supported keys:
+
+- `intent_prefetch_enabled`
+- `intent_prefetch_delay_ms`
+- `intent_prefetch_limit`
+
+These control the safe same-origin document prefetch runtime loaded on public pages. The default is enabled, with conservative route/query exclusions and a low per-page limit. Private app surfaces such as admin, checkout, Manage Pledge, and supporter-community routes do not load the public prefetch runtime.
+
+Super admins can edit these fields in the dashboard under **Settings -> Advanced performance**. Published changes update `_config.yml`, mirror the Worker-facing `INTENT_PREFETCH_*` values, and take effect on static pages after the normal rebuild/deploy path.
+
 ## Site-Only vs Worker-Mirrored Settings
 
 Some settings only affect the Jekyll build and browser-owned UI. Others are also reflected into the Worker env automatically.
@@ -770,6 +785,9 @@ These site-config values are also reflected into the Worker env values in [`work
 - `reports.campaign_runner.email_subject_prefix` -> `CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX`
 - `debug.console_logging_enabled` -> `DEBUG_CONSOLE_LOGGING_ENABLED`
 - `debug.verbose_console_logging` -> `DEBUG_VERBOSE_CONSOLE_LOGGING`
+- `performance.intent_prefetch_enabled` -> `INTENT_PREFETCH_ENABLED`
+- `performance.intent_prefetch_delay_ms` -> `INTENT_PREFETCH_DELAY_MS`
+- `performance.intent_prefetch_limit` -> `INTENT_PREFETCH_LIMIT`
 - `cache.live_stats_ttl_seconds` -> `LIVE_STATS_CACHE_TTL_SECONDS`
 - `cache.live_inventory_ttl_seconds` -> `LIVE_INVENTORY_CACHE_TTL_SECONDS`
 
@@ -796,9 +814,11 @@ npm run sync:worker-config
 
 That command syncs the Worker-mirrored values in [`worker/wrangler.toml`](../worker/wrangler.toml) from `_config.yml` and `_config.local.yml`.
 
-It does not write Worker secrets, media files, or optimization outputs. USPS OAuth secrets, Stripe secret keys, Resend keys, ZIP.TAX keys, Turnstile secrets, GitHub tokens, and Cloudflare deploy credentials still belong in Worker secrets, GitHub repository secrets, or ignored local env files.
+It does not write Worker secrets, media files, or generated optimization outputs. USPS OAuth secrets, Stripe secret keys, Resend keys, ZIP.TAX keys, Turnstile secrets, GitHub tokens, and Cloudflare deploy credentials still belong in Worker secrets, GitHub repository secrets, or ignored local env files.
 
 Dashboard-uploaded media also does not add new sync-script config. Uploads commit source files into the existing asset directories; `npm run media:optimize` / `npm run media:optimize:check` and the **Optimize dashboard media** workflow handle image compression and WebM derivatives outside the Worker.
+
+Generated CSS/JS minification is also outside the Worker and dashboard save path. Production deploys run `npm run assets:minify` only after Jekyll writes `_site`, so forks should keep source assets readable in `assets/` and let the deploy artifact step handle minified output. Cloudflare edge compression should stay enabled, but Cloudflare Auto Minify should stay disabled to avoid a second rewriting layer.
 
 The main local/dev validation paths already call that sync automatically:
 

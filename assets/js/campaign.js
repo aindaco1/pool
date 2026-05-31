@@ -75,8 +75,17 @@ function getCartProvider() {
   return window.PoolCartProvider || null;
 }
 
-async function waitForCartProvider() {
-  const provider = getCartProvider();
+async function waitForCartProvider(reason = 'campaign-cart-flow') {
+  let provider = getCartProvider();
+  if (!provider?.whenReady && window.PoolCartRuntime?.load) {
+    try {
+      provider = await window.PoolCartRuntime.load(reason);
+    } catch (error) {
+      logger.error('Cart runtime load failed:', error);
+      return null;
+    }
+  }
+
   if (!provider?.whenReady) {
     return null;
   }
@@ -163,7 +172,7 @@ async function handleTierChangeFlow() {
     
     showTierChangeToast('Adding new tier to cart...', 'info');
     
-    await waitForCartProvider();
+    await waitForCartProvider('tier-change-flow');
     
     tierButton.click();
     
@@ -203,7 +212,7 @@ async function handleAddTiersFlow() {
   showTierChangeToast('Adding items to cart...', 'info');
   
   try {
-    const cartProvider = await waitForCartProvider();
+    const cartProvider = await waitForCartProvider('add-tiers-flow');
     
     // Add tier items
     for (const tierItem of tierItems) {

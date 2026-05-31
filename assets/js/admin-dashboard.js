@@ -138,6 +138,7 @@
   var turnstileLoadPromise = null;
   var turnstileWidgetId = null;
   var turnstileToken = '';
+  var adminLoginAttemptStarted = false;
 
   function t(key, fallback, replacements) {
     var text = messages[key] || fallback || key;
@@ -195,20 +196,18 @@
     return value;
   }
 
-  function setText(node, value) {
+  function setStatusText(node, value, options) {
     if (!node) return;
-    node.removeAttribute('data-admin-platform-status');
-    node.textContent = value || '';
-  }
-
-  function setPlatformStatus(node, value) {
-    if (!node) return;
+    node.removeAttribute('data-admin-prominent-status');
     node.textContent = '';
     if (!value) {
-      node.removeAttribute('data-admin-platform-status');
       return;
     }
-    node.setAttribute('data-admin-platform-status', 'true');
+    if (!options?.prominent) {
+      node.textContent = value;
+      return;
+    }
+    node.setAttribute('data-admin-prominent-status', 'true');
 
     var message = document.createElement('span');
     message.className = 'admin-dashboard__status-message';
@@ -217,19 +216,20 @@
     node.append(message);
   }
 
-  function hasAdminTurnstile() {
-    return Boolean(turnstileSiteKey && turnstileWidgetRoot);
+  function setText(node, value) {
+    setStatusText(node, value);
   }
 
-  function resetAdminTurnstile() {
-    turnstileToken = '';
-    if (turnstileWidgetId !== null && window.turnstile?.reset) {
-      try {
-        window.turnstile.reset(turnstileWidgetId);
-      } catch (error) {
-        logger.warn('Unable to reset admin challenge', error);
-      }
-    }
+  function setProminentStatus(node, value) {
+    setStatusText(node, value, { prominent: true });
+  }
+
+  function setAuthStatus(value) {
+    setProminentStatus(authStatus, value);
+  }
+
+  function hasAdminTurnstile() {
+    return Boolean(turnstileSiteKey && turnstileWidgetRoot);
   }
 
   function renderAdminTurnstile() {
@@ -247,12 +247,14 @@
         turnstileToken = String(token || '');
       },
       'expired-callback': function() {
+        if (adminLoginAttemptStarted) return;
         turnstileToken = '';
-        setText(authStatus, t('challenge_expired', 'Security check expired. Please try again.'));
+        setAuthStatus(t('challenge_expired', 'Security check expired. Please try again.'));
       },
       'error-callback': function() {
+        if (adminLoginAttemptStarted) return;
         turnstileToken = '';
-        setText(authStatus, t('challenge_failed', 'Security check failed. Please try again.'));
+        setAuthStatus(t('challenge_failed', 'Security check failed. Please try again.'));
       }
     });
   }
@@ -598,7 +600,7 @@
     if (authPanel) authPanel.hidden = false;
     if (app) app.hidden = true;
     if (logoutButton) logoutButton.hidden = true;
-    setText(authStatus, message || '');
+    setAuthStatus(message || '');
   }
 
   function showApp(user) {
@@ -3776,7 +3778,7 @@
         await uploadPendingDiaryContentMedia(roots?.[0] || campaignSettingsRoot, statusNode);
         changes = collectSettingsChanges(roots);
         if (!changes.length) {
-          setPlatformStatus(statusNode, t('settings_published_no_deploy', 'Changes were saved, but the site did not start updating automatically.'));
+          setProminentStatus(statusNode, t('settings_published_no_deploy', 'Changes were saved, but the site did not start updating automatically.'));
           updateDirtyIndicators();
           return true;
         }
@@ -3788,7 +3790,7 @@
         method: 'POST',
         body: JSON.stringify({ changes: changes })
       });
-      setPlatformStatus(statusNode, result?.rebuild?.triggered
+      setProminentStatus(statusNode, result?.rebuild?.triggered
         ? t('settings_published', 'Changes published. They may take a few minutes to appear.')
         : t('settings_published_no_deploy', 'Changes were saved, but the site did not start updating automatically.'));
       resetSettingsDirtyBaseline(undefined, changes);
@@ -7477,7 +7479,7 @@
   }
 
   async function loadSession() {
-    setText(authStatus, t('loading_session', 'Checking admin session...'));
+    setAuthStatus(t('loading_session', 'Checking admin session...'));
     try {
       var session = await requestJson('/admin/session', { method: 'GET' });
       currentCsrf = session.csrfToken || '';
@@ -7511,7 +7513,7 @@
     if (hasAdminTurnstile()) {
       ensureAdminTurnstile().catch(function(error) {
         logger.warn('Admin challenge failed to load', error);
-        setText(authStatus, t('challenge_failed', 'Security check failed. Please try again.'));
+        setAuthStatus(t('challenge_failed', 'Security check failed. Please try again.'));
       });
     }
 
@@ -7519,33 +7521,32 @@
       event.preventDefault();
       var email = String(emailInput?.value || '').trim();
       if (!email) return;
-      setText(authStatus, t('sending_link', 'Sending magic link...'));
+      setAuthStatus(t('sending_link', 'Sending magic link...'));
       try {
         var challengeToken = await adminTurnstileTokenForSubmit();
         if (hasAdminTurnstile() && !challengeToken) {
-          setText(authStatus, t('challenge_required', 'Complete the security check before requesting a sign-in link.'));
+          setAuthStatus(t('challenge_required', 'Complete the security check before requesting a sign-in link.'));
           return;
         }
+        adminLoginAttemptStarted = true;
         var result = await requestJson('/admin/auth/start', {
           method: 'POST',
           body: JSON.stringify({ email: email, preferredLang: lang, turnstileToken: challengeToken || undefined })
         });
-        resetAdminTurnstile();
         if (result.loginUrl) {
-          setText(authStatus, t('dev_link_ready', 'Development login link is ready.') + ' ' + result.loginUrl);
+          setAuthStatus(t('dev_link_ready', 'Development login link is ready.') + ' ' + result.loginUrl);
         } else {
-          setText(authStatus, t('link_sent', 'If that email has access, a magic link is on the way.'));
+          setAuthStatus(t('link_sent', 'If that email has access, a magic link is on the way.'));
         }
       } catch (error) {
         logger.error('Admin sign-in start failed', error);
-        resetAdminTurnstile();
         var code = error?.data?.code || '';
         if (code === 'admin_challenge_required') {
-          setText(authStatus, t('challenge_required', 'Complete the security check before requesting a sign-in link.'));
+          setAuthStatus(t('challenge_required', 'Complete the security check before requesting a sign-in link.'));
         } else if (String(code).indexOf('admin_challenge') === 0) {
-          setText(authStatus, t('challenge_failed', 'Security check failed. Please try again.'));
+          setAuthStatus(t('challenge_failed', 'Security check failed. Please try again.'));
         } else {
-          setText(authStatus, t('login_failed', 'Unable to start admin sign-in.'));
+          setAuthStatus(t('login_failed', 'Unable to start admin sign-in.'));
         }
       }
     });

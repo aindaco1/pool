@@ -1,0 +1,33 @@
+{%- assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign share_base_url = site.platform.site_url | default: site.url | default: "" -%}
+{%- capture campaign_share_url -%}{{ share_base_url }}{{ page.url }}{%- endcapture -%}
+{%- capture campaign_share_title -%}{{ include.title | default: page.title | strip_html | strip }}{%- endcapture -%}
+{%- capture campaign_share_message -%}{{ include.text | default: campaign_share_title | strip_html | strip }}{%- endcapture -%}
+{%- capture campaign_share_body -%}{{ campaign_share_message }} {{ campaign_share_url | strip }}{%- endcapture -%}
+{%- assign campaign_share_url_encoded = campaign_share_url | strip | uri_escape -%}
+{%- assign campaign_share_title_encoded = campaign_share_title | uri_escape -%}
+{%- assign campaign_share_message_encoded = campaign_share_message | strip | uri_escape -%}
+{%- assign campaign_share_body_encoded = campaign_share_body | strip | uri_escape -%}
+{%- capture share_to_bluesky -%}{% include t.html key="campaign.share_to_platform" lang=current_lang platform="Bluesky" %}{%- endcapture -%}
+{%- capture share_to_x -%}{% include t.html key="campaign.share_to_platform" lang=current_lang platform="X" %}{%- endcapture -%}
+{%- capture share_to_threads -%}{% include t.html key="campaign.share_to_platform" lang=current_lang platform="Threads" %}{%- endcapture -%}
+{%- capture share_to_facebook -%}{% include t.html key="campaign.share_to_platform" lang=current_lang platform="Facebook" %}{%- endcapture -%}
+{%- capture share_to_sms -%}{% include t.html key="campaign.share_to_platform" lang=current_lang platform="SMS" %}{%- endcapture -%}
+{%- capture share_via_email -%}{% include t.html key="campaign.share_via_email" lang=current_lang %}{%- endcapture -%}
+
+<nav
+  class="campaign-share {{ include.class | default: '' }}"
+  aria-label="{% include t.html key="campaign.share_label" lang=current_lang %}"
+  data-campaign-share
+  data-share-url="{{ campaign_share_url | strip | escape }}"
+  data-share-title="{{ campaign_share_title | escape }}"
+  data-share-text="{{ campaign_share_message | escape }}">
+  <div class="campaign-share__links">
+    <a class="campaign-share__link" href="https://bsky.app/intent/compose?text={{ campaign_share_body_encoded }}" target="_blank" rel="noopener noreferrer" data-campaign-share-target="bluesky" aria-label="{{ share_to_bluesky | strip | escape }}" title="{{ share_to_bluesky | strip | escape }}">{% include share-platform-icon.html icon="bluesky" %}<span class="sr-only">{{ share_to_bluesky | strip }}</span></a>
+    <a class="campaign-share__link" href="https://twitter.com/intent/tweet?text={{ campaign_share_message_encoded }}&amp;url={{ campaign_share_url_encoded }}" target="_blank" rel="noopener noreferrer" data-campaign-share-target="x" aria-label="{{ share_to_x | strip | escape }}" title="{{ share_to_x | strip | escape }}">{% include share-platform-icon.html icon="x" %}<span class="sr-only">{{ share_to_x | strip }}</span></a>
+    <a class="campaign-share__link" href="https://www.threads.net/intent/post?text={{ campaign_share_body_encoded }}" target="_blank" rel="noopener noreferrer" data-campaign-share-target="threads" aria-label="{{ share_to_threads | strip | escape }}" title="{{ share_to_threads | strip | escape }}">{% include share-platform-icon.html icon="threads" %}<span class="sr-only">{{ share_to_threads | strip }}</span></a>
+    <a class="campaign-share__link" href="https://www.facebook.com/sharer/sharer.php?u={{ campaign_share_url_encoded }}" target="_blank" rel="noopener noreferrer" data-campaign-share-target="facebook" aria-label="{{ share_to_facebook | strip | escape }}" title="{{ share_to_facebook | strip | escape }}">{% include share-platform-icon.html icon="facebook" %}<span class="sr-only">{{ share_to_facebook | strip }}</span></a>
+    <a class="campaign-share__link" href="sms:?&amp;body={{ campaign_share_body_encoded }}" data-campaign-share-target="sms" aria-label="{{ share_to_sms | strip | escape }}" title="{{ share_to_sms | strip | escape }}">{% include share-platform-icon.html icon="sms" %}<span class="sr-only">{{ share_to_sms | strip }}</span></a>
+    <a class="campaign-share__link" href="mailto:?subject={{ campaign_share_title_encoded }}&amp;body={{ campaign_share_body_encoded }}" data-campaign-share-target="email" aria-label="{{ share_via_email | strip | escape }}" title="{{ share_via_email | strip | escape }}">{% include share-platform-icon.html icon="email" %}<span class="sr-only">{{ share_via_email | strip }}</span></a>
+  </div>
+</nav>

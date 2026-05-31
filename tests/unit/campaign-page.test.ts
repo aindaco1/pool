@@ -18,6 +18,14 @@ function renderCampaignPage() {
       </a>
     </section>
     <section id="campaign-tiers"></section>
+    <nav data-campaign-share data-share-url="https://pool.test/campaigns/demo/" data-share-title="Demo campaign" data-share-text="Help Demo campaign reach its goal. Pledge or share before the deadline:">
+      <a data-campaign-share-target="bluesky" href="#bluesky">Bluesky</a>
+      <a data-campaign-share-target="x" href="#x">X</a>
+      <a data-campaign-share-target="threads" href="#threads">Threads</a>
+      <a data-campaign-share-target="facebook" href="#facebook">Facebook</a>
+      <a data-campaign-share-target="sms" href="#sms">SMS</a>
+      <a data-campaign-share-target="email" href="#email">Email</a>
+    </nav>
     <script data-campaign-page-script="true" data-campaign-slug="demo"></script>
   `;
 }
@@ -118,6 +126,24 @@ describe('campaign page script', () => {
 
     gallery.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }));
     expect(scrollToSpy).toHaveBeenCalledWith({ left: 0, behavior: 'smooth' });
+  });
+
+  it('updates campaign share links with safe current-page params', async () => {
+    window.history.replaceState({}, '', '/campaigns/demo/?utm_source=newsletter&token=secret&ref=abc');
+
+    await import('../../assets/js/campaign-page.js');
+
+    const bluesky = document.querySelector('[data-campaign-share-target="bluesky"]') as HTMLAnchorElement;
+    const x = document.querySelector('[data-campaign-share-target="x"]') as HTMLAnchorElement;
+    const email = document.querySelector('[data-campaign-share-target="email"]') as HTMLAnchorElement;
+
+    expect(bluesky.href).toContain('Help%20Demo%20campaign%20reach%20its%20goal.%20Pledge%20or%20share%20before%20the%20deadline%3A%20https%3A%2F%2Fpool.test%2Fcampaigns%2Fdemo%2F%3Fref%3Dabc%26utm_source%3Dnewsletter');
+    expect(x.href).toContain('text=Help%20Demo%20campaign%20reach%20its%20goal.%20Pledge%20or%20share%20before%20the%20deadline%3A');
+    expect(x.href).toContain('url=https%3A%2F%2Fpool.test%2Fcampaigns%2Fdemo%2F%3Fref%3Dabc%26utm_source%3Dnewsletter');
+    expect(email.href).toContain('subject=Demo%20campaign');
+    expect(email.href).toContain('body=Help%20Demo%20campaign%20reach%20its%20goal.%20Pledge%20or%20share%20before%20the%20deadline%3A%20https%3A%2F%2Fpool.test%2Fcampaigns%2Fdemo%2F%3Fref%3Dabc%26utm_source%3Dnewsletter');
+    expect(bluesky.href).not.toContain('token');
+    expect(document.querySelector('[data-campaign-share-target="copy"]')).toBeNull();
   });
 
   it('uses hidden state and width classes for countdown and video shell', async () => {

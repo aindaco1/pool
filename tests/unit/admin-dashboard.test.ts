@@ -399,6 +399,7 @@ describe('admin dashboard foundation', () => {
     expect(adminScss).toContain('.admin-mobile-tab-select');
     expect(adminScss).toContain('@media (max-width: 899px)');
     expect(adminScss).toContain('display: grid;');
+    expect(adminScss).toContain('[data-admin-prominent-status="true"]');
     expect(adminScss).toContain('.admin-content-block.is-active .admin-content-block__chrome');
     expect(adminScss).toContain('.admin-settings__field-grid--count-5');
     expect(adminScss).toContain('repeat(auto-fit, minmax(8rem, 1fr))');
@@ -409,6 +410,12 @@ describe('admin dashboard foundation', () => {
     expect(adminScript).toContain('/admin/marketing/referrals');
     expect(adminScript).toContain('/admin/analytics');
     expect(adminScript).toContain('function formatMoneyExact');
+    expect(adminScript).toContain('function setProminentStatus');
+    expect(adminScript).toContain('function setAuthStatus');
+    expect(adminScript).toContain('var adminLoginAttemptStarted = false;');
+    expect(adminScript).toContain('if (adminLoginAttemptStarted) return;');
+    expect(adminScript).not.toContain('resetAdminTurnstile');
+    expect(adminScript).not.toContain('window.turnstile.reset');
     expect(adminScript).toContain('minimumFractionDigits: 2');
     expect(adminScript).toContain('formatMoneyExact(supporter.amount)');
     expect(adminScript).toContain('/admin/settings');
@@ -1125,10 +1132,16 @@ describe('admin dashboard foundation', () => {
     ]);
     const performanceRows = body.sections.find((section: { title: string }) => section.title === 'Advanced performance').rows;
     expect(performanceRows.map((row: { label: string }) => row.label)).toEqual([
+      'Intent prefetch enabled',
+      'Intent prefetch delay ms',
+      'Intent prefetch limit',
       'Live stats cache TTL seconds',
       'Live inventory cache TTL seconds'
     ]);
     expect(performanceRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Intent prefetch enabled', path: 'performance.intent_prefetch_enabled', input: 'boolean', layoutGroup: 'intent-prefetch-enabled' }),
+      expect.objectContaining({ label: 'Intent prefetch delay ms', path: 'performance.intent_prefetch_delay_ms', input: 'integer', layoutGroup: 'intent-prefetch-tuning', min: 0, step: 10 }),
+      expect.objectContaining({ label: 'Intent prefetch limit', path: 'performance.intent_prefetch_limit', input: 'integer', layoutGroup: 'intent-prefetch-tuning', min: 0, step: 1 }),
       expect.objectContaining({ label: 'Live stats cache TTL seconds', path: 'cache.live_stats_ttl_seconds', input: 'integer', layoutGroup: 'cache-live-ttl' }),
       expect.objectContaining({ label: 'Live inventory cache TTL seconds', path: 'cache.live_inventory_ttl_seconds', input: 'integer', layoutGroup: 'cache-live-ttl' })
     ]));

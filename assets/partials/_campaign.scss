@@ -1,4 +1,5 @@
 // Campaign page specific styles
+$campaign-share-tablet-breakpoint: 1200px;
 
 // Campaign page layout
 .campaign-container {
@@ -12,6 +13,10 @@
   
   @include ms {
     grid-template-columns: 2fr 1fr;
+  }
+
+  @include sm {
+    gap: $space-2xl;
   }
   
   @include xsm {
@@ -93,6 +98,116 @@
   @include xsm {
     font-size: $font-size-base;
     line-height: 1.55;
+  }
+}
+
+.campaign-share {
+  @include stack($space-xs);
+  align-items: flex-start;
+  min-width: 0;
+  text-align: left;
+
+  &--mobile {
+    display: none;
+
+    @media (max-width: $campaign-share-tablet-breakpoint) {
+      display: flex;
+      align-items: center;
+      margin: $space-lg auto 0;
+      text-align: center;
+    }
+  }
+
+  &--sidebar {
+    margin-top: $space-lg;
+    padding-top: $space-md;
+    border-top: 1px solid $border--default;
+
+    @media (max-width: $campaign-share-tablet-breakpoint) {
+      display: none;
+    }
+  }
+
+  &__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-xs;
+    min-width: 0;
+
+    @media (max-width: $campaign-share-tablet-breakpoint) {
+      justify-content: center;
+    }
+  }
+
+  &__link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid $border--default;
+    border-radius: $radius--chip;
+    background: $surface--base;
+    color: $color--primary;
+    font: inherit;
+    font-size: $type--meta;
+    font-weight: 700;
+    line-height: 1.1;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+
+    &:hover,
+    &:focus-visible {
+      background: $surface--soft;
+      border-color: $border--strong;
+      transform: translateY(-1px);
+      text-decoration: none;
+    }
+
+    &:focus-visible {
+      outline: 2px solid $color--primary;
+      outline-offset: 2px;
+    }
+
+    @include xsm {
+      width: 38px;
+      height: 38px;
+    }
+  }
+
+  &__icon-wrap {
+    position: relative;
+    display: block;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+  }
+
+  &__icon,
+  &__icon-image {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  &__icon {
+    display: none;
+  }
+
+  &__icon-image {
+    object-fit: contain;
+  }
+
+  .supports-inline-svg &__icon {
+    display: block;
+  }
+
+  .supports-inline-svg &__icon-image {
+    display: none;
   }
 }
 
@@ -417,6 +532,12 @@
       width: 100%;
       justify-content: center;
     }
+  }
+
+  .campaign-share--sidebar + &__embed {
+    margin-top: $space-sm;
+    padding-top: 0;
+    border-top: 0;
   }
 }
 

@@ -9739,6 +9739,9 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['design.color_primary', { label: 'Primary Color', type: 'string', input: 'color', layoutGroup: 'design-colors', help: 'Primary action and brand accent color used for links, buttons, progress accents, and email calls to action.' }],
   ['design.radius_lg', { label: 'Button Radius', type: 'string', input: 'text', help: 'The large border radius used for major buttons and rounded elements across the site and supporter emails.' }],
   ['admin.users', { label: 'Users', type: 'admin_users', input: 'admin-users', help: 'Admin accounts allowed to sign in. Super admins can manage the whole platform; campaign users can manage only the campaigns selected here.' }],
+  ['performance.intent_prefetch_enabled', { label: 'Intent prefetch enabled', type: 'boolean', layoutGroup: 'intent-prefetch-enabled', help: 'Whether public pages should prefetch likely same-origin navigations after hover, focus, or touch intent.' }],
+  ['performance.intent_prefetch_delay_ms', { label: 'Intent prefetch delay ms', type: 'number', input: 'integer', min: 0, step: 10, layoutGroup: 'intent-prefetch-tuning', help: 'How long to wait after pointer or keyboard focus intent before prefetching an eligible public page.' }],
+  ['performance.intent_prefetch_limit', { label: 'Intent prefetch limit', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'intent-prefetch-tuning', help: 'Maximum number of public document prefetches allowed during one page view.' }],
   ['cache.live_stats_ttl_seconds', { label: 'Live stats cache TTL seconds', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'cache-live-ttl', help: 'How long browsers cache live campaign stats before asking the Worker again.' }],
   ['cache.live_inventory_ttl_seconds', { label: 'Live inventory cache TTL seconds', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'cache-live-ttl', help: 'How long browsers cache live inventory before asking the Worker again.' }]
 ]);
@@ -10120,6 +10123,9 @@ async function handleAdminSettings(request, env) {
         ['Products', platformAddOnProducts, editableAdminSetting('add_ons.products', 'add_on_products')]
       ]),
       adminSettingsSection('Advanced performance', [
+        ['Intent prefetch enabled', env.INTENT_PREFETCH_ENABLED ?? 'true', editableAdminSetting('performance.intent_prefetch_enabled', 'boolean')],
+        ['Intent prefetch delay ms', env.INTENT_PREFETCH_DELAY_MS || '90', editableAdminSetting('performance.intent_prefetch_delay_ms', 'number')],
+        ['Intent prefetch limit', env.INTENT_PREFETCH_LIMIT || '3', editableAdminSetting('performance.intent_prefetch_limit', 'number')],
         ['Live stats cache TTL seconds', env.LIVE_STATS_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_stats_ttl_seconds', 'number')],
         ['Live inventory cache TTL seconds', env.LIVE_INVENTORY_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_inventory_ttl_seconds', 'number')]
       ]),

@@ -105,6 +105,17 @@ Admin mutations use these common protections:
 - The static admin shell uses a restrictive meta CSP with no inline scripts, limited Worker/API connections, and sandboxed preview iframes that receive only Worker-rendered preview HTML. Framing protection must be delivered as an HTTP header, such as `Content-Security-Policy: frame-ancestors 'none'` or `X-Frame-Options: DENY`; browsers ignore `frame-ancestors` inside meta CSP.
 - Admin magic-link emails use internally generated login URLs and strip email-header control characters from admin-configurable sender/subject values before sending.
 
+### Public Prefetch And Share-Link Boundaries
+
+The public intent-prefetch runtime is deliberately narrow so speculative navigation cannot turn private flows into background traffic.
+
+- Prefetching is loaded only on public page layouts.
+- Eligible URLs must be same-origin public document routes from the allowlist.
+- Admin, checkout, Manage Pledge, pledge-result, supporter-community, API, Worker, tokenized, and sensitive-query routes are rejected.
+- The runtime respects explicit `data-no-prefetch`, `download`, `target`, `nofollow`, save-data, slow-network, and per-page limit guards.
+
+Campaign share links follow the same privacy boundary. The client preserves only safe UTM/referral query params for public campaign URLs, leaves token/order/email/session params behind, and lets Open Graph metadata supply preview images instead of serializing image URLs into share intents.
+
 Admin field classes are normalized consistently:
 
 - Plain text strips control characters, enforces length limits, and rejects raw HTML.
@@ -564,4 +575,4 @@ If the on-site payment step completes but the pledge doesn't appear yet (common 
 
 ---
 
-_Last updated: May 28, 2026_
+_Last updated: May 31, 2026_

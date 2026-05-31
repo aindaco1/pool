@@ -179,7 +179,8 @@ For current Cloudflare limits, see:
 8. **Content safety must hold at render time**: authoring audits help, but the real protection comes from runtime Markdown-link sanitization and exact-origin embed validation.
 9. **Magic links must require real pledge rows**: token validity alone is insufficient; missing pledge records should fail closed.
 10. **Localized chrome should stay shared**: campaign-page controls and status copy that belong to the platform, not the creator, should flow through the shared locale catalog so public templates, runtime UI, and supporter emails do not drift apart.
+11. **Performance work should stay static-first**: prefer stable Jekyll output, generated asset minification, lazy runtime loading, and conservative public-only prefetching before adding client complexity.
 
 ---
 
-_Last updated: Apr 18, 2026_
+_Last updated: May 31, 2026_

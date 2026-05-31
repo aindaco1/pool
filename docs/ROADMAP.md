@@ -2,9 +2,9 @@
 
 ## Current Milestone
 
-**v1.0.1**
+**v1.0.2**
 
-The v1.0 feature set and release-hardening pass are complete. v1.0.1 adds admin content-editor media uploads, actual Stripe fee/net capture for analytics, and dashboard media optimization tooling. Remaining unstarted work lives under **Future Features** unless a critical launch regression is found.
+The v1.0 feature set and release-hardening pass are complete. v1.0.2 adds public-page performance work, generated asset minification, safe intent prefetching, campaign share links with state-aware CTAs, and admin performance controls. Remaining unstarted work lives under **Future Features** unless a critical launch regression is found.
 
 ## Completed
 
@@ -203,6 +203,16 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.1 adds admin 
   - the admin Marketing embed preview keeps progress fill, milestones, goal marker, and stretch-goal labels contained for video-led campaigns
   - campaign pages now emit richer state-aware social metadata plus Worker-generated PNG share-card images, with SVG retained for internal preview/debug tooling
   - localized campaign routes, localized embed routes, and locale-aware share-card URLs keep embeds and rich previews aligned across English and Spanish
+- [x] v1.0.2 performance, sharing, and admin polish
+  - campaign progress bars and milestone markers now render static width/position classes so first load no longer waits for JavaScript to avoid collapsed marker layouts
+  - public pages load a lightweight cart-runtime loader first and defer the full cart stack until persisted cart state, recovery state, or clear supporter intent requires it
+  - same-origin public document prefetching now follows a small local intent model with route allowlists, sensitive-query exclusions, network guards, low per-page limits, and a default-enabled config surface
+  - Settings -> Advanced performance exposes the intent-prefetch enabled state, delay, and page-view limit for super admins, with Worker config mirroring through `INTENT_PREFETCH_*`
+  - production Pages builds now minify generated `_site` CSS/JS after Jekyll output, while Cloudflare remains responsible for gzip/Brotli/Zstandard transfer compression and Auto Minify stays disabled
+  - campaign pages now render reusable icon-only share links for Bluesky, X, Threads, Facebook, SMS, and email, using localized URLs, local PNG icon fallbacks for inline-SVG edge cases, and state-aware CTA text where platforms allow message text
+  - responsive share controls appear below the short blurb on mobile/tablet and above the embed button only on desktop
+  - admin email sign-in keeps the existing Turnstile challenge after a login attempt and uses the shared dashboard status-message styling for more prominent auth feedback
+  - the public Campaign Creator Checklist and Spanish checklist now describe the creator-facing changes from v0.9.5 through v1.0.2, including share-link planning and dashboard media uploads
 - [x] Developer FAQ based on internal documentation
 - [x] Marketing landing page for the platform on a different domain
 - [x] Denial of service attack defense pass
@@ -257,11 +267,6 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.1 adds admin 
   - Update cart, checkout, Manage Pledge, analytics, reports, and fulfillment exports to use the resolved variant price consistently
   - Preserve backwards compatibility for existing add-ons whose variants only define `id`, `label`, and `inventory`
   - Add admin dashboard validation so price overrides cannot be negative, malformed, or silently ignored
-- [ ] "Share to" platform links for campaigns modeled off dust-wave-new news items "share to" platform links
-  - Add reusable share-link generation for campaign pages and campaign share/marketing surfaces
-  - Support a curated set of destinations such as email, SMS, X, Facebook, Bluesky, Threads, and copy-link without adding tracking writes
-  - Keep URLs locale-aware, preserve campaign/referral/UTM parameters where appropriate, and avoid exposing supporter-only tokens
-  - Add responsive and accessible button/menu patterns that reuse the existing public-site button and icon language
 - [ ] Allow super admins and campaign users to publish email-protected campaign preview pages
   - Add a preview publication state that exposes draft campaign pages only through signed, expiring links
   - Scope preview access to super admins, assigned campaign users, or explicitly invited reviewers

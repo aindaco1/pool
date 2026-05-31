@@ -162,10 +162,21 @@ build_with_podman_jekyll() {
     -v pool-dev-bundle:/usr/local/bundle \
     localhost/pool-dev-site:latest \
     bash -lc 'cd /workspace && SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet'
+
+  minify_site_assets
 }
 
 build_with_host_jekyll() {
   SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
+  minify_site_assets
+}
+
+minify_site_assets() {
+  if ! command -v node >/dev/null 2>&1; then
+    echo "Node is required to minify generated site assets"
+    return 1
+  fi
+  node ./scripts/minify-site-assets.mjs --write >/dev/null
 }
 
 verify_build_artifacts() {
@@ -211,6 +222,10 @@ verify_build_artifacts() {
   fi
   if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/admin/index.html >/dev/null; then
     echo "Admin page is missing noindex robots metadata"
+    return 1
+  fi
+  if ! node ./scripts/minify-site-assets.mjs --check >/dev/null; then
+    echo "Generated CSS/JS assets still have minification savings"
     return 1
   fi
   if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/es/admin/index.html >/dev/null; then
