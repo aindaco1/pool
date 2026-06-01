@@ -263,6 +263,7 @@ The media pipeline:
 
 - compresses images when the optimized result is smaller
 - generates responsive WebP variants at `320w`, `480w`, `960w`, and `1600w` for public image templates when the source image is larger than that variant
+- skips `cwebp` re-optimization for animated WebP derivatives because `cwebp` cannot decode animated WebP files
 - generates WebM derivatives for uploaded videos
 - rewrites literal `_campaigns` / `_config.yml` references from uploaded source videos to generated WebM derivatives
 - keeps original source videos available for rollback or future re-encoding

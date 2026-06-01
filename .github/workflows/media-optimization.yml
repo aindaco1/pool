@@ -19,6 +19,8 @@ on:
       - 'assets/videos/**'
       - '_campaigns/**'
       - '_config.yml'
+      - 'scripts/optimize-media.mjs'
+      - '.github/workflows/media-optimization.yml'
 
 permissions:
   contents: write

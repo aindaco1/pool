@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
+import { Buffer } from 'node:buffer';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -120,6 +121,34 @@ async function fileSize(filePath) {
   }
 }
 
+export function hasAnimatedWebpChunks(buffer) {
+  const bytes = Buffer.from(buffer || []);
+  if (
+    bytes.length < 12 ||
+    bytes.toString('ascii', 0, 4) !== 'RIFF' ||
+    bytes.toString('ascii', 8, 12) !== 'WEBP'
+  ) {
+    return false;
+  }
+
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const chunkType = bytes.toString('ascii', offset, offset + 4);
+    const chunkSize = bytes.readUInt32LE(offset + 4);
+    if (chunkType === 'ANIM' || chunkType === 'ANMF') return true;
+    offset += 8 + chunkSize + (chunkSize % 2);
+  }
+  return false;
+}
+
+async function isAnimatedWebpFile(filePath) {
+  try {
+    return hasAnimatedWebpChunks(await fs.readFile(filePath));
+  } catch {
+    return false;
+  }
+}
+
 async function walkFiles(root) {
   const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
   const files = [];
@@ -139,7 +168,7 @@ async function changedFiles() {
     const { stdout } = await execFileAsync('git', ['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD']);
     return stdout.split(/\r?\n/).filter(Boolean);
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -162,8 +191,8 @@ async function resolveMediaFiles(args) {
     return args.files.map(normalizeRepoPath).filter(isDashboardMediaFile);
   }
   if (args.changed) {
-    const files = (await changedFiles()).map(normalizeRepoPath).filter(isDashboardMediaFile);
-    if (files.length) return files;
+    const changed = await changedFiles();
+    if (changed) return changed.map(normalizeRepoPath).filter(isDashboardMediaFile);
   }
   const roots = await Promise.all(MEDIA_ROOTS.map((root) => walkFiles(root)));
   return roots.flat()
@@ -231,7 +260,13 @@ async function optimizeImage(repoPath, args, tools) {
     const candidatePath = `${filePath}.optimized.gif`;
     await execFileAsync('gifsicle', ['-O3', filePath, '-o', candidatePath]);
     return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
-  } else if (extension === '.webp' && tools.cwebp) {
+  } else if (extension === '.webp') {
+    if (await isAnimatedWebpFile(filePath)) {
+      return { repoPath, changed: false, skipped: 'animated webp unsupported by cwebp' };
+    }
+    if (!tools.cwebp) {
+      return { repoPath, changed: false, skipped: `missing optimizer for ${extension}` };
+    }
     const candidatePath = `${filePath}.optimized`;
     await execFileAsync('cwebp', ['-quiet', '-lossless', '-z', '9', filePath, '-o', candidatePath]);
     return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
