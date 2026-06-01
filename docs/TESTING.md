@@ -129,6 +129,7 @@ Recent security hardening that the gate now covers includes:
 - Markdown link-scheme neutralization in long-form content
 - exact-origin validation for structured embeds (`spotify`, `youtube`, `vimeo`)
 - serialized limited-tier inventory reservations at checkout start and confirmation at successful persistence time
+- launch reminder Turnstile verification, deduped signup storage, scoped unsubscribe suppression, and idempotent dispatch
 
 Media optimization is intentionally separate from the pre-merge gate because it depends on native tools such as FFmpeg and image optimizers. When a branch includes dashboard-uploaded or manually-added media, run:
 
@@ -917,5 +918,5 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 ### Resend Dashboard
 - **Domain**: Verify the domain portion of the sender addresses configured in `_config.yml` / Worker env. For this deployment, `PLEDGES_EMAIL_FROM` is `The Pool <pledges@pool.dustwave.xyz>`, so Resend must authorize `pool.dustwave.xyz`.
 - **API Key**: Create key with "Sending access" permission
-- Used for: All supporter-facing pledge email (confirmation, manage/community access, diary updates, announcements, charge success, payment failure, cancellations)
+- Used for: All supporter-facing pledge email (confirmation, manage/community access, launch reminders, diary updates, announcements, reports, charge success, payment failure, cancellations)
 - Local dev note: even when `SITE_BASE` points at `127.0.0.1`, embedded email images still use the public `https://pool.dustwave.xyz` asset base so inbox previews do not show broken localhost image URLs.

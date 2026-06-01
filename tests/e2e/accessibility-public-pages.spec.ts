@@ -103,13 +103,15 @@ test.describe('Public Page Accessibility', () => {
     ]);
   });
 
-  test('live campaign page has no obvious axe violations', async ({ page }) => {
+  test('upcoming campaign page has no obvious axe violations', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
     await expect(page.locator('.campaign-container')).toBeVisible();
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
       'heading "HAND RELATIONS"',
-      'heading "Campaign Ended"'
+      'heading "Starts in"',
+      'heading "Launch reminder"',
+      'heading "Tiers"'
     ]);
   });
 

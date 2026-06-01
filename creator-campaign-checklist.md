@@ -34,7 +34,7 @@ This checklist covers:
 
 ## What Changed Since v0.9.5
 
-This checklist now reflects the creator-facing platform changes through **v1.0.2**:
+This checklist now reflects the creator-facing platform changes through **v1.0.3**:
 
 - creators can use campaign-specific dashboard access for normal edits instead of direct repository access
 - dashboard media uploads support images, video, audio, previews, and later repository optimization with responsive WebP variants
@@ -43,6 +43,8 @@ This checklist now reflects the creator-facing platform changes through **v1.0.2
 - hosted embeds give creators a live widget for websites and HTML-friendly partner pages
 - campaign pages include built-in share links for Bluesky, X, Threads, Facebook, SMS, and email
 - share intents use the campaign's current state, title, blurb, and public URL where each platform supports message text
+- upcoming campaigns can collect one-time launch reminder signups before pledging opens
+- campaign launch/deadline timing follows the deployment's configured platform timezone
 - public performance work makes campaign progress, share links, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
 
 ## The Short Version
@@ -65,6 +67,7 @@ If a creator only reads one section, it should be this one.
 - tier name, price, and description for each tier
 - report recipient email addresses, if the campaign runner wants automatic reports
 - dashboard editor email addresses, if the creator or team should edit the campaign directly
+- a launch reminder decision for upcoming campaigns: enabled public form, no form, or launch without a pre-launch signup period
 
 ### Strongly recommended
 
@@ -132,6 +135,7 @@ These are the foundational fields every campaign should have.
 | Runner report emails | Recommended | One or more campaign-runner recipients for pledge and fulfillment reports. |
 | Fulfillment owner | Recommended | Who is responsible for campaign rewards after a successful charge. |
 | Dashboard editors | Recommended | Authorized creator/team emails that should receive campaign-specific admin access. |
+| Launch reminders | Optional | If the campaign has a pre-launch period, decide whether to collect one-time email reminders before pledging opens. |
 
 <figure class="creator-checklist-screenshot creator-checklist-screenshot--compact">
   <img src="/assets/images/checklists/creator-campaign-checklist/creator-facts.png" alt="Creator facts panel showing creator image, name, category, and embed link." loading="lazy">
@@ -164,6 +168,8 @@ Operational notes:
 - Publishing campaign or settings changes commits through the platform workflow and may take time to deploy.
 - User management is separate from publishing: dashboard users save to Worker KV and do not create GitHub commits.
 - Admin sign-in may include a Cloudflare Turnstile challenge before the email magic link is sent.
+- Upcoming campaign launch reminder forms may also use Cloudflare Turnstile; platform operators configure those keys and secrets, not campaign creators.
+- Campaign launch and deadline dates are interpreted in the platform timezone configured by a super admin, so confirm that timezone before publishing time-sensitive campaign copy.
 
 ### Short Blurb Guidance
 
@@ -287,7 +293,7 @@ Use these for concept art, stills, behind-the-scenes images, moodboards, process
 - **Recommended formats:** `WebP`, `JPG`, `PNG`
 - **Recommended file size:** ideally under `500 to 600 KB` each
 
-The dashboard preserves original uploads. In v1.0.2, the repository media workflow can generate `480w`, `960w`, and `1600w` WebP variants for public pages, but creators should still export images near the recommended dimensions and crops before upload.
+The dashboard preserves original uploads. In v1.0.3, the repository media workflow can generate `320w`, `480w`, `960w`, and `1600w` WebP variants for public pages, but creators should still export images near the recommended dimensions and crops before upload.
 
 Each public-facing image should also include:
 

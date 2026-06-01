@@ -231,7 +231,7 @@
     margin-top: 0;
   }
   
-  h4 {
+  &__heading {
     margin: 0 0 $space-md 0;
     @include type-label;
     color: $color--primary;

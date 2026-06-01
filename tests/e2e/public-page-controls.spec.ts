@@ -48,10 +48,10 @@ test.describe('Public Page Keyboard Controls', () => {
     await expect(mobileShare).toBeHidden();
     await expect(sidebarShare.locator('.campaign-share__label')).toHaveCount(0);
     await expect(sidebarShare.locator('[data-campaign-share-target="copy"]')).toHaveCount(0);
-    await expect(sidebarShare).toHaveAttribute('data-share-text', /HAND RELATIONS has ended\. See what the campaign made possible:/);
+    await expect(sidebarShare).toHaveAttribute('data-share-text', /HAND RELATIONS is launching Dec 1, 2026\. Follow the campaign and help it start strong:/);
     await expect(sidebarShare.locator('[data-campaign-share-target="bluesky"]')).toHaveAttribute('href', /utm_source%3De2e/);
-    await expect(sidebarShare.locator('[data-campaign-share-target="x"]')).toHaveAttribute('href', /text=HAND%20RELATIONS%20has%20ended/);
-    await expect(sidebarShare.locator('[data-campaign-share-target="email"]')).toHaveAttribute('href', /body=HAND%20RELATIONS%20has%20ended/);
+    await expect(sidebarShare.locator('[data-campaign-share-target="x"]')).toHaveAttribute('href', /text=HAND%20RELATIONS%20is%20launching/);
+    await expect(sidebarShare.locator('[data-campaign-share-target="email"]')).toHaveAttribute('href', /body=HAND%20RELATIONS%20is%20launching/);
     await expect(sidebarShare.locator('[data-campaign-share-target="bluesky"]')).not.toHaveAttribute('href', /token/);
     await expect(sidebarShare.locator('.campaign-share__icon').first()).toBeVisible();
     await expect(sidebarShare.locator('.campaign-share__icon-image').first()).toBeHidden();

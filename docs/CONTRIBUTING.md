@@ -76,7 +76,7 @@ For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `do
 
 ---
 
-## Current Status (May 2026)
+## Current Status (June 2026)
 
 ✅ **Completed:**
 - Jekyll + first-party cart site structure
@@ -103,11 +103,14 @@ For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `do
 - Podman-backed local dev/testing path
 - More explicit inventory overselling protection via Durable Object coordination
 - Private admin dashboard for role-scoped campaign editing, settings, add-ons, analytics, reports, supporters, marketing links, and user management
+- Completed typography, elements, and layouts redesign across public pages, campaign surfaces, checkout, and Manage Pledge
+- Configurable platform timezone for campaign deadlines, countdowns, reports, lifecycle automation, and settlement checks
+- Upcoming-campaign launch reminders with Turnstile, dedupe, unsubscribe, and shared Resend delivery
+- Public-page performance hardening, generated asset minification, conservative same-origin prefetching, and responsive media derivatives
 
-🚧 **In Progress:**
-- Typography, elements, and layouts redesign
-  - shared tokens, type hierarchy, and reusable surface/button/field primitives are in place
-  - public pages, campaign surfaces, checkout, and Manage Pledge are being aligned to the same calmer visual system
+🚧 **Active focus:**
+- Merge-gate discipline and release-readiness audits across accessibility, customization, dashboard, i18n, performance, security, and SEO
+- Tax calculator depth, net revenue analytics, richer campaign marketing tools, add-on variant pricing, and protected campaign preview pages
 
 ---
 
@@ -185,4 +188,4 @@ Use the project docs and existing git history for context, and keep changes scop
 
 ---
 
-_Last updated: April 2026_
+_Last updated: June 1, 2026_

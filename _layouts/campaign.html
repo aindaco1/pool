@@ -329,7 +329,7 @@
 
       {% if page.tiers %}
       <section class="sidebar-tiers" id="campaign-tiers" aria-labelledby="campaign-tiers-heading" tabindex="-1">
-        <h4 id="campaign-tiers-heading">{% include t.html key="campaign.tiers_heading" lang=current_lang %}</h4>
+        <h2 class="sidebar-tiers__heading" id="campaign-tiers-heading">{% include t.html key="campaign.tiers_heading" lang=current_lang %}</h2>
         
         {% assign featured_tier = page.tiers | where: "id", page.featured_tier_id | first %}
         {% if featured_tier %}

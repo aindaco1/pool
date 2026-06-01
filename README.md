@@ -489,6 +489,7 @@ The Worker powers:
 - webhook processing and pledge persistence
 - tip-aware total calculation
 - supporter email delivery via Resend
+- upcoming-campaign launch reminder delivery through the shared Resend path
 - batched settlement and retry flows
 - browser admin dashboard auth, read APIs, publish APIs, user management, marketing referral saves, and legacy shared-secret admin endpoints
 

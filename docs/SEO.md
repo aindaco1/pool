@@ -227,4 +227,4 @@ The core rule remains simple: public metadata should reflect visible public cont
 
 ---
 
-_Last updated: May 31, 2026_
+_Last updated: June 1, 2026_

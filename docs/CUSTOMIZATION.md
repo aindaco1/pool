@@ -48,6 +48,7 @@ The site config is organized around these fork-facing sections:
 - `design`
 - `debug`
 - `performance`
+- `launch_reminders`
 - `add_ons`
 - `checkout`
 - `cache`
@@ -703,6 +704,30 @@ Supported keys:
 These control the safe same-origin document prefetch runtime loaded on public pages. The default is enabled, with conservative route/query exclusions and a low per-page limit. Private app surfaces such as admin, checkout, Manage Pledge, and supporter-community routes do not load the public prefetch runtime.
 
 Super admins can edit these fields in the dashboard under **Settings -> Advanced performance**. Published changes update `_config.yml`, mirror the Worker-facing `INTENT_PREFETCH_*` values, and take effect on static pages after the normal rebuild/deploy path.
+
+### `launch_reminders`
+
+Use `launch_reminders` for the public one-time reminder form shown on upcoming campaign pages.
+
+Supported keys:
+
+- `enabled`
+- `turnstile_site_key`
+
+Current behavior:
+
+- the form only renders for campaigns whose effective state is `upcoming`
+- the public site key can be blanked in `_config.local.yml` to hide the widget locally
+- the matching secret belongs in Worker secrets as `TURNSTILE_SECRET_KEY` or `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY`
+- reminder signup, unsubscribe, and dispatch logic lives in the Worker and reuses the existing Resend email module
+
+Example:
+
+```yml
+launch_reminders:
+  enabled: true
+  turnstile_site_key: "0x..."
+```
 
 ## Site-Only vs Worker-Mirrored Settings
 

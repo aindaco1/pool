@@ -504,7 +504,7 @@ Before deploying to production, verify these secrets are set:
 | Launch Reminder Token Secret | `LAUNCH_REMINDER_TOKEN_SECRET` or `MAGIC_LINK_SECRET` fallback | 32+ chars |
 | Admin Session Secret | `ADMIN_SESSION_SECRET` | 32+ chars |
 | Admin Secret | `ADMIN_SECRET` | 32+ chars |
-| Turnstile Secret | `TURNSTILE_SECRET_KEY` or scoped admin/reminder variants | N/A |
+| Turnstile Secret | `TURNSTILE_SECRET_KEY`, `ADMIN_TURNSTILE_SECRET_KEY`, or `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY` | N/A |
 | Resend API Key | `RESEND_API_KEY` | N/A |
 
 Generate secure secrets:
@@ -585,4 +585,4 @@ If the on-site payment step completes but the pledge doesn't appear yet (common 
 
 ---
 
-_Last updated: May 31, 2026_
+_Last updated: June 1, 2026_

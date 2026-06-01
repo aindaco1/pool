@@ -8,6 +8,8 @@ description: Review pledge terms, payment processing, fulfillment, and privacy d
 
 # Terms & Creative Guidelines
 
+These terms reflect The Pool platform release milestone **v1.0.3**.
+
 ## Pledge Terms
 
 - All pledges are **all-or-nothing**. Your card is saved securely but charged **only if** the campaign reaches its goal by the deadline.

@@ -82,9 +82,11 @@ Settings are grouped in a left sidebar. Super admins can edit publishable config
 
 ### Platform
 
-Platform identity fields include site title, platform name, company, author, default creator name, support email, site description, email sender names, and app mode.
+Platform identity fields include site title, platform name, company, author, default creator name, support email, site description, email sender names, app mode, and the default platform timezone.
 
 The pledge and update sender fields must use domains authorized for the configured Resend API key. For this deployment, pledge confirmations use `The Pool <pledges@pool.dustwave.xyz>` so the sender domain matches the authorized `pool.dustwave.xyz` Resend domain.
+
+The default timezone field is a select menu backed by supported IANA timezone values. It controls campaign start/deadline boundaries, countdowns, scheduled campaign-runner reports, lifecycle automation, and settlement checks. The default remains `America/Denver` until a super admin changes it.
 
 ### Brand & SEO
 
@@ -362,6 +364,7 @@ Check:
 - the email is present in `_config.yml` `admin.users`, `ADMIN_USERS_JSON`, `ADMIN_BOOTSTRAP_EMAILS`, or the KV-backed users list
 - local secrets exist in `worker/.dev.vars`
 - if Turnstile is enabled, `_config.yml` has `admin.turnstile_site_key` and the Worker has `TURNSTILE_SECRET_KEY`
+- if launch reminder Turnstile is enabled, `_config.yml` has `launch_reminders.turnstile_site_key` and the Worker has `TURNSTILE_SECRET_KEY` or `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY`
 - if testing locally with Turnstile enabled, use Cloudflare's test keys or set `ADMIN_TURNSTILE_BYPASS=true` only in a local/test Worker environment
 
 ### Changes Do Not Appear On The Public Site
@@ -386,4 +389,4 @@ Dashboard read endpoints rely on `campaign-pledges:{slug}` indexes and intention
 
 ---
 
-_Last updated: May 31, 2026_
+_Last updated: June 1, 2026_

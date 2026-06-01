@@ -21,7 +21,7 @@ upcoming → live → post
 
 | State | UX | Actions |
 |-------|-----|---------|
-| `upcoming` | Buttons disabled, "Coming soon" | Countdown to launch |
+| `upcoming` | Buttons disabled, "Coming soon" | Countdown to launch, optional one-time launch reminder signup |
 | `live` | Pledge buttons active | Cards saved via The Pool's on-site Stripe payment step |
 | `post` | Campaign closed | Charges processed (if funded) |
 
@@ -69,6 +69,10 @@ Pledges are stored in Cloudflare KV. Key patterns:
 | `pending-extras:{orderId}` | Temporary storage for support items/custom amount during checkout |
 | `pending-tiers:{orderId}` | Temporary storage for additional tiers when Stripe metadata would be too large |
 | `checkout-intent:{orderId}` | Canonicalized checkout payload used to fan bundled checkout into campaign-scoped pledges |
+| `launch-reminder:{campaignSlug}:{emailHash}` | Upcoming-campaign reminder signup and opt-in metadata |
+| `launch-reminder-suppressed:{campaignSlug}:{emailHash}` | Campaign-scoped reminder unsubscribe marker |
+| `launch-reminder-sent:{campaignSlug}:{emailHash}` | Launch reminder send idempotency marker |
+| `launch-reminder-dispatch:{campaignSlug}` | Bounded dispatch job cursor for a campaign that just became live |
 | `admin-users:v1` | Runtime dashboard users saved from **Settings -> Users** |
 | `admin-marketing-referrals:{campaignSlug}` | Saved referral code metadata for the dashboard Marketing tab |
 
@@ -487,9 +491,11 @@ crons = ["* * * * *"]
 
 1. Records a heartbeat (`cron:lastRun` in KV)
 2. Lists all campaigns with `goal_deadline` and `goal_amount`
-3. For each campaign where deadline has passed in the platform timezone, goal is met, and `campaign-charged:{slug}` is not set:
+3. Drains queued launch reminder dispatch jobs in bounded batches
+4. Queues one launch reminder dispatch job when an upcoming campaign becomes live
+5. For each campaign where deadline has passed in the platform timezone, goal is met, and `campaign-charged:{slug}` is not set:
    - Dispatches batched settlement via `POST /admin/settle-dispatch/:slug`
-4. Triggers GitHub Pages rebuild if any campaign state transitions detected
+6. Triggers GitHub Pages rebuild if any campaign state transitions detected
 
 **Settlement dispatch (self-chaining batches):**
 
@@ -625,6 +631,12 @@ All emails show exact amounts with 2 decimal places (no rounding).
 - Includes: Supporter access links (community + manage), Instagram CTA (if campaign has Instagram URL)
 - Endpoint: `POST /admin/broadcast/announcement`
 
+**Launch Reminder** (sent once when an upcoming campaign becomes live)
+- Subject: "Now live | {Campaign Title}"
+- Contains: Campaign title, localized launch copy, campaign CTA, and unsubscribe link
+- Uses: Signup `preferredLang`, existing Resend sender configuration, suppression markers, and sent markers
+- Note: Reminder signup is separate from pledging and can be cancelled from the reminder email
+
 ---
 
 ## Security Considerations
@@ -638,6 +650,8 @@ All emails show exact amounts with 2 decimal places (no rounding).
 - First-party checkout and payment-method POSTs enforce trusted `SITE_BASE` origins
 - Browser-stored checkout drafts and in-flight identifiers are session-scoped or time-limited
 - All deadlines evaluated in the platform timezone
+- Launch reminder signups require explicit campaign/email opt-in, rate limiting, and Turnstile verification when configured
+- Launch reminder unsubscribe links use scoped signed tokens and suppress only that campaign/email reminder
 - Community/voting access revoked immediately when pledge is cancelled
 - `/votes` API checks pledge status on every request (not just token validity)
 
@@ -664,4 +678,4 @@ All emails show exact amounts with 2 decimal places (no rounding).
 
 ---
 
-_Last updated: May 29, 2026_
+_Last updated: June 1, 2026_

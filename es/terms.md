@@ -9,6 +9,8 @@ description: Revisa los términos de aporte, el procesamiento de pagos, el cumpl
 
 # Términos y pautas creativas
 
+Estos términos reflejan el hito de lanzamiento **v1.0.3** de la plataforma The Pool.
+
 ## Términos del aporte
 
 - Todos los aportes son **de todo o nada**. Tu tarjeta se guarda de forma segura, pero se cobra **solo si** la campaña alcanza su meta antes de la fecha límite.

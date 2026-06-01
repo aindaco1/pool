@@ -183,4 +183,4 @@ For current Cloudflare limits, see:
 
 ---
 
-_Last updated: May 31, 2026_
+_Last updated: June 1, 2026_

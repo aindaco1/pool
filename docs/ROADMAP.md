@@ -212,7 +212,15 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds config
   - campaign pages now render reusable icon-only share links for Bluesky, X, Threads, Facebook, SMS, and email, using localized URLs, local PNG icon fallbacks for inline-SVG edge cases, and state-aware CTA text where platforms allow message text
   - responsive share controls appear below the short blurb on mobile/tablet and above the embed button only on desktop
   - admin email sign-in keeps the existing Turnstile challenge after a login attempt and uses the shared dashboard status-message styling for more prominent auth feedback
-  - the public Campaign Creator Checklist and Spanish checklist now describe the creator-facing changes from v0.9.5 through v1.0.2, including share-link planning and dashboard media uploads
+  - the public Campaign Creator Checklist and Spanish checklist were updated for the v1.0.2 creator-facing changes, including share-link planning and dashboard media uploads
+- [x] v1.0.3 platform timezone, launch reminders, and media workflow hardening
+  - super admins can set the default platform timezone from a select menu populated with supported IANA timezone options
+  - Jekyll campaign state, browser countdowns, Worker deadline checks, campaign state transitions, scheduled campaign-runner reports, settlement checks, and admin date/time surfaces now share the same `platform.timezone` / `PLATFORM_TIMEZONE` model
+  - upcoming campaign pages can collect one-time launch reminder signups through a slim localized form with Turnstile, rate limiting, campaign/email dedupe, signed unsubscribe links, and bounded dispatch jobs
+  - launch reminder delivery reuses the existing Resend email module, sender configuration, locale catalog, and pacing instead of adding a second email integration
+  - `_config.local.yml` can blank the reminder Turnstile site key so local development hides the widget consistently with local admin sign-in
+  - the Podman media optimizer now includes `optipng` and `gifsicle` for local PNG/GIF source compression through the same repository media workflow
+  - the public creator checklists now describe the creator-facing v1.0.3 changes, including launch reminders, platform timezone expectations, and `320w` responsive WebP variants
 - [x] Developer FAQ based on internal documentation
 - [x] Marketing landing page for the platform on a different domain
 - [x] Denial of service attack defense pass
@@ -273,18 +281,6 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds config
   - Keep previews out of `robots.txt`, `sitemap.xml`, public campaign indexes, and social metadata intended for live pages
   - Reuse the existing magic-link/session validation patterns instead of introducing a separate password system
   - Make preview publishing clear in the admin dashboard so users understand it does not make the campaign publicly live
-- [x] Allow potential pledgers to sign up for email launch reminders for upcoming campaigns
-  - Add an opt-in form on upcoming campaign pages with explicit consent and locale-aware copy
-    - Use Cloudflare Turnstile as a CAPTCHA/challenge
-  - Store reminder signups in campaign-scoped, deduplicated KV keys derived from normalized email hashes
-  - Send launch reminders when the campaign transitions to live, with idempotent per-recipient send markers to avoid duplicates
-  - Provide signed unsubscribe links and suppression handling before sending any reminder email
-  - Keep signup reads/writes bounded with prefix listing, dispatch jobs, and small per-cron batches so popular upcoming campaigns can stay within free-tier KV expectations
-- [x] Allow super admins to set a default timezone for the platform rather than hardcoding Mountain Time
-  - Introduce a platform-level timezone setting with IANA timezone validation, defaulting to `America/Denver` for compatibility
-  - Audit campaign state transitions, countdowns, settlement scheduling, reports, emails, and dashboard date/time fields for timezone assumptions
-  - Update Jekyll plugins, Worker deadline logic, cron guidance, and documentation together so frontend and Worker behavior stay aligned
-  - Preserve existing campaign behavior unless a fork explicitly changes the platform timezone
 
 ## Known Issues
 
