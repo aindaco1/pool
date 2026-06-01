@@ -21,7 +21,8 @@
     data-platform-company-name="{{ site.platform.company_name | default: site.author | escape }}"
     data-platform-author="{{ site.author | default: site.platform.company_name | escape }}"
     data-platform-support-email="{{ site.platform.support_email | default: '' | escape }}"
-    data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"></script>
+    data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"
+    data-platform-timezone="{{ site.platform.timezone | default: 'America/Denver' | escape }}"></script>
   <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
 </head>
 <body class="campaign-embed-page">

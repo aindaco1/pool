@@ -85,6 +85,7 @@ Supported keys:
 - `site_url`
 - `worker_url`
 - `default_creator_name`
+- `timezone`
 - `logo_path`
 - `footer_logo_path`
 - `favicon_path`
@@ -98,13 +99,15 @@ These values feed:
 - app-title metadata for mobile/share surfaces
 - default social-card image
 - campaign creator fallback copy
+- campaign deadline/countdown behavior and Worker scheduled lifecycle windows
 - checkout / Manage Pledge UI copy and bootstrapped client config
 - Worker email branding when mirrored
 
 Notes:
 
 - `platform.*` is the primary branding surface.
-- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v1.0.2`.
+- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v1.0.3`.
+- `platform.timezone` must be a supported IANA timezone. It defaults to `America/Denver` so existing forks keep the old lifecycle behavior until they change it.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
 - `platform.logo_path` is also the mirrored brand mark used in supporter emails.
@@ -115,8 +118,8 @@ Example:
 ```yml
 platform:
   name: My Fork
-  version: 1.0.2
-  release_label: v1.0.2
+  version: 1.0.3
+  release_label: v1.0.3
   company_name: Example Studio
   support_email: support@example.com
   pledges_email_from: "My Fork <pledges@pool.example.com>"
@@ -124,6 +127,7 @@ platform:
   site_url: https://crowdfund.example.com
   worker_url: https://pledge.example.com
   default_creator_name: Example Studio
+  timezone: America/Denver
   logo_path: /assets/images/brand/logo-square.png
   footer_logo_path: /assets/images/brand/logo-footer.png
   favicon_path: /assets/images/brand/favicon.png
@@ -539,8 +543,8 @@ Supported keys today:
 - `campaign_runner.enabled`
 - `campaign_runner.daily_pledge_report_enabled`
 - `campaign_runner.fulfillment_report_enabled`
-- `campaign_runner.send_hour_mt`
-- `campaign_runner.send_minute_mt`
+- `campaign_runner.send_hour`
+- `campaign_runner.send_minute`
 - `campaign_runner.include_stats_summary`
 - `campaign_runner.include_csv_attachment`
 - `campaign_runner.email_subject_prefix`
@@ -549,7 +553,7 @@ Current behavior:
 
 - campaign-level recipients live in campaign front matter as `runner_report_emails`
 - if that campaign field is missing or empty, no campaign-runner emails are sent for that campaign
-- the send window is still interpreted in Mountain Time so report timing stays aligned with the rest of the campaign lifecycle model
+- the send window is interpreted in `platform.timezone` so report timing stays aligned with the rest of the campaign lifecycle model
 - `email_subject_prefix` can be set to an empty string to disable the prefix entirely
 - when the prefix is omitted at runtime, the Worker falls back to `[platform.name]`
 - report subjects stay concise and deliverability-oriented: no emoji, short report labels, and a consistent prefix + report-kind + campaign-title pattern
@@ -568,8 +572,8 @@ reports:
     enabled: true
     daily_pledge_report_enabled: true
     fulfillment_report_enabled: true
-    send_hour_mt: 7
-    send_minute_mt: 0
+    send_hour: 7
+    send_minute: 0
     include_stats_summary: true
     include_csv_attachment: true
     email_subject_prefix: "[My Fork]"
@@ -595,7 +599,7 @@ runner_report_emails:
 
 Use `design` for curated design-system overrides that do not require Sass edits.
 
-These values are emitted into the generated stylesheet [assets/theme-vars.css](../assets/theme-vars.css), which keeps the design-variable bridge compatible with the site’s strict CSP. Forks do not need to edit Sass just to change supported tokens.
+These values are emitted into the generated stylesheet [assets/main.css](../assets/main.scss), which keeps the design-variable bridge compatible with the site’s strict CSP. [assets/theme-vars.css](../assets/theme-vars.css) remains as a compatibility artifact, but public layouts do not request it separately. Forks do not need to edit Sass just to change supported tokens.
 
 The same generated CSS variables also now theme the on-site Stripe Elements sidecar, so supported typography/color/radius overrides carry through the custom checkout payment UI without adding a separate checkout-only config layer.
 
@@ -775,14 +779,16 @@ These site-config values are also reflected into the Worker env values in [`work
 - `shipping.usps.quote_cache_ttl_seconds` -> `USPS_QUOTE_CACHE_TTL_SECONDS`
 - `shipping.usps.failure_cooldown_seconds` -> `USPS_FAILURE_COOLDOWN_SECONDS`
 - `shipping.usps.rate_limit_cooldown_seconds` -> `USPS_RATE_LIMIT_COOLDOWN_SECONDS`
+- `platform.timezone` -> `PLATFORM_TIMEZONE`
 - `reports.campaign_runner.enabled` -> `CAMPAIGN_RUNNER_REPORTS_ENABLED`
 - `reports.campaign_runner.daily_pledge_report_enabled` -> `CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED`
 - `reports.campaign_runner.fulfillment_report_enabled` -> `CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED`
-- `reports.campaign_runner.send_hour_mt` -> `CAMPAIGN_RUNNER_REPORT_HOUR_MT`
-- `reports.campaign_runner.send_minute_mt` -> `CAMPAIGN_RUNNER_REPORT_MINUTE_MT`
+- `reports.campaign_runner.send_hour` -> `CAMPAIGN_RUNNER_REPORT_HOUR`
+- `reports.campaign_runner.send_minute` -> `CAMPAIGN_RUNNER_REPORT_MINUTE`
 - `reports.campaign_runner.include_stats_summary` -> `CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY`
 - `reports.campaign_runner.include_csv_attachment` -> `CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT`
 - `reports.campaign_runner.email_subject_prefix` -> `CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX`
+- `launch_reminders.enabled` -> `LAUNCH_REMINDERS_ENABLED`
 - `debug.console_logging_enabled` -> `DEBUG_CONSOLE_LOGGING_ENABLED`
 - `debug.verbose_console_logging` -> `DEBUG_VERBOSE_CONSOLE_LOGGING`
 - `performance.intent_prefetch_enabled` -> `INTENT_PREFETCH_ENABLED`
@@ -816,7 +822,15 @@ That command syncs the Worker-mirrored values in [`worker/wrangler.toml`](../wor
 
 It does not write Worker secrets, media files, or generated optimization outputs. USPS OAuth secrets, Stripe secret keys, Resend keys, ZIP.TAX keys, Turnstile secrets, GitHub tokens, and Cloudflare deploy credentials still belong in Worker secrets, GitHub repository secrets, or ignored local env files.
 
-Dashboard-uploaded media also does not add new sync-script config. Uploads commit source files into the existing asset directories; `npm run media:optimize` / `npm run media:optimize:check` and the **Optimize dashboard media** workflow handle image compression, responsive WebP variants, and WebM derivatives outside the Worker.
+Launch reminders have one public setting and one secret boundary:
+
+- `_config.yml` `launch_reminders.enabled` controls whether upcoming campaign pages render the reminder form.
+- `_config.yml` `launch_reminders.turnstile_site_key` is the public Cloudflare Turnstile site key used by that form.
+- `_config.local.yml` may override `launch_reminders.turnstile_site_key` with an empty string to hide the widget in local development, matching the local admin sign-in Turnstile override.
+- The matching Turnstile secret belongs in Worker secrets as `TURNSTILE_SECRET_KEY` or `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY`.
+- Reminder emails use the existing Resend-backed Worker email module and the configured `platform.updates_email_from` sender.
+
+Dashboard-uploaded media also does not add new sync-script config. Uploads commit source files into the existing asset directories; `npm run media:optimize` / `npm run media:optimize:check`, the Podman-backed variants for machines without native optimizers, and the **Optimize dashboard media** workflow handle image compression, responsive WebP variants, and WebM derivatives outside the Worker.
 
 Generated CSS/JS minification is also outside the Worker and dashboard save path. Production deploys run `npm run assets:minify` only after Jekyll writes `_site`, so forks should keep source assets readable in `assets/` and let the deploy artifact step handle minified output. Cloudflare edge compression should stay enabled, but Cloudflare Auto Minify should stay disabled to avoid a second rewriting layer.
 

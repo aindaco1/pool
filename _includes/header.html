@@ -5,7 +5,7 @@
 <header class="site-header" role="banner">
   <div class="site-header__container">
     <a href="{{ home_url | strip }}" class="site-header__branding" aria-label="{% include t.html key='nav.home_aria' lang=current_lang title=platform_title %}">
-      <img src="{{ header_logo_path }}" alt="" class="site-header__logo" aria-hidden="true"{% if header_logo_path == '/assets/images/defaults/dust-wave-square.png' %} width="1078" height="985"{% endif %}>
+      {% include responsive-image.html src=header_logo_path alt="" class="site-header__logo" decoding="async" sizes="70px" widths="320,480" %}
       <span class="site-header__title">{{ platform_title }}</span>
     </a>
     <div class="site-header__actions">

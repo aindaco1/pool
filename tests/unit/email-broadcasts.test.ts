@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { RESEND_RATE_LIMIT_DELAY_MS } from '../../worker/src/email.js';
 
 // Mock KV store
 function createMockKV(initialData: Record<string, any> = {}) {
@@ -112,8 +113,8 @@ async function checkMilestones(
   return newMilestones;
 }
 
-// Rate limit constant (mirrors worker/src/index.js)
-const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
+// Rate limit constant lives with the shared Resend email integration.
+const RESEND_RATE_LIMIT_DELAY = RESEND_RATE_LIMIT_DELAY_MS;
 
 // Inline implementation of getDiaryExcerpt (mirrors worker/src/index.js)
 function getDiaryExcerpt(entry: { body?: string; content?: Array<{ type: string; body?: string; text?: string }> }, maxLength = 200): string {

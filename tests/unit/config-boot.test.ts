@@ -27,6 +27,7 @@ describe('config boot scripts', () => {
         data-platform-company-name="Fork Studio"
         data-platform-author="Fork Studio"
         data-platform-support-email="support@fork.test"
+        data-platform-timezone="Europe/London"
         data-default-creator-name="Fork Studio"
         data-sales-tax-rate="0.07875"
         data-flat-shipping-rate="3.00"
@@ -45,6 +46,8 @@ describe('config boot scripts', () => {
         data-seo-index-public-community-hub="true"
         data-debug-console-logging-enabled="true"
         data-debug-verbose-console-logging="false"
+        data-launch-reminders-enabled="true"
+        data-launch-reminder-turnstile-site-key="turnstile_public_test"
         data-stripe-publishable-key="pk_test_pool"></script>
     `;
 
@@ -69,6 +72,7 @@ describe('config boot scripts', () => {
         supportEmail: 'support@fork.test',
         siteUrl: 'https://pool.test',
         workerUrl: 'https://worker.test',
+        timezone: 'Europe/London',
         defaultCreatorName: 'Fork Studio'
       },
       pricing: {
@@ -142,11 +146,16 @@ describe('config boot scripts', () => {
         consoleLoggingEnabled: 'true',
         verboseConsoleLogging: 'false'
       },
+      launchReminders: {
+        enabled: true,
+        turnstileSiteKey: 'turnstile_public_test'
+      },
       siteUrl: 'https://pool.test',
       workerBase: 'https://worker.test',
       platformName: 'Fork Pool',
       platformCompanyName: 'Fork Studio',
       platformAuthor: 'Fork Studio',
+      platformTimezone: 'Europe/London',
       supportEmail: 'support@fork.test',
       defaultCreatorName: 'Fork Studio',
       salesTaxRate: '0.07875',
@@ -170,7 +179,9 @@ describe('config boot scripts', () => {
       seoXHandle: 'dustwave',
       seoIndexPublicCommunityHub: 'true',
       debugConsoleLoggingEnabled: 'true',
-      debugVerboseConsoleLogging: 'false'
+      debugVerboseConsoleLogging: 'false',
+      launchRemindersEnabled: 'true',
+      launchReminderTurnstileSiteKey: 'turnstile_public_test'
     });
   });
 });

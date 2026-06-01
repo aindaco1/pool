@@ -43,6 +43,15 @@ describe('campaign content security audit', () => {
     expect(textTemplate).toContain('{{ include.block.body | safe_markdown_source | markdownify | sanitize_markdown_links: site.url }}');
   });
 
+  it('allows Cloudflare Web Analytics only on public campaign CSP surfaces', () => {
+    const campaignCsp = fs.readFileSync(path.join(repoRoot, '_includes', 'first-party-campaign-csp-strict.html'), 'utf8');
+    const adminCsp = fs.readFileSync(path.join(repoRoot, '_includes', 'first-party-admin-csp.html'), 'utf8');
+
+    expect(campaignCsp).toContain('https://static.cloudflareinsights.com');
+    expect(campaignCsp).toContain('https://cloudflareinsights.com');
+    expect(adminCsp).not.toContain('https://static.cloudflareinsights.com');
+  });
+
   it('keeps short blurbs on the safe rich text filter', () => {
     const campaignTemplate = fs.readFileSync(path.join(repoRoot, '_layouts', 'campaign.html'), 'utf8');
     const cardTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'campaign-card.html'), 'utf8');

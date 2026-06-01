@@ -3,8 +3,15 @@ FROM ruby:3.3-bookworm
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     build-essential \
+    ca-certificates \
     git \
     curl \
+    ffmpeg \
+    gifsicle \
+    libjpeg-turbo-progs \
+    nodejs \
+    optipng \
+    webp \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace

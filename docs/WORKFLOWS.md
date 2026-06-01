@@ -33,7 +33,7 @@ upcoming → live → post
 |-----------|------|
 | **First-party cart** | Browser-owned cart UI and checkout review state |
 | **Stripe** | Checkout Sessions in setup mode (custom on-site payment step) + PaymentIntents (charge later) |
-| **Cloudflare Worker** | Backend: checkout, webhooks, pledge storage (KV), combined live reads, stats, auto-settle cron |
+| **Cloudflare Worker** | Backend: checkout, webhooks, pledge storage (KV), combined live reads, stats, auto-settle scheduler |
 | **Jekyll** | Static pages + campaign markdown |
 | **Admin dashboard** | Private browser workspace for settings, campaigns, add-ons, reports, analytics, supporters, marketing links, and users |
 
@@ -48,7 +48,7 @@ upcoming → live → post
 4. SAVE CARD  → The existing checkout sidecar keeps the visitor on-site, mounts secure Stripe payment UI, and saves the payment method (no charge)
 5. CONFIRM    → Stripe confirms the setup, then Worker persists one pledge per campaign in KV, sends campaign-specific supporter email(s), and refreshes live campaign reads before success UX completes
 6. MANAGE     → Backer uses magic link to cancel/modify/update card
-7. DEADLINE   → Worker cron (midnight MT) checks campaigns
+7. DEADLINE   → Worker scheduler checks campaigns after midnight in the platform timezone
 8. CHARGE     → If funded + deadline passed: aggregate by email within each campaign, charge once per supporter per campaign, and store actual Stripe fee/net data when Stripe returns balance transaction details
 9. COMPLETE   → Update pledge_status to 'charged' or 'payment_failed'
 ```
@@ -248,7 +248,7 @@ If the token is valid but its pledge record no longer exists, this route returns
 **Flag logic:**
 - `canModify` / `canCancel`: `true` only if `pledgeStatus === 'active'` AND `!charged` AND deadline not passed
 - `canUpdatePaymentMethod`: `true` if `!charged` (allowed even after deadline for failed payment recovery)
-- `deadlinePassed`: `true` if campaign deadline has passed (Mountain Time)
+- `deadlinePassed`: `true` if campaign deadline has passed in the platform timezone
 
 ### `POST /pledge/cancel`
 Cancel an active pledge.
@@ -344,7 +344,7 @@ Send a custom announcement email with optional CTA link to all campaign supporte
   "campaignSlug": "worst-movie-ever",
   "subject": "Submissions close March 6th!",
   "heading": "Last call for submissions!",
-  "body": "The deadline is this Thursday at midnight MT.",
+  "body": "The deadline is this Thursday at midnight in the platform timezone.",
   "ctaLabel": "Submit Your Reward",
   "ctaUrl": "https://example.com/submit",
   "dryRun": true
@@ -475,19 +475,19 @@ Supporter-only community page:
 
 ## Charging Flow (Worker Cron)
 
-The Worker has scheduled triggers at **6:00 AM UTC** and **7:00 AM UTC** so daily checks line up with midnight Mountain Time in both MDT and MST:
+The Worker has a minute-level scheduled trigger. Daily lifecycle work is gated to a small midnight window in the configured platform timezone and claimed once per local date:
 
 ```toml
 # wrangler.toml
 [triggers]
-crons = ["0 6 * * *", "0 7 * * *"]
+crons = ["* * * * *"]
 ```
 
 **What it does:**
 
 1. Records a heartbeat (`cron:lastRun` in KV)
 2. Lists all campaigns with `goal_deadline` and `goal_amount`
-3. For each campaign where deadline has passed (in MT), goal is met, and `campaign-charged:{slug}` is not set:
+3. For each campaign where deadline has passed in the platform timezone, goal is met, and `campaign-charged:{slug}` is not set:
    - Dispatches batched settlement via `POST /admin/settle-dispatch/:slug`
 4. Triggers GitHub Pages rebuild if any campaign state transitions detected
 
@@ -637,7 +637,7 @@ All emails show exact amounts with 2 decimal places (no rounding).
 - Sensitive checkout and payment-method bootstrap responses are `private, no-store`
 - First-party checkout and payment-method POSTs enforce trusted `SITE_BASE` origins
 - Browser-stored checkout drafts and in-flight identifiers are session-scoped or time-limited
-- All deadlines evaluated in Mountain Time
+- All deadlines evaluated in the platform timezone
 - Community/voting access revoked immediately when pledge is cancelled
 - `/votes` API checks pledge status on every request (not just token validity)
 
@@ -646,7 +646,7 @@ All emails show exact amounts with 2 decimal places (no rounding).
 ## Race Condition Handling
 
 - `/pledge/cancel` and `/pledge/modify` reject if pledge `charged: true`
-- `/pledge/cancel` and `/pledge/modify` reject if campaign deadline has passed (Mountain Time)
+- `/pledge/cancel` and `/pledge/modify` reject if campaign deadline has passed in the platform timezone
 - Cron checks `pledgeStatus === 'active'` and `!charged` before charging
 - `pledgeStatus` and `charged` flags prevent double-charging
 - Aggregation by email ensures one charge per supporter per campaign even with multiple pledge rows

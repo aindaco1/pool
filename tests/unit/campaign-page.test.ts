@@ -67,20 +67,28 @@ describe('campaign page script', () => {
             imageGallery: 'Image gallery',
             countdownLive: 'Campaign is now live!',
             countdownFunded: 'Project Funded',
-            countdownEnded: 'Campaign Ended'
+            countdownEnded: 'Campaign Ended',
+            launchReminderSuccess: "You're on the reminder list.",
+            launchReminderError: 'Could not save this reminder. Please try again.',
+            launchReminderSubmitting: 'Saving...',
+            launchReminderEmailRequired: 'Enter your email address.',
+            launchReminderConsentRequired: 'Confirm that you want this launch reminder.'
           }
         }
-      }
+      },
+      workerBase: 'https://pledge.test'
     };
     window.history.replaceState({}, '', '/campaigns/demo/?dev=1');
     renderCampaignPage();
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     vi.useRealTimers();
     delete (document as any).activeElement;
     delete (window as any).POOL_CONFIG;
+    delete (window as any).POOL_TIME;
     document.body.innerHTML = '';
   });
 
@@ -144,6 +152,90 @@ describe('campaign page script', () => {
     expect(email.href).toContain('body=Help%20Demo%20campaign%20reach%20its%20goal.%20Pledge%20or%20share%20before%20the%20deadline%3A%20https%3A%2F%2Fpool.test%2Fcampaigns%2Fdemo%2F%3Fref%3Dabc%26utm_source%3Dnewsletter');
     expect(bluesky.href).not.toContain('token');
     expect(document.querySelector('[data-campaign-share-target="copy"]')).toBeNull();
+  });
+
+  it('submits upcoming campaign launch reminder signups to the Worker', async () => {
+    document.body.innerHTML = `
+      <form data-launch-reminder-form data-campaign-slug="demo" data-lang="en">
+        <input name="email" type="email">
+        <input name="consent" type="hidden" value="true">
+        <button type="submit">Remind me</button>
+        <p data-launch-reminder-status></p>
+      </form>
+      <script data-campaign-page-script="true" data-campaign-slug="demo"></script>
+    `;
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await import('../../assets/js/campaign-page.js');
+
+    const form = document.querySelector('[data-launch-reminder-form]') as HTMLFormElement;
+    const email = form.querySelector('input[name="email"]') as HTMLInputElement;
+    email.value = 'fan@example.com';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(fetchMock).toHaveBeenCalledWith('https://pledge.test/launch-reminders', expect.objectContaining({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        campaignSlug: 'demo',
+        email: 'fan@example.com',
+        preferredLang: 'en',
+        consent: true,
+        turnstileToken: undefined
+      })
+    }));
+    expect((form.querySelector('[data-launch-reminder-status]') as HTMLElement).textContent).toBe("You're on the reminder list.");
+  });
+
+  it('uses normal Turnstile sizing in the sidebar and flexible sizing in the header', async () => {
+    document.body.innerHTML = `
+      <section class="launch-reminder launch-reminder--sidebar">
+        <form data-launch-reminder-form data-campaign-slug="demo" data-lang="en" data-turnstile-site-key="site-key">
+          <input name="email" type="email" value="sidebar@example.com">
+          <input name="consent" type="hidden" value="true">
+          <button type="submit">Remind me</button>
+          <div data-launch-reminder-turnstile></div>
+          <p data-launch-reminder-status></p>
+        </form>
+      </section>
+      <section class="launch-reminder launch-reminder--header">
+        <form data-launch-reminder-form data-campaign-slug="demo" data-lang="en" data-turnstile-site-key="site-key">
+          <input name="email" type="email" value="header@example.com">
+          <input name="consent" type="hidden" value="true">
+          <button type="submit">Remind me</button>
+          <div data-launch-reminder-turnstile></div>
+          <p data-launch-reminder-status></p>
+        </form>
+      </section>
+      <script data-campaign-page-script="true" data-campaign-slug="demo"></script>
+    `;
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    }));
+    const renderMock = vi.fn(() => 'widget-id');
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('turnstile', {
+      render: renderMock,
+      getResponse: vi.fn(() => 'turnstile-token'),
+      reset: vi.fn()
+    });
+
+    await import('../../assets/js/campaign-page.js');
+
+    const forms = document.querySelectorAll('[data-launch-reminder-form]');
+    forms[0].dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    forms[1].dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(renderMock.mock.calls[0][1]).toMatchObject({ size: 'normal' });
+    expect(renderMock.mock.calls[1][1]).toMatchObject({ size: 'flexible' });
   });
 
   it('uses hidden state and width classes for countdown and video shell', async () => {
@@ -214,6 +306,39 @@ describe('campaign page script', () => {
     expect(loading.hidden).toBe(true);
     expect(playButton.hidden).toBe(true);
     expect(overlay.hidden).toBe(true);
+
+    vi.useRealTimers();
+  });
+
+  it('uses a smaller value style when the days countdown has three or more digits', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    (window as any).POOL_TIME = {
+      campaignDeadlineDate: () => new Date('2026-04-11T00:00:00Z')
+    };
+    window.history.replaceState({}, '', '/campaigns/demo/');
+    document.body.innerHTML = `
+      <div class="campaign-countdown" id="campaign-countdown" data-deadline="2026-04-11" data-state="live" data-goal-met="false">
+        <h2 class="campaign-countdown__heading">Ends in</h2>
+        <p class="sr-only" id="campaign-countdown-status"></p>
+        <div class="flip-countdown">
+          <div class="flip-card" data-unit="days"><span class="flip-card__value">00</span></div>
+          <div class="flip-card" data-unit="hours"><span class="flip-card__value">00</span></div>
+          <div class="flip-card" data-unit="mins"><span class="flip-card__value">00</span></div>
+          <div class="flip-card" data-unit="secs"><span class="flip-card__value">00</span></div>
+        </div>
+        <div class="campaign-countdown__message"></div>
+      </div>
+      <script data-campaign-page-script="true" data-campaign-slug="demo"></script>
+    `;
+
+    await import('../../assets/js/campaign-page.js');
+
+    const daysCard = document.querySelector('.flip-card[data-unit="days"]') as HTMLElement;
+    const hoursCard = document.querySelector('.flip-card[data-unit="hours"]') as HTMLElement;
+    expect((daysCard.querySelector('.flip-card__value') as HTMLElement).textContent).toBe('100');
+    expect(daysCard.classList.contains('flip-card--long-value')).toBe(true);
+    expect(hoursCard.classList.contains('flip-card--long-value')).toBe(false);
 
     vi.useRealTimers();
   });

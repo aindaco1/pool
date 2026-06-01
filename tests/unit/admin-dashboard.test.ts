@@ -779,6 +779,7 @@ describe('admin dashboard foundation', () => {
       body: JSON.stringify({
         changes: [
           { path: 'platform.logo_path', value: 'javascript:alert(1)' },
+          { path: 'platform.timezone', value: 'Not/AZone' },
           { path: 'hero_video', campaignSlug: 'hand-relations', value: 'https://example.test/not-a-video' },
           { path: 'seo.same_as', value: 'https://example.test/profile\njavascript:alert(1)' },
           { path: 'design.font_body', value: 'Inter; background:url(javascript:alert(1))' },
@@ -802,6 +803,7 @@ describe('admin dashboard foundation', () => {
     const body = await previewResponse.json();
     const errors = body.errors.join('\n');
     expect(errors).toContain('Logo must use http or https');
+    expect(errors).toContain('Default timezone must be a supported IANA timezone');
     expect(errors).toContain('Hero video must be an uploaded MP4, WebM, or MOV video path, or a YouTube or Vimeo URL');
     expect(errors).toContain('Same-as links contains an invalid URL');
     expect(errors).toContain('Body font must be a simple CSS font stack');
@@ -862,6 +864,7 @@ describe('admin dashboard foundation', () => {
       'Company',
       'Site author',
       'Default creator name',
+      'Default timezone',
       'Support email',
       'Site description',
       'Pledges email from',
@@ -874,6 +877,18 @@ describe('admin dashboard foundation', () => {
       expect.objectContaining({ label: 'Company', path: 'platform.company_name', layoutGroup: 'platform-company-author', editable: true }),
       expect.objectContaining({ label: 'Site author', value: 'Dust Wave', path: 'author', layoutGroup: 'platform-company-author', editable: true }),
       expect.objectContaining({ label: 'Default creator name', path: 'platform.default_creator_name', layoutGroup: 'platform-creator-support', editable: true }),
+      expect.objectContaining({
+        label: 'Default timezone',
+        path: 'platform.timezone',
+        input: 'select',
+        rawValue: 'America/Denver',
+        options: expect.arrayContaining([
+          expect.objectContaining({ value: 'America/Denver', label: 'America/Denver' }),
+          expect.objectContaining({ value: 'Africa/Addis_Ababa', label: 'Africa/Addis Ababa' }),
+          expect.objectContaining({ value: 'Europe/London', label: 'Europe/London' })
+        ]),
+        editable: true
+      }),
       expect.objectContaining({ label: 'Support email', path: 'platform.support_email', layoutGroup: 'platform-creator-support', editable: true }),
       expect.objectContaining({ label: 'Pledges email from', path: 'platform.pledges_email_from', layoutGroup: 'platform-email-from', editable: true }),
       expect.objectContaining({ label: 'Updates email from', path: 'platform.updates_email_from', layoutGroup: 'platform-email-from', editable: true }),
@@ -1148,7 +1163,7 @@ describe('admin dashboard foundation', () => {
     const reportRows = body.sections.find((section: { title: string }) => section.title === 'Campaign runner reports').rows;
     expect(reportRows.map((row: { label: string }) => row.label)).toEqual([
       'Enabled',
-      'Send Time (Mountain Time)',
+      'Send Time',
       'Email Subject Prefix',
       'Daily pledge report enabled',
       'Fulfillment report enabled',
@@ -1164,14 +1179,14 @@ describe('admin dashboard foundation', () => {
         layoutGroup: 'reports-enabled-time'
       }),
       expect.objectContaining({
-        label: 'Send Time (Mountain Time)',
+        label: 'Send Time',
         input: 'time',
-        path: 'reports.campaign_runner.send_hour_mt',
+        path: 'reports.campaign_runner.send_hour',
         layoutGroup: 'reports-enabled-time',
         visibleWhen: { path: 'reports.campaign_runner.enabled', value: 'true' },
         timeParts: expect.objectContaining({
-          hourPath: 'reports.campaign_runner.send_hour_mt',
-          minutePath: 'reports.campaign_runner.send_minute_mt'
+          hourPath: 'reports.campaign_runner.send_hour',
+          minutePath: 'reports.campaign_runner.send_minute'
         })
       }),
       expect.objectContaining({
@@ -1200,9 +1215,7 @@ describe('admin dashboard foundation', () => {
         visibleWhen: { path: 'reports.campaign_runner.enabled', value: 'true' }
       })
     ]));
-    expect(reportRows).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: 'Send minute MT' })
-    ]));
+    expect(reportRows.map((row: { path?: string }) => row.path)).not.toContain('reports.campaign_runner.send_minute_mt');
     const debugRows = body.sections.find((section: { title: string }) => section.title === 'Debug').rows;
     expect(debugRows.map((row: { label: string }) => row.label)).toEqual([
       'Console logging enabled',
@@ -1434,6 +1447,7 @@ runner_report_emails:
       { path: 'platform.name', value: 'The Pool Updated' },
       { path: 'author', value: 'Dust Wave Studio' },
       { path: 'platform.logo_path', value: '/assets/images/admin/logo-uploaded.png' },
+      { path: 'platform.timezone', value: 'Europe/London' },
       { path: 'platform.pledges_email_from', value: 'The Pool <pledges@pool.test>' },
       { path: 'seo.same_as', value: 'https://example.test/profile\nhttps://social.example.test/pool' },
       { path: 'debug.verbose_console_logging', value: 'false' },
@@ -1552,6 +1566,7 @@ runner_report_emails:
     expect(configContent).toContain('name: "The Pool Updated"');
     expect(configContent).toContain('author: "Dust Wave Studio"');
     expect(configContent).toContain('logo_path: "/assets/images/admin/logo-uploaded.png"');
+    expect(configContent).toContain('timezone: "Europe/London"');
     expect(configContent).toContain('pledges_email_from: "The Pool <pledges@pool.test>"');
     expect(configContent).toContain('same_as:\n    - "https://example.test/profile"\n    - "https://social.example.test/pool"');
     expect(configContent).toContain('verbose_console_logging: false');

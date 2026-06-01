@@ -9,9 +9,11 @@ This document covers the security architecture, known risks, applied hardening m
 | Mechanism | Endpoints | Description |
 |-----------|-----------|-------------|
 | **Magic Link Tokens** | `/pledge*`, `/pledges`, `/votes` | HMAC-SHA256 signed tokens with 90-day expiry |
+| **Launch Reminder Unsubscribe Tokens** | `GET /launch-reminders/unsubscribe` | Scoped HMAC token that suppresses one campaign/email reminder signup |
 | **Stripe Webhook Signature** | `/webhooks/stripe` | HMAC-SHA256 verification per Stripe spec |
 | **Admin Dashboard Sessions** | Browser dashboard `/admin/*` APIs | Email magic-link sign-in, signed session cookie, CSRF header on mutations, role/campaign scoping |
 | **Admin Sign-In Challenge** | `POST /admin/auth/start` | Optional Cloudflare Turnstile verification before admin magic-link issuance |
+| **Launch Reminder Challenge** | `POST /launch-reminders` | Optional/expected Cloudflare Turnstile verification before reminder signup writes |
 | **Admin Recovery Secret** | Automation and recovery `/admin/*` endpoints | `Authorization: Bearer <secret>` or `x-admin-key` header for script-driven operations |
 | **Test Mode Guard** | `/test/*` | `APP_MODE === 'test'` environment check |
 
@@ -35,6 +37,10 @@ This document covers the security architecture, known risks, applied hardening m
 | `admin-users:v1` | PLEDGES | Runtime admin users and campaign scopes | **High** - access control |
 | `admin-marketing-referrals:{slug}` | PLEDGES | Saved referral code metadata | **Low** - admin-authored marketing data |
 | `admin-audit:{date}:{action}:{id}` | PLEDGES | Recent admin mutation audit events | **Medium** - admin identity + operational metadata |
+| `launch-reminder:{slug}:{emailHash}` | PLEDGES | Upcoming-campaign reminder email and opt-in metadata | **Medium** - campaign-scoped email |
+| `launch-reminder-suppressed:{slug}:{emailHash}` | PLEDGES | Reminder suppression marker | **Medium** - campaign-scoped email hash |
+| `launch-reminder-sent:{slug}:{emailHash}` | PLEDGES | Reminder send idempotency marker | **Low** - send state |
+| `launch-reminder-dispatch:{slug}` | PLEDGES | Bounded reminder dispatch job cursor/progress | **Low** - operational state |
 | `vote:{slug}:{decision}:{email}` | VOTES | Vote choice | **Medium** - links supporter to vote |
 | `results:{slug}:{decision}` | VOTES | Vote tallies | **Low** - semi-public |
 | `rl:{endpoint}:{ip}` | RATELIMIT | Request count + reset time | **Low** - ephemeral |
@@ -97,6 +103,7 @@ Admin mutations use these common protections:
 
 - Browser dashboard mutations require a valid admin session cookie and `x-pool-admin-csrf` header.
 - When `TURNSTILE_SECRET_KEY` is configured, admin email sign-in requires a server-verified Cloudflare Turnstile token before rate-limit writes, login nonce writes, or magic-link email sends. `ADMIN_TURNSTILE_BYPASS=true` is accepted only in local/test mode or local URLs for automated testing.
+- Launch reminder signups use the same shared Turnstile verifier with public-reminder-specific env gates. `LAUNCH_REMINDER_TURNSTILE_BYPASS=true` is accepted only in local/test mode or local URLs for automated testing.
 - Campaign users can mutate only campaigns in their assigned scope; super admins can mutate platform settings and all campaigns.
 - GitHub-backed settings are allowlisted through `ADMIN_PLATFORM_SETTING_SCHEMA` and `ADMIN_CAMPAIGN_SETTING_SCHEMA`. Unknown paths are rejected, and pseudo UI rows such as the campaign content editor cannot be mass-assigned through settings publishing.
 - Admin media uploads are scoped server-side by upload kind. Campaign media uploads require a valid campaign slug plus `campaign:edit_content`; platform/default media uploads require the super-admin `settings:publish` path. The Worker validates file type, size, destination directory, and filename before committing an asset path.
@@ -115,6 +122,8 @@ The public intent-prefetch runtime is deliberately narrow so speculative navigat
 - The runtime respects explicit `data-no-prefetch`, `download`, `target`, `nofollow`, save-data, slow-network, and per-page limit guards.
 
 Campaign share links follow the same privacy boundary. The client preserves only safe UTM/referral query params for public campaign URLs, leaves token/order/email/session params behind, and lets Open Graph metadata supply preview images instead of serializing image URLs into share intents.
+
+Launch reminder forms are public but bounded: signups require explicit consent, are rate-limited by IP, write one deduped campaign/email-hash record, and can be reactivated only by another explicit signup. Reminder dispatch checks suppression and sent markers immediately before email delivery.
 
 Admin field classes are normalized consistently:
 
@@ -492,9 +501,10 @@ Before deploying to production, verify these secrets are set:
 | Stripe Webhook Secret | `STRIPE_WEBHOOK_SECRET_LIVE` | 32+ chars |
 | Checkout Intent Secret | `CHECKOUT_INTENT_SECRET` | 32+ chars |
 | Magic Link Secret | `MAGIC_LINK_SECRET` | 32+ chars |
+| Launch Reminder Token Secret | `LAUNCH_REMINDER_TOKEN_SECRET` or `MAGIC_LINK_SECRET` fallback | 32+ chars |
 | Admin Session Secret | `ADMIN_SESSION_SECRET` | 32+ chars |
 | Admin Secret | `ADMIN_SECRET` | 32+ chars |
-| Admin Turnstile Secret | `TURNSTILE_SECRET_KEY` | N/A |
+| Turnstile Secret | `TURNSTILE_SECRET_KEY` or scoped admin/reminder variants | N/A |
 | Resend API Key | `RESEND_API_KEY` | N/A |
 
 Generate secure secrets:

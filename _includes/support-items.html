@@ -54,7 +54,7 @@
         </div>
         <div class="support-item__progress">
           {% if include.campaign.progress_background %}
-          <img src="{{ include.campaign.progress_background }}" alt="" class="support-item__progress-bg" aria-hidden="true">
+          {% include responsive-image.html src=include.campaign.progress_background alt="" class="support-item__progress-bg" aria_hidden=true loading="lazy" decoding="async" sizes="(min-width: 1000px) 320px, calc(100vw - 64px)" %}
           {% endif %}
           <span class="u-width-pct-{{ percent }}" data-progress-width="{{ percent }}"></span>
         </div>

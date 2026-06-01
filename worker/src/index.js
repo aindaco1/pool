@@ -16,6 +16,8 @@
  *   POST /votes              - Cast a vote
  *   GET  /live/:slug         - Get combined live stats + inventory for a campaign
  *   GET  /stats/:slug        - Get live pledge stats for a campaign
+ *   POST /launch-reminders   - Save an upcoming campaign launch reminder signup
+ *   GET  /launch-reminders/unsubscribe - Suppress a launch reminder signup
  *   GET  /share/campaign/:slug.png - Get crawler-safe campaign share-card image
  *   GET  /share/campaign/:slug.svg - Get internal/debug campaign share-card image
  *   POST /stats/:slug/check - Check stats/index/inventory projection drift (admin)
@@ -58,7 +60,7 @@
  */
 
 import { generateToken, verifyToken } from './token.js';
-import { sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail, sendCampaignRunnerReportEmail, sendAdminUserCreatedEmail } from './email.js';
+import { RESEND_RATE_LIMIT_DELAY_MS, sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail, sendCampaignRunnerReportEmail, sendAdminUserCreatedEmail } from './email.js';
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
@@ -74,8 +76,8 @@ import {
   getCampaignRunnerFulfillmentReportEnabled,
   getCampaignRunnerIncludeCsvAttachment,
   getCampaignRunnerIncludeStatsSummary,
-  getCampaignRunnerReportHourMt,
-  getCampaignRunnerReportMinuteMt,
+  getCampaignRunnerReportHour,
+  getCampaignRunnerReportMinute,
   getCampaignRunnerReportsEnabled,
   getCampaignShippingFallbackFeeCents,
   getCheckoutProvider,
@@ -90,6 +92,25 @@ import {
 import { normalizeShippingDestination, quoteCampaignShipment } from './shipping.js';
 import { normalizeTaxDestination, quoteTax } from './tax.js';
 import { buildFulfillmentReport, buildPledgeLedgerReport, rebuildCsvReport } from './reports.js';
+import {
+  ensureLaunchReminderDispatchForCampaign,
+  handleLaunchReminderSignup,
+  handleLaunchReminderUnsubscribe,
+  processLaunchReminderDispatchJobs,
+  verifyLaunchReminderSignupChallenge
+} from './launch-reminders.js';
+import {
+  campaignDeadlineDate,
+  campaignStartDate,
+  getPlatformDateKey,
+  getPlatformTimeParts,
+  getPlatformTimeZone,
+  getTimeZoneOptions,
+  isCampaignDeadlinePassed,
+  isInPlatformDailyWindow,
+  isSupportedTimeZone,
+  formatInPlatformTimeZone
+} from './timezone.js';
 import {
   adminCorsResponse,
   getEffectiveAdminUsers,
@@ -111,15 +132,17 @@ function configureWorkerLogging(env) {
   console = getScopedConsole(env, 'index');
 }
 
-// Rate limit delay for Resend API (2 req/sec limit)
-const RESEND_RATE_LIMIT_DELAY = 600; // ms between emails
 const STRIPE_CUSTOM_UI_MODE_API_VERSION = '2026-02-25.clover';
 const PRIVATE_NO_STORE_CACHE_CONTROL = 'private, no-store, max-age=0';
 const DEFAULT_I18N_LANG = 'en';
 const ADD_ON_ITEM_PREFIX = 'addon__';
 const SUPPORTER_EMAIL_RETRY_PREFIX = 'supporter-email-retry:';
 const SUPPORTER_EMAIL_RETRY_CRON = '*/15 * * * *';
-const CAMPAIGN_RUNNER_REPORT_CRONS = new Set(['0 13 * * *', '0 14 * * *']);
+const PLATFORM_SCHEDULER_CRON = '* * * * *';
+const SUPPORTER_EMAIL_RETRY_INTERVAL_MINUTES = 15;
+const LEGACY_CAMPAIGN_RUNNER_REPORT_CRONS = new Set(['0 13 * * *', '0 14 * * *']);
+const LEGACY_PLATFORM_DAILY_CRONS = new Set(['0 6 * * *', '0 7 * * *']);
+const PLATFORM_DAILY_TASK_WINDOW_MINUTES = 5;
 const SUPPORTER_EMAIL_RETRY_BATCH_SIZE = 10;
 const SUPPORTER_EMAIL_RETRY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SHARE_CARD_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=3600';
@@ -1691,6 +1714,7 @@ const RATE_LIMITS = {
   complete: { prefix: 'rl:complete', limit: 12, windowSeconds: 60 },    // 12 recovery attempts/min/order
   abandon: { prefix: 'rl:abandon', limit: 12, windowSeconds: 60 },      // 12 abandon attempts/min/order
   votes: { prefix: 'rl:votes', limit: 45, windowSeconds: 60 },          // 45 vote reads/writes/min/IP
+  launchReminder: { prefix: 'rl:launch-reminder', limit: 5, windowSeconds: 60 }, // 5 launch reminder signups/min/IP
   admin: { prefix: 'rl:admin', limit: 5, windowSeconds: 60 },       // 5 admin calls/min
   pledgeRead: { prefix: 'rl:pledge-read', limit: 120, windowSeconds: 60 },   // 120 manage reads/min/IP
   pledgeWrite: { prefix: 'rl:pledge-write', limit: 30, windowSeconds: 60 }   // 30 manage mutations/min/IP
@@ -1725,74 +1749,24 @@ function requireAdmin(request, env) {
   return { ok: false, response: jsonResponse({ error: 'Unauthorized' }, 401) };
 }
 
-// Mountain Time offset: -7 hours (MST) or -6 hours (MDT)
-// Returns deadline as end of day (23:59:59) in Mountain Time, DST-aware
-function getMTOffset(dateString) {
-  // Use Intl to determine if a date falls in MST (-7) or MDT (-6)
-  const fmt = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Denver',
-    timeZoneName: 'short'
-  });
-  // Check the target date at noon to avoid edge cases
-  const [year, month, day] = dateString.split('-').map(Number);
-  const parts = fmt.formatToParts(new Date(Date.UTC(year, month - 1, day, 19, 0, 0))); // noon MT ≈ 19:00 UTC
-  const tzName = parts.find(p => p.type === 'timeZoneName')?.value;
-  return tzName === 'MDT' ? 6 : 7;
+function getCampaignDeadlineDate(dateString, env = {}) {
+  return campaignDeadlineDate(dateString, env);
 }
 
-function getDeadlineMT(dateString) {
-  const [year, month, day] = dateString.split('-').map(Number);
-  const offset = getMTOffset(dateString);
-  // End of day in MT = 23:59:59 MT = next day (23+offset):59:59 UTC
-  return new Date(Date.UTC(year, month - 1, day, 23 + offset, 59, 59));
+function isDeadlinePassed(dateString, env = {}, now = new Date()) {
+  return isCampaignDeadlinePassed(dateString, env, now);
 }
 
-// Check if we're past the deadline in Mountain Time
-function isDeadlinePassed(dateString) {
-  const deadline = getDeadlineMT(dateString);
-  return new Date() > deadline;
-}
-
-function getMountainTimeParts(date = new Date()) {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Denver',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
-  const parts = formatter.formatToParts(date);
-  const map = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
-  return {
-    year: Number(map.year || 0) || 0,
-    month: Number(map.month || 0) || 0,
-    day: Number(map.day || 0) || 0,
-    hour: Number(map.hour || 0) || 0,
-    minute: Number(map.minute || 0) || 0
-  };
-}
-
-function getMountainDateKey(date = new Date()) {
-  const parts = getMountainTimeParts(date);
-  return [
-    String(parts.year).padStart(4, '0'),
-    String(parts.month).padStart(2, '0'),
-    String(parts.day).padStart(2, '0')
-  ].join('-');
-}
-
-function formatCampaignRunnerReportDateLabel(date = new Date()) {
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Denver',
+function formatCampaignRunnerReportDateLabel(env = {}, date = new Date()) {
+  return formatInPlatformTimeZone(env, date, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true
-  }).format(date) + ' MT';
+    hour12: true,
+    timeZoneName: 'short'
+  });
 }
 
 function formatUsdCents(cents = 0) {
@@ -1814,12 +1788,12 @@ function countRecentCampaignPledges(pledges = [], now = new Date(), windowMs = 2
   }).length;
 }
 
-function formatDeadlineCountdown(dateString, now = new Date()) {
+function formatDeadlineCountdown(dateString, env = {}, now = new Date()) {
   if (!dateString) {
     return '';
   }
 
-  const deadline = getDeadlineMT(dateString);
+  const deadline = getCampaignDeadlineDate(dateString, env);
   const diffMs = deadline.getTime() - now.getTime();
   const absDiffMs = Math.abs(diffMs);
   const totalHours = Math.floor(absDiffMs / (60 * 60 * 1000));
@@ -1835,21 +1809,21 @@ function formatDeadlineCountdown(dateString, now = new Date()) {
   return `Deadline passed ${dayLabel}, ${hourLabel} ago`;
 }
 
-function getDaysUntilDeadline(dateString, now = new Date()) {
+function getDaysUntilDeadline(dateString, env = {}, now = new Date()) {
   if (!dateString) {
     return null;
   }
-  const diffMs = getDeadlineMT(dateString).getTime() - now.getTime();
+  const diffMs = getCampaignDeadlineDate(dateString, env).getTime() - now.getTime();
   return diffMs / (24 * 60 * 60 * 1000);
 }
 
-function buildCampaignRunnerEncouragement(campaign, reportKind, pledges = [], now = new Date()) {
+function buildCampaignRunnerEncouragement(campaign, reportKind, pledges = [], now = new Date(), env = {}) {
   const normalizedReportKind = String(reportKind || '').trim().toLowerCase();
 
   if (normalizedReportKind.includes('fulfillment report')) {
-    const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
+    const effectiveState = getEffectiveState(campaign, env) || campaign?.state || 'unknown';
     const deadlineLine = campaign?.goal_deadline
-      ? formatDeadlineCountdown(campaign.goal_deadline, now)
+      ? formatDeadlineCountdown(campaign.goal_deadline, env, now)
       : null;
 
     return {
@@ -1870,9 +1844,9 @@ function buildCampaignRunnerEncouragement(campaign, reportKind, pledges = [], no
     return null;
   }
 
-  const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
+  const effectiveState = getEffectiveState(campaign, env) || campaign?.state || 'unknown';
   const newPledgesLast24Hours = countRecentCampaignPledges(pledges, now);
-  const daysUntilDeadline = getDaysUntilDeadline(campaign?.goal_deadline, now);
+  const daysUntilDeadline = getDaysUntilDeadline(campaign?.goal_deadline, env, now);
   const recentMomentumLine = newPledgesLast24Hours > 0
     ? `You picked up **${newPledgesLast24Hours} new pledge${newPledgesLast24Hours === 1 ? '' : 's'}** in the previous 24 hours, which is a strong prompt to give people one more fresh reason to pay attention today.`
     : 'If momentum feels quiet right now, that is normal. The middle stretch of a campaign is rarely won by repeating the launch ask; it is won by giving people **something new to care about**.';
@@ -1891,7 +1865,7 @@ function buildCampaignRunnerEncouragement(campaign, reportKind, pledges = [], no
   }
 
   if (effectiveState === 'live' && campaign?.start_date) {
-    const startDate = new Date(`${campaign.start_date}T00:00:00Z`);
+    const startDate = campaignStartDate(campaign.start_date, env);
     const daysSinceStart = (now.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000);
     if (Number.isFinite(daysSinceStart) && daysSinceStart <= 5) {
       return {
@@ -1933,11 +1907,40 @@ function buildCampaignRunnerEncouragement(campaign, reportKind, pledges = [], no
 }
 
 function shouldRunCampaignRunnerReportsNow(env, date = new Date()) {
-  const parts = getMountainTimeParts(date);
+  const parts = getPlatformTimeParts(env, date);
   return (
-    parts.hour === getCampaignRunnerReportHourMt(env) &&
-    parts.minute === getCampaignRunnerReportMinuteMt(env)
+    parts.hour === getCampaignRunnerReportHour(env) &&
+    parts.minute === getCampaignRunnerReportMinute(env)
   );
+}
+
+function shouldRunSupporterEmailRetryNow(date = new Date()) {
+  return date.getUTCMinutes() % SUPPORTER_EMAIL_RETRY_INTERVAL_MINUTES === 0;
+}
+
+function shouldRunPlatformDailyTasksNow(env, cronExpression = '', date = new Date()) {
+  if (!cronExpression || LEGACY_PLATFORM_DAILY_CRONS.has(cronExpression)) return true;
+  if (cronExpression !== PLATFORM_SCHEDULER_CRON) return false;
+  return isInPlatformDailyWindow(env, date, {
+    hour: 0,
+    minuteWindow: PLATFORM_DAILY_TASK_WINDOW_MINUTES
+  });
+}
+
+async function claimPlatformDailyTaskRun(env, date = new Date()) {
+  if (!env.PLEDGES) return { claimed: true, markerKey: '' };
+
+  const dateKey = getPlatformDateKey(env, date);
+  const markerKey = `cron:platform-daily:${dateKey}`;
+  const existing = await env.PLEDGES.get(markerKey);
+  if (existing) return { claimed: false, markerKey };
+
+  await env.PLEDGES.put(markerKey, JSON.stringify({
+    startedAt: new Date().toISOString(),
+    dateKey,
+    timeZone: getPlatformTimeZone(env)
+  }), { expirationTtl: 172800 });
+  return { claimed: true, markerKey };
 }
 
 function normalizeCampaignRunnerReportRecipients(campaign = {}) {
@@ -3762,6 +3765,23 @@ export default {
         return withObservedOperation(env, ctx, 'tax_quote', () => handleTaxQuote(request, env));
       }
 
+      if (path === '/launch-reminders' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const challengeResponse = await verifyLaunchReminderSignupChallenge(request, env, parsedBody.body || {});
+        if (challengeResponse) return challengeResponse;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.launchReminder);
+        if (!rl.allowed) return rl.response;
+        return handleLaunchReminderSignup(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/launch-reminders/unsubscribe' && method === 'GET') {
+        return handleLaunchReminderUnsubscribe(request, env);
+      }
+
       if (path === '/checkout-intent/summary' && method === 'GET') {
         return handleFirstPartyCheckoutSummary(request, env);
       }
@@ -4088,25 +4108,27 @@ export default {
     }
   },
 
-  // Cron triggers:
-  // - `0 6 * * *` / `0 7 * * *`: daily campaign transitions + settlement checks at midnight Mountain Time
-  // - `0 13 * * *` / `0 14 * * *`: 7:00 AM Mountain Time campaign-runner reports
-  // - `*/15 * * * *`: retry failed supporter confirmation emails
+  // Cron trigger:
+  // - `* * * * *`: timezone-aware platform scheduler. Individual tasks gate on
+  //   the configured platform timezone and idempotency markers.
   async scheduled(event, env, ctx) {
     configureWorkerLogging(env);
-    console.log('⏰ Scheduled task triggered:', new Date().toISOString());
+    const now = new Date();
+    console.log('⏰ Scheduled task triggered:', now.toISOString());
     const cronExpression = String(event?.cron || '');
     
     // Heartbeat: record cron execution
     if (env.PLEDGES) {
-      await env.PLEDGES.put('cron:lastRun', new Date().toISOString(), { expirationTtl: 172800 });
+      await env.PLEDGES.put('cron:lastRun', now.toISOString(), { expirationTtl: 172800 });
     }
 
-    if (cronExpression === SUPPORTER_EMAIL_RETRY_CRON) {
+    const shouldRunRetry = cronExpression === SUPPORTER_EMAIL_RETRY_CRON ||
+      (cronExpression === PLATFORM_SCHEDULER_CRON && shouldRunSupporterEmailRetryNow(now));
+    if (shouldRunRetry) {
       try {
         const retryResults = await processQueuedSupporterEmails(env);
         if (env.PLEDGES) {
-          await env.PLEDGES.put('cron:lastEmailRetryRun', new Date().toISOString(), { expirationTtl: 172800 });
+          await env.PLEDGES.put('cron:lastEmailRetryRun', now.toISOString(), { expirationTtl: 172800 });
         }
         console.log('📧 Supporter email retry complete:', retryResults);
       } catch (err) {
@@ -4118,14 +4140,17 @@ export default {
           }), { expirationTtl: 604800 });
         }
       }
-      return;
+      if (cronExpression === SUPPORTER_EMAIL_RETRY_CRON) return;
     }
 
-    if (CAMPAIGN_RUNNER_REPORT_CRONS.has(cronExpression)) {
+    const shouldCheckCampaignRunnerReports = !cronExpression ||
+      cronExpression === PLATFORM_SCHEDULER_CRON ||
+      LEGACY_CAMPAIGN_RUNNER_REPORT_CRONS.has(cronExpression);
+    if (shouldCheckCampaignRunnerReports) {
       try {
-        const reportResults = await processCampaignRunnerReports(env);
+        const reportResults = await processCampaignRunnerReports(env, now);
         if (env.PLEDGES && reportResults.attempted) {
-          await env.PLEDGES.put('cron:lastCampaignRunnerReportRun', new Date().toISOString(), { expirationTtl: 172800 });
+          await env.PLEDGES.put('cron:lastCampaignRunnerReportRun', now.toISOString(), { expirationTtl: 172800 });
         }
         console.log('📊 Campaign runner report cron complete:', reportResults);
       } catch (err) {
@@ -4137,23 +4162,64 @@ export default {
           }), { expirationTtl: 604800 });
         }
       }
+      if (LEGACY_CAMPAIGN_RUNNER_REPORT_CRONS.has(cronExpression)) return;
+    }
+
+    const shouldProcessLaunchReminders = !cronExpression || cronExpression === PLATFORM_SCHEDULER_CRON;
+    if (shouldProcessLaunchReminders) {
+      try {
+        const reminderResults = await processLaunchReminderDispatchJobs(env, now);
+        if (env.PLEDGES && reminderResults.attempted) {
+          await env.PLEDGES.put('cron:lastLaunchReminderRun', now.toISOString(), { expirationTtl: 172800 });
+        }
+        console.log('📨 Launch reminder dispatch cron complete:', reminderResults);
+      } catch (err) {
+        console.error('📨 Launch reminder dispatch cron failed:', err);
+        if (env.PLEDGES) {
+          await env.PLEDGES.put('cron:lastError', JSON.stringify({
+            at: new Date().toISOString(),
+            error: err.message
+          }), { expirationTtl: 604800 });
+        }
+      }
+    }
+
+    if (!shouldRunPlatformDailyTasksNow(env, cronExpression, now)) {
+      return;
+    }
+
+    const dailyClaim = await claimPlatformDailyTaskRun(env, now);
+    if (!dailyClaim.claimed) {
+      console.log('⏰ Platform daily task already claimed:', dailyClaim.markerKey);
       return;
     }
     
     try {
       const campaigns = await getCampaigns(env);
-      const results = { checked: 0, settlementDispatched: 0, transitioned: 0, errors: [] };
+      const results = { checked: 0, settlementDispatched: 0, transitioned: 0, launchReminderDispatchQueued: 0, errors: [] };
       let needsRebuild = false;
       
       for (const campaign of campaigns.campaigns || campaigns) {
         results.checked++;
         
         // Check if campaign state should transition based on dates
-        const effectiveState = getEffectiveState(campaign);
+        const effectiveState = getEffectiveState(campaign, env);
         if (effectiveState !== campaign.state) {
           console.log(`⏰ Campaign ${campaign.slug}: state transition detected (${campaign.state} → ${effectiveState})`);
           results.transitioned++;
           needsRebuild = true;
+        }
+
+        if (effectiveState === 'live') {
+          try {
+            const reminderDispatch = await ensureLaunchReminderDispatchForCampaign(env, campaign);
+            if (reminderDispatch.queued) {
+              results.launchReminderDispatchQueued++;
+            }
+          } catch (reminderErr) {
+            results.errors.push({ campaign: campaign.slug, type: 'launch-reminder', error: reminderErr.message });
+            console.error(`📨 Launch reminder dispatch queue failed for ${campaign.slug}:`, reminderErr.message);
+          }
         }
         
         // Skip campaigns without deadline/goal for settlement
@@ -4161,8 +4227,8 @@ export default {
           continue;
         }
         
-        // Check if deadline has passed (in Mountain Time)
-        if (!isDeadlinePassed(campaign.goal_deadline)) {
+        // Check if deadline has passed in the platform timezone.
+        if (!isDeadlinePassed(campaign.goal_deadline, env)) {
           continue;
         }
 
@@ -4223,11 +4289,6 @@ export default {
         }
       }
 
-      const retryResults = await processQueuedSupporterEmails(env);
-      if (retryResults.processed > 0) {
-        console.log('📧 Supporter email retry complete:', retryResults);
-      }
-      
       console.log('⏰ Scheduled task complete:', results);
     } catch (err) {
       console.error('⏰ Scheduled task error:', err);
@@ -5129,7 +5190,7 @@ async function handleFirstPartyCheckoutRecovery(request, env) {
   return jsonResponse({
     campaignSlug,
     campaignTitle,
-    effectiveState: getEffectiveState(campaign),
+    effectiveState: getEffectiveState(campaign, env),
     acceptingPledges,
     statusMessage: acceptingPledges
       ? `${campaignTitle} is still accepting pledges.`
@@ -5810,7 +5871,7 @@ async function handleStripeWebhook(request, env, ctx) {
             // Auto-retry charge if this was a failed payment and campaign is past deadline + funded
             if (wasPaymentFailed && !existingPledge.charged) {
               const pledgeCampaign = await getCampaign(env, existingPledge.campaignSlug);
-              if (pledgeCampaign?.goal_deadline && isDeadlinePassed(pledgeCampaign.goal_deadline)) {
+              if (pledgeCampaign?.goal_deadline && isDeadlinePassed(pledgeCampaign.goal_deadline, env)) {
                 const stats = await getCampaignStats(env, existingPledge.campaignSlug);
                 const goalAmountCents = (pledgeCampaign.goal_amount || 0) * 100;
                 
@@ -6232,7 +6293,7 @@ async function handleGetPledge(request, env) {
     if (pledgeData) {
       // Check if campaign deadline has passed
       const campaign = await getCampaign(env, pledgeData.campaignSlug);
-      const deadlinePassed = campaign?.goal_deadline && isDeadlinePassed(campaign.goal_deadline);
+      const deadlinePassed = campaign?.goal_deadline && isDeadlinePassed(campaign.goal_deadline, env);
       const canChange = pledgeData.pledgeStatus === 'active' && !pledgeData.charged && !deadlinePassed;
       
       return jsonResponse({
@@ -6292,7 +6353,7 @@ async function handleGetPledges(request, env) {
     const pledgeData = await env.PLEDGES.get(`pledge:${authorizedOrder.orderId}`, { type: 'json' });
     if (pledgeData && pledgeData.pledgeStatus !== 'cancelled') {
       const campaign = await getCampaign(env, pledgeData.campaignSlug);
-      const deadlinePassed = campaign?.goal_deadline && isDeadlinePassed(campaign.goal_deadline);
+      const deadlinePassed = campaign?.goal_deadline && isDeadlinePassed(campaign.goal_deadline, env);
       const canChange = pledgeData.pledgeStatus === 'active' && !pledgeData.charged && !deadlinePassed;
 
       pledges.push({
@@ -6367,7 +6428,7 @@ async function handleCancelPledge(request, env) {
       
       // Check if campaign deadline has passed
       const campaign = await getCampaign(env, pledgeData.campaignSlug);
-      if (campaign?.goal_deadline && isDeadlinePassed(campaign.goal_deadline)) {
+      if (campaign?.goal_deadline && isDeadlinePassed(campaign.goal_deadline, env)) {
         return jsonResponse({ error: 'Cannot cancel - campaign deadline has passed' }, 400);
       }
       
@@ -7349,14 +7410,14 @@ async function handleSettleCampaign(request, campaignSlug, env) {
     }, 400);
   }
 
-  // Check if deadline has passed (Mountain Time)
+  // Check if deadline has passed in the platform timezone.
   if (campaign.goal_deadline) {
-    if (!isDeadlinePassed(campaign.goal_deadline)) {
-      const deadline = getDeadlineMT(campaign.goal_deadline);
+    if (!isDeadlinePassed(campaign.goal_deadline, env)) {
+      const deadline = getCampaignDeadlineDate(campaign.goal_deadline, env);
       return jsonResponse({ 
         error: 'Deadline has not passed yet',
         deadline: deadline.toISOString(),
-        deadlineMT: campaign.goal_deadline + ' 23:59:59 MT',
+        deadlineLocal: `${campaign.goal_deadline} 23:59:59 ${getPlatformTimeZone(env)}`,
         now: new Date().toISOString()
       }, 400);
     }
@@ -8218,7 +8279,7 @@ function getCampaignRunnerStatsSummary(campaign, stats, env, reportKind, pledges
     summary.push(`Goal progress: ${formatUsdCents(goalAmountCents)} goal (${percentFunded}% funded)`);
   }
   if (campaign?.goal_deadline) {
-    summary.push(formatDeadlineCountdown(campaign.goal_deadline, now));
+    summary.push(formatDeadlineCountdown(campaign.goal_deadline, env, now));
   }
 
   return summary;
@@ -8306,7 +8367,7 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
     })
     : buildPledgeLedgerReport(pledges, { campaign });
   const slugPart = String(campaign?.slug || 'campaign-report').trim() || 'campaign-report';
-  const datePart = String(reportDateKey || '').trim() || getMountainDateKey();
+  const datePart = String(reportDateKey || '').trim() || getPlatformDateKey(env);
   const includeStatsSummary = getCampaignRunnerIncludeStatsSummary(env);
   const includeCsvAttachment = getCampaignRunnerIncludeCsvAttachment(env);
   const campaignTitle = campaign.title || campaign.slug;
@@ -8336,12 +8397,12 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
           now: reportDate
         })
         : [];
-      const fulfillmentEncouragement = buildCampaignRunnerEncouragement(campaign, reportKind, pledges, reportDate);
+      const fulfillmentEncouragement = buildCampaignRunnerEncouragement(campaign, reportKind, pledges, reportDate, env);
       const runnerCsvFilename = `${slugPart}-fulfillment-report-${datePart}.csv`;
 
       for (let index = 0; index < recipients.length; index += 1) {
         if (sent > 0) {
-          await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+          await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
         }
 
         await sendCampaignRunnerReportEmail(env, {
@@ -8362,7 +8423,7 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
 
     if (supportEmail && platformFulfillmentReport.rows.length > 0) {
       if (sent > 0) {
-        await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+        await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
       }
 
       const platformSummary = includeStatsSummary
@@ -8374,7 +8435,7 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
           now: reportDate
         })
         : [];
-      const platformEncouragement = buildCampaignRunnerEncouragement(campaign, 'Platform fulfillment report', pledges, reportDate);
+      const platformEncouragement = buildCampaignRunnerEncouragement(campaign, 'Platform fulfillment report', pledges, reportDate, env);
       const platformCsvFilename = `${slugPart}-platform-fulfillment-report-${datePart}.csv`;
 
       await sendCampaignRunnerReportEmail(env, {
@@ -8409,13 +8470,13 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
   const summary = includeStatsSummary
     ? getCampaignRunnerStatsSummary(campaign, stats, env, reportKind, pledges, reportDate)
     : [];
-  const encouragement = buildCampaignRunnerEncouragement(campaign, reportKind, pledges, reportDate);
+  const encouragement = buildCampaignRunnerEncouragement(campaign, reportKind, pledges, reportDate, env);
   const csvFilename = `${slugPart}-pledge-report-${datePart}.csv`;
 
   let sent = 0;
   for (let index = 0; index < recipients.length; index += 1) {
     if (index > 0) {
-      await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+      await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
     }
 
     await sendCampaignRunnerReportEmail(env, {
@@ -8443,8 +8504,8 @@ async function processCampaignRunnerReports(env, now = new Date()) {
 
   const campaignsData = await getCampaigns(env);
   const campaigns = campaignsData?.campaigns || campaignsData || [];
-  const reportDateKey = getMountainDateKey(now);
-  const reportDateLabel = formatCampaignRunnerReportDateLabel(now);
+  const reportDateKey = getPlatformDateKey(env, now);
+  const reportDateLabel = formatCampaignRunnerReportDateLabel(env, now);
   const results = {
     attempted: true,
     checked: 0,
@@ -8465,7 +8526,7 @@ async function processCampaignRunnerReports(env, now = new Date()) {
     results.checked += 1;
 
     try {
-      const effectiveState = getEffectiveState(campaign);
+      const effectiveState = getEffectiveState(campaign, env);
       const pledges = await getCampaignReportPledges(env, campaign.slug);
 
       if (effectiveState === 'live' && shouldCheckPledgeReport && getCampaignRunnerDailyPledgeReportEnabled(env)) {
@@ -8539,8 +8600,8 @@ async function handleCampaignRunnerReport(request, env) {
   const recipients = normalizeCampaignRunnerReportRecipients(campaign);
   const supportEmail = String(getSupportEmail(env) || '').trim().toLowerCase();
   const reportDate = new Date();
-  const reportDateKey = getMountainDateKey(reportDate);
-  const reportDateLabel = formatCampaignRunnerReportDateLabel(reportDate);
+  const reportDateKey = getPlatformDateKey(env, reportDate);
+  const reportDateLabel = formatCampaignRunnerReportDateLabel(env, reportDate);
   const markerKey = getCampaignRunnerReportMarkerKey(reportType, campaignSlug, reportDateKey);
   const markerPayload = await env.PLEDGES?.get(markerKey, { type: 'json' });
   const reportKind = getCampaignRunnerReportKindLabel(reportType);
@@ -8584,7 +8645,7 @@ async function handleCampaignRunnerReport(request, env) {
       campaignSlug,
       reportType,
       reportKind,
-      effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown',
+      effectiveState: getEffectiveState(campaign, env) || campaign?.state || 'unknown',
       recipientCount: recipients.length,
       recipients,
       platformRecipient: reportType === 'fulfillment' ? supportEmail || null : null,
@@ -8619,7 +8680,7 @@ async function handleCampaignRunnerReport(request, env) {
     campaignSlug,
     reportType,
     reportKind,
-    effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown',
+    effectiveState: getEffectiveState(campaign, env) || campaign?.state || 'unknown',
     recipientCount: recipients.length,
     recipients,
     platformRecipient: reportType === 'fulfillment' ? supportEmail || null : null,
@@ -8701,7 +8762,7 @@ async function triggerMilestoneEmails(env, campaignSlug) {
         
         // Rate limit: Resend allows 2 req/sec
         if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+          await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
         }
         
         try {
@@ -8780,7 +8841,7 @@ async function handleBroadcastAnnouncement(request, env) {
     const supporter = supporters[i];
     
     if (i > 0) {
-      await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+      await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
     }
     
     try {
@@ -8861,7 +8922,7 @@ async function handleBroadcastDiary(request, env) {
     
     // Rate limit: Resend allows 2 req/sec
     if (i > 0) {
-      await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+      await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
     }
     
     try {
@@ -8970,7 +9031,7 @@ async function handleDiaryCheck(request, env) {
         const supporter = supporters[i];
         
         if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+          await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
         }
         
         try {
@@ -9084,7 +9145,7 @@ async function handleBroadcastMilestone(request, env) {
     
     // Rate limit: Resend allows 2 req/sec
     if (i > 0) {
-      await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+      await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
     }
     
     try {
@@ -9224,7 +9285,7 @@ async function handleMilestoneCheck(request, campaignSlug, env) {
       
       // Rate limit: Resend allows 2 req/sec
       if (i > 0) {
-        await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY));
+        await new Promise(resolve => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
       }
       
       try {
@@ -9569,7 +9630,7 @@ async function handleAdminDashboardSummary(request, env) {
     const pledgedAmount = Number(stats?.pledgedAmount || 0);
     const pledgeCount = Number(stats?.pledgeCount || 0);
     const goalAmount = Number(campaign?.goal_amount || 0);
-    const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
+    const effectiveState = getEffectiveState(campaign, env) || campaign?.state || 'unknown';
     if (effectiveState === 'live') {
       totals.liveCampaigns += 1;
     }
@@ -9666,6 +9727,8 @@ const ADMIN_SHIPPING_DEFAULT_OPTION_OPTIONS = [
   { value: 'adult_signature_required', label: 'Adult signature required' }
 ];
 
+const ADMIN_TIME_ZONE_OPTIONS = getTimeZoneOptions();
+
 const ADMIN_CAMPAIGN_STATE_OPTIONS = [
   { value: 'upcoming', label: 'Upcoming' },
   { value: 'live', label: 'Live' },
@@ -9719,8 +9782,8 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['reports.campaign_runner.enabled', { label: 'Enabled', type: 'boolean', layoutGroup: 'reports-enabled-time', help: 'Whether scheduled campaign-runner reports are enabled for the platform.' }],
   ['reports.campaign_runner.daily_pledge_report_enabled', { label: 'Daily pledge report enabled', type: 'boolean', layoutGroup: 'reports-daily-fulfillment', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'Whether campaign admins should receive daily pledge ledger reports.' }],
   ['reports.campaign_runner.fulfillment_report_enabled', { label: 'Fulfillment report enabled', type: 'boolean', layoutGroup: 'reports-daily-fulfillment', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'Whether campaign admins should receive fulfillment-focused reports.' }],
-  ['reports.campaign_runner.send_hour_mt', { label: 'Send Time (Mountain Time)', type: 'number', input: 'integer', min: 0, max: 23, step: 1, layoutGroup: 'reports-enabled-time', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'The Mountain Time clock time when scheduled campaign-runner reports should be sent.' }],
-  ['reports.campaign_runner.send_minute_mt', { label: 'Send minute MT', type: 'number', input: 'integer', min: 0, max: 59, step: 1, visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'The minute within the scheduled Mountain Time hour when reports should be sent.' }],
+  ['reports.campaign_runner.send_hour', { label: 'Send Time', type: 'number', input: 'integer', min: 0, max: 23, step: 1, layoutGroup: 'reports-enabled-time', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'The platform timezone clock time when scheduled campaign-runner reports should be sent.' }],
+  ['reports.campaign_runner.send_minute', { label: 'Send minute', type: 'number', input: 'integer', min: 0, max: 59, step: 1, visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'The minute within the scheduled platform timezone hour when reports should be sent.' }],
   ['reports.campaign_runner.include_stats_summary', { label: 'Include stats summary', type: 'boolean', layoutGroup: 'reports-stats-csv', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'Whether report emails should include campaign totals and performance summary details.' }],
   ['reports.campaign_runner.include_csv_attachment', { label: 'Include CSV attachment', type: 'boolean', layoutGroup: 'reports-stats-csv', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'Whether report emails should include downloadable CSV attachments.' }],
   ['reports.campaign_runner.email_subject_prefix', { label: 'Email subject prefix', type: 'string', visibleWhen: ADMIN_CAMPAIGN_RUNNER_ENABLED_VISIBLE_WHEN, help: 'The prefix added to campaign-runner report email subject lines.' }],
@@ -9728,6 +9791,7 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['add_ons.low_stock_threshold', { label: 'Low stock threshold', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'add-ons-enabled-stock', visibleWhen: { path: 'add_ons.enabled', value: 'true' }, help: 'The inventory count where platform add-ons should be treated as low stock.' }],
   ['add_ons.products', { label: 'Products', type: 'add_on_products', input: 'add-on-products', visibleWhen: { path: 'add_ons.enabled', value: 'true' }, help: 'The platform add-on product catalog shown during checkout.' }],
   ['platform.logo_path', { label: 'Logo', type: 'string', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo', help: 'The logo image used in platform emails. For best results upload a square PNG, JPEG, or WebP at 512 x 512 px or larger, under 512 KB, with transparent or solid background.' }],
+  ['platform.timezone', { label: 'Default timezone', type: 'string', input: 'select', options: ADMIN_TIME_ZONE_OPTIONS, layoutGroup: 'platform-defaults', help: 'IANA timezone used for campaign deadlines, countdowns, scheduled reports, and Worker lifecycle automation.' }],
   ['debug.console_logging_enabled', { label: 'Console logging enabled', type: 'boolean', layoutGroup: 'debug-logging', help: 'Whether browser and Worker console logging is enabled for diagnostics.' }],
   ['debug.verbose_console_logging', { label: 'Verbose console logging', type: 'boolean', layoutGroup: 'debug-logging', help: 'Whether extra diagnostic detail should be logged during troubleshooting.' }],
   ['design.font_body', { label: 'Body font', type: 'string', input: 'text', placeholder: '"Inter", sans-serif', layoutGroup: 'design-fonts', help: 'The primary font stack used across the site. Font names only work if the font is loaded by the site CSS or available on the visitor\'s device. Supporter emails reuse this value where email clients allow it.' }],
@@ -9839,19 +9903,19 @@ function readOnlyConditionalAdminSettingHelp(help, visibleWhen) {
 
 function campaignRunnerSendTimeSetting(hour, minute) {
   return {
-    ...editableAdminSetting('reports.campaign_runner.send_hour_mt', 'number'),
+    ...editableAdminSetting('reports.campaign_runner.send_hour', 'number'),
     input: 'time',
-    help: 'The Mountain Time clock time when scheduled campaign-runner reports should be sent.',
+    help: 'The platform timezone clock time when scheduled campaign-runner reports should be sent.',
     timeParts: {
-      hourPath: 'reports.campaign_runner.send_hour_mt',
-      minutePath: 'reports.campaign_runner.send_minute_mt',
+      hourPath: 'reports.campaign_runner.send_hour',
+      minutePath: 'reports.campaign_runner.send_minute',
       hour: Number(hour || 0),
       minute: Number(minute || 0)
     }
   };
 }
 
-function publicCampaignSettings(campaign = {}) {
+function publicCampaignSettings(campaign = {}, env = {}) {
   return {
     slug: campaign.slug || '',
     title: campaign.title || campaign.slug || '',
@@ -9861,7 +9925,7 @@ function publicCampaignSettings(campaign = {}) {
     category: campaign.category || '',
     instagram: campaign.instagram || '',
     state: campaign.state || 'unknown',
-    effectiveState: getEffectiveState(campaign) || campaign.state || 'unknown',
+    effectiveState: getEffectiveState(campaign, env) || campaign.state || 'unknown',
     url: campaign.url || `/campaigns/${encodeURIComponent(campaign.slug || '')}/`,
     startDate: campaign.start_date || '',
     goalDeadline: campaign.goal_deadline || '',
@@ -9909,8 +9973,8 @@ function campaignTierSelectOptions(tiers = []) {
   return options;
 }
 
-function campaignSettingsSection(campaign = {}) {
-  const settings = publicCampaignSettings(campaign);
+function campaignSettingsSection(campaign = {}, env = {}) {
+  const settings = publicCampaignSettings(campaign, env);
   const featuredTierSetting = {
     ...editableAdminSetting('featured_tier_id', 'string', settings.slug),
     options: campaignTierSelectOptions(settings.tiers)
@@ -10021,7 +10085,7 @@ async function handleAdminSettings(request, env) {
     auth.user.campaignSlugs.includes(String(campaign?.slug || ''))
   ));
 
-  const campaignSections = allowedCampaigns.map(campaignSettingsSection);
+  const campaignSections = allowedCampaigns.map((campaign) => campaignSettingsSection(campaign, env));
   const sections = [];
   const canonicalSiteBase = env.CANONICAL_SITE_BASE || env.SITE_BASE;
   const canonicalWorkerBase = env.CANONICAL_WORKER_BASE || env.WORKER_BASE;
@@ -10042,6 +10106,7 @@ async function handleAdminSettings(request, env) {
         ['Company', env.PLATFORM_COMPANY_NAME, editableAdminSetting('platform.company_name')],
         ['Site author', env.PLATFORM_AUTHOR, editableAdminSetting('author')],
         ['Default creator name', env.PLATFORM_DEFAULT_CREATOR_NAME || env.PLATFORM_COMPANY_NAME || env.PLATFORM_AUTHOR, editableAdminSetting('platform.default_creator_name')],
+        ['Default timezone', getPlatformTimeZone(env), editableAdminSetting('platform.timezone')],
         ['Support email', env.SUPPORT_EMAIL, editableAdminSetting('platform.support_email')],
         ['Site description', env.SITE_DESCRIPTION, editableAdminSetting('description')],
         ['Pledges email from', env.PLEDGES_EMAIL_FROM, editableAdminSetting('platform.pledges_email_from')],
@@ -10093,7 +10158,7 @@ async function handleAdminSettings(request, env) {
       ]),
       adminSettingsSection('Campaign runner reports', [
         ['Enabled', env.CAMPAIGN_RUNNER_REPORTS_ENABLED, editableAdminSetting('reports.campaign_runner.enabled', 'boolean')],
-        ['Send Time (Mountain Time)', env.CAMPAIGN_RUNNER_REPORT_HOUR_MT, campaignRunnerSendTimeSetting(env.CAMPAIGN_RUNNER_REPORT_HOUR_MT, env.CAMPAIGN_RUNNER_REPORT_MINUTE_MT)],
+        ['Send Time', env.CAMPAIGN_RUNNER_REPORT_HOUR ?? env.CAMPAIGN_RUNNER_REPORT_HOUR_MT, campaignRunnerSendTimeSetting(env.CAMPAIGN_RUNNER_REPORT_HOUR ?? env.CAMPAIGN_RUNNER_REPORT_HOUR_MT, env.CAMPAIGN_RUNNER_REPORT_MINUTE ?? env.CAMPAIGN_RUNNER_REPORT_MINUTE_MT)],
         ['Email Subject Prefix', env.CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX, editableAdminSetting('reports.campaign_runner.email_subject_prefix')],
         ['Daily pledge report enabled', env.CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED, editableAdminSetting('reports.campaign_runner.daily_pledge_report_enabled', 'boolean')],
         ['Fulfillment report enabled', env.CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED, editableAdminSetting('reports.campaign_runner.fulfillment_report_enabled', 'boolean')],
@@ -10444,6 +10509,13 @@ function normalizeAdminSettingsValue(value, schema = {}) {
     if (schema.min !== undefined && number < schema.min) return { ok: false, error: `${label} must be at least ${schema.min}.` };
     if (schema.max !== undefined && number > schema.max) return { ok: false, error: `${label} must be no more than ${schema.max}.` };
     return { ok: true, value: number };
+  }
+  if (schema.path === 'platform.timezone') {
+    const text = stripAdminControlCharacters(value).trim();
+    if (!isSupportedTimeZone(text)) {
+      return { ok: false, error: `${label} must be a supported IANA timezone.` };
+    }
+    return { ok: true, value: text };
   }
   if (schema.input === 'select' && Array.isArray(schema.options) && schema.options.length > 0) {
     const text = String(value ?? '').trim();
@@ -12009,7 +12081,7 @@ async function buildAdminCampaignAnalytics(env, campaign) {
     slug: campaignSlug,
     title: campaign?.title || campaignSlug,
     state: campaign?.state || 'unknown',
-    effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown',
+    effectiveState: getEffectiveState(campaign, env) || campaign?.state || 'unknown',
     goalAmount: Number(campaign?.goal_amount || 0),
     indexedPledgeCount: normalizedOrderIds.length,
     totals: emptyAdminAnalyticsTotals(),
@@ -13244,12 +13316,12 @@ async function handleAdminSupporters(request, env) {
     campaign: allCampaignsRequested ? null : {
       slug: selectedCampaigns[0]?.slug || requestedCampaignSlug,
       title: selectedCampaigns[0]?.title || requestedCampaignSlug,
-      effectiveState: getEffectiveState(selectedCampaigns[0]) || selectedCampaigns[0]?.state || 'unknown'
+      effectiveState: getEffectiveState(selectedCampaigns[0], env) || selectedCampaigns[0]?.state || 'unknown'
     },
     campaigns: selectedCampaigns.map((campaign) => ({
       slug: campaign.slug,
       title: campaign.title || campaign.slug,
-      effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown'
+      effectiveState: getEffectiveState(campaign, env) || campaign?.state || 'unknown'
     })),
     supporters,
     missingCampaigns,
@@ -13286,8 +13358,8 @@ async function buildAdminCampaignRunnerSingleReportPayload(env, auth, campaign, 
     };
   }
 
-  const reportDateKey = getMountainDateKey(reportDate);
-  const reportDateLabel = formatCampaignRunnerReportDateLabel(reportDate);
+  const reportDateKey = getPlatformDateKey(env, reportDate);
+  const reportDateLabel = formatCampaignRunnerReportDateLabel(env, reportDate);
   const reportKind = getCampaignRunnerReportKindLabel(reportType);
   const markerKey = getCampaignRunnerReportMarkerKey(reportType, campaignSlug, reportDateKey);
   const markerPayload = await env.PLEDGES?.get(markerKey, { type: 'json' });
@@ -13333,7 +13405,7 @@ async function buildAdminCampaignRunnerSingleReportPayload(env, auth, campaign, 
       campaignTitle: campaign.title || campaign.slug,
       reportType,
       reportKind,
-      effectiveState: getEffectiveState(campaign) || campaign?.state || 'unknown',
+      effectiveState: getEffectiveState(campaign, env) || campaign?.state || 'unknown',
       recipientCount: normalizeCampaignRunnerReportRecipients(campaign).length,
       platformRecipient: reportType === 'fulfillment' ? String(getSupportEmail(env) || '').trim().toLowerCase() || null : null,
       rowCount: campaignRowCount,
@@ -13405,7 +13477,7 @@ async function buildAdminCampaignRunnerReportPayload(request, env) {
   const header = reports.find((report) => Array.isArray(report.header) && report.header.length)?.header || [];
   const rows = reports.flatMap((report) => Array.isArray(report.rows) ? report.rows : []);
   const csv = rebuildCsvReport({ header, rows }).csv;
-  const reportDateKey = getMountainDateKey(reportDate);
+  const reportDateKey = getPlatformDateKey(env, reportDate);
   const reportKind = getCampaignRunnerReportKindLabel(reportType);
   const alreadyMarkedCount = reports.filter((report) => report.alreadyMarked).length;
 
@@ -13435,7 +13507,7 @@ async function buildAdminCampaignRunnerReportPayload(request, env) {
       totalRowCount: reports.reduce((sum, report) => sum + Number(report.totalRowCount || 0), 0),
       csvFilename: `all-campaigns-${reportType === 'fulfillment' ? 'fulfillment-report' : 'pledge-report'}-${reportDateKey}.csv`,
       reportDateKey,
-      reportDateLabel: formatCampaignRunnerReportDateLabel(reportDate),
+      reportDateLabel: formatCampaignRunnerReportDateLabel(env, reportDate),
       includeStatsSummary: getCampaignRunnerIncludeStatsSummary(env),
       includeCsvAttachment: getCampaignRunnerIncludeCsvAttachment(env),
       alreadyMarked: reports.length > 0 && alreadyMarkedCount === reports.length,
@@ -13680,7 +13752,7 @@ async function handleGetLiveCampaign(campaignSlug, env) {
   const reservedCounts = inventorySnapshot?.reservedCounts || {};
   const goalAmount = campaign?.goal_amount || 0;
   const pledgedAmount = stats?.pledgedAmount || 0;
-  const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
+  const effectiveState = getEffectiveState(campaign, env) || campaign?.state || 'unknown';
   const isFunded = goalAmount > 0 ? pledgedAmount >= (goalAmount * 100) : false;
 
   const tiers = {};
@@ -13775,7 +13847,7 @@ async function getCampaignShareCardContext(campaignSlug, request, env) {
     };
   }
 
-  const effectiveState = getEffectiveState(campaign) || campaign?.state || 'unknown';
+  const effectiveState = getEffectiveState(campaign, env) || campaign?.state || 'unknown';
   const pledgedAmount = Number(stats?.pledgedAmount || 0);
   const goalAmount = Number(campaign?.goal_amount || 0);
   const isFunded = goalAmount > 0 ? pledgedAmount >= (goalAmount * 100) : false;

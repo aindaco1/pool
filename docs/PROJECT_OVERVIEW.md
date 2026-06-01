@@ -20,7 +20,7 @@ Creators define campaigns in Markdown; backers pledge through The Pool’s first
 | **Payments** | Stripe (Checkout Sessions in setup mode + off-session charges) | Secure payment fields, saved payment methods, then charge cards later |
 | **API/Glue** | Cloudflare Worker (`pledge.dustwave.xyz`) | Handles checkout bootstrap, webhooks, tip-aware totals, recovery, and reporting data |
 | **Admin UI** | Private dashboard (`/admin/`, `/es/admin/`) | Role-scoped settings, campaigns, add-ons, analytics, reports, supporters, marketing tools, and users |
-| **Automation** | Worker cron + GitHub Action | Auto-settle (batched) + state transitions |
+| **Automation** | Worker scheduler + GitHub Action | Auto-settle (batched) + state transitions |
 | **Storage** | Markdown / YAML | Campaign definitions & state |
 | **Styling** | Sass + generated theme vars | Shared design system for public pages, checkout, pledge management, and branded checkout/email surfaces |
 
@@ -70,12 +70,12 @@ For current Cloudflare limits, see:
 
 ## Funding Flow
 
-1. **Visitor pledges** through the first-party cart → Worker creates a setup-mode Stripe Checkout Session, and the existing second checkout sidecar mounts secure Stripe payment UI on-site. One checkout can include items from multiple campaigns. Cart and checkout show subtotal, shipping, sales tax, and optional Dust Wave tip from a shared pricing model.  
-2. **Stripe** saves a card through that on-site payment step, returning IDs to the Worker.  
-3. Worker stores pledge data in **Cloudflare KV** (tiers, support items, custom amounts, shipping address, tip percent/amount, Stripe IDs), fanning a bundled checkout out into one campaign-scoped pledge per campaign. The client does not treat checkout as successful until persistence is confirmed.  
-4. **Worker cron** runs daily at midnight MT:  
+1. **Visitor pledges** through the first-party cart → Worker creates a setup-mode Stripe Checkout Session, and the existing second checkout sidecar mounts secure Stripe payment UI on-site. One checkout can include items from multiple campaigns. Cart and checkout show subtotal, shipping, sales tax, and optional Dust Wave tip from a shared pricing model.
+2. **Stripe** saves a card through that on-site payment step, returning IDs to the Worker.
+3. Worker stores pledge data in **Cloudflare KV** (tiers, support items, custom amounts, shipping address, tip percent/amount, Stripe IDs), fanning a bundled checkout out into one campaign-scoped pledge per campaign. The client does not treat checkout as successful until persistence is confirmed.
+4. **Worker scheduler** runs daily lifecycle work after midnight in the configured platform timezone:
    - Records heartbeat (`cron:lastRun` in KV) for monitoring.
-   - Triggers site rebuild when `goal_deadline` passes (`live` → `post`).  
+   - Triggers site rebuild when `goal_deadline` passes (`live` → `post`).
    - If funded, dispatches batched settlement via self-chaining `/admin/settle-dispatch`.
    - Each batch (6 pledges) runs in a separate Worker invocation to stay within subrequest limits.
    - Charges are aggregated by email within each campaign — one charge per supporter per campaign.
@@ -150,7 +150,7 @@ For current Cloudflare limits, see:
 3. ✅ Cloudflare Worker deployed (`pledge.dustwave.xyz`) with Stripe + Worker signing secrets.  
 4. ✅ Stripe webhook configured → Worker `/webhooks/stripe`.  
 5. ✅ Repo secrets set: `STRIPE_SECRET_KEY`, `CHECKOUT_INTENT_SECRET`, and admin/email secrets.  
-6. ✅ Daily Worker cron enabled (6 AM UTC and 7 AM UTC for MDT/MST midnight checks) — check via `GET /admin/cron/status`.
+6. ✅ Minute-level Worker scheduler enabled with platform-timezone daily gates — check via `GET /admin/cron/status`.
 7. ✅ Cloudflare cache purge configured (preferred: API token/account ID; legacy email/key auth still works if explicitly configured).  
 8. ✅ Test campaign runs end-to-end in Stripe test mode.
 9. ✅ Long-form content sanitizes Markdown link schemes and only renders structured embeds from exact approved origins.
@@ -175,7 +175,7 @@ For current Cloudflare limits, see:
 4. **Sass compilation**: Jekyll compiles `.scss` files automatically when `sass:` is configured in `_config.yml`.
 5. **Countdown pre-rendering**: Calculate initial values at build time (Jekyll) or render time (JS) to avoid "00 00 00 00" flash.
 6. **Support items data flow**: Cart.js extracts support items → Worker stores in temp KV → Webhook merges into final pledge.
-7. **DST-aware timezone handling**: All deadline logic (frontend countdown, Worker settlement, campaign state transitions) uses `Intl.DateTimeFormat` with `timeZone: 'America/Denver'` to detect MST vs MDT — never hardcode UTC offsets.
+7. **DST-aware timezone handling**: All deadline logic (frontend countdown, Worker settlement, campaign state transitions) uses `platform.timezone` / `PLATFORM_TIMEZONE` with `Intl.DateTimeFormat`; the default is `America/Denver`.
 8. **Content safety must hold at render time**: authoring audits help, but the real protection comes from runtime Markdown-link sanitization and exact-origin embed validation.
 9. **Magic links must require real pledge rows**: token validity alone is insufficient; missing pledge records should fail closed.
 10. **Localized chrome should stay shared**: campaign-page controls and status copy that belong to the platform, not the creator, should flow through the shared locale catalog so public templates, runtime UI, and supporter emails do not drift apart.

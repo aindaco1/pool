@@ -3,8 +3,8 @@ layout: campaign
 title: "HAND RELATIONS"
 slug: hand-relations
 test_only: true
-start_date: 2025-12-01
-goal_deadline: 2026-01-31
+start_date: 2026-12-01
+goal_deadline: 2027-01-31
 goal_amount: 25000
 charged: false
 hero_image: /assets/images/defaults/dust-wave-square.png

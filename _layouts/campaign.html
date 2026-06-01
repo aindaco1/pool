@@ -7,13 +7,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-campaign-csp-strict.html %}
-  {% include cart-head.html %}
   {% assign campaign_hero_has_remote_video = false %}
+  {% assign campaign_hero_has_youtube_video = false %}
   {% if page.hero_video %}
-    {% if page.hero_video contains "youtube.com" or page.hero_video contains "youtu.be" or page.hero_video contains "vimeo.com" or page.hero_video contains "instagram.com" %}
+    {% if page.hero_video contains "youtube.com" or page.hero_video contains "youtu.be" %}
+      {% assign campaign_hero_has_remote_video = true %}
+      {% assign campaign_hero_has_youtube_video = true %}
+    {% elsif page.hero_video contains "vimeo.com" or page.hero_video contains "instagram.com" %}
       {% assign campaign_hero_has_remote_video = true %}
     {% endif %}
   {% endif %}
+  {% if campaign_hero_has_youtube_video %}
+  <link rel="preconnect" href="https://www.youtube-nocookie.com">
+  {% endif %}
+  {% include cart-head.html %}
   {% assign campaign_hero_preload_image = "" %}
   {% unless campaign_hero_has_remote_video %}
     {% assign campaign_hero_preload_image = page.hero_image_wide | default: page.hero_image %}
@@ -46,9 +53,8 @@
   {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
   {% assign goal_num = page.goal_amount | default: 0 | plus: 0 %}
   {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
-  {% assign start_epoch = page.start_date | date: '%s' | plus: 0 %}
-  {% assign deadline_epoch = page.goal_deadline | date: '%s' | plus: 0 %}
-  {% if page.goal_deadline %}{% assign deadline_epoch = deadline_epoch | plus: 86399 %}{% endif %}
+  {% assign start_epoch = page.start_date | pool_platform_start_epoch | plus: 0 %}
+  {% assign deadline_epoch = page.goal_deadline | pool_platform_deadline_epoch | plus: 0 %}
   {% assign campaign_render_state = page.state | default: '' %}
   {% if campaign_render_state == '' %}
     {% if page.start_date and now_epoch < start_epoch %}
@@ -59,6 +65,11 @@
       {% assign campaign_render_state = 'post' %}
     {% endif %}
   {% endif %}
+  {% assign launch_reminders_enabled = true %}
+  {% if site.launch_reminders.enabled == false %}
+    {% assign launch_reminders_enabled = false %}
+  {% endif %}
+  {% assign launch_reminder_turnstile_site_key = site.launch_reminders.turnstile_site_key | default: "" | strip %}
   {% assign campaign_preview_state = page.state | default: '' %}
   {% if page.funded == true or page.charged == true %}
     {% assign campaign_preview_state = 'funded' %}
@@ -107,7 +118,7 @@
   <main id="main-content" class="campaign-container" data-campaign-slug="{{ page.slug }}" data-single-tier-only="{{ page.single_tier_only | default: false }}" data-state="{{ campaign_render_state }}" tabindex="-1">
     {% if page.campaign_background %}
     <div class="campaign-background" aria-hidden="true">
-      <img src="{{ page.campaign_background }}" alt="" class="campaign-background__image">
+      {% include responsive-image.html src=page.campaign_background alt="" class="campaign-background__image" picture_class="campaign-background__picture" aria_hidden=true decoding="async" sizes="100vw" %}
     </div>
     {% endif %}
     <header class="campaign-header">
@@ -115,21 +126,20 @@
       {% if page.short_blurb %}
         <p class="campaign-blurb">{{ page.short_blurb | safe_rich_text }}</p>
       {% endif %}
-      {% include campaign-share-links.html class="campaign-share--mobile" lang=current_lang title=campaign_social_title text=campaign_social_share_text %}
       {% if page.goal_deadline %}
       {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
-      <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-state="{{ campaign_render_state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}" role="timer" aria-labelledby="campaign-countdown-heading" aria-describedby="campaign-countdown-status">
+      <div class="campaign-countdown" id="campaign-countdown" data-deadline="{{ page.goal_deadline | date: '%Y-%m-%d' }}" data-start="{{ page.start_date | date: '%Y-%m-%d' }}" data-timezone="{{ site.platform.timezone | default: 'America/Denver' | escape }}" data-state="{{ campaign_render_state }}" data-goal-met="{% if pledged_num >= page.goal_amount %}true{% else %}false{% endif %}" data-goal="{{ page.goal_amount }}" role="timer" aria-labelledby="campaign-countdown-heading" aria-describedby="campaign-countdown-status">
         {% if campaign_render_state == "upcoming" or campaign_render_state == "live" %}
           <h2 class="campaign-countdown__heading" id="campaign-countdown-heading">{% if campaign_render_state == "upcoming" %}{% include t.html key="campaign.starts_in" lang=current_lang %}{% else %}{% include t.html key="campaign.ends_in" lang=current_lang %}{% endif %}</h2>
           <p class="sr-only" id="campaign-countdown-status"></p>
           {% assign target_date = page.goal_deadline %}
           {% if campaign_render_state == "upcoming" %}{% assign target_date = page.start_date %}{% endif %}
           {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}
-          {% assign target_epoch = target_date | date: '%s' | plus: 0 %}
+          {% assign target_epoch = target_date | pool_platform_start_epoch | plus: 0 %}
           {% if campaign_render_state == "upcoming" %}
             {% comment %}Target is midnight of start date{% endcomment %}
           {% else %}
-            {% assign target_epoch = target_epoch | plus: 86399 %}{% comment %}End of day: +23:59:59{% endcomment %}
+            {% assign target_epoch = target_date | pool_platform_deadline_epoch | plus: 0 %}{% comment %}End of day in platform timezone{% endcomment %}
           {% endif %}
           {% assign diff_secs = target_epoch | minus: now_epoch %}
           {% if diff_secs < 0 %}{% assign diff_secs = 0 %}{% endif %}
@@ -141,7 +151,7 @@
           {% assign init_secs = remainder | modulo: 60 %}
           <div class="flip-countdown" aria-hidden="true">
             <div class="flip-countdown__group">
-              <div class="flip-card" data-unit="days">
+              <div class="flip-card{% if init_days >= 100 %} flip-card--long-value{% endif %}{% if init_days >= 1000 %} flip-card--extra-long-value{% endif %}" data-unit="days">
                 <span class="flip-card__value">{% if init_days < 10 %}0{% endif %}{{ init_days }}</span>
               </div>
               <span class="flip-countdown__label">{% include t.html key="campaign.days" lang=current_lang %}</span>
@@ -177,6 +187,10 @@
         {% endif %}
       </div>
       {% endif %}
+      {% if campaign_render_state == "upcoming" and launch_reminders_enabled %}
+      {% include launch-reminder-form.html class="launch-reminder--header" variant="header" lang=current_lang %}
+      {% endif %}
+      {% include campaign-share-links.html class="campaign-share--mobile" lang=current_lang title=campaign_social_title text=campaign_social_share_text %}
       <button type="button" class="btn btn--primary campaign-header__cta" data-scroll-target="campaign-tiers">{% include t.html key="campaign.support_cta" lang=current_lang %}</button>
     </header>
 
@@ -281,7 +295,7 @@
         {% if page.creator_image %}
           <div class="campaign-facts__creator">
             {% assign campaign_creator_image_alt = page.creator_name | default: 'Creator' %}
-            {% include responsive-image.html src=page.creator_image alt=campaign_creator_image_alt loading="lazy" decoding="async" sizes="48px" widths="480" %}
+            {% include responsive-image.html src=page.creator_image alt=campaign_creator_image_alt loading="lazy" decoding="async" sizes="48px" widths="320,480" %}
             <span>{{ page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}</span>
           </div>
         {% endif %}
@@ -300,6 +314,9 @@
           {% endif %}
         </dl>
         {%- capture embed_builder_path -%}{% include localized-url.html lang=current_lang path='/embed/campaign/' %}{%- endcapture -%}
+        {% if campaign_render_state == "upcoming" and launch_reminders_enabled %}
+        {% include launch-reminder-form.html class="launch-reminder--sidebar" variant="sidebar" lang=current_lang %}
+        {% endif %}
         {% include campaign-share-links.html class="campaign-share--sidebar" lang=current_lang title=campaign_social_title text=campaign_social_share_text %}
         <div class="campaign-facts__embed">
           <a href="{{ embed_builder_path }}?slug={{ page.slug | uri_escape }}" class="btn btn--secondary">

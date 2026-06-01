@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   sendChargeSuccessEmail,
+  sendLaunchReminderEmail,
   sendPaymentFailedEmail,
   sendPledgeCancelledEmail,
   sendPledgeModifiedEmail,
@@ -154,6 +155,28 @@ describe('supporter email tip breakdowns', () => {
     });
 
     expect(getEmailPayload(fetchMock).subject).toBe('Pledge cancelled | sunder');
+  });
+
+  it('sends launch reminders through the shared updates email path', async () => {
+    const fetchMock = mockResend();
+
+    await sendLaunchReminderEmail(env, {
+      email: 'fan@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'Sunder',
+      campaignUrl: 'https://pool.test/campaigns/sunder/',
+      unsubscribeUrl: 'https://pledge.pool.test/launch-reminders/unsubscribe?t=token',
+      preferredLang: 'en'
+    });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.from).toBe('The Pool <updates@pool.test>');
+    expect(payload.to).toBe('fan@example.com');
+    expect(payload.subject).toBe('Now live | Sunder');
+    expect(payload.html).toContain('Sunder is live');
+    expect(payload.html).toContain('https://pool.test/campaigns/sunder/');
+    expect(payload.html).toContain('https://pledge.pool.test/launch-reminders/unsubscribe?t=token');
+    expect(payload.reply_to).toBe('info@pool.test');
   });
 
   it('includes the platform tip line in pledge modified emails', async () => {

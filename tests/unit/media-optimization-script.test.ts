@@ -31,6 +31,7 @@ describe('media optimization script helpers', () => {
       .toBe('assets/images/campaigns/their-love/movie-poster-960.webp');
     expect(responsiveWebpDerivativePathsForImage('assets/images/campaigns/their-love/hero-wide.jpg'))
       .toEqual([
+        'assets/images/campaigns/their-love/hero-wide-320.webp',
         'assets/images/campaigns/their-love/hero-wide-480.webp',
         'assets/images/campaigns/their-love/hero-wide-960.webp',
         'assets/images/campaigns/their-love/hero-wide-1600.webp'

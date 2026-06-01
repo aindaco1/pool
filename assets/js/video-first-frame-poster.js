@@ -4,7 +4,10 @@
   var FIRST_FRAME_ATTR = 'data-first-frame-poster';
   var FIRST_FRAME_READY_ATTR = 'data-first-frame-poster-ready';
   var FIRST_FRAME_PENDING_ATTR = 'data-first-frame-poster-pending';
+  var FIRST_FRAME_OBSERVED_ATTR = 'data-first-frame-poster-observed';
+  var FIRST_FRAME_INDEX_ATTR = 'data-first-frame-poster-index';
   var MAX_POSTER_WIDTH = 1280;
+  var posterObserver = null;
 
   function getVideoSource(video) {
     var source = video.currentSrc || '';
@@ -91,6 +94,51 @@
     preview.load();
   }
 
+  function getPosterObserver() {
+    if (posterObserver || !('IntersectionObserver' in window)) return posterObserver;
+
+    posterObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting && entry.intersectionRatio <= 0) return;
+
+        var video = entry.target;
+        posterObserver.unobserve(video);
+        video.removeAttribute(FIRST_FRAME_OBSERVED_ATTR);
+        var index = Number(video.getAttribute(FIRST_FRAME_INDEX_ATTR) || '0');
+        video.removeAttribute(FIRST_FRAME_INDEX_ATTR);
+        setFirstFramePoster(video, index);
+      });
+    }, {
+      rootMargin: '600px 0px'
+    });
+
+    return posterObserver;
+  }
+
+  function scheduleFirstFramePoster(video, index) {
+    if (!(video instanceof HTMLVideoElement)) return;
+    if (
+      video.poster ||
+      video.hasAttribute(FIRST_FRAME_READY_ATTR) ||
+      video.hasAttribute(FIRST_FRAME_PENDING_ATTR) ||
+      video.hasAttribute(FIRST_FRAME_OBSERVED_ATTR)
+    ) {
+      return;
+    }
+
+    var observer = getPosterObserver();
+    if (observer) {
+      video.setAttribute(FIRST_FRAME_OBSERVED_ATTR, 'true');
+      video.setAttribute(FIRST_FRAME_INDEX_ATTR, String(index));
+      observer.observe(video);
+      return;
+    }
+
+    window.setTimeout(function () {
+      setFirstFramePoster(video, index);
+    }, 1500);
+  }
+
   function init(root) {
     var scope = root && typeof root.querySelectorAll === 'function' ? root : document;
     var videos = [];
@@ -100,7 +148,7 @@
     scope.querySelectorAll('video[' + FIRST_FRAME_ATTR + ']').forEach(function (video) {
       videos.push(video);
     });
-    videos.forEach(setFirstFramePoster);
+    videos.forEach(scheduleFirstFramePoster);
   }
 
   window.PoolVideoPosters = {

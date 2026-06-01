@@ -179,7 +179,7 @@ describe('Settlement triggering conditions', () => {
     
     // Helper to check if deadline passed (simplified for test)
     function isDeadlinePassed(dateString: string): boolean {
-      const deadline = new Date(dateString + 'T23:59:59-07:00'); // End of day MT
+      const deadline = new Date(dateString + 'T23:59:59-07:00'); // Default platform timezone winter offset
       return new Date() > deadline;
     }
     

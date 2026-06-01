@@ -10,6 +10,7 @@
   var platformCompanyName = dataset.platformCompanyName || platformName;
   var platformAuthor = dataset.platformAuthor || platformCompanyName;
   var supportEmail = dataset.platformSupportEmail || '';
+  var platformTimezone = isValidTimeZone(dataset.platformTimezone) ? dataset.platformTimezone : 'America/Denver';
   var siteUrl = dataset.siteUrl || '';
   var workerBase = dataset.workerBase || '';
   var defaultCreatorName = dataset.defaultCreatorName || platformCompanyName;
@@ -24,6 +25,8 @@
   var maxTipPercent = dataset.maxTipPercent || '15';
   var liveStatsCacheTtlSeconds = dataset.liveStatsCacheTtlSeconds || '300';
   var liveInventoryCacheTtlSeconds = dataset.liveInventoryCacheTtlSeconds || '300';
+  var launchRemindersEnabled = dataset.launchRemindersEnabled || 'true';
+  var launchReminderTurnstileSiteKey = dataset.launchReminderTurnstileSiteKey || '';
   var cartRuntime = 'first_party';
   var checkoutProvider = 'first_party';
   var checkoutUiMode = 'custom';
@@ -68,6 +71,79 @@
     }
   }
 
+  function isValidTimeZone(timeZone) {
+    if (!timeZone || typeof Intl === 'undefined' || typeof Intl.DateTimeFormat !== 'function') return false;
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: timeZone }).format(new Date());
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function getTimeZoneFormatter(timeZone) {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: isValidTimeZone(timeZone) ? timeZone : 'America/Denver',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23'
+    });
+  }
+
+  function getTimeZoneParts(date, timeZone) {
+    var parts = getTimeZoneFormatter(timeZone).formatToParts(date instanceof Date ? date : new Date(date));
+    var map = {};
+    parts.forEach(function(part) {
+      if (part.type !== 'literal') map[part.type] = part.value;
+    });
+    var hour = Number(map.hour || 0) || 0;
+    return {
+      year: Number(map.year || 0) || 0,
+      month: Number(map.month || 0) || 0,
+      day: Number(map.day || 0) || 0,
+      hour: hour === 24 ? 0 : hour,
+      minute: Number(map.minute || 0) || 0,
+      second: Number(map.second || 0) || 0
+    };
+  }
+
+  function getTimeZoneOffsetMs(date, timeZone) {
+    var parts = getTimeZoneParts(date, timeZone);
+    var localAsUtcMs = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+    return localAsUtcMs - date.getTime();
+  }
+
+  function dateAtTimeInTimeZone(dateString, hour, minute, second, timeZone) {
+    var match = String(dateString || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return new Date(NaN);
+    var safeTimeZone = isValidTimeZone(timeZone) ? timeZone : platformTimezone;
+    var localAsUtcMs = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), hour || 0, minute || 0, second || 0);
+    var firstGuess = new Date(localAsUtcMs);
+    var firstOffset = getTimeZoneOffsetMs(firstGuess, safeTimeZone);
+    var firstResult = new Date(localAsUtcMs - firstOffset);
+    var correctedOffset = getTimeZoneOffsetMs(firstResult, safeTimeZone);
+    return new Date(localAsUtcMs - correctedOffset);
+  }
+
+  window.POOL_TIME = {
+    defaultTimeZone: 'America/Denver',
+    platformTimeZone: platformTimezone,
+    getPlatformTimeZone: function() {
+      return platformTimezone;
+    },
+    dateAtTimeInTimeZone: dateAtTimeInTimeZone,
+    campaignStartDate: function(dateString) {
+      return dateAtTimeInTimeZone(dateString, 0, 0, 0, platformTimezone);
+    },
+    campaignDeadlineDate: function(dateString) {
+      return dateAtTimeInTimeZone(dateString, 23, 59, 59, platformTimezone);
+    }
+  };
+
   window.POOL_CONFIG = {
     i18n: {
       currentLang: currentLang,
@@ -80,7 +156,8 @@
       supportEmail: supportEmail,
       siteUrl: siteUrl,
       workerUrl: workerBase,
-      defaultCreatorName: defaultCreatorName
+      defaultCreatorName: defaultCreatorName,
+      timezone: platformTimezone
     },
     pricing: {
       salesTaxRate: salesTaxRate,
@@ -101,6 +178,10 @@
       liveStatsTtlSeconds: liveStatsCacheTtlSeconds,
       liveInventoryTtlSeconds: liveInventoryCacheTtlSeconds
     },
+    launchReminders: {
+      enabled: launchRemindersEnabled !== 'false',
+      turnstileSiteKey: launchReminderTurnstileSiteKey
+    },
     checkout: {
       cartRuntime: cartRuntime,
       provider: checkoutProvider,
@@ -120,6 +201,7 @@
     platformName: platformName,
     platformCompanyName: platformCompanyName,
     platformAuthor: platformAuthor,
+    platformTimezone: platformTimezone,
     supportEmail: supportEmail,
     defaultCreatorName: defaultCreatorName,
     salesTaxRate: salesTaxRate,
@@ -133,6 +215,8 @@
     maxTipPercent: maxTipPercent,
     liveStatsCacheTtlSeconds: liveStatsCacheTtlSeconds,
     liveInventoryCacheTtlSeconds: liveInventoryCacheTtlSeconds,
+    launchRemindersEnabled: launchRemindersEnabled,
+    launchReminderTurnstileSiteKey: launchReminderTurnstileSiteKey,
     cartRuntime: cartRuntime,
     checkoutProvider: checkoutProvider,
     checkoutUiMode: checkoutUiMode,

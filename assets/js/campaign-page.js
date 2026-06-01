@@ -19,6 +19,7 @@ const SHARE_QUERY_ALLOWLIST = new Set([
   'utm_content',
   'utm_term'
 ]);
+let launchReminderTurnstileLoadPromise = null;
 
 function initInlineSvgSupportClass() {
   const testSvg = document.createElementNS?.('http://www.w3.org/2000/svg', 'svg');
@@ -64,6 +65,12 @@ function setCountdownHeading(messageEl, text, modifierClass) {
   }
 }
 
+function updateFlipCardValueLengthClass(card, displayValue) {
+  const digitCount = String(displayValue || '').length;
+  card.classList.toggle('flip-card--long-value', digitCount >= 3);
+  card.classList.toggle('flip-card--extra-long-value', digitCount >= 4);
+}
+
 function applyWidthClass(node, prefix, percent) {
   if (!node) return;
   const clampedPercent = Math.max(0, Math.min(100, Math.round(percent)));
@@ -75,7 +82,7 @@ function applyWidthClass(node, prefix, percent) {
   node.classList.add(prefix + clampedPercent);
 }
 
-function getMountainTimeOffset(dateStr) {
+function getFallbackDenverTimeOffset(dateStr) {
   const parts = dateStr.split('-');
   const year = parseInt(parts[0], 10);
   const month = parseInt(parts[1], 10);
@@ -87,6 +94,20 @@ function getMountainTimeOffset(dateStr) {
   const timeZoneParts = formatter.formatToParts(new Date(Date.UTC(year, month - 1, day, 19, 0, 0)));
   const match = timeZoneParts.find((part) => part.type === 'timeZoneName');
   return match?.value === 'MDT' ? '-06:00' : '-07:00';
+}
+
+function campaignStartDate(dateStr) {
+  if (window.POOL_TIME?.campaignStartDate) {
+    return window.POOL_TIME.campaignStartDate(dateStr);
+  }
+  return new Date(dateStr + 'T00:00:00' + getFallbackDenverTimeOffset(dateStr));
+}
+
+function campaignDeadlineDate(dateStr) {
+  if (window.POOL_TIME?.campaignDeadlineDate) {
+    return window.POOL_TIME.campaignDeadlineDate(dateStr);
+  }
+  return new Date(dateStr + 'T23:59:59' + getFallbackDenverTimeOffset(dateStr));
 }
 
 function initSupportScroll() {
@@ -223,9 +244,9 @@ function initCampaignCountdown() {
 
   let targetDate;
   if (state === 'upcoming' && startStr) {
-    targetDate = new Date(startStr + 'T00:00:00' + getMountainTimeOffset(startStr));
+    targetDate = campaignStartDate(startStr);
   } else {
-    targetDate = new Date(deadlineStr + 'T23:59:59' + getMountainTimeOffset(deadlineStr));
+    targetDate = campaignDeadlineDate(deadlineStr);
   }
 
   const flipCards = {};
@@ -243,6 +264,7 @@ function initCampaignCountdown() {
     const valueEl = card.querySelector('.flip-card__value');
 
     if (lastValues[unit] === -1) {
+      updateFlipCardValueLengthClass(card, displayVal);
       valueEl.textContent = displayVal;
       lastValues[unit] = value;
       return;
@@ -252,6 +274,7 @@ function initCampaignCountdown() {
     lastValues[unit] = value;
     card.classList.add('flip');
     setTimeout(() => {
+      updateFlipCardValueLengthClass(card, displayVal);
       valueEl.textContent = displayVal;
       card.classList.remove('flip');
     }, 150);
@@ -473,6 +496,225 @@ function initCommunityTeaser(campaignSlug) {
   }
 }
 
+function resolveWorkerUrl(path) {
+  const workerBase =
+    window.POOL_CONFIG?.workerBase ||
+    window.POOL_CONFIG?.platform?.workerUrl ||
+    window.location.origin;
+  try {
+    return new URL(path, workerBase).toString();
+  } catch {
+    return path;
+  }
+}
+
+function setLaunchReminderStatus(statusEl, message, status) {
+  if (!statusEl) return;
+  statusEl.textContent = message || '';
+  if (status) {
+    statusEl.dataset.status = status;
+  } else {
+    delete statusEl.dataset.status;
+  }
+}
+
+function loadLaunchReminderTurnstile() {
+  if (window.turnstile?.render) return Promise.resolve();
+  if (launchReminderTurnstileLoadPromise) return launchReminderTurnstileLoadPromise;
+
+  launchReminderTurnstileLoadPromise = new Promise((resolve, reject) => {
+    const scriptNode = document.createElement('script');
+    scriptNode.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    scriptNode.async = true;
+    scriptNode.defer = true;
+    scriptNode.onload = () => resolve();
+    scriptNode.onerror = () => reject(new Error('Turnstile failed to load'));
+    document.head.appendChild(scriptNode);
+  });
+
+  return launchReminderTurnstileLoadPromise;
+}
+
+function getLaunchReminderTurnstileSize(form) {
+  return form.closest('.launch-reminder--sidebar') ? 'normal' : 'flexible';
+}
+
+async function ensureLaunchReminderTurnstile(form) {
+  const root = form.querySelector('[data-launch-reminder-turnstile]');
+  const siteKey =
+    form.getAttribute('data-turnstile-site-key') ||
+    window.POOL_CONFIG?.launchReminders?.turnstileSiteKey ||
+    window.POOL_CONFIG?.launchReminderTurnstileSiteKey ||
+    '';
+  if (!root || !siteKey) return '';
+
+  await loadLaunchReminderTurnstile();
+  if (!window.turnstile?.render) return '';
+
+  if (!form._launchReminderTurnstile) {
+    form._launchReminderTurnstile = {
+      widgetId: window.turnstile.render(root, {
+        sitekey: siteKey,
+        action: 'launch_reminder_signup',
+        size: getLaunchReminderTurnstileSize(form),
+        callback(token) {
+          form._launchReminderTurnstile.token = String(token || '');
+        },
+        'expired-callback'() {
+          form._launchReminderTurnstile.token = '';
+        },
+        'error-callback'() {
+          form._launchReminderTurnstile.token = '';
+        }
+      }),
+      token: ''
+    };
+  }
+
+  if (!form._launchReminderTurnstile.token && window.turnstile.getResponse) {
+    form._launchReminderTurnstile.token = String(window.turnstile.getResponse(form._launchReminderTurnstile.widgetId) || '');
+  }
+
+  return form._launchReminderTurnstile.token || '';
+}
+
+function resetLaunchReminderTurnstile(form) {
+  const state = form._launchReminderTurnstile;
+  if (!state || state.widgetId === undefined || !window.turnstile?.reset) return;
+  window.turnstile.reset(state.widgetId);
+  state.token = '';
+}
+
+function getLaunchReminderConsent(consentInput) {
+  if (!consentInput) return true;
+  if (consentInput.type === 'checkbox') return Boolean(consentInput.checked);
+  return ['1', 'true', 'yes', 'on'].includes(String(consentInput.value || '').trim().toLowerCase());
+}
+
+function isLaunchReminderFormVisible(form) {
+  if (!form?.isConnected) return false;
+  const style = window.getComputedStyle ? window.getComputedStyle(form) : null;
+  if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
+  return form.getClientRects().length > 0 || form.offsetParent !== null;
+}
+
+function renderVisibleLaunchReminderTurnstiles() {
+  document.querySelectorAll('[data-launch-reminder-form]').forEach((form) => {
+    if (!form.querySelector('[data-launch-reminder-turnstile]') || !isLaunchReminderFormVisible(form)) return;
+    loadLaunchReminderTurnstile()
+      .then(() => ensureLaunchReminderTurnstile(form))
+      .catch(() => {});
+  });
+}
+
+function initLaunchReminderForms() {
+  document.querySelectorAll('[data-launch-reminder-form]').forEach((form) => {
+    if (form.dataset.launchReminderReady === 'true') return;
+    form.dataset.launchReminderReady = 'true';
+
+    const emailInput = form.querySelector('input[name="email"]');
+    const consentInput = form.querySelector('input[name="consent"]');
+    const submitButton = form.querySelector('button[type="submit"]');
+    const statusEl = form.querySelector('[data-launch-reminder-status]');
+    const campaignSlug = form.getAttribute('data-campaign-slug') || bootScript.dataset.campaignSlug || '';
+    const preferredLang =
+      form.getAttribute('data-lang') ||
+      window.POOL_CONFIG?.i18n?.currentLang ||
+      'en';
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const email = String(emailInput?.value || '').trim();
+      const consent = getLaunchReminderConsent(consentInput);
+
+      if (!email) {
+        setLaunchReminderStatus(
+          statusEl,
+          getRuntimeMessage('campaign.launchReminderEmailRequired', 'Enter your email address.'),
+          'error'
+        );
+        emailInput?.focus();
+        return;
+      }
+
+      if (!consent) {
+        setLaunchReminderStatus(
+          statusEl,
+          getRuntimeMessage('campaign.launchReminderConsentRequired', 'Confirm that you want this launch reminder.'),
+          'error'
+        );
+        if (consentInput?.type !== 'hidden') consentInput?.focus();
+        return;
+      }
+
+      if (!campaignSlug) {
+        setLaunchReminderStatus(
+          statusEl,
+          getRuntimeMessage('campaign.launchReminderError', 'Could not save this reminder. Please try again.'),
+          'error'
+        );
+        return;
+      }
+
+      const defaultButtonText = submitButton?.textContent || '';
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = getRuntimeMessage('campaign.launchReminderSubmitting', 'Saving...');
+      }
+      setLaunchReminderStatus(statusEl, '', '');
+
+      try {
+        const turnstileToken = await ensureLaunchReminderTurnstile(form);
+        const hasTurnstile = Boolean(form.querySelector('[data-launch-reminder-turnstile]'));
+        if (hasTurnstile && !turnstileToken) {
+          throw new Error('challenge_required');
+        }
+
+        const response = await fetch(resolveWorkerUrl('/launch-reminders'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            campaignSlug,
+            email,
+            preferredLang,
+            consent,
+            turnstileToken: turnstileToken || undefined
+          })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data?.ok === false) {
+          throw new Error(data?.code || 'launch_reminder_failed');
+        }
+
+        setLaunchReminderStatus(
+          statusEl,
+          getRuntimeMessage('campaign.launchReminderSuccess', "You're on the reminder list."),
+          'success'
+        );
+        form.reset();
+        resetLaunchReminderTurnstile(form);
+      } catch (_error) {
+        setLaunchReminderStatus(
+          statusEl,
+          getRuntimeMessage('campaign.launchReminderError', 'Could not save this reminder. Please try again.'),
+          'error'
+        );
+        resetLaunchReminderTurnstile(form);
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = defaultButtonText;
+        }
+      }
+    });
+
+  });
+
+  renderVisibleLaunchReminderTurnstiles();
+  window.addEventListener('resize', renderVisibleLaunchReminderTurnstiles, { passive: true });
+}
+
 function init() {
   initSupportScroll();
   initCampaignShareLinks();
@@ -480,6 +722,7 @@ function init() {
   initCampaignCountdown();
   initHeroVideo();
   initCommunityTeaser(bootScript.dataset.campaignSlug || '');
+  initLaunchReminderForms();
 }
 
 if (document.readyState === 'loading') {

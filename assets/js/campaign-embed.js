@@ -161,7 +161,7 @@ function formatDate(dateString) {
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
-function getMountainTimeOffset(dateString) {
+function getFallbackDenverTimeOffset(dateString) {
   const [year, month, day] = String(dateString || '').split('-').map(Number);
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Denver',
@@ -174,7 +174,10 @@ function getMountainTimeOffset(dateString) {
 
 function getDeadlineDate(dateString) {
   if (!dateString) return null;
-  return new Date(dateString + 'T23:59:59' + getMountainTimeOffset(dateString));
+  if (window.POOL_TIME?.campaignDeadlineDate) {
+    return window.POOL_TIME.campaignDeadlineDate(dateString);
+  }
+  return new Date(dateString + 'T23:59:59' + getFallbackDenverTimeOffset(dateString));
 }
 
 function formatCountdown(distanceMs) {

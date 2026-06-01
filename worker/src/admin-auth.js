@@ -1,13 +1,12 @@
 import { getAllowedOrigin, isValidEmail, SECURITY_HEADERS } from './validation.js';
 import { sendAdminLoginEmail } from './email.js';
+import { getTurnstileSecret, shouldBypassTurnstile, verifyTurnstile } from './turnstile.js';
 
 export const ADMIN_SESSION_COOKIE = 'pool_admin_session';
 export const ADMIN_USERS_KV_KEY = 'admin-users:v1';
 
 const ADMIN_LOGIN_TTL_SECONDS = 15 * 60;
 const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60;
-const TURNSTILE_SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-const TURNSTILE_MAX_TOKEN_LENGTH = 2048;
 const ADMIN_TURNSTILE_ACTION = 'admin_login';
 
 function privateAdminJsonResponse(data, status = 200, env = null, extraHeaders = {}) {
@@ -296,26 +295,16 @@ function shouldExposeAdminLoginUrl(env) {
 }
 
 function getAdminTurnstileSecret(env) {
-  return String(env?.TURNSTILE_SECRET_KEY || env?.ADMIN_TURNSTILE_SECRET_KEY || '').trim();
+  return getTurnstileSecret(env, ['TURNSTILE_SECRET_KEY', 'ADMIN_TURNSTILE_SECRET_KEY']);
 }
 
 function shouldBypassAdminTurnstile(env) {
-  if (!isTruthyAdminEnv(env?.ADMIN_TURNSTILE_BYPASS)) return false;
-  if (String(env?.APP_MODE || '').trim().toLowerCase() === 'test') return true;
-  return isLocalAdminUrl(env?.SITE_BASE) || isLocalAdminUrl(env?.WORKER_BASE) || isLocalAdminUrl(env?.CORS_ALLOWED_ORIGIN);
+  return shouldBypassTurnstile(env, 'ADMIN_TURNSTILE_BYPASS');
 }
 
 function isAdminTurnstileRequired(env) {
   if (shouldBypassAdminTurnstile(env)) return false;
   return Boolean(getAdminTurnstileSecret(env)) || isTruthyAdminEnv(env?.ADMIN_TURNSTILE_REQUIRED);
-}
-
-function getRequestIp(request) {
-  return String(
-    request.headers.get('CF-Connecting-IP') ||
-    request.headers.get('X-Forwarded-For') ||
-    ''
-  ).split(',')[0].trim();
 }
 
 function adminChallengeErrorResponse(error, status, env) {
@@ -325,8 +314,16 @@ function adminChallengeErrorResponse(error, status, env) {
 async function verifyAdminTurnstile(request, env, token) {
   if (!isAdminTurnstileRequired(env)) return { ok: true };
 
-  const secret = getAdminTurnstileSecret(env);
-  if (!secret) {
+  const result = await verifyTurnstile(request, env, token, {
+    action: ADMIN_TURNSTILE_ACTION,
+    secretEnvNames: ['TURNSTILE_SECRET_KEY', 'ADMIN_TURNSTILE_SECRET_KEY'],
+    requiredEnvName: 'ADMIN_TURNSTILE_REQUIRED',
+    bypassEnvName: 'ADMIN_TURNSTILE_BYPASS'
+  });
+
+  if (result.ok) return { ok: true };
+
+  if (result.code === 'challenge_not_configured') {
     return {
       ok: false,
       response: privateAdminJsonResponse({
@@ -336,8 +333,7 @@ async function verifyAdminTurnstile(request, env, token) {
     };
   }
 
-  const responseToken = String(token || '').trim();
-  if (!responseToken || responseToken.length > TURNSTILE_MAX_TOKEN_LENGTH) {
+  if (result.code === 'challenge_required') {
     return {
       ok: false,
       response: privateAdminJsonResponse({
@@ -347,47 +343,13 @@ async function verifyAdminTurnstile(request, env, token) {
     };
   }
 
-  let result = null;
-  try {
-    const verifyResponse = await fetch(TURNSTILE_SITEVERIFY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        secret,
-        response: responseToken,
-        remoteip: getRequestIp(request) || undefined,
-        idempotency_key: crypto.randomUUID()
-      })
-    });
-    result = await verifyResponse.json().catch(() => null);
-    if (!verifyResponse.ok) {
-      return {
-        ok: false,
-        response: adminChallengeErrorResponse('Admin challenge verification failed', 400, env)
-      };
-    }
-  } catch {
-    return {
-      ok: false,
-      response: adminChallengeErrorResponse('Admin challenge verification unavailable', 503, env)
-    };
-  }
-
-  if (!result?.success) {
-    return {
-      ok: false,
-      response: adminChallengeErrorResponse('Admin challenge verification failed', 400, env)
-    };
-  }
-
-  if (result.action && result.action !== ADMIN_TURNSTILE_ACTION) {
-    return {
-      ok: false,
-      response: adminChallengeErrorResponse('Admin challenge verification failed', 400, env)
-    };
-  }
-
-  return { ok: true };
+  const errorMessage = result.code === 'challenge_unavailable'
+    ? 'Admin challenge verification unavailable'
+    : 'Admin challenge verification failed';
+  return {
+    ok: false,
+    response: adminChallengeErrorResponse(errorMessage, result.status || 400, env)
+  };
 }
 
 export async function verifyAdminAuthStartChallenge(request, env, body = {}) {

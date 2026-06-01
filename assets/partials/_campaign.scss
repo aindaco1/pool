@@ -12,7 +12,7 @@ $campaign-share-tablet-breakpoint: 1200px;
   padding-bottom: $container-vpad;
   
   @include ms {
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: minmax(0, 2fr) minmax(344px, 1fr);
   }
 
   @include sm {
@@ -51,6 +51,12 @@ $campaign-share-tablet-breakpoint: 1200px;
     object-fit: cover;
     object-position: top center;
     display: block;
+  }
+
+  &__picture {
+    display: block;
+    width: 100%;
+    height: 100%;
   }
 }
 
@@ -101,6 +107,136 @@ $campaign-share-tablet-breakpoint: 1200px;
   }
 }
 
+.launch-reminder {
+  width: 100%;
+  margin: $space-lg 0 0;
+  padding: 0 0 $space-md;
+  border-bottom: 1px solid $border--default;
+  text-align: left;
+
+  @include xsm {
+    margin-top: $space-md;
+    padding-bottom: $space-sm;
+  }
+
+  h2 {
+    @include type-label;
+    font-family: $font-family--body;
+    margin: 0 0 4px 0;
+    color: $color--secondary;
+  }
+
+  &--header {
+    display: none;
+
+    @media (max-width: $campaign-share-tablet-breakpoint) {
+      display: block;
+      width: min(100%, 640px);
+      margin-left: auto;
+      margin-right: auto;
+      padding-top: $space-lg;
+      border-top: 1px solid $border--default;
+      text-align: center;
+    }
+
+    @include xsm {
+      padding-top: $space-md;
+    }
+  }
+
+  &--header h2 {
+    @media (max-width: $campaign-share-tablet-breakpoint) {
+      @include heading-font;
+      font-size: $product-title--size;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      text-transform: none;
+      color: $color--primary;
+      margin-bottom: $space-xl;
+    }
+
+    @include xsm {
+      font-size: 24px;
+      margin-bottom: $space-md;
+    }
+  }
+
+  &--sidebar {
+    display: block;
+
+    @media (max-width: $campaign-share-tablet-breakpoint) {
+      display: none;
+    }
+  }
+
+  &__form {
+    display: grid;
+    gap: $space-xs;
+  }
+
+  &__label {
+    @include type-meta;
+    font-weight: 700;
+    color: $color--primary;
+  }
+
+  &__row {
+    display: grid;
+    gap: $space-xs;
+  }
+
+  &--header &__row {
+    @media (max-width: $campaign-share-tablet-breakpoint) {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+  }
+
+  &__input {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    @include field-shell;
+  }
+
+  &__submit.btn {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  &--header &__submit.btn {
+    @media (max-width: $campaign-share-tablet-breakpoint) {
+      width: auto;
+      padding-left: $space-lg;
+      padding-right: $space-lg;
+    }
+  }
+
+  &__turnstile {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 65px;
+    margin-top: $space-xs;
+    overflow: visible;
+  }
+
+  &__status {
+    @include type-meta;
+    margin: 0;
+  }
+
+  &__status[data-status="success"] {
+    color: $color--success;
+  }
+
+  &__status[data-status="error"] {
+    color: $color--danger;
+  }
+}
+
 .campaign-share {
   @include stack($space-xs);
   align-items: flex-start;
@@ -113,7 +249,7 @@ $campaign-share-tablet-breakpoint: 1200px;
     @media (max-width: $campaign-share-tablet-breakpoint) {
       display: flex;
       align-items: center;
-      margin: $space-lg auto 0;
+      margin: $space-md auto 0;
       text-align: center;
     }
   }
@@ -126,6 +262,12 @@ $campaign-share-tablet-breakpoint: 1200px;
     @media (max-width: $campaign-share-tablet-breakpoint) {
       display: none;
     }
+  }
+
+  .launch-reminder + &--sidebar {
+    margin-top: $space-md;
+    padding-top: 0;
+    border-top: 0;
   }
 
   &__links {

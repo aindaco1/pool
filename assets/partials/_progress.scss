@@ -497,10 +497,28 @@
     @include heading-font;
     font-weight: 700;
     font-size: 48px;
+    line-height: 1;
     color: $color--white;
     
     @include xsm {
       font-size: 28px;
+    }
+  }
+
+  &--long-value &__value {
+    font-size: 40px;
+    letter-spacing: -0.04em;
+
+    @include xsm {
+      font-size: 24px;
+    }
+  }
+
+  &--extra-long-value &__value {
+    font-size: 34px;
+
+    @include xsm {
+      font-size: 20px;
     }
   }
   

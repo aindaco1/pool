@@ -1,0 +1,18 @@
+{%- assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign launch_reminder_variant = include.variant | default: "default" -%}
+{%- capture launch_reminder_id -%}launch-reminder-{{ page.slug | slugify }}-{{ launch_reminder_variant | slugify }}{%- endcapture -%}
+<section class="launch-reminder {{ include.class | default: '' }}" aria-labelledby="{{ launch_reminder_id }}-heading">
+  <h2 id="{{ launch_reminder_id }}-heading">{% include t.html key="campaign.launch_reminder_heading" lang=current_lang %}</h2>
+  <form class="launch-reminder__form" data-launch-reminder-form data-campaign-slug="{{ page.slug | escape }}" data-lang="{{ current_lang | escape }}"{% if launch_reminder_turnstile_site_key != "" %} data-turnstile-site-key="{{ launch_reminder_turnstile_site_key | escape }}"{% endif %}>
+    <label class="launch-reminder__label sr-only" for="{{ launch_reminder_id }}-email">{% include t.html key="campaign.launch_reminder_email_label" lang=current_lang %}</label>
+    <div class="launch-reminder__row">
+      <input class="launch-reminder__input" id="{{ launch_reminder_id }}-email" name="email" type="email" autocomplete="email" inputmode="email" required placeholder="{% include t.html key='campaign.launch_reminder_email_label' lang=current_lang %}">
+      <button class="btn btn--primary launch-reminder__submit" type="submit">{% include t.html key="campaign.launch_reminder_submit" lang=current_lang %}</button>
+    </div>
+    <input type="hidden" name="consent" value="true">
+    {% if launch_reminder_turnstile_site_key != "" %}
+    <div class="launch-reminder__turnstile" data-launch-reminder-turnstile></div>
+    {% endif %}
+    <p class="launch-reminder__status" data-launch-reminder-status role="status" aria-live="polite" aria-atomic="true"></p>
+  </form>
+</section>

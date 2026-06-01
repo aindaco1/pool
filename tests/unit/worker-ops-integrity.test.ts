@@ -26,6 +26,7 @@ const mockSendAnnouncementEmail = vi.fn(async () => {});
 const mockSendCampaignRunnerReportEmail = vi.fn(async () => {});
 const mockSendMilestoneEmail = vi.fn(async () => {});
 const mockSendSupporterEmail = vi.fn(async () => {});
+const mockSendLaunchReminderEmail = vi.fn(async () => ({ sent: true }));
 
 vi.mock('../../worker/src/stripe.js', () => ({
   verifyStripeSignature: vi.fn(async () => ({ valid: true })),
@@ -38,6 +39,7 @@ vi.mock('../../worker/src/token.js', () => ({
 }));
 
 vi.mock('../../worker/src/email.js', () => ({
+  RESEND_RATE_LIMIT_DELAY_MS: 0,
   sendSupporterEmail: mockSendSupporterEmail,
   sendPaymentFailedEmail: vi.fn(async () => {}),
   sendPledgeModifiedEmail: vi.fn(async () => {}),
@@ -46,7 +48,8 @@ vi.mock('../../worker/src/email.js', () => ({
   sendMilestoneEmail: mockSendMilestoneEmail,
   sendChargeSuccessEmail: vi.fn(async () => {}),
   sendAnnouncementEmail: mockSendAnnouncementEmail,
-  sendCampaignRunnerReportEmail: mockSendCampaignRunnerReportEmail
+  sendCampaignRunnerReportEmail: mockSendCampaignRunnerReportEmail,
+  sendLaunchReminderEmail: mockSendLaunchReminderEmail
 }));
 
 vi.mock('../../worker/src/github.js', () => ({
@@ -258,7 +261,7 @@ describe('worker operational integrity', () => {
     await expect(kv.get('cron:lastEmailRetryRun')).resolves.toBeTruthy();
   });
 
-  it('sends a daily campaign-runner pledge report at 7am Mountain Time', async () => {
+  it('sends a daily campaign-runner pledge report at 7am platform time', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-21T13:00:00.000Z'));
 
@@ -369,6 +372,50 @@ describe('worker operational integrity', () => {
     }));
     await expect(kv.get('campaign-runner-report:pledge:hand-relations:2026-04-21')).resolves.toBeTruthy();
     await expect(kv.get('cron:lastCampaignRunnerReportRun')).resolves.toBeTruthy();
+  });
+
+  it('dispatches queued launch reminders once and writes sent markers', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('launch-reminder:hand-relations:hash123', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      campaignTitle: 'Hand Relations',
+      email: 'fan@example.com',
+      emailHash: 'hash123',
+      preferredLang: 'en',
+      status: 'active',
+      createdAt: '2026-04-21T00:00:00.000Z',
+      updatedAt: '2026-04-21T00:00:00.000Z'
+    }));
+    await kv.put('launch-reminder-dispatch:hand-relations', JSON.stringify({
+      version: 1,
+      status: 'pending',
+      campaignSlug: 'hand-relations',
+      campaignTitle: 'Hand Relations',
+      queuedAt: '2026-04-21T00:00:00.000Z',
+      updatedAt: '2026-04-21T00:00:00.000Z',
+      sent: 0,
+      skipped: 0,
+      failed: 0
+    }));
+
+    await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+
+    expect(mockSendLaunchReminderEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendLaunchReminderEmail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      email: 'fan@example.com',
+      campaignSlug: 'hand-relations',
+      campaignTitle: 'Hand Relations',
+      campaignUrl: 'https://pool.test/campaigns/hand-relations/',
+      unsubscribeUrl: 'https://pool.test/launch-reminders/unsubscribe?t=token'
+    }));
+    await expect(kv.get('launch-reminder-sent:hand-relations:hash123')).resolves.toBeTruthy();
+    await expect(kv.get('launch-reminder-dispatch:hand-relations')).resolves.toBeNull();
+    await expect(kv.get('launch-reminder-complete:hand-relations')).resolves.toBeTruthy();
+
+    await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+    expect(mockSendLaunchReminderEmail).toHaveBeenCalledTimes(1);
   });
 
   it('dry-runs a campaign-runner report without sending email', async () => {

@@ -43,8 +43,8 @@ interface Campaign {
   goal_amount: number;
 }
 
-// Helper to get DST-aware Mountain Time offset
-function getMTOffset(dateString: string): number {
+// Helper to get DST-aware default platform timezone offset
+function getDefaultPlatformOffset(dateString: string): number {
   const [year, month, day] = dateString.split('-').map(Number);
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Denver',
@@ -55,10 +55,10 @@ function getMTOffset(dateString: string): number {
   return tzName === 'MDT' ? 6 : 7;
 }
 
-// Helper to check if deadline passed (MT timezone, DST-aware)
+// Helper to check if deadline passed in the default platform timezone
 function isDeadlinePassed(dateString: string): boolean {
   const [year, month, day] = dateString.split('-').map(Number);
-  const offset = getMTOffset(dateString);
+  const offset = getDefaultPlatformOffset(dateString);
   const deadline = new Date(Date.UTC(year, month - 1, day, 23 + offset, 59, 59));
   return new Date() > deadline;
 }
@@ -110,8 +110,8 @@ describe('Deadline enforcement', () => {
       expect(isDeadlinePassed(pastDate)).toBe(true);
     });
 
-    it('should handle deadline at end of day (23:59:59 MT)', () => {
-      // This tests the edge case of checking very close to midnight MT
+    it('should handle deadline at the local end of day', () => {
+      // This tests the edge case of checking very close to local midnight.
       const today = new Date();
       const todayString = today.toISOString().split('T')[0];
       
@@ -552,25 +552,25 @@ describe('API response shape', () => {
 // =============================================================================
 
 describe('DST-aware deadline handling', () => {
-  it('should use MDT offset (-6) for summer dates', () => {
-    const offset = getMTOffset('2026-07-15');
+  it('should use the summer offset for default Denver dates', () => {
+    const offset = getDefaultPlatformOffset('2026-07-15');
     expect(offset).toBe(6);
   });
 
-  it('should use MST offset (-7) for winter dates', () => {
-    const offset = getMTOffset('2026-01-15');
+  it('should use the winter offset for default Denver dates', () => {
+    const offset = getDefaultPlatformOffset('2026-01-15');
     expect(offset).toBe(7);
   });
 
   it('should handle DST transition boundary (March)', () => {
     // 2026-03-08 is near spring-forward
-    const offset = getMTOffset('2026-03-08');
+    const offset = getDefaultPlatformOffset('2026-03-08');
     expect([6, 7]).toContain(offset);
   });
 
   it('should handle DST transition boundary (November)', () => {
     // 2026-11-01 is near fall-back
-    const offset = getMTOffset('2026-11-01');
+    const offset = getDefaultPlatformOffset('2026-11-01');
     expect([6, 7]).toContain(offset);
   });
 });

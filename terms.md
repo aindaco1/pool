@@ -16,7 +16,8 @@ description: Review pledge terms, payment processing, fulfillment, and privacy d
 - **No account required** — manage your pledge entirely via email links.
 - Where this deployment offers additional languages, those emailed pledge links and supporter-community links may use localized routes while still authorizing the same pledge.
 - A single checkout may include more than one campaign, but each campaign is stored and managed as its own pledge after checkout.
-- All campaign deadlines use Mountain Time (MST/MDT).
+- Upcoming campaign launch reminders are optional and separate from pledging. If you opt in, The Pool sends one reminder when that campaign goes live and includes an unsubscribe link.
+- All campaign deadlines use this deployment's configured platform timezone. This deployment defaults to `America/Denver` unless platform administrators change it.
 - Community votes are limited to the published options on a campaign's supporter page, and closed decisions do not accept new votes.
 - If a manage link points to a pledge that no longer exists, The Pool treats it as unavailable instead of reconstructing placeholder pledge access.
 - Public campaign pages may include share links for external platforms, SMS, and email. Those links are for public campaign URLs only and do not include pledge-management, checkout, supporter-community, admin, or magic-link tokens.
@@ -35,6 +36,7 @@ description: Review pledge terms, payment processing, fulfillment, and privacy d
 - If a delivery option is available for your shipment and you change it in checkout or Manage Pledge, the stored shipping total and pledge total are recalculated from the saved pledge state before the change is persisted.
 - If you modify a pledge, The Pool recalculates totals from the saved pledge state and the campaign or add-on definitions in effect for that deployment, rather than trusting browser-submitted money fields.
 - Transactional emails and supporter access links may reflect this deployment's configured branding and localized route structure, but each emailed manage link still authorizes only the pledge tied to that specific order.
+- Scheduled campaign-runner reports, campaign state changes, and settlement checks use the same configured platform timezone as campaign deadlines.
 
 ## Creative Control & Submissions
 
@@ -64,6 +66,7 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - We collect only the information necessary to process pledges and fulfill rewards: email, name, pledge/order details, and, for physical rewards, physical campaign add-ons, or physical platform add-ons, a shipping address.
 - Full card details are handled and stored by Stripe. The Pool does not store full card numbers or CVC values.
 - Email addresses and any shipping details needed for fulfillment may be stored in our system for pledge management, campaign-specific confirmations, campaign updates, and reward fulfillment.
+- If you sign up for an upcoming campaign launch reminder, your email is stored in campaign-scoped reminder records so The Pool can send that one reminder, avoid duplicate sends, and honor unsubscribes for that campaign. Reminder signups may use Cloudflare Turnstile to reduce abuse.
 - Campaign organizers may receive campaign-scoped reports or fulfillment exports containing supporter/order details needed to run that specific campaign, coordinate delivery, or send production-related updates. Those reports stay limited to the campaign a supporter backed rather than exposing unrelated campaign pledges.
 - Authorized campaign operators may also view campaign-scoped supporter rows, reports, analytics, fulfillment data, and campaign content through The Pool's private admin dashboard. Dashboard access is role-scoped: campaign users see only assigned campaigns, while platform administrators may see platform-wide operational data needed to run The Pool.
 - When a pledge includes platform-fulfilled add-on items, platform operators may separately receive platform-only fulfillment exports limited to the items they must deliver.
@@ -73,7 +76,7 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - Supporter-community access in the browser may be remembered for the current session as a convenience, but the emailed magic link remains the source of truth for access.
 - Public pages may prefetch eligible same-origin public pages after hover, focus, or touch intent to make normal navigation faster. This prefetch behavior excludes admin, checkout, Manage Pledge, supporter-community, tokenized, external, and sensitive-query links.
 - Campaign share links may preserve safe public referral or UTM query parameters so campaign runners can understand public promotion sources. They do not preserve token, order, email, session, or other sensitive query parameters.
-- We do not sell your information. We share it only as necessary for payment processing, transactional email delivery, shipping quote calculation, and reward fulfillment.
+- We do not sell your information. We share it only as necessary for payment processing, transactional email delivery, abuse prevention, shipping quote calculation, and reward fulfillment.
 
 ## Platform & Technology
 
@@ -84,9 +87,9 @@ The Pool is an [open-source crowdfunding platform](https://github.com/aindaco1/p
 - **[Stripe](https://stripe.com)** — Secure payment fields, saved payment methods, and payment processing
 - **[Cloudflare Workers](https://workers.cloudflare.com)** — Backend API for canonical pledge validation, pledge storage, live stats, and automated campaign settlement
 - **Private admin dashboard** — Role-scoped campaign editing, reports, analytics, supporter views, marketing links, user management, and platform operations
-- **[Resend](https://resend.com)** — Transactional emails (confirmations, updates, charge notifications)
+- **[Resend](https://resend.com)** — Transactional emails (confirmations, launch reminders, updates, charge notifications)
 
-Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project, with optional platform tips helping cover maintenance of The Pool itself. Production builds also minify generated CSS/JS assets after static site generation, while Cloudflare handles transfer compression at the edge.
+Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project, with optional platform tips helping cover maintenance of The Pool itself. Production builds also minify generated CSS/JS assets after static site generation, while Cloudflare handles transfer compression at the edge. Campaign lifecycle automation uses the configured platform timezone so deadlines, countdowns, reports, and settlement checks stay aligned.
 
 ## Questions
 
@@ -94,4 +97,4 @@ For questions about these terms or your pledge, email us at info@dustwave.xyz.
 
 ---
 
-_Last updated: May 31, 2026_
+_Last updated: June 1, 2026_

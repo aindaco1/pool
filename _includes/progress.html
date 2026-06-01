@@ -49,7 +49,7 @@
 
 <div class="progress-wrap" data-live-stats data-campaign-slug="{{ include.campaign_slug }}" data-goal="{{ goal_num }}" data-pledged="{{ pledged_num }}" data-max-threshold="{{ max_threshold }}">
   {% if include.progress_background %}
-  <img src="{{ include.progress_background }}" alt="" class="progress-wrap__bg" aria-hidden="true">
+  {% include responsive-image.html src=include.progress_background alt="" class="progress-wrap__bg" aria_hidden=true loading="lazy" decoding="async" sizes="(min-width: 1000px) 640px, calc(100vw - 72px)" %}
   {% endif %}
   <div class="progress-bar{% if exceeded_max %} progress-bar--exceeded{% endif %}">
     <span class="u-width-pct-{{ pct }}" data-progress-width="{{ pct }}"></span>

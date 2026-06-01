@@ -2,9 +2,9 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.0.2**. The v1.0 feature set and launch hardening pass are complete; v1.0.2 adds public-page performance work, responsive media variants, generated asset minification, safe intent prefetching, campaign share links with state-aware CTAs, and admin performance controls.
+Current release milestone: **v1.0.3**. The v1.0 feature set and launch hardening pass are complete; v1.0.3 adds configurable platform timezone handling plus opt-in launch reminders for upcoming campaigns.
 
-A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
+A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
 ## Features
 
@@ -25,7 +25,8 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Safer supporter sessions** — Community pages keep supporter access in browser session storage instead of a long-lived token cookie
 - **Stretch goals** — Auto-unlock at funding thresholds
 - **Campaign lifecycle** — `upcoming` → `live` → `post` states with automatic transitions + Cloudflare cache purge
-- **Countdown timers** — Mountain Time (MST/MDT) with automatic DST detection, pre-rendered to avoid flash
+- **Countdown timers** — configurable IANA platform timezone with automatic DST handling, pre-rendered to avoid flash
+- **Launch reminders** — Upcoming campaign pages can collect explicit email opt-ins, verify Turnstile challenges, dedupe signups by campaign/email, send one Resend-powered launch email when the campaign goes live, and honor unsubscribe/suppression markers before sending
 - **Stable campaign progress rendering** — Funding bars and milestone markers render their positions in static HTML/CSS so first load does not wait for JavaScript to avoid layout collapse
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement with published option allowlists and closed-decision lockout
@@ -129,6 +130,7 @@ Fork-facing settings now use a structured config model in [`_config.yml`](_confi
 - `shipping` for origin settings, USPS quote behavior, fallback policy, free-shipping defaults, shipping presets, and limited shipping-option policy
 - `add_ons` for a small global merch catalog, fixed-price products, and simple variants like shirt sizes
 - `reports` for campaign-runner report timing, attachments, summaries, subject-prefix behavior, and the split fulfillment-email workflow alongside `platform.support_email`
+- `launch_reminders` for enabling upcoming-campaign reminder forms and setting the public Turnstile site key
 - campaign front matter `campaign_add_ons` for campaign-scoped merch that should use the same card UI but count toward that campaign’s subtotal and shipping rules
 - `i18n` for default/supported languages, language labels, and localized public-page routes
 - `design` for curated typography, radius, layout-width, and theme-token overrides
@@ -138,14 +140,14 @@ Fork-facing settings now use a structured config model in [`_config.yml`](_confi
 - `checkout` for truly variable checkout settings like the Stripe publishable key
 - `cache` for live browser TTLs
 
-[`_config.local.yml`](_config.local.yml) is now intentionally thin: it should only carry true local overrides like localhost URLs and `show_test_campaigns`, not a second copy of the base config.
+[`_config.local.yml`](_config.local.yml) is now intentionally thin: it should only carry true local overrides like localhost URLs, `show_test_campaigns`, and local-only public Turnstile key blanks, not a second copy of the base config.
 
 See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for the supported no-code customization surface and which settings are automatically mirrored to the Worker.
 See [docs/SEO.md](docs/SEO.md) for the current SEO fundamentals implementation and supported SEO surface.
 See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) for the current accessibility baseline and verified critical flows.
 See [docs/I18N.md](docs/I18N.md) for the locale model, shared translation sources, and localized route behavior.
 
-Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It now covers the v0.9.5 through v1.0.2 creator-facing changes, including campaign add-ons, hosted embeds, share-link/social-preview planning, dashboard media uploads, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
+Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It covers recent creator-facing changes, including campaign add-ons, hosted embeds, share-link/social-preview planning, dashboard media uploads, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
 
 For localization, the supported model is:
 
@@ -171,6 +173,8 @@ For a full host-only stack, run the Worker separately with `cd worker && wrangle
 Local admin dashboard testing reads the bootstrap super-admin email from ignored `worker/.dev.vars` as `ADMIN_BOOTSTRAP_EMAILS`. `npm run secrets:dev` creates that file from `worker/.dev.vars.example`, where forks can replace the placeholder with their own local sign-in email. The committed dev Worker defaults still set `CORS_ALLOWED_ORIGIN=http://127.0.0.1:4000` and the two test-only campaigns `hand-relations,smoke-editable`. `_config.yml` `admin.users` is the production seed/recovery list mirrored into the deployed Worker as `ADMIN_USERS_JSON`; admin user edits made in the dashboard are saved directly to Worker KV under `admin-users:v1`, take effect immediately, and do not publish to GitHub. Machine-specific secrets and local bootstrap access belong in ignored `worker/.dev.vars`.
 
 Admin email sign-in can also use Cloudflare Turnstile. Set the public widget key in `_config.yml` as `admin.turnstile_site_key`, and store the matching `TURNSTILE_SECRET_KEY` as a Worker secret. Local/test automation can use `ADMIN_TURNSTILE_BYPASS=true`, but that bypass should stay out of deployed Workers.
+
+Launch reminder forms use `_config.yml` `launch_reminders.turnstile_site_key` and the same shared Turnstile verification helper in the Worker. `_config.local.yml` can blank that public key to hide the widget locally; deployments may reuse `TURNSTILE_SECRET_KEY` or set `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY`. Local/test automation can use `LAUNCH_REMINDER_TURNSTILE_BYPASS=true` only in local/test Worker contexts.
 
 Dashboard publish paths are intentionally split:
 
@@ -214,7 +218,7 @@ npm run podman:self-check
 
 If you want to exercise the on-site Stripe checkout locally, add `STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...` to [`worker/.dev.vars`](worker/.dev.vars) before starting the stack.
 
-For production, use Cloudflare Worker secrets for runtime credentials and GitHub repository secrets for deploy credentials. Do not put Stripe secret keys, webhook secrets, Resend keys, USPS client secrets, ZIP.TAX keys, or Cloudflare API tokens in `_config.yml`.
+For production, use Cloudflare Worker secrets for runtime credentials and GitHub repository secrets for deploy credentials. Do not put Stripe secret keys, webhook secrets, Resend keys, Turnstile secrets, USPS client secrets, ZIP.TAX keys, or Cloudflare API tokens in `_config.yml`.
 
 Resend sender domains must match the configured sender addresses. For this deployment, pledge and update emails use `pool.dustwave.xyz` senders such as `The Pool <pledges@pool.dustwave.xyz>`, so the Resend API key must be authorized for `pool.dustwave.xyz`.
 
@@ -275,6 +279,7 @@ npm run test:security  # Security tests — pen testing the Worker API
 npm run test:security:podman # Security tests with a Podman-backed local stack in one invocation
 npm run assets:minify:check # Check built _site CSS/JS for remaining minification savings
 npm run media:optimize:check # Check uploaded media for pending optimization/derivatives
+npm run media:optimize:check:podman # Same media check inside the Podman toolchain
 npm test               # Run unit + e2e
 ```
 
@@ -340,7 +345,7 @@ The headless browser harness now builds a clean static `_site` and serves it wit
 - Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow
 - Unit, security, and headless E2E suites are green on this branch
 
-**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility (including axe-backed public-page checks across campaign, community, and pledge-result states, ARIA snapshots, and keyboard-only checkout/manage/community/public-control assertions), mobile viewport regressions for public pages and pledge flows, campaign states, secret exposure auditing, campaign-content HTML/link/embed auditing, serialized tier-inventory coordination, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
+**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, launch reminder signup/unsubscribe/dispatch paths, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility (including axe-backed public-page checks across campaign, community, and pledge-result states, ARIA snapshots, and keyboard-only checkout/manage/community/public-control assertions), mobile viewport regressions for public pages and pledge flows, campaign states, secret exposure auditing, campaign-content HTML/link/embed auditing, serialized tier-inventory coordination, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
 
 For local merge smoke on mutable pledges, use:
 

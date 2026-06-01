@@ -1,6 +1,6 @@
 {
   "name": "pool",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "**Dust Wave's open crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)",
   "main": "index.js",
   "directories": {
@@ -32,7 +32,9 @@
     "assets:minify": "node ./scripts/minify-site-assets.mjs --write",
     "assets:minify:check": "node ./scripts/minify-site-assets.mjs --check",
     "media:optimize": "node ./scripts/optimize-media.mjs --write",
-    "media:optimize:check": "node ./scripts/optimize-media.mjs --check"
+    "media:optimize:check": "node ./scripts/optimize-media.mjs --check",
+    "media:optimize:podman": "./scripts/podman-media-optimize.sh --write",
+    "media:optimize:check:podman": "./scripts/podman-media-optimize.sh --check"
   },
   "keywords": [],
   "author": "",

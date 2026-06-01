@@ -38,6 +38,7 @@ const mockSendDiaryUpdateEmail = vi.fn(async () => {});
 const mockSendMilestoneEmail = vi.fn(async () => {});
 const mockSendChargeSuccessEmail = vi.fn(async () => {});
 const mockSendAnnouncementEmail = vi.fn(async () => {});
+const mockSendLaunchReminderEmail = vi.fn(async () => ({ sent: true }));
 
 vi.mock('../../worker/src/stripe.js', () => ({
   verifyStripeSignature: mockVerifyStripeSignature,
@@ -50,6 +51,7 @@ vi.mock('../../worker/src/token.js', () => ({
 }));
 
 vi.mock('../../worker/src/email.js', () => ({
+  RESEND_RATE_LIMIT_DELAY_MS: 0,
   sendSupporterEmail: mockSendSupporterEmail,
   sendPaymentFailedEmail: mockSendPaymentFailedEmail,
   sendPledgeModifiedEmail: mockSendPledgeModifiedEmail,
@@ -57,7 +59,8 @@ vi.mock('../../worker/src/email.js', () => ({
   sendDiaryUpdateEmail: mockSendDiaryUpdateEmail,
   sendMilestoneEmail: mockSendMilestoneEmail,
   sendChargeSuccessEmail: mockSendChargeSuccessEmail,
-  sendAnnouncementEmail: mockSendAnnouncementEmail
+  sendAnnouncementEmail: mockSendAnnouncementEmail,
+  sendLaunchReminderEmail: mockSendLaunchReminderEmail
 }));
 
 vi.mock('../../worker/src/github.js', () => ({
@@ -516,6 +519,7 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('crypto', webcrypto);
+  __resetCampaignRuntimeStateForTests();
   mockStripeClient.checkout.sessions.create.mockResolvedValue({
     id: 'cs_test_default_123',
     client_secret: 'cs_test_default_secret_123',
@@ -562,6 +566,122 @@ describe('Worker business logic hardening', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'Rate limit storage not configured'
     });
+  });
+
+  it('stores launch reminder signups for upcoming campaigns with normalized dedupe', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as MockKVNamespace;
+    const upcomingCampaign = {
+      ...campaignFixture,
+      slug: 'future-campaign',
+      title: 'Future Campaign',
+      state: 'upcoming',
+      start_date: '2099-01-01',
+      url: '/campaigns/future-campaign/'
+    };
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [upcomingCampaign] });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const firstResponse = await worker.fetch(
+      new Request('https://pool.test/launch-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'future-campaign',
+          email: 'Fan@Example.COM ',
+          preferredLang: 'es',
+          consent: true
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+    const secondResponse = await worker.fetch(
+      new Request('https://pool.test/launch-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'future-campaign',
+          email: 'fan@example.com',
+          preferredLang: 'en',
+          consent: true
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    const signupKeys = Array.from(kv.store.keys()).filter(key => key.startsWith('launch-reminder:future-campaign:'));
+    expect(signupKeys).toHaveLength(1);
+    const record = JSON.parse(kv.store.get(signupKeys[0]) as string);
+    expect(record).toMatchObject({
+      campaignSlug: 'future-campaign',
+      campaignTitle: 'Future Campaign',
+      email: 'fan@example.com',
+      preferredLang: 'en',
+      status: 'active'
+    });
+  });
+
+  it('rejects launch reminder signups once a campaign is live', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as MockKVNamespace;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/launch-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          email: 'fan@example.com',
+          consent: true
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(409);
+    expect(Array.from(kv.store.keys()).some(key => key.startsWith('launch-reminder:hand-relations:'))).toBe(false);
+  });
+
+  it('suppresses a launch reminder from a scoped unsubscribe token', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('launch-reminder:future-campaign:abc123', JSON.stringify({
+      campaignSlug: 'future-campaign',
+      campaignTitle: 'Future Campaign',
+      email: 'fan@example.com',
+      emailHash: 'abc123',
+      preferredLang: 'en',
+      status: 'active',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z'
+    }));
+    mockVerifyToken.mockResolvedValueOnce({
+      scope: 'launch-reminder-unsubscribe',
+      campaignSlug: 'future-campaign',
+      emailHash: 'abc123',
+      email: 'fan@example.com'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/launch-reminders/unsubscribe?t=unsubscribe-token'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const updated = JSON.parse(kv.store.get('launch-reminder:future-campaign:abc123') as string);
+    expect(updated.status).toBe('unsubscribed');
+    expect(kv.store.has('launch-reminder-suppressed:future-campaign:abc123')).toBe(true);
   });
 
   it('fails closed on first-party checkout start when the intent secret is missing', async () => {

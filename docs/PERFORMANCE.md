@@ -111,6 +111,14 @@ Keep these responsibilities separate:
 
 Cloudflare Auto Minify should stay disabled. It rewrites responses at the edge, making production behavior harder to reproduce locally and harder to test in CI. Prefer the repo-controlled generated asset step instead.
 
+Keep Rocket Loader and Email Address Obfuscation disabled for this site. Rocket Loader rewrites script tags at the edge, while Email Address Obfuscation injects `/cdn-cgi/scripts/*/cloudflare-static/email-decode.min.js`; both make strict-CSP pages harder to reproduce locally and can show up as render-blocking or console-noise diagnostics in PageSpeed Insights.
+
+If Cloudflare Web Analytics is enabled, campaign pages must allow Cloudflare's analytics script and beacon endpoint in the campaign CSP. Private/admin surfaces should stay stricter unless there is an explicit analytics/privacy decision to include them.
+
+Font stylesheets are linked from the document head instead of imported from `assets/main.css`. This lets the browser discover font CSS and font connections without waiting on the main stylesheet while preserving the intentional font-loading behavior.
+
+The generated design-token CSS variables are included in `assets/main.css`; `assets/theme-vars.css` remains available as a compatibility artifact, but public layouts should not request it as a separate render-blocking stylesheet.
+
 ## Intent-Based Prefetching
 
 The Pool includes an optional same-origin document prefetch runtime for public navigation links. It is inspired by instant.page's hover/touch intent model, but the implementation is local, small, and deliberately conservative.
@@ -238,12 +246,23 @@ npm run media:optimize
 npm run media:optimize:check
 ```
 
+If the host machine does not have the native optimizers installed, use the Podman-backed wrappers instead:
+
+```bash
+npm run media:optimize:podman
+npm run media:optimize:check:podman
+```
+
+The Podman site image includes `ffmpeg`, `optipng`, `libjpeg-turbo-progs`, `gifsicle`, and `webp` so local image compression and responsive derivative generation use the same native toolchain as the GitHub media workflow. Rebuild the image with `PODMAN_REBUILD=1` after changing container package requirements.
+
 For deployed media-heavy regressions, run the **Optimize dashboard media** GitHub Actions workflow with `scope=all` so existing campaign assets are optimized by the same pipeline rather than edited one-off.
+
+If PageSpeed flags oversized campaign images that already flow through `responsive-image.html`, first confirm whether the corresponding `-320.webp`, `-480.webp`, `-960.webp`, and `-1600.webp` derivatives exist. Missing derivatives should be produced by `npm run media:optimize` locally or by the workflow with `scope=all`, not by one-off manual image edits.
 
 The media pipeline:
 
 - compresses images when the optimized result is smaller
-- generates responsive WebP variants at `480w`, `960w`, and `1600w` for public image templates when the source image is larger than that variant
+- generates responsive WebP variants at `320w`, `480w`, `960w`, and `1600w` for public image templates when the source image is larger than that variant
 - generates WebM derivatives for uploaded videos
 - rewrites literal `_campaigns` / `_config.yml` references from uploaded source videos to generated WebM derivatives
 - keeps original source videos available for rollback or future re-encoding

@@ -37,8 +37,8 @@ exclude:
 # Structured platform settings for forks.
 platform:
   name: The Pool
-  version: "1.0.2"
-  release_label: "v1.0.2"
+  version: "1.0.3"
+  release_label: "v1.0.3"
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   pledges_email_from: "The Pool <pledges@pool.dustwave.xyz>"
@@ -46,6 +46,7 @@ platform:
   site_url: "https://pool.dustwave.xyz"
   worker_url: "https://pledge.dustwave.xyz"
   default_creator_name: Dust Wave
+  timezone: America/Denver
   logo_path: /assets/images/defaults/dust-wave-square.png
   footer_logo_path: /assets/images/defaults/dust-wave-square.png
   favicon_path: /assets/images/defaults/favicon.png
@@ -77,6 +78,12 @@ admin:
 # expose the nested `admin` config object reliably.
 admin_production_site_url: "https://pool.dustwave.xyz"
 admin_production_worker_url: "https://pledge.dustwave.xyz"
+
+launch_reminders:
+  enabled: true
+  # Optional Cloudflare Turnstile site key for public upcoming-campaign launch reminder forms.
+  # Keep the matching secret key in Worker secrets as TURNSTILE_SECRET_KEY or LAUNCH_REMINDER_TURNSTILE_SECRET_KEY.
+  turnstile_site_key: "0x4AAAAAADWvXKd12BE4fhQL"
 
 pricing:
   sales_tax_rate: 0.07625
@@ -211,8 +218,8 @@ reports:
     enabled: true
     daily_pledge_report_enabled: true
     fulfillment_report_enabled: true
-    send_hour_mt: 7
-    send_minute_mt: 0
+    send_hour: 7
+    send_minute: 0
     include_stats_summary: true
     include_csv_attachment: true
     email_subject_prefix: "[The Pool]"

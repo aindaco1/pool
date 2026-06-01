@@ -20,6 +20,7 @@ npm run test:security      # Security pen tests (Worker must be running)
 npm run test:security:podman  # Security pen tests with a one-shot Podman-backed stack
 npm run test:security:staging  # Security tests against a staging worker, if you maintain one
 npm run media:optimize:check   # Check dashboard-uploaded media for pending optimization/responsive variants/derivatives
+npm run media:optimize:check:podman  # Same media check inside the Podman toolchain
 ./scripts/test-checkout.sh --podman  # Manual checkout helper against the Podman stack
 ./scripts/test-e2e.sh --podman       # Automated browser helper against the Podman stack
 npm run test:usps          # Live USPS credential + quote sanity check
@@ -61,13 +62,13 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 |--------|-----------------|
 | `live-stats.js` | `formatMoney`, `updateProgressBar`, `updateMarkerState`, `checkTierUnlocks`, `checkLateSupport`, `updateSupportItems`, `updateTierInventory` |
 | `platform-tip` | Tip sanitization, tip percent derivation, tip amount calculation |
-| `pledge-management` | DST-aware deadline enforcement (MST/MDT via Intl), cancel/modify/payment-method validation, pledge status transitions, multi-campaign independence, shipping in pledge records, API response shape |
+| `pledge-management` | DST-aware deadline enforcement through the configured platform timezone, cancel/modify/payment-method validation, pledge status transitions, multi-campaign independence, shipping in pledge records, API response shape |
 | `settlement` | Charge aggregation (including shipping fees), payment success/failure, retry flow, dry-run mode, edge cases, batched settlement, campaign pledge index, settlement dispatch, shipping in settlement, cron heartbeat |
 | `email-broadcasts` | Diary excerpt extraction (with ellipsis truncation), diary/milestone tracking helpers, milestone checking logic, rate limiting |
-| `email-tip` | Tip-aware supporter email breakdowns across confirmation / modified / cancelled / failed / charged emails |
+| `email-tip` | Tip-aware supporter email breakdowns across confirmation / modified / cancelled / failed / charged emails, plus launch reminder email routing through the shared updates sender |
 | `votes` | Email-based vote storage/dedup, vote status retrieval, campaign results, result aggregation |
 | `admin-dashboard` | Dashboard dirty-state tracking, settings serialization, content/editor normalization, staged media uploads, actual Stripe fee analytics/backfill, referral URL helpers, responsive/i18n support utilities |
-| `campaign-page` | Share-link URL construction, safe query preservation, state-aware share text, public campaign controls, and SEO-sensitive campaign-page behavior |
+| `campaign-page` | Share-link URL construction, safe query preservation, state-aware share text, launch reminder form submission, public campaign controls, and SEO-sensitive campaign-page behavior |
 | `page-prefetch` | Same-origin public-route allowlisting, sensitive-query exclusions, network guards, delay/limit handling, and document prefetch hint creation |
 | `cart-runtime-loader` | Lazy cart-runtime boot, persisted/recovery cart detection, idempotent loading, and user-intent triggers |
 | `site-asset-minification` | Generated `_site` CSS/JS minification behavior and check-mode failure cases |
@@ -101,6 +102,7 @@ This runs:
   - `tests/unit/worker-business-logic.test.ts`
   - `tests/unit/worker-ops-integrity.test.ts`
   - `tests/unit/stats-pagination.test.ts`
+  These Worker suites cover launch reminder signup validation, unsubscribe suppression, queued dispatch idempotency, and the shared Resend send path.
 - Content safety filter regressions in `tests/unit/content-safety-filter.test.ts`, including unsafe Markdown link schemes and strict structured-embed URL validation
 - Campaign-content audit coverage in `tests/unit/campaign-content-security.test.ts`, including the allowed inline HTML subset and rejection of disallowed raw tags
 - Durable Object tier-inventory serialization coverage in `tests/unit/tier-inventory-do.test.ts`
@@ -132,6 +134,7 @@ Media optimization is intentionally separate from the pre-merge gate because it 
 
 ```bash
 npm run media:optimize:check
+npm run media:optimize:check:podman # use when host-native media tools are missing
 ```
 
 The local Worker defaults in [worker/wrangler.toml](../worker/wrangler.toml) now match that first-party setup. `./scripts/dev.sh --podman` now auto-generates a local `CHECKOUT_INTENT_SECRET` in `worker/.dev.vars` if it is missing, so fresh local checkout starts do not fail closed on an uninitialized dev secret.
@@ -868,6 +871,7 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 
 - [ ] Switch Stripe to live keys
 - [ ] Verify the Resend sender domain used by `PLEDGES_EMAIL_FROM` and `UPDATES_EMAIL_FROM` (for this deployment, `pool.dustwave.xyz`)
+- [ ] If launch reminders or admin Turnstile widgets are enabled, verify the public site keys and matching Worker Turnstile secrets are set
 - [ ] Deploy Worker: `wrangler deploy`
 - [ ] Set up Stripe webhook in dashboard → `https://pledge.dustwave.xyz/webhooks/stripe`
 - [ ] Test with a real $1 pledge
@@ -888,6 +892,9 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 - `MAGIC_LINK_SECRET` — Random 32+ char string for HMAC token signing
 - `RESEND_API_KEY` — Resend API key for supporter emails (re_...)
 - `ADMIN_SECRET` — Random string for admin API endpoints
+- `TURNSTILE_SECRET_KEY` — Shared Cloudflare Turnstile secret when admin sign-in or launch reminder widgets are enabled
+- `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY` — Optional reminder-specific Turnstile secret if not using the shared secret
+- `LAUNCH_REMINDER_TOKEN_SECRET` — Optional reminder unsubscribe-token secret; falls back to `MAGIC_LINK_SECRET`
 - `GITHUB_TOKEN` — GitHub PAT with repo/workflow access for dashboard publish actions and rebuild triggers; optional only when you are not testing GitHub-backed publishing
 - `ADMIN_BOOTSTRAP_EMAILS` — Optional local/recovery super-admin email list for dashboard sign-in; local dev reads this from `worker/.dev.vars`
 - `ADMIN_USERS_JSON` — Optional seed/recovery admin user list mirrored from `_config.yml`; dashboard Users edits save to KV at `admin-users:v1`

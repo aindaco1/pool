@@ -19,7 +19,7 @@ describe('getEffectiveState', () => {
     ).toBe('upcoming');
   });
 
-  it('treats upcoming campaigns as live once the MT start time passes', () => {
+  it('treats upcoming campaigns as live once the platform start time passes', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-27T06:30:00Z'));
 
@@ -32,7 +32,7 @@ describe('getEffectiveState', () => {
     ).toBe('live');
   });
 
-  it('treats live campaigns as post once the MT deadline passes', () => {
+  it('treats live campaigns as post once the platform deadline passes', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-28T06:00:00Z'));
 
@@ -43,5 +43,18 @@ describe('getEffectiveState', () => {
         goal_deadline: '2026-03-27'
       })
     ).toBe('post');
+  });
+
+  it('honors a non-Denver platform timezone', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-20T15:30:00Z'));
+
+    expect(
+      getEffectiveState({
+        state: 'upcoming',
+        start_date: '2026-04-21',
+        goal_deadline: '2026-04-30'
+      }, { PLATFORM_TIMEZONE: 'Asia/Tokyo' })
+    ).toBe('live');
   });
 });

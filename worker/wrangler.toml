@@ -8,12 +8,11 @@ routes = [
   { pattern = "pledge.dustwave.xyz/*", zone_name = "dustwave.xyz" }
 ]
 
-# Cron triggers:
-# - `0 6 * * *` / `0 7 * * *`: daily campaign transition + settlement checks at midnight Mountain Time
-# - `0 13 * * *` / `0 14 * * *`: 7:00 AM Mountain Time campaign-runner reports
-# - `*/15 * * * *`: retry failed supporter confirmation emails
+# Cron trigger:
+# - `* * * * *`: timezone-aware platform scheduler. Individual tasks gate on
+#   the configured platform timezone and idempotency markers.
 [triggers]
-crons = ["0 6 * * *", "0 7 * * *", "0 13 * * *", "0 14 * * *", "*/15 * * * *"]
+crons = ["* * * * *"]
 
 [vars]
 SITE_BASE = "https://pool.dustwave.xyz"
@@ -29,6 +28,7 @@ PLATFORM_NAME = "The Pool"
 PLATFORM_COMPANY_NAME = "Dust Wave"
 PLATFORM_AUTHOR = "Dust Wave"
 PLATFORM_DEFAULT_CREATOR_NAME = "Dust Wave"
+PLATFORM_TIMEZONE = "America/Denver"
 SUPPORT_EMAIL = "info@dustwave.xyz"
 PLEDGES_EMAIL_FROM = "The Pool <pledges@pool.dustwave.xyz>"
 UPDATES_EMAIL_FROM = "The Pool <updates@pool.dustwave.xyz>"
@@ -71,11 +71,12 @@ USPS_RATE_LIMIT_COOLDOWN_SECONDS = "1800"
 CAMPAIGN_RUNNER_REPORTS_ENABLED = "true"
 CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED = "true"
 CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED = "true"
-CAMPAIGN_RUNNER_REPORT_HOUR_MT = "7"
-CAMPAIGN_RUNNER_REPORT_MINUTE_MT = "0"
+CAMPAIGN_RUNNER_REPORT_HOUR = "7"
+CAMPAIGN_RUNNER_REPORT_MINUTE = "0"
 CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY = "true"
 CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT = "true"
 CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX = "[The Pool]"
+LAUNCH_REMINDERS_ENABLED = "true"
 DEBUG_CONSOLE_LOGGING_ENABLED = "true"
 DEBUG_VERBOSE_CONSOLE_LOGGING = "true"
 INTENT_PREFETCH_ENABLED = "true"
@@ -132,13 +133,16 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - CHECKOUT_INTENT_SECRET     (HMAC secret for first-party checkout intent signing)
 # - RESEND_API_KEY             (Resend email API key)
 # - ADMIN_SECRET               (Admin API key for broadcast/rebuild endpoints)
-# - TURNSTILE_SECRET_KEY       (Cloudflare Turnstile secret for admin sign-in challenge)
+# - TURNSTILE_SECRET_KEY       (shared Cloudflare Turnstile secret for admin sign-in and launch reminder challenges)
 #
 # Optional (for separate test/live keys):
 # - STRIPE_SECRET_KEY_LIVE / STRIPE_SECRET_KEY_TEST
 # - STRIPE_WEBHOOK_SECRET_LIVE / STRIPE_WEBHOOK_SECRET_TEST
 # - STRIPE_WEBHOOK_SECRET      (webhook signing secret)
 # - USPS_CLIENT_SECRET         (USPS OAuth client secret for live shipping quotes)
+# - ADMIN_TURNSTILE_SECRET_KEY (admin-specific Turnstile secret if not using TURNSTILE_SECRET_KEY)
+# - LAUNCH_REMINDER_TURNSTILE_SECRET_KEY (reminder-specific Turnstile secret if not using TURNSTILE_SECRET_KEY)
+# - LAUNCH_REMINDER_TOKEN_SECRET (optional unsubscribe-token secret; falls back to MAGIC_LINK_SECRET)
 #
 # Optional (for GitHub rebuild trigger):
 # - GITHUB_TOKEN               (GitHub PAT with workflow scope)
@@ -147,6 +151,10 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - GITHUB_WORKFLOW            (defaults to 'deploy.yml')
 # - ADMIN_TURNSTILE_REQUIRED   (set true to fail closed when Turnstile is expected)
 # - ADMIN_TURNSTILE_BYPASS     (local/test-only bypass for automated admin auth tests)
+# - LAUNCH_REMINDER_TURNSTILE_REQUIRED (set true to fail closed when reminder Turnstile is expected)
+# - LAUNCH_REMINDER_TURNSTILE_BYPASS   (local/test-only bypass for reminder signup automation)
+# - LAUNCH_REMINDER_DISPATCH_BATCH_SIZE (optional reminder send batch size)
+# - LAUNCH_REMINDER_DISPATCH_JOB_LIMIT  (optional reminder dispatch jobs per scheduled tick)
 
 # Development overrides
 # Keep local Worker defaults aligned with `_config.local.yml` so local
@@ -168,6 +176,7 @@ PLATFORM_NAME = "The Pool"
 PLATFORM_COMPANY_NAME = "Dust Wave"
 PLATFORM_AUTHOR = "Dust Wave"
 PLATFORM_DEFAULT_CREATOR_NAME = "Dust Wave"
+PLATFORM_TIMEZONE = "America/Denver"
 SUPPORT_EMAIL = "info@dustwave.xyz"
 PLEDGES_EMAIL_FROM = "The Pool <pledges@pool.dustwave.xyz>"
 UPDATES_EMAIL_FROM = "The Pool <updates@pool.dustwave.xyz>"
@@ -210,11 +219,12 @@ USPS_RATE_LIMIT_COOLDOWN_SECONDS = "1800"
 CAMPAIGN_RUNNER_REPORTS_ENABLED = "true"
 CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED = "true"
 CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED = "true"
-CAMPAIGN_RUNNER_REPORT_HOUR_MT = "7"
-CAMPAIGN_RUNNER_REPORT_MINUTE_MT = "0"
+CAMPAIGN_RUNNER_REPORT_HOUR = "7"
+CAMPAIGN_RUNNER_REPORT_MINUTE = "0"
 CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY = "true"
 CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT = "true"
 CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX = "[The Pool]"
+LAUNCH_REMINDERS_ENABLED = "true"
 DEBUG_CONSOLE_LOGGING_ENABLED = "true"
 DEBUG_VERBOSE_CONSOLE_LOGGING = "true"
 INTENT_PREFETCH_ENABLED = "true"

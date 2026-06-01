@@ -32,6 +32,7 @@ const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
 const SAFE_INSTAGRAM_HOSTS = new Set(['instagram.com', 'www.instagram.com']);
 const DEFAULT_I18N_LANG = 'en';
 const EMAIL_I18N_CACHE = new Map();
+export const RESEND_RATE_LIMIT_DELAY_MS = 600;
 let console = globalThis.console;
 
 function configureEmailLogging(env) {
@@ -569,6 +570,84 @@ export async function sendAdminUserCreatedEmail(env, { email, name = '', role = 
     return { sent: true };
   } catch (error) {
     return { sent: false, reason: error?.message || 'Failed to send admin user email' };
+  }
+}
+
+export async function sendLaunchReminderEmail(env, { email, campaignSlug, campaignTitle, campaignUrl, unsubscribeUrl, preferredLang } = {}) {
+  configureEmailLogging(env);
+  if (!env?.RESEND_API_KEY) {
+    return { sent: false, reason: 'RESEND_API_KEY not configured' };
+  }
+
+  const translator = await getEmailTranslator(env, preferredLang);
+  const { t, lang } = translator;
+  const theme = getEmailTheme(env);
+  const platformName = safeEmailHeaderText(getPlatformName(env) || 'The Pool') || 'The Pool';
+  const safeCampaignTitle = safeEmailHeaderText(campaignTitle || campaignSlug || t('launch_reminder.fallback_campaign', 'this campaign'));
+  const from = safeEmailHeaderText(getUpdatesEmailFrom(env) || getPledgesEmailFrom(env));
+  const campaignHref = safeExternalUrl(campaignUrl, env.SITE_BASE) || safeSiteUrl(getLocalizedPath(`/campaigns/${encodeURIComponent(campaignSlug || '')}/`, lang), env.SITE_BASE);
+  const unsubscribeHref = safeExternalUrl(unsubscribeUrl, env.WORKER_BASE || env.SITE_BASE);
+  const subject = safeEmailHeaderText(buildEmailSubject(
+    t('subjects.launch_reminder', 'Now live', { campaign: safeCampaignTitle }),
+    safeCampaignTitle,
+    ''
+  ));
+  const heading = t('launch_reminder.heading', '%{campaign} is live', { campaign: safeCampaignTitle });
+  const intro = t(
+    'launch_reminder.intro',
+    'You asked for a reminder when %{campaign} launched. The campaign is open now.',
+    { campaign: safeCampaignTitle }
+  );
+  const cta = t('launch_reminder.cta', 'View campaign');
+  const footer = t(
+    'launch_reminder.footer',
+    'You are receiving this because you signed up for a launch reminder for %{campaign}.',
+    { campaign: safeCampaignTitle }
+  );
+  const unsubscribeLabel = t('launch_reminder.unsubscribe', 'Unsubscribe from this reminder');
+
+  const unsubscribeBlock = unsubscribeHref ? `
+    <p style="margin: 12px 0 0 0; font-size: 12px; color: ${theme.mutedTextColor};">
+      <a href="${escapeHtml(unsubscribeHref)}" style="color: ${theme.primaryColor}; text-decoration: underline;">${escapeHtml(unsubscribeLabel)}</a>
+    </p>
+  ` : '';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(heading))}
+  <div style="${getEmailCardStyle(theme)}">
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(intro)}</p>
+    <p style="margin: 0;">
+      <a href="${escapeHtml(campaignHref)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(cta)}</a>
+    </p>
+  </div>
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(footer)}</p>
+    ${unsubscribeBlock}
+  </div>
+</body>
+</html>
+  `.trim();
+
+  try {
+    await sendResendEmail(env, {
+      from,
+      to: email,
+      subject,
+      html
+    }, {
+      errorLabel: 'Resend error (launch reminder)',
+      failureLabel: 'Failed to send launch reminder email'
+    });
+    return { sent: true };
+  } catch (error) {
+    return { sent: false, reason: error?.message || 'Failed to send launch reminder email' };
   }
 }
 

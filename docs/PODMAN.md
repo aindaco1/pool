@@ -129,6 +129,7 @@ Rebuild when you change:
 - `Containerfile.dev`
 - `worker/Containerfile.dev`
 - system package requirements
+- media optimizer requirements such as `optipng`, `gifsicle`, `libjpeg-turbo-progs`, `webp`, or `ffmpeg`
 - dependency bootstrap assumptions
 - Node/Wrangler runtime assumptions such as the Worker `compatibility_date`
 
@@ -137,6 +138,15 @@ Use:
 ```bash
 PODMAN_REBUILD=1 ./scripts/dev.sh --podman
 ```
+
+The site image also supports the local media optimization wrappers:
+
+```bash
+npm run media:optimize:podman
+npm run media:optimize:check:podman
+```
+
+Use `PODMAN_REBUILD=1 npm run media:optimize:podman` after package changes so the optimizer container has the current native PNG/GIF/JPEG/WebP/video tools.
 
 ## Browser Testing
 

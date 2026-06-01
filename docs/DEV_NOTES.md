@@ -6,7 +6,7 @@
 - **First-party cart runtime** — Browser-owned cart, checkout review, and on-site Stripe payment flow
 - **Cloudflare Worker** — Backend API, pledge storage (KV), email sending
 - **Stripe** — Checkout Sessions in setup mode for the on-site payment step, plus PaymentIntents for later charging
-- **Resend** — Transactional emails (supporter confirmation, milestones, failures)
+- **Resend** — Transactional emails (supporter confirmation, launch reminders, milestones, failures)
 - **Private admin dashboard** — Role-scoped campaign editing, settings, add-ons, reports, analytics, supporters, and marketing tools
 
 ### Fork-Friendly Free-Plan Knobs
@@ -18,6 +18,7 @@ If you are trying to keep a fork comfortable on the Cloudflare Workers free plan
 - `performance.intent_prefetch_enabled`
 - `performance.intent_prefetch_delay_ms`
 - `performance.intent_prefetch_limit`
+- `launch_reminders.enabled`
 - `pricing.sales_tax_rate`
 - `shipping.fallback_flat_rate`
 
@@ -37,6 +38,7 @@ The config now uses a structured settings model in [`_config.yml`](../_config.ym
 - `debug`
 - `add_ons`
 - `checkout`
+- `launch_reminders`
 - `cache`
 
 Treat [`_config.local.yml`](../_config.local.yml) as a thin override file for localhost URLs and other machine-local differences, not as a second place to duplicate the canonical fork settings.
@@ -47,12 +49,12 @@ See [CUSTOMIZATION.md](../docs/CUSTOMIZATION.md) for the supported no-code fork 
 
 Current mirrored Worker values worth treating as part of the supported customization surface:
 
-- identity, URL, and SEO vars: `SITE_TITLE`, `SITE_DESCRIPTION`, `PLATFORM_NAME`, `PLATFORM_COMPANY_NAME`, `PLATFORM_AUTHOR`, `PLATFORM_DEFAULT_CREATOR_NAME`, `SITE_BASE`, `WORKER_BASE`, `CANONICAL_SITE_BASE`, `CANONICAL_WORKER_BASE`, `CORS_ALLOWED_ORIGIN`, `SEO_*`
+- identity, URL, timezone, and SEO vars: `SITE_TITLE`, `SITE_DESCRIPTION`, `PLATFORM_NAME`, `PLATFORM_COMPANY_NAME`, `PLATFORM_AUTHOR`, `PLATFORM_DEFAULT_CREATOR_NAME`, `PLATFORM_TIMEZONE`, `SITE_BASE`, `WORKER_BASE`, `CANONICAL_SITE_BASE`, `CANONICAL_WORKER_BASE`, `CORS_ALLOWED_ORIGIN`, `SEO_*`
 - admin vars: production `ADMIN_USERS_JSON`, dev-only `ADMIN_TEST_CAMPAIGNS`, and local-only `ADMIN_BOOTSTRAP_EMAILS` in `worker/.dev.vars`
 - checkout and pricing vars: `STRIPE_PUBLISHABLE_KEY`, `SALES_TAX_RATE`, `FLAT_SHIPPING_RATE`, `DEFAULT_PLATFORM_TIP_PERCENT`, `MAX_PLATFORM_TIP_PERCENT`
 - tax and shipping vars: `TAX_PROVIDER`, `TAX_ORIGIN_COUNTRY`, `TAX_USE_REGIONAL_ORIGIN`, `NM_GRT_API_BASE`, `ZIP_TAX_API_BASE`, `SHIPPING_ORIGIN_ZIP`, `SHIPPING_ORIGIN_COUNTRY`, `SHIPPING_FALLBACK_FLAT_RATE`, `FREE_SHIPPING_DEFAULT`, `SHIPPING_DEFAULT_OPTION`, `USPS_*`
 - email and design vars: `SUPPORT_EMAIL`, `PLEDGES_EMAIL_FROM`, `UPDATES_EMAIL_FROM`, `EMAIL_*`, `PLATFORM_FOOTER_LOGO_PATH`, `PLATFORM_FAVICON_PATH`, `PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH`
-- campaign-runner, cache, performance, and debug vars: `CAMPAIGN_RUNNER_*`, `LIVE_STATS_CACHE_TTL_SECONDS`, `LIVE_INVENTORY_CACHE_TTL_SECONDS`, `INTENT_PREFETCH_ENABLED`, `INTENT_PREFETCH_DELAY_MS`, `INTENT_PREFETCH_LIMIT`, `DEBUG_CONSOLE_LOGGING_ENABLED`, `DEBUG_VERBOSE_CONSOLE_LOGGING`
+- campaign-runner, launch reminder, cache, performance, and debug vars: `CAMPAIGN_RUNNER_*`, `LAUNCH_REMINDERS_ENABLED`, `LIVE_STATS_CACHE_TTL_SECONDS`, `LIVE_INVENTORY_CACHE_TTL_SECONDS`, `INTENT_PREFETCH_ENABLED`, `INTENT_PREFETCH_DELAY_MS`, `INTENT_PREFETCH_LIMIT`, `DEBUG_CONSOLE_LOGGING_ENABLED`, `DEBUG_VERBOSE_CONSOLE_LOGGING`
 
 The repo now includes `npm run sync:worker-config`, which syncs those mirrored values from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`. The main local dev, test, Worker-only, and pre-merge paths call it automatically. The merge gate’s first-party artifact check also falls back to the Podman-backed build path when host Bundler/Jekyll is unavailable.
 
@@ -60,7 +62,7 @@ When adding a new Worker-visible config setting, update `scripts/sync-worker-con
 
 Local Worker development now targets Node 24 to match GitHub Actions. The Podman Worker image defaults to Node 24, while host helper scripts prefer Node 24 and fall back to Node 22 rather than forcing the old Node 20 path that Wrangler 4 no longer supports. The shared Worker `compatibility_date` should move deliberately with Wrangler/runtime updates so local Miniflare behavior and deployed Workers behavior stay aligned.
 
-USPS OAuth secrets are intentionally separate from that mirrored config surface. Keep `USPS_CLIENT_SECRET` in Worker secrets or `worker/.dev.vars`, not in `_config.yml`.
+USPS OAuth, Turnstile, and token-signing secrets are intentionally separate from that mirrored config surface. Keep `USPS_CLIENT_SECRET`, `TURNSTILE_SECRET_KEY`, `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY`, and `LAUNCH_REMINDER_TOKEN_SECRET` in Worker secrets or `worker/.dev.vars`, not in `_config.yml`.
 
 SEO fundamentals now follow a similarly bounded model:
 
@@ -107,7 +109,7 @@ Note: first-party cart/runtime and the custom on-site checkout UI are now treate
 
 The default visual language still starts from Dust Wave's calmer editorial look, but the current repo is no longer locked to one hard-coded brand theme:
 
-- **Theme tokens**: `design.*` in `_config.yml` feeds generated CSS variables in `assets/theme-vars.css`
+- **Theme tokens**: `design.*` in `_config.yml` feeds generated CSS variables into `assets/main.css`; `assets/theme-vars.css` remains as a compatibility artifact
 - **Checkout styling**: the on-site Stripe Elements sidecar now reads that same token surface for colors, radius, and body font
 - **Supporter-email branding**: a curated subset of `platform.*` + `design.*` is mirrored into Worker env so logo/font/color/button styling stays aligned in email
 - **Spacing**: the Sass system still uses an 8px-based layout rhythm internally
@@ -117,7 +119,7 @@ The default visual language still starts from Dust Wave's calmer editorial look,
 
 ```
 assets/
-├── main.scss              # Entry point with font imports
+├── main.scss              # Entry point with generated theme vars and Sass partial imports
 ├── partials/              # 14 active modular partials
 │   ├── _variables.scss    # Colors, spacing, typography tokens
 │   ├── _mixins.scss       # Breakpoints, button patterns
@@ -141,7 +143,7 @@ assets/
     └── cart-provider.js   # First-party cart/runtime provider
 ```
 
-Jekyll compiles `main.scss` → `main.css` automatically.
+Jekyll compiles `main.scss` → `main.css` automatically. External font stylesheets are linked from the document head instead of imported from Sass so they are discovered without chaining through `main.css`.
 
 ## Jekyll Include Gotcha
 
@@ -194,7 +196,7 @@ The private dashboard at `/admin/` is now the supported browser-based editor and
 - Secrets stay in Worker secrets or ignored `.dev.vars`; the dashboard only shows configured/missing status.
 - Reports, analytics, supporter browsing, content previews, table filtering, and CSV downloads are read-only dashboard flows and should not add KV writes.
 - Image/video/audio uploads use the existing asset directories, normalize filenames, and then publish through the same GitHub-backed path as the field they update.
-- Media optimization is deliberately outside the Worker. Use `npm run media:optimize` locally, `npm run media:optimize:check` before merge when uploaded media changed, or let the `Optimize dashboard media` GitHub Actions workflow run after dashboard uploads reach `main`. The workflow can be manually dispatched with `scope=all` to reprocess existing media.
+- Media optimization is deliberately outside the Worker. Use `npm run media:optimize` locally, `npm run media:optimize:podman` when host-native optimizers are missing, `npm run media:optimize:check` or `npm run media:optimize:check:podman` before merge when uploaded media changed, or let the `Optimize dashboard media` GitHub Actions workflow run after dashboard uploads reach `main`. The workflow can be manually dispatched with `scope=all` to reprocess existing media.
 
 See [DASHBOARD.md](DASHBOARD.md) for the full dashboard reference.
 
@@ -226,9 +228,9 @@ Each campaign lives in `_campaigns/<slug>.md`.
 layout: campaign
 title: "CAMPAIGN NAME"
 slug: campaign-slug
-start_date: 2025-01-15   # Campaign goes live at midnight MT on this date
+start_date: 2025-01-15   # Campaign goes live at midnight in the platform timezone
 goal_amount: 25000
-goal_deadline: 2025-12-20  # Campaign ends at 11:59 PM MT on this date
+goal_deadline: 2025-12-20  # Campaign ends at 11:59:59 PM in the platform timezone
 charged: false
 # pledged_amount not needed - live-stats.js fetches from KV and enables late support dynamically
 hero_image: /assets/images/hero.jpg
@@ -243,17 +245,17 @@ long_content:
 - Between dates → `live` (pledges accepted)
 - After `goal_deadline` → `post` (campaign closed)
 
-The `_plugins/campaign_state.rb` plugin sets state at build time. The Worker cron triggers a site rebuild when dates cross midnight MT.
+The `_plugins/campaign_state.rb` plugin sets state at build time. The Worker scheduler triggers a site rebuild when dates cross midnight in the configured platform timezone.
 
-**Mountain Time enforcement**: The Jekyll plugin evaluates dates in the `America/Denver` timezone before comparing dates, so campaigns transition at midnight Mountain Time on UTC-based CI servers and still respect daylight saving time. The Worker and GitHub Actions rebuild schedules should account for both MST and MDT launch/deadline boundaries.
+**Platform timezone enforcement**: The Jekyll plugin, browser countdowns, and Worker deadline logic all use `platform.timezone`, mirrored to the Worker as `PLATFORM_TIMEZONE`. It must be a supported IANA timezone and defaults to `America/Denver` for compatibility.
 
 ### Countdown Timer Timezone
 
-The campaign page countdown timer uses **Mountain Time (MT)** with automatic DST detection:
-- **Upcoming campaigns**: Count down to midnight MT (00:00:00) on the `start_date`
-- **Live campaigns**: Count down to 11:59:59 PM MT on the `goal_deadline`
+The campaign page countdown timer uses the configured platform timezone with automatic DST handling:
+- **Upcoming campaigns**: Count down to midnight (00:00:00) on the `start_date`
+- **Live campaigns**: Count down to 11:59:59 PM on the `goal_deadline`
 
-The timer uses `Intl.DateTimeFormat` with `timeZone: 'America/Denver'` and `timeZoneName: 'short'` to detect whether each date falls in MST (UTC-7) or MDT (UTC-6), then applies the correct offset. This approach works from any user timezone and automatically follows US DST rules without hardcoding transition dates.
+The timer uses `Intl.DateTimeFormat` with `platform.timezone` to convert date-only campaign boundaries into absolute instants. This works from any user timezone and follows the selected timezone's daylight saving rules without hardcoding transition dates.
 
 The Worker (`worker/src/index.js` and `worker/src/campaigns.js`) uses the same `Intl`-based approach for deadline enforcement and settlement timing.
 
@@ -418,7 +420,7 @@ Diary entries support rich content blocks (same as `long_content`):
 
 ```yaml
 diary:
-  - date: 2026-01-15T09:00:00-07:00  # ISO 8601 with timezone (MT)
+  - date: 2026-01-15T09:00:00-07:00  # ISO 8601 with timezone offset
     title: "Day 14 — Principal Photography"
     phase: production  # fundraising | pre-production | production | post-production | distribution
     content:
@@ -436,8 +438,8 @@ diary:
 ```
 
 **Date format:** Use ISO 8601 with timezone offset for proper sorting:
-- MST (winter): `2026-01-15T09:00:00-07:00`
-- MDT (summer): `2025-10-15T14:00:00-06:00`
+- Winter example: `2026-01-15T09:00:00-07:00`
+- Summer example: `2025-10-15T14:00:00-06:00`
 
 Entries without a time component (`2026-01-15`) display date only. Entries with time display "Jan 15, 2026 · 9:00 AM".
 
@@ -872,6 +874,8 @@ worker/src/
 ├── checkout-intent-do.js # Durable Object nonce coordinator
 ├── tier-inventory-do.js  # Durable Object coordinator for scarce tier claims
 ├── email.js              # Resend email templates
+├── launch-reminders.js   # Campaign-scoped reminder signup, unsubscribe, dispatch jobs
+├── turnstile.js          # Shared Cloudflare Turnstile verification helper
 ├── github.js             # Trigger GitHub Pages rebuilds
 ├── provider-config.js    # Runtime/provider flags
 ├── stats.js              # KV-based stats + inventory cache, milestones
@@ -890,28 +894,32 @@ worker/src/
 | `GET /pledge?token=...` | Get pledge details for manage page |
 | `POST /pledge/cancel` | Cancel an active pledge |
 | `POST /pledge/modify` | Change tier/amount |
+| `POST /launch-reminders` | Save an opt-in reminder for an upcoming campaign |
+| `GET /launch-reminders/unsubscribe?t=...` | Suppress a campaign-scoped launch reminder |
 | `GET /stats/:slug` | Live pledge totals for a campaign |
 | `POST /admin/settle/:slug` | Manually charge all funded pledges |
 
 ### Cron Trigger (Auto-Settle)
 
-The Worker has scheduled triggers at **6:00 AM UTC** and **7:00 AM UTC** so lifecycle checks run at midnight Mountain Time in both MDT and MST:
+The Worker uses one minute-level scheduled trigger. Individual tasks check the configured platform timezone and idempotency markers before doing durable work:
 
 ```toml
 # wrangler.toml
 [triggers]
-crons = ["0 6 * * *", "0 7 * * *"]
+crons = ["* * * * *"]
 ```
 
 **What it does:**
-1. Lists all campaigns with a `goal_deadline` and `goal_amount`
-2. For each campaign where the deadline has passed (in MT) and the goal is met:
+1. Drains queued launch reminder dispatch jobs in bounded batches
+2. Lists all campaigns with a `goal_deadline` and `goal_amount`
+3. Queues a one-time launch reminder dispatch when an upcoming campaign becomes live
+4. For each campaign where the deadline has passed in the platform timezone and the goal is met:
    - Checks if there are any uncharged active pledges
    - If so, runs the same settle logic as `/admin/settle/:slug`
-3. Aggregates pledges by email within each campaign so each supporter gets ONE charge per campaign
-4. Sends charge-success / payment-failed emails as appropriate
+5. Aggregates pledges by email within each campaign so each supporter gets ONE charge per campaign
+6. Sends charge-success / payment-failed emails as appropriate
 
-**Timezone note:** The duplicate UTC schedules are intentional. One aligns with midnight MDT, the other aligns with midnight MST. The settlement/state logic still checks campaign dates before doing any durable work, so the off-season run is harmless.
+**Timezone note:** The scheduler runs every minute, but lifecycle work is gated to a small midnight window in the platform timezone and claimed once per local date. Launch reminder dispatch jobs can drain on any scheduled tick after the live transition is claimed, and supporter-email retries still run every 15 minutes inside the same scheduled handler.
 
 ### Token Module
 
@@ -1015,7 +1023,7 @@ Use `requires_threshold` on the tier; the template hides it until `pledged_amoun
 Stripe SetupIntents (saved payment methods) don't expire like 7-day card holds, which is why we use them.
 
 **How are campaigns charged when funded?**  
-The Worker automatically settles campaigns via a daily cron trigger (runs at midnight MT). When a campaign's deadline passes and it has met its goal, the Worker:
+The Worker automatically settles campaigns via the scheduled handler once per local day after midnight in the platform timezone. When a campaign's deadline passes and it has met its goal, the Worker:
 1. Aggregates all active pledges **by email within a campaign** (one charge per supporter per campaign, not per pledge row)
 2. Uses the most recently updated payment method for each supporter
 3. Creates one Stripe PaymentIntent per supporter for their campaign total amount
@@ -1025,7 +1033,7 @@ The Worker automatically settles campaigns via a daily cron trigger (runs at mid
 Cancelled pledges are never charged. You can also manually trigger settlement via `POST /admin/settle/:slug`.
 
 **What timezone are deadlines in?**  
-All deadlines use **Mountain Time (MST/MDT)**. A campaign with `goal_deadline: 2025-12-20` ends at 11:59:59 PM MST on that date. Cron triggers run at both 6:00 AM UTC and 7:00 AM UTC so daily checks cover midnight MDT and midnight MST. The countdown timer on campaign pages automatically detects DST and uses -06:00 (MDT) during summer months and -07:00 (MST) the rest of the year.
+All deadlines use the configured platform timezone. A campaign with `goal_deadline: 2025-12-20` ends at 11:59:59 PM on that date in `platform.timezone`. The default is `America/Denver`, so existing forks keep the previous behavior until a super admin changes the timezone.
 
 ---
 
@@ -1348,7 +1356,7 @@ done
 
 The settlement flow uses **self-chaining batched invocations** to stay within Cloudflare Worker's 50 subrequest limit:
 
-1. **Cron** (`scheduled()`) runs daily at midnight MT, dispatches to `/admin/settle-dispatch/:slug`
+1. **Scheduler** (`scheduled()`) claims one daily run after midnight in the platform timezone, then dispatches settlement work
 2. **Dispatch** reads campaign pledge index, processes 6 pledges per batch via `/admin/settle-batch`
 3. **Each batch** is a separate Worker invocation with its own subrequest budget
 4. **Self-chains** until all pledges are processed, then sets `campaign-charged:{slug}` marker

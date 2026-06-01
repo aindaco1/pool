@@ -10,7 +10,7 @@ const execFileAsync = promisify(execFile);
 const IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png', '.webp']);
 const RESPONSIVE_IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png']);
 const VIDEO_EXTENSIONS = new Set(['.mov', '.mp4', '.m4v']);
-const RESPONSIVE_WEBP_WIDTHS = [480, 960, 1600];
+const RESPONSIVE_WEBP_WIDTHS = [320, 480, 960, 1600];
 const RESPONSIVE_WEBP_QUALITY = '86';
 const MEDIA_ROOTS = ['assets/images', 'assets/videos'];
 const REFERENCE_ROOTS = ['_campaigns', '_data'];
@@ -214,15 +214,23 @@ async function optimizeImage(repoPath, args, tools) {
   if (!before) return { repoPath, changed: false, skipped: 'missing' };
 
   if (extension === '.png' && tools.oxipng) {
-    if (args.write) await execFileAsync('oxipng', ['-o', 'max', '--strip', 'safe', filePath]);
+    const candidatePath = `${filePath}.optimized.png`;
+    await fs.copyFile(filePath, candidatePath);
+    await execFileAsync('oxipng', ['-o', 'max', '--strip', 'safe', candidatePath]);
+    return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
   } else if (extension === '.png' && tools.optipng) {
-    if (args.write) await execFileAsync('optipng', ['-o7', '-quiet', filePath]);
+    const candidatePath = `${filePath}.optimized.png`;
+    await fs.copyFile(filePath, candidatePath);
+    await execFileAsync('optipng', ['-o7', '-quiet', candidatePath]);
+    return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
   } else if ((extension === '.jpg' || extension === '.jpeg') && tools.jpegtran) {
     const candidatePath = `${filePath}.optimized`;
     await execFileAsync('jpegtran', ['-copy', 'none', '-optimize', '-progressive', '-outfile', candidatePath, filePath]);
     return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
   } else if (extension === '.gif' && tools.gifsicle) {
-    if (args.write) await execFileAsync('gifsicle', ['-O3', '-b', filePath]);
+    const candidatePath = `${filePath}.optimized.gif`;
+    await execFileAsync('gifsicle', ['-O3', filePath, '-o', candidatePath]);
+    return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
   } else if (extension === '.webp' && tools.cwebp) {
     const candidatePath = `${filePath}.optimized`;
     await execFileAsync('cwebp', ['-quiet', '-lossless', '-z', '9', filePath, '-o', candidatePath]);

@@ -34,8 +34,8 @@ const DEFAULT_USPS_RATE_LIMIT_COOLDOWN_SECONDS = 1800;
 const DEFAULT_CAMPAIGN_RUNNER_REPORTS_ENABLED = true;
 const DEFAULT_CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED = true;
 const DEFAULT_CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED = true;
-const DEFAULT_CAMPAIGN_RUNNER_REPORT_HOUR_MT = 7;
-const DEFAULT_CAMPAIGN_RUNNER_REPORT_MINUTE_MT = 0;
+const DEFAULT_CAMPAIGN_RUNNER_REPORT_HOUR = 7;
+const DEFAULT_CAMPAIGN_RUNNER_REPORT_MINUTE = 0;
 const DEFAULT_CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY = true;
 const DEFAULT_CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT = true;
 const DEFAULT_PLATFORM_TIP_PERCENT = 5;
@@ -70,8 +70,8 @@ export {
   DEFAULT_CAMPAIGN_RUNNER_REPORTS_ENABLED,
   DEFAULT_CAMPAIGN_RUNNER_DAILY_PLEDGE_REPORT_ENABLED,
   DEFAULT_CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED,
-  DEFAULT_CAMPAIGN_RUNNER_REPORT_HOUR_MT,
-  DEFAULT_CAMPAIGN_RUNNER_REPORT_MINUTE_MT,
+  DEFAULT_CAMPAIGN_RUNNER_REPORT_HOUR,
+  DEFAULT_CAMPAIGN_RUNNER_REPORT_MINUTE,
   DEFAULT_CAMPAIGN_RUNNER_INCLUDE_STATS_SUMMARY,
   DEFAULT_CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT,
   DEFAULT_SHIPPING_FALLBACK_FLAT_RATE,
@@ -199,18 +199,26 @@ export function getCampaignRunnerFulfillmentReportEnabled(env = {}) {
   return normalized === null ? DEFAULT_CAMPAIGN_RUNNER_FULFILLMENT_REPORT_ENABLED : normalized;
 }
 
-export function getCampaignRunnerReportHourMt(env = {}) {
-  const parsed = Number(env.CAMPAIGN_RUNNER_REPORT_HOUR_MT);
+export function getCampaignRunnerReportHour(env = {}) {
+  const parsed = Number(env.CAMPAIGN_RUNNER_REPORT_HOUR ?? env.CAMPAIGN_RUNNER_REPORT_HOUR_MT);
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 23
     ? parsed
-    : DEFAULT_CAMPAIGN_RUNNER_REPORT_HOUR_MT;
+    : DEFAULT_CAMPAIGN_RUNNER_REPORT_HOUR;
+}
+
+export function getCampaignRunnerReportMinute(env = {}) {
+  const parsed = Number(env.CAMPAIGN_RUNNER_REPORT_MINUTE ?? env.CAMPAIGN_RUNNER_REPORT_MINUTE_MT);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 59
+    ? parsed
+    : DEFAULT_CAMPAIGN_RUNNER_REPORT_MINUTE;
+}
+
+export function getCampaignRunnerReportHourMt(env = {}) {
+  return getCampaignRunnerReportHour(env);
 }
 
 export function getCampaignRunnerReportMinuteMt(env = {}) {
-  const parsed = Number(env.CAMPAIGN_RUNNER_REPORT_MINUTE_MT);
-  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 59
-    ? parsed
-    : DEFAULT_CAMPAIGN_RUNNER_REPORT_MINUTE_MT;
+  return getCampaignRunnerReportMinute(env);
 }
 
 export function getCampaignRunnerIncludeStatsSummary(env = {}) {

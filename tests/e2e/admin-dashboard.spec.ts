@@ -149,6 +149,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
               rows: [
                 { label: 'Name', value: 'The Pool', rawValue: 'The Pool', editable: true, path: 'platform.name', type: 'string', input: 'text' },
                 { label: 'Site author', value: 'Dust Wave', rawValue: 'Dust Wave', editable: true, path: 'author', type: 'string', input: 'text' },
+                { label: 'Default timezone', value: 'America/Denver', rawValue: 'America/Denver', editable: true, path: 'platform.timezone', type: 'string', input: 'select', options: [{ value: 'America/Denver', label: 'America/Denver' }, { value: 'Europe/London', label: 'Europe/London' }] },
                 { label: 'App mode', value: 'test' },
                 { label: 'CORS allowed origin', value: SITE_BASE }
               ].map(withFieldHelp)
@@ -272,18 +273,18 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
                   help: 'Whether scheduled campaign-runner reports are enabled for the platform.'
                 },
                 {
-                  label: 'Send Time (Mountain Time)',
+                  label: 'Send Time',
                   value: '7',
                   rawValue: '7',
                   editable: true,
-                  path: 'reports.campaign_runner.send_hour_mt',
+                  path: 'reports.campaign_runner.send_hour',
                   type: 'number',
                   input: 'time',
-                  help: 'The Mountain Time clock time when scheduled campaign-runner reports should be sent.',
+                  help: 'The platform timezone clock time when scheduled campaign-runner reports should be sent.',
                   visibleWhen: { path: 'reports.campaign_runner.enabled', value: 'true' },
                   timeParts: {
-                    hourPath: 'reports.campaign_runner.send_hour_mt',
-                    minutePath: 'reports.campaign_runner.send_minute_mt',
+                    hourPath: 'reports.campaign_runner.send_hour',
+                    minutePath: 'reports.campaign_runner.send_minute',
                     hour: 7,
                     minute: 0
                   }
@@ -806,14 +807,14 @@ test.describe('Admin Dashboard', () => {
     await selectSettingsSection(page, 'Campaign runner reports');
     await expect(page.locator('#admin-settings-publish')).toBeVisible();
     await expect(page.locator('[data-settings-path="reports.campaign_runner.enabled"]')).toHaveValue('true');
-    await expect(page.locator('[data-settings-row-label="Send Time (Mountain Time)"]')).toBeVisible();
+    await expect(page.locator('[data-settings-row-label="Send Time"]')).toBeVisible();
     await page.locator('[data-settings-path="reports.campaign_runner.enabled"]').selectOption('false');
-    await expect(page.locator('[data-settings-row-label="Send Time (Mountain Time)"]')).toBeHidden();
+    await expect(page.locator('[data-settings-row-label="Send Time"]')).toBeHidden();
     await page.locator('[data-settings-path="reports.campaign_runner.enabled"]').selectOption('true');
-    await expect(page.locator('[data-settings-row-label="Send Time (Mountain Time)"]')).toBeVisible();
+    await expect(page.locator('[data-settings-row-label="Send Time"]')).toBeVisible();
     await expect(page.locator('#admin-settings-results [data-settings-path="add_ons.enabled"]')).toHaveCount(0);
-    await expect(page.locator('[data-settings-path="reports.campaign_runner.send_hour_mt"]')).toHaveAttribute('type', 'time');
-    await expect(page.locator('[data-settings-path="reports.campaign_runner.send_hour_mt"]')).toHaveValue('07:00');
+    await expect(page.locator('[data-settings-path="reports.campaign_runner.send_hour"]')).toHaveAttribute('type', 'time');
+    await expect(page.locator('[data-settings-path="reports.campaign_runner.send_hour"]')).toHaveValue('07:00');
     await selectSettingsSection(page, 'Advanced performance');
     await expect(page.locator('[data-settings-path="performance.intent_prefetch_enabled"]')).toHaveValue('true');
     await expect(page.locator('[data-settings-path="performance.intent_prefetch_delay_ms"]')).toHaveValue('90');
@@ -1452,12 +1453,13 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('[data-settings-path="design.color_text"]')).toHaveAttribute('type', 'color');
     await selectSettingsSection(page, 'Platform');
     await page.locator('[data-settings-path="platform.name"]').fill('The Pool Updated');
+    await page.locator('[data-settings-path="platform.timezone"]').selectOption('Europe/London');
     await selectSettingsSection(page, 'Tax');
     await page.locator('[data-settings-path="tax.provider"]').selectOption('offline_rules');
     await selectSettingsSection(page, 'Pricing');
     await page.locator('[data-settings-path="pricing.sales_tax_rate"]').fill('8.125');
     await selectSettingsSection(page, 'Campaign runner reports');
-    await page.locator('[data-settings-path="reports.campaign_runner.send_hour_mt"]').fill('09:30');
+    await page.locator('[data-settings-path="reports.campaign_runner.send_hour"]').fill('09:30');
     await selectAdminSection(page, 'Add-ons');
     await expect(page.locator('#admin-addons-results [data-settings-path="add_ons.enabled"]')).toHaveValue('true');
     await expect(page.locator('#admin-addons-results [data-settings-row-label="Low stock threshold"]')).toBeVisible();
@@ -1502,10 +1504,11 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-addons-status')).toContainText('Changes published');
     await expect.poll(() => calls.settingsPublish.length).toBe(1);
     expect(calls.settingsPublish[0].changes[0]).toMatchObject({ path: 'platform.name', value: 'The Pool Updated' });
+    expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'platform.timezone', value: 'Europe/London' }));
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'pricing.sales_tax_rate', value: '0.08125' }));
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'tax.provider', value: 'offline_rules' }));
-    expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'reports.campaign_runner.send_hour_mt', value: '9' }));
-    expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'reports.campaign_runner.send_minute_mt', value: '30' }));
+    expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'reports.campaign_runner.send_hour', value: '9' }));
+    expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'reports.campaign_runner.send_minute', value: '30' }));
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'platform.logo_path', value: '/assets/images/defaults/logo-e2e.png' }));
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'debug.verbose_console_logging', value: 'false' }));
     expect(calls.settingsPublish[0].changes).not.toContainEqual(expect.objectContaining({ path: 'slug' }));

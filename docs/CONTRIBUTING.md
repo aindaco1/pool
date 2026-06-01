@@ -92,7 +92,7 @@ For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `do
 - Non-stackable tier support (hide quantity controls in cart)
 - Mobile hamburger/cart overlay handling
 - Cloudflare Worker (pledge storage, stats, inventory, emails)
-- Worker cron trigger for auto-settle (midnight MT)
+- Worker scheduled task for auto-settle at midnight in the configured platform timezone
 - Aggregated charging (one charge per supporter per campaign)
 - Support items and custom amounts data flow (cart → Worker → KV → stats)
 - Countdown timer pre-rendering (no "00 00 00 00" flash)

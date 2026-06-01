@@ -17,7 +17,8 @@ description: Revisa los términos de aporte, el procesamiento de pagos, el cumpl
 - **No se requiere cuenta**: gestiona tu aporte por completo mediante enlaces de correo electrónico.
 - Cuando esta implementación ofrece idiomas adicionales, esos enlaces enviados por correo para el aporte y la comunidad de patrocinadores pueden usar rutas localizadas sin dejar de autorizar el mismo aporte.
 - Un mismo pago puede incluir más de una campaña, pero cada campaña se guarda y se gestiona como un aporte independiente después del pago.
-- Todas las fechas límite de campaña usan horario de montaña (MST/MDT).
+- Los recordatorios de lanzamiento para campañas próximas son opcionales e independientes del aporte. Si te apuntas, The Pool envía un solo recordatorio cuando esa campaña se activa e incluye un enlace para cancelar ese recordatorio.
+- Todas las fechas límite de campaña usan la zona horaria configurada para esta implementación. Esta implementación usa `America/Denver` de forma predeterminada, salvo que las personas administradoras de plataforma la cambien.
 - Los votos de comunidad se limitan a las opciones publicadas en la página de patrocinadores de la campaña, y las decisiones cerradas no aceptan nuevos votos.
 - Si un enlace de gestión apunta a un aporte que ya no existe, The Pool lo trata como no disponible en lugar de reconstruir un acceso de marcador de posición.
 - Las páginas públicas de campaña pueden incluir enlaces para compartir en plataformas externas, SMS y email. Esos enlaces son solo para URLs públicas de campaña y no incluyen tokens de gestión de aportes, checkout, comunidad de patrocinadores, admin ni magic links.
@@ -36,6 +37,7 @@ description: Revisa los términos de aporte, el procesamiento de pagos, el cumpl
 - Si hay una opción de entrega disponible para tu envío y la cambias en el pago o en Gestionar aporte, el total de envío guardado y el total del aporte se recalculan a partir del estado guardado del aporte antes de persistir el cambio.
 - Si modificas un aporte, The Pool recalcula los totales a partir del estado guardado del aporte y de las definiciones de campaña o complemento vigentes en esa implementación, en lugar de confiar en importes enviados por el navegador.
 - Los correos transaccionales y los enlaces de acceso para patrocinadores pueden reflejar la marca configurada para esta implementación y su estructura de rutas localizadas, pero cada enlace de gestión enviado por correo sigue autorizando solo el aporte vinculado a ese pedido específico.
+- Los reportes programados para responsables de campaña, los cambios de estado de campaña y las comprobaciones de liquidación usan la misma zona horaria configurada que las fechas límite de campaña.
 
 ## Control creativo y envíos
 
@@ -65,6 +67,7 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Solo recopilamos la información necesaria para procesar aportes y completar recompensas: correo electrónico, nombre, detalles del aporte o pedido y, para recompensas físicas, complementos físicos de campaña o complementos físicos de la plataforma, una dirección de envío.
 - Los datos completos de tarjeta son gestionados y almacenados por Stripe. The Pool no almacena números completos de tarjeta ni valores CVC.
 - Las direcciones de correo electrónico y cualquier dato de envío necesario para el cumplimiento pueden almacenarse en nuestro sistema para la gestión del aporte, confirmaciones específicas de campaña, actualizaciones de campaña y cumplimiento de recompensas.
+- Si te apuntas a un recordatorio de lanzamiento para una campaña próxima, tu correo se guarda en registros de recordatorio limitados a esa campaña para que The Pool pueda enviar ese único recordatorio, evitar duplicados y respetar cancelaciones de ese recordatorio. Los formularios de recordatorio pueden usar Cloudflare Turnstile para reducir abuso.
 - Las personas organizadoras de campañas pueden recibir informes por campaña o exportaciones de cumplimiento con los datos de apoyo y pedido necesarios para operar esa campaña concreta, coordinar la entrega o enviar actualizaciones relacionadas con la producción. Esos informes se limitan a la campaña que apoyaste y no exponen aportes de campañas no relacionadas.
 - Las personas operadoras autorizadas también pueden ver filas de patrocinadores, reportes, analytics, datos de fulfillment y contenido de campaña desde el panel privado de administración de The Pool. El acceso del panel está limitado por rol: las personas usuarias de campaña solo ven las campañas asignadas, mientras que las administradoras de plataforma pueden ver datos operativos de toda la plataforma necesarios para operar The Pool.
 - Cuando un aporte incluye complementos cumplidos por la plataforma, las operadoras de la plataforma pueden recibir por separado exportaciones de cumplimiento limitadas únicamente a los artículos que deben entregar.
@@ -74,7 +77,7 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - El acceso a la comunidad de patrocinadores en el navegador puede recordarse durante la sesión actual como una comodidad, pero el enlace mágico enviado por correo sigue siendo la fuente de verdad para el acceso.
 - Las páginas públicas pueden prefetch páginas públicas elegibles del mismo origen después de hover, foco o toque para que la navegación normal sea más rápida. Este comportamiento excluye enlaces de admin, checkout, Gestionar aporte, comunidad de patrocinadores, enlaces con tokens, externos y con parámetros sensibles.
 - Los enlaces para compartir campañas pueden preservar parámetros públicos seguros de referencia o UTM para que responsables de campaña entiendan el origen de la promoción pública. No preservan parámetros de token, pedido, email, sesión u otros datos sensibles.
-- No vendemos tu información. Solo la compartimos cuando es necesario para el procesamiento del pago, la entrega de correos transaccionales, el cálculo de cotizaciones de envío y el cumplimiento de recompensas.
+- No vendemos tu información. Solo la compartimos cuando es necesario para el procesamiento del pago, la entrega de correos transaccionales, la prevención de abuso, el cálculo de cotizaciones de envío y el cumplimiento de recompensas.
 
 ## Plataforma y tecnología
 
@@ -85,9 +88,9 @@ The Pool es una [plataforma de crowdfunding de código abierto](https://github.c
 - **[Stripe](https://stripe.com)**: campos de pago seguros, métodos de pago guardados y procesamiento de pagos
 - **[Cloudflare Workers](https://workers.cloudflare.com)**: API backend para validación canónica de aportes, almacenamiento de aportes, estadísticas en vivo y liquidación automatizada de campañas
 - **Panel privado de administración**: edición de campañas por rol, reportes, analytics, vistas de patrocinadores, enlaces de marketing, gestión de usuarios y operaciones de plataforma
-- **[Resend](https://resend.com)**: correos transaccionales (confirmaciones, actualizaciones y notificaciones de cobro)
+- **[Resend](https://resend.com)**: correos transaccionales (confirmaciones, recordatorios de lanzamiento, actualizaciones y notificaciones de cobro)
 
-Los datos de los aportes se almacenan en Cloudflare KV. Esta arquitectura implica menores costes operativos y hace que una mayor parte de tu aporte vaya directamente al proyecto, con las propinas opcionales ayudando a cubrir el mantenimiento de The Pool. Las compilaciones de producción también minifican los assets CSS/JS generados después de crear el sitio estático, mientras Cloudflare gestiona la compresión de transferencia en el edge.
+Los datos de los aportes se almacenan en Cloudflare KV. Esta arquitectura implica menores costes operativos y hace que una mayor parte de tu aporte vaya directamente al proyecto, con las propinas opcionales ayudando a cubrir el mantenimiento de The Pool. Las compilaciones de producción también minifican los assets CSS/JS generados después de crear el sitio estático, mientras Cloudflare gestiona la compresión de transferencia en el edge. La automatización del ciclo de vida de campañas usa la zona horaria configurada para mantener alineadas fechas límite, cuentas regresivas, reportes y comprobaciones de liquidación.
 
 ## Preguntas
 
@@ -95,4 +98,4 @@ Si tienes preguntas sobre estos términos o sobre tu aporte, escribe a info@dust
 
 ---
 
-_Última actualización: 31 de mayo de 2026_
+_Última actualización: 1 de junio de 2026_

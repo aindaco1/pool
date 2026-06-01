@@ -1,6 +1,6 @@
 # The Pool - Pledge Worker
 
-Cloudflare Worker handling first-party checkout canonicalization, Stripe integration, pledge management, order-scoped supporter authentication, and the private browser admin dashboard APIs.
+Cloudflare Worker handling first-party checkout canonicalization, Stripe integration, pledge management, order-scoped supporter authentication, upcoming-campaign launch reminders, and the private browser admin dashboard APIs.
 
 For day-to-day local development, prefer the repo-root Podman path:
 
@@ -60,7 +60,9 @@ The Worker now also writes lightweight observability summaries into `PLEDGES` KV
 - Stripe webhook delivery outcomes and recent delivery history
 - sampled wall-clock timings for a small set of mutation routes used to tune the `cpu_ms` cap
 
-Campaign-runner reports now use dedicated scheduled runs at 7:00 AM Mountain Time. The Worker keeps that window MT-aware in code, while `wrangler.toml` includes the paired UTC cron entries needed to cover both MST and MDT safely.
+Campaign-runner reports use the configured platform timezone. `PLATFORM_TIMEZONE` defaults to `America/Denver`, and the minute-level Worker scheduler checks the configured local send time before sending so forks can use any supported IANA timezone.
+
+Upcoming-campaign launch reminders also run through the minute-level scheduler. Public campaign pages collect explicit opt-in email reminders only while a campaign is upcoming; the Worker stores campaign-scoped hashed signup keys, queues one dispatch job when that campaign becomes live, and sends through the existing Resend email module with the updates sender. The reminder path does not add a second Resend API integration.
 
 The sampling rate defaults to `0.1` and can be overridden with `OBSERVABILITY_SAMPLE_RATE=0.05` (or any `0-1` value) if a fork wants fewer or more sampled timing writes.
 
@@ -135,6 +137,13 @@ wrangler secret put ADMIN_SESSION_SECRET
 # the PLEDGES KV key admin-users:v1 and do not publish to GitHub.
 # Local dev reads ADMIN_BOOTSTRAP_EMAILS from worker/.dev.vars as a
 # recovery/bootstrap super-admin path.
+
+# Cloudflare Turnstile challenge verification when public widgets are enabled
+wrangler secret put TURNSTILE_SECRET_KEY
+
+# Optional: scoped launch-reminder Turnstile / unsubscribe-token secrets
+wrangler secret put LAUNCH_REMINDER_TURNSTILE_SECRET_KEY
+wrangler secret put LAUNCH_REMINDER_TOKEN_SECRET
 
 # USPS OAuth secret (keep the client id in site config)
 wrangler secret put USPS_CLIENT_SECRET
@@ -315,6 +324,28 @@ The current browser flow uses this for provisional cart / custom-checkout tax di
 
 If the payload does not include enough destination detail for the configured provider, the Worker can return a provisional/no-tax-result response and let the browser keep displaying `--` until checkout has a better billing or shipping destination.
 
+### POST /launch-reminders
+Save a public launch reminder signup for an upcoming campaign.
+
+```json
+{
+  "campaignSlug": "their-love",
+  "email": "supporter@example.com",
+  "preferredLang": "en",
+  "consent": true,
+  "turnstileToken": "optional-widget-token"
+}
+```
+
+The endpoint is enabled by `LAUNCH_REMINDERS_ENABLED`, accepts only upcoming campaigns, requires explicit consent, rate limits by IP, and verifies Cloudflare Turnstile when a reminder or shared Turnstile secret is configured. Signup records are campaign scoped and deduped by a normalized email hash, so refreshing or submitting again updates one active reminder instead of creating a list of duplicates.
+
+### GET /launch-reminders/unsubscribe?t={token}
+Suppress a campaign-scoped launch reminder.
+
+The token is signed by `LAUNCH_REMINDER_TOKEN_SECRET` or the `MAGIC_LINK_SECRET` fallback, and it only authorizes the campaign/email hash encoded in the token. The unsubscribe path marks the signup unsubscribed, writes a suppression marker, and returns a noindex/no-store HTML response.
+
+Launch reminder dispatch is scheduler-driven: when a campaign becomes live, the daily lifecycle pass queues one dispatch job; minute-level scheduled runs drain that job in bounded batches. Each recipient gets a per-campaign sent marker before the job advances, and email delivery uses the existing `sendLaunchReminderEmail` helper in `worker/src/email.js`, the shared Resend payload builder, and `UPDATES_EMAIL_FROM`.
+
 ### GET /admin/observability/webhooks?days=2
 Admin-only webhook observability summary.
 
@@ -427,7 +458,7 @@ Preview or manually send a campaign-runner report for one campaign. Requires `x-
 Notes:
 
 - `dryRun: true` returns recipients, row counts, filename, and marker status without sending
-- omitting `markAsSent` defaults it to `true` for live sends so the matching cron run does not immediately duplicate the report
+- omitting `markAsSent` defaults it to `true` for live sends so the matching scheduled run does not immediately duplicate the report
 - campaign recipients still come from campaign front matter `runner_report_emails`
 - `reportType: "pledge"` is the daily live-campaign ledger report
 - `reportType: "fulfillment"` is the one-time post-deadline shipment/export report
@@ -537,15 +568,24 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `ADMIN_BOOTSTRAP_EMAILS` | Optional bootstrap/recovery super-admin emails; set this in `worker/.dev.vars` for local dev |
 | `ADMIN_USERS_JSON` | Seed/recovery admin users mirrored from `_config.yml`; runtime dashboard edits save to KV at `admin-users:v1` |
 | `ADMIN_TEST_CAMPAIGNS` | Optional comma-separated campaign slugs exposed to the local admin dashboard test setup |
-| `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile secret key for admin email sign-in challenge verification |
+| `TURNSTILE_SECRET_KEY` | Shared Cloudflare Turnstile secret key for admin email sign-in and launch reminder challenge verification |
+| `ADMIN_TURNSTILE_SECRET_KEY` | Optional admin-specific Turnstile secret when not using `TURNSTILE_SECRET_KEY` |
 | `ADMIN_TURNSTILE_REQUIRED` | Optional fail-closed flag for deployments that expect Turnstile to be configured |
 | `ADMIN_TURNSTILE_BYPASS` | Local/test-only bypass for automated admin auth tests; do not enable on deployed Workers |
+| `LAUNCH_REMINDERS_ENABLED` | Enables public upcoming-campaign launch reminder signup handling; mirrored from `_config.yml` |
+| `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY` | Optional reminder-specific Turnstile secret when not using `TURNSTILE_SECRET_KEY` |
+| `LAUNCH_REMINDER_TURNSTILE_REQUIRED` | Optional fail-closed flag for reminder signups when a reminder Turnstile widget is expected |
+| `LAUNCH_REMINDER_TURNSTILE_BYPASS` | Local/test-only bypass for reminder signup automation; do not enable on deployed Workers |
+| `LAUNCH_REMINDER_TOKEN_SECRET` | Optional unsubscribe-token signing secret; falls back to `MAGIC_LINK_SECRET` |
+| `LAUNCH_REMINDER_DISPATCH_BATCH_SIZE` | Optional per-job reminder dispatch batch size override |
+| `LAUNCH_REMINDER_DISPATCH_JOB_LIMIT` | Optional number of reminder dispatch jobs to process per scheduled tick |
 | `INTENT_PREFETCH_ENABLED` | Public document intent-prefetch enabled flag mirrored from site config |
 | `INTENT_PREFETCH_DELAY_MS` | Hover/focus delay before public document prefetch starts |
 | `INTENT_PREFETCH_LIMIT` | Maximum public document prefetches per page view |
-| `RESEND_RATE_LIMIT_DELAY` | Delay between emails in ms (default: 600ms to stay under Resend's 2 req/sec limit) |
 
 When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email images still fall back to the public `https://pool.dustwave.xyz` asset base so inbox clients do not receive broken localhost image URLs.
+
+Resend pacing is centralized as `RESEND_RATE_LIMIT_DELAY_MS` in `worker/src/email.js` and reused by supporter broadcasts, reports, and launch reminder dispatch. Keep new email workflows on the shared `sendResendEmail` / payload-builder path so sender identity, localization, branding, and rate-limit behavior do not drift.
 
 Fork note: treat those identity, email-branding, pricing, and shipping vars as mirrors of the structured site config in [`_config.yml`](../_config.yml), especially the `platform`, `design`, `pricing`, and `shipping` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior now, not Worker env toggles you should normally customize directly.
 

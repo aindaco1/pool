@@ -2,9 +2,9 @@
 
 ## Current Milestone
 
-**v1.0.2**
+**v1.0.3**
 
-The v1.0 feature set and release-hardening pass are complete. v1.0.2 adds public-page performance work, responsive media variants, generated asset minification, safe intent prefetching, campaign share links with state-aware CTAs, and admin performance controls. Remaining unstarted work lives under **Future Features** unless a critical launch regression is found.
+The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds configurable platform timezone handling plus opt-in launch reminders for upcoming campaigns, while preserving the default `America/Denver` lifecycle model for existing forks.
 
 ## Completed
 
@@ -16,9 +16,9 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.2 adds public
   - translation helper, `en.yml`, and example templates
 - [x] Cloudflare Worker backend and lifecycle automation
   - pledge storage, stats, inventory, and emails
-  - auto-settle cron
+  - auto-settle scheduler
   - aggregated supporter charging
-  - DST-aware Mountain Time deadline handling across frontend + Worker
+  - DST-aware configurable platform timezone deadline handling across frontend + Worker
   - automatic campaign state transitions
 - [x] Podman-backed local development and testing
   - `./scripts/dev.sh --podman`
@@ -179,7 +179,7 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.2 adds public
 - [x] Variable-first customization for forks
   - canonical `platform`, `pricing`, `design`, `checkout`, and `cache` settings
   - auto-synced Worker mirroring from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`
-  - curated CSS theme-variable bridge via `assets/theme-vars.css`
+  - curated CSS theme-variable bridge emitted into `assets/main.css`
   - configurable core brand assets and documented no-code customization surface
   - branded Stripe Elements and supporter emails now follow the shared design/config surface instead of a separate checkout/email theme path
 - [x] i18n completion with a Spanish language translation available
@@ -230,8 +230,8 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.2 adds public
   - local smoke fixtures and merge-gate coverage now work under location-aware tax providers instead of assuming flat tax
 - [x] Reports for campaign runners
   - campaign front matter now supports `runner_report_emails`, with empty/missing meaning no runner reports for that campaign
-  - `_config.yml` now exposes a bounded `reports.campaign_runner` customization surface for enablement, MT send time, summaries, attachments, and subject prefix
-  - the Worker sends daily campaign-scoped pledge-ledger emails at 7am MT for live campaigns and split post-deadline fulfillment emails for campaign vs. platform fulfillers
+  - `_config.yml` now exposes a bounded `reports.campaign_runner` customization surface for enablement, platform-timezone send time, summaries, attachments, and subject prefix
+  - the Worker sends daily campaign-scoped pledge-ledger emails at the configured local send time for live campaigns and split post-deadline fulfillment emails for campaign vs. platform fulfillers
   - the dashboard Reports tab previews pledge/fulfillment rows and downloads CSVs without sending emails or writing sent markers
   - shared-secret report endpoints remain separate for script/operator workflows that intentionally send reports
   - local CLI exports and scheduled Worker emails now share the same JS report core to avoid CSV drift
@@ -273,14 +273,14 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.2 adds public
   - Keep previews out of `robots.txt`, `sitemap.xml`, public campaign indexes, and social metadata intended for live pages
   - Reuse the existing magic-link/session validation patterns instead of introducing a separate password system
   - Make preview publishing clear in the admin dashboard so users understand it does not make the campaign publicly live
-- [ ] Allow potential pledgers to sign up for email launch reminders for upcoming campaigns
+- [x] Allow potential pledgers to sign up for email launch reminders for upcoming campaigns
   - Add an opt-in form on upcoming campaign pages with explicit consent and locale-aware copy
     - Use Cloudflare Turnstile as a CAPTCHA/challenge
-  - Store reminder signups in a campaign-scoped, deduplicated KV record keyed by normalized email
-  - Send launch reminders when the campaign transitions to live, with idempotent send markers to avoid duplicates
-  - Provide unsubscribe or suppression handling before sending any reminder email
-  - Keep signup reads/writes bounded so popular upcoming campaigns can stay within free-tier KV expectations
-- [ ] Allow super admins to set a default timezone for the platform rather than hardcoding Mountain Time
+  - Store reminder signups in campaign-scoped, deduplicated KV keys derived from normalized email hashes
+  - Send launch reminders when the campaign transitions to live, with idempotent per-recipient send markers to avoid duplicates
+  - Provide signed unsubscribe links and suppression handling before sending any reminder email
+  - Keep signup reads/writes bounded with prefix listing, dispatch jobs, and small per-cron batches so popular upcoming campaigns can stay within free-tier KV expectations
+- [x] Allow super admins to set a default timezone for the platform rather than hardcoding Mountain Time
   - Introduce a platform-level timezone setting with IANA timezone validation, defaulting to `America/Denver` for compatibility
   - Audit campaign state transitions, countdowns, settlement scheduling, reports, emails, and dashboard date/time fields for timezone assumptions
   - Update Jekyll plugins, Worker deadline logic, cron guidance, and documentation together so frontend and Worker behavior stay aligned

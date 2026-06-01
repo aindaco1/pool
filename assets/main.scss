@@ -1,11 +1,7 @@
 ---
 ---
 
-// Import Google Fonts (Inter)
-@import url("https://fonts.googleapis.com/css?family=Inter:400,700&display=swap");
-
-// Import Adobe Typekit (Gambado Sans)
-@import url("https://use.typekit.net/hoj2yet.css");
+{% include theme-vars.css %}
 
 // Import partials - foundation
 @import "partials/variables";

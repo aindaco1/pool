@@ -102,6 +102,7 @@
     data-platform-author="{{ site.author | default: site.platform.company_name | escape }}"
     data-platform-support-email="{{ site.platform.support_email | default: '' | escape }}"
     data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"
+    data-platform-timezone="{{ site.platform.timezone | default: 'America/Denver' | escape }}"
     data-sales-tax-rate="{{ site.pricing.sales_tax_rate | default: 0.07875 }}"
     data-flat-shipping-rate="{{ site.pricing.flat_shipping_rate | default: 3.00 }}"
     data-shipping-origin-zip="{{ site.shipping.origin_zip | default: '' }}"
