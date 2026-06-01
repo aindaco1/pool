@@ -3,12 +3,7 @@
 {% assign image_width = block.width | plus: 0 %}
 {% assign image_height = block.height | plus: 0 %}
 <figure class="content-block content-block--image content-block--align-{{ alignment | escape }}">
-  <img 
-    src="{{ block.src | escape }}"
-    alt="{{ block.alt | default: '' | escape }}"
-    loading="lazy"
-    {% if image_width > 0 %}width="{{ image_width }}"{% endif %}
-    {% if image_height > 0 %}height="{{ image_height }}"{% endif %}>
+  {% include responsive-image.html src=block.src alt=block.alt loading="lazy" decoding="async" width=image_width height=image_height sizes="(min-width: 900px) 760px, 100vw" %}
   {% if block.caption %}
     <figcaption class="content-block__caption">{{ block.caption | safe_rich_text }}</figcaption>
   {% endif %}

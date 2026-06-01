@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.0.2**. The v1.0 feature set and launch hardening pass are complete; v1.0.2 adds public-page performance work, generated asset minification, safe intent prefetching, campaign share links with state-aware CTAs, and admin performance controls.
+Current release milestone: **v1.0.2**. The v1.0 feature set and launch hardening pass are complete; v1.0.2 adds public-page performance work, responsive media variants, generated asset minification, safe intent prefetching, campaign share links with state-aware CTAs, and admin performance controls.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, a Worker cron dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -42,7 +42,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Tip-aware emails + reports** — Supporter emails, pledge reports, and fulfillment exports all include the platform tip when present
 - **Actual Stripe fee analytics foundation** — Newly charged pledges store Stripe balance transaction fee/net values when available, and dashboard analytics prefer those actual values while clearly labeling estimated fallback rows
 - **Admin content-editor media uploads** — Campaign and diary content editors can stage image, video, and audio uploads with immediate previews, then publish them into the campaign asset directory with the content change
-- **Dashboard media optimization pipeline** — Dashboard-uploaded media stays source-preserving in the Worker, then repository tooling can losslessly compress images and generate high-quality WebM derivatives for uploaded videos
+- **Dashboard media optimization pipeline** — Dashboard-uploaded media stays source-preserving in the Worker, then repository tooling can losslessly compress images, generate responsive WebP browser variants, and generate high-quality WebM derivatives for uploaded videos
 - **Generated asset minification** — Production Pages builds minify generated `_site` CSS/JS after Jekyll output while leaving source files readable and Cloudflare responsible for transfer compression
 - **Campaign-runner reports** — Configurable campaign-scoped daily pledge-ledger emails and post-deadline fulfillment exports can go to each campaign’s configured runner recipients, while the dashboard previews/downloads pledge and fulfillment CSVs without sending email or writing sent markers
 - **Projection drift diagnostics** — Read-only admin checks and a local CLI can compare stored stats, inventory, and campaign indexes against saved pledge truth before any repair path mutates data
@@ -451,7 +451,7 @@ Required GitHub repository secrets for automatic Worker deployment:
 
 The workflow also needs GitHub Pages deployment permissions. Keep `pages: write` and `id-token: write` explicit on the Pages deploy job if you copy or refactor `.github/workflows/deploy.yml`.
 
-Dashboard-uploaded media is source-preserving when it enters the repository. The separate **Optimize dashboard media** workflow runs on `main` for `assets/images/**`, `assets/videos/**`, `_campaigns/**`, and `_config.yml` changes; it compresses images when smaller output is available, generates WebM derivatives for uploaded videos, rewrites literal video references after derivatives exist, and commits those optimization changes back with the GitHub Actions bot.
+Dashboard-uploaded media is source-preserving when it enters the repository. The separate **Optimize dashboard media** workflow runs on `main` for `assets/images/**`, `assets/videos/**`, `_campaigns/**`, and `_config.yml` changes; it compresses images when smaller output is available, generates responsive WebP variants for public image templates, generates WebM derivatives for uploaded videos, rewrites literal video references after derivatives exist, and commits those optimization changes back with the GitHub Actions bot. Use the manual `scope=all` workflow option when existing campaign media needs a full reprocess.
 
 If the diary check logs an HTTP `403` Cloudflare challenge page, the request is being stopped before it reaches the Worker. Add a Cloudflare WAF custom rule that skips managed challenges for:
 

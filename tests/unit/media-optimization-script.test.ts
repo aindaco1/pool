@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeRepoPath,
   publicAssetPathForRepoPath,
+  responsiveWebpDerivativePathForImage,
+  responsiveWebpDerivativePathsForImage,
   rewriteMediaReferences,
   webmDerivativePathForVideo
 } from '../../scripts/optimize-media.mjs';
@@ -21,6 +23,21 @@ describe('media optimization script helpers', () => {
     expect(webmDerivativePathForVideo('assets/videos/campaigns/their-love/proof.mov'))
       .toBe('assets/videos/campaigns/their-love/proof.webm');
     expect(webmDerivativePathForVideo('assets/videos/campaigns/their-love/proof.webm'))
+      .toBe('');
+  });
+
+  it('derives responsive WebP image variant paths without recursively optimizing generated variants', () => {
+    expect(responsiveWebpDerivativePathForImage('assets/images/campaigns/their-love/movie-poster.png', 960))
+      .toBe('assets/images/campaigns/their-love/movie-poster-960.webp');
+    expect(responsiveWebpDerivativePathsForImage('assets/images/campaigns/their-love/hero-wide.jpg'))
+      .toEqual([
+        'assets/images/campaigns/their-love/hero-wide-480.webp',
+        'assets/images/campaigns/their-love/hero-wide-960.webp',
+        'assets/images/campaigns/their-love/hero-wide-1600.webp'
+      ]);
+    expect(responsiveWebpDerivativePathForImage('assets/images/campaigns/their-love/hero-wide-960.webp', 480))
+      .toBe('');
+    expect(responsiveWebpDerivativePathForImage('assets/videos/campaigns/their-love/proof.mp4', 480))
       .toBe('');
   });
 

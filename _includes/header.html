@@ -1,10 +1,11 @@
 {%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
 {%- assign platform_title = site.platform.name | default: site.title -%}
+{%- assign header_logo_path = site.platform.logo_path | default: '/assets/images/defaults/dust-wave-square.png' -%}
 {%- capture home_url -%}{% include localized-url.html lang=current_lang translation_key="home" %}{%- endcapture -%}
 <header class="site-header" role="banner">
   <div class="site-header__container">
     <a href="{{ home_url | strip }}" class="site-header__branding" aria-label="{% include t.html key='nav.home_aria' lang=current_lang title=platform_title %}">
-      <img src="{{ site.platform.logo_path | default: '/assets/images/defaults/dust-wave-square.png' }}" alt="" class="site-header__logo" aria-hidden="true">
+      <img src="{{ header_logo_path }}" alt="" class="site-header__logo" aria-hidden="true"{% if header_logo_path == '/assets/images/defaults/dust-wave-square.png' %} width="1078" height="985"{% endif %}>
       <span class="site-header__title">{{ platform_title }}</span>
     </a>
     <div class="site-header__actions">

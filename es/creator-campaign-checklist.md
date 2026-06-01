@@ -37,7 +37,7 @@ La lista cubre:
 Esta lista refleja los cambios de la plataforma hasta **v1.0.2**:
 
 - las personas creadoras pueden tener acceso específico al panel para editar campañas sin acceso directo al repositorio
-- las cargas de media en el panel soportan imágenes, video, audio, previews y optimización posterior en el repositorio
+- las cargas de media en el panel soportan imágenes, video, audio, previews y optimización posterior en el repositorio con variantes WebP responsivas
 - los add-ons de campaña pueden pertenecer a una sola campaña y contar hacia su meta
 - los correos de reportes pueden recibir ledgers diarios de pledges y exports de fulfillment después de la fecha límite
 - los embeds alojados dan un widget vivo para sitios web y páginas de partners que aceptan HTML
@@ -190,7 +190,9 @@ El video debe construir confianza, tono y urgencia. No necesita equipo caro, per
 - **Duración ideal:** `2:00 a 3:30`
 - **Máximo recomendado:** `5:00`
 - **Formato preferido para self-hosting:** `.webm`
-- **Optimización:** las cargas del panel preservan la fuente y el pipeline del repositorio puede generar imágenes comprimidas y derivados WebM antes de lanzar
+- **Optimización:** las cargas del panel preservan la fuente y el pipeline del repositorio puede generar imágenes comprimidas, variantes WebP responsivas y derivados WebM antes de lanzar
+
+El pipeline de media de v1.0.2 puede crear variantes WebP de `480w`, `960w` y `1600w` para páginas públicas cuando la imagen fuente es más grande. Aun así, conviene exportar las imágenes cerca de las dimensiones y recortes recomendados antes de subirlas.
 
 El video debería responder:
 

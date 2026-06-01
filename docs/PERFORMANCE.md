@@ -238,9 +238,12 @@ npm run media:optimize
 npm run media:optimize:check
 ```
 
+For deployed media-heavy regressions, run the **Optimize dashboard media** GitHub Actions workflow with `scope=all` so existing campaign assets are optimized by the same pipeline rather than edited one-off.
+
 The media pipeline:
 
 - compresses images when the optimized result is smaller
+- generates responsive WebP variants at `480w`, `960w`, and `1600w` for public image templates when the source image is larger than that variant
 - generates WebM derivatives for uploaded videos
 - rewrites literal `_campaigns` / `_config.yml` references from uploaded source videos to generated WebM derivatives
 - keeps original source videos available for rollback or future re-encoding
@@ -249,6 +252,7 @@ For campaign pages, prefer:
 
 - explicit image dimensions or stable CSS aspect ratios
 - optimized hero images that match the rendered crop
+- source images near the documented target dimensions; responsive variants reduce transfer size but are not a substitute for choosing the right crop
 - WebM for hero/background video where practical
 - lazy loading for below-fold media
 - meaningful alt text for informative images

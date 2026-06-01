@@ -19,7 +19,7 @@ npm run podman:doctor      # Cross-platform Podman readiness check
 npm run test:security      # Security pen tests (Worker must be running)
 npm run test:security:podman  # Security pen tests with a one-shot Podman-backed stack
 npm run test:security:staging  # Security tests against a staging worker, if you maintain one
-npm run media:optimize:check   # Check dashboard-uploaded media for pending optimization/derivatives
+npm run media:optimize:check   # Check dashboard-uploaded media for pending optimization/responsive variants/derivatives
 ./scripts/test-checkout.sh --podman  # Manual checkout helper against the Podman stack
 ./scripts/test-e2e.sh --podman       # Automated browser helper against the Podman stack
 npm run test:usps          # Live USPS credential + quote sanity check

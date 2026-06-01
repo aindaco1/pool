@@ -12,7 +12,13 @@ describe('SEO templates', () => {
   it('routes public layouts through the shared seo include', () => {
     const defaultLayout = readRepoFile('_layouts', 'default.html');
     const campaignLayout = readRepoFile('_layouts', 'campaign.html');
+    const header = readRepoFile('_includes', 'header.html');
+    const footer = readRepoFile('_includes', 'site-footer.html');
     const cartRuntimeFoot = readRepoFile('_includes', 'cart-runtime-foot.html');
+    const responsiveImage = readRepoFile('_includes', 'responsive-image.html');
+    const tierCard = readRepoFile('_includes', 'tier-card.html');
+    const contentImageBlock = readRepoFile('_includes', 'blocks', 'image.html');
+    const galleryBlock = readRepoFile('_includes', 'blocks', 'gallery.html');
     const pagePrefetch = readRepoFile('_includes', 'page-prefetch.html');
     const campaignShareLinks = readRepoFile('_includes', 'campaign-share-links.html');
     const sharePlatformIcon = readRepoFile('_includes', 'share-platform-icon.html');
@@ -28,9 +34,19 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('translation_key=page.translation_key');
     expect(defaultLayout).toContain('{% if page.live_stats %}');
     expect(defaultLayout).toContain('<script src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>');
+    expect(campaignLayout).toContain('campaign_hero_has_remote_video');
+    expect(campaignLayout).toContain('{% unless campaign_hero_has_remote_video %}');
     expect(campaignLayout).toContain('campaign_hero_preload_image');
     expect(campaignLayout).toContain('<link rel="preload" as="image" href="{{ campaign_hero_preload_image }}">');
     expect(campaignLayout).toContain('fetchpriority="high" decoding="async"');
+    expect(header).toContain('width="1078" height="985"');
+    expect(footer).toContain('width="1078" height="985"');
+    expect(responsiveImage).toContain('<source type="image/webp" srcset="{{ responsive_srcset | escape }}"');
+    expect(campaignLayout).toContain('responsive-image.html src=page.hero_image_wide');
+    expect(tierCard).toContain('loading="lazy" decoding="async"');
+    expect(tierCard).toContain('responsive-image.html src=include.tier.image');
+    expect(contentImageBlock).toContain('responsive-image.html src=block.src');
+    expect(galleryBlock).toContain('responsive-image.html src=img.src');
     expect(campaignLayout).toContain('<script src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>');
     expect(campaignLayout).toContain('<script src="/assets/js/campaign.js?v={{ asset_version }}" defer></script>');
     expect(campaignLayout).toContain('campaign-share-links.html class="campaign-share--mobile"');
@@ -69,6 +85,8 @@ describe('SEO templates', () => {
     expect(cartRuntimeFoot).not.toContain('/assets/js/cart.js?v={{ asset_version }}');
     expect(cartRuntimeFoot).not.toContain('/assets/js/add-on-utils.js');
     expect(cartRuntimeFoot).not.toContain('/assets/js/stripe-checkout-sidecar.js');
+    expect(cartRuntimeFoot).not.toContain('<link rel="preconnect" href="https://js.stripe.com"');
+    expect(cartRuntimeFoot).not.toContain('<link rel="preconnect" href="https://api.stripe.com"');
     expect(homePage).toContain('live_stats: true');
     expect(spanishHomePage).toContain('live_stats: true');
   });

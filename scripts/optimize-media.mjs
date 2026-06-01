@@ -8,7 +8,10 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 const IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png', '.webp']);
+const RESPONSIVE_IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png']);
 const VIDEO_EXTENSIONS = new Set(['.mov', '.mp4', '.m4v']);
+const RESPONSIVE_WEBP_WIDTHS = [480, 960, 1600];
+const RESPONSIVE_WEBP_QUALITY = '86';
 const MEDIA_ROOTS = ['assets/images', 'assets/videos'];
 const REFERENCE_ROOTS = ['_campaigns', '_data'];
 const REFERENCE_FILES = ['_config.yml'];
@@ -28,6 +31,31 @@ export function webmDerivativePathForVideo(repoPath) {
   return VIDEO_EXTENSIONS.has(extension)
     ? normalized.slice(0, -extension.length) + '.webm'
     : '';
+}
+
+function isResponsiveWebpDerivative(repoPath) {
+  return /-\d+\.webp$/i.test(normalizeRepoPath(repoPath));
+}
+
+export function responsiveWebpDerivativePathForImage(repoPath, width) {
+  const normalized = normalizeRepoPath(repoPath);
+  const extension = path.posix.extname(normalized).toLowerCase();
+  const numericWidth = Number(width);
+  if (
+    !RESPONSIVE_IMAGE_EXTENSIONS.has(extension) ||
+    !Number.isInteger(numericWidth) ||
+    numericWidth <= 0 ||
+    isResponsiveWebpDerivative(normalized)
+  ) {
+    return '';
+  }
+  return `${normalized.slice(0, -extension.length)}-${numericWidth}.webp`;
+}
+
+export function responsiveWebpDerivativePathsForImage(repoPath, widths = RESPONSIVE_WEBP_WIDTHS) {
+  return widths
+    .map((width) => responsiveWebpDerivativePathForImage(repoPath, width))
+    .filter(Boolean);
 }
 
 export function rewriteMediaReferences(source, replacements = new Map()) {
@@ -58,12 +86,20 @@ function parseArgs(argv = []) {
 }
 
 async function commandExists(command) {
+  const probes = [['--version'], ['-version'], ['-h']];
   try {
-    await execFileAsync(command, ['--version']);
-    return true;
+    for (const args of probes) {
+      try {
+        await execFileAsync(command, args);
+        return true;
+      } catch (error) {
+        if (error?.code === 'ENOENT') throw error;
+      }
+    }
   } catch {
-    return false;
+    // Fall through to the final false value.
   }
+  return false;
 }
 
 async function fileExists(filePath) {
@@ -150,6 +186,27 @@ async function replaceIfSmaller(sourcePath, candidatePath, write) {
   return { changed: true, bytesSaved: sourceSize - candidateSize };
 }
 
+async function imageDimensions(repoPath, tools) {
+  if (!tools.ffprobe) return null;
+  try {
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v', 'error',
+      '-select_streams', 'v:0',
+      '-show_entries', 'stream=width,height',
+      '-of', 'csv=s=x:p=0',
+      path.resolve(repoPath)
+    ]);
+    const match = stdout.trim().match(/^(\d+)x(\d+)/);
+    if (!match) return null;
+    return {
+      width: Number(match[1]),
+      height: Number(match[2])
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function optimizeImage(repoPath, args, tools) {
   const extension = path.posix.extname(repoPath).toLowerCase();
   const filePath = path.resolve(repoPath);
@@ -176,6 +233,105 @@ async function optimizeImage(repoPath, args, tools) {
 
   const after = await fileSize(filePath);
   return { repoPath, changed: after < before, bytesSaved: Math.max(0, before - after) };
+}
+
+async function replaceDerivativeIfSmaller(sourcePath, derivativePath, candidatePath, write) {
+  const sourceSize = await fileSize(sourcePath);
+  const candidateSize = await fileSize(candidatePath);
+  const derivativeExists = await fileExists(derivativePath);
+  if (!candidateSize || candidateSize >= sourceSize) {
+    await fs.rm(candidatePath, { force: true });
+    if (write && derivativeExists) {
+      await fs.rm(derivativePath, { force: true });
+    }
+    return { changed: derivativeExists, bytesSaved: 0, skipped: 'candidate not smaller than source' };
+  }
+  if (write) {
+    await fs.mkdir(path.dirname(derivativePath), { recursive: true });
+    await fs.rename(candidatePath, derivativePath);
+  } else {
+    await fs.rm(candidatePath, { force: true });
+  }
+  return { changed: true, bytesSaved: sourceSize - candidateSize };
+}
+
+async function generateResponsiveWebpDerivative(repoPath, width, dimensions, args, tools) {
+  const extension = path.posix.extname(repoPath).toLowerCase();
+  const derivativeRepoPath = responsiveWebpDerivativePathForImage(repoPath, width);
+  if (!derivativeRepoPath) return { repoPath, changed: false, skipped: 'not a responsive image source' };
+  if (dimensions.width <= width) {
+    return { repoPath, changed: false, derivativeRepoPath, width, skipped: 'source not wider than variant' };
+  }
+
+  const sourcePath = path.resolve(repoPath);
+  const derivativePath = path.resolve(derivativeRepoPath);
+  const sourceStat = await fs.stat(sourcePath).catch(() => null);
+  const derivativeStat = await fs.stat(derivativePath).catch(() => null);
+  if (derivativeStat && sourceStat && derivativeStat.mtimeMs >= sourceStat.mtimeMs) {
+    return { repoPath, changed: false, derivativeRepoPath, width, skipped: 'up to date' };
+  }
+
+  if (!args.write && !args.check) {
+    return { repoPath, changed: Boolean(!derivativeStat), derivativeRepoPath, width };
+  }
+
+  const targetHeight = Math.max(1, Math.round((dimensions.height * width) / dimensions.width));
+  const candidatePath = `${derivativePath}.candidate`;
+  if (extension === '.gif') {
+    await execFileAsync('ffmpeg', [
+      '-y',
+      '-i', sourcePath,
+      '-vf', `scale=${width}:${targetHeight}:flags=lanczos`,
+      '-loop', '0',
+      '-c:v', 'libwebp',
+      '-quality', RESPONSIVE_WEBP_QUALITY,
+      '-preset', 'picture',
+      '-an',
+      '-fps_mode', 'passthrough',
+      '-f', 'webp',
+      candidatePath
+    ], { maxBuffer: 1024 * 1024 * 20 });
+  } else {
+    await execFileAsync('cwebp', [
+      '-quiet',
+      '-q', RESPONSIVE_WEBP_QUALITY,
+      '-metadata', 'none',
+      '-resize', String(width), String(targetHeight),
+      sourcePath,
+      '-o', candidatePath
+    ], { maxBuffer: 1024 * 1024 * 20 });
+  }
+  return {
+    repoPath,
+    derivativeRepoPath,
+    width,
+    ...await replaceDerivativeIfSmaller(sourcePath, derivativePath, candidatePath, args.write)
+  };
+}
+
+async function generateResponsiveWebpDerivatives(repoPath, args, tools) {
+  const derivativeRepoPaths = responsiveWebpDerivativePathsForImage(repoPath);
+  if (!derivativeRepoPaths.length) return [];
+  const extension = path.posix.extname(repoPath).toLowerCase();
+  if (!tools.ffprobe) {
+    return [{ repoPath, changed: false, skipped: 'missing ffprobe for responsive image variants' }];
+  }
+  if (extension === '.gif' && !tools.ffmpeg) {
+    return [{ repoPath, changed: false, skipped: 'missing ffmpeg for animated responsive image variants' }];
+  }
+  if (extension !== '.gif' && !tools.cwebp) {
+    return [{ repoPath, changed: false, skipped: 'missing cwebp for responsive image variants' }];
+  }
+  const dimensions = await imageDimensions(repoPath, tools);
+  if (!dimensions?.width || !dimensions?.height) {
+    return [{ repoPath, changed: false, skipped: 'unable to read image dimensions' }];
+  }
+  const results = [];
+  for (const derivativeRepoPath of derivativeRepoPaths) {
+    const width = Number(derivativeRepoPath.match(/-(\d+)\.webp$/i)?.[1] || 0);
+    results.push(await generateResponsiveWebpDerivative(repoPath, width, dimensions, args, tools));
+  }
+  return results;
 }
 
 async function generateWebmDerivative(repoPath, args, tools) {
@@ -244,6 +400,7 @@ async function main() {
     jpegtran: await commandExists('jpegtran'),
     gifsicle: await commandExists('gifsicle'),
     cwebp: await commandExists('cwebp'),
+    ffprobe: await commandExists('ffprobe'),
     ffmpeg: await commandExists('ffmpeg')
   };
   const replacements = new Map();
@@ -252,6 +409,7 @@ async function main() {
   for (const repoPath of mediaFiles) {
     if (isImageFile(repoPath)) {
       results.push(await optimizeImage(repoPath, { ...args, write }, tools));
+      results.push(...await generateResponsiveWebpDerivatives(repoPath, { ...args, write }, tools));
     } else if (isVideoSourceFile(repoPath)) {
       const result = await generateWebmDerivative(repoPath, { ...args, write }, tools);
       results.push(result);

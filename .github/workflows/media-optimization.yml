@@ -2,6 +2,15 @@ name: Optimize dashboard media
 
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Media scope to optimize'
+        required: true
+        default: changed
+        type: choice
+        options:
+          - changed
+          - all
   push:
     branches:
       - main
@@ -33,8 +42,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg optipng libjpeg-turbo-progs gifsicle webp
 
-      - name: Optimize changed media
-        run: node ./scripts/optimize-media.mjs --write --changed
+      - name: Optimize media
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "all" ]; then
+            node ./scripts/optimize-media.mjs --write
+          else
+            node ./scripts/optimize-media.mjs --write --changed
+          fi
 
       - name: Commit optimized media
         run: |

@@ -816,7 +816,7 @@ That command syncs the Worker-mirrored values in [`worker/wrangler.toml`](../wor
 
 It does not write Worker secrets, media files, or generated optimization outputs. USPS OAuth secrets, Stripe secret keys, Resend keys, ZIP.TAX keys, Turnstile secrets, GitHub tokens, and Cloudflare deploy credentials still belong in Worker secrets, GitHub repository secrets, or ignored local env files.
 
-Dashboard-uploaded media also does not add new sync-script config. Uploads commit source files into the existing asset directories; `npm run media:optimize` / `npm run media:optimize:check` and the **Optimize dashboard media** workflow handle image compression and WebM derivatives outside the Worker.
+Dashboard-uploaded media also does not add new sync-script config. Uploads commit source files into the existing asset directories; `npm run media:optimize` / `npm run media:optimize:check` and the **Optimize dashboard media** workflow handle image compression, responsive WebP variants, and WebM derivatives outside the Worker.
 
 Generated CSS/JS minification is also outside the Worker and dashboard save path. Production deploys run `npm run assets:minify` only after Jekyll writes `_site`, so forks should keep source assets readable in `assets/` and let the deploy artifact step handle minified output. Cloudflare edge compression should stay enabled, but Cloudflare Auto Minify should stay disabled to avoid a second rewriting layer.
 

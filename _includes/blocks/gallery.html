@@ -18,10 +18,7 @@
     {% endif %}>
     {% for img in block.images %}
       <div class="gallery__item"{% if caption_style == 'overlay' and img.caption %} tabindex="0"{% endif %}>
-        <img 
-          src="{{ img.src | escape }}"
-          alt="{{ img.alt | default: '' | escape }}"
-          loading="lazy">
+        {% include responsive-image.html src=img.src alt=img.alt loading="lazy" decoding="async" sizes="(min-width: 900px) 360px, 92vw" %}
         {% if img.caption %}
           <span class="gallery__item-caption"><span class="gallery__item-caption-text">{{ img.caption | safe_rich_text }}</span></span>
         {% endif %}

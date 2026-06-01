@@ -4,7 +4,7 @@
 
 **v1.0.2**
 
-The v1.0 feature set and release-hardening pass are complete. v1.0.2 adds public-page performance work, generated asset minification, safe intent prefetching, campaign share links with state-aware CTAs, and admin performance controls. Remaining unstarted work lives under **Future Features** unless a critical launch regression is found.
+The v1.0 feature set and release-hardening pass are complete. v1.0.2 adds public-page performance work, responsive media variants, generated asset minification, safe intent prefetching, campaign share links with state-aware CTAs, and admin performance controls. Remaining unstarted work lives under **Future Features** unless a critical launch regression is found.
 
 ## Completed
 
@@ -143,7 +143,7 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.2 adds public
   - diary entry editing preserves stable entry IDs, and newly added diary entries receive title-based IDs during publish so automatic emails send only for genuinely new entries
   - full campaign schema for tiers, campaign add-ons, stretch goals, support items, diary, and decisions
   - dashboard uploads route to convention-based asset directories, preserve existing IDs where needed, and derive new IDs from names/labels
-  - dashboard media uploads stay source-preserving in the Worker, with external lossless image optimization and WebM derivative generation in the repository media pipeline
+  - dashboard media uploads stay source-preserving in the Worker, with external lossless image optimization, responsive WebP variants, and WebM derivative generation in the repository media pipeline
   - physical product editors expose shipping presets or explicit package metadata while digital products hide shipping-only fields
   - desktop/tablet/mobile responsive pass, accessibility pass, security pass, SEO noindex pass, and Spanish i18n pass
   - focused unit, browser, and KV-write-budget coverage for admin dashboard flows

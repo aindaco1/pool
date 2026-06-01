@@ -38,6 +38,8 @@
   }
   
   &__logo {
+    width: auto;
+    height: auto;
     max-height: 4rem;
     margin-right: 0;
     
@@ -310,6 +312,8 @@ main {
     display: block;
     
     img {
+      width: auto;
+      height: auto;
       max-height: $space-2xl;
       margin-right: 0;
     }

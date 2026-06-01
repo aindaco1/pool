@@ -37,7 +37,7 @@ This checklist covers:
 This checklist now reflects the creator-facing platform changes through **v1.0.2**:
 
 - creators can use campaign-specific dashboard access for normal edits instead of direct repository access
-- dashboard media uploads support images, video, audio, previews, and later repository optimization
+- dashboard media uploads support images, video, audio, previews, and later repository optimization with responsive WebP variants
 - campaign add-ons can be attached to one campaign and count toward that campaign's goal
 - campaign-runner report recipients can receive daily pledge ledgers and post-deadline fulfillment exports
 - hosted embeds give creators a live widget for websites and HTML-friendly partner pages
@@ -286,6 +286,8 @@ Use these for concept art, stills, behind-the-scenes images, moodboards, process
 - **Aspect ratio:** flexible, though a consistent set often looks better
 - **Recommended formats:** `WebP`, `JPG`, `PNG`
 - **Recommended file size:** ideally under `500 to 600 KB` each
+
+The dashboard preserves original uploads. In v1.0.2, the repository media workflow can generate `480w`, `960w`, and `1600w` WebP variants for public pages, but creators should still export images near the recommended dimensions and crops before upload.
 
 Each public-facing image should also include:
 

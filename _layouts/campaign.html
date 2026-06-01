@@ -8,8 +8,17 @@
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-campaign-csp-strict.html %}
   {% include cart-head.html %}
-  {% assign campaign_hero_preload_image = page.hero_image_wide | default: page.hero_image %}
-  {% if campaign_hero_preload_image %}
+  {% assign campaign_hero_has_remote_video = false %}
+  {% if page.hero_video %}
+    {% if page.hero_video contains "youtube.com" or page.hero_video contains "youtu.be" or page.hero_video contains "vimeo.com" or page.hero_video contains "instagram.com" %}
+      {% assign campaign_hero_has_remote_video = true %}
+    {% endif %}
+  {% endif %}
+  {% assign campaign_hero_preload_image = "" %}
+  {% unless campaign_hero_has_remote_video %}
+    {% assign campaign_hero_preload_image = page.hero_image_wide | default: page.hero_image %}
+  {% endunless %}
+  {% if campaign_hero_preload_image and campaign_hero_preload_image != "" %}
   <link rel="preload" as="image" href="{{ campaign_hero_preload_image }}">
   {% endif %}
   {% capture campaign_worker_social_image %}{{ site.platform.worker_url | default: site.platform.site_url | default: site.url }}/share/campaign/{{ page.slug | uri_escape }}.png?lang={{ current_lang | uri_escape }}{% endcapture %}
@@ -222,9 +231,9 @@
             </div>
           {% endif %}
         {% elsif page.hero_image_wide %}
-        <img src="{{ page.hero_image_wide }}" alt="{{ page.title | escape }}" fetchpriority="high" decoding="async">
+        {% include responsive-image.html src=page.hero_image_wide alt=page.title fetchpriority="high" decoding="async" sizes="(min-width: 900px) 760px, 100vw" %}
         {% elsif page.hero_image %}
-        <img src="{{ page.hero_image }}" alt="{{ page.title | escape }}" fetchpriority="high" decoding="async">
+        {% include responsive-image.html src=page.hero_image alt=page.title fetchpriority="high" decoding="async" sizes="(min-width: 900px) 760px, 100vw" %}
         {% endif %}
         {% assign progress_pledged = page.pledged_amount | default: 0 | plus: 0 %}
         {% include progress.html campaign_slug=page.slug pledged=progress_pledged goal=page.goal_amount deadline=page.goal_deadline start_date=page.start_date stretch_goals=page.stretch_goals stretch_hidden=page.stretch_hidden state=campaign_render_state progress_background=page.progress_background lang=current_lang %}
@@ -271,7 +280,8 @@
       <div class="campaign-facts">
         {% if page.creator_image %}
           <div class="campaign-facts__creator">
-            <img src="{{ page.creator_image }}" alt="{{ page.creator_name | default: 'Creator' | escape }}">
+            {% assign campaign_creator_image_alt = page.creator_name | default: 'Creator' %}
+            {% include responsive-image.html src=page.creator_image alt=campaign_creator_image_alt loading="lazy" decoding="async" sizes="48px" widths="480" %}
             <span>{{ page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}</span>
           </div>
         {% endif %}
