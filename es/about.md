@@ -11,7 +11,7 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
-El hito de lanzamiento actual de la plataforma es **v1.0.3**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente se enfoca en una zona horaria configurable y recordatorios opt-in para campañas próximas.
+El hito de lanzamiento actual de la plataforma es **v1.0.3**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente se enfoca en una zona horaria configurable, recordatorios opt-in para campañas próximas y mejoras de performance móvil en páginas de campaña.
 
 ## Aportes de todo o nada
 
@@ -63,7 +63,7 @@ Las páginas de campaña están diseñadas para compartirse fácilmente sin conv
 - **Enlaces integrados para compartir**: las páginas de campaña incluyen destinos para Bluesky, X, Threads, Facebook, SMS y email. Usan la URL pública de campaña y texto según el estado cuando la plataforma destino permite mensaje.
 - **Previews enriquecidos**: los enlaces públicos de campaña emiten metadatos Open Graph y Twitter, además de imágenes de share card compatibles con crawlers, para que las plataformas sociales muestren un preview útil.
 - **Los enlaces privados siguen privados**: Gestionar aporte, comunidad de patrocinadores, checkout, admin y enlaces con tokens quedan fuera de la intención pública de compartir e indexar.
-- **Primera carga más rápida**: las barras de progreso e hitos de campaña renderizan posiciones estables antes de que termine JavaScript, el CSS/JS generado se minifica para producción y el runtime completo del carrito espera hasta que haya estado de carrito o intención del patrocinador.
+- **Primera carga más rápida**: las barras de progreso e hitos de campaña renderizan posiciones estables antes de que termine JavaScript, las variantes responsivas reducen descargas de imagen en móvil, los videos hero de YouTube esperan intención de reproducción antes de cargar el embed remoto, el CSS/JS generado se minifica para producción y el runtime completo del carrito espera hasta que haya estado de carrito o intención del patrocinador.
 - **Prefetch conservador**: las páginas públicas pueden prefetch rutas públicas probables del mismo origen después de hover, foco o toque, pero se excluyen enlaces privados, checkout, admin, comunidad de patrocinadores, externos y con parámetros sensibles.
 
 ## Para creadores
@@ -107,7 +107,7 @@ The Pool es una plataforma de crowdfunding con arquitectura static-first. Las p�
 
 El stack está pensado para equipos pequeños y forks. Cada servicio principal ofrece un nivel gratuito, y la plataforma evita trabajo dinámico innecesario siempre que puede. Las páginas públicas de campaña son estáticas, los datos públicos en vivo se combinan y se cachean en el navegador, y el Worker se reserva para operaciones que necesitan confianza del servidor.
 
-El modelo de performance pública sigue siendo static-first. El sitio minifica los assets generados, deja la compresión de transferencia a Cloudflare, reserva espacio estable para progreso y media de campaña, y retrasa el código pesado del carrito hasta que realmente hace falta.
+El modelo de performance pública sigue siendo static-first. El sitio minifica los assets generados, deja la compresión de transferencia a Cloudflare, reserva espacio estable para progreso y media de campaña, sirve variantes responsivas de imagen cuando existen, difiere los embeds hero remotos de YouTube hasta que haya intención de reproducción y retrasa el código pesado del carrito hasta que realmente hace falta.
 
 El panel de administración sigue la misma disciplina de costes. Navegación, filtros, vistas previas, analytics, reportes y borradores locales evitan escrituras a KV. Las escrituras durables ocurren solo cuando una persona administradora guarda estado propio del panel o publica cambios de campaña/plataforma.
 

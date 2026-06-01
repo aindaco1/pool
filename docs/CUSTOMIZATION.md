@@ -855,7 +855,7 @@ Launch reminders have one public setting and one secret boundary:
 - The matching Turnstile secret belongs in Worker secrets as `TURNSTILE_SECRET_KEY` or `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY`.
 - Reminder emails use the existing Resend-backed Worker email module and the configured `platform.updates_email_from` sender.
 
-Dashboard-uploaded media also does not add new sync-script config. Uploads commit source files into the existing asset directories; `npm run media:optimize` / `npm run media:optimize:check`, the Podman-backed variants for machines without native optimizers, and the **Optimize dashboard media** workflow handle image compression, responsive WebP variants, and WebM derivatives outside the Worker.
+Dashboard-uploaded media also does not add new sync-script config. Uploads commit source files into the existing asset directories; `npm run media:optimize` / `npm run media:optimize:check`, the Podman-backed variants for machines without native optimizers, and the **Optimize dashboard media** workflow handle image compression, responsive WebP variants at `320w`, `480w`, `640w`, `960w`, and `1600w`, and WebM derivatives outside the Worker.
 
 Generated CSS/JS minification is also outside the Worker and dashboard save path. Production deploys run `npm run assets:minify` only after Jekyll writes `_site`, so forks should keep source assets readable in `assets/` and let the deploy artifact step handle minified output. Cloudflare edge compression should stay enabled, but Cloudflare Auto Minify should stay disabled to avoid a second rewriting layer.
 

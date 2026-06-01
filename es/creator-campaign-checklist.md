@@ -45,7 +45,7 @@ Esta lista refleja los cambios de la plataforma hasta **v1.0.3**:
 - los textos de compartir usan estado de campaña, título, blurb y URL pública cuando la plataforma destino permite texto
 - las campañas próximas pueden recoger recordatorios únicos de lanzamiento antes de abrir aportes
 - el lanzamiento y las fechas límite siguen la zona horaria configurada para la plataforma
-- las mejoras de performance hacen más estable la primera carga, pero las campañas aún necesitan media optimizada y copy conciso
+- las mejoras de performance hacen más estable la primera carga, incluidos embeds hero de YouTube diferidos y entrega responsiva de imágenes, pero las campañas aún necesitan media optimizada y copy conciso
 
 ## Versión rápida
 
@@ -198,7 +198,7 @@ El video debe construir confianza, tono y urgencia. No necesita equipo caro, per
 - **Formato preferido para self-hosting:** `.webm`
 - **Optimización:** las cargas del panel preservan la fuente y el pipeline del repositorio puede generar imágenes comprimidas, variantes WebP responsivas y derivados WebM antes de lanzar
 
-El pipeline de media de v1.0.3 puede crear variantes WebP de `320w`, `480w`, `960w` y `1600w` para páginas públicas cuando la imagen fuente es más grande. Aun así, conviene exportar las imágenes cerca de las dimensiones y recortes recomendados antes de subirlas.
+El pipeline de media de v1.0.3 puede crear variantes WebP de `320w`, `480w`, `640w`, `960w` y `1600w` para páginas públicas cuando la imagen fuente es más grande. Aun así, conviene exportar las imágenes cerca de las dimensiones y recortes recomendados antes de subirlas.
 
 El video debería responder:
 

@@ -469,6 +469,30 @@ function initHeroVideo() {
   video.load();
 }
 
+function initYoutubeHeroFacades() {
+  document.querySelectorAll('[data-youtube-embed]').forEach((facade) => {
+    if (facade.dataset.youtubeReady === 'true') return;
+    facade.dataset.youtubeReady = 'true';
+
+    const button = facade.querySelector('[data-youtube-play]');
+    const src = facade.getAttribute('data-youtube-src') || '';
+    const title = facade.getAttribute('data-youtube-title') || getRuntimeMessage('campaign.videoEmbedTitle', 'Campaign video');
+    if (!button || !src) return;
+
+    button.addEventListener('click', () => {
+      const iframe = document.createElement('iframe');
+      iframe.src = src;
+      iframe.title = title;
+      iframe.frameBorder = '0';
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+      iframe.allowFullscreen = true;
+      facade.replaceChildren(iframe);
+      facade.classList.add('hero__video--youtube-loaded');
+      iframe.focus();
+    });
+  });
+}
+
 function initCommunityTeaser(campaignSlug) {
   if (!campaignSlug) return;
   const teaser = document.getElementById('community-teaser');
@@ -720,6 +744,7 @@ function init() {
   initCampaignShareLinks();
   initScrollableGalleries();
   initCampaignCountdown();
+  initYoutubeHeroFacades();
   initHeroVideo();
   initCommunityTeaser(bootScript.dataset.campaignSlug || '');
   initLaunchReminderForms();

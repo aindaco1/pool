@@ -4,7 +4,7 @@
 
 **v1.0.3**
 
-The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds configurable platform timezone handling plus opt-in launch reminders for upcoming campaigns, while preserving the default `America/Denver` lifecycle model for existing forks.
+The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds configurable platform timezone handling, opt-in launch reminders for upcoming campaigns, and mobile campaign-page performance refinements, while preserving the default `America/Denver` lifecycle model for existing forks.
 
 ## Completed
 
@@ -220,7 +220,9 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds config
   - launch reminder delivery reuses the existing Resend email module, sender configuration, locale catalog, and pacing instead of adding a second email integration
   - `_config.local.yml` can blank the reminder Turnstile site key so local development hides the widget consistently with local admin sign-in
   - the Podman media optimizer now includes `optipng` and `gifsicle` for local PNG/GIF source compression through the same repository media workflow
-  - the public creator checklists now describe the creator-facing v1.0.3 changes, including launch reminders, platform timezone expectations, and `320w` responsive WebP variants
+  - responsive image generation now includes a `640w` WebP rung between the existing `480w` and `960w` variants for mobile campaign pages
+  - YouTube campaign hero videos now render local poster/play facades and defer the remote iframe until supporter play intent
+  - the public creator checklists now describe the creator-facing v1.0.3 changes, including launch reminders, platform timezone expectations, deferred YouTube hero embeds, and responsive WebP variants
 - [x] Developer FAQ based on internal documentation
 - [x] Marketing landing page for the platform on a different domain
 - [x] Denial of service attack defense pass

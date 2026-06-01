@@ -26,7 +26,7 @@
   {%- if image_extension == "gif" or image_extension == "jpg" or image_extension == "jpeg" or image_extension == "png" -%}
     {%- assign image_stem_size = image_src_clean.size | minus: image_extension.size | minus: 1 -%}
     {%- assign image_stem = image_src_clean | slice: 0, image_stem_size -%}
-    {%- assign responsive_widths = include.widths | default: "320,480,960,1600" | split: "," -%}
+    {%- assign responsive_widths = include.widths | default: "320,480,640,960,1600" | split: "," -%}
     {%- for responsive_width_raw in responsive_widths -%}
       {%- assign responsive_width = responsive_width_raw | strip -%}
       {%- assign responsive_candidate = image_stem | append: "-" | append: responsive_width | append: ".webp" -%}

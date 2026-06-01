@@ -49,6 +49,7 @@ Current guardrails:
 
 - progress bars and marker positions render static width/left utility classes in Jekyll output so they do not start collapsed while JavaScript loads
 - campaign hero images are emitted with preload and high fetch priority where the layout knows the likely LCP asset
+- YouTube campaign hero videos render a local poster/play facade first and load the YouTube iframe only after play intent
 - common scripts use `defer` or lazy dynamic loading instead of parser-blocking script tags
 - private/admin surfaces stay `noindex` and should not inherit public prefetch behavior
 
@@ -257,12 +258,12 @@ The Podman site image includes `ffmpeg`, `optipng`, `libjpeg-turbo-progs`, `gifs
 
 For deployed media-heavy regressions, run the **Optimize dashboard media** GitHub Actions workflow with `scope=all` so existing campaign assets are optimized by the same pipeline rather than edited one-off.
 
-If PageSpeed flags oversized campaign images that already flow through `responsive-image.html`, first confirm whether the corresponding `-320.webp`, `-480.webp`, `-960.webp`, and `-1600.webp` derivatives exist. Missing derivatives should be produced by `npm run media:optimize` locally or by the workflow with `scope=all`, not by one-off manual image edits.
+If PageSpeed flags oversized campaign images that already flow through `responsive-image.html`, first confirm whether the corresponding `-320.webp`, `-480.webp`, `-640.webp`, `-960.webp`, and `-1600.webp` derivatives exist. Missing derivatives should be produced by `npm run media:optimize` locally or by the workflow with `scope=all`, not by one-off manual image edits.
 
 The media pipeline:
 
 - compresses images when the optimized result is smaller
-- generates responsive WebP variants at `320w`, `480w`, `960w`, and `1600w` for public image templates when the source image is larger than that variant
+- generates responsive WebP variants at `320w`, `480w`, `640w`, `960w`, and `1600w` for public image templates when the source image is larger than that variant
 - skips `cwebp` re-optimization for animated WebP derivatives because `cwebp` cannot decode animated WebP files
 - generates WebM derivatives for uploaded videos
 - rewrites literal `_campaigns` / `_config.yml` references from uploaded source videos to generated WebM derivatives

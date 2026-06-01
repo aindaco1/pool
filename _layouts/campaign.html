@@ -17,16 +17,17 @@
       {% assign campaign_hero_has_remote_video = true %}
     {% endif %}
   {% endif %}
-  {% if campaign_hero_has_youtube_video %}
-  <link rel="preconnect" href="https://www.youtube-nocookie.com">
-  {% endif %}
   {% include cart-head.html %}
   {% assign campaign_hero_preload_image = "" %}
-  {% unless campaign_hero_has_remote_video %}
+  {% if campaign_hero_has_youtube_video %}
     {% assign campaign_hero_preload_image = page.hero_image_wide | default: page.hero_image %}
-  {% endunless %}
+  {% elsif campaign_hero_has_remote_video %}
+    {% assign campaign_hero_preload_image = "" %}
+  {% else %}
+    {% assign campaign_hero_preload_image = page.hero_image_wide | default: page.hero_image %}
+  {% endif %}
   {% if campaign_hero_preload_image and campaign_hero_preload_image != "" %}
-  <link rel="preload" as="image" href="{{ campaign_hero_preload_image }}">
+  {% include responsive-image-preload.html src=campaign_hero_preload_image sizes="(min-width: 900px) 760px, calc(100vw - 40px)" fetchpriority="high" %}
   {% endif %}
   {% capture campaign_worker_social_image %}{{ site.platform.worker_url | default: site.platform.site_url | default: site.url }}/share/campaign/{{ page.slug | uri_escape }}.png?lang={{ current_lang | uri_escape }}{% endcapture %}
   {% assign campaign_social_image = page.social_image | default: campaign_worker_social_image %}
@@ -206,8 +207,18 @@
             {% elsif page.hero_video contains "/embed/" %}
               {% assign yt_id = page.hero_video | split: "/embed/" | last | split: "?" | first %}
             {% endif %}
-            <div class="hero__video hero__video--youtube">
-              <iframe src="https://www.youtube-nocookie.com/embed/{{ yt_id }}" title="{% include t.html key='campaign.video_embed_title' lang=current_lang title=page.title %}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"></iframe>
+            {% capture yt_embed_title %}{% include t.html key='campaign.video_embed_title' lang=current_lang title=page.title %}{% endcapture %}
+            {% assign yt_poster = page.hero_image_wide | default: page.hero_image %}
+            <div class="hero__video hero__video--youtube hero__video--youtube-facade" data-youtube-embed data-youtube-src="https://www.youtube-nocookie.com/embed/{{ yt_id }}?autoplay=1&amp;rel=0" data-youtube-title="{{ yt_embed_title | escape }}">
+              {% if yt_poster %}
+                {% include responsive-image.html src=yt_poster alt=page.title class="hero__video-poster" fetchpriority="high" decoding="async" sizes="(min-width: 900px) 760px, calc(100vw - 40px)" %}
+              {% endif %}
+              <button class="hero__video-play hero__video-play--youtube" type="button" data-youtube-play aria-label="{% include t.html key='campaign.play_video' lang=current_lang %}">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+              <noscript>
+                <iframe src="https://www.youtube-nocookie.com/embed/{{ yt_id }}" title="{{ yt_embed_title | escape }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>
+              </noscript>
             </div>
           {% elsif page.hero_video contains "vimeo.com" %}
             {% assign vimeo_id = "" %}
@@ -245,9 +256,9 @@
             </div>
           {% endif %}
         {% elsif page.hero_image_wide %}
-        {% include responsive-image.html src=page.hero_image_wide alt=page.title fetchpriority="high" decoding="async" sizes="(min-width: 900px) 760px, 100vw" %}
+        {% include responsive-image.html src=page.hero_image_wide alt=page.title fetchpriority="high" decoding="async" sizes="(min-width: 900px) 760px, calc(100vw - 40px)" %}
         {% elsif page.hero_image %}
-        {% include responsive-image.html src=page.hero_image alt=page.title fetchpriority="high" decoding="async" sizes="(min-width: 900px) 760px, 100vw" %}
+        {% include responsive-image.html src=page.hero_image alt=page.title fetchpriority="high" decoding="async" sizes="(min-width: 900px) 760px, calc(100vw - 40px)" %}
         {% endif %}
         {% assign progress_pledged = page.pledged_amount | default: 0 | plus: 0 %}
         {% include progress.html campaign_slug=page.slug pledged=progress_pledged goal=page.goal_amount deadline=page.goal_deadline start_date=page.start_date stretch_goals=page.stretch_goals stretch_hidden=page.stretch_hidden state=campaign_render_state progress_background=page.progress_background lang=current_lang %}

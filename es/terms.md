@@ -78,6 +78,7 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Los complementos de campaña con inventario limitado también usan el estado de los aportes guardados, no los borradores en curso del carrito, para determinar el stock restante.
 - El acceso a la comunidad de patrocinadores en el navegador puede recordarse durante la sesión actual como una comodidad, pero el enlace mágico enviado por correo sigue siendo la fuente de verdad para el acceso.
 - Las páginas públicas pueden prefetch páginas públicas elegibles del mismo origen después de hover, foco o toque para que la navegación normal sea más rápida. Este comportamiento excluye enlaces de admin, checkout, Gestionar aporte, comunidad de patrocinadores, enlaces con tokens, externos y con parámetros sensibles.
+- Las páginas públicas de campaña pueden diferir algunos embeds de terceros, como videos hero de YouTube, hasta que elijas reproducirlos. Hasta entonces, la página puede mostrar una imagen local de poster en lugar de contactar a ese proveedor externo.
 - Los enlaces para compartir campañas pueden preservar parámetros públicos seguros de referencia o UTM para que responsables de campaña entiendan el origen de la promoción pública. No preservan parámetros de token, pedido, email, sesión u otros datos sensibles.
 - No vendemos tu información. Solo la compartimos cuando es necesario para el procesamiento del pago, la entrega de correos transaccionales, la prevención de abuso, el cálculo de cotizaciones de envío y el cumplimiento de recompensas.
 
@@ -92,7 +93,7 @@ The Pool es una [plataforma de crowdfunding de código abierto](https://github.c
 - **Panel privado de administración**: edición de campañas por rol, reportes, analytics, vistas de patrocinadores, enlaces de marketing, gestión de usuarios y operaciones de plataforma
 - **[Resend](https://resend.com)**: correos transaccionales (confirmaciones, recordatorios de lanzamiento, actualizaciones y notificaciones de cobro)
 
-Los datos de los aportes se almacenan en Cloudflare KV. Esta arquitectura implica menores costes operativos y hace que una mayor parte de tu aporte vaya directamente al proyecto, con las propinas opcionales ayudando a cubrir el mantenimiento de The Pool. Las compilaciones de producción también minifican los assets CSS/JS generados después de crear el sitio estático, mientras Cloudflare gestiona la compresión de transferencia en el edge. La automatización del ciclo de vida de campañas usa la zona horaria configurada para mantener alineadas fechas límite, cuentas regresivas, reportes y comprobaciones de liquidación.
+Los datos de los aportes se almacenan en Cloudflare KV. Esta arquitectura implica menores costes operativos y hace que una mayor parte de tu aporte vaya directamente al proyecto, con las propinas opcionales ayudando a cubrir el mantenimiento de The Pool. Las compilaciones de producción también minifican los assets CSS/JS generados después de crear el sitio estático, generan variantes responsivas de imagen para páginas públicas y dejan que Cloudflare gestione la compresión de transferencia en el edge. La automatización del ciclo de vida de campañas usa la zona horaria configurada para mantener alineadas fechas límite, cuentas regresivas, reportes y comprobaciones de liquidación.
 
 ## Preguntas
 

@@ -49,6 +49,7 @@ describe('media optimization script helpers', () => {
       .toEqual([
         'assets/images/campaigns/their-love/hero-wide-320.webp',
         'assets/images/campaigns/their-love/hero-wide-480.webp',
+        'assets/images/campaigns/their-love/hero-wide-640.webp',
         'assets/images/campaigns/their-love/hero-wide-960.webp',
         'assets/images/campaigns/their-love/hero-wide-1600.webp'
       ]);

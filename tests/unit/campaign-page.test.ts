@@ -57,6 +57,16 @@ function renderCampaignPageWithVideo() {
   `;
 }
 
+function renderCampaignPageWithYoutubeFacade() {
+  document.body.innerHTML = `
+    <div class="hero__video hero__video--youtube hero__video--youtube-facade" data-youtube-embed data-youtube-src="https://www.youtube-nocookie.com/embed/demo-video?autoplay=1&amp;rel=0" data-youtube-title="Demo video">
+      <img class="hero__video-poster" src="/poster.jpg" alt="Demo">
+      <button class="hero__video-play hero__video-play--youtube" type="button" data-youtube-play aria-label="Play video"></button>
+    </div>
+    <script data-campaign-page-script="true" data-campaign-slug="demo"></script>
+  `;
+}
+
 describe('campaign page script', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -308,6 +318,24 @@ describe('campaign page script', () => {
     expect(overlay.hidden).toBe(true);
 
     vi.useRealTimers();
+  });
+
+  it('loads YouTube hero embeds only after play intent', async () => {
+    renderCampaignPageWithYoutubeFacade();
+
+    await import('../../assets/js/campaign-page.js');
+
+    const facade = document.querySelector('[data-youtube-embed]') as HTMLElement;
+    expect(facade.querySelector('iframe')).toBeNull();
+
+    (facade.querySelector('[data-youtube-play]') as HTMLButtonElement).click();
+
+    const iframe = facade.querySelector('iframe') as HTMLIFrameElement;
+    expect(iframe).toBeTruthy();
+    expect(iframe.src).toBe('https://www.youtube-nocookie.com/embed/demo-video?autoplay=1&rel=0');
+    expect(iframe.title).toBe('Demo video');
+    expect(iframe.allowFullscreen).toBe(true);
+    expect(facade.classList.contains('hero__video--youtube-loaded')).toBe(true);
   });
 
   it('uses a smaller value style when the days countdown has three or more digits', async () => {

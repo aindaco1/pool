@@ -45,7 +45,7 @@ This checklist now reflects the creator-facing platform changes through **v1.0.3
 - share intents use the campaign's current state, title, blurb, and public URL where each platform supports message text
 - upcoming campaigns can collect one-time launch reminder signups before pledging opens
 - campaign launch/deadline timing follows the deployment's configured platform timezone
-- public performance work makes campaign progress, share links, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
+- public performance work makes campaign progress, share links, deferred YouTube hero embeds, responsive image delivery, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
 
 ## The Short Version
 
@@ -293,7 +293,7 @@ Use these for concept art, stills, behind-the-scenes images, moodboards, process
 - **Recommended formats:** `WebP`, `JPG`, `PNG`
 - **Recommended file size:** ideally under `500 to 600 KB` each
 
-The dashboard preserves original uploads. In v1.0.3, the repository media workflow can generate `320w`, `480w`, `960w`, and `1600w` WebP variants for public pages, but creators should still export images near the recommended dimensions and crops before upload.
+The dashboard preserves original uploads. In v1.0.3, the repository media workflow can generate `320w`, `480w`, `640w`, `960w`, and `1600w` WebP variants for public pages, but creators should still export images near the recommended dimensions and crops before upload.
 
 Each public-facing image should also include:
 

@@ -11,7 +11,7 @@ const execFileAsync = promisify(execFile);
 const IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png', '.webp']);
 const RESPONSIVE_IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png']);
 const VIDEO_EXTENSIONS = new Set(['.mov', '.mp4', '.m4v']);
-const RESPONSIVE_WEBP_WIDTHS = [320, 480, 960, 1600];
+const RESPONSIVE_WEBP_WIDTHS = [320, 480, 640, 960, 1600];
 const RESPONSIVE_WEBP_QUALITY = '86';
 const MEDIA_ROOTS = ['assets/images', 'assets/videos'];
 const REFERENCE_ROOTS = ['_campaigns', '_data'];
@@ -261,6 +261,9 @@ async function optimizeImage(repoPath, args, tools) {
     await execFileAsync('gifsicle', ['-O3', filePath, '-o', candidatePath]);
     return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
   } else if (extension === '.webp') {
+    if (isResponsiveWebpDerivative(repoPath)) {
+      return { repoPath, changed: false, skipped: 'generated responsive webp derivative' };
+    }
     if (await isAnimatedWebpFile(filePath)) {
       return { repoPath, changed: false, skipped: 'animated webp unsupported by cwebp' };
     }

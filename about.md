@@ -10,7 +10,7 @@ description: Learn how The Pool works, from all-or-nothing pledging to magic-lin
 
 **The Pool** is Dust Wave's crowdfunding platform for independent film and creative projects, built on open-source technology.
 
-The current platform release milestone is **v1.0.3**. The v1.0 feature set and launch hardening pass are complete, and the latest release focuses on configurable platform timezone handling plus opt-in launch reminders for upcoming campaigns.
+The current platform release milestone is **v1.0.3**. The v1.0 feature set and launch hardening pass are complete, and the latest release focuses on configurable platform timezone handling, opt-in launch reminders for upcoming campaigns, and mobile campaign-page performance refinements.
 
 ## All-or-Nothing Pledging
 
@@ -62,7 +62,7 @@ Campaign pages are designed to be easy to share without turning private supporte
 - **Built-in share links** — Campaign pages include share targets for Bluesky, X, Threads, Facebook, SMS, and email. Those links use the public campaign URL and state-aware copy where the destination supports message text.
 - **Rich previews** — Public campaign links emit Open Graph and Twitter metadata, plus crawler-friendly campaign share-card images, so social platforms can show a useful preview.
 - **Private links stay private** — Manage Pledge, supporter-community, checkout, admin, and tokenized links stay out of public sharing and indexing intent.
-- **Faster first load** — Campaign progress bars and milestones render stable positions before JavaScript finishes, generated CSS/JS is minified for production, and the full cart runtime waits until there is cart state or supporter intent.
+- **Faster first load** — Campaign progress bars and milestones render stable positions before JavaScript finishes, responsive media variants keep mobile image downloads smaller, YouTube hero videos wait for play intent before loading the remote embed, generated CSS/JS is minified for production, and the full cart runtime waits until there is cart state or supporter intent.
 - **Conservative prefetching** — Public pages can prefetch likely same-origin public navigation after hover, focus, or touch intent, but private, checkout, admin, supporter, external, and sensitive-query links are excluded.
 
 ## For Creators
@@ -106,7 +106,7 @@ The Pool is a static-first crowdfunding stack. Public pages are generated ahead 
 
 The stack is designed to be practical for small teams and forks. Each major service has a free tier, and the platform avoids unnecessary dynamic work wherever possible. Public campaign pages are static, public live data is combined and browser-cached, and the Worker is reserved for operations that need server-side trust.
 
-The public page performance model stays static-first. The site minifies generated build artifacts, lets Cloudflare handle transfer compression, reserves stable space for campaign progress and media, and delays heavier first-party cart code until it is actually needed.
+The public page performance model stays static-first. The site minifies generated build artifacts, lets Cloudflare handle transfer compression, reserves stable space for campaign progress and media, serves generated responsive image variants where available, defers remote YouTube hero embeds until play intent, and delays heavier first-party cart code until it is actually needed.
 
 The admin dashboard follows the same cost discipline. Browsing, filtering, previews, analytics, reports, and local drafts avoid KV writes. Durable writes happen only when an admin explicitly saves dashboard-only state or publishes a campaign/platform change.
 
