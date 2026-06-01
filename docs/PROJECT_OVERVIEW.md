@@ -74,7 +74,7 @@ For current Cloudflare limits, see:
 2. **Stripe** saves a card through that on-site payment step, returning IDs to the Worker.
 3. Worker stores pledge data in **Cloudflare KV** (tiers, support items, custom amounts, shipping address, tip percent/amount, Stripe IDs), fanning a bundled checkout out into one campaign-scoped pledge per campaign. The client does not treat checkout as successful until persistence is confirmed.
 4. **Worker scheduler** runs daily lifecycle work after midnight in the configured platform timezone:
-   - Records heartbeat (`cron:lastRun` in KV) for monitoring.
+   - Records an hourly heartbeat (`cron:lastRun` in KV) for monitoring without turning the minute-level scheduler into steady KV write churn.
    - Triggers site rebuild when `goal_deadline` passes (`live` → `post`).
    - If funded, dispatches batched settlement via self-chaining `/admin/settle-dispatch`.
    - Each batch (6 pledges) runs in a separate Worker invocation to stay within subrequest limits.

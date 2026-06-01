@@ -139,6 +139,7 @@ const ADD_ON_ITEM_PREFIX = 'addon__';
 const SUPPORTER_EMAIL_RETRY_PREFIX = 'supporter-email-retry:';
 const SUPPORTER_EMAIL_RETRY_CRON = '*/15 * * * *';
 const PLATFORM_SCHEDULER_CRON = '* * * * *';
+const PLATFORM_SCHEDULER_HEARTBEAT_INTERVAL_MINUTES = 60;
 const SUPPORTER_EMAIL_RETRY_INTERVAL_MINUTES = 15;
 const LEGACY_CAMPAIGN_RUNNER_REPORT_CRONS = new Set(['0 13 * * *', '0 14 * * *']);
 const LEGACY_PLATFORM_DAILY_CRONS = new Set(['0 6 * * *', '0 7 * * *']);
@@ -1916,6 +1917,13 @@ function shouldRunCampaignRunnerReportsNow(env, date = new Date()) {
 
 function shouldRunSupporterEmailRetryNow(date = new Date()) {
   return date.getUTCMinutes() % SUPPORTER_EMAIL_RETRY_INTERVAL_MINUTES === 0;
+}
+
+function shouldRecordCronHeartbeat(cronExpression = '', date = new Date()) {
+  if (cronExpression === PLATFORM_SCHEDULER_CRON) {
+    return date.getUTCMinutes() % PLATFORM_SCHEDULER_HEARTBEAT_INTERVAL_MINUTES === 0;
+  }
+  return true;
 }
 
 function shouldRunPlatformDailyTasksNow(env, cronExpression = '', date = new Date()) {
@@ -4118,7 +4126,7 @@ export default {
     const cronExpression = String(event?.cron || '');
     
     // Heartbeat: record cron execution
-    if (env.PLEDGES) {
+    if (env.PLEDGES && shouldRecordCronHeartbeat(cronExpression, now)) {
       await env.PLEDGES.put('cron:lastRun', now.toISOString(), { expirationTtl: 172800 });
     }
 

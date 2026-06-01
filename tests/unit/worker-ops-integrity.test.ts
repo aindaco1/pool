@@ -60,6 +60,7 @@ class PaginatedKVNamespace {
   store = new Map<string, string>();
   pageSize: number;
   listCalls: Array<{ prefix: string; cursor?: string }> = [];
+  putCalls: Array<{ key: string; value: string }> = [];
 
   constructor(pageSize = 2) {
     this.pageSize = pageSize;
@@ -75,6 +76,7 @@ class PaginatedKVNamespace {
   }
 
   async put(key: string, value: string) {
+    this.putCalls.push({ key, value });
     this.store.set(key, value);
   }
 
@@ -219,6 +221,20 @@ beforeEach(() => {
 });
 
 describe('worker operational integrity', () => {
+  it('throttles the minute-level cron heartbeat to avoid baseline KV write churn', async () => {
+    vi.useFakeTimers();
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    vi.setSystemTime(new Date('2026-04-21T13:01:00.000Z'));
+    await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+    expect(kv.putCalls.filter(call => call.key === 'cron:lastRun')).toHaveLength(0);
+
+    vi.setSystemTime(new Date('2026-04-21T14:00:00.000Z'));
+    await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+    expect(kv.putCalls.filter(call => call.key === 'cron:lastRun')).toHaveLength(1);
+  });
+
   it('retries queued supporter confirmation emails on the retry cron', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;

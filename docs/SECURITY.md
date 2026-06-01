@@ -31,7 +31,7 @@ This document covers the security architecture, known risks, applied hardening m
 | `settlement-job:{slug}` | PLEDGES | Settlement batch progress | **Low** - ephemeral |
 | `pending-extras:{orderId}` | PLEDGES | Temporary support item / custom amount checkout extras | **Low** - ephemeral |
 | `pending-tiers:{orderId}` | PLEDGES | Temporary overflow tier metadata during checkout | **Low** - ephemeral |
-| `cron:lastRun` | PLEDGES | Last cron execution timestamp | **Low** - monitoring |
+| `cron:lastRun` | PLEDGES | Last persisted hourly cron execution timestamp | **Low** - monitoring |
 | `admin-login:{hash}` | PLEDGES | One-time admin login nonce and email | **Medium** - ephemeral admin auth |
 | `admin-session:{hash}` | PLEDGES | Admin email, role, campaign scope, CSRF token, expiry | **High** - admin auth |
 | `admin-users:v1` | PLEDGES | Runtime admin users and campaign scopes | **High** - access control |

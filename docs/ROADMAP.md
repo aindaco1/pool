@@ -218,6 +218,7 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds config
   - Jekyll campaign state, browser countdowns, Worker deadline checks, campaign state transitions, scheduled campaign-runner reports, settlement checks, and admin date/time surfaces now share the same `platform.timezone` / `PLATFORM_TIMEZONE` model
   - upcoming campaign pages can collect one-time launch reminder signups through a slim localized form with Turnstile, rate limiting, campaign/email dedupe, signed unsubscribe links, and bounded dispatch jobs
   - launch reminder delivery reuses the existing Resend email module, sender configuration, locale catalog, and pacing instead of adding a second email integration
+  - the minute-level Worker scheduler now persists `cron:lastRun` hourly instead of every minute, keeping cron health visible without consuming the free-tier KV write budget as baseline churn
   - `_config.local.yml` can blank the reminder Turnstile site key so local development hides the widget consistently with local admin sign-in
   - the Podman media optimizer now includes `optipng` and `gifsicle` for local PNG/GIF source compression through the same repository media workflow
   - responsive image generation now includes a `640w` WebP rung between the existing `480w` and `960w` variants for mobile campaign pages

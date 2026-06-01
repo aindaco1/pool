@@ -1370,7 +1370,7 @@ The settlement flow uses **self-chaining batched invocations** to stay within Cl
 That index is still the preferred fast path for reports, settlement, and admin reads, but stats and inventory recalculation now treat it as repairable projection state rather than untouchable truth. If it drifts from the underlying active pledge records, the rebuild path rewrites it automatically.
 | `settlement-job:{slug}` | Batch progress tracking (cursor, totals) |
 | `campaign-charged:{slug}` | Settlement completion marker (prevents re-settle) |
-| `cron:lastRun` | Heartbeat — last cron execution timestamp |
+| `cron:lastRun` | Hourly scheduler heartbeat — last persisted cron execution timestamp |
 | `cron:lastError` | Last cron error details (7-day TTL) |
 
 **Projection drift checks:**

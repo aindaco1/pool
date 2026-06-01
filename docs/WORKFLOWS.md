@@ -489,7 +489,7 @@ crons = ["* * * * *"]
 
 **What it does:**
 
-1. Records a heartbeat (`cron:lastRun` in KV)
+1. Records an hourly heartbeat (`cron:lastRun` in KV) so the minute-level scheduler does not burn the free KV write budget
 2. Lists all campaigns with `goal_deadline` and `goal_amount`
 3. Drains queued launch reminder dispatch jobs in bounded batches
 4. Queues one launch reminder dispatch job when an upcoming campaign becomes live
