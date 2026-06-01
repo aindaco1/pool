@@ -6,7 +6,6 @@
 - Added upcoming-campaign launch reminders with a slim public signup form, Cloudflare Turnstile verification, campaign/email dedupe, signed unsubscribe links, bounded KV dispatch jobs, and Resend delivery through the existing shared email module.
 - Updated local development so `_config.local.yml` can hide launch reminder Turnstile widgets the same way local admin sign-in can hide its Turnstile widget.
 - Extended the Podman media optimizer image and wrappers with `optipng` and `gifsicle` so local PNG/GIF source compression uses the same repository media workflow as responsive image and video derivative generation.
-- Refreshed release, roadmap, creator checklist, dashboard, customization, i18n, performance, security, SEO, workflow, About, and Terms documentation for the 1.0.3 audit pass.
 
 ## v1.0.2 - 2026-06-01
 
