@@ -519,6 +519,7 @@ Current add-on inventory behavior:
 - `inventory` can live on the product itself or on each variant
 - `low_stock_threshold` controls when the shared cart/manage UI shows scarcity messaging
 - sold-out variants are removed from the shared product-state surface unless the supporter already owns that exact variant on an existing pledge
+- saved add-on sold counts live in `add-on-inventory-sold:v1` after the first projection bootstrap, and pledge create, modify, and cancel paths keep the projection current
 - the cart and Manage Pledge both use the same shared add-on product-card model, so forks do not need to style or configure two different merch systems
 - the add-on section heading and support note are localized through the normal runtime i18n files, and the support note interpolates the configured site author name automatically
 

@@ -236,6 +236,20 @@ When changing live reads:
 - keep stale recovery behavior private to the browser and avoid long-lived sensitive storage
 - use `GET /admin/observability/performance` to inspect sampled Worker timings on deployed or local environments
 
+## KV List Budget
+
+Workers KV list requests are a separate free-tier budget from reads and writes. Normal public and dashboard paths should avoid namespace scans and prefer projections, indexes, or explicit queue-state markers.
+
+Current guardrails:
+
+- campaign reports, supporter browsing, settlement, and repair paths prefer `campaign-pledges:{slug}` indexes over pledge namespace scans
+- platform add-on inventory reads use `add-on-inventory-sold:v1` after the first sold-count projection bootstrap
+- launch reminder dispatch uses `launch-reminder-dispatch-queue:v1` so idle scheduled ticks do not list `launch-reminder-dispatch:*`
+- supporter confirmation email retry uses `supporter-email-retry-queue:v1` so retry polling skips `supporter-email-retry:*` scans while idle or before the next attempt is due
+- idle queue-state markers expire hourly, which keeps compatibility with manually inserted jobs without returning to minute-level namespace polling
+
+Under normal no-queue traffic, expect roughly `48-75` KV list requests over 24 hours. Active launch reminder batches and due supporter email retries still list their bounded queue prefixes when actual work is pending.
+
 ## Media Optimization
 
 Dashboard uploads are source-preserving. The Worker validates uploads and commits them, but it does not run native image optimizers or FFmpeg.

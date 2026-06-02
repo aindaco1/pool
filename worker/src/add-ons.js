@@ -3,6 +3,7 @@ import { getScopedConsole } from './logger.js';
 const CACHE_TTL = 60 * 1000;
 const ADD_ON_INVENTORY_CACHE_TTL = 60 * 1000;
 const ADD_ON_INVENTORY_OVERRIDES_KEY = 'add-on-inventory-overrides';
+const ADD_ON_INVENTORY_SOLD_KEY = 'add-on-inventory-sold:v1';
 let console = globalThis.console;
 const addOnCatalogCacheByEnv = new WeakMap();
 const addOnInventoryCacheByEnv = new WeakMap();
@@ -117,6 +118,132 @@ async function persistAddOnInventoryOverrides(env, overrides) {
   return { storageWrite: true, overrides: normalized };
 }
 
+function normalizeSoldCount(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 0;
+}
+
+function emptySoldProjection() {
+  return {
+    version: 1,
+    products: {},
+    updatedAt: null
+  };
+}
+
+function normalizeSoldProjection(value) {
+  const projection = emptySoldProjection();
+  const products = value?.products && typeof value.products === 'object'
+    ? value.products
+    : {};
+
+  for (const [productId, productEntry] of Object.entries(products)) {
+    const normalizedProductId = String(productId || '').trim();
+    if (!normalizedProductId || !productEntry || typeof productEntry !== 'object') continue;
+
+    const entry = {
+      directSold: normalizeSoldCount(productEntry.directSold ?? productEntry.sold),
+      variants: {}
+    };
+    const variants = productEntry.variants && typeof productEntry.variants === 'object'
+      ? productEntry.variants
+      : {};
+
+    for (const [variantId, variantEntry] of Object.entries(variants)) {
+      const normalizedVariantId = String(variantId || '').trim();
+      const sold = normalizeSoldCount(
+        variantEntry && typeof variantEntry === 'object'
+          ? variantEntry.sold
+          : variantEntry
+      );
+      if (normalizedVariantId && sold > 0) {
+        entry.variants[normalizedVariantId] = { sold };
+      }
+    }
+
+    if (entry.directSold > 0 || Object.keys(entry.variants).length > 0) {
+      projection.products[normalizedProductId] = entry;
+    }
+  }
+
+  projection.updatedAt = value?.updatedAt || null;
+  return projection;
+}
+
+function getProjectionProductEntry(projection, productId) {
+  const normalizedProductId = String(productId || '').trim();
+  if (!normalizedProductId) return null;
+  if (!projection.products[normalizedProductId]) {
+    projection.products[normalizedProductId] = { directSold: 0, variants: {} };
+  }
+  return projection.products[normalizedProductId];
+}
+
+function applySelectionDeltaToProjection(projection, selection = {}, multiplier = 1) {
+  const productId = String(selection?.productId || '').trim();
+  const variantId = String(selection?.variantId || '').trim();
+  const quantity = normalizeSoldCount(selection?.quantity);
+  const delta = quantity * multiplier;
+  if (!productId || delta === 0) return;
+
+  const entry = getProjectionProductEntry(projection, productId);
+  if (!entry) return;
+
+  if (variantId) {
+    const current = normalizeSoldCount(entry.variants?.[variantId]?.sold);
+    const next = Math.max(0, current + delta);
+    if (next > 0) {
+      entry.variants[variantId] = { sold: next };
+    } else {
+      delete entry.variants[variantId];
+    }
+  } else {
+    entry.directSold = Math.max(0, normalizeSoldCount(entry.directSold) + delta);
+  }
+
+  if (normalizeSoldCount(entry.directSold) === 0 && Object.keys(entry.variants || {}).length === 0) {
+    delete projection.products[productId];
+  }
+}
+
+function getProjectionSelections(projection = {}) {
+  const selections = [];
+  for (const [productId, entry] of Object.entries(projection.products || {})) {
+    const directSold = normalizeSoldCount(entry?.directSold);
+    if (directSold > 0) {
+      selections.push({ productId, variantId: '', quantity: directSold });
+    }
+    for (const [variantId, variantEntry] of Object.entries(entry?.variants || {})) {
+      const sold = normalizeSoldCount(variantEntry?.sold);
+      if (sold > 0) {
+        selections.push({ productId, variantId, quantity: sold });
+      }
+    }
+  }
+  return selections;
+}
+
+function buildSoldProjectionFromPledges(pledges = []) {
+  const projection = emptySoldProjection();
+  for (const pledge of pledges || []) {
+    if (!pledge || pledge.pledgeStatus === 'cancelled') continue;
+    for (const selection of pledge.bundleAddOns || []) {
+      applySelectionDeltaToProjection(projection, selection, 1);
+    }
+  }
+  projection.updatedAt = new Date().toISOString();
+  return projection;
+}
+
+async function persistSoldProjection(env, projection) {
+  const normalized = normalizeSoldProjection({
+    ...projection,
+    updatedAt: new Date().toISOString()
+  });
+  await env.PLEDGES.put(ADD_ON_INVENTORY_SOLD_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
 function getOverrideInventory(entry = {}) {
   return entry && Object.prototype.hasOwnProperty.call(entry, 'inventory')
     ? getConfiguredInventory(entry)
@@ -220,6 +347,70 @@ async function listAllPledges(env) {
   return pledges;
 }
 
+export async function rebuildAddOnInventorySoldProjection(env, { persist = true } = {}) {
+  configureAddOnLogging(env);
+  if (!env?.PLEDGES) return emptySoldProjection();
+
+  const pledges = await listAllPledges(env);
+  const projection = buildSoldProjectionFromPledges(pledges);
+  return persist ? persistSoldProjection(env, projection) : projection;
+}
+
+async function getAddOnInventorySoldProjection(env, { persistOnRebuild = true } = {}) {
+  if (!env?.PLEDGES) return emptySoldProjection();
+
+  const stored = await env.PLEDGES.get(ADD_ON_INVENTORY_SOLD_KEY, { type: 'json' });
+  if (stored && typeof stored === 'object') {
+    return normalizeSoldProjection(stored);
+  }
+
+  return rebuildAddOnInventorySoldProjection(env, { persist: persistOnRebuild });
+}
+
+async function getStoredAddOnInventorySoldProjection(env) {
+  if (!env?.PLEDGES) return emptySoldProjection();
+  const stored = await env.PLEDGES.get(ADD_ON_INVENTORY_SOLD_KEY, { type: 'json' });
+  return stored && typeof stored === 'object'
+    ? normalizeSoldProjection(stored)
+    : emptySoldProjection();
+}
+
+export async function ensureAddOnInventorySoldProjection(env) {
+  configureAddOnLogging(env);
+  if (!env?.PLEDGES) return { ready: false };
+
+  const stored = await env.PLEDGES.get(ADD_ON_INVENTORY_SOLD_KEY, { type: 'json' });
+  if (stored && typeof stored === 'object') {
+    return { ready: true, rebuilt: false };
+  }
+
+  await rebuildAddOnInventorySoldProjection(env, { persist: true });
+  return { ready: true, rebuilt: true };
+}
+
+export async function applyAddOnInventoryProjectionDelta(env, previousSelections = [], nextSelections = []) {
+  configureAddOnLogging(env);
+  if (!env?.PLEDGES) return { updated: false };
+
+  const projection = await getStoredAddOnInventorySoldProjection(env);
+  const before = JSON.stringify(projection.products || {});
+
+  for (const selection of previousSelections || []) {
+    applySelectionDeltaToProjection(projection, selection, -1);
+  }
+  for (const selection of nextSelections || []) {
+    applySelectionDeltaToProjection(projection, selection, 1);
+  }
+
+  if (JSON.stringify(projection.products || {}) === before) {
+    return { updated: false };
+  }
+
+  await persistSoldProjection(env, projection);
+  invalidateAddOnInventorySnapshot(env);
+  return { updated: true };
+}
+
 function applySoldSelections(snapshot, selections = []) {
   for (const selection of selections || []) {
     const productId = String(selection?.productId || '');
@@ -261,7 +452,7 @@ function finalizeAvailability(snapshot) {
   return snapshot;
 }
 
-export async function getAddOnInventorySnapshot(env, { force = false } = {}) {
+export async function getAddOnInventorySnapshot(env, { force = false, persistProjectionOnRebuild = true } = {}) {
   configureAddOnLogging(env);
 
   const now = Date.now();
@@ -273,11 +464,11 @@ export async function getAddOnInventorySnapshot(env, { force = false } = {}) {
   const catalog = await getAddOns(env);
   const overrides = await getAddOnInventoryOverrides(env);
   const snapshot = buildConfiguredInventorySnapshot(catalog, overrides);
-  const pledges = await listAllPledges(env);
-
-  for (const pledge of pledges) {
-    if (!pledge || pledge.pledgeStatus === 'cancelled') continue;
-    applySoldSelections(snapshot, pledge.bundleAddOns || []);
+  if (Object.keys(snapshot.products || {}).length > 0) {
+    const soldProjection = await getAddOnInventorySoldProjection(env, {
+      persistOnRebuild: persistProjectionOnRebuild
+    });
+    applySoldSelections(snapshot, getProjectionSelections(soldProjection));
   }
 
   const data = {
@@ -390,7 +581,10 @@ export async function mutateAddOnInventoryOverride(env, mutation = {}) {
 
   const catalog = await getAddOns(env);
   const target = findInventoryTarget(catalog, mutation.productId, mutation.variantId);
-  const beforeSnapshot = await getAddOnInventorySnapshot(env, { force: true });
+  const beforeSnapshot = await getAddOnInventorySnapshot(env, {
+    force: true,
+    persistProjectionOnRebuild: false
+  });
   const before = getSnapshotTarget(beforeSnapshot, target.productId, target.variantId);
   if (!before) {
     throw new Error('Inventory target not found');
@@ -420,7 +614,10 @@ export async function mutateAddOnInventoryOverride(env, mutation = {}) {
 
   const persistResult = await persistAddOnInventoryOverrides(env, nextOverrides);
   invalidateAddOnInventorySnapshot(env);
-  const afterSnapshot = await getAddOnInventorySnapshot(env, { force: true });
+  const afterSnapshot = await getAddOnInventorySnapshot(env, {
+    force: true,
+    persistProjectionOnRebuild: false
+  });
   const after = getSnapshotTarget(afterSnapshot, target.productId, target.variantId);
 
   return {

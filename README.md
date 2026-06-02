@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.0.3**. The v1.0 feature set and launch hardening pass are complete; v1.0.3 adds configurable platform timezone handling, opt-in launch reminders for upcoming campaigns, and mobile campaign-page performance refinements.
+Current release milestone: **v1.0.3**. The v1.0 feature set and launch hardening pass are complete; v1.0.3 adds configurable platform timezone handling, opt-in launch reminders for upcoming campaigns, Cloudflare KV list-budget hardening, and mobile campaign-page performance refinements.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -116,7 +116,7 @@ Fork-friendly global merch/add-on settings now also live in:
 - product images, size-aware variants, per-product or per-variant inventory, and `shipping_preset` references for physical catalog items
 - bundle-level add-ons can now be selected in the cart sidecar, anchored to a campaign in multi-campaign carts, and edited later from Manage Pledge
 - low-stock messaging and sold-out variant filtering now come from the shared inventory-aware add-on product-state layer used by both cart and Manage Pledge
-- configured add-on inventory is the starting baseline; remaining stock is derived from saved pledge state, not unsaved cart or Manage drafts
+- configured add-on inventory is the starting baseline; remaining stock is derived from saved pledge state through the `add-on-inventory-sold:v1` projection, not unsaved cart or Manage drafts
 - pledge and fulfillment reports now separate campaign pledge value from platform add-on value for easier operations
 
 Fork-facing settings now use a structured config model in [`_config.yml`](_config.yml):
@@ -235,6 +235,8 @@ The Pool is intentionally shaped so most traffic stays cheap:
 - normal dashboard reads, content previews, report previews/downloads, supporter filters, analytics views, marketing URL building, and local editor drafts are designed to add zero KV writes
 - the new read-only drift checks make it easier to confirm when projections are stale before running a repair path
 - limited-tier write paths now ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
+- platform add-on inventory reads use a sold-count projection after the initial bootstrap, so normal inventory refreshes do not list all pledge keys
+- launch reminder dispatch and supporter confirmation retry polling use queue-state markers; idle cron ticks skip KV list scans, and idle queues get an hourly compatibility recheck instead of minute-level or 15-minute namespace polling
 - public read paths stay intentionally permissive so a legitimately popular campaign does not hit artificial anti-DoS ceilings, while the expensive checkout / Manage / admin writes carry the tighter rate limits and request-size caps
 - once a client is already over a rate limit window, repeated blocked requests no longer rewrite the same KV counter on every hit
 - `POST /checkout-intent/abandon` uses an order-scoped retry bucket so unload/retry cleanup stays friendly to shared IPs without leaving the release path wide open
@@ -262,6 +264,8 @@ As of April 18, 2026, Cloudflare documents the Workers Free plan at `100,000` re
 - [Cloudflare Workers KV limits](https://developers.cloudflare.com/kv/platform/limits/)
 
 The practical takeaway for forks is simple: The Pool can still fit the Workers Free plan for its intended “small number of concurrent campaigns, modest backer volume, one-month run” shape, especially because public read traffic is cheap and most days have little mutation traffic. The reason to move to Paid is not that Free suddenly stopped working, but that Paid gives healthier headroom for flash spikes, abuse-path KV writes, heavier modify/cancel activity, and more operator tooling.
+
+With the v1.0.3 list-budget hardening, a normal no-queue day is expected to use roughly `48-75` Workers KV list requests over 24 hours: about one hourly idle recheck each for launch reminder dispatch and supporter email retry queues, plus occasional projection bootstraps or operator repair paths. Active launch reminder jobs and due supporter email retries still list their bounded queues when real work is pending.
 
 One deployment nuance: Cloudflare's configurable `limits` block is only enforced on the Standard Usage Model and only on deployed Workers, not in local development. That means the new `cpu_ms` guard is a denial-of-wallet backstop for Paid deployments, while Workers Free still relies on Cloudflare's built-in free-plan ceilings.
 

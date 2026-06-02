@@ -4,7 +4,7 @@
 
 **v1.0.3**
 
-The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds configurable platform timezone handling, opt-in launch reminders for upcoming campaigns, and mobile campaign-page performance refinements, while preserving the default `America/Denver` lifecycle model for existing forks.
+The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds configurable platform timezone handling, opt-in launch reminders for upcoming campaigns, Cloudflare KV list-budget hardening, and mobile campaign-page performance refinements, while preserving the default `America/Denver` lifecycle model for existing forks.
 
 ## Completed
 
@@ -219,6 +219,8 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds config
   - upcoming campaign pages can collect one-time launch reminder signups through a slim localized form with Turnstile, rate limiting, campaign/email dedupe, signed unsubscribe links, and bounded dispatch jobs
   - launch reminder delivery reuses the existing Resend email module, sender configuration, locale catalog, and pacing instead of adding a second email integration
   - the minute-level Worker scheduler now persists `cron:lastRun` hourly instead of every minute, keeping cron health visible without consuming the free-tier KV write budget as baseline churn
+  - launch reminder dispatch and supporter confirmation retry queues now maintain small queue-state markers so idle scheduled ticks skip KV namespace list scans, with hourly compatibility rechecks for manually inserted legacy jobs
+  - platform add-on inventory now uses a durable sold-count projection that pledge create, modify, and cancel paths update, so normal inventory reads no longer rebuild sold counts by listing all pledges after bootstrap
   - `_config.local.yml` can blank the reminder Turnstile site key so local development hides the widget consistently with local admin sign-in
   - the Podman media optimizer now includes `optipng` and `gifsicle` for local PNG/GIF source compression through the same repository media workflow
   - responsive image generation now includes a `640w` WebP rung between the existing `480w` and `960w` variants for mobile campaign pages

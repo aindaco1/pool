@@ -378,7 +378,7 @@ tiers:
 
 In the admin dashboard, tier IDs are read-only for editors: legacy IDs are preserved, while new tier IDs derive from the name. `shipping_preset` hides for digital tiers. If a physical tier has no preset, explicit package weight/dimension fields are shown.
 
-**Platform add-on products**: Global merch or upsell items now have a separate config path under `add_ons` in [/_config.yml](../_config.yml). That catalog is intended for fixed-price platform-wide products with simple variants, like shirt sizes, and should not be modeled as campaign `support_items`. The Worker mirrors the catalog through [/api/add-ons.json](../api/add-ons.json), exposes a current inventory snapshot through `/add-ons/inventory`, carries bundle-level add-on selections plus an anchor campaign through checkout, persists those anchor-bound add-ons on the pledge without counting them toward campaign-goal totals, and now exposes them separately in pledge and fulfillment exports. Cart and Manage Pledge both consume the same inventory-aware product-state logic, including low-stock messaging and sold-out variant filtering.
+**Platform add-on products**: Global merch or upsell items now have a separate config path under `add_ons` in [/_config.yml](../_config.yml). That catalog is intended for fixed-price platform-wide products with simple variants, like shirt sizes, and should not be modeled as campaign `support_items`. The Worker mirrors the catalog through [/api/add-ons.json](../api/add-ons.json), exposes a current inventory snapshot through `/add-ons/inventory`, carries bundle-level add-on selections plus an anchor campaign through checkout, persists those anchor-bound add-ons on the pledge without counting them toward campaign-goal totals, and now exposes them separately in pledge and fulfillment exports. Sold counts live in the `add-on-inventory-sold:v1` projection after bootstrap, and cart and Manage Pledge both consume the same inventory-aware product-state logic, including low-stock messaging and sold-out variant filtering.
 
 - `category: digital` add-ons never contribute to shipping
 - `category: physical` add-ons participate in the same shipping calculator used for physical tiers and physical support items
@@ -910,7 +910,7 @@ crons = ["* * * * *"]
 ```
 
 **What it does:**
-1. Drains queued launch reminder dispatch jobs in bounded batches
+1. Drains queued launch reminder dispatch jobs in bounded batches when the dispatch queue state says work is pending
 2. Lists all campaigns with a `goal_deadline` and `goal_amount`
 3. Queues a one-time launch reminder dispatch when an upcoming campaign becomes live
 4. For each campaign where the deadline has passed in the platform timezone and the goal is met:
@@ -919,7 +919,7 @@ crons = ["* * * * *"]
 5. Aggregates pledges by email within each campaign so each supporter gets ONE charge per campaign
 6. Sends charge-success / payment-failed emails as appropriate
 
-**Timezone note:** The scheduler runs every minute, but lifecycle work is gated to a small midnight window in the platform timezone and claimed once per local date. Launch reminder dispatch jobs can drain on any scheduled tick after the live transition is claimed, and supporter-email retries still run every 15 minutes inside the same scheduled handler.
+**Timezone note:** The scheduler runs every minute, but lifecycle work is gated to a small midnight window in the platform timezone and claimed once per local date. Launch reminder dispatch jobs can drain on any scheduled tick after the live transition is claimed, and supporter-email retries still run every 15 minutes inside the same scheduled handler. Both queues keep lightweight queue-state markers, so idle ticks skip KV list scans and only do an hourly compatibility recheck unless real work has been marked pending.
 
 ### Token Module
 
@@ -1009,6 +1009,9 @@ Cloudflare KV. Key patterns:
 - `email:{email}` — Array of order IDs for that email
 - `stats:{campaignSlug}` — Aggregated totals (pledgedAmount, pledgeCount, tierCounts)
 - `tier-inventory:{campaignSlug}` — Tier claim counts for limited tiers
+- `campaign-pledges:{campaignSlug}` — Campaign-scoped pledge index for reports, settlement, admin reads, and projection repair
+- `add-on-inventory-sold:v1` — Platform add-on sold-count projection
+- `launch-reminder-dispatch-queue:v1` and `supporter-email-retry-queue:v1` — Queue-state markers that let idle cron ticks skip KV list scans
 
 **What role does the browser cart play?**  
 The first-party cart provides pledge review and checkout handoff state in the browser. Final pledge data is stored in KV after Stripe webhook confirmation.

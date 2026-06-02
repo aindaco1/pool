@@ -73,6 +73,10 @@ Pledges are stored in Cloudflare KV. Key patterns:
 | `launch-reminder-suppressed:{campaignSlug}:{emailHash}` | Campaign-scoped reminder unsubscribe marker |
 | `launch-reminder-sent:{campaignSlug}:{emailHash}` | Launch reminder send idempotency marker |
 | `launch-reminder-dispatch:{campaignSlug}` | Bounded dispatch job cursor for a campaign that just became live |
+| `launch-reminder-dispatch-queue:v1` | Queue-state marker that lets idle launch reminder scheduled ticks skip dispatch list scans |
+| `supporter-email-retry:{orderId}` | Queued supporter confirmation email retry payload |
+| `supporter-email-retry-queue:v1` | Queue-state marker with the next due supporter email retry time |
+| `add-on-inventory-sold:v1` | Sold-count projection for platform add-on inventory |
 | `admin-users:v1` | Runtime dashboard users saved from **Settings -> Users** |
 | `admin-marketing-referrals:{campaignSlug}` | Saved referral code metadata for the dashboard Marketing tab |
 
@@ -491,11 +495,13 @@ crons = ["* * * * *"]
 
 1. Records an hourly heartbeat (`cron:lastRun` in KV) so the minute-level scheduler does not burn the free KV write budget
 2. Lists all campaigns with `goal_deadline` and `goal_amount`
-3. Drains queued launch reminder dispatch jobs in bounded batches
+3. Drains queued launch reminder dispatch jobs in bounded batches only when queue state says work is pending
 4. Queues one launch reminder dispatch job when an upcoming campaign becomes live
 5. For each campaign where deadline has passed in the platform timezone, goal is met, and `campaign-charged:{slug}` is not set:
    - Dispatches batched settlement via `POST /admin/settle-dispatch/:slug`
 6. Triggers GitHub Pages rebuild if any campaign state transitions detected
+
+The scheduler is intentionally free-tier-aware. Launch reminder dispatch and supporter confirmation email retry queues each keep a small queue-state key. When a queue is known idle, scheduled runs skip the corresponding KV namespace list operation and rely on an hourly idle recheck for compatibility with manually inserted jobs. When real work is queued, the write path marks that queue pending immediately so the next scheduled run can process it without waiting for the compatibility recheck.
 
 **Settlement dispatch (self-chaining batches):**
 

@@ -69,7 +69,17 @@ def wrangler_supports_remote_flag():
 
 
 def wrangler_failure_message(output):
-    if 'CLOUDFLARE_API_TOKEN' in output or 'Not logged in' in output or 'Authentication error [code: 10000]' in output:
+    wrangler_startup_failed = (
+        'You installed workerd on another platform' in output
+        or 'platform-specific binary executable' in output
+        or 'worker/node_modules/workerd' in output
+    )
+    if (
+        'CLOUDFLARE_API_TOKEN' in output
+        or 'Not logged in' in output
+        or 'Authentication error [code: 10000]' in output
+        or wrangler_startup_failed
+    ):
         podman_note = ''
         if os.environ.get('PODMAN_REPORT_INTERNAL') == '1':
             podman_note = (
@@ -92,6 +102,12 @@ def wrangler_failure_message(output):
             '~/Desktop/pool-fulfillment-report.csv\n\n'
             'For local Wrangler state instead, use --local.'
             f'{podman_note}'
+            + (
+                '\nWrangler could not start because the local workerd binary '
+                'does not match this platform. Reinstall Worker dependencies '
+                'with `cd worker && npm ci` if authentication is already configured.'
+                if wrangler_startup_failed else ''
+            )
         )
     return output or 'wrangler command failed'
 

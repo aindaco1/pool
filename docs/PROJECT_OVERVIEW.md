@@ -35,9 +35,11 @@ The current architecture is deliberately optimized so Cloudflare deployments spe
 - dashboard reports, supporters, analytics, settlement helpers, admin broadcast audience lookups, and stats / inventory reconciliation all prefer the `campaign-pledges:{slug}` index and avoid expensive namespace scans on normal read paths
 - dashboard content loads/previews, report previews/downloads, supporter filters, analytics views, and marketing referral lists are designed to add zero KV writes
 - limited-tier write paths now ask the per-campaign coordinator for reservation-aware availability, while public inventory stays in KV as a projection
+- platform add-on inventory uses a sold-count projection after bootstrap instead of rebuilding from pledge namespace scans on normal reads
+- launch reminder dispatch and supporter confirmation retry polling use queue-state markers, so idle scheduled ticks skip KV list scans and fall back to hourly compatibility checks
 - rate limiting still fails closed, but repeated blocked requests inside the same window no longer rewrite the same KV counter on every hit
 
-That means the real ceiling for most forks is usually **KV writes from successful pledge activity**, not public read traffic. `RATELIMIT` is now a hard requirement for supported deployments, but that does not by itself make the Free plan non-viable for the project's intended small-scale crowdfunding shape.
+That means the real ceiling for most forks is usually **KV writes from successful pledge activity**, not public read traffic or idle list polling. `RATELIMIT` is now a hard requirement for supported deployments, but that does not by itself make the Free plan non-viable for the project's intended small-scale crowdfunding shape.
 
 ## Local Development Shape
 

@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot } from '../../worker/src/add-ons.js';
+import { applyAddOnInventoryProjectionDelta, ensureAddOnInventorySoldProjection, getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot } from '../../worker/src/add-ons.js';
 
 class MockKVNamespace {
   store = new Map<string, string>();
+  listCount = 0;
 
   async get(key: string, options?: { type?: string }) {
     if (!this.store.has(key)) return null;
@@ -18,6 +19,7 @@ class MockKVNamespace {
   }
 
   async list({ prefix = '', cursor }: { prefix?: string; cursor?: string } = {}) {
+    this.listCount += 1;
     if (cursor) {
       return { keys: [], list_complete: true, cursor: undefined };
     }
@@ -36,12 +38,7 @@ describe('add-on inventory snapshot cache', () => {
     vi.restoreAllMocks();
   });
 
-  it('rebuilds add-on inventory after invalidation when saved pledges change', async () => {
-    const env = {
-      SITE_BASE: 'https://pool.test',
-      PLEDGES: new MockKVNamespace()
-    } as any;
-
+  function stubAddOnCatalog() {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       enabled: true,
       low_stock_threshold: 5,
@@ -59,12 +56,57 @@ describe('add-on inventory snapshot cache', () => {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     })) as any);
+  }
+
+  it('rebuilds add-on inventory after invalidation when saved pledges change', async () => {
+    const env = {
+      SITE_BASE: 'https://pool.test',
+      PLEDGES: new MockKVNamespace()
+    } as any;
+
+    stubAddOnCatalog();
 
     const firstSnapshot = await getAddOnInventorySnapshot(env);
     expect(firstSnapshot.products['dust-wave-sticker']).toMatchObject({
       sold: 0,
       remaining: 50
     });
+    expect(env.PLEDGES.listCount).toBe(1);
+
+    await env.PLEDGES.put('pledge:order-1', JSON.stringify({
+      orderId: 'order-1',
+      campaignSlug: 'demo',
+      pledgeStatus: 'active',
+      bundleAddOns: [
+        { productId: 'dust-wave-sticker', quantity: 2 }
+      ]
+    }));
+    await applyAddOnInventoryProjectionDelta(env, [], [
+      { productId: 'dust-wave-sticker', quantity: 2 }
+    ]);
+
+    const staleSnapshot = await getAddOnInventorySnapshot(env);
+    expect(staleSnapshot.products['dust-wave-sticker']).toMatchObject({
+      sold: 2,
+      remaining: 48
+    });
+
+    invalidateAddOnInventorySnapshot(env);
+
+    const refreshedSnapshot = await getAddOnInventorySnapshot(env);
+    expect(refreshedSnapshot.products['dust-wave-sticker']).toMatchObject({
+      sold: 2,
+      remaining: 48
+    });
+    expect(env.PLEDGES.listCount).toBe(1);
+  });
+
+  it('bootstraps the sold projection before modifying pledge add-ons', async () => {
+    const env = {
+      SITE_BASE: 'https://pool.test',
+      PLEDGES: new MockKVNamespace()
+    } as any;
+    stubAddOnCatalog();
 
     await env.PLEDGES.put('pledge:order-1', JSON.stringify({
       orderId: 'order-1',
@@ -75,18 +117,26 @@ describe('add-on inventory snapshot cache', () => {
       ]
     }));
 
-    const staleSnapshot = await getAddOnInventorySnapshot(env);
-    expect(staleSnapshot.products['dust-wave-sticker']).toMatchObject({
-      sold: 0,
-      remaining: 50
-    });
+    await ensureAddOnInventorySoldProjection(env);
+    await env.PLEDGES.put('pledge:order-1', JSON.stringify({
+      orderId: 'order-1',
+      campaignSlug: 'demo',
+      pledgeStatus: 'active',
+      bundleAddOns: [
+        { productId: 'dust-wave-sticker', quantity: 3 }
+      ]
+    }));
+    await applyAddOnInventoryProjectionDelta(env, [
+      { productId: 'dust-wave-sticker', quantity: 2 }
+    ], [
+      { productId: 'dust-wave-sticker', quantity: 3 }
+    ]);
 
-    invalidateAddOnInventorySnapshot(env);
-
-    const refreshedSnapshot = await getAddOnInventorySnapshot(env);
-    expect(refreshedSnapshot.products['dust-wave-sticker']).toMatchObject({
-      sold: 2,
-      remaining: 48
+    const snapshot = await getAddOnInventorySnapshot(env);
+    expect(snapshot.products['dust-wave-sticker']).toMatchObject({
+      sold: 3,
+      remaining: 47
     });
+    expect(env.PLEDGES.listCount).toBe(1);
   });
 });

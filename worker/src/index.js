@@ -64,7 +64,7 @@ import { RESEND_RATE_LIMIT_DELAY_MS, sendSupporterEmail, sendPaymentFailedEmail,
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
-import { getAddOns, getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
+import { applyAddOnInventoryProjectionDelta, ensureAddOnInventorySoldProjection, getAddOns, getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
 import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges, checkCampaignProjectionDrift } from './stats.js';
 import { getGitHubTextFile, putGitHubBase64File, putGitHubTextFile, triggerSiteRebuild } from './github.js';
 import { getScopedConsole } from './logger.js';
@@ -137,6 +137,7 @@ const PRIVATE_NO_STORE_CACHE_CONTROL = 'private, no-store, max-age=0';
 const DEFAULT_I18N_LANG = 'en';
 const ADD_ON_ITEM_PREFIX = 'addon__';
 const SUPPORTER_EMAIL_RETRY_PREFIX = 'supporter-email-retry:';
+const SUPPORTER_EMAIL_RETRY_QUEUE_STATE_KEY = 'supporter-email-retry-queue:v1';
 const SUPPORTER_EMAIL_RETRY_CRON = '*/15 * * * *';
 const PLATFORM_SCHEDULER_CRON = '* * * * *';
 const PLATFORM_SCHEDULER_HEARTBEAT_INTERVAL_MINUTES = 60;
@@ -146,6 +147,7 @@ const LEGACY_PLATFORM_DAILY_CRONS = new Set(['0 6 * * *', '0 7 * * *']);
 const PLATFORM_DAILY_TASK_WINDOW_MINUTES = 5;
 const SUPPORTER_EMAIL_RETRY_BATCH_SIZE = 10;
 const SUPPORTER_EMAIL_RETRY_TTL_SECONDS = 30 * 24 * 60 * 60;
+const IDLE_QUEUE_RECHECK_TTL_SECONDS = 60 * 60;
 const SHARE_CARD_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=3600';
 const SHARE_CARD_RASTER_WIDTH = 1200;
 const SHARE_CARD_RASTER_HEIGHT = 630;
@@ -3450,8 +3452,13 @@ async function persistNewPledge(env, {
   let campaignIndexed = false;
   let statsUpdated = false;
   let supportStatsUpdated = false;
+  let addOnInventoryProjected = false;
 
   try {
+    if ((pledgeData.bundleAddOns || []).length > 0) {
+      await ensureAddOnInventorySoldProjection(env);
+    }
+
     await env.PLEDGES.put(`pledge:${pledgeData.orderId}`, JSON.stringify(pledgeData));
 
     const emailKey = `email:${pledgeData.email.toLowerCase()}`;
@@ -3479,7 +3486,8 @@ async function persistNewPledge(env, {
       supportStatsUpdated = true;
     }
 
-    invalidateAddOnInventorySnapshot(env);
+    await applyAddOnInventoryProjectionDelta(env, [], pledgeData.bundleAddOns || []);
+    addOnInventoryProjected = true;
 
     return { success: true };
   } catch (err) {
@@ -3498,6 +3506,10 @@ async function persistNewPledge(env, {
 
     if (supportStatsUpdated) {
       await updateSupportItemStats(env, campaignSlug, supportItems, []);
+    }
+
+    if (addOnInventoryProjected) {
+      await applyAddOnInventoryProjectionDelta(env, pledgeData.bundleAddOns || [], []);
     }
 
     if (statsUpdated) {
@@ -4391,6 +4403,49 @@ function getSupporterEmailRetryDelayMs(attempts) {
   return Math.min(12 * 60 * 60 * 1000, 5 * 60 * 1000 * (2 ** (normalizedAttempts - 1)));
 }
 
+function parseTimestampMs(value) {
+  const parsed = Date.parse(String(value || ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeSupporterEmailRetryQueueState(value) {
+  if (!value || typeof value !== 'object') return null;
+  return {
+    hasPending: value.hasPending === true,
+    nextAttemptAt: parseTimestampMs(value.nextAttemptAt) === null ? null : String(value.nextAttemptAt)
+  };
+}
+
+async function writeSupporterEmailRetryQueueState(env, { hasPending, nextAttemptAt = null } = {}) {
+  if (!env.PLEDGES) return;
+  const state = {
+    version: 1,
+    hasPending: hasPending === true,
+    nextAttemptAt: hasPending === true && nextAttemptAt ? String(nextAttemptAt) : null,
+    updatedAt: new Date().toISOString()
+  };
+  const options = hasPending === true
+    ? { expirationTtl: SUPPORTER_EMAIL_RETRY_TTL_SECONDS }
+    : { expirationTtl: IDLE_QUEUE_RECHECK_TTL_SECONDS };
+  await env.PLEDGES.put(SUPPORTER_EMAIL_RETRY_QUEUE_STATE_KEY, JSON.stringify(state), options);
+}
+
+async function markSupporterEmailRetryQueuePending(env, nextAttemptAt) {
+  if (!env.PLEDGES) return;
+  const existing = normalizeSupporterEmailRetryQueueState(
+    await env.PLEDGES.get(SUPPORTER_EMAIL_RETRY_QUEUE_STATE_KEY, { type: 'json' })
+  );
+  const existingTime = existing?.hasPending ? parseTimestampMs(existing.nextAttemptAt) : null;
+  const nextTime = parseTimestampMs(nextAttemptAt);
+  const earliest = existingTime !== null && nextTime !== null
+    ? Math.min(existingTime, nextTime)
+    : existingTime ?? nextTime;
+  await writeSupporterEmailRetryQueueState(env, {
+    hasPending: true,
+    nextAttemptAt: earliest === null ? nextAttemptAt : new Date(earliest).toISOString()
+  });
+}
+
 async function updatePledgeEmailDeliveryState(env, orderId, updates = {}) {
   const normalizedOrderId = String(orderId || '').trim();
   if (!env.PLEDGES || !normalizedOrderId || !updates || typeof updates !== 'object') {
@@ -4419,7 +4474,7 @@ async function queueSupporterEmailRetry(env, { orderId, payload, error, attempts
   const nextAttemptAt = new Date(now.getTime() + getSupporterEmailRetryDelayMs(nextAttempts)).toISOString();
   const lastError = String(error || 'Unknown supporter email error');
 
-  await env.PLEDGES.put(retryKey, JSON.stringify({
+  const retryRecord = {
     orderId: normalizedOrderId,
     payload,
     attempts: nextAttempts,
@@ -4427,7 +4482,10 @@ async function queueSupporterEmailRetry(env, { orderId, payload, error, attempts
     lastAttemptAt: now.toISOString(),
     nextAttemptAt,
     lastError
-  }), { expirationTtl: SUPPORTER_EMAIL_RETRY_TTL_SECONDS });
+  };
+
+  await env.PLEDGES.put(retryKey, JSON.stringify(retryRecord), { expirationTtl: SUPPORTER_EMAIL_RETRY_TTL_SECONDS });
+  await markSupporterEmailRetryQueuePending(env, nextAttemptAt);
 
   await updatePledgeEmailDeliveryState(env, normalizedOrderId, {
     emailSent: false,
@@ -4436,6 +4494,7 @@ async function queueSupporterEmailRetry(env, { orderId, payload, error, attempts
     emailRetryAttempts: nextAttempts,
     emailNextRetryAt: nextAttemptAt
   });
+  return retryRecord;
 }
 
 async function clearSupporterEmailRetry(env, orderId) {
@@ -4463,13 +4522,13 @@ async function attemptSupporterEmailDelivery(env, { orderId, payload, attempts =
     return { ok: true };
   } catch (err) {
     const message = err?.message || 'Unknown supporter email error';
-    await queueSupporterEmailRetry(env, {
+    const retryRecord = await queueSupporterEmailRetry(env, {
       orderId: normalizedOrderId,
       payload,
       error: message,
       attempts
     });
-    return { ok: false, error: message };
+    return { ok: false, error: message, nextAttemptAt: retryRecord?.nextAttemptAt || null };
   }
 }
 
@@ -4478,6 +4537,19 @@ async function processQueuedSupporterEmails(env, { maxJobs = SUPPORTER_EMAIL_RET
     return { processed: 0, sent: 0, failed: 0 };
   }
 
+  const queueState = normalizeSupporterEmailRetryQueueState(
+    await env.PLEDGES.get(SUPPORTER_EMAIL_RETRY_QUEUE_STATE_KEY, { type: 'json' })
+  );
+  const nowMs = Date.now();
+  const queueNextAttemptMs = parseTimestampMs(queueState?.nextAttemptAt);
+  if (queueState && !queueState.hasPending) {
+    return { processed: 0, sent: 0, failed: 0, skipped: 'idle' };
+  }
+  if (queueState?.hasPending && queueNextAttemptMs !== null && queueNextAttemptMs > nowMs) {
+    return { processed: 0, sent: 0, failed: 0, skipped: 'not_due', nextAttemptAt: queueState.nextAttemptAt };
+  }
+
+  const records = [];
   const dueRecords = [];
   let cursor;
 
@@ -4486,7 +4558,9 @@ async function processQueuedSupporterEmails(env, { maxJobs = SUPPORTER_EMAIL_RET
     for (const entry of page?.keys || []) {
       const record = await env.PLEDGES.get(entry.name, { type: 'json' });
       if (!record?.orderId || !record?.payload) continue;
-      if (!record.nextAttemptAt || Date.parse(record.nextAttemptAt) <= Date.now()) {
+      records.push(record);
+      const nextAttemptMs = parseTimestampMs(record.nextAttemptAt);
+      if (nextAttemptMs === null || nextAttemptMs <= nowMs) {
         dueRecords.push(record);
       }
     }
@@ -4502,8 +4576,18 @@ async function processQueuedSupporterEmails(env, { maxJobs = SUPPORTER_EMAIL_RET
   let processed = 0;
   let sent = 0;
   let failed = 0;
+  const selectedRecords = dueRecords.slice(0, Math.max(1, Number(maxJobs) || SUPPORTER_EMAIL_RETRY_BATCH_SIZE));
+  const selectedOrderIds = new Set(selectedRecords.map((record) => String(record.orderId || '')));
+  const pendingAttemptTimes = [];
 
-  for (const record of dueRecords.slice(0, Math.max(1, Number(maxJobs) || SUPPORTER_EMAIL_RETRY_BATCH_SIZE))) {
+  for (const record of records) {
+    const orderId = String(record.orderId || '');
+    if (!orderId || selectedOrderIds.has(orderId)) continue;
+    const nextAttemptMs = parseTimestampMs(record.nextAttemptAt);
+    pendingAttemptTimes.push(nextAttemptMs === null || nextAttemptMs <= nowMs ? nowMs : nextAttemptMs);
+  }
+
+  for (const record of selectedRecords) {
     processed++;
     const result = await attemptSupporterEmailDelivery(env, {
       orderId: record.orderId,
@@ -4514,7 +4598,15 @@ async function processQueuedSupporterEmails(env, { maxJobs = SUPPORTER_EMAIL_RET
       sent++;
     } else {
       failed++;
+      pendingAttemptTimes.push(parseTimestampMs(result.nextAttemptAt) ?? nowMs);
     }
+  }
+
+  if (pendingAttemptTimes.length > 0) {
+    const nextAttemptAt = new Date(Math.min(...pendingAttemptTimes)).toISOString();
+    await writeSupporterEmailRetryQueueState(env, { hasPending: true, nextAttemptAt });
+  } else {
+    await writeSupporterEmailRetryQueueState(env, { hasPending: false });
   }
 
   return { processed, sent, failed };
@@ -6442,6 +6534,9 @@ async function handleCancelPledge(request, env) {
       
       // Store for stats update
       cancelledPledgeData = { ...pledgeData };
+      if ((cancelledPledgeData.bundleAddOns || []).length > 0) {
+        await ensureAddOnInventorySoldProjection(env);
+      }
       
       const now = new Date().toISOString();
       pledgeData.pledgeStatus = 'cancelled';
@@ -6516,7 +6611,7 @@ async function handleCancelPledge(request, env) {
         }
       }
 
-      invalidateAddOnInventorySnapshot(env);
+      await applyAddOnInventoryProjectionDelta(env, cancelledPledgeData?.bundleAddOns || [], []);
       
       // Update email mapping - check if user has other active pledges
       const emailKey = `email:${pledgeData.email.toLowerCase()}`;
@@ -6814,19 +6909,40 @@ async function handleModifyPledge(request, env) {
 
       let pledgeStored = false;
       let statsReconciled = false;
+      let addOnInventoryProjected = false;
 
       try {
+        if (
+          (originalPledgeData.bundleAddOns || []).length > 0 ||
+          (nextPledgeData.bundleAddOns || []).length > 0
+        ) {
+          await ensureAddOnInventorySoldProjection(env);
+        }
+
         await env.PLEDGES.put(`pledge:${targetOrderId}`, JSON.stringify(nextPledgeData));
         pledgeStored = true;
+
+        await applyAddOnInventoryProjectionDelta(
+          env,
+          originalPledgeData.bundleAddOns || [],
+          nextPledgeData.bundleAddOns || []
+        );
+        addOnInventoryProjected = true;
 
         await recalculateStats(env, campaignSlug);
         statsReconciled = true;
 
-        invalidateAddOnInventorySnapshot(env);
-
         updatedPledgeData = nextPledgeData;
       } catch (err) {
         console.error('Failed to persist pledge modification:', err.message);
+
+        if (addOnInventoryProjected) {
+          await applyAddOnInventoryProjectionDelta(
+            env,
+            nextPledgeData.bundleAddOns || [],
+            originalPledgeData.bundleAddOns || []
+          );
+        }
 
         if (pledgeStored) {
           await env.PLEDGES.put(`pledge:${targetOrderId}`, JSON.stringify(originalPledgeData));
@@ -13653,7 +13769,10 @@ async function handleAdminAddOnInventory(request, env) {
 
   const [catalog, snapshot] = await Promise.all([
     getAddOns(env),
-    getAddOnInventorySnapshot(env, { force: true })
+    getAddOnInventorySnapshot(env, {
+      force: true,
+      persistProjectionOnRebuild: false
+    })
   ]);
 
   return privateJsonResponse({

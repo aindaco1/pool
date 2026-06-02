@@ -277,6 +277,68 @@ describe('worker operational integrity', () => {
     await expect(kv.get('cron:lastEmailRetryRun')).resolves.toBeTruthy();
   });
 
+  it('skips supporter email retry list scans while the retry queue is idle', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await worker.scheduled({ cron: '*/15 * * * *' }, env, { waitUntil: () => {} });
+    expect(kv.listCalls.some(call => call.prefix === 'supporter-email-retry:')).toBe(true);
+
+    kv.listCalls = [];
+    await worker.scheduled({ cron: '*/15 * * * *' }, env, { waitUntil: () => {} });
+    expect(kv.listCalls.some(call => call.prefix === 'supporter-email-retry:')).toBe(false);
+  });
+
+  it('defers supporter email retry list scans until the next queued attempt is due', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-14T00:00:00.000Z'));
+
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('pledge:pool-intent-retry-future', JSON.stringify({
+      orderId: 'pool-intent-retry-future',
+      email: 'future@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'active',
+      charged: false
+    }));
+    await kv.put('supporter-email-retry:pool-intent-retry-future', JSON.stringify({
+      orderId: 'pool-intent-retry-future',
+      payload: {
+        email: 'future@example.com',
+        campaignSlug: 'hand-relations',
+        campaignTitle: 'Hand Relations',
+        subtotal: 500,
+        tax: 39,
+        shipping: 0,
+        tipAmount: 25,
+        tipPercent: 5,
+        token: 'token'
+      },
+      attempts: 1,
+      createdAt: '2026-04-14T00:00:00.000Z',
+      lastAttemptAt: '2026-04-14T00:00:00.000Z',
+      nextAttemptAt: '2026-04-14T01:00:00.000Z',
+      lastError: 'resend unavailable'
+    }));
+    await kv.put('supporter-email-retry-queue:v1', JSON.stringify({
+      version: 1,
+      hasPending: true,
+      nextAttemptAt: '2026-04-14T01:00:00.000Z',
+      updatedAt: '2026-04-14T00:00:00.000Z'
+    }));
+
+    await worker.scheduled({ cron: '*/15 * * * *' }, env, { waitUntil: () => {} });
+    expect(kv.listCalls.some(call => call.prefix === 'supporter-email-retry:')).toBe(false);
+    expect(mockSendSupporterEmail).not.toHaveBeenCalled();
+
+    vi.setSystemTime(new Date('2026-04-14T01:00:00.000Z'));
+    await worker.scheduled({ cron: '*/15 * * * *' }, env, { waitUntil: () => {} });
+    expect(kv.listCalls.some(call => call.prefix === 'supporter-email-retry:')).toBe(true);
+    expect(mockSendSupporterEmail).toHaveBeenCalledTimes(1);
+  });
+
   it('sends a daily campaign-runner pledge report at 7am platform time', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-21T13:00:00.000Z'));
@@ -432,6 +494,18 @@ describe('worker operational integrity', () => {
 
     await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
     expect(mockSendLaunchReminderEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips launch reminder dispatch list scans while the dispatch queue is idle', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+    expect(kv.listCalls.some(call => call.prefix === 'launch-reminder-dispatch:')).toBe(true);
+
+    kv.listCalls = [];
+    await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+    expect(kv.listCalls.some(call => call.prefix === 'launch-reminder-dispatch:')).toBe(false);
   });
 
   it('dry-runs a campaign-runner report without sending email', async () => {

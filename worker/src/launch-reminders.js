@@ -10,6 +10,7 @@ const SUPPRESSION_PREFIX = 'launch-reminder-suppressed:';
 const SENT_PREFIX = 'launch-reminder-sent:';
 const DISPATCH_PREFIX = 'launch-reminder-dispatch:';
 const COMPLETE_PREFIX = 'launch-reminder-complete:';
+const DISPATCH_QUEUE_STATE_KEY = 'launch-reminder-dispatch-queue:v1';
 const TOKEN_SCOPE_UNSUBSCRIBE = 'launch-reminder-unsubscribe';
 const DEFAULT_DISPATCH_BATCH_SIZE = 25;
 const DEFAULT_DISPATCH_JOB_LIMIT = 3;
@@ -17,6 +18,7 @@ const DISPATCH_JOB_TTL_SECONDS = 14 * 24 * 60 * 60;
 const SENT_MARKER_TTL_SECONDS = 400 * 24 * 60 * 60;
 const COMPLETE_MARKER_TTL_SECONDS = 400 * 24 * 60 * 60;
 const SUPPRESSION_TTL_SECONDS = 400 * 24 * 60 * 60;
+const IDLE_QUEUE_RECHECK_TTL_SECONDS = 60 * 60;
 
 function isTruthyEnv(value) {
   return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
@@ -73,6 +75,22 @@ function getDispatchKey(campaignSlug) {
 
 function getCompleteKey(campaignSlug) {
   return `${COMPLETE_PREFIX}${campaignSlug}`;
+}
+
+function normalizeDispatchQueueState(value) {
+  if (!value || typeof value !== 'object') return null;
+  return { hasPending: value.hasPending === true };
+}
+
+async function writeDispatchQueueState(env, hasPending) {
+  if (!env?.PLEDGES) return;
+  await env.PLEDGES.put(DISPATCH_QUEUE_STATE_KEY, JSON.stringify({
+    version: 1,
+    hasPending: hasPending === true,
+    updatedAt: new Date().toISOString()
+  }), {
+    expirationTtl: hasPending === true ? DISPATCH_JOB_TTL_SECONDS : IDLE_QUEUE_RECHECK_TTL_SECONDS
+  });
 }
 
 function getLaunchReminderTokenSecret(env) {
@@ -296,7 +314,10 @@ export async function ensureLaunchReminderDispatchForCampaign(env, campaign) {
     env.PLEDGES.get(dispatchKey, { type: 'json' })
   ]);
   if (complete) return { queued: false, reason: 'already_complete' };
-  if (existingJob?.status === 'pending') return { queued: false, reason: 'already_queued' };
+  if (existingJob?.status === 'pending') {
+    await writeDispatchQueueState(env, true);
+    return { queued: false, reason: 'already_queued' };
+  }
 
   if (!(await campaignHasLaunchReminderSignups(env, campaignSlug))) {
     await env.PLEDGES.put(completeKey, new Date().toISOString(), { expirationTtl: COMPLETE_MARKER_TTL_SECONDS });
@@ -316,6 +337,7 @@ export async function ensureLaunchReminderDispatchForCampaign(env, campaign) {
     skipped: 0,
     failed: 0
   }), { expirationTtl: DISPATCH_JOB_TTL_SECONDS });
+  await writeDispatchQueueState(env, true);
 
   return { queued: true };
 }
@@ -432,6 +454,13 @@ export async function processLaunchReminderDispatchJobs(env, now = new Date()) {
     return { attempted: false, jobs: 0, sent: 0, skipped: 0, failed: 0, completed: 0 };
   }
 
+  const queueState = normalizeDispatchQueueState(
+    await env.PLEDGES.get(DISPATCH_QUEUE_STATE_KEY, { type: 'json' })
+  );
+  if (queueState && !queueState.hasPending) {
+    return { attempted: false, jobs: 0, sent: 0, skipped: 0, failed: 0, completed: 0, skippedReason: 'idle' };
+  }
+
   const jobLimit = Math.max(1, Math.min(
     10,
     Number.parseInt(String(env.LAUNCH_REMINDER_DISPATCH_JOB_LIMIT || DEFAULT_DISPATCH_JOB_LIMIT), 10) || DEFAULT_DISPATCH_JOB_LIMIT
@@ -442,6 +471,7 @@ export async function processLaunchReminderDispatchJobs(env, now = new Date()) {
   });
   const keys = Array.isArray(listing?.keys) ? listing.keys.slice(0, jobLimit) : [];
   const results = { attempted: keys.length > 0, jobs: 0, sent: 0, skipped: 0, failed: 0, completed: 0 };
+  let hasPendingJobs = listing?.list_complete === false;
 
   for (const keyInfo of keys) {
     const jobKey = keyInfo?.name;
@@ -457,8 +487,12 @@ export async function processLaunchReminderDispatchJobs(env, now = new Date()) {
     results.skipped += result.skipped || 0;
     results.failed += result.failed || 0;
     if (result.completed) results.completed++;
+    if (!result.completed && !result.deleted) {
+      hasPendingJobs = true;
+    }
   }
 
+  await writeDispatchQueueState(env, hasPendingJobs);
   return results;
 }
 

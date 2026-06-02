@@ -62,7 +62,9 @@ The Worker now also writes lightweight observability summaries into `PLEDGES` KV
 
 Campaign-runner reports use the configured platform timezone. `PLATFORM_TIMEZONE` defaults to `America/Denver`, and the minute-level Worker scheduler checks the configured local send time before sending so forks can use any supported IANA timezone.
 
-Upcoming-campaign launch reminders also run through the minute-level scheduler. Public campaign pages collect explicit opt-in email reminders only while a campaign is upcoming; the Worker stores campaign-scoped hashed signup keys, queues one dispatch job when that campaign becomes live, and sends through the existing Resend email module with the updates sender. The reminder path does not add a second Resend API integration.
+Upcoming-campaign launch reminders also run through the minute-level scheduler. Public campaign pages collect explicit opt-in email reminders only while a campaign is upcoming; the Worker stores campaign-scoped hashed signup keys, queues one dispatch job when that campaign becomes live, and sends through the existing Resend email module with the updates sender. The dispatch queue keeps `launch-reminder-dispatch-queue:v1` state so idle scheduled ticks skip dispatch namespace scans; queued jobs mark the state pending immediately, and idle state expires hourly for compatibility with manually inserted jobs. The reminder path does not add a second Resend API integration.
+
+Supporter confirmation email retries use the same free-tier-aware pattern. Failed sends write `supporter-email-retry:{orderId}` plus `supporter-email-retry-queue:v1`, and the scheduled retry pass skips KV list scans while the queue is idle or before the next retry is due.
 
 Public campaign-page media optimization remains a static-site concern rather than a Worker runtime concern. The Worker preserves dashboard uploads as source files; Jekyll templates, the repository media optimizer, and the deploy artifact step handle responsive WebP variants, local YouTube hero poster facades, and generated CSS/JS minification before the public Pages artifact is served.
 
@@ -78,7 +80,7 @@ Before mutating anything, operators can now run read-only drift checks through:
 
 Those checks compare stored `campaign-pledges:{slug}`, `stats:{slug}`, and `tier-inventory:{slug}` projections against active pledge truth and return a structured diff instead of silently repairing state.
 
-The same “saved truth over draft state” rule now applies to platform add-ons: `_config.yml` defines the starting inventory baseline for each product or variant, while the Worker derives effective remaining inventory from saved pledge state and invalidates cached add-on inventory after pledge create, modify, or cancel events.
+The same “saved truth over draft state” rule now applies to platform add-ons: `_config.yml` defines the starting inventory baseline for each product or variant, while the Worker stores sold counts in `add-on-inventory-sold:v1`, updates that projection after pledge create, modify, or cancel events, and avoids repeated pledge namespace scans for normal inventory reads after the initial projection bootstrap.
 
 ## Setup
 
@@ -392,7 +394,7 @@ Admin auth starts/exchanges and browser-admin mutations are rate limited through
 
 When `TURNSTILE_SECRET_KEY` is configured, `POST /admin/auth/start` verifies the Cloudflare Turnstile challenge before sending magic-link email. Keep that protection on the submit path only so it does not add dashboard pageview or typing-time KV writes.
 
-Platform add-on inventory uses `_config.yml` as the configured baseline, optional `add-on-inventory-overrides` KV state for operator restocks, and saved pledge truth for sold counts. Admin inventory page views do not load the inventory table automatically; the super-admin inventory read is explicit and may scan pledge truth, while set/restock/reset actions write only the override state plus an audit event.
+Platform add-on inventory uses `_config.yml` as the configured baseline, optional `add-on-inventory-overrides` KV state for operator restocks, and `add-on-inventory-sold:v1` for sold counts derived from saved pledge truth. Admin inventory page views do not load the inventory table automatically; the super-admin inventory read is explicit and uses the sold-count projection after bootstrap, while set/restock/reset actions write only the override state plus an audit event.
 
 The marketing-tool slice keeps campaign URL building, UTM/referral parameters, embed-builder shortcuts, local field preferences, and copy snippets in browser state. Saved referral codes are separate: listing them is a read-only campaign-scoped Worker call, and saving one is an explicit mutation.
 

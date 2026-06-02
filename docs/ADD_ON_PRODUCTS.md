@@ -174,6 +174,7 @@ The current add-on flow is intentionally inventory-aware:
 - low-stock messaging appears when remaining quantity is at or below `low_stock_threshold`
 - sold-out variants are removed from the shared product-state surface unless they are already selected on an existing pledge
 - add-on inventory is counted from persisted pledge records, not in-progress cart drafts
+- sold counts are stored in `add-on-inventory-sold:v1` after the first projection bootstrap, and pledge create, modify, and cancel paths keep that projection current so normal inventory reads do not list all pledge keys
 - super admins can set platform add-on inventory overrides in the dashboard without editing `_config.yml`; those overrides are stored separately from the configured baseline
 
 ## UI Model
