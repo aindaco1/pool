@@ -5192,6 +5192,15 @@
     control.append(paragraph);
   }
 
+  function wrapMarkdownInline(inner, openMarker, closeMarker) {
+    var text = String(inner || '');
+    var leading = text.match(/^\s+/)?.[0] || '';
+    var trailing = text.match(/\s+$/)?.[0] || '';
+    var core = text.slice(leading.length, text.length - trailing.length);
+    if (!core) return text;
+    return leading + openMarker + core + closeMarker + trailing;
+  }
+
   function nodeToMarkdown(node) {
     if (!node) return '';
     if (node.nodeType === Node.TEXT_NODE) return String(node.textContent || '').replace(/\u00a0/g, ' ');
@@ -5204,9 +5213,9 @@
       var href = element.getAttribute('href') || '';
       return href ? '[' + inner + '](' + href + ')' : inner;
     }
-    if (tag === 'strong' || tag === 'b') return '**' + inner + '**';
-    if (tag === 'em' || tag === 'i') return '*' + inner + '*';
-    if (tag === 'u') return '<u>' + inner + '</u>';
+    if (tag === 'strong' || tag === 'b') return wrapMarkdownInline(inner, '**', '**');
+    if (tag === 'em' || tag === 'i') return wrapMarkdownInline(inner, '*', '*');
+    if (tag === 'u') return wrapMarkdownInline(inner, '<u>', '</u>');
     if (tag === 'h2') return '## ' + inner.trim();
     if (tag === 'h3') return '### ' + inner.trim();
     if (tag === 'h4') return '#### ' + inner.trim();

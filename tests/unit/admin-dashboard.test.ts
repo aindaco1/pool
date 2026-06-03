@@ -76,6 +76,38 @@ function jsonResponse(data: unknown, status = 200) {
   });
 }
 
+type GitHubFetchCall = { url: string; method: string; body?: any };
+
+function isMediaOptimizationDispatch(url: string, method: string) {
+  return url.endsWith('/actions/workflows/media-optimization.yml/dispatches') && method === 'POST';
+}
+
+function maybeMediaOptimizationDispatch(
+  url: string,
+  method: string,
+  init: RequestInit | undefined,
+  githubCalls: GitHubFetchCall[]
+) {
+  if (!isMediaOptimizationDispatch(url, method)) return null;
+  const body = JSON.parse(String(init?.body || '{}'));
+  githubCalls.push({ url, method, body });
+  return new Response(null, { status: 204 });
+}
+
+function githubPutCalls(githubCalls: GitHubFetchCall[]) {
+  return githubCalls.filter((call) => call.method === 'PUT');
+}
+
+function githubMediaOptimizationDispatch(githubCalls: GitHubFetchCall[]) {
+  return githubCalls.find((call) => isMediaOptimizationDispatch(call.url, call.method));
+}
+
+function expectChangedMediaOptimizationDispatch(githubCalls: GitHubFetchCall[]) {
+  const dispatch = githubMediaOptimizationDispatch(githubCalls);
+  expect(dispatch).toBeDefined();
+  expect(dispatch?.body).toEqual({ ref: 'main', inputs: { scope: 'changed' } });
+}
+
 async function sha256Hex(value: string) {
   const data = new TextEncoder().encode(value);
   const hash = await crypto.subtle.digest('SHA-256', data);
@@ -1608,6 +1640,8 @@ runner_report_emails:
     global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = String(init?.method || 'GET');
+      const dispatchResponse = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
+      if (dispatchResponse) return dispatchResponse;
       if (url.includes('/contents/assets/images/defaults/logo-') && method === 'PUT') {
         const body = JSON.parse(String(init?.body || '{}'));
         githubCalls.push({ url, method, body });
@@ -1634,10 +1668,14 @@ runner_report_emails:
     const body = await response.json();
     expect(body.path).toMatch(/^\/assets\/images\/defaults\/logo-\d{8}-\d{6}\.png$/);
     expect(body.processing).toMatchObject({ imageOptimization: 'source-preserved', videoTranscoding: 'not-video' });
+    expect(body.mediaOptimization).toEqual({ triggered: true, workflow: 'media-optimization.yml' });
     expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
-    expect(githubCalls).toHaveLength(1);
-    expect(githubCalls[0].body.content).toBe('aGVsbG8=');
-    expect(githubCalls[0].body.message).toContain('Upload admin logo');
+    expect(githubCalls).toHaveLength(2);
+    expectChangedMediaOptimizationDispatch(githubCalls);
+    const putCalls = githubPutCalls(githubCalls);
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0].body.content).toBe('aGVsbG8=');
+    expect(putCalls[0].body.message).toContain('Upload admin logo');
     expectNoKvWritesOrLists(env, 'logo upload');
   });
 
@@ -1654,6 +1692,8 @@ runner_report_emails:
     global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = String(init?.method || 'GET');
+      const dispatchResponse = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
+      if (dispatchResponse) return dispatchResponse;
       if (url.includes('/contents/assets/images/campaigns/hand-relations/hero-wide-') && method === 'PUT') {
         const body = JSON.parse(String(init?.body || '{}'));
         githubCalls.push({ url, method, body });
@@ -1683,9 +1723,13 @@ runner_report_emails:
     const body = await response.json();
     expect(body.path).toMatch(/^\/assets\/images\/campaigns\/hand-relations\/hero-wide-\d{8}-\d{6}\.webp$/);
     expect(body.processing).toMatchObject({ imageOptimization: 'source-preserved', videoTranscoding: 'not-video' });
+    expect(body.mediaOptimization).toEqual({ triggered: true, workflow: 'media-optimization.yml' });
     expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
-    expect(githubCalls).toHaveLength(1);
-    expect(githubCalls[0].body.message).toContain('Upload admin image');
+    expect(githubCalls).toHaveLength(2);
+    expectChangedMediaOptimizationDispatch(githubCalls);
+    const putCalls = githubPutCalls(githubCalls);
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0].body.message).toContain('Upload admin image');
     expectNoKvWritesOrLists(env, 'campaign image upload');
   });
 
@@ -1702,6 +1746,8 @@ runner_report_emails:
     global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = String(init?.method || 'GET');
+      const dispatchResponse = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
+      if (dispatchResponse) return dispatchResponse;
       if (url.includes('/contents/assets/images/campaigns/hand-relations/content-image-1-') && method === 'PUT') {
         const body = JSON.parse(String(init?.body || '{}'));
         githubCalls.push({ url, method, body });
@@ -1732,8 +1778,11 @@ runner_report_emails:
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.path).toMatch(/^\/assets\/images\/campaigns\/hand-relations\/content-image-1-\d{8}-\d{6}\.png$/);
+    expect(body.mediaOptimization).toEqual({ triggered: true, workflow: 'media-optimization.yml' });
     expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
-    expect(githubCalls).toHaveLength(1);
+    expect(githubCalls).toHaveLength(2);
+    expectChangedMediaOptimizationDispatch(githubCalls);
+    expect(githubPutCalls(githubCalls)).toHaveLength(1);
     expectNoKvWritesOrLists(env, 'content editor image upload');
   });
 
@@ -1755,6 +1804,8 @@ runner_report_emails:
     global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = String(init?.method || 'GET');
+      const dispatchResponse = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
+      if (dispatchResponse) return dispatchResponse;
       if (url === 'https://pool.test/api/campaigns.json') {
         return jsonResponse({ campaigns: [campaignFixture] });
       }
@@ -1785,6 +1836,8 @@ runner_report_emails:
       })
     }), env, ctx);
     expect(allowedResponse.status).toBe(200);
+    const allowedBody = await allowedResponse.json();
+    expect(allowedBody.mediaOptimization).toEqual({ triggered: true, workflow: 'media-optimization.yml' });
 
     const blockedCampaignResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/image-upload', {
       method: 'POST',
@@ -1814,7 +1867,9 @@ runner_report_emails:
     }), env, ctx);
     expect(blockedPlatformResponse.status).toBe(403);
 
-    expect(githubCalls).toHaveLength(1);
+    expect(githubCalls).toHaveLength(2);
+    expectChangedMediaOptimizationDispatch(githubCalls);
+    expect(githubPutCalls(githubCalls)).toHaveLength(1);
     expectNoKvWritesOrLists(env, 'scoped campaign media upload');
   });
 
@@ -1861,8 +1916,13 @@ runner_report_emails:
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.path).toMatch(/^\/assets\/audio\/campaigns\/hand-relations\/content-audio-1-\d{8}-\d{6}\.mp3$/);
+    expect(body.mediaOptimization).toEqual({
+      triggered: false,
+      reason: 'Media optimization is not configured for this upload type.'
+    });
     expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
     expect(githubCalls).toHaveLength(1);
+    expect(githubMediaOptimizationDispatch(githubCalls)).toBeUndefined();
     expect(githubCalls[0].body.message).toContain('Upload admin audio');
     expectNoKvWritesOrLists(env, 'content editor audio upload');
   });
@@ -1880,6 +1940,8 @@ runner_report_emails:
     global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = String(init?.method || 'GET');
+      const dispatchResponse = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
+      if (dispatchResponse) return dispatchResponse;
       if (url.includes('/contents/assets/videos/campaigns/hand-relations/video-') && method === 'PUT') {
         const body = JSON.parse(String(init?.body || '{}'));
         githubCalls.push({ url, method, body });
@@ -1909,11 +1971,283 @@ runner_report_emails:
     const body = await response.json();
     expect(body.path).toMatch(/^\/assets\/videos\/campaigns\/hand-relations\/video-\d{8}-\d{6}\.mp4$/);
     expect(body.processing).toMatchObject({ imageOptimization: 'not-image', videoTranscoding: 'source-preserved' });
+    expect(body.mediaOptimization).toEqual({ triggered: true, workflow: 'media-optimization.yml' });
     expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
-    expect(githubCalls).toHaveLength(1);
-    expect(githubCalls[0].body.content).toBe('aGVsbG8=');
-    expect(githubCalls[0].body.message).toContain('Upload admin video');
+    expect(githubCalls).toHaveLength(2);
+    expectChangedMediaOptimizationDispatch(githubCalls);
+    const putCalls = githubPutCalls(githubCalls);
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0].body.content).toBe('aGVsbG8=');
+    expect(putCalls[0].body.message).toContain('Upload admin video');
     expectNoKvWritesOrLists(env, 'video upload');
+  });
+
+  it('deletes dashboard-owned content media when a published content block is removed', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_WORKFLOW: 'deploy.yml',
+      GITHUB_REF: 'main'
+    };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    const ratelimit = env.RATELIMIT as CountingKVNamespace;
+    const deletedMediaPath = 'assets/images/campaigns/hand-relations/deleted-block.webp';
+    const campaignWithMedia = {
+      ...campaignFixture,
+      long_content: [
+        { type: 'image', src: `/${deletedMediaPath}`, alt: 'Deleted block' },
+        { type: 'text', body: 'Old text.' }
+      ]
+    };
+    const githubCalls: GitHubFetchCall[] = [];
+    const existingMarkdown = `---
+layout: campaign
+title: "Hand Relations"
+slug: hand-relations
+short_blurb: "Old blurb"
+long_content:
+  - type: image
+    src: "/${deletedMediaPath}"
+    alt: "Deleted block"
+  - type: text
+    body: |
+      Old text.
+---
+`;
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignWithMedia] });
+      }
+      if (url === 'https://pool.test/api/add-ons.json') {
+        return jsonResponse(addOnsFixture);
+      }
+      if (url.includes('/contents/_campaigns/hand-relations.md') && method === 'GET') {
+        githubCalls.push({ url, method });
+        return jsonResponse({
+          path: '_campaigns/hand-relations.md',
+          sha: 'old-file-sha',
+          encoding: 'base64',
+          content: Buffer.from(existingMarkdown, 'utf8').toString('base64')
+        });
+      }
+      if (url.endsWith('/contents/_campaigns/hand-relations.md') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: '_campaigns/hand-relations.md', sha: 'new-file-sha' },
+          commit: { sha: 'content-commit-sha', html_url: 'https://github.test/content-commit-sha' }
+        });
+      }
+      if (url.includes(`/contents/${deletedMediaPath}`) && method === 'GET') {
+        githubCalls.push({ url, method });
+        return jsonResponse({
+          path: deletedMediaPath,
+          sha: 'deleted-media-sha',
+          encoding: 'base64',
+          content: 'bWVkaWE='
+        });
+      }
+      if (url.endsWith(`/contents/${deletedMediaPath}`) && method === 'DELETE') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: deletedMediaPath },
+          commit: { sha: 'delete-media-commit', html_url: 'https://github.test/delete-media-commit' }
+        });
+      }
+      if (url.endsWith('/actions/workflows/deploy.yml/dispatches') && method === 'POST') {
+        githubCalls.push({ url, method, body: JSON.parse(String(init?.body || '{}')) });
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    pledges.resetCounts();
+    ratelimit.resetCounts();
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/content/publish', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({
+        intent: 'publish',
+        campaignSlug: 'hand-relations',
+        draft: {
+          title: 'Hand Relations Publish',
+          shortBlurb: 'Published blurb.',
+          longContent: [{ type: 'text', body: 'Published body.' }]
+        }
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.mediaCleanup).toMatchObject({
+      attempted: 1,
+      deleted: [deletedMediaPath],
+      skipped: [],
+      failed: []
+    });
+    const mediaDelete = githubCalls.find((call) => call.method === 'DELETE' && call.url.endsWith(`/contents/${deletedMediaPath}`));
+    expect(mediaDelete?.body).toMatchObject({
+      sha: 'deleted-media-sha',
+      branch: 'main'
+    });
+    expect(mediaDelete?.body.message).toContain(`Delete hand-relations unused dashboard media ${deletedMediaPath}`);
+    const audit = JSON.parse(pledges.store.get(body.auditKey) as string);
+    expect(audit).toMatchObject({
+      mediaDeleted: 1,
+      mediaDeleteFailed: 0
+    });
+  });
+
+  it('deletes dashboard-owned diary media when an entry is removed', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_WORKFLOW: 'deploy.yml',
+      GITHUB_REF: 'main'
+    };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const deletedMediaPath = 'assets/images/campaigns/hand-relations/deleted-diary.webp';
+    const retainedMediaPath = 'assets/images/campaigns/hand-relations/retained-diary.webp';
+    const campaignWithDiaryMedia = {
+      ...campaignFixture,
+      diary: [
+        {
+          title: 'Deleted diary',
+          id: 'deleted-diary',
+          date: '2026-05-27T10:00-06:00',
+          phase: 'production',
+          content: [{ type: 'image', src: `/${deletedMediaPath}`, alt: 'Deleted diary image' }]
+        },
+        {
+          title: 'Retained diary',
+          id: 'retained-diary',
+          date: '2026-05-28T10:00-06:00',
+          phase: 'production',
+          content: [{ type: 'image', src: `/${retainedMediaPath}`, alt: 'Retained diary image' }]
+        }
+      ]
+    };
+    const githubCalls: GitHubFetchCall[] = [];
+    const existingMarkdown = `---
+layout: campaign
+title: "Hand Relations"
+slug: hand-relations
+diary:
+  - title: "Deleted diary"
+    id: "deleted-diary"
+    date: "2026-05-27T10:00-06:00"
+    phase: "production"
+    content:
+      - type: image
+        src: "/${deletedMediaPath}"
+        alt: "Deleted diary image"
+  - title: "Retained diary"
+    id: "retained-diary"
+    date: "2026-05-28T10:00-06:00"
+    phase: "production"
+    content:
+      - type: image
+        src: "/${retainedMediaPath}"
+        alt: "Retained diary image"
+---
+`;
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignWithDiaryMedia] });
+      }
+      if (url === 'https://pool.test/api/add-ons.json') {
+        return jsonResponse(addOnsFixture);
+      }
+      if (url.includes('/contents/_campaigns/hand-relations.md') && method === 'GET') {
+        githubCalls.push({ url, method });
+        return jsonResponse({
+          path: '_campaigns/hand-relations.md',
+          sha: 'campaign-sha',
+          encoding: 'base64',
+          content: Buffer.from(existingMarkdown, 'utf8').toString('base64')
+        });
+      }
+      if (url.endsWith('/contents/_campaigns/hand-relations.md') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: '_campaigns/hand-relations.md', sha: 'new-campaign-sha' },
+          commit: { sha: 'campaign-commit', html_url: 'https://github.test/campaign-commit' }
+        });
+      }
+      if (url.includes(`/contents/${deletedMediaPath}`) && method === 'GET') {
+        githubCalls.push({ url, method });
+        return jsonResponse({
+          path: deletedMediaPath,
+          sha: 'deleted-diary-media-sha',
+          encoding: 'base64',
+          content: 'bWVkaWE='
+        });
+      }
+      if (url.endsWith(`/contents/${deletedMediaPath}`) && method === 'DELETE') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: deletedMediaPath },
+          commit: { sha: 'delete-diary-media-commit', html_url: 'https://github.test/delete-diary-media-commit' }
+        });
+      }
+      if (url.endsWith('/actions/workflows/deploy.yml/dispatches') && method === 'POST') {
+        githubCalls.push({ url, method, body: JSON.parse(String(init?.body || '{}')) });
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/publish', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        changes: [{
+          path: 'diary',
+          campaignSlug: 'hand-relations',
+          value: JSON.stringify([{
+            title: 'Retained diary',
+            id: 'retained-diary',
+            date: '2026-05-28T10:00-06:00',
+            phase: 'production',
+            content: [{ type: 'image', src: `/${retainedMediaPath}`, alt: 'Retained diary image' }]
+          }])
+        }]
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.mediaCleanup).toMatchObject({
+      attempted: 1,
+      deleted: [deletedMediaPath],
+      skipped: [],
+      failed: []
+    });
+    expect(githubCalls.some((call) => call.method === 'DELETE' && call.url.endsWith(`/contents/${retainedMediaPath}`))).toBe(false);
+    const mediaDelete = githubCalls.find((call) => call.method === 'DELETE' && call.url.endsWith(`/contents/${deletedMediaPath}`));
+    expect(mediaDelete?.body).toMatchObject({
+      sha: 'deleted-diary-media-sha',
+      branch: 'main'
+    });
   });
 
   it('enforces the admin read-path KV budget with an explicit counter harness', async () => {

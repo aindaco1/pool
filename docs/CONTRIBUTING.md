@@ -107,6 +107,7 @@ For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `do
 - Configurable platform timezone for campaign deadlines, countdowns, reports, lifecycle automation, and settlement checks
 - Upcoming-campaign launch reminders with Turnstile, dedupe, unsubscribe, and shared Resend delivery
 - Public-page performance hardening, generated asset minification, conservative same-origin prefetching, and responsive media derivatives
+- Dashboard media workflow hardening for image/video optimization dispatch, publish-time media cleanup, and diary anchor/rendering fixes
 
 🚧 **Active focus:**
 - Merge-gate discipline and release-readiness audits across accessibility, customization, dashboard, i18n, performance, security, and SEO
@@ -188,4 +189,4 @@ Use the project docs and existing git history for context, and keep changes scop
 
 ---
 
-_Last updated: June 1, 2026_
+_Last updated: June 3, 2026_

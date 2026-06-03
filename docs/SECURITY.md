@@ -111,6 +111,7 @@ Admin mutations use these common protections:
 - Campaign users can mutate only campaigns in their assigned scope; super admins can mutate platform settings and all campaigns.
 - GitHub-backed settings are allowlisted through `ADMIN_PLATFORM_SETTING_SCHEMA` and `ADMIN_CAMPAIGN_SETTING_SCHEMA`. Unknown paths are rejected, and pseudo UI rows such as the campaign content editor cannot be mass-assigned through settings publishing.
 - Admin media uploads are scoped server-side by upload kind. Campaign media uploads require a valid campaign slug plus `campaign:edit_content`; platform/default media uploads require the super-admin `settings:publish` path. The Worker validates file type, size, destination directory, and filename before committing an asset path.
+- Publish-time media cleanup is derived server-side from the previously loaded campaign data and the normalized campaign draft being committed. It only deletes safe root-relative dashboard-owned files under the same campaign's `assets/images`, `assets/videos`, or `assets/audio` directories, and it preserves external URLs, shared/default assets, and files still referenced elsewhere in the campaign.
 - Runtime-only admin users are saved only to KV at `admin-users:v1`; they are not serialized into `_config.yml`.
 - Marketing referral codes are saved only on explicit user action and are scoped to the campaign URL origin/path the admin account can access.
 - The static admin shell uses a restrictive meta CSP with no inline scripts, limited Worker/API connections, and sandboxed preview iframes that receive only Worker-rendered preview HTML. Framing protection must be delivered as an HTTP header, such as `Content-Security-Policy: frame-ancestors 'none'` or `X-Frame-Options: DENY`; browsers ignore `frame-ancestors` inside meta CSP.
@@ -589,4 +590,4 @@ If the on-site payment step completes but the pledge doesn't appear yet (common 
 
 ---
 
-_Last updated: June 1, 2026_
+_Last updated: June 3, 2026_

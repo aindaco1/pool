@@ -53,7 +53,9 @@ vi.mock('../../worker/src/email.js', () => ({
 }));
 
 vi.mock('../../worker/src/github.js', () => ({
-  triggerSiteRebuild: vi.fn(async () => {})
+  triggerSiteRebuild: vi.fn(async () => {}),
+  triggerMediaOptimization: vi.fn(async () => ({ triggered: true })),
+  deleteGitHubFile: vi.fn(async () => ({ ok: true, deleted: true }))
 }));
 
 class PaginatedKVNamespace {

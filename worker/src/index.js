@@ -66,7 +66,7 @@ import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
 import { applyAddOnInventoryProjectionDelta, ensureAddOnInventorySoldProjection, getAddOns, getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
 import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges, checkCampaignProjectionDrift } from './stats.js';
-import { getGitHubTextFile, putGitHubBase64File, putGitHubTextFile, triggerSiteRebuild } from './github.js';
+import { deleteGitHubFile, getGitHubTextFile, putGitHubBase64File, putGitHubTextFile, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
 import { getScopedConsole } from './logger.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
@@ -10505,6 +10505,170 @@ function normalizeAdminHeroVideoReference(value, label = 'Hero video') {
   };
 }
 
+const ADMIN_MEDIA_CLEANUP_IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png', '.webp']);
+const ADMIN_MEDIA_CLEANUP_RESPONSIVE_IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png']);
+const ADMIN_MEDIA_CLEANUP_VIDEO_EXTENSIONS = new Set(['.m4v', '.mov', '.mp4', '.webm']);
+const ADMIN_MEDIA_CLEANUP_SOURCE_VIDEO_EXTENSIONS = ['.m4v', '.mov', '.mp4'];
+const ADMIN_MEDIA_CLEANUP_AUDIO_EXTENSIONS = new Set(['.aac', '.m4a', '.mp3', '.ogg', '.wav', '.webm']);
+const ADMIN_MEDIA_CLEANUP_RESPONSIVE_WIDTHS = [320, 480, 640, 960, 1600];
+
+function adminMediaPathExtension(repoPath) {
+  const match = String(repoPath || '').toLowerCase().match(/\.[a-z0-9]+$/);
+  return match ? match[0] : '';
+}
+
+function normalizeAdminDashboardCampaignMediaPath(value, campaignSlug) {
+  const text = String(value || '').trim();
+  if (!text || !text.startsWith('/')) return '';
+  const pathOnly = text.split(/[?#]/)[0];
+  if (!isSafeAdminRootRelativePath(pathOnly)) return '';
+  const repoPath = pathOnly.replace(/^\/+/, '');
+  const slug = String(campaignSlug || '').trim();
+  if (!isValidSlug(slug)) return '';
+  const extension = adminMediaPathExtension(repoPath);
+  const imagePrefix = `assets/images/campaigns/${slug}/`;
+  const videoPrefix = `assets/videos/campaigns/${slug}/`;
+  const audioPrefix = `assets/audio/campaigns/${slug}/`;
+  if (repoPath.startsWith(imagePrefix) && ADMIN_MEDIA_CLEANUP_IMAGE_EXTENSIONS.has(extension)) return repoPath;
+  if (repoPath.startsWith(videoPrefix) && ADMIN_MEDIA_CLEANUP_VIDEO_EXTENSIONS.has(extension)) return repoPath;
+  if (repoPath.startsWith(audioPrefix) && ADMIN_MEDIA_CLEANUP_AUDIO_EXTENSIONS.has(extension)) return repoPath;
+  return '';
+}
+
+function addAdminDashboardCampaignMediaPath(paths, value, campaignSlug) {
+  const repoPath = normalizeAdminDashboardCampaignMediaPath(value, campaignSlug);
+  if (repoPath) paths.add(repoPath);
+}
+
+function collectAdminContentMediaPaths(blocks = [], campaignSlug) {
+  const paths = new Set();
+  for (const block of Array.isArray(blocks) ? blocks : []) {
+    if (!block || typeof block !== 'object') continue;
+    if (block.type === 'image') {
+      addAdminDashboardCampaignMediaPath(paths, block.src, campaignSlug);
+    } else if (block.type === 'gallery') {
+      for (const image of Array.isArray(block.images) ? block.images : []) {
+        addAdminDashboardCampaignMediaPath(paths, image?.src, campaignSlug);
+      }
+    } else if (block.type === 'video') {
+      addAdminDashboardCampaignMediaPath(paths, block.src, campaignSlug);
+      addAdminDashboardCampaignMediaPath(paths, block.poster, campaignSlug);
+    } else if (block.type === 'audio') {
+      addAdminDashboardCampaignMediaPath(paths, block.src, campaignSlug);
+    }
+  }
+  return paths;
+}
+
+function collectAdminDiaryMediaPaths(entries = [], campaignSlug) {
+  const paths = new Set();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    for (const repoPath of collectAdminContentMediaPaths(entry?.content || [], campaignSlug)) {
+      paths.add(repoPath);
+    }
+  }
+  return paths;
+}
+
+function collectAdminDashboardCampaignMediaPaths(value, campaignSlug, paths = new Set()) {
+  if (typeof value === 'string') {
+    addAdminDashboardCampaignMediaPath(paths, value, campaignSlug);
+    return paths;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectAdminDashboardCampaignMediaPaths(item, campaignSlug, paths));
+    return paths;
+  }
+  if (value && typeof value === 'object') {
+    Object.values(value).forEach((item) => collectAdminDashboardCampaignMediaPaths(item, campaignSlug, paths));
+  }
+  return paths;
+}
+
+function adminMediaCleanupCompanionPaths(repoPath) {
+  const paths = new Set([repoPath]);
+  const extension = adminMediaPathExtension(repoPath);
+  const base = extension ? repoPath.slice(0, -extension.length) : repoPath;
+  if (repoPath.startsWith('assets/images/') && ADMIN_MEDIA_CLEANUP_RESPONSIVE_IMAGE_EXTENSIONS.has(extension)) {
+    ADMIN_MEDIA_CLEANUP_RESPONSIVE_WIDTHS.forEach((width) => paths.add(`${base}-${width}.webp`));
+  }
+  if (repoPath.startsWith('assets/videos/')) {
+    if (ADMIN_MEDIA_CLEANUP_SOURCE_VIDEO_EXTENSIONS.includes(extension)) {
+      paths.add(`${base}.webm`);
+    } else if (extension === '.webm') {
+      ADMIN_MEDIA_CLEANUP_SOURCE_VIDEO_EXTENSIONS.forEach((sourceExtension) => paths.add(`${base}${sourceExtension}`));
+    }
+  }
+  return paths;
+}
+
+function removedAdminDashboardCampaignMediaPaths(previousPaths, nextPaths) {
+  const next = nextPaths || new Set();
+  const removed = new Set();
+  for (const repoPath of previousPaths || []) {
+    if (next.has(repoPath)) continue;
+    for (const cleanupPath of adminMediaCleanupCompanionPaths(repoPath)) {
+      if (!next.has(cleanupPath)) removed.add(cleanupPath);
+    }
+  }
+  return Array.from(removed).sort();
+}
+
+function applyAdminCampaignMediaCleanupChanges(campaign = {}, changes = []) {
+  const nextCampaign = { ...(campaign || {}) };
+  for (const change of changes || []) {
+    const path = String(change?.path || '').trim();
+    if (!path || path.includes('.')) continue;
+    nextCampaign[path] = change.value;
+  }
+  return nextCampaign;
+}
+
+async function cleanupRemovedAdminDashboardMedia(env, campaignSlug, paths = [], reason = 'admin-content-publish') {
+  const uniquePaths = Array.from(new Set(paths)).sort();
+  const results = [];
+  for (const repoPath of uniquePaths) {
+    const result = await deleteGitHubFile(
+      env,
+      repoPath,
+      `Delete ${campaignSlug} unused dashboard media ${repoPath}`
+    );
+    results.push({
+      path: repoPath,
+      deleted: result.ok === true && result.deleted === true,
+      skipped: result.ok === true && result.skipped === true,
+      reason: result.reason || undefined,
+      commitSha: result.commitSha || undefined,
+      error: result.ok ? undefined : result.error || 'Unable to delete media',
+      status: result.ok ? undefined : result.status
+    });
+  }
+  return {
+    reason,
+    attempted: uniquePaths.length,
+    deleted: results.filter((result) => result.deleted).map((result) => result.path),
+    skipped: results.filter((result) => result.skipped).map((result) => ({ path: result.path, reason: result.reason })),
+    failed: results.filter((result) => result.error).map((result) => ({ path: result.path, error: result.error, status: result.status }))
+  };
+}
+
+function mergeAdminMediaCleanupResults(cleanups = []) {
+  const merged = {
+    attempted: 0,
+    deleted: [],
+    skipped: [],
+    failed: []
+  };
+  for (const cleanup of cleanups || []) {
+    if (!cleanup) continue;
+    merged.attempted += Number(cleanup.attempted || 0);
+    merged.deleted.push(...(cleanup.deleted || []));
+    merged.skipped.push(...(cleanup.skipped || []));
+    merged.failed.push(...(cleanup.failed || []));
+  }
+  return merged;
+}
+
 function collectAdminRichTextErrors(value, fieldName, { maxLength = 8000 } = {}) {
   const text = stripAdminControlCharacters(value, { allowNewlines: true }).trim();
   const errors = [];
@@ -11168,6 +11332,7 @@ async function validateAdminSettingsChanges(request, env, body = {}, options = {
   return {
     ok: errors.length === 0,
     auth,
+    campaignMap,
     changes: normalized,
     errors,
     warnings: normalized.length
@@ -11621,6 +11786,15 @@ function adminUploadProcessingSummary(contentType, extension) {
   };
 }
 
+function shouldTriggerAdminMediaOptimization(filePath = '', contentType = '') {
+  const normalizedPath = String(filePath || '').replace(/^\/+/, '');
+  const type = String(contentType || '').toLowerCase();
+  return (
+    (type.startsWith('image/') && normalizedPath.startsWith('assets/images/')) ||
+    (type.startsWith('video/') && normalizedPath.startsWith('assets/videos/'))
+  );
+}
+
 const ADMIN_CAMPAIGN_MEDIA_UPLOAD_KINDS = new Set([
   'campaign',
   'campaign-video',
@@ -11733,6 +11907,10 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     }, uploaded.status || 502, env);
   }
 
+  const mediaOptimization = shouldTriggerAdminMediaOptimization(normalized.filePath, normalized.contentType)
+    ? await triggerMediaOptimization(env, { scope: 'changed' })
+    : { triggered: false, reason: 'Media optimization is not configured for this upload type.' };
+
   return privateJsonResponse({
     success: true,
     path: normalized.publicPath,
@@ -11742,6 +11920,7 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     contentType: normalized.contentType,
     bytes: normalized.estimatedBytes,
     processing: normalized.processing,
+    mediaOptimization,
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
   }, 200, env);
 }
@@ -11854,6 +12033,7 @@ async function handleAdminSettingsPublish(request, env) {
   }
 
   const commits = [];
+  const mediaCleanups = [];
   const platformChanges = result.changes.filter((change) => !change.campaignSlug);
   if (platformChanges.length) {
     const githubFile = await getGitHubTextFile(env, '_config.yml');
@@ -11883,6 +12063,13 @@ async function handleAdminSettingsPublish(request, env) {
   });
   for (const [campaignSlug, changes] of campaignGroups.entries()) {
     const filePath = getAdminCampaignMarkdownPath(campaignSlug);
+    const currentCampaign = result.campaignMap?.get(campaignSlug) || {};
+    const previousDiaryMedia = changes.some((change) => change.path === 'diary')
+      ? collectAdminDiaryMediaPaths(currentCampaign.diary || [], campaignSlug)
+      : new Set();
+    const nextCampaign = applyAdminCampaignMediaCleanupChanges(currentCampaign, changes);
+    const nextCampaignMedia = collectAdminDashboardCampaignMediaPaths(nextCampaign, campaignSlug);
+    const removedMediaPaths = removedAdminDashboardCampaignMediaPaths(previousDiaryMedia, nextCampaignMedia);
     const githubFile = await getGitHubTextFile(env, filePath);
     if (!githubFile.ok) {
       return privateJsonResponse({ error: githubFile.error, code: githubFile.code || 'github_error' }, githubFile.status || 502, env);
@@ -11892,15 +12079,20 @@ async function handleAdminSettingsPublish(request, env) {
     const saved = await putGitHubTextFile(env, filePath, applied.content, `Update ${campaignSlug} admin settings (${changes.length})`, githubFile.sha);
     if (!saved.ok) return privateJsonResponse({ error: saved.error, code: saved.code || 'github_error' }, saved.status || 502, env);
     commits.push(saved);
+    if (removedMediaPaths.length) {
+      mediaCleanups.push(await cleanupRemovedAdminDashboardMedia(env, campaignSlug, removedMediaPaths, 'admin-settings-publish'));
+    }
   }
 
   const rebuild = await triggerSiteRebuild(env, 'admin-settings-publish');
+  const mediaCleanup = mergeAdminMediaCleanupResults(mediaCleanups);
   return privateJsonResponse({
     success: true,
     published: true,
     changeCount: result.changes.length,
     commits,
     rebuild,
+    mediaCleanup,
     deployNotice: 'Publishing commits changes to GitHub and starts a deploy. Changes may take a few minutes to appear.',
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
   }, 200, env);
@@ -13332,6 +13524,13 @@ async function handleAdminContentPublish(request, env) {
     return privateJsonResponse({ error: nextMarkdown.error }, 422, env);
   }
 
+  const previousContentMedia = collectAdminContentMediaPaths(scoped.campaign.long_content || [], scoped.campaign.slug);
+  const nextCampaign = {
+    ...scoped.campaign,
+    long_content: preview.normalizedDraft.longContent || []
+  };
+  const nextCampaignMedia = collectAdminDashboardCampaignMediaPaths(nextCampaign, scoped.campaign.slug);
+  const removedMediaPaths = removedAdminDashboardCampaignMediaPaths(previousContentMedia, nextCampaignMedia);
   const commitMessage = String(body.message || '').trim() || `Update ${scoped.campaign.slug} campaign content`;
   const committed = await putGitHubTextFile(env, githubPath, nextMarkdown.content, commitMessage, existing.sha);
   if (!committed.ok) {
@@ -13341,6 +13540,9 @@ async function handleAdminContentPublish(request, env) {
     }, committed.status || 502, env);
   }
 
+  const mediaCleanup = removedMediaPaths.length
+    ? await cleanupRemovedAdminDashboardMedia(env, scoped.campaign.slug, removedMediaPaths, 'admin-content-publish')
+    : mergeAdminMediaCleanupResults([]);
   const rebuild = await triggerSiteRebuild(env, `admin-content-publish:${scoped.campaign.slug}`);
   const auditKey = await recordAdminAuditEvent(env, {
     action: 'campaign:publish_content',
@@ -13348,7 +13550,9 @@ async function handleAdminContentPublish(request, env) {
     campaignSlug: scoped.campaign.slug,
     githubPath,
     commitSha: committed.commitSha,
-    rebuildTriggered: rebuild.triggered === true
+    rebuildTriggered: rebuild.triggered === true,
+    mediaDeleted: mediaCleanup.deleted.length,
+    mediaDeleteFailed: mediaCleanup.failed.length
   });
 
   return privateJsonResponse({
@@ -13357,6 +13561,7 @@ async function handleAdminContentPublish(request, env) {
     githubPath,
     commitSha: committed.commitSha,
     commitUrl: committed.commitUrl,
+    mediaCleanup,
     rebuild,
     auditKey,
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 1, kvListExpected: 0 })

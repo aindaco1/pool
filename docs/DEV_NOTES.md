@@ -196,7 +196,8 @@ The private dashboard at `/admin/` is now the supported browser-based editor and
 - Secrets stay in Worker secrets or ignored `.dev.vars`; the dashboard only shows configured/missing status.
 - Reports, analytics, supporter browsing, content previews, table filtering, and CSV downloads are read-only dashboard flows and should not add KV writes.
 - Image/video/audio uploads use the existing asset directories, normalize filenames, and then publish through the same GitHub-backed path as the field they update.
-- Media optimization is deliberately outside the Worker. Use `npm run media:optimize` locally, `npm run media:optimize:podman` when host-native optimizers are missing, `npm run media:optimize:check` or `npm run media:optimize:check:podman` before merge when uploaded media changed, or let the `Optimize dashboard media` GitHub Actions workflow run after dashboard uploads reach `main`. The workflow can be manually dispatched with `scope=all` to reprocess existing media.
+- Content and diary media cleanup runs at publish time. The Worker compares the previously loaded campaign content/diary data with the normalized draft being committed, deletes same-campaign dashboard-owned media paths that disappeared, and preserves external URLs, shared/default assets, and files still referenced elsewhere in the campaign.
+- Media optimization is deliberately outside the Worker. After image and video uploads commit successfully, the Worker requests the `Optimize dashboard media` GitHub Actions workflow with `scope=changed`; audio uploads are source-preserved because the optimizer does not process `assets/audio`. Use `npm run media:optimize` locally, `npm run media:optimize:podman` when host-native optimizers are missing, `npm run media:optimize:check` or `npm run media:optimize:check:podman` before merge when uploaded media changed, or manually dispatch the workflow with `scope=all` to reprocess existing media.
 
 See [DASHBOARD.md](DASHBOARD.md) for the full dashboard reference.
 
@@ -1404,4 +1405,4 @@ curl -s https://pledge.dustwave.xyz/admin/cron/status \
 
 ---
 
-_Last updated: June 1, 2026_
+_Last updated: June 3, 2026_

@@ -252,7 +252,7 @@ Under normal no-queue traffic, expect roughly `48-75` KV list requests over 24 h
 
 ## Media Optimization
 
-Dashboard uploads are source-preserving. The Worker validates uploads and commits them, but it does not run native image optimizers or FFmpeg.
+Dashboard uploads are source-preserving. The Worker validates uploads and commits them, then requests the **Optimize dashboard media** workflow for image/video uploads. It still does not run native image optimizers or FFmpeg itself.
 
 Use the repository media pipeline for source media:
 
@@ -270,7 +270,7 @@ npm run media:optimize:check:podman
 
 The Podman site image includes `ffmpeg`, `optipng`, `libjpeg-turbo-progs`, `gifsicle`, and `webp` so local image compression and responsive derivative generation use the same native toolchain as the GitHub media workflow. Rebuild the image with `PODMAN_REBUILD=1` after changing container package requirements.
 
-For deployed media-heavy regressions, run the **Optimize dashboard media** GitHub Actions workflow with `scope=all` so existing campaign assets are optimized by the same pipeline rather than edited one-off.
+For deployed media-heavy regressions, manually run the **Optimize dashboard media** GitHub Actions workflow with `scope=all` so existing campaign assets are optimized by the same pipeline rather than edited one-off.
 
 If PageSpeed flags oversized campaign images that already flow through `responsive-image.html`, first confirm whether the corresponding `-320.webp`, `-480.webp`, `-640.webp`, `-960.webp`, and `-1600.webp` derivatives exist. Missing derivatives should be produced by `npm run media:optimize` locally or by the workflow with `scope=all`, not by one-off manual image edits.
 
@@ -377,4 +377,4 @@ The platform does not currently:
 
 ---
 
-_Last updated: June 1, 2026_
+_Last updated: June 3, 2026_

@@ -11,7 +11,7 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
-El hito de lanzamiento actual de la plataforma es **v1.0.3**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente se enfoca en una zona horaria configurable, recordatorios opt-in para campañas próximas y mejoras de performance móvil en páginas de campaña.
+El hito de lanzamiento actual de la plataforma es **v1.0.3**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente se enfoca en zona horaria configurable, recordatorios opt-in para campañas próximas, presupuestos de Cloudflare KV, performance móvil, enlaces de diario y flujos de media del panel.
 
 ## Aportes de todo o nada
 
@@ -77,7 +77,7 @@ La plataforma está diseñada para cineastas y equipos creativos que necesitan u
 - **Add-ons de campaña**: vende merch o extras específicos de la campaña en el mismo flujo de aporte, manteniendo ingresos, inventario y envío ligados a esa campaña.
 - **Panel privado de administración**: da a personas de confianza un espacio enfocado para ajustes de campaña, contenido de página, recompensas, actualizaciones, decisiones, reportes, patrocinadores, analytics y enlaces de marketing.
 - **Zona horaria configurable de plataforma**: las personas superadministradoras pueden elegir la zona horaria IANA usada para fechas límite, cuentas regresivas, reportes programados y automatización del ciclo de vida.
-- **Cargas de media en el panel**: prepara imágenes, video y audio de campaña o diario con previews, y publícalos en las rutas de assets de campaña mediante el flujo revisable normal.
+- **Cargas de media en el panel**: prepara imágenes, video y audio de campaña o diario con previews, publícalos en las rutas de assets de campaña, activa la optimización de imágenes/video y limpia media del panel que ya no esté referenciada.
 - **Reportes cuando los necesites**: previsualiza y descarga CSVs de aportes o fulfillment desde el panel, con correos opcionales para responsables de campaña mientras la campaña está activa.
 - **Recordatorios para campañas próximas**: permite que posibles patrocinadores opten por un solo correo de lanzamiento antes de que una campaña abra, sin cuentas ni dependencias de lista de correo.
 - **Embeds para promoción**: genera widgets vivos de campaña para sitios aliados, páginas de prensa, portfolios de creadores o páginas de patrocinadores.
@@ -127,4 +127,4 @@ The Pool es de código abierto. Toda la plataforma, el frontend, el Worker, la a
 
 *The Pool ha sido creado y es mantenido por [Dust Wave](https://dustwave.xyz).*
 
-_Última actualización: 1 de junio de 2026_
+_Última actualización: 3 de junio de 2026_

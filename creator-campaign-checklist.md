@@ -293,7 +293,7 @@ Use these for concept art, stills, behind-the-scenes images, moodboards, process
 - **Recommended formats:** `WebP`, `JPG`, `PNG`
 - **Recommended file size:** ideally under `500 to 600 KB` each
 
-The dashboard preserves original uploads. In v1.0.3, the repository media workflow can generate `320w`, `480w`, `640w`, `960w`, and `1600w` WebP variants for public pages, but creators should still export images near the recommended dimensions and crops before upload.
+The dashboard preserves original uploads. In v1.0.3, dashboard image/video uploads request the repository media workflow after publish, and that workflow can generate `320w`, `480w`, `640w`, `960w`, and `1600w` WebP variants for public pages. Creators should still export images near the recommended dimensions and crops before upload.
 
 Each public-facing image should also include:
 
@@ -350,7 +350,7 @@ If self-hosting:
 - **Preferred format in this repo:** `.webm`
 - **Poster image:** use the wide hero image
 - **Compression target:** web-friendly, fast-loading
-- **Optimization:** dashboard uploads preserve source files, and the repository media pipeline can generate compressed images and WebM derivatives before launch
+- **Optimization:** dashboard uploads preserve source files, image/video uploads request the repository media pipeline after publish, and the pipeline can generate compressed images and WebM derivatives before launch
 
 ### Video Best Practices
 

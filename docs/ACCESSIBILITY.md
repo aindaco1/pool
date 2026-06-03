@@ -32,6 +32,7 @@ The recent accessibility hardening pass added:
 - APG-style keyboard tab behavior for:
   - production diary tabs
   - production phase tabs
+- hash-linked diary panels activate their matching tab before scrolling, so links into hidden diary phases remain reachable for keyboard and assistive-technology users
 - keyboard-friendly carousel gallery behavior on public campaign pages:
   - focusable scroll regions
   - ArrowLeft / ArrowRight navigation
@@ -250,4 +251,4 @@ Good next accessibility improvements include:
 
 ---
 
-_Last updated: June 1, 2026_
+_Last updated: June 3, 2026_

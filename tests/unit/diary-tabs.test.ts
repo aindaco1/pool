@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 describe('diary tabs script', () => {
   beforeEach(() => {
     vi.resetModules();
+    window.history.replaceState({}, '', '/campaigns/sunder/');
     document.body.innerHTML = `
       <div class="diary-tabs" role="tablist" aria-label="Diary phases">
         <button class="diary-tab" id="diary-tab-fundraising" aria-selected="true" aria-controls="diary-fundraising" tabindex="0" data-tab="fundraising" type="button">Fundraising</button>
@@ -16,6 +17,7 @@ describe('diary tabs script', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     document.body.innerHTML = '';
+    window.history.replaceState({}, '', '/');
   });
 
   it('switches selected tabs and visible panels', async () => {
@@ -57,5 +59,30 @@ describe('diary tabs script', () => {
     fundraisingTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
     expect(document.activeElement).toBe(productionTab);
     expect(productionTab.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('activates and scrolls to a diary panel referenced by the initial hash', async () => {
+    window.history.replaceState({}, '', '/campaigns/sunder/#diary-production');
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    const productionPanel = document.getElementById('diary-production') as HTMLElement;
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(productionPanel, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView
+    });
+
+    await import('../../assets/js/diary-tabs.js');
+
+    const tabs = document.querySelectorAll('.diary-tab');
+    const fundraisingPanel = document.getElementById('diary-fundraising') as HTMLElement;
+
+    expect(tabs[0].getAttribute('aria-selected')).toBe('false');
+    expect(tabs[1].getAttribute('aria-selected')).toBe('true');
+    expect(fundraisingPanel.hidden).toBe(true);
+    expect(productionPanel.hidden).toBe(false);
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
   });
 });

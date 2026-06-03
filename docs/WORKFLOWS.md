@@ -379,7 +379,7 @@ Primary flows:
 - Saved referral codes in **Marketing** save to campaign-scoped KV.
 - **Reports** previews pledge/fulfillment rows and downloads CSVs; it does not send email and does not mark reports as sent.
 - **Analytics** uses stored actual Stripe fee/net data when available and exposes a super-admin backfill for older charged pledges.
-- Content-editor media uploads stage files locally, upload on publish, and commit source-preserved assets through the GitHub-backed path; image compression, responsive WebP variants (`320w`, `480w`, `640w`, `960w`, `1600w`), and video derivatives run later in the repository media pipeline.
+- Content-editor media uploads stage files locally, upload on publish, and commit source-preserved assets through the GitHub-backed path; image/video uploads then request the `Optimize dashboard media` workflow with `scope=changed` for image compression, responsive WebP variants (`320w`, `480w`, `640w`, `960w`, `1600w`), and video derivatives. Publish also deletes same-campaign dashboard-owned media that disappeared from content blocks or removed diary entries and is not referenced elsewhere in the campaign.
 - **Secrets & credentials** reports configured/missing status only; it does not expose or store secret values.
 
 Report preview/download endpoints used by the dashboard:
@@ -684,4 +684,4 @@ All emails show exact amounts with 2 decimal places (no rounding).
 
 ---
 
-_Last updated: June 1, 2026_
+_Last updated: June 3, 2026_

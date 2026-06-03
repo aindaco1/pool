@@ -66,7 +66,7 @@ Upcoming-campaign launch reminders also run through the minute-level scheduler. 
 
 Supporter confirmation email retries use the same free-tier-aware pattern. Failed sends write `supporter-email-retry:{orderId}` plus `supporter-email-retry-queue:v1`, and the scheduled retry pass skips KV list scans while the queue is idle or before the next retry is due.
 
-Public campaign-page media optimization remains a static-site concern rather than a Worker runtime concern. The Worker preserves dashboard uploads as source files; Jekyll templates, the repository media optimizer, and the deploy artifact step handle responsive WebP variants, local YouTube hero poster facades, and generated CSS/JS minification before the public Pages artifact is served.
+Public campaign-page media optimization remains a static-site concern rather than a Worker runtime concern. The Worker preserves dashboard uploads as source files and dispatches the repository optimizer for committed image/video uploads; Jekyll templates, the repository media optimizer, and the deploy artifact step handle responsive WebP variants, local YouTube hero poster facades, and generated CSS/JS minification before the public Pages artifact is served.
 
 The sampling rate defaults to `0.1` and can be overridden with `OBSERVABILITY_SAMPLE_RATE=0.05` (or any `0-1` value) if a fork wants fewer or more sampled timing writes.
 
@@ -371,7 +371,7 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `GET /admin/dashboard/summary` reads role-scoped campaign summaries
 - `GET /admin/settings` reads a role-scoped settings/config snapshot for the dashboard
 - `POST /admin/settings/preview` validates settings changes without publishing
-- `POST /admin/settings/logo-upload`, `POST /admin/settings/image-upload`, `POST /admin/settings/audio-upload`, and `POST /admin/settings/video-upload` stage dashboard uploads through the same GitHub-backed publish path as their owning settings/content fields; native image optimization and video transcoding run later in the repository media pipeline, not inside the Worker
+- `POST /admin/settings/logo-upload`, `POST /admin/settings/image-upload`, `POST /admin/settings/audio-upload`, and `POST /admin/settings/video-upload` stage dashboard uploads through the same GitHub-backed publish path as their owning settings/content fields; image/video uploads request the **Optimize dashboard media** workflow with `scope=changed` after commit, while native image optimization and video transcoding still run in the repository media pipeline rather than inside the Worker
 - `POST /admin/settings/publish` validates and publishes platform settings, platform add-ons, campaign variables, and campaign structured data through GitHub-backed commits
 - `POST /admin/users` saves dashboard-managed admin users directly to `admin-users:v1` in Worker KV and emails newly created users sign-in instructions when Resend is configured
 - `GET /admin/analytics` reads role-scoped pledge-derived revenue, status, language, referral, and campaign/platform split metrics without writing analytics state; dashboard currency presentation keeps exact cents

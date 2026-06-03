@@ -262,6 +262,18 @@ describe('content safety filter', () => {
     expect(rendered).not.toContain('target="_blank"');
   });
 
+  it('normalizes dashboard-authored emphasis with trailing spaces inside delimiters', () => {
+    const rendered = renderFilter(
+      'safe_markdownify',
+      '**it came out great. **Three very long, **15-hour days **with *behind-the-scenes pics *from here.'
+    );
+
+    expect(rendered).toContain('<strong>it came out great.</strong> Three very long');
+    expect(rendered).toContain('<strong>15-hour days</strong> with');
+    expect(rendered).toContain('<em>behind-the-scenes pics</em> from here');
+    expect(rendered).not.toContain('**it came out great.');
+  });
+
   it('rejects javascript structured embed urls even when they contain an approved substring', () => {
     const rendered = renderFilter(
       'approved_embed_src',

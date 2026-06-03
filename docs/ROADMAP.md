@@ -4,7 +4,7 @@
 
 **v1.0.3**
 
-The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds configurable platform timezone handling, opt-in launch reminders for upcoming campaigns, Cloudflare KV list-budget hardening, and mobile campaign-page performance refinements, while preserving the default `America/Denver` lifecycle model for existing forks.
+The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds configurable platform timezone handling, opt-in launch reminders for upcoming campaigns, Cloudflare KV list-budget hardening, mobile campaign-page performance refinements, diary-rendering fixes, and dashboard media workflow hardening, while preserving the default `America/Denver` lifecycle model for existing forks.
 
 ## Completed
 
@@ -142,8 +142,8 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds config
   - polymorphic block schema reused by campaign content and diary entries
   - diary entry editing preserves stable entry IDs, and newly added diary entries receive title-based IDs during publish so automatic emails send only for genuinely new entries
   - full campaign schema for tiers, campaign add-ons, stretch goals, support items, diary, and decisions
-  - dashboard uploads route to convention-based asset directories, preserve existing IDs where needed, and derive new IDs from names/labels
-  - dashboard media uploads stay source-preserving in the Worker, with external lossless image optimization, responsive WebP variants, and WebM derivative generation in the repository media pipeline
+  - dashboard uploads route to convention-based asset directories, preserve existing IDs where needed, derive new IDs from names/labels, and clean up same-campaign dashboard-owned content/diary media that is no longer referenced
+  - dashboard media uploads stay source-preserving in the Worker, with image/video upload commits dispatching the external lossless image optimization, responsive WebP variant, and WebM derivative pipeline
   - physical product editors expose shipping presets or explicit package metadata while digital products hide shipping-only fields
   - desktop/tablet/mobile responsive pass, accessibility pass, security pass, SEO noindex pass, and Spanish i18n pass
   - focused unit, browser, and KV-write-budget coverage for admin dashboard flows
@@ -225,6 +225,9 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds config
   - the Podman media optimizer now includes `optipng` and `gifsicle` for local PNG/GIF source compression through the same repository media workflow
   - responsive image generation now includes a `640w` WebP rung between the existing `480w` and `960w` variants for mobile campaign pages
   - YouTube campaign hero videos now render local poster/play facades and defer the remote iframe until supporter play intent
+  - dashboard image/video uploads now request the `Optimize dashboard media` workflow with `scope=changed`, while audio uploads stay source-preserved
+  - dashboard content and diary publishing now deletes same-campaign dashboard-owned media that disappeared from content blocks or removed diary entries and is not referenced elsewhere
+  - dashboard-authored diary rich text now preserves inline emphasis spacing, and diary hash links open the matching phase tab before scrolling to anchors such as `#diary-production`
   - the public creator checklists now describe the creator-facing v1.0.3 changes, including launch reminders, platform timezone expectations, deferred YouTube hero embeds, and responsive WebP variants
 - [x] Developer FAQ based on internal documentation
 - [x] Marketing landing page for the platform on a different domain

@@ -196,7 +196,7 @@ El video debe construir confianza, tono y urgencia. No necesita equipo caro, per
 - **Duración ideal:** `2:00 a 3:30`
 - **Máximo recomendado:** `5:00`
 - **Formato preferido para self-hosting:** `.webm`
-- **Optimización:** las cargas del panel preservan la fuente y el pipeline del repositorio puede generar imágenes comprimidas, variantes WebP responsivas y derivados WebM antes de lanzar
+- **Optimización:** las cargas del panel preservan la fuente, las cargas de imagen/video solicitan el pipeline del repositorio después de publicar, y ese pipeline puede generar imágenes comprimidas, variantes WebP responsivas y derivados WebM antes de lanzar
 
 El pipeline de media de v1.0.3 puede crear variantes WebP de `320w`, `480w`, `640w`, `960w` y `1600w` para páginas públicas cuando la imagen fuente es más grande. Aun así, conviene exportar las imágenes cerca de las dimensiones y recortes recomendados antes de subirlas.
 

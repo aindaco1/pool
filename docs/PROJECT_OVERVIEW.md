@@ -25,6 +25,7 @@ Creators define campaigns in Markdown; backers pledge through The Pool’s first
 | **Styling** | Sass + generated theme vars | Shared design system for public pages, checkout, pledge management, and branded checkout/email surfaces |
 
 All code is versioned and auditable. Campaign editing now flows through the private admin dashboard or direct repo edits, with publishable changes still committed back to the repo through the Worker-controlled GitHub path.
+Dashboard media uploads stay source-preserving at the Worker boundary: image/video uploads request the repository optimization workflow after commit, and content/diary publishes remove same-campaign dashboard-owned media that is no longer referenced.
 
 ## Plan Efficiency Notes For Forks
 
@@ -182,7 +183,8 @@ For current Cloudflare limits, see:
 9. **Magic links must require real pledge rows**: token validity alone is insufficient; missing pledge records should fail closed.
 10. **Localized chrome should stay shared**: campaign-page controls and status copy that belong to the platform, not the creator, should flow through the shared locale catalog so public templates, runtime UI, and supporter emails do not drift apart.
 11. **Performance work should stay static-first**: prefer stable Jekyll output, generated asset minification, lazy runtime loading, and conservative public-only prefetching before adding client complexity.
+12. **Media lifecycle work should stay repo-backed**: dashboard uploads commit source files first, repository automation owns native image/video optimization, and publish-time cleanup only removes same-campaign media that disappeared from authored content and is not referenced elsewhere.
 
 ---
 
-_Last updated: June 1, 2026_
+_Last updated: June 3, 2026_

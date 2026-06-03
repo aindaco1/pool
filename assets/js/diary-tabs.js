@@ -5,6 +5,23 @@
   var panels = document.querySelectorAll('.diary-panel');
   if (!tabs.length || !panels.length) return;
 
+  function tabForPanel(panelId) {
+    return Array.prototype.find.call(tabs, function(tab) {
+      return tab.getAttribute('aria-controls') === panelId;
+    }) || null;
+  }
+
+  function hashTarget() {
+    var hash = window.location.hash ? window.location.hash.slice(1) : '';
+    if (!hash) return null;
+    try {
+      hash = decodeURIComponent(hash);
+    } catch (_error) {
+    }
+    var target = document.getElementById(hash);
+    return target instanceof HTMLElement ? target : null;
+  }
+
   function activateTab(nextTab, shouldFocus) {
     if (!nextTab) return;
     var targetId = nextTab.getAttribute('aria-controls') || ('diary-' + nextTab.dataset.tab);
@@ -24,6 +41,44 @@
     if (shouldFocus) {
       nextTab.focus();
     }
+  }
+
+  function scrollToHashTarget(target) {
+    if (!target || typeof target.scrollIntoView !== 'function') return;
+    var schedule = window.requestAnimationFrame || function(callback) {
+      return window.setTimeout(callback, 0);
+    };
+    schedule(function() {
+      target.scrollIntoView({ block: 'start' });
+    });
+  }
+
+  function activateHashTarget(shouldScroll) {
+    var target = hashTarget();
+    if (!target) return false;
+
+    var panel = target.classList.contains('diary-panel')
+      ? target
+      : target.classList.contains('diary-tab')
+        ? document.getElementById(target.getAttribute('aria-controls') || '')
+        : null;
+    if (!(panel instanceof HTMLElement)) return false;
+
+    var tab = tabForPanel(panel.id);
+    if (!tab) return false;
+
+    activateTab(tab, false);
+
+    if (shouldScroll) {
+      scrollToHashTarget(target);
+      if (document.readyState !== 'complete') {
+        window.addEventListener('load', function() {
+          if (hashTarget() === target) scrollToHashTarget(target);
+        }, { once: true });
+      }
+    }
+
+    return true;
   }
 
   function moveTabFocus(currentTab, direction) {
@@ -62,5 +117,10 @@
           break;
       }
     });
+  });
+
+  activateHashTarget(true);
+  window.addEventListener('hashchange', function() {
+    activateHashTarget(true);
   });
 })();

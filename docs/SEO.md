@@ -25,6 +25,7 @@ The current baseline includes:
 - social image alt metadata
 - state-aware campaign social titles and descriptions
 - state-aware campaign share-link intent text for platforms that accept message copy, while Facebook and other card-first destinations keep relying on the page URL and Open Graph metadata
+- public campaign diary hash links activate the matching diary phase tab before scrolling, so anchors into hidden panels such as `#diary-production` remain valid share/email targets
 - Worker-generated campaign share-card PNGs for public social metadata, with SVG retained for internal preview/debug tooling
 - generated [`robots.txt`](../robots.txt)
 - generated [`sitemap.xml`](../sitemap.xml)
@@ -227,4 +228,4 @@ The core rule remains simple: public metadata should reflect visible public cont
 
 ---
 
-_Last updated: June 1, 2026_
+_Last updated: June 3, 2026_

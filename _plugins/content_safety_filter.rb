@@ -37,11 +37,11 @@ module Jekyll
     end
 
     def safe_markdown_source(input)
-      sanitize_rich_text(input)
+      sanitize_rich_text(normalize_markdown_emphasis_spacing(input))
     end
 
     def safe_markdownify(input, site_url = nil)
-      sanitized = sanitize_rich_text(input)
+      sanitized = safe_markdown_source(input)
       html = Kramdown::Document.new(sanitized).to_html
       sanitize_markdown_links(html, site_url)
     end
@@ -72,6 +72,20 @@ module Jekyll
     end
 
     private
+
+    def normalize_markdown_emphasis_spacing(input)
+      text = input.to_s.dup
+      text.gsub!(/\*\*([^\n]*?\S)(\s+)\*\*/) do
+        "**#{Regexp.last_match(1)}**#{Regexp.last_match(2)}"
+      end
+      text.gsub!(/(?<!\*)\*([^\n*]*?\S)(\s+)\*(?!\*)/) do
+        "*#{Regexp.last_match(1)}*#{Regexp.last_match(2)}"
+      end
+      text.gsub!(/(?<!_)_([^\n_]*?\S)(\s+)_(?!_)/) do
+        "_#{Regexp.last_match(1)}_#{Regexp.last_match(2)}"
+      end
+      text
+    end
 
     def sanitize_rich_text(input)
       text = input.to_s.dup

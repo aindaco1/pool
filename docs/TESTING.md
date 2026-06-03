@@ -131,7 +131,7 @@ Recent security hardening that the gate now covers includes:
 - serialized limited-tier inventory reservations at checkout start and confirmation at successful persistence time
 - launch reminder Turnstile verification, deduped signup storage, scoped unsubscribe suppression, and idempotent dispatch
 
-Media optimization is intentionally separate from the pre-merge gate because it depends on native tools such as FFmpeg and image optimizers. When a branch includes dashboard-uploaded or manually-added media, run:
+Media optimization is intentionally separate from the pre-merge gate because it depends on native tools such as FFmpeg and image optimizers. Dashboard image/video uploads request the optimizer after commit, but when a branch includes manually-added media or you need to verify generated variants before merge, run:
 
 ```bash
 npm run media:optimize:check
