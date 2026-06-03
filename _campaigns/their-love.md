@@ -237,35 +237,6 @@ tiers:
       stack_height_in: 18
     late_support: true
 diary:
-  - title: "We Wrapped!"
-    id: "we-wrapped"
-    date: "2026-06-02T23:18-06:00"
-    phase: "production"
-    content:
-      - type: "image"
-        align: "center"
-        src: "/assets/images/campaigns/their-love/content-tenor-1933565638-20260603-051859.gif"
-        alt: ""
-        caption: "That's a wrap!"
-      - type: "text"
-        body: |
-          **Backers,**
-          
-          I’m very happy to announce that, at **3am yesterday**, we wrapped *sunder*!
-          
-          In case you were wondering: **it came out great.**
-          
-          Three very long, **15-hour days** with lots of ball-busting locations, shots, and logistical rigamarole. Luckily, we had a hard-working team that put together some great stuff.
-          
-          I’m super jazzed to show you some *behind-the-scenes pics* from this weekend. Check out that **monster costume** — everybody was freaked the hell out.
-          
-          Next up, we move to the **edit and animation**. This’ll take a while, but we’ll keep you updated every step of the way.
-          
-          But first, we’re gonna take a week to relax. We’ve been hustling to get to this point since, uhhhh, **November?** That’s a bloody long time, mate!
-          
-          With that being said, I can confirm with **100% certainty** that this film will be **FIRE, HEAT, GAS,** and **SEVERAL OTHER INFERNAL-THEMED ATTRIBUTES.**
-          
-          Thank you all for your continued support and patience. The biggest hurdle is over. Now it’s time to put it all together!
   - title: "THANK YOU!!!!"
     id: "thank-you"
     date: "2026-05-27T19:42+00:00"
