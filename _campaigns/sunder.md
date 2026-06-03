@@ -166,112 +166,103 @@ stretch_goals:
 support_items: []
 decisions: []
 diary:
-  - date: 2026-04-27T09:42:00Z
-    id: four-days-left
-    title: 4 days left!
-    phase: fundraising
+  - title: "We Wrapped!"
+    id: "we-wrapped"
+    date: "2026-06-02T23:28-06:00"
+    phase: "production"
     content:
-      - type: text
-        body: >-
-          **Hello generous patrons.**
-
-
-          We have reached the **final week** of our fundraiser, and we only need
-          **$400 left to go!** *Holy-camoly!* Thanks to all ya-all, we managed
-          to hit **⅓ of our goal on the very first day**, and **over HALF within
-          the first week!** *Gadzooks!* That’s a lot of money! I am so grateful
-          for everyone who’s believed in me and left donations, especially in
-          this crummy economy.
-      - type: image
-        src: /assets/images/campaigns/sunder/diary-1-1.png
-        alt: The director in repose
-        caption: The director in repose.
-      - type: text
-        body: That being said, making *youtube poop kickstarter promos* isn’t all we’ve
-          been up to, we’ve been doing a lot of boring stuff too. I’ve been
-          working with **Chance, our director of photography**, to crank out
-          that shotlist.
-      - type: image
-        src: /assets/images/campaigns/sunder/diary-1-4.png
-        alt: location scouting
-        caption: Chance and Jerome scouting
-      - type: text
-        body: Gotta lot of cool imagery in store for you, and our cast has been
-          finalized since before we even opened this fundraiser! We’ve also done
-          some **location scouting!** Attached are some photos from our most
-          recent scout of a house that’ll play a pretty important role in the
-          film *honk honk.*
-      - type: image
-        src: /assets/images/campaigns/sunder/diary-1-5.png
-        alt: location scouting
-      - type: text
-        body: Everything’s starting to take a tangible form rather than just vague
-          rattlings in my head. That’s thanks to my **endlessly talented
-          producers** who have kept the project's momentum rolling despite our
-          insanely crowded schedules. With all the work my **awesome team** has
-          been doing, I’ve never been more excited about this project than I am
-          right now!
-      - type: image
-        src: /assets/images/campaigns/sunder/diary-1-2.png
-        alt: location scouting
-      - type: text
-        body: We just need a little more help getting through this **final stretch.**
-          So, if you know a guy who just came into **$400** and doesn’t know
-          what to do with it, you know where to send them to!
-      - type: image
-        src: /assets/images/campaigns/sunder/diary-1-3.png
-        alt: location scouting
-  - date: 2026-04-29T10:13:00Z
-    id: we-did-it
-    title: We did it!
-    phase: fundraising
+      - type: "image"
+        align: "center"
+        src: "/assets/images/campaigns/sunder/content-wrapped-20260603-052919.gif"
+        alt: ""
+        caption: "That's a wrap!"
+      - type: "text"
+        body: |
+          **Backers,**
+          
+          I’m very happy to announce that, at **3am yesterday**, we wrapped *sunder**!*
+          
+          In case you were wondering: **it came out great. **Three very long, **15-hour days **with lots of ball-busting locations, shots, and logistical rigamarole. Luckily, we had a hard-working team that put together some great stuff.
+          
+          I’m super jazzed to soon show you some *behind-the-scenes pics *from this weekend. Check out that **monster costume **— everybody was freaked the hell out.
+          
+          Next up, we move to the **edit and animation**. This’ll take a while, but we’ll keep you updated every step of the way.
+          
+          But first, we’re gonna take a week to relax. We’ve been hustling to get to this point since, uhhhh, **November? **That’s a bloody long time, mate!
+          
+          With that being said, I can confirm with **100% certainty **that this film will be **FIRE, HEAT, GAS, **and **SEVERAL OTHER INFERNAL-THEMED ATTRIBUTES.**
+          
+          Thank you all for your continued support and patience. The biggest hurdle is over. *Now it’s time to put it all together!*
+  - title: "We did it!"
+    id: "we-did-it"
+    date: "2026-04-29T10:13+00:00"
+    phase: "fundraising"
     content:
-      - type: image
-        src: /assets/images/defaults/celebration.gif
-        alt: celebration
-      - type: text
-        body: >-
-          **Oh em eff gee. Guys. We reached our fundraising goal!** And with **3
-          days to spare!**
-
-
-          Thank all of you so much for believing in this project, believing in
-          me, and believing in my team. I swear on the *Old Testament God*, the
-          *New Testament God*, *Allah*, the *entire Greek pantheon*, the *entire
-          Sumerian pantheon*, and the *Egyptian pantheon* that we will **NOT**
-          let you down!
-
-
-          I’m sure you’re all eager to know what’s next for ***Sunder***, and
-          you should be happy to know that *your* work here is done!
-
-
+      - type: "image"
+        src: "/assets/images/defaults/celebration.gif"
+        alt: "celebration"
+      - type: "text"
+        body: |
+          **Oh em eff gee. Guys. We reached our fundraising goal!** And with **3 days to spare!**
+          
+          Thank all of you so much for believing in this project, believing in me, and believing in my team. I swear on the *Old Testament God*, the *New Testament God*, *Allah*, the *entire Greek pantheon*, the *entire Sumerian pantheon*, and the *Egyptian pantheon* that we will **NOT** let you down!
+          
+          I’m sure you’re all eager to know what’s next for ***Sunder***, and you should be happy to know that *your* work here is done!
+          
           For us, on the other hand, **May’s gonna be a busy month:**
-
-
+          
           - **Actor rehearsals**
-
           - **Finalizing locations**
-
           - **Gathering equipment**
-
           - **Completing the monster costume**
-
           - **Shooting the damn thing by the end of May**
-
-
-          After the animators work their magic and we get **Robin’s thumping
-          score** in, we’ll have a film.
-
-
-          All thanks to you guys who’ve trusted *little old me* with all this
-          money.
-
-
+          
+          After the animators work their magic and we get **Robin’s thumping score** in, we’ll have a film.
+          
+          All thanks to you guys who’ve trusted *little old me* with all this money.
+          
           **Thanks, guys. I won’t let you down!**
-
-
+          
           -- Aidan
+  - title: "4 days left!"
+    id: "4-days-left"
+    date: "2026-04-27T09:42+00:00"
+    phase: "fundraising"
+    content:
+      - type: "text"
+        body: |
+          **Hello generous patrons.**
+          
+          We have reached the **final week** of our fundraiser, and we only need **$400 left to go!** *Holy-camoly!* Thanks to all ya-all, we managed to hit **⅓ of our goal on the very first day**, and **over HALF within the first week!** *Gadzooks!* That’s a lot of money! I am so grateful for everyone who’s believed in me and left donations, especially in this crummy economy.
+      - type: "image"
+        src: "/assets/images/campaigns/sunder/diary-1-1.png"
+        alt: "The director in repose"
+        caption: "The director in repose."
+      - type: "text"
+        body: |
+          That being said, making *youtube poop kickstarter promos* isn’t all we’ve been up to, we’ve been doing a lot of boring stuff too. I’ve been working with **Chance, our director of photography**, to crank out that shotlist.
+      - type: "image"
+        src: "/assets/images/campaigns/sunder/diary-1-4.png"
+        alt: "location scouting"
+        caption: "Chance and Jerome scouting"
+      - type: "text"
+        body: |
+          Gotta lot of cool imagery in store for you, and our cast has been finalized since before we even opened this fundraiser! We’ve also done some **location scouting!** Attached are some photos from our most recent scout of a house that’ll play a pretty important role in the film *honk honk.*
+      - type: "image"
+        src: "/assets/images/campaigns/sunder/diary-1-5.png"
+        alt: "location scouting"
+      - type: "text"
+        body: |
+          Everything’s starting to take a tangible form rather than just vague rattlings in my head. That’s thanks to my **endlessly talented producers** who have kept the project's momentum rolling despite our insanely crowded schedules. With all the work my **awesome team** has been doing, I’ve never been more excited about this project than I am right now!
+      - type: "image"
+        src: "/assets/images/campaigns/sunder/diary-1-2.png"
+        alt: "location scouting"
+      - type: "text"
+        body: |
+          We just need a little more help getting through this **final stretch.** So, if you know a guy who just came into **$400** and doesn’t know what to do with it, you know where to send them to!
+      - type: "image"
+        src: "/assets/images/campaigns/sunder/diary-1-3.png"
+        alt: "location scouting"
 ongoing_items: []
 tiers:
   - id: screw-goodies
