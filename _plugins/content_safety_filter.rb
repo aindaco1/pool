@@ -75,14 +75,14 @@ module Jekyll
 
     def normalize_markdown_emphasis_spacing(input)
       text = input.to_s.dup
-      text.gsub!(/\*\*([^\n]*?\S)(\s+)\*\*/) do
-        "**#{Regexp.last_match(1)}**#{Regexp.last_match(2)}"
+      text.gsub!(/\*\*(\s*)((?:(?!\*\*|\n).)*?\S)(\s*)\*\*/) do
+        "#{Regexp.last_match(1)}**#{Regexp.last_match(2)}**#{Regexp.last_match(3)}"
       end
-      text.gsub!(/(?<!\*)\*([^\n*]*?\S)(\s+)\*(?!\*)/) do
-        "*#{Regexp.last_match(1)}*#{Regexp.last_match(2)}"
+      text.gsub!(/(?<!\*)\*(?!\*)(\s*)([^\n*]*?\S)(\s*)(?<!\*)\*(?!\*)/) do
+        "#{Regexp.last_match(1)}*#{Regexp.last_match(2)}*#{Regexp.last_match(3)}"
       end
-      text.gsub!(/(?<!_)_([^\n_]*?\S)(\s+)_(?!_)/) do
-        "_#{Regexp.last_match(1)}_#{Regexp.last_match(2)}"
+      text.gsub!(/(?<!_)_(?!_)(\s*)([^\n_]*?\S)(\s*)(?<!_)_(?!_)/) do
+        "#{Regexp.last_match(1)}_#{Regexp.last_match(2)}_#{Regexp.last_match(3)}"
       end
       text
     end

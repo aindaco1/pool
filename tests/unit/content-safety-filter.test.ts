@@ -274,6 +274,21 @@ describe('content safety filter', () => {
     expect(rendered).not.toContain('**it came out great.');
   });
 
+  it('normalizes dashboard-authored emphasis with leading spaces inside delimiters', () => {
+    const rendered = renderFilter(
+      'safe_markdownify',
+      'choice.** blake, her brother, is gone,** and flesh.* ooey, gooey flesh…* yuck. this film will be** FIRE, HEAT, GAS,** and** SEVERAL OTHER INFERNAL-THEMED ATTRIBUTES.**'
+    );
+
+    expect(rendered).toContain('choice. <strong>blake, her brother, is gone,</strong> and');
+    expect(rendered).toContain('flesh. <em>ooey, gooey flesh…</em> yuck');
+    expect(rendered).toContain('will be <strong>FIRE, HEAT, GAS,</strong> and <strong>SEVERAL OTHER INFERNAL-THEMED ATTRIBUTES.</strong>');
+    expect(rendered).not.toContain('choice.** blake');
+    expect(rendered).not.toContain('flesh.* ooey');
+    expect(rendered).not.toContain('will be** FIRE');
+    expect(rendered).not.toContain('and** SEVERAL');
+  });
+
   it('rejects javascript structured embed urls even when they contain an approved substring', () => {
     const rendered = renderFilter(
       'approved_embed_src',

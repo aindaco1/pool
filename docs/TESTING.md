@@ -103,7 +103,7 @@ This runs:
   - `tests/unit/worker-ops-integrity.test.ts`
   - `tests/unit/stats-pagination.test.ts`
   These Worker suites cover launch reminder signup validation, unsubscribe suppression, queued dispatch idempotency, and the shared Resend send path.
-- Content safety filter regressions in `tests/unit/content-safety-filter.test.ts`, including unsafe Markdown link schemes and strict structured-embed URL validation
+- Content safety filter regressions in `tests/unit/content-safety-filter.test.ts`, including unsafe Markdown link schemes, dashboard-authored emphasis spacing, and strict structured-embed URL validation
 - Campaign-content audit coverage in `tests/unit/campaign-content-security.test.ts`, including the allowed inline HTML subset and rejection of disallowed raw tags
 - Durable Object tier-inventory serialization coverage in `tests/unit/tier-inventory-do.test.ts`
 - Local smoke scripts against the test-only mutable campaign:

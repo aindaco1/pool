@@ -38,7 +38,7 @@ long_content:
       you. unfortunately for mina, her despair has been given flesh. *ooey,
       gooey flesh…* yuck. this monster isn't just a hack n' slash beast either.
       it attacks our mina by **stripping her senses away.** smell, taste, sight,
-      hearing, and finally, ++touch++.
+      hearing, and finally, <u>touch</u>.
 
 
       this gives us a great opportunity. once mina goes blind, our diligent team
@@ -180,7 +180,7 @@ diary:
         body: |
           **Backers,**
           
-          I’m very happy to announce that, at **3am yesterday**, we wrapped *sunder**!*
+          I’m very happy to announce that, at **3am yesterday**, we wrapped *sunder*!
           
           In case you were wondering: **it came out great.** Three very long, **15-hour days** with lots of ball-busting locations, shots, and logistical rigamarole. Luckily, we had a hard-working team that put together some great stuff.
           

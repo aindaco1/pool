@@ -47,6 +47,20 @@ describe('admin dashboard content editor serialization', () => {
     expect(blocks[0].body).toBe('**it came out great.** Three very long, **15-hour days** with *behind-the-scenes pics* from here.');
   });
 
+  it('keeps leading spaces outside Markdown emphasis markers', async () => {
+    await import('../../assets/js/admin-dashboard.js');
+
+    const editor = document.querySelector('[data-content-field="body"]') as HTMLElement;
+    const field = document.getElementById('admin-content-long-content') as HTMLTextAreaElement;
+    Object.defineProperty(editor, 'isContentEditable', { configurable: true, value: true });
+    editor.innerHTML = '<p>choice.<strong> blake, her brother, is gone,</strong> and flesh.<em> ooey, gooey flesh…</em> yuck. this film will be<strong> FIRE, HEAT, GAS,</strong> and<strong> SEVERAL OTHER INFERNAL-THEMED ATTRIBUTES.</strong></p>';
+
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const blocks = JSON.parse(field.value);
+    expect(blocks[0].body).toBe('choice. **blake, her brother, is gone,** and flesh. *ooey, gooey flesh…* yuck. this film will be **FIRE, HEAT, GAS,** and **SEVERAL OTHER INFERNAL-THEMED ATTRIBUTES.**');
+  });
+
   it('serializes nested bold and italic without leaving unmatched markers', async () => {
     await import('../../assets/js/admin-dashboard.js');
 
