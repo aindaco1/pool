@@ -30,7 +30,7 @@ The mirrored Worker config now also includes the shared debug flags:
 - `DEBUG_CONSOLE_LOGGING_ENABLED`
 - `DEBUG_VERBOSE_CONSOLE_LOGGING`
 
-Those come from `debug.console_logging_enabled` and `debug.verbose_console_logging` in the repo-root [`_config.yml`](../_config.yml), and both default to `true` so local and deployed Workers stay verbose unless a fork explicitly turns logging down.
+Those come from `debug.console_logging_enabled` and `debug.verbose_console_logging` in the repo-root [`_config.yml`](../_config.yml). Console logging stays enabled by default, while verbose debug/info/log noise defaults to off so warning/error output remains useful without shipping broad diagnostic detail.
 
 The Worker mirror also carries the public intent-prefetch knobs used by generated public pages:
 
@@ -105,7 +105,7 @@ Local development secrets live in ignored [`worker/.dev.vars`](../worker/.dev.va
 npm run secrets:dev
 ```
 
-The helper creates `worker/.dev.vars` from [`worker/.dev.vars.example`](./.dev.vars.example) when needed, applies local-only permissions, generates signing secrets for local development, and prompts for optional provider keys without echoing values back to the terminal. The dev launchers also run this helper in non-interactive mode so local signing secrets exist before Wrangler starts.
+The helper creates `worker/.dev.vars` from [`worker/.dev.vars.example`](./.dev.vars.example) when needed, applies local-only permissions, generates signing secrets for local development, and prompts for optional provider keys without echoing values back to the terminal. The dev launchers also run this helper in non-interactive mode so local signing secrets exist before Wrangler starts. Do not paste production secret values into `worker/.dev.vars` as a backup; use separate local-only values there.
 
 Production secrets belong in Cloudflare Worker secrets:
 
@@ -134,6 +134,10 @@ wrangler secret put RESEND_API_KEY
 
 # Admin endpoints
 wrangler secret put ADMIN_SECRET
+# Optional scoped admin endpoint secrets. When set, these routes reject
+# ADMIN_SECRET and require their narrower secret.
+wrangler secret put ADMIN_SETTLEMENT_SECRET
+wrangler secret put ADMIN_BROADCAST_SECRET
 
 # Browser admin sessions and bootstrap access
 wrangler secret put ADMIN_SESSION_SECRET
@@ -156,7 +160,7 @@ wrangler secret put USPS_CLIENT_SECRET
 wrangler secret put ZIP_TAX_API_KEY
 ```
 
-Do not store secret values in `_config.yml`, campaign YAML, KV, admin setting drafts, or committed documentation. Stripe publishable keys are public browser keys and may be stored in dashboard Settings or deployment vars. The admin dashboard only reports whether runtime credentials appear configured; it does not read or persist secret values.
+If a GitHub Actions workflow or operator job calls scoped admin endpoints, set the same scoped value as a GitHub repository secret for that workflow as well. Repository secrets authenticate GitHub Actions; they do not create or update Cloudflare Worker runtime secrets. Do not store secret values in `_config.yml`, campaign YAML, KV, admin setting drafts, or committed documentation. Stripe publishable keys are public browser keys and may be stored in dashboard Settings or deployment vars. The admin dashboard only reports whether runtime credentials appear configured; it does not read or persist secret values.
 
 The Resend API key must be allowed to send from the domain configured in `PLEDGES_EMAIL_FROM` and `UPDATES_EMAIL_FROM`. For the live Dust Wave deployment, those sender addresses use `pool.dustwave.xyz`; authorizing only a root domain does not authorize subdomain senders, and authorizing only a subdomain does not authorize root-domain senders.
 
@@ -195,7 +199,7 @@ npm run deploy
 npm run deploy:worker
 ```
 
-On GitHub, pushes to `main` also deploy the Worker automatically through `.github/workflows/deploy.yml`. The preferred setup uses repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. As a temporary fallback, the workflow also accepts legacy Cloudflare auth via `CLOUDFLARE_EMAIL` and `CLOUDFLARE_KEY`. The Pages deploy job requires `pages: write` and `id-token: write`; keep those permissions explicit if the workflow is copied into a fork.
+On GitHub, pushes to `main` also deploy the Worker automatically through `.github/workflows/deploy.yml`. The workflow uses repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; cache purging can use a narrower `CLOUDFLARE_CACHE_PURGE_TOKEN` and otherwise falls back to `CLOUDFLARE_API_TOKEN`. The Pages deploy job requires `pages: write` and `id-token: write`; keep those permissions explicit if the workflow is copied into a fork.
 
 ## API Endpoints
 
@@ -411,9 +415,9 @@ Send diary update notification to all campaign supporters. Requires `x-admin-key
 ```
 
 ### POST /admin/diary/check
-Check all campaigns for new diary entries and broadcast them automatically. Called by GitHub Actions after deploy. Requires `Authorization: Bearer {ADMIN_SECRET}` header.
+Check all campaigns for new diary entries and broadcast them automatically. Called by GitHub Actions after deploy. Requires `Authorization: Bearer {ADMIN_BROADCAST_SECRET}` when the scoped broadcast secret is configured, otherwise `Authorization: Bearer {ADMIN_SECRET}`.
 
-If Cloudflare zone security challenges the GitHub Actions request before it reaches the Worker, set a repository secret named `DIARY_CHECK_BYPASS_SECRET` and add a Cloudflare WAF skip rule for `POST /admin/diary/check` when `X-Pool-Diary-Check` matches that secret. Keep `ADMIN_SECRET` enabled; the bypass header is only an edge-rule signal, not Worker authentication.
+If Cloudflare zone security challenges the GitHub Actions request before it reaches the Worker, set a repository secret named `DIARY_CHECK_BYPASS_SECRET` and add a Cloudflare WAF skip rule for `POST /admin/diary/check` when `X-Pool-Diary-Check` matches that secret. Keep the Worker admin or broadcast secret enabled; the bypass header is only an edge-rule signal, not Worker authentication.
 
 ```json
 {
@@ -618,9 +622,10 @@ The Worker also serves localized campaign share-card previews at `GET /share/cam
    - User can modify tier, cancel, or update payment method
 
 4. **Campaign reaches goal**
-   - Admin triggers charge process (separate script)
-   - Creates PaymentIntents using stored payment methods
-   - Updates pledge status to "charged"
+   - The scheduler or an authorized operator dispatches campaign settlement
+   - The campaign's settlement coordinator serializes settlement batches
+   - The Worker creates PaymentIntents using stored payment methods and deterministic idempotency keys
+   - Pledges update to "charged" or "payment_failed"
 
 ## Test Mode
 
@@ -671,4 +676,4 @@ Diary entries are automatically broadcast to supporters when deployed:
 
 Diary entries should have stable `id` values. The dashboard preserves existing IDs and the Worker derives title-based IDs when publishing entries that do not have one yet. Automatic broadcasts track `id:{entryId}` markers and still recognize legacy date markers, including date strings that only differ by `:00` seconds formatting. Updating an existing diary entry title, date display, phase, or content should not send another automatic email.
 
-**Setup:** Ensure `ADMIN_SECRET` is set as a GitHub repository secret for the deploy action to authenticate. If the post-deploy check receives a Cloudflare challenge page, also configure `DIARY_CHECK_BYPASS_SECRET` plus the matching WAF skip rule described above.
+**Setup:** Ensure `ADMIN_SECRET` is set as a GitHub repository secret for the deploy action to authenticate, or set `ADMIN_BROADCAST_SECRET` in both Cloudflare Worker secrets and GitHub repository secrets when using scoped broadcast credentials. If the post-deploy check receives a Cloudflare challenge page, also configure `DIARY_CHECK_BYPASS_SECRET` plus the matching WAF skip rule described above.

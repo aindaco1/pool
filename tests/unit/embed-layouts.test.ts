@@ -51,6 +51,12 @@ describe('campaign embed surface', () => {
     const translationsEs = readRepoFile('_data', 'i18n', 'es.yml');
 
     expect(embedScript).toContain('pool-campaign-embed:resize');
+    expect(embedScript).toContain('sanitizeInlineEmbedHtml');
+    expect(embedScript).toContain('isSafeEmbedHref');
+    expect(embedScript).toContain('getParentTargetOrigin');
+    expect(embedScript).toContain('sanitizeInlineEmbedHtml(campaign.shortBlurbHtml)');
+    expect(embedScript).not.toContain('campaign.shortBlurbHtml || escapeHtml');
+    expect(embedScript).not.toContain("}, '*');");
     expect(embedScript).toContain('buildEmbedCode');
     expect(embedScript).toContain('buildResizeHelperScript');
     expect(embedScript).toContain('data-pool-campaign-embed');

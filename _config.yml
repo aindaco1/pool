@@ -16,7 +16,7 @@ seo:
 
 debug:
   console_logging_enabled: true
-  verbose_console_logging: true
+  verbose_console_logging: false
 
 exclude:
   - README.md

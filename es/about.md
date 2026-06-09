@@ -11,7 +11,7 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
-El hito de lanzamiento actual de la plataforma es **v1.0.3**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente se enfoca en zona horaria configurable, recordatorios opt-in para campañas próximas, presupuestos de Cloudflare KV, performance móvil, enlaces de diario y flujos de media del panel.
+El hito de lanzamiento actual de la plataforma es **v1.0.3**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente se enfoca en zona horaria configurable, recordatorios opt-in para campañas próximas, presupuestos de Cloudflare KV, liquidación de campañas más segura, performance móvil, enlaces de diario y flujos de media del panel.
 
 ## Aportes de todo o nada
 
@@ -54,7 +54,7 @@ Para el acceso a la comunidad de patrocinadores, The Pool mantiene la sesión ve
 
 Algunos checkouts pueden incluir add-ons de plataforma, add-ons de campaña, mejoras de entrega, tarifas de envío, impuestos o una propina opcional para la plataforma. El checkout explica qué cuenta para la meta de la campaña y qué apoya a la plataforma por separado.
 
-Los múltiples aportes desde el mismo correo se combinan en un único cobro cuando la misma campaña tiene éxito. Las propinas opcionales y los add-ons de plataforma apoyan al equipo que opera la plataforma y no cuentan para la meta de financiación del proyecto.
+Los múltiples aportes desde el mismo correo se combinan en un único cobro cuando la misma campaña tiene éxito. Si más de una campaña del mismo pago tiene éxito, esos cobros siguen separados por campaña. Las propinas opcionales y los add-ons de plataforma apoyan al equipo que opera la plataforma y no cuentan para la meta de financiación del proyecto.
 
 ## Compartir y performance
 
@@ -94,14 +94,14 @@ La plataforma está diseñada para cineastas y equipos creativos que necesitan u
 
 ## La tecnología
 
-The Pool es una plataforma de crowdfunding con arquitectura static-first. Las páginas públicas se generan con anticipación, mientras el trabajo confiable de servidor queda detrás de Cloudflare Workers para precios, aportes, acceso administrativo, datos de fulfillment y liquidación.
+The Pool es una plataforma de crowdfunding con arquitectura static-first. Las páginas públicas se generan con anticipación, mientras el trabajo confiable de servidor queda detrás de Cloudflare Workers para precios, aportes, acceso administrativo, datos de fulfillment y liquidación serializada.
 
 | Área | Qué lo ejecuta | Por qué importa para forks |
 |------|----------------|----------------------------|
 | Sitio público | [GitHub Pages](https://docs.github.com/en/pages) y Jekyll | Las páginas de campaña, docs, contenido traducido y metadatos públicos siguen siendo fáciles de alojar y revisar en Git. |
 | Experiencia de aporte | Runtime de carrito de The Pool | El carrito, selección de recompensas, add-ons, revisión del aporte y gestión por enlaces mágicos siguen siendo de primera parte. |
 | Pagos | [Stripe](https://stripe.com) | Stripe controla los campos sensibles de pago, métodos guardados y cobros posteriores. |
-| Backend | [Cloudflare Workers](https://workers.cloudflare.com) y KV | El Worker valida totales, guarda aportes, sirve estadísticas en vivo, alimenta APIs del panel y maneja estado de fulfillment/liquidación. |
+| Backend | [Cloudflare Workers](https://workers.cloudflare.com) y KV | El Worker valida totales, guarda aportes, sirve estadísticas en vivo, alimenta APIs del panel y maneja fulfillment más estado de liquidación por campaña. |
 | Panel de administración | Panel privado de The Pool | Las personas autorizadas pueden gestionar campañas, contenido, reportes, patrocinadores, analytics, enlaces de marketing, add-ons y usuarios sin editar archivos directamente. |
 | Correo | [Resend](https://resend.com) | Confirmaciones, enlaces de patrocinador, recordatorios de lanzamiento, actualizaciones de campaña y avisos de cobro usan una sola ruta de correo transaccional. |
 
@@ -127,4 +127,4 @@ The Pool es de código abierto. Toda la plataforma, el frontend, el Worker, la a
 
 *The Pool ha sido creado y es mantenido por [Dust Wave](https://dustwave.xyz).*
 
-_Última actualización: 3 de junio de 2026_
+_Última actualización: 9 de junio de 2026_

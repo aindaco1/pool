@@ -28,6 +28,7 @@ These terms reflect The Pool platform release milestone **v1.0.3**.
 
 - Your card details are handled by **Stripe's secure payment fields** embedded in The Pool checkout. We do not store full card numbers or CVC values. No charge is made until the campaign succeeds.
 - If a campaign is funded, all pledges from the same email for that campaign are combined into a single charge.
+- If one checkout includes more than one funded campaign, each funded campaign may produce its own charge because pledges and settlement are campaign-scoped.
 - You may add an **optional platform tip** from 0% to 15% during checkout. The default tip is 5%.
 - Optional platform tips support maintenance of The Pool and are included in your pledge total, but **do not count toward a campaign's funding goal**.
 - This deployment may also offer **optional platform add-ons** alongside a pledge. Platform add-ons support maintenance of The Pool, are included in your pledge total, and **do not count toward a campaign's funding goal**.
@@ -38,7 +39,7 @@ These terms reflect The Pool platform release milestone **v1.0.3**.
 - If a delivery option is available for your shipment and you change it in checkout or Manage Pledge, the stored shipping total and pledge total are recalculated from the saved pledge state before the change is persisted.
 - If you modify a pledge, The Pool recalculates totals from the saved pledge state and the campaign or add-on definitions in effect for that deployment, rather than trusting browser-submitted money fields.
 - Transactional emails and supporter access links may reflect this deployment's configured branding and localized route structure, but each emailed manage link still authorizes only the pledge tied to that specific order.
-- Scheduled campaign-runner reports, campaign state changes, and settlement checks use the same configured platform timezone as campaign deadlines.
+- Scheduled campaign-runner reports, campaign state changes, and settlement checks use the same configured platform timezone as campaign deadlines. Settlement checks are serialized by campaign to avoid duplicate campaign charging.
 
 ## Creative Control & Submissions
 
@@ -72,7 +73,7 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - Campaign organizers may receive campaign-scoped reports or fulfillment exports containing supporter/order details needed to run that specific campaign, coordinate delivery, or send production-related updates. Those reports stay limited to the campaign a supporter backed rather than exposing unrelated campaign pledges.
 - Authorized campaign operators may also view campaign-scoped supporter rows, reports, analytics, fulfillment data, and campaign content through The Pool's private admin dashboard. Dashboard access is role-scoped: campaign users see only assigned campaigns, while platform administrators may see platform-wide operational data needed to run The Pool.
 - When a pledge includes platform-fulfilled add-on items, platform operators may separately receive platform-only fulfillment exports limited to the items they must deliver.
-- Platform administrators may use the dashboard to manage campaign configuration, platform settings, add-ons, referral links, and authorized dashboard users. Secret values are not stored in campaign content or dashboard drafts.
+- Platform administrators may use the dashboard to manage campaign configuration, platform settings, add-ons, referral links, and authorized dashboard users. Secret values are kept in deployment secret stores or ignored local files, not in campaign content or dashboard drafts.
 - Inventory-limited platform add-ons use saved pledge state, not in-progress cart drafts, to determine remaining stock.
 - Inventory-limited campaign add-ons also use saved pledge state, not in-progress cart drafts, to determine remaining stock.
 - Supporter-community access in the browser may be remembered for the current session as a convenience, but the emailed magic link remains the source of truth for access.
@@ -100,4 +101,4 @@ For questions about these terms or your pledge, email us at info@dustwave.xyz.
 
 ---
 
-_Last updated: June 1, 2026_
+_Last updated: June 9, 2026_

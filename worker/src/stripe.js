@@ -100,6 +100,10 @@ export function createStripeClient(secretKey) {
       options.headers['Stripe-Version'] = requestOptions.stripeVersion;
     }
 
+    if (requestOptions.idempotencyKey) {
+      options.headers['Idempotency-Key'] = requestOptions.idempotencyKey;
+    }
+
     if (data) {
       options.body = new URLSearchParams(flattenObject(data)).toString();
     }
@@ -120,7 +124,7 @@ export function createStripeClient(secretKey) {
       retrieve: (id) => request('GET', `/setup_intents/${id}`)
     },
     paymentIntents: {
-      create: (data) => request('POST', '/payment_intents', data),
+      create: (data, requestOptions) => request('POST', '/payment_intents', data, requestOptions),
       retrieve: (id, params = {}) => {
         const query = new URLSearchParams(flattenObject(params)).toString();
         return request('GET', `/payment_intents/${id}${query ? `?${query}` : ''}`);

@@ -345,7 +345,7 @@ Trigger a GitHub Pages rebuild (for state transitions).
 ### `POST /admin/broadcast/announcement`
 Send a custom announcement email with optional CTA link to all campaign supporters.
 
-**Headers:** `Authorization: Bearer ADMIN_SECRET`  
+**Headers:** `Authorization: Bearer ADMIN_BROADCAST_SECRET` when configured, otherwise `Authorization: Bearer ADMIN_SECRET`
 **Request:**
 ```json
 {
@@ -392,7 +392,7 @@ curl "http://localhost:8787/admin/reports/campaign-runner/preview?campaignSlug=h
 curl "http://localhost:8787/admin/reports/campaign-runner.csv?campaignSlug=hand-relations&reportType=fulfillment"
 ```
 
-For authenticated browser use these endpoints require the dashboard session cookie and CSRF/origin protections where applicable. Script-driven admin endpoints that still use `Authorization: Bearer ADMIN_SECRET` remain separate from the browser dashboard contract.
+For authenticated browser use these endpoints require the dashboard session cookie and CSRF/origin protections where applicable. Script-driven admin endpoints that use Bearer secrets remain separate from the browser dashboard contract. Settlement routes can require `ADMIN_SETTLEMENT_SECRET`, and broadcast/diary/milestone routes can require `ADMIN_BROADCAST_SECRET`; if a scoped secret is not configured, the route falls back to `ADMIN_SECRET`. Set scoped secrets in Cloudflare Worker secrets for runtime enforcement, and add matching GitHub repository secrets only for Actions or operator workflows that call those endpoints.
 
 Stripe financials backfill for super admins:
 
@@ -507,13 +507,15 @@ The scheduler is intentionally free-tier-aware. Launch reminder dispatch and sup
 
 The `settle-dispatch` endpoint handles the actual charging in batches to stay within CF Worker's 50 subrequest limit:
 
-1. Reads the campaign pledge index (`campaign-pledges:{slug}` in KV)
-2. Initializes a settlement job (`settlement-job:{slug}`) tracking progress
-3. Processes 6 pledges per batch via `POST /admin/settle-batch`
-4. Self-invokes for the next batch until all pledges are processed
-5. Each batch is a separate Worker invocation with its own subrequest budget
-6. **Aggregates pledges by email** — each supporter gets ONE charge
-7. On completion, sets `campaign-charged:{slug}` only when no active pledge still needs attention
+1. Claims the campaign's `SETTLEMENT_COORDINATOR` Durable Object lock
+2. Reads the campaign pledge index (`campaign-pledges:{slug}` in KV)
+3. Initializes a settlement job (`settlement-job:{slug}`) tracking progress
+4. Processes 6 pledges from the same campaign per batch via `POST /admin/settle-batch`
+5. Self-invokes for the next batch until all pledges are processed, forwarding the same lock owner
+6. Each batch is a separate Worker invocation with its own subrequest budget
+7. **Aggregates pledges by email** — each supporter gets ONE charge per campaign
+8. Uses a deterministic Stripe idempotency key per campaign/supporter charge group
+9. On completion, sets `campaign-charged:{slug}` only when no active pledge still needs attention
 
 **Campaign pledge index:**
 
@@ -527,10 +529,11 @@ A per-campaign array of order IDs (`campaign-pledges:{slug}`) is maintained auto
 **Key behaviors:**
 - Cancelled pledges are never charged
 - Multiple pledges from same email = one aggregated charge (subtotals + shipping + tax + tip summed)
+- Multi-campaign carts remain supported because checkout persistence creates one pledge record per campaign; settlement locks and batches are campaign-scoped and reject mixed-campaign batches
 - Uses the most recently updated payment method for each supporter
 - Already-charged pledges are safely skipped (idempotent)
-- Can be triggered manually via `POST /admin/settle-dispatch/:slug`
-- Legacy monolithic settle still available: `POST /admin/settle/:slug` (use settle-dispatch for large campaigns)
+- Can be triggered manually via `POST /admin/settle-dispatch/:slug` with `ADMIN_SETTLEMENT_SECRET` when configured, otherwise `ADMIN_SECRET`
+- Legacy monolithic settle still available: `POST /admin/settle/:slug`; it uses the same campaign lock and Stripe idempotency key path, but `settle-dispatch` is preferred for large campaigns
 - Cron heartbeat: check via `GET /admin/cron/status`
 
 ### Payment Failure & Retry

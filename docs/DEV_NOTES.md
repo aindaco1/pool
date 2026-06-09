@@ -455,7 +455,7 @@ diary:
 
 **Email broadcasts:** When diary entries are added and deployed, the GitHub Action triggers `/admin/diary/check` which sends update emails to all campaign supporters. The automatic check sends only entries that have not been broadcast before. Diary entries use stable `id` values for broadcast tracking; the dashboard preserves existing IDs, and the Worker derives title-based IDs for newly added entries. Legacy date markers are still recognized so edits to older entries do not resend. The email excerpt is auto-extracted from text blocks (first 200 chars, markdown stripped).
 
-**Required setup:** Add `ADMIN_SECRET` as a GitHub repository secret (Settings → Secrets → Actions). This must match the Worker's `ADMIN_SECRET`. Without it, diary email broadcasts will silently fail.
+**Required setup:** Add `ADMIN_SECRET` as a GitHub repository secret (Settings → Secrets → Actions), or add `ADMIN_BROADCAST_SECRET` to both Cloudflare Worker secrets and GitHub repository secrets when using scoped broadcast credentials. Repository secrets authenticate the GitHub Action; Worker secrets are what the deployed route reads. Without the matching secret in both places, diary email broadcasts will fail authentication.
 
 ### Ongoing Funding (Post-Campaign)
 
@@ -574,12 +574,16 @@ CHECKOUT_INTENT_SECRET=random-32-char-string-for-hmac
 MAGIC_LINK_SECRET=random-32-char-string-for-hmac
 RESEND_API_KEY=re_...
 ADMIN_SECRET=local-admin-secret
+ADMIN_SETTLEMENT_SECRET=local-settlement-admin-secret
+ADMIN_BROADCAST_SECRET=local-broadcast-admin-secret
 ```
 
 Generate secrets:
 ```bash
 openssl rand -base64 32
 ```
+
+Use separate local-only values in `worker/.dev.vars`; do not use that file as a production secret backup. Production runtime secrets belong in Cloudflare Worker secrets, while GitHub repository secrets are only for Actions or operator automation that needs to call protected routes.
 
 ### 3. Set Up KV Namespaces
 
@@ -948,7 +952,9 @@ Secrets live in Cloudflare Worker environment variables. Never commit:
 | `CHECKOUT_INTENT_SECRET` | Sign first-party checkout snapshots |
 | `MAGIC_LINK_SECRET` | HMAC signing for pledge management tokens |
 | `RESEND_API_KEY` | Send supporter/milestone/failed emails |
-| `ADMIN_SECRET` | Protect admin endpoints (settle, rebuild, etc.) |
+| `ADMIN_SECRET` | Protect admin endpoints (recovery, rebuild, and fallback automation auth) |
+| `ADMIN_SETTLEMENT_SECRET` | Optional scoped secret for settlement endpoints; when set, settlement routes reject `ADMIN_SECRET` |
+| `ADMIN_BROADCAST_SECRET` | Optional scoped secret for announcement, diary, and milestone endpoints; when set, broadcast routes reject `ADMIN_SECRET` |
 
 ## Email Best Practices
 
@@ -1358,24 +1364,27 @@ done
 
 ## Settlement Architecture
 
-The settlement flow uses **self-chaining batched invocations** to stay within Cloudflare Worker's 50 subrequest limit:
+The settlement flow uses a **campaign-scoped Durable Object lock** plus self-chaining batched invocations to stay within Cloudflare Worker's 50 subrequest limit:
 
-1. **Scheduler** (`scheduled()`) claims one daily run after midnight in the platform timezone, then dispatches settlement work
-2. **Dispatch** reads campaign pledge index, processes 6 pledges per batch via `/admin/settle-batch`
-3. **Each batch** is a separate Worker invocation with its own subrequest budget
-4. **Self-chains** until all pledges are processed, then sets `campaign-charged:{slug}` marker
+1. **Scheduler** (`scheduled()`) claims one daily run after midnight in the platform timezone, then claims the campaign settlement lock before dispatching work
+2. **Dispatch** refreshes the same `SETTLEMENT_COORDINATOR` lock, reads the campaign pledge index, and processes 6 pledges per batch via `/admin/settle-batch`
+3. **Each batch** verifies all chargeable pledges belong to one campaign, refreshes or claims the campaign lock, and uses deterministic Stripe idempotency keys for each supporter charge
+4. **Self-chains** until all pledges are processed, then sets `campaign-charged:{slug}` only when no active pledge still needs attention
 
-**KV keys used by settlement:**
+Multi-campaign carts remain supported because webhook persistence fans a cart bundle into separate campaign-scoped pledge records. Settlement is intentionally campaign-scoped: locks, batch validation, job state, and completion markers are keyed by the campaign being charged.
+
+**State used by settlement:**
 
 | Key | Purpose |
 |-----|---------|
 | `campaign-pledges:{slug}` | Per-campaign array of order IDs (maintained on create/cancel) |
-
-That index is still the preferred fast path for reports, settlement, and admin reads, but stats and inventory recalculation now treat it as repairable projection state rather than untouchable truth. If it drifts from the underlying active pledge records, the rebuild path rewrites it automatically.
 | `settlement-job:{slug}` | Batch progress tracking (cursor, totals) |
 | `campaign-charged:{slug}` | Settlement completion marker (prevents re-settle) |
 | `cron:lastRun` | Hourly scheduler heartbeat — last persisted cron execution timestamp |
 | `cron:lastError` | Last cron error details (7-day TTL) |
+| `SETTLEMENT_COORDINATOR` Durable Object | Short-lived campaign settlement lock and owner refresh/release state |
+
+`campaign-pledges:{slug}` is still the preferred fast path for reports, settlement, and admin reads, but stats and inventory recalculation treat it as repairable projection state rather than untouchable truth. If it drifts from the underlying active pledge records, the rebuild path rewrites it automatically.
 
 **Projection drift checks:**
 

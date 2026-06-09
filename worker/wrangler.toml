@@ -78,7 +78,7 @@ CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT = "true"
 CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX = "[The Pool]"
 LAUNCH_REMINDERS_ENABLED = "true"
 DEBUG_CONSOLE_LOGGING_ENABLED = "true"
-DEBUG_VERBOSE_CONSOLE_LOGGING = "true"
+DEBUG_VERBOSE_CONSOLE_LOGGING = "false"
 INTENT_PREFETCH_ENABLED = "true"
 INTENT_PREFETCH_DELAY_MS = "90"
 INTENT_PREFETCH_LIMIT = "3"
@@ -95,6 +95,10 @@ class_name = "CheckoutIntentNonceCoordinator"
 name = "TIER_INVENTORY_COORDINATOR"
 class_name = "TierInventoryCoordinator"
 
+[[durable_objects.bindings]]
+name = "SETTLEMENT_COORDINATOR"
+class_name = "SettlementCoordinator"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["CheckoutIntentNonceCoordinator"]
@@ -102,6 +106,10 @@ new_sqlite_classes = ["CheckoutIntentNonceCoordinator"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["TierInventoryCoordinator"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["SettlementCoordinator"]
 
 # KV Namespaces - update IDs after running:
 #   wrangler kv:namespace create "VOTES"
@@ -132,7 +140,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - MAGIC_LINK_SECRET          (HMAC secret for token signing)
 # - CHECKOUT_INTENT_SECRET     (HMAC secret for first-party checkout intent signing)
 # - RESEND_API_KEY             (Resend email API key)
-# - ADMIN_SECRET               (Admin API key for broadcast/rebuild endpoints)
+# - ADMIN_SECRET               (Admin API key for recovery/rebuild endpoints and scoped-secret fallback)
 # - TURNSTILE_SECRET_KEY       (shared Cloudflare Turnstile secret for admin sign-in and launch reminder challenges)
 #
 # Optional (for separate test/live keys):
@@ -140,6 +148,8 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - STRIPE_WEBHOOK_SECRET_LIVE / STRIPE_WEBHOOK_SECRET_TEST
 # - STRIPE_WEBHOOK_SECRET      (webhook signing secret)
 # - USPS_CLIENT_SECRET         (USPS OAuth client secret for live shipping quotes)
+# - ADMIN_SETTLEMENT_SECRET    (scoped settlement endpoint secret; rejects ADMIN_SECRET when set)
+# - ADMIN_BROADCAST_SECRET     (scoped broadcast/diary/milestone endpoint secret; rejects ADMIN_SECRET when set)
 # - ADMIN_TURNSTILE_SECRET_KEY (admin-specific Turnstile secret if not using TURNSTILE_SECRET_KEY)
 # - LAUNCH_REMINDER_TURNSTILE_SECRET_KEY (reminder-specific Turnstile secret if not using TURNSTILE_SECRET_KEY)
 # - LAUNCH_REMINDER_TOKEN_SECRET (optional unsubscribe-token secret; falls back to MAGIC_LINK_SECRET)
@@ -226,7 +236,7 @@ CAMPAIGN_RUNNER_INCLUDE_CSV_ATTACHMENT = "true"
 CAMPAIGN_RUNNER_EMAIL_SUBJECT_PREFIX = "[The Pool]"
 LAUNCH_REMINDERS_ENABLED = "true"
 DEBUG_CONSOLE_LOGGING_ENABLED = "true"
-DEBUG_VERBOSE_CONSOLE_LOGGING = "true"
+DEBUG_VERBOSE_CONSOLE_LOGGING = "false"
 INTENT_PREFETCH_ENABLED = "true"
 INTENT_PREFETCH_DELAY_MS = "90"
 INTENT_PREFETCH_LIMIT = "3"
@@ -242,6 +252,10 @@ class_name = "CheckoutIntentNonceCoordinator"
 [[env.dev.durable_objects.bindings]]
 name = "TIER_INVENTORY_COORDINATOR"
 class_name = "TierInventoryCoordinator"
+
+[[env.dev.durable_objects.bindings]]
+name = "SETTLEMENT_COORDINATOR"
+class_name = "SettlementCoordinator"
 
 [[env.dev.kv_namespaces]]
 binding = "VOTES"

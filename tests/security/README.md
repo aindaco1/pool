@@ -104,6 +104,8 @@ Set these environment variables:
 | `WORKER_URL` | `http://localhost:8787` | Worker endpoint to test |
 | `PROD_MODE` | `false` | Skip destructive tests |
 | `ADMIN_SECRET` | (none) | Admin secret for auth tests |
+| `ADMIN_SETTLEMENT_SECRET` | (none) | Optional scoped settlement secret for environments that enforce settlement auth |
+| `ADMIN_BROADCAST_SECRET` | (none) | Optional scoped broadcast secret for environments that enforce broadcast/diary auth |
 | `TEST_TOKEN` | (none) | Valid magic link token for auth tests |
 
 ## CI Integration

@@ -29,6 +29,7 @@ Estos términos reflejan el hito de lanzamiento **v1.0.3** de la plataforma The 
 
 - Los datos de tu tarjeta son gestionados por **los campos de pago seguros de Stripe** integrados en el flujo de pago de The Pool. No almacenamos números completos de tarjeta ni valores CVC. No se realiza ningún cobro hasta que la campaña tenga éxito.
 - Si una campaña se financia, todos los aportes del mismo correo para esa campaña se combinan en un único cobro.
+- Si un mismo pago incluye más de una campaña financiada, cada campaña financiada puede generar su propio cobro porque los aportes y la liquidación están separados por campaña.
 - Puedes añadir una **propina opcional para la plataforma** de entre 0% y 15% durante el pago. La propina predeterminada es del 5%.
 - Las propinas opcionales ayudan al mantenimiento de The Pool y se incluyen en el total de tu aporte, pero **no cuentan para la meta de financiación de la campaña**.
 - Esta implementación también puede ofrecer **complementos opcionales de la plataforma** junto con un aporte. Los complementos de la plataforma ayudan al mantenimiento de The Pool, se incluyen en el total de tu aporte y **no cuentan para la meta de financiación de la campaña**.
@@ -39,7 +40,7 @@ Estos términos reflejan el hito de lanzamiento **v1.0.3** de la plataforma The 
 - Si hay una opción de entrega disponible para tu envío y la cambias en el pago o en Gestionar aporte, el total de envío guardado y el total del aporte se recalculan a partir del estado guardado del aporte antes de persistir el cambio.
 - Si modificas un aporte, The Pool recalcula los totales a partir del estado guardado del aporte y de las definiciones de campaña o complemento vigentes en esa implementación, en lugar de confiar en importes enviados por el navegador.
 - Los correos transaccionales y los enlaces de acceso para patrocinadores pueden reflejar la marca configurada para esta implementación y su estructura de rutas localizadas, pero cada enlace de gestión enviado por correo sigue autorizando solo el aporte vinculado a ese pedido específico.
-- Los reportes programados para responsables de campaña, los cambios de estado de campaña y las comprobaciones de liquidación usan la misma zona horaria configurada que las fechas límite de campaña.
+- Los reportes programados para responsables de campaña, los cambios de estado de campaña y las comprobaciones de liquidación usan la misma zona horaria configurada que las fechas límite de campaña. Las comprobaciones de liquidación se serializan por campaña para evitar cobros duplicados de una campaña.
 
 ## Control creativo y envíos
 
@@ -73,7 +74,7 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Las personas organizadoras de campañas pueden recibir informes por campaña o exportaciones de cumplimiento con los datos de apoyo y pedido necesarios para operar esa campaña concreta, coordinar la entrega o enviar actualizaciones relacionadas con la producción. Esos informes se limitan a la campaña que apoyaste y no exponen aportes de campañas no relacionadas.
 - Las personas operadoras autorizadas también pueden ver filas de patrocinadores, reportes, analytics, datos de fulfillment y contenido de campaña desde el panel privado de administración de The Pool. El acceso del panel está limitado por rol: las personas usuarias de campaña solo ven las campañas asignadas, mientras que las administradoras de plataforma pueden ver datos operativos de toda la plataforma necesarios para operar The Pool.
 - Cuando un aporte incluye complementos cumplidos por la plataforma, las operadoras de la plataforma pueden recibir por separado exportaciones de cumplimiento limitadas únicamente a los artículos que deben entregar.
-- Las administradoras de plataforma pueden usar el panel para gestionar configuración de campañas, ajustes de plataforma, complementos, enlaces de referencia y personas usuarias autorizadas del panel. Los valores secretos no se guardan en contenido de campaña ni en borradores del panel.
+- Las administradoras de plataforma pueden usar el panel para gestionar configuración de campañas, ajustes de plataforma, complementos, enlaces de referencia y personas usuarias autorizadas del panel. Los valores secretos se mantienen en almacenes de secretos de despliegue o archivos locales ignorados, no en contenido de campaña ni en borradores del panel.
 - Los complementos de la plataforma con inventario limitado usan el estado de los aportes guardados, no los borradores en curso del carrito, para determinar el stock restante.
 - Los complementos de campaña con inventario limitado también usan el estado de los aportes guardados, no los borradores en curso del carrito, para determinar el stock restante.
 - El acceso a la comunidad de patrocinadores en el navegador puede recordarse durante la sesión actual como una comodidad, pero el enlace mágico enviado por correo sigue siendo la fuente de verdad para el acceso.
@@ -101,4 +102,4 @@ Si tienes preguntas sobre estos términos o sobre tu aporte, escribe a info@dust
 
 ---
 
-_Última actualización: 1 de junio de 2026_
+_Última actualización: 9 de junio de 2026_

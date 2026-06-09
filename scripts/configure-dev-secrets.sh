@@ -192,6 +192,8 @@ ensure_local_default "ADMIN_BOOTSTRAP_EMAILS"
 ensure_local_default "ADMIN_TEST_CAMPAIGNS"
 
 ensure_generated_secret "ADMIN_SECRET"
+ensure_generated_secret "ADMIN_SETTLEMENT_SECRET"
+ensure_generated_secret "ADMIN_BROADCAST_SECRET"
 ensure_generated_secret "CHECKOUT_INTENT_SECRET"
 ensure_generated_secret "MAGIC_LINK_SECRET"
 ensure_generated_secret "ADMIN_SESSION_SECRET"

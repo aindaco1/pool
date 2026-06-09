@@ -143,28 +143,54 @@ module Jekyll
     def allowed_link_href?(href)
       return false if href.nil?
 
-      normalized = CGI.unescapeHTML(href.to_s).strip
-      return false if normalized.empty?
-      return true if normalized.start_with?('#', '/', '?', './', '../')
+      raw = href.to_s.strip
+      return false if raw.empty?
 
-      uri = parse_uri(normalized)
-      return false unless uri
-      return true if uri.scheme.nil? && uri.host.nil?
-
-      %w[http https mailto].include?(uri.scheme)
+      html_entity_variants(raw).all? do |candidate|
+        allowed_normalized_link_href?(candidate)
+      end
     end
 
     def external_http_link?(href, site_host)
-      uri = parse_uri(href)
+      uri = parse_uri(CGI.unescapeHTML(href.to_s))
       return false unless uri
-      return false unless %w[http https].include?(uri.scheme)
+      return false unless %w[http https].include?(uri.scheme.to_s.downcase)
       return true if site_host.nil? || site_host.empty?
 
       uri.host != site_host
     end
 
+    def allowed_normalized_link_href?(value)
+      normalized = value.to_s.gsub(/[\u0000-\u0020]+/, '').strip
+      return false if normalized.empty?
+      return true if normalized.start_with?('#', '?', './', '../')
+      return true if normalized.start_with?('/') && !normalized.start_with?('//')
+
+      uri = parse_uri(normalized)
+      return false unless uri
+      return true if uri.scheme.nil? && uri.host.nil?
+
+      %w[http https mailto].include?(uri.scheme.to_s.downcase)
+    end
+
+    def html_entity_variants(value)
+      variants = []
+      current = value.to_s
+
+      4.times do
+        variants << current
+        decoded = CGI.unescapeHTML(current)
+        break if decoded == current
+
+        current = decoded
+      end
+
+      variants << current
+      variants.uniq
+    end
+
     def parse_uri(value)
-      normalized = CGI.unescapeHTML(value.to_s).gsub(/[\u0000-\u0020]+/, '')
+      normalized = value.to_s.gsub(/[\u0000-\u0020]+/, '')
       URI.parse(normalized)
     rescue URI::InvalidURIError
       nil

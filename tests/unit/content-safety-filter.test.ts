@@ -243,6 +243,18 @@ describe('content safety filter', () => {
     expect(rendered).toContain('href="#"');
   });
 
+  it('neutralizes entity-encoded javascript markdown links', () => {
+    const rendered = renderFilter('safe_markdownify', '[x](java&#x73;cript:alert(1))');
+    expect(rendered).not.toContain('javascript:alert(1)');
+    expect(rendered).toContain('href="#"');
+  });
+
+  it('neutralizes protocol-relative markdown links', () => {
+    const rendered = renderFilter('safe_markdownify', '[x](//example.com/path)');
+    expect(rendered).not.toContain('href="//example.com/path"');
+    expect(rendered).toContain('href="#"');
+  });
+
   it('neutralizes data markdown links', () => {
     const rendered = renderFilter('safe_markdownify', '[x](data:text/html,boom)');
     expect(rendered).not.toContain('href="data:text/html,boom"');

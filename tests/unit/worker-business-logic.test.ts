@@ -3265,6 +3265,51 @@ describe('Worker business logic hardening', () => {
     expect(requestOptions).toEqual({ stripeVersion: '2026-02-25.clover' });
   });
 
+  it('does not return raw Stripe errors from payment-method update starts', async () => {
+    mockVerifyToken.mockResolvedValue({
+      orderId: 'order-update-redacted',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations'
+    });
+    mockStripeClient.checkout.sessions.create.mockRejectedValueOnce(
+      new Error('stripe leaked session secret cs_secret_should_not_leave_logs')
+    );
+
+    const env = createEnv({
+      CHECKOUT_UI_MODE: 'custom',
+      STRIPE_PUBLISHABLE_KEY_TEST: 'pk_test_pool_123'
+    });
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('pledge:order-update-redacted', JSON.stringify({
+      orderId: 'order-update-redacted',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      stripeCustomerId: 'cus_existing'
+    }));
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const response = await worker.fetch(
+        new Request('https://pool.test/pledge/payment-method/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: 'valid-token' })
+        }),
+        env,
+        { waitUntil: () => {} }
+      );
+
+      expect(response.status).toBe(500);
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+      await expect(response.json()).resolves.toEqual({
+        error: 'Failed to create payment update session'
+      });
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('cs_secret_should_not_leave_logs');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it('rejects cross-site payment method update starts', async () => {
     const env = createEnv({
       CHECKOUT_UI_MODE: 'custom',

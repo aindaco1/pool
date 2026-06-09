@@ -125,6 +125,7 @@ describe('SEO templates', () => {
     const seoMeta = readRepoFile('_includes', 'seo-meta.html');
 
     expect(manageLayout).toContain('indexable=false');
+    expect(manageLayout).toContain('<meta name="referrer" content="no-referrer">');
     expect(communityLayout).toContain('indexable=false');
     expect(pledgeResultLayout).toContain('indexable=false');
     expect(adminLayout).toContain('indexable=false');

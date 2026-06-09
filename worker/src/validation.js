@@ -54,10 +54,24 @@ export const SECURITY_HEADERS = {
   'Referrer-Policy': 'strict-origin-when-cross-origin'
 };
 
+const DEFAULT_PRIVATE_CORS_ORIGIN = 'https://pool.dustwave.xyz';
+
+function normalizeOrigin(value) {
+  const configured = String(value || '').trim();
+  if (!configured || configured === '*') return '';
+  try {
+    return new URL(configured).origin;
+  } catch {
+    return '';
+  }
+}
+
 // SEC-004: CORS helper - returns allowed origin based on endpoint type
 export function getAllowedOrigin(env, isPublic = false) {
   if (isPublic) return '*';
-  return env?.CORS_ALLOWED_ORIGIN || env?.SITE_BASE || '*';
+  return normalizeOrigin(env?.CORS_ALLOWED_ORIGIN) ||
+         normalizeOrigin(env?.SITE_BASE) ||
+         DEFAULT_PRIVATE_CORS_ORIGIN;
 }
 
 // Shared JSON response helper with security headers

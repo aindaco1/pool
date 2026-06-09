@@ -124,6 +124,64 @@ class MockTierInventoryNamespace {
   }
 }
 
+class MockSettlementNamespace {
+  locks = new Map<string, { owner: string; expiresAt: number; reason?: string }>();
+  calls: Array<{ name: string; pathname: string; body: Record<string, unknown> }> = [];
+
+  idFromName(name: string) {
+    return { name };
+  }
+
+  forceLock(name: string, owner = 'other-owner') {
+    this.locks.set(name, {
+      owner,
+      expiresAt: Date.now() + 15 * 60 * 1000,
+      reason: 'test'
+    });
+  }
+
+  get(id: { name: string }) {
+    return {
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        const pathname = new URL(url).pathname;
+        const body = init?.body ? JSON.parse(String(init.body)) : {};
+        this.calls.push({ name: id.name, pathname, body });
+        const owner = String(body.owner || '');
+        const existing = this.locks.get(id.name);
+
+        if (pathname === '/claim') {
+          if (existing && existing.expiresAt > Date.now() && existing.owner !== owner) {
+            return jsonResponse({
+              ok: false,
+              locked: true,
+              owner: existing.owner,
+              expiresAt: existing.expiresAt
+            }, 409);
+          }
+          const lock = {
+            owner,
+            reason: String(body.reason || ''),
+            expiresAt: Date.now() + Number(body.ttlMs || 15 * 60 * 1000)
+          };
+          this.locks.set(id.name, lock);
+          return jsonResponse({ ok: true, locked: false, ...lock });
+        }
+
+        if (pathname === '/release') {
+          if (!existing || existing.owner === owner) {
+            this.locks.delete(id.name);
+            return jsonResponse({ ok: true, released: Boolean(existing) });
+          }
+          return jsonResponse({ ok: false, owner: existing.owner, expiresAt: existing.expiresAt }, 409);
+        }
+
+        return jsonResponse({ ok: true, locked: Boolean(existing), ...existing });
+      }
+    };
+  }
+}
+
 const campaignFixture = {
   slug: 'hand-relations',
   url: '/campaigns/hand-relations/',
@@ -189,6 +247,7 @@ function createEnv(overrides: Record<string, unknown> = {}) {
     RESEND_API_KEY: 'test_resend_key',
     PLEDGES: new PaginatedKVNamespace(2),
     RATELIMIT: new PaginatedKVNamespace(50),
+    SETTLEMENT_COORDINATOR: new MockSettlementNamespace(),
     ...overrides
   };
 }
@@ -884,6 +943,132 @@ describe('worker operational integrity', () => {
     expect(await kv.get('campaign-charged:hand-relations')).toBeNull();
   });
 
+  it('rejects direct settlement when another campaign settlement owns the lock', async () => {
+    const settlement = new MockSettlementNamespace();
+    settlement.forceLock('hand-relations', 'existing-run');
+    const env = createEnv({ SETTLEMENT_COORDINATOR: settlement });
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-locked-settle-1']));
+    await kv.put('pledge:order-locked-settle-1', JSON.stringify({
+      orderId: 'order-locked-settle-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      amount: 3000000,
+      subtotal: 3000000,
+      tax: 0,
+      shipping: 0,
+      pledgeStatus: 'active',
+      charged: false,
+      stripeCustomerId: 'cus_locked',
+      stripePaymentMethodId: 'pm_locked',
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 3000000,
+      pledgeCount: 1,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [
+            {
+              ...campaignFixture,
+              goal_deadline: '2020-01-01'
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/settle/hand-relations', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer admin-secret',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body).toMatchObject({ campaignSlug: 'hand-relations', locked: true });
+    expect(mockStripeClient.paymentIntents.create).not.toHaveBeenCalled();
+  });
+
+  it('uses a deterministic Stripe idempotency key for direct settlement charges', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-idempotent-settle-1']));
+    await kv.put('pledge:order-idempotent-settle-1', JSON.stringify({
+      orderId: 'order-idempotent-settle-1',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      amount: 3000000,
+      subtotal: 3000000,
+      tax: 0,
+      shipping: 0,
+      pledgeStatus: 'active',
+      charged: false,
+      stripeCustomerId: 'cus_idempotent',
+      stripePaymentMethodId: 'pm_idempotent',
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      pledgedAmount: 3000000,
+      pledgeCount: 1,
+      tierCounts: {},
+      supportItems: {},
+      updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({
+          campaigns: [
+            {
+              ...campaignFixture,
+              goal_deadline: '2020-01-01'
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/settle/hand-relations', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer admin-secret',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockStripeClient.paymentIntents.create).toHaveBeenCalledTimes(1);
+    const requestOptions = mockStripeClient.paymentIntents.create.mock.calls[0][1];
+    expect(requestOptions.idempotencyKey).toMatch(/^settle:hand-relations:[a-f0-9]{48}$/);
+  });
+
   it('does not mark scheduled settlement complete when active pledges are skipped for missing customers', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;
@@ -932,7 +1117,7 @@ describe('worker operational integrity', () => {
   });
 
   it('does not mark a campaign settled when dispatch finishes with unresolved pledges', async () => {
-    const env = createEnv();
+    const env = createEnv({ ADMIN_SETTLEMENT_SECRET: 'settlement-secret' });
     const kv = env.PLEDGES as PaginatedKVNamespace;
 
     await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-settle-1']));
@@ -972,7 +1157,7 @@ describe('worker operational integrity', () => {
       new Request('https://pool.test/admin/settle-dispatch/hand-relations', {
         method: 'POST',
         headers: {
-          Authorization: 'Bearer admin-secret',
+          Authorization: 'Bearer settlement-secret',
           'Content-Type': 'application/json'
         }
       }),
@@ -1050,6 +1235,76 @@ describe('worker operational integrity', () => {
     expect(response.status).toBe(409);
     const body = await response.json();
     expect(body.requiresRebuild).toBe(true);
+  });
+
+  it('requires the scoped settlement secret when it is configured', async () => {
+    const env = createEnv({ ADMIN_SETTLEMENT_SECRET: 'settlement-secret' });
+
+    const broadSecretResponse = await worker.fetch(
+      new Request('https://pool.test/admin/settle-dispatch/hand-relations', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer admin-secret',
+          'Content-Type': 'application/json'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(broadSecretResponse.status).toBe(401);
+
+    const scopedSecretResponse = await worker.fetch(
+      new Request('https://pool.test/admin/settle-dispatch/hand-relations', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer settlement-secret',
+          'Content-Type': 'application/json'
+        }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(scopedSecretResponse.status).toBe(409);
+    const body = await scopedSecretResponse.json();
+    expect(body.requiresRebuild).toBe(true);
+  });
+
+  it('requires the scoped broadcast secret when it is configured', async () => {
+    const env = createEnv({ ADMIN_BROADCAST_SECRET: 'broadcast-secret' });
+
+    const broadSecretResponse = await worker.fetch(
+      new Request('https://pool.test/admin/broadcast/announcement', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer admin-secret',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(broadSecretResponse.status).toBe(401);
+
+    const scopedSecretResponse = await worker.fetch(
+      new Request('https://pool.test/admin/broadcast/announcement', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer broadcast-secret',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(scopedSecretResponse.status).toBe(400);
+    const body = await scopedSecretResponse.json();
+    expect(body.error).toBe('Missing campaignSlug, subject, or body');
   });
 
   it('fails closed when customer backfill is missing a campaign pledge index', async () => {

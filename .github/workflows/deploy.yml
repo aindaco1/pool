@@ -112,8 +112,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_KEY }}
-          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
 
       - name: Deploy to GitHub Pages
         id: deployment
@@ -121,16 +119,36 @@ jobs:
 
       - name: Purge Cloudflare cache
         if: ${{ vars.CLOUDFLARE_ENABLED == 'true' }}
-        uses: jakejarvis/cloudflare-purge-action@master
+        run: |
+          if [ -z "$CLOUDFLARE_ZONE" ]; then
+            echo "CLOUDFLARE_ZONE secret is required to purge cache."
+            exit 1
+          fi
+          if [ -z "$CLOUDFLARE_CACHE_PURGE_TOKEN" ]; then
+            echo "CLOUDFLARE_CACHE_PURGE_TOKEN or CLOUDFLARE_API_TOKEN secret is required to purge cache."
+            exit 1
+          fi
+
+          response="$(mktemp)"
+          status="$(curl -sS -o "$response" -w "%{http_code}" \
+            -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE}/purge_cache" \
+            -H "Authorization: Bearer ${CLOUDFLARE_CACHE_PURGE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}')"
+
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Cloudflare cache purge failed with status $status"
+            cat "$response"
+            exit 1
+          fi
         env:
           CLOUDFLARE_ZONE: ${{ secrets.CLOUDFLARE_ZONE }}
-          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
-          CLOUDFLARE_KEY: ${{ secrets.CLOUDFLARE_KEY }}
+          CLOUDFLARE_CACHE_PURGE_TOKEN: ${{ secrets.CLOUDFLARE_CACHE_PURGE_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Check for new diary entries
         if: success()
         env:
-          ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+          ADMIN_SECRET: ${{ secrets.ADMIN_BROADCAST_SECRET || secrets.ADMIN_SECRET }}
           DIARY_CHECK_BYPASS_SECRET: ${{ secrets.DIARY_CHECK_BYPASS_SECRET }}
         run: |
           sleep 30  # Wait for CDN propagation after cache purge

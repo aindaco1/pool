@@ -125,6 +125,7 @@ import {
 import { initWasm, Resvg } from '@resvg/resvg-wasm';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
+export { SettlementCoordinator } from './settlement-do.js';
 
 let console = globalThis.console;
 
@@ -1728,24 +1729,54 @@ const ADMIN_RATE_LIMIT_OPTIONS = {
   privateResponse: true
 };
 
+const ADMIN_SECRET_SCOPES = {
+  settlement: ['ADMIN_SETTLEMENT_SECRET', 'SETTLEMENT_ADMIN_SECRET'],
+  broadcast: ['ADMIN_BROADCAST_SECRET', 'BROADCAST_ADMIN_SECRET'],
+  maintenance: ['ADMIN_MAINTENANCE_SECRET', 'MAINTENANCE_ADMIN_SECRET']
+};
+
+function configuredSecret(value) {
+  const secret = String(value || '').trim();
+  return secret || '';
+}
+
+function getAdminSecretForScope(env, scope = 'default') {
+  const scopedKeys = ADMIN_SECRET_SCOPES[scope] || [];
+  for (const key of scopedKeys) {
+    const secret = configuredSecret(env?.[key]);
+    if (secret) {
+      return { secret, key, scoped: true };
+    }
+  }
+
+  const fallbackSecret = configuredSecret(env?.ADMIN_SECRET);
+  return fallbackSecret
+    ? { secret: fallbackSecret, key: 'ADMIN_SECRET', scoped: false }
+    : null;
+}
+
 // SEC-006: Admin authentication helper with timing-safe comparison
-function requireAdmin(request, env) {
+function requireAdmin(request, env, scope = 'default') {
   const authHeader = request.headers.get('Authorization') || '';
   const adminKey = request.headers.get('x-admin-key') || '';
+  const credential = getAdminSecretForScope(env, scope);
   
-  if (!env.ADMIN_SECRET) {
-    console.error('CRITICAL: ADMIN_SECRET not configured');
+  if (!credential) {
+    console.error(`CRITICAL: admin secret not configured for ${scope} scope`);
     return { ok: false, response: jsonResponse({ error: 'Admin not configured' }, 500) };
   }
   
   // Check Bearer token in Authorization header
-  const bearerToken = authHeader.replace('Bearer ', '');
-  if (bearerToken && timingSafeEqual(bearerToken, env.ADMIN_SECRET)) {
+  const bearerPrefix = 'Bearer ';
+  const bearerToken = authHeader.startsWith(bearerPrefix)
+    ? authHeader.slice(bearerPrefix.length)
+    : '';
+  if (bearerToken && timingSafeEqual(bearerToken, credential.secret)) {
     return { ok: true };
   }
   
   // Check x-admin-key header
-  if (adminKey && timingSafeEqual(adminKey, env.ADMIN_SECRET)) {
+  if (adminKey && timingSafeEqual(adminKey, credential.secret)) {
     return { ok: true };
   }
   
@@ -2058,6 +2089,24 @@ const STRIPE_FINANCIAL_EXPAND = Object.freeze(['latest_charge.balance_transactio
 
 function withStripeFinancialExpansion(data = {}) {
   return { ...data, expand: STRIPE_FINANCIAL_EXPAND };
+}
+
+function stripeSessionLogContext(session = {}) {
+  return {
+    id: session?.id || null,
+    status: session?.status || null,
+    mode: session?.mode || null,
+    paymentStatus: session?.payment_status || null
+  };
+}
+
+function stripeErrorLogContext(err = {}) {
+  return {
+    type: err?.type || err?.name || 'Error',
+    code: err?.code || null,
+    statusCode: err?.statusCode || err?.status || null,
+    requestId: err?.requestId || err?.request_id || null
+  };
 }
 
 function stripeObjectId(value) {
@@ -3224,6 +3273,114 @@ async function callTierInventoryCoordinator(env, campaignSlug, path, payload = {
   return body;
 }
 
+const SETTLEMENT_LOCK_TTL_MS = 15 * 60 * 1000;
+
+function hasSettlementCoordinator(env) {
+  return !!env?.SETTLEMENT_COORDINATOR;
+}
+
+function getSettlementCoordinatorStub(env, campaignSlug) {
+  const id = env.SETTLEMENT_COORDINATOR.idFromName(campaignSlug);
+  return env.SETTLEMENT_COORDINATOR.get(id);
+}
+
+function createSettlementLockOwner() {
+  if (crypto?.randomUUID) return crypto.randomUUID();
+  const random = Math.random().toString(36).slice(2);
+  return `${Date.now().toString(36)}-${random}`;
+}
+
+async function callSettlementCoordinator(env, campaignSlug, path, payload = {}) {
+  const response = await getSettlementCoordinatorStub(env, campaignSlug).fetch(
+    `https://settlement-coordinator${path}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        campaignSlug,
+        ttlMs: SETTLEMENT_LOCK_TTL_MS,
+        ...payload
+      })
+    }
+  );
+
+  let body = {};
+  try {
+    body = await response.json();
+  } catch (_err) {
+    body = {};
+  }
+
+  return { response, body };
+}
+
+async function acquireSettlementLock(env, campaignSlug, { owner = '', reason = 'settlement' } = {}) {
+  const lockOwner = String(owner || createSettlementLockOwner()).trim();
+  if (!hasSettlementCoordinator(env)) {
+    return { ok: true, owner: lockOwner, unguarded: true };
+  }
+
+  const { response, body } = await callSettlementCoordinator(env, campaignSlug, '/claim', {
+    owner: lockOwner,
+    reason
+  });
+
+  if (!response.ok || body?.ok !== true) {
+    return {
+      ok: false,
+      status: response.status || 409,
+      owner: body?.owner || '',
+      expiresAt: body?.expiresAt || null,
+      reason: body?.reason || '',
+      error: body?.error || 'Settlement already running'
+    };
+  }
+
+  return {
+    ok: true,
+    owner: body.owner || lockOwner,
+    expiresAt: body.expiresAt || null,
+    unguarded: false
+  };
+}
+
+async function releaseSettlementLock(env, campaignSlug, owner) {
+  if (!hasSettlementCoordinator(env) || !owner) return { ok: true, released: false };
+  const { body } = await callSettlementCoordinator(env, campaignSlug, '/release', { owner });
+  return body;
+}
+
+async function releaseSettlementLockQuietly(env, campaignSlug, lock, context = 'settlement') {
+  if (!lock?.ok || lock.unguarded) return;
+  await releaseSettlementLock(env, campaignSlug, lock.owner).catch((releaseErr) => {
+    console.error(`Failed to release ${context} settlement lock for ${campaignSlug}:`, releaseErr.message);
+  });
+}
+
+function settlementLockResponse(campaignSlug, lock, env) {
+  return jsonResponse({
+    error: lock.error || 'Settlement already running',
+    campaignSlug,
+    locked: true,
+    expiresAt: lock.expiresAt || null
+  }, lock.status || 409, env);
+}
+
+async function settlementChargeIdempotencyKey(campaignSlug, pledges = [], amount = 0, paymentMethodId = '') {
+  const orderIds = pledges.map((pledge) => String(pledge?.orderId || '')).filter(Boolean).sort();
+  const input = JSON.stringify({
+    campaignSlug,
+    orderIds,
+    amount: Number(amount || 0),
+    paymentMethodId: String(paymentMethodId || '')
+  });
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  const hex = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+  return `settle:${campaignSlug}:${hex.slice(0, 48)}`;
+}
+
 async function buildTierInventorySnapshot(env, campaignSlug, campaign = null) {
   if (hasTierInventoryCoordinator(env)) {
     try {
@@ -4272,7 +4429,14 @@ export default {
         
         // Settle directly to avoid self-invocation 522 timeouts
         console.log(`⏰ Settling campaign: ${campaign.slug}`);
+        let settlementLock = null;
         try {
+          settlementLock = await acquireSettlementLock(env, campaign.slug, { reason: 'scheduled-settlement' });
+          if (!settlementLock.ok) {
+            console.log(`⏰ Campaign ${campaign.slug}: settlement already running, skipping scheduled charge`);
+            continue;
+          }
+
           const settleResult = await settleCampaign(campaign.slug, env);
           console.log(`✅ Settlement complete for ${campaign.slug}:`, JSON.stringify({
             supportersCharged: settleResult.supportersCharged,
@@ -4294,6 +4458,8 @@ export default {
         } catch (settleErr) {
           results.errors.push({ campaign: campaign.slug, error: settleErr.message });
           console.error(`❌ Settlement failed for ${campaign.slug}:`, settleErr.message);
+        } finally {
+          await releaseSettlementLockQuietly(env, campaign.slug, settlementLock, 'scheduled');
         }
       }
       
@@ -4959,7 +5125,8 @@ async function handleFirstPartyCheckoutStart(request, env) {
 
     if (usingCustomCheckoutUi) {
       if (!session.client_secret) {
-        throw new Error('Stripe custom checkout session missing client_secret');
+        console.error('Stripe custom checkout session missing client_secret:', stripeSessionLogContext(session));
+        return privateJsonResponse({ error: 'Failed to create checkout session' }, 500, env);
       }
 
       return privateJsonResponse({
@@ -4979,7 +5146,8 @@ async function handleFirstPartyCheckoutStart(request, env) {
     for (const reservedGroup of reservedCheckoutGroups) {
       await clearTierReservation(env, reservedGroup.campaignSlug, reservedGroup.orderId);
     }
-    return privateJsonResponse({ error: 'Failed to create checkout session: ' + stripeErr.message }, 500, env);
+    console.error('Stripe checkout session error:', stripeErrorLogContext(stripeErr));
+    return privateJsonResponse({ error: 'Failed to create checkout session' }, 500, env);
   }
 }
 
@@ -7130,8 +7298,8 @@ async function handleUpdatePaymentMethod(request, env) {
 
     if (usingCustomCheckoutUi) {
       if (!session.client_secret) {
-        console.error('Stripe custom session missing client_secret:', JSON.stringify(session, null, 2));
-        return privateJsonResponse({ error: 'Failed to create checkout session' }, 500, env);
+        console.error('Stripe custom payment update session missing client_secret:', stripeSessionLogContext(session));
+        return privateJsonResponse({ error: 'Failed to create payment update session' }, 500, env);
       }
 
       return privateJsonResponse({
@@ -7143,14 +7311,14 @@ async function handleUpdatePaymentMethod(request, env) {
     }
 
     if (!session.url) {
-      console.error('Stripe session has no URL:', JSON.stringify(session, null, 2));
-      return privateJsonResponse({ error: 'Failed to create checkout session' }, 500, env);
+      console.error('Stripe payment update session has no URL:', stripeSessionLogContext(session));
+      return privateJsonResponse({ error: 'Failed to create payment update session' }, 500, env);
     }
 
     return privateJsonResponse({ checkoutUiMode: 'hosted', url: session.url }, 200, env);
   } catch (err) {
-    console.error('Stripe checkout session error:', err);
-    return privateJsonResponse({ error: `Stripe error: ${err.message || 'Unknown error'}` }, 500, env);
+    console.error('Stripe payment update session error:', stripeErrorLogContext(err));
+    return privateJsonResponse({ error: 'Failed to create payment update session' }, 500, env);
   }
 }
 
@@ -7272,7 +7440,14 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           pledgeCount: supporter.pledges.length.toString(),
           orderIds: supporter.pledges.map(p => p.orderId).join(',')
         }
-      }));
+      }), {
+        idempotencyKey: await settlementChargeIdempotencyKey(
+          campaignSlug,
+          supporter.pledges,
+          supporter.totalAmount,
+          supporter.paymentMethodId
+        )
+      });
 
       if (paymentIntent.status === 'succeeded') {
         const chargedAt = new Date().toISOString();
@@ -7510,7 +7685,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
  * Admin: Settle campaign - charge all pledges if funded and deadline passed
  */
 async function handleSettleCampaign(request, campaignSlug, env) {
-  const auth = requireAdmin(request, env);
+  const auth = requireAdmin(request, env, 'settlement');
   if (!auth.ok) return auth.response;
 
   if (!campaignSlug) {
@@ -7555,7 +7730,15 @@ async function handleSettleCampaign(request, campaignSlug, env) {
   const body = parsedBody.body || {};
   const dryRun = body.dryRun === true;
 
+  let settlementLock = null;
   try {
+    if (!dryRun) {
+      settlementLock = await acquireSettlementLock(env, campaignSlug, { reason: 'settle-campaign' });
+      if (!settlementLock.ok) {
+        return settlementLockResponse(campaignSlug, settlementLock, env);
+      }
+    }
+
     const results = await settleCampaign(campaignSlug, env, { dryRun });
     
     if (dryRun) {
@@ -7577,7 +7760,9 @@ async function handleSettleCampaign(request, campaignSlug, env) {
       ...results
     });
   } catch (err) {
-    return jsonResponse({ error: err.message }, 500);
+    return jsonResponse({ error: err.message }, 500, env);
+  } finally {
+    await releaseSettlementLockQuietly(env, campaignSlug, settlementLock);
   }
 }
 
@@ -7588,7 +7773,7 @@ async function handleSettleCampaign(request, campaignSlug, env) {
  * Each invocation gets its own 50-subrequest budget.
  */
 async function handleSettleDispatch(request, campaignSlug, env) {
-  const auth = requireAdmin(request, env);
+  const auth = requireAdmin(request, env, 'settlement');
   if (!auth.ok) return auth.response;
 
   if (!campaignSlug || !env.PLEDGES) {
@@ -7603,60 +7788,88 @@ async function handleSettleDispatch(request, campaignSlug, env) {
     return jsonResponse({ message: 'Campaign already settled', campaignSlug, settledAt: settledMarker });
   }
 
-  // Load or initialize settlement job
+  const parsedBody = await parseOptionalJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
+  const requestedLockOwner = String(body.settlementLockOwner || body.lockOwner || '').trim();
+  const settlementLock = await acquireSettlementLock(env, campaignSlug, {
+    owner: requestedLockOwner,
+    reason: 'settle-dispatch'
+  });
+  if (!settlementLock.ok) {
+    return settlementLockResponse(campaignSlug, settlementLock, env);
+  }
+
   const jobKey = `settlement-job:${campaignSlug}`;
-  let job = await env.PLEDGES.get(jobKey, { type: 'json' });
-
-  if (!job || job.status !== 'running') {
-    // Initialize: read campaign pledge index
-    const orderIds = await getCampaignOrderIds(env, campaignSlug);
-
-    if (!orderIds) {
-      return jsonResponse({
-        error: `Campaign pledge index missing for ${campaignSlug}. Run /admin/rebuild/${campaignSlug} first.`,
-        campaignSlug,
-        requiresRebuild: true
-      }, 409);
-    }
-
-    job = {
-      status: 'running',
-      cursor: 0,
-      total: orderIds.length,
-      orderIds,
-      startedAt: Date.now(),
-      lastBatchAt: null,
-      batchesCompleted: 0,
-      totalCharged: 0,
-      totalFailed: 0,
-      totalSkipped: 0,
-      totalNeedsAttention: 0
-    };
-  }
-
-  if (job.cursor >= job.total) {
-    const finalized = await finalizeSettlementDispatch(env, campaignSlug, jobKey, job);
-    console.log(`${finalized.needsAttention ? '⚠️' : '✅'} Settlement complete for ${campaignSlug}:`, JSON.stringify(job));
-    return jsonResponse({
-      message: finalized.needsAttention ? 'Settlement completed with unresolved pledges' : 'Settlement complete',
-      ...job
-    });
-  }
-
-  // Process one batch
-  const batch = job.orderIds.slice(job.cursor, job.cursor + BATCH_SIZE);
-  console.log(`💳 Settling batch ${job.batchesCompleted + 1} for ${campaignSlug}: ${batch.length} pledges (${job.cursor}/${job.total})`);
+  let job = null;
 
   try {
+    // Load or initialize settlement job
+    job = await env.PLEDGES.get(jobKey, { type: 'json' });
+
+    if (!job || job.status !== 'running') {
+      // Initialize: read campaign pledge index
+      const orderIds = await getCampaignOrderIds(env, campaignSlug);
+
+      if (!orderIds) {
+        return jsonResponse({
+          error: `Campaign pledge index missing for ${campaignSlug}. Run /admin/rebuild/${campaignSlug} first.`,
+          campaignSlug,
+          requiresRebuild: true
+        }, 409);
+      }
+
+      job = {
+        status: 'running',
+        cursor: 0,
+        total: orderIds.length,
+        orderIds,
+        settlementLockOwner: settlementLock.owner,
+        startedAt: Date.now(),
+        lastBatchAt: null,
+        batchesCompleted: 0,
+        totalCharged: 0,
+        totalFailed: 0,
+        totalSkipped: 0,
+        totalNeedsAttention: 0
+      };
+    } else {
+      job.settlementLockOwner = settlementLock.owner;
+    }
+
+    if (job.cursor >= job.total) {
+      const finalized = await finalizeSettlementDispatch(env, campaignSlug, jobKey, job);
+      console.log(`${finalized.needsAttention ? '⚠️' : '✅'} Settlement complete for ${campaignSlug}:`, JSON.stringify(job));
+      return jsonResponse({
+        message: finalized.needsAttention ? 'Settlement completed with unresolved pledges' : 'Settlement complete',
+        ...job
+      });
+    }
+
+    // Process one batch
+    const batch = job.orderIds.slice(job.cursor, job.cursor + BATCH_SIZE);
+    console.log(`💳 Settling batch ${job.batchesCompleted + 1} for ${campaignSlug}: ${batch.length} pledges (${job.cursor}/${job.total})`);
+
+    const settlementCredential = getAdminSecretForScope(env, 'settlement');
+    if (!settlementCredential) {
+      return jsonResponse({ error: 'Admin not configured' }, 500);
+    }
+
     const batchRes = await fetch(`${env.WORKER_BASE}/admin/settle-batch`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${env.ADMIN_SECRET}`,
+        'Authorization': `Bearer ${settlementCredential.secret}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ orderIds: batch })
+      body: JSON.stringify({ orderIds: batch, settlementLockOwner: settlementLock.owner })
     });
     const batchResult = await batchRes.json();
+    if (!batchRes.ok) {
+      throw new Error(batchResult?.error || `Settlement batch failed with status ${batchRes.status}`);
+    }
 
     job.cursor += batch.length;
     job.lastBatchAt = Date.now();
@@ -7677,9 +7890,10 @@ async function handleSettleDispatch(request, campaignSlug, env) {
       const nextFetch = fetch(`${env.WORKER_BASE}/admin/settle-dispatch/${campaignSlug}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${env.ADMIN_SECRET}`,
+          'Authorization': `Bearer ${settlementCredential.secret}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ settlementLockOwner: settlementLock.owner })
       }).catch(err => console.error('Chain dispatch failed:', err.message));
 
       // Can't use ctx.waitUntil here (not in scheduled), so await it
@@ -7699,9 +7913,16 @@ async function handleSettleDispatch(request, campaignSlug, env) {
     });
   } catch (err) {
     console.error(`❌ Batch settlement failed for ${campaignSlug}:`, err.message);
-    job.lastError = err.message;
-    await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: 604800 });
-    return jsonResponse({ error: err.message, progress: `${job.cursor}/${job.total}` }, 500);
+    if (job) {
+      job.lastError = err.message;
+      await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: 604800 });
+    }
+    return jsonResponse({
+      error: err.message,
+      progress: job ? `${job.cursor}/${job.total}` : null
+    }, 500);
+  } finally {
+    await releaseSettlementLockQuietly(env, campaignSlug, settlementLock, 'dispatch');
   }
 }
 
@@ -7755,7 +7976,7 @@ async function handlePerformanceObservability(request, env) {
 }
 
 async function handleSettleBatch(request, env) {
-  const auth = requireAdmin(request, env);
+  const auth = requireAdmin(request, env, 'settlement');
   if (!auth.ok) return auth.response;
 
   const parsedBody = await parseJsonRequestBody(request, env, {
@@ -7832,128 +8053,155 @@ async function handleSettleBatch(request, env) {
 
   // Fetch campaign data once (for email template)
   const campaignSlug = pledges[0].campaignSlug;
+  const campaignSlugs = new Set(pledges.map((pledge) => pledge.campaignSlug));
+  if (campaignSlugs.size !== 1) {
+    return jsonResponse({ error: 'Settlement batches must contain pledges from one campaign' }, 400);
+  }
+
+  const requestedLockOwner = String(body.settlementLockOwner || body.lockOwner || '').trim();
+  const settlementLock = await acquireSettlementLock(env, campaignSlug, {
+    owner: requestedLockOwner,
+    reason: 'settle-batch'
+  });
+  if (!settlementLock.ok) {
+    return settlementLockResponse(campaignSlug, settlementLock, env);
+  }
+  const releaseBatchLock = !requestedLockOwner;
   const campaign = await getCampaign(env, campaignSlug);
   const campaignTitle = campaign?.title || campaignSlug;
 
-  for (const [email, data] of Object.entries(byEmail)) {
-    // Use most recently updated payment method
-    let customerId, paymentMethodId;
-    let latest = null;
-    for (const p of data.pledges) {
-      const updated = new Date(p.updatedAt || p.createdAt);
-      if (!latest || updated > latest) {
-        latest = updated;
-        customerId = p.stripeCustomerId;
-        paymentMethodId = p.stripePaymentMethodId;
-      }
-    }
-
-    // Reset any payment_failed status before charging
-    for (const p of data.pledges) {
-      if (p.pledgeStatus === 'payment_failed') {
-        p.pledgeStatus = 'active';
-        p.lastPaymentError = null;
-        await env.PLEDGES.put(`pledge:${p.orderId}`, JSON.stringify(p));
-      }
-    }
-
-    try {
-      const paymentIntent = await stripe.paymentIntents.create(withStripeFinancialExpansion({
-        amount: data.totalAmount,
-        currency: 'usd',
-        customer: customerId,
-        payment_method: paymentMethodId,
-        off_session: true,
-        confirm: true,
-        metadata: {
-          campaignSlug,
-          email,
-          pledgeCount: data.pledges.length.toString(),
-          orderIds: data.pledges.map(p => p.orderId).join(',')
+  try {
+    for (const [email, data] of Object.entries(byEmail)) {
+      // Use most recently updated payment method
+      let customerId, paymentMethodId;
+      let latest = null;
+      for (const p of data.pledges) {
+        const updated = new Date(p.updatedAt || p.createdAt);
+        if (!latest || updated > latest) {
+          latest = updated;
+          customerId = p.stripeCustomerId;
+          paymentMethodId = p.stripePaymentMethodId;
         }
-      }));
+      }
 
-      if (paymentIntent.status === 'succeeded') {
-        const chargedAt = new Date().toISOString();
-        applyStripeFinancialsToPledges(data.pledges, paymentIntent, null, chargedAt);
-        for (const pledge of data.pledges) {
-          pledge.charged = true;
-          pledge.pledgeStatus = 'charged';
-          pledge.chargedAt = chargedAt;
-          pledge.stripePaymentIntentId = paymentIntent.id;
-          pledge.updatedAt = chargedAt;
-          await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
+      // Reset any payment_failed status before charging
+      for (const p of data.pledges) {
+        if (p.pledgeStatus === 'payment_failed') {
+          p.pledgeStatus = 'active';
+          p.lastPaymentError = null;
+          await env.PLEDGES.put(`pledge:${p.orderId}`, JSON.stringify(p));
         }
+      }
 
-        // Send success email
-        try {
-          const token = await generateToken(env.MAGIC_LINK_SECRET, {
-            orderId: data.pledges[0].orderId,
+      try {
+        const paymentIntent = await stripe.paymentIntents.create(withStripeFinancialExpansion({
+          amount: data.totalAmount,
+          currency: 'usd',
+          customer: customerId,
+          payment_method: paymentMethodId,
+          off_session: true,
+          confirm: true,
+          metadata: {
+            campaignSlug,
             email,
-            campaignSlug
-          });
+            pledgeCount: data.pledges.length.toString(),
+            orderIds: data.pledges.map(p => p.orderId).join(',')
+          }
+        }), {
+          idempotencyKey: await settlementChargeIdempotencyKey(
+            campaignSlug,
+            data.pledges,
+            data.totalAmount,
+            paymentMethodId
+          )
+        });
 
-          let combinedSubtotal = 0;
-          let combinedTax = 0;
-          let combinedShipping = 0;
-          let combinedTipAmount = 0;
-          const combinedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
+        if (paymentIntent.status === 'succeeded') {
+          const chargedAt = new Date().toISOString();
+          applyStripeFinancialsToPledges(data.pledges, paymentIntent, null, chargedAt);
           for (const pledge of data.pledges) {
-            combinedSubtotal += pledge.subtotal || pledge.amount || 0;
-            combinedTax += pledge.tax || 0;
-            combinedShipping += pledge.shipping || 0;
-            combinedTipAmount += getStoredTipAmount(env, pledge);
-            if (pledge.tierName) {
-              if (!combinedItems.tierName) {
-                combinedItems.tierName = pledge.tierName;
-                combinedItems.tierQty = pledge.tierQty || 1;
-              } else {
-                combinedItems.additionalTiers.push({ name: pledge.tierName, qty: pledge.tierQty || 1 });
-              }
-            }
-            for (const at of (pledge.additionalTiers || [])) {
-              const tierData = campaign?.tiers?.find(t => t.id === at.id);
-              combinedItems.additionalTiers.push({ name: tierData?.name || at.id, qty: at.qty || 1 });
-            }
-            for (const si of (pledge.supportItems || [])) {
-              const itemData = campaign?.support_items?.find(s => s.id === si.id);
-              combinedItems.supportItems.push({ label: itemData?.label || si.id, amount: si.amount || 0 });
-            }
-            combinedItems.customAmount += pledge.customAmount || 0;
+            pledge.charged = true;
+            pledge.pledgeStatus = 'charged';
+            pledge.chargedAt = chargedAt;
+            pledge.stripePaymentIntentId = paymentIntent.id;
+            pledge.updatedAt = chargedAt;
+            await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
           }
 
-          await sendChargeSuccessEmail(env, {
-            email, campaignSlug, campaignTitle,
-            preferredLang: data.pledges[0]?.preferredLang || DEFAULT_I18N_LANG,
-            subtotal: combinedSubtotal, tax: combinedTax, shipping: combinedShipping, tipAmount: combinedTipAmount, tipPercent: derivePlatformTipPercent(combinedSubtotal, combinedTipAmount, 0, getMaxPlatformTipPercent(env)), amount: data.totalAmount,
-            token,
-            hasDecisions: campaign?.has_decisions === true,
-            pledgeItems: combinedItems
-          });
-        } catch (emailErr) {
-          console.error('Failed to send charge success email:', emailErr.message);
+          // Send success email
+          try {
+            const token = await generateToken(env.MAGIC_LINK_SECRET, {
+              orderId: data.pledges[0].orderId,
+              email,
+              campaignSlug
+            });
+
+            let combinedSubtotal = 0;
+            let combinedTax = 0;
+            let combinedShipping = 0;
+            let combinedTipAmount = 0;
+            const combinedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], customAmount: 0 };
+            for (const pledge of data.pledges) {
+              combinedSubtotal += pledge.subtotal || pledge.amount || 0;
+              combinedTax += pledge.tax || 0;
+              combinedShipping += pledge.shipping || 0;
+              combinedTipAmount += getStoredTipAmount(env, pledge);
+              if (pledge.tierName) {
+                if (!combinedItems.tierName) {
+                  combinedItems.tierName = pledge.tierName;
+                  combinedItems.tierQty = pledge.tierQty || 1;
+                } else {
+                  combinedItems.additionalTiers.push({ name: pledge.tierName, qty: pledge.tierQty || 1 });
+                }
+              }
+              for (const at of (pledge.additionalTiers || [])) {
+                const tierData = campaign?.tiers?.find(t => t.id === at.id);
+                combinedItems.additionalTiers.push({ name: tierData?.name || at.id, qty: at.qty || 1 });
+              }
+              for (const si of (pledge.supportItems || [])) {
+                const itemData = campaign?.support_items?.find(s => s.id === si.id);
+                combinedItems.supportItems.push({ label: itemData?.label || si.id, amount: si.amount || 0 });
+              }
+              combinedItems.customAmount += pledge.customAmount || 0;
+            }
+
+            await sendChargeSuccessEmail(env, {
+              email, campaignSlug, campaignTitle,
+              preferredLang: data.pledges[0]?.preferredLang || DEFAULT_I18N_LANG,
+              subtotal: combinedSubtotal, tax: combinedTax, shipping: combinedShipping, tipAmount: combinedTipAmount, tipPercent: derivePlatformTipPercent(combinedSubtotal, combinedTipAmount, 0, getMaxPlatformTipPercent(env)), amount: data.totalAmount,
+              token,
+              hasDecisions: campaign?.has_decisions === true,
+              pledgeItems: combinedItems
+            });
+          } catch (emailErr) {
+            console.error('Failed to send charge success email:', emailErr.message);
+          }
+
+          results.charged += data.pledges.length;
+          results.details.push({ email, status: 'charged', amount: data.totalAmount });
+        } else {
+          throw new Error('Payment status: ' + paymentIntent.status);
         }
+      } catch (err) {
+        results.failed += data.pledges.length;
+        results.errors.push({ email, orderIds: data.pledges.map(p => p.orderId), error: err.message });
+        results.details.push({ email, status: 'failed', error: err.message });
 
-        results.charged += data.pledges.length;
-        results.details.push({ email, status: 'charged', amount: data.totalAmount });
-      } else {
-        throw new Error('Payment status: ' + paymentIntent.status);
-      }
-    } catch (err) {
-      results.failed += data.pledges.length;
-      results.errors.push({ email, orderIds: data.pledges.map(p => p.orderId), error: err.message });
-      results.details.push({ email, status: 'failed', error: err.message });
-
-      for (const pledge of data.pledges) {
-        pledge.pledgeStatus = 'payment_failed';
-        pledge.lastPaymentError = err.message;
-        pledge.updatedAt = new Date().toISOString();
-        await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
+        for (const pledge of data.pledges) {
+          pledge.pledgeStatus = 'payment_failed';
+          pledge.lastPaymentError = err.message;
+          pledge.updatedAt = new Date().toISOString();
+          await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
+        }
       }
     }
-  }
 
-  return jsonResponse(results);
+    return jsonResponse(results);
+  } finally {
+    if (releaseBatchLock) {
+      await releaseSettlementLockQuietly(env, campaignSlug, settlementLock, 'batch');
+    }
+  }
 }
 
 async function handleRebuildCampaignIndex(request, campaignSlug, env) {
@@ -8926,7 +9174,7 @@ async function triggerMilestoneEmails(env, campaignSlug) {
  * Admin: Broadcast announcement with optional CTA link to all campaign supporters
  */
 async function handleBroadcastAnnouncement(request, env) {
-  const auth = requireAdmin(request, env);
+  const auth = requireAdmin(request, env, 'broadcast');
   if (!auth.ok) return auth.response;
 
   const parsedBody = await parseJsonRequestBody(request, env, {
@@ -9008,7 +9256,7 @@ async function handleBroadcastAnnouncement(request, env) {
  * Admin: Broadcast diary update to all campaign supporters
  */
 async function handleBroadcastDiary(request, env) {
-  const auth = requireAdmin(request, env);
+  const auth = requireAdmin(request, env, 'broadcast');
   if (!auth.ok) return auth.response;
 
   const parsedBody = await parseJsonRequestBody(request, env, {
@@ -9086,7 +9334,7 @@ async function handleBroadcastDiary(request, env) {
  * Called automatically after deploy via GitHub Action
  */
 async function handleDiaryCheck(request, env) {
-  const auth = requireAdmin(request, env);
+  const auth = requireAdmin(request, env, 'broadcast');
   if (!auth.ok) return auth.response;
 
   const parsedBody = await parseOptionalJsonRequestBody(request, env, {
@@ -9207,7 +9455,7 @@ async function handleDiaryCheck(request, env) {
  * Admin: Broadcast milestone notification to all campaign supporters
  */
 async function handleBroadcastMilestone(request, env) {
-  const auth = requireAdmin(request, env);
+  const auth = requireAdmin(request, env, 'broadcast');
   if (!auth.ok) return auth.response;
 
   const parsedBody = await parseJsonRequestBody(request, env, {
@@ -9315,7 +9563,7 @@ async function handleBroadcastMilestone(request, env) {
  * Use this to catch up on milestones for campaigns that crossed thresholds before auto-trigger was implemented
  */
 async function handleMilestoneCheck(request, campaignSlug, env) {
-  const auth = requireAdmin(request, env);
+  const auth = requireAdmin(request, env, 'broadcast');
   if (!auth.ok) return auth.response;
 
   const campaign = await getCampaign(env, campaignSlug);
@@ -10188,6 +10436,8 @@ function adminSecretStatusRows(env) {
     ['Magic link secret', status(env.MAGIC_LINK_SECRET), readOnlyAdminSettingHelp('Signing secret for supporter magic links and scoped pledge-management access. Generate a unique value per environment.')],
     ['Admin session secret', status(env.ADMIN_SESSION_SECRET, false), readOnlyAdminSettingHelp('Dedicated signing secret for browser admin sessions. Optional in development because the Worker has fallbacks, but production should set it explicitly.')],
     ['Admin recovery secret', status(env.ADMIN_SECRET), readOnlyAdminSettingHelp('Bearer secret used by protected admin automation and recovery endpoints. Keep this in Worker or GitHub secrets only.')],
+    ['Admin settlement secret', status(env.ADMIN_SETTLEMENT_SECRET || env.SETTLEMENT_ADMIN_SECRET, false), readOnlyAdminSettingHelp('Optional scoped Bearer secret for settlement endpoints. When configured, settlement routes reject the broader admin recovery secret.')],
+    ['Admin broadcast secret', status(env.ADMIN_BROADCAST_SECRET || env.BROADCAST_ADMIN_SECRET, false), readOnlyAdminSettingHelp('Optional scoped Bearer secret for diary, milestone, and announcement automation. When configured, broadcast routes reject the broader admin recovery secret.')],
     ['Admin Turnstile secret', status(env.TURNSTILE_SECRET_KEY || env.ADMIN_TURNSTILE_SECRET_KEY, turnstileRequired), readOnlyAdminSettingHelp('Cloudflare Turnstile secret used to verify admin email sign-in challenges. Required when the admin Turnstile widget is enabled.')],
     ['Resend API key', status(env.RESEND_API_KEY), readOnlyAdminSettingHelp('Email provider API key used for admin magic links, pledge emails, and campaign notifications. Never store it in _config.yml.')],
     ['USPS client secret', status(env.USPS_CLIENT_SECRET, uspsRequired), readOnlyAdminSettingHelp('USPS OAuth client secret for live shipping quotes. Required only when USPS is enabled; the client ID remains non-secret config.')],
