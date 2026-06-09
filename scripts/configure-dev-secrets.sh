@@ -204,7 +204,8 @@ prompt_optional_secret "STRIPE_PUBLISHABLE_KEY_TEST" "Stripe test publishable ke
 prompt_optional_secret "RESEND_API_KEY" "Resend API key"
 prompt_optional_secret "USPS_CLIENT_SECRET" "USPS client secret"
 prompt_optional_secret "ZIP_TAX_API_KEY" "ZIP.TAX API key"
-prompt_optional_secret "CLOUDFLARE_API_TOKEN" "Cloudflare API token for local report/export scripts"
+prompt_optional_secret "CLOUDFLARE_API_TOKEN" "Cloudflare user API token for local report/export scripts"
+prompt_optional_secret "CLOUDFLARE_ACCOUNT_ID" "Cloudflare account ID for local report/export scripts"
 
 echo ""
 echo "Local Worker secrets are stored in $DEV_VARS."

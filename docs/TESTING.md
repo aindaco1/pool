@@ -899,6 +899,8 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 - `ADMIN_SECRET` — Random string for admin API endpoints
 - `ADMIN_SETTLEMENT_SECRET` — Optional scoped admin secret for settlement endpoints; use a separate local-only value in `worker/.dev.vars`
 - `ADMIN_BROADCAST_SECRET` — Optional scoped admin secret for diary, milestone, and announcement endpoints; also add it to GitHub repository secrets for the post-deploy diary check when enabled
+- `CLOUDFLARE_API_TOKEN` — For GitHub deploys, use a Cloudflare user API token created from **My Profile -> API Tokens** with the **Edit Cloudflare Workers** template. For local report exports, use a separate read-only Workers KV token when possible.
+- `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account id for Wrangler deploys and non-interactive local report/export scripts
 - `TURNSTILE_SECRET_KEY` — Shared Cloudflare Turnstile secret when admin sign-in or launch reminder widgets are enabled
 - `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY` — Optional reminder-specific Turnstile secret if not using the shared secret
 - `LAUNCH_REMINDER_TOKEN_SECRET` — Optional reminder unsubscribe-token secret; falls back to `MAGIC_LINK_SECRET`

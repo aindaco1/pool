@@ -163,10 +163,11 @@ npm run test:security:podman
 npm run test:e2e:headless:podman
 ```
 
-Remote production report exports can also run through the worker container. Create a Cloudflare user API token with **Account / Workers KV Storage / Read** access to the account that owns the `PLEDGES` KV namespace, then store it in an ignored local env file such as `worker/.dev.vars`:
+Remote production report exports can also run through the worker container. Create a Cloudflare user API token with **Account / Workers KV Storage / Read** access to the account that owns the `PLEDGES` KV namespace, then store it with the account id in an ignored local env file such as `worker/.dev.vars`:
 
 ```bash
 CLOUDFLARE_API_TOKEN=your-token
+CLOUDFLARE_ACCOUNT_ID=your-account-id
 ```
 
 Run:

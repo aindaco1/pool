@@ -54,7 +54,7 @@ load_cloudflare_report_env_file() {
     key="${key%"${key##*[![:space:]]}"}"
     key="${key#export }"
     case "$key" in
-      CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|CLOUDFLARE_EMAIL|CLOUDFLARE_KEY)
+      CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID)
         if [[ -z "${!key:-}" ]]; then
           value="${value#"${value%%[![:space:]]*}"}"
           value="${value%"${value##*[![:space:]]}"}"
@@ -120,7 +120,7 @@ if [[ "$USE_PODMAN" == "true" && "$PODMAN_REPORT_INTERNAL" != "1" ]]; then
   done
 
   PODMAN_ENV_ARGS=()
-  for env_name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_EMAIL CLOUDFLARE_KEY; do
+  for env_name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
     if [[ -n "${!env_name:-}" ]]; then
       PODMAN_ENV_ARGS+=(-e "$env_name")
     fi

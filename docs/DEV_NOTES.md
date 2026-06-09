@@ -752,6 +752,7 @@ cd worker && npx wrangler login
 
 # Or, for non-interactive shells and Podman-backed report runs:
 export CLOUDFLARE_API_TOKEN="your-token"
+export CLOUDFLARE_ACCOUNT_ID="your-account-id"
 
 # All pledges, production KV
 ./scripts/pledge-report.sh
@@ -766,16 +767,17 @@ export CLOUDFLARE_API_TOKEN="your-token"
 ./scripts/pledge-report.sh worst-movie-ever > pledges.csv
 ```
 
-For Podman-backed remote reports, put `CLOUDFLARE_API_TOKEN` in the host shell or an ignored local env file such as `.env.local`, `.env.cloudflare`, or `worker/.dev.vars`; the report wrappers pass Cloudflare auth values through to `podman exec`.
+For Podman-backed remote reports, put `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in the host shell or an ignored local env file such as `.env.local`, `.env.cloudflare`, or `worker/.dev.vars`; the report wrappers pass Cloudflare auth values through to `podman exec`.
 
 Fork setup for production reports:
 
 1. In Cloudflare, go to **My Profile -> API Tokens -> Create Token**.
 2. Create a user token with **Account / Workers KV Storage / Read** scoped to the account that owns this fork's `PLEDGES` KV namespace.
-3. Store it in `worker/.dev.vars` or another ignored env file:
+3. Store it with the account id in `worker/.dev.vars` or another ignored env file:
 
 ```bash
 CLOUDFLARE_API_TOKEN=your-token
+CLOUDFLARE_ACCOUNT_ID=your-account-id
 ```
 
 4. Run production exports through the same Podman worker environment used by local tests:

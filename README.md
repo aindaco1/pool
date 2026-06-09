@@ -303,17 +303,19 @@ cd worker && npx wrangler login
 
 # Or, for non-interactive shells and Podman-backed report runs:
 export CLOUDFLARE_API_TOKEN="your-token"
+export CLOUDFLARE_ACCOUNT_ID="your-account-id"
 ./scripts/pledge-report.sh --env production --remote > ~/Desktop/pool-pledge-report.csv
 ./scripts/fulfillment-report.sh --env production --remote > ~/Desktop/pool-fulfillment-report.csv
 ```
-For Podman-backed remote reports, prefer `CLOUDFLARE_API_TOKEN` in the host shell or an ignored local env file such as `.env.local`, `.env.cloudflare`, or `worker/.dev.vars`; the report wrappers pass those Cloudflare auth values into `podman exec`. Fork setup:
+For Podman-backed remote reports, prefer `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in the host shell or an ignored local env file such as `.env.local`, `.env.cloudflare`, or `worker/.dev.vars`; the report wrappers pass those Cloudflare auth values into `podman exec`. Fork setup:
 
 1. In Cloudflare, create a user API token from **My Profile -> API Tokens -> Create Token**.
 2. Grant **Account / Workers KV Storage / Read** for the account that owns the `PLEDGES` KV namespace.
-3. Add the token to `worker/.dev.vars`:
+3. Add the token and account id to `worker/.dev.vars`:
 
 ```bash
 CLOUDFLARE_API_TOKEN=your-token
+CLOUDFLARE_ACCOUNT_ID=your-account-id
 ```
 
 Then run the remote production exports through the Podman worker container:
@@ -455,15 +457,14 @@ That GitHub Actions workflow now deploys both:
 The Pages build runs Jekyll first, then `npm run assets:minify` against generated `_site/assets/**/*.css` and `_site/assets/**/*.js` before uploading the artifact. Source files stay readable in the repository; Cloudflare still handles gzip/Brotli/Zstandard compression at the edge, so Cloudflare Auto Minify should stay disabled.
 
 Required GitHub repository secrets for automatic Worker deployment:
-- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_API_TOKEN` from a **user API token** created under **My Profile -> API Tokens**, using the **Edit Cloudflare Workers** template and scoped to this account and the `dustwave.xyz` zone. Do not use an account-owned API token; Wrangler still calls user-scoped endpoints such as memberships during deploy.
 - `CLOUDFLARE_ACCOUNT_ID`
 - `ADMIN_SECRET` for the post-deploy diary check
 - optional `ADMIN_BROADCAST_SECRET` for the post-deploy diary check when the Worker uses scoped broadcast credentials
-- optional `ADMIN_SETTLEMENT_SECRET` for GitHub Actions or operator workflows that call settlement endpoints
-- optional `CLOUDFLARE_CACHE_PURGE_TOKEN` with zone cache-purge permissions if you want cache purging to use a token narrower than the deploy token
+- optional `CLOUDFLARE_CACHE_PURGE_TOKEN` with zone cache-purge permissions if you want cache purging to use a token narrower than the deploy token. This is recommended; otherwise the deploy token must also be allowed to purge cache.
 - optional `DIARY_CHECK_BYPASS_SECRET` if Cloudflare WAF challenges the post-deploy diary check
 
-Set the matching `ADMIN_BROADCAST_SECRET` or `ADMIN_SETTLEMENT_SECRET` in Cloudflare Worker secrets before relying on scoped route enforcement in production. Keep separate local-only values in `worker/.dev.vars`; do not copy production values there as a backup.
+Set the matching `ADMIN_BROADCAST_SECRET` or `ADMIN_SETTLEMENT_SECRET` in Cloudflare Worker secrets before relying on scoped route enforcement in production. Add `ADMIN_SETTLEMENT_SECRET` to GitHub repository secrets only if a GitHub Actions or operator workflow actually calls settlement endpoints. Keep separate local-only values in `worker/.dev.vars`; do not copy production values there as a backup.
 
 The workflow also needs GitHub Pages deployment permissions. Keep `pages: write` and `id-token: write` explicit on the Pages deploy job if you copy or refactor `.github/workflows/deploy.yml`.
 

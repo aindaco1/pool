@@ -46,7 +46,12 @@ RESEND_API_KEY=
 
 # Dashboard publish and report helpers.
 GITHUB_TOKEN=
+# Local remote-report/export scripts can use a read-only Cloudflare user API
+# token with Account / Workers KV Storage / Read scoped to this account.
+# GitHub Actions deploys need a separate user API token created from the
+# "Edit Cloudflare Workers" template and stored as a repository secret.
 CLOUDFLARE_API_TOKEN=
+CLOUDFLARE_ACCOUNT_ID=
 
 # Shipping and tax provider credentials.
 USPS_ENABLED=false

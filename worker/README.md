@@ -199,7 +199,7 @@ npm run deploy
 npm run deploy:worker
 ```
 
-On GitHub, pushes to `main` also deploy the Worker automatically through `.github/workflows/deploy.yml`. The workflow uses repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; cache purging can use a narrower `CLOUDFLARE_CACHE_PURGE_TOKEN` and otherwise falls back to `CLOUDFLARE_API_TOKEN`. The Pages deploy job requires `pages: write` and `id-token: write`; keep those permissions explicit if the workflow is copied into a fork.
+On GitHub, pushes to `main` also deploy the Worker automatically through `.github/workflows/deploy.yml`. The workflow uses repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; create `CLOUDFLARE_API_TOKEN` as a user API token under **My Profile -> API Tokens** with the **Edit Cloudflare Workers** template, scoped to this account and the `dustwave.xyz` zone. Do not use an account-owned API token, because Wrangler still calls user-scoped endpoints during deploy. Cache purging can use a narrower `CLOUDFLARE_CACHE_PURGE_TOKEN` and otherwise falls back to `CLOUDFLARE_API_TOKEN`; the separate cache-purge token is recommended so the deploy token does not need zone cache-purge access. The Pages deploy job requires `pages: write` and `id-token: write`; keep those permissions explicit if the workflow is copied into a fork.
 
 ## API Endpoints
 
