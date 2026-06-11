@@ -3848,6 +3848,10 @@ export default {
         return handleAdminAnalytics(request, env);
       }
 
+      if (path === '/admin/plan-usage' && method === 'GET') {
+        return handleAdminPlanUsage(request, env);
+      }
+
       if (path === '/admin/analytics/stripe-financials/backfill' && method === 'POST') {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
@@ -10065,6 +10069,7 @@ function adminSettingsSection(title, entries) {
       visibleWhen: options.visibleWhen && typeof options.visibleWhen === 'object' ? options.visibleWhen : null,
       layoutGroup: options.layoutGroup || '',
       campaignSlug: options.campaignSlug || '',
+      hideLabel: Boolean(options.hideLabel),
       help: options.help || ''
     }))
   };
@@ -10442,8 +10447,652 @@ function adminSecretStatusRows(env) {
     ['Resend API key', status(env.RESEND_API_KEY), readOnlyAdminSettingHelp('Email provider API key used for admin magic links, pledge emails, and campaign notifications. Never store it in _config.yml.')],
     ['USPS client secret', status(env.USPS_CLIENT_SECRET, uspsRequired), readOnlyAdminSettingHelp('USPS OAuth client secret for live shipping quotes. Required only when USPS is enabled; the client ID remains non-secret config.')],
     ['ZIP.TAX API key', status(env.ZIP_TAX_API_KEY || env.TAX_API_KEY, zipTaxRequired), readOnlyAdminSettingHelp('ZIP.TAX API key for jurisdiction-level tax lookup. Required only when the ZIP.TAX provider is selected.')],
+    ['Cloudflare usage analytics token', status(env.CLOUDFLARE_USAGE_API_TOKEN || env.CLOUDFLARE_ANALYTICS_API_TOKEN, false), readOnlyAdminSettingHelp('Optional read-only Cloudflare GraphQL Analytics token for the admin plan usage tracker. Keep deploy tokens separate from usage tokens.')],
     ['Cloudflare deploy credentials', 'GitHub secret / local shell only', readOnlyAdminSettingHelp('Cloudflare API tokens are not visible to the Worker runtime. Store deploy credentials in GitHub repository secrets or ignored local env files.')]
   ];
+}
+
+const ADMIN_PLAN_USAGE_SOURCE_URLS = {
+  cloudflareWorkers: 'https://developers.cloudflare.com/analytics/graphql-api/tutorials/querying-workers-metrics/',
+  cloudflareKv: 'https://developers.cloudflare.com/kv/observability/metrics-analytics/',
+  resendUsage: 'https://resend.com/settings/usage',
+  resendRateLimit: 'https://resend.com/docs/api-reference/rate-limit',
+  resendPricing: 'https://resend.com/pricing'
+};
+
+const ADMIN_CLOUDFLARE_PLAN_CATALOG = {
+  unknown: {
+    label: 'Plan not detected',
+    upgradeUrl: 'https://dash.cloudflare.com/?to=/:account/workers/plans'
+  },
+  free: {
+    label: 'Free',
+    upgradeUrl: 'https://dash.cloudflare.com/?to=/:account/workers/plans',
+    workerRequestsDaily: 100000,
+    kvReadsDaily: 100000,
+    kvWritesDaily: 1000,
+    kvDeletesDaily: 1000,
+    kvListsDaily: 1000
+  },
+  standard: {
+    label: 'Workers Paid',
+    upgradeUrl: 'https://dash.cloudflare.com/?to=/:account/workers/plans',
+    workerRequestsMonthly: 10000000,
+    kvReadsMonthly: 10000000,
+    kvWritesMonthly: 1000000,
+    kvDeletesMonthly: 1000000,
+    kvListsMonthly: 1000000
+  }
+};
+
+const ADMIN_RESEND_PLAN_CATALOG = {
+  unknown: {
+    label: 'Plan not detected',
+    upgradeUrl: 'https://resend.com/settings/billing',
+    emailsDaily: null,
+    emailsMonthly: null
+  },
+  paid: {
+    label: 'Paid plan',
+    upgradeUrl: 'https://resend.com/settings/billing',
+    emailsDaily: null,
+    emailsMonthly: null
+  },
+  free: {
+    label: 'Free',
+    upgradeUrl: 'https://resend.com/settings/billing',
+    emailsDaily: 100,
+    emailsMonthly: 3000
+  },
+  pro: {
+    label: 'Pro',
+    upgradeUrl: 'https://resend.com/settings/billing',
+    emailsDaily: null,
+    emailsMonthly: 50000
+  },
+  scale: {
+    label: 'Scale',
+    upgradeUrl: 'https://resend.com/settings/billing',
+    emailsDaily: null,
+    emailsMonthly: 100000
+  }
+};
+
+function normalizeAdminPlanKey(value, fallback = 'free') {
+  return String(value || fallback || 'free')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || fallback;
+}
+
+function normalizeCloudflarePlanKey(value, fallback = 'unknown') {
+  const key = normalizeAdminPlanKey(value, fallback);
+  if (['paid', 'workers_paid', 'standard_paid', 'standard'].includes(key)) return 'standard';
+  return ADMIN_CLOUDFLARE_PLAN_CATALOG[key] ? key : fallback;
+}
+
+function normalizeResendPlanKey(value, fallback = 'unknown') {
+  const key = normalizeAdminPlanKey(value, fallback);
+  if (['transactional_pro', 'email_pro'].includes(key)) return 'pro';
+  if (['transactional_scale', 'email_scale'].includes(key)) return 'scale';
+  return ADMIN_RESEND_PLAN_CATALOG[key] ? key : fallback;
+}
+
+function adminUsageNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function adminPlanUsagePercent(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.max(1, Math.min(100, parsed));
+}
+
+function adminPlanUsageThresholds(env) {
+  const warning = adminPlanUsagePercent(env.PLAN_USAGE_WARNING_PERCENT || env.ADMIN_PLAN_USAGE_WARNING_PERCENT, 80);
+  const critical = adminPlanUsagePercent(env.PLAN_USAGE_CRITICAL_PERCENT || env.ADMIN_PLAN_USAGE_CRITICAL_PERCENT, 95);
+  return {
+    warning,
+    critical: Math.max(warning, critical)
+  };
+}
+
+function adminPlanLimit(env, name, fallback) {
+  const override = adminUsageNumber(env[name]);
+  if (override !== null && override >= 0) return override;
+  return fallback === null || fallback === undefined ? null : Number(fallback || 0);
+}
+
+function adminPlanMetric(config, thresholds) {
+  if (config.unlimited === true) {
+    return {
+      id: config.id,
+      label: config.label,
+      period: config.period || 'monthly',
+      used: null,
+      limit: null,
+      unit: config.unit || 'count',
+      percent: null,
+      severity: 'ok',
+      unlimited: true,
+      source: config.source || '',
+      help: config.help || ''
+    };
+  }
+  const used = adminUsageNumber(config.used);
+  const limit = adminUsageNumber(config.limit);
+  const hasLimit = limit !== null && limit > 0;
+  const percent = used !== null && hasLimit ? (used / limit) * 100 : null;
+  let severity = 'unknown';
+  if (percent !== null) {
+    severity = percent >= thresholds.critical ? 'critical' : percent >= thresholds.warning ? 'warning' : 'ok';
+  }
+  return {
+    id: config.id,
+    label: config.label,
+    period: config.period || 'monthly',
+    used,
+    limit: hasLimit ? limit : null,
+    unit: config.unit || 'count',
+    percent,
+    severity,
+    source: config.source || '',
+    help: config.help || ''
+  };
+}
+
+function adminConfiguredCloudflarePlanKey(env) {
+  const raw = String(env.PLAN_USAGE_CLOUDFLARE_PLAN || env.CLOUDFLARE_PLAN || env.CLOUDFLARE_WORKERS_PLAN || '').trim();
+  return raw ? normalizeCloudflarePlanKey(raw, 'unknown') : '';
+}
+
+function adminConfiguredResendPlanKey(env) {
+  const raw = String(env.PLAN_USAGE_RESEND_PLAN || env.RESEND_PLAN || '').trim();
+  return raw ? normalizeResendPlanKey(raw, 'unknown') : '';
+}
+
+function adminUtcDateString(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function adminUtcStartOfDay(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function adminUtcStartOfMonth(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function sumAdminWorkersUsageRows(rows = []) {
+  return (Array.isArray(rows) ? rows : []).reduce((totals, row) => {
+    totals.requests += Number(row?.sum?.requests || 0) || 0;
+    totals.subrequests += Number(row?.sum?.subrequests || 0) || 0;
+    totals.errors += Number(row?.sum?.errors || 0) || 0;
+    return totals;
+  }, { requests: 0, subrequests: 0, errors: 0 });
+}
+
+function sumAdminKvUsageRows(rows = []) {
+  return (Array.isArray(rows) ? rows : []).reduce((totals, row) => {
+    const action = String(row?.dimensions?.actionType || '').trim().toLowerCase();
+    const requests = Number(row?.sum?.requests || 0) || 0;
+    if (action === 'read') totals.reads += requests;
+    else if (action === 'write') totals.writes += requests;
+    else if (action === 'delete') totals.deletes += requests;
+    else if (action === 'list') totals.lists += requests;
+    else totals.other += requests;
+    return totals;
+  }, { reads: 0, writes: 0, deletes: 0, lists: 0, other: 0 });
+}
+
+async function fetchAdminCloudflareGraphql(token, query, variables) {
+  const response = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ query, variables })
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || (Array.isArray(body?.errors) && body.errors.length > 0)) {
+    throw new Error('cloudflare_graphql_failed');
+  }
+  return body?.data || {};
+}
+
+async function fetchAdminCloudflareWorkersUsage(token, accountTag, scriptName, now = new Date()) {
+  const dayStart = adminUtcStartOfDay(now);
+  const monthStart = adminUtcStartOfMonth(now);
+  const scriptVariable = scriptName ? ', $scriptName: string' : '';
+  const scriptFilter = scriptName ? 'scriptName: $scriptName,' : '';
+  const query = `
+    query AdminWorkersPlanUsage($accountTag: string!, $dayStart: string, $dayEnd: string, $monthStart: string, $monthEnd: string${scriptVariable}) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          day: workersInvocationsAdaptive(limit: 10000, filter: { ${scriptFilter} datetime_geq: $dayStart, datetime_leq: $dayEnd }) {
+            sum { requests subrequests errors }
+          }
+          month: workersInvocationsAdaptive(limit: 10000, filter: { ${scriptFilter} datetime_geq: $monthStart, datetime_leq: $monthEnd }) {
+            sum { requests subrequests errors }
+          }
+        }
+      }
+    }
+  `;
+  const variables = {
+    accountTag,
+    dayStart: dayStart.toISOString(),
+    dayEnd: now.toISOString(),
+    monthStart: monthStart.toISOString(),
+    monthEnd: now.toISOString()
+  };
+  if (scriptName) variables.scriptName = scriptName;
+  const data = await fetchAdminCloudflareGraphql(token, query, variables);
+  const account = data?.viewer?.accounts?.[0] || {};
+  return {
+    day: sumAdminWorkersUsageRows(account.day || []),
+    month: sumAdminWorkersUsageRows(account.month || [])
+  };
+}
+
+async function fetchAdminCloudflareKvUsage(token, accountTag, now = new Date()) {
+  const dayStart = adminUtcDateString(adminUtcStartOfDay(now));
+  const monthStart = adminUtcDateString(adminUtcStartOfMonth(now));
+  const today = adminUtcDateString(now);
+  const query = `
+    query AdminKvPlanUsage($accountTag: string!, $dayStart: Date, $monthStart: Date, $today: Date) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          day: kvOperationsAdaptiveGroups(filter: { date_geq: $dayStart, date_leq: $today }, limit: 10000) {
+            sum { requests }
+            dimensions { actionType }
+          }
+          month: kvOperationsAdaptiveGroups(filter: { date_geq: $monthStart, date_leq: $today }, limit: 10000) {
+            sum { requests }
+            dimensions { actionType }
+          }
+        }
+      }
+    }
+  `;
+  const data = await fetchAdminCloudflareGraphql(token, query, { accountTag, dayStart, monthStart, today });
+  const account = data?.viewer?.accounts?.[0] || {};
+  return {
+    day: sumAdminKvUsageRows(account.day || []),
+    month: sumAdminKvUsageRows(account.month || [])
+  };
+}
+
+async function fetchAdminCloudflareSubscriptions(token, accountTag) {
+  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountTag)}/subscriptions`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json'
+    }
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body?.success === false) {
+    throw new Error('cloudflare_subscriptions_failed');
+  }
+  return Array.isArray(body?.result) ? body.result : [];
+}
+
+function isActiveAdminCloudflareSubscription(subscription = {}) {
+  const state = String(subscription?.state || '').trim().toLowerCase();
+  return !['cancelled', 'failed', 'expired'].includes(state);
+}
+
+function adminCloudflareSubscriptionText(subscription = {}) {
+  const plan = subscription?.rate_plan || {};
+  return [
+    subscription?.id,
+    subscription?.price,
+    plan?.id,
+    plan?.public_name,
+    plan?.scope,
+    ...(Array.isArray(plan?.sets) ? plan.sets : [])
+  ].map((value) => String(value || '').toLowerCase()).join(' ');
+}
+
+function adminCloudflareSubscriptionMatchesWorkers(subscription = {}) {
+  return /\bworkers?\b/.test(adminCloudflareSubscriptionText(subscription));
+}
+
+function detectAdminCloudflarePlanFromSubscriptions(subscriptions = []) {
+  const activeSubscriptions = (Array.isArray(subscriptions) ? subscriptions : [])
+    .filter(isActiveAdminCloudflareSubscription);
+  const workerSubscription = activeSubscriptions.find(adminCloudflareSubscriptionMatchesWorkers);
+  if (!workerSubscription) return { planKey: 'free', planSource: 'cloudflare-subscriptions' };
+  const text = adminCloudflareSubscriptionText(workerSubscription);
+  const price = Number(workerSubscription?.price);
+  if (/\b(free|workers_free)\b/.test(text)) return { planKey: 'free', planSource: 'cloudflare-subscriptions' };
+  if (/\b(paid|standard|workers_paid)\b/.test(text) || (Number.isFinite(price) && price > 0)) {
+    return { planKey: 'standard', planSource: 'cloudflare-subscriptions' };
+  }
+  return { planKey: 'unknown', planSource: 'cloudflare-subscriptions' };
+}
+
+async function detectAdminCloudflarePlan(token, accountTag, configuredPlanKey) {
+  if (configuredPlanKey && configuredPlanKey !== 'unknown') {
+    return { planKey: configuredPlanKey, planSource: 'configured' };
+  }
+  try {
+    return detectAdminCloudflarePlanFromSubscriptions(await fetchAdminCloudflareSubscriptions(token, accountTag));
+  } catch (_error) {
+    return { planKey: configuredPlanKey || 'unknown', planSource: 'unavailable' };
+  }
+}
+
+function adminCloudflarePlanMetrics(env, planKey, usage, thresholds) {
+  const plan = ADMIN_CLOUDFLARE_PLAN_CATALOG[planKey] || ADMIN_CLOUDFLARE_PLAN_CATALOG.unknown;
+  const paidPlan = planKey === 'standard';
+  const period = paidPlan ? 'monthly' : 'daily';
+  const workersUsage = paidPlan ? usage?.workers?.month : usage?.workers?.day;
+  const kvUsage = paidPlan ? usage?.kv?.month : usage?.kv?.day;
+  const suffix = paidPlan ? 'MONTHLY' : 'DAILY';
+  const labelSuffix = paidPlan ? 'this month' : 'today';
+
+  return [
+    adminPlanMetric({
+      id: 'cloudflare-workers-requests',
+      label: 'Workers requests',
+      period,
+      used: workersUsage?.requests,
+      limit: adminPlanLimit(env, `CLOUDFLARE_WORKERS_REQUESTS_${suffix}_LIMIT`, paidPlan ? plan.workerRequestsMonthly : plan.workerRequestsDaily),
+      unit: 'requests',
+      source: 'Cloudflare GraphQL Analytics',
+      help: `Worker invocation requests ${labelSuffix}.`
+    }, thresholds),
+    adminPlanMetric({
+      id: 'cloudflare-kv-reads',
+      label: 'KV reads',
+      period,
+      used: kvUsage?.reads,
+      limit: adminPlanLimit(env, `CLOUDFLARE_KV_READS_${suffix}_LIMIT`, paidPlan ? plan.kvReadsMonthly : plan.kvReadsDaily),
+      unit: 'operations',
+      source: 'Cloudflare GraphQL Analytics',
+      help: `Workers KV read operations ${labelSuffix}.`
+    }, thresholds),
+    adminPlanMetric({
+      id: 'cloudflare-kv-writes',
+      label: 'KV writes',
+      period,
+      used: kvUsage?.writes,
+      limit: adminPlanLimit(env, `CLOUDFLARE_KV_WRITES_${suffix}_LIMIT`, paidPlan ? plan.kvWritesMonthly : plan.kvWritesDaily),
+      unit: 'operations',
+      source: 'Cloudflare GraphQL Analytics',
+      help: `Workers KV write operations ${labelSuffix}.`
+    }, thresholds),
+    adminPlanMetric({
+      id: 'cloudflare-kv-deletes',
+      label: 'KV deletes',
+      period,
+      used: kvUsage?.deletes,
+      limit: adminPlanLimit(env, `CLOUDFLARE_KV_DELETES_${suffix}_LIMIT`, paidPlan ? plan.kvDeletesMonthly : plan.kvDeletesDaily),
+      unit: 'operations',
+      source: 'Cloudflare GraphQL Analytics',
+      help: `Workers KV delete operations ${labelSuffix}.`
+    }, thresholds),
+    adminPlanMetric({
+      id: 'cloudflare-kv-lists',
+      label: 'KV list operations',
+      period,
+      used: kvUsage?.lists,
+      limit: adminPlanLimit(env, `CLOUDFLARE_KV_LISTS_${suffix}_LIMIT`, paidPlan ? plan.kvListsMonthly : plan.kvListsDaily),
+      unit: 'operations',
+      source: 'Cloudflare GraphQL Analytics',
+      help: `Workers KV list operations ${labelSuffix}.`
+    }, thresholds)
+  ];
+}
+
+async function buildAdminCloudflarePlanUsage(env, thresholds) {
+  const configuredPlanKey = adminConfiguredCloudflarePlanKey(env);
+  const token = String(env.CLOUDFLARE_USAGE_API_TOKEN || env.CLOUDFLARE_ANALYTICS_API_TOKEN || '').trim();
+  const accountTag = String(env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+  const scriptName = String(env.CLOUDFLARE_WORKER_SCRIPT_NAME || env.WORKER_SCRIPT_NAME || '').trim();
+  let planKey = configuredPlanKey || 'unknown';
+  let planSource = configuredPlanKey ? 'configured' : 'unknown';
+  let status = 'ok';
+  let statusMessage = 'Usage refreshed from Cloudflare GraphQL Analytics.';
+  let usage = null;
+
+  if (!token || !accountTag) {
+    status = 'missing_credentials';
+    statusMessage = 'Add CLOUDFLARE_USAGE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to refresh Cloudflare usage.';
+  } else {
+    try {
+      const [workers, kv, detectedPlan] = await Promise.all([
+        fetchAdminCloudflareWorkersUsage(token, accountTag, scriptName),
+        fetchAdminCloudflareKvUsage(token, accountTag),
+        detectAdminCloudflarePlan(token, accountTag, configuredPlanKey)
+      ]);
+      usage = { workers, kv };
+      planKey = detectedPlan?.planKey || planKey;
+      planSource = detectedPlan?.planSource || planSource;
+    } catch (_error) {
+      status = 'unavailable';
+      statusMessage = 'Cloudflare usage could not be refreshed. Check the read-only analytics token and account scope.';
+    }
+  }
+  const plan = ADMIN_CLOUDFLARE_PLAN_CATALOG[planKey] || ADMIN_CLOUDFLARE_PLAN_CATALOG.unknown;
+
+  return {
+    id: 'cloudflare',
+    name: 'Cloudflare',
+    planName: plan.label,
+    planKey,
+    planSource,
+    status,
+    statusMessage,
+    upgradeUrl: plan.upgradeUrl,
+    scope: scriptName ? `Worker script: ${scriptName}` : 'Account-wide Workers and KV usage',
+    metrics: adminCloudflarePlanMetrics(env, planKey, usage, thresholds),
+    sources: [ADMIN_PLAN_USAGE_SOURCE_URLS.cloudflareWorkers, ADMIN_PLAN_USAGE_SOURCE_URLS.cloudflareKv]
+  };
+}
+
+function parseResendQuotaHeader(value) {
+  const numbers = String(value || '').match(/[\d,]+/g);
+  if (!numbers || !numbers.length) return null;
+  const used = Number(String(numbers[0] || '').replace(/,/g, ''));
+  const limit = numbers.length > 1 ? Number(String(numbers[1] || '').replace(/,/g, '')) : null;
+  return {
+    used: Number.isFinite(used) ? used : null,
+    limit: Number.isFinite(limit) ? limit : null
+  };
+}
+
+function formatAdminPlanInteger(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toLocaleString('en-US') : String(value || '');
+}
+
+function detectAdminResendPlanFromMonthlyLimit(limit, planSource) {
+  const monthlyLimit = adminUsageNumber(limit);
+  if (monthlyLimit === null || monthlyLimit <= 0) return null;
+  const matchingPlanEntry = Object.entries(ADMIN_RESEND_PLAN_CATALOG)
+    .find(([, plan]) => plan.emailsMonthly === monthlyLimit);
+  if (matchingPlanEntry) {
+    return {
+      planKey: matchingPlanEntry[0],
+      planName: matchingPlanEntry[1].label,
+      planSource
+    };
+  }
+  return {
+    planKey: 'paid',
+    planName: `${formatAdminPlanInteger(monthlyLimit)} emails / mo`,
+    planSource
+  };
+}
+
+function detectAdminResendPlan(env, usage) {
+  const configuredPlanKey = adminConfiguredResendPlanKey(env);
+  if (configuredPlanKey && configuredPlanKey !== 'unknown') {
+    const configuredPlan = ADMIN_RESEND_PLAN_CATALOG[configuredPlanKey] || ADMIN_RESEND_PLAN_CATALOG.unknown;
+    return { planKey: configuredPlanKey, planName: configuredPlan.label, planSource: 'configured' };
+  }
+  const monthlyHeader = parseResendQuotaHeader(usage?.monthlyQuota);
+  const dailyHeader = parseResendQuotaHeader(usage?.dailyQuota);
+  if (dailyHeader && dailyHeader.used !== null) {
+    return { planKey: 'free', planName: ADMIN_RESEND_PLAN_CATALOG.free.label, planSource: 'resend-quota-headers' };
+  }
+  if (monthlyHeader && monthlyHeader.limit !== null) {
+    return detectAdminResendPlanFromMonthlyLimit(monthlyHeader.limit, 'resend-quota-headers');
+  }
+  const configuredMonthlyPlan = detectAdminResendPlanFromMonthlyLimit(env.RESEND_EMAILS_MONTHLY_LIMIT, 'configured-limit');
+  if (configuredMonthlyPlan) {
+    return configuredMonthlyPlan;
+  }
+  if (monthlyHeader && monthlyHeader.used !== null) {
+    return { planKey: 'paid', planName: ADMIN_RESEND_PLAN_CATALOG.paid.label, planSource: 'resend-quota-headers' };
+  }
+  return {
+    planKey: configuredPlanKey || 'unknown',
+    planName: (ADMIN_RESEND_PLAN_CATALOG[configuredPlanKey] || ADMIN_RESEND_PLAN_CATALOG.unknown).label,
+    planSource: configuredPlanKey ? 'configured' : 'unknown'
+  };
+}
+
+function adminResendPlanMetrics(env, planKey, usage, thresholds) {
+  const plan = ADMIN_RESEND_PLAN_CATALOG[planKey] || ADMIN_RESEND_PLAN_CATALOG.unknown;
+  const monthlyHeader = parseResendQuotaHeader(usage?.monthlyQuota);
+  const dailyHeader = parseResendQuotaHeader(usage?.dailyQuota);
+  const rateLimit = adminUsageNumber(usage?.rateLimit);
+  const rateRemaining = adminUsageNumber(usage?.rateRemaining);
+  const metrics = [
+    adminPlanMetric({
+      id: 'resend-monthly-emails',
+      label: 'Monthly emails',
+      period: 'monthly',
+      used: monthlyHeader?.used,
+      limit: adminPlanLimit(env, 'RESEND_EMAILS_MONTHLY_LIMIT', monthlyHeader?.limit ?? plan.emailsMonthly),
+      unit: 'emails',
+      source: 'Resend quota headers',
+      help: 'Sent and received emails counted against the current monthly quota.'
+    }, thresholds)
+  ];
+
+  if (dailyHeader && dailyHeader.used !== null) {
+    metrics.push(adminPlanMetric({
+      id: 'resend-daily-emails',
+      label: 'Daily emails',
+      period: 'daily',
+      used: dailyHeader?.used,
+      limit: adminPlanLimit(env, 'RESEND_EMAILS_DAILY_LIMIT', dailyHeader?.limit ?? plan.emailsDaily),
+      unit: 'emails',
+      source: 'Resend quota headers',
+      help: 'Daily email quota usage. Resend only sends this header for free-plan accounts.'
+    }, thresholds));
+  } else if (['paid', 'pro', 'scale'].includes(planKey)) {
+    metrics.push(adminPlanMetric({
+      id: 'resend-daily-emails',
+      label: 'Daily emails',
+      period: 'daily',
+      unlimited: true,
+      unit: 'emails',
+      source: 'Resend quota headers',
+      help: 'Paid Resend transactional plans do not have a daily email quota.'
+    }, thresholds));
+  }
+
+  if (rateLimit !== null && rateLimit > 0) {
+    metrics.push(adminPlanMetric({
+      id: 'resend-api-rate-window',
+      label: 'API rate window',
+      period: 'rate_limit',
+      used: rateRemaining === null ? null : Math.max(0, rateLimit - rateRemaining),
+      limit: rateLimit,
+      unit: 'requests',
+      source: 'Resend rate-limit headers',
+      help: usage?.rateReset ? `Current API rate-limit window. Resets at ${usage.rateReset}.` : 'Current API rate-limit window.'
+    }, thresholds));
+  }
+
+  return metrics;
+}
+
+async function fetchAdminResendUsage(apiKey) {
+  const response = await fetch('https://api.resend.com/emails?limit=1', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json'
+    }
+  });
+  if (!response.ok && response.status !== 429) {
+    throw new Error('resend_usage_failed');
+  }
+  return {
+    dailyQuota: response.headers.get('x-resend-daily-quota') || '',
+    monthlyQuota: response.headers.get('x-resend-monthly-quota') || '',
+    rateLimit: response.headers.get('ratelimit-limit') || '',
+    rateRemaining: response.headers.get('ratelimit-remaining') || '',
+    rateReset: response.headers.get('ratelimit-reset') || response.headers.get('retry-after') || ''
+  };
+}
+
+async function buildAdminResendPlanUsage(env, thresholds) {
+  let detectedPlan = detectAdminResendPlan(env, null);
+  const apiKey = String(env.RESEND_API_KEY || '').trim();
+  let status = 'ok';
+  let statusMessage = 'Usage refreshed from Resend response headers.';
+  let usage = null;
+
+  if (!apiKey) {
+    status = 'missing_credentials';
+    statusMessage = 'Add RESEND_API_KEY to refresh Resend usage.';
+  } else {
+    try {
+      usage = await fetchAdminResendUsage(apiKey);
+      detectedPlan = detectAdminResendPlan(env, usage);
+    } catch (_error) {
+      status = 'unavailable';
+      statusMessage = 'Resend usage could not be refreshed. Check the API key and rate limits.';
+    }
+  }
+
+  return {
+    id: 'resend',
+    name: 'Resend',
+    planName: detectedPlan.planName,
+    planKey: detectedPlan.planKey,
+    planSource: detectedPlan.planSource,
+    status,
+    statusMessage,
+    upgradeUrl: (ADMIN_RESEND_PLAN_CATALOG[detectedPlan.planKey] || ADMIN_RESEND_PLAN_CATALOG.paid).upgradeUrl,
+    links: [{
+      labelKey: 'plan_usage_resend_usage',
+      label: 'Usage',
+      url: ADMIN_PLAN_USAGE_SOURCE_URLS.resendUsage
+    }],
+    scope: 'Team email quota',
+    metrics: adminResendPlanMetrics(env, detectedPlan.planKey, usage, thresholds),
+    sources: [ADMIN_PLAN_USAGE_SOURCE_URLS.resendRateLimit, ADMIN_PLAN_USAGE_SOURCE_URLS.resendPricing]
+  };
+}
+
+async function handleAdminPlanUsage(request, env) {
+  const auth = await requireAdminSession(request, env, 'settings:publish');
+  if (!auth.ok) return auth.response;
+  const thresholds = adminPlanUsageThresholds(env);
+  const [cloudflare, resend] = await Promise.all([
+    buildAdminCloudflarePlanUsage(env, thresholds),
+    buildAdminResendPlanUsage(env, thresholds)
+  ]);
+  return privateJsonResponse({
+    user: auth.user,
+    thresholds,
+    providers: [cloudflare, resend],
+    writeBudget: adminReadBudget(),
+    generatedAt: new Date().toISOString()
+  }, 200, env);
 }
 
 async function handleAdminSettings(request, env) {
@@ -10567,6 +11216,12 @@ async function handleAdminSettings(request, env) {
         ['Intent prefetch limit', env.INTENT_PREFETCH_LIMIT || '3', editableAdminSetting('performance.intent_prefetch_limit', 'number')],
         ['Live stats cache TTL seconds', env.LIVE_STATS_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_stats_ttl_seconds', 'number')],
         ['Live inventory cache TTL seconds', env.LIVE_INVENTORY_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_inventory_ttl_seconds', 'number')]
+      ]),
+      adminSettingsSection('Plan usage', [
+        ['', '', {
+          input: 'plan-usage',
+          hideLabel: true
+        }]
       ]),
       adminSettingsSection('Debug', [
         ['Console logging enabled', env.DEBUG_CONSOLE_LOGGING_ENABLED, editableAdminSetting('debug.console_logging_enabled', 'boolean')],
@@ -12478,6 +13133,7 @@ function emptyAdminAnalyticsTotals() {
     campaignAddOnRevenue: 0,
     platformAddOnRevenue: 0,
     platformTipRevenue: 0,
+    platformRevenue: 0,
     taxTotal: 0,
     shippingTotal: 0,
     actualStripeFeeAmount: 0,
@@ -12487,11 +13143,37 @@ function emptyAdminAnalyticsTotals() {
     pendingStripeFinancialPledgeCount: 0,
     estimatedStripeFeeAmount: 0,
     estimatedStripeFeePledgeCount: 0,
+    processorFeeAllocatedToCampaignRevenue: 0,
+    processorFeeAllocatedToPlatformRevenue: 0,
+    processorFeeAllocatedToTax: 0,
+    processorFeeAllocatedToShipping: 0,
+    netCampaignRevenue: 0,
+    netPlatformRevenue: 0,
     physicalPledgeCount: 0,
     physicalPledgeAmount: 0,
     digitalPledgeCount: 0,
     digitalPledgeAmount: 0,
     platformAddOnPledgeCount: 0
+  };
+}
+
+function allocateAdminAnalyticsProcessorFees(feeAmount, {
+  campaignRevenue = 0,
+  platformRevenue = 0,
+  taxTotal = 0,
+  shippingTotal = 0
+} = {}) {
+  const [campaignFee, platformFee, taxFee, shippingFee] = allocateIntegerTotal(feeAmount, [
+    { amount: campaignRevenue },
+    { amount: platformRevenue },
+    { amount: taxTotal },
+    { amount: shippingTotal }
+  ]);
+  return {
+    campaignRevenue: Math.max(0, Number(campaignFee || 0) || 0),
+    platformRevenue: Math.max(0, Number(platformFee || 0) || 0),
+    tax: Math.max(0, Number(taxFee || 0) || 0),
+    shipping: Math.max(0, Number(shippingFee || 0) || 0)
   };
 }
 
@@ -12570,11 +13252,16 @@ function applyPledgeToAdminAnalytics(analytics, campaign, pledge = {}, supporter
   const bundleAddOns = Array.isArray(pledge?.bundleAddOns) ? pledge.bundleAddOns : [];
   const platformAddOnRevenue = getPlatformBundleAddOnSubtotal(bundleAddOns);
   const campaignAddOnRevenue = getCampaignBundleAddOnSubtotal(bundleAddOns, campaignSlug);
+  const platformTipRevenue = Number(pledge?.tipAmount || 0) || 0;
+  const platformRevenue = platformAddOnRevenue + platformTipRevenue;
   const campaignRevenue = Math.max(0, subtotal - platformAddOnRevenue);
+  const taxTotal = Number(pledge?.tax || 0) || 0;
+  const shippingTotal = Number(pledge?.shipping || 0) || 0;
   const isCancelled = status === 'cancelled';
   const countsTowardPledged = !isCancelled;
   const countsTowardStripeFeeEstimate = status === 'active' || status === 'charged';
   const storedStripeFinancials = getStoredStripeFinancials(pledge);
+  let processorFeeForAllocation = 0;
 
   analytics.totals.pledgeCount += 1;
   if (countsTowardPledged) {
@@ -12583,24 +13270,42 @@ function applyPledgeToAdminAnalytics(analytics, campaign, pledge = {}, supporter
     analytics.totals.campaignRevenue += campaignRevenue;
     analytics.totals.campaignAddOnRevenue += campaignAddOnRevenue;
     analytics.totals.platformAddOnRevenue += platformAddOnRevenue;
-    analytics.totals.platformTipRevenue += Number(pledge?.tipAmount || 0) || 0;
-    analytics.totals.taxTotal += Number(pledge?.tax || 0) || 0;
-    analytics.totals.shippingTotal += Number(pledge?.shipping || 0) || 0;
+    analytics.totals.platformTipRevenue += platformTipRevenue;
+    analytics.totals.platformRevenue += platformRevenue;
+    analytics.totals.taxTotal += taxTotal;
+    analytics.totals.shippingTotal += shippingTotal;
   } else {
     analytics.totals.cancelledPledgeCount += 1;
   }
 
   if (status === 'charged' && storedStripeFinancials?.source === 'actual') {
     analytics.totals.actualStripeFinancialPledgeCount += 1;
-    analytics.totals.actualStripeFeeAmount += Math.max(0, Number(storedStripeFinancials.feeAmount || 0) || 0);
+    processorFeeForAllocation = Math.max(0, Number(storedStripeFinancials.feeAmount || 0) || 0);
+    analytics.totals.actualStripeFeeAmount += processorFeeForAllocation;
     analytics.totals.actualStripeNetAmount += Math.max(0, Number(storedStripeFinancials.netAmount || 0) || 0);
     analytics.totals.actualStripeGrossAmount += Math.max(0, Number(storedStripeFinancials.grossAmount || 0) || 0);
   } else if (countsTowardStripeFeeEstimate) {
+    processorFeeForAllocation = estimateAdminStripeFeeCents(amount);
     analytics.totals.estimatedStripeFeePledgeCount += 1;
-    analytics.totals.estimatedStripeFeeAmount += estimateAdminStripeFeeCents(amount);
+    analytics.totals.estimatedStripeFeeAmount += processorFeeForAllocation;
     if (status === 'charged' && storedStripeFinancials?.source === 'pending') {
       analytics.totals.pendingStripeFinancialPledgeCount += 1;
     }
+  }
+
+  if (countsTowardPledged) {
+    const processorFeeAllocations = allocateAdminAnalyticsProcessorFees(processorFeeForAllocation, {
+      campaignRevenue,
+      platformRevenue,
+      taxTotal,
+      shippingTotal
+    });
+    analytics.totals.processorFeeAllocatedToCampaignRevenue += processorFeeAllocations.campaignRevenue;
+    analytics.totals.processorFeeAllocatedToPlatformRevenue += processorFeeAllocations.platformRevenue;
+    analytics.totals.processorFeeAllocatedToTax += processorFeeAllocations.tax;
+    analytics.totals.processorFeeAllocatedToShipping += processorFeeAllocations.shipping;
+    analytics.totals.netCampaignRevenue += Math.max(0, campaignRevenue - processorFeeAllocations.campaignRevenue);
+    analytics.totals.netPlatformRevenue += Math.max(0, platformRevenue - processorFeeAllocations.platformRevenue);
   }
 
   if (status === 'charged') {

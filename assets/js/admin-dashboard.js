@@ -765,8 +765,306 @@
     return output;
   }
 
+  function planUsagePeriodLabel(period) {
+    var labels = {
+      daily: t('plan_usage_period_daily', 'Daily'),
+      monthly: t('plan_usage_period_monthly', 'Monthly'),
+      rate_limit: t('plan_usage_period_rate_limit', 'Rate window')
+    };
+    return labels[period] || String(period || '');
+  }
+
+  function planUsageUnitLabel(unit) {
+    var labels = {
+      emails: t('plan_usage_unit_emails', 'emails'),
+      operations: t('plan_usage_unit_operations', 'operations'),
+      requests: t('plan_usage_unit_requests', 'requests'),
+      count: t('plan_usage_unit_count', 'items')
+    };
+    return labels[unit] || String(unit || '');
+  }
+
+  function formatPlanUsageNumber(value) {
+    return value === null || value === undefined
+      ? t('plan_usage_not_available', 'Not available')
+      : formatNumber(value);
+  }
+
+  function planUsageMetricText(metric) {
+    if (metric?.unlimited === true) return t('plan_usage_unlimited', 'Unlimited');
+    var used = formatPlanUsageNumber(metric?.used);
+    var unit = planUsageUnitLabel(metric?.unit);
+    if (metric?.limit === null || metric?.limit === undefined) {
+      return metric?.used === null || metric?.used === undefined
+        ? t('plan_usage_not_available', 'Not available')
+        : t('plan_usage_used_only', '%{used} %{unit}', { used: used, unit: unit });
+    }
+    if (metric?.used === null || metric?.used === undefined) {
+      return t('plan_usage_limit_only', '%{limit} %{unit} limit', {
+        limit: formatNumber(metric.limit),
+        unit: unit
+      });
+    }
+    return t('plan_usage_used_of_limit', '%{used} of %{limit} %{unit}', {
+      used: used,
+      limit: formatNumber(metric.limit),
+      unit: unit
+    });
+  }
+
+  function planUsageProviderSeverity(provider) {
+    if (provider?.status && provider.status !== 'ok') return provider.status;
+    var metrics = Array.isArray(provider?.metrics) ? provider.metrics : [];
+    if (metrics.some(function(metric) { return metric?.severity === 'critical'; })) return 'critical';
+    if (metrics.some(function(metric) { return metric?.severity === 'warning'; })) return 'warning';
+    return 'ok';
+  }
+
+  function planUsageMetricLabel(metric) {
+    var labels = {
+      'cloudflare-workers-requests': ['plan_usage_metric_cloudflare_workers_requests', 'Workers requests'],
+      'cloudflare-kv-reads': ['plan_usage_metric_cloudflare_kv_reads', 'KV reads'],
+      'cloudflare-kv-writes': ['plan_usage_metric_cloudflare_kv_writes', 'KV writes'],
+      'cloudflare-kv-deletes': ['plan_usage_metric_cloudflare_kv_deletes', 'KV deletes'],
+      'cloudflare-kv-lists': ['plan_usage_metric_cloudflare_kv_lists', 'KV list operations'],
+      'resend-monthly-emails': ['plan_usage_metric_resend_monthly_emails', 'Monthly emails'],
+      'resend-daily-emails': ['plan_usage_metric_resend_daily_emails', 'Daily emails'],
+      'resend-api-rate-window': ['plan_usage_metric_resend_api_rate_window', 'API rate window']
+    };
+    var entry = labels[String(metric?.id || '')];
+    return entry ? t(entry[0], entry[1]) : (metric?.label || t('plan_usage_metric', 'Metric'));
+  }
+
+  function planUsageMetricHelp(metric) {
+    var helps = {
+      'cloudflare-workers-requests': ['plan_usage_help_cloudflare_workers_requests', 'Worker invocation requests for the selected period.'],
+      'cloudflare-kv-reads': ['plan_usage_help_cloudflare_kv_reads', 'Workers KV read operations for the selected period.'],
+      'cloudflare-kv-writes': ['plan_usage_help_cloudflare_kv_writes', 'Workers KV write operations for the selected period.'],
+      'cloudflare-kv-deletes': ['plan_usage_help_cloudflare_kv_deletes', 'Workers KV delete operations for the selected period.'],
+      'cloudflare-kv-lists': ['plan_usage_help_cloudflare_kv_lists', 'Workers KV list operations for the selected period.'],
+      'resend-monthly-emails': ['plan_usage_help_resend_monthly_emails', 'Sent and received emails counted against the current monthly quota. If Resend omits the usage header, only the inferred plan limit is shown.'],
+      'resend-daily-emails': ['plan_usage_help_resend_daily_emails', 'Daily email quota usage. Paid Resend transactional plans do not have a daily email quota.'],
+      'resend-api-rate-window': ['plan_usage_help_resend_api_rate_window', 'Current per-second Resend API request window. The dashboard usage check counts as one request.']
+    };
+    var entry = helps[String(metric?.id || '')];
+    return entry ? t(entry[0], entry[1]) : (metric?.help || '');
+  }
+
+  function planUsageProviderStatusText(provider) {
+    var key = 'plan_usage_status_' + String(provider?.id || 'provider') + '_' + String(provider?.status || 'unknown');
+    return t(key, provider?.statusMessage || '');
+  }
+
+  function planUsageProviderHelp(provider) {
+    if (provider?.id === 'cloudflare') {
+      return t('plan_usage_help_cloudflare_provider', 'Shows how close this Worker and its KV storage are to the Cloudflare plan limits. Free/Paid is detected automatically when the usage token can read billing; otherwise use the plan override.');
+    }
+    if (provider?.id === 'resend') {
+      return t('plan_usage_help_resend_provider', 'Shows the Resend email quota and current API request window for this team. Resend may only provide the plan limit, so monthly sent usage can be unavailable.');
+    }
+    return '';
+  }
+
+  function planUsageProviderScopeText(provider) {
+    var scope = String(provider?.scope || '');
+    if (provider?.id === 'cloudflare' && scope.indexOf('Worker script: ') === 0) {
+      return t('plan_usage_scope_cloudflare_script', 'Worker script: %{script}', {
+        script: scope.replace('Worker script: ', '')
+      });
+    }
+    if (provider?.id === 'cloudflare') {
+      return t('plan_usage_scope_cloudflare_account', 'Account-wide Workers and KV usage');
+    }
+    if (provider?.id === 'resend') {
+      return t('plan_usage_scope_resend_team', 'Team email quota');
+    }
+    return scope;
+  }
+
+  function renderPlanUsageMetric(metric) {
+    var item = document.createElement('div');
+    item.className = 'admin-plan-usage__metric admin-plan-usage__metric--' + String(metric?.severity || 'unknown');
+    var header = document.createElement('div');
+    header.className = 'admin-plan-usage__metric-header';
+    var label = document.createElement('strong');
+    label.textContent = planUsageMetricLabel(metric);
+    var period = document.createElement('span');
+    period.textContent = planUsagePeriodLabel(metric?.period);
+    header.append(label, period);
+
+    var value = document.createElement('p');
+    value.className = 'admin-plan-usage__metric-value';
+    value.textContent = planUsageMetricText(metric);
+
+    var percent = Number(metric?.percent);
+    var bar = document.createElement('div');
+    bar.className = 'admin-plan-usage__bar';
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-valuemin', '0');
+    if (metric?.unlimited === true) {
+      bar.setAttribute('aria-valuetext', t('plan_usage_unlimited', 'Unlimited'));
+      bar.style.setProperty('--admin-plan-usage-percent', '0%');
+    } else if (Number.isFinite(percent)) {
+      var clampedPercent = Math.max(0, Math.min(100, percent));
+      bar.setAttribute('aria-valuemax', '100');
+      bar.setAttribute('aria-valuenow', String(Math.round(clampedPercent)));
+      bar.setAttribute('aria-valuetext', t('plan_usage_percent_used', '%{percent}% used', {
+        percent: formatNumber(Math.round(percent))
+      }));
+      bar.style.setProperty('--admin-plan-usage-percent', clampedPercent + '%');
+    } else {
+      bar.setAttribute('aria-valuetext', t('plan_usage_usage_unknown', 'Usage unavailable'));
+      bar.style.setProperty('--admin-plan-usage-percent', '0%');
+    }
+    var fill = document.createElement('span');
+    fill.className = 'admin-plan-usage__bar-fill';
+    bar.append(fill);
+
+    item.append(header, value, bar);
+    var helpText = planUsageMetricHelp(metric);
+    if (helpText) {
+      var help = document.createElement('p');
+      help.className = 'admin-plan-usage__metric-help';
+      help.textContent = helpText;
+      item.append(help);
+    }
+    return item;
+  }
+
+  function renderPlanUsageProvider(provider) {
+    var card = document.createElement('section');
+    var severity = planUsageProviderSeverity(provider);
+    card.className = 'admin-plan-usage__provider admin-plan-usage__provider--' + severity;
+    var header = document.createElement('div');
+    header.className = 'admin-plan-usage__provider-header';
+    var title = document.createElement('h4');
+    title.className = 'admin-settings__label admin-plan-usage__provider-title';
+    var titleText = document.createElement('span');
+    titleText.textContent = provider?.name || t('plan_usage_provider', 'Provider');
+    title.append(titleText);
+    var providerHelp = createHelpControl(titleText.textContent, planUsageProviderHelp(provider), 'plan-usage-provider-' + String(provider?.id || 'provider'));
+    if (providerHelp) title.append(providerHelp);
+    var plan = document.createElement('span');
+    plan.textContent = provider?.planName || t('plan_usage_plan_unknown', 'Plan unknown');
+    header.append(title, plan);
+
+    var status = document.createElement('p');
+    status.className = 'admin-plan-usage__provider-status';
+    status.textContent = provider?.status && provider.status !== 'ok'
+      ? planUsageProviderStatusText(provider)
+      : '';
+
+    var scope = document.createElement('p');
+    scope.className = 'admin-plan-usage__scope';
+    scope.textContent = planUsageProviderScopeText(provider);
+
+    var metrics = document.createElement('div');
+    metrics.className = 'admin-plan-usage__metrics';
+    (Array.isArray(provider?.metrics) ? provider.metrics : []).forEach(function(metric) {
+      metrics.append(renderPlanUsageMetric(metric));
+    });
+
+    card.append(header);
+    if (status.textContent) card.append(status);
+    if (scope.textContent) card.append(scope);
+    card.append(metrics);
+    var links = document.createElement('div');
+    links.className = 'admin-plan-usage__links';
+    (Array.isArray(provider?.links) ? provider.links : []).forEach(function(linkConfig) {
+      var linkLabel = linkConfig?.labelKey
+        ? t(linkConfig.labelKey, linkConfig.label || '')
+        : linkConfig?.label;
+      if (!linkConfig?.url || !linkLabel) return;
+      var providerLink = document.createElement('a');
+      providerLink.className = 'admin-plan-usage__link';
+      providerLink.href = linkConfig.url;
+      providerLink.rel = 'noopener noreferrer';
+      providerLink.target = '_blank';
+      providerLink.textContent = linkLabel;
+      links.append(providerLink);
+    });
+    if (provider?.upgradeUrl) {
+      var link = document.createElement('a');
+      link.className = 'admin-plan-usage__link admin-plan-usage__upgrade';
+      link.href = provider.upgradeUrl;
+      link.rel = 'noopener noreferrer';
+      link.target = '_blank';
+      link.textContent = t('plan_usage_manage_plan', 'Manage plan');
+      links.append(link);
+    }
+    if (links.childElementCount) card.append(links);
+    return card;
+  }
+
+  function renderPlanUsageResults(root, data) {
+    root.replaceChildren();
+    var providers = Array.isArray(data?.providers) ? data.providers : [];
+    if (!providers.length) {
+      var empty = document.createElement('p');
+      empty.className = 'admin-app__muted';
+      empty.textContent = t('plan_usage_empty', 'No provider usage was returned.');
+      root.append(empty);
+      return;
+    }
+    providers.forEach(function(provider) {
+      root.append(renderPlanUsageProvider(provider));
+    });
+  }
+
+  async function loadPlanUsageTracker(root) {
+    if (!(root instanceof HTMLElement)) return;
+    if (root.dataset.planUsageState === 'loading' || root.dataset.planUsageState === 'loaded') return;
+    var status = root.querySelector('[data-plan-usage-status]');
+    var results = root.querySelector('[data-plan-usage-results]');
+    root.dataset.planUsageState = 'loading';
+    if (status) {
+      status.hidden = false;
+      status.textContent = t('plan_usage_loading', 'Loading plan usage...');
+    }
+    try {
+      var data = await requestJson('/admin/plan-usage', { method: 'GET' });
+      if (results) renderPlanUsageResults(results, data);
+      if (status) {
+        status.textContent = '';
+        status.hidden = true;
+      }
+      root.dataset.planUsageState = 'loaded';
+    } catch (error) {
+      logger.error('Failed to load plan usage', error);
+      if (status) {
+        status.hidden = false;
+        status.textContent = t('plan_usage_load_failed', 'Unable to load plan usage.');
+      }
+      root.dataset.planUsageState = 'failed';
+    }
+  }
+
+  function createPlanUsageTracker() {
+    var root = document.createElement('div');
+    root.className = 'admin-plan-usage';
+    root.dataset.planUsageTracker = 'true';
+    var status = document.createElement('p');
+    status.className = 'admin-plan-usage__status admin-app__muted';
+    status.setAttribute('aria-live', 'polite');
+    status.dataset.planUsageStatus = 'true';
+    status.hidden = true;
+    status.textContent = t('plan_usage_idle', 'Plan usage will load when this section opens.');
+
+    var results = document.createElement('div');
+    results.className = 'admin-plan-usage__results';
+    results.dataset.planUsageResults = 'true';
+    root.append(status, results);
+    return root;
+  }
+
   function appendSettingsControl(parent, row, section, index) {
     var describedById = settingsHelpId(row, section?.title, index);
+    if (row?.input === 'plan-usage') {
+      var tracker = createPlanUsageTracker();
+      describeCompositeControl(tracker, describedById, row?.label || '');
+      parent.append(tracker);
+      return;
+    }
     if (row?.input === 'content-editor') {
       var slot = document.createElement('div');
       slot.className = 'admin-settings__content-editor-slot';
@@ -848,6 +1146,7 @@
     caption.textContent = heading.textContent;
     var tbody = document.createElement('tbody');
     function shouldHideFieldLabel(row) {
+      if (row?.hideLabel === true) return true;
       if (options?.hideFieldLabels === true) return true;
       if (Array.isArray(options?.hideFieldLabels)) {
         return options.hideFieldLabels.includes(row?.path) || options.hideFieldLabels.includes(row?.label);
@@ -858,7 +1157,7 @@
       var tr = document.createElement('tr');
       tr.dataset.settingsRowLabel = row?.label || '';
       applySettingsVisibleWhenDataset(tr, row);
-      var renderFullWidth = options?.fullWidthRows === true || row?.input === 'settings-field-grid';
+      var renderFullWidth = options?.fullWidthRows === true || row?.input === 'settings-field-grid' || row?.input === 'plan-usage';
       if (renderFullWidth) tr.classList.add('admin-settings__row--full');
       var th = document.createElement('th');
       th.scope = 'row';
@@ -3199,12 +3498,17 @@
         rawValue: canonicalWorkerBase
       });
     }
-    var fieldKey = settingsFieldTranslationKey(next, scope);
     next.sourceLabel = row.label || '';
-    next.label = t(fieldKey + '_label', row.label || '');
-    next.help = t(fieldKey + '_help', row.help || '');
+    if (next.hideLabel === true && !next.sourceLabel) {
+      next.label = '';
+      next.help = row.help || '';
+    } else {
+      var fieldKey = settingsFieldTranslationKey(next, scope);
+      next.label = t(fieldKey + '_label', row.label || '');
+      next.help = t(fieldKey + '_help', row.help || '');
+      if (next.placeholder) next.placeholder = t(fieldKey + '_placeholder', next.placeholder);
+    }
     next.value = localizeReadOnlySettingsValue(next);
-    if (next.placeholder) next.placeholder = t(fieldKey + '_placeholder', next.placeholder);
     if (Array.isArray(next.options)) {
       next.options = next.options.map(function(optionConfig) {
         return localizeSettingsOption(optionConfig, next, scope);
@@ -3496,6 +3800,7 @@
       panel.hidden = panel.dataset.settingsSectionPanel !== selectedSettingsSectionId;
     });
     var activePanel = settingsRoot.querySelector('[data-settings-section-panel="' + cssEscape(selectedSettingsSectionId) + '"]');
+    activePanel?.querySelectorAll?.('[data-plan-usage-tracker]').forEach(loadPlanUsageTracker);
     var hasPublishableControls = Boolean(activePanel?.querySelector?.('[data-settings-path]:not([data-settings-runtime-only="true"])'));
     activeSettingsSectionHasPublishableControls = hasPublishableControls;
     var settingsPublishActions = settingsPublish?.closest?.('.admin-settings__actions');
@@ -4454,6 +4759,24 @@
     return Number(totals?.actualStripeFeeAmount || 0) + Number(totals?.estimatedStripeFeeAmount || 0);
   }
 
+  function analyticsPlatformRevenue(totals) {
+    var explicit = Number(totals?.platformRevenue);
+    if (Number.isFinite(explicit)) return explicit;
+    return Number(totals?.platformAddOnRevenue || 0) + Number(totals?.platformTipRevenue || 0);
+  }
+
+  function analyticsNetCampaignRevenue(totals) {
+    var explicit = Number(totals?.netCampaignRevenue);
+    if (Number.isFinite(explicit)) return explicit;
+    return Math.max(0, Number(totals?.campaignRevenue || 0) - Number(totals?.processorFeeAllocatedToCampaignRevenue || 0));
+  }
+
+  function analyticsNetPlatformRevenue(totals) {
+    var explicit = Number(totals?.netPlatformRevenue);
+    if (Number.isFinite(explicit)) return explicit;
+    return Math.max(0, analyticsPlatformRevenue(totals) - Number(totals?.processorFeeAllocatedToPlatformRevenue || 0));
+  }
+
   function analyticsStripeFeeLabel(totals) {
     return Number(totals?.actualStripeFinancialPledgeCount || 0) > 0
       ? t('analytics_stripe_fees', 'Stripe fees')
@@ -4476,7 +4799,7 @@
     if (!analyticsRoot) return;
     analyticsRoot.replaceChildren();
     var totals = data?.totals || {};
-    var platformRevenue = Number(totals.platformAddOnRevenue || 0) + Number(totals.platformTipRevenue || 0);
+    var platformRevenue = analyticsPlatformRevenue(totals);
     var averagePledge = Number(totals.pledgeCount || 0) > 0
       ? Number(totals.pledgedAmount || 0) / Number(totals.pledgeCount || 1)
       : 0;
@@ -4487,7 +4810,9 @@
     metrics.append(
       analyticsMetricCard(t('analytics_pledged', 'Pledged'), formatMoneyExact(totals.pledgedAmount), t('analytics_help_pledged', 'Total promised by non-cancelled pledges. This can include active pledges and payment-failed pledges, so use Charged for money actually collected.'), 'pledged'),
       analyticsMetricCard(t('analytics_campaign_revenue', 'Campaign revenue'), formatMoneyExact(totals.campaignRevenue), t('analytics_help_campaign_revenue', 'Pledge value that belongs to the campaign before tax, shipping, platform tips, and platform add-ons. Campaign add-ons are already included here.'), 'campaign-revenue'),
+      analyticsMetricCard(t('analytics_net_campaign_revenue', 'Net campaign revenue'), formatMoneyExact(analyticsNetCampaignRevenue(totals)), t('analytics_help_net_campaign_revenue', 'Campaign revenue after its allocated share of actual or estimated processor fees. Tax, shipping, platform tips, and platform add-ons are not included.'), 'net-campaign-revenue'),
       analyticsMetricCard(t('analytics_platform_revenue', 'Platform revenue'), formatMoneyExact(platformRevenue), t('analytics_help_platform_revenue', 'Pledge value that belongs to the platform: platform add-ons plus platform tips. This does not include tax, shipping, campaign revenue, or processor fees.'), 'platform-revenue'),
+      analyticsMetricCard(t('analytics_net_platform_revenue', 'Net platform revenue'), formatMoneyExact(analyticsNetPlatformRevenue(totals)), t('analytics_help_net_platform_revenue', 'Platform revenue after its allocated share of actual or estimated processor fees. Tax, shipping, and campaign revenue are not included.'), 'net-platform-revenue'),
       analyticsMetricCard(t('analytics_tax', 'Tax'), formatMoneyExact(totals.taxTotal), t('analytics_help_tax', 'Sales tax recorded on non-cancelled pledges. This is included in Pledged, but not in Campaign revenue or Platform revenue.'), 'tax'),
       analyticsMetricCard(t('analytics_shipping', 'Shipping'), formatMoneyExact(totals.shippingTotal), t('analytics_help_shipping', 'Shipping fees recorded on non-cancelled pledges. This is included in Pledged, but not in Campaign revenue or Platform revenue.'), 'shipping'),
       analyticsMetricCard(analyticsStripeFeeLabel(totals), formatMoneyExact(analyticsStripeFeeAmount(totals)), analyticsStripeFeeHelp(totals), 'stripe-fees'),
@@ -4544,7 +4869,9 @@
       t('analytics_pledges', 'Pledges'),
       t('analytics_charged', 'Charged'),
       t('analytics_campaign_revenue', 'Campaign revenue'),
+      t('analytics_net_campaign_revenue', 'Net campaign revenue'),
       t('analytics_platform_revenue', 'Platform revenue'),
+      t('analytics_net_platform_revenue', 'Net platform revenue'),
       t('analytics_stripe_fees', 'Stripe fees'),
       t('analytics_payment_failed', 'Payment failed')
     ];
@@ -4568,7 +4895,9 @@
         { value: formatNumber(campaignTotals.pledgeCount), sortValue: Number(campaignTotals.pledgeCount || 0) },
         { value: formatMoneyExact(campaignTotals.chargedAmount), sortValue: Number(campaignTotals.chargedAmount || 0) },
         { value: formatMoneyExact(campaignTotals.campaignRevenue), sortValue: Number(campaignTotals.campaignRevenue || 0) },
-        { value: formatMoneyExact(Number(campaignTotals.platformAddOnRevenue || 0) + Number(campaignTotals.platformTipRevenue || 0)), sortValue: Number(campaignTotals.platformAddOnRevenue || 0) + Number(campaignTotals.platformTipRevenue || 0) },
+        { value: formatMoneyExact(analyticsNetCampaignRevenue(campaignTotals)), sortValue: analyticsNetCampaignRevenue(campaignTotals) },
+        { value: formatMoneyExact(analyticsPlatformRevenue(campaignTotals)), sortValue: analyticsPlatformRevenue(campaignTotals) },
+        { value: formatMoneyExact(analyticsNetPlatformRevenue(campaignTotals)), sortValue: analyticsNetPlatformRevenue(campaignTotals) },
         { value: formatMoneyExact(analyticsStripeFeeAmount(campaignTotals)), sortValue: analyticsStripeFeeAmount(campaignTotals) },
         { value: formatMoneyExact(campaignTotals.paymentFailedAmount), sortValue: Number(campaignTotals.paymentFailedAmount || 0) }
       ]);

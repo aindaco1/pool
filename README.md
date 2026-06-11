@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.0.3**. The v1.0 feature set and launch hardening pass are complete; v1.0.3 adds configurable platform timezone handling, opt-in launch reminders for upcoming campaigns, Cloudflare KV list-budget hardening, serialized campaign settlement, scoped admin automation credentials, mobile campaign-page performance refinements, diary-rendering fixes, and dashboard media workflow hardening.
+Current release milestone: **v1.0.4**. The v1.0 feature set and launch hardening pass are complete; v1.0.4 adds admin dashboard net revenue analytics after allocated processor fees and an explicit Cloudflare/Resend plan usage tracker for super admins.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -43,6 +43,8 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Manage Pledge dashboard** — Desktop-friendly Active / Closed sections with locked-state read-only controls after deadline
 - **Tip-aware emails + reports** — Supporter emails, pledge reports, and fulfillment exports all include the platform tip when present
 - **Actual Stripe fee analytics foundation** — Newly charged pledges store Stripe balance transaction fee/net values when available, and dashboard analytics prefer those actual values while clearly labeling estimated fallback rows
+- **Net revenue analytics** — Dashboard analytics keep gross Campaign revenue and Platform revenue visible while adding net campaign/platform values after each category's allocated share of actual or estimated processor fees
+- **Provider plan usage visibility** — Super admins can open Settings -> Plan usage to see Cloudflare Workers/KV and Resend quota status from server-side provider calls without exposing tokens or writing KV state
 - **Admin content-editor media uploads** — Campaign and diary content editors can stage image, video, and audio uploads with immediate previews, then publish them into the campaign asset directory with the content change; publish also removes same-campaign dashboard-owned media that is no longer referenced
 - **Dashboard media optimization pipeline** — Dashboard-uploaded media stays source-preserving in the Worker, image/video uploads dispatch the repository optimizer with `scope=changed`, and repository tooling can losslessly compress images, generate responsive WebP browser variants including a `640w` mobile-friendly rung, and generate high-quality WebM derivatives for uploaded videos
 - **Deferred remote video embeds** — YouTube campaign hero videos render with a local poster/play facade first and load the remote iframe only after supporter play intent
@@ -191,7 +193,7 @@ To create or update local secrets safely, run:
 npm run secrets:dev
 ```
 
-That helper creates `worker/.dev.vars` from `worker/.dev.vars.example` when needed, locks it down with local-only file permissions, generates local signing secrets, and prompts for optional provider keys without printing them back to the terminal. Keep those values separate from production secrets; `worker/.dev.vars` is for local development, not a backup of deployed credentials. The admin dashboard shows a read-only **Secrets & credentials** status section, but it never stores secret values in `_config.yml`, KV, GitHub commits, or admin setting drafts.
+That helper creates `worker/.dev.vars` from `worker/.dev.vars.example` when needed, locks it down with local-only file permissions, generates local signing secrets, keeps variables grouped by purpose, and prompts for optional provider keys without printing secret values back to the terminal. Keep those values separate from production secrets; `worker/.dev.vars` is for local development, not a backup of deployed credentials. The admin dashboard shows read-only **Secrets & credentials** and **Plan usage** sections, but it never stores secret values in `_config.yml`, KV, GitHub commits, or admin setting drafts.
 
 To seed both admin test campaigns against a running local Worker:
 

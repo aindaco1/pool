@@ -11,7 +11,7 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
-El hito de lanzamiento actual de la plataforma es **v1.0.3**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente se enfoca en zona horaria configurable, recordatorios opt-in para campañas próximas, presupuestos de Cloudflare KV, liquidación de campañas más segura, performance móvil, enlaces de diario y flujos de media del panel.
+El hito de lanzamiento actual de la plataforma es **v1.0.4**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente se enfoca en analytics del panel con ingresos netos después de comisiones de procesamiento asignadas, además de visibilidad del uso de planes de Cloudflare y Resend para personas operadoras de la plataforma.
 
 ## Aportes de todo o nada
 
@@ -127,4 +127,4 @@ The Pool es de código abierto. Toda la plataforma, el frontend, el Worker, la a
 
 *The Pool ha sido creado y es mantenido por [Dust Wave](https://dustwave.xyz).*
 
-_Última actualización: 9 de junio de 2026_
+_Última actualización: 11 de junio de 2026_

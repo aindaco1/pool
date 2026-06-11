@@ -149,6 +149,14 @@ wrangler secret put ADMIN_SESSION_SECRET
 # Cloudflare Turnstile challenge verification when public widgets are enabled
 wrangler secret put TURNSTILE_SECRET_KEY
 
+# Optional admin plan usage tracker. Use a read-only GraphQL Analytics token,
+# not the broader Wrangler deploy token. Add Billing Read to detect the
+# current Workers plan from account subscriptions.
+wrangler secret put CLOUDFLARE_USAGE_API_TOKEN
+# Also make CLOUDFLARE_ACCOUNT_ID available to the Worker runtime, either as
+# a plain Worker variable or as a secret if you do not want it in config.
+# CLOUDFLARE_WORKER_SCRIPT_NAME is optional and filters request metrics to one script.
+
 # Optional: scoped launch-reminder Turnstile / unsubscribe-token secrets
 wrangler secret put LAUNCH_REMINDER_TURNSTILE_SECRET_KEY
 wrangler secret put LAUNCH_REMINDER_TOKEN_SECRET
@@ -163,6 +171,8 @@ wrangler secret put ZIP_TAX_API_KEY
 If a GitHub Actions workflow or operator job calls scoped admin endpoints, set the same scoped value as a GitHub repository secret for that workflow as well. Repository secrets authenticate GitHub Actions; they do not create or update Cloudflare Worker runtime secrets. Do not store secret values in `_config.yml`, campaign YAML, KV, admin setting drafts, or committed documentation. Stripe publishable keys are public browser keys and may be stored in dashboard Settings or deployment vars. The admin dashboard only reports whether runtime credentials appear configured; it does not read or persist secret values.
 
 The Resend API key must be allowed to send from the domain configured in `PLEDGES_EMAIL_FROM` and `UPDATES_EMAIL_FROM`. For the live Dust Wave deployment, those sender addresses use `pool.dustwave.xyz`; authorizing only a root domain does not authorize subdomain senders, and authorizing only a subdomain does not authorize root-domain senders.
+
+For Settings -> Plan usage, Resend normally needs only `RESEND_API_KEY`. Optional `PLAN_USAGE_RESEND_PLAN`, `RESEND_EMAILS_MONTHLY_LIMIT`, and `RESEND_EMAILS_DAILY_LIMIT` values are display overrides for deployments where Resend returns rate-limit headers but does not expose the monthly sent-usage header through a safe read endpoint.
 
 Custom checkout requires the matching Stripe publishable key for the current `APP_MODE`. If the Worker is configured for custom checkout but no publishable key is available, checkout falls back to Stripe-hosted Checkout instead of returning `503`, so pledges can still continue while the publishable key is being configured.
 
@@ -379,6 +389,7 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `POST /admin/settings/publish` validates and publishes platform settings, platform add-ons, campaign variables, and campaign structured data through GitHub-backed commits
 - `POST /admin/users` saves dashboard-managed admin users directly to `admin-users:v1` in Worker KV and emails newly created users sign-in instructions when Resend is configured
 - `GET /admin/analytics` reads role-scoped pledge-derived revenue, status, language, referral, and campaign/platform split metrics without writing analytics state; dashboard currency presentation keeps exact cents
+- `GET /admin/plan-usage` lets super admins load Cloudflare and Resend plan usage from provider APIs without exposing provider tokens to the browser or writing KV state; the dashboard loads it automatically when Settings -> Plan usage is opened
 - `POST /admin/analytics/stripe-financials/backfill` lets super admins backfill actual Stripe fee/net values from Stripe balance transactions for charged pledges, using campaign pledge indexes instead of KV list scans
 - `GET /admin/content/campaign?campaignSlug=...` loads role-scoped campaign content into the browser editor without persisting a draft
 - `POST /admin/content/preview` validates and renders role-scoped campaign content drafts without publishing, auditing, or writing KV
@@ -392,7 +403,7 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `GET /admin/add-ons/inventory` reads platform add-on baseline, sold, remaining, and override state for super admins
 - `POST /admin/add-ons/inventory` explicitly sets, restocks, or resets platform add-on inventory baseline overrides with CSRF protection and audit logging
 
-Normal dashboard reads, supporter filters, pagination, pledge-derived analytics, marketing referral lists, report previews, CSV downloads, content loads, content previews, and local editor drafts are designed to add zero KV writes and zero KV list operations. Browser-initiated user saves, marketing referral saves, content publishes, and inventory changes are explicit mutations: user saves write `admin-users:v1`, referral saves write one campaign-scoped referral list, content publishes commit to GitHub, trigger the rebuild workflow, and write one audit event. If an older campaign is missing its `campaign-pledges:{slug}` projection, the dashboard endpoints return zero rows or `campaign_index_required` instead of falling back to a namespace scan; run the existing projection repair/rebuild tools explicitly when that happens.
+Normal dashboard reads, supporter filters, pagination, pledge-derived analytics, marketing referral lists, report previews, CSV downloads, content loads, content previews, and local editor drafts are designed to add zero KV writes and zero KV list operations. Plan usage loads are also KV read-only, but intentionally call Cloudflare and Resend provider APIs once when a super admin opens Settings -> Plan usage. Browser-initiated user saves, marketing referral saves, content publishes, and inventory changes are explicit mutations: user saves write `admin-users:v1`, referral saves write one campaign-scoped referral list, content publishes commit to GitHub, trigger the rebuild workflow, and write one audit event. If an older campaign is missing its `campaign-pledges:{slug}` projection, the dashboard endpoints return zero rows or `campaign_index_required` instead of falling back to a namespace scan; run the existing projection repair/rebuild tools explicitly when that happens.
 
 Admin auth starts/exchanges and browser-admin mutations are rate limited through the `RATELIMIT` binding and return private/no-store failures when throttled. Normal authenticated reads such as session checks, dashboard summaries, supporter filters, report previews, analytics views, and content previews are intentionally not KV-rate-limited. Magic-link login tokens are one-time use, and session reads do not refresh near-expiry sessions or clean up expired sessions on the read path. Cookie-backed admin mutations require both the session CSRF token and a trusted same-site `Origin`/`Referer` or non-cross-site fetch context before durable writes.
 
@@ -580,6 +591,13 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `ADMIN_TURNSTILE_SECRET_KEY` | Optional admin-specific Turnstile secret when not using `TURNSTILE_SECRET_KEY` |
 | `ADMIN_TURNSTILE_REQUIRED` | Optional fail-closed flag for deployments that expect Turnstile to be configured |
 | `ADMIN_TURNSTILE_BYPASS` | Local/test-only bypass for automated admin auth tests; do not enable on deployed Workers |
+| `CLOUDFLARE_USAGE_API_TOKEN` / `CLOUDFLARE_ANALYTICS_API_TOKEN` | Optional read-only GraphQL Analytics token for Settings -> Plan usage; add Billing Read for Workers plan auto-detection and keep it separate from deploy tokens |
+| `CLOUDFLARE_ACCOUNT_ID` | Account id used by Cloudflare plan usage GraphQL queries |
+| `CLOUDFLARE_WORKER_SCRIPT_NAME` | Optional Worker script filter for Cloudflare request metrics; omit for account-wide Workers usage |
+| `PLAN_USAGE_CLOUDFLARE_PLAN` / `PLAN_USAGE_RESEND_PLAN` | Optional display plan keys (`free`, `standard`/`paid`, `pro`, `scale`) used only when provider plan auto-detection is unavailable |
+| `CLOUDFLARE_*_DAILY_LIMIT` / `CLOUDFLARE_*_MONTHLY_LIMIT` | Optional Cloudflare metric limit overrides for Workers requests and KV reads/writes/deletes/lists, for example `CLOUDFLARE_WORKERS_REQUESTS_MONTHLY_LIMIT` |
+| `RESEND_EMAILS_MONTHLY_LIMIT` / `RESEND_EMAILS_DAILY_LIMIT` | Optional Resend display quota overrides used when Resend exposes plan/rate-limit data but omits monthly sent-usage headers |
+| `PLAN_USAGE_WARNING_PERCENT` / `PLAN_USAGE_CRITICAL_PERCENT` | Optional warning thresholds for plan usage progress bars |
 | `LAUNCH_REMINDERS_ENABLED` | Enables public upcoming-campaign launch reminder signup handling; mirrored from `_config.yml` |
 | `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY` | Optional reminder-specific Turnstile secret when not using `TURNSTILE_SECRET_KEY` |
 | `LAUNCH_REMINDER_TURNSTILE_REQUIRED` | Optional fail-closed flag for reminder signups when a reminder Turnstile widget is expected |

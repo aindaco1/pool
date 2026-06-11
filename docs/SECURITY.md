@@ -98,6 +98,8 @@ Runtime credentials are intentionally separated from editable site configuration
 - Local development secrets belong in ignored `worker/.dev.vars`; run `npm run secrets:dev` to create/update that file safely. Use separate local-only values, not production backups.
 - Production Worker credentials belong in Cloudflare Worker secrets through `wrangler secret put`.
 - Deploy credentials such as `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_CACHE_PURGE_TOKEN`, `ADMIN_BROADCAST_SECRET`, and `DIARY_CHECK_BYPASS_SECRET` belong in GitHub repository secrets only when GitHub Actions or operator scripts need to call those routes. Add `ADMIN_SETTLEMENT_SECRET` there only when a workflow actually calls settlement endpoints.
+- The admin plan usage tracker must use `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN` with read-only GraphQL Analytics scope, plus Billing Read if Workers plan auto-detection is enabled. Do not reuse the broader Wrangler deploy token for dashboard usage reads.
+- `CLOUDFLARE_ACCOUNT_ID` is not sensitive by itself, but Settings -> Plan usage still needs it in the Worker runtime environment as a variable or secret. A GitHub repository secret with the same name does not automatically become a deployed Worker binding.
 - Wrangler deploys require `CLOUDFLARE_API_TOKEN` to be a Cloudflare user API token created from **My Profile -> API Tokens** with the **Edit Cloudflare Workers** template. Account-owned API tokens are not sufficient because Wrangler still calls user-scoped endpoints during deploy.
 - GitHub repository secrets are not Worker runtime secrets. Scoped admin route enforcement requires the matching `ADMIN_BROADCAST_SECRET` or `ADMIN_SETTLEMENT_SECRET` to be present in Cloudflare Worker secrets too.
 - The admin dashboard may show Configured/Missing status for runtime credentials, but it must not expose, edit, serialize, or publish secret values.
@@ -522,6 +524,7 @@ Before deploying to production, verify these secrets are set:
 | Broadcast Admin Secret | `ADMIN_BROADCAST_SECRET` (optional, scoped) | 32+ chars |
 | Turnstile Secret | `TURNSTILE_SECRET_KEY`, `ADMIN_TURNSTILE_SECRET_KEY`, or `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY` | N/A |
 | Resend API Key | `RESEND_API_KEY` | N/A |
+| Cloudflare Usage Analytics Token | `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN` | GraphQL Analytics Read; optional Billing Read for plan detection |
 
 When GitHub Actions or an operator script calls protected admin endpoints, add only the needed matching secret to GitHub repository secrets. The default deploy workflow uses `ADMIN_BROADCAST_SECRET` for the post-deploy diary check when it is configured; future settlement automation should use `ADMIN_SETTLEMENT_SECRET` rather than the broader fallback secret.
 

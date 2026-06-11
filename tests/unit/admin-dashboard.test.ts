@@ -873,9 +873,13 @@ describe('admin dashboard foundation', () => {
       'Secrets & credentials',
       'Runtime diagnostics'
     ]);
+    const planUsageRows = body.sections.find((section: { title: string }) => section.title === 'Plan usage').rows;
+    expect(planUsageRows).toEqual([
+      expect.objectContaining({ label: '', input: 'plan-usage', hideLabel: true })
+    ]);
     const settingsRows = [...body.sections, ...body.campaigns].flatMap((section: { rows: Array<{ help?: string }> }) => section.rows);
     expect(settingsRows.length).toBeGreaterThan(20);
-    settingsRows.forEach((row: { label: string; help?: string }) => {
+    settingsRows.filter((row: { input?: string }) => row.input !== 'plan-usage').forEach((row: { label: string; help?: string }) => {
       expect(row.help, `${row.label} should include field help`).toEqual(expect.any(String));
       expect(row.help?.length, `${row.label} should include field help`).toBeGreaterThan(20);
     });
@@ -1376,6 +1380,196 @@ describe('admin dashboard foundation', () => {
     expect(campaignBody.campaigns).toHaveLength(1);
     expect(campaignBody.campaigns[0]).toMatchObject({ title: 'Hand Relations' });
     expectNoKvWritesOrLists(env, 'campaign settings read');
+  });
+
+  it('returns plan usage limits without provider calls when credentials are missing', async () => {
+    const env = createEnv();
+    const { ctx, cookie } = await signInAdmin(env);
+    const fetchMock = global.fetch as unknown as { mockClear: () => void, mock: { calls: Array<[RequestInfo | URL, RequestInit?]> } };
+    fetchMock.mockClear();
+    resetKvCounters(env);
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/plan-usage', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.writeBudget).toEqual({ readOnly: true, kvWritesExpected: 0, kvListExpected: 0 });
+    expect(body.providers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'cloudflare',
+        planName: 'Plan not detected',
+        planKey: 'unknown',
+        status: 'missing_credentials',
+        metrics: expect.arrayContaining([
+          expect.objectContaining({ id: 'cloudflare-workers-requests', used: null, limit: null }),
+          expect.objectContaining({ id: 'cloudflare-kv-writes', used: null, limit: null })
+        ])
+      }),
+      expect.objectContaining({
+        id: 'resend',
+        planName: 'Plan not detected',
+        planKey: 'unknown',
+        status: 'missing_credentials',
+        metrics: expect.arrayContaining([
+          expect.objectContaining({ id: 'resend-monthly-emails', used: null, limit: null })
+        ])
+      })
+    ]));
+    expect(fetchMock.mock.calls).toHaveLength(0);
+    expectNoKvWritesOrLists(env, 'plan usage missing credentials read');
+  });
+
+  it('refreshes Cloudflare and Resend plan usage without KV writes or list scans', async () => {
+    const env = {
+      ...createEnv(),
+      CLOUDFLARE_USAGE_API_TOKEN: 'cf-usage-token',
+      CLOUDFLARE_ACCOUNT_ID: 'cf-account',
+      CLOUDFLARE_WORKER_SCRIPT_NAME: 'pool-worker',
+      RESEND_API_KEY: 'resend-test'
+    };
+    const { ctx, cookie } = await signInAdmin(env);
+    const defaultFetch = global.fetch;
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://api.cloudflare.com/client/v4/accounts/cf-account/subscriptions') {
+        return jsonResponse({
+          success: true,
+          result: [{
+            id: 'sub-workers-paid',
+            state: 'Paid',
+            frequency: 'monthly',
+            price: 5,
+            rate_plan: {
+              id: 'workers_paid',
+              public_name: 'Workers Paid',
+              scope: 'account',
+              sets: ['workers']
+            }
+          }]
+        });
+      }
+      if (url === 'https://api.cloudflare.com/client/v4/graphql') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        if (String(body.query || '').includes('AdminWorkersPlanUsage')) {
+          return jsonResponse({
+            data: {
+              viewer: {
+                accounts: [{
+                  day: [{ sum: { requests: 1200, subrequests: 240, errors: 2 } }],
+                  month: [{ sum: { requests: 25000, subrequests: 5000, errors: 8 } }]
+                }]
+              }
+            }
+          });
+        }
+        if (String(body.query || '').includes('AdminKvPlanUsage')) {
+          return jsonResponse({
+            data: {
+              viewer: {
+                accounts: [{
+                  day: [
+                    { sum: { requests: 100 }, dimensions: { actionType: 'read' } },
+                    { sum: { requests: 2 }, dimensions: { actionType: 'write' } },
+                    { sum: { requests: 1 }, dimensions: { actionType: 'delete' } },
+                    { sum: { requests: 3 }, dimensions: { actionType: 'list' } }
+                  ],
+                  month: [
+                    { sum: { requests: 4000 }, dimensions: { actionType: 'read' } },
+                    { sum: { requests: 80 }, dimensions: { actionType: 'write' } },
+                    { sum: { requests: 6 }, dimensions: { actionType: 'delete' } },
+                    { sum: { requests: 30 }, dimensions: { actionType: 'list' } }
+                  ]
+                }]
+              }
+            }
+          });
+        }
+      }
+      if (url === 'https://api.resend.com/emails?limit=1') {
+        return new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-resend-monthly-quota': '420 / 50,000',
+            'ratelimit-limit': '5',
+            'ratelimit-remaining': '3',
+            'ratelimit-reset': '10'
+          }
+        });
+      }
+      return defaultFetch(input, init);
+    }) as typeof fetch;
+    resetKvCounters(env);
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/plan-usage', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.providers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'cloudflare',
+        planName: 'Workers Paid',
+        planKey: 'standard',
+        planSource: 'cloudflare-subscriptions',
+        status: 'ok',
+        scope: 'Worker script: pool-worker',
+        metrics: expect.arrayContaining([
+          expect.objectContaining({ id: 'cloudflare-workers-requests', used: 25000, limit: 10000000, severity: 'ok' }),
+          expect.objectContaining({ id: 'cloudflare-kv-reads', used: 4000, limit: 10000000 }),
+          expect.objectContaining({ id: 'cloudflare-kv-writes', used: 80, limit: 1000000 }),
+          expect.objectContaining({ id: 'cloudflare-kv-deletes', used: 6, limit: 1000000 }),
+          expect.objectContaining({ id: 'cloudflare-kv-lists', used: 30, limit: 1000000 })
+        ])
+      }),
+      expect.objectContaining({
+        id: 'resend',
+        planName: 'Pro',
+        planKey: 'pro',
+        planSource: 'resend-quota-headers',
+        status: 'ok',
+        metrics: expect.arrayContaining([
+          expect.objectContaining({ id: 'resend-monthly-emails', used: 420, limit: 50000 }),
+          expect.objectContaining({ id: 'resend-daily-emails', unlimited: true, severity: 'ok' }),
+          expect.objectContaining({ id: 'resend-api-rate-window', used: 2, limit: 5 })
+        ])
+      })
+    ]));
+    const resendProvider = body.providers.find((provider: { id: string }) => provider.id === 'resend');
+    expect(resendProvider.links).toEqual([expect.objectContaining({
+      labelKey: 'plan_usage_resend_usage',
+      label: 'Usage',
+      url: 'https://resend.com/settings/usage'
+    })]);
+    expect(resendProvider.metrics.find((metric: { id: string }) => metric.id === 'resend-daily-emails')).toMatchObject({
+      used: null,
+      limit: null,
+      unlimited: true
+    });
+    expect(body.writeBudget).toEqual({ readOnly: true, kvWritesExpected: 0, kvListExpected: 0 });
+    expectNoKvWritesOrLists(env, 'plan usage provider refresh');
+  });
+
+  it('restricts plan usage refreshes to super admins', async () => {
+    const env = createEnv();
+    const userKey = `admin-user:${await sha256Hex('creator@example.com')}`;
+    (env.PLEDGES as CountingKVNamespace).store.set(userKey, JSON.stringify({
+      email: 'creator@example.com',
+      role: 'campaign_user',
+      campaignSlugs: ['hand-relations']
+    }));
+    const { ctx, cookie } = await signInAdmin(env, 'creator@example.com');
+    resetKvCounters(env);
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/plan-usage', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(response.status).toBe(403);
+    expectNoKvWritesOrLists(env, 'campaign user plan usage rejection');
   });
 
   it('validates and publishes admin settings through GitHub without KV writes', async () => {
@@ -3050,12 +3244,19 @@ diary:
       campaignAddOnRevenue: 1200,
       platformAddOnRevenue: 600,
       platformTipRevenue: 550,
+      platformRevenue: 1150,
       actualStripeFeeAmount: 175,
       actualStripeNetAmount: 4825,
       actualStripeGrossAmount: 5000,
       actualStripeFinancialPledgeCount: 1,
       estimatedStripeFeeAmount: 233,
       estimatedStripeFeePledgeCount: 1,
+      processorFeeAllocatedToCampaignRevenue: 337,
+      processorFeeAllocatedToPlatformRevenue: 39,
+      processorFeeAllocatedToTax: 22,
+      processorFeeAllocatedToShipping: 10,
+      netCampaignRevenue: 9563,
+      netPlatformRevenue: 1111,
       physicalPledgeCount: 0,
       physicalPledgeAmount: 0,
       digitalPledgeCount: 2,

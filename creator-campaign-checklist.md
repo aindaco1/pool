@@ -34,7 +34,7 @@ This checklist covers:
 
 ## What Changed Since v0.9.5
 
-This checklist now reflects the creator-facing platform changes through **v1.0.3**:
+This checklist now reflects the creator-facing platform changes through **v1.0.4**:
 
 - creators can use campaign-specific dashboard access for normal edits instead of direct repository access
 - dashboard media uploads support images, video, audio, previews, and later repository optimization with responsive WebP variants
@@ -45,6 +45,8 @@ This checklist now reflects the creator-facing platform changes through **v1.0.3
 - share intents use the campaign's current state, title, blurb, and public URL where each platform supports message text
 - upcoming campaigns can collect one-time launch reminder signups before pledging opens
 - campaign launch/deadline timing follows the deployment's configured platform timezone
+- campaign analytics now keep gross campaign revenue visible while also showing net campaign revenue after allocated processor fees
+- platform operators can monitor Cloudflare and Resend plan usage from the admin dashboard without exposing provider tokens to campaign teams
 - public performance work makes campaign progress, share links, deferred YouTube hero embeds, responsive image delivery, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
 
 ## The Short Version
@@ -170,6 +172,7 @@ Operational notes:
 - Admin sign-in may include a Cloudflare Turnstile challenge before the email magic link is sent.
 - Upcoming campaign launch reminder forms may also use Cloudflare Turnstile; platform operators configure those keys and secrets, not campaign creators.
 - Campaign launch and deadline dates are interpreted in the platform timezone configured by a super admin, so confirm that timezone before publishing time-sensitive campaign copy.
+- Analytics distinguish gross campaign revenue from net campaign revenue after allocated processor fees, which helps creators reconcile campaign totals without hiding the public funding math.
 
 ### Short Blurb Guidance
 

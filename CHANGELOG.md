@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.4 - 2026-06-11
+
+- Added super-admin Settings -> Plan usage tracking for Cloudflare Workers/KV and Resend quotas, with automatic load, provider-detected plan names where available, progress bars, warning thresholds, and provider plan links while keeping provider tokens server-side.
+- Added dashboard net campaign/platform revenue analytics after allocated actual or estimated Stripe processor fees, while preserving gross Campaign revenue and Platform revenue cards for reconciliation.
+- Added component-level processor fee allocation across campaign revenue, platform revenue, tax, and shipping so table/CSV exports reconcile with stored Stripe balance transactions or existing fee estimates.
+- Documented usage-tracker environment variables and the read-only Cloudflare GraphQL Analytics plus Billing Read token boundary for usage and Workers plan detection.
+- Reorganized local Worker `.dev.vars` scaffolding and `npm run secrets:dev` output into purpose-based groups, including Plan Usage provider settings and overrides.
+- Updated release metadata to `1.0.4`.
+
 ## v1.0.3 - 2026-06-01
 
 - Added configurable platform timezone handling across Jekyll campaign state, browser countdowns, Worker lifecycle automation, campaign-runner reports, dashboard settings, and Worker config mirroring. The default remains `America/Denver` for compatibility, and super admins can choose from supported IANA timezones.

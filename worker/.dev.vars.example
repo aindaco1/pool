@@ -19,7 +19,7 @@ CORS_ALLOWED_ORIGIN=http://127.0.0.1:4000
 ADMIN_BOOTSTRAP_EMAILS=admin@example.com
 ADMIN_TEST_CAMPAIGNS=hand-relations,smoke-editable
 
-# Local signing and session secrets.
+# Admin auth, sessions, and challenge protection.
 ADMIN_SECRET=
 # Optional scoped admin endpoint secrets. When set, settlement or broadcast
 # routes require these narrower values instead of ADMIN_SECRET.
@@ -41,10 +41,15 @@ STRIPE_PUBLISHABLE_KEY_TEST=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_WEBHOOK_SECRET_TEST=
 
-# Email delivery.
+# Email delivery and Resend plan usage.
 RESEND_API_KEY=
+# Resend safe API probes may expose rate-limit headers without monthly sent
+# usage. These optional overrides keep the admin Plan usage display explicit.
+PLAN_USAGE_RESEND_PLAN=
+RESEND_EMAILS_MONTHLY_LIMIT=
+RESEND_EMAILS_DAILY_LIMIT=
 
-# Dashboard publish and report helpers.
+# Dashboard publish, report helpers, and Cloudflare plan usage.
 GITHUB_TOKEN=
 # Local remote-report/export scripts can use a read-only Cloudflare user API
 # token with Account / Workers KV Storage / Read scoped to this account.
@@ -52,6 +57,17 @@ GITHUB_TOKEN=
 # "Edit Cloudflare Workers" template and stored as a repository secret.
 CLOUDFLARE_API_TOKEN=
 CLOUDFLARE_ACCOUNT_ID=
+# Use a read-only GraphQL Analytics token for admin Settings -> Plan usage,
+# not the broader deploy token above. Add Billing Read if you want Workers
+# plan auto-detection; otherwise set PLAN_USAGE_CLOUDFLARE_PLAN.
+CLOUDFLARE_USAGE_API_TOKEN=
+CLOUDFLARE_WORKER_SCRIPT_NAME=
+PLAN_USAGE_CLOUDFLARE_PLAN=
+PLAN_USAGE_WARNING_PERCENT=80
+PLAN_USAGE_CRITICAL_PERCENT=95
+# Optional Cloudflare metric limit overrides are also supported with names
+# such as CLOUDFLARE_WORKERS_REQUESTS_MONTHLY_LIMIT and
+# CLOUDFLARE_KV_WRITES_DAILY_LIMIT when provider defaults do not match.
 
 # Shipping and tax provider credentials.
 USPS_ENABLED=false

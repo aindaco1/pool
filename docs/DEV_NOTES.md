@@ -564,24 +564,13 @@ npm install
 
 ### 2. Configure Worker Secrets
 
-Create `worker/.dev.vars` for local development:
+Create or update `worker/.dev.vars` for local development:
 
 ```bash
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-CHECKOUT_INTENT_SECRET=random-32-char-string-for-hmac
-MAGIC_LINK_SECRET=random-32-char-string-for-hmac
-RESEND_API_KEY=re_...
-ADMIN_SECRET=local-admin-secret
-ADMIN_SETTLEMENT_SECRET=local-settlement-admin-secret
-ADMIN_BROADCAST_SECRET=local-broadcast-admin-secret
+npm run secrets:dev
 ```
 
-Generate secrets:
-```bash
-openssl rand -base64 32
-```
+The helper copies `worker/.dev.vars.example` when needed, generates local signing/session secrets, keeps variables grouped by purpose, and prompts for optional provider credentials. For Settings -> Plan usage, local Resend checks use `RESEND_API_KEY`; local Cloudflare checks use `CLOUDFLARE_USAGE_API_TOKEN` plus `CLOUDFLARE_ACCOUNT_ID`, with optional plan/limit overrides when provider APIs do not expose a value.
 
 Use separate local-only values in `worker/.dev.vars`; do not use that file as a production secret backup. Production runtime secrets belong in Cloudflare Worker secrets, while GitHub repository secrets are only for Actions or operator automation that needs to call protected routes.
 
@@ -954,6 +943,7 @@ Secrets live in Cloudflare Worker environment variables. Never commit:
 | `CHECKOUT_INTENT_SECRET` | Sign first-party checkout snapshots |
 | `MAGIC_LINK_SECRET` | HMAC signing for pledge management tokens |
 | `RESEND_API_KEY` | Send supporter/milestone/failed emails |
+| `CLOUDFLARE_USAGE_API_TOKEN` | Optional read-only GraphQL Analytics token for admin plan usage loads; add Billing Read for Workers plan auto-detection |
 | `ADMIN_SECRET` | Protect admin endpoints (recovery, rebuild, and fallback automation auth) |
 | `ADMIN_SETTLEMENT_SECRET` | Optional scoped secret for settlement endpoints; when set, settlement routes reject `ADMIN_SECRET` |
 | `ADMIN_BROADCAST_SECRET` | Optional scoped secret for announcement, diary, and milestone endpoints; when set, broadcast routes reject `ADMIN_SECRET` |

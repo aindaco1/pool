@@ -10,7 +10,7 @@ description: Learn how The Pool works, from all-or-nothing pledging to magic-lin
 
 **The Pool** is Dust Wave's crowdfunding platform for independent film and creative projects, built on open-source technology.
 
-The current platform release milestone is **v1.0.3**. The v1.0 feature set and launch hardening pass are complete, and the latest release focuses on configurable platform timezone handling, opt-in launch reminders for upcoming campaigns, Cloudflare KV budget hardening, safer campaign settlement, mobile campaign-page performance, diary links, and dashboard media workflows.
+The current platform release milestone is **v1.0.4**. The v1.0 feature set and launch hardening pass are complete, and the latest release focuses on admin dashboard net revenue analytics after allocated processor fees plus Cloudflare and Resend plan usage visibility for platform operators.
 
 ## All-or-Nothing Pledging
 
@@ -126,4 +126,4 @@ The Pool is open source. The entire platform — frontend, Worker, automation, a
 
 *The Pool is created and maintained by [Dust Wave](https://dustwave.xyz).*
 
-_Last updated: June 9, 2026_
+_Last updated: June 11, 2026_

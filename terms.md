@@ -8,7 +8,7 @@ description: Review pledge terms, payment processing, fulfillment, and privacy d
 
 # Terms & Creative Guidelines
 
-These terms reflect The Pool platform release milestone **v1.0.3**.
+These terms reflect The Pool platform release milestone **v1.0.4**.
 
 ## Pledge Terms
 
@@ -80,6 +80,7 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - Public pages may prefetch eligible same-origin public pages after hover, focus, or touch intent to make normal navigation faster. This prefetch behavior excludes admin, checkout, Manage Pledge, supporter-community, tokenized, external, and sensitive-query links.
 - Public campaign pages may defer selected third-party media embeds, such as YouTube hero videos, until you choose to play them. Until then, the page may show a local poster image instead of contacting that third-party embed provider.
 - Campaign share links may preserve safe public referral or UTM query parameters so campaign runners can understand public promotion sources. They do not preserve token, order, email, session, or other sensitive query parameters.
+- Authorized platform operators may load Cloudflare and Resend plan-usage status in the private admin dashboard. Those provider checks use server-side credentials and do not send pledge details, supporter emails, shipping addresses, or payment data to the usage endpoints.
 - We do not sell your information. We share it only as necessary for payment processing, transactional email delivery, abuse prevention, shipping quote calculation, and reward fulfillment.
 
 ## Platform & Technology
@@ -101,4 +102,4 @@ For questions about these terms or your pledge, email us at info@dustwave.xyz.
 
 ---
 
-_Last updated: June 9, 2026_
+_Last updated: June 11, 2026_

@@ -533,6 +533,136 @@
   position: relative;
 }
 
+.admin-plan-usage {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-plan-usage__status {
+  margin: 0;
+}
+
+.admin-plan-usage__results,
+.admin-plan-usage__metrics {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-plan-usage__provider {
+  border: 1px solid $border--default;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.admin-plan-usage__provider--warning {
+  border-color: $color--warning-border;
+}
+
+.admin-plan-usage__provider--critical,
+.admin-plan-usage__provider--unavailable,
+.admin-plan-usage__provider--missing_credentials {
+  border-color: $color--danger;
+}
+
+.admin-plan-usage__provider-header,
+.admin-plan-usage__metric-header {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.admin-plan-usage__provider-header h4 {
+  font-family: $font-family--body;
+  font-size: $type--ui;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.admin-plan-usage__provider-header span,
+.admin-plan-usage__metric-header span,
+.admin-plan-usage__scope,
+.admin-plan-usage__metric-help {
+  color: $color--secondary;
+  font-size: $type--meta;
+}
+
+.admin-plan-usage__provider-status,
+.admin-plan-usage__scope,
+.admin-plan-usage__metric-value,
+.admin-plan-usage__metric-help {
+  margin: 0;
+}
+
+.admin-plan-usage__metrics {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.admin-plan-usage__metric {
+  background: $surface--page;
+  border: 1px solid $border--soft;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.admin-plan-usage__metric--warning {
+  border-color: $color--warning-border;
+}
+
+.admin-plan-usage__metric--critical {
+  border-color: $color--danger;
+}
+
+.admin-plan-usage__metric-value {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.admin-plan-usage__bar {
+  background: $surface--strong;
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.admin-plan-usage__bar-fill {
+  background: $color--success;
+  display: block;
+  height: 100%;
+  width: var(--admin-plan-usage-percent, 0%);
+}
+
+.admin-plan-usage__metric--warning .admin-plan-usage__bar-fill {
+  background: $color--warning-border;
+}
+
+.admin-plan-usage__metric--critical .admin-plan-usage__bar-fill {
+  background: $color--danger;
+}
+
+.admin-plan-usage__links {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-self: start;
+}
+
+.admin-plan-usage__link {
+  justify-self: start;
+}
+
 .admin-settings__required {
   color: $color--primary;
   font-weight: 700;

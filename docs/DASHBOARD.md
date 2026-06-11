@@ -58,6 +58,7 @@ The dashboard intentionally separates read-only browsing, local drafting, KV wri
 | Image/video/audio uploads | Worker validates media, commits the asset path through GitHub, and updates the relevant field locally until publish |
 | Marketing referral save/edit/delete | Campaign-scoped KV mutation for saved referral codes |
 | Settings -> Users save | Single KV write to `admin-users:v1` |
+| Settings -> Plan usage | Read-only Cloudflare/Resend provider API calls; zero KV writes or list operations |
 | Secrets & credentials | Read-only status only; secret values are never shown, edited, serialized, or published |
 
 Normal dashboard reads must stay within the KV-write budget described in `worker/README.md` and covered by tests.
@@ -68,7 +69,7 @@ GitHub-backed publish actions require the deployed Worker to have `GITHUB_TOKEN`
 
 The top-level dashboard order is:
 
-1. **Settings**: platform configuration, branding/SEO, pricing, tax, shipping, runner reports, design, users, performance, debug, credential status, and runtime diagnostics.
+1. **Settings**: platform configuration, branding/SEO, pricing, tax, shipping, runner reports, design, users, performance, plan usage, debug, credential status, and runtime diagnostics.
 2. **Add-ons**: platform add-on availability and product details, visible only to super admins.
 3. **Campaigns**: role-scoped campaign settings, page content, rewards, campaign add-ons, stretch goals, ongoing items, diary entries, and decisions.
 4. **Analytics**: pledge-derived campaign and portfolio analytics.
@@ -130,6 +131,14 @@ Advanced performance settings expose the safe public intent-prefetch controls:
 - cap the number of prefetched documents per page view
 
 The defaults are intentionally conservative and apply only to public same-origin document links. Admin, checkout, Manage Pledge, supporter-community, tokenized, external, and sensitive-query links are excluded by the runtime. Publishing these settings updates `_config.yml`, mirrors the `INTENT_PREFETCH_*` Worker vars, and requires the normal static rebuild before public pages use the new values.
+
+### Plan Usage
+
+Plan usage is a super-admin-only read-only section for operational provider limits. It loads automatically when **Settings -> Plan usage** opens and refreshes only when the admin reloads the page.
+
+The Worker calls Cloudflare and Resend with server-side credentials and returns sanitized plan names, usage numbers, limits, severity, and provider links. Provider tokens never reach the browser, and the endpoint does not write KV or list KV namespaces.
+
+Cloudflare usage uses `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN` plus `CLOUDFLARE_ACCOUNT_ID`. Add Billing Read to the usage token if Workers plan auto-detection should work; otherwise set `PLAN_USAGE_CLOUDFLARE_PLAN`. Resend usage uses `RESEND_API_KEY`; optional plan/limit overrides exist because safe Resend probes can expose rate-limit headers without monthly sent-usage headers.
 
 ### Design
 
@@ -276,9 +285,9 @@ The Supporters tab shows role-scoped supporter rows with live filtering, sorting
 
 Analytics is derived from existing pledge indexes and campaign summaries. It should not create analytics-specific KV writes on view.
 
-The dashboard shows cards for pledge totals, revenue categories, tax, shipping, Stripe fees, pledge status, supporters, average pledge, campaign add-ons, referral attribution, UTM source, fulfillment type, language, and other pledge-derived breakdowns. Money values display exact cents.
+The dashboard shows cards for pledge totals, revenue categories, net revenue after allocated processor fees, tax, shipping, Stripe fees, pledge status, supporters, average pledge, campaign add-ons, referral attribution, UTM source, fulfillment type, language, and other pledge-derived breakdowns. Money values display exact cents.
 
-Stripe fees use actual stored Stripe balance transaction fee/net values for charged pledges when available. Active pledges and older charged pledge rows without actual Stripe balance data continue to use the standard planning estimate. Super-admin-only backfills can safely retrieve historical balance transaction data from Stripe without KV list scans through `POST /admin/analytics/stripe-financials/backfill`.
+Gross Campaign revenue and Platform revenue remain visible for reconciliation. Net campaign revenue and Net platform revenue subtract each category's allocated share of actual Stripe processor fees when stored balance transaction data exists. Active pledges and older charged pledge rows without actual Stripe balance data continue to use the standard planning estimate. Super-admin-only backfills can safely retrieve historical balance transaction data from Stripe without KV list scans through `POST /admin/analytics/stripe-financials/backfill`.
 
 ## Marketing
 
@@ -391,4 +400,4 @@ Dashboard read endpoints rely on `campaign-pledges:{slug}` indexes and intention
 
 ---
 
-_Last updated: June 3, 2026_
+_Last updated: June 11, 2026_

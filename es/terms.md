@@ -9,7 +9,7 @@ description: Revisa los términos de aporte, el procesamiento de pagos, el cumpl
 
 # Términos y pautas creativas
 
-Estos términos reflejan el hito de lanzamiento **v1.0.3** de la plataforma The Pool.
+Estos términos reflejan el hito de lanzamiento **v1.0.4** de la plataforma The Pool.
 
 ## Términos del aporte
 
@@ -81,6 +81,7 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Las páginas públicas pueden prefetch páginas públicas elegibles del mismo origen después de hover, foco o toque para que la navegación normal sea más rápida. Este comportamiento excluye enlaces de admin, checkout, Gestionar aporte, comunidad de patrocinadores, enlaces con tokens, externos y con parámetros sensibles.
 - Las páginas públicas de campaña pueden diferir algunos embeds de terceros, como videos hero de YouTube, hasta que elijas reproducirlos. Hasta entonces, la página puede mostrar una imagen local de poster en lugar de contactar a ese proveedor externo.
 - Los enlaces para compartir campañas pueden preservar parámetros públicos seguros de referencia o UTM para que responsables de campaña entiendan el origen de la promoción pública. No preservan parámetros de token, pedido, email, sesión u otros datos sensibles.
+- Las personas operadoras autorizadas de la plataforma pueden cargar el estado de uso de planes de Cloudflare y Resend en el panel privado. Esas comprobaciones usan credenciales del servidor y no envían detalles de aportes, correos de patrocinadores, direcciones de envío ni datos de pago a los endpoints de uso.
 - No vendemos tu información. Solo la compartimos cuando es necesario para el procesamiento del pago, la entrega de correos transaccionales, la prevención de abuso, el cálculo de cotizaciones de envío y el cumplimiento de recompensas.
 
 ## Plataforma y tecnología
@@ -102,4 +103,4 @@ Si tienes preguntas sobre estos términos o sobre tu aporte, escribe a info@dust
 
 ---
 
-_Última actualización: 9 de junio de 2026_
+_Última actualización: 11 de junio de 2026_

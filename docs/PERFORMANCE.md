@@ -310,6 +310,8 @@ Admin performance settings currently live under **Settings -> Advanced performan
 - `performance.intent_prefetch_delay_ms`
 - `performance.intent_prefetch_limit`
 
+Settings -> Plan usage is intentionally separate from public performance settings. It performs one read-only Cloudflare/Resend provider snapshot when the section opens, does not poll in the background, and refreshes only when the admin reloads the page.
+
 ## Measuring Changes
 
 Use local checks for regressions and production-like checks for final confidence.
@@ -377,4 +379,4 @@ The platform does not currently:
 
 ---
 
-_Last updated: June 3, 2026_
+_Last updated: June 11, 2026_

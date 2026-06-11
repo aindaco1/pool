@@ -34,7 +34,7 @@ La lista cubre:
 
 ## Qué cambió desde v0.9.5
 
-Esta lista refleja los cambios de la plataforma hasta **v1.0.3**:
+Esta lista refleja los cambios de la plataforma hasta **v1.0.4**:
 
 - las personas creadoras pueden tener acceso específico al panel para editar campañas sin acceso directo al repositorio
 - las cargas de media en el panel soportan imágenes, video, audio, previews y optimización posterior en el repositorio con variantes WebP responsivas
@@ -45,6 +45,8 @@ Esta lista refleja los cambios de la plataforma hasta **v1.0.3**:
 - los textos de compartir usan estado de campaña, título, blurb y URL pública cuando la plataforma destino permite texto
 - las campañas próximas pueden recoger recordatorios únicos de lanzamiento antes de abrir aportes
 - el lanzamiento y las fechas límite siguen la zona horaria configurada para la plataforma
+- los analytics de campaña mantienen visible el ingreso bruto de campaña y también muestran el ingreso neto después de comisiones de procesamiento asignadas
+- las personas operadoras de plataforma pueden vigilar el uso de planes de Cloudflare y Resend desde el panel sin exponer tokens de proveedores al equipo creador
 - las mejoras de performance hacen más estable la primera carga, incluidos embeds hero de YouTube diferidos y entrega responsiva de imágenes, pero las campañas aún necesitan media optimizada y copy conciso
 
 ## Versión rápida
@@ -160,6 +162,7 @@ Notas operativas:
 - La gestión de usuarios es separada: los usuarios del panel se guardan en Worker KV y no crean commits en GitHub.
 - El sign-in del panel puede pedir un desafío de Cloudflare Turnstile antes de enviar el magic link por email.
 - Los formularios de recordatorio para campañas próximas también pueden usar Cloudflare Turnstile; las claves y secretos los configuran las personas operadoras de plataforma, no las creadoras.
+- Los analytics distinguen ingresos brutos de campaña e ingresos netos después de comisiones de procesamiento asignadas, para ayudar a reconciliar totales sin ocultar la matemática pública de financiación.
 - Las fechas de lanzamiento y cierre se interpretan en la zona horaria de plataforma configurada por una persona superadministradora, así que conviene confirmarla antes de publicar copy sensible a horario.
 
 ## Imágenes y video

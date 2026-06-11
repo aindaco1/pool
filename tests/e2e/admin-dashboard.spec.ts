@@ -72,6 +72,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     inventoryRead: [],
     inventoryWrite: [],
     analytics: [],
+    planUsage: [],
     settings: [],
     settingsPreview: [],
     settingsPublish: [],
@@ -333,6 +334,18 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
                 { label: 'Live inventory cache TTL seconds', value: '300', rawValue: '300', editable: true, path: 'cache.live_inventory_ttl_seconds', type: 'number', input: 'integer', layoutGroup: 'cache-live-ttl' }
               ].map(withFieldHelp)
             }, {
+              title: 'Plan usage',
+              rows: [{
+                label: '',
+                value: '',
+                rawValue: '',
+                editable: false,
+                path: '',
+                type: 'string',
+                input: 'plan-usage',
+                hideLabel: true
+              }]
+            }, {
               title: 'Debug',
               rows: [
                 { label: 'Console logging enabled', value: 'Yes', rawValue: true, editable: true, path: 'debug.console_logging_enabled', type: 'boolean', input: 'boolean', layoutGroup: 'debug-logging' },
@@ -578,14 +591,70 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
           campaignRevenue: 11000,
           platformAddOnRevenue: 600,
           platformTipRevenue: 400,
+          platformRevenue: 1000,
+          processorFeeAllocatedToCampaignRevenue: 320,
+          processorFeeAllocatedToPlatformRevenue: 30,
+          netCampaignRevenue: 10680,
+          netPlatformRevenue: 970,
           paymentFailedAmount: 0
         },
-        campaigns: [{ ...campaignSummary, totals: { pledgedAmount: 12000, uniqueSupporters: 2, platformAddOnRevenue: 600, paymentFailedAmount: 0 } }],
+        campaigns: [{
+          ...campaignSummary,
+          totals: {
+            pledgedAmount: 12000,
+            uniqueSupporters: 2,
+            campaignRevenue: 11000,
+            platformRevenue: 1000,
+            platformAddOnRevenue: 600,
+            platformTipRevenue: 400,
+            netCampaignRevenue: 10680,
+            netPlatformRevenue: 970,
+            paymentFailedAmount: 0
+          }
+        }],
         statusBreakdown: [{ key: 'active', count: 2, amount: 12000 }],
         referralBreakdown: [{ key: 'newsletter', count: 1, amount: 5000 }],
         languageBreakdown: [{ key: 'en', count: 1, amount: 5000 }],
         utmSourceBreakdown: [{ key: 'email', count: 1, amount: 5000 }],
         writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
+      });
+    }
+    if (url.pathname === '/admin/plan-usage') {
+      calls.planUsage.push({ method });
+      return fulfillJson({
+        thresholds: { warning: 80, critical: 95 },
+        providers: [{
+          id: 'cloudflare',
+          name: 'Cloudflare',
+          planName: 'Workers Paid',
+          planKey: 'standard',
+          planSource: 'cloudflare-subscriptions',
+          status: 'ok',
+          statusMessage: 'Usage refreshed from Cloudflare GraphQL Analytics.',
+          upgradeUrl: 'https://dash.cloudflare.com/?to=/:account/workers/plans',
+          scope: 'Worker script: pool-worker',
+          metrics: [
+            { id: 'cloudflare-workers-requests', label: 'Workers requests', period: 'monthly', used: 25000, limit: 10000000, unit: 'requests', percent: 0.25, severity: 'ok', help: 'Worker invocation requests this month.' },
+            { id: 'cloudflare-kv-writes', label: 'KV writes', period: 'monthly', used: 80, limit: 1000000, unit: 'operations', percent: 0.008, severity: 'ok', help: 'Workers KV write operations this month.' }
+          ]
+        }, {
+          id: 'resend',
+          name: 'Resend',
+          planName: 'Pro',
+          planKey: 'pro',
+          planSource: 'resend-quota-headers',
+          status: 'ok',
+          statusMessage: 'Usage refreshed from Resend response headers.',
+          upgradeUrl: 'https://resend.com/settings/billing',
+          links: [{ labelKey: 'plan_usage_resend_usage', label: 'Usage', url: 'https://resend.com/settings/usage' }],
+          scope: 'Team email quota',
+          metrics: [
+            { id: 'resend-monthly-emails', label: 'Monthly emails', period: 'monthly', used: null, limit: 50000, unit: 'emails', percent: null, severity: 'unknown', help: 'Sent and received emails counted against the current monthly quota.' },
+            { id: 'resend-daily-emails', label: 'Daily emails', period: 'daily', used: null, limit: null, unit: 'emails', percent: null, severity: 'ok', unlimited: true, help: 'Paid Resend transactional plans do not have a daily email quota.' }
+          ]
+        }],
+        writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 },
+        generatedAt: '2026-06-11T12:00:00.000Z'
       });
     }
     if (url.pathname === '/admin/marketing/referrals') {
@@ -761,7 +830,7 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByText('Signed in as admin@example.com')).toBeVisible();
     await expect(page.getByRole('tab').nth(0)).toHaveText('Settings');
     await expect(page.getByRole('tab').nth(1)).toHaveText('Add-ons');
-    await expect(page.getByRole('tab').nth(2)).toHaveText('Campaigns');
+    await expect(page.getByRole('tab', { name: 'Campaigns' })).toBeVisible();
     await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
     await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
     await selectSettingsSection(page, 'Canonical URLs');
@@ -822,6 +891,25 @@ test.describe('Admin Dashboard', () => {
     await page.locator('[data-settings-path="performance.intent_prefetch_enabled"]').selectOption('false');
     await expect(page.locator('#admin-settings-publish')).toBeVisible();
     await page.locator('[data-settings-path="performance.intent_prefetch_enabled"]').selectOption('true');
+    await selectSettingsSection(page, 'Plan usage');
+    await expect(page.locator('#admin-settings-publish')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Refresh usage' })).toHaveCount(0);
+    await expect.poll(() => calls.planUsage.length).toBe(1);
+    await expect(page.locator('#admin-settings-results')).not.toContainText('Cloudflare and Resend usage');
+    await expect(page.locator('#admin-settings-results')).not.toContainText('settings_readonly_value_label');
+    await expect(page.locator('#admin-settings-results')).not.toContainText('settings_readonly_value_help');
+    await expect(page.locator('#admin-settings-results')).toContainText('Cloudflare');
+    await expect(page.locator('#admin-settings-results')).toContainText('Workers Paid');
+    await expect(page.locator('#admin-settings-results')).toContainText('25,000 of 10,000,000 requests');
+    await expect(page.locator('#admin-settings-results')).toContainText('Resend');
+    await expect(page.locator('#admin-settings-results')).toContainText('Pro');
+    await expect(page.locator('#admin-settings-results')).toContainText('50,000 emails limit');
+    await expect(page.locator('#admin-settings-results')).not.toContainText('Not available of 50,000 emails');
+    await expect(page.locator('#admin-settings-results')).toContainText('Unlimited');
+    const resendProvider = page.locator('.admin-plan-usage__provider').filter({ hasText: 'Resend' });
+    await expect(resendProvider.getByRole('link', { name: 'Usage' })).toHaveAttribute('href', 'https://resend.com/settings/usage');
+    await expect(resendProvider.locator('.admin-plan-usage__links a')).toHaveText(['Usage', 'Manage plan']);
+    await expect(page.locator('#admin-settings-results')).not.toContainText('Usage refreshed');
     await selectSettingsSection(page, 'Users');
     const adminUsersEditor = page.locator('[data-settings-path="admin.users"]');
     await expect(adminUsersEditor).toBeVisible();

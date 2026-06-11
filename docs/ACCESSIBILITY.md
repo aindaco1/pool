@@ -61,6 +61,7 @@ The recent accessibility hardening pass added:
   - WYSIWYG content-editor chrome that is only keyboard-reachable when the relevant block is active
   - content-editor media upload controls with labeled native file inputs, visible focus on the styled upload button, upload status regions, and browser-local previews before publish
   - gallery image caption settings that reuse the shared label/help pattern and expose the hover-caption editor as a labeled rich-text textbox
+  - Settings -> Plan usage provider headings that reuse the shared admin label/help pattern, polite loading status, accessible progressbar text, and responsive metric cards
   - sortable data tables that expose `aria-sort` state and sort buttons
 
 ## Critical Surfaces
@@ -228,6 +229,7 @@ Automated checks help, but these manual accessibility checks are still important
 - error messages are understandable and appear near the right fields
 - admin dashboard tabs, Settings sidebars, Campaign sidebars, and Campaign subtabs can be traversed with keyboard only
 - admin dashboard help buttons announce useful field descriptions without interfering with the field's visible label
+- Settings -> Plan usage announces loading status, exposes provider help, and keeps usage progress bars understandable when a provider returns only limits or unlimited quotas
 - WYSIWYG editor block controls are not reachable while hidden and become reachable after the block is focused or activated
 - admin dashboard table sorting and CSV export flows are operable with keyboard only
 
@@ -251,4 +253,4 @@ Good next accessibility improvements include:
 
 ---
 
-_Last updated: June 3, 2026_
+_Last updated: June 11, 2026_

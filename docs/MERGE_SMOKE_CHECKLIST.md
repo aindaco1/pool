@@ -254,14 +254,15 @@ Run this section when the branch changes dashboard UI, admin Worker routes, camp
 
 1. Sign in to `/admin/` with an authorized admin email.
 2. Verify the main tabs render without horizontal overflow at desktop, tablet, and mobile widths.
-3. In **Settings**, confirm publishable sections show a disabled `Publish` button until a real change is made. Confirm **Users**, **Secrets & credentials**, and **Runtime diagnostics** do not show an unused publish action.
+3. In **Settings**, confirm publishable sections show a disabled `Publish` button until a real change is made. Confirm **Users**, **Plan usage**, **Secrets & credentials**, and **Runtime diagnostics** do not show an unused publish action.
 4. In **Settings -> Users**, create or edit a campaign user, save, and confirm the change takes effect without a GitHub publish flow.
-5. In **Campaigns**, switch campaign subtabs and verify content, tiers, campaign add-ons, diary entries, and decisions load for the selected campaign only.
-6. In **Content** and **Diary Entries**, add/edit a content block, verify WYSIWYG preview behavior, and confirm `Save Draft` only enables when the local draft differs from the saved value.
-7. In **Add-ons** and campaign **Add-Ons**, verify physical products show shipping preset / package fields, digital products hide shipping fields, and product/variant IDs derive from names/labels for new entries.
-8. In **Analytics**, **Reports**, and **Supporters**, verify the default `All` view only shows campaigns available to the current admin, dollar amounts show exact cents where applicable, and CSV export matches the visible rows.
-9. In **Marketing**, save/edit/delete a referral code, verify the URL builder clears after save/refresh, and confirm the embedded campaign builder still works.
-10. For `/es/admin/`, verify translated tab labels and tablet/mobile navigation do not overflow.
+5. In **Settings -> Plan usage**, verify usage loads automatically, there is no `Refresh usage` button, Cloudflare/Resend headings have readable help text, and the cards do not overflow on mobile.
+6. In **Campaigns**, switch campaign subtabs and verify content, tiers, campaign add-ons, diary entries, and decisions load for the selected campaign only.
+7. In **Content** and **Diary Entries**, add/edit a content block, verify WYSIWYG preview behavior, and confirm `Save Draft` only enables when the local draft differs from the saved value.
+8. In **Add-ons** and campaign **Add-Ons**, verify physical products show shipping preset / package fields, digital products hide shipping fields, and product/variant IDs derive from names/labels for new entries.
+9. In **Analytics**, **Reports**, and **Supporters**, verify the default `All` view only shows campaigns available to the current admin, gross and net revenue amounts show exact cents where applicable, and CSV export matches the visible rows.
+10. In **Marketing**, save/edit/delete a referral code, verify the URL builder clears after save/refresh, and confirm the embedded campaign builder still works.
+11. For `/es/admin/`, verify translated tab labels, Plan usage labels/links, and tablet/mobile navigation do not overflow.
 
 ## Sign-Off Template
 

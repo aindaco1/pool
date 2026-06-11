@@ -2,11 +2,25 @@
 
 ## Current Milestone
 
-**v1.0.3**
+**v1.0.4**
 
-The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds configurable platform timezone handling, opt-in launch reminders for upcoming campaigns, Cloudflare KV list-budget hardening, mobile campaign-page performance refinements, diary-rendering fixes, and dashboard media workflow hardening, while preserving the default `America/Denver` lifecycle model for existing forks.
+The v1.0 feature set and release-hardening pass are complete. v1.0.4 focuses on admin dashboard financial and operational visibility: net revenue after allocated processor fees plus explicit Cloudflare and Resend plan usage tracking for super admins.
 
 ## Completed
+
+**Admin dashboard analytics and operations**
+
+- [x] Add net revenue analytics after allocated processor fees
+  - Existing Campaign revenue and Platform revenue cards remain gross category totals
+  - Net campaign revenue and Net platform revenue cards/table columns show gross category totals after each category's allocated processor-fee share
+  - Actual Stripe fees are allocated proportionally across campaign revenue, platform revenue, tax, and shipping when stored balance transaction data exists
+  - Active pledges and charged pledges still awaiting actual balance transaction data use the existing estimated Stripe fee model
+  - Card and table labels keep gross and net values distinct for reconciliation
+- [x] Create a tracker that shows use of Cloudflare and Resend plans
+  - Super admins can load Cloudflare Workers/KV and Resend quota usage from Settings -> Plan usage automatically when the section opens
+  - The tracker shows plan names, progress bars, `used of limit` text, warning/critical thresholds, and plan-management links
+  - Provider API tokens stay server-side; the browser receives only sanitized usage metrics and status messages
+  - Loads are page-refresh scoped and read-only, with zero KV writes or list operations
 
 **Platform foundation**
 
@@ -269,12 +283,6 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds config
   - Decide how much international logic should stay vendored offline versus optional provider-backed
   - Add a documented tax-data refresh/import workflow for future jurisdiction datasets
   - Future consideration: business tax handling such as VAT ID validation, reverse-charge flows, exemptions, and product tax classes
-- [ ] Add net revenue analytics after allocated processor fees
-  - Keep existing Campaign revenue and Platform revenue cards as gross category totals for clarity
-  - Add separate Net campaign revenue and Net platform revenue values
-  - Allocate actual Stripe fees proportionally across campaign revenue, platform revenue, tax, and shipping based on each component's share of the charged PaymentIntent
-  - Fall back to estimated fee allocation only for active pledges or older charged pledges without actual Stripe balance transaction data
-  - Make card/table help text explicit about gross versus net values so analytics reconcile cleanly
 - [ ] Add richer campaign marketing tools
   - announcement composer with local drafts, read-only dry runs, and explicit live-send/audit writes
   - optional abandoned-cart follow-up only after consent, retention, duplicate-send prevention, and free-tier-aware storage are designed
@@ -291,14 +299,6 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds config
   - Make preview publishing clear in the admin dashboard so users understand it does not make the campaign publicly live
 - [ ] Create a simplified install script or simple Mac/Windows/Linux app to facilitate local and production deployment
   - Use gh, cloudflare, and any other CLIs that will help automate setup tasks
-- [ ] Create a tracker that shows use of Cloudflare and Resend plans
-  - Designed to show super admins plan use, both daily and monthly, to make sure that they're not exceeding known limits
-    - Uses progress bar and simple XXX of XXX used
-    - Supports multiple use metrics that are restricted by plans
-  - Supports and shows current plan names
-  - Warns super admins when approaching daily or monthly limits
-  - Links directly to plan upgrade pages for their respective services
-
 ## Known Issues
 
 **Credit Card Autofill**: CC number, expiry, and CVV fields are inside Stripe's iframe for PCI compliance — not accessible to our autofill scripts.
