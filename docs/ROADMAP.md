@@ -291,6 +291,13 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.3 adds config
   - Make preview publishing clear in the admin dashboard so users understand it does not make the campaign publicly live
 - [ ] Create a simplified install script or simple Mac/Windows/Linux app to facilitate local and production deployment
   - Use gh, cloudflare, and any other CLIs that will help automate setup tasks
+- [ ] Create a tracker that shows use of Cloudflare and Resend plans
+  - Designed to show super admins plan use, both daily and monthly, to make sure that they're not exceeding known limits
+    - Uses progress bar and simple XXX of XXX used
+    - Supports multiple use metrics that are restricted by plans
+  - Supports and shows current plan names
+  - Warns super admins when approaching daily or monthly limits
+  - Links directly to plan upgrade pages for their respective services
 
 ## Known Issues
 
