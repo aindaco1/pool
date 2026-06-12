@@ -297,6 +297,7 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.4 focuses on 
   - Keep previews out of `robots.txt`, `sitemap.xml`, public campaign indexes, and social metadata intended for live pages
   - Reuse the existing magic-link/session validation patterns instead of introducing a separate password system
   - Make preview publishing clear in the admin dashboard so users understand it does not make the campaign publicly live
+  - Preview links should be [slug]/preview
 - [ ] Create a simplified install script or simple Mac/Windows/Linux app to facilitate local and production deployment
   - Use gh, cloudflare, and any other CLIs that will help automate setup tasks
 ## Known Issues
