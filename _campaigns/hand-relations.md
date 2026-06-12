@@ -191,4 +191,7 @@ tiers:
     category: digital
     late_support: false
     requires_threshold: 50000
+preview_enabled: true
+preview_reviewer_emails: []
+preview_updated_at: "2026-06-12T10:21:31.387Z"
 ---
