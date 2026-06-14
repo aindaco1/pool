@@ -90,6 +90,8 @@ DEV_ENV_ORDER = [
   'CANONICAL_WORKER_BASE',
   'CORS_ALLOWED_ORIGIN',
   'APP_MODE',
+  'ADMIN_LOCAL_REPO_WRITES_ENABLED',
+  'ADMIN_LOCAL_REPO_SERVICE',
   'ADMIN_TEST_CAMPAIGNS',
   'SITE_TITLE',
   'SITE_DESCRIPTION',
@@ -444,7 +446,11 @@ existing_top = parse_simple_assignments(content)
 existing_dev = parse_env_dev_vars(content)
 
 top_values = build_mirror_values(base_config, existing_top)
-dev_values = build_mirror_values(dev_config, existing_dev).merge('APP_MODE' => 'test')
+dev_values = build_mirror_values(dev_config, existing_dev).merge(
+  'APP_MODE' => 'test',
+  'ADMIN_LOCAL_REPO_WRITES_ENABLED' => 'true',
+  'ADMIN_LOCAL_REPO_SERVICE' => 'http://127.0.0.1:8799'
+)
 top_values['APP_MODE'] = 'live'
 top_values['CANONICAL_SITE_BASE'] = top_values['SITE_BASE']
 top_values['CANONICAL_WORKER_BASE'] = top_values['WORKER_BASE']

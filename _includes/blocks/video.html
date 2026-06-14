@@ -31,6 +31,7 @@
         frameborder="0" 
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
         loading="lazy"
+        referrerpolicy="strict-origin-when-cross-origin"
         title="{{ block.caption | default: 'Video' | strip_html | escape }}">
       </iframe>
     {% endif %}

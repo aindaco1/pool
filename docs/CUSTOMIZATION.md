@@ -21,6 +21,8 @@ For normal operator edits, use the private admin dashboard at `/admin/` or `/es/
 - **Settings** edits platform-wide configuration and runtime admin tools for super admins.
 - **Add-ons** edits platform add-on products for super admins.
 - **Campaigns** edits campaign settings, page content, tiers, support items, campaign add-ons, stretch goals, ongoing items, diary entries, and decisions.
+- **Campaigns** also lets super admins create preview-only campaigns from a title plus one or more campaign users; those campaigns stay out of public routes until launched.
+- **Preview** publishes a protected campaign preview for authorized admins and explicitly invited reviewers without adding previewer emails to campaign source.
 - **Settings -> Users** is runtime-only and saves directly to Worker KV at `admin-users:v1`; it does not publish to GitHub.
 - **Secrets & credentials** is read-only status. Secret values still belong in Worker secrets, GitHub repository secrets, or ignored local env files.
 
@@ -107,7 +109,7 @@ These values feed:
 Notes:
 
 - `platform.*` is the primary branding surface.
-- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v1.0.4`.
+- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v1.0.5`.
 - `platform.timezone` must be a supported IANA timezone. It defaults to `America/Denver` so existing forks keep the old lifecycle behavior until they change it.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
@@ -119,8 +121,8 @@ Example:
 ```yml
 platform:
   name: My Fork
-  version: 1.0.4
-  release_label: v1.0.4
+  version: 1.0.5
+  release_label: v1.0.5
   company_name: Example Studio
   support_email: support@example.com
   pledges_email_from: "My Fork <pledges@pool.example.com>"
@@ -882,6 +884,7 @@ Still code-level today:
 - changing Stripe-owned field styling beyond the supported design-token bridge and Stripe’s appearance API
 - introducing brand-new layout structures, page templates, or content block types
 - changing font hosting/CSP behavior beyond the currently supported font stacks
+- changing the protected preview authorization model, reviewer-link expiry, or preview-only public filtering rules
 
 Also note:
 
@@ -912,7 +915,7 @@ npm run podman:doctor
 - Stripe payment UI styling
 - Manage Pledge
 - supporter emails
-- admin dashboard publish state, read-only secrets status, and role-scoped campaign visibility when dashboard fields changed
+- admin dashboard publish/preview state, read-only secrets status, protected preview access emails, new campaign assignment emails, and role-scoped campaign visibility when dashboard fields changed
 
 6. Run the relevant checks:
 

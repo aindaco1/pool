@@ -15,6 +15,7 @@ npm run test:e2e:headless  # CI mode
 npm run test:e2e:headless:podman  # Automated browser suite with Playwright in Podman
 npm run test:e2e:parity    # First-party critical-path browser flows
 npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium  # Focused admin dashboard browser suite
+npm run test:e2e:headless:podman -- tests/e2e/admin-dashboard.spec.ts --project=chromium  # Podman-backed admin create/preview/browser suite
 npm run podman:doctor      # Cross-platform Podman readiness check
 npm run test:security      # Security pen tests (Worker must be running)
 npm run test:security:podman  # Security pen tests with a one-shot Podman-backed stack
@@ -412,6 +413,9 @@ Browser-based tests for full user flows in `tests/e2e/`.
 **Admin Dashboard Coverage Highlights:**
 - Magic-link sign-in, role-scoped tabs, and campaign-user access restrictions
 - Settings, Add-ons, Campaigns, Analytics, Reports, Supporters, and Marketing tab behavior
+- Super-admin Create new campaign flow, including multiple existing/new campaign users and assignment email behavior
+- Protected Preview publish flow, including current-user dashboard link creation, optional reviewer email input UX, base-revision conflict handling, 24-hour reviewer links, and zero previewer-email persistence in campaign Markdown
+- Super-admin Archive campaign flow, including non-live visibility, live-campaign rejection, campaign-user rejection, local archive moves, GitHub Action dispatch body, and audit-event write budget
 - Settings -> Plan usage automatic loading, provider help text, localized provider links, and zero-write read budget
 - Gross campaign/platform revenue, net campaign/platform revenue after allocated processor fees, and exact-cent analytics presentation
 - Content editor WYSIWYG block editing, link/media settings, diary editor reuse, draft state, publish state, and mobile preview
@@ -897,6 +901,7 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 - `APP_MODE` — `live` or `test`
 - `CHECKOUT_INTENT_SECRET` — Random 32+ char string for checkout signing
 - `MAGIC_LINK_SECRET` — Random 32+ char string for HMAC token signing
+- `CAMPAIGN_PREVIEW_SECRET` — Optional dedicated preview reviewer-link signing secret; if omitted, the Worker falls back to existing signing secrets
 - `RESEND_API_KEY` — Resend API key for supporter emails (re_...)
 - `ADMIN_SECRET` — Random string for admin API endpoints
 - `ADMIN_SETTLEMENT_SECRET` — Optional scoped admin secret for settlement endpoints; use a separate local-only value in `worker/.dev.vars`
@@ -917,6 +922,7 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
   - Keys: `pledge:{orderId}` → pledge JSON
   - Keys: `email:{email}` → array of order IDs
   - Keys: `stats:{campaignSlug}` → `{ pledgedAmount, pledgeCount, tierCounts }`
+  - Keys: `campaign-preview-reviewers:{campaignSlug}` → 24-hour protected-preview reviewer email allowlist
 - **Namespace**: `VOTES` — Stores community votes
   - Keys: `vote:{campaignSlug}:{decisionId}:{orderId}` → option string
   - Keys: `results:{campaignSlug}:{decisionId}` → JSON `{optionA: count, ...}`

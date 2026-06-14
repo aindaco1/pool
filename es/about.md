@@ -11,7 +11,7 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
-El hito de lanzamiento actual de la plataforma es **v1.0.4**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente se enfoca en analytics del panel con ingresos netos después de comisiones de procesamiento asignadas, además de visibilidad del uso de planes de Cloudflare y Resend para personas operadoras de la plataforma.
+El hito de lanzamiento actual de la plataforma es **v1.0.5**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente añade vistas previas protegidas de campaña para personas revisoras de confianza, creación de campañas por superadministradores con correos de asignación para personas usuarias de campaña y archivado de campañas no activas por superadministradores.
 
 ## Aportes de todo o nada
 
@@ -76,6 +76,9 @@ La plataforma está diseñada para cineastas y equipos creativos que necesitan u
 - **Add-ons opcionales de plataforma**: ofrece merch de plataforma junto con los aportes cuando esté habilitado, con inventario y envío separados que no cuentan para la meta de financiación de la campaña.
 - **Add-ons de campaña**: vende merch o extras específicos de la campaña en el mismo flujo de aporte, manteniendo ingresos, inventario y envío ligados a esa campaña.
 - **Panel privado de administración**: da a personas de confianza un espacio enfocado para ajustes de campaña, contenido de página, recompensas, actualizaciones, decisiones, reportes, patrocinadores, analytics y enlaces de marketing.
+- **Vistas previas protegidas de campaña**: comparte campañas en borrador o solo-preview de forma privada con personas usuarias asignadas y revisoras invitadas antes de que la página pública lance.
+- **Configuración de nuevas campañas**: las personas superadministradoras pueden crear una campaña privada en borrador a partir de un título y personas usuarias asignadas, y luego completar el resto desde el panel.
+- **Archivado de campañas**: las personas superadministradoras pueden archivar campañas no activas sin borrar la fuente ni los medios subidos de la campaña, manteniendo un registro revisable fuera de las listas activas.
 - **Zona horaria configurable de plataforma**: las personas superadministradoras pueden elegir la zona horaria IANA usada para fechas límite, cuentas regresivas, reportes programados y automatización del ciclo de vida.
 - **Cargas de media en el panel**: prepara imágenes, video y audio de campaña o diario con previews, publícalos en las rutas de assets de campaña, activa la optimización de imágenes/video y limpia media del panel que ya no esté referenciada.
 - **Reportes cuando los necesites**: previsualiza y descarga CSVs de aportes o fulfillment desde el panel, con correos opcionales para responsables de campaña mientras la campaña está activa.
@@ -109,13 +112,13 @@ El stack está pensado para equipos pequeños y forks. Cada servicio principal o
 
 El modelo de performance pública sigue siendo static-first. El sitio minifica los assets generados, deja la compresión de transferencia a Cloudflare, reserva espacio estable para progreso y media de campaña, sirve variantes responsivas de imagen cuando existen, difiere los embeds hero remotos de YouTube hasta que haya intención de reproducción y retrasa el código pesado del carrito hasta que realmente hace falta.
 
-El panel de administración sigue la misma disciplina de costes. Navegación, filtros, vistas previas, analytics, reportes y borradores locales evitan escrituras a KV. Las escrituras durables ocurren solo cuando una persona administradora guarda estado propio del panel o publica cambios de campaña/plataforma.
+El panel de administración sigue la misma disciplina de costes. Navegación, filtros, vistas previas, analytics, reportes y borradores locales evitan escrituras a KV. Las escrituras durables ocurren solo cuando una persona administradora guarda estado propio del panel, crea una campaña, publica una vista previa protegida o publica cambios de campaña/plataforma.
 
 La personalización se controla principalmente por configuración. Impuestos, envío, SEO, localización, zona horaria de plataforma, logging, identidad de correo, ajustes del panel, branding público, estilo del checkout y presentación de correos para patrocinadores se mantienen alineados por config para que un fork pueda cambiar la presentación sin reescribir el modelo de aportes.
 
 Para desarrolladores, los límites son intencionalmente claros: el contenido estático pertenece al sitio, los cálculos confiables de aportes pertenecen al Worker, los datos de pago pertenecen a Stripe, el correo transaccional pertenece a Resend y las operaciones por rol pertenecen al panel de administración.
 
-La misma arquitectura permite trabajar accesibilidad y SEO sin debilitar la seguridad. Las páginas públicas emiten metadatos rastreables y datos estructurados conservadores, mientras que las páginas privadas con enlaces mágicos, como Gestionar aporte, las comunidades de patrocinadores y el panel de administración, quedan fuera de la indexación de búsqueda. Los flujos de checkout y gestión añaden comportamiento de teclado, foco, diálogos, regiones en vivo y landmarks alrededor de la UI segura de Stripe en lugar de reemplazarla.
+La misma arquitectura permite trabajar accesibilidad y SEO sin debilitar la seguridad. Las páginas públicas emiten metadatos rastreables y datos estructurados conservadores, mientras que las páginas privadas con enlaces mágicos, como Gestionar aporte, las comunidades de patrocinadores, las vistas previas protegidas de campaña y el panel de administración, quedan fuera de la indexación de búsqueda. Los flujos de checkout y gestión añaden comportamiento de teclado, foco, diálogos, regiones en vivo y landmarks alrededor de la UI segura de Stripe en lugar de reemplazarla.
 
 ## Código abierto
 
@@ -127,4 +130,4 @@ The Pool es de código abierto. Toda la plataforma, el frontend, el Worker, la a
 
 *The Pool ha sido creado y es mantenido por [Dust Wave](https://dustwave.xyz).*
 
-_Última actualización: 11 de junio de 2026_
+_Última actualización: 12 de junio de 2026_

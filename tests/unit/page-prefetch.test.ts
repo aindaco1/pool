@@ -103,6 +103,7 @@ describe('intent-based page prefetching', () => {
       makeLink('/pledge-success/?orderId=pool-intent-1'),
       makeLink('/campaigns/demo/?token=secret'),
       makeLink('/campaigns/demo/?publicToken=secret'),
+      makeLink('/campaigns/demo/preview/?t=secret'),
       makeLink('/#main-content'),
       makeLink('https://example.com/campaigns/demo/'),
       makeLink('/campaigns/demo/', { target: '_blank' }),

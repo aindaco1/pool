@@ -28,4 +28,19 @@ describe('workflow security posture', () => {
     expect(workflow).not.toMatch(/git push\s+origin\s+main/);
     expect(workflow).not.toMatch(/git push\s+origin\s+HEAD:main/);
   });
+
+  it('archives campaigns with validated workflow_dispatch input and move-only filesystem operations', () => {
+    const workflow = readWorkflow('archive-campaign.yml');
+
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain('campaign_slug:');
+    expect(workflow).toContain('/^[a-z0-9-]{1,100}$/');
+    expect(workflow).toContain('function isArchiveableMediaReference');
+    expect(workflow).toContain("reference.startsWith('assets/images/campaign-add-ons/')");
+    expect(workflow).toContain("fs.renameSync(campaignPath, archivedCampaignPath)");
+    expect(workflow).toContain("fs.renameSync(sourcePath, targetPath)");
+    expect(workflow).toContain("path.join('archive', 'campaigns', slug)");
+    expect(workflow).not.toContain('rm -rf');
+    expect(workflow).not.toContain('pull_request_target');
+  });
 });

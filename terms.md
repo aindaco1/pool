@@ -8,7 +8,7 @@ description: Review pledge terms, payment processing, fulfillment, and privacy d
 
 # Terms & Creative Guidelines
 
-These terms reflect The Pool platform release milestone **v1.0.4**.
+These terms reflect The Pool platform release milestone **v1.0.5**.
 
 ## Pledge Terms
 
@@ -19,6 +19,7 @@ These terms reflect The Pool platform release milestone **v1.0.4**.
 - Where this deployment offers additional languages, those emailed pledge links and supporter-community links may use localized routes while still authorizing the same pledge.
 - A single checkout may include more than one campaign, but each campaign is stored and managed as its own pledge after checkout.
 - Upcoming campaign launch reminders are optional and separate from pledging. If you opt in, The Pool sends one reminder when that campaign goes live and includes an unsubscribe link.
+- Some campaigns may be shared privately before launch through protected preview links. Reviewer preview links are invitation-only, campaign-scoped, and expire after 24 hours.
 - All campaign deadlines use this deployment's configured platform timezone. This deployment defaults to `America/Denver` unless platform administrators change it.
 - Community votes are limited to the published options on a campaign's supporter page, and closed decisions do not accept new votes.
 - If a manage link points to a pledge that no longer exists, The Pool treats it as unavailable instead of reconstructing placeholder pledge access.
@@ -72,12 +73,15 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - If you sign up for an upcoming campaign launch reminder, your email is stored in campaign-scoped reminder records so The Pool can send that one reminder, avoid duplicate sends, and honor unsubscribes for that campaign. Reminder signups may use Cloudflare Turnstile to reduce abuse.
 - Campaign organizers may receive campaign-scoped reports or fulfillment exports containing supporter/order details needed to run that specific campaign, coordinate delivery, or send production-related updates. Those reports stay limited to the campaign a supporter backed rather than exposing unrelated campaign pledges.
 - Authorized campaign operators may also view campaign-scoped supporter rows, reports, analytics, fulfillment data, and campaign content through The Pool's private admin dashboard. Dashboard access is role-scoped: campaign users see only assigned campaigns, while platform administrators may see platform-wide operational data needed to run The Pool.
+- Authorized campaign operators may use protected previews to review draft campaign pages before launch. Explicit reviewer email allowlists are stored only for the short preview window and are not intended for public campaign pages.
+- If a campaign is archived by an authorized platform administrator, campaign source data and campaign-owned uploaded media may be retained in the repository archive for operational records instead of being deleted.
 - When a pledge includes platform-fulfilled add-on items, platform operators may separately receive platform-only fulfillment exports limited to the items they must deliver.
 - Platform administrators may use the dashboard to manage campaign configuration, platform settings, add-ons, referral links, and authorized dashboard users. Secret values are kept in deployment secret stores or ignored local files, not in campaign content or dashboard drafts.
 - Inventory-limited platform add-ons use saved pledge state, not in-progress cart drafts, to determine remaining stock.
 - Inventory-limited campaign add-ons also use saved pledge state, not in-progress cart drafts, to determine remaining stock.
 - Supporter-community access in the browser may be remembered for the current session as a convenience, but the emailed magic link remains the source of truth for access.
 - Public pages may prefetch eligible same-origin public pages after hover, focus, or touch intent to make normal navigation faster. This prefetch behavior excludes admin, checkout, Manage Pledge, supporter-community, tokenized, external, and sensitive-query links.
+- Protected preview pages are private review surfaces. They are excluded from public sitemap, social-preview, and indexing intent until a campaign is launched publicly.
 - Public campaign pages may defer selected third-party media embeds, such as YouTube hero videos, until you choose to play them. Until then, the page may show a local poster image instead of contacting that third-party embed provider.
 - Campaign share links may preserve safe public referral or UTM query parameters so campaign runners can understand public promotion sources. They do not preserve token, order, email, session, or other sensitive query parameters.
 - Authorized platform operators may load Cloudflare and Resend plan-usage status in the private admin dashboard. Those provider checks use server-side credentials and do not send pledge details, supporter emails, shipping addresses, or payment data to the usage endpoints.
@@ -91,7 +95,7 @@ The Pool is an [open-source crowdfunding platform](https://github.com/aindaco1/p
 - **The Pool cart runtime** — First-party cart management, checkout sidecars, pledge review, and lazy public-page loading until cart state or supporter intent requires the full cart stack
 - **[Stripe](https://stripe.com)** — Secure payment fields, saved payment methods, and payment processing
 - **[Cloudflare Workers](https://workers.cloudflare.com)** — Backend API for canonical pledge validation, pledge storage, live stats, and automated campaign settlement
-- **Private admin dashboard** — Role-scoped campaign editing, reports, analytics, supporter views, marketing links, user management, and platform operations
+- **Private admin dashboard** — Role-scoped campaign editing, protected previews, new campaign creation, reports, analytics, supporter views, marketing links, user management, and platform operations
 - **[Resend](https://resend.com)** — Transactional emails (confirmations, launch reminders, updates, charge notifications)
 
 Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project, with optional platform tips helping cover maintenance of The Pool itself. Production builds also minify generated CSS/JS assets after static site generation, generate responsive image variants for public pages, and let Cloudflare handle transfer compression at the edge. Campaign lifecycle automation uses the configured platform timezone so deadlines, countdowns, reports, and settlement checks stay aligned.
@@ -102,4 +106,4 @@ For questions about these terms or your pledge, email us at info@dustwave.xyz.
 
 ---
 
-_Last updated: June 11, 2026_
+_Last updated: June 12, 2026_

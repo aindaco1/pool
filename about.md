@@ -10,7 +10,7 @@ description: Learn how The Pool works, from all-or-nothing pledging to magic-lin
 
 **The Pool** is Dust Wave's crowdfunding platform for independent film and creative projects, built on open-source technology.
 
-The current platform release milestone is **v1.0.4**. The v1.0 feature set and launch hardening pass are complete, and the latest release focuses on admin dashboard net revenue analytics after allocated processor fees plus Cloudflare and Resend plan usage visibility for platform operators.
+The current platform release milestone is **v1.0.5**. The v1.0 feature set and launch hardening pass are complete, and the latest release adds protected campaign previews for trusted reviewers, super-admin campaign creation with campaign-user assignment emails, and super-admin archiving for non-live campaigns.
 
 ## All-or-Nothing Pledging
 
@@ -75,6 +75,9 @@ The Pool is designed for filmmakers and creative teams that need a campaign they
 - **Optional platform add-ons** — Offer platform merch alongside pledges when enabled, with separate inventory and shipping handling that does not count toward a campaign's funding goal.
 - **Campaign add-ons** — Sell campaign-specific merch or extras in the same pledge flow while keeping revenue, inventory, and shipping tied to that campaign.
 - **Private admin dashboard** — Give trusted team members a focused workspace for campaign settings, page content, rewards, updates, decisions, reports, supporters, analytics, and marketing links.
+- **Protected campaign previews** — Share draft or preview-only campaigns privately with assigned campaign users and explicitly invited reviewers before the public campaign page launches.
+- **New campaign setup** — Super admins can create a private draft campaign from a title and assigned campaign users, then fill in the rest of the campaign from the dashboard.
+- **Campaign archiving** — Super admins can archive non-live campaigns without deleting campaign source or uploaded media, keeping a reviewable record outside active campaign lists.
 - **Configurable platform timezone** — Super admins can choose the IANA timezone used for campaign deadlines, countdowns, scheduled reports, and lifecycle automation.
 - **Dashboard media uploads** — Stage campaign and diary images, video, and audio with previews, publish them into campaign asset paths through the normal reviewable workflow, trigger image/video optimization, and clean up dashboard-owned media that is no longer referenced.
 - **Reports when you need them** — Preview and download pledge or fulfillment CSVs from the dashboard, with optional campaign-runner emails during active campaigns.
@@ -108,13 +111,13 @@ The stack is designed to be practical for small teams and forks. Each major serv
 
 The public page performance model stays static-first. The site minifies generated build artifacts, lets Cloudflare handle transfer compression, reserves stable space for campaign progress and media, serves generated responsive image variants where available, defers remote YouTube hero embeds until play intent, and delays heavier first-party cart code until it is actually needed.
 
-The admin dashboard follows the same cost discipline. Browsing, filtering, previews, analytics, reports, and local drafts avoid KV writes. Durable writes happen only when an admin explicitly saves dashboard-only state or publishes a campaign/platform change.
+The admin dashboard follows the same cost discipline. Browsing, filtering, previews, analytics, reports, and local drafts avoid KV writes. Durable writes happen only when an admin explicitly saves dashboard-only state, creates a campaign, publishes a protected preview, or publishes a campaign/platform change.
 
 Customization is mostly configuration-driven. Tax, shipping, SEO, localization, platform timezone, logging, email identity, dashboard settings, public branding, checkout styling, and supporter email presentation are kept aligned through config so a fork can change the presentation without rewriting the pledge model.
 
 For developers, the boundaries are intentionally clear: static content belongs in the site, trusted pledge math belongs in the Worker, payment details belong in Stripe, transactional email belongs in Resend, and role-scoped operations belong in the admin dashboard.
 
-The same architecture supports accessibility and SEO without weakening security. Public pages emit crawlable metadata and conservative structured data, while private magic-link pages such as Manage Pledge, supporter community pages, and the admin dashboard stay out of search indexing. Checkout and management flows add keyboard, focus, dialog, live-region, and landmark behavior around Stripe's secure payment UI rather than replacing it.
+The same architecture supports accessibility and SEO without weakening security. Public pages emit crawlable metadata and conservative structured data, while private magic-link pages such as Manage Pledge, supporter community pages, protected campaign previews, and the admin dashboard stay out of search indexing. Checkout and management flows add keyboard, focus, dialog, live-region, and landmark behavior around Stripe's secure payment UI rather than replacing it.
 
 ## Open Source
 
@@ -126,4 +129,4 @@ The Pool is open source. The entire platform — frontend, Worker, automation, a
 
 *The Pool is created and maintained by [Dust Wave](https://dustwave.xyz).*
 
-_Last updated: June 11, 2026_
+_Last updated: June 12, 2026_

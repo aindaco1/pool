@@ -24,4 +24,17 @@ describe('layout accessibility scaffolding', () => {
     expect(adminLayout).toContain('href="#main-content"');
     expect(adminLayout).toContain('<main id="main-content"');
   });
+
+  it('keeps keyboard focus outlines black instead of the legacy yellow accent', () => {
+    const variables = readRepoFile('assets', 'partials', '_variables.scss');
+    const accessibility = readRepoFile('assets', 'partials', '_accessibility.scss');
+
+    expect(variables).toContain('$focus--outline: $color--black;');
+    expect(accessibility).toContain('outline: 2px solid $focus--outline;');
+    expect(accessibility).toContain('outline: 3px solid $focus--outline;');
+    expect(accessibility).toContain('box-shadow: 0 0 0 4px $focus--outline-shadow;');
+    expect(accessibility).not.toContain('outline: 2px solid $goback--accent;');
+    expect(accessibility).not.toContain('outline: 3px solid $goback--accent;');
+    expect(accessibility).not.toContain('rgba($goback--accent');
+  });
 });

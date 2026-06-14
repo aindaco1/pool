@@ -29,9 +29,9 @@
       {% assign add_on_comma = true %}
     {% endfor %}
     {% if site.show_test_campaigns %}
-      {% assign campaign_add_on_campaigns = site.campaigns %}
+      {% assign campaign_add_on_campaigns = site.campaigns | where_exp: "c", "c.preview_only != true and c.published != false" %}
     {% else %}
-      {% assign campaign_add_on_campaigns = site.campaigns | where_exp: "c", "c.test_only != true" %}
+      {% assign campaign_add_on_campaigns = site.campaigns | where_exp: "c", "c.test_only != true and c.preview_only != true and c.published != false" %}
     {% endif %}
     {% for campaign in campaign_add_on_campaigns %}
       {% for product in campaign.campaign_add_ons %}

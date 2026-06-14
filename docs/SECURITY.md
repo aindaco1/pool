@@ -12,6 +12,7 @@ This document covers the security architecture, known risks, applied hardening m
 | **Launch Reminder Unsubscribe Tokens** | `GET /launch-reminders/unsubscribe` | Scoped HMAC token that suppresses one campaign/email reminder signup |
 | **Stripe Webhook Signature** | `/webhooks/stripe` | HMAC-SHA256 verification per Stripe spec |
 | **Admin Dashboard Sessions** | Browser dashboard `/admin/*` APIs | Email magic-link sign-in, signed session cookie, CSRF header on mutations, role/campaign scoping |
+| **Campaign Preview Reviewer Tokens** | `/campaigns/:slug/preview/` via `/admin/campaign-preview/:slug` | Short-lived signed reviewer tokens scoped to campaign slug and reviewer email, backed by a 24-hour KV allowlist |
 | **Admin Sign-In Challenge** | `POST /admin/auth/start` | Optional Cloudflare Turnstile verification before admin magic-link issuance |
 | **Launch Reminder Challenge** | `POST /launch-reminders` | Optional/expected Cloudflare Turnstile verification before reminder signup writes |
 | **Admin Recovery Secret** | Automation and recovery `/admin/*` endpoints | `Authorization: Bearer <secret>` or `x-admin-key` header for script-driven operations |
@@ -37,6 +38,7 @@ This document covers the security architecture, known risks, applied hardening m
 | `admin-session:{hash}` | PLEDGES | Admin email, role, campaign scope, CSRF token, expiry | **High** - admin auth |
 | `admin-users:v1` | PLEDGES | Runtime admin users and campaign scopes | **High** - access control |
 | `admin-marketing-referrals:{slug}` | PLEDGES | Saved referral code metadata | **Low** - admin-authored marketing data |
+| `campaign-preview-reviewers:{slug}` | PLEDGES | Normalized reviewer email allowlist for protected campaign previews, with 24-hour TTL | **Medium** - campaign-scoped email access list |
 | `admin-audit:{date}:{action}:{id}` | PLEDGES | Recent admin mutation audit events | **Medium** - admin identity + operational metadata |
 | `launch-reminder:{slug}:{emailHash}` | PLEDGES | Upcoming-campaign reminder email and opt-in metadata | **Medium** - campaign-scoped email |
 | `launch-reminder-suppressed:{slug}:{emailHash}` | PLEDGES | Reminder suppression marker | **Medium** - campaign-scoped email hash |
@@ -121,8 +123,22 @@ Admin mutations use these common protections:
 - Publish-time media cleanup is derived server-side from the previously loaded campaign data and the normalized campaign draft being committed. It only deletes safe root-relative dashboard-owned files under the same campaign's `assets/images`, `assets/videos`, or `assets/audio` directories, and it preserves external URLs, shared/default assets, and files still referenced elsewhere in the campaign.
 - Runtime-only admin users are saved only to KV at `admin-users:v1`; they are not serialized into `_config.yml`.
 - Marketing referral codes are saved only on explicit user action and are scoped to the campaign URL origin/path the admin account can access.
+- New campaign creation is super-admin-only, writes a preview-only campaign Markdown file locally in dev or through the existing GitHub path in production, and keeps that campaign out of public route generation until launched. Creating new campaign users during that flow saves to `admin-users:v1` and emails assigned users through the shared admin email path when users are assigned.
+- Protected preview publication is scoped to super admins and assigned campaign users. It commits only preview flags to campaign Markdown, stores the publishing admin plus optional reviewer emails in a short-lived `campaign-preview-reviewers:{slug}` KV allowlist, returns a signed 24-hour dashboard link for the publishing admin, sends signed 24-hour reviewer links when optional reviewers are added, and records an audit event. Previewer emails must not be persisted in GitHub-backed campaign source, public campaign JSON, sitemap output, or generated metadata.
+- Campaign archiving is super-admin-only and unavailable for currently live campaigns. The Worker validates the CSRF token, role, slug, campaign existence, and effective state before moving files locally in dev or dispatching `.github/workflows/archive-campaign.yml` in production. Both archive paths validate the slug, move campaign source and campaign-owned media into `archive/campaigns/<slug>/`, skip media still referenced by other active campaigns, and write an `archive-manifest.json`.
 - The static admin shell uses a restrictive meta CSP with no inline scripts, limited Worker/API connections, and sandboxed preview iframes that receive only Worker-rendered preview HTML. Framing protection must be delivered as an HTTP header, such as `Content-Security-Policy: frame-ancestors 'none'` or `X-Frame-Options: DENY`; browsers ignore `frame-ancestors` inside meta CSP.
 - Admin magic-link emails use internally generated login URLs and strip email-header control characters from admin-configurable sender/subject values before sending.
+
+### Protected Campaign Preview Boundary
+
+Protected previews are private review surfaces for editable campaigns, not public campaign pages.
+
+- Static preview shells live under `/campaigns/:slug/preview/` and localized equivalents for every campaign slug so preview links do not race a static-site rebuild. They use `noindex,nofollow,noarchive`, strict-origin referrer behavior for embedded media compatibility, no public social metadata, and no public JSON-LD.
+- The shell is generic and does not embed campaign title, payload data, or preview access data at build time. It fetches a no-store full campaign page preview payload from `/admin/campaign-preview/:slug`, with pledge controls rendered read-only.
+- Authenticated admins can fetch the payload only through the existing admin session, CSRF/origin protections where applicable, and role/campaign scope checks.
+- Explicit reviewers use signed `t` tokens scoped to token type, campaign slug, reviewer email, and expiry. The Worker also checks the email against the 24-hour KV allowlist before returning a preview payload.
+- Preview publish requests carry a GitHub base revision when available. Stale publishes return a conflict instead of overwriting another user's changes.
+- Public campaign filters treat preview-only/unlaunched campaigns as invisible for public pages, localized routes, `/api/campaigns.json`, add-on catalogs, share cards, sitemap output, robots crawl intent, embeds, and public prefetch eligibility.
 
 ### Public Prefetch And Share-Link Boundaries
 
@@ -130,7 +146,7 @@ The public intent-prefetch runtime is deliberately narrow so speculative navigat
 
 - Prefetching is loaded only on public page layouts.
 - Eligible URLs must be same-origin public document routes from the allowlist.
-- Admin, checkout, Manage Pledge, pledge-result, supporter-community, API, Worker, tokenized, and sensitive-query routes are rejected.
+- Admin, checkout, Manage Pledge, pledge-result, supporter-community, campaign preview, API, Worker, tokenized, and sensitive-query routes are rejected.
 - The runtime respects explicit `data-no-prefetch`, `download`, `target`, `nofollow`, save-data, slow-network, and per-page limit guards.
 
 Campaign share links follow the same privacy boundary. The client preserves only safe UTM/referral query params for public campaign URLs, leaves token/order/email/session params behind, and lets Open Graph metadata supply preview images instead of serializing image URLs into share intents.
@@ -499,6 +515,7 @@ Covered write paths:
 - `/admin/content/preview` and `/admin/content/publish`
 - `/admin/settings/logo-upload`, `/admin/settings/image-upload`, `/admin/settings/audio-upload`, and `/admin/settings/video-upload`
 - `/admin/users`
+- `/admin/campaigns/create`, `/admin/campaigns/archive`, and `/admin/campaign-preview/publish`
 - `/admin/marketing/referrals`
 
 The hardening rejects stored-XSS primitives such as raw `<script>`, event-handler attributes, unsafe Markdown links, parent-relative Markdown links, `javascript:`/`data:` URLs, CSS function/declaration injection, and unsafe asset paths. It also rejects settings mass assignment for dashboard-only rows and normalizes structured arrays for platform add-ons, campaign add-ons, tiers, support items, diary entries, stretch goals, ongoing items, and decisions. Media uploads are role-scoped, content-type allowlisted, size-limited, and written only to canonical dashboard asset directories.

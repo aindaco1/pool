@@ -54,6 +54,9 @@ The dashboard intentionally separates read-only browsing, local drafting, KV wri
 | Dashboard summary, analytics, reports, supporters, table filtering, and content preview | Read-only; should add zero KV writes |
 | Content editor **Save draft** | Browser-local draft only |
 | Campaign content/settings publish | Worker validates input, writes to GitHub-backed files, triggers the normal rebuild/deploy path, and records an audit event |
+| Protected preview publish | Worker validates campaign scope and base revision, writes only preview flags to GitHub-backed campaign Markdown, stores the publishing admin plus optional reviewer emails in `PLEDGES` KV at `campaign-preview-reviewers:<slug>` with a 24-hour TTL, returns a dashboard-visible signed link for the publisher, sends signed links to optional reviewers, and records an audit event |
+| Super-admin campaign creation | Worker creates a preview-only `_campaigns/<slug>.md` file locally in dev or through GitHub in production, optionally saves assigned/new campaign users to `admin-users:v1`, emails assigned campaign users when present, triggers rebuild when GitHub-backed, and records an audit event |
+| Super-admin campaign archive | Worker validates super-admin role, CSRF, campaign existence, and non-live state, then archives locally in dev or dispatches `.github/workflows/archive-campaign.yml` in production; the archive move keeps campaign source and campaign-owned media under `archive/campaigns/<slug>/` |
 | Platform settings and platform add-ons publish | Worker validates input, writes to GitHub-backed config/assets, triggers the normal rebuild/deploy path, and shows the result as a dashboard platform message |
 | Image/video/audio uploads | Worker validates media, commits the asset path through GitHub, and updates the relevant field locally until publish |
 | Marketing referral save/edit/delete | Campaign-scoped KV mutation for saved referral codes |
@@ -83,7 +86,7 @@ Settings are grouped in a left sidebar. Super admins can edit publishable config
 
 ### Platform
 
-Platform identity fields include site title, platform name, company, author, default creator name, support email, site description, email sender names, app mode, and the default platform timezone.
+Platform identity fields include site title, platform name, company, author, default creator name, support email, site description, canonical site/Worker URLs, email sender names, app mode, and the default platform timezone. The canonical URL fields sit below Site Description in the Platform section, one per column on wide viewports.
 
 The pledge and update sender fields must use domains authorized for the configured Resend API key. For this deployment, pledge confirmations use `The Pool <pledges@pool.dustwave.xyz>` so the sender domain matches the authorized `pool.dustwave.xyz` Resend domain.
 
@@ -99,10 +102,6 @@ Use one same-as URL per line. Use canonical public profile URLs, for example:
 https://www.instagram.com/example
 https://www.imdb.com/name/nm0000000/
 ```
-
-### Canonical URLs
-
-Canonical URL fields control the production site and Worker origins used in generated links, metadata, admin runtime settings, and Worker CORS expectations.
 
 The local stack can override `SITE_BASE` and `WORKER_BASE` from `_config.local.yml`, but `scripts/sync-worker-config.rb` keeps `CANONICAL_SITE_BASE` and `CANONICAL_WORKER_BASE` pinned to the production values from `_config.yml`. That lets the local dashboard show production publish targets without breaking localhost requests.
 
@@ -187,6 +186,8 @@ Digital add-ons hide shipping fields. Physical add-ons can use a preset or expli
 
 Campaigns are shown in a left sidebar. Super admins see all campaigns. Campaign users see only assigned campaigns.
 
+For super admins, the first row of the Campaigns sidebar is an icon-only `+` button for **Create new campaign**. Existing campaigns appear below that row. Campaign users do not see the create button.
+
 Each campaign has these subtabs:
 
 1. **Settings**
@@ -199,11 +200,42 @@ Each campaign has these subtabs:
 8. **Diary Entries**
 9. **Decisions**
 
+### Create New Campaign
+
+Create new campaign is super-admin-only. It creates a preview-only campaign that remains invisible from public `/campaigns/:slug/`, localized campaign routes, homepage/community/add-on indexes, `/api/campaigns.json`, share cards, sitemap output, robots crawl intent, embeds, and public prefetch eligibility until the campaign is launched.
+
+Required fields:
+
+- campaign title
+- one or more campaign users
+
+Super admins can create a campaign with no assigned campaign users, select multiple existing campaign users, choose **Create new campaign user**, and add one or more new campaign users with required names and emails in the same dialog. New users are saved to `admin-users:v1`; assigned campaign users receive a Resend-powered email with the admin dashboard link when email delivery is configured.
+
+The Worker derives the slug from the title, writes `_campaigns/<slug>.md` through the existing GitHub publish path, sets preview-only/public-hidden defaults, triggers the normal rebuild, and records an audit event. The flow does not require launch dates, goal amount, rewards, images, or page content.
+
+### Protected Preview
+
+The **Preview** button appears next to **Publish** for campaign content. Super admins and assigned campaign users can publish a protected preview for campaigns they can edit.
+
+Preview publication:
+
+- validates the current campaign scope and CSRF token
+- rejects stale base revisions when the campaign Markdown changed since the editor loaded
+- writes only preview state to GitHub-backed campaign Markdown; previewer emails are not committed
+- stores the publishing admin plus optional reviewer allowlist in `PLEDGES` KV under `campaign-preview-reviewers:<slug>` with a 24-hour TTL
+- returns a signed preview link for the publishing admin so the dashboard can keep it visible after the modal closes
+- emails explicitly invited additional reviewers signed preview links that expire in 24 hours, with that expiry stated in the email copy
+- records an admin audit event
+
+Preview pages live at `/campaigns/:slug/preview/` and localized equivalents. Generic static shells are generated for every campaign slug so emailed preview links can open immediately; the shell does not embed the campaign title or draft content. It fetches a full read-only campaign page preview through the Worker with either the current admin session or a valid reviewer token, loads the campaign stylesheet and font kit, permits approved media-player embeds, and disables pledge controls. The static preview shell is `noindex,nofollow,noarchive`, uses no social metadata, strips the preview token from the address bar after load, and remains outside public sitemap output and public prefetch eligibility.
+
 ### Campaign Settings
 
 Campaign settings include identity, dates, goal amount, charged/read-only state, runner report emails, shipping overrides, hero media, creator image, backgrounds, and other campaign front matter.
 
 Slug and URL are read-only derived fields. Existing campaign slugs are preserved. For new repo-created campaigns, keep the slug URL-safe and stable because checkout, reports, magic links, and pledge records depend on it.
+
+Super admins see **Archive campaign** at the bottom of the Settings subtab after **Campaign background** and **Progress background** when the campaign is not currently live. Campaign users never see this control, and live campaigns hide it entirely. Archiving prompts for confirmation, then moves the campaign out of active source without deleting data. In local dev, `ADMIN_LOCAL_REPO_WRITES_ENABLED=true` routes the Worker through a token-protected local repo helper that moves mounted repo files. In production, the Worker starts the repository **Archive campaign** GitHub Action. Both paths move `_campaigns/<slug>.md`, campaign-owned image/video/audio files, and referenced campaign add-on media into `archive/campaigns/<slug>/`, write an `archive-manifest.json`, and leave media still referenced by other active campaigns in place and listed in the manifest.
 
 ### Content
 
@@ -330,6 +362,8 @@ When a published content media block is removed, or a diary entry with media blo
 
 The Worker upload endpoint is source-preserving. It validates type, size, campaign scope, directory, and filename, but it does not run native image optimizers or FFmpeg. For image and video uploads, the Worker dispatches the **Optimize dashboard media** GitHub Actions workflow with `scope=changed` after the GitHub commit succeeds. Lossless image compression and video transcoding still run outside the Worker through the repository media pipeline.
 
+Campaign archive moves are repository-side for the same reason. In local dev, the Worker calls the local repo helper when `ADMIN_LOCAL_REPO_WRITES_ENABLED=true`; in production, the dashboard dispatches the **Archive campaign** workflow after super-admin authorization, and the workflow validates the slug before moving campaign source and campaign-owned media into `archive/campaigns/<slug>/`.
+
 Use `npm run media:optimize` locally or manually dispatch the workflow when retrying optimization, reviewing repo-side media changes, or processing files outside the dashboard upload path. If the host machine does not have the native optimizers installed, use `npm run media:optimize:podman` to run the same script inside the Podman site image with `optipng`, `gifsicle`, `libjpeg-turbo-progs`, `webp`, and `ffmpeg`. Use `npm run media:optimize:check` or `npm run media:optimize:check:podman` when reviewing a media-heavy branch and you want to fail on pending image optimizations, responsive WebP variants, or missing video derivatives. The pipeline optimizes images in place when the optimized result is smaller, generates responsive `.webp` image variants for public templates at `320w`, `480w`, `640w`, `960w`, and `1600w`, generates high-quality `.webm` derivatives beside uploaded MP4/MOV files, and rewrites literal `_campaigns` / `_config.yml` references from the uploaded source video to the generated WebM derivative. Original source images and videos remain in the repository for rollback and future re-encoding. Use the workflow's manual `scope=all` option when deployed existing media needs a full reprocess.
 
 Use meaningful alt text for images that communicate content. Decorative backgrounds can use empty alt text in the public templates.
@@ -342,6 +376,7 @@ The dashboard follows these project rules:
 - All mutations require a valid admin session and CSRF header.
 - Role and campaign scoping are enforced server-side.
 - Secrets are never stored in `_config.yml`, campaign YAML, dashboard drafts, KV user records, or GitHub commits.
+- Preview access emails are stored only in short-lived Worker KV allowlists, not in campaign Markdown, public JSON, sitemap output, or generated page metadata.
 - Shared admin label/help components should be used for new fields.
 - Hidden editor chrome should not be keyboard-reachable.
 - Sortable tables should expose `aria-sort`.

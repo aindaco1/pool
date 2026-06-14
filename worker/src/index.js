@@ -54,19 +54,20 @@
  *   POST /admin/campaign-index/rebuild/:slug - Rebuild campaign pledge index from KV
  *   GET  /admin/cron/status         - Check cron heartbeat status
  *   POST /admin/recover-checkout   - Recover missed Stripe webhook (creates pledge from session)
+ *   POST /admin/campaigns/archive  - Archive a non-live campaign locally in dev or through GitHub Actions (super admin)
  *   POST /test/setup         - Create test pledges (test mode only)
  *   POST /test/cleanup       - Remove test pledges (test mode only)
  *   POST /test/email         - Test individual email sends (test mode only)
  */
 
 import { generateToken, verifyToken } from './token.js';
-import { RESEND_RATE_LIMIT_DELAY_MS, sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail, sendCampaignRunnerReportEmail, sendAdminUserCreatedEmail } from './email.js';
+import { RESEND_RATE_LIMIT_DELAY_MS, sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail, sendCampaignRunnerReportEmail, sendAdminUserCreatedEmail, sendCampaignAssignmentEmail, sendCampaignPreviewEmail } from './email.js';
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
 import { applyAddOnInventoryProjectionDelta, ensureAddOnInventorySoldProjection, getAddOns, getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
 import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges, checkCampaignProjectionDrift } from './stats.js';
-import { deleteGitHubFile, getGitHubTextFile, putGitHubBase64File, putGitHubTextFile, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
+import { deleteGitHubFile, getGitHubTextFile, listGitHubDirectory, putGitHubBase64File, putGitHubTextFile, triggerCampaignArchive, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
 import { getScopedConsole } from './logger.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
@@ -165,6 +166,14 @@ const OBSERVABILITY_MAX_DAYS = 7;
 const DEFAULT_OBSERVABILITY_SAMPLE_RATE = 0.1;
 const CAMPAIGN_RUNNER_REPORT_MARKER_TTL_SECONDS = 180 * 24 * 60 * 60;
 const ADMIN_AUDIT_EVENT_TTL_SECONDS = 400 * 24 * 60 * 60;
+const CAMPAIGN_PREVIEW_LINK_TTL_SECONDS = 24 * 60 * 60;
+const CAMPAIGN_PREVIEW_LINK_TTL_DAYS = 1;
+const CAMPAIGN_PREVIEW_REVIEWER_TTL_SECONDS = CAMPAIGN_PREVIEW_LINK_TTL_SECONDS;
+const ADMIN_UNPUBLISHED_CAMPAIGN_CACHE_TTL_MS = 60 * 1000;
+
+let cachedUnpublishedAdminCampaigns = null;
+let cachedUnpublishedAdminCampaignsAt = 0;
+let cachedUnpublishedAdminCampaignsKey = '';
 
 // Extract plain text excerpt from diary entry (supports both legacy body and content blocks)
 function getDiaryExcerpt(entry, maxLength = 200) {
@@ -3842,6 +3851,47 @@ export default {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminUsersSave(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/admin/campaigns/create' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminCampaignCreate(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/admin/campaigns/archive' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminCampaignArchive(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/admin/campaign-preview/publish' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminCampaignPreviewPublish(request, env, parsedBody.body || {});
+      }
+
+      const adminCampaignPreviewMatch = path.match(/^\/admin\/campaign-preview\/([^/]+)$/);
+      if (adminCampaignPreviewMatch && method === 'GET') {
+        return handleAdminCampaignPreview(request, env, decodeURIComponent(adminCampaignPreviewMatch[1] || ''));
       }
 
       if (path === '/admin/analytics' && method === 'GET') {
@@ -9987,7 +10037,7 @@ async function handleAdminDashboardSummary(request, env) {
   const auth = await requireAdminSession(request, env, 'campaign:read');
   if (!auth.ok) return auth.response;
 
-  const { campaigns } = await getCampaigns(env);
+  const campaigns = await getAdminCampaigns(env);
   const allowedCampaigns = (campaigns || []).filter((campaign) => (
     auth.user.role === 'super_admin' ||
     auth.user.campaignSlugs.includes(String(campaign?.slug || ''))
@@ -10069,6 +10119,8 @@ function adminSettingsSection(title, entries) {
       visibleWhen: options.visibleWhen && typeof options.visibleWhen === 'object' ? options.visibleWhen : null,
       layoutGroup: options.layoutGroup || '',
       campaignSlug: options.campaignSlug || '',
+      archivePath: options.archivePath || '',
+      effectiveState: options.effectiveState || '',
       hideLabel: Boolean(options.hideLabel),
       help: options.help || ''
     }))
@@ -10126,8 +10178,8 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['platform.support_email', { label: 'Support email', type: 'string', input: 'email', layoutGroup: 'platform-creator-support', help: 'The public email address users should contact for pledge or platform support.' }],
   ['platform.pledges_email_from', { label: 'Pledges email from', type: 'string', input: 'email-sender', layoutGroup: 'platform-email-from', help: 'Sender identity used for pledge confirmation and pledge status emails. The sending domain must still be authorized by the email provider.' }],
   ['platform.updates_email_from', { label: 'Updates email from', type: 'string', input: 'email-sender', layoutGroup: 'platform-email-from', help: 'Sender identity used for campaign update and announcement emails. The sending domain must still be authorized by the email provider.' }],
-  ['platform.site_url', { label: 'Production site URL', type: 'string', input: 'url', help: 'The canonical public website URL used in generated links, metadata, and deploy-time config.' }],
-  ['platform.worker_url', { label: 'Production Worker URL', type: 'string', input: 'url', help: 'The canonical production Worker API URL used by the live site for pledge and admin requests.' }],
+  ['platform.site_url', { label: 'Production site URL', type: 'string', input: 'url', layoutGroup: 'platform-canonical-urls', help: 'The canonical public website URL used in generated links, metadata, and deploy-time config.' }],
+  ['platform.worker_url', { label: 'Production Worker URL', type: 'string', input: 'url', layoutGroup: 'platform-canonical-urls', help: 'The canonical production Worker API URL used by the live site for pledge and admin requests.' }],
   ['platform.footer_logo_path', { label: 'Footer logo', type: 'string', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo', help: 'Logo image used in the site footer. A square or horizontal PNG, JPEG, or WebP works best.' }],
   ['platform.favicon_path', { label: 'Favicon', type: 'string', input: 'image-upload', layoutGroup: 'brand-favicon-social-image', help: 'Small browser-tab icon for the site. Use a simple square PNG for the most reliable display.' }],
   ['platform.default_social_image_path', { label: 'Default social image', type: 'string', input: 'image-upload', layoutGroup: 'brand-favicon-social-image', help: 'Fallback image used for social share cards when a page or campaign does not provide its own image. Recommended: 1200 x 630 px.' }],
@@ -10350,13 +10402,31 @@ function campaignTierSelectOptions(tiers = []) {
   return options;
 }
 
-function campaignSettingsSection(campaign = {}, env = {}) {
+function isPublicCampaignLiveForArchive(campaign = {}, env = {}) {
+  if (isAdminPreviewOnlyCampaign(campaign)) return false;
+  return (getEffectiveState(campaign, env) || campaign.state || 'unknown') === 'live';
+}
+
+function campaignArchiveSetting(campaign = {}, env = {}) {
+  const slug = String(campaign?.slug || '').trim();
+  return {
+    path: 'archive_campaign',
+    input: 'campaign-archive',
+    type: 'action',
+    campaignSlug: slug,
+    archivePath: slug ? `archive/campaigns/${slug}/` : '',
+    effectiveState: getEffectiveState(campaign, env) || campaign.state || 'unknown',
+    help: 'Archiving keeps this campaign data and uploaded media for records. It does not delete data, but the campaign will leave active dashboard lists after the archive deploys.'
+  };
+}
+
+function campaignSettingsSection(campaign = {}, env = {}, options = {}) {
   const settings = publicCampaignSettings(campaign, env);
   const featuredTierSetting = {
     ...editableAdminSetting('featured_tier_id', 'string', settings.slug),
     options: campaignTierSelectOptions(settings.tiers)
   };
-  return adminSettingsSection(settings.title || settings.slug || 'Campaign', [
+  const rows = [
     ['Title', settings.title, editableAdminSetting('title', 'string', settings.slug)],
     ['Creator name', settings.creatorName, editableAdminSetting('creator_name', 'string', settings.slug)],
     ['Short blurb', settings.shortBlurb, editableAdminSetting('short_blurb', 'string', settings.slug)],
@@ -10393,7 +10463,11 @@ function campaignSettingsSection(campaign = {}, env = {}) {
     ['Support items', settings.supportItems, editableAdminSetting('support_items', 'campaign_collection', settings.slug)],
     ['Diary entries', settings.diary, editableAdminSetting('diary', 'campaign_collection', settings.slug)],
     ['Decisions', settings.decisions, editableAdminSetting('decisions', 'campaign_collection', settings.slug)]
-  ]);
+  ];
+  if (options.canArchiveCampaigns === true && !isPublicCampaignLiveForArchive(campaign, env)) {
+    rows.splice(27, 0, ['Archive campaign', '', campaignArchiveSetting(campaign, env)]);
+  }
+  return adminSettingsSection(settings.title || settings.slug || 'Campaign', rows);
 }
 
 function parseAdminDelimitedList(value) {
@@ -10420,6 +10494,560 @@ function adminCampaignOptions(campaigns = []) {
       value: String(campaign?.slug || '').trim()
     }))
     .filter((campaign) => campaign.value);
+}
+
+function isAdminPreviewOnlyCampaign(campaign = {}) {
+  return campaign?.preview_only === true ||
+    campaign?.previewOnly === true ||
+    campaign?.published === false ||
+    String(campaign?.visibility || '').trim().toLowerCase() === 'preview';
+}
+
+function splitAdminYamlInlineParts(value = '') {
+  const parts = [];
+  let current = '';
+  let quote = '';
+  let depth = 0;
+  const text = String(value || '');
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const previous = text[index - 1];
+    if (quote) {
+      current += char;
+      if (char === quote && previous !== '\\') quote = '';
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      current += char;
+      continue;
+    }
+    if (char === '{' || char === '[') depth += 1;
+    if (char === '}' || char === ']') depth = Math.max(0, depth - 1);
+    if (char === ',' && depth === 0) {
+      parts.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
+function parseAdminYamlInlineObject(rawValue = '') {
+  const body = String(rawValue || '').trim().replace(/^\{\s*/, '').replace(/\s*\}$/, '');
+  const object = {};
+  splitAdminYamlInlineParts(body).forEach((part) => {
+    const match = part.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (match) object[match[1]] = parseAdminYamlScalar(match[2]);
+  });
+  return object;
+}
+
+function adminYamlIndent(line = '') {
+  return (String(line || '').match(/^ */) || [''])[0].length;
+}
+
+function nextAdminYamlContentIndex(lines, index) {
+  let cursor = index;
+  while (cursor < lines.length && !String(lines[cursor] || '').trim()) cursor += 1;
+  return cursor;
+}
+
+function parseAdminYamlBlockScalar(lines, index, parentIndent) {
+  let cursor = index;
+  let minIndent = null;
+  while (cursor < lines.length) {
+    const line = lines[cursor] || '';
+    if (line.trim() && adminYamlIndent(line) <= parentIndent) break;
+    if (line.trim()) {
+      const indent = adminYamlIndent(line);
+      minIndent = minIndent === null ? indent : Math.min(minIndent, indent);
+    }
+    cursor += 1;
+  }
+  const stripIndent = minIndent === null ? parentIndent + 2 : minIndent;
+  const valueLines = lines.slice(index, cursor).map((line) => {
+    if (!String(line || '').trim()) return '';
+    return String(line || '').slice(Math.min(adminYamlIndent(line), stripIndent));
+  });
+  while (valueLines.length && valueLines[valueLines.length - 1] === '') valueLines.pop();
+  return { value: valueLines.join('\n'), index: cursor };
+}
+
+function parseAdminYamlScalar(rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) return '';
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (value === 'null') return null;
+  if (value === '[]') return [];
+  if (value.startsWith('{') && value.endsWith('}')) return parseAdminYamlInlineObject(value);
+  if (/^-?\d+(?:\.\d+)?$/.test(value)) return Number(value);
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    try {
+      return value.startsWith('"') ? JSON.parse(value) : value.slice(1, -1).replace(/''/g, "'");
+    } catch {
+      return value.slice(1, -1);
+    }
+  }
+  return value;
+}
+
+function parseAdminYamlKeyValueText(text = '') {
+  const match = String(text || '').match(/^([A-Za-z0-9_-]+):(?:\s*(.*))?$/);
+  if (!match) return null;
+  return {
+    key: match[1],
+    raw: match[2] === undefined ? '' : match[2]
+  };
+}
+
+function parseAdminYamlNode(lines, index, indent) {
+  const start = nextAdminYamlContentIndex(lines, index);
+  if (start >= lines.length || adminYamlIndent(lines[start]) < indent) {
+    return { value: null, index: start };
+  }
+  const trimmed = String(lines[start] || '').slice(adminYamlIndent(lines[start]));
+  if (adminYamlIndent(lines[start]) === indent && trimmed.startsWith('-')) {
+    return parseAdminYamlSequence(lines, start, indent);
+  }
+  return parseAdminYamlMapping(lines, start, indent);
+}
+
+function parseAdminYamlMapping(lines, index, indent) {
+  const data = {};
+  let cursor = index;
+  while (cursor < lines.length) {
+    cursor = nextAdminYamlContentIndex(lines, cursor);
+    if (cursor >= lines.length) break;
+
+    const line = lines[cursor] || '';
+    const lineIndent = adminYamlIndent(line);
+    if (lineIndent < indent) break;
+    if (lineIndent > indent) break;
+
+    const text = String(line).slice(indent);
+    if (text.startsWith('-')) break;
+    const pair = parseAdminYamlKeyValueText(text);
+    if (!pair) break;
+
+    cursor += 1;
+    if (/^\|[+-]?$/.test(pair.raw)) {
+      const block = parseAdminYamlBlockScalar(lines, cursor, indent);
+      data[pair.key] = block.value;
+      cursor = block.index;
+      continue;
+    }
+    if (pair.raw !== '') {
+      data[pair.key] = parseAdminYamlScalar(pair.raw);
+      continue;
+    }
+
+    const childIndex = nextAdminYamlContentIndex(lines, cursor);
+    if (childIndex >= lines.length || adminYamlIndent(lines[childIndex]) <= indent) {
+      data[pair.key] = '';
+      cursor = childIndex;
+      continue;
+    }
+    const child = parseAdminYamlNode(lines, childIndex, adminYamlIndent(lines[childIndex]));
+    data[pair.key] = child.value;
+    cursor = child.index;
+  }
+  return { value: data, index: cursor };
+}
+
+function parseAdminYamlSequence(lines, index, indent) {
+  const items = [];
+  let cursor = index;
+  while (cursor < lines.length) {
+    cursor = nextAdminYamlContentIndex(lines, cursor);
+    if (cursor >= lines.length) break;
+
+    const line = lines[cursor] || '';
+    const lineIndent = adminYamlIndent(line);
+    if (lineIndent < indent) break;
+    if (lineIndent > indent) break;
+
+    const text = String(line).slice(indent);
+    if (!text.startsWith('-')) break;
+    const itemText = text.replace(/^-\s*/, '');
+    cursor += 1;
+
+    if (!itemText) {
+      const childIndex = nextAdminYamlContentIndex(lines, cursor);
+      if (childIndex >= lines.length || adminYamlIndent(lines[childIndex]) <= indent) {
+        items.push(null);
+        cursor = childIndex;
+        continue;
+      }
+      const child = parseAdminYamlNode(lines, childIndex, adminYamlIndent(lines[childIndex]));
+      items.push(child.value);
+      cursor = child.index;
+      continue;
+    }
+    if (/^\|[+-]?$/.test(itemText)) {
+      const block = parseAdminYamlBlockScalar(lines, cursor, indent);
+      items.push(block.value);
+      cursor = block.index;
+      continue;
+    }
+
+    const firstPair = parseAdminYamlKeyValueText(itemText);
+    if (firstPair) {
+      const object = {};
+      if (/^\|[+-]?$/.test(firstPair.raw)) {
+        const block = parseAdminYamlBlockScalar(lines, cursor, indent + 2);
+        object[firstPair.key] = block.value;
+        cursor = block.index;
+      } else if (firstPair.raw !== '') {
+        object[firstPair.key] = parseAdminYamlScalar(firstPair.raw);
+      } else {
+        const childIndex = nextAdminYamlContentIndex(lines, cursor);
+        if (childIndex < lines.length && adminYamlIndent(lines[childIndex]) > indent) {
+          const child = parseAdminYamlNode(lines, childIndex, adminYamlIndent(lines[childIndex]));
+          object[firstPair.key] = child.value;
+          cursor = child.index;
+        } else {
+          object[firstPair.key] = '';
+          cursor = childIndex;
+        }
+      }
+      const restIndex = nextAdminYamlContentIndex(lines, cursor);
+      if (restIndex < lines.length && adminYamlIndent(lines[restIndex]) === indent + 2 && !String(lines[restIndex] || '').slice(indent + 2).startsWith('-')) {
+        const rest = parseAdminYamlMapping(lines, restIndex, indent + 2);
+        Object.assign(object, rest.value);
+        cursor = rest.index;
+      }
+      items.push(object);
+      continue;
+    }
+
+    items.push(parseAdminYamlScalar(itemText));
+  }
+  return { value: items, index: cursor };
+}
+
+function parseAdminFrontMatter(source = '') {
+  const match = String(source || '').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return null;
+  const lines = match[1].split(/\r?\n/);
+  return parseAdminYamlMapping(lines, 0, 0).value;
+}
+
+function normalizeAdminCampaignFromMarkdown(source = '', file = {}) {
+  const frontMatter = parseAdminFrontMatter(source);
+  if (!frontMatter) return null;
+  const slug = String(frontMatter.slug || '').trim();
+  if (!isValidSlug(slug)) return null;
+  return {
+    ...frontMatter,
+    slug,
+    title: String(frontMatter.title || slug).trim(),
+    state: String(frontMatter.state || 'upcoming').trim() || 'upcoming',
+    url: `/campaigns/${encodeURIComponent(slug)}/`,
+    _adminOnly: isAdminPreviewOnlyCampaign(frontMatter),
+    _githubPath: file.path || getAdminCampaignMarkdownPath(slug),
+    _githubSha: file.sha || ''
+  };
+}
+
+function isTruthyWorkerEnv(value) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function isLocalAdminRepoWritesEnabled(env = {}) {
+  return String(env.APP_MODE || '').trim().toLowerCase() === 'test' &&
+    isTruthyWorkerEnv(env.ADMIN_LOCAL_REPO_WRITES_ENABLED);
+}
+
+function localAdminRepoServiceBase(env = {}) {
+  if (!isLocalAdminRepoWritesEnabled(env)) return '';
+  const raw = String(env.ADMIN_LOCAL_REPO_SERVICE || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    const hostname = url.hostname.toLowerCase();
+    if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(hostname)) return '';
+    return url.toString().replace(/\/$/, '');
+  } catch (_error) {
+    return '';
+  }
+}
+
+async function callLocalAdminRepoService(env, pathname, body = {}) {
+  const base = localAdminRepoServiceBase(env);
+  if (!base) return { ok: false, status: 503, error: 'Local repository service is not configured.', code: 'local_repo_service_not_configured' };
+  const token = String(env.ADMIN_LOCAL_REPO_TOKEN || env.ADMIN_SECRET || '').trim();
+  if (!token) return { ok: false, status: 503, error: 'Local repository token is not configured.', code: 'local_repo_token_missing' };
+  let response = null;
+  try {
+    response = await fetch(`${base}${pathname}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      status: 502,
+      error: error?.message || 'Local repository service is unreachable.',
+      code: 'local_repo_service_unreachable'
+    };
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) {
+    return {
+      ok: false,
+      status: response.status,
+      error: data?.error || `Local repository service error: ${response.status}`,
+      code: data?.code || 'local_repo_service_failed'
+    };
+  }
+  return { ok: true, ...data };
+}
+
+async function localAdminRepoRoot(env = {}) {
+  const { basename, resolve } = await import('node:path');
+  const configuredRoot = String(env.ADMIN_LOCAL_REPO_ROOT || '').trim();
+  if (configuredRoot) return resolve(configuredRoot);
+  const cwd = typeof process !== 'undefined' && typeof process.cwd === 'function' ? process.cwd() : '.';
+  return basename(cwd) === 'worker' ? resolve(cwd, '..') : resolve(cwd);
+}
+
+function normalizeLocalAdminRepoPath(filePath = '') {
+  const normalized = String(filePath || '').replace(/^\/+/, '').split(/[?#]/)[0];
+  if (!normalized || normalized.includes('\\') || normalized.split('/').some((part) => part === '..')) return '';
+  if (normalized.startsWith('../') || normalized.includes('/../')) return '';
+  return normalized;
+}
+
+async function localAdminAbsolutePath(env, filePath) {
+  const path = await import('node:path');
+  const root = await localAdminRepoRoot(env);
+  const repoPath = normalizeLocalAdminRepoPath(filePath);
+  if (!repoPath || path.isAbsolute(repoPath)) return null;
+  const absolutePath = path.resolve(root, repoPath);
+  const rootWithSeparator = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
+  if (absolutePath !== root && !absolutePath.startsWith(rootWithSeparator)) return null;
+  return { root, repoPath, absolutePath };
+}
+
+async function readLocalAdminTextFile(env, filePath) {
+  if (!isLocalAdminRepoWritesEnabled(env)) {
+    return { ok: false, status: 503, error: 'Local repository writes are not enabled.', code: 'local_repo_writes_disabled' };
+  }
+  if (localAdminRepoServiceBase(env)) {
+    return callLocalAdminRepoService(env, '/read', { path: filePath });
+  }
+  const fs = await import('node:fs/promises');
+  const resolved = await localAdminAbsolutePath(env, filePath);
+  if (!resolved) return { ok: false, status: 400, error: 'Invalid local repository path.', code: 'invalid_local_repo_path' };
+  try {
+    const content = await fs.readFile(resolved.absolutePath, 'utf8');
+    return { ok: true, path: resolved.repoPath, content };
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return { ok: false, status: 404, error: `Local file not found: ${resolved.repoPath}`, code: 'local_file_not_found' };
+    }
+    return { ok: false, status: 500, error: error?.message || 'Unable to read local file.', code: 'local_file_read_failed' };
+  }
+}
+
+async function putLocalAdminTextFile(env, filePath, content, { overwrite = false } = {}) {
+  if (!isLocalAdminRepoWritesEnabled(env)) {
+    return { ok: false, status: 503, error: 'Local repository writes are not enabled.', code: 'local_repo_writes_disabled' };
+  }
+  if (localAdminRepoServiceBase(env)) {
+    return callLocalAdminRepoService(env, '/write', { path: filePath, content, overwrite });
+  }
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const resolved = await localAdminAbsolutePath(env, filePath);
+  if (!resolved) return { ok: false, status: 400, error: 'Invalid local repository path.', code: 'invalid_local_repo_path' };
+  try {
+    await fs.mkdir(path.dirname(resolved.absolutePath), { recursive: true });
+    await fs.writeFile(resolved.absolutePath, String(content || ''), {
+      encoding: 'utf8',
+      flag: overwrite ? 'w' : 'wx'
+    });
+    return {
+      ok: true,
+      path: resolved.repoPath,
+      contentSha: '',
+      commitSha: 'local',
+      commitUrl: ''
+    };
+  } catch (error) {
+    if (error?.code === 'EEXIST') {
+      return { ok: false, status: 409, error: `Local file already exists: ${resolved.repoPath}`, code: 'local_file_exists' };
+    }
+    return { ok: false, status: 500, error: error?.message || 'Unable to write local file.', code: 'local_file_write_failed' };
+  }
+}
+
+async function listLocalAdminCampaignMarkdownFiles(env) {
+  if (!isLocalAdminRepoWritesEnabled(env)) return [];
+  if (localAdminRepoServiceBase(env)) {
+    const listed = await callLocalAdminRepoService(env, '/campaign-files');
+    return listed.ok && Array.isArray(listed.files) ? listed.files : [];
+  }
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const resolved = await localAdminAbsolutePath(env, '_campaigns');
+  if (!resolved) return [];
+  let entries = [];
+  try {
+    entries = await fs.readdir(resolved.absolutePath, { withFileTypes: true });
+  } catch (_error) {
+    return [];
+  }
+  return entries
+    .filter((entry) => entry.isFile() && /\.md$/i.test(entry.name))
+    .map((entry) => ({
+      name: entry.name,
+      path: `_campaigns/${entry.name}`,
+      absolutePath: path.join(resolved.absolutePath, entry.name)
+    }));
+}
+
+async function getAdminCampaignFromMarkdownFile(env, campaignSlug) {
+  const slug = String(campaignSlug || '').trim();
+  if (isLocalAdminRepoWritesEnabled(env) && isValidSlug(slug)) {
+    const filePath = getAdminCampaignMarkdownPath(slug);
+    const file = await readLocalAdminTextFile(env, filePath);
+    if (file.ok) {
+      return normalizeAdminCampaignFromMarkdown(file.content, {
+        path: file.path || filePath,
+        sha: ''
+      });
+    }
+  }
+  if (!env?.GITHUB_TOKEN || !isValidSlug(slug)) return null;
+  try {
+    const file = await getGitHubTextFile(env, getAdminCampaignMarkdownPath(slug));
+    if (!file.ok) return null;
+    return normalizeAdminCampaignFromMarkdown(file.content, {
+      path: file.path || getAdminCampaignMarkdownPath(slug),
+      sha: file.sha || ''
+    });
+  } catch (_error) {
+    return null;
+  }
+}
+
+function mergeAdminCampaignPreviewMetadata(campaign, markdownCampaign) {
+  if (!campaign) return markdownCampaign;
+  if (!markdownCampaign) return campaign;
+  const merged = { ...campaign, ...markdownCampaign };
+  [
+    'long_content',
+    'support_items',
+    'campaign_add_ons',
+    'tiers',
+    'stretch_goals',
+    'ongoing_items',
+    'diary',
+    'decisions'
+  ].forEach((field) => {
+    if (Array.isArray(markdownCampaign[field])) {
+      merged[field] = markdownCampaign[field];
+    } else if (Array.isArray(campaign[field])) {
+      merged[field] = campaign[field];
+    }
+  });
+  return merged;
+}
+
+async function getAdminCampaignPreviewAccessCampaign(env, campaignSlug) {
+  const markdownCampaign = await getAdminCampaignFromMarkdownFile(env, campaignSlug);
+  let publicCampaign = null;
+  try {
+    publicCampaign = await getCampaign(env, campaignSlug);
+  } catch (_error) {
+    publicCampaign = null;
+  }
+  return mergeAdminCampaignPreviewMetadata(publicCampaign, markdownCampaign) || markdownCampaign || publicCampaign;
+}
+
+async function getUnpublishedAdminCampaigns(env) {
+  if (isLocalAdminRepoWritesEnabled(env)) {
+    const campaigns = [];
+    const files = await listLocalAdminCampaignMarkdownFiles(env);
+    const fs = await import('node:fs/promises');
+    for (const file of files.slice(0, 100)) {
+      try {
+        const content = typeof file.content === 'string'
+          ? file.content
+          : await fs.readFile(file.absolutePath, 'utf8');
+        const campaign = normalizeAdminCampaignFromMarkdown(content, { path: file.path, sha: '' });
+        if (campaign && isAdminPreviewOnlyCampaign(campaign)) campaigns.push(campaign);
+      } catch (_error) {
+      }
+    }
+    return campaigns;
+  }
+  if (!env?.GITHUB_TOKEN) return [];
+  const now = Date.now();
+  const cacheKey = [
+    env.GITHUB_OWNER || 'dust-wave',
+    env.GITHUB_REPO || 'pool',
+    env.GITHUB_REF || 'main'
+  ].join('/');
+  if (
+    cachedUnpublishedAdminCampaigns &&
+    cachedUnpublishedAdminCampaignsKey === cacheKey &&
+    now - cachedUnpublishedAdminCampaignsAt < ADMIN_UNPUBLISHED_CAMPAIGN_CACHE_TTL_MS
+  ) {
+    return cachedUnpublishedAdminCampaigns;
+  }
+  const listed = await listGitHubDirectory(env, '_campaigns', { quiet: true });
+  if (!listed.ok) return [];
+  const markdownFiles = listed.entries
+    .filter((entry) => entry.type === 'file' && /\.md$/i.test(entry.name))
+    .slice(0, 100);
+  const campaigns = [];
+  for (const entry of markdownFiles) {
+    const file = await getGitHubTextFile(env, entry.path);
+    if (!file.ok) continue;
+    const campaign = normalizeAdminCampaignFromMarkdown(file.content, {
+      path: entry.path,
+      sha: file.sha || entry.sha
+    });
+    if (campaign && isAdminPreviewOnlyCampaign(campaign)) campaigns.push(campaign);
+  }
+  cachedUnpublishedAdminCampaigns = campaigns;
+  cachedUnpublishedAdminCampaignsAt = now;
+  cachedUnpublishedAdminCampaignsKey = cacheKey;
+  return campaigns;
+}
+
+async function getAdminCampaigns(env) {
+  const [{ campaigns }, unpublishedCampaigns] = await Promise.all([
+    getCampaigns(env),
+    getUnpublishedAdminCampaigns(env)
+  ]);
+  const bySlug = new Map();
+  for (const campaign of Array.isArray(campaigns) ? campaigns : []) {
+    if (campaign?.slug) bySlug.set(String(campaign.slug), campaign);
+  }
+  for (const campaign of unpublishedCampaigns) {
+    if (campaign?.slug) bySlug.set(String(campaign.slug), campaign);
+  }
+  return Array.from(bySlug.values());
+}
+
+async function getAdminCampaign(env, slug) {
+  const campaignSlug = String(slug || '').trim();
+  if (!campaignSlug) return null;
+  const campaign = await getCampaign(env, campaignSlug);
+  if (campaign) return campaign;
+  const unpublishedCampaigns = await getUnpublishedAdminCampaigns(env);
+  return unpublishedCampaigns.find((item) => String(item?.slug || '') === campaignSlug) || null;
 }
 
 function adminSecretStatusRows(env) {
@@ -11099,8 +11727,8 @@ async function handleAdminSettings(request, env) {
   const auth = await requireAdminSession(request, env, 'campaign:read');
   if (!auth.ok) return auth.response;
 
-  const [{ campaigns }, addOns] = await Promise.all([
-    getCampaigns(env),
+  const [campaigns, addOns] = await Promise.all([
+    getAdminCampaigns(env),
     auth.user.role === 'super_admin' ? getAddOns(env) : Promise.resolve(null)
   ]);
   const allowedCampaigns = (campaigns || []).filter((campaign) => (
@@ -11108,7 +11736,9 @@ async function handleAdminSettings(request, env) {
     auth.user.campaignSlugs.includes(String(campaign?.slug || ''))
   ));
 
-  const campaignSections = allowedCampaigns.map((campaign) => campaignSettingsSection(campaign, env));
+  const campaignSections = allowedCampaigns.map((campaign) => campaignSettingsSection(campaign, env, {
+    canArchiveCampaigns: auth.user.role === 'super_admin'
+  }));
   const sections = [];
   const canonicalSiteBase = env.CANONICAL_SITE_BASE || env.SITE_BASE;
   const canonicalWorkerBase = env.CANONICAL_WORKER_BASE || env.WORKER_BASE;
@@ -11132,6 +11762,8 @@ async function handleAdminSettings(request, env) {
         ['Default timezone', getPlatformTimeZone(env), editableAdminSetting('platform.timezone')],
         ['Support email', env.SUPPORT_EMAIL, editableAdminSetting('platform.support_email')],
         ['Site description', env.SITE_DESCRIPTION, editableAdminSetting('description')],
+        ['Production site URL', canonicalSiteBase, editableAdminSetting('platform.site_url')],
+        ['Production Worker URL', canonicalWorkerBase, editableAdminSetting('platform.worker_url')],
         ['Pledges email from', env.PLEDGES_EMAIL_FROM, editableAdminSetting('platform.pledges_email_from')],
         ['Updates email from', env.UPDATES_EMAIL_FROM, editableAdminSetting('platform.updates_email_from')],
         ['App mode', env.APP_MODE, readOnlyAdminSettingHelp('The runtime environment mode currently used by the Worker, such as live or test.')]
@@ -11145,10 +11777,6 @@ async function handleAdminSettings(request, env) {
         ['Default social image alt', env.SEO_DEFAULT_SOCIAL_IMAGE_ALT || env.PLATFORM_NAME, editableAdminSetting('seo.default_social_image_alt')],
         ['Same-as links', seoSameAs, editableAdminSetting('seo.same_as', 'list')],
         ['Index public community hub', env.SEO_INDEX_PUBLIC_COMMUNITY_HUB ?? 'true', editableAdminSetting('seo.index_public_community_hub', 'boolean')]
-      ]),
-      adminSettingsSection('Canonical URLs', [
-        ['Production site URL', canonicalSiteBase, editableAdminSetting('platform.site_url')],
-        ['Production Worker URL', canonicalWorkerBase, editableAdminSetting('platform.worker_url')]
       ]),
       adminSettingsSection('Checkout', [
         ['Stripe publishable key', env.STRIPE_PUBLISHABLE_KEY || '', editableAdminSetting('checkout.stripe_publishable_key')]
@@ -12159,7 +12787,7 @@ async function validateAdminSettingsChanges(request, env, body = {}, options = {
     return { ok: false, response: privateJsonResponse({ error: 'Too many settings changes.' }, 400, env) };
   }
 
-  const { campaigns } = await getCampaigns(env);
+  const campaigns = await getAdminCampaigns(env);
   const campaignMap = new Map((campaigns || []).map((campaign) => [String(campaign?.slug || ''), campaign]));
   const normalized = [];
   const errors = [];
@@ -12350,6 +12978,1083 @@ async function handleAdminUsersSave(request, env, body = {}) {
     })),
     notifications,
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 1 })
+  }, 200, env);
+}
+
+function normalizeAdminEmailValue(value, label = 'Email') {
+  const email = stripAdminControlCharacters(value).trim().toLowerCase();
+  if (!isValidEmail(email)) return { ok: false, error: `${label} must be a valid email address.` };
+  return { ok: true, value: email };
+}
+
+function normalizeAdminCampaignTitle(value) {
+  const title = normalizeAdminPlainText(value, 'Campaign title', { maxLength: 160 });
+  if (!title.ok) return title;
+  if (!title.value) return { ok: false, error: 'Campaign title is required.' };
+  return title;
+}
+
+function normalizeNewCampaignUser(value = {}, label = 'Campaign user') {
+  const name = normalizeAdminPlainText(value?.name || '', `${label} name`, { maxLength: 160 });
+  if (!name.ok) return name;
+  if (!name.value) return { ok: false, error: `${label} name is required.` };
+  const email = normalizeAdminEmailValue(value?.email || '', `${label} email`);
+  if (!email.ok) return email;
+  return {
+    ok: true,
+    value: {
+      name: name.value,
+      email: email.value,
+      role: 'campaign_user',
+      campaignSlugs: []
+    }
+  };
+}
+
+function normalizeNewCampaignUsersForCreate(body = {}) {
+  const source = Array.isArray(body.newCampaignUsers)
+    ? body.newCampaignUsers
+    : body.newCampaignUser && typeof body.newCampaignUser === 'object'
+      ? [body.newCampaignUser]
+      : [];
+  const users = [];
+  const errors = [];
+  const seen = new Set();
+
+  for (const [index, item] of source.entries()) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      errors.push(`New campaign user ${index + 1} must include a name and email.`);
+      continue;
+    }
+    const rawName = String(item?.name || '').trim();
+    const rawEmail = String(item?.email || '').trim();
+    if (!rawName && !rawEmail) continue;
+    const normalized = normalizeNewCampaignUser(item, `New campaign user ${index + 1}`);
+    if (!normalized.ok) {
+      errors.push(normalized.error);
+      continue;
+    }
+    if (seen.has(normalized.value.email)) {
+      errors.push(`New campaign user ${index + 1} email is duplicated.`);
+      continue;
+    }
+    seen.add(normalized.value.email);
+    users.push(normalized.value);
+  }
+
+  return { ok: errors.length === 0, value: users, errors };
+}
+
+function getCampaignPreviewSecret(env = {}) {
+  return env.CAMPAIGN_PREVIEW_SECRET || env.MAGIC_LINK_SECRET || env.ADMIN_SESSION_SECRET || env.ADMIN_SECRET || '';
+}
+
+function buildCampaignPreviewUrl(env, campaignSlug, token = '') {
+  const base = String(env.SITE_BASE || env.CANONICAL_SITE_BASE || '').replace(/\/$/, '');
+  const previewPath = `/campaigns/${encodeURIComponent(campaignSlug)}/preview/`;
+  if (!base) {
+    return token ? `${previewPath}?t=${encodeURIComponent(token)}` : previewPath;
+  }
+  const url = new URL(`${base}${previewPath}`);
+  if (token) url.searchParams.set('t', token);
+  return url.toString();
+}
+
+function createCampaignPreviewLinkId() {
+  if (typeof crypto?.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function campaignPreviewExpiresAt(now = new Date()) {
+  return new Date(now.getTime() + CAMPAIGN_PREVIEW_LINK_TTL_SECONDS * 1000).toISOString();
+}
+
+async function buildCampaignPreviewLinkForEmail(env, campaignSlug, email, secret = getCampaignPreviewSecret(env), options = {}) {
+  const normalizedEmail = normalizeAdminEmailValue(email, 'Preview email');
+  if (!normalizedEmail.ok) return { ok: false, error: normalizedEmail.error };
+  if (!secret) return { ok: false, error: 'Campaign preview signing is not configured' };
+  const createdAtDate = options?.now instanceof Date && Number.isFinite(options.now.getTime())
+    ? options.now
+    : new Date();
+  const createdAt = String(options?.createdAt || createdAtDate.toISOString());
+  const expiresAt = String(options?.expiresAt || campaignPreviewExpiresAt(createdAtDate));
+  const linkId = String(options?.linkId || createCampaignPreviewLinkId()).trim();
+  const token = await generateToken(secret, {
+    type: 'campaign_preview',
+    campaignSlug,
+    email: normalizedEmail.value,
+    linkId
+  }, CAMPAIGN_PREVIEW_LINK_TTL_DAYS);
+  return {
+    ok: true,
+    email: normalizedEmail.value,
+    linkId,
+    previewUrl: buildCampaignPreviewUrl(env, campaignSlug, token),
+    createdAt,
+    expiresAt,
+    expiresInHours: CAMPAIGN_PREVIEW_LINK_TTL_SECONDS / 60 / 60
+  };
+}
+
+function normalizeReviewerEmails(value, { maxEmails = 25 } = {}) {
+  const source = Array.isArray(value) ? value : String(value || '').split(/[\n,]+/);
+  const errors = [];
+  const emails = [];
+  const seen = new Set();
+  for (const item of source) {
+    const email = normalizeAdminEmailValue(item, 'Reviewer email');
+    if (!email.ok) {
+      if (String(item || '').trim()) errors.push(email.error);
+      continue;
+    }
+    if (!seen.has(email.value)) {
+      seen.add(email.value);
+      emails.push(email.value);
+    }
+  }
+  if (emails.length > maxEmails) errors.push(`Preview reviewers can include at most ${maxEmails} emails.`);
+  return { ok: errors.length === 0, value: emails.slice(0, maxEmails), errors };
+}
+
+function buildBlankCampaignMarkdown({ title, slug, campaignUserName }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const creatorName = String(campaignUserName || '').trim() || '';
+  return `---
+layout: campaign
+title: ${yamlQuoteAdminString(title)}
+slug: ${slug}
+published: false
+preview_only: true
+preview_enabled: false
+preview_reviewer_emails: []
+state: upcoming
+start_date: ${today}
+goal_deadline: ${today}
+goal_amount: 0
+charged: false
+hero_image: /assets/images/defaults/dust-wave-square.png
+hero_image_wide: /assets/images/defaults/dust-wave-square.png
+creator_image: /assets/images/defaults/dust-wave-square.png
+creator_name: ${yamlQuoteAdminString(creatorName)}
+category: ${yamlQuoteAdminString('Other')}
+short_blurb: ""
+show_ongoing: false
+single_tier_only: false
+stretch_hidden: true
+custom_late_support: false
+runner_report_emails: []
+long_content: []
+support_items: []
+campaign_add_ons: []
+tiers: []
+stretch_goals: []
+ongoing_items: []
+diary: []
+decisions: []
+---
+`;
+}
+
+function normalizeArchiveMediaReference(value = '') {
+  const text = String(value || '').replace(/^\/+/, '').split(/[?#]/)[0];
+  if (!text || text.includes('..') || text.includes('\\')) return '';
+  if (!/^assets\/(?:images|videos|audio)\//.test(text)) return '';
+  return text;
+}
+
+function campaignArchiveMediaReferences(source = '') {
+  const refs = new Set();
+  const matches = String(source || '').match(/\/?assets\/(?:images|videos|audio)\/[^\s"'<>),\]}]+/g) || [];
+  matches.forEach((match) => {
+    const normalized = normalizeArchiveMediaReference(match);
+    if (normalized) refs.add(normalized);
+  });
+  return refs;
+}
+
+function isArchiveableCampaignMediaReference(reference, campaignSlug) {
+  const slug = String(campaignSlug || '').trim();
+  return reference.startsWith(`assets/images/campaigns/${slug}/`) ||
+    reference.startsWith(`assets/videos/campaigns/${slug}/`) ||
+    reference.startsWith(`assets/audio/campaigns/${slug}/`) ||
+    reference.startsWith('assets/images/campaign-add-ons/');
+}
+
+async function archiveLocalAdminCampaign(env, { campaignSlug = '', requestedBy = '' } = {}) {
+  if (!isLocalAdminRepoWritesEnabled(env)) {
+    return { ok: false, status: 503, error: 'Local repository writes are not enabled.', code: 'local_repo_writes_disabled' };
+  }
+  if (localAdminRepoServiceBase(env)) {
+    return callLocalAdminRepoService(env, '/archive', { campaignSlug, requestedBy });
+  }
+  const slug = String(campaignSlug || '').trim();
+  if (!isValidSlug(slug)) {
+    return { ok: false, status: 400, error: 'Invalid campaign slug.', code: 'invalid_campaign_slug' };
+  }
+
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const root = await localAdminRepoRoot(env);
+  const archiveRoot = `archive/campaigns/${slug}`;
+  const campaignPath = `_campaigns/${slug}.md`;
+  const archivedCampaignPath = `${archiveRoot}/_campaigns/${slug}.md`;
+
+  function absolute(repoPath) {
+    const normalized = normalizeLocalAdminRepoPath(repoPath);
+    if (!normalized || path.isAbsolute(normalized)) return '';
+    const absolutePath = path.resolve(root, normalized);
+    const rootWithSeparator = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
+    if (absolutePath !== root && !absolutePath.startsWith(rootWithSeparator)) return '';
+    return absolutePath;
+  }
+
+  async function exists(repoPath) {
+    const filePath = absolute(repoPath);
+    if (!filePath) return false;
+    try {
+      await fs.access(filePath);
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  async function walkFiles(repoDirectory) {
+    const directoryPath = absolute(repoDirectory);
+    if (!directoryPath) return [];
+    let entries = [];
+    try {
+      entries = await fs.readdir(directoryPath, { withFileTypes: true });
+    } catch (_error) {
+      return [];
+    }
+    const files = [];
+    for (const entry of entries) {
+      const childRepoPath = `${repoDirectory.replace(/\/$/, '')}/${entry.name}`;
+      if (entry.isDirectory()) {
+        files.push(...await walkFiles(childRepoPath));
+      } else if (entry.isFile()) {
+        files.push(childRepoPath);
+      }
+    }
+    return files;
+  }
+
+  const campaignAbsolutePath = absolute(campaignPath);
+  const archiveRootAbsolutePath = absolute(archiveRoot);
+  if (!campaignAbsolutePath || !archiveRootAbsolutePath) {
+    return { ok: false, status: 400, error: 'Invalid local campaign archive path.', code: 'invalid_local_archive_path' };
+  }
+  if (!await exists(campaignPath)) {
+    return {
+      ok: false,
+      status: 404,
+      error: 'Local campaign source was not found. If this campaign was created on GitHub, pull the branch before archiving it locally.',
+      code: 'local_campaign_source_not_found'
+    };
+  }
+  if (await exists(archiveRoot)) {
+    return { ok: false, status: 409, error: 'This campaign already has a local archive.', code: 'local_campaign_archive_exists' };
+  }
+
+  const campaignSource = await fs.readFile(campaignAbsolutePath, 'utf8');
+  const referencedMedia = Array.from(campaignArchiveMediaReferences(campaignSource))
+    .filter((reference) => isArchiveableCampaignMediaReference(reference, slug));
+  const candidateMedia = new Set(referencedMedia);
+  for (const directory of [
+    `assets/images/campaigns/${slug}`,
+    `assets/videos/campaigns/${slug}`,
+    `assets/audio/campaigns/${slug}`
+  ]) {
+    const files = await walkFiles(directory);
+    files.forEach((filePath) => candidateMedia.add(filePath));
+  }
+
+  const otherCampaignReferences = new Set();
+  const campaignFiles = await walkFiles('_campaigns');
+  for (const filePath of campaignFiles) {
+    if (filePath === campaignPath || !filePath.endsWith('.md')) continue;
+    try {
+      const source = await fs.readFile(absolute(filePath), 'utf8');
+      campaignArchiveMediaReferences(source).forEach((reference) => otherCampaignReferences.add(reference));
+    } catch (_error) {
+    }
+  }
+
+  const movedMedia = [];
+  const skippedSharedMedia = [];
+  for (const sourcePath of Array.from(candidateMedia).sort()) {
+    if (!await exists(sourcePath)) continue;
+    if (otherCampaignReferences.has(sourcePath)) {
+      skippedSharedMedia.push(sourcePath);
+      continue;
+    }
+    const targetPath = `${archiveRoot}/${sourcePath}`;
+    const sourceAbsolutePath = absolute(sourcePath);
+    const targetAbsolutePath = absolute(targetPath);
+    if (!sourceAbsolutePath || !targetAbsolutePath) continue;
+    await fs.mkdir(path.dirname(targetAbsolutePath), { recursive: true });
+    await fs.rename(sourceAbsolutePath, targetAbsolutePath);
+    movedMedia.push({ sourcePath, archivePath: targetPath });
+  }
+
+  let archivedSource = campaignSource;
+  movedMedia.forEach((item, index) => {
+    const token = `__POOL_ARCHIVE_MEDIA_${index}__`;
+    archivedSource = archivedSource.split(`/${item.sourcePath}`).join(`/${token}`);
+    archivedSource = archivedSource.split(item.sourcePath).join(token);
+    archivedSource = archivedSource.split(token).join(item.archivePath);
+  });
+
+  const archivedCampaignAbsolutePath = absolute(archivedCampaignPath);
+  if (!archivedCampaignAbsolutePath) {
+    return { ok: false, status: 400, error: 'Invalid local archived campaign path.', code: 'invalid_local_archive_path' };
+  }
+  await fs.mkdir(path.dirname(archivedCampaignAbsolutePath), { recursive: true });
+  await fs.rename(campaignAbsolutePath, archivedCampaignAbsolutePath);
+  await fs.writeFile(archivedCampaignAbsolutePath, archivedSource, 'utf8');
+  await fs.writeFile(absolute(`${archiveRoot}/archive-manifest.json`), `${JSON.stringify({
+    campaignSlug: slug,
+    requestedBy: String(requestedBy || ''),
+    archivedAt: new Date().toISOString(),
+    sourceCampaignPath: campaignPath,
+    archivedCampaignPath,
+    movedMedia,
+    skippedSharedMedia
+  }, null, 2)}\n`, 'utf8');
+
+  cachedUnpublishedAdminCampaigns = null;
+  cachedUnpublishedAdminCampaignsAt = 0;
+  cachedUnpublishedAdminCampaignsKey = '';
+
+  return {
+    ok: true,
+    mode: 'local',
+    archivePath: `${archiveRoot}/`,
+    movedMedia,
+    skippedSharedMedia
+  };
+}
+
+function yamlAdminStringList(key, values = []) {
+  const items = Array.isArray(values) ? values : [];
+  if (!items.length) return `${key}: []`;
+  return `${key}:\n${items.map((item) => `  - ${yamlQuoteAdminString(item)}`).join('\n')}`;
+}
+
+function applyAdminCampaignPreviewSettingsToMarkdown(source, { enabled = true } = {}) {
+  const match = String(source || '').match(/^---\r?\n([\s\S]*?)\r?\n---(\r?\n[\s\S]*)?$/);
+  if (!match) {
+    return { ok: false, error: 'Campaign Markdown must contain YAML front matter.' };
+  }
+
+  let frontMatter = match[1];
+  frontMatter = replaceAdminFrontMatterBlock(frontMatter, 'preview_enabled', `preview_enabled: ${enabled ? 'true' : 'false'}`);
+  frontMatter = replaceAdminFrontMatterBlock(frontMatter, 'preview_reviewer_emails', 'preview_reviewer_emails: []');
+  frontMatter = replaceAdminFrontMatterBlock(frontMatter, 'preview_updated_at', yamlAdminScalarLine('preview_updated_at', new Date().toISOString()));
+
+  return {
+    ok: true,
+    content: `---\n${frontMatter.replace(/\s*$/, '')}\n---${match[2] || '\n'}`
+  };
+}
+
+function normalizeCampaignUserEmailListForCreate(body = {}) {
+  const sourceValue = body.campaignUserEmails ?? body.existingCampaignUserEmails ?? body.campaignUserEmail ?? body.existingCampaignUserEmail ?? [];
+  const source = Array.isArray(sourceValue) ? sourceValue : String(sourceValue || '').split(/[\n,]+/);
+  const emails = [];
+  const errors = [];
+  const seen = new Set();
+
+  for (const item of source) {
+    const raw = String(item || '').trim();
+    if (!raw) continue;
+    const normalized = normalizeAdminEmailValue(raw, 'Campaign user email');
+    if (!normalized.ok) {
+      errors.push(normalized.error);
+      continue;
+    }
+    if (!seen.has(normalized.value)) {
+      seen.add(normalized.value);
+      emails.push(normalized.value);
+    }
+  }
+
+  return { ok: errors.length === 0, value: emails, errors };
+}
+
+async function resolveCampaignUsersForCreate(env, body, campaigns, auth) {
+  const existingEmails = normalizeCampaignUserEmailListForCreate(body);
+  if (!existingEmails.ok) return { ok: false, error: existingEmails.errors.join(' ') };
+  const newUsers = normalizeNewCampaignUsersForCreate(body);
+  if (!newUsers.ok) return { ok: false, error: newUsers.errors.join(' ') };
+  const previousUsers = await getEffectiveAdminUsers(env);
+  const users = previousUsers.map((user) => ({
+    name: user.name || '',
+    email: user.email,
+    role: user.role === 'super_admin' ? 'super_admin' : 'campaign_user',
+    campaignSlugs: user.role === 'super_admin' ? [] : (user.campaignSlugs || [])
+  }));
+  const assignedUsers = [];
+
+  function assignUser(user) {
+    if (!user || user.role !== 'campaign_user') return;
+    if (!assignedUsers.some((assigned) => assigned.email === user.email)) {
+      assignedUsers.push(user);
+    }
+  }
+
+  for (const email of existingEmails.value) {
+    const user = users.find((candidate) => candidate.email === email && candidate.role === 'campaign_user');
+    if (!user) return { ok: false, error: `Selected campaign user "${email}" was not found.` };
+    assignUser(user);
+  }
+
+  for (const newUser of newUsers.value) {
+    const existing = users.find((user) => user.email === newUser.email);
+    if (existing && existing.role !== 'campaign_user') {
+      return { ok: false, error: 'Campaign user email already belongs to a super admin.' };
+    }
+    if (existing) {
+      existing.name = newUser.name || existing.name;
+      assignUser(existing);
+    } else {
+      users.push(newUser);
+      assignUser(newUser);
+    }
+  }
+
+  return { ok: true, assignedUsers, users, previousUsers };
+}
+
+async function handleAdminCampaignCreate(request, env, body = {}) {
+  const auth = await requireAdminSession(request, env, 'settings:publish', { requireCsrf: true });
+  if (!auth.ok) return auth.response;
+  if (auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Forbidden' }, 403, env);
+  }
+  const localRepoWrites = isLocalAdminRepoWritesEnabled(env);
+  if (!localRepoWrites && !env.GITHUB_TOKEN) {
+    return privateJsonResponse({ error: 'GITHUB_TOKEN not configured', code: 'github_not_configured' }, 503, env);
+  }
+
+  const title = normalizeAdminCampaignTitle(body.title);
+  if (!title.ok) return privateJsonResponse({ valid: false, errors: [title.error] }, 422, env);
+
+  const campaigns = await getAdminCampaigns(env);
+  const userResult = await resolveCampaignUsersForCreate(env, body, campaigns, auth);
+  if (!userResult.ok) {
+    return privateJsonResponse({ valid: false, errors: [userResult.error] }, 422, env);
+  }
+
+  const usedSlugs = new Set((campaigns || []).map((campaign) => String(campaign?.slug || '')).filter(Boolean));
+  const slug = uniqueAdminId(title.value, usedSlugs);
+  const githubPath = getAdminCampaignMarkdownPath(slug);
+  const assignedCampaignUserNames = userResult.assignedUsers
+    .map((user) => String(user.name || '').trim())
+    .filter(Boolean);
+  const markdown = buildBlankCampaignMarkdown({
+    title: title.value,
+    slug,
+    campaignUserName: assignedCampaignUserNames.join(', ')
+  });
+
+  for (const user of userResult.assignedUsers) {
+    if (!user.campaignSlugs.includes(slug)) {
+      user.campaignSlugs.push(slug);
+    }
+  }
+  const hasAssignedCampaignUsers = userResult.assignedUsers.length > 0;
+  let normalizedUsers = { ok: true, value: userResult.users };
+  if (hasAssignedCampaignUsers) {
+    const availableCampaignSlugs = new Set([...usedSlugs, slug]);
+    for (const user of userResult.users) {
+      for (const existingSlug of user.campaignSlugs || []) {
+        if (isValidSlug(existingSlug)) availableCampaignSlugs.add(existingSlug);
+      }
+    }
+    normalizedUsers = normalizeAdminUsers(userResult.users, {
+      label: 'Users',
+      availableCampaignSlugs: Array.from(availableCampaignSlugs),
+      currentUserEmail: auth.user.email
+    });
+    if (!normalizedUsers.ok) {
+      return privateJsonResponse({ valid: false, errors: [normalizedUsers.error] }, 422, env);
+    }
+  }
+
+  const committed = localRepoWrites
+    ? await putLocalAdminTextFile(env, githubPath, markdown)
+    : await putGitHubTextFile(env, githubPath, markdown, `Create ${slug} campaign`);
+  if (!committed.ok) {
+    return privateJsonResponse({
+      error: committed.error || 'Unable to create campaign',
+      code: committed.code || (localRepoWrites ? 'local_campaign_write_failed' : 'github_commit_failed')
+    }, committed.status || 502, env);
+  }
+
+  const savedUsers = hasAssignedCampaignUsers
+    ? await saveStoredAdminUsers(env, normalizedUsers.value, { updatedBy: auth.user.email })
+    : { ok: true, users: normalizedUsers.value };
+  if (!savedUsers.ok) return privateJsonResponse({ error: savedUsers.error }, savedUsers.status || 500, env);
+
+  const assignedUserByEmail = new Map(userResult.assignedUsers.map((user) => [user.email, user]));
+  const savedAssignedUsers = savedUsers.users
+    .filter((user) => assignedUserByEmail.has(user.email))
+    .map((user) => assignedUserByEmail.get(user.email) || user);
+  const [adminUserNotifications, assignmentNotifications] = hasAssignedCampaignUsers
+    ? await Promise.all([
+      notifyNewAdminUsers(env, savedUsers.users, userResult.previousUsers || [], [{ slug, title: title.value }], {
+        createdBy: auth.user.email,
+        lang: body.preferredLang
+      }),
+      Promise.all(savedAssignedUsers.map(async (user) => {
+        const result = await sendCampaignAssignmentEmail(env, {
+          email: user.email,
+          name: user.name || '',
+          campaignTitle: title.value,
+          campaignSlug: slug,
+          assignedBy: auth.user.email,
+          lang: body.preferredLang
+        });
+        return {
+          email: user.email,
+          sent: result.sent !== false,
+          reason: result.sent === false ? result.reason : undefined
+        };
+      }))
+    ])
+    : [{
+      newUserEmails: [],
+      sent: [],
+      failed: []
+    }, []];
+  const primaryAssignedUser = savedAssignedUsers[0] || userResult.assignedUsers[0] || {};
+
+  const rebuild = localRepoWrites
+    ? { triggered: false, reason: 'Local campaign file written; Jekyll will rebuild locally.' }
+    : await triggerSiteRebuild(env, `admin-campaign-create:${slug}`);
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'campaign:create_new',
+    adminEmail: auth.user.email,
+    campaignSlug: slug,
+    assignedCampaignUserEmail: primaryAssignedUser.email,
+    assignedCampaignUserEmails: savedAssignedUsers.map((user) => user.email),
+    githubPath,
+    commitSha: committed.commitSha,
+    mode: localRepoWrites ? 'local' : 'github',
+    rebuildTriggered: rebuild.triggered === true
+  });
+  cachedUnpublishedAdminCampaigns = null;
+  cachedUnpublishedAdminCampaignsAt = 0;
+  cachedUnpublishedAdminCampaignsKey = '';
+
+  return privateJsonResponse({
+    success: true,
+    campaign: {
+      slug,
+      title: title.value,
+      previewOnly: true,
+      published: false,
+      assignedCampaignUserEmail: primaryAssignedUser.email || '',
+      assignedCampaignUserName: primaryAssignedUser.name || '',
+      assignedCampaignUserEmails: savedAssignedUsers.map((user) => user.email),
+      assignedCampaignUsers: savedAssignedUsers.map((user) => ({
+        email: user.email,
+        name: user.name || ''
+      }))
+    },
+    githubPath,
+    commitSha: committed.commitSha,
+    commitUrl: committed.commitUrl,
+    rebuild,
+    auditKey,
+    notifications: {
+      adminUserCreated: adminUserNotifications,
+      assignment: assignmentNotifications[0] || null,
+      assignments: assignmentNotifications
+    },
+    users: savedUsers.users.map((user) => ({
+      name: user.name || '',
+      email: user.email,
+      role: user.role === 'super_admin' ? 'super_admin' : 'campaign_user',
+      campaigns: user.role === 'super_admin' ? [] : (user.campaignSlugs || [])
+    })),
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: hasAssignedCampaignUsers ? 2 : 1, kvListExpected: 0 })
+  }, 200, env);
+}
+
+async function handleAdminCampaignArchive(request, env, body = {}) {
+  const campaignSlug = String(body.campaignSlug || body.slug || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'settings:publish', { requireCsrf: true });
+  if (!scoped.ok) return scoped.response;
+  if (scoped.auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Forbidden' }, 403, env);
+  }
+  if (body.intent && body.intent !== 'archive_campaign') {
+    return privateJsonResponse({ error: 'Invalid campaign archive intent' }, 400, env);
+  }
+  const localRepoWrites = isLocalAdminRepoWritesEnabled(env);
+  if (!localRepoWrites && !env.GITHUB_TOKEN) {
+    return privateJsonResponse({ error: 'GITHUB_TOKEN not configured', code: 'github_not_configured' }, 503, env);
+  }
+  if (isPublicCampaignLiveForArchive(scoped.campaign, env)) {
+    return privateJsonResponse({
+      error: 'Live campaigns cannot be archived from the dashboard.',
+      code: 'campaign_live_archive_blocked',
+      campaignSlug: scoped.campaign.slug,
+      effectiveState: getEffectiveState(scoped.campaign, env) || scoped.campaign.state || 'unknown'
+    }, 409, env);
+  }
+
+  const archive = localRepoWrites
+    ? await archiveLocalAdminCampaign(env, {
+      campaignSlug: scoped.campaign.slug,
+      requestedBy: scoped.auth.user.email
+    })
+    : await triggerCampaignArchive(env, {
+      campaignSlug: scoped.campaign.slug,
+      requestedBy: scoped.auth.user.email
+    });
+  const archiveSucceeded = localRepoWrites ? archive.ok === true : archive.triggered === true;
+  if (!archiveSucceeded) {
+    return privateJsonResponse({
+      error: archive.error || archive.reason || 'Unable to archive campaign.',
+      code: archive.code || (localRepoWrites ? 'local_campaign_archive_failed' : 'campaign_archive_dispatch_failed'),
+      campaignSlug: scoped.campaign.slug,
+      workflow: archive.workflow || env.GITHUB_CAMPAIGN_ARCHIVE_WORKFLOW || 'archive-campaign.yml'
+    }, archive.status || 502, env);
+  }
+
+  let auditKey = null;
+  try {
+    auditKey = await recordAdminAuditEvent(env, {
+      action: 'campaign:archive',
+      adminEmail: scoped.auth.user.email,
+      campaignSlug: scoped.campaign.slug,
+      mode: localRepoWrites ? 'local' : 'github',
+      workflow: archive.workflow || env.GITHUB_CAMPAIGN_ARCHIVE_WORKFLOW || 'archive-campaign.yml',
+      archivePath: archive.archivePath || `archive/campaigns/${scoped.campaign.slug}/`,
+      movedMediaCount: Array.isArray(archive.movedMedia) ? archive.movedMedia.length : undefined,
+      skippedSharedMediaCount: Array.isArray(archive.skippedSharedMedia) ? archive.skippedSharedMedia.length : undefined
+    });
+  } catch (error) {
+    console.error('Failed to record campaign archive audit event:', error?.message || error);
+  }
+
+  return privateJsonResponse({
+    success: true,
+    campaignSlug: scoped.campaign.slug,
+    mode: localRepoWrites ? 'local' : 'github',
+    archivePath: archive.archivePath || `archive/campaigns/${scoped.campaign.slug}/`,
+    workflow: archive.workflow || env.GITHUB_CAMPAIGN_ARCHIVE_WORKFLOW || 'archive-campaign.yml',
+    auditKey,
+    message: localRepoWrites ? 'Campaign archived locally.' : 'Campaign archive workflow started.',
+    movedMediaCount: Array.isArray(archive.movedMedia) ? archive.movedMedia.length : undefined,
+    skippedSharedMediaCount: Array.isArray(archive.skippedSharedMedia) ? archive.skippedSharedMedia.length : undefined,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 1, kvListExpected: 0 })
+  }, 200, env);
+}
+
+function campaignPreviewReviewerKey(campaignSlug) {
+  return `campaign-preview-reviewers:${campaignSlug}`;
+}
+
+async function saveCampaignPreviewReviewerEmails(env, campaignSlug, reviewerEmails = [], auth = {}, options = {}) {
+  if (!env?.PLEDGES) {
+    return { ok: false, response: privateJsonResponse({ error: 'PLEDGES KV not configured' }, 503, env) };
+  }
+  const reviewers = normalizeReviewerEmails(reviewerEmails, options);
+  if (!reviewers.ok) {
+    return { ok: false, response: privateJsonResponse({ valid: false, errors: reviewers.errors }, 422, env) };
+  }
+  const now = new Date();
+  const previewLinkEntries = Array.isArray(options?.previewLinks) ? options.previewLinks : [];
+  const previewLinkByEmail = new Map();
+  for (const link of previewLinkEntries) {
+    const email = normalizeAdminEmailValue(link?.email || '', 'Preview email');
+    if (!email.ok) continue;
+    const linkId = String(link?.linkId || '').trim();
+    const previewUrl = String(link?.previewUrl || '').trim();
+    const expiresAt = String(link?.expiresAt || '').trim();
+    if (!linkId || !previewUrl || !expiresAt) continue;
+    previewLinkByEmail.set(email.value, {
+      email: email.value,
+      linkId,
+      previewUrl,
+      createdAt: String(link?.createdAt || now.toISOString()),
+      expiresAt
+    });
+  }
+  const links = {};
+  for (const email of reviewers.value) {
+    const link = previewLinkByEmail.get(email);
+    if (link) links[email] = link;
+  }
+  try {
+    await env.PLEDGES.put(campaignPreviewReviewerKey(campaignSlug), JSON.stringify({
+      campaignSlug,
+      emails: reviewers.value,
+      links,
+      updatedAt: now.toISOString(),
+      updatedBy: auth?.user?.email || '',
+      expiresAt: new Date(now.getTime() + CAMPAIGN_PREVIEW_REVIEWER_TTL_SECONDS * 1000).toISOString()
+    }), { expirationTtl: CAMPAIGN_PREVIEW_REVIEWER_TTL_SECONDS });
+  } catch (error) {
+    console.error('Failed to save campaign preview reviewer emails:', error?.message || error);
+    return {
+      ok: false,
+      response: privateJsonResponse({
+        error: 'Unable to save preview reviewer emails. Please try again.',
+        code: 'preview_reviewers_save_failed'
+      }, 502, env)
+    };
+  }
+  return { ok: true, reviewerEmails: reviewers.value, links };
+}
+
+async function campaignPreviewReviewerRecord(env, campaignSlug) {
+  if (!env?.PLEDGES || !isValidSlug(campaignSlug)) return null;
+  let record = null;
+  try {
+    record = await env.PLEDGES.get(campaignPreviewReviewerKey(campaignSlug), { type: 'json' });
+  } catch (error) {
+    console.error('Failed to load campaign preview reviewer emails:', error?.message || error);
+    return null;
+  }
+  if (!record || typeof record !== 'object') return null;
+  const expiresAt = Date.parse(String(record.expiresAt || ''));
+  if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) return null;
+  const reviewers = normalizeReviewerEmails(record.emails || []);
+  if (!reviewers.ok) return null;
+  const links = record.links && typeof record.links === 'object' && !Array.isArray(record.links)
+    ? record.links
+    : {};
+  return {
+    campaignSlug: String(record.campaignSlug || campaignSlug),
+    emails: reviewers.value,
+    links,
+    expiresAt: String(record.expiresAt || '')
+  };
+}
+
+function activeCampaignPreviewLinkForEmailFromRecord(record, email, nowMs = Date.now()) {
+  const normalizedEmail = normalizeAdminEmailValue(email || '', 'Preview email');
+  if (!record || !normalizedEmail.ok) return null;
+  if (!Array.isArray(record.emails) || !record.emails.includes(normalizedEmail.value)) return null;
+  const link = record.links?.[normalizedEmail.value];
+  if (!link || typeof link !== 'object') return null;
+  const expiresAtMs = Date.parse(String(link.expiresAt || ''));
+  if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs) return null;
+  const previewUrl = String(link.previewUrl || '').trim();
+  const linkId = String(link.linkId || '').trim();
+  if (!previewUrl || !linkId) return null;
+  return {
+    email: normalizedEmail.value,
+    linkId,
+    previewUrl,
+    expiresAt: new Date(expiresAtMs).toISOString(),
+    expiresInHours: Math.max(1, Math.ceil((expiresAtMs - nowMs) / (60 * 60 * 1000)))
+  };
+}
+
+async function activeCampaignPreviewLinkForEmail(env, campaignSlug, email) {
+  const record = await campaignPreviewReviewerRecord(env, campaignSlug);
+  return activeCampaignPreviewLinkForEmailFromRecord(record, email);
+}
+
+async function campaignPreviewReviewerEmails(env, campaignSlug) {
+  const record = await campaignPreviewReviewerRecord(env, campaignSlug);
+  return record?.emails || [];
+}
+
+function isCampaignPreviewEnabled(campaign = {}) {
+  return campaign.preview_enabled === true ||
+    campaign.previewEnabled === true ||
+    String(campaign.preview_enabled || '').trim().toLowerCase() === 'true';
+}
+
+function buildAdminCampaignPreviewPayload(campaign = {}, actor = {}, env = {}, lang = 'en') {
+  const draft = {
+    campaignSlug: campaign.slug,
+    title: campaign.title || campaign.slug || '',
+    shortBlurb: campaign.short_blurb || campaign.shortBlurb || '',
+    longContent: Array.isArray(campaign.long_content)
+      ? campaign.long_content
+      : Array.isArray(campaign.longContent)
+        ? campaign.longContent
+        : []
+  };
+  const preview = buildAdminContentPreview(draft, campaign);
+  const previewCampaign = {
+    ...campaign,
+    title: preview.normalizedDraft.title,
+    short_blurb: preview.normalizedDraft.shortBlurb,
+    long_content: preview.normalizedDraft.longContent
+  };
+  preview.preview.html = buildAdminCampaignPagePreviewHtml(previewCampaign, env, lang);
+  preview.preview.fullPage = true;
+  return {
+    campaignSlug: campaign.slug,
+    campaign: {
+      slug: campaign.slug,
+      title: campaign.title || campaign.slug || '',
+      previewOnly: isAdminPreviewOnlyCampaign(campaign),
+      previewEnabled: isCampaignPreviewEnabled(campaign)
+    },
+    actor,
+    expiresInHours: CAMPAIGN_PREVIEW_LINK_TTL_SECONDS / 60 / 60,
+    ...preview,
+    writeBudget: adminReadBudget()
+  };
+}
+
+async function authorizeCampaignPreviewToken(request, env, campaignSlug) {
+  const url = new URL(request.url);
+  const token = String(url.searchParams.get('t') || '').trim();
+  if (!token) return { ok: false, reason: 'missing_token' };
+
+  const previewNoIndexHeaders = { 'X-Robots-Tag': 'noindex, nofollow, noarchive' };
+  const secret = getCampaignPreviewSecret(env);
+  if (!secret) {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'Campaign preview signing is not configured' }, 503, env, previewNoIndexHeaders)
+    };
+  }
+
+  const payload = await verifyToken(secret, token, env);
+  if (!payload || payload.type !== 'campaign_preview') {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'Invalid or expired preview link' }, 401, env, previewNoIndexHeaders)
+    };
+  }
+
+  if (String(payload.campaignSlug || '') !== campaignSlug) {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'Preview link does not match this campaign' }, 403, env, previewNoIndexHeaders)
+    };
+  }
+
+  const email = normalizeAdminEmailValue(payload.email || '', 'Reviewer email');
+  if (!email.ok) {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'Preview link is missing a reviewer email' }, 401, env, previewNoIndexHeaders)
+    };
+  }
+
+  const record = await campaignPreviewReviewerRecord(env, campaignSlug);
+  if (!record || !record.emails.includes(email.value)) {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'This reviewer is not invited to this preview' }, 403, env, previewNoIndexHeaders)
+    };
+  }
+  const hasLinkMetadata = record.links && typeof record.links === 'object' && Object.keys(record.links).length > 0;
+  if (hasLinkMetadata) {
+    const activeLink = activeCampaignPreviewLinkForEmailFromRecord(record, email.value);
+    if (!activeLink || !payload.linkId || String(payload.linkId) !== activeLink.linkId) {
+      return {
+        ok: false,
+        response: privateJsonResponse({ error: 'Invalid or expired preview link' }, 401, env, previewNoIndexHeaders)
+      };
+    }
+  }
+
+  return { ok: true, email: email.value, exp: payload.exp || 0, linkId: payload.linkId || '' };
+}
+
+async function handleAdminCampaignPreview(request, env, campaignSlug) {
+  const previewNoIndexHeaders = { 'X-Robots-Tag': 'noindex, nofollow, noarchive' };
+  const previewLang = normalizeAdminPreviewLang(new URL(request.url).searchParams.get('lang') || 'en');
+  if (!isValidSlug(campaignSlug)) {
+    return privateJsonResponse({ error: 'Invalid campaign slug' }, 400, env, previewNoIndexHeaders);
+  }
+
+  const tokenAuth = await authorizeCampaignPreviewToken(request, env, campaignSlug);
+  if (tokenAuth.ok) {
+    const campaign = await getAdminCampaignPreviewAccessCampaign(env, campaignSlug);
+    if (!campaign) return privateJsonResponse({ error: 'Campaign not found' }, 404, env, previewNoIndexHeaders);
+    if (!isCampaignPreviewEnabled(campaign)) {
+      return privateJsonResponse({ error: 'Campaign preview is not enabled' }, 403, env, previewNoIndexHeaders);
+    }
+    return privateJsonResponse(buildAdminCampaignPreviewPayload(campaign, {
+      type: 'reviewer',
+      email: tokenAuth.email,
+      tokenExpiresAt: tokenAuth.exp ? new Date(tokenAuth.exp * 1000).toISOString() : ''
+    }, env, previewLang), 200, env, previewNoIndexHeaders);
+  }
+  if (tokenAuth.response) return tokenAuth.response;
+
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'campaign:read');
+  if (!scoped.ok) return scoped.response;
+  const markdownCampaign = await getAdminCampaignPreviewAccessCampaign(env, campaignSlug);
+  return privateJsonResponse(buildAdminCampaignPreviewPayload(markdownCampaign || scoped.campaign, {
+    type: scoped.auth.user.role === 'super_admin' ? 'super_admin' : 'campaign_user',
+    email: scoped.auth.user.email
+  }, env, previewLang), 200, env, previewNoIndexHeaders);
+}
+
+async function buildCampaignPreviewEmails(env, campaign, reviewerLinks = [], auth, lang) {
+  const results = [];
+  try {
+    for (const link of reviewerLinks) {
+      if (!link?.ok || !link.email || !link.previewUrl) throw new Error(link?.error || 'Unable to generate preview link.');
+      const result = await sendCampaignPreviewEmail(env, {
+        email: link.email,
+        campaignTitle: campaign.title || campaign.slug,
+        previewUrl: link.previewUrl,
+        expiresHours: 24,
+        invitedBy: auth.user.email,
+        lang
+      });
+      results.push({
+        email: link.email,
+        previewUrl: link.previewUrl,
+        sent: result.sent !== false,
+        reason: result.sent === false ? result.reason : undefined
+      });
+    }
+  } catch (error) {
+    console.error('Failed to prepare campaign preview emails:', error?.message || error);
+    return {
+      ok: false,
+      response: privateJsonResponse({
+        error: 'Unable to prepare preview email links. Please try again.',
+        code: 'preview_email_prepare_failed'
+      }, 502, env)
+    };
+  }
+  return { ok: true, results };
+}
+
+async function handleAdminCampaignPreviewPublish(request, env, body = {}) {
+  try {
+    return await handleAdminCampaignPreviewPublishUnsafe(request, env, body);
+  } catch (error) {
+    console.error('Failed to publish campaign preview:', error?.message || error);
+    return privateJsonResponse({
+      error: 'Unable to publish campaign preview. Please try again.',
+      code: 'campaign_preview_publish_failed'
+    }, 502, env);
+  }
+}
+
+async function handleAdminCampaignPreviewPublishUnsafe(request, env, body = {}) {
+  const campaignSlug = String(body.campaignSlug || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'campaign:edit_content', { requireCsrf: true });
+  if (!scoped.ok) return scoped.response;
+  if (!env.GITHUB_TOKEN) {
+    return privateJsonResponse({ error: 'GITHUB_TOKEN not configured', code: 'github_not_configured' }, 503, env);
+  }
+  if (body.intent && body.intent !== 'publish_preview') {
+    return privateJsonResponse({ error: 'Invalid preview publish intent' }, 400, env);
+  }
+
+  const reviewers = normalizeReviewerEmails(body.reviewerEmails ?? body.previewReviewerEmails ?? []);
+  if (!reviewers.ok) {
+    return privateJsonResponse({ valid: false, errors: reviewers.errors }, 422, env);
+  }
+  if (!getCampaignPreviewSecret(env)) {
+    return privateJsonResponse({ error: 'Campaign preview signing is not configured' }, 503, env);
+  }
+  const currentUserPreview = await buildCampaignPreviewLinkForEmail(env, scoped.campaign.slug, scoped.auth.user.email);
+  if (!currentUserPreview.ok) {
+    return privateJsonResponse({ error: currentUserPreview.error || 'Unable to create your preview link.' }, 422, env);
+  }
+  const additionalReviewerEmails = reviewers.value.filter((email) => email !== currentUserPreview.email);
+  const additionalReviewerLinks = [];
+  for (const email of additionalReviewerEmails) {
+    const link = await buildCampaignPreviewLinkForEmail(env, scoped.campaign.slug, email);
+    if (!link.ok) {
+      return privateJsonResponse({ error: link.error || 'Unable to create a reviewer preview link.' }, 422, env);
+    }
+    additionalReviewerLinks.push(link);
+  }
+  const previewLinks = [currentUserPreview, ...additionalReviewerLinks];
+  const previewAccessEmails = [currentUserPreview.email, ...additionalReviewerEmails];
+
+  const githubPath = getAdminCampaignMarkdownPath(scoped.campaign.slug);
+  const existing = await getGitHubTextFile(env, githubPath);
+  if (!existing.ok) {
+    return privateJsonResponse({
+      error: existing.error || 'Unable to load campaign Markdown from GitHub',
+      code: existing.code || 'github_load_failed'
+    }, existing.status || 502, env);
+  }
+
+  const baseRevision = String(body.baseRevision || body.fileSha || '').trim();
+  if (baseRevision && existing.sha && baseRevision !== existing.sha) {
+    return privateJsonResponse({
+      error: 'Campaign changed since this editor loaded. Reload before publishing the preview.',
+      code: 'campaign_revision_conflict',
+      currentRevision: existing.sha,
+      baseRevision
+    }, 409, env);
+  }
+
+  const nextMarkdown = applyAdminCampaignPreviewSettingsToMarkdown(existing.content, { enabled: true });
+  if (!nextMarkdown.ok) {
+    return privateJsonResponse({ error: nextMarkdown.error }, 422, env);
+  }
+
+  const committed = await putGitHubTextFile(env, githubPath, nextMarkdown.content, `Publish ${scoped.campaign.slug} campaign preview`, existing.sha);
+  if (!committed.ok) {
+    return privateJsonResponse({
+      error: committed.error || 'Unable to publish campaign preview',
+      code: committed.code || 'github_commit_failed'
+    }, committed.status || 502, env);
+  }
+
+  const storedReviewers = await saveCampaignPreviewReviewerEmails(env, scoped.campaign.slug, previewAccessEmails, scoped.auth, {
+    maxEmails: 26,
+    previewLinks
+  });
+  if (!storedReviewers.ok) return storedReviewers.response;
+
+  const emailResult = await buildCampaignPreviewEmails(env, scoped.campaign, additionalReviewerLinks, scoped.auth, body.preferredLang);
+  if (!emailResult.ok) return emailResult.response;
+  const rebuild = await triggerSiteRebuild(env, `admin-campaign-preview:${scoped.campaign.slug}`);
+  let auditKey = null;
+  try {
+    auditKey = await recordAdminAuditEvent(env, {
+      action: 'campaign:publish_preview',
+      adminEmail: scoped.auth.user.email,
+      campaignSlug: scoped.campaign.slug,
+      reviewerCount: additionalReviewerEmails.length,
+      previewAccessCount: storedReviewers.reviewerEmails.length,
+      githubPath,
+      commitSha: committed.commitSha,
+      rebuildTriggered: rebuild.triggered === true
+    });
+  } catch (error) {
+    console.error('Failed to record campaign preview publish audit event:', error?.message || error);
+  }
+  cachedUnpublishedAdminCampaigns = null;
+  cachedUnpublishedAdminCampaignsAt = 0;
+  cachedUnpublishedAdminCampaignsKey = '';
+
+  return privateJsonResponse({
+    success: true,
+    campaignSlug: scoped.campaign.slug,
+    reviewerEmails: additionalReviewerEmails,
+    currentUserPreview,
+    expiresInHours: 24,
+    githubPath,
+    contentSha: committed.contentSha,
+    commitSha: committed.commitSha,
+    commitUrl: committed.commitUrl,
+    rebuild,
+    auditKey,
+    emails: emailResult.results,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 2, kvListExpected: 0 })
   }, 200, env);
 }
 
@@ -13795,6 +15500,9 @@ const ADMIN_CONTENT_ALLOWED_BLOCK_TYPES = new Set([
 ]);
 const ADMIN_CONTENT_ALLOWED_EMBED_PROVIDERS = new Set(['spotify', 'youtube', 'vimeo']);
 const ADMIN_CONTENT_ALLOWED_VIDEO_PROVIDERS = new Set(['youtube', 'vimeo', 'local']);
+const ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY = 'strict-origin-when-cross-origin';
+const ADMIN_CONTENT_YOUTUBE_IFRAME_ALLOW = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+const ADMIN_CONTENT_VIMEO_IFRAME_ALLOW = 'autoplay; fullscreen; picture-in-picture';
 const ADMIN_CONTENT_ALLOWED_INLINE_TAGS = new Set(['b', 'br', 'em', 'i', 'strong', 'u']);
 const ADMIN_CONTENT_ALLOWED_ALIGNMENTS = new Set(['left', 'center', 'right', 'justify']);
 const ADMIN_CONTENT_ALLOWED_GALLERY_LAYOUTS = new Set(['grid', 'carousel']);
@@ -14159,9 +15867,10 @@ function renderAdminContentBlock(block, index, errors) {
       ? `https://player.vimeo.com/video/${encodeURIComponent(block.video_id)}?dnt=1`
       : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(block.video_id)}`;
     const allow = provider === 'vimeo'
-      ? 'autoplay; fullscreen; picture-in-picture'
-      : 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
-    return `<figure class="admin-content-preview__block admin-content-preview__block--video${adminContentAlignClass(block)}"><div class="video-embed video-embed--${provider}"><iframe src="${escapeAdminPreviewAttribute(src)}" title="${escapeAdminPreviewAttribute(title)}" loading="lazy" allow="${escapeAdminPreviewAttribute(allow)}"></iframe></div>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+      ? ADMIN_CONTENT_VIMEO_IFRAME_ALLOW
+      : ADMIN_CONTENT_YOUTUBE_IFRAME_ALLOW;
+    const referrerAttr = provider === 'youtube' ? ` referrerpolicy="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}"` : '';
+    return `<figure class="admin-content-preview__block admin-content-preview__block--video${adminContentAlignClass(block)}"><div class="video-embed video-embed--${provider}"><iframe src="${escapeAdminPreviewAttribute(src)}" title="${escapeAdminPreviewAttribute(title)}" loading="lazy" allow="${escapeAdminPreviewAttribute(allow)}"${referrerAttr}></iframe></div>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
   }
 
   if (block.type === 'image') {
@@ -14187,7 +15896,8 @@ function renderAdminContentBlock(block, index, errors) {
   }
 
   if (block.type === 'embed') {
-    return `<figure class="admin-content-preview__block admin-content-preview__block--embed${adminContentAlignClass(block)}"><iframe src="${escapeAdminPreviewAttribute(block.src)}" title="${escapeAdminPreviewAttribute(block.title || block.provider || 'Embedded content')}" loading="lazy"></iframe>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+    const referrerAttr = block.provider === 'youtube' ? ` referrerpolicy="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}"` : '';
+    return `<figure class="admin-content-preview__block admin-content-preview__block--embed${adminContentAlignClass(block)}"><iframe src="${escapeAdminPreviewAttribute(block.src)}" title="${escapeAdminPreviewAttribute(block.title || block.provider || 'Embedded content')}" loading="lazy"${referrerAttr}></iframe>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
   }
 
   if (block.type === 'quote') {
@@ -14201,18 +15911,518 @@ function renderAdminContentBlock(block, index, errors) {
   return '';
 }
 
+function normalizeAdminPreviewLang(value) {
+  const lang = String(value || '').trim().toLowerCase();
+  return lang.startsWith('es') ? 'es' : 'en';
+}
+
+function adminPreviewText(lang = 'en') {
+  const isSpanish = normalizeAdminPreviewLang(lang) === 'es';
+  return isSpanish
+    ? {
+        supportCta: 'Apoyar',
+        creator: 'Creador',
+        category: 'Categoría',
+        defaultCategory: 'Largometraje',
+        tiersHeading: 'Niveles',
+        noRewardHeading: 'Sin recompensa',
+        customAmountHeading: 'Apoya a tu discreción',
+        customAmountDescription: 'Contribuye cualquier monto, sin recompensa.',
+        customAmountButton: 'Apoyar',
+        pledge: 'Aportar',
+        limitLabel: 'Límite:',
+        remainingLabel: 'Restantes:',
+        goal: 'Meta',
+        starts: 'Empieza %{date}',
+        ends: 'Termina %{date}',
+        ended: 'Terminó %{date}',
+        supporterCommunity: 'Comunidad de patrocinadores',
+        supportersOnly: 'Los patrocinadores de esta campaña tienen acceso exclusivo a votar sobre decisiones creativas.',
+        supportersOnlyCta: 'Solo patrocinadores',
+        diary: 'Diario',
+        diaryTablistLabel: 'Fases del diario',
+        diaryEmpty: 'Todavía no hay entradas.',
+        diaryPhases: {
+          fundraising: 'Financiación',
+          'pre-production': 'Preproducción',
+          production: 'Producción',
+          'post-production': 'Postproducción',
+          distribution: 'Distribución'
+        }
+      }
+    : {
+        supportCta: 'Support',
+        creator: 'Creator',
+        category: 'Category',
+        defaultCategory: 'Feature Film',
+        tiersHeading: 'Tiers',
+        noRewardHeading: 'No Reward',
+        customAmountHeading: 'Support at your discretion',
+        customAmountDescription: 'Contribute any amount, no reward attached.',
+        customAmountButton: 'Support',
+        pledge: 'Pledge',
+        limitLabel: 'Limit:',
+        remainingLabel: 'Remaining:',
+        goal: 'Goal!',
+        starts: 'Starts %{date}',
+        ends: 'Ends %{date}',
+        ended: 'Ended %{date}',
+        supporterCommunity: 'Supporter Community',
+        supportersOnly: 'Backers of this campaign get exclusive access to vote on creative decisions.',
+        supportersOnlyCta: 'Supporters Only',
+        diary: 'Diary',
+        diaryTablistLabel: 'Diary phases',
+        diaryEmpty: 'No entries yet.',
+        diaryPhases: {
+          fundraising: 'Fundraising',
+          'pre-production': 'Pre-Production',
+          production: 'Production',
+          'post-production': 'Post-Production',
+          distribution: 'Distribution'
+        }
+      };
+}
+
+function adminPreviewInterpolate(value, replacements = {}) {
+  return String(value || '').replace(/%\{([^}]+)\}/g, (_match, key) => replacements[key] ?? '');
+}
+
+function adminPreviewSiteBase(env = {}) {
+  return String(env?.SITE_BASE || env?.CANONICAL_SITE_BASE || '').replace(/\/+$/, '');
+}
+
+function adminPreviewFontHead() {
+  return `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://use.typekit.net" crossorigin>
+  <link rel="dns-prefetch" href="https://p.typekit.net">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:400,700">
+  <link rel="stylesheet" href="https://use.typekit.net/hoj2yet.css">`;
+}
+
+function adminPreviewUrl(value, env = {}) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('#')) return raw;
+  try {
+    const base = adminPreviewSiteBase(env) || 'https://pool.dustwave.xyz';
+    const parsed = new URL(raw, `${base}/`);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+    return parsed.toString();
+  } catch {
+    return raw.startsWith('/') ? raw : '';
+  }
+}
+
+function adminPreviewAsset(value, env = {}) {
+  return adminPreviewUrl(value, env);
+}
+
+function adminPreviewPercent(value) {
+  const number = Math.round(Number(value || 0));
+  if (!Number.isFinite(number)) return 0;
+  return Math.min(100, Math.max(0, number));
+}
+
+function formatAdminPreviewMoney(amount = 0) {
+  const value = Number(amount || 0);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: value % 1 === 0 ? 0 : 2
+  }).format(value);
+}
+
+function formatAdminPreviewMoneyShort(amount = 0) {
+  const value = Number(amount || 0);
+  if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(value % 1000000 === 0 ? 0 : 1)}M`;
+  if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}K`;
+  return formatAdminPreviewMoney(value);
+}
+
+function formatAdminPreviewDate(dateString, lang = 'en') {
+  const parts = String(dateString || '').split('-').map((part) => Number(part));
+  if (parts.length < 3 || parts.some((part) => !Number.isFinite(part))) return String(dateString || '');
+  return new Intl.DateTimeFormat(normalizeAdminPreviewLang(lang), {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC'
+  }).format(new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])));
+}
+
+function formatAdminPreviewDateTime(dateString, lang = 'en') {
+  const raw = String(dateString || '').trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
+  if (!match) return raw;
+  const monthLabels = normalizeAdminPreviewLang(lang) === 'es'
+    ? ['ene.', 'feb.', 'mar.', 'abr.', 'may.', 'jun.', 'jul.', 'ago.', 'sept.', 'oct.', 'nov.', 'dic.']
+    : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = match[4] == null ? 0 : Number(match[4]);
+  const minute = match[5] == null ? 0 : Number(match[5]);
+  if (![year, month, day, hour, minute].every(Number.isFinite) || month < 1 || month > 12) return raw;
+  const dateLabel = `${monthLabels[month - 1]} ${day}, ${year}`;
+  if (match[4] == null || (hour === 0 && minute === 0)) return dateLabel;
+  const hour12 = hour % 12 || 12;
+  const minuteLabel = String(minute).padStart(2, '0');
+  let meridiem = hour >= 12 ? 'PM' : 'AM';
+  if (normalizeAdminPreviewLang(lang) === 'es') {
+    meridiem = hour >= 12 ? 'p. m.' : 'a. m.';
+  }
+  return `${dateLabel} · ${hour12}:${minuteLabel} ${meridiem}`;
+}
+
+function adminPreviewCampaignState(campaign = {}, env = {}) {
+  const effective = getEffectiveState(campaign, env);
+  if (effective) return effective;
+  const now = Date.now();
+  const start = Date.parse(`${String(campaign.start_date || '').slice(0, 10)}T00:00:00Z`);
+  const deadline = Date.parse(`${String(campaign.goal_deadline || '').slice(0, 10)}T23:59:59Z`);
+  if (Number.isFinite(start) && now < start) return 'upcoming';
+  if (Number.isFinite(deadline) && now <= deadline) return 'live';
+  if (Number.isFinite(deadline)) return 'post';
+  return 'live';
+}
+
+function renderAdminCampaignPreviewContentBlock(block, index, errors, env = {}) {
+  const path = `longContent[${index}]`;
+  if (!block) return '';
+  const align = normalizeAdminContentAlignment(block.align);
+
+  if (block.type === 'text') {
+    return `<div class="content-block content-block--text content-block--align-${escapeAdminPreviewAttribute(align)}">${renderAdminPreviewTextBlock(block.body, errors, `${path}.body`)}</div>`;
+  }
+
+  if (block.type === 'video') {
+    const title = block.caption || `${block.provider} video`;
+    const provider = normalizeAdminContentVideoProvider(block.provider);
+    if (provider === 'local') {
+      const src = adminPreviewAsset(block.src, env) || block.src || '';
+      const type = adminContentVideoType(src);
+      const typeAttr = type ? ` type="${escapeAdminPreviewAttribute(type)}"` : '';
+      const posterAttr = block.poster ? ` poster="${escapeAdminPreviewAttribute(adminPreviewAsset(block.poster, env) || block.poster)}"` : '';
+      const firstFrameAttr = block.poster ? '' : ' data-first-frame-poster="true"';
+      return `<figure class="content-block content-block--video content-block--align-${escapeAdminPreviewAttribute(align)}"><div class="video-embed video-embed--local"><video controls preload="none" playsinline${posterAttr}${firstFrameAttr}><source src="${escapeAdminPreviewAttribute(src)}"${typeAttr}>Video not supported.</video></div>${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+    }
+    const src = provider === 'vimeo'
+      ? `https://player.vimeo.com/video/${encodeURIComponent(block.video_id)}?dnt=1`
+      : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(block.video_id)}`;
+    const allow = provider === 'vimeo'
+      ? ADMIN_CONTENT_VIMEO_IFRAME_ALLOW
+      : ADMIN_CONTENT_YOUTUBE_IFRAME_ALLOW;
+    const referrerAttr = provider === 'youtube' ? ` referrerpolicy="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}"` : '';
+    return `<figure class="content-block content-block--video content-block--align-${escapeAdminPreviewAttribute(align)}"><div class="video-embed video-embed--${provider}"><iframe src="${escapeAdminPreviewAttribute(src)}" title="${escapeAdminPreviewAttribute(title)}" frameborder="0" loading="lazy" allow="${escapeAdminPreviewAttribute(allow)}"${referrerAttr}></iframe></div>${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+  }
+
+  if (block.type === 'image') {
+    const src = adminPreviewAsset(block.src, env) || block.src || '';
+    return `<figure class="content-block content-block--image content-block--align-${escapeAdminPreviewAttribute(align)}"><img src="${escapeAdminPreviewAttribute(src)}" alt="${escapeAdminPreviewAttribute(block.alt)}" loading="lazy" decoding="async">${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+  }
+
+  if (block.type === 'gallery') {
+    const layout = normalizeAdminContentGalleryLayout(block.layout);
+    const captionStyle = normalizeAdminContentGalleryCaptionStyle(block.caption_style);
+    const containerAttrs = layout === 'carousel' ? ' tabindex="0" aria-label="Image gallery"' : '';
+    const images = block.images.map((image, imageIndex) => {
+      const itemAttrs = captionStyle === 'overlay' && image.caption ? ' tabindex="0"' : '';
+      const caption = image.caption
+        ? `<span class="gallery__item-caption"><span class="gallery__item-caption-text">${renderAdminPreviewInlineMarkdown(image.caption, errors, `${path}.images[${imageIndex}].caption`)}</span></span>`
+        : '';
+      const src = adminPreviewAsset(image.src, env) || image.src || '';
+      return `<div class="gallery__item"${itemAttrs}><img src="${escapeAdminPreviewAttribute(src)}" alt="${escapeAdminPreviewAttribute(image.alt)}" loading="lazy" decoding="async">${caption}</div>`;
+    }).join('');
+    return `<figure class="content-block content-block--gallery gallery--${layout} gallery--caption-${captionStyle} content-block--align-${escapeAdminPreviewAttribute(align)}"><div class="gallery__container"${containerAttrs}>${images}</div>${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+  }
+
+  if (block.type === 'audio') {
+    const src = adminPreviewAsset(block.src, env) || block.src || '';
+    return `<figure class="content-block content-block--audio content-block--align-${escapeAdminPreviewAttribute(align)}"><div class="audio-player">${block.title ? `<span class="audio-player__title">${escapeAdminPreviewHtml(block.title)}</span>` : ''}<audio controls preload="metadata"><source src="${escapeAdminPreviewAttribute(src)}" type="audio/mpeg">Your browser does not support the audio element.</audio></div>${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+  }
+
+  if (block.type === 'embed') {
+    const referrerAttr = block.provider === 'youtube' ? ` referrerpolicy="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}"` : '';
+    return `<figure class="content-block content-block--embed content-block--align-${escapeAdminPreviewAttribute(align)}"><div class="embed-container ${block.provider === 'spotify' ? 'embed-container--spotify' : 'embed-container--video'}"><iframe src="${escapeAdminPreviewAttribute(block.src)}" title="${escapeAdminPreviewAttribute(block.title || block.provider || 'Embedded content')}" loading="lazy"${referrerAttr}></iframe></div>${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+  }
+
+  if (block.type === 'quote') {
+    return `<blockquote class="content-block content-block--quote content-block--align-${escapeAdminPreviewAttribute(align)}"><p>${renderAdminPreviewInlineMarkdown(block.text, errors, `${path}.text`)}</p>${block.author ? `<cite>— ${escapeAdminPreviewHtml(block.author)}</cite>` : ''}</blockquote>`;
+  }
+
+  if (block.type === 'divider') {
+    return `<hr class="content-block content-block--divider content-block--align-${escapeAdminPreviewAttribute(align)}">`;
+  }
+
+  return '';
+}
+
+function renderAdminCampaignPreviewHero(campaign = {}, env = {}) {
+  const title = campaign.title || campaign.slug || '';
+  const video = String(campaign.hero_video || '').trim();
+  const wideImage = adminPreviewAsset(campaign.hero_image_wide || campaign.hero_image || '', env);
+  if (video) {
+    if (/youtu\.be\/|youtube\.com/i.test(video)) {
+      const id = video.includes('youtu.be/')
+        ? video.split('youtu.be/').pop().split(/[?&/]/)[0]
+        : video.includes('watch?v=')
+          ? video.split('watch?v=').pop().split(/[?&]/)[0]
+          : video.split('/embed/').pop().split(/[?&/]/)[0];
+      const poster = wideImage ? `<img src="${escapeAdminPreviewAttribute(wideImage)}" alt="${escapeAdminPreviewAttribute(title)}" class="hero__video-poster">` : '';
+      return `<div class="hero__video hero__video--youtube hero__video--youtube-facade">${poster}<iframe src="https://www.youtube-nocookie.com/embed/${escapeAdminPreviewAttribute(id)}" title="${escapeAdminPreviewAttribute(`${title} campaign video`)}" frameborder="0" loading="lazy" allow="${ADMIN_CONTENT_YOUTUBE_IFRAME_ALLOW}" referrerpolicy="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}"></iframe></div>`;
+    }
+    if (/vimeo\.com/i.test(video)) {
+      const id = video.split('/').pop().split(/[?&]/)[0];
+      return `<div class="hero__video hero__video--vimeo"><iframe src="https://player.vimeo.com/video/${escapeAdminPreviewAttribute(id)}?dnt=1" title="${escapeAdminPreviewAttribute(`${title} campaign video`)}" frameborder="0" loading="lazy" allow="autoplay; fullscreen; picture-in-picture"></iframe></div>`;
+    }
+    const src = adminPreviewAsset(video, env);
+    if (src) {
+      const poster = wideImage ? ` poster="${escapeAdminPreviewAttribute(wideImage)}"` : '';
+      const type = adminContentVideoType(src);
+      const typeAttr = type ? ` type="${escapeAdminPreviewAttribute(type)}"` : '';
+      return `<div class="hero__video-wrapper"><video class="hero__video" controls preload="none" playsinline${poster}><source src="${escapeAdminPreviewAttribute(src)}"${typeAttr}>Video not supported.</video></div>`;
+    }
+  }
+  return wideImage
+    ? `<img src="${escapeAdminPreviewAttribute(wideImage)}" alt="${escapeAdminPreviewAttribute(title)}" loading="eager" decoding="async">`
+    : '';
+}
+
+function renderAdminCampaignPreviewProgress(campaign = {}, state = 'live', lang = 'en') {
+  const text = adminPreviewText(lang);
+  const goal = Number(campaign.goal_amount || 0) || 0;
+  const pledged = Number(campaign.pledged_amount || 0) || 0;
+  const max = Math.max(goal, pledged, 1);
+  const pct = adminPreviewPercent((pledged / max) * 100);
+  const oneThird = goal / 3;
+  const twoThirds = (goal * 2) / 3;
+  const oneThirdPct = adminPreviewPercent((oneThird / max) * 100);
+  const twoThirdsPct = adminPreviewPercent((twoThirds / max) * 100);
+  const goalPct = adminPreviewPercent((goal / max) * 100);
+  const dateLabel = state === 'upcoming' && campaign.start_date
+    ? adminPreviewInterpolate(text.starts, { date: formatAdminPreviewDate(campaign.start_date, lang) })
+    : campaign.goal_deadline
+      ? adminPreviewInterpolate(state === 'post' ? text.ended : text.ends, { date: formatAdminPreviewDate(campaign.goal_deadline, lang) })
+      : '';
+  return `<div class="progress-wrap" data-campaign-slug="${escapeAdminPreviewAttribute(campaign.slug || '')}" data-goal="${escapeAdminPreviewAttribute(goal)}" data-pledged="${escapeAdminPreviewAttribute(pledged)}" data-max-threshold="${escapeAdminPreviewAttribute(max)}">
+    <div class="progress-bar">
+      <span class="u-width-pct-${pct}" data-progress-width="${pct}"></span>
+      <div class="progress-marker progress-marker--milestone u-left-pct-${oneThirdPct}${pledged >= oneThird ? ' progress-marker--achieved' : ''}" data-progress-left="${oneThirdPct}"><span class="progress-marker__dot"></span><span class="progress-marker__label"><span class="progress-marker__amount">${escapeAdminPreviewHtml(formatAdminPreviewMoneyShort(oneThird))}</span><span class="progress-marker__desc">1/3</span></span></div>
+      <div class="progress-marker progress-marker--milestone u-left-pct-${twoThirdsPct}${pledged >= twoThirds ? ' progress-marker--achieved' : ''}" data-progress-left="${twoThirdsPct}"><span class="progress-marker__dot"></span><span class="progress-marker__label"><span class="progress-marker__amount">${escapeAdminPreviewHtml(formatAdminPreviewMoneyShort(twoThirds))}</span><span class="progress-marker__desc">2/3</span></span></div>
+      <div class="progress-marker progress-marker--goal u-left-pct-${goalPct}${pledged >= goal ? ' progress-marker--achieved' : ''}" data-progress-left="${goalPct}"><span class="progress-marker__dot"></span><span class="progress-marker__label"><span class="progress-marker__amount">${escapeAdminPreviewHtml(formatAdminPreviewMoneyShort(goal))}</span><span class="progress-marker__desc">${escapeAdminPreviewHtml(text.goal)}</span></span></div>
+    </div>
+    <div class="progress-meta"><strong>${escapeAdminPreviewHtml(formatAdminPreviewMoney(pledged))}</strong> of ${escapeAdminPreviewHtml(formatAdminPreviewMoney(goal))}${dateLabel ? ` · ${escapeAdminPreviewHtml(dateLabel)}` : ''}</div>
+  </div>`;
+}
+
+function renderAdminCampaignPreviewFacts(campaign = {}, env = {}, lang = 'en') {
+  const text = adminPreviewText(lang);
+  const creator = campaign.creator_name || env?.PLATFORM_DEFAULT_CREATOR_NAME || env?.PLATFORM_COMPANY_NAME || env?.PLATFORM_AUTHOR || 'Dust Wave';
+  const category = campaign.category || text.defaultCategory;
+  const creatorImage = adminPreviewAsset(campaign.creator_image || '', env);
+  return `<div class="campaign-facts">
+    ${creatorImage ? `<div class="campaign-facts__creator"><img src="${escapeAdminPreviewAttribute(creatorImage)}" alt="${escapeAdminPreviewAttribute(creator)}" loading="lazy" decoding="async"><span>${escapeAdminPreviewHtml(creator)}</span></div>` : ''}
+    <dl>
+      ${creatorImage ? '' : `<dt>${escapeAdminPreviewHtml(text.creator)}</dt><dd>${escapeAdminPreviewHtml(creator)}</dd>`}
+      <dt>${escapeAdminPreviewHtml(text.category)}</dt><dd>${escapeAdminPreviewHtml(category)}</dd>
+    </dl>
+  </div>`;
+}
+
+function renderAdminCampaignPreviewTier(campaign = {}, tier = {}, lang = 'en', errors = [], env = {}) {
+  const text = adminPreviewText(lang);
+  const tierId = String(tier.id || '').trim();
+  const image = tier.image ? `<img class="tier-card__image" src="${escapeAdminPreviewAttribute(adminPreviewAsset(tier.image, env) || tier.image)}" alt="${escapeAdminPreviewAttribute(tier.name || '')}" loading="lazy" decoding="async">` : '';
+  const locked = tier.requires_threshold ? ' tier-card--locked' : '';
+  return `<div class="tier-card compact${locked}" id="tier-${escapeAdminPreviewAttribute(tierId)}" data-tier-id="${escapeAdminPreviewAttribute(tierId)}" data-campaign-slug="${escapeAdminPreviewAttribute(campaign.slug || '')}">
+    ${image}
+    <h3>${escapeAdminPreviewHtml(tier.name || tierId)} — ${escapeAdminPreviewHtml(formatAdminPreviewMoney(Number(tier.price || 0)))}</h3>
+    ${tier.description ? `<p>${renderAdminPreviewInlineMarkdown(tier.description, errors, `tiers.${tierId}.description`)}</p>` : ''}
+    ${tier.limit_total ? `<p class="limit">${escapeAdminPreviewHtml(text.limitLabel)} <span>${escapeAdminPreviewHtml(tier.limit_total)}</span> · ${escapeAdminPreviewHtml(text.remainingLabel)} <span>${escapeAdminPreviewHtml(tier.remaining ?? '')}</span></p>` : ''}
+    <button class="poolcart-add-item" type="button" disabled aria-disabled="true">${escapeAdminPreviewHtml(text.pledge)} ${escapeAdminPreviewHtml(formatAdminPreviewMoney(Number(tier.price || 0)))}</button>
+  </div>`;
+}
+
+function renderAdminCampaignPreviewSupportItems(campaign = {}, lang = 'en') {
+  if (!Array.isArray(campaign.support_items) || campaign.support_items.length === 0) return '';
+  const text = adminPreviewText(lang);
+  const items = campaign.support_items.map((item) => {
+    const target = Number(item?.target || 0) || 0;
+    const current = Number(item?.current || 0) || 0;
+    const percent = adminPreviewPercent(target > 0 ? (current / target) * 100 : 0);
+    return `<div class="support-item" id="support-${escapeAdminPreviewAttribute(item?.id || '')}">
+      <div class="support-item__info">
+        <div class="support-item__header"><strong>${escapeAdminPreviewHtml(item?.label || '')}</strong><span class="support-item__amount">${escapeAdminPreviewHtml(formatAdminPreviewMoney(current))} / ${escapeAdminPreviewHtml(formatAdminPreviewMoney(target))}</span></div>
+        <div class="support-item__progress"><span class="u-width-pct-${percent}" data-progress-width="${percent}"></span></div>
+        ${item?.need ? `<p class="support-item__need">${escapeAdminPreviewHtml(item.need)}</p>` : ''}
+      </div>
+      <div class="support-item__actions">
+        <div class="support-item__input-wrap"><span class="support-item__currency">$</span><input type="number" class="support-item__input" disabled aria-disabled="true" placeholder="${escapeAdminPreviewAttribute(Math.max(0, target - current))}"></div>
+        <button class="poolcart-add-item support-item__btn" type="button" disabled aria-disabled="true">${escapeAdminPreviewHtml(text.customAmountButton)}</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="support-items"><h5>${escapeAdminPreviewHtml(text.customAmountHeading)}</h5>${items}</div>`;
+}
+
+function renderAdminCampaignPreviewTiers(campaign = {}, lang = 'en', env = {}) {
+  const text = adminPreviewText(lang);
+  const tiers = Array.isArray(campaign.tiers) ? campaign.tiers : [];
+  const errors = [];
+  const featuredId = String(campaign.featured_tier_id || '');
+  const featured = tiers.find((tier) => String(tier?.id || '') === featuredId);
+  const others = tiers.filter((tier) => String(tier?.id || '') !== featuredId)
+    .sort((a, b) => Number(a?.price || 0) - Number(b?.price || 0));
+  const tierHtml = [featured, ...others].filter(Boolean).map((tier) => renderAdminCampaignPreviewTier(campaign, tier, lang, errors, env)).join('');
+  if (!tierHtml && !campaign.support_items?.length) return '';
+  return `<section class="sidebar-tiers" id="campaign-tiers" aria-labelledby="campaign-tiers-heading" tabindex="-1">
+    <h2 class="sidebar-tiers__heading" id="campaign-tiers-heading">${escapeAdminPreviewHtml(text.tiersHeading)}</h2>
+    ${tierHtml}
+    <div class="sidebar-tiers__no-reward">
+      <h4>${escapeAdminPreviewHtml(text.noRewardHeading)}</h4>
+      <div class="custom-amount" id="custom-amount" role="group" aria-labelledby="custom-amount-heading">
+        <div class="custom-amount__info"><h5 id="custom-amount-heading">${escapeAdminPreviewHtml(text.customAmountHeading)}</h5><p id="custom-amount-desc">${escapeAdminPreviewHtml(text.customAmountDescription)}</p></div>
+        <div class="custom-amount__actions"><div class="custom-amount__input-wrap"><span class="custom-amount__currency" aria-hidden="true">$</span><input type="number" id="custom-amount-input" class="custom-amount__input" min="1" step="1" placeholder="25" disabled aria-disabled="true"></div><button class="poolcart-add-item custom-amount__btn" id="custom-amount-btn" type="button" disabled aria-disabled="true">${escapeAdminPreviewHtml(text.customAmountButton)}</button></div>
+      </div>
+      ${renderAdminCampaignPreviewSupportItems(campaign, lang)}
+    </div>
+  </section>`;
+}
+
+function renderAdminCampaignPreviewDiary(campaign = {}, lang = 'en', env = {}) {
+  const entries = Array.isArray(campaign.diary) ? campaign.diary : [];
+  if (!entries.length) return '';
+  const text = adminPreviewText(lang);
+  const errors = [];
+  const phases = ['fundraising', 'pre-production', 'production', 'post-production', 'distribution'];
+  const tabHtml = phases.map((phase, index) => {
+    const selected = index === 0;
+    return `<button class="diary-tab" id="diary-tab-${escapeAdminPreviewAttribute(phase)}" role="tab" aria-selected="${selected ? 'true' : 'false'}" aria-controls="diary-${escapeAdminPreviewAttribute(phase)}" tabindex="${selected ? '0' : '-1'}" data-tab="${escapeAdminPreviewAttribute(phase)}" type="button">${escapeAdminPreviewHtml(text.diaryPhases[phase] || phase)}</button>`;
+  }).join('');
+  const sortedEntries = entries.slice().sort((a, b) => {
+    const left = Date.parse(a?.date || '');
+    const right = Date.parse(b?.date || '');
+    if (!Number.isFinite(left) && !Number.isFinite(right)) return 0;
+    if (!Number.isFinite(left)) return 1;
+    if (!Number.isFinite(right)) return -1;
+    return right - left;
+  });
+  const panelsHtml = phases.map((phase, phaseIndex) => {
+    const isFirst = phaseIndex === 0;
+    const phaseEntries = sortedEntries.filter((entry) => String(entry?.phase || 'fundraising') === phase);
+    const entryHtml = phaseEntries.map((entry, entryIndex) => {
+      const blocks = Array.isArray(entry?.content)
+        ? entry.content.map((block, blockIndex) => validateAdminContentBlock(block, blockIndex, errors, [])).filter(Boolean)
+        : [];
+      const bodyHtml = entry?.body
+        ? `<p class="diary-entry__body">${renderAdminPreviewInlineMarkdown(entry.body, errors, `diary.${phase}.${entryIndex}.body`)}</p>`
+        : '';
+      const contentHtml = blocks.length
+        ? `<div class="diary-entry__content">${blocks.map((block, blockIndex) => renderAdminCampaignPreviewContentBlock(block, blockIndex, errors, env)).join('')}</div>`
+        : bodyHtml;
+      return `<article class="diary-entry" id="${escapeAdminPreviewAttribute(entry?.id || `diary-${phase}-${entryIndex + 1}`)}">
+        <h4 class="diary-entry__title">${escapeAdminPreviewHtml(entry?.title || '')}</h4>
+        ${entry?.date ? `<time class="diary-entry__date" datetime="${escapeAdminPreviewAttribute(entry.date)}">${escapeAdminPreviewHtml(formatAdminPreviewDateTime(entry.date, lang))}</time>` : ''}
+        ${contentHtml}
+      </article>`;
+    }).join('');
+    return `<div id="diary-${escapeAdminPreviewAttribute(phase)}" class="diary-panel${isFirst ? '' : ' hidden'}" role="tabpanel" aria-labelledby="diary-tab-${escapeAdminPreviewAttribute(phase)}"${isFirst ? '' : ' hidden'}>
+      ${entryHtml ? `<div class="diary-list">${entryHtml}</div>` : `<p class="empty-state">${escapeAdminPreviewHtml(text.diaryEmpty)}</p>`}
+    </div>`;
+  }).join('');
+  const siteBase = adminPreviewSiteBase(env);
+  const scriptSrc = siteBase ? `${siteBase}/assets/js/diary-tabs.js` : '/assets/js/diary-tabs.js';
+  return `<section class="diary" id="diary" aria-labelledby="campaign-preview-diary-heading">
+    <h3 id="campaign-preview-diary-heading">${escapeAdminPreviewHtml(text.diary)}</h3>
+    <div class="diary-tabs" role="tablist" aria-label="${escapeAdminPreviewAttribute(text.diaryTablistLabel)}">${tabHtml}</div>
+    ${panelsHtml}
+  </section>
+  <script src="${escapeAdminPreviewAttribute(scriptSrc)}" defer></script>`;
+}
+
+function buildAdminCampaignPagePreviewHtml(campaign = {}, env = {}, lang = 'en') {
+  const currentLang = normalizeAdminPreviewLang(lang);
+  const text = adminPreviewText(currentLang);
+  const siteBase = adminPreviewSiteBase(env);
+  const mainCss = siteBase ? `${siteBase}/assets/main.css` : '/assets/main.css';
+  const firstFramePosterScript = siteBase ? `${siteBase}/assets/js/video-first-frame-poster.js` : '/assets/js/video-first-frame-poster.js';
+  const state = adminPreviewCampaignState(campaign, env);
+  const errors = [];
+  const title = campaign.title || campaign.slug || '';
+  const shortBlurb = campaign.short_blurb || campaign.shortBlurb || '';
+  const blocks = Array.isArray(campaign.long_content)
+    ? campaign.long_content
+    : Array.isArray(campaign.longContent)
+      ? campaign.longContent
+      : [];
+  const blocksHtml = blocks.map((block, index) => renderAdminCampaignPreviewContentBlock(block, index, errors, env)).join('\n');
+  const heroHtml = renderAdminCampaignPreviewHero(campaign, env);
+  const communityHtml = Array.isArray(campaign.decisions) && campaign.decisions.length
+    ? `<section class="community-teaser" id="community-teaser" aria-labelledby="community-teaser-heading"><h3 id="community-teaser-heading">${escapeAdminPreviewHtml(text.supporterCommunity)}</h3><p class="teaser-locked">${escapeAdminPreviewHtml(text.supportersOnly)}</p><a href="#" class="btn btn--secondary btn--locked" aria-disabled="true" tabindex="-1">${escapeAdminPreviewHtml(text.supportersOnlyCta)}</a></section>`
+    : '';
+
+  return `<!doctype html>
+<html lang="${escapeAdminPreviewAttribute(currentLang)}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}">
+  ${siteBase ? `<base href="${escapeAdminPreviewAttribute(`${siteBase}/`)}">` : ''}
+  ${adminPreviewFontHead()}
+  <link rel="stylesheet" href="${escapeAdminPreviewAttribute(mainCss)}">
+</head>
+<body class="campaign-preview-render">
+  <main class="campaign-container campaign-preview-readonly" data-campaign-slug="${escapeAdminPreviewAttribute(campaign.slug || '')}" data-single-tier-only="${campaign.single_tier_only === true ? 'true' : 'false'}" data-state="${escapeAdminPreviewAttribute(state)}" tabindex="-1">
+    <header class="campaign-header">
+      <h1>${escapeAdminPreviewHtml(title)}</h1>
+      ${shortBlurb ? `<p class="campaign-blurb">${renderAdminPreviewInlineMarkdown(shortBlurb, errors, 'shortBlurb')}</p>` : ''}
+      <button type="button" class="btn btn--primary campaign-header__cta" disabled aria-disabled="true">${escapeAdminPreviewHtml(text.supportCta)}</button>
+    </header>
+    <div class="campaign-content">
+      <header class="hero">
+        ${heroHtml}
+        ${renderAdminCampaignPreviewProgress(campaign, state, currentLang)}
+      </header>
+      <section class="content">${blocksHtml ? `<div class="long-content">${blocksHtml}</div>` : ''}</section>
+      ${communityHtml}
+      ${renderAdminCampaignPreviewDiary(campaign, currentLang, env)}
+    </div>
+    <aside class="campaign-sidebar">
+      ${renderAdminCampaignPreviewFacts(campaign, env, currentLang)}
+      ${renderAdminCampaignPreviewTiers(campaign, currentLang, env)}
+    </aside>
+  </main>
+  <script src="${escapeAdminPreviewAttribute(firstFramePosterScript)}" defer></script>
+</body>
+</html>`;
+}
+
 function normalizeAdminContentDraft(body = {}) {
   const draft = body.draft && typeof body.draft === 'object' ? body.draft : body;
   return {
     campaignSlug: String(body.campaignSlug || draft.campaignSlug || '').trim(),
     title: String(draft.title || '').trim(),
     shortBlurb: String(draft.shortBlurb ?? draft.short_blurb ?? ''),
-    longContent: Array.isArray(draft.longContent)
-      ? draft.longContent
-      : Array.isArray(draft.long_content)
-        ? draft.long_content
-        : []
+    longContent: normalizeAdminDraftLongContent(
+      Array.isArray(draft.longContent)
+        ? draft.longContent
+        : Array.isArray(draft.long_content)
+          ? draft.long_content
+          : []
+    )
   };
+}
+
+function isEmptyAdminDraftTextBlock(block) {
+  if (!block || typeof block !== 'object' || Array.isArray(block)) return false;
+  const type = String(block.type || '').trim().toLowerCase();
+  if (type !== 'text') return false;
+  if (String(block.body || '').trim()) return false;
+  return Object.keys(block).every((key) => ['type', 'body', 'align'].includes(key));
+}
+
+function normalizeAdminDraftLongContent(blocks = []) {
+  return (Array.isArray(blocks) ? blocks : []).filter((block) => !isEmptyAdminDraftTextBlock(block));
 }
 
 function buildAdminContentPreview(draft, campaign) {
@@ -14277,7 +16487,7 @@ async function getRoleScopedAdminCampaign(request, env, campaignSlug, permission
     return { ok: false, response: privateJsonResponse({ error: 'Invalid campaign slug' }, 400, env) };
   }
 
-  const campaign = await getCampaign(env, campaignSlug);
+  const campaign = await getAdminCampaign(env, campaignSlug);
   if (!campaign) {
     return { ok: false, response: privateJsonResponse({ error: 'Campaign not found' }, 404, env) };
   }
@@ -14292,6 +16502,7 @@ async function handleAdminContentCampaign(request, env) {
   if (!scoped.ok) return scoped.response;
 
   const campaign = scoped.campaign;
+  const activePreview = await activeCampaignPreviewLinkForEmail(env, campaign.slug, scoped.auth.user.email);
   return privateJsonResponse({
     user: scoped.auth.user,
     campaign: {
@@ -14301,7 +16512,9 @@ async function handleAdminContentCampaign(request, env) {
       longContent: Array.isArray(campaign.long_content) ? campaign.long_content : [],
       diaryCount: Array.isArray(campaign.diary) ? campaign.diary.length : 0,
       tierCount: Array.isArray(campaign.tiers) ? campaign.tiers.length : 0,
-      decisionCount: Array.isArray(campaign.decisions) ? campaign.decisions.length : 0
+      decisionCount: Array.isArray(campaign.decisions) ? campaign.decisions.length : 0,
+      baseRevision: campaign._githubSha || '',
+      activePreview
     },
     writeBudget: adminReadBudget()
   }, 200, env);
@@ -14474,6 +16687,16 @@ async function handleAdminContentPublish(request, env) {
     }, existing.status || 502, env);
   }
 
+  const baseRevision = String(body.baseRevision || body.fileSha || '').trim();
+  if (baseRevision && existing.sha && baseRevision !== existing.sha) {
+    return privateJsonResponse({
+      error: 'Campaign changed since this editor loaded. Reload before publishing.',
+      code: 'campaign_revision_conflict',
+      currentRevision: existing.sha,
+      baseRevision
+    }, 409, env);
+  }
+
   const nextMarkdown = applyAdminCampaignContentDraftToMarkdown(existing.content, preview.normalizedDraft);
   if (!nextMarkdown.ok) {
     return privateJsonResponse({ error: nextMarkdown.error }, 422, env);
@@ -14514,6 +16737,7 @@ async function handleAdminContentPublish(request, env) {
     success: true,
     campaignSlug: scoped.campaign.slug,
     githubPath,
+    contentSha: committed.contentSha,
     commitSha: committed.commitSha,
     commitUrl: committed.commitUrl,
     mediaCleanup,

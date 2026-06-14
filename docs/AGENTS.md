@@ -204,6 +204,8 @@ If you add a new public page, embed route, or campaign-specific flow, check whet
 
 `/manage/`, pledge result pages, and token-bearing/private routes must stay out of search indexing and should preserve token/query behavior when switching languages.
 
+Protected campaign previews are also private. Preview-only campaigns should stay out of public campaign routes until launched, and preview access emails should live only in short-lived Worker KV allowlists, not campaign Markdown or public generated artifacts.
+
 ### 7. Ended campaigns should not behave like live ones
 
 Countdowns, pledge controls, and embed/share-preview state should respect the effective campaign state, especially after deadlines.

@@ -43,7 +43,7 @@
   
   &:focus {
     top: 8px;
-    outline: 3px solid $goback--accent;
+    outline: 3px solid $focus--outline;
     outline-offset: 2px;
   }
 }
@@ -51,7 +51,7 @@
 // Focus visible styles - consistent across all interactive elements
 // Uses :focus-visible to only show on keyboard focus, not mouse clicks
 :focus-visible {
-  outline: 2px solid $goback--accent;
+  outline: 2px solid $focus--outline;
   outline-offset: 2px;
 }
 
@@ -63,7 +63,7 @@
 // Fallback for browsers without :focus-visible support
 @supports not selector(:focus-visible) {
   :focus {
-    outline: 2px solid $goback--accent;
+    outline: 2px solid $focus--outline;
     outline-offset: 2px;
   }
 }
@@ -72,14 +72,14 @@
 button:focus-visible,
 .btn:focus-visible,
 .poolcart-add-item:focus-visible {
-  outline: 3px solid $goback--accent;
+  outline: 3px solid $focus--outline;
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba($goback--accent, 0.2);
+  box-shadow: 0 0 0 4px $focus--outline-shadow;
 }
 
 // Link focus states
 a:focus-visible {
-  outline: 2px solid $goback--accent;
+  outline: 2px solid $focus--outline;
   outline-offset: 2px;
   border-radius: 2px;
 }

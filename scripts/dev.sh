@@ -13,6 +13,7 @@ trap 'kill 0' EXIT
 
 JEKYLL_PORT=4000
 WORKER_PORT=8787
+LOCAL_REPO_SERVICE_PORT=8799
 STRIPE_LOG="/tmp/pool-stripe-listen.log"
 USES_FIRST_PARTY_LOCAL=true
 SKIP_STRIPE=false
@@ -147,6 +148,7 @@ fi
 # Clear stale local services so the dev environment matches the test harness ports.
 kill_port_if_busy "$JEKYLL_PORT" "Jekyll"
 kill_port_if_busy "$WORKER_PORT" "Worker"
+kill_port_if_busy "$LOCAL_REPO_SERVICE_PORT" "Local repo service"
 
 # Jekyll (without livereload - causes issues with iCloud Drive sync)
 echo "📦 Starting Jekyll..."
@@ -157,6 +159,9 @@ bundle exec jekyll serve --config _config.yml,_config.local.yml --port "$JEKYLL_
 echo "⚡ Starting Wrangler (local KV)..."
 (cd worker && {
   prefer_current_node_path || true
+  node src/local-repo-service.mjs &
+  LOCAL_REPO_SERVICE_PID=$!
+  trap 'kill "$LOCAL_REPO_SERVICE_PID" >/dev/null 2>&1 || true' EXIT INT TERM
   npx wrangler dev --env dev --port "$WORKER_PORT"
 }) &
 

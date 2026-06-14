@@ -1,0 +1,85 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
+{%- assign asset_version = site.time | date: "%s" -%}
+{%- capture preview_title -%}{% include t.html key="campaign_protected_preview.title" lang=current_lang %}{%- endcapture -%}
+{%- capture preview_heading -%}{% include t.html key="campaign_protected_preview.heading" lang=current_lang %}{%- endcapture -%}
+{%- capture preview_description -%}{% include t.html key="campaign_protected_preview.description" lang=current_lang %}{%- endcapture -%}
+{%- capture preview_loading -%}{% include t.html key="campaign_protected_preview.loading" lang=current_lang %}{%- endcapture -%}
+{%- capture preview_error -%}{% include t.html key="campaign_protected_preview.error" lang=current_lang %}{%- endcapture -%}
+{%- capture preview_access_title -%}{% include t.html key="campaign_protected_preview.access_title" lang=current_lang %}{%- endcapture -%}
+{%- capture preview_access_body -%}{% include t.html key="campaign_protected_preview.access_body" lang=current_lang %}{%- endcapture -%}
+{%- capture preview_frame_title -%}{% include t.html key="campaign_protected_preview.frame_title" lang=current_lang %}{%- endcapture -%}
+<!doctype html>
+<html lang="{{ current_lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
+  {% include first-party-admin-csp.html %}
+  {% include cart-runtime-head.html %}
+  {% include seo-meta.html lang=current_lang title=preview_title indexable=false social=false translation_key=page.translation_key localized_paths=page.localized_paths %}
+</head>
+<body>
+  <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
+  {% include header.html hide_cart=true %}
+
+  <main id="main-content" class="campaign-protected-preview" role="main" tabindex="-1">
+    <section
+      class="campaign-protected-preview__shell"
+      data-campaign-preview
+      data-campaign-preview-slug="{{ page.campaign_slug | escape }}"
+      data-preview-loading="{{ preview_loading | strip | escape }}"
+      data-preview-error="{{ preview_error | strip | escape }}"
+      data-preview-access-title="{{ preview_access_title | strip | escape }}"
+      data-preview-access-body="{{ preview_access_body | strip | escape }}">
+      <div class="campaign-protected-preview__header">
+        <h1>{{ preview_heading | strip }}</h1>
+        <p class="campaign-protected-preview__description">{{ preview_description | strip }}</p>
+        <p data-campaign-preview-status role="status" aria-live="polite">{{ preview_loading | strip }}</p>
+      </div>
+      <div class="campaign-protected-preview__notice" data-campaign-preview-notice role="alert" hidden>
+        <h2 data-campaign-preview-notice-title>{{ preview_access_title | strip }}</h2>
+        <p data-campaign-preview-notice-body>{{ preview_access_body | strip }}</p>
+      </div>
+      <iframe
+        class="campaign-protected-preview__frame"
+        title="{{ preview_frame_title | strip | escape }}"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
+        allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+        referrerpolicy="strict-origin-when-cross-origin"
+        data-campaign-preview-frame
+        hidden></iframe>
+    </section>
+  </main>
+
+  {% include site-footer.html lang=current_lang translation_key=page.translation_key localized_paths=page.localized_paths %}
+  <div id="aria-live-region" class="aria-live" aria-live="polite" aria-atomic="true"></div>
+  <script
+    src="/assets/js/pool-config.js?v={{ asset_version }}"
+    defer
+    data-pool-config-script="true"
+    data-current-lang="{{ current_lang }}"
+    data-runtime-messages="{{ runtime_messages_json | strip | escape }}"
+    data-site-url="{{ site.platform.site_url | default: site.url }}"
+    data-worker-base="{{ site.platform.worker_url }}"
+    data-platform-name="{{ site.platform.name | default: site.title | escape }}"
+    data-platform-company-name="{{ site.platform.company_name | default: site.author | escape }}"
+    data-platform-author="{{ site.author | default: site.platform.company_name | escape }}"
+    data-platform-support-email="{{ site.platform.support_email | default: '' | escape }}"
+    data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"
+    data-platform-timezone="{{ site.platform.timezone | default: 'America/Denver' | escape }}"
+    data-sales-tax-rate="{{ site.pricing.sales_tax_rate | default: 0.07875 }}"
+    data-flat-shipping-rate="{{ site.pricing.flat_shipping_rate | default: 3.00 }}"
+    data-default-tip-percent="{{ site.pricing.default_tip_percent | default: 5 }}"
+    data-max-tip-percent="{{ site.pricing.max_tip_percent | default: 15 }}"
+    data-live-stats-cache-ttl-seconds="{{ site.cache.live_stats_ttl_seconds | default: 300 }}"
+    data-live-inventory-cache-ttl-seconds="{{ site.cache.live_inventory_ttl_seconds | default: 300 }}"
+    data-seo-x-handle="{{ site.seo.x_handle | default: '' | escape }}"
+    data-seo-index-public-community-hub="{{ site.seo.index_public_community_hub | default: true }}"
+    data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
+    data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"></script>
+  <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
+  <script src="/assets/js/campaign-preview.js?v={{ asset_version }}" defer data-campaign-preview-script="true"></script>
+</body>
+</html>

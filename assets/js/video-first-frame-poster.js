@@ -20,8 +20,13 @@
 
   function cacheBustedSameOriginUrl(src, index) {
     try {
-      var url = new URL(src, window.location.href);
-      if (url.origin !== window.location.origin) return '';
+      var baseUrl = document.baseURI || window.location.href;
+      var url = new URL(src, baseUrl);
+      var baseOrigin = new URL(baseUrl, window.location.href).origin;
+      var pageOrigin = window.location.origin && window.location.origin !== 'null'
+        ? window.location.origin
+        : baseOrigin;
+      if (url.origin !== pageOrigin) return '';
       url.searchParams.set('pool_first_frame_poster', String(Date.now()) + '-' + String(index));
       return url.href;
     } catch (_error) {

@@ -1,19 +1,29 @@
 module Jekyll
-  class LocalizedCampaignPage < PageWithoutAFile
+  class CampaignPreviewPage < PageWithoutAFile
     def initialize(site, base, campaign, lang:, localized_paths:, translation_key:)
       slug = campaign.data['slug']
-      super(site, base, File.join(lang.to_s, 'campaigns', slug.to_s), 'index.html')
+      dir = lang.to_s == default_lang(site).to_s ? File.join('campaigns', slug.to_s, 'preview') : File.join(lang.to_s, 'campaigns', slug.to_s, 'preview')
+      super(site, base, dir, 'index.html')
 
-      self.content = campaign.content
-      self.data = campaign.data.dup
-      self.data['layout'] = campaign.data['layout'] || 'campaign'
-      self.data['lang'] = lang
-      self.data['localized_paths'] = localized_paths
-      self.data['translation_key'] = translation_key
+      self.content = ''
+      self.data = {
+        'layout' => 'campaign-preview',
+        'lang' => lang,
+        'campaign_slug' => slug,
+        'indexable' => false,
+        'localized_paths' => localized_paths,
+        'translation_key' => translation_key
+      }
+    end
+
+    private
+
+    def default_lang(site)
+      site.config.dig('i18n', 'default_lang') || site.config['lang'] || 'en'
     end
   end
 
-  class LocalizedCampaignPageGenerator < Generator
+  class CampaignPreviewPageGenerator < Generator
     safe true
     priority :low
 
@@ -26,20 +36,15 @@ module Jekyll
       campaigns.each do |campaign|
         slug = campaign.data['slug']
         next unless slug
-        next if campaign.data['preview_only'] == true || campaign.data['published'] == false
 
-        translation_key = "campaign_#{slug}"
+        translation_key = "campaign_preview_#{slug}"
         localized_paths = build_localized_paths(slug, supported_langs, default_lang.to_s)
 
-        campaign.data['lang'] ||= default_lang
-        campaign.data['localized_paths'] = localized_paths
-        campaign.data['translation_key'] = translation_key
-
         supported_langs.each do |lang|
-          next if lang == default_lang.to_s
-          next if localized_campaign_page_exists?(site, localized_paths[lang])
+          target_url = localized_paths[lang]
+          next if preview_page_exists?(site, target_url)
 
-          site.pages << LocalizedCampaignPage.new(
+          site.pages << CampaignPreviewPage.new(
             site,
             site.source,
             campaign,
@@ -55,12 +60,12 @@ module Jekyll
 
     def build_localized_paths(slug, supported_langs, default_lang)
       supported_langs.each_with_object({}) do |lang, paths|
-        base_path = "/campaigns/#{slug}/"
+        base_path = "/campaigns/#{slug}/preview/"
         paths[lang] = lang == default_lang ? base_path : "/#{lang}#{base_path}"
       end
     end
 
-    def localized_campaign_page_exists?(site, target_url)
+    def preview_page_exists?(site, target_url)
       site.pages.any? { |page| page.url == target_url || page.dir == target_url }
     end
   end

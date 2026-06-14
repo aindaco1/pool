@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -314,9 +315,16 @@ describe('admin dashboard foundation', () => {
     const adminFieldLabel = readRepoFile('_includes', 'admin-field-label.html');
     const csp = readRepoFile('_includes', 'first-party-admin-csp.html');
     const campaignsApi = readRepoFile('api', 'campaigns.json');
+    const campaignPreviewLayout = readRepoFile('_layouts', 'campaign-preview.html');
+    const campaignPreviewScript = readRepoFile('assets', 'js', 'campaign-preview.js');
+    const campaignPreviewPlugin = readRepoFile('_plugins', 'campaign_preview_pages.rb');
+    const archiveCampaignWorkflow = readRepoFile('.github', 'workflows', 'archive-campaign.yml');
+    const pagePrefetchScript = readRepoFile('assets', 'js', 'page-prefetch.js');
     const mainScss = readRepoFile('assets', 'main.scss');
     const adminScss = readRepoFile('assets', 'partials', '_admin.scss');
     const adminScript = readRepoFile('assets', 'js', 'admin-dashboard.js');
+    const enI18n = readRepoFile('_data', 'i18n', 'en.yml');
+    const esI18n = readRepoFile('_data', 'i18n', 'es.yml');
 
     expect(config).toContain('admin:');
     expect(config).toContain('users:');
@@ -329,6 +337,8 @@ describe('admin dashboard foundation', () => {
     expect(config).toContain('es: /es/admin/');
     expect(robots).toContain('Disallow: /admin/');
     expect(robots).toContain('Disallow: /es/admin/');
+    expect(robots).toContain('Disallow: /campaigns/*/preview/');
+    expect(robots).toContain('Disallow: /es/campaigns/*/preview/');
     expect(adminPage).toContain('layout: admin');
     expect(adminPage).toContain('indexable: false');
     expect(adminPage).toContain('sitemap: false');
@@ -415,8 +425,18 @@ describe('admin dashboard foundation', () => {
     expect(layout).not.toContain('id="admin-content-load"');
     expect(layout).not.toContain('admin.content_advanced_json');
     expect(layout).toContain('id="admin-content-publish"');
+    expect(layout).toContain('id="admin-campaign-create"');
+    expect(layout).toContain('id="admin-campaign-preview-publish"');
+    expect(layout).toContain('class="admin-campaign-create-button"');
+    expect(layout).toContain('class="admin-campaign-create-button__icon" aria-hidden="true">+</span>');
+    expect(layout).toContain('class="admin-campaign-create-button__label"');
+    expect(layout.indexOf('id="admin-campaign-create"')).toBeLessThan(layout.indexOf('id="admin-campaign-tabs"'));
+    expect(layout.indexOf('id="admin-campaign-preview-publish"')).toBeGreaterThan(layout.indexOf('id="admin-content-campaign"'));
+    expect(layout.indexOf('id="admin-campaign-preview-publish"')).toBeLessThan(layout.indexOf('id="admin-content-publish"'));
+    expect(layout.indexOf('id="admin-content-publish"')).toBeLessThan(layout.indexOf('id="admin-campaign-status"'));
     expect(layout).toContain('id="admin-campaign-status"');
-    expect(layout).toContain('sandbox="allow-scripts allow-popups allow-presentation"');
+    expect(layout).toContain('sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"');
+    expect(layout).toContain('allow="autoplay; fullscreen; picture-in-picture; encrypted-media"');
     expect(csp).toContain("frame-src 'self'");
     expect(csp).not.toContain('frame-ancestors');
     expect(csp).toContain('https://www.youtube-nocookie.com');
@@ -424,14 +444,62 @@ describe('admin dashboard foundation', () => {
     expect(csp).toContain("img-src 'self' data: blob:");
     expect(csp).toContain("media-src 'self' https: blob:");
     expect(campaignsApi).toContain('"decisions": {{ campaign.decisions | default: empty | jsonify }}');
+    expect(campaignsApi).toContain('c.preview_only != true and c.published != false');
+    expect(campaignPreviewLayout).toContain('class="campaign-protected-preview"');
+    expect(campaignPreviewLayout).toContain('campaign_protected_preview.description');
+    expect(campaignPreviewLayout).toContain('campaign_protected_preview.access_title');
+    expect(campaignPreviewLayout).toContain('campaign_protected_preview.access_body');
+    expect(campaignPreviewLayout).toContain('class="campaign-protected-preview__description"');
+    expect(campaignPreviewLayout).toContain('data-campaign-preview-notice role="alert" hidden');
+    expect(enI18n).toContain('heading: "Preview"');
+    expect(enI18n).toContain('description: "This protected preview shows the full campaign page for invited reviewers, and links expire in 24 hours."');
+    expect(enI18n).toContain('access_title: "Preview link unavailable"');
+    expect(enI18n).toContain('access_body: "This preview link has expired or is invalid. Ask the campaign team for a new 24-hour preview link."');
+    expect(esI18n).toContain('heading: "Vista previa"');
+    expect(esI18n).toContain('description: "Esta vista previa protegida muestra la página completa de la campaña para revisores invitados, y los enlaces vencen en 24 horas."');
+    expect(esI18n).toContain('access_title: "El enlace de vista previa no está disponible"');
+    expect(esI18n).toContain('access_body: "Este enlace de vista previa venció o no es válido. Pide al equipo de la campaña un nuevo enlace de vista previa de 24 horas."');
+    expect(campaignPreviewLayout).toContain('indexable=false');
+    expect(campaignPreviewLayout).toContain('social=false');
+    expect(campaignPreviewLayout).toContain('meta name="referrer" content="strict-origin-when-cross-origin"');
+    expect(campaignPreviewLayout).toContain('sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"');
+    expect(campaignPreviewLayout).toContain('allow="autoplay; fullscreen; picture-in-picture; encrypted-media"');
+    expect(campaignPreviewLayout).toContain('referrerpolicy="strict-origin-when-cross-origin"');
+    expect(campaignPreviewLayout).not.toContain('page.campaign_title');
+    expect(campaignPreviewLayout).not.toContain('data-preview-ready');
+    expect(campaignPreviewLayout).not.toContain('page-prefetch.html');
+    expect(campaignPreviewScript).toContain('/admin/campaign-preview/');
+    expect(campaignPreviewScript).toContain('credentials: \'include\'');
+    expect(campaignPreviewScript).toContain('history.replaceState');
+    expect(campaignPreviewScript).toContain("params.set('lang', lang)");
+    expect(campaignPreviewScript).toContain('isAccessError(error)');
+    expect(campaignPreviewScript).toContain("root.dataset.campaignPreviewAccess = 'blocked'");
+    expect(campaignPreviewScript).toContain("setStatus('')");
+    expect(campaignPreviewScript).not.toContain('Preview loaded');
+    expect(adminScss).toContain('.campaign-protected-preview__notice');
+    expect(adminScss).toContain('.campaign-protected-preview__notice[hidden]');
+    expect(adminScss).toContain('.campaign-protected-preview__frame');
+    expect(adminScss).toContain('min-width: 0;');
+    expect(adminScss).toContain('@media (min-width: 1180px)');
+    expect(adminScss).toContain('body.campaign-preview-render');
+    expect(adminScss).toContain('.campaign-preview-readonly');
+    expect(campaignPreviewPlugin).toContain("slug = campaign.data['slug']");
+    expect(campaignPreviewPlugin).not.toContain('preview_page_required?');
+    expect(campaignPreviewPlugin).not.toContain("campaign.data['preview_only']");
+    expect(campaignPreviewPlugin).not.toContain("campaign.data['preview_enabled']");
+    expect(pagePrefetchScript).toContain("'t'");
     expect(mainScss).toContain('@import "partials/admin";');
     expect(adminScss).toContain('@media (max-width: 1100px)');
     expect(adminScss).toContain('.admin-tabs__list');
     expect(adminScss).toContain('overflow-x: auto;');
     expect(adminScss).toContain('.admin-mobile-tab-select');
+    expect(adminScss).toContain('max-width: min(100%, 1320px);');
+    expect(adminScss).toContain('min-width: 1120px;');
     expect(adminScss).toContain('@media (max-width: 899px)');
     expect(adminScss).toContain('display: grid;');
     expect(adminScss).toContain('[data-admin-prominent-status="true"]');
+    expect(adminScss).toContain('.admin-dashboard__status-action');
+    expect(adminScss).toContain('.admin-campaigns > .admin-campaigns__status');
     expect(adminScss).toContain('.admin-content-block.is-active .admin-content-block__chrome');
     expect(adminScss).toContain('.admin-settings__field-grid--count-5');
     expect(adminScss).toContain('repeat(auto-fit, minmax(8rem, 1fr))');
@@ -443,6 +511,10 @@ describe('admin dashboard foundation', () => {
     expect(adminScript).toContain('/admin/analytics');
     expect(adminScript).toContain('function formatMoneyExact');
     expect(adminScript).toContain('function setProminentStatus');
+    expect(adminScript).toContain('function setCampaignPreviewPublishedStatus');
+    expect(adminScript).toContain('function setCampaignPreviewStatusForLink');
+    expect(adminScript).toContain('function activePreviewForCampaign');
+    expect(adminScript).toContain('data-campaign-preview-status');
     expect(adminScript).toContain('function setAuthStatus');
     expect(adminScript).toContain('var adminLoginAttemptStarted = false;');
     expect(adminScript).toContain('if (adminLoginAttemptStarted) return;');
@@ -455,6 +527,55 @@ describe('admin dashboard foundation', () => {
     expect(adminScript).toContain('data-admin-user-card');
     expect(adminScript).toContain('/admin/content/preview');
     expect(adminScript).toContain('/admin/content/publish');
+    expect(adminScript).toContain('function isEmptyDraftTextBlock');
+    expect(adminScript).toContain('dropEmptyDraftBlocks');
+    expect(adminScript).toContain('suppressValidation: options?.auto === true');
+    expect(adminScript).toContain('/admin/campaigns/create');
+    expect(adminScript).toContain('/admin/campaigns/archive');
+    expect(adminScript).toContain('function createCampaignArchiveAction');
+    expect(adminScript).toContain('campaign_archive_warning');
+    expect(adminScript).toContain('/admin/campaign-preview/publish');
+    expect(adminScript).toContain('data?.currentUserPreview');
+    expect(adminScript).toContain('campaign?.activePreview');
+    expect(adminScript).toContain('data-campaign-preview-current-link');
+    expect(adminScript).toContain('campaign_preview_current_user_notice');
+    expect(adminScript).toContain('campaign_preview_open_current');
+    expect(adminScript).toContain("reviewers.dataset.campaignPreviewReviewers = 'true'");
+    expect(adminScript).toContain('campaignUserEmails: campaignUserEmails');
+    expect(adminScript).toContain("var createNewCampaignUserValue = '__create_new_campaign_user__'");
+    expect(adminScript).toContain('body.newCampaignUsers = newCampaignUsers');
+    expect(adminScript).toContain('data-campaign-new-user-row');
+    expect(adminScript).toContain('campaign_create_campaign_title_help');
+    expect(adminScript).toContain('campaign_create_created_no_users');
+    expect(adminScript).toContain('campaign_archive_archived_local');
+    expect(adminScript).toContain('createProductLabelRow(labelText, options?.help ||');
+    expect(adminScript).toContain('function firstAdminFocusTarget');
+    expect(adminScript).toContain("control.classList.contains('admin-settings__help-button')");
+    expect(adminScript).toContain("helpClassName: 'admin-settings__help--edge-start'");
+    expect(adminScript).toContain('var firstControl = firstAdminFocusTarget(dialog)');
+    expect(adminScript).not.toContain('admin-action-dialog-help-');
+    expect(adminScript).not.toContain("dialog.querySelector('input, select, textarea, button')");
+    expect(adminScript).not.toContain("appendDialogControlGroup(form, t('campaign_create_new_users'");
+    expect(adminScript).not.toContain('reviewers.rows = 5');
+    expect(adminScss).toContain('.admin-action-dialog__field > .admin-settings__product-label');
+    expect(adminScss).toContain('.admin-settings__help--edge-start .admin-settings__help-tooltip');
+    expect(adminScss).toContain('.admin-campaign-archive-action');
+    expect(enI18n).toContain('campaign_field_archive_campaign: "Archive campaign"');
+    expect(enI18n).toContain('campaign_create_created_no_users: "Campaign created. No campaign users were assigned."');
+    expect(enI18n).toContain('campaign_archive_archived_local: "Campaign archived locally.');
+    expect(esI18n).toContain('campaign_field_archive_campaign: "Archivar campaña"');
+    expect(archiveCampaignWorkflow).toContain('name: Archive campaign');
+    expect(archiveCampaignWorkflow).toContain('workflow_dispatch:');
+    expect(archiveCampaignWorkflow).toContain('campaign_slug:');
+    expect(archiveCampaignWorkflow).toContain('/^[a-z0-9-]{1,100}$/');
+    expect(archiveCampaignWorkflow).toContain("fs.renameSync(campaignPath, archivedCampaignPath)");
+    expect(archiveCampaignWorkflow).toContain("path.join('archive', 'campaigns', slug)");
+    expect(archiveCampaignWorkflow).not.toContain('rm -rf');
+    expect(adminScss).toContain('overflow: visible;');
+    expect(adminScss).not.toContain('.admin-action-dialog__field small');
+    expect(adminScss).toContain('.admin-settings__email-list-input:focus');
+    expect(adminScss).toContain('.admin-campaign-new-users__row');
+    expect(adminScript).toContain('loadedContentBaseRevision');
     expect(adminScript).toContain('pool-admin-content-draft:');
   });
 
@@ -497,6 +618,122 @@ describe('admin dashboard foundation', () => {
     expect(campaignJsonTemplate).toContain('"requires_threshold": {% if tier.requires_threshold %}{{ tier.requires_threshold }}{% else %}null{% endif %}');
     expect(campaignJsonTemplate).toContain('"body": {{ entry.body | jsonify }}');
     expect(campaignJsonTemplate).toContain('"content": {{ entry.content | default: empty | jsonify }}');
+  });
+
+  it('loads structured content from GitHub-only unpublished campaigns', async () => {
+    const env = {
+      ...createEnv(),
+      ADMIN_BOOTSTRAP_EMAILS: '',
+      ADMIN_USERS_JSON: JSON.stringify([{
+        name: 'Draft Creator',
+        email: 'creator@example.com',
+        role: 'campaign_user',
+        campaignSlugs: ['draft-campaign']
+      }]),
+      GITHUB_TOKEN: 'github-test',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo-structured-draft',
+      GITHUB_REF: 'main'
+    };
+    const { cookie, ctx } = await signInAdmin(env, 'creator@example.com');
+    const draftMarkdown = `---
+layout: campaign
+title: "Draft Campaign"
+slug: draft-campaign
+published: false
+preview_only: true
+preview_enabled: true
+preview_reviewer_emails:
+  - "reviewer@example.com"
+short_blurb: "Private draft blurb"
+long_content:
+  - type: text
+    body: |
+      ## Draft body
+
+      Line two.
+    align: center
+  - type: gallery
+    layout: grid
+    images:
+      - src: "/assets/images/campaigns/draft-campaign/one.png"
+        alt: "One"
+        caption: "First image"
+      - src: "/assets/images/campaigns/draft-campaign/two.png"
+        alt: "Two"
+tiers:
+  - id: "frame-slot"
+    name: "Frame slot"
+    price: 25
+    shipping:
+      length: 10
+      width: 8
+      height: 1
+      weight_oz: 12
+---
+`;
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture] });
+      }
+      if (url.includes('/contents/_campaigns?') && method === 'GET') {
+        return jsonResponse([{
+          name: 'draft-campaign.md',
+          path: '_campaigns/draft-campaign.md',
+          type: 'file',
+          sha: 'draft-list-sha'
+        }]);
+      }
+      if (url.includes('/contents/_campaigns/draft-campaign.md') && method === 'GET') {
+        return jsonResponse({
+          path: '_campaigns/draft-campaign.md',
+          sha: 'draft-file-sha',
+          encoding: 'base64',
+          content: Buffer.from(draftMarkdown, 'utf8').toString('base64')
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/content/campaign?campaignSlug=draft-campaign', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.campaign).toMatchObject({
+      slug: 'draft-campaign',
+      title: 'Draft Campaign',
+      shortBlurb: 'Private draft blurb',
+      baseRevision: 'draft-file-sha'
+    });
+    expect(body.campaign.longContent).toEqual([
+      {
+        type: 'text',
+        body: '## Draft body\n\nLine two.',
+        align: 'center'
+      },
+      {
+        type: 'gallery',
+        layout: 'grid',
+        images: [
+          {
+            src: '/assets/images/campaigns/draft-campaign/one.png',
+            alt: 'One',
+            caption: 'First image'
+          },
+          {
+            src: '/assets/images/campaigns/draft-campaign/two.png',
+            alt: 'Two'
+          }
+        ]
+      }
+    ]);
+    expectNoKvWritesOrLists(env, 'GitHub-only unpublished campaign content load');
   });
 
   it('keeps admin session and dashboard summary reads free of KV writes', async () => {
@@ -772,6 +1009,480 @@ describe('admin dashboard foundation', () => {
     expect(fetchMock.mock.calls.some(([input]) => input === 'https://api.resend.com/emails')).toBe(false);
   });
 
+  it('lets super admins create new preview-only campaigns and email assigned campaign users', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_WORKFLOW: 'deploy.yml',
+      GITHUB_REF: 'main',
+      RESEND_API_KEY: 'resend-test',
+      UPDATES_EMAIL_FROM: 'Pool Admin <admin@pool.test>'
+    };
+    (env.PLEDGES as CountingKVNamespace).store.set('admin-users:v1', JSON.stringify({
+      users: [{
+        name: 'Admin Person',
+        email: 'admin@example.com',
+        role: 'super_admin',
+        campaignSlugs: []
+      }, {
+        name: 'Creator Person',
+        email: 'creator@example.com',
+        role: 'campaign_user',
+        campaignSlugs: []
+      }, {
+        name: 'Second Creator',
+        email: 'second-creator@example.com',
+        role: 'campaign_user',
+        campaignSlugs: []
+      }]
+    }));
+    const { cookie, ctx, csrfToken } = await signInAdmin(env);
+    const githubCalls: GitHubFetchCall[] = [];
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture] });
+      }
+      if (url.includes('/contents/_campaigns?') && method === 'GET') {
+        githubCalls.push({ url, method });
+        return jsonResponse([]);
+      }
+      if (url.endsWith('/contents/_campaigns/new-blank.md') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: '_campaigns/new-blank.md', sha: 'new-blank-file-sha' },
+          commit: { sha: 'new-blank-commit', html_url: 'https://github.test/new-blank-commit' }
+        });
+      }
+      if (url.endsWith('/actions/workflows/deploy.yml/dispatches') && method === 'POST') {
+        githubCalls.push({ url, method, body: JSON.parse(String(init?.body || '{}')) });
+        return new Response(null, { status: 204 });
+      }
+      if (url === 'https://api.resend.com/emails') {
+        return jsonResponse({ id: 'assignment-email' });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/campaigns/create', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        title: 'New Blank',
+        campaignUserEmails: ['creator@example.com', 'second-creator@example.com'],
+        newCampaignUsers: [{
+          name: 'New Creator',
+          email: 'new-creator@example.com'
+        }, {
+          name: 'Another Creator',
+          email: 'another-creator@example.com'
+        }],
+        preferredLang: 'en'
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      success: true,
+      campaign: {
+        slug: 'new-blank',
+        title: 'New Blank',
+        previewOnly: true,
+        published: false,
+        assignedCampaignUserEmail: 'creator@example.com',
+        assignedCampaignUserEmails: ['creator@example.com', 'second-creator@example.com', 'new-creator@example.com', 'another-creator@example.com'],
+        assignedCampaignUsers: [
+          { email: 'creator@example.com', name: 'Creator Person' },
+          { email: 'second-creator@example.com', name: 'Second Creator' },
+          { email: 'new-creator@example.com', name: 'New Creator' },
+          { email: 'another-creator@example.com', name: 'Another Creator' }
+        ]
+      },
+      githubPath: '_campaigns/new-blank.md',
+      commitSha: 'new-blank-commit',
+      notifications: {
+        adminUserCreated: {
+          newUserEmails: ['new-creator@example.com', 'another-creator@example.com']
+        },
+        assignment: { email: 'creator@example.com', sent: true },
+        assignments: [
+          { email: 'creator@example.com', sent: true },
+          { email: 'second-creator@example.com', sent: true },
+          { email: 'new-creator@example.com', sent: true },
+          { email: 'another-creator@example.com', sent: true }
+        ]
+      }
+    });
+    const putCall = githubCalls.find((call) => call.method === 'PUT' && call.url.endsWith('/contents/_campaigns/new-blank.md'));
+    expect(putCall).toBeTruthy();
+    const markdown = Buffer.from(String(putCall?.body?.content || ''), 'base64').toString('utf8');
+    expect(markdown).toContain('title: "New Blank"');
+    expect(markdown).toContain('slug: new-blank');
+    expect(markdown).toContain('published: false');
+    expect(markdown).toContain('preview_only: true');
+    expect(markdown).toContain('creator_name: "Creator Person, Second Creator, New Creator, Another Creator"');
+    expect(githubCalls.some((call) => call.url.endsWith('/actions/workflows/deploy.yml/dispatches'))).toBe(true);
+    const savedUsers = JSON.parse((env.PLEDGES as CountingKVNamespace).store.get('admin-users:v1') || '{}');
+    expect(savedUsers.users).toEqual(expect.arrayContaining([
+      expect.objectContaining({ email: 'creator@example.com', campaignSlugs: ['new-blank'] }),
+      expect.objectContaining({ email: 'second-creator@example.com', campaignSlugs: ['new-blank'] }),
+      expect.objectContaining({ email: 'new-creator@example.com', campaignSlugs: ['new-blank'] }),
+      expect.objectContaining({ email: 'another-creator@example.com', campaignSlugs: ['new-blank'] })
+    ]));
+    const emailCalls = (global.fetch as unknown as { mock: { calls: Array<[RequestInfo | URL, RequestInit?]> } }).mock.calls
+      .filter(([input]) => input === 'https://api.resend.com/emails');
+    expect(emailCalls).toHaveLength(6);
+    const emailPayloads = emailCalls.map((call) => JSON.parse(String(call[1]?.body || '{}')));
+    const assignmentPayloads = emailPayloads.filter((payload) => payload.subject === 'Campaign assigned | The Pool');
+    const adminCreatedPayloads = emailPayloads.filter((payload) => payload.subject === 'Admin access added | The Pool');
+    expect(assignmentPayloads).toHaveLength(4);
+    expect(adminCreatedPayloads).toHaveLength(2);
+    expect(assignmentPayloads).toEqual(expect.arrayContaining([
+      expect.objectContaining({ to: 'creator@example.com', subject: 'Campaign assigned | The Pool' }),
+      expect.objectContaining({ to: 'second-creator@example.com', subject: 'Campaign assigned | The Pool' }),
+      expect.objectContaining({ to: 'new-creator@example.com', subject: 'Campaign assigned | The Pool' }),
+      expect.objectContaining({ to: 'another-creator@example.com', subject: 'Campaign assigned | The Pool' })
+    ]));
+    expect(adminCreatedPayloads).toEqual(expect.arrayContaining([
+      expect.objectContaining({ to: 'new-creator@example.com', subject: 'Admin access added | The Pool' }),
+      expect.objectContaining({ to: 'another-creator@example.com', subject: 'Admin access added | The Pool' })
+    ]));
+    expect(assignmentPayloads.every((payload) => String(payload.html || '').includes('Open admin dashboard'))).toBe(true);
+  });
+
+  it('lets super admins create new campaigns without assigning campaign users', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_WORKFLOW: 'deploy.yml',
+      GITHUB_REF: 'main',
+      RESEND_API_KEY: 'resend-test',
+      UPDATES_EMAIL_FROM: 'Pool Admin <admin@pool.test>'
+    };
+    const { cookie, ctx, csrfToken } = await signInAdmin(env);
+    const githubCalls: GitHubFetchCall[] = [];
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture] });
+      }
+      if (url.includes('/contents/_campaigns?') && method === 'GET') {
+        githubCalls.push({ url, method });
+        return jsonResponse([]);
+      }
+      if (url.endsWith('/contents/_campaigns/unassigned-campaign.md') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: '_campaigns/unassigned-campaign.md', sha: 'unassigned-file-sha' },
+          commit: { sha: 'unassigned-commit', html_url: 'https://github.test/unassigned-commit' }
+        });
+      }
+      if (url.endsWith('/actions/workflows/deploy.yml/dispatches') && method === 'POST') {
+        githubCalls.push({ url, method, body: JSON.parse(String(init?.body || '{}')) });
+        return new Response(null, { status: 204 });
+      }
+      if (url === 'https://api.resend.com/emails') {
+        throw new Error('Unassigned campaign should not send assignment emails');
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/campaigns/create', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        title: 'Unassigned Campaign',
+        campaignUserEmails: [],
+        newCampaignUsers: [],
+        preferredLang: 'en'
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      success: true,
+      campaign: {
+        slug: 'unassigned-campaign',
+        title: 'Unassigned Campaign',
+        previewOnly: true,
+        published: false,
+        assignedCampaignUserEmail: '',
+        assignedCampaignUserEmails: [],
+        assignedCampaignUsers: []
+      },
+      notifications: {
+        adminUserCreated: {
+          newUserEmails: [],
+          sent: [],
+          failed: []
+        },
+        assignment: null,
+        assignments: []
+      },
+      writeBudget: { readOnly: false, kvWritesExpected: 1, kvListExpected: 0 }
+    });
+    const putCall = githubCalls.find((call) => call.method === 'PUT' && call.url.endsWith('/contents/_campaigns/unassigned-campaign.md'));
+    expect(putCall).toBeTruthy();
+    const markdown = Buffer.from(String(putCall?.body?.content || ''), 'base64').toString('utf8');
+    expect(markdown).toContain('title: "Unassigned Campaign"');
+    expect(markdown).toContain('creator_name: ""');
+    expect((env.PLEDGES as CountingKVNamespace).store.has('admin-users:v1')).toBe(false);
+    expect(githubCalls.some((call) => call.url.endsWith('/actions/workflows/deploy.yml/dispatches'))).toBe(true);
+  });
+
+  it('lets super admins dispatch campaign archives for non-live campaigns only', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-test',
+      GITHUB_OWNER: 'dust-wave',
+      GITHUB_REPO: 'pool',
+      GITHUB_REF: 'main'
+    };
+    const archiveableCampaign = {
+      ...campaignFixture,
+      state: 'upcoming',
+      start_date: '2099-01-01',
+      goal_deadline: '2099-12-31'
+    };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const githubCalls: GitHubFetchCall[] = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [archiveableCampaign] });
+      }
+      if (url.endsWith('/actions/workflows/archive-campaign.yml/dispatches') && method === 'POST') {
+        githubCalls.push({ url, method, body: JSON.parse(String(init?.body || '{}')) });
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetCampaignRuntimeStateForTests();
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/campaigns/archive', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        intent: 'archive_campaign',
+        campaignSlug: 'hand-relations'
+      })
+    }), env, ctx);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      success: true,
+      campaignSlug: 'hand-relations',
+      archivePath: 'archive/campaigns/hand-relations/',
+      workflow: 'archive-campaign.yml',
+      writeBudget: { readOnly: false, kvWritesExpected: 1, kvListExpected: 0 }
+    });
+    expect(githubCalls).toEqual([expect.objectContaining({
+      body: {
+        ref: 'main',
+        inputs: {
+          campaign_slug: 'hand-relations',
+          requested_by: 'admin@example.com'
+        }
+      }
+    })]);
+    expect(body.auditKey).toContain('admin-audit:');
+    const auditRecord = JSON.parse((env.PLEDGES as CountingKVNamespace).store.get(body.auditKey) || '{}');
+    expect(auditRecord).toMatchObject({
+      action: 'campaign:archive',
+      adminEmail: 'admin@example.com',
+      campaignSlug: 'hand-relations',
+      archivePath: 'archive/campaigns/hand-relations/'
+    });
+
+    resetCampaignRuntimeStateForTests();
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture] });
+      }
+      if (url.endsWith('/actions/workflows/archive-campaign.yml/dispatches') && method === 'POST') {
+        throw new Error('Archive workflow should not dispatch for live campaigns');
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+    const liveResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/campaigns/archive', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        intent: 'archive_campaign',
+        campaignSlug: 'hand-relations'
+      })
+    }), env, ctx);
+    expect(liveResponse.status).toBe(409);
+    await expect(liveResponse.json()).resolves.toMatchObject({
+      code: 'campaign_live_archive_blocked'
+    });
+
+    const campaignUserEnv = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-test',
+      GITHUB_OWNER: 'dust-wave',
+      GITHUB_REPO: 'pool',
+      GITHUB_REF: 'main'
+    };
+    (campaignUserEnv.PLEDGES as CountingKVNamespace).store.set('admin-users:v1', JSON.stringify({
+      users: [{
+        name: 'Admin Person',
+        email: 'admin@example.com',
+        role: 'super_admin',
+        campaignSlugs: []
+      }, {
+        name: 'Creator Person',
+        email: 'creator@example.com',
+        role: 'campaign_user',
+        campaignSlugs: ['hand-relations']
+      }]
+    }));
+    const campaignSession = await signInAdmin(campaignUserEnv, 'creator@example.com');
+    resetCampaignRuntimeStateForTests();
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [archiveableCampaign] });
+      }
+      if (url === 'https://pool.test/api/add-ons.json') {
+        return jsonResponse(addOnsFixture);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+    const campaignUserResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/campaigns/archive', {
+      method: 'POST',
+      headers: { Cookie: campaignSession.cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': campaignSession.csrfToken },
+      body: JSON.stringify({
+        intent: 'archive_campaign',
+        campaignSlug: 'hand-relations'
+      })
+    }), campaignUserEnv, campaignSession.ctx);
+    expect(campaignUserResponse.status).toBe(403);
+  });
+
+  it('archives campaigns locally in dev without dispatching GitHub Actions', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pool-local-archive-'));
+    try {
+      fs.mkdirSync(path.join(tempRoot, '_campaigns'), { recursive: true });
+      fs.mkdirSync(path.join(tempRoot, 'assets/images/campaigns/hand-relations'), { recursive: true });
+      fs.mkdirSync(path.join(tempRoot, 'assets/images/campaign-add-ons'), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, 'assets/images/campaigns/hand-relations/hero.png'), 'hero');
+      fs.writeFileSync(path.join(tempRoot, 'assets/images/campaign-add-ons/local-addon.png'), 'local-addon');
+      fs.writeFileSync(path.join(tempRoot, 'assets/images/campaign-add-ons/shared-addon.png'), 'shared-addon');
+      fs.writeFileSync(path.join(tempRoot, '_campaigns/hand-relations.md'), `---
+layout: campaign
+title: Hand Relations
+slug: hand-relations
+preview_only: true
+state: upcoming
+hero_image: /assets/images/campaigns/hand-relations/hero.png
+campaign_add_ons:
+  - image: /assets/images/campaign-add-ons/local-addon.png
+  - image: /assets/images/campaign-add-ons/shared-addon.png
+---
+`);
+      fs.writeFileSync(path.join(tempRoot, '_campaigns/other-campaign.md'), `---
+layout: campaign
+title: Other Campaign
+slug: other-campaign
+state: upcoming
+campaign_add_ons:
+  - image: /assets/images/campaign-add-ons/shared-addon.png
+---
+`);
+
+      const env = {
+        ...createEnv(),
+        GITHUB_TOKEN: 'github-test',
+        GITHUB_OWNER: 'dust-wave',
+        GITHUB_REPO: 'pool',
+        GITHUB_REF: 'main',
+        ADMIN_LOCAL_REPO_WRITES_ENABLED: 'true',
+        ADMIN_LOCAL_REPO_ROOT: tempRoot
+      };
+      const archiveableCampaign = {
+        ...campaignFixture,
+        state: 'upcoming',
+        start_date: '2099-01-01',
+        goal_deadline: '2099-12-31'
+      };
+      const { ctx, cookie, csrfToken } = await signInAdmin(env);
+      global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        if (url === 'https://pool.test/api/campaigns.json') {
+          return jsonResponse({ campaigns: [archiveableCampaign] });
+        }
+        throw new Error(`Unexpected fetch: ${url}`);
+      }) as typeof fetch;
+
+      resetCampaignRuntimeStateForTests();
+      resetKvCounters(env);
+      const response = await worker.fetch(new Request('https://pledge.pool.test/admin/campaigns/archive', {
+        method: 'POST',
+        headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+        body: JSON.stringify({
+          intent: 'archive_campaign',
+          campaignSlug: 'hand-relations'
+        })
+      }), env, ctx);
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body).toMatchObject({
+        success: true,
+        mode: 'local',
+        campaignSlug: 'hand-relations',
+        archivePath: 'archive/campaigns/hand-relations/',
+        movedMediaCount: 2,
+        skippedSharedMediaCount: 1,
+        writeBudget: { readOnly: false, kvWritesExpected: 1, kvListExpected: 0 }
+      });
+      expect(fs.existsSync(path.join(tempRoot, '_campaigns/hand-relations.md'))).toBe(false);
+      expect(fs.existsSync(path.join(tempRoot, 'archive/campaigns/hand-relations/_campaigns/hand-relations.md'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'assets/images/campaigns/hand-relations/hero.png'))).toBe(false);
+      expect(fs.existsSync(path.join(tempRoot, 'archive/campaigns/hand-relations/assets/images/campaigns/hand-relations/hero.png'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'assets/images/campaign-add-ons/local-addon.png'))).toBe(false);
+      expect(fs.existsSync(path.join(tempRoot, 'archive/campaigns/hand-relations/assets/images/campaign-add-ons/local-addon.png'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, 'assets/images/campaign-add-ons/shared-addon.png'))).toBe(true);
+      const archivedSource = fs.readFileSync(path.join(tempRoot, 'archive/campaigns/hand-relations/_campaigns/hand-relations.md'), 'utf8');
+      expect(archivedSource).toContain('archive/campaigns/hand-relations/assets/images/campaigns/hand-relations/hero.png');
+      expect(archivedSource).toContain('archive/campaigns/hand-relations/assets/images/campaign-add-ons/local-addon.png');
+      expect(archivedSource).toContain('/assets/images/campaign-add-ons/shared-addon.png');
+      const manifest = JSON.parse(fs.readFileSync(path.join(tempRoot, 'archive/campaigns/hand-relations/archive-manifest.json'), 'utf8'));
+      expect(manifest.movedMedia).toHaveLength(2);
+      expect(manifest.skippedSharedMedia).toEqual(['assets/images/campaign-add-ons/shared-addon.png']);
+      const auditRecord = JSON.parse((env.PLEDGES as CountingKVNamespace).store.get(body.auditKey) || '{}');
+      expect(auditRecord).toMatchObject({
+        action: 'campaign:archive',
+        adminEmail: 'admin@example.com',
+        campaignSlug: 'hand-relations',
+        mode: 'local',
+        movedMediaCount: 2,
+        skippedSharedMediaCount: 1
+      });
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('keeps admin users out of GitHub-backed settings publishing', async () => {
     const env = createEnv();
     const { cookie, ctx } = await signInAdmin(env);
@@ -860,13 +1571,13 @@ describe('admin dashboard foundation', () => {
     expect(body.writeBudget).toEqual({ readOnly: true, kvWritesExpected: 0, kvListExpected: 0 });
     expect(body.sections).toEqual(expect.arrayContaining([
       expect.objectContaining({ title: 'Platform' }),
-      expect.objectContaining({ title: 'Canonical URLs' }),
       expect.objectContaining({ title: 'Secrets & credentials' }),
       expect.objectContaining({ title: 'Runtime diagnostics' }),
       expect.objectContaining({ title: 'Pricing' }),
       expect.objectContaining({ title: 'Platform add-ons' })
     ]));
     const sectionTitles = body.sections.map((section: { title: string }) => section.title);
+    expect(sectionTitles).not.toContain('Canonical URLs');
     expect(sectionTitles.indexOf('Design')).toBeLessThan(sectionTitles.indexOf('Users'));
     expect(sectionTitles.indexOf('Users')).toBeLessThan(sectionTitles.indexOf('Advanced performance'));
     expect(body.sections.slice(-2).map((section: { title: string }) => section.title)).toEqual([
@@ -883,11 +1594,6 @@ describe('admin dashboard foundation', () => {
       expect(row.help, `${row.label} should include field help`).toEqual(expect.any(String));
       expect(row.help?.length, `${row.label} should include field help`).toBeGreaterThan(20);
     });
-    const canonicalRows = body.sections.find((section: { title: string }) => section.title === 'Canonical URLs').rows;
-    expect(canonicalRows).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: 'Production site URL', value: 'https://pool.dustwave.xyz', path: 'platform.site_url', editable: true }),
-      expect.objectContaining({ label: 'Production Worker URL', value: 'https://pledge.dustwave.xyz', path: 'platform.worker_url', editable: true })
-    ]));
     const runtimeRows = body.sections.find((section: { title: string }) => section.title === 'Runtime diagnostics').rows;
     expect(runtimeRows).toEqual(expect.arrayContaining([
       expect.objectContaining({ label: 'Current site base', value: 'https://pool.test', editable: false }),
@@ -903,6 +1609,8 @@ describe('admin dashboard foundation', () => {
       'Default timezone',
       'Support email',
       'Site description',
+      'Production site URL',
+      'Production Worker URL',
       'Pledges email from',
       'Updates email from',
       'App mode'
@@ -926,6 +1634,8 @@ describe('admin dashboard foundation', () => {
         editable: true
       }),
       expect.objectContaining({ label: 'Support email', path: 'platform.support_email', layoutGroup: 'platform-creator-support', editable: true }),
+      expect.objectContaining({ label: 'Production site URL', value: 'https://pool.dustwave.xyz', path: 'platform.site_url', layoutGroup: 'platform-canonical-urls', editable: true }),
+      expect.objectContaining({ label: 'Production Worker URL', value: 'https://pledge.dustwave.xyz', path: 'platform.worker_url', layoutGroup: 'platform-canonical-urls', editable: true }),
       expect.objectContaining({ label: 'Pledges email from', path: 'platform.pledges_email_from', layoutGroup: 'platform-email-from', editable: true }),
       expect.objectContaining({ label: 'Updates email from', path: 'platform.updates_email_from', layoutGroup: 'platform-email-from', editable: true }),
       expect.objectContaining({ label: 'App mode', value: 'test', editable: false })
@@ -1380,6 +2090,82 @@ describe('admin dashboard foundation', () => {
     expect(campaignBody.campaigns).toHaveLength(1);
     expect(campaignBody.campaigns[0]).toMatchObject({ title: 'Hand Relations' });
     expectNoKvWritesOrLists(env, 'campaign settings read');
+  });
+
+  it('shows archive controls only to super admins for non-live campaigns', async () => {
+    const env = createEnv();
+    const archiveableCampaign = {
+      ...campaignFixture,
+      state: 'upcoming',
+      start_date: '2099-01-01',
+      goal_deadline: '2099-12-31'
+    };
+    resetCampaignRuntimeStateForTests();
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [archiveableCampaign] });
+      }
+      if (url === 'https://pool.test/api/add-ons.json') {
+        return jsonResponse(addOnsFixture);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const { ctx, cookie } = await signInAdmin(env);
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/settings', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const campaignRows = body.campaigns[0].rows;
+    const campaignLabels = campaignRows.map((row: { label: string }) => row.label);
+    expect(campaignLabels.indexOf('Archive campaign')).toBeGreaterThan(campaignLabels.indexOf('Progress background'));
+    expect(campaignRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        label: 'Archive campaign',
+        path: 'archive_campaign',
+        input: 'campaign-archive',
+        campaignSlug: 'hand-relations',
+        archivePath: 'archive/campaigns/hand-relations/',
+        effectiveState: 'upcoming'
+      })
+    ]));
+    expectNoKvWritesOrLists(env, 'archiveable campaign settings read');
+
+    const userKey = `admin-user:${await sha256Hex('creator@example.com')}`;
+    (env.PLEDGES as CountingKVNamespace).store.set(userKey, JSON.stringify({
+      email: 'creator@example.com',
+      role: 'campaign_user',
+      campaignSlugs: ['hand-relations']
+    }));
+    const campaignSession = await signInAdmin(env, 'creator@example.com');
+    const campaignResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings', {
+      method: 'GET',
+      headers: { Cookie: campaignSession.cookie }
+    }), env, campaignSession.ctx);
+    const campaignBody = await campaignResponse.json();
+    expect(campaignBody.campaigns[0].rows.map((row: { label: string }) => row.label)).not.toContain('Archive campaign');
+
+    resetCampaignRuntimeStateForTests();
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture] });
+      }
+      if (url === 'https://pool.test/api/add-ons.json') {
+        return jsonResponse(addOnsFixture);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+    const liveResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    const liveBody = await liveResponse.json();
+    expect(liveBody.campaigns[0].rows.map((row: { label: string }) => row.label)).not.toContain('Archive campaign');
   });
 
   it('returns plan usage limits without provider calls when credentials are missing', async () => {
@@ -3729,6 +4515,7 @@ diary:
     expect(preview.preview.html).toContain('class="video-embed video-embed--youtube"');
     expect(preview.preview.html).toContain('https://www.youtube-nocookie.com/embed/video-demo');
     expect(preview.preview.html).toContain('allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"');
+    expect(preview.preview.html).toContain('referrerpolicy="strict-origin-when-cross-origin"');
     expect(preview.preview.html).toContain('<figcaption class="admin-content-preview__caption">Demo video</figcaption>');
     expect(preview.preview.html).toContain('video-embed--local');
     expect(preview.preview.html).toContain('<video controls preload="none" playsinline data-first-frame-poster="true">');
@@ -3786,6 +4573,75 @@ diary:
     expect(body.preview.html).not.toContain('<img');
     expect(body.preview.html).not.toContain('<script');
     expect(body.preview.html).not.toContain('../admin');
+    expect(pledges.putCalls).toBe(0);
+    expect(pledges.deleteCalls).toBe(0);
+    expect(pledges.listCalls).toBe(0);
+  });
+
+  it('allows blank campaign content previews without treating the editor placeholder as content', async () => {
+    const env = createEnv();
+    const { ctx, cookie } = await signInAdmin(env);
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    pledges.resetCounts();
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/content/preview', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        draft: {
+          title: 'Blank Starter',
+          shortBlurb: '',
+          longContent: [{ type: 'text', body: '', align: 'left' }]
+        }
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.valid).toBe(true);
+    expect(body.errors).toEqual([]);
+    expect(body.normalizedDraft.longContent).toEqual([]);
+    expect(body.warnings).toContain('shortBlurb is empty.');
+    expect(body.warnings).toContain('longContent is empty.');
+    expect(pledges.putCalls).toBe(0);
+    expect(pledges.deleteCalls).toBe(0);
+    expect(pledges.listCalls).toBe(0);
+  });
+
+  it('omits expired dashboard preview links from campaign content loads', async () => {
+    const env = createEnv();
+    const { ctx, cookie } = await signInAdmin(env);
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    pledges.store.set('campaign-preview-reviewers:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      emails: ['admin@example.com'],
+      links: {
+        'admin@example.com': {
+          email: 'admin@example.com',
+          linkId: 'expired-link',
+          previewUrl: 'https://pool.test/campaigns/hand-relations/preview/?t=expired',
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          expiresAt: new Date(Date.now() - 60 * 1000).toISOString()
+        }
+      },
+      updatedAt: new Date().toISOString(),
+      updatedBy: 'admin@example.com',
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    }));
+    pledges.resetCounts();
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/content/campaign?campaignSlug=hand-relations', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.campaign.activePreview).toBeNull();
     expect(pledges.putCalls).toBe(0);
     expect(pledges.deleteCalls).toBe(0);
     expect(pledges.listCalls).toBe(0);
@@ -3852,6 +4708,339 @@ diary:
     expect(payload.html).toContain('<a href="https://pool.dustwave.xyz/admin/?admin_login=');
     expect(payload.html).toContain('Open admin');
     expect(payload.text).toContain('Open admin (https://pool.dustwave.xyz/admin/?admin_login=');
+  });
+
+  it('publishes protected campaign previews and serves invited reviewer links for 24 hours', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-test',
+      GITHUB_OWNER: 'dust-wave',
+      GITHUB_REPO: 'pool',
+      GITHUB_REF: 'main',
+      GITHUB_WORKFLOW: 'deploy.yml',
+      CAMPAIGN_PREVIEW_SECRET: 'campaign-preview-secret',
+      RESEND_API_KEY: 'resend-test',
+      UPDATES_EMAIL_FROM: 'Pool Admin <admin@pool.test>'
+    };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const githubCalls: GitHubFetchCall[] = [];
+    let fileSha = 'old-preview-sha';
+    let previewPutCount = 0;
+    let campaignMarkdown = `---
+layout: campaign
+title: "Hand Relations"
+slug: hand-relations
+preview_enabled: false
+preview_reviewer_emails: []
+short_blurb: "Old blurb"
+long_content:
+  - type: text
+    body: |
+      Old body.
+  - type: video
+    provider: youtube
+    video_id: "dQw4w9WgXcQ"
+    caption: "Concept teaser"
+diary:
+  - id: warning
+    title: "Two days left to submit!"
+    date: 2026-03-04T12:00:00-06:00
+    phase: fundraising
+    content:
+      - type: text
+        body: |
+          This is your 48-hour warning.
+  - id: production-note
+    title: "Day 14 — Principal Photography"
+    date: 2026-03-07T19:00:00-06:00
+    phase: production
+    content:
+      - type: text
+        body: |
+          We kept rolling.
+tiers:
+  - id: frame-slot
+    name: Buy 1 Frame
+    price: 5
+    description: Sponsor a frame.
+    limit_total: 1000
+    remaining: 947
+    stackable: true
+---
+`;
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture] });
+      }
+      if (url.includes('/contents/_campaigns/hand-relations.md') && method === 'GET') {
+        githubCalls.push({ url, method });
+        return jsonResponse({
+          path: '_campaigns/hand-relations.md',
+          sha: fileSha,
+          encoding: 'base64',
+          content: Buffer.from(campaignMarkdown, 'utf8').toString('base64')
+        });
+      }
+      if (url.endsWith('/contents/_campaigns/hand-relations.md') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        campaignMarkdown = Buffer.from(String(body.content || ''), 'base64').toString('utf8');
+        previewPutCount += 1;
+        fileSha = previewPutCount === 1 ? 'new-preview-sha' : `new-preview-sha-${previewPutCount}`;
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: '_campaigns/hand-relations.md', sha: fileSha },
+          commit: { sha: 'preview-commit-sha', html_url: 'https://github.test/preview-commit-sha' }
+        });
+      }
+      if (url.endsWith('/actions/workflows/deploy.yml/dispatches') && method === 'POST') {
+        githubCalls.push({ url, method, body: JSON.parse(String(init?.body || '{}')) });
+        return new Response(null, { status: 204 });
+      }
+      if (url === 'https://api.resend.com/emails') {
+        return jsonResponse({ id: 'preview-email' });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetKvCounters(env);
+    const publishResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/campaign-preview/publish', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        intent: 'publish_preview',
+        campaignSlug: 'hand-relations',
+        reviewerEmails: 'reviewer@example.com',
+        baseRevision: 'old-preview-sha',
+        preferredLang: 'en'
+      })
+    }), env, ctx);
+
+    expect(publishResponse.status).toBe(200);
+    const publishBody = await publishResponse.json();
+    expect(publishBody).toMatchObject({
+      success: true,
+      campaignSlug: 'hand-relations',
+      reviewerEmails: ['reviewer@example.com'],
+      expiresInHours: 24,
+      contentSha: 'new-preview-sha',
+      commitSha: 'preview-commit-sha',
+      writeBudget: { readOnly: false, kvWritesExpected: 2, kvListExpected: 0 }
+    });
+    expect(publishBody.currentUserPreview).toMatchObject({
+      email: 'admin@example.com',
+      expiresInHours: 24
+    });
+    expect(publishBody.currentUserPreview.linkId).toBeTruthy();
+    expect(publishBody.currentUserPreview.expiresAt).toBeTruthy();
+    expect(publishBody.currentUserPreview.previewUrl).toContain('/campaigns/hand-relations/preview/?t=');
+    expect(publishBody.emails).toHaveLength(1);
+    expect(campaignMarkdown).toContain('preview_enabled: true');
+    expect(campaignMarkdown).toContain('preview_reviewer_emails: []');
+    expect(campaignMarkdown).not.toContain('reviewer@example.com');
+    expect(campaignMarkdown).toContain('preview_updated_at:');
+    const reviewerRecord = await env.PLEDGES.get('campaign-preview-reviewers:hand-relations', { type: 'json' });
+    expect(reviewerRecord).toMatchObject({
+      campaignSlug: 'hand-relations',
+      emails: ['admin@example.com', 'reviewer@example.com']
+    });
+    expect(reviewerRecord.links['admin@example.com']).toMatchObject({
+      linkId: publishBody.currentUserPreview.linkId,
+      previewUrl: publishBody.currentUserPreview.previewUrl,
+      expiresAt: publishBody.currentUserPreview.expiresAt
+    });
+    expect(reviewerRecord.links['reviewer@example.com']).toMatchObject({
+      email: 'reviewer@example.com',
+      previewUrl: expect.stringContaining('/campaigns/hand-relations/preview/?t=')
+    });
+    const emailCall = (global.fetch as unknown as { mock: { calls: Array<[RequestInfo | URL, RequestInit?]> } }).mock.calls
+      .find(([input]) => input === 'https://api.resend.com/emails');
+    const emailPayload = JSON.parse(String(emailCall?.[1]?.body || '{}'));
+    expect(emailPayload).toMatchObject({
+      to: 'reviewer@example.com',
+      subject: 'Private campaign preview | The Pool'
+    });
+    expect(emailPayload.html).toContain('/campaigns/hand-relations/preview/?t=');
+    expect(emailPayload.html).toContain('expires in 24 hours');
+    const previewUrl = String(emailPayload.html.match(/href="([^"]+)"/)?.[1] || '').replace(/&amp;/g, '&');
+    expect(previewUrl).toBe(reviewerRecord.links['reviewer@example.com'].previewUrl);
+    const previewToken = new URL(previewUrl).searchParams.get('t');
+    expect(previewToken).toBeTruthy();
+    const currentPreviewToken = new URL(publishBody.currentUserPreview.previewUrl).searchParams.get('t');
+    expect(currentPreviewToken).toBeTruthy();
+
+    const contentCampaignResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/content/campaign?campaignSlug=hand-relations', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(contentCampaignResponse.status).toBe(200);
+    const contentCampaignBody = await contentCampaignResponse.json();
+    expect(contentCampaignBody.campaign.activePreview).toMatchObject({
+      email: 'admin@example.com',
+      linkId: publishBody.currentUserPreview.linkId,
+      previewUrl: publishBody.currentUserPreview.previewUrl
+    });
+
+    const currentPreviewResponse = await worker.fetch(new Request(`https://pledge.pool.test/admin/campaign-preview/hand-relations?t=${currentPreviewToken}`), env, ctx);
+    expect(currentPreviewResponse.status).toBe(200);
+    const currentPreviewBody = await currentPreviewResponse.json();
+    expect(currentPreviewBody.actor).toMatchObject({ type: 'reviewer', email: 'admin@example.com' });
+
+    const previewResponse = await worker.fetch(new Request(`https://pledge.pool.test/admin/campaign-preview/hand-relations?t=${previewToken}`), env, ctx);
+    expect(previewResponse.status).toBe(200);
+    expect(previewResponse.headers.get('X-Robots-Tag')).toContain('noindex');
+    const previewBody = await previewResponse.json();
+    expect(previewBody.actor).toMatchObject({ type: 'reviewer', email: 'reviewer@example.com' });
+    expect(previewBody.campaign).toMatchObject({ slug: 'hand-relations', previewEnabled: true });
+    expect(previewBody.preview).toMatchObject({ fullPage: true });
+    expect(previewBody.preview.html).toContain('<base href="https://pool.test/">');
+    expect(previewBody.preview.html).toContain('https://fonts.googleapis.com/css?family=Inter:400,700');
+    expect(previewBody.preview.html).toContain('https://use.typekit.net/hoj2yet.css');
+    expect(previewBody.preview.html).toContain('/assets/main.css');
+    expect(previewBody.preview.html).toContain('meta name="referrer" content="strict-origin-when-cross-origin"');
+    expect(previewBody.preview.html).not.toContain('<style>');
+    expect(previewBody.preview.html).toContain('class="campaign-container campaign-preview-readonly"');
+    expect(previewBody.preview.html).toContain('class="campaign-content"');
+    expect(previewBody.preview.html).toContain('class="campaign-sidebar"');
+    expect(previewBody.preview.html).toContain('class="sidebar-tiers"');
+    expect(previewBody.preview.html).toContain('frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"');
+    expect(previewBody.preview.html).toContain('referrerpolicy="strict-origin-when-cross-origin"');
+    expect(previewBody.preview.html).toContain('class="diary-tabs"');
+    expect(previewBody.preview.html).toContain('class="diary-panel"');
+    expect(previewBody.preview.html).toContain('class="diary-entry__title">Two days left to submit!');
+    expect(previewBody.preview.html).toContain('Mar 4, 2026 · 12:00 PM');
+    expect(previewBody.preview.html).toContain('/assets/js/diary-tabs.js');
+    expect(previewBody.preview.html).toContain('/assets/js/video-first-frame-poster.js');
+    expect(previewBody.preview.html).toContain('class="poolcart-add-item" type="button" disabled aria-disabled="true"');
+    expect(previewBody.preview.html).toContain('Old body.');
+    expect(previewBody.preview.html).not.toContain('The Vision');
+
+    const secondPublishResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/campaign-preview/publish', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        intent: 'publish_preview',
+        campaignSlug: 'hand-relations',
+        reviewerEmails: 'reviewer@example.com',
+        baseRevision: 'new-preview-sha',
+        preferredLang: 'en'
+      })
+    }), env, ctx);
+    expect(secondPublishResponse.status).toBe(200);
+    const secondPublishBody = await secondPublishResponse.json();
+    expect(secondPublishBody.contentSha).toBe('new-preview-sha-2');
+    expect(secondPublishBody.currentUserPreview.previewUrl).not.toBe(publishBody.currentUserPreview.previewUrl);
+    expect(secondPublishBody.currentUserPreview.linkId).not.toBe(publishBody.currentUserPreview.linkId);
+
+    const supersededPreviewResponse = await worker.fetch(new Request(`https://pledge.pool.test/admin/campaign-preview/hand-relations?t=${currentPreviewToken}`), env, ctx);
+    expect(supersededPreviewResponse.status).toBe(401);
+
+    const updatedCurrentPreviewToken = new URL(secondPublishBody.currentUserPreview.previewUrl).searchParams.get('t');
+    expect(updatedCurrentPreviewToken).toBeTruthy();
+    const updatedPreviewResponse = await worker.fetch(new Request(`https://pledge.pool.test/admin/campaign-preview/hand-relations?t=${updatedCurrentPreviewToken}`), env, ctx);
+    expect(updatedPreviewResponse.status).toBe(200);
+
+    const updatedContentCampaignResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/content/campaign?campaignSlug=hand-relations', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(updatedContentCampaignResponse.status).toBe(200);
+    const updatedContentCampaignBody = await updatedContentCampaignResponse.json();
+    expect(updatedContentCampaignBody.campaign.activePreview).toMatchObject({
+      email: 'admin@example.com',
+      linkId: secondPublishBody.currentUserPreview.linkId,
+      previewUrl: secondPublishBody.currentUserPreview.previewUrl
+    });
+    expect(updatedContentCampaignBody.campaign.activePreview.previewUrl).not.toBe(publishBody.currentUserPreview.previewUrl);
+  });
+
+  it('returns structured JSON when protected preview reviewer storage fails', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-test',
+      GITHUB_OWNER: 'dust-wave',
+      GITHUB_REPO: 'pool',
+      GITHUB_REF: 'main',
+      GITHUB_WORKFLOW: 'deploy.yml',
+      CAMPAIGN_PREVIEW_SECRET: 'campaign-preview-secret',
+      RESEND_API_KEY: 'resend-test',
+      UPDATES_EMAIL_FROM: 'Pool Admin <admin@pool.test>'
+    };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    const originalPut = pledges.put.bind(pledges);
+    vi.spyOn(pledges, 'put').mockImplementation(async (key: string, value: string) => {
+      if (key === 'campaign-preview-reviewers:hand-relations') {
+        throw new Error('KV unavailable');
+      }
+      await originalPut(key, value);
+    });
+
+    let fileSha = 'old-preview-sha';
+    let campaignMarkdown = `---
+layout: campaign
+title: "Hand Relations"
+slug: hand-relations
+preview_enabled: false
+preview_reviewer_emails: []
+short_blurb: "Old blurb"
+long_content:
+  - type: text
+    body: |
+      Old body.
+---
+`;
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture] });
+      }
+      if (url.includes('/contents/_campaigns/hand-relations.md') && method === 'GET') {
+        return jsonResponse({
+          path: '_campaigns/hand-relations.md',
+          sha: fileSha,
+          encoding: 'base64',
+          content: Buffer.from(campaignMarkdown, 'utf8').toString('base64')
+        });
+      }
+      if (url.endsWith('/contents/_campaigns/hand-relations.md') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        campaignMarkdown = Buffer.from(String(body.content || ''), 'base64').toString('utf8');
+        fileSha = 'new-preview-sha';
+        return jsonResponse({
+          content: { path: '_campaigns/hand-relations.md', sha: fileSha },
+          commit: { sha: 'preview-commit-sha', html_url: 'https://github.test/preview-commit-sha' }
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const publishResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/campaign-preview/publish', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        intent: 'publish_preview',
+        campaignSlug: 'hand-relations',
+        reviewerEmails: 'alonso@hey.com',
+        baseRevision: 'old-preview-sha',
+        preferredLang: 'en'
+      })
+    }), env, ctx);
+
+    expect(publishResponse.status).toBe(502);
+    expect(publishResponse.headers.get('Access-Control-Allow-Origin')).toBe('https://pool.test');
+    const publishBody = await publishResponse.json();
+    expect(publishBody).toMatchObject({
+      code: 'preview_reviewers_save_failed',
+      error: 'Unable to save preview reviewer emails. Please try again.'
+    });
+    expect(campaignMarkdown).toContain('preview_enabled: true');
+    expect((global.fetch as unknown as { mock: { calls: Array<[RequestInfo | URL, RequestInit?]> } }).mock.calls
+      .find(([input]) => input === 'https://api.resend.com/emails')).toBeUndefined();
   });
 
   it('publishes validated campaign content through GitHub with CSRF and one audit write', async () => {

@@ -14,7 +14,7 @@ permalink: /sitemap.xml
     <lastmod>{{ item.last_modified_at | default: item.date | default: site.time | date_to_xmlschema }}</lastmod>
   </url>
   {% endfor %}
-  {% assign public_campaigns = site.campaigns | where_exp: "item", "item.test_only != true and item.sitemap != false" %}
+  {% assign public_campaigns = site.campaigns | where_exp: "item", "item.test_only != true and item.preview_only != true and item.published != false and item.sitemap != false" %}
   {% for item in public_campaigns %}
   <url>
     <loc>{{ site.platform.site_url | default: site.url }}{{ item.url }}</loc>

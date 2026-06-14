@@ -24,6 +24,7 @@ module Jekyll
       campaigns.each do |campaign|
         slug = campaign.data['slug']
         next unless slug
+        next if campaign.data['preview_only'] == true || campaign.data['published'] == false
         
         # Check if a manual community page already exists
         existing = site.pages.find { |p| p.dir == "/community/#{slug}/" || p.url == "/community/#{slug}/" }

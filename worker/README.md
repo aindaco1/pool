@@ -1,6 +1,6 @@
 # The Pool - Pledge Worker
 
-Cloudflare Worker handling first-party checkout canonicalization, Stripe integration, pledge management, order-scoped supporter authentication, upcoming-campaign launch reminders, and the private browser admin dashboard APIs.
+Cloudflare Worker handling first-party checkout canonicalization, Stripe integration, pledge management, order-scoped supporter authentication, upcoming-campaign launch reminders, protected campaign previews, and the private browser admin dashboard APIs.
 
 For day-to-day local development, prefer the repo-root Podman path:
 
@@ -128,6 +128,10 @@ wrangler secret put CHECKOUT_INTENT_SECRET
 
 # Magic link token secret
 wrangler secret put MAGIC_LINK_SECRET
+
+# Optional dedicated campaign-preview reviewer token secret.
+# Falls back to MAGIC_LINK_SECRET / admin signing secrets when omitted.
+wrangler secret put CAMPAIGN_PREVIEW_SECRET
 
 # Email delivery
 wrangler secret put RESEND_API_KEY
@@ -388,6 +392,10 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `POST /admin/settings/logo-upload`, `POST /admin/settings/image-upload`, `POST /admin/settings/audio-upload`, and `POST /admin/settings/video-upload` stage dashboard uploads through the same GitHub-backed publish path as their owning settings/content fields; image/video uploads request the **Optimize dashboard media** workflow with `scope=changed` after commit, while native image optimization and video transcoding still run in the repository media pipeline rather than inside the Worker
 - `POST /admin/settings/publish` validates and publishes platform settings, platform add-ons, campaign variables, and campaign structured data through GitHub-backed commits
 - `POST /admin/users` saves dashboard-managed admin users directly to `admin-users:v1` in Worker KV and emails newly created users sign-in instructions when Resend is configured
+- `POST /admin/campaigns/create` lets super admins create preview-only campaigns through the GitHub-backed campaign source path, assign one or more existing campaign users, optionally create multiple new campaign users in `admin-users:v1`, email assigned users the admin dashboard link, and record an audit event
+- `POST /admin/campaigns/archive` lets super admins archive non-live campaigns locally in dev or by dispatching `.github/workflows/archive-campaign.yml` in production; the Worker validates CSRF, role, slug, campaign existence, and effective state, records an audit event, and moves campaign source/media through the dev repo helper or GitHub Actions
+- `POST /admin/campaign-preview/publish` lets super admins and assigned campaign users publish a protected preview, stores the publishing admin plus optional reviewer emails in `campaign-preview-reviewers:{slug}` with a 24-hour TTL, returns a signed dashboard preview link for the publishing admin, sends signed links to optional reviewers, writes only preview flags to campaign Markdown, and records an audit event
+- `GET /admin/campaign-preview/:slug` returns a private/no-store full campaign page preview payload with campaign fonts/media embeds and read-only pledge controls when the requester has an authorized admin session or a valid reviewer token whose email is still on the 24-hour KV allowlist
 - `GET /admin/analytics` reads role-scoped pledge-derived revenue, status, language, referral, and campaign/platform split metrics without writing analytics state; dashboard currency presentation keeps exact cents
 - `GET /admin/plan-usage` lets super admins load Cloudflare and Resend plan usage from provider APIs without exposing provider tokens to the browser or writing KV state; the dashboard loads it automatically when Settings -> Plan usage is opened
 - `POST /admin/analytics/stripe-financials/backfill` lets super admins backfill actual Stripe fee/net values from Stripe balance transactions for charged pledges, using campaign pledge indexes instead of KV list scans
@@ -403,7 +411,7 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `GET /admin/add-ons/inventory` reads platform add-on baseline, sold, remaining, and override state for super admins
 - `POST /admin/add-ons/inventory` explicitly sets, restocks, or resets platform add-on inventory baseline overrides with CSRF protection and audit logging
 
-Normal dashboard reads, supporter filters, pagination, pledge-derived analytics, marketing referral lists, report previews, CSV downloads, content loads, content previews, and local editor drafts are designed to add zero KV writes and zero KV list operations. Plan usage loads are also KV read-only, but intentionally call Cloudflare and Resend provider APIs once when a super admin opens Settings -> Plan usage. Browser-initiated user saves, marketing referral saves, content publishes, and inventory changes are explicit mutations: user saves write `admin-users:v1`, referral saves write one campaign-scoped referral list, content publishes commit to GitHub, trigger the rebuild workflow, and write one audit event. If an older campaign is missing its `campaign-pledges:{slug}` projection, the dashboard endpoints return zero rows or `campaign_index_required` instead of falling back to a namespace scan; run the existing projection repair/rebuild tools explicitly when that happens.
+Normal dashboard reads, supporter filters, pagination, pledge-derived analytics, marketing referral lists, report previews, CSV downloads, content loads, protected preview payload reads, content previews, and local editor drafts are designed to add zero KV writes and zero KV list operations. Plan usage loads are also KV read-only, but intentionally call Cloudflare and Resend provider APIs once when a super admin opens Settings -> Plan usage. Browser-initiated user saves, marketing referral saves, content publishes, preview publishes, new campaign creation, campaign archive operations, and inventory changes are explicit mutations: user saves write `admin-users:v1`, referral saves write one campaign-scoped referral list, content publishes commit to GitHub, trigger the rebuild workflow, and write one audit event, preview publishes write one short-lived `campaign-preview-reviewers:{slug}` access allowlist plus one audit event, new campaign creation may write `admin-users:v1` plus one audit event in addition to the campaign file write, and archive writes one audit event while local dev or `.github/workflows/archive-campaign.yml` moves source/media into `archive/campaigns/<slug>/`. If an older campaign is missing its `campaign-pledges:{slug}` projection, the dashboard endpoints return zero rows or `campaign_index_required` instead of falling back to a namespace scan; run the existing projection repair/rebuild tools explicitly when that happens.
 
 Admin auth starts/exchanges and browser-admin mutations are rate limited through the `RATELIMIT` binding and return private/no-store failures when throttled. Normal authenticated reads such as session checks, dashboard summaries, supporter filters, report previews, analytics views, and content previews are intentionally not KV-rate-limited. Magic-link login tokens are one-time use, and session reads do not refresh near-expiry sessions or clean up expired sessions on the read path. Cookie-backed admin mutations require both the session CSRF token and a trusted same-site `Origin`/`Referer` or non-cross-site fetch context before durable writes.
 
@@ -581,7 +589,10 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `DEFAULT_PLATFORM_TIP_PERCENT` | Default platform tip percent mirrored from `pricing.default_tip_percent` |
 | `MAX_PLATFORM_TIP_PERCENT` | Max platform tip percent mirrored from `pricing.max_tip_percent` |
 | `APP_MODE` | `"test"` or `"live"` - determines which API keys to use. Production deployments should use `"live"`; local `dev` uses `"test"`. |
+| `ADMIN_LOCAL_REPO_WRITES_ENABLED` | Dev-only guard that lets `APP_MODE=test` create preview-only campaign files and archive campaign source/media in the mounted local repository. Do not enable on deployed Workers. |
+| `ADMIN_LOCAL_REPO_SERVICE` | Dev-only local helper URL used by Wrangler/Podman because the Worker runtime cannot write files directly. Defaults to `http://127.0.0.1:8799` in `env.dev`. |
 | `CORS_ALLOWED_ORIGIN` | Browser origin allowed to call the Worker from the dashboard/site |
+| `CAMPAIGN_PREVIEW_SECRET` | Optional dedicated HMAC signing secret for 24-hour campaign preview reviewer links; falls back to existing signing secrets when omitted |
 | `ADMIN_EXPOSE_LOGIN_LINK` | Optional local-only escape hatch to return admin login URLs in `/admin/auth/start` responses. Do not enable on deployed Workers. |
 | `ADMIN_SESSION_SECRET` | Secret used for browser admin session cookies |
 | `ADMIN_BOOTSTRAP_EMAILS` | Optional bootstrap/recovery super-admin emails; set this in `worker/.dev.vars` for local dev |

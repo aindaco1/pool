@@ -1,7 +1,7 @@
 {% if site.show_test_campaigns %}
-  {% assign filtered_campaigns = site.campaigns %}
+  {% assign filtered_campaigns = site.campaigns | where_exp: "c", "c.preview_only != true and c.published != false" %}
 {% else %}
-  {% assign filtered_campaigns = site.campaigns | where_exp: "c", "c.test_only != true" %}
+  {% assign filtered_campaigns = site.campaigns | where_exp: "c", "c.test_only != true and c.preview_only != true and c.published != false" %}
 {% endif %}
 {% assign live_campaigns = filtered_campaigns | where: "state", "live" | sort: "goal_deadline" %}
 {% assign upcoming_campaigns = filtered_campaigns | where: "state", "upcoming" | sort: "start_date" %}

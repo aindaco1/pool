@@ -485,6 +485,7 @@ function initYoutubeHeroFacades() {
       iframe.title = title;
       iframe.frameBorder = '0';
       iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+      iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
       iframe.allowFullscreen = true;
       facade.replaceChildren(iframe);
       facade.classList.add('hero__video--youtube-loaded');

@@ -3,9 +3,9 @@
   <p>{% include t.html key="community.index_intro" lang=page.lang %}</p>
 
   {% if site.show_test_campaigns %}
-    {% assign visible_campaigns = site.campaigns %}
+    {% assign visible_campaigns = site.campaigns | where_exp: "c", "c.preview_only != true and c.published != false" %}
   {% else %}
-    {% assign visible_campaigns = site.campaigns | where_exp: "c", "c.test_only != true" %}
+    {% assign visible_campaigns = site.campaigns | where_exp: "c", "c.test_only != true and c.preview_only != true and c.published != false" %}
   {% endif %}
   {% assign visible_campaigns = visible_campaigns | where_exp: "c", "c.decisions and c.decisions.size > 0" | sort: "goal_deadline" | reverse %}
 

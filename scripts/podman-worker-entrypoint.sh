@@ -20,7 +20,20 @@ if [ ! -d node_modules ] || \
   printf '%s\n' "$CURRENT_PACKAGE_LOCK_HASH" > "$PACKAGE_LOCK_HASH_FILE"
 fi
 
-exec npx wrangler dev \
+LOCAL_REPO_SERVICE_PID=""
+if [ -f /workspace/worker/src/local-repo-service.mjs ]; then
+  node /workspace/worker/src/local-repo-service.mjs &
+  LOCAL_REPO_SERVICE_PID=$!
+fi
+
+cleanup() {
+  if [ -n "$LOCAL_REPO_SERVICE_PID" ]; then
+    kill "$LOCAL_REPO_SERVICE_PID" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT INT TERM
+
+npx wrangler dev \
   --env dev \
   --port 8787 \
   --ip 0.0.0.0

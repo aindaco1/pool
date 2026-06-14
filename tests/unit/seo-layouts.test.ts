@@ -43,6 +43,7 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('responsive-image-preload.html src=campaign_hero_preload_image');
     expect(campaignLayout).toContain('data-youtube-embed');
     expect(campaignLayout).toContain('data-youtube-src="https://www.youtube-nocookie.com/embed/{{ yt_id }}?autoplay=1&amp;rel=0"');
+    expect(campaignLayout).toContain('referrerpolicy="strict-origin-when-cross-origin"');
     expect(campaignLayout).toContain('class="hero__video-poster"');
     expect(campaignLayout).toContain('fetchpriority="high" decoding="async"');
     expect(campaignLayout).toContain('responsive-image.html src=page.campaign_background');
@@ -215,10 +216,14 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain("key='campaign.play_video'");
     expect(campaignLayout).toContain('video-first-frame-poster.js');
     expect(readRepoFile('assets', 'js', 'video-first-frame-poster.js')).toContain('IntersectionObserver');
+    expect(readRepoFile('assets', 'js', 'video-first-frame-poster.js')).toContain('document.baseURI');
+    expect(readRepoFile('assets', 'js', 'video-first-frame-poster.js')).toContain("window.location.origin !== 'null'");
     expect(campaignLayout).toContain('key="campaign.supporter_community_unlocked"');
     expect(campaignLayout).toContain('key="campaign.supporters_only_cta"');
     expect(campaignLayout).toContain('key="misc.video_not_supported"');
     expect(readRepoFile('_includes', 'blocks', 'video.html')).toContain('data-first-frame-poster="true"');
+    expect(readRepoFile('_includes', 'blocks', 'video.html')).toContain('referrerpolicy="strict-origin-when-cross-origin"');
+    expect(readRepoFile('_includes', 'blocks', 'embed.html')).toContain('referrerpolicy="strict-origin-when-cross-origin"');
     expect(campaignLayout).toContain('{% if campaign_render_state == "upcoming" or campaign_render_state == "live" %}');
     expect(campaignLayout).toContain('key="runtime.campaign.countdown_funded"');
     expect(campaignLayout).toContain('key="runtime.campaign.countdown_ended"');
