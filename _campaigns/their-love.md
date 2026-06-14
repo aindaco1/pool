@@ -249,4 +249,7 @@ diary:
       - type: "text"
         body: |
           In less than 48 hours, we’ve officially hit 2.5K of our 5K goal! We are incredibly grateful at Their Love to have such an amazing community rallying around us to ensure this project gets made; we’re still in shock. So, we can’t say it enough: thank you. More updates to come soon as we close in on the end of our campaign and get ready to shoot!
+preview_enabled: true
+preview_reviewer_emails: []
+preview_updated_at: "2026-06-14T21:45:55.606Z"
 ---
