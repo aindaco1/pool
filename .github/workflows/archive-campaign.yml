@@ -1,0 +1,162 @@
+name: Archive campaign
+
+on:
+  workflow_dispatch:
+    inputs:
+      campaign_slug:
+        description: 'Campaign slug to archive'
+        required: true
+        type: string
+      requested_by:
+        description: 'Admin email that requested the archive'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: campaign-archive-${{ inputs.campaign_slug }}
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Select dispatch branch
+        run: |
+          branch="${GITHUB_REF_NAME:-main}"
+          git checkout "$branch"
+
+      - name: Archive campaign source and media
+        env:
+          CAMPAIGN_SLUG: ${{ inputs.campaign_slug }}
+          REQUESTED_BY: ${{ inputs.requested_by }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const slug = String(process.env.CAMPAIGN_SLUG || '').trim();
+          const requestedBy = String(process.env.REQUESTED_BY || '').trim();
+          if (!/^[a-z0-9-]{1,100}$/.test(slug)) {
+            throw new Error('campaign_slug must use lowercase letters, numbers, and hyphens only.');
+          }
+
+          const campaignPath = path.join('_campaigns', `${slug}.md`);
+          const archiveRoot = path.join('archive', 'campaigns', slug);
+          const archivedCampaignPath = path.join(archiveRoot, '_campaigns', `${slug}.md`);
+          if (!fs.existsSync(campaignPath)) {
+            throw new Error(`Campaign source not found: ${campaignPath}`);
+          }
+          if (fs.existsSync(archiveRoot)) {
+            throw new Error(`Archive already exists: ${archiveRoot}`);
+          }
+
+          function walkFiles(directory) {
+            if (!fs.existsSync(directory)) return [];
+            const entries = fs.readdirSync(directory, { withFileTypes: true });
+            return entries.flatMap((entry) => {
+              const fullPath = path.join(directory, entry.name);
+              if (entry.isDirectory()) return walkFiles(fullPath);
+              return entry.isFile() ? [fullPath] : [];
+            });
+          }
+
+          function normalizeRepoPath(value) {
+            const text = String(value || '').replace(/^\/+/, '').split(/[?#]/)[0];
+            if (!text || text.includes('..') || path.isAbsolute(text) || text.includes('\\')) return '';
+            if (!/^assets\/(?:images|videos|audio)\//.test(text)) return '';
+            return text;
+          }
+
+          function mediaReferences(source) {
+            const refs = new Set();
+            const matches = String(source || '').match(/\/?assets\/(?:images|videos|audio)\/[^\s"'<>),\]}]+/g) || [];
+            matches.forEach((match) => {
+              const normalized = normalizeRepoPath(match);
+              if (normalized) refs.add(normalized);
+            });
+            return refs;
+          }
+
+          function isArchiveableMediaReference(reference) {
+            return reference.startsWith(`assets/images/campaigns/${slug}/`) ||
+              reference.startsWith(`assets/videos/campaigns/${slug}/`) ||
+              reference.startsWith(`assets/audio/campaigns/${slug}/`) ||
+              reference.startsWith('assets/images/campaign-add-ons/');
+          }
+
+          const campaignSource = fs.readFileSync(campaignPath, 'utf8');
+          const referencedMedia = Array.from(mediaReferences(campaignSource)).filter(isArchiveableMediaReference);
+          const candidateMedia = new Set(referencedMedia);
+          [
+            `assets/images/campaigns/${slug}`,
+            `assets/videos/campaigns/${slug}`,
+            `assets/audio/campaigns/${slug}`
+          ].forEach((directory) => {
+            walkFiles(directory).forEach((filePath) => candidateMedia.add(filePath));
+          });
+
+          const otherCampaignReferences = new Set();
+          walkFiles('_campaigns').forEach((filePath) => {
+            if (filePath === campaignPath || !filePath.endsWith('.md')) return;
+            const source = fs.readFileSync(filePath, 'utf8');
+            mediaReferences(source).forEach((reference) => otherCampaignReferences.add(reference));
+          });
+
+          const movedMedia = [];
+          const skippedSharedMedia = [];
+          Array.from(candidateMedia).sort().forEach((sourcePath) => {
+            if (!fs.existsSync(sourcePath)) return;
+            if (otherCampaignReferences.has(sourcePath)) {
+              skippedSharedMedia.push(sourcePath);
+              return;
+            }
+            const targetPath = path.join(archiveRoot, sourcePath);
+            fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+            fs.renameSync(sourcePath, targetPath);
+            movedMedia.push({ sourcePath, archivePath: targetPath });
+          });
+
+          let archivedSource = campaignSource;
+          movedMedia.forEach((item, index) => {
+            const token = `__POOL_ARCHIVE_MEDIA_${index}__`;
+            archivedSource = archivedSource.split(`/${item.sourcePath}`).join(`/${token}`);
+            archivedSource = archivedSource.split(item.sourcePath).join(token);
+            archivedSource = archivedSource.split(token).join(item.archivePath);
+          });
+
+          fs.mkdirSync(path.dirname(archivedCampaignPath), { recursive: true });
+          fs.renameSync(campaignPath, archivedCampaignPath);
+          fs.writeFileSync(archivedCampaignPath, archivedSource);
+          fs.writeFileSync(path.join(archiveRoot, 'archive-manifest.json'), `${JSON.stringify({
+            campaignSlug: slug,
+            requestedBy,
+            archivedAt: new Date().toISOString(),
+            sourceCampaignPath: campaignPath,
+            archivedCampaignPath,
+            movedMedia,
+            skippedSharedMedia
+          }, null, 2)}\n`);
+
+          console.log(`Archived ${slug}: ${movedMedia.length} media files moved, ${skippedSharedMedia.length} shared files left in place.`);
+          NODE
+
+      - name: Commit archive
+        run: |
+          branch="${GITHUB_REF_NAME:-main}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- _campaigns archive assets
+          if git diff --cached --quiet; then
+            echo "No campaign archive changes."
+            exit 0
+          fi
+          git commit -m "Archive ${{ inputs.campaign_slug }} campaign"
+          git push origin "$branch"

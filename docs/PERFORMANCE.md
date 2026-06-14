@@ -174,6 +174,8 @@ The allowlist is intentionally narrow. Current eligible paths are:
 - public campaign detail pages such as `/campaigns/hand-relations/`
 - localized public campaign routes when generated with the same path model
 
+Protected campaign previews such as `/campaigns/:slug/preview/` are not public campaign detail pages for this purpose and are never eligible.
+
 The runtime rejects any link that is not a same-origin `http:` or `https:` document navigation.
 
 ### Exclusions
@@ -187,8 +189,9 @@ The runtime rejects links when any of these are true:
 - the link has a `target` other than `_self`
 - the link has `data-no-prefetch`
 - the navigation points at the current document, including fragment-only links
-- the URL contains sensitive query params such as `token`, `publicToken`, `adminToken`, `orderId`, `email`, or `session`
+- the URL contains sensitive query params such as `t`, `token`, `publicToken`, `adminToken`, `orderId`, `email`, or `session`
 - the path is under `/admin`, `/manage`, `/community`, `/cart`, `/checkout`, `/checkout-intent`, `/pledge-success`, `/pledge-cancelled`, `/api`, or `/worker`
+- the path is a protected campaign preview route such as `/campaigns/:slug/preview/`
 - the path is not on the public allowlist
 
 Use `data-no-prefetch` for one-off exclusions on otherwise eligible public links.
@@ -294,13 +297,14 @@ For campaign pages, prefer:
 
 ## Admin And Private Surfaces
 
-Admin, manage, checkout, pledge-result, community, and tokenized routes should optimize for correctness and privacy before speculative speed.
+Admin, protected campaign preview, manage, checkout, pledge-result, community, and tokenized routes should optimize for correctness and privacy before speculative speed.
 
 Rules for private surfaces:
 
 - do not load public document prefetching
 - do not prefetch token-bearing or order-bearing links
 - keep auth, checkout, and recovery responses private and uncached
+- keep protected preview payload responses private and uncached, and strip reviewer tokens from the address bar after the preview shell has enough context to load
 - keep status and error messages visible without requiring a full reload
 - avoid sending secrets, admin-only data, or supporter tokens into static generated pages
 
@@ -323,6 +327,8 @@ bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
 npm run assets:minify
 npm run assets:minify:check
 npm run test:unit
+npx vitest run tests/unit/page-prefetch.test.ts tests/unit/layout-accessibility.test.ts
+npm run test:e2e:headless:podman -- tests/e2e/admin-dashboard.spec.ts --project=chromium
 ```
 
 Focused browser validation for public UI changes:

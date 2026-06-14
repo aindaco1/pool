@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.0.4**. The v1.0 feature set and launch hardening pass are complete; v1.0.4 adds admin dashboard net revenue analytics after allocated processor fees and an explicit Cloudflare/Resend plan usage tracker for super admins.
+Current release milestone: **v1.0.5**. The v1.0 feature set and launch hardening pass are complete; v1.0.5 adds protected campaign previews for super admins, assigned campaign users, and explicitly invited reviewers, super-admin new campaign creation with campaign-user assignment emails, and super-admin campaign archiving for non-live campaigns.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -38,6 +38,9 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
 - **Announcements** — Admin broadcast emails with custom CTA links to supporters
 - **Private admin dashboard** — Magic-link admin access for role-scoped settings, campaign editing, add-ons, supporters, reports, analytics, marketing/referral tools, users, and read-only secrets/diagnostics without exposing admin secrets in browser code
+- **Protected campaign previews** — Super admins and assigned campaign users can publish noindex, email-protected full-page previews for campaigns they can edit, with generic static shells, read-only pledge controls, dashboard-visible publisher links, optional invited reviewer links that expire in 24 hours, and preview access allowlists stored in short-lived Worker KV instead of campaign source.
+- **New campaign creation** — Super admins can create a preview-only campaign from the dashboard with only a title, optionally selecting one or more existing campaign users or creating one or more new users with required name/email.
+- **Campaign archiving** — Super admins can archive non-live campaigns from Campaigns -> Settings; local dev archives directly in the mounted repo, while production dispatches a validated GitHub Actions workflow that moves campaign source and campaign-owned media into `archive/campaigns/<slug>/` instead of deleting archived data.
 - **Instagram integration** — Optional social CTA in supporter emails
 - **Ongoing funding** — Post-campaign support section
 - **Manage Pledge dashboard** — Desktop-friendly Active / Closed sections with locked-state read-only controls after deadline
@@ -183,6 +186,9 @@ Launch reminder forms use `_config.yml` `launch_reminders.turnstile_site_key` an
 Dashboard publish paths are intentionally split:
 
 - Settings, Add-ons, Campaigns, and content publishes validate through the Worker and commit changes back to GitHub before the normal deploy flow.
+- Campaign preview publishes set a GitHub-backed preview flag, store the invited reviewer email allowlist in a 24-hour KV record, send signed preview links, and record an audit event.
+- Super-admin new campaign creation writes a preview-only `_campaigns/<slug>.md` file through local repo writes in dev or the GitHub publish path in production, saves any assigned/new campaign users to `admin-users:v1`, emails assigned users when present, and keeps the public campaign page hidden until launch.
+- Super-admin campaign archive validates a non-live campaign in the Worker, records an audit event, and either archives locally in dev or dispatches `.github/workflows/archive-campaign.yml` in production to move campaign source and campaign-owned media into `archive/campaigns/<slug>/`.
 - Settings -> Users saves directly to Worker KV and does not use the publish button.
 - Marketing saved referral codes write one campaign-scoped KV record only when explicitly saved.
 - Reports, Analytics, Supporters, content loads/previews, local drafts, filters, sorting, and CSV downloads are read-only browsing flows.
@@ -235,7 +241,9 @@ The Pool is intentionally shaped so most traffic stays cheap:
 - campaign pages cache live stats and inventory in `localStorage` for `cache.live_stats_ttl_seconds` / `cache.live_inventory_ttl_seconds` (default `300`)
 - background tabs stop refreshing until the page becomes visible again
 - dashboard reports, supporters, analytics, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans, and stats/inventory rebuilds now repair stale campaign indexes when they detect drift
-- normal dashboard reads, content previews, report previews/downloads, supporter filters, analytics views, marketing URL building, and local editor drafts are designed to add zero KV writes
+- normal dashboard reads, protected preview rendering, content previews, report previews/downloads, supporter filters, analytics views, marketing URL building, and local editor drafts are designed to add zero KV writes
+- protected preview publication writes one short-lived `campaign-preview-reviewers:{slug}` access allowlist plus one audit record, while GitHub-backed campaign Markdown stores no previewer email addresses
+- campaign archive writes only the admin audit record in KV; the source/media move happens locally in dev and in GitHub Actions for production
 - the new read-only drift checks make it easier to confirm when projections are stale before running a repair path
 - limited-tier write paths now ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
 - platform add-on inventory reads use a sold-count projection after the initial bootstrap, so normal inventory refreshes do not list all pledge keys
@@ -282,6 +290,7 @@ npm run test:e2e       # E2E tests (Playwright) — fully automated browser cove
 npm run test:e2e:headless # CI-style automated browser suite
 npm run test:e2e:headless:podman -- tests/e2e/accessibility-public-pages.spec.ts --project=chromium # Podman-backed public accessibility slice
 npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium # Focused admin dashboard browser suite
+npm run test:e2e:headless:podman -- tests/e2e/admin-dashboard.spec.ts --project=chromium # Podman-backed admin create/preview dashboard suite
 node --check assets/js/admin-dashboard.js # Dashboard JavaScript syntax check
 npm run test:security  # Security tests — pen testing the Worker API
 npm run test:security:podman # Security tests with a Podman-backed local stack in one invocation
@@ -499,7 +508,7 @@ The Worker powers:
 - supporter email delivery via Resend
 - upcoming-campaign launch reminder delivery through the shared Resend path
 - batched settlement and retry flows
-- browser admin dashboard auth, read APIs, publish APIs, user management, marketing referral saves, and legacy shared-secret admin endpoints
+- browser admin dashboard auth, read APIs, GitHub-backed publish APIs, protected campaign previews, new campaign creation, user management, marketing referral saves, and legacy shared-secret admin endpoints
 
 ---
 

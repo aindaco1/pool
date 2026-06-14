@@ -573,6 +573,139 @@ export async function sendAdminUserCreatedEmail(env, { email, name = '', role = 
   }
 }
 
+export async function sendCampaignAssignmentEmail(env, { email, name = '', campaignTitle = '', campaignSlug = '', assignedBy = '', lang } = {}) {
+  configureEmailLogging(env);
+  if (!env?.RESEND_API_KEY) {
+    return { sent: false, reason: 'RESEND_API_KEY not configured' };
+  }
+
+  const translator = await getEmailTranslator(env, lang);
+  const theme = getEmailTheme(env);
+  const platformName = safeEmailHeaderText(getPlatformName(env) || 'The Pool') || 'The Pool';
+  const from = safeEmailHeaderText(getUpdatesEmailFrom(env) || getPledgesEmailFrom(env));
+  const adminUrl = safeSiteUrl(getLocalizedPath('/admin/', translator.lang), getResolvedSiteBase(env));
+  const displayName = String(name || '').trim() || email;
+  const safeCampaignTitle = String(campaignTitle || campaignSlug || 'campaign').trim();
+  const assignedByLine = assignedBy
+    ? `<p style="margin: 16px 0 0 0; font-size: 13px; color: ${theme.mutedTextColor};">${escapeHtml(translator.t('campaign_assignment.assigned_by', 'Assigned by %{email}', { email: assignedBy }))}</p>`
+    : '';
+  const subject = safeEmailHeaderText(buildEmailSubject(
+    translator.t('subjects.campaign_assignment', 'Campaign assigned'),
+    platformName
+  ));
+  const heading = translator.t('campaign_assignment.heading', 'Campaign assigned');
+  const intro = translator.t('campaign_assignment.intro', 'You have been assigned to manage %{campaign} on %{platform}.', {
+    campaign: safeCampaignTitle,
+    platform: platformName
+  });
+  const instructions = translator.t(
+    'campaign_assignment.instructions',
+    'Open the admin dashboard and sign in with this email address to edit the campaign.'
+  );
+  const cta = translator.t('campaign_assignment.cta', 'Open admin dashboard');
+  const footer = translator.t(
+    'campaign_assignment.footer',
+    'If you were not expecting this campaign access, ignore this email or contact the platform owner.'
+  );
+
+  const html = `
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(heading))}
+  <div style="${getEmailCardStyle(theme)}">
+    <p style="margin: 0 0 8px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(translator.t('campaign_assignment.greeting', 'Hi %{name},', { name: displayName }))}</p>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(intro)}</p>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(instructions)}</p>
+    <p style="margin: 0;">
+      <a href="${escapeHtml(adminUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(cta)}</a>
+    </p>
+    ${assignedByLine}
+  </div>
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(footer)}</p>
+  </div>
+</body>`;
+
+  try {
+    await sendResendEmail(env, {
+      from,
+      to: email,
+      subject,
+      html
+    }, {
+      errorLabel: 'Resend error (campaign assignment)',
+      failureLabel: 'Failed to send campaign assignment email'
+    });
+    return { sent: true };
+  } catch (error) {
+    return { sent: false, reason: error?.message || 'Failed to send campaign assignment email' };
+  }
+}
+
+export async function sendCampaignPreviewEmail(env, { email, campaignTitle = '', previewUrl = '', expiresHours = 24, invitedBy = '', lang } = {}) {
+  configureEmailLogging(env);
+  if (!env?.RESEND_API_KEY) {
+    return { sent: false, reason: 'RESEND_API_KEY not configured' };
+  }
+
+  const translator = await getEmailTranslator(env, lang);
+  const theme = getEmailTheme(env);
+  const platformName = safeEmailHeaderText(getPlatformName(env) || 'The Pool') || 'The Pool';
+  const from = safeEmailHeaderText(getUpdatesEmailFrom(env) || getPledgesEmailFrom(env));
+  const safeCampaignTitle = String(campaignTitle || 'campaign preview').trim();
+  const invitedByLine = invitedBy
+    ? `<p style="margin: 16px 0 0 0; font-size: 13px; color: ${theme.mutedTextColor};">${escapeHtml(translator.t('campaign_preview_email.invited_by', 'Sent by %{email}', { email: invitedBy }))}</p>`
+    : '';
+  const subject = safeEmailHeaderText(buildEmailSubject(
+    translator.t('subjects.campaign_preview', 'Private campaign preview'),
+    platformName
+  ));
+  const heading = translator.t('campaign_preview_email.heading', 'Private campaign preview');
+  const intro = translator.t('campaign_preview_email.intro', 'You have been invited to review a private preview of %{campaign}.', {
+    campaign: safeCampaignTitle
+  });
+  const expiry = translator.t(
+    'campaign_preview_email.expiry',
+    'This private preview link expires in %{hours} hours. If it expires before you review the campaign, ask the campaign team for a new link.',
+    { hours: String(expiresHours) }
+  );
+  const cta = translator.t('campaign_preview_email.cta', 'Open private preview');
+  const footer = translator.t(
+    'campaign_preview_email.footer',
+    'Do not forward this link. It is intended only for the email address that received it.'
+  );
+
+  const html = `
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(heading))}
+  <div style="${getEmailCardStyle(theme)}">
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(intro)}</p>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(expiry)}</p>
+    <p style="margin: 0;">
+      <a href="${escapeHtml(previewUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(cta)}</a>
+    </p>
+    ${invitedByLine}
+  </div>
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(footer)}</p>
+  </div>
+</body>`;
+
+  try {
+    await sendResendEmail(env, {
+      from,
+      to: email,
+      subject,
+      html
+    }, {
+      errorLabel: 'Resend error (campaign preview)',
+      failureLabel: 'Failed to send campaign preview email'
+    });
+    return { sent: true };
+  } catch (error) {
+    return { sent: false, reason: error?.message || 'Failed to send campaign preview email' };
+  }
+}
+
 export async function sendLaunchReminderEmail(env, { email, campaignSlug, campaignTitle, campaignUrl, unsubscribeUrl, preferredLang } = {}) {
   configureEmailLogging(env);
   if (!env?.RESEND_API_KEY) {

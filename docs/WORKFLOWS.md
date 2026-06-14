@@ -375,6 +375,9 @@ Primary flows:
 
 - Dashboard summary, analytics, reports, supporters, content loads, and content previews are read-only browsing flows.
 - Campaign content/settings and platform settings/add-ons publish through Worker validation and GitHub-backed commits.
+- Super-admin **Create new campaign** writes a preview-only campaign Markdown file locally in dev or through the GitHub-backed path in production, optionally saves multiple new campaign users to `admin-users:v1`, emails assigned users the admin dashboard link, and keeps the campaign hidden from public routes until launch.
+- Campaign **Preview** publishes protected preview flags through GitHub, stores the publishing admin plus optional reviewer emails only in a 24-hour `campaign-preview-reviewers:{slug}` KV allowlist, returns a dashboard-visible 24-hour link for the publishing admin, sends signed 24-hour links to optional reviewers, and serves private/no-store preview payloads through `/admin/campaign-preview/:slug`.
+- Super-admin **Archive campaign** is available only for non-live campaigns. The Worker validates role, CSRF, campaign slug, and effective state, then archives directly in the mounted repo for local dev or dispatches `.github/workflows/archive-campaign.yml` in production; the archive move writes `archive-manifest.json` and keeps campaign source/media under `archive/campaigns/<slug>/`.
 - **Settings -> Users** saves directly to Worker KV at `admin-users:v1`.
 - Saved referral codes in **Marketing** save to campaign-scoped KV.
 - **Reports** previews pledge/fulfillment rows and downloads CSVs; it does not send email and does not mark reports as sent.

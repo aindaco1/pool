@@ -465,7 +465,7 @@ function renderMedia(campaign, embedOptions) {
         videoId = heroVideo.split('/embed/').pop().split('?')[0];
       }
       if (videoId) {
-        return '<iframe src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(videoId) + '?autoplay=1&mute=1&loop=1&playlist=' + encodeURIComponent(videoId) + '&controls=0&modestbranding=1&playsinline=1" title="' + imageAlt + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe>';
+        return '<iframe src="https://www.youtube-nocookie.com/embed/' + encodeURIComponent(videoId) + '?autoplay=1&mute=1&loop=1&playlist=' + encodeURIComponent(videoId) + '&controls=0&modestbranding=1&playsinline=1" title="' + imageAlt + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe>';
       }
     }
 

@@ -12,6 +12,7 @@
     'orderid',
     'publictoken',
     'session',
+    't',
     'token'
   ]);
   var prefetchedUrls = new Set();

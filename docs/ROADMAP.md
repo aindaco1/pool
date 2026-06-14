@@ -2,11 +2,32 @@
 
 ## Current Milestone
 
-**v1.0.4**
+**v1.0.5**
 
-The v1.0 feature set and release-hardening pass are complete. v1.0.4 focuses on admin dashboard financial and operational visibility: net revenue after allocated processor fees plus explicit Cloudflare and Resend plan usage tracking for super admins.
+The v1.0 feature set and release-hardening pass are complete. v1.0.5 focuses on protected draft-campaign collaboration: email-protected preview pages, dashboard-visible publisher links, explicitly invited reviewer links that expire in 24 hours, and super-admin new campaign creation with campaign-user assignment emails.
 
 ## Completed
+
+**Protected campaign previews and new campaign creation**
+
+- [x] Allow super admins and assigned campaign users to publish email-protected campaign preview pages
+  - Preview pages live at `/campaigns/:slug/preview/` and localized equivalents, but stay `noindex,nofollow,noarchive`, strict-origin referrer scoped for embedded media, no-store, outside public sitemap output, and excluded from public intent prefetching
+  - Authenticated super admins and assigned campaign users can fetch preview payloads through the existing admin session and campaign-scope checks
+  - Publishing admins receive a dashboard-visible signed preview link, explicitly invited reviewer emails receive signed preview links that expire in 24 hours, and the email copy says so clearly
+  - Preview access validates token type, expiry, campaign slug, and allowed email against a 24-hour `campaign-preview-reviewers:<slug>` Worker KV allowlist instead of storing reviewer lists in GitHub-backed campaign front matter or public campaign JSON
+  - New/preview-only campaigns remain invisible from public `/campaigns/:slug/`, homepage lists, localized campaign pages, community pages, `/api/campaigns.json`, add-on catalogs, share cards, and sitemap output until launched
+- [x] Add super-admin-only new campaign creation
+  - Super admins can create a preview-only campaign from the Campaigns dashboard with only a required title
+  - The flow can optionally assign one or more existing campaign users and optionally create one or more new campaign users with required names and emails
+  - Campaign source is created locally in dev or through the existing GitHub-backed `_campaigns/<slug>.md` publish path in production, the normal rebuild is triggered when GitHub-backed, assigned/new users are saved in `admin-users:v1`, and an admin audit event is recorded
+  - Assigned campaign users receive Resend-powered emails with the admin dashboard link when users are assigned
+- [x] Add super-admin-only campaign archiving for non-live campaigns
+  - The Campaigns -> Settings subtab shows Archive campaign below the background fields only to super admins when the campaign is not currently live
+  - The Worker validates role, CSRF, campaign existence, and effective state, then archives locally in dev or dispatches `.github/workflows/archive-campaign.yml` in production
+  - The archive move keeps campaign source and campaign-owned media in `archive/campaigns/<slug>/`, writes an archive manifest, and leaves media still referenced by other active campaigns in place
+- [x] Add lightweight multi-user editing safeguards
+  - Campaign content and preview publishes carry a GitHub file SHA/base revision when available
+  - Stale publishes are rejected with a specific conflict response so browser-local drafts remain intact and users can reload before publishing
 
 **Admin dashboard analytics and operations**
 
@@ -291,15 +312,9 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.4 focuses on 
   - Update cart, checkout, Manage Pledge, analytics, reports, and fulfillment exports to use the resolved variant price consistently
   - Preserve backwards compatibility for existing add-ons whose variants only define `id`, `label`, and `inventory`
   - Add admin dashboard validation so price overrides cannot be negative, malformed, or silently ignored
-- [ ] Allow super admins and campaign users to publish email-protected campaign preview pages
-  - Add a preview publication state that exposes draft campaign pages only through signed, expiring links
-  - Scope preview access to super admins, assigned campaign users, or explicitly invited reviewers
-  - Keep previews out of `robots.txt`, `sitemap.xml`, public campaign indexes, and social metadata intended for live pages
-  - Reuse the existing magic-link/session validation patterns instead of introducing a separate password system
-  - Make preview publishing clear in the admin dashboard so users understand it does not make the campaign publicly live
-  - Preview links should be [slug]/preview
 - [ ] Create a simplified install script or simple Mac/Windows/Linux app to facilitate local and production deployment
   - Use gh, cloudflare, and any other CLIs that will help automate setup tasks
+
 ## Known Issues
 
 **Credit Card Autofill**: CC number, expiry, and CVV fields are inside Stripe's iframe for PCI compliance — not accessible to our autofill scripts.

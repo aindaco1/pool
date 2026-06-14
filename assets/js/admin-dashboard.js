@@ -70,6 +70,8 @@
   var analyticsRoot = document.getElementById('admin-analytics-results');
   var analyticsSort = { index: -1, direction: 'asc' };
   var contentCampaign = document.getElementById('admin-content-campaign');
+  var campaignCreateButton = document.getElementById('admin-campaign-create');
+  var campaignPreviewPublishButton = document.getElementById('admin-campaign-preview-publish');
   var contentLoad = document.getElementById('admin-content-load');
   var contentEditor = document.getElementById('admin-content-editor');
   var contentTitleField = document.getElementById('admin-content-title-field');
@@ -111,6 +113,7 @@
   var marketingEmbedSyncedSlug = '';
   var contentStoragePrefix = 'pool-admin-content-draft:';
   var loadedContentCampaignSlug = '';
+  var loadedContentBaseRevision = '';
   var contentBlocks = [];
   var contentBlockTypes = ['text', 'quote', 'image', 'gallery', 'video', 'audio', 'embed', 'divider'];
   var contentAlignments = ['left', 'center', 'right', 'justify'];
@@ -129,6 +132,7 @@
   var contentPreviewRequestId = 0;
   var contentSavedSnapshot = '';
   var contentHasUnsavedChanges = false;
+  var campaignPreviewStatusTimer = 0;
   var pendingContentUploadCounter = 0;
   var collectionFieldIdCounter = 0;
   var contentEditorInstanceCounter = 0;
@@ -198,6 +202,11 @@
 
   function setStatusText(node, value, options) {
     if (!node) return;
+    if (node === campaignStatus) {
+      clearCampaignPreviewStatusTimer();
+      node.removeAttribute('data-campaign-preview-status');
+      node.removeAttribute('data-campaign-preview-slug');
+    }
     node.removeAttribute('data-admin-prominent-status');
     node.textContent = '';
     if (!value) {
@@ -222,6 +231,118 @@
 
   function setProminentStatus(node, value) {
     setStatusText(node, value, { prominent: true });
+  }
+
+  function clearCampaignPreviewStatusTimer() {
+    if (!campaignPreviewStatusTimer) return;
+    window.clearTimeout(campaignPreviewStatusTimer);
+    campaignPreviewStatusTimer = 0;
+  }
+
+  function normalizeCampaignPreviewStatusLink(preview, campaignSlug) {
+    var previewUrl = String(preview?.previewUrl || '').trim();
+    if (!previewUrl) return null;
+    var expiresAtMs = Date.parse(String(preview?.expiresAt || ''));
+    if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) return null;
+    var expiresInHours = Number(preview?.expiresInHours || 0);
+    if (Number.isFinite(expiresAtMs)) {
+      expiresInHours = Math.max(1, Math.ceil((expiresAtMs - Date.now()) / (60 * 60 * 1000)));
+    }
+    if (!Number.isFinite(expiresInHours) || expiresInHours <= 0) expiresInHours = 24;
+    return {
+      previewUrl: previewUrl,
+      campaignSlug: String(preview?.campaignSlug || campaignSlug || ''),
+      expiresAtMs: Number.isFinite(expiresAtMs) ? expiresAtMs : 0,
+      expiresInHours: expiresInHours
+    };
+  }
+
+  function setActivePreviewForCampaign(campaignSlug, preview) {
+    var slug = String(campaignSlug || '').trim();
+    if (!slug) return;
+    var activePreview = normalizeCampaignPreviewStatusLink(preview, slug) ? preview : null;
+    currentCampaigns.forEach(function(campaign) {
+      if (String(campaign?.slug || '') === slug) campaign.activePreview = activePreview;
+    });
+    currentCampaignSettingsSections.forEach(function(section) {
+      if (campaignSettingsSlug(section) === slug) section.activePreview = activePreview;
+    });
+  }
+
+  function activePreviewForCampaign(campaignSlug) {
+    var slug = String(campaignSlug || '').trim();
+    if (!slug) return null;
+    var section = currentCampaignSettingsSections.find(function(candidate) {
+      return campaignSettingsSlug(candidate) === slug;
+    });
+    if (section?.activePreview) return section.activePreview;
+    var campaign = currentCampaigns.find(function(candidate) {
+      return String(candidate?.slug || '') === slug;
+    });
+    return campaign?.activePreview || null;
+  }
+
+  function clearCampaignPreviewStatus(campaignSlug) {
+    clearCampaignPreviewStatusTimer();
+    setActivePreviewForCampaign(campaignSlug, null);
+    if (!campaignStatus || campaignStatus.dataset.campaignPreviewStatus !== 'true') return;
+    var activeSlug = String(campaignStatus.dataset.campaignPreviewSlug || '');
+    if (campaignSlug && activeSlug && activeSlug !== campaignSlug) return;
+    campaignStatus.removeAttribute('data-admin-prominent-status');
+    campaignStatus.removeAttribute('data-campaign-preview-status');
+    campaignStatus.removeAttribute('data-campaign-preview-slug');
+    campaignStatus.textContent = '';
+  }
+
+  function setCampaignPreviewStatusForLink(preview, options) {
+    var slug = String(options?.campaignSlug || preview?.campaignSlug || selectedCampaignSettingsSlug || '').trim();
+    var linkInfo = normalizeCampaignPreviewStatusLink(preview, slug);
+    if (!campaignStatus || !linkInfo) {
+      if (!linkInfo) clearCampaignPreviewStatus(slug);
+      return;
+    }
+    clearCampaignPreviewStatusTimer();
+    setActivePreviewForCampaign(slug, preview);
+    campaignStatus.removeAttribute('hidden');
+    campaignStatus.setAttribute('data-admin-prominent-status', 'true');
+    campaignStatus.dataset.campaignPreviewStatus = 'true';
+    campaignStatus.dataset.campaignPreviewSlug = slug;
+    campaignStatus.textContent = '';
+
+    var message = document.createElement('span');
+    message.className = 'admin-dashboard__status-message';
+    message.textContent = t('campaign_preview_published', 'Preview link ready. Links expire in %{hours} hours.', {
+      hours: String(linkInfo.expiresInHours)
+    });
+
+    var link = document.createElement('a');
+    link.className = 'btn btn--secondary btn--small admin-dashboard__status-action';
+    link.href = linkInfo.previewUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.setAttribute('data-campaign-preview-current-link', 'true');
+    link.textContent = t('campaign_preview_open_current', 'Open preview');
+
+    campaignStatus.append(message, link);
+
+    if (linkInfo.expiresAtMs) {
+      var delay = Math.max(0, Math.min(linkInfo.expiresAtMs - Date.now(), 2147483647));
+      campaignPreviewStatusTimer = window.setTimeout(function() {
+        clearCampaignPreviewStatus(slug);
+      }, delay);
+    }
+  }
+
+  function setCampaignPreviewPublishedStatus(data) {
+    var currentPreview = data?.currentUserPreview || data?.activePreview || null;
+    var slug = String(data?.campaignSlug || currentPreview?.campaignSlug || selectedCampaignSettingsSlug || '').trim();
+    if (!normalizeCampaignPreviewStatusLink(currentPreview, slug)) {
+      setProminentStatus(campaignStatus, t('campaign_preview_published', 'Preview link ready. Links expire in %{hours} hours.', {
+        hours: String(data?.expiresInHours || currentPreview?.expiresInHours || 24)
+      }));
+      return;
+    }
+    setCampaignPreviewStatusForLink(currentPreview, { campaignSlug: slug });
   }
 
   function setAuthStatus(value) {
@@ -483,6 +604,9 @@
       forceDisabled: activeDiaryContentField instanceof HTMLTextAreaElement
     });
     setDirtyButtonState(contentSaveDraft, contentHasUnsavedChanges, t('content_save_draft', 'Save draft'), t('content_save_draft', 'Save draft'));
+    if (campaignPreviewPublishButton instanceof HTMLButtonElement) {
+      campaignPreviewPublishButton.disabled = !selectedContentCampaignSlug() || activeDiaryContentField instanceof HTMLTextAreaElement;
+    }
   }
 
   function markDiaryEditorDirty(root, dirty) {
@@ -608,7 +732,9 @@
     if (authPanel) authPanel.hidden = true;
     if (app) app.hidden = false;
     if (logoutButton) logoutButton.hidden = false;
+    if (campaignCreateButton instanceof HTMLButtonElement) campaignCreateButton.hidden = user?.role !== 'super_admin';
     syncAdminTabsForRole(user);
+    updateDirtyIndicators();
     var roleLabel = user?.role === 'super_admin'
       ? t('role_super_admin', 'super admin')
       : t('role_campaign_user', 'campaign user');
@@ -1073,6 +1199,12 @@
       parent.append(slot);
       return;
     }
+    if (row?.input === 'campaign-archive') {
+      var archiveControl = createSettingsInput(row);
+      describeCompositeControl(archiveControl, describedById, row?.label || row?.path || '');
+      parent.append(archiveControl);
+      return;
+    }
     if (row?.input === 'slug-derived' || row?.input === 'url-derived') {
       var derived = createSettingsInput(row);
       derived.dataset.settingsDerivedCampaign = row.campaignSlug || campaignSettingsSlug(section) || '';
@@ -1230,12 +1362,17 @@
     if (buffer) node.append(document.createTextNode(buffer));
   }
 
-  function createHelpControl(label, helpText, idBase) {
+  function createHelpControl(label, helpText, idBase, options) {
     var text = String(helpText || '').trim();
     if (!text) return null;
     var helpId = safeHelpId('admin-setting-help', idBase || label, collectionFieldIdCounter);
     var help = document.createElement('span');
     help.className = 'admin-settings__help';
+    if (options?.className) {
+      String(options.className).split(/\s+/).filter(Boolean).forEach(function(className) {
+        help.classList.add(className);
+      });
+    }
     help.dataset.adminHelpId = helpId;
     var button = document.createElement('button');
     button.className = 'admin-settings__help-button';
@@ -1268,7 +1405,7 @@
     if (control.tagName === 'DIV' && label && !control.getAttribute('role')) {
       control.setAttribute('role', 'group');
     }
-    if (!control.getAttribute('aria-label') && label && ['DIV', 'FIELDSET'].includes(control.tagName)) {
+    if (!control.getAttribute('aria-label') && !control.getAttribute('aria-labelledby') && label && ['DIV', 'FIELDSET'].includes(control.tagName)) {
       control.setAttribute('aria-label', label);
     }
   }
@@ -1294,9 +1431,23 @@
     label.append(document.createTextNode(labelText));
     if (options?.required) appendRequiredMarker(label);
     row.append(label);
-    var help = createHelpControl(labelText, helpText || '', idBase);
+    var help = createHelpControl(labelText, helpText || '', idBase, {
+      className: options?.helpClassName || ''
+    });
     if (help) row.append(help);
     return { row, label, helpId: help?.dataset?.adminHelpId || '' };
+  }
+
+  function firstAdminFocusTarget(scope, options) {
+    if (!(scope instanceof HTMLElement)) return null;
+    return Array.from(scope.querySelectorAll('input, textarea, select, button, [tabindex]')).find(function(control) {
+      if (!(control instanceof HTMLElement)) return false;
+      if (control.classList.contains('admin-settings__help-button')) return false;
+      if (options?.skipFileInputs !== false && control instanceof HTMLInputElement && control.type === 'file') return false;
+      if (control.hasAttribute('disabled') || control.getAttribute('aria-hidden') === 'true') return false;
+      if (control.hidden || control.closest('[hidden]')) return false;
+      return true;
+    }) || null;
   }
 
   function createAdminControl(options) {
@@ -1375,6 +1526,9 @@
     }
     if (inputType === 'checkbox-list') {
       return createCheckboxListInput(row);
+    }
+    if (inputType === 'campaign-archive') {
+      return createCampaignArchiveAction(row);
     }
     if (inputType === 'slug-derived' || inputType === 'url-derived') {
       control = document.createElement('output');
@@ -1664,6 +1818,9 @@
       root.value = values().join(', ');
       root.dispatchEvent(new Event('input', { bubbles: true }));
     }
+    function syncFocusState() {
+      root.classList.toggle('is-focused', root.contains(document.activeElement));
+    }
     function addEmail(value) {
       var email = String(value || '').trim().replace(/,+$/g, '');
       if (!email || values().includes(email)) return;
@@ -1704,6 +1861,11 @@
     input.addEventListener('blur', function() {
       addEmail(input.value);
       input.value = '';
+      window.setTimeout(syncFocusState, 0);
+    });
+    root.addEventListener('focusin', syncFocusState);
+    root.addEventListener('focusout', function() {
+      window.setTimeout(syncFocusState, 0);
     });
     root.commitPending = function() {
       addEmail(input.value);
@@ -1711,6 +1873,25 @@
     };
     root.append(list, input);
     syncValue();
+    return root;
+  }
+
+  function createCampaignArchiveAction(row) {
+    var root = document.createElement('div');
+    root.className = 'admin-campaign-archive-action';
+    root.dataset.campaignArchiveAction = row.campaignSlug || '';
+    var copy = document.createElement('p');
+    copy.className = 'admin-app__muted admin-campaign-archive-action__copy';
+    copy.textContent = t('campaign_archive_summary', 'Archive this campaign and keep its data and uploaded media for records.');
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn--danger-outline admin-campaign-archive-action__button';
+    button.dataset.campaignArchiveButton = row.campaignSlug || '';
+    button.textContent = t('campaign_archive_button', 'Archive');
+    button.addEventListener('click', function() {
+      openCampaignArchiveDialog(row);
+    });
+    root.append(copy, button);
     return root;
   }
 
@@ -3670,6 +3851,9 @@
       });
     }
     mountContentEditorForCampaign(selectedCampaignSettingsSlug);
+    setCampaignPreviewStatusForLink(activePreviewForCampaign(selectedCampaignSettingsSlug), {
+      campaignSlug: selectedCampaignSettingsSlug
+    });
     if (document.querySelector('[data-admin-tab-panel="campaigns"]')?.hidden === false) {
       loadContentCampaign({ skipIfLoaded: true });
     }
@@ -4143,6 +4327,7 @@
     resetMarketingBuilderFields();
     loadMarketingReferrals();
     hydrateContentDraft();
+    updateDirtyIndicators();
   }
 
   function renderAnalyticsOptions(campaigns) {
@@ -5094,8 +5279,25 @@
     return copy;
   }
 
-  function serializableContentBlocks(blocks) {
-    return (Array.isArray(blocks) ? blocks : []).map(serializableContentBlock);
+  function isEmptyDraftTextBlock(block) {
+    if (!block || typeof block !== 'object' || Array.isArray(block)) return false;
+    if (block._pendingUpload || block._pendingPosterUpload) return false;
+    var type = contentBlockCommand(block.type);
+    if (type !== 'text') return false;
+    if (String(block.body || '').trim()) return false;
+    return Object.keys(block).every(function(key) {
+      return ['type', 'body', 'align'].includes(key) || key.indexOf('_pending') === 0;
+    });
+  }
+
+  function serializableContentBlocks(blocks, options) {
+    var source = Array.isArray(blocks) ? blocks : [];
+    if (options?.dropEmptyDraftBlocks) {
+      source = source.filter(function(block) {
+        return !isEmptyDraftTextBlock(block);
+      });
+    }
+    return source.map(serializableContentBlock);
   }
 
   function walkPendingContentUploads(blocks, callback) {
@@ -5153,7 +5355,7 @@
 
   function contentBlocksSnapshot(blocks) {
     try {
-      var source = Array.isArray(blocks) ? serializableContentBlocks(blocks) : blocks || [];
+      var source = Array.isArray(blocks) ? serializableContentBlocks(blocks, { dropEmptyDraftBlocks: true }) : blocks || [];
       return JSON.stringify(parseContentBlocks(source));
     } catch (_error) {
       return JSON.stringify([]);
@@ -5268,7 +5470,10 @@
 
   function syncContentJsonFromBlocks() {
     if (activeContentJsonField instanceof HTMLTextAreaElement) {
-      activeContentJsonField.value = JSON.stringify(serializableContentBlocks(contentBlocks), null, 2);
+      var editingDiary = activeDiaryContentField instanceof HTMLTextAreaElement && activeContentJsonField === activeDiaryContentField;
+      activeContentJsonField.value = JSON.stringify(serializableContentBlocks(contentBlocks, {
+        dropEmptyDraftBlocks: !editingDiary
+      }), null, 2);
     }
   }
 
@@ -6217,6 +6422,7 @@
         iframe.allow = provider === 'vimeo'
           ? 'autoplay; fullscreen; picture-in-picture'
           : 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+        if (provider === 'youtube') iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
         video.append(iframe);
         card.append(video);
       } else {
@@ -6258,6 +6464,7 @@
         embed.src = block.src;
         embed.loading = 'lazy';
         embed.title = block.title || block.caption || t('content_embed_title', 'Embedded content');
+        if (block.provider === 'youtube') embed.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
         embedWrap.append(embed);
         card.append(embedWrap);
       } else {
@@ -6718,14 +6925,7 @@
   }
 
   function firstContentSettingsFocusTarget(panel) {
-    if (!(panel instanceof HTMLElement)) return null;
-    return Array.from(panel.querySelectorAll('input, textarea, select, button')).find(function(control) {
-      if (!(control instanceof HTMLElement)) return false;
-      if (control.classList.contains('admin-settings__help-button')) return false;
-      if (control instanceof HTMLInputElement && control.type === 'file') return false;
-      if (control.hasAttribute('disabled') || control.getAttribute('aria-hidden') === 'true') return false;
-      return true;
-    }) || null;
+    return firstAdminFocusTarget(panel);
   }
 
   function toggleMediaSettings(button) {
@@ -6868,7 +7068,6 @@
   function syncActiveDiaryContentField() {
     if (!(activeDiaryContentField instanceof HTMLTextAreaElement)) return false;
     syncContentJsonFromBlocks();
-    activeDiaryContentField.value = JSON.stringify(serializableContentBlocks(contentBlocks), null, 2);
     activeDiaryContentField.dispatchEvent(new Event('change', { bubbles: true }));
     markDiaryEditorDirty(contentBlocksRoot, contentEditorDirtySnapshot(contentBlocks) !== (activeDiaryContentField.dataset.diaryDraftOriginal || contentEditorDirtySnapshot([])));
     updateAdminDirtyIndicatorsSoon();
@@ -6903,7 +7102,7 @@
         campaignSlug: slug,
         title: contentTitleField?.value || '',
         shortBlurb: contentShortBlurb?.value || '',
-        longContent: serializableContentBlocks(contentBlocks)
+        longContent: serializableContentBlocks(contentBlocks, { dropEmptyDraftBlocks: true })
       }));
     } catch (_error) {
     }
@@ -6950,7 +7149,7 @@
   function readContentEditorDraft() {
     syncContentMetadataFromSettings();
     var sourceBlocks = Array.isArray(contentBlocks) && contentBlocks.length
-      ? serializableContentBlocks(contentBlocks)
+      ? serializableContentBlocks(contentBlocks, { dropEmptyDraftBlocks: true })
       : contentLongContent?.value || [];
     var longContent = parseContentBlocks(sourceBlocks);
     syncContentJsonFromBlocks();
@@ -6989,11 +7188,11 @@
     });
   }
 
-  function renderContentPreview(data) {
+  function renderContentPreview(data, options) {
     var html = data?.preview?.html || '';
     if (contentPreviewDesktop instanceof HTMLIFrameElement) contentPreviewDesktop.srcdoc = html;
     if (contentPreviewMobile instanceof HTMLIFrameElement) contentPreviewMobile.srcdoc = html;
-    renderContentValidation(data);
+    renderContentValidation(options?.suppressValidation ? {} : data);
   }
 
   async function loadContentCampaign(options) {
@@ -7016,6 +7215,9 @@
       syncContentMetadataFromSettings();
       writeContentDraft({ trackDirty: false });
       loadedContentCampaignSlug = slug;
+      loadedContentBaseRevision = data?.campaign?.baseRevision || '';
+      setActivePreviewForCampaign(slug, data?.campaign?.activePreview || null);
+      setCampaignPreviewStatusForLink(data?.campaign?.activePreview || null, { campaignSlug: slug });
       resetContentDirtyBaseline();
       setText(contentStatus, '');
       scheduleContentPreview({ immediate: true });
@@ -7060,13 +7262,13 @@
         })
       });
       if (requestId !== contentPreviewRequestId) return;
-      renderContentPreview(data);
+      renderContentPreview(data, { suppressValidation: options?.auto === true });
       if (!options?.silent) setText(contentStatus, t('content_preview_ready', 'Preview is ready.'));
     } catch (error) {
       if (requestId !== contentPreviewRequestId) return;
       if (error?.data?.preview) {
-        renderContentPreview(error.data);
-      } else {
+        renderContentPreview(error.data, { suppressValidation: options?.auto === true });
+      } else if (!options?.auto) {
         renderContentValidation(error?.data || {});
       }
       if (!options?.silent) setText(contentStatus, t('content_preview_failed', 'Preview needs changes before it can publish.'));
@@ -7189,9 +7391,11 @@
         body: JSON.stringify({
           intent: 'publish',
           campaignSlug: draft.campaignSlug,
+          baseRevision: loadedContentBaseRevision,
           draft: draft
         })
       });
+      loadedContentBaseRevision = data?.contentSha || loadedContentBaseRevision;
       setText(contentStatus, t('content_published', 'Content published. Rebuild status: %{status}', {
         status: data?.rebuild?.triggered ? t('yes', 'Yes') : t('no', 'No')
       }));
@@ -7205,6 +7409,8 @@
       }
       setText(contentStatus, error?.data?.code === 'github_not_configured'
         ? t('content_publish_not_configured', 'GitHub publishing is not configured.')
+        : error?.data?.code === 'campaign_revision_conflict'
+          ? (error?.data?.error || t('content_publish_conflict', 'Campaign changed since this editor loaded. Reload before publishing.'))
         : t('content_publish_failed', 'Unable to publish content.'));
       return false;
     }
@@ -7231,6 +7437,393 @@
       if (!contentPublished) return;
     }
     updateDirtyIndicators();
+  }
+
+  function currentAdminUserRows() {
+    var editor = adminUsersEditor();
+    if (editor?.dataset?.adminUsersSavedValue) {
+      try {
+        return JSON.parse(String(editor.dataset.adminUsersSavedValue || '[]')) || [];
+      } catch (_error) {
+      }
+    }
+    var sections = Array.isArray(currentSettings?.sections) ? currentSettings.sections : [];
+    for (const section of sections) {
+      var row = Array.isArray(section?.rows)
+        ? section.rows.find(function(item) { return item?.path === 'admin.users' || item?.input === 'admin-users'; })
+        : null;
+      if (Array.isArray(row?.rawValue)) return row.rawValue;
+    }
+    return [];
+  }
+
+  function currentCampaignUserRows() {
+    return currentAdminUserRows().filter(function(user) {
+      return String(user?.role || '').trim() === 'campaign_user' && String(user?.email || '').trim();
+    }).map(function(user) {
+      return {
+        name: String(user.name || '').trim(),
+        email: String(user.email || '').trim().toLowerCase()
+      };
+    });
+  }
+
+  function appendDialogField(form, labelText, control, options) {
+    var field = document.createElement('div');
+    field.className = 'admin-action-dialog__field';
+    if (control instanceof HTMLElement && !control.id) {
+      control.id = 'admin-action-dialog-field-' + String(++collectionFieldIdCounter);
+    }
+    var controlId = control instanceof HTMLElement ? control.id : 'admin-action-dialog-field-' + String(++collectionFieldIdCounter);
+    var labelInfo = createProductLabelRow(labelText, options?.help || '', controlId, {
+      htmlFor: controlId,
+      helpClassName: 'admin-settings__help--edge-start',
+      required: options?.required
+    });
+    if (labelInfo.helpId) appendDescribedBy(control, labelInfo.helpId);
+    field.append(labelInfo.row, control);
+    form.append(field);
+    return field;
+  }
+
+  function appendDialogControlGroup(form, labelText, control, options) {
+    var field = document.createElement('div');
+    field.className = 'admin-action-dialog__field';
+    var labelId = 'admin-action-dialog-label-' + String(++collectionFieldIdCounter);
+    var labelInfo = createProductLabelRow(labelText, options?.help || '', labelId, {
+      helpClassName: 'admin-settings__help--edge-start',
+      labelId: labelId
+    });
+    if (control instanceof HTMLElement && labelInfo.label?.id && !control.getAttribute('aria-labelledby')) {
+      control.setAttribute('aria-labelledby', labelInfo.label.id);
+    }
+    if (labelInfo.helpId) describeCompositeControl(control, labelInfo.helpId, labelText);
+    field.append(labelInfo.row, control);
+    form.append(field);
+    return field;
+  }
+
+  function openAdminActionDialog(title, buildBody, onSubmit) {
+    var dialog = document.createElement('dialog');
+    dialog.className = 'admin-action-dialog';
+    var form = document.createElement('form');
+    form.className = 'admin-action-dialog__form';
+    var heading = document.createElement('h2');
+    heading.textContent = title;
+    var status = document.createElement('p');
+    status.className = 'admin-dashboard__status';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    var actions = document.createElement('div');
+    actions.className = 'admin-action-dialog__actions';
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn btn--secondary';
+    cancel.textContent = t('cancel', 'Cancel');
+    var submit = document.createElement('button');
+    submit.type = 'submit';
+    submit.className = 'btn';
+    submit.textContent = t('continue', 'Continue');
+    actions.append(cancel, submit);
+    form.append(heading);
+    buildBody(form, status, submit);
+    form.append(status, actions);
+    dialog.append(form);
+    document.body.append(dialog);
+
+    function closeDialog() {
+      if (typeof dialog.close === 'function') dialog.close();
+      dialog.remove();
+    }
+
+    cancel.addEventListener('click', closeDialog);
+    dialog.addEventListener('cancel', function(event) {
+      event.preventDefault();
+      closeDialog();
+    });
+    form.addEventListener('submit', async function(event) {
+      event.preventDefault();
+      submit.disabled = true;
+      cancel.disabled = true;
+      try {
+        await onSubmit(form, status);
+        closeDialog();
+      } catch (error) {
+        logger.error('Admin action failed', error);
+        setText(status, error?.data?.errors?.join(' ') || error?.data?.error || error?.message || t('admin_action_failed', 'Action failed.'));
+        submit.disabled = false;
+        cancel.disabled = false;
+      }
+    });
+
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute('open', '');
+    }
+    var firstControl = firstAdminFocusTarget(dialog);
+    if (firstControl instanceof HTMLElement) firstControl.focus();
+    return dialog;
+  }
+
+  function openCreateCampaignDialog() {
+    if (currentUser?.role !== 'super_admin') return;
+    var campaignUsers = currentCampaignUserRows();
+    var createNewCampaignUserValue = '__create_new_campaign_user__';
+    openAdminActionDialog(t('campaign_create_title', 'Create new campaign'), function(form) {
+      var title = document.createElement('input');
+      title.className = 'admin-settings__input';
+      title.name = 'title';
+      title.type = 'text';
+      title.required = true;
+      title.maxLength = 160;
+      appendDialogField(form, t('campaign_create_campaign_title', 'Campaign title'), title, {
+        help: t('campaign_create_campaign_title_help', 'Use the public working name for this campaign. The initial campaign slug is generated from this title.')
+      });
+
+      var userOptions = [{
+        value: createNewCampaignUserValue,
+        label: t('campaign_create_new_user_option', 'Create new campaign user')
+      }].concat(campaignUsers.map(function(user) {
+        return {
+          value: user.email,
+          label: user.name ? user.name + ' <' + user.email + '>' : user.email
+        };
+      }));
+      var campaignUserSelection = createCheckboxListInput({
+        label: t('campaign_create_user_mode', 'Campaign users'),
+        rawValue: [],
+        includeStandardOption: false,
+        options: userOptions
+      });
+      campaignUserSelection.dataset.campaignCreateUsers = 'existing';
+      appendDialogControlGroup(form, t('campaign_create_user_mode', 'Campaign users'), campaignUserSelection, {
+        help: t('campaign_create_existing_users_help', 'Choose who can manage this campaign. Select existing users, or choose Create new campaign user to add people now.')
+      });
+
+      var newUsersPanel = document.createElement('div');
+      newUsersPanel.className = 'admin-campaign-new-users';
+      newUsersPanel.setAttribute('role', 'group');
+      newUsersPanel.setAttribute('aria-label', t('campaign_create_new_users', 'New campaign users'));
+      var newUsersList = document.createElement('div');
+      newUsersList.className = 'admin-campaign-new-users__list';
+      var addNewUserButton = document.createElement('button');
+      addNewUserButton.type = 'button';
+      addNewUserButton.className = 'btn btn--secondary';
+      addNewUserButton.dataset.campaignNewUserAdd = 'true';
+      addNewUserButton.textContent = t('campaign_create_add_new_user', 'Add another user');
+      newUsersPanel.append(newUsersList, addNewUserButton);
+      var newUsersField = document.createElement('div');
+      newUsersField.className = 'admin-action-dialog__field admin-action-dialog__field--unlabeled';
+      newUsersField.append(newUsersPanel);
+      form.append(newUsersField);
+
+      function newUserRows() {
+        return Array.from(newUsersList.querySelectorAll('[data-campaign-new-user-row]'));
+      }
+
+      function syncNewUserRemoveButtons() {
+        var rows = newUserRows();
+        rows.forEach(function(row) {
+          var remove = row.querySelector('[data-campaign-new-user-remove]');
+          if (remove instanceof HTMLButtonElement) remove.hidden = rows.length <= 1;
+        });
+      }
+
+      function appendNewUserRow(options) {
+        var row = document.createElement('div');
+        row.className = 'admin-campaign-new-users__row';
+        row.dataset.campaignNewUserRow = 'true';
+
+        var nameLabel = document.createElement('label');
+        nameLabel.className = 'admin-campaign-new-users__field';
+        var nameText = document.createElement('span');
+        nameText.textContent = t('campaign_create_user_name', 'New campaign user name');
+        var nameInput = document.createElement('input');
+        nameInput.className = 'admin-settings__input';
+        nameInput.name = 'newCampaignUserName';
+        nameInput.type = 'text';
+        nameInput.maxLength = 160;
+        nameInput.autocomplete = 'name';
+        nameInput.dataset.campaignNewUserName = 'true';
+        nameInput.value = String(options?.name || '');
+        nameLabel.append(nameText, nameInput);
+
+        var emailLabel = document.createElement('label');
+        emailLabel.className = 'admin-campaign-new-users__field';
+        var emailText = document.createElement('span');
+        emailText.textContent = t('campaign_create_user_email', 'New campaign user email');
+        var emailInput = document.createElement('input');
+        emailInput.className = 'admin-settings__input';
+        emailInput.name = 'newCampaignUserEmail';
+        emailInput.type = 'email';
+        emailInput.autocomplete = 'email';
+        emailInput.dataset.campaignNewUserEmail = 'true';
+        emailInput.value = String(options?.email || '');
+        emailLabel.append(emailText, emailInput);
+
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn btn--secondary admin-campaign-new-users__remove';
+        remove.dataset.campaignNewUserRemove = 'true';
+        remove.textContent = t('campaign_create_remove_new_user', 'Remove');
+        remove.addEventListener('click', function() {
+          row.remove();
+          if (!newUserRows().length) appendNewUserRow();
+          syncNewUserRemoveButtons();
+        });
+
+        row.append(nameLabel, emailLabel, remove);
+        newUsersList.append(row);
+        syncNewUserRemoveButtons();
+        return row;
+      }
+
+      function selectedCampaignUserOptions() {
+        return String(campaignUserSelection.value || '').split(',')
+          .map(function(value) { return value.trim(); })
+          .filter(Boolean);
+      }
+
+      function syncNewUsersPanel() {
+        var showNewUsers = selectedCampaignUserOptions().includes(createNewCampaignUserValue);
+        newUsersField.hidden = !showNewUsers;
+        if (showNewUsers && !newUserRows().length) appendNewUserRow();
+      }
+
+      appendNewUserRow();
+      campaignUserSelection.addEventListener('input', syncNewUsersPanel);
+      addNewUserButton.addEventListener('click', function() {
+        var row = appendNewUserRow();
+        row.querySelector('input')?.focus();
+      });
+      syncNewUsersPanel();
+    }, async function(form, status) {
+      var formData = new FormData(form);
+      var existingUsers = form.querySelector('[data-campaign-create-users="existing"]');
+      var selectedUsers = String(existingUsers?.value || '').split(',')
+        .map(function(value) { return value.trim(); })
+        .filter(Boolean);
+      var wantsNewUsers = selectedUsers.includes(createNewCampaignUserValue);
+      var campaignUserEmails = selectedUsers.filter(function(value) {
+        return value !== createNewCampaignUserValue;
+      });
+      var newCampaignUsers = [];
+      if (wantsNewUsers) {
+        var partialNewUser = false;
+        form.querySelectorAll('[data-campaign-new-user-row]').forEach(function(row) {
+          var name = String(row.querySelector('[data-campaign-new-user-name]')?.value || '').trim();
+          var email = String(row.querySelector('[data-campaign-new-user-email]')?.value || '').trim();
+          if (!name && !email) return;
+          if (!name || !email) {
+            partialNewUser = true;
+            return;
+          }
+          newCampaignUsers.push({ name: name, email: email });
+        });
+        if (partialNewUser) {
+          throw new Error(t('campaign_create_new_user_complete_required', 'Each new campaign user needs a name and email.'));
+        }
+      }
+      var body = {
+        title: String(formData.get('title') || '').trim(),
+        campaignUserEmails: campaignUserEmails,
+        preferredLang: lang
+      };
+      if (newCampaignUsers.length) {
+        body.newCampaignUsers = newCampaignUsers;
+      }
+      setText(status, t('campaign_create_creating', 'Creating campaign...'));
+      var data = await requestJson('/admin/campaigns/create', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+      selectedCampaignSettingsSlug = data?.campaign?.slug || selectedCampaignSettingsSlug;
+      var assignmentFailed = Array.isArray(data?.notifications?.assignments)
+        ? data.notifications.assignments.some(function(item) { return item?.sent === false; })
+        : data?.notifications?.assignment?.sent === false;
+      var assignedUserCount = Array.isArray(data?.campaign?.assignedCampaignUserEmails)
+        ? data.campaign.assignedCampaignUserEmails.length
+        : 0;
+      setProminentStatus(campaignStatus, assignedUserCount === 0
+        ? t('campaign_create_created_no_users', 'Campaign created. No campaign users were assigned.')
+        : assignmentFailed
+        ? t('campaign_create_created_email_failed', 'Campaign created, but one or more assignment emails could not be sent.')
+        : t('campaign_create_created', 'Campaign created. Assigned campaign users were emailed.'));
+      await loadSummary();
+    });
+  }
+
+  function openCampaignPreviewPublishDialog() {
+    var slug = selectedContentCampaignSlug();
+    if (!slug) return;
+    openAdminActionDialog(t('campaign_preview_publish_title', 'Publish protected preview'), function(form) {
+      var note = document.createElement('p');
+      note.className = 'admin-app__muted';
+      note.textContent = t('campaign_preview_current_user_notice', 'Your 24-hour preview link will be created when you publish this preview. Add optional additional previewer emails below if anyone else should receive one.');
+      form.append(note);
+      var reviewers = createEmailListInput({
+        label: t('campaign_preview_reviewers', 'Additional previewer emails (optional)'),
+        rawValue: []
+      });
+      reviewers.dataset.campaignPreviewReviewers = 'true';
+      appendDialogControlGroup(form, t('campaign_preview_reviewers', 'Additional previewer emails (optional)'), reviewers, {
+        help: t('campaign_preview_reviewers_help', 'Optional: add more people who should receive a private preview link. Type an email and press Enter or comma; links expire in 24 hours.')
+      });
+    }, async function(form, status) {
+      var reviewers = form.querySelector('[data-campaign-preview-reviewers]');
+      if (reviewers?.commitPending) reviewers.commitPending();
+      setText(status, t('campaign_preview_publishing', 'Creating your preview link...'));
+      var data = await requestJson('/admin/campaign-preview/publish', {
+        method: 'POST',
+        body: JSON.stringify({
+          intent: 'publish_preview',
+          campaignSlug: slug,
+          reviewerEmails: String(reviewers?.value || ''),
+          baseRevision: loadedContentCampaignSlug === slug ? loadedContentBaseRevision : '',
+          preferredLang: lang
+        })
+      });
+      loadedContentBaseRevision = data?.contentSha || loadedContentBaseRevision;
+      setCampaignPreviewPublishedStatus(data);
+    });
+  }
+
+  function openCampaignArchiveDialog(row) {
+    var slug = String(row?.campaignSlug || selectedCampaignSettingsSlug || '').trim();
+    if (!slug || currentUser?.role !== 'super_admin') return;
+    openAdminActionDialog(t('campaign_archive_title', 'Archive campaign'), function(form, _status, submit) {
+      var warning = document.createElement('p');
+      warning.className = 'admin-campaign-archive-dialog__warning';
+      warning.textContent = t('campaign_archive_warning', 'Archiving keeps this campaign data and uploaded media for records. It does not delete data, but the campaign will leave active dashboard lists after the archive deploys.');
+      var note = document.createElement('p');
+      note.className = 'admin-app__muted';
+      note.textContent = t('campaign_archive_live_note', 'Live campaigns cannot be archived from the dashboard.');
+      form.append(warning, note);
+      if (submit instanceof HTMLButtonElement) {
+        submit.textContent = t('campaign_archive_confirm', 'Archive');
+        submit.classList.add('btn--danger');
+      }
+    }, async function(_form, status) {
+      setText(status, t('campaign_archive_archiving', 'Archiving campaign...'));
+      var data = await requestJson('/admin/campaigns/archive', {
+        method: 'POST',
+        body: JSON.stringify({
+          intent: 'archive_campaign',
+          campaignSlug: slug
+        })
+      });
+      setProminentStatus(campaignStatus, data?.mode === 'local'
+        ? t('campaign_archive_archived_local', 'Campaign archived locally. It will leave active dashboard lists after the local site rebuilds.')
+        : t('campaign_archive_started', 'Archive workflow started. The campaign will leave active dashboard lists after the archive deploys.'));
+      var button = campaignSettingsRoot?.querySelector?.('[data-campaign-archive-button="' + cssEscape(slug) + '"]');
+      if (button instanceof HTMLButtonElement) button.disabled = true;
+      if (data?.archivePath) {
+        var action = campaignSettingsRoot?.querySelector?.('[data-campaign-archive-action="' + cssEscape(slug) + '"]');
+        if (action instanceof HTMLElement) action.dataset.campaignArchivePath = data.archivePath;
+      }
+      await loadSummary();
+    });
   }
 
   function reportQueryParams() {
@@ -8277,6 +8870,14 @@
 
   if (contentPublish) {
     contentPublish.addEventListener('click', publishCampaignChanges);
+  }
+
+  if (campaignCreateButton) {
+    campaignCreateButton.addEventListener('click', openCreateCampaignDialog);
+  }
+
+  if (campaignPreviewPublishButton) {
+    campaignPreviewPublishButton.addEventListener('click', openCampaignPreviewPublishDialog);
   }
 
   function loadSupportersForCurrentFilters() {

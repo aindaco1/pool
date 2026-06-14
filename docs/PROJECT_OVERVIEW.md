@@ -25,6 +25,7 @@ Creators define campaigns in Markdown; backers pledge through The Pool’s first
 | **Styling** | Sass + generated theme vars | Shared design system for public pages, checkout, pledge management, and branded checkout/email surfaces |
 
 All code is versioned and auditable. Campaign editing now flows through the private admin dashboard or direct repo edits, with publishable changes still committed back to the repo through the Worker-controlled GitHub path.
+Super admins can create preview-only campaigns through that same path; those campaigns stay hidden from public campaign routes until launched. Super admins can also archive non-live campaigns through a validated GitHub Actions move into `archive/campaigns/<slug>/`, keeping archived source and media in the repository instead of deleting data. Protected preview reviewer email allowlists live in short-lived Worker KV records instead of campaign Markdown.
 Dashboard media uploads stay source-preserving at the Worker boundary: image/video uploads request the repository optimization workflow after commit, and content/diary publishes remove same-campaign dashboard-owned media that is no longer referenced.
 
 ## Plan Efficiency Notes For Forks
@@ -35,6 +36,8 @@ The current architecture is deliberately optimized so Cloudflare deployments spe
 - the browser caches live stats and inventory in `localStorage` for the configured TTLs, and hidden tabs stop refreshing until visible again
 - dashboard reports, supporters, analytics, settlement helpers, admin broadcast audience lookups, and stats / inventory reconciliation all prefer the `campaign-pledges:{slug}` index and avoid expensive namespace scans on normal read paths
 - dashboard content loads/previews, report previews/downloads, supporter filters, analytics views, and marketing referral lists are designed to add zero KV writes
+- protected preview payload reads are zero-write; publishing a protected preview writes one 24-hour preview access allowlist plus an audit event
+- campaign archive operations write one audit event; the source/media archive move runs locally in dev and in GitHub Actions for production
 - limited-tier write paths now ask the per-campaign coordinator for reservation-aware availability, while public inventory stays in KV as a projection
 - platform add-on inventory uses a sold-count projection after bootstrap instead of rebuilding from pledge namespace scans on normal reads
 - launch reminder dispatch and supporter confirmation retry polling use queue-state markers, so idle scheduled ticks skip KV list scans and fall back to hourly compatibility checks
@@ -158,7 +161,7 @@ For current Cloudflare limits, see:
 8. ✅ Test campaign runs end-to-end in Stripe test mode.
 9. ✅ Long-form content sanitizes Markdown link schemes and only renders structured embeds from exact approved origins.
 10. ✅ Missing-pledge magic-link reads fail closed with `404`.
-11. ✅ Private admin dashboard emits `noindex`, uses magic-link auth, and keeps user/referral KV mutations separate from GitHub-backed publish flows.
+11. ✅ Private admin dashboard emits `noindex`, uses magic-link auth, keeps user/referral/preview reviewer KV mutations separate from GitHub-backed publish flows, and keeps preview-only campaigns out of public routes until launched.
 
 ---
 
@@ -184,7 +187,8 @@ For current Cloudflare limits, see:
 10. **Localized chrome should stay shared**: campaign-page controls and status copy that belong to the platform, not the creator, should flow through the shared locale catalog so public templates, runtime UI, and supporter emails do not drift apart.
 11. **Performance work should stay static-first**: prefer stable Jekyll output, generated asset minification, lazy runtime loading, and conservative public-only prefetching before adding client complexity.
 12. **Media lifecycle work should stay repo-backed**: dashboard uploads commit source files first, repository automation owns native image/video optimization, and publish-time cleanup only removes same-campaign media that disappeared from authored content and is not referenced elsewhere.
+13. **Preview access data should stay out of source**: protected-preview Markdown carries only preview flags; preview access emails belong in short-lived Worker KV allowlists and signed 24-hour links.
 
 ---
 
-_Last updated: June 3, 2026_
+_Last updated: June 12, 2026_

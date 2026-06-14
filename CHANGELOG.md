@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.0.5 - 2026-06-14
+
+Release scope:
+
+- Added protected campaign previews for super admins, assigned campaign users, and explicitly invited reviewer emails. Preview links are signed, campaign-scoped, dashboard-visible for the publishing admin, and expire after 24 hours.
+- Added super-admin campaign creation for preview-only campaigns. Campaign users are optional at creation time; super admins can assign multiple existing users or create multiple new users, and assigned users receive the admin dashboard link by email when delivery is configured.
+- Added super-admin campaign archiving for non-live campaigns. Local development archives through the mounted repo helper, while production dispatches the validated `archive-campaign` GitHub Actions workflow.
+- Preserved public visibility and SEO boundaries: preview-only campaigns remain hidden from public campaign routes, home/community/add-on indexes, `/api/campaigns.json`, embeds, share-card metadata, sitemap output, robots intent, and public prefetching until launched.
+- Preserved KV budget discipline: dashboard reads, preview rendering, field browsing, local drafts, reports, supporters, and analytics remain read-only; explicit create, preview publish, user save, archive audit, and email actions perform bounded writes.
+- Added lightweight multi-user editing safeguards with GitHub base-revision checks for campaign content and preview publishes, stale-publish conflicts, local draft preservation, and audit events for create, preview publish, archive, and content publish actions.
+- Kept the new dashboard UI accessible, localized, mobile-responsive, and DRY by reusing shared admin label/help/info-button, email-list, modal, focus, and status patterns.
+- Improved Podman local development resilience with supervised service restarts, stale Podman recovery attempts, local repo helper support for create/archive testing, and updated Podman documentation.
+
+- Added GitHub-backed protected preview publication at `/admin/campaign-preview/publish`, no-store preview payload reads at `/admin/campaign-preview/:slug`, generic noindex preview shells at `/campaigns/:slug/preview/` for every campaign slug so emailed links do not depend on a post-publish rebuild, and 24-hour KV preview access allowlists at `campaign-preview-reviewers:<slug>`.
+- Added signed 24-hour dashboard preview links for the publishing admin, optional signed reviewer preview emails, and campaign-assignment emails through the shared Resend email theme and i18n catalog.
+- Rendered protected preview payloads as full read-only campaign page previews with campaign CSS/fonts loaded, media embeds enabled, and pledge controls disabled.
+- Matched protected-preview diary rendering to the public campaign diary tabs, phase panels, and dashed entry cards.
+- Added super-admin dashboard controls for new preview-only campaign creation and protected preview publication.
+- Added super-admin-only campaign archiving for non-live campaigns from Campaigns -> Settings, backed locally by dev-only repository writes and in production by a manual GitHub Actions workflow that moves `_campaigns/<slug>.md` and campaign-owned media into `archive/campaigns/<slug>/` without deleting archived data.
+- Added preview-only/public filtering across campaign JSON, homepage/community/add-on indexes, localized pages, sitemap, robots intent, and prefetch eligibility.
+- Added base-revision conflict checks for campaign content and preview publishes.
+- Kept previewer emails out of GitHub-backed campaign Markdown and public generated artifacts; campaign source now carries only the preview flag and compatibility-empty `preview_reviewer_emails: []`.
+
 ## v1.0.4 - 2026-06-11
 
 - Added super-admin Settings -> Plan usage tracking for Cloudflare Workers/KV and Resend quotas, with automatic load, provider-detected plan names where available, progress bars, warning thresholds, and provider plan links while keeping provider tokens server-side.
@@ -7,7 +30,6 @@
 - Added component-level processor fee allocation across campaign revenue, platform revenue, tax, and shipping so table/CSV exports reconcile with stored Stripe balance transactions or existing fee estimates.
 - Documented usage-tracker environment variables and the read-only Cloudflare GraphQL Analytics plus Billing Read token boundary for usage and Workers plan detection.
 - Reorganized local Worker `.dev.vars` scaffolding and `npm run secrets:dev` output into purpose-based groups, including Plan Usage provider settings and overrides.
-- Updated release metadata to `1.0.4`.
 
 ## v1.0.3 - 2026-06-01
 
@@ -66,8 +88,6 @@
 - Preserved the Cloudflare Workers KV free-tier target by keeping normal dashboard reads, previews, filters, analytics, and local drafts at zero KV writes.
 - Aligned pledge email sender configuration with the authorized Resend sender domain and documented sender-domain setup for forks.
 - Made GitHub Pages deploy permissions explicit for the production deploy workflow.
-- Added admin dashboard accessibility, i18n, SEO/noindex, security, mobile/tablet responsiveness, and DRY UI passes, plus focused unit, Playwright, Podman smoke, and KV-write-budget coverage.
-- Updated release metadata to `1.0.0`.
 
 ## v0.9.5 - 2026-05-03
 
@@ -77,7 +97,6 @@
 - Switched the Podman Worker dependency bootstrap to `npm ci` so local container starts do not rewrite `worker/package-lock.json`.
 - Expanded creator launch documentation with add-ons, hosted embeds, tax/shipping fallback expectations, free-shipping decisions, report recipients, and fulfillment handoff.
 - Added a Spanish creator checklist route for fork and creator onboarding.
-- Verified the full merge gate, including security suite, host smoke, Podman mutable-pledge smoke, and headless E2E.
 
 ## v0.9.4 - 2026-05-02
 

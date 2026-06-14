@@ -2985,6 +2985,14 @@ describe('cart provider shim', () => {
       workerBase: WORKER_BASE
     };
 
+    // Drain debounced checkout work from earlier tests before installing this test's guarded mocks.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({}), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })));
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url === `${WORKER_BASE}/tax/quote`) {

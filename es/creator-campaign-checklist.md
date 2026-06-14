@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Lista para creadores de campañas
-description: "Una lista práctica para preparar una campaña en The Pool: panel de administración, imágenes, video, textos, niveles, add-ons, enlaces para compartir, embeds, impuestos, envío, reportes y fulfillment."
+description: "Una lista práctica para preparar una campaña en The Pool: panel de administración, vistas previas protegidas, imágenes, video, textos, niveles, add-ons, enlaces para compartir, embeds, impuestos, envío, reportes y fulfillment."
 permalink: /es/creator-campaign-checklist/
 lang: es
 indexable: false
@@ -34,7 +34,7 @@ La lista cubre:
 
 ## Qué cambió desde v0.9.5
 
-Esta lista refleja los cambios de la plataforma hasta **v1.0.4**:
+Esta lista refleja los cambios de la plataforma hasta **v1.0.5**:
 
 - las personas creadoras pueden tener acceso específico al panel para editar campañas sin acceso directo al repositorio
 - las cargas de media en el panel soportan imágenes, video, audio, previews y optimización posterior en el repositorio con variantes WebP responsivas
@@ -47,6 +47,7 @@ Esta lista refleja los cambios de la plataforma hasta **v1.0.4**:
 - el lanzamiento y las fechas límite siguen la zona horaria configurada para la plataforma
 - los analytics de campaña mantienen visible el ingreso bruto de campaña y también muestran el ingreso neto después de comisiones de procesamiento asignadas
 - las personas operadoras de plataforma pueden vigilar el uso de planes de Cloudflare y Resend desde el panel sin exponer tokens de proveedores al equipo creador
+- los equipos de campaña pueden usar enlaces de vista previa protegida para revisar borradores de campaña de forma privada antes del lanzamiento público
 - las mejoras de performance hacen más estable la primera carga, incluidos embeds hero de YouTube diferidos y entrega responsiva de imágenes, pero las campañas aún necesitan media optimizada y copy conciso
 
 ## Versión rápida
@@ -67,6 +68,7 @@ Esta lista refleja los cambios de la plataforma hasta **v1.0.4**:
 - nombre, precio y descripción de cada nivel
 - correos de reportes si la persona responsable quiere recibir reportes automáticos
 - correos de editoras o editores del panel, si el equipo creador editará directamente
+- correos opcionales de personas revisoras que deberían ver el borrador privado antes del lanzamiento
 - decisión sobre recordatorios de lanzamiento para campañas próximas: formulario público, sin formulario o lanzamiento sin periodo previo
 
 ### Muy recomendado
@@ -128,6 +130,7 @@ La campaña debe explicar rápido:
 | Correos de reportes | Recomendado | Correos que recibirán reportes de pledges y fulfillment. |
 | Responsable de fulfillment | Recomendado | Quién entrega las recompensas si la campaña se cobra con éxito. |
 | Editores del panel | Recomendado | Correos autorizados del equipo creador que deberían tener acceso solo a esta campaña. |
+| Personas revisoras | Opcional | Correos de confianza que deberían recibir un enlace de vista previa protegida antes del lanzamiento público. |
 | Recordatorios de lanzamiento | Opcional | Si la campaña tiene periodo previo, decidir si se recogerán correos para un único recordatorio cuando abra. |
 
 <figure class="creator-checklist-screenshot creator-checklist-screenshot--compact">
@@ -146,10 +149,12 @@ El panel puede gestionar:
 - niveles, artículos de apoyo, add-ons de campaña, stretch goals, entradas de diario y decisiones
 - vistas previas de reportes, listas de patrocinadores, analytics, enlaces de marketing/referencia y accesos al constructor de embeds
 - textos de compartir y entradas de social preview mediante los mismos campos de título, blurb, imagen hero y estado que se muestran en la página pública
+- enlaces de vista previa protegida para personas revisoras de confianza antes de que la campaña sea pública
 
 Antes del lanzamiento, confirma:
 
 - qué correos del equipo creador deben tener acceso específico a la campaña
+- qué personas revisoras externas, si las hay, deben recibir enlaces de vista previa protegida
 - quién puede publicar cambios de campaña
 - si una administradora de plataforma debe revisar los cambios antes del lanzamiento
 - qué campos deben quedarse estables cuando ya existan enlaces públicos, especialmente slug, URL, precios, inventario, envío e impuestos
@@ -159,6 +164,7 @@ Notas operativas:
 - Los IDs nuevos de niveles, artículos, add-ons, decisiones y variantes pueden derivarse del nombre o label en el panel; los IDs heredados deben mantenerse estables.
 - Los borradores del editor son locales hasta que se guarden o publiquen, así que no deben tratarse como fuente de verdad.
 - Publicar cambios de campaña o configuración pasa por el flujo de la plataforma y puede tardar en desplegarse.
+- Los enlaces de vista previa protegida expiran después de 24 horas, pueden regenerarse desde el panel por una persona autorizada y no hacen visible una campaña de solo preview en las rutas públicas.
 - La gestión de usuarios es separada: los usuarios del panel se guardan en Worker KV y no crean commits en GitHub.
 - El sign-in del panel puede pedir un desafío de Cloudflare Turnstile antes de enviar el magic link por email.
 - Los formularios de recordatorio para campañas próximas también pueden usar Cloudflare Turnstile; las claves y secretos los configuran las personas operadoras de plataforma, no las creadoras.

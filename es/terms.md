@@ -9,7 +9,7 @@ description: Revisa los términos de aporte, el procesamiento de pagos, el cumpl
 
 # Términos y pautas creativas
 
-Estos términos reflejan el hito de lanzamiento **v1.0.4** de la plataforma The Pool.
+Estos términos reflejan el hito de lanzamiento **v1.0.5** de la plataforma The Pool.
 
 ## Términos del aporte
 
@@ -20,6 +20,7 @@ Estos términos reflejan el hito de lanzamiento **v1.0.4** de la plataforma The 
 - Cuando esta implementación ofrece idiomas adicionales, esos enlaces enviados por correo para el aporte y la comunidad de patrocinadores pueden usar rutas localizadas sin dejar de autorizar el mismo aporte.
 - Un mismo pago puede incluir más de una campaña, pero cada campaña se guarda y se gestiona como un aporte independiente después del pago.
 - Los recordatorios de lanzamiento para campañas próximas son opcionales e independientes del aporte. Si te apuntas, The Pool envía un solo recordatorio cuando esa campaña se activa e incluye un enlace para cancelar ese recordatorio.
+- Algunas campañas pueden compartirse de forma privada antes del lanzamiento mediante enlaces de vista previa protegida. Los enlaces para revisoras son solo por invitación, limitados a una campaña y vencen después de 24 horas.
 - Todas las fechas límite de campaña usan la zona horaria configurada para esta implementación. Esta implementación usa `America/Denver` de forma predeterminada, salvo que las personas administradoras de plataforma la cambien.
 - Los votos de comunidad se limitan a las opciones publicadas en la página de patrocinadores de la campaña, y las decisiones cerradas no aceptan nuevos votos.
 - Si un enlace de gestión apunta a un aporte que ya no existe, The Pool lo trata como no disponible en lugar de reconstruir un acceso de marcador de posición.
@@ -73,12 +74,15 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Si te apuntas a un recordatorio de lanzamiento para una campaña próxima, tu correo se guarda en registros de recordatorio limitados a esa campaña para que The Pool pueda enviar ese único recordatorio, evitar duplicados y respetar cancelaciones de ese recordatorio. Los formularios de recordatorio pueden usar Cloudflare Turnstile para reducir abuso.
 - Las personas organizadoras de campañas pueden recibir informes por campaña o exportaciones de cumplimiento con los datos de apoyo y pedido necesarios para operar esa campaña concreta, coordinar la entrega o enviar actualizaciones relacionadas con la producción. Esos informes se limitan a la campaña que apoyaste y no exponen aportes de campañas no relacionadas.
 - Las personas operadoras autorizadas también pueden ver filas de patrocinadores, reportes, analytics, datos de fulfillment y contenido de campaña desde el panel privado de administración de The Pool. El acceso del panel está limitado por rol: las personas usuarias de campaña solo ven las campañas asignadas, mientras que las administradoras de plataforma pueden ver datos operativos de toda la plataforma necesarios para operar The Pool.
+- Las personas operadoras autorizadas pueden usar vistas previas protegidas para revisar páginas de campaña en borrador antes del lanzamiento. Las listas de correos de revisoras explícitas se guardan solo durante la ventana breve de preview y no están pensadas para páginas públicas de campaña.
+- Si una campaña es archivada por una persona administradora autorizada de la plataforma, los datos fuente de la campaña y los medios subidos propiedad de esa campaña pueden conservarse en el archivo del repositorio como registros operativos en lugar de eliminarse.
 - Cuando un aporte incluye complementos cumplidos por la plataforma, las operadoras de la plataforma pueden recibir por separado exportaciones de cumplimiento limitadas únicamente a los artículos que deben entregar.
 - Las administradoras de plataforma pueden usar el panel para gestionar configuración de campañas, ajustes de plataforma, complementos, enlaces de referencia y personas usuarias autorizadas del panel. Los valores secretos se mantienen en almacenes de secretos de despliegue o archivos locales ignorados, no en contenido de campaña ni en borradores del panel.
 - Los complementos de la plataforma con inventario limitado usan el estado de los aportes guardados, no los borradores en curso del carrito, para determinar el stock restante.
 - Los complementos de campaña con inventario limitado también usan el estado de los aportes guardados, no los borradores en curso del carrito, para determinar el stock restante.
 - El acceso a la comunidad de patrocinadores en el navegador puede recordarse durante la sesión actual como una comodidad, pero el enlace mágico enviado por correo sigue siendo la fuente de verdad para el acceso.
 - Las páginas públicas pueden prefetch páginas públicas elegibles del mismo origen después de hover, foco o toque para que la navegación normal sea más rápida. Este comportamiento excluye enlaces de admin, checkout, Gestionar aporte, comunidad de patrocinadores, enlaces con tokens, externos y con parámetros sensibles.
+- Las páginas de vista previa protegida son superficies privadas de revisión. Se excluyen del sitemap público, de previews sociales y de la intención de indexación hasta que una campaña se lance públicamente.
 - Las páginas públicas de campaña pueden diferir algunos embeds de terceros, como videos hero de YouTube, hasta que elijas reproducirlos. Hasta entonces, la página puede mostrar una imagen local de poster en lugar de contactar a ese proveedor externo.
 - Los enlaces para compartir campañas pueden preservar parámetros públicos seguros de referencia o UTM para que responsables de campaña entiendan el origen de la promoción pública. No preservan parámetros de token, pedido, email, sesión u otros datos sensibles.
 - Las personas operadoras autorizadas de la plataforma pueden cargar el estado de uso de planes de Cloudflare y Resend en el panel privado. Esas comprobaciones usan credenciales del servidor y no envían detalles de aportes, correos de patrocinadores, direcciones de envío ni datos de pago a los endpoints de uso.
@@ -92,7 +96,7 @@ The Pool es una [plataforma de crowdfunding de código abierto](https://github.c
 - **El runtime de carrito de The Pool**: gestión propia del carrito, sidecars de pago, revisión del aporte y carga diferida en páginas públicas hasta que haya estado de carrito o intención del patrocinador
 - **[Stripe](https://stripe.com)**: campos de pago seguros, métodos de pago guardados y procesamiento de pagos
 - **[Cloudflare Workers](https://workers.cloudflare.com)**: API backend para validación canónica de aportes, almacenamiento de aportes, estadísticas en vivo y liquidación automatizada de campañas
-- **Panel privado de administración**: edición de campañas por rol, reportes, analytics, vistas de patrocinadores, enlaces de marketing, gestión de usuarios y operaciones de plataforma
+- **Panel privado de administración**: edición de campañas por rol, vistas previas protegidas, creación de campañas nuevas, reportes, analytics, vistas de patrocinadores, enlaces de marketing, gestión de usuarios y operaciones de plataforma
 - **[Resend](https://resend.com)**: correos transaccionales (confirmaciones, recordatorios de lanzamiento, actualizaciones y notificaciones de cobro)
 
 Los datos de los aportes se almacenan en Cloudflare KV. Esta arquitectura implica menores costes operativos y hace que una mayor parte de tu aporte vaya directamente al proyecto, con las propinas opcionales ayudando a cubrir el mantenimiento de The Pool. Las compilaciones de producción también minifican los assets CSS/JS generados después de crear el sitio estático, generan variantes responsivas de imagen para páginas públicas y dejan que Cloudflare gestione la compresión de transferencia en el edge. La automatización del ciclo de vida de campañas usa la zona horaria configurada para mantener alineadas fechas límite, cuentas regresivas, reportes y comprobaciones de liquidación.
@@ -103,4 +107,4 @@ Si tienes preguntas sobre estos términos o sobre tu aporte, escribe a info@dust
 
 ---
 
-_Última actualización: 11 de junio de 2026_
+_Última actualización: 12 de junio de 2026_

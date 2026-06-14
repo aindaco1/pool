@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   sendAnnouncementEmail,
+  sendCampaignAssignmentEmail,
+  sendCampaignPreviewEmail,
   sendCampaignRunnerReportEmail,
   sendDiaryUpdateEmail,
   sendMilestoneEmail,
@@ -122,6 +124,53 @@ describe('email HTML security', () => {
     expect(payload.html).toContain('Share this campaign on Instagram');
     expect(payload.html).not.toContain('/assets/images/instagram-white.png');
     expect(payload.reply_to).toBe('info@pool.test');
+  });
+
+  it('sends campaign assignment emails with escaped campaign and assignee details', async () => {
+    const fetchMock = mockResend();
+
+    await sendCampaignAssignmentEmail(env, {
+      email: 'creator@example.com',
+      name: '<Creator>',
+      campaignTitle: '<New Film>',
+      campaignSlug: 'new-film',
+      assignedBy: 'admin@example.com',
+      lang: 'en'
+    });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload).toMatchObject({
+      to: 'creator@example.com',
+      subject: 'Campaign assigned | The Pool'
+    });
+    expect(payload.html).toContain('&lt;Creator&gt;');
+    expect(payload.html).toContain('&lt;New Film&gt;');
+    expect(payload.html).toContain('Open admin dashboard');
+    expect(payload.html).toContain('https://pool.test/admin/');
+    expect(payload.html).toContain('Assigned by admin@example.com');
+  });
+
+  it('sends private campaign preview emails with 24-hour expiry copy', async () => {
+    const fetchMock = mockResend();
+
+    await sendCampaignPreviewEmail(env, {
+      email: 'reviewer@example.com',
+      campaignTitle: '<Private Film>',
+      previewUrl: 'https://pool.test/campaigns/private-film/preview/?t=secret-token',
+      expiresHours: 24,
+      invitedBy: 'admin@example.com',
+      lang: 'en'
+    });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload).toMatchObject({
+      to: 'reviewer@example.com',
+      subject: 'Private campaign preview | The Pool'
+    });
+    expect(payload.html).toContain('&lt;Private Film&gt;');
+    expect(payload.html).toContain('expires in 24 hours');
+    expect(payload.html).toContain('Do not forward this link');
+    expect(payload.html).toContain('https://pool.test/campaigns/private-film/preview/?t=secret-token');
   });
 
   it('uses a public https asset base for prominent instagram email icons even in local dev', async () => {

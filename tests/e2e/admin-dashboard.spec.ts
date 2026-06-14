@@ -150,15 +150,12 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
               rows: [
                 { label: 'Name', value: 'The Pool', rawValue: 'The Pool', editable: true, path: 'platform.name', type: 'string', input: 'text' },
                 { label: 'Site author', value: 'Dust Wave', rawValue: 'Dust Wave', editable: true, path: 'author', type: 'string', input: 'text' },
+                { label: 'Site description', value: 'Creative crowdfunding.', rawValue: 'Creative crowdfunding.', editable: true, path: 'description', type: 'string', input: 'textarea' },
+                { label: 'Production site URL', value: SITE_BASE, rawValue: SITE_BASE, editable: true, path: 'platform.site_url', type: 'string', input: 'url' },
+                { label: 'Production Worker URL', value: WORKER_BASE, rawValue: WORKER_BASE, editable: true, path: 'platform.worker_url', type: 'string', input: 'url' },
                 { label: 'Default timezone', value: 'America/Denver', rawValue: 'America/Denver', editable: true, path: 'platform.timezone', type: 'string', input: 'select', options: [{ value: 'America/Denver', label: 'America/Denver' }, { value: 'Europe/London', label: 'Europe/London' }] },
                 { label: 'App mode', value: 'test' },
                 { label: 'CORS allowed origin', value: SITE_BASE }
-              ].map(withFieldHelp)
-            }, {
-              title: 'Canonical URLs',
-              rows: [
-                { label: 'Production site URL', value: SITE_BASE, rawValue: SITE_BASE, editable: true, path: 'platform.site_url', type: 'string', input: 'url' },
-                { label: 'Production Worker URL', value: WORKER_BASE, rawValue: WORKER_BASE, editable: true, path: 'platform.worker_url', type: 'string', input: 'url' }
               ].map(withFieldHelp)
             }, {
               title: 'Pricing',
@@ -833,7 +830,7 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('tab', { name: 'Campaigns' })).toBeVisible();
     await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
     await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
-    await selectSettingsSection(page, 'Canonical URLs');
+    await selectSettingsSection(page, 'Platform');
     await expect(page.locator('#admin-settings-publish')).toBeVisible();
     const settingsHeaderHeight = await page.locator('#admin-panel-settings .admin-settings__header').evaluate((element: HTMLElement) => element.getBoundingClientRect().height);
     await expect(page.getByRole('button', { name: 'About Production Worker URL' })).toBeVisible();
@@ -969,10 +966,11 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('tab', { name: 'Hand Relations', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="settings"]')).toHaveAttribute('aria-selected', 'true');
     await expect.poll(async () => {
+      const createButton = await page.locator('#admin-campaign-create').boundingBox();
       const campaignTab = await page.getByRole('tab', { name: 'Hand Relations', exact: true }).boundingBox();
       const sectionTabs = await page.locator('[data-campaign-settings-panel="hand-relations"] .admin-campaign-section-tabs').boundingBox();
-      if (!campaignTab || !sectionTabs) return false;
-      return Math.abs(campaignTab.y - sectionTabs.y) < 8;
+      if (!createButton || !campaignTab || !sectionTabs) return false;
+      return createButton.y < campaignTab.y && campaignTab.x < sectionTabs.x;
     }).toBe(true);
     await expect.poll(async () => {
       return page.locator('[data-campaign-settings-panel="hand-relations"] .admin-campaign-section-tabs').evaluate((element: HTMLElement) => element.scrollWidth <= element.clientWidth + 1);

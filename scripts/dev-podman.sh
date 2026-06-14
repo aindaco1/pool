@@ -15,6 +15,7 @@ SITE_CONTAINER="pool-dev-site"
 WORKER_CONTAINER="pool-dev-worker"
 SITE_IMAGE="localhost/pool-dev-site:latest"
 WORKER_IMAGE="localhost/pool-dev-worker:latest"
+PODMAN_DEV_LABEL="pool.dev.stack=pool"
 WORKER_NODE_IMAGE="${PODMAN_WORKER_NODE_IMAGE:-}"
 SITE_VOLUME="pool-dev-bundle"
 WORKER_NODE_MODULES_VOLUME="pool-dev-worker-node-modules"
@@ -22,6 +23,10 @@ SKIP_STRIPE="${SKIP_STRIPE:-false}"
 PODMAN_REBUILD="${PODMAN_REBUILD:-0}"
 PODMAN_SOCKET=""
 PODMAN_DETACH="${PODMAN_DETACH:-false}"
+PODMAN_SUPERVISE_INTERVAL="${PODMAN_SUPERVISE_INTERVAL:-2}"
+PODMAN_SUPERVISE_LOG_LINES="${PODMAN_SUPERVISE_LOG_LINES:-30}"
+PODMAN_STACK_START_ATTEMPTS="${PODMAN_STACK_START_ATTEMPTS:-3}"
+PODMAN_STACK_RETRY_DELAY="${PODMAN_STACK_RETRY_DELAY:-3}"
 
 detect_podman_socket() {
   podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true
@@ -227,9 +232,14 @@ kill_port_if_busy() {
   while IFS= read -r pid; do
     [ -z "$pid" ] && continue
     local process_name=""
+    local process_args=""
     process_name="$(ps -p "$pid" -o comm= 2>/dev/null | tr -d '[:space:]' || true)"
-    if [ "$process_name" = "gvproxy" ]; then
-      echo "   Skipping gvproxy; Podman will manage that listener."
+    process_args="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+    if [[ "$process_name $process_args" == *gvproxy* ]] || \
+       [[ "$process_name $process_args" == *podman* ]] || \
+       [[ "$process_name $process_args" == *qemu* ]] || \
+       [[ "$process_name $process_args" == *vfkit* ]]; then
+      echo "   Skipping Podman-managed listener on port $port (pid $pid)."
       continue
     fi
     kill "$pid" 2>/dev/null || true
@@ -347,9 +357,122 @@ build_image_if_needed() {
 }
 
 cleanup_pod() {
-  podman rm -f "$SITE_CONTAINER" >/dev/null 2>&1 || true
-  podman rm -f "$WORKER_CONTAINER" >/dev/null 2>&1 || true
+  local id=""
+
+  podman rm -f "$SITE_CONTAINER" "$WORKER_CONTAINER" >/dev/null 2>&1 || true
+  while IFS= read -r id; do
+    [ -z "$id" ] && continue
+    podman rm -f "$id" >/dev/null 2>&1 || true
+  done <<< "$(podman ps -aq --filter "label=${PODMAN_DEV_LABEL}" 2>/dev/null || true)"
+
   podman pod rm -f "$POD_NAME" >/dev/null 2>&1 || true
+  while IFS= read -r id; do
+    [ -z "$id" ] && continue
+    podman pod rm -f "$id" >/dev/null 2>&1 || true
+  done <<< "$(podman pod ps -q --filter "label=${PODMAN_DEV_LABEL}" 2>/dev/null || true)"
+
+  for _ in $(seq 1 8); do
+    if ! podman container exists "$SITE_CONTAINER" >/dev/null 2>&1 && \
+       ! podman container exists "$WORKER_CONTAINER" >/dev/null 2>&1 && \
+       ! podman pod exists "$POD_NAME" >/dev/null 2>&1; then
+      return 0
+    fi
+    podman rm -f "$SITE_CONTAINER" "$WORKER_CONTAINER" >/dev/null 2>&1 || true
+    podman pod rm -f "$POD_NAME" >/dev/null 2>&1 || true
+    sleep 1
+  done
+
+  echo "⚠️  Podman did not fully remove the previous dev pod; continuing with a clean-create attempt."
+  print_dev_stack_state
+  return 0
+}
+
+print_dev_stack_state() {
+  echo "   Current Podman dev stack state:"
+  podman pod inspect "$POD_NAME" --format "   pod ${POD_NAME}: {{.State}}" 2>/dev/null || echo "   pod ${POD_NAME}: missing"
+  podman inspect --format "   ${SITE_CONTAINER}: {{.State.Status}} (exit {{.State.ExitCode}})" "$SITE_CONTAINER" 2>/dev/null || echo "   ${SITE_CONTAINER}: missing"
+  podman inspect --format "   ${WORKER_CONTAINER}: {{.State.Status}} (exit {{.State.ExitCode}})" "$WORKER_CONTAINER" 2>/dev/null || echo "   ${WORKER_CONTAINER}: missing"
+}
+
+recover_podman_stack_start() {
+  local attempt="$1"
+  local os_family=""
+
+  print_dev_stack_state
+  cleanup_pod
+
+  os_family="$(detect_os_family)"
+  if [ "$attempt" -ge 2 ] && { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; }; then
+    echo "🔄 Restarting Podman machine to clear stale libpod state..."
+    podman machine stop podman-machine-default >/tmp/pool-podman-machine-stop.log 2>&1 || true
+    podman machine start --quiet --no-info podman-machine-default >/tmp/pool-podman-machine-start.log 2>&1 || true
+    configure_podman_connection
+    ensure_podman_stability "$os_family" || return 1
+  else
+    ensure_podman_ready || return 1
+  fi
+
+  sleep "$PODMAN_STACK_RETRY_DELAY"
+}
+
+start_pod_containers() {
+  echo "📦 Starting Podman dev pod..."
+  podman pod create \
+    --name "$POD_NAME" \
+    --label "$PODMAN_DEV_LABEL" \
+    -p "127.0.0.1:${JEKYLL_PORT}:4000" \
+    -p "127.0.0.1:${WORKER_PORT}:8787" >/dev/null || return 1
+  podman pod start "$POD_NAME" >/dev/null || return 1
+
+  podman run -d \
+    --name "$SITE_CONTAINER" \
+    --pod "$POD_NAME" \
+    --label "$PODMAN_DEV_LABEL" \
+    --restart=unless-stopped \
+    -v "$ROOT_DIR:/workspace" \
+    -v "$SITE_VOLUME:/usr/local/bundle" \
+    "$SITE_IMAGE" >/dev/null || return 1
+
+  podman run -d \
+    --name "$WORKER_CONTAINER" \
+    --pod "$POD_NAME" \
+    --label "$PODMAN_DEV_LABEL" \
+    --restart=unless-stopped \
+    -v "$ROOT_DIR:/workspace" \
+    -v "$WORKER_NODE_MODULES_VOLUME:/workspace/worker/node_modules" \
+    "$WORKER_IMAGE" >/dev/null || return 1
+}
+
+start_dev_stack_once() {
+  cleanup_pod
+  if ! start_pod_containers; then
+    cleanup_pod
+    return 1
+  fi
+  wait_for_http "http://127.0.0.1:${JEKYLL_PORT}" "Jekyll" || return 1
+  wait_for_worker_http "http://127.0.0.1:${WORKER_PORT}/stats/does-not-exist" "Worker" || return 1
+}
+
+start_dev_stack() {
+  local attempt=1
+
+  while [ "$attempt" -le "$PODMAN_STACK_START_ATTEMPTS" ]; do
+    if start_dev_stack_once; then
+      return 0
+    fi
+
+    echo "⚠️  Podman dev stack failed to start on attempt ${attempt}/${PODMAN_STACK_START_ATTEMPTS}."
+    if [ "$attempt" -ge "$PODMAN_STACK_START_ATTEMPTS" ]; then
+      print_dev_stack_state
+      cleanup_pod
+      return 1
+    fi
+
+    recover_podman_stack_start "$attempt" || return 1
+    attempt=$((attempt + 1))
+  done
+
+  return 1
 }
 
 wait_for_http() {
@@ -365,6 +488,91 @@ wait_for_http() {
 
   echo "❌ $label failed to start"
   return 1
+}
+
+container_running() {
+  local container="$1"
+  [ "$(podman inspect --format '{{.State.Running}}' "$container" 2>/dev/null || echo false)" = "true" ]
+}
+
+container_status_summary() {
+  local container="$1"
+  podman inspect --format '{{.State.Status}} (exit {{.State.ExitCode}})' "$container" 2>/dev/null || echo "missing"
+}
+
+restart_dev_container() {
+  local container="$1"
+  local label="$2"
+  local wait_function="$3"
+  local wait_url="$4"
+  local status=""
+
+  status="$(container_status_summary "$container")"
+  echo "⚠️  $label container stopped: $status"
+  echo "   Last $PODMAN_SUPERVISE_LOG_LINES $label log lines:"
+  podman logs --tail "$PODMAN_SUPERVISE_LOG_LINES" "$container" 2>&1 | sed 's/^/   /' || true
+
+  echo "🔄 Restarting $label container..."
+  if ! podman start "$container" >/dev/null; then
+    echo "⚠️  Could not restart $label container directly; recreating the Podman dev stack with recovery retries..."
+    start_dev_stack || return 1
+    return 0
+  fi
+
+  if ! "$wait_function" "$wait_url" "$label"; then
+    echo "⚠️  $label did not become healthy after restart; recreating the Podman dev stack with recovery retries..."
+    start_dev_stack || return 1
+  fi
+}
+
+retry_later() {
+  local reason="$1"
+  echo "⚠️  ${reason}; will retry in ${PODMAN_STACK_RETRY_DELAY}s."
+  sleep "$PODMAN_STACK_RETRY_DELAY"
+}
+
+supervise_dev_stack() {
+  echo "🛡️  Supervising Podman containers; stopped services will be restarted automatically"
+  while true; do
+    sleep "$PODMAN_SUPERVISE_INTERVAL"
+
+    if ! podman info >/dev/null 2>&1; then
+      echo "⚠️  Podman became unreachable; attempting to recover the Podman machine..."
+      if ! ensure_podman_ready || ! start_dev_stack; then
+        retry_later "Podman recovery did not complete"
+      fi
+      continue
+    fi
+
+    if ! podman pod exists "$POD_NAME" >/dev/null 2>&1; then
+      echo "⚠️  Podman dev pod is missing; recreating it..."
+      if ! start_dev_stack; then
+        retry_later "Podman dev pod recreation failed"
+      fi
+      continue
+    fi
+
+    if ! podman container exists "$SITE_CONTAINER" >/dev/null 2>&1 || \
+       ! podman container exists "$WORKER_CONTAINER" >/dev/null 2>&1; then
+      echo "⚠️  One or more dev containers are missing; recreating the Podman dev stack..."
+      if ! start_dev_stack; then
+        retry_later "Podman dev stack recreation failed"
+      fi
+      continue
+    fi
+
+    if ! container_running "$SITE_CONTAINER"; then
+      if ! restart_dev_container "$SITE_CONTAINER" "Jekyll" wait_for_http "http://127.0.0.1:${JEKYLL_PORT}"; then
+        retry_later "Jekyll restart failed"
+      fi
+    fi
+
+    if ! container_running "$WORKER_CONTAINER"; then
+      if ! restart_dev_container "$WORKER_CONTAINER" "Worker" wait_for_worker_http "http://127.0.0.1:${WORKER_PORT}/stats/does-not-exist"; then
+        retry_later "Worker restart failed"
+      fi
+    fi
+  done
 }
 
 wait_for_worker_http() {
@@ -400,8 +608,11 @@ ensure_podman_ready
 ensure_local_secret "CHECKOUT_INTENT_SECRET"
 
 cleanup_pod
+ensure_podman_ready
+cleanup_pod
 kill_port_if_busy "$JEKYLL_PORT" "Jekyll"
 kill_port_if_busy "$WORKER_PORT" "Worker"
+ensure_podman_ready
 
 build_image_if_needed "$SITE_IMAGE" "$ROOT_DIR" "$ROOT_DIR/Containerfile.dev"
 if [ -z "$WORKER_NODE_IMAGE" ] && \
@@ -421,28 +632,7 @@ fi
 podman volume exists "$SITE_VOLUME" >/dev/null 2>&1 || podman volume create "$SITE_VOLUME" >/dev/null
 podman volume exists "$WORKER_NODE_MODULES_VOLUME" >/dev/null 2>&1 || podman volume create "$WORKER_NODE_MODULES_VOLUME" >/dev/null
 
-echo "📦 Starting Podman dev pod..."
-podman pod create \
-  --name "$POD_NAME" \
-  -p "127.0.0.1:${JEKYLL_PORT}:4000" \
-  -p "127.0.0.1:${WORKER_PORT}:8787" >/dev/null
-
-podman run -d \
-  --name "$SITE_CONTAINER" \
-  --pod "$POD_NAME" \
-  -v "$ROOT_DIR:/workspace" \
-  -v "$SITE_VOLUME:/usr/local/bundle" \
-  "$SITE_IMAGE" >/dev/null
-
-podman run -d \
-  --name "$WORKER_CONTAINER" \
-  --pod "$POD_NAME" \
-  -v "$ROOT_DIR:/workspace" \
-  -v "$WORKER_NODE_MODULES_VOLUME:/workspace/worker/node_modules" \
-  "$WORKER_IMAGE" >/dev/null
-
-wait_for_http "http://127.0.0.1:${JEKYLL_PORT}" "Jekyll"
-wait_for_worker_http "http://127.0.0.1:${WORKER_PORT}/stats/does-not-exist" "Worker"
+start_dev_stack
 
 if [ "$SKIP_STRIPE" != "true" ]; then
   if ! command -v stripe >/dev/null 2>&1; then
@@ -501,6 +691,7 @@ fi
 echo ""
 echo "💡 Podman notes:"
 echo "   - Rebuild images with: PODMAN_REBUILD=1 ./scripts/dev.sh --podman"
+echo "   - Restart supervision interval: PODMAN_SUPERVISE_INTERVAL=${PODMAN_SUPERVISE_INTERVAL}s"
 echo "   - Logs: podman logs -f $SITE_CONTAINER | podman logs -f $WORKER_CONTAINER"
 echo "   - Stop all services with Ctrl+C"
 echo ""
@@ -510,6 +701,4 @@ if [ "$PODMAN_DETACH" = "true" ]; then
   exit 0
 fi
 
-while true; do
-  sleep 1
-done
+supervise_dev_stack

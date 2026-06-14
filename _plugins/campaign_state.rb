@@ -76,6 +76,7 @@ Jekyll::Hooks.register :site, :post_read do |site|
   next unless campaigns
 
   campaigns.docs.each do |campaign|
+    campaign.data['published'] = false if campaign.data['preview_only'] == true
     pool_apply_campaign_state(campaign, today)
   end
 end

@@ -22,6 +22,7 @@
         src="{{ safe_src | escape }}"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
         loading="lazy"
+        referrerpolicy="strict-origin-when-cross-origin"
         title="{{ block.title | default: block.caption | default: 'Embedded video' | escape }}">
       </iframe>
     </div>

@@ -89,6 +89,19 @@ export async function triggerMediaOptimization(env, { scope = 'changed' } = {}) 
   });
 }
 
+export async function triggerCampaignArchive(env, { campaignSlug = '', requestedBy = '' } = {}) {
+  const workflow = env.GITHUB_CAMPAIGN_ARCHIVE_WORKFLOW || 'archive-campaign.yml';
+  return triggerGitHubWorkflow(env, {
+    workflow,
+    inputs: {
+      campaign_slug: String(campaignSlug || ''),
+      requested_by: String(requestedBy || '')
+    },
+    successMessage: `Campaign archive triggered: ${campaignSlug}`,
+    missingTokenReason: 'No GitHub token configured'
+  });
+}
+
 function getGitHubRepoConfig(env = {}) {
   return {
     owner: env.GITHUB_OWNER || 'aindaco1',
@@ -164,6 +177,49 @@ export async function getGitHubTextFile(env, filePath) {
     sha: data.sha,
     content: decodeUtf8Base64(data.content)
   };
+}
+
+export async function listGitHubDirectory(env, directoryPath, options = {}) {
+  configureGitHubLogging(env);
+  const quiet = options?.quiet === true;
+
+  if (!env.GITHUB_TOKEN) {
+    return { ok: false, status: 503, error: 'GITHUB_TOKEN not configured', code: 'github_not_configured' };
+  }
+
+  try {
+    const { owner, repo, ref } = getGitHubRepoConfig(env);
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${encodeGitHubPath(directoryPath)}?ref=${encodeURIComponent(ref)}`,
+      {
+        method: 'GET',
+        headers: getGitHubHeaders(env)
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (!quiet) console.error(`Failed to list GitHub directory ${directoryPath}: ${response.status}`);
+      return { ok: false, status: response.status, error: data?.message || `GitHub API error: ${response.status}` };
+    }
+
+    if (!Array.isArray(data)) {
+      return { ok: false, status: 502, error: 'Unexpected GitHub directory response' };
+    }
+
+    return {
+      ok: true,
+      entries: data.map((entry) => ({
+        name: String(entry?.name || ''),
+        path: String(entry?.path || ''),
+        type: String(entry?.type || ''),
+        sha: String(entry?.sha || '')
+      })).filter((entry) => entry.name && entry.path)
+    };
+  } catch (error) {
+    if (!quiet) console.error(`Failed to list GitHub directory ${directoryPath}:`, error);
+    return { ok: false, status: 502, error: 'Unable to list GitHub directory', code: 'github_list_failed' };
+  }
 }
 
 export async function putGitHubTextFile(env, filePath, content, message, sha) {

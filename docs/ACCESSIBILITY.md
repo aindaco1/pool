@@ -62,6 +62,7 @@ The recent accessibility hardening pass added:
   - content-editor media upload controls with labeled native file inputs, visible focus on the styled upload button, upload status regions, and browser-local previews before publish
   - gallery image caption settings that reuse the shared label/help pattern and expose the hover-caption editor as a labeled rich-text textbox
   - Settings -> Plan usage provider headings that reuse the shared admin label/help pattern, polite loading status, accessible progressbar text, and responsive metric cards
+  - Create new campaign and protected Preview dialogs that reuse the shared admin label/help/info-button pattern, native fields, email-list token input, dialog focus handling, and polite status messaging
   - sortable data tables that expose `aria-sort` state and sort buttons
 
 ## Critical Surfaces
@@ -103,6 +104,8 @@ The admin dashboard has enough custom UI that it needs its own accessibility rul
 - Gallery block settings and individual gallery-image settings should stay visually and semantically distinct, but both should reuse the shared admin field label/help components.
 - Sortable admin tables should use real buttons in column headers, maintain `aria-sort`, and keep export buttons outside horizontally scrollable table regions.
 - Save/Publish status messages should use polite status regions; validation or blocking errors should remain near the relevant field or workflow.
+- Create/Preview modal fields should use the same shared admin info-button/help implementation as Settings and Campaign fields; avoid one-off inline help that can clip against modal edges.
+- Keyboard focus outlines should use the shared black focus token, including admin modal fields and email-list inputs.
 
 ## Automated Coverage
 
@@ -158,7 +161,7 @@ Current automated accessibility-related coverage includes:
   - these verify diary-tab navigation, carousel-gallery navigation, custom-amount entry, support-item entry, and supporter-community teaser activation remain usable without pointer input
 - admin-dashboard keyboard, axe, and semantics assertions in:
   - `tests/e2e/admin-dashboard.spec.ts`
-  - this covers admin sign-in, role-gated tabs, settings-section tabs, campaign subtabs, shared field help, user campaign checkbox groups, WYSIWYG editor chrome, media settings panels, staged media-upload status/ARIA, gallery caption help, sortable data surfaces, and Spanish admin route loading
+  - this covers admin sign-in, role-gated tabs, settings-section tabs, campaign subtabs, shared field help, create/preview dialogs, user campaign checkbox groups, WYSIWYG editor chrome, media settings panels, staged media-upload status/ARIA, gallery caption help, sortable data surfaces, and Spanish admin route loading
 
 Run the focused accessibility slice with:
 
@@ -229,6 +232,7 @@ Automated checks help, but these manual accessibility checks are still important
 - error messages are understandable and appear near the right fields
 - admin dashboard tabs, Settings sidebars, Campaign sidebars, and Campaign subtabs can be traversed with keyboard only
 - admin dashboard help buttons announce useful field descriptions without interfering with the field's visible label
+- Create new campaign and Preview dialog fields expose the same reusable info-button/help behavior and do not clip help text against modal edges
 - Settings -> Plan usage announces loading status, exposes provider help, and keeps usage progress bars understandable when a provider returns only limits or unlimited quotas
 - WYSIWYG editor block controls are not reachable while hidden and become reachable after the block is focused or activated
 - admin dashboard table sorting and CSV export flows are operable with keyboard only

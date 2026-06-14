@@ -334,6 +334,7 @@ describe('campaign page script', () => {
     expect(iframe).toBeTruthy();
     expect(iframe.src).toBe('https://www.youtube-nocookie.com/embed/demo-video?autoplay=1&rel=0');
     expect(iframe.title).toBe('Demo video');
+    expect(iframe.getAttribute('referrerpolicy')).toBe('strict-origin-when-cross-origin');
     expect(iframe.allowFullscreen).toBe(true);
     expect(facade.classList.contains('hero__video--youtube-loaded')).toBe(true);
   });

@@ -89,6 +89,10 @@ $goback--bg: #888f91;
 $goback--accent: #f6e770;
 $goback--border: darken($goback--bg, 5%);
 
+// Focus states
+$focus--outline: $color--black;
+$focus--outline-shadow: rgba($focus--outline, 0.18);
+
 // Legacy cart
 $legacy-cart--accent: #000000;
 $legacy-cart--contrast: #ffffff;
