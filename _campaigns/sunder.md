@@ -338,4 +338,7 @@ tiers:
       height_in: 3
       stack_height_in: 0.5
 test_only: false
+preview_enabled: true
+preview_reviewer_emails: []
+preview_updated_at: "2026-06-15T16:33:33.453Z"
 ---
