@@ -77,6 +77,12 @@ trap cleanup EXIT
 
 LOCAL_URL="http://127.0.0.1:4000"
 
+site_ready() {
+    local body
+    body="$(curl -fsS "$LOCAL_URL/admin/" 2>/dev/null || true)"
+    [[ "$body" == *'id="admin-auth-panel"'* ]]
+}
+
 if [ "$USE_PODMAN" = "true" ]; then
     prefer_podman_path || true
     echo "📦 Podman mode enabled"
@@ -96,12 +102,17 @@ else
 
     # Wait for Jekyll
     for i in {1..30}; do
-        if curl -s http://127.0.0.1:4000 > /dev/null 2>&1; then
+        if site_ready; then
             echo "✅ Jekyll ready"
             break
         fi
         sleep 1
     done
+
+    if ! site_ready; then
+        echo "❌ Jekyll did not serve the expected admin page. See /tmp/jekyll.log"
+        exit 1
+    fi
 fi
 
 # Run automated tests against the local stack.

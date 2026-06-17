@@ -549,6 +549,7 @@ $campaign-share-tablet-breakpoint: 1200px;
     display: flex;
     align-items: center;
     justify-content: center;
+    text-decoration: none;
     transition: transform 0.2s ease, background 0.2s ease;
     
     svg {

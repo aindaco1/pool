@@ -304,16 +304,31 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.5 focuses on 
   - Decide how much international logic should stay vendored offline versus optional provider-backed
   - Add a documented tax-data refresh/import workflow for future jurisdiction datasets
   - Future consideration: business tax handling such as VAT ID validation, reverse-charge flows, exemptions, and product tax classes
-- [ ] Add richer campaign marketing tools
-  - announcement composer with local drafts, read-only dry runs, and explicit live-send/audit writes
-  - optional abandoned-cart follow-up only after consent, retention, duplicate-send prevention, and free-tier-aware storage are designed
+- [x] Add richer campaign marketing tools
+  - Expand Campaigns -> Marketing for tracked links, referral codes, embeds, and downloadable QR codes without adding another top-level dashboard surface
+  - Add Campaigns -> Blast announcement composer for all campaign supporters, with browser-local drafts, uploaded campaign-hosted images through the shared media optimizer path, email-safe YouTube/Vimeo links, automatic read-only dry runs before test/live sends, test-send-to-self support, read-only sent history, and explicit live-send/audit writes
+  - Add a visible campaign-link QR code generator inside the same Marketing view, derived from the current campaign URL builder including UTM/referral parameters, with accessible live preview and downloadable PNG/SVG output
+  - Let campaign users send announcements for campaigns assigned to them, while keeping role/campaign scope, CSRF, normalization, and audit checks server-side
+  - Ship abandoned-cart follow-up in a consent-first model with clear opt-in, retention limits, suppression, duplicate-send prevention, and free-tier-aware queue/storage behavior
+  - Dry-run announcements use the campaign pledge index and do not send email, write audit records, or list KV namespaces; live sends require a matching dry-run hash
+  - QR generation is browser-local and adapted from the MIT-licensed QR generator approach in `1612elphi/delphitools` for this stack's campaign URL builder and download needs
+  - Future follow-up: shared cross-admin marketing drafts in KV after access, conflict, expiry, and write-budget rules are designed
+- [ ] Add a media-library picker for shared WYSIWYG image blocks
+  - Let Campaign Content, Diary, and Blast image blocks select existing uploaded campaign images from a scoped media library instead of requiring users to paste `/assets/...` paths
+  - Keep the picker campaign-scoped by default, with super-admin access to shared/default media only where that is already allowed by upload permissions
+  - Reuse the existing dashboard media directories, upload metadata, and same-campaign cleanup rules; do not introduce new KV state or duplicate media indexing unless a read-only manifest is needed for performance
+  - Once selection is available, consider making Source URL an advanced/edit-existing-path affordance rather than a primary field
 - [ ] Support different prices per add-on variation
   - Extend platform and campaign add-on variant schemas so a variant can override base price without requiring duplicate products
   - Update cart, checkout, Manage Pledge, analytics, reports, and fulfillment exports to use the resolved variant price consistently
   - Preserve backwards compatibility for existing add-ons whose variants only define `id`, `label`, and `inventory`
   - Add admin dashboard validation so price overrides cannot be negative, malformed, or silently ignored
-- [ ] Create a simplified install script or simple Mac/Windows/Linux app to facilitate local and production deployment
-  - Use gh, cloudflare, and any other CLIs that will help automate setup tasks
+- [x] Create a simplified install script or simple Mac/Windows/Linux app to facilitate local and production deployment
+  - Start script-first, using `gh`, `wrangler`, Stripe CLI, and any other provider CLIs/API checks that help automate local and production setup tasks
+  - Cover Cloudflare Worker/KV/RATELIMIT setup, GitHub Pages and repository secrets, Stripe webhooks, Resend sender readiness, Turnstile, USPS, ZIP.TAX, local secrets, and config sync
+  - Help users authenticate required CLIs and continue with clear next steps when an external provider requires manual confirmation
+  - Ship `npm run setup:deploy` / `scripts/setup-deploy.mjs` as a dependency-free Node CLI with dry-run support, local secret generation, Cloudflare KV creation/update, Worker secret writes, GitHub repository secret writes, config sync, and optional `wrangler deploy`
+  - Future follow-up: simple Mac/Windows/Linux app wrapper around the same setup core once the script-first workflow is stable
 
 ## Known Issues
 

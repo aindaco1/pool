@@ -12,6 +12,8 @@ These behaviors changed intentionally and should **not** be treated as regressio
 - `/checkout-intent/start` now reserves scarce limited inventory before payment confirmation, and successful persistence confirms that reservation.
 - Legacy `GET /checkout` is disabled.
 - Settlement only marks a campaign fully settled when no active pledges were skipped.
+- Campaigns -> Marketing now includes browser-local QR download tools, and Campaigns -> Blast contains announcement drafting/sending tools for each campaign.
+- Custom first-party checkout can queue a consent-based abandoned-checkout reminder; the field should be absent from checkout payloads unless the supporter opted in.
 
 ## Environment
 
@@ -54,6 +56,12 @@ Use local rehearsal to sanity-check checkout, webhook delivery, manage-link beha
 For dashboard-heavy branches, open the local dashboard at `http://127.0.0.1:4000/admin/`. The dev stack seeds the bootstrap admin defaults documented in `README.md` and `worker/README.md`; user-management changes made in the dashboard save to local Worker KV and are reset with local KV state.
 
 For local-only pledge management checks, use the `smoke-editable` campaign. It is defined as `test_only: true`, so it shows up in local development when `_config.local.yml` enables `show_test_campaigns`, while staying excluded from the production homepage and production `/api/campaigns.json`.
+
+Before testing deployment surfaces, run the setup helper in dry-run mode and confirm it plans Cloudflare/GitHub changes without mutating anything:
+
+```bash
+npm run setup:deploy -- --mode=production --dry-run --skip-auth --skip-secrets
+```
 
 Recommended local setup for modify/cancel smoke:
 
@@ -263,7 +271,8 @@ Run this section when the branch changes dashboard UI, admin Worker routes, camp
 9. In **Content** and **Diary Entries**, add/edit a content block, verify WYSIWYG preview behavior, and confirm `Save Draft` only enables when the local draft differs from the saved value.
 10. In **Add-ons** and campaign **Add-Ons**, verify physical products show shipping preset / package fields, digital products hide shipping fields, and product/variant IDs derive from names/labels for new entries.
 11. In **Analytics**, **Reports**, and **Supporters**, verify the default `All` view only shows campaigns available to the current admin, gross and net revenue amounts show exact cents where applicable, and CSV export matches the visible rows.
-12. In **Marketing**, save/edit/delete a referral code, verify the URL builder clears after save/refresh, and confirm the embedded campaign builder still works.
+12. In **Marketing**, save/edit/delete a referral code, verify the URL builder clears after save/refresh, confirm the QR preview updates from the current campaign URL, download PNG/SVG QR files, and confirm the embedded campaign builder still works.
+13. In **Campaigns -> Blast**, draft a supporter announcement with text plus an image URL or YouTube/Vimeo block, click **Send test**, and verify the automatic dry-run returns an audience count/hash before the test email goes to the signed-in admin. Then click **Send blast**, confirm the live send, and verify sent history records subject, content, CTA Button Label, and CTA Button URL below the editor. Use a campaign with a rebuilt `campaign-pledges:<slug>` index; missing indexes should fail closed with `campaign_index_required` before any email send.
 13. For `/es/admin/`, verify translated tab labels, Plan usage labels/links, Create new campaign / Preview copy, and tablet/mobile navigation do not overflow.
 
 ## Sign-Off Template

@@ -153,6 +153,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - ADMIN_TURNSTILE_SECRET_KEY (admin-specific Turnstile secret if not using TURNSTILE_SECRET_KEY)
 # - LAUNCH_REMINDER_TURNSTILE_SECRET_KEY (reminder-specific Turnstile secret if not using TURNSTILE_SECRET_KEY)
 # - LAUNCH_REMINDER_TOKEN_SECRET (optional unsubscribe-token secret; falls back to MAGIC_LINK_SECRET)
+# - ABANDONED_CART_TOKEN_SECRET (optional checkout-reminder unsubscribe-token secret; falls back to MAGIC_LINK_SECRET)
 #
 # Optional (for GitHub rebuild trigger):
 # - GITHUB_TOKEN               (GitHub PAT with workflow scope)

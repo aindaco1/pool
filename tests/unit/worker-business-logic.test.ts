@@ -39,6 +39,7 @@ const mockSendMilestoneEmail = vi.fn(async () => {});
 const mockSendChargeSuccessEmail = vi.fn(async () => {});
 const mockSendAnnouncementEmail = vi.fn(async () => {});
 const mockSendLaunchReminderEmail = vi.fn(async () => ({ sent: true }));
+const mockSendAbandonedCartEmail = vi.fn(async () => ({ sent: true }));
 
 vi.mock('../../worker/src/stripe.js', () => ({
   verifyStripeSignature: mockVerifyStripeSignature,
@@ -60,7 +61,8 @@ vi.mock('../../worker/src/email.js', () => ({
   sendMilestoneEmail: mockSendMilestoneEmail,
   sendChargeSuccessEmail: mockSendChargeSuccessEmail,
   sendAnnouncementEmail: mockSendAnnouncementEmail,
-  sendLaunchReminderEmail: mockSendLaunchReminderEmail
+  sendLaunchReminderEmail: mockSendLaunchReminderEmail,
+  sendAbandonedCartEmail: mockSendAbandonedCartEmail
 }));
 
 vi.mock('../../worker/src/github.js', () => ({
@@ -770,6 +772,183 @@ describe('Worker business logic hardening', () => {
         })
       ]
     });
+  });
+
+  it('queues abandoned checkout reminders only after an opted-in first-party checkout starts', async () => {
+    const checkoutIntents = new MockCheckoutIntentNamespace();
+    const tierInventory = new MockTierInventoryNamespace();
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: checkoutIntents,
+      TIER_INVENTORY_COORDINATOR: tierInventory,
+      ABANDONED_CART_DELAY_MS: '0'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__frame-slot', quantity: 1 }],
+          email: 'Buyer@Example.COM',
+          tipPercent: 5,
+          abandonedCartConsent: true
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    const orderId = sessionPayload.metadata.orderId;
+    const kv = env.PLEDGES as MockKVNamespace;
+    const manifest = await kv.get(`pending-checkout:${orderId}`, { type: 'json' });
+    expect(manifest.abandonedCart).toMatchObject({
+      consent: true,
+      email: 'buyer@example.com',
+      preferredLang: 'en'
+    });
+    await expect(kv.get(`abandoned-cart:${orderId}`, { type: 'json' })).resolves.toMatchObject({
+      orderId,
+      email: 'buyer@example.com',
+      campaignSlugs: ['hand-relations'],
+      campaignTitle: 'Hand Relations',
+      status: 'pending'
+    });
+    await expect(kv.get('abandoned-cart-queue:v1', { type: 'json' })).resolves.toMatchObject({
+      hasPending: true
+    });
+  });
+
+  it('sends due abandoned checkout reminders from the scheduler and marks the audience sent', async () => {
+    const checkoutIntents = new MockCheckoutIntentNamespace();
+    const tierInventory = new MockTierInventoryNamespace();
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: checkoutIntents,
+      TIER_INVENTORY_COORDINATOR: tierInventory,
+      ABANDONED_CART_DELAY_MS: '0'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/checkout-intent/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignSlug: 'hand-relations',
+          items: [{ id: 'hand-relations__frame-slot', quantity: 1 }],
+          email: 'buyer@example.com',
+          tipPercent: 5,
+          abandonedCartConsent: true
+        })
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+    expect(response.status).toBe(200);
+
+    const scheduledWorker = worker as unknown as {
+      scheduled: (event: { cron: string }, env: Record<string, unknown>, ctx: { waitUntil: (promise: Promise<unknown>) => void }) => Promise<void>
+    };
+    await scheduledWorker.scheduled(
+      { cron: '* * * * *' },
+      env,
+      { waitUntil: () => {} }
+    );
+
+    const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+    const orderId = sessionPayload.metadata.orderId;
+    const kv = env.PLEDGES as MockKVNamespace;
+    expect(mockSendAbandonedCartEmail).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      campaignTitle: 'Hand Relations',
+      unsubscribeUrl: expect.stringContaining('/abandoned-cart/unsubscribe?t=token')
+    }));
+    await expect(kv.get(`abandoned-cart:${orderId}`, { type: 'json' })).resolves.toBeNull();
+    expect(Array.from(kv.store.keys()).some(key => key.startsWith('abandoned-cart-sent:'))).toBe(true);
+    await expect(kv.get('abandoned-cart-queue:v1', { type: 'json' })).resolves.toMatchObject({
+      hasPending: false
+    });
+  });
+
+  it('skips abandoned checkout reminders when the email already completed a campaign pledge', async () => {
+    const env = createEnv({ ABANDONED_CART_DELAY_MS: '0' });
+    const kv = env.PLEDGES as MockKVNamespace;
+    const campaignSetHash = await hashCheckoutBundle(buildCheckoutBundleHashInput({
+      bundleAddOns: [],
+      bundleAddOnAnchorCampaignSlug: '',
+      contributions: []
+    }));
+    await kv.put('abandoned-cart:pool-intent-stale', JSON.stringify({
+      version: 1,
+      status: 'pending',
+      orderId: 'pool-intent-stale',
+      email: 'buyer@example.com',
+      emailHash: 'buyer-hash',
+      preferredLang: 'en',
+      campaignSlugs: ['hand-relations'],
+      campaignSetHash,
+      campaignTitle: 'HAND RELATIONS',
+      campaignTitles: ['HAND RELATIONS'],
+      campaignUrl: 'https://pool.test/campaigns/hand-relations/',
+      amountCents: 2500,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      sendAfter: '2026-01-01T00:00:00.000Z',
+      attempts: 0
+    }));
+    await kv.put('abandoned-cart-queue:v1', JSON.stringify({ version: 1, hasPending: true, nextDueAt: '2026-01-01T00:00:00.000Z' }));
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['new-order']));
+    await kv.put('pledge:new-order', JSON.stringify({
+      orderId: 'new-order',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'active'
+    }));
+
+    const scheduledWorker = worker as unknown as {
+      scheduled: (event: { cron: string }, env: Record<string, unknown>, ctx: { waitUntil: (promise: Promise<unknown>) => void }) => Promise<void>
+    };
+    await scheduledWorker.scheduled(
+      { cron: '* * * * *' },
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(mockSendAbandonedCartEmail).not.toHaveBeenCalled();
+    await expect(kv.get('abandoned-cart:pool-intent-stale', { type: 'json' })).resolves.toBeNull();
+  });
+
+  it('suppresses abandoned checkout reminders from a signed unsubscribe token', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('abandoned-cart:pool-intent-unsub', JSON.stringify({
+      orderId: 'pool-intent-unsub',
+      email: 'buyer@example.com',
+      emailHash: 'buyer-hash',
+      campaignSetHash: 'campaign-hash',
+      campaignSlugs: ['hand-relations']
+    }));
+    mockVerifyToken.mockResolvedValueOnce({
+      scope: 'abandoned-cart-unsubscribe',
+      orderId: 'pool-intent-unsub',
+      emailHash: 'buyer-hash',
+      email: 'buyer@example.com'
+    });
+
+    const response = await worker.fetch(
+      new Request('https://pool.test/abandoned-cart/unsubscribe?t=unsubscribe-token'),
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(200);
+    expect(kv.store.has('abandoned-cart-suppressed:buyer-hash')).toBe(true);
+    await expect(kv.get('abandoned-cart:pool-intent-unsub', { type: 'json' })).resolves.toBeNull();
   });
 
   it('stores bundle-level add-ons and an anchor campaign for multi-campaign checkout', async () => {

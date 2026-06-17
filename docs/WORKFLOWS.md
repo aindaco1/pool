@@ -78,7 +78,7 @@ Pledges are stored in Cloudflare KV. Key patterns:
 | `supporter-email-retry-queue:v1` | Queue-state marker with the next due supporter email retry time |
 | `add-on-inventory-sold:v1` | Sold-count projection for platform add-on inventory |
 | `admin-users:v1` | Runtime dashboard users saved from **Settings -> Users** |
-| `admin-marketing-referrals:{campaignSlug}` | Saved referral code metadata for the dashboard Marketing tab |
+| `admin-marketing-referrals:{campaignSlug}` | Saved referral code and QR source metadata for the dashboard Marketing tab |
 
 Scarce-tier reservations and committed claim state now live in the per-campaign Durable Object coordinator rather than KV. `tier-inventory:{campaignSlug}` remains the public projection used by `/inventory/:slug` and `/live/:slug`.
 

@@ -43,6 +43,8 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('responsive-image-preload.html src=campaign_hero_preload_image');
     expect(campaignLayout).toContain('data-youtube-embed');
     expect(campaignLayout).toContain('data-youtube-src="https://www.youtube-nocookie.com/embed/{{ yt_id }}?autoplay=1&amp;rel=0"');
+    expect(campaignLayout).toContain('/maxres1.jpg');
+    expect(campaignLayout).toContain('data-youtube-poster-fallback');
     expect(campaignLayout).toContain('referrerpolicy="strict-origin-when-cross-origin"');
     expect(campaignLayout).toContain('class="hero__video-poster"');
     expect(campaignLayout).toContain('fetchpriority="high" decoding="async"');

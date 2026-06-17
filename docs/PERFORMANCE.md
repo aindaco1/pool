@@ -257,6 +257,8 @@ Under normal no-queue traffic, expect roughly `48-75` KV list requests over 24 h
 
 Dashboard uploads are source-preserving. The Worker validates uploads and commits them, then requests the **Optimize dashboard media** workflow for image/video uploads. It still does not run native image optimizers or FFmpeg itself.
 
+Campaign Content, diary content, and Blast email image uploads share the same campaign media upload path. Blast images therefore add no new Worker-side optimization system or KV state: they are committed under `assets/images/campaigns/<slug>/`, the existing media workflow runs with `scope=changed`, and the final site-hosted `/assets/...` path is used in the email payload. Blast video blocks remain provider links/buttons for YouTube or Vimeo instead of embedded players, keeping email HTML small and client-compatible.
+
 Use the repository media pipeline for source media:
 
 ```bash

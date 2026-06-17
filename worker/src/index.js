@@ -18,6 +18,7 @@
  *   GET  /stats/:slug        - Get live pledge stats for a campaign
  *   POST /launch-reminders   - Save an upcoming campaign launch reminder signup
  *   GET  /launch-reminders/unsubscribe - Suppress a launch reminder signup
+ *   GET  /abandoned-cart/unsubscribe - Suppress abandoned-checkout reminder emails
  *   GET  /share/campaign/:slug.png - Get crawler-safe campaign share-card image
  *   GET  /share/campaign/:slug.svg - Get internal/debug campaign share-card image
  *   POST /stats/:slug/check - Check stats/index/inventory projection drift (admin)
@@ -41,6 +42,8 @@
  *   POST /admin/add-ons/inventory - Override or reset platform add-on inventory baselines
  *   POST /admin/inventory/init-all    - Initialize inventory for all campaigns (admin)
  *   POST /admin/rebuild      - Trigger GitHub Pages rebuild (admin)
+ *   GET /admin/marketing/announcements - Browser-admin sent announcement history for a campaign
+ *   POST /admin/marketing/announcement - Browser-admin dry-run, test-send, or send announcement to campaign supporters
  *   POST /admin/broadcast/announcement - Send announcement with CTA link to campaign supporters
  *   POST /admin/broadcast/diary     - Send diary update to all campaign supporters
  *   POST /admin/diary/check         - Check all campaigns for new diary entries and broadcast
@@ -61,7 +64,7 @@
  */
 
 import { generateToken, verifyToken } from './token.js';
-import { RESEND_RATE_LIMIT_DELAY_MS, sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail, sendCampaignRunnerReportEmail, sendAdminUserCreatedEmail, sendCampaignAssignmentEmail, sendCampaignPreviewEmail } from './email.js';
+import { RESEND_RATE_LIMIT_DELAY_MS, sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail, sendCampaignRunnerReportEmail, sendAdminUserCreatedEmail, sendCampaignAssignmentEmail, sendCampaignPreviewEmail, sendAbandonedCartEmail } from './email.js';
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
@@ -71,7 +74,7 @@ import { deleteGitHubFile, getGitHubTextFile, listGitHubDirectory, putGitHubBase
 import { getScopedConsole } from './logger.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
-import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput, CHECKOUT_INTENT_VERSION, DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
+import { hashCheckoutContribution, hashCheckoutBundle, buildCheckoutHashInput, buildCheckoutBundleHashInput, stableStringify, CHECKOUT_INTENT_VERSION, DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
 import {
   getCampaignRunnerDailyPledgeReportEnabled,
   getCampaignRunnerFulfillmentReportEnabled,
@@ -88,6 +91,7 @@ import {
   getMaxPlatformTipPercent,
   getPlatformCompanyName,
   getSupportEmail,
+  getWorkerBase,
   getShippingFallbackFeeCents
 } from './provider-config.js';
 import { normalizeShippingDestination, quoteCampaignShipment } from './shipping.js';
@@ -150,6 +154,16 @@ const PLATFORM_DAILY_TASK_WINDOW_MINUTES = 5;
 const SUPPORTER_EMAIL_RETRY_BATCH_SIZE = 10;
 const SUPPORTER_EMAIL_RETRY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const IDLE_QUEUE_RECHECK_TTL_SECONDS = 60 * 60;
+const ABANDONED_CART_PREFIX = 'abandoned-cart:';
+const ABANDONED_CART_SENT_PREFIX = 'abandoned-cart-sent:';
+const ABANDONED_CART_SUPPRESSED_PREFIX = 'abandoned-cart-suppressed:';
+const ABANDONED_CART_QUEUE_STATE_KEY = 'abandoned-cart-queue:v1';
+const ABANDONED_CART_TOKEN_SCOPE_UNSUBSCRIBE = 'abandoned-cart-unsubscribe';
+const ABANDONED_CART_TTL_SECONDS = 14 * 24 * 60 * 60;
+const ABANDONED_CART_SENT_TTL_SECONDS = 400 * 24 * 60 * 60;
+const ABANDONED_CART_SUPPRESSION_TTL_SECONDS = 400 * 24 * 60 * 60;
+const ABANDONED_CART_DEFAULT_DELAY_MS = 6 * 60 * 60 * 1000;
+const ABANDONED_CART_DEFAULT_BATCH_SIZE = 10;
 const SHARE_CARD_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=3600';
 const SHARE_CARD_RASTER_WIDTH = 1200;
 const SHARE_CARD_RASTER_HEIGHT = 630;
@@ -3552,6 +3566,380 @@ async function abandonCheckoutIntent(env, orderId) {
   return { success: true, released: manifest.campaigns.length };
 }
 
+function getAbandonedCartKey(orderId) {
+  return `${ABANDONED_CART_PREFIX}${orderId}`;
+}
+
+function getAbandonedCartSentKey(emailHash, campaignSetHash) {
+  return `${ABANDONED_CART_SENT_PREFIX}${emailHash}:${campaignSetHash}`;
+}
+
+function getAbandonedCartSuppressionKey(emailHash) {
+  return `${ABANDONED_CART_SUPPRESSED_PREFIX}${emailHash}`;
+}
+
+function normalizeAbandonedCartQueueState(value) {
+  if (!value || typeof value !== 'object') return null;
+  return {
+    hasPending: value.hasPending === true,
+    nextDueAt: String(value.nextDueAt || '')
+  };
+}
+
+function getAbandonedCartDelayMs(env) {
+  const raw = Number.parseInt(String(env?.ABANDONED_CART_DELAY_MS || ''), 10);
+  if (Number.isFinite(raw) && raw >= 0) {
+    return Math.min(raw, 7 * 24 * 60 * 60 * 1000);
+  }
+  return ABANDONED_CART_DEFAULT_DELAY_MS;
+}
+
+function getAbandonedCartBatchSize(env) {
+  const raw = Number.parseInt(String(env?.ABANDONED_CART_BATCH_SIZE || ''), 10);
+  return Math.max(1, Math.min(100, Number.isFinite(raw) ? raw : ABANDONED_CART_DEFAULT_BATCH_SIZE));
+}
+
+async function writeAbandonedCartQueueState(env, hasPending, nextDueAt = '') {
+  if (!env?.PLEDGES) return;
+  await env.PLEDGES.put(ABANDONED_CART_QUEUE_STATE_KEY, JSON.stringify({
+    version: 1,
+    hasPending: hasPending === true,
+    nextDueAt: hasPending === true ? String(nextDueAt || '') : '',
+    updatedAt: new Date().toISOString()
+  }), {
+    expirationTtl: hasPending === true ? ABANDONED_CART_TTL_SECONDS : IDLE_QUEUE_RECHECK_TTL_SECONDS
+  });
+}
+
+function getAbandonedCartTokenSecret(env) {
+  return String(env?.ABANDONED_CART_TOKEN_SECRET || env?.MAGIC_LINK_SECRET || '').trim();
+}
+
+function getAbandonedCartUnsubscribeUrl(env, token) {
+  const base = String(getWorkerBase(env) || env?.SITE_BASE || '').trim() || 'https://pool.dustwave.xyz';
+  const url = new URL('/abandoned-cart/unsubscribe', base);
+  url.searchParams.set('t', token);
+  return url.toString();
+}
+
+function abandonedCartHtmlResponse(title, body, status = 200) {
+  return new Response(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>${escapeAdminPreviewHtml(title)}</title>
+</head>
+<body>
+  <main>
+    <h1>${escapeAdminPreviewHtml(title)}</h1>
+    <p>${escapeAdminPreviewHtml(body)}</p>
+  </main>
+</body>
+</html>`, {
+    status,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': PRIVATE_NO_STORE_CACHE_CONTROL,
+      ...SECURITY_HEADERS
+    }
+  });
+}
+
+function normalizeAbandonedCartEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getAbandonedCartCampaignSet(campaignSlugs = []) {
+  return Array.from(new Set(
+    (Array.isArray(campaignSlugs) ? campaignSlugs : [])
+      .map((slug) => String(slug || '').trim())
+      .filter(Boolean)
+  )).sort();
+}
+
+async function getAbandonedCartCampaignSetHash(campaignSlugs = []) {
+  return sha256Hex(stableStringify(getAbandonedCartCampaignSet(campaignSlugs)));
+}
+
+function getCampaignSiteUrl(env, campaign, preferredLang = DEFAULT_I18N_LANG) {
+  const lang = normalizePreferredLang(preferredLang, DEFAULT_I18N_LANG);
+  const path = campaign?.localized_paths?.[lang] ||
+    campaign?.url ||
+    `/campaigns/${encodeURIComponent(campaign?.slug || '')}/`;
+  try {
+    return new URL(path, String(env?.SITE_BASE || '').trim() || 'https://pool.dustwave.xyz').toString();
+  } catch {
+    return getLocalizedSiteUrl(env, `/campaigns/${encodeURIComponent(campaign?.slug || '')}/`, lang);
+  }
+}
+
+async function buildAbandonedCartSnapshot(env, bundleManifest) {
+  const consent = bundleManifest?.abandonedCart;
+  const email = normalizeAbandonedCartEmail(consent?.email);
+  if (!bundleManifest?.orderId || !consent?.consent || !isValidEmail(email)) {
+    return null;
+  }
+
+  const preferredLang = normalizePreferredLang(bundleManifest.preferredLang || consent.preferredLang, DEFAULT_I18N_LANG);
+  const campaignSlugs = getAbandonedCartCampaignSet(
+    (bundleManifest.campaigns || []).map((entry) => entry.campaignSlug)
+  );
+  if (campaignSlugs.length === 0) return null;
+
+  const consentCampaigns = Array.isArray(consent.campaigns) ? consent.campaigns : [];
+  const campaigns = [];
+  for (const slug of campaignSlugs) {
+    const consentCampaign = consentCampaigns.find((entry) => String(entry?.slug || '').trim() === slug);
+    if (consentCampaign?.title || consentCampaign?.url) {
+      campaigns.push({
+        slug,
+        title: String(consentCampaign.title || slug),
+        url: String(consentCampaign.url || getCampaignSiteUrl(env, { slug }, preferredLang))
+      });
+      continue;
+    }
+    const campaign = await getCampaign(env, slug);
+    campaigns.push({
+      slug,
+      title: campaign?.title || slug,
+      url: getCampaignSiteUrl(env, campaign || { slug }, preferredLang)
+    });
+  }
+
+  const emailHash = await sha256Hex(email);
+  const campaignSetHash = await getAbandonedCartCampaignSetHash(campaignSlugs);
+  const primaryCampaign = campaigns[0];
+  const nowMs = Date.now();
+  const sendAfter = new Date(nowMs + getAbandonedCartDelayMs(env)).toISOString();
+
+  return {
+    version: 1,
+    status: 'pending',
+    orderId: bundleManifest.orderId,
+    email,
+    emailHash,
+    preferredLang,
+    campaignSlugs,
+    campaignSetHash,
+    campaignTitle: campaigns.length === 1 ? primaryCampaign.title : '',
+    campaignTitles: campaigns.map((campaign) => campaign.title),
+    campaignUrl: primaryCampaign.url,
+    amountCents: Number(consent.amountCents ?? bundleManifest?.totals?.amount ?? 0) || 0,
+    createdAt: new Date(nowMs).toISOString(),
+    sendAfter,
+    attempts: 0,
+    lastError: ''
+  };
+}
+
+async function queueAbandonedCheckoutFollowup(env, bundleManifest) {
+  if (!env?.PLEDGES) return { queued: false, reason: 'storage_not_configured' };
+  if (!getAbandonedCartTokenSecret(env)) return { queued: false, reason: 'token_secret_not_configured' };
+
+  const record = await buildAbandonedCartSnapshot(env, bundleManifest);
+  if (!record) return { queued: false, reason: 'not_consented' };
+
+  const [suppressed, alreadySent] = await Promise.all([
+    env.PLEDGES.get(getAbandonedCartSuppressionKey(record.emailHash)),
+    env.PLEDGES.get(getAbandonedCartSentKey(record.emailHash, record.campaignSetHash))
+  ]);
+  if (suppressed || alreadySent) {
+    return { queued: false, reason: suppressed ? 'suppressed' : 'already_sent' };
+  }
+
+  await env.PLEDGES.put(getAbandonedCartKey(record.orderId), JSON.stringify(record), {
+    expirationTtl: ABANDONED_CART_TTL_SECONDS
+  });
+  await writeAbandonedCartQueueState(env, true, record.sendAfter);
+  return { queued: true, orderId: record.orderId, sendAfter: record.sendAfter };
+}
+
+async function queueAbandonedCheckoutFollowupQuietly(env, bundleManifest) {
+  try {
+    const queuedReminder = await queueAbandonedCheckoutFollowup(env, bundleManifest);
+    if (!queuedReminder.queued) {
+      console.warn('Abandoned checkout reminder was not queued:', queuedReminder.reason);
+    }
+  } catch (reminderErr) {
+    console.error('Abandoned checkout reminder queue failed:', reminderErr.message);
+  }
+}
+
+async function deleteAbandonedCheckoutFollowup(env, orderId) {
+  if (!env?.PLEDGES || !orderId) return;
+  await env.PLEDGES.delete(getAbandonedCartKey(orderId));
+}
+
+async function hasCompletedPledgeForAbandonedCart(env, record) {
+  if (!env?.PLEDGES || !record?.emailHash) return false;
+  const email = normalizeAbandonedCartEmail(record.email);
+  if (!email) return false;
+
+  for (const campaignSlug of getAbandonedCartCampaignSet(record.campaignSlugs)) {
+    const orderIds = await getCampaignOrderIds(env, campaignSlug);
+    if (!Array.isArray(orderIds)) continue;
+    for (const orderId of orderIds) {
+      const pledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+      if (!pledge || pledge.pledgeStatus === 'cancelled') continue;
+      if (normalizeAbandonedCartEmail(pledge.email) === email) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+async function processAbandonedCartFollowups(env, now = new Date()) {
+  if (!env?.PLEDGES) {
+    return { attempted: false, sent: 0, skipped: 0, failed: 0, checked: 0, skippedReason: 'storage_not_configured' };
+  }
+
+  const queueState = normalizeAbandonedCartQueueState(
+    await env.PLEDGES.get(ABANDONED_CART_QUEUE_STATE_KEY, { type: 'json' })
+  );
+  if (queueState && !queueState.hasPending) {
+    return { attempted: false, sent: 0, skipped: 0, failed: 0, checked: 0, skippedReason: 'idle' };
+  }
+  const nextDueMs = queueState?.nextDueAt ? Date.parse(queueState.nextDueAt) : 0;
+  if (Number.isFinite(nextDueMs) && nextDueMs > now.getTime()) {
+    return { attempted: false, sent: 0, skipped: 0, failed: 0, checked: 0, skippedReason: 'not_due', nextDueAt: queueState.nextDueAt };
+  }
+
+  const listing = await env.PLEDGES.list({
+    prefix: ABANDONED_CART_PREFIX,
+    limit: getAbandonedCartBatchSize(env)
+  });
+  const keys = Array.isArray(listing?.keys) ? listing.keys : [];
+  const results = { attempted: keys.length > 0, sent: 0, skipped: 0, failed: 0, checked: 0 };
+  let hasPending = listing?.list_complete === false;
+  let nextDueAt = '';
+
+  for (const keyInfo of keys) {
+    const key = keyInfo?.name || '';
+    if (!key || key === ABANDONED_CART_QUEUE_STATE_KEY) continue;
+    const record = await env.PLEDGES.get(key, { type: 'json' });
+    results.checked++;
+
+    if (!record?.orderId || !record.email || !record.emailHash || !record.campaignSetHash) {
+      await env.PLEDGES.delete(key);
+      results.skipped++;
+      continue;
+    }
+
+    const sendAfterMs = Date.parse(record.sendAfter || '');
+    if (Number.isFinite(sendAfterMs) && sendAfterMs > now.getTime()) {
+      hasPending = true;
+      if (!nextDueAt || sendAfterMs < Date.parse(nextDueAt)) {
+        nextDueAt = new Date(sendAfterMs).toISOString();
+      }
+      continue;
+    }
+
+    const [suppressed, alreadySent] = await Promise.all([
+      env.PLEDGES.get(getAbandonedCartSuppressionKey(record.emailHash)),
+      env.PLEDGES.get(getAbandonedCartSentKey(record.emailHash, record.campaignSetHash))
+    ]);
+    if (suppressed || alreadySent || await hasCompletedPledgeForAbandonedCart(env, record)) {
+      await env.PLEDGES.delete(key);
+      results.skipped++;
+      continue;
+    }
+
+    const tokenSecret = getAbandonedCartTokenSecret(env);
+    if (!tokenSecret) {
+      record.attempts = Number(record.attempts || 0) + 1;
+      record.lastError = 'Reminder unsubscribe signing is not configured';
+      record.sendAfter = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      await env.PLEDGES.put(key, JSON.stringify(record), { expirationTtl: ABANDONED_CART_TTL_SECONDS });
+      hasPending = true;
+      nextDueAt = nextDueAt && Date.parse(nextDueAt) < Date.parse(record.sendAfter) ? nextDueAt : record.sendAfter;
+      results.failed++;
+      continue;
+    }
+
+    const token = await generateToken(tokenSecret, {
+      scope: ABANDONED_CART_TOKEN_SCOPE_UNSUBSCRIBE,
+      orderId: record.orderId,
+      emailHash: record.emailHash,
+      email: record.email
+    }, 30);
+
+    const result = await sendAbandonedCartEmail(env, {
+      email: record.email,
+      campaignSlug: record.campaignSlugs?.[0] || '',
+      campaignTitle: record.campaignTitle || '',
+      campaignTitles: record.campaignTitles || [],
+      campaignUrl: record.campaignUrl || '',
+      amountCents: Number(record.amountCents || 0) || 0,
+      unsubscribeUrl: getAbandonedCartUnsubscribeUrl(env, token),
+      preferredLang: record.preferredLang || DEFAULT_I18N_LANG
+    });
+
+    if (!result?.sent) {
+      const attempts = Number(record.attempts || 0) + 1;
+      const retryDelayMs = Math.min(24 * 60 * 60 * 1000, Math.max(15 * 60 * 1000, (2 ** Math.min(attempts, 6)) * 15 * 60 * 1000));
+      record.attempts = attempts;
+      record.lastError = String(result?.reason || 'Email send failed').slice(0, 300);
+      record.sendAfter = new Date(now.getTime() + retryDelayMs).toISOString();
+      await env.PLEDGES.put(key, JSON.stringify(record), { expirationTtl: ABANDONED_CART_TTL_SECONDS });
+      hasPending = true;
+      nextDueAt = nextDueAt && Date.parse(nextDueAt) < Date.parse(record.sendAfter) ? nextDueAt : record.sendAfter;
+      results.failed++;
+      continue;
+    }
+
+    await env.PLEDGES.put(getAbandonedCartSentKey(record.emailHash, record.campaignSetHash), now.toISOString(), {
+      expirationTtl: ABANDONED_CART_SENT_TTL_SECONDS
+    });
+    await env.PLEDGES.delete(key);
+    results.sent++;
+    await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
+  }
+
+  await writeAbandonedCartQueueState(env, hasPending, nextDueAt);
+  return results;
+}
+
+async function handleAbandonedCartUnsubscribe(request, env) {
+  if (!env?.PLEDGES) {
+    return abandonedCartHtmlResponse('Reminder unavailable', 'Reminder unsubscribe storage is not configured.', 503);
+  }
+
+  const tokenSecret = getAbandonedCartTokenSecret(env);
+  if (!tokenSecret) {
+    return abandonedCartHtmlResponse('Reminder unavailable', 'Reminder unsubscribe links are not configured.', 503);
+  }
+
+  const url = new URL(request.url);
+  const token = String(url.searchParams.get('t') || '').trim();
+  const payload = token ? await verifyToken(tokenSecret, token, env) : null;
+  if (
+    !payload ||
+    payload.scope !== ABANDONED_CART_TOKEN_SCOPE_UNSUBSCRIBE ||
+    !payload.emailHash
+  ) {
+    return abandonedCartHtmlResponse('Reminder link expired', 'This reminder link is invalid or expired.', 400);
+  }
+
+  const emailHash = String(payload.emailHash || '').trim();
+  const now = new Date().toISOString();
+  await env.PLEDGES.put(getAbandonedCartSuppressionKey(emailHash), JSON.stringify({
+    emailHash,
+    email: payload.email || '',
+    suppressedAt: now,
+    source: 'unsubscribe'
+  }), { expirationTtl: ABANDONED_CART_SUPPRESSION_TTL_SECONDS });
+
+  if (isFirstPartyOrderId(payload.orderId)) {
+    await deleteAbandonedCheckoutFollowup(env, payload.orderId);
+  }
+
+  return abandonedCartHtmlResponse('Reminder unsubscribed', 'You will not receive this checkout reminder.');
+}
+
 async function claimSelectedTierInventory(env, campaignSlug, selectedTiers = [], campaign) {
   return claimTierSelectionInventory(env, campaignSlug, selectedTiers, campaign);
 }
@@ -3936,6 +4324,25 @@ export default {
         return handleAdminMarketingReferralDelete(request, env, parsedBody.body || {});
       }
 
+      if (path === '/admin/marketing/announcements' && method === 'GET') {
+        return handleAdminMarketingAnnouncementHistory(request, env);
+      }
+
+      if (path === '/admin/marketing/announcement' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.body || {};
+        if (body.dryRun !== true) {
+          const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+          if (!rl.allowed) return rl.response;
+        }
+        return handleAdminMarketingAnnouncement(request, env, body);
+      }
+
       if (path === '/admin/content/campaign' && method === 'GET') {
         return handleAdminContentCampaign(request, env);
       }
@@ -4011,6 +4418,10 @@ export default {
 
       if (path === '/launch-reminders/unsubscribe' && method === 'GET') {
         return handleLaunchReminderUnsubscribe(request, env);
+      }
+
+      if (path === '/abandoned-cart/unsubscribe' && method === 'GET') {
+        return handleAbandonedCartUnsubscribe(request, env);
       }
 
       if (path === '/checkout-intent/summary' && method === 'GET') {
@@ -4406,6 +4817,25 @@ export default {
         console.log('📨 Launch reminder dispatch cron complete:', reminderResults);
       } catch (err) {
         console.error('📨 Launch reminder dispatch cron failed:', err);
+        if (env.PLEDGES) {
+          await env.PLEDGES.put('cron:lastError', JSON.stringify({
+            at: new Date().toISOString(),
+            error: err.message
+          }), { expirationTtl: 604800 });
+        }
+      }
+    }
+
+    const shouldProcessAbandonedCartFollowups = !cronExpression || cronExpression === PLATFORM_SCHEDULER_CRON;
+    if (shouldProcessAbandonedCartFollowups) {
+      try {
+        const abandonedCartResults = await processAbandonedCartFollowups(env, now);
+        if (env.PLEDGES && abandonedCartResults.attempted) {
+          await env.PLEDGES.put('cron:lastAbandonedCartRun', now.toISOString(), { expirationTtl: 172800 });
+        }
+        console.log('📨 Abandoned checkout reminder cron complete:', abandonedCartResults);
+      } catch (err) {
+        console.error('📨 Abandoned checkout reminder cron failed:', err);
         if (env.PLEDGES) {
           await env.PLEDGES.put('cron:lastError', JSON.stringify({
             at: new Date().toISOString(),
@@ -4873,9 +5303,13 @@ async function handleFirstPartyCheckoutStart(request, env) {
     billingAddress,
     shippingAddress,
     shippingOption,
+    abandonedCartConsent = false,
     bundleAddOnAnchorCampaignSlug
   } = body || {};
   const normalizedPreferredLang = normalizePreferredLang(preferredLang);
+  const normalizedEmail = normalizeAbandonedCartEmail(email);
+  const wantsAbandonedCartReminder = abandonedCartConsent === true ||
+    String(abandonedCartConsent || '').trim().toLowerCase() === 'true';
   const normalizedTipPercent = sanitizePlatformTipPercent(
     tipPercent,
     getDefaultPlatformTipPercent(env),
@@ -4887,6 +5321,10 @@ async function handleFirstPartyCheckoutStart(request, env) {
 
   if (email && !isValidEmail(email)) {
     return privateJsonResponse({ error: 'Invalid email format' }, 400, env);
+  }
+
+  if (wantsAbandonedCartReminder && !isValidEmail(normalizedEmail)) {
+    return privateJsonResponse({ error: 'Email is required for a checkout reminder.' }, 400, env);
   }
 
   const normalizedDestination = shippingAddress
@@ -5050,6 +5488,17 @@ async function handleFirstPartyCheckoutStart(request, env) {
     orderId,
     checkoutProvider: 'first_party',
     preferredLang: normalizedPreferredLang,
+    abandonedCart: wantsAbandonedCartReminder ? {
+      consent: true,
+      email: normalizedEmail,
+      preferredLang: normalizedPreferredLang,
+      amountCents: bundleTotals.amount,
+      campaigns: checkoutGroups.map((group) => ({
+        slug: group.campaignSlug,
+        title: group.campaign?.title || group.campaignSlug,
+        url: getCampaignSiteUrl(env, group.campaign || { slug: group.campaignSlug }, normalizedPreferredLang)
+      }))
+    } : null,
     campaignCount: checkoutGroups.length,
     bundleAddOnAnchorCampaignSlug: resolvedBundleAddOnAnchorCampaignSlug,
     bundleAddOns,
@@ -5183,6 +5632,10 @@ async function handleFirstPartyCheckoutStart(request, env) {
         return privateJsonResponse({ error: 'Failed to create checkout session' }, 500, env);
       }
 
+      if (wantsAbandonedCartReminder) {
+        await queueAbandonedCheckoutFollowupQuietly(env, bundleManifest);
+      }
+
       return privateJsonResponse({
         checkoutUiMode: 'custom',
         sessionId: session.id,
@@ -5190,6 +5643,15 @@ async function handleFirstPartyCheckoutStart(request, env) {
         publishableKey: stripePublishableKey,
         orderId
       }, 200, env);
+    }
+
+    if (!session.url) {
+      console.error('Stripe hosted checkout session missing url:', stripeSessionLogContext(session));
+      return privateJsonResponse({ error: 'Failed to create checkout session' }, 500, env);
+    }
+
+    if (wantsAbandonedCartReminder) {
+      await queueAbandonedCheckoutFollowupQuietly(env, bundleManifest);
     }
 
     return privateJsonResponse({ checkoutUiMode: 'hosted', url: session.url }, 200, env);
@@ -5940,6 +6402,7 @@ async function processFirstPartyCheckoutBundle({
     confirmedAt: new Date().toISOString(),
     confirmedCampaigns
   });
+  await deleteAbandonedCheckoutFollowup(env, orderId);
 
   if (supporterEmailJobs.length > 0) {
     ctx.waitUntil((async () => {
@@ -6288,6 +6751,7 @@ async function handleStripeWebhook(request, env, ctx) {
             await clearTierReservation(env, campaignSlug, orderId);
             await env.PLEDGES.delete(`pending-tiers:${orderId}`);
             await env.PLEDGES.delete(`pending-extras:${orderId}`);
+            await deleteAbandonedCheckoutFollowup(env, orderId);
             await env.PLEDGES.delete(getCheckoutBundleStorageKey(orderId));
             // Duplicate webhook - pledge already processed
             console.log('📝 Pledge already exists, skipping duplicate webhook:', orderId);
@@ -6470,6 +6934,7 @@ async function handleStripeWebhook(request, env, ctx) {
               confirmedCampaigns: [{ orderId, campaignSlug, campaignTitle }]
             });
           }
+          await deleteAbandonedCheckoutFollowup(env, orderId);
 
           // Check for milestone emails (async, don't block response but keep worker alive)
           ctx.waitUntil(
@@ -8575,7 +9040,7 @@ async function handleTestCleanup(request, env) {
 /**
  * Get all supporters for a campaign from KV
  */
-async function getCampaignSupporters(env, campaignSlug) {
+async function getCampaignSupporters(env, campaignSlug, { allowListFallback = true } = {}) {
   if (!env.PLEDGES) return [];
   
   const supporters = [];
@@ -8602,6 +9067,10 @@ async function getCampaignSupporters(env, campaignSlug) {
     }
 
     return supporters;
+  }
+
+  if (!allowListFallback) {
+    return null;
   }
 
   const pledgeKeys = await listAllPledgeKeys(env);
@@ -10432,7 +10901,9 @@ function campaignSettingsSection(campaign = {}, env = {}, options = {}) {
     ['Short blurb', settings.shortBlurb, editableAdminSetting('short_blurb', 'string', settings.slug)],
     ['Slug', settings.slug, derivedCampaignSetting('slug', 'slug-derived', 'URL-safe campaign identifier. Existing campaigns keep their current slug; new campaigns derive it from the title.', 'campaign-slug-url')],
     ['URL', settings.url, derivedCampaignSetting('url', 'url-derived', 'Public campaign page URL. Existing campaigns keep their current URL; new campaigns derive it from the title.', 'campaign-slug-url')],
-    ['Hero video', settings.heroVideo, editableAdminSetting('hero_video', 'string', settings.slug)],
+    ['Hero video', settings.heroVideo, {
+      ...editableAdminSetting('hero_video', 'string', settings.slug)
+    }],
     ['Creator image', settings.creatorImage, editableAdminSetting('creator_image', 'string', settings.slug)],
     ['Category', settings.category, editableAdminSetting('category', 'string', settings.slug)],
     ['Instagram URL', settings.instagram, editableAdminSetting('instagram', 'string', settings.slug)],
@@ -15375,16 +15846,336 @@ function normalizeAdminMarketingReferralUrl(value, env, campaignSlug) {
 
 function publicAdminMarketingReferral(record = {}) {
   const referrer = String(record.referrer || record.name || '');
+  const url = String(record.url || '');
   return {
     code: String(record.code || ''),
     name: referrer,
     referrer,
-    url: String(record.url || ''),
+    url,
+    qrCode: url ? { format: 'qr-code', url } : null,
     campaignSlug: String(record.campaignSlug || ''),
     createdAt: record.createdAt || null,
     updatedAt: record.updatedAt || null,
     createdBy: String(record.createdBy || '')
   };
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value || '')));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function normalizeAdminMarketingCtaUrl(value, env) {
+  const raw = String(value || '').trim().slice(0, 2048);
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    const allowedOrigins = adminMarketingReferralAllowedOrigins(env);
+    if (allowedOrigins.length > 0 && !allowedOrigins.includes(url.origin)) return '';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+function isEmptyAdminMarketingAnnouncementBlock(block) {
+  if (!block || typeof block !== 'object') return true;
+  const type = String(block.type || '').trim();
+  if (type === 'text') return !String(block.body || '').trim();
+  if (type === 'quote') return !String(block.text || '').trim();
+  if (type === 'image') return !String(block.src || '').trim();
+  if (type === 'video') return !String(block.video_id || '').trim();
+  return type === 'divider';
+}
+
+function normalizeAdminMarketingAnnouncementContentBlocks(value) {
+  const rawBlocks = Array.isArray(value) ? value : [];
+  const allowedTypes = new Set(['text', 'quote', 'image', 'video', 'divider']);
+  const errors = [];
+  const warnings = [];
+  const blocks = rawBlocks
+    .slice(0, ADMIN_CONTENT_MAX_BLOCKS)
+    .filter((block) => !isEmptyAdminMarketingAnnouncementBlock(block))
+    .map((block, index) => {
+      const type = String(block?.type || '').trim();
+      if (!allowedTypes.has(type)) {
+        errors.push(`Announcement content[${index}].type is not supported.`);
+        return null;
+      }
+      if (type === 'video' && String(block.provider || '').trim().toLowerCase() === 'local') {
+        errors.push(`Announcement content[${index}].provider must be youtube or vimeo.`);
+        return null;
+      }
+      return validateAdminContentBlock(block, index, errors, warnings);
+    })
+    .filter(Boolean);
+  if (rawBlocks.length > ADMIN_CONTENT_MAX_BLOCKS) {
+    warnings.push(`Announcement content was limited to ${ADMIN_CONTENT_MAX_BLOCKS} blocks.`);
+  }
+  if (errors.length) {
+    return { ok: false, error: `Announcement content is invalid: ${errors.join(' ')}` };
+  }
+  return { ok: true, value: blocks, warnings };
+}
+
+function normalizeAdminMarketingAnnouncementBody(body = {}) {
+  const subjectResult = normalizeAdminPlainText(body.subject, 'Subject', { maxLength: 160 });
+  if (!subjectResult.ok) return subjectResult;
+  const headingResult = normalizeAdminPlainText(body.heading || '', 'Heading', { maxLength: 160 });
+  if (!headingResult.ok) return headingResult;
+  const messageResult = normalizeAdminPlainText(body.body, 'Announcement content', {
+    maxLength: 5000,
+    allowNewlines: true,
+    allowRawHtml: true
+  });
+  if (!messageResult.ok) return messageResult;
+  const contentBlocksResult = normalizeAdminMarketingAnnouncementContentBlocks(body.contentBlocks || body.content || []);
+  if (!contentBlocksResult.ok) return contentBlocksResult;
+  const ctaLabelResult = normalizeAdminPlainText(body.ctaLabel || '', 'CTA button label', { maxLength: 80 });
+  if (!ctaLabelResult.ok) return ctaLabelResult;
+
+  const subject = subjectResult.value;
+  const heading = headingResult.value;
+  const message = messageResult.value;
+  const contentBlocks = contentBlocksResult.value;
+  const ctaLabel = ctaLabelResult.value;
+  const ctaUrl = normalizeAdminMarketingCtaUrl(body.ctaUrl, body.env);
+  if (String(body.ctaUrl || '').trim() && !ctaUrl) {
+    return { ok: false, error: 'CTA button URL must be a same-site http(s) URL.' };
+  }
+  if ((ctaLabel && !ctaUrl) || (!ctaLabel && ctaUrl)) {
+    return { ok: false, error: 'CTA button label and CTA button URL must be provided together.' };
+  }
+  if (!subject || (!message && contentBlocks.length === 0)) {
+    return { ok: false, error: 'Subject and announcement content are required.' };
+  }
+
+  return {
+    ok: true,
+    value: {
+      subject,
+      heading,
+      body: message,
+      contentBlocks,
+      ctaLabel,
+      ctaUrl
+    }
+  };
+}
+
+async function adminMarketingAnnouncementDryRunHash({ campaignSlug, message, supporters }) {
+  const audience = (Array.isArray(supporters) ? supporters : [])
+    .map((supporter) => String(supporter?.email || '').trim().toLowerCase())
+    .filter(Boolean)
+    .sort();
+  return sha256Hex(stableStringify({
+    campaignSlug,
+    message,
+    audience
+  }));
+}
+
+async function sendAdminMarketingAnnouncementToSupporter(env, campaign, supporter, message) {
+  const token = await generateToken(env.MAGIC_LINK_SECRET, {
+    orderId: supporter.orderId,
+    email: supporter.email,
+    campaignSlug: campaign.slug
+  });
+
+  await sendAnnouncementEmail(env, {
+    email: supporter.email,
+    campaignSlug: campaign.slug,
+    campaignTitle: campaign.title || campaign.slug,
+    preferredLang: supporter.preferredLang || DEFAULT_I18N_LANG,
+    subject: message.subject,
+    heading: message.heading,
+    body: message.body,
+    contentBlocks: message.contentBlocks,
+    ctaLabel: message.ctaLabel,
+    ctaUrl: message.ctaUrl,
+    token,
+    instagramUrl: campaign.instagram,
+    hasDecisions: campaign?.has_decisions === true
+  });
+}
+
+async function handleAdminMarketingAnnouncement(request, env, body = {}) {
+  const campaignSlug = String(body.campaignSlug || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'marketing:send', { requireCsrf: true });
+  if (!scoped.ok) return scoped.response;
+
+  const normalizedMessage = normalizeAdminMarketingAnnouncementBody({ ...body, env });
+  if (!normalizedMessage.ok) {
+    return privateJsonResponse({ error: normalizedMessage.error }, 400, env);
+  }
+  const message = normalizedMessage.value;
+  const campaign = scoped.campaign;
+  const supporters = await getCampaignSupporters(env, campaignSlug, { allowListFallback: false });
+  if (!Array.isArray(supporters)) {
+    return adminIndexRequiredResponse(env, {
+      campaignSlug,
+      extra: {
+        error: 'Campaign pledge index must be rebuilt before supporter announcements can be sent.'
+      }
+    });
+  }
+
+  const dryRunHash = await adminMarketingAnnouncementDryRunHash({
+    campaignSlug,
+    message,
+    supporters
+  });
+
+  if (body.dryRun === true) {
+    return privateJsonResponse({
+      dryRun: true,
+      campaignSlug,
+      recipientCount: supporters.length,
+      dryRunHash,
+      preview: message,
+      writeBudget: adminReadBudget({ kvListExpected: 0 })
+    }, 200, env);
+  }
+
+  if (body.testSend === true) {
+    await sendAnnouncementEmail(env, {
+      email: scoped.auth.user.email,
+      campaignSlug,
+      campaignTitle: campaign.title || campaignSlug,
+      preferredLang: scoped.auth.user.preferredLang || DEFAULT_I18N_LANG,
+      subject: message.subject,
+      heading: message.heading,
+      body: message.body,
+      contentBlocks: message.contentBlocks,
+      ctaLabel: message.ctaLabel,
+      ctaUrl: message.ctaUrl,
+      instagramUrl: campaign.instagram,
+      hasDecisions: campaign?.has_decisions === true,
+      testMode: true
+    });
+    return privateJsonResponse({
+      success: true,
+      testSend: true,
+      campaignSlug,
+      testRecipient: scoped.auth.user.email,
+      recipientCount: 1,
+      dryRunHash,
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0, kvListExpected: 0 })
+    }, 200, env);
+  }
+
+  const providedDryRunHash = String(body.dryRunHash || '').trim();
+  if (!providedDryRunHash || !timingSafeEqual(providedDryRunHash, dryRunHash)) {
+    return privateJsonResponse({
+      error: 'Run a dry run for this exact announcement and audience before sending.',
+      code: 'dry_run_required',
+      dryRunHash
+    }, 409, env);
+  }
+
+  if (!env.MAGIC_LINK_SECRET) {
+    return privateJsonResponse({ error: 'Supporter magic-link signing is unavailable.' }, 503, env);
+  }
+
+  const results = { sent: 0, failed: 0, errors: [] };
+  for (let index = 0; index < supporters.length; index += 1) {
+    const supporter = supporters[index];
+    if (index > 0) {
+      await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
+    }
+    try {
+      await sendAdminMarketingAnnouncementToSupporter(env, campaign, supporter, message);
+      results.sent += 1;
+    } catch (err) {
+      results.failed += 1;
+      results.errors.push({
+        email: supporter.email,
+        error: err?.message || 'Announcement send failed'
+      });
+    }
+  }
+
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'marketing_announcement_send',
+    actorEmail: scoped.auth.user.email,
+    campaignSlug,
+    subject: message.subject,
+    body: message.body,
+    contentBlocks: message.contentBlocks,
+    ctaLabel: message.ctaLabel,
+    ctaUrl: message.ctaUrl,
+    recipientCount: supporters.length,
+    sent: results.sent,
+    failed: results.failed,
+    dryRunHash
+  });
+
+  return privateJsonResponse({
+    success: true,
+    campaignSlug,
+    subject: message.subject,
+    recipientCount: supporters.length,
+    auditKey,
+    ...results,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 1, kvListExpected: 0 })
+  }, results.failed > 0 ? 207 : 200, env);
+}
+
+function publicAdminMarketingAnnouncementHistoryRow(record = {}) {
+  const normalizedBlocks = normalizeAdminMarketingAnnouncementContentBlocks(record.contentBlocks || []);
+  return {
+    createdAt: String(record.createdAt || ''),
+    campaignSlug: String(record.campaignSlug || ''),
+    subject: String(record.subject || ''),
+    body: String(record.body || ''),
+    contentBlocks: normalizedBlocks.ok ? normalizedBlocks.value : [],
+    ctaLabel: String(record.ctaLabel || ''),
+    ctaUrl: String(record.ctaUrl || ''),
+    recipientCount: Number(record.recipientCount || 0),
+    sent: Number(record.sent || 0),
+    failed: Number(record.failed || 0)
+  };
+}
+
+async function handleAdminMarketingAnnouncementHistory(request, env) {
+  const url = new URL(request.url);
+  const campaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'campaign:read');
+  if (!scoped.ok) return scoped.response;
+  if (!env.PLEDGES) {
+    return privateJsonResponse({
+      campaignSlug,
+      announcements: [],
+      writeBudget: adminReadBudget({ kvListExpected: 0 })
+    }, 200, env);
+  }
+
+  const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit') || 20) || 20));
+  const listed = await env.PLEDGES.list({
+    prefix: 'admin-audit:',
+    limit: 1000
+  });
+  const keys = (listed.keys || [])
+    .map((item) => String(item?.name || ''))
+    .filter((key) => key.includes(':marketing_announcement_send:'))
+    .sort()
+    .reverse()
+    .slice(0, Math.max(limit * 5, limit));
+  const records = await Promise.all(keys.map((key) => env.PLEDGES.get(key, { type: 'json' }).catch(() => null)));
+  const announcements = records
+    .filter((record) => record?.action === 'marketing_announcement_send' && record?.campaignSlug === campaignSlug)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    .slice(0, limit)
+    .map(publicAdminMarketingAnnouncementHistoryRow);
+
+  return privateJsonResponse({
+    campaignSlug,
+    announcements,
+    writeBudget: adminReadBudget({ kvListExpected: 1 })
+  }, 200, env);
 }
 
 async function readAdminMarketingReferrals(env, campaignSlug) {
@@ -15438,6 +16229,7 @@ async function handleAdminMarketingReferralSave(request, env, body = {}) {
     name: referrer,
     referrer,
     url,
+    qrCode: { format: 'qr-code', url },
     campaignSlug,
     createdAt: existingIndex >= 0 ? referrals[existingIndex].createdAt || now : now,
     updatedAt: now,
@@ -15845,6 +16637,41 @@ function validateAdminContentBlock(block, index, errors, warnings) {
   return { type, align: normalizeAdminContentAlignment(block.align) };
 }
 
+function adminExternalVideoWatchUrl(provider, videoId) {
+  const id = String(videoId || '').trim();
+  if (!id) return '';
+  if (provider === 'vimeo') return `https://vimeo.com/${encodeURIComponent(id)}`;
+  return `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+}
+
+function adminExternalVideoThumbnailUrl(provider, videoId) {
+  const id = String(videoId || '').trim();
+  if (!id || provider === 'vimeo') return '';
+  return `https://i.ytimg.com/vi/${encodeURIComponent(id)}/maxres1.jpg`;
+}
+
+function adminExternalVideoThumbnailFallbackUrl(provider, videoId) {
+  const id = String(videoId || '').trim();
+  if (!id || provider === 'vimeo') return '';
+  return `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hq1.jpg`;
+}
+
+function renderAdminContentExternalLink(href, label, className) {
+  return `<div class="${escapeAdminPreviewAttribute(className)}"><a href="${escapeAdminPreviewAttribute(href)}" target="_blank" rel="noopener noreferrer">${escapeAdminPreviewHtml(label)}</a></div>`;
+}
+
+function renderAdminContentExternalVideoFacade(provider, videoId, label) {
+  const thumbnail = adminExternalVideoThumbnailUrl(provider, videoId);
+  if (provider === 'youtube') {
+    const fallback = adminExternalVideoThumbnailFallbackUrl(provider, videoId);
+    const fallbackAttr = fallback ? ` data-youtube-poster-fallback="${escapeAdminPreviewAttribute(fallback)}"` : '';
+    const thumbnailHtml = thumbnail ? `<img class="hero__video-poster" src="${escapeAdminPreviewAttribute(thumbnail)}" alt="" loading="lazy" decoding="async"${fallbackAttr}>` : '';
+    return `<div class="hero__video hero__video--youtube hero__video--youtube-facade">${thumbnailHtml}<a class="hero__video-play hero__video-play--youtube" href="${escapeAdminPreviewAttribute(adminExternalVideoWatchUrl(provider, videoId))}" target="_blank" rel="noopener noreferrer" aria-label="${escapeAdminPreviewAttribute(label)}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg></a></div>`;
+  }
+  const thumbnailHtml = thumbnail ? `<img class="video-embed__external-thumbnail" src="${escapeAdminPreviewAttribute(thumbnail)}" alt="" loading="lazy" decoding="async">` : '';
+  return `<div class="video-embed video-embed--external video-embed--${escapeAdminPreviewAttribute(provider)}">${thumbnailHtml}<a class="video-embed__external-link" href="${escapeAdminPreviewAttribute(adminExternalVideoWatchUrl(provider, videoId))}" target="_blank" rel="noopener noreferrer" aria-label="${escapeAdminPreviewAttribute(label)}"><span class="video-embed__external-play" aria-hidden="true">▶</span></a></div>`;
+}
+
 function renderAdminContentBlock(block, index, errors) {
   const path = `longContent[${index}]`;
   if (!block) return '';
@@ -15854,7 +16681,6 @@ function renderAdminContentBlock(block, index, errors) {
   }
 
   if (block.type === 'video') {
-    const title = block.caption || `${block.provider} video`;
     const provider = normalizeAdminContentVideoProvider(block.provider);
     if (provider === 'local') {
       const type = adminContentVideoType(block.src);
@@ -15863,14 +16689,9 @@ function renderAdminContentBlock(block, index, errors) {
       const firstFrameAttr = block.poster ? '' : ' data-first-frame-poster="true"';
       return `<figure class="admin-content-preview__block admin-content-preview__block--video${adminContentAlignClass(block)}"><div class="video-embed video-embed--local"><video controls preload="none" playsinline${posterAttr}${firstFrameAttr}><source src="${escapeAdminPreviewAttribute(block.src)}"${typeAttr}>Video not supported.</video></div>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
     }
-    const src = provider === 'vimeo'
-      ? `https://player.vimeo.com/video/${encodeURIComponent(block.video_id)}?dnt=1`
-      : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(block.video_id)}`;
-    const allow = provider === 'vimeo'
-      ? ADMIN_CONTENT_VIMEO_IFRAME_ALLOW
-      : ADMIN_CONTENT_YOUTUBE_IFRAME_ALLOW;
-    const referrerAttr = provider === 'youtube' ? ` referrerpolicy="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}"` : '';
-    return `<figure class="admin-content-preview__block admin-content-preview__block--video${adminContentAlignClass(block)}"><div class="video-embed video-embed--${provider}"><iframe src="${escapeAdminPreviewAttribute(src)}" title="${escapeAdminPreviewAttribute(title)}" loading="lazy" allow="${escapeAdminPreviewAttribute(allow)}"${referrerAttr}></iframe></div>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+    const providerLabel = provider === 'vimeo' ? 'Vimeo' : 'YouTube';
+    const facade = renderAdminContentExternalVideoFacade(provider, block.video_id, `${providerLabel}: ${block.caption || block.video_id}`);
+    return `<figure class="admin-content-preview__block admin-content-preview__block--video${adminContentAlignClass(block)}">${facade}${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
   }
 
   if (block.type === 'image') {
@@ -15896,8 +16717,12 @@ function renderAdminContentBlock(block, index, errors) {
   }
 
   if (block.type === 'embed') {
-    const referrerAttr = block.provider === 'youtube' ? ` referrerpolicy="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}"` : '';
-    return `<figure class="admin-content-preview__block admin-content-preview__block--embed${adminContentAlignClass(block)}"><iframe src="${escapeAdminPreviewAttribute(block.src)}" title="${escapeAdminPreviewAttribute(block.title || block.provider || 'Embedded content')}" loading="lazy"${referrerAttr}></iframe>${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+    const link = renderAdminContentExternalLink(
+      block.src,
+      block.title || block.caption || block.provider || 'Embedded content',
+      'admin-content-preview__media-placeholder admin-content-preview__media-placeholder--external embed-container--link'
+    );
+    return `<figure class="admin-content-preview__block admin-content-preview__block--embed${adminContentAlignClass(block)}">${link}${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
   }
 
   if (block.type === 'quote') {
@@ -16096,7 +16921,6 @@ function renderAdminCampaignPreviewContentBlock(block, index, errors, env = {}) 
   }
 
   if (block.type === 'video') {
-    const title = block.caption || `${block.provider} video`;
     const provider = normalizeAdminContentVideoProvider(block.provider);
     if (provider === 'local') {
       const src = adminPreviewAsset(block.src, env) || block.src || '';
@@ -16106,14 +16930,9 @@ function renderAdminCampaignPreviewContentBlock(block, index, errors, env = {}) 
       const firstFrameAttr = block.poster ? '' : ' data-first-frame-poster="true"';
       return `<figure class="content-block content-block--video content-block--align-${escapeAdminPreviewAttribute(align)}"><div class="video-embed video-embed--local"><video controls preload="none" playsinline${posterAttr}${firstFrameAttr}><source src="${escapeAdminPreviewAttribute(src)}"${typeAttr}>Video not supported.</video></div>${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
     }
-    const src = provider === 'vimeo'
-      ? `https://player.vimeo.com/video/${encodeURIComponent(block.video_id)}?dnt=1`
-      : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(block.video_id)}`;
-    const allow = provider === 'vimeo'
-      ? ADMIN_CONTENT_VIMEO_IFRAME_ALLOW
-      : ADMIN_CONTENT_YOUTUBE_IFRAME_ALLOW;
-    const referrerAttr = provider === 'youtube' ? ` referrerpolicy="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}"` : '';
-    return `<figure class="content-block content-block--video content-block--align-${escapeAdminPreviewAttribute(align)}"><div class="video-embed video-embed--${provider}"><iframe src="${escapeAdminPreviewAttribute(src)}" title="${escapeAdminPreviewAttribute(title)}" frameborder="0" loading="lazy" allow="${escapeAdminPreviewAttribute(allow)}"${referrerAttr}></iframe></div>${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+    const providerLabel = provider === 'vimeo' ? 'Vimeo' : 'YouTube';
+    const facade = renderAdminContentExternalVideoFacade(provider, block.video_id, `${providerLabel}: ${block.caption || block.video_id}`);
+    return `<figure class="content-block content-block--video content-block--align-${escapeAdminPreviewAttribute(align)}">${facade}${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
   }
 
   if (block.type === 'image') {
@@ -16142,8 +16961,12 @@ function renderAdminCampaignPreviewContentBlock(block, index, errors, env = {}) 
   }
 
   if (block.type === 'embed') {
-    const referrerAttr = block.provider === 'youtube' ? ` referrerpolicy="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}"` : '';
-    return `<figure class="content-block content-block--embed content-block--align-${escapeAdminPreviewAttribute(align)}"><div class="embed-container ${block.provider === 'spotify' ? 'embed-container--spotify' : 'embed-container--video'}"><iframe src="${escapeAdminPreviewAttribute(block.src)}" title="${escapeAdminPreviewAttribute(block.title || block.provider || 'Embedded content')}" loading="lazy"${referrerAttr}></iframe></div>${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
+    const link = renderAdminContentExternalLink(
+      block.src,
+      block.title || block.caption || block.provider || 'Embedded content',
+      'content-block__media-placeholder content-block__media-placeholder--external embed-container--link'
+    );
+    return `<figure class="content-block content-block--embed content-block--align-${escapeAdminPreviewAttribute(align)}">${link}${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
   }
 
   if (block.type === 'quote') {
@@ -16168,12 +16991,12 @@ function renderAdminCampaignPreviewHero(campaign = {}, env = {}) {
         : video.includes('watch?v=')
           ? video.split('watch?v=').pop().split(/[?&]/)[0]
           : video.split('/embed/').pop().split(/[?&/]/)[0];
-      const poster = wideImage ? `<img src="${escapeAdminPreviewAttribute(wideImage)}" alt="${escapeAdminPreviewAttribute(title)}" class="hero__video-poster">` : '';
-      return `<div class="hero__video hero__video--youtube hero__video--youtube-facade">${poster}<iframe src="https://www.youtube-nocookie.com/embed/${escapeAdminPreviewAttribute(id)}" title="${escapeAdminPreviewAttribute(`${title} campaign video`)}" frameborder="0" loading="lazy" allow="${ADMIN_CONTENT_YOUTUBE_IFRAME_ALLOW}" referrerpolicy="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}"></iframe></div>`;
+      return renderAdminContentExternalVideoFacade('youtube', id, `${title || 'Campaign'} video`);
     }
     if (/vimeo\.com/i.test(video)) {
       const id = video.split('/').pop().split(/[?&]/)[0];
-      return `<div class="hero__video hero__video--vimeo"><iframe src="https://player.vimeo.com/video/${escapeAdminPreviewAttribute(id)}?dnt=1" title="${escapeAdminPreviewAttribute(`${title} campaign video`)}" frameborder="0" loading="lazy" allow="autoplay; fullscreen; picture-in-picture"></iframe></div>`;
+      const facade = renderAdminContentExternalVideoFacade('vimeo', id, `${title || 'Campaign'} video`);
+      return `<div class="hero__video hero__video--vimeo">${facade}</div>`;
     }
     const src = adminPreviewAsset(video, env);
     if (src) {

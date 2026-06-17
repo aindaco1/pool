@@ -204,6 +204,8 @@ const campaignFixture = {
   goal_amount: 25000,
   goal_deadline: '2099-12-31',
   start_date: '2026-01-01',
+  hero_image: '/assets/images/campaigns/hand-relations/hero.png',
+  hero_image_wide: '/assets/images/campaigns/hand-relations/hero-wide.png',
   short_blurb: 'Elevated horror where a corporate empathy campaign consumes bureaucracy.',
   long_content: [
     {
@@ -313,6 +315,7 @@ describe('admin dashboard foundation', () => {
     const layout = readRepoFile('_layouts', 'admin.html');
     const embedBuilder = readRepoFile('_includes', 'campaign-embed-builder.html');
     const adminFieldLabel = readRepoFile('_includes', 'admin-field-label.html');
+    const embedScript = readRepoFile('assets', 'js', 'campaign-embed.js');
     const csp = readRepoFile('_includes', 'first-party-admin-csp.html');
     const campaignsApi = readRepoFile('api', 'campaigns.json');
     const campaignPreviewLayout = readRepoFile('_layouts', 'campaign-preview.html');
@@ -393,9 +396,53 @@ describe('admin dashboard foundation', () => {
     expect(layout).toContain('id="admin-marketing-help-url"');
     expect(adminFieldLabel).toContain('<div class="admin-settings__label">');
     expect(adminFieldLabel).toContain('<label for="{{ include.for }}">');
+    expect(adminFieldLabel).toContain('include.heading_tag');
+    expect(adminFieldLabel).toContain('include.heading_id');
     expect(adminFieldLabel).not.toMatch(/<label\b[^>]*>[\s\S]*?<button\b[\s\S]*?<\/label>/);
-    expect(layout).toContain('id="admin-marketing-snippets"');
+    expect(layout).not.toContain('id="admin-marketing-snippets"');
+    expect(layout).toContain('class="admin-marketing__url-row"');
     expect(layout).toContain('id="admin-marketing-referrals"');
+    expect(layout).toContain('class="admin-marketing__resources"');
+    expect(layout).toContain('id="admin-marketing-qr-preview"');
+    expect(layout).toContain('id="admin-marketing-qr-download-png"');
+    expect(layout).toContain('id="admin-marketing-qr-download-svg"');
+    expect(layout).toContain('label_key="admin.marketing_qr_title"');
+    expect(layout).toContain('help_key="admin.marketing_qr_help"');
+    expect(layout).toContain('help_id="admin-marketing-help-qr"');
+    expect(layout).toContain('heading_tag="h3"');
+    expect(adminScript).not.toContain('marketing_qr_ready');
+    expect(adminScript).not.toContain('QR code ready.');
+    expect(adminScript).toContain('marketing_ref_link_header');
+    expect(adminScript).not.toContain('marketing_referrer_header');
+    expect(adminScript).not.toContain('marketing_ref_url_header');
+    expect(adminScript).toContain('admin-marketing__referral-link');
+    expect(adminScript).toContain('marketing_ref_qr_header');
+    expect(adminScript).toContain('downloadMarketingReferralQr');
+    expect(adminScript).toContain("qrCode: { url: url, format: 'qr-code' }");
+    expect(adminScss).toContain('.admin-marketing__referral-qr-actions');
+    expect(layout).not.toContain('id="admin-marketing-announcement-subject"');
+    expect(layout).not.toContain('id="admin-marketing-announcement-content-editor"');
+    expect(layout).not.toContain('id="admin-marketing-announcement-content"');
+    expect(layout).not.toContain('id="admin-marketing-announcement-heading"');
+    expect(layout).not.toContain('id="admin-marketing-announcement-body"');
+    expect(layout).not.toContain('id="admin-marketing-announcement-dry-run"');
+    expect(adminScript).toContain("editor.dataset.contentEditorMode = 'blast'");
+    expect(adminScript).toContain('campaign_subtab_blast');
+    expect(adminScript).toContain('renderCampaignBlastPanel');
+    expect(adminScript).toContain('uploadPendingMarketingAnnouncementMedia');
+    expect(adminScript).toContain("{ collection: 'blast' }");
+    expect(adminScript).toContain('contentEditorStatusTarget');
+    expect(adminScript).toContain('contentField.editor.__contentStatus = status');
+    expect(adminScript).toContain('blast.content[');
+    expect(adminScript).toContain("root.append(grid, actions, status, history)");
+    expect(adminScript).toContain("labelInfo.row.classList.add('admin-settings__label')");
+    expect(adminScript).not.toContain('data-marketing-announcement-preview');
+    expect(adminScript).not.toContain('renderMarketingAnnouncementPreview');
+    expect(adminScript).not.toContain('admin-blast__preview');
+    expect(adminScript).toContain('marketing_announcement_subject_help');
+    expect(adminScript).toContain('marketing_announcement_content_help');
+    expect(adminScript).toContain('marketing_announcement_cta_help');
+    expect(adminScript).toContain('marketing_announcement_cta_url_help');
     expect(layout).toContain('campaign-embed-builder.html');
     expect(layout).toContain('autoload="false"');
     expect(layout).toContain('sync_query="false"');
@@ -404,16 +451,20 @@ describe('admin dashboard foundation', () => {
     expect(embedBuilder).toContain('data-campaign-embed-autoload="{{ embed_autoload }}"');
     expect(embedBuilder).toContain('data-campaign-embed-sync-query="{{ embed_sync_query }}"');
     expect(layout).toContain('/assets/js/campaign-embed.js');
+    expect(layout).toContain('/assets/js/vendor/qrcode-generator.js');
+    expect(embedScript).toContain('isAdminMarketingEmbed');
+    expect(embedScript).toContain('heroVideo && !isAdminMarketingEmbed');
     expect(layout.indexOf('id="admin-marketing-campaign"')).toBeLessThan(layout.indexOf('id="admin-marketing-referrer"'));
     expect(layout.indexOf('id="admin-marketing-referrer"')).toBeLessThan(layout.indexOf('id="admin-marketing-ref"'));
     expect(layout.indexOf('id="admin-marketing-ref"')).toBeLessThan(layout.indexOf('id="admin-marketing-source"'));
     expect(layout.indexOf('id="admin-marketing-source"')).toBeLessThan(layout.indexOf('id="admin-marketing-medium"'));
     expect(layout.indexOf('id="admin-marketing-medium"')).toBeLessThan(layout.indexOf('id="admin-marketing-content"'));
     expect(layout.indexOf('id="admin-marketing-content"')).toBeLessThan(layout.indexOf('id="admin-marketing-url"'));
+    expect(layout.indexOf('id="admin-marketing-url"')).toBeLessThan(layout.indexOf('id="admin-marketing-qr-preview"'));
+    expect(layout.indexOf('id="admin-marketing-qr-preview"')).toBeLessThan(layout.indexOf('id="admin-marketing-copy-url"'));
     expect(layout.indexOf('id="admin-marketing-save-referral"')).toBeLessThan(layout.indexOf('id="admin-marketing-status"'));
     expect(layout.indexOf('id="admin-marketing-status"')).toBeLessThan(layout.indexOf('id="admin-marketing-referrals"'));
-    expect(layout.indexOf('id="admin-marketing-referrals"')).toBeLessThan(layout.indexOf('id="admin-marketing-snippets"'));
-    expect(layout.indexOf('id="admin-marketing-snippets"')).toBeLessThan(layout.indexOf('campaign-embed-builder.html'));
+    expect(layout.indexOf('id="admin-marketing-referrals"')).toBeLessThan(layout.indexOf('campaign-embed-builder.html'));
     expect(layout).toContain('id="admin-analytics-campaign"');
     expect(layout).not.toContain('id="admin-analytics-load"');
     expect(layout).toContain('id="admin-analytics-results"');
@@ -435,13 +486,14 @@ describe('admin dashboard foundation', () => {
     expect(layout.indexOf('id="admin-campaign-preview-publish"')).toBeLessThan(layout.indexOf('id="admin-content-publish"'));
     expect(layout.indexOf('id="admin-content-publish"')).toBeLessThan(layout.indexOf('id="admin-campaign-status"'));
     expect(layout).toContain('id="admin-campaign-status"');
-    expect(layout).toContain('sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"');
+    expect(layout).toContain('sandbox="allow-scripts allow-popups allow-presentation"');
+    expect(layout).not.toContain('sandbox="allow-scripts allow-same-origin');
     expect(layout).toContain('allow="autoplay; fullscreen; picture-in-picture; encrypted-media"');
     expect(csp).toContain("frame-src 'self'");
     expect(csp).not.toContain('frame-ancestors');
     expect(csp).toContain('https://www.youtube-nocookie.com');
     expect(csp).toContain('{{ site.platform.worker_url }}');
-    expect(csp).toContain("img-src 'self' data: blob:");
+    expect(csp).toContain("img-src 'self' data: blob: https://i.ytimg.com");
     expect(csp).toContain("media-src 'self' https: blob:");
     expect(campaignsApi).toContain('"decisions": {{ campaign.decisions | default: empty | jsonify }}');
     expect(campaignsApi).toContain('c.preview_only != true and c.published != false');
@@ -462,7 +514,8 @@ describe('admin dashboard foundation', () => {
     expect(campaignPreviewLayout).toContain('indexable=false');
     expect(campaignPreviewLayout).toContain('social=false');
     expect(campaignPreviewLayout).toContain('meta name="referrer" content="strict-origin-when-cross-origin"');
-    expect(campaignPreviewLayout).toContain('sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"');
+    expect(campaignPreviewLayout).toContain('sandbox="allow-scripts allow-popups allow-presentation"');
+    expect(campaignPreviewLayout).not.toContain('sandbox="allow-scripts allow-same-origin');
     expect(campaignPreviewLayout).toContain('allow="autoplay; fullscreen; picture-in-picture; encrypted-media"');
     expect(campaignPreviewLayout).toContain('referrerpolicy="strict-origin-when-cross-origin"');
     expect(campaignPreviewLayout).not.toContain('page.campaign_title');
@@ -503,11 +556,45 @@ describe('admin dashboard foundation', () => {
     expect(adminScss).toContain('.admin-content-block.is-active .admin-content-block__chrome');
     expect(adminScss).toContain('.admin-settings__field-grid--count-5');
     expect(adminScss).toContain('repeat(auto-fit, minmax(8rem, 1fr))');
+    expect(adminScss).toContain('.admin-marketing__resources');
+    expect(adminScss).toContain('.admin-marketing__url-row');
+    expect(adminScss).toContain('--admin-marketing-qr-size: 120px;');
+    expect(adminScss).toContain('grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);');
+    expect(adminScss).toContain('.admin-marketing__url-row #admin-marketing-url');
+    expect(adminScss).toContain('height: var(--admin-marketing-qr-size);');
+    expect(adminScss).toContain('grid-template-columns: var(--admin-marketing-qr-size) minmax(9.5rem, 1fr);');
+    expect(adminScss).toContain('.admin-settings__label h3');
+    expect(adminScss).toContain('.admin-marketing__referrals > h3');
+    expect(adminScss).toContain('.admin-content-block__media-placeholder--external');
+    expect(adminScss).toContain('.admin-content-preview__media-placeholder--external');
+    expect(adminScss).toContain('.content-block__media-placeholder--external');
+    expect(adminScss).toContain('.admin-settings__video-embed-preview');
+    expect(adminScss).toContain('.hero__video--youtube');
+    expect(adminScss).toContain('.video-embed--external');
+    expect(adminScss).toContain('.video-embed__external-thumbnail');
+    expect(adminScss).toContain('.video-embed__external-link');
+    expect(adminScss).toContain('.video-embed__external-play');
+    expect(adminScss).not.toContain('.video-embed__external-label');
+    expect(adminScss).toContain('.admin-marketing__qr-actions .admin-dashboard__status:empty');
+    expect(adminScss).toContain('width: min(100%, var(--admin-marketing-qr-size));');
     expect(adminScript).toContain('pool-admin-marketing-builder');
+    expect(adminScript).toContain('pool-admin-marketing-announcements');
     expect(adminScript).toContain('syncMobileTabSelect');
     expect(adminScript).toContain('filenameBase');
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");
     expect(adminScript).toContain('/admin/marketing/referrals');
+    expect(adminScript).toContain('/admin/marketing/announcement');
+    expect(adminScript).toContain('/admin/marketing/announcements');
+    expect(adminScript).toContain('function renderMarketingQr');
+    expect(adminScript).toContain('function externalVideoWatchUrl');
+    expect(adminScript).toContain('function externalVideoThumbnailUrl');
+    expect(adminScript).toContain('function externalVideoThumbnailFallbackUrl');
+    expect(adminScript).toContain('function createExternalVideoPreview');
+    expect(adminScript).toContain('function createExternalMediaLink');
+    expect(adminScript).not.toContain('function externalVideoEmbedUrl');
+    expect(adminScript).toContain('function activeContentBlockTypes');
+    expect(adminScript).toContain('function marketingAnnouncementBlocksToMarkdown');
+    expect(adminScript).toContain('function runMarketingAnnouncementDryRun');
     expect(adminScript).toContain('/admin/analytics');
     expect(adminScript).toContain('function formatMoneyExact');
     expect(adminScript).toContain('function setProminentStatus');
@@ -2766,6 +2853,59 @@ runner_report_emails:
     expectNoKvWritesOrLists(env, 'content editor image upload');
   });
 
+  it('uploads staged Blast images through the campaign media optimizer without KV writes', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_REF: 'main'
+    };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const githubCalls: Array<{ url: string; method: string; body?: any }> = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      const dispatchResponse = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
+      if (dispatchResponse) return dispatchResponse;
+      if (url.includes('/contents/assets/images/campaigns/hand-relations/content-blast-image-1-') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: 'assets/images/campaigns/hand-relations/content-blast-image-1-test.png', sha: 'image-sha' },
+          commit: { sha: 'image-commit', html_url: 'https://github.test/image-commit' }
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/image-upload', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        filename: 'Blast Image.png',
+        contentType: 'image/png',
+        content: 'data:image/png;base64,aGVsbG8=',
+        kind: 'campaign-content',
+        campaignSlug: 'hand-relations',
+        collection: 'blast',
+        fieldPath: 'blast.content[0].src',
+        filenameBase: 'blast-image-1'
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.path).toMatch(/^\/assets\/images\/campaigns\/hand-relations\/content-blast-image-1-\d{8}-\d{6}\.png$/);
+    expect(body.mediaOptimization).toEqual({ triggered: true, workflow: 'media-optimization.yml' });
+    expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
+    expect(githubCalls).toHaveLength(2);
+    expectChangedMediaOptimizationDispatch(githubCalls);
+    expect(githubPutCalls(githubCalls)).toHaveLength(1);
+    expectNoKvWritesOrLists(env, 'blast image upload');
+  });
+
   it('scopes campaign media uploads to campaign admins and keeps platform uploads super-admin only', async () => {
     const env = {
       ...createEnv(),
@@ -4228,13 +4368,21 @@ diary:
       code: 'launch-list',
       name: 'Launch list',
       referrer: 'Launch list',
-      url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list'
+      url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list',
+      qrCode: {
+        format: 'qr-code',
+        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list'
+      }
     });
     expect(saveBody.referrals).toEqual([
       expect.objectContaining({
         code: 'launch-list',
         referrer: 'Launch list',
-        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list'
+        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list',
+        qrCode: {
+          format: 'qr-code',
+          url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list'
+        }
       })
     ]);
     expect(pledges.putCalls).toBe(1);
@@ -4266,7 +4414,11 @@ diary:
       expect.objectContaining({
         code: 'launch-list-updated',
         referrer: 'Launch list updated',
-        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list-updated'
+        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list-updated',
+        qrCode: {
+          format: 'qr-code',
+          url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list-updated'
+        }
       })
     ]);
     expect(pledges.putCalls).toBe(1);
@@ -4287,7 +4439,11 @@ diary:
       expect.objectContaining({
         code: 'launch-list-updated',
         referrer: 'Launch list updated',
-        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list-updated'
+        url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list-updated',
+        qrCode: {
+          format: 'qr-code',
+          url: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations&ref=launch-list-updated'
+        }
       })
     ]);
     expectNoKvWritesOrLists(env, 'marketing referrals read after save');
@@ -4315,6 +4471,175 @@ diary:
     expect(ratelimit.putCalls).toBe(1);
     expect(ratelimit.deleteCalls).toBe(0);
     expect(ratelimit.listCalls).toBe(0);
+  });
+
+  it('dry-runs campaign announcements from the campaign index without KV writes or list scans', async () => {
+    const env = createEnv();
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    pledges.store.set('admin-users:v1', JSON.stringify({
+      users: [{
+        name: 'Creator',
+        email: 'creator@example.com',
+        role: 'campaign_user',
+        campaignSlugs: ['hand-relations']
+      }]
+    }));
+    const { ctx, cookie, csrfToken } = await signInAdmin(env, 'creator@example.com');
+
+    pledges.store.set('campaign-pledges:hand-relations', JSON.stringify(['announce-1', 'announce-2', 'announce-duplicate']));
+    pledges.store.set('pledge:announce-1', JSON.stringify({
+      orderId: 'announce-1',
+      email: 'reader@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'active',
+      preferredLang: 'en'
+    }));
+    pledges.store.set('pledge:announce-2', JSON.stringify({
+      orderId: 'announce-2',
+      email: 'lector@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'charged',
+      preferredLang: 'es'
+    }));
+    pledges.store.set('pledge:announce-duplicate', JSON.stringify({
+      orderId: 'announce-duplicate',
+      email: 'reader@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'active',
+      preferredLang: 'en'
+    }));
+    resetKvCounters(env);
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/announcement', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        subject: 'Launch update',
+        body: '## We are live\n\nA **short** supporter update.\n\n- Share it\n- Back it',
+        contentBlocks: [
+          { type: 'text', body: '## We are live\n\nA **short** supporter update.', align: 'left' },
+          { type: 'image', src: '/assets/images/campaigns/hand-relations/blast.jpg', alt: 'Campaign still', caption: 'A production still.', align: 'center' },
+          { type: 'video', provider: 'youtube', video_id: 'abcDEF123', caption: 'Watch the trailer.', align: 'left' }
+        ],
+        ctaLabel: 'View campaign',
+        ctaUrl: 'https://pool.test/campaigns/hand-relations/?utm_campaign=hand-relations',
+        dryRun: true
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      dryRun: true,
+      campaignSlug: 'hand-relations',
+      recipientCount: 2,
+      preview: expect.objectContaining({
+        body: '## We are live\n\nA **short** supporter update.\n\n- Share it\n- Back it',
+        contentBlocks: expect.arrayContaining([
+          expect.objectContaining({ type: 'image', src: '/assets/images/campaigns/hand-relations/blast.jpg' }),
+          expect.objectContaining({ type: 'video', provider: 'youtube', video_id: 'abcDEF123' })
+        ])
+      }),
+      writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
+    });
+    expect(body.dryRunHash).toMatch(/^[a-f0-9]{64}$/);
+    expectNoKvWritesOrLists(env, 'marketing announcement dry run');
+  });
+
+  it('fails announcement dry runs closed when the campaign pledge index is missing', async () => {
+    const env = createEnv();
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    resetKvCounters(env);
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/announcement', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        subject: 'Launch update',
+        body: 'A short supporter update.',
+        dryRun: true
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'campaign_index_required',
+      campaignSlug: 'hand-relations',
+      writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
+    });
+    expectNoKvWritesOrLists(env, 'marketing announcement missing index dry run');
+  });
+
+  it('loads sent campaign blasts from audit history with a bounded KV list', async () => {
+    const env = createEnv();
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    const { ctx, cookie } = await signInAdmin(env);
+    pledges.store.set('admin-audit:2026-06-16:marketing_announcement_send:recent', JSON.stringify({
+      action: 'marketing_announcement_send',
+      createdAt: '2026-06-16T12:00:00.000Z',
+      actorEmail: 'admin@example.com',
+      campaignSlug: 'hand-relations',
+      subject: 'Launch update',
+      body: '## We are live',
+      contentBlocks: [
+        { type: 'text', body: '## We are live', align: 'left' },
+        { type: 'image', src: '/assets/images/campaigns/hand-relations/blast.jpg', alt: 'Campaign still', caption: 'A production still.', align: 'center' }
+      ],
+      ctaLabel: 'View campaign',
+      ctaUrl: 'https://pool.test/campaigns/hand-relations/',
+      recipientCount: 12,
+      sent: 12,
+      failed: 0
+    }));
+    pledges.store.set('admin-audit:2026-06-16:marketing_announcement_send:other', JSON.stringify({
+      action: 'marketing_announcement_send',
+      createdAt: '2026-06-16T11:00:00.000Z',
+      campaignSlug: 'other-campaign',
+      subject: 'Other update',
+      sent: 1,
+      failed: 0
+    }));
+    resetKvCounters(env);
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/announcements?campaignSlug=hand-relations', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      campaignSlug: 'hand-relations',
+      writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 1 }
+    });
+    expect(body.announcements).toEqual([
+      expect.objectContaining({
+        subject: 'Launch update',
+        body: '## We are live',
+        ctaLabel: 'View campaign',
+        ctaUrl: 'https://pool.test/campaigns/hand-relations/',
+        sent: 12,
+        failed: 0,
+        contentBlocks: expect.arrayContaining([
+          expect.objectContaining({ type: 'text', body: '## We are live' }),
+          expect.objectContaining({ type: 'image', src: '/assets/images/campaigns/hand-relations/blast.jpg' })
+        ])
+      })
+    ]);
+    expect(readKvCounters(env)).toEqual({
+      pledges: { put: 0, delete: 0, list: 1 },
+      ratelimit: { put: 0, delete: 0, list: 0 }
+    });
   });
 
   it('deduplicates portfolio supporter counts across campaign analytics', async () => {
@@ -4512,10 +4837,19 @@ diary:
     expect(preview.preview.html).toContain('<ol><li>First scene</li><li>Second scene</li></ol>');
     expect(preview.preview.html).toContain('class="admin-content-preview__divider');
     expect(preview.preview.html).not.toContain('admin-content-preview__block--divider');
-    expect(preview.preview.html).toContain('class="video-embed video-embed--youtube"');
-    expect(preview.preview.html).toContain('https://www.youtube-nocookie.com/embed/video-demo');
-    expect(preview.preview.html).toContain('allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"');
-    expect(preview.preview.html).toContain('referrerpolicy="strict-origin-when-cross-origin"');
+    expect(preview.preview.html).toContain('hero__video hero__video--youtube hero__video--youtube-facade');
+    expect(preview.preview.html).toContain('hero__video-poster');
+    expect(preview.preview.html).toContain('hero__video-play hero__video-play--youtube');
+    expect(preview.preview.html).toContain('https://i.ytimg.com/vi/video-demo/maxres1.jpg');
+    expect(preview.preview.html).toContain('data-youtube-poster-fallback="https://i.ytimg.com/vi/video-demo/hq1.jpg"');
+    expect(preview.preview.html).toContain('href="https://www.youtube.com/watch?v=video-demo"');
+    expect(preview.preview.html).toContain('aria-label="YouTube: Demo video"');
+    expect(preview.preview.html).toContain('target="_blank" rel="noopener noreferrer"');
+    expect(preview.preview.html).toContain('<path d="M8 5v14l11-7z"/>');
+    expect(preview.preview.html).not.toContain('video-embed__external-label');
+    expect(preview.preview.html).not.toContain('https://www.youtube-nocookie.com/embed/video-demo');
+    expect(preview.preview.html).not.toContain('allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"');
+    expect(preview.preview.html).not.toContain('referrerpolicy="strict-origin-when-cross-origin"');
     expect(preview.preview.html).toContain('<figcaption class="admin-content-preview__caption">Demo video</figcaption>');
     expect(preview.preview.html).toContain('video-embed--local');
     expect(preview.preview.html).toContain('<video controls preload="none" playsinline data-first-frame-poster="true">');
@@ -4525,7 +4859,8 @@ diary:
     expect(preview.preview.html).toContain('<span class="gallery__item-caption-text"><strong>James Clare - Writer/Director</strong><br>Lead <em>actor</em></span>');
     expect(preview.preview.html).not.toContain('&lt;strong&gt;James Clare');
     expect(preview.preview.html).toContain('<cite>— Director</cite>');
-    expect(preview.preview.html).toContain('https://www.youtube-nocookie.com/embed/demo');
+    expect(preview.preview.html).toContain('href="https://www.youtube-nocookie.com/embed/demo"');
+    expect(preview.preview.html).not.toContain('<iframe src="https://www.youtube-nocookie.com/embed/demo"');
 
     expect(pledges.putCalls).toBe(0);
     expect(pledges.deleteCalls).toBe(0);
@@ -4905,8 +5240,15 @@ tiers:
     expect(previewBody.preview.html).toContain('class="campaign-content"');
     expect(previewBody.preview.html).toContain('class="campaign-sidebar"');
     expect(previewBody.preview.html).toContain('class="sidebar-tiers"');
-    expect(previewBody.preview.html).toContain('frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"');
-    expect(previewBody.preview.html).toContain('referrerpolicy="strict-origin-when-cross-origin"');
+    expect(previewBody.preview.html).toContain('hero__video hero__video--youtube hero__video--youtube-facade');
+    expect(previewBody.preview.html).toContain('hero__video-poster');
+    expect(previewBody.preview.html).toContain('hero__video-play hero__video-play--youtube');
+    expect(previewBody.preview.html).toContain('https://i.ytimg.com/vi/dQw4w9WgXcQ/maxres1.jpg');
+    expect(previewBody.preview.html).toContain('data-youtube-poster-fallback="https://i.ytimg.com/vi/dQw4w9WgXcQ/hq1.jpg"');
+    expect(previewBody.preview.html).toContain('href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"');
+    expect(previewBody.preview.html).not.toContain('video-embed__external-label');
+    expect(previewBody.preview.html).not.toContain('frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"');
+    expect(previewBody.preview.html).not.toContain('referrerpolicy="strict-origin-when-cross-origin"');
     expect(previewBody.preview.html).toContain('class="diary-tabs"');
     expect(previewBody.preview.html).toContain('class="diary-panel"');
     expect(previewBody.preview.html).toContain('class="diary-entry__title">Two days left to submit!');

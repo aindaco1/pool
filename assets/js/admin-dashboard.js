@@ -62,9 +62,21 @@
   var marketingSaveReferral = document.getElementById('admin-marketing-save-referral');
   var marketingCancelEdit = document.getElementById('admin-marketing-cancel-edit');
   var marketingStatus = document.getElementById('admin-marketing-status');
-  var marketingSnippets = document.getElementById('admin-marketing-snippets');
   var marketingReferralsRoot = document.getElementById('admin-marketing-referrals');
   var marketingEmbedBuilder = document.querySelector('[data-admin-marketing-embed]');
+  var marketingQrPreview = document.getElementById('admin-marketing-qr-preview');
+  var marketingQrStatus = document.getElementById('admin-marketing-qr-status');
+  var marketingQrDownloadPng = document.getElementById('admin-marketing-qr-download-png');
+  var marketingQrDownloadSvg = document.getElementById('admin-marketing-qr-download-svg');
+  var marketingAnnouncementSubject = null;
+  var marketingAnnouncementContentEditor = null;
+  var marketingAnnouncementContent = null;
+  var marketingAnnouncementCtaLabel = null;
+  var marketingAnnouncementCtaUrl = null;
+  var marketingAnnouncementTest = null;
+  var marketingAnnouncementSend = null;
+  var marketingAnnouncementStatus = null;
+  var marketingAnnouncementHistory = null;
   var analyticsCampaign = document.getElementById('admin-analytics-campaign');
   var analyticsStatus = document.getElementById('admin-analytics-status');
   var analyticsRoot = document.getElementById('admin-analytics-results');
@@ -83,6 +95,7 @@
   var contentPublish = document.getElementById('admin-content-publish');
   var campaignStatus = document.getElementById('admin-campaign-status');
   var contentStatus = document.getElementById('admin-content-status');
+  var activeContentStatus = contentStatus;
   var contentValidation = document.getElementById('admin-content-validation');
   var contentPreviewGrid = document.querySelector('.admin-content__preview-grid');
   var contentPreviewDesktop = document.getElementById('admin-content-preview-desktop');
@@ -109,8 +122,18 @@
   var supporterNextCursor = null;
   var supporterFilterTimer = 0;
   var marketingStorageKey = 'pool-admin-marketing-builder';
+  var marketingAnnouncementStorageKey = 'pool-admin-marketing-announcements';
   var marketingEditingOriginalCode = '';
   var marketingEmbedSyncedSlug = '';
+  var marketingCurrentQr = null;
+  var marketingCurrentQrUrl = '';
+  var activeMarketingAnnouncementCampaignSlug = '';
+  var marketingAnnouncementHistoryLoading = false;
+  var marketingAnnouncementHydrating = false;
+  var marketingAnnouncementHistoryCache = {};
+  var marketingAnnouncementDryRunHash = '';
+  var marketingAnnouncementDryRunSignature = '';
+  var marketingAnnouncementDryRunCount = 0;
   var contentStoragePrefix = 'pool-admin-content-draft:';
   var loadedContentCampaignSlug = '';
   var loadedContentBaseRevision = '';
@@ -670,11 +693,96 @@
     return null;
   }
 
-  function externalVideoEmbedUrl(video) {
-    if (!video?.id) return '';
-    if (video.provider === 'vimeo') return 'https://player.vimeo.com/video/' + encodeURIComponent(video.id) + '?dnt=1';
-    if (video.provider === 'youtube') return 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(video.id);
-    return '';
+  function externalVideoWatchUrl(provider, videoId) {
+    var id = String(videoId || '').trim();
+    if (!id) return '';
+    if (provider === 'vimeo') return 'https://vimeo.com/' + encodeURIComponent(id);
+    return 'https://www.youtube.com/watch?v=' + encodeURIComponent(id);
+  }
+
+  function externalVideoThumbnailUrl(provider, videoId) {
+    var id = String(videoId || '').trim();
+    if (!id || provider === 'vimeo') return '';
+    return 'https://i.ytimg.com/vi/' + encodeURIComponent(id) + '/maxres1.jpg';
+  }
+
+  function externalVideoThumbnailFallbackUrl(provider, videoId) {
+    var id = String(videoId || '').trim();
+    if (!id || provider === 'vimeo') return '';
+    return 'https://i.ytimg.com/vi/' + encodeURIComponent(id) + '/hq1.jpg';
+  }
+
+  function attachExternalVideoThumbnailFallback(image, fallback) {
+    if (!(image instanceof HTMLImageElement) || !fallback) return;
+    var didFallback = false;
+    var useFallback = function() {
+      if (didFallback || image.src === fallback) return;
+      didFallback = true;
+      image.src = fallback;
+    };
+    image.addEventListener('error', useFallback, { once: true });
+    if (image.complete && image.naturalWidth === 0) useFallback();
+  }
+
+  function createExternalMediaLink(href, label, className) {
+    var wrap = document.createElement('div');
+    wrap.className = className || 'admin-content-block__media-placeholder admin-content-block__media-placeholder--external';
+    var link = document.createElement('a');
+    link.href = href;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = label;
+    wrap.append(link);
+    return wrap;
+  }
+
+  function createExternalVideoPreview(provider, videoId, label) {
+    var href = externalVideoWatchUrl(provider, videoId);
+    var thumbnail = externalVideoThumbnailUrl(provider, videoId);
+    var fallbackThumbnail = externalVideoThumbnailFallbackUrl(provider, videoId);
+    var wrap = document.createElement('div');
+    var isYoutube = provider !== 'vimeo';
+    wrap.className = isYoutube
+      ? 'hero__video hero__video--youtube hero__video--youtube-facade'
+      : 'video-embed video-embed--external video-embed--vimeo';
+    if (thumbnail) {
+      var image = document.createElement('img');
+      image.className = isYoutube ? 'hero__video-poster' : 'video-embed__external-thumbnail';
+      image.src = thumbnail;
+      image.alt = '';
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      if (fallbackThumbnail) {
+        image.dataset.videoThumbnailFallback = fallbackThumbnail;
+        attachExternalVideoThumbnailFallback(image, fallbackThumbnail);
+      }
+      wrap.append(image);
+    }
+    var link = document.createElement('a');
+    link.className = isYoutube ? 'hero__video-play hero__video-play--youtube' : 'video-embed__external-link';
+    link.href = href;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.setAttribute('aria-label', label);
+    if (isYoutube) {
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'currentColor');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.setAttribute('focusable', 'false');
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M8 5v14l11-7z');
+      svg.append(path);
+      link.append(svg);
+    } else {
+      var play = document.createElement('span');
+      play.className = 'video-embed__external-play';
+      play.setAttribute('aria-hidden', 'true');
+      play.textContent = '▶';
+      link.append(play);
+    }
+    wrap.append(link);
+    return wrap;
   }
 
   async function requestJson(path, options) {
@@ -1980,11 +2088,8 @@
       preview.muted = true;
       preview.playsInline = true;
       preview.setAttribute('aria-label', options?.previewAlt || t('settings_video_preview_alt', 'Current video preview'));
-      embedPreview = document.createElement('iframe');
+      embedPreview = document.createElement('div');
       embedPreview.className = 'admin-settings__video-embed-preview';
-      embedPreview.title = options?.previewAlt || t('settings_video_preview_alt', 'Current video preview');
-      embedPreview.loading = 'lazy';
-      embedPreview.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
       embedPreview.hidden = true;
     }
     var previewEmpty = document.createElement('span');
@@ -2042,7 +2147,8 @@
         preview.removeAttribute('src');
         if (preview instanceof HTMLVideoElement) preview.replaceChildren();
         if (embedPreview) {
-          embedPreview.removeAttribute('src');
+          embedPreview.removeAttribute('href');
+          embedPreview.replaceChildren();
           embedPreview.hidden = true;
         }
         preview.hidden = true;
@@ -2055,13 +2161,17 @@
           preview.removeAttribute('src');
           preview.replaceChildren();
           preview.hidden = true;
-          embedPreview.src = externalVideoEmbedUrl(externalVideo);
+          var externalVideoLabel = externalVideo.provider === 'vimeo'
+            ? t('content_open_vimeo_link', 'Open Vimeo video')
+            : t('content_open_youtube_link', 'Open YouTube video');
+          embedPreview.replaceChildren(createExternalVideoPreview(externalVideo.provider, externalVideo.id, externalVideoLabel));
           embedPreview.hidden = false;
           previewEmpty.hidden = true;
           return;
         }
         if (embedPreview) {
-          embedPreview.removeAttribute('src');
+          embedPreview.removeAttribute('href');
+          embedPreview.replaceChildren();
           embedPreview.hidden = true;
         }
         var previewUrl = mediaPreviewUrl(path);
@@ -3730,7 +3840,8 @@
       { id: 'stretch_goals', label: t('campaign_subtab_stretch_goals', 'Stretch Goals') },
       { id: 'ongoing_items', label: t('campaign_subtab_ongoing_items', 'Ongoing Items') },
       { id: 'diary', label: t('campaign_subtab_diary', 'Diary Entries') },
-      { id: 'decisions', label: t('campaign_subtab_decisions', 'Decisions') }
+      { id: 'decisions', label: t('campaign_subtab_decisions', 'Decisions') },
+      { id: 'blast', label: t('campaign_subtab_blast', 'Blast') }
     ];
   }
 
@@ -3744,7 +3855,8 @@
       stretch_goals: t('campaign_subtab_short_stretch_goals', 'Goals'),
       ongoing_items: t('campaign_subtab_short_ongoing_items', 'Ongoing'),
       diary: t('campaign_subtab_short_diary', 'Diary'),
-      decisions: t('campaign_subtab_short_decisions', 'Decisions')
+      decisions: t('campaign_subtab_short_decisions', 'Decisions'),
+      blast: t('campaign_subtab_short_blast', 'Blast')
     };
     return labels[subtabId] || fallback || subtabId;
   }
@@ -3759,7 +3871,8 @@
       stretch_goals: t('campaign_subtab_desc_stretch_goals', 'Manage funding milestones that unlock when the campaign reaches specific amounts.'),
       ongoing_items: t('campaign_subtab_desc_ongoing_items', 'Manage ongoing support needs shown after or alongside the main campaign.'),
       diary: t('campaign_subtab_desc_diary', 'Create and edit campaign updates. Entries are sorted newest first.'),
-      decisions: t('campaign_subtab_desc_decisions', 'Manage supporter vote and poll questions, eligibility, deadlines, and option artwork.')
+      decisions: t('campaign_subtab_desc_decisions', 'Manage supporter vote and poll questions, eligibility, deadlines, and option artwork.'),
+      blast: t('campaign_subtab_desc_blast', 'Send supporter email blasts for this campaign and review previously sent blasts.')
     };
     return descriptions[subtabId] || '';
   }
@@ -3771,6 +3884,175 @@
     copy.textContent = campaignSettingsSubtabDescription(subtab.id);
     intro.append(copy);
     return intro;
+  }
+
+  function setActiveMarketingAnnouncementControls(root, campaignSlug) {
+    if (!(root instanceof HTMLElement)) return;
+    activeMarketingAnnouncementCampaignSlug = String(campaignSlug || root.dataset.campaignBlastPanel || '').trim();
+    marketingAnnouncementSubject = root.querySelector('[data-marketing-announcement-subject]');
+    marketingAnnouncementContentEditor = root.querySelector('[data-marketing-announcement-content-editor]');
+    marketingAnnouncementContent = root.querySelector('[data-marketing-announcement-content]');
+    marketingAnnouncementCtaLabel = root.querySelector('[data-marketing-announcement-cta-label]');
+    marketingAnnouncementCtaUrl = root.querySelector('[data-marketing-announcement-cta-url]');
+    marketingAnnouncementTest = root.querySelector('[data-marketing-announcement-test]');
+    marketingAnnouncementSend = root.querySelector('[data-marketing-announcement-send]');
+    marketingAnnouncementStatus = root.querySelector('[data-marketing-announcement-status]');
+    marketingAnnouncementHistory = root.querySelector('[data-marketing-announcement-history]');
+  }
+
+  function createCampaignBlastInputField(options) {
+    var field = document.createElement('div');
+    field.className = 'admin-blast__field';
+    if (options?.className) field.classList.add(options.className);
+    var labelInfo = createProductLabelRow(options.label, options.help, options.id, {
+      htmlFor: options.control?.id,
+      required: Boolean(options.required)
+    });
+    labelInfo.row.classList.add('admin-settings__label');
+    if (options.control instanceof HTMLElement) appendDescribedBy(options.control, labelInfo.helpId);
+    field.append(labelInfo.row, options.control);
+    return field;
+  }
+
+  function createCampaignBlastContentField(baseId) {
+    var field = document.createElement('div');
+    field.className = 'admin-blast__field admin-blast__field--full';
+    var labelId = baseId + '-content-label';
+    var labelInfo = createProductLabelRow(
+      t('marketing_announcement_content_label', 'Announcement content'),
+      t('marketing_announcement_content_help', 'Use the rich content editor for email-ready text, headings, quotes, links, images, and YouTube/Vimeo video embeds.'),
+      baseId + '-content',
+      { labelId, required: true }
+    );
+    labelInfo.row.classList.add('admin-settings__label');
+    var editor = document.createElement('div');
+    editor.id = baseId + '-content-editor';
+    editor.className = 'admin-content__blocks long-content admin-blast__content-editor';
+    editor.dataset.contentEditorId = 'blast-' + baseId.replace(/^admin-blast-/, '');
+    editor.dataset.contentEditorMode = 'blast';
+    editor.dataset.marketingAnnouncementContentEditor = 'true';
+    editor.setAttribute('aria-labelledby', labelId);
+    appendDescribedBy(editor, labelInfo.helpId);
+    var textarea = document.createElement('textarea');
+    textarea.id = baseId + '-content';
+    textarea.name = 'announcementContent';
+    textarea.rows = 8;
+    textarea.spellcheck = false;
+    textarea.hidden = true;
+    textarea.required = true;
+    textarea.dataset.marketingAnnouncementContent = 'true';
+    field.append(labelInfo.row, editor, textarea);
+    return { field, editor, textarea };
+  }
+
+  function renderCampaignBlastPanel(section, campaignSlug) {
+    var safeId = slugifyTitle(campaignSlug || section?.title || 'campaign', 'campaign');
+    var baseId = 'admin-blast-' + safeId;
+    var root = document.createElement('section');
+    root.className = 'admin-blast';
+    root.dataset.campaignBlastPanel = campaignSlug || '';
+
+    var grid = document.createElement('div');
+    grid.className = 'admin-blast__grid';
+
+    var subject = document.createElement('input');
+    subject.id = baseId + '-subject';
+    subject.className = 'admin-settings__input';
+    subject.name = 'announcementSubject';
+    subject.type = 'text';
+    subject.autocomplete = 'off';
+    subject.required = true;
+    subject.dataset.marketingAnnouncementSubject = 'true';
+    grid.append(createCampaignBlastInputField({
+      id: subject.id,
+      label: t('marketing_announcement_subject_label', 'Subject'),
+      help: t('marketing_announcement_subject_help', 'Email subject line shown in the supporter inbox. Keep it short, specific, and campaign-relevant.'),
+      control: subject,
+      required: true
+    }));
+
+    var contentField = createCampaignBlastContentField(baseId);
+    grid.append(contentField.field);
+
+    var ctaLabel = document.createElement('input');
+    ctaLabel.id = baseId + '-cta-label';
+    ctaLabel.className = 'admin-settings__input';
+    ctaLabel.name = 'announcementCtaLabel';
+    ctaLabel.type = 'text';
+    ctaLabel.autocomplete = 'off';
+    ctaLabel.dataset.marketingAnnouncementCtaLabel = 'true';
+    grid.append(createCampaignBlastInputField({
+      id: ctaLabel.id,
+      label: t('marketing_announcement_cta_label', 'CTA Button Label'),
+      help: t('marketing_announcement_cta_help', 'Optional short action text for the email button, such as View campaign or Read the update. Use only when you also provide a CTA button URL.'),
+      control: ctaLabel
+    }));
+
+    var ctaUrl = document.createElement('input');
+    ctaUrl.id = baseId + '-cta-url';
+    ctaUrl.className = 'admin-settings__input';
+    ctaUrl.name = 'announcementCtaUrl';
+    ctaUrl.type = 'url';
+    ctaUrl.autocomplete = 'off';
+    ctaUrl.dataset.marketingAnnouncementCtaUrl = 'true';
+    grid.append(createCampaignBlastInputField({
+      id: ctaUrl.id,
+      label: t('marketing_announcement_cta_url_label', 'CTA Button URL'),
+      help: t('marketing_announcement_cta_url_help', 'Optional same-site http(s) URL for the CTA button. Pair it with a CTA button label so supporters know what the button does.'),
+      control: ctaUrl,
+      className: 'admin-blast__field--wide'
+    }));
+
+    var actions = document.createElement('div');
+    actions.className = 'admin-blast__actions';
+    var testButton = document.createElement('button');
+    testButton.type = 'button';
+    testButton.className = 'btn btn--secondary';
+    testButton.dataset.marketingAnnouncementTest = 'true';
+    testButton.textContent = t('marketing_announcement_test', 'Send test');
+    var sendButton = document.createElement('button');
+    sendButton.type = 'button';
+    sendButton.className = 'btn';
+    sendButton.dataset.marketingAnnouncementSend = 'true';
+    sendButton.textContent = t('marketing_announcement_send', 'Send blast');
+    actions.append(testButton, sendButton);
+
+    var status = document.createElement('div');
+    status.className = 'admin-dashboard__status admin-blast__status';
+    status.dataset.marketingAnnouncementStatus = 'true';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+
+    var history = document.createElement('div');
+    history.className = 'admin-blast__history';
+    history.dataset.marketingAnnouncementHistory = 'true';
+    history.setAttribute('aria-live', 'polite');
+    history.textContent = t('marketing_announcement_history_empty', 'No blasts have been sent for this campaign yet.');
+
+    root.append(grid, actions, status, history);
+    var handleBlastDraftChange = function() {
+      if (marketingAnnouncementHydrating) return;
+      setActiveMarketingAnnouncementControls(root, campaignSlug);
+      writeMarketingAnnouncementDraft();
+      marketingAnnouncementDryRunHash = '';
+      marketingAnnouncementDryRunSignature = '';
+      marketingAnnouncementDryRunCount = 0;
+    };
+    testButton.addEventListener('click', function() {
+      setActiveMarketingAnnouncementControls(root, campaignSlug);
+      sendMarketingAnnouncementTest();
+    });
+    sendButton.addEventListener('click', function() {
+      setActiveMarketingAnnouncementControls(root, campaignSlug);
+      sendMarketingAnnouncement();
+    });
+    contentField.editor.__contentStatus = status;
+    attachContentBlockEditor(contentField.editor, contentField.textarea);
+    setActiveMarketingAnnouncementControls(root, campaignSlug);
+    hydrateMarketingAnnouncementDraft();
+    root.addEventListener('input', handleBlastDraftChange);
+    root.addEventListener('change', handleBlastDraftChange);
+    return root;
   }
 
   function campaignSettingsSubtabForRow(row) {
@@ -3813,6 +4095,12 @@
     panel.querySelectorAll('[data-campaign-settings-subtab-panel]').forEach(function(subPanel) {
       subPanel.hidden = subPanel.dataset.campaignSettingsSubtabPanel !== nextSubtabId;
     });
+    if (nextSubtabId === 'blast') {
+      var root = panel.querySelector('[data-campaign-blast-panel]');
+      setActiveMarketingAnnouncementControls(root, panel.dataset.campaignSettingsPanel || selectedCampaignSettingsSlug || '');
+      hydrateMarketingAnnouncementDraft();
+      loadMarketingAnnouncementHistory();
+    }
     syncCampaignSubtabMobileTabs(panel);
   }
 
@@ -3936,7 +4224,9 @@
         subPanel.setAttribute('role', 'tabpanel');
         subPanel.setAttribute('aria-labelledby', subtabButtonId);
         subPanel.append(renderCampaignSettingsSubtabIntro(subtab));
-        if (subtab.rows.length) {
+        if (subtab.id === 'blast') {
+          subPanel.append(renderCampaignBlastPanel(section, slug));
+        } else if (subtab.rows.length) {
           subPanel.append(renderSettingsTable(Object.assign({}, section, { title: subtab.label, rows: subtab.rows }), {
             hideHeading: true,
             fullWidthRows: true,
@@ -4325,6 +4615,7 @@
     });
     renderAnalyticsOptions(campaigns);
     resetMarketingBuilderFields();
+    hydrateMarketingAnnouncementDraft();
     loadMarketingReferrals();
     hydrateContentDraft();
     updateDirtyIndicators();
@@ -4429,62 +4720,551 @@
     return url.toString();
   }
 
-  function buildMarketingSnippets(campaign, url) {
-    var title = campaign?.title || campaign?.slug || '';
-    var platform = config.platform?.name || config.platformName || 'The Pool';
-    var emailCopy = t('marketing_email_copy', 'I thought you might like %{title}. See the campaign, rewards, and progress here: %{url}', { title: title, url: url });
-    var emailHtml = t(
-      'marketing_email_copy_html',
-      'I thought you might like <strong>%{title}</strong>. See the <a href="%{url}">campaign, rewards, and progress</a>.',
-      {
-        title: escapeEditorHtml(title),
-        url: escapeEditorAttribute(url)
-      }
-    );
-    return [
-      {
-        title: t('marketing_snippet_social', 'Social post'),
-        copy: t('marketing_social_copy', 'Support %{title} on %{platform}: %{url}', { title: title, platform: platform, url: url })
-      },
-      {
-        title: t('marketing_snippet_email', 'Email intro'),
-        copy: emailCopy,
-        html: emailHtml
-      },
-      {
-        title: t('marketing_snippet_milestone', 'Milestone nudge'),
-        copy: t('marketing_milestone_copy', '%{title} is live now. Every pledge helps move it closer to the finish line: %{url}', { title: title, url: url })
-      }
-    ];
+  function safeMarketingFilename(value, fallback) {
+    return String(value || fallback || 'campaign')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || fallback || 'campaign';
   }
 
-  function renderMarketingSnippets(campaign, url) {
-    if (!marketingSnippets) return;
-    marketingSnippets.replaceChildren();
-    if (!campaign || !url) return;
-    buildMarketingSnippets(campaign, url).forEach(function(snippet) {
-      var card = document.createElement('section');
-      card.className = 'admin-marketing__snippet';
-      var title = document.createElement('span');
-      title.className = 'admin-marketing__snippet-title';
-      title.textContent = snippet.title;
-      var copy = document.createElement('p');
-      copy.className = 'admin-marketing__snippet-copy';
-      var safeHtml = snippet.html ? sanitizeClipboardHtml(snippet.html, false) : '';
-      if (safeHtml) {
-        copy.innerHTML = safeHtml;
-      } else {
-        copy.textContent = snippet.copy;
+  function downloadTextFile(filename, text, type) {
+    var blob = new Blob([String(text || '')], { type: type || 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function qrSvgMarkup(qr, cellSize, margin) {
+    if (!qr) return '';
+    var moduleCount = qr.getModuleCount();
+    var size = (moduleCount + (margin * 2)) * cellSize;
+    var parts = [
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '" role="img">',
+      '<rect width="100%" height="100%" fill="#fff"/>'
+    ];
+    for (var row = 0; row < moduleCount; row += 1) {
+      for (var col = 0; col < moduleCount; col += 1) {
+        if (!qr.isDark(row, col)) continue;
+        parts.push('<rect x="' + ((col + margin) * cellSize) + '" y="' + ((row + margin) * cellSize) + '" width="' + cellSize + '" height="' + cellSize + '" fill="#000"/>');
       }
-      var button = document.createElement('button');
-      button.className = 'btn btn--secondary';
-      button.type = 'button';
-      button.dataset.marketingCopy = snippet.copy;
-      if (safeHtml) button.dataset.marketingCopyHtml = safeHtml;
-      button.textContent = t('marketing_copy_snippet', 'Copy snippet');
-      card.append(title, copy, button);
-      marketingSnippets.append(card);
+    }
+    parts.push('</svg>');
+    return parts.join('');
+  }
+
+  function drawQrCanvas(qr, canvas, cellSize, margin) {
+    if (!qr || !(canvas instanceof HTMLCanvasElement)) return;
+    var moduleCount = qr.getModuleCount();
+    var size = (moduleCount + (margin * 2)) * cellSize;
+    canvas.width = size;
+    canvas.height = size;
+    var context = canvas.getContext('2d');
+    if (!context) return;
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, size, size);
+    context.fillStyle = '#000';
+    for (var row = 0; row < moduleCount; row += 1) {
+      for (var col = 0; col < moduleCount; col += 1) {
+        if (qr.isDark(row, col)) {
+          context.fillRect((col + margin) * cellSize, (row + margin) * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+  }
+
+  function createMarketingQr(url) {
+    var value = String(url || '').trim();
+    if (!value || typeof window.qrcode !== 'function') return null;
+    var qr = window.qrcode(0, 'M');
+    qr.addData(value);
+    qr.make();
+    return qr;
+  }
+
+  function renderMarketingQr(url) {
+    marketingCurrentQr = null;
+    marketingCurrentQrUrl = String(url || '').trim();
+    if (!marketingQrPreview) return;
+    marketingQrPreview.replaceChildren();
+    if (!marketingCurrentQrUrl) {
+      setText(marketingQrStatus, '');
+      return;
+    }
+    if (typeof window.qrcode !== 'function') {
+      setText(marketingQrStatus, t('marketing_qr_unavailable', 'QR generation is unavailable.'));
+      return;
+    }
+    try {
+      var qr = createMarketingQr(marketingCurrentQrUrl);
+      if (!qr) {
+        setText(marketingQrStatus, t('marketing_qr_unavailable', 'QR generation is unavailable.'));
+        return;
+      }
+      marketingCurrentQr = qr;
+      var canvas = document.createElement('canvas');
+      canvas.setAttribute('aria-label', t('marketing_qr_title', 'Campaign QR code'));
+      drawQrCanvas(qr, canvas, 8, 4);
+      marketingQrPreview.append(canvas);
+      setText(marketingQrStatus, '');
+    } catch (error) {
+      logger.warn('Failed to render marketing QR code', error);
+      setText(marketingQrStatus, t('marketing_qr_unavailable', 'QR generation is unavailable.'));
+    }
+  }
+
+  function marketingQrFilename(extension, row) {
+    var campaignSlug = String(row?.campaignSlug || selectedMarketingCampaign()?.slug || 'campaign').trim();
+    var ref = normalizeMarketingReferralCode(row?.code || marketingRef?.value || '');
+    var base = safeMarketingFilename([campaignSlug || 'campaign', ref || 'qr'].filter(Boolean).join('-'), 'campaign-qr');
+    return base + '.' + extension;
+  }
+
+  function downloadMarketingQrForUrl(url, extension, options) {
+    var statusNode = options?.status || marketingQrStatus;
+    var qr = createMarketingQr(url);
+    if (!qr) {
+      setText(statusNode, t('marketing_qr_unavailable', 'QR generation is unavailable.'));
+      return;
+    }
+    if (extension === 'png') {
+      var canvas = document.createElement('canvas');
+      drawQrCanvas(qr, canvas, 12, 4);
+      var link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = marketingQrFilename('png', options?.row);
+      document.body.append(link);
+      link.click();
+      link.remove();
+    } else {
+      downloadTextFile(marketingQrFilename('svg', options?.row), qrSvgMarkup(qr, 8, 4), 'image/svg+xml;charset=utf-8');
+    }
+    setText(statusNode, t('marketing_qr_downloaded', 'QR code downloaded.'));
+  }
+
+  function downloadMarketingQrPng() {
+    downloadMarketingQrForUrl(marketingCurrentQrUrl, 'png', { status: marketingQrStatus });
+  }
+
+  function downloadMarketingQrSvg() {
+    downloadMarketingQrForUrl(marketingCurrentQrUrl, 'svg', { status: marketingQrStatus });
+  }
+
+  function readMarketingAnnouncementDrafts() {
+    try {
+      return JSON.parse(localStorage.getItem(marketingAnnouncementStorageKey) || '{}') || {};
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function selectedMarketingCampaignSlug() {
+    return selectedMarketingCampaign()?.slug || '';
+  }
+
+  function selectedMarketingAnnouncementCampaignSlug() {
+    return activeMarketingAnnouncementCampaignSlug || selectedCampaignSettingsSlug || selectedMarketingCampaignSlug();
+  }
+
+  function normalizeMarketingAnnouncementBlocks(value) {
+    try {
+      return parseContentBlocks(value).filter(function(block) {
+        return ['text', 'quote', 'image', 'video', 'divider'].includes(block.type);
+      }).map(function(block) {
+        if (block.type !== 'video') return block;
+        var provider = ['youtube', 'vimeo'].includes(block.provider) ? block.provider : 'youtube';
+        return Object.assign({}, block, { provider, src: '', poster: '' });
+      });
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function marketingAnnouncementBlocksFromDraft(draft) {
+    var blocks = normalizeMarketingAnnouncementBlocks(draft?.content || draft?.contentBlocks || []);
+    if (blocks.length) return blocks;
+    var legacyBody = String(draft?.body || '').trim();
+    var legacyHeading = String(draft?.heading || '').trim();
+    if (legacyHeading || legacyBody) {
+      return [{
+        type: 'text',
+        body: [legacyHeading ? '## ' + legacyHeading : '', legacyBody].filter(Boolean).join('\n\n'),
+        align: 'left'
+      }];
+    }
+    return [defaultContentBlock('text')];
+  }
+
+  function marketingAnnouncementContentBlocks() {
+    var source = Array.isArray(marketingAnnouncementContentEditor?.__contentBlocks)
+      ? marketingAnnouncementContentEditor.__contentBlocks
+      : marketingAnnouncementContent?.value || [];
+    var blocks = normalizeMarketingAnnouncementBlocks(source);
+    return blocks.length ? blocks : [defaultContentBlock('text')];
+  }
+
+  function marketingAnnouncementBlocksToMarkdown(blocks) {
+    return serializableContentBlocks(normalizeMarketingAnnouncementBlocks(blocks), { dropEmptyDraftBlocks: true }).map(function(block) {
+      if (block.type === 'quote') {
+        return [block.text || '', block.author ? '\u2014 ' + block.author : ''].filter(Boolean).join('\n');
+      }
+      if (block.type === 'text') return String(block.body || '').trim();
+      if (block.type === 'image') {
+        return [block.alt, block.caption, block.src].filter(Boolean).join('\n').trim();
+      }
+      if (block.type === 'video') {
+        return [
+          block.caption,
+          block.provider === 'vimeo' ? 'Vimeo video ' + (block.video_id || '') : 'YouTube video ' + (block.video_id || '')
+        ].filter(Boolean).join('\n').trim();
+      }
+      return '';
+    }).filter(Boolean).join('\n\n').trim();
+  }
+
+  function hasMarketingAnnouncementContentBlocks(blocks) {
+    return normalizeMarketingAnnouncementBlocks(blocks).some(function(block) {
+      if (block.type === 'text') return Boolean(String(block.body || '').trim());
+      if (block.type === 'quote') return Boolean(String(block.text || '').trim());
+      if (block.type === 'image') return Boolean(String(block.src || '').trim());
+      if (block.type === 'video') return Boolean(String(block.video_id || '').trim());
+      return false;
     });
+  }
+
+  function setMarketingAnnouncementContentBlocks(blocks) {
+    if (!(marketingAnnouncementContentEditor instanceof HTMLElement) || !(marketingAnnouncementContent instanceof HTMLTextAreaElement)) return;
+    var normalized = normalizeMarketingAnnouncementBlocks(blocks);
+    if (!normalized.length) normalized = [defaultContentBlock('text')];
+    marketingAnnouncementContent.value = JSON.stringify(serializableContentBlocks(normalized), null, 2);
+    withContentEditorContext(marketingAnnouncementContentEditor, marketingAnnouncementContent, function() {
+      contentBlocks = normalized;
+      renderContentBlocks();
+    });
+  }
+
+  function currentMarketingAnnouncementDraft() {
+    var blocks = marketingAnnouncementContentBlocks();
+    return {
+      subject: marketingAnnouncementSubject?.value || '',
+      content: serializableContentBlocks(blocks, { dropEmptyDraftBlocks: true }),
+      body: marketingAnnouncementBlocksToMarkdown(blocks),
+      ctaLabel: marketingAnnouncementCtaLabel?.value || '',
+      ctaUrl: marketingAnnouncementCtaUrl?.value || ''
+    };
+  }
+
+  function marketingAnnouncementRawBlocks() {
+    if (Array.isArray(marketingAnnouncementContentEditor?.__contentBlocks)) {
+      return marketingAnnouncementContentEditor.__contentBlocks;
+    }
+    return marketingAnnouncementContentBlocks();
+  }
+
+  function writeMarketingAnnouncementDraft() {
+    var campaignSlug = selectedMarketingAnnouncementCampaignSlug();
+    if (!campaignSlug) return;
+    try {
+      var drafts = readMarketingAnnouncementDrafts();
+      drafts[campaignSlug] = currentMarketingAnnouncementDraft();
+      localStorage.setItem(marketingAnnouncementStorageKey, JSON.stringify(drafts));
+    } catch (_error) {
+    }
+  }
+
+  function hydrateMarketingAnnouncementDraft() {
+    var campaignSlug = selectedMarketingAnnouncementCampaignSlug();
+    var draft = readMarketingAnnouncementDrafts()[campaignSlug] || {};
+    marketingAnnouncementHydrating = true;
+    try {
+      if (marketingAnnouncementSubject instanceof HTMLInputElement) marketingAnnouncementSubject.value = draft.subject || '';
+      setMarketingAnnouncementContentBlocks(marketingAnnouncementBlocksFromDraft(draft));
+      if (marketingAnnouncementCtaLabel instanceof HTMLInputElement) marketingAnnouncementCtaLabel.value = draft.ctaLabel || '';
+      if (marketingAnnouncementCtaUrl instanceof HTMLInputElement) marketingAnnouncementCtaUrl.value = draft.ctaUrl || '';
+      marketingAnnouncementDryRunHash = '';
+      marketingAnnouncementDryRunSignature = '';
+      marketingAnnouncementDryRunCount = 0;
+    } finally {
+      marketingAnnouncementHydrating = false;
+    }
+  }
+
+  function marketingAnnouncementPayload(extra) {
+    var campaignSlug = selectedMarketingAnnouncementCampaignSlug();
+    var campaign = currentCampaigns.find(function(item) {
+      return item?.slug === campaignSlug;
+    }) || { slug: campaignSlug };
+    var draft = currentMarketingAnnouncementDraft();
+    return Object.assign({
+      campaignSlug: campaign?.slug || '',
+      subject: draft.subject.trim(),
+      body: draft.body.trim(),
+      contentBlocks: draft.content,
+      ctaLabel: draft.ctaLabel.trim(),
+      ctaUrl: draft.ctaUrl.trim()
+    }, extra || {});
+  }
+
+  function marketingAnnouncementSignature(payload) {
+    return JSON.stringify({
+      campaignSlug: payload?.campaignSlug || '',
+      subject: payload?.subject || '',
+      body: payload?.body || '',
+      contentBlocks: payload?.contentBlocks || [],
+      ctaLabel: payload?.ctaLabel || '',
+      ctaUrl: payload?.ctaUrl || ''
+    });
+  }
+
+  function validateMarketingAnnouncementPayload(payload) {
+    return Boolean(payload?.campaignSlug && payload.subject && (payload.body || hasMarketingAnnouncementContentBlocks(payload.contentBlocks)));
+  }
+
+  function renderMarketingAnnouncementBlock(target, block) {
+    if (!(target instanceof HTMLElement) || !block) return;
+    if (block.type === 'text') {
+      var body = document.createElement('div');
+      body.className = 'admin-blast__history-body';
+      body.innerHTML = markdownToEditorHtml(block.body || '', true);
+      target.append(body);
+      return;
+    }
+    if (block.type === 'quote') {
+      var quote = document.createElement('blockquote');
+      quote.textContent = block.text || '';
+      if (block.author) {
+        var cite = document.createElement('cite');
+        cite.textContent = block.author;
+        quote.append(cite);
+      }
+      target.append(quote);
+      return;
+    }
+    if (block.type === 'image') {
+      var figure = document.createElement('figure');
+      var image = document.createElement('img');
+      image.src = block.src || '';
+      image.alt = block.alt || '';
+      figure.append(image);
+      if (block.caption) {
+        var caption = document.createElement('figcaption');
+        caption.innerHTML = markdownToEditorHtml(block.caption || '', true);
+        figure.append(caption);
+      }
+      target.append(figure);
+      return;
+    }
+    if (block.type === 'video') {
+      var video = document.createElement('div');
+      video.className = 'admin-blast__history-video';
+      var provider = block.provider === 'vimeo' ? 'Vimeo' : 'YouTube';
+      video.textContent = [provider, block.video_id, block.caption].filter(Boolean).join(' - ');
+      target.append(video);
+      return;
+    }
+    if (block.type === 'divider') {
+      target.append(document.createElement('hr'));
+    }
+  }
+
+  function renderMarketingAnnouncementHistory(rows, options) {
+    if (!marketingAnnouncementHistory) return;
+    var campaignSlug = selectedMarketingAnnouncementCampaignSlug();
+    if (options?.cache !== false && campaignSlug) {
+      marketingAnnouncementHistoryCache[campaignSlug] = Array.isArray(rows) ? rows : [];
+    }
+    marketingAnnouncementHistory.replaceChildren();
+    var heading = document.createElement('h3');
+    heading.textContent = t('marketing_announcement_history_title', 'Sent blasts');
+    marketingAnnouncementHistory.append(heading);
+    if (!Array.isArray(rows) || !rows.length) {
+      var empty = document.createElement('p');
+      empty.className = 'admin-app__muted';
+      empty.textContent = t('marketing_announcement_history_empty', 'No blasts have been sent for this campaign yet.');
+      marketingAnnouncementHistory.append(empty);
+      return;
+    }
+    rows.forEach(function(row) {
+      var card = document.createElement('article');
+      card.className = 'admin-blast__history-card';
+      var title = document.createElement('strong');
+      title.textContent = row.subject || t('marketing_announcement_subject_label', 'Subject');
+      var meta = document.createElement('span');
+      meta.className = 'admin-app__muted';
+      meta.textContent = [
+        row.createdAt ? new Date(row.createdAt).toLocaleString(lang || 'en') : '',
+        t('marketing_announcement_history_recipients', '%{sent} sent, %{failed} failed', {
+          sent: Number(row.sent || 0),
+          failed: Number(row.failed || 0)
+        })
+      ].filter(Boolean).join(' - ');
+      var content = document.createElement('div');
+      content.className = 'admin-blast__history-content';
+      var blocks = normalizeMarketingAnnouncementBlocks(row.contentBlocks || []);
+      if (blocks.length) {
+        blocks.forEach(function(block) {
+          renderMarketingAnnouncementBlock(content, block);
+        });
+      } else if (row.body) {
+        content.innerHTML = markdownToEditorHtml(row.body || '', true);
+      }
+      card.append(title, meta, content);
+      if (row.ctaLabel || row.ctaUrl) {
+        var cta = document.createElement('span');
+        cta.textContent = [row.ctaLabel, row.ctaUrl].filter(Boolean).join(' - ');
+        card.append(cta);
+      }
+      marketingAnnouncementHistory.append(card);
+    });
+  }
+
+  async function loadMarketingAnnouncementHistory() {
+    var campaignSlug = selectedMarketingAnnouncementCampaignSlug();
+    if (!campaignSlug || !marketingAnnouncementHistory || marketingAnnouncementHistoryLoading) return;
+    marketingAnnouncementHistoryLoading = true;
+    setText(marketingAnnouncementHistory, t('marketing_announcement_history_loading', 'Loading sent blasts...'));
+    try {
+      var params = new URLSearchParams({ campaignSlug });
+      var data = await requestJson('/admin/marketing/announcements?' + params.toString(), { method: 'GET' });
+      renderMarketingAnnouncementHistory(data.announcements || []);
+    } catch (error) {
+      logger.error('Failed to load marketing announcement history', error);
+      setText(marketingAnnouncementHistory, error?.data?.error || t('marketing_announcement_history_failed', 'Unable to load sent blasts.'));
+    } finally {
+      marketingAnnouncementHistoryLoading = false;
+    }
+  }
+
+  async function runMarketingAnnouncementDryRun() {
+    var payload = marketingAnnouncementPayload({ dryRun: true });
+    if (!validateMarketingAnnouncementPayload(payload)) {
+      setText(marketingAnnouncementStatus, t('marketing_announcement_required', 'Choose a campaign and enter a subject and announcement content first.'));
+      return null;
+    }
+    setText(marketingAnnouncementStatus, t('marketing_announcement_dry_running', 'Checking audience...'));
+    try {
+      var data = await requestJson('/admin/marketing/announcement', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      marketingAnnouncementDryRunHash = data.dryRunHash || '';
+      marketingAnnouncementDryRunSignature = marketingAnnouncementSignature(payload);
+      marketingAnnouncementDryRunCount = Number(data.recipientCount || 0);
+      setText(marketingAnnouncementStatus, t('marketing_announcement_dry_run_ready', 'Audience check ready: %{count} supporter(s) will receive this blast. No emails sent.', {
+        count: marketingAnnouncementDryRunCount
+      }));
+      return data;
+    } catch (error) {
+      logger.error('Failed to dry run marketing announcement', error);
+      var key = error?.data?.code === 'campaign_index_required' ? 'marketing_announcement_index_required' : 'marketing_announcement_dry_run_failed';
+      setText(marketingAnnouncementStatus, error?.data?.error || t(key, key === 'marketing_announcement_index_required'
+        ? 'Campaign pledge indexes must be rebuilt before announcements can be sent.'
+        : 'Unable to dry run announcement.'));
+      return null;
+    }
+  }
+
+  async function uploadPendingMarketingAnnouncementMedia() {
+    var blocks = marketingAnnouncementRawBlocks();
+    if (!hasPendingContentUploads(blocks)) return 0;
+    var campaignSlug = selectedMarketingAnnouncementCampaignSlug();
+    if (!campaignSlug) return 0;
+    setText(marketingAnnouncementStatus, t('marketing_announcement_media_uploading', 'Uploading selected Blast images...'));
+    var count = await uploadPendingContentMedia(blocks, campaignSlug, { collection: 'blast' });
+    setMarketingAnnouncementContentBlocks(blocks);
+    writeMarketingAnnouncementDraft();
+    return count;
+  }
+
+  async function sendMarketingAnnouncementTest() {
+    try {
+      await uploadPendingMarketingAnnouncementMedia();
+    } catch (error) {
+      logger.error('Failed to upload marketing announcement media', error);
+      setText(marketingAnnouncementStatus, error?.data?.error || error?.message || t('marketing_announcement_media_upload_failed', 'Unable to upload selected Blast images.'));
+      return;
+    }
+    var dryRun = await runMarketingAnnouncementDryRun();
+    if (!dryRun) return;
+    var payload = marketingAnnouncementPayload({ testSend: true, dryRunHash: dryRun.dryRunHash || '' });
+    if (!validateMarketingAnnouncementPayload(payload)) {
+      setText(marketingAnnouncementStatus, t('marketing_announcement_required', 'Choose a campaign and enter a subject and announcement content first.'));
+      return;
+    }
+    setText(marketingAnnouncementStatus, t('marketing_announcement_test_sending', 'Sending test email...'));
+    try {
+      var data = await requestJson('/admin/marketing/announcement', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      setText(marketingAnnouncementStatus, t('marketing_announcement_test_sent', 'Test email sent to %{email}.', {
+        email: data.testRecipient || currentUser?.email || ''
+      }));
+    } catch (error) {
+      logger.error('Failed to send marketing announcement test', error);
+      setText(marketingAnnouncementStatus, error?.data?.error || t('marketing_announcement_test_failed', 'Unable to send test email.'));
+    }
+  }
+
+  async function sendMarketingAnnouncement() {
+    try {
+      await uploadPendingMarketingAnnouncementMedia();
+    } catch (error) {
+      logger.error('Failed to upload marketing announcement media', error);
+      setText(marketingAnnouncementStatus, error?.data?.error || error?.message || t('marketing_announcement_media_upload_failed', 'Unable to upload selected Blast images.'));
+      return;
+    }
+    var dryRun = await runMarketingAnnouncementDryRun();
+    if (!dryRun) return;
+    var payload = marketingAnnouncementPayload({
+      dryRunHash: dryRun.dryRunHash || ''
+    });
+    if (!validateMarketingAnnouncementPayload(payload)) {
+      setText(marketingAnnouncementStatus, t('marketing_announcement_required', 'Choose a campaign and enter a subject and announcement content first.'));
+      return;
+    }
+    if (!window.confirm(t('marketing_announcement_send_confirm', 'Send this announcement to %{count} supporter(s)?', {
+      count: Number(dryRun.recipientCount || marketingAnnouncementDryRunCount || 0)
+    }))) {
+      return;
+    }
+    setText(marketingAnnouncementStatus, t('marketing_announcement_sending', 'Sending announcement...'));
+    try {
+      var data = await requestJson('/admin/marketing/announcement', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      marketingAnnouncementDryRunHash = '';
+      marketingAnnouncementDryRunSignature = '';
+      marketingAnnouncementDryRunCount = 0;
+      setText(marketingAnnouncementStatus, t('marketing_announcement_sent', 'Announcement sent to %{sent} supporter(s). %{failed} failed.', {
+        sent: Number(data.sent || 0),
+        failed: Number(data.failed || 0)
+      }));
+      var campaignSlug = selectedMarketingAnnouncementCampaignSlug();
+      var sentRow = {
+        createdAt: new Date().toISOString(),
+        campaignSlug,
+        subject: payload.subject,
+        body: payload.body,
+        contentBlocks: payload.contentBlocks || [],
+        ctaLabel: payload.ctaLabel,
+        ctaUrl: payload.ctaUrl,
+        recipientCount: Number(data.recipientCount || 0),
+        sent: Number(data.sent || 0),
+        failed: Number(data.failed || 0)
+      };
+      renderMarketingAnnouncementHistory([sentRow].concat(marketingAnnouncementHistoryCache[campaignSlug] || []));
+    } catch (error) {
+      logger.error('Failed to send marketing announcement', error);
+      setText(marketingAnnouncementStatus, error?.data?.error || t('marketing_announcement_send_failed', 'Unable to send announcement.'));
+    }
   }
 
   function setMarketingEditingState(code) {
@@ -4550,6 +5330,17 @@
     }
   }
 
+  function marketingReferralQrUrl(row) {
+    return String(row?.qrCode?.url || row?.qr?.url || row?.url || '').trim();
+  }
+
+  function downloadMarketingReferralQr(row, extension) {
+    downloadMarketingQrForUrl(marketingReferralQrUrl(row), extension, {
+      row: row,
+      status: marketingStatus
+    });
+  }
+
   function renderMarketingReferrals(referrals) {
     if (!marketingReferralsRoot) return;
     marketingReferralsRoot.replaceChildren();
@@ -4569,27 +5360,54 @@
     table.className = 'admin-marketing__referrals-table';
     var thead = document.createElement('thead');
     var headerRow = document.createElement('tr');
-    var referrerHeader = t('marketing_referrer_header', 'Referrer');
-    var urlHeader = t('marketing_ref_url_header', 'URL');
+    var linkHeader = t('marketing_ref_link_header', 'Link');
+    var qrHeader = t('marketing_ref_qr_header', 'QR code');
     var createdHeader = t('marketing_ref_created_header', 'Created');
     var actionsHeader = t('marketing_ref_actions_header', 'Actions');
-    appendTableHeader(headerRow, [referrerHeader, urlHeader, createdHeader, actionsHeader]);
+    appendTableHeader(headerRow, [linkHeader, qrHeader, createdHeader, actionsHeader]);
     thead.append(headerRow);
     var tbody = document.createElement('tbody');
     rows.forEach(function(row) {
       var tr = document.createElement('tr');
-      var referrerCell = document.createElement('td');
-      referrerCell.setAttribute('data-label', referrerHeader);
-      referrerCell.textContent = row.referrer || row.name || '';
-      var urlCell = document.createElement('td');
-      urlCell.setAttribute('data-label', urlHeader);
+      var linkCell = document.createElement('td');
+      linkCell.setAttribute('data-label', linkHeader);
       var url = String(row.url || '').trim();
+      var linkLabel = row.referrer || row.name || row.code || url;
       if (url) {
         var link = document.createElement('a');
-        link.className = 'admin-marketing__referral-url';
+        link.className = 'admin-marketing__referral-link';
         link.href = url;
-        link.textContent = url;
-        urlCell.append(link);
+        link.title = url;
+        link.textContent = linkLabel;
+        linkCell.append(link);
+      } else {
+        linkCell.textContent = linkLabel;
+      }
+      var qrCell = document.createElement('td');
+      qrCell.setAttribute('data-label', qrHeader);
+      var qrUrl = marketingReferralQrUrl(row);
+      if (qrUrl) {
+        var qrActions = document.createElement('div');
+        qrActions.className = 'admin-marketing__referral-qr-actions';
+        var qrName = row.referrer || row.name || row.code || t('marketing_ref_qr_header', 'QR code');
+        var png = document.createElement('button');
+        png.className = 'btn btn--secondary btn--small';
+        png.type = 'button';
+        png.textContent = t('marketing_ref_qr_png', 'PNG');
+        png.setAttribute('aria-label', t('marketing_ref_qr_download_png', 'Download QR code PNG for %{referrer}', { referrer: qrName }));
+        png.addEventListener('click', function() {
+          downloadMarketingReferralQr(row, 'png');
+        });
+        var svg = document.createElement('button');
+        svg.className = 'btn btn--secondary btn--small';
+        svg.type = 'button';
+        svg.textContent = t('marketing_ref_qr_svg', 'SVG');
+        svg.setAttribute('aria-label', t('marketing_ref_qr_download_svg', 'Download QR code SVG for %{referrer}', { referrer: qrName }));
+        svg.addEventListener('click', function() {
+          downloadMarketingReferralQr(row, 'svg');
+        });
+        qrActions.append(png, svg);
+        qrCell.append(qrActions);
       }
       var createdCell = document.createElement('td');
       createdCell.setAttribute('data-label', createdHeader);
@@ -4614,7 +5432,7 @@
       });
       actions.append(edit, remove);
       actionsCell.append(actions);
-      tr.append(referrerCell, urlCell, createdCell, actionsCell);
+      tr.append(linkCell, qrCell, createdCell, actionsCell);
       tbody.append(tr);
     });
     table.append(thead, tbody);
@@ -4676,7 +5494,8 @@
           originalCode: marketingEditingOriginalCode || undefined,
           name: name,
           referrer: name,
-          url: url
+          url: url,
+          qrCode: { url: url, format: 'qr-code' }
         })
       });
       setMarketingEditingState('');
@@ -4694,7 +5513,7 @@
     var campaign = selectedMarketingCampaign();
     if (!campaign) {
       if (marketingUrl) marketingUrl.value = '';
-      if (marketingSnippets) marketingSnippets.replaceChildren();
+      renderMarketingQr('');
       syncMarketingEmbedBuilder(null);
       return;
     }
@@ -4708,7 +5527,7 @@
     var campaignUrl = buildMarketingUrl(campaign);
     if (marketingUrl) marketingUrl.value = campaignUrl;
     syncMarketingEmbedBuilder(campaign);
-    renderMarketingSnippets(campaign, campaignUrl);
+    renderMarketingQr(campaignUrl);
   }
 
   function syncMarketingEmbedBuilder(campaign) {
@@ -5152,9 +5971,25 @@
     return labels[type] || labels.text;
   }
 
+  function activeContentBlockTypes() {
+    return ['announcement', 'blast'].includes(contentBlocksRoot?.dataset?.contentEditorMode || '')
+      ? ['text', 'quote', 'image', 'video', 'divider']
+      : contentBlockTypes;
+  }
+
+  function isBlastContentEditorMode() {
+    return ['announcement', 'blast'].includes(contentBlocksRoot?.dataset?.contentEditorMode || '');
+  }
+
+  function activeContentVideoProviders() {
+    return isBlastContentEditorMode()
+      ? ['youtube', 'vimeo']
+      : ['youtube', 'vimeo', 'local'];
+  }
+
   function contentBlockCommand(value) {
     var type = String(value || '').trim().replace(/^\/+/, '').toLowerCase();
-    return contentBlockTypes.indexOf(type) >= 0 ? type : 'text';
+    return activeContentBlockTypes().indexOf(type) >= 0 ? type : 'text';
   }
 
   function contentBlockAlignment(value) {
@@ -5174,7 +6009,8 @@
 
   function contentVideoProvider(value) {
     var provider = String(value || '').trim().toLowerCase();
-    return ['youtube', 'vimeo', 'local'].indexOf(provider) >= 0 ? provider : 'youtube';
+    var providers = activeContentVideoProviders();
+    return providers.indexOf(provider) >= 0 ? provider : 'youtube';
   }
 
   function contentVideoSourceType(src) {
@@ -5496,8 +6332,10 @@
     var previousDiaryField = activeDiaryContentField;
     var previousEditable = activeContentEditable;
     var previousLink = activeContentLink;
+    var previousStatus = activeContentStatus;
     contentBlocksRoot = root;
     activeContentJsonField = field;
+    activeContentStatus = root.__contentStatus instanceof HTMLElement ? root.__contentStatus : contentStatus;
     contentBlocks = Array.isArray(root.__contentBlocks) ? root.__contentBlocks : contentBlocksFromField(field);
     contentHistory = root.__contentHistory || [];
     lastContentMutation = root.__lastContentMutation || '';
@@ -5518,6 +6356,7 @@
       activeDiaryContentField = previousDiaryField;
       activeContentEditable = previousEditable;
       activeContentLink = previousLink;
+      activeContentStatus = previousStatus;
     }
   }
 
@@ -5534,6 +6373,10 @@
 
   function isSafeEditorHref(value) {
     return /^(https?:\/\/|mailto:|\/(?!\/)|#)/i.test(String(value || '').trim());
+  }
+
+  function contentEditorStatusTarget() {
+    return activeContentStatus instanceof HTMLElement ? activeContentStatus : contentStatus;
   }
 
   function renderEditorInlineMarkdown(value) {
@@ -5816,7 +6659,7 @@
     control.dataset.contentIndex = String(index);
     control.dataset.contentField = field;
     control.dataset.placeholder = options?.placeholder || (field === 'body'
-      ? t('content_empty_block', 'Start writing, or type /quote, /image, or /divider...')
+      ? t('content_empty_block', 'Start writing. Use Add content block to insert other block types.')
       : labelText);
     control.setAttribute('aria-label', labelText);
     control.setAttribute('role', 'textbox');
@@ -5884,7 +6727,7 @@
     var target = options?.imageIndex !== undefined ? block.images?.[options.imageIndex] : block;
     var pending = pendingUploadForContentField(target, options?.field || 'src');
     if (pending) {
-      status.textContent = t('content_media_selected', '%{name} selected. Publish to upload it.', {
+      status.textContent = t('content_media_selected', '%{name} selected. It will upload before publishing or sending.', {
         name: pending.name || t('content_media_file', 'File')
       });
     }
@@ -6002,7 +6845,7 @@
     select.dataset.contentIndex = String(index);
     select.dataset.contentAction = 'type';
     select.setAttribute('aria-label', t('content_block_type', 'Block type'));
-    contentBlockTypes.forEach(function(type) {
+    activeContentBlockTypes().forEach(function(type) {
       var option = document.createElement('option');
       option.value = type;
       option.textContent = contentBlockLabel(type);
@@ -6191,19 +7034,22 @@
     var fields = document.createElement('div');
     fields.className = 'admin-content-block__fields';
     if (block.type === 'image') {
-      fields.append(
-        createContentMediaUploadInput(block, index, {
-          kind: 'image',
-          label: t('content_upload_image', 'Upload image'),
-          hideLabel: true
-        }),
+      var imageControls = [createContentMediaUploadInput(block, index, {
+        kind: 'image',
+        label: t('content_upload_image', 'Upload image'),
+        hideLabel: true
+      })];
+      imageControls.push(
         createContentInput('input', block, index, 'src', t('content_field_src', 'Source URL'), {
-          help: t('content_field_src_help', 'Use an internal uploaded asset path, such as /assets/images/campaigns/example/image.jpg. External image URLs are not supported for this content block.')
+          help: isBlastContentEditorMode()
+            ? t('content_field_src_blast_help', 'Upload new images whenever possible. Use Source URL to reuse an existing site-hosted /assets/images/... path or repair a saved path; external image URLs are not included in Blast emails.')
+            : t('content_field_src_help', 'Upload new images whenever possible. Use Source URL to reuse an existing uploaded /assets/... path or repair a saved path; external image URLs are not supported.')
         }),
         createContentInput('input', block, index, 'alt', t('content_field_alt', 'Alt text'), {
           help: t('content_field_alt_help', 'Describe the meaningful content of the image for screen readers and people browsing without images.')
         })
       );
+      fields.append.apply(fields, imageControls);
     } else if (block.type === 'gallery') {
       fields.append(
         createContentInput('select', block, index, 'layout', t('content_field_gallery_layout', 'Gallery layout'), {
@@ -6229,13 +7075,21 @@
         })
       );
     } else if (block.type === 'video') {
+      var providerOptions = activeContentVideoProviders().map(function(provider) {
+        return {
+          value: provider,
+          label: provider === 'vimeo'
+            ? t('content_provider_vimeo', 'Vimeo')
+            : provider === 'local'
+              ? t('content_provider_local', 'Uploaded video')
+              : t('content_provider_youtube', 'YouTube')
+        };
+      });
       var providerInput = createContentInput('select', block, index, 'provider', t('content_field_provider', 'Provider'), {
-        help: t('content_field_provider_help', 'Choose whether this video embeds from YouTube/Vimeo or uses an uploaded video file.'),
-        options: [
-          { value: 'youtube', label: t('content_provider_youtube', 'YouTube') },
-          { value: 'vimeo', label: t('content_provider_vimeo', 'Vimeo') },
-          { value: 'local', label: t('content_provider_local', 'Uploaded video') }
-        ]
+        help: providerOptions.some(function(option) { return option.value === 'local'; })
+          ? t('content_field_provider_help', 'Choose whether this video embeds from YouTube/Vimeo or uses an uploaded video file.')
+          : t('content_field_provider_blast_help', 'Choose YouTube or Vimeo for supporter email video links.'),
+        options: providerOptions
       });
       if (contentVideoProvider(block.provider) === 'local') {
         fields.append(
@@ -6324,7 +7178,7 @@
         hideLabel: true
       }),
       createGalleryImageInput('input', block, index, imageIndex, 'src', t('content_field_src', 'Source URL'), {
-        help: t('content_field_src_help', 'Use an internal uploaded asset path, such as /assets/images/campaigns/example/image.jpg. External image URLs are not supported for this content block.')
+        help: t('content_field_src_help', 'Upload new images whenever possible. Use Source URL to reuse an existing uploaded /assets/... path or repair a saved path; external image URLs are not supported.')
       }),
       createGalleryImageInput('input', block, index, imageIndex, 'alt', t('content_field_alt', 'Alt text'), {
         help: t('content_field_alt_help', 'Describe the meaningful content of the image for screen readers and people browsing without images.')
@@ -6411,20 +7265,10 @@
         card.append(localVideo);
         if (window.PoolVideoPosters?.init) window.PoolVideoPosters.init(localVideo);
       } else if (block.video_id) {
-        var video = document.createElement('div');
-        video.className = 'video-embed video-embed--' + (provider === 'vimeo' ? 'vimeo' : 'youtube');
-        var iframe = document.createElement('iframe');
-        iframe.src = provider === 'vimeo'
-          ? 'https://player.vimeo.com/video/' + encodeURIComponent(block.video_id) + '?dnt=1'
-          : 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(block.video_id);
-        iframe.loading = 'lazy';
-        iframe.title = block.caption || t('content_video_title', 'Video');
-        iframe.allow = provider === 'vimeo'
-          ? 'autoplay; fullscreen; picture-in-picture'
-          : 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
-        if (provider === 'youtube') iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-        video.append(iframe);
-        card.append(video);
+        var providerLabel = provider === 'vimeo'
+          ? t('content_provider_vimeo', 'Vimeo')
+          : t('content_provider_youtube', 'YouTube');
+        card.append(createExternalVideoPreview(provider, block.video_id, providerLabel + ': ' + (block.caption || block.video_id)));
       } else {
         card.append(createMediaPlaceholder());
       }
@@ -6458,15 +7302,11 @@
       renderMediaSettings(card, block, index);
     } else if (block.type === 'embed') {
       if (block.src) {
-        var embedWrap = document.createElement('div');
-        embedWrap.className = 'embed-container ' + (block.provider === 'spotify' ? 'embed-container--spotify' : 'embed-container--video');
-        var embed = document.createElement('iframe');
-        embed.src = block.src;
-        embed.loading = 'lazy';
-        embed.title = block.title || block.caption || t('content_embed_title', 'Embedded content');
-        if (block.provider === 'youtube') embed.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-        embedWrap.append(embed);
-        card.append(embedWrap);
+        card.append(createExternalMediaLink(
+          block.src,
+          block.title || block.caption || t('content_embed_title', 'Embedded content'),
+          'admin-content-block__media-placeholder admin-content-block__media-placeholder--external embed-container--link'
+        ));
       } else {
         card.append(createMediaPlaceholder());
       }
@@ -6597,7 +7437,7 @@
     syncContentJsonFromBlocks();
     renderContentBlocks(resolved.index);
     writeContentDraft({ schedulePreview: false });
-    setText(contentStatus, t('content_media_selected', '%{name} selected. Publish to upload it.', {
+    setText(contentEditorStatusTarget(), t('content_media_selected', '%{name} selected. It will upload before publishing or sending.', {
       name: file.name || t('content_media_file', 'File')
     }));
     control.value = '';
@@ -6839,7 +7679,18 @@
     var control = activeContentEditable;
     if (!(control instanceof HTMLElement) || !control.isContentEditable) return;
     control.focus();
-    document.execCommand(action, false, value || null);
+    var applied = false;
+    try {
+      applied = document.execCommand(action, false, value || null);
+    } catch (_error) {
+      applied = false;
+    }
+    if (!applied && action === 'formatBlock' && value) {
+      try {
+        document.execCommand(action, false, '<' + value + '>');
+      } catch (_error) {
+      }
+    }
     updateContentBlockField(control);
     writeContentDraft();
     updateContentFormatState();
@@ -6855,7 +7706,7 @@
     if (url === null) return;
     var href = String(url || '').trim();
     if (!isSafeEditorHref(href)) {
-      setText(contentStatus, t('content_link_invalid', 'Links must start with http://, https://, mailto:, /, or #.'));
+      setText(contentEditorStatusTarget(), t('content_link_invalid', 'Links must start with http://, https://, mailto:, /, or #.'));
       return;
     }
     var selection = window.getSelection();
@@ -6879,7 +7730,7 @@
     if (!(input instanceof HTMLInputElement) || !(link instanceof HTMLAnchorElement) || !editable) return;
     var href = input.value.trim();
     if (!isSafeEditorHref(href)) {
-      setText(contentStatus, t('content_link_invalid', 'Links must start with http://, https://, mailto:, /, or #.'));
+      setText(contentEditorStatusTarget(), t('content_link_invalid', 'Links must start with http://, https://, mailto:, /, or #.'));
       input.value = link.getAttribute('href') || '';
       return;
     }
@@ -6992,7 +7843,7 @@
     var field = control.dataset.contentField || '';
     if (field !== 'body' || !contentBlocks[index]) return false;
     var value = editorHtmlToMarkdown(control);
-    var commandNames = contentBlockTypes.join('|');
+    var commandNames = activeContentBlockTypes().join('|');
     var commandMatch = value.match(new RegExp('(?:^|\\n|\\s)/(?:' + commandNames + ')(?=\\s*$|\\n)', 'i'));
     if (!commandMatch) return false;
 
@@ -7246,7 +8097,7 @@
     }
     if (hasPendingContentUploads(contentBlocks)) {
       renderContentValidation({});
-      if (!options?.silent) setText(contentStatus, t('content_preview_pending_media', 'Selected media is previewing in the editor. Publish to upload it and refresh the mobile preview.'));
+      if (!options?.silent) setText(contentStatus, t('content_preview_pending_media', 'Selected media is previewing in the editor. It will upload before publishing or sending, then refresh the mobile preview.'));
       return;
     }
 
@@ -7282,6 +8133,10 @@
       if (meta?.imageIndex !== undefined) return 'diary[' + entry + '].content[' + meta.index + '].images[' + meta.imageIndex + '].src';
       return 'diary[' + entry + '].content[' + meta.index + '].' + field;
     }
+    if (context?.collection === 'blast') {
+      if (meta?.imageIndex !== undefined) return 'blast.content[' + meta.index + '].images[' + meta.imageIndex + '].src';
+      return 'blast.content[' + meta.index + '].' + field;
+    }
     if (meta?.imageIndex !== undefined) return 'long_content[' + meta.index + '].images[' + meta.imageIndex + '].src';
     return 'long_content[' + meta.index + '].' + field;
   }
@@ -7301,6 +8156,11 @@
         : kind === 'audio'
           ? '/admin/settings/audio-upload'
           : '/admin/settings/image-upload';
+      var filenameBase = pending.filenameBase || '';
+      if (context?.collection === 'blast') {
+        filenameBase = filenameBase.replace(/^content-/, '');
+        if (filenameBase && !filenameBase.startsWith('blast-')) filenameBase = 'blast-' + filenameBase;
+      }
       var result = await requestJson(uploadPath, {
         method: 'POST',
         body: JSON.stringify({
@@ -7311,7 +8171,7 @@
           campaignSlug: campaignSlug || selectedContentCampaignSlug(),
           collection: context?.collection || 'content',
           fieldPath: pendingContentUploadFieldPath(item.meta, context),
-          filenameBase: pending.filenameBase || ''
+          filenameBase
         })
       });
       item.target[item.meta?.field || 'src'] = result.path || '';
@@ -8611,6 +9471,14 @@
     });
   }
 
+  if (marketingQrDownloadPng) {
+    marketingQrDownloadPng.addEventListener('click', downloadMarketingQrPng);
+  }
+
+  if (marketingQrDownloadSvg) {
+    marketingQrDownloadSvg.addEventListener('click', downloadMarketingQrSvg);
+  }
+
   if (marketingSaveReferral) {
     marketingSaveReferral.addEventListener('click', saveMarketingReferral);
   }
@@ -8619,15 +9487,6 @@
     marketingCancelEdit.addEventListener('click', function() {
       setMarketingEditingState('');
       setText(marketingStatus, '');
-    });
-  }
-
-  if (marketingSnippets) {
-    marketingSnippets.addEventListener('click', function(event) {
-      var button = event.target?.closest?.('[data-marketing-copy]');
-      if (button instanceof HTMLButtonElement) {
-        copyMarketingText(button.dataset.marketingCopy || '', button.dataset.marketingCopyHtml || '');
-      }
     });
   }
 
