@@ -447,6 +447,7 @@ describe('admin dashboard foundation', () => {
     expect(layout).toContain('autoload="false"');
     expect(layout).toContain('sync_query="false"');
     expect(layout).toContain('admin_marketing=true');
+    expect(layout).toContain('/assets/js/form-control-identity.js');
     expect(embedBuilder).toContain('data-admin-marketing-embed="true"');
     expect(embedBuilder).toContain('data-campaign-embed-autoload="{{ embed_autoload }}"');
     expect(embedBuilder).toContain('data-campaign-embed-sync-query="{{ embed_sync_query }}"');

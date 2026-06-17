@@ -106,6 +106,7 @@ describe('SEO templates', () => {
     expect(pagePrefetch).toContain('/assets/js/page-prefetch.js?v={{ asset_version }}');
     expect(config).toContain('intent_prefetch_enabled: true');
     expect(cartRuntimeFoot).not.toContain('/assets/js/campaign.js');
+    expect(cartRuntimeFoot).toContain('/assets/js/form-control-identity.js?v={{ asset_version }}');
     expect(cartRuntimeFoot).toContain('/assets/js/cart-runtime-loader.js?v={{ asset_version }}');
     expect(cartRuntimeFoot).toContain('data-pool-cart-runtime-loader="true"');
     expect(cartRuntimeFoot).not.toContain('/assets/js/cart-provider.js');
@@ -129,9 +130,12 @@ describe('SEO templates', () => {
 
     expect(manageLayout).toContain('indexable=false');
     expect(manageLayout).toContain('<meta name="referrer" content="no-referrer">');
+    expect(manageLayout).toContain('/assets/js/form-control-identity.js?v={{ asset_version }}');
     expect(communityLayout).toContain('indexable=false');
+    expect(communityLayout).toContain('/assets/js/form-control-identity.js');
     expect(pledgeResultLayout).toContain('indexable=false');
     expect(adminLayout).toContain('indexable=false');
+    expect(adminLayout).toContain('/assets/js/form-control-identity.js?v={{ asset_version }}');
     expect(adminLayout).toContain('social=false');
     expect(adminPage).toContain('indexable: false');
     expect(adminPage).toContain('sitemap: false');
