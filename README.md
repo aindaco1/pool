@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.0.6**. The v1.0 feature set and launch hardening pass are complete; v1.0.6 expands Campaigns -> Marketing with QR downloads, adds Campaigns -> Blast supporter announcement tooling, adds consent-based abandoned checkout reminders, and introduces a cross-platform setup/deployment helper for fork operators.
+Current release milestone: **v1.0.6**. The v1.0 feature set and launch hardening pass are complete; v1.0.6 expands Campaigns -> Marketing with QR downloads, adds Campaigns -> Blast supporter email tooling, adds consent-based abandoned checkout reminders, and introduces a cross-platform setup/deployment helper for fork operators.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -37,9 +37,9 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Serialized campaign settlement** — Scheduled and manual settlement routes use a per-campaign coordinator lock plus deterministic Stripe idempotency keys, so same-campaign charging cannot overlap while multi-campaign carts stay campaign-scoped
 - **Strict missing-pledge handling** — Magic-link pledge reads fail closed with `404` when the backing pledge record is missing
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
-- **Announcements** — Admin broadcast emails with custom CTA links to supporters
+- **Supporter blasts** — Campaign admins can send scoped supporter email blasts with WYSIWYG content, campaign-hosted images, email-safe video links, automatic dry runs, and custom CTA links
 - **Private admin dashboard** — Magic-link admin access for role-scoped settings, campaign editing, add-ons, supporters, reports, analytics, marketing/referral tools, users, and read-only secrets/diagnostics without exposing admin secrets in browser code
-- **Richer campaign marketing tools** — Campaigns -> Marketing can build tracked campaign links, save referral codes, and preview/download campaign QR codes as PNG/SVG; Campaigns -> Blast can draft supporter announcements locally with the WYSIWYG content editor, upload hosted campaign images through the shared media optimizer path, link YouTube/Vimeo videos instead of embedding remote players in email, automatically dry-run audiences before test/live sends, test-send to the signed-in admin, send to the campaign's indexed supporters, and show read-only sent blast history
+- **Richer campaign marketing tools** — Campaigns -> Marketing can build tracked campaign links, save referral codes, and preview/download campaign QR codes as PNG/SVG; Campaigns -> Blast can draft supporter email blasts locally with the WYSIWYG content editor, upload hosted campaign images through the shared media optimizer path, link YouTube/Vimeo videos instead of embedding remote players in email, automatically dry-run audiences before test/live sends, test-send to the signed-in admin, send to the campaign's indexed supporters, and show read-only sent blast history
 - **Protected campaign previews** — Super admins and assigned campaign users can publish noindex, email-protected full-page previews for campaigns they can edit, with generic static shells, read-only pledge controls, dashboard-visible publisher links, optional invited reviewer links that expire in 24 hours, and preview access allowlists stored in short-lived Worker KV instead of campaign source.
 - **New campaign creation** — Super admins can create a preview-only campaign from the dashboard with only a title, optionally selecting one or more existing campaign users or creating one or more new users with required name/email.
 - **Campaign archiving** — Super admins can archive non-live campaigns from Campaigns -> Settings; local dev archives directly in the mounted repo, while production dispatches a validated GitHub Actions workflow that moves campaign source and campaign-owned media into `archive/campaigns/<slug>/` instead of deleting archived data.
@@ -159,7 +159,7 @@ See [docs/SEO.md](docs/SEO.md) for the current SEO fundamentals implementation a
 See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) for the current accessibility baseline and verified critical flows.
 See [docs/I18N.md](docs/I18N.md) for the locale model, shared translation sources, and localized route behavior.
 
-Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It covers recent creator-facing changes, including campaign add-ons, hosted embeds, share-link/social-preview planning, dashboard media uploads, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
+Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It covers recent creator-facing changes, including campaign add-ons, hosted embeds, QR/referral links, supporter Blast prep, share-link/social-preview planning, dashboard media uploads, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
 
 For localization, the supported model is:
 
@@ -532,6 +532,7 @@ The Worker powers:
 - supporter email delivery via Resend
 - upcoming-campaign launch reminder delivery through the shared Resend path
 - consent-based abandoned-checkout reminder delivery through the shared Resend path
+- Campaigns -> Blast supporter email delivery through the shared Resend path
 - batched settlement and retry flows
 - browser admin dashboard auth, read APIs, GitHub-backed publish APIs, protected campaign previews, new campaign creation, user management, marketing referral saves, and legacy shared-secret admin endpoints
 

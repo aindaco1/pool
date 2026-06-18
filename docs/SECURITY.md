@@ -45,6 +45,10 @@ This document covers the security architecture, known risks, applied hardening m
 | `launch-reminder-sent:{slug}:{emailHash}` | PLEDGES | Reminder send idempotency marker | **Low** - send state |
 | `launch-reminder-dispatch:{slug}` | PLEDGES | Bounded reminder dispatch job cursor/progress | **Low** - operational state |
 | `launch-reminder-dispatch-queue:v1` | PLEDGES | Reminder dispatch queue idle/pending marker | **Low** - operational state |
+| `abandoned-cart:{orderId}` | PLEDGES | Explicitly opted-in checkout reminder email and campaign snapshot | **Medium** - campaign-scoped email |
+| `abandoned-cart-sent:{emailHash}:{campaignSetHash}` | PLEDGES | Checkout reminder send idempotency marker | **Low** - send state |
+| `abandoned-cart-suppressed:{emailHash}` | PLEDGES | Checkout reminder unsubscribe marker | **Medium** - supporter email hash |
+| `abandoned-cart-queue:v1` | PLEDGES | Checkout reminder queue idle/pending marker | **Low** - operational state |
 | `supporter-email-retry:{orderId}` | PLEDGES | Queued supporter confirmation email retry payload | **Medium** - supporter email payload |
 | `supporter-email-retry-queue:v1` | PLEDGES | Supporter email retry idle/pending and next-attempt marker | **Low** - operational state |
 | `add-on-inventory-sold:v1` | PLEDGES | Platform add-on sold-count projection | **Low** - aggregate inventory state |
@@ -123,6 +127,7 @@ Admin mutations use these common protections:
 - Publish-time media cleanup is derived server-side from the previously loaded campaign data and the normalized campaign draft being committed. It only deletes safe root-relative dashboard-owned files under the same campaign's `assets/images`, `assets/videos`, or `assets/audio` directories, and it preserves external URLs, shared/default assets, and files still referenced elsewhere in the campaign.
 - Runtime-only admin users are saved only to KV at `admin-users:v1`; they are not serialized into `_config.yml`.
 - Marketing referral codes are saved only on explicit user action and are scoped to the campaign URL origin/path the admin account can access.
+- Campaigns -> Blast sends are scoped to campaigns the admin account can edit. Blast dry runs require the campaign pledge index and add no KV writes or list operations; live sends require a matching dry-run hash and write one audit event after dispatch.
 - New campaign creation is super-admin-only, writes a preview-only campaign Markdown file locally in dev or through the existing GitHub path in production, and keeps that campaign out of public route generation until launched. Creating new campaign users during that flow saves to `admin-users:v1` and emails assigned users through the shared admin email path when users are assigned.
 - Protected preview publication is scoped to super admins and assigned campaign users. It commits only preview flags to campaign Markdown, stores the publishing admin plus optional reviewer emails in a short-lived `campaign-preview-reviewers:{slug}` KV allowlist, returns a signed 24-hour dashboard link for the publishing admin, sends signed 24-hour reviewer links when optional reviewers are added, and records an audit event. Previewer emails must not be persisted in GitHub-backed campaign source, public campaign JSON, sitemap output, or generated metadata.
 - Campaign archiving is super-admin-only and unavailable for currently live campaigns. The Worker validates the CSRF token, role, slug, campaign existence, and effective state before moving files locally in dev or dispatching `.github/workflows/archive-campaign.yml` in production. Both archive paths validate the slug, move campaign source and campaign-owned media into `archive/campaigns/<slug>/`, skip media still referenced by other active campaigns, and write an `archive-manifest.json`.
@@ -519,8 +524,9 @@ Covered write paths:
 - `/admin/users`
 - `/admin/campaigns/create`, `/admin/campaigns/archive`, and `/admin/campaign-preview/publish`
 - `/admin/marketing/referrals`
+- `/admin/marketing/announcement`
 
-The hardening rejects stored-XSS primitives such as raw `<script>`, event-handler attributes, unsafe Markdown links, parent-relative Markdown links, `javascript:`/`data:` URLs, CSS function/declaration injection, and unsafe asset paths. It also rejects settings mass assignment for dashboard-only rows and normalizes structured arrays for platform add-ons, campaign add-ons, tiers, support items, diary entries, stretch goals, ongoing items, and decisions. Media uploads are role-scoped, content-type allowlisted, size-limited, and written only to canonical dashboard asset directories.
+The hardening rejects stored-XSS primitives such as raw `<script>`, event-handler attributes, unsafe Markdown links, parent-relative Markdown links, `javascript:`/`data:` URLs, CSS function/declaration injection, and unsafe asset paths. It also rejects settings mass assignment for dashboard-only rows and normalizes structured arrays for platform add-ons, campaign add-ons, tiers, support items, diary entries, stretch goals, ongoing items, and decisions. Media uploads are role-scoped, content-type allowlisted, size-limited, and written only to canonical dashboard asset directories. Blast email rendering includes only site-hosted image paths and email-safe video links rather than arbitrary remote image hotlinks or iframe embeds.
 
 The browser dashboard also has defense-in-depth hardening around the editing shell: the admin page meta CSP avoids inline scripts, limits Worker/API connections, and keeps content previews in sandboxed iframes. Deployments should add framing protection through HTTP headers, such as `Content-Security-Policy: frame-ancestors 'none'` or `X-Frame-Options: DENY`, because meta CSP cannot enforce that directive. Magic-link email payloads strip CRLF/control characters from configurable header values before calling Resend so platform names or sender settings cannot create header-injection payloads.
 

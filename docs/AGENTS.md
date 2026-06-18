@@ -145,13 +145,15 @@ If you touch deliverability-sensitive behavior, also sanity-check:
 - `from` domain alignment
 - `reply_to`
 - plain-text body generation
+- hosted image URLs and email-safe video links for Blast content
 - transactional vs promotional content mixing
 
 ### Change embeds or rich previews
 
 Start with:
 
-- dashboard **Marketing** tab if the task is only building a campaign embed snippet or saved referral URL
+- dashboard **Marketing** tab if the task is only building a campaign embed snippet, saved referral URL, QR download, or tracked campaign link
+- dashboard **Campaigns -> Blast** if the task changes supporter email blast drafting, dry runs, test sends, live sends, or sent history
 - embed routes and layout in [`embed/`](../embed) and [`_layouts/campaign-embed.html`](../_layouts/campaign-embed.html)
 - embed client/runtime in [`assets/js/campaign-embed.js`](../assets/js/campaign-embed.js)
 - embed styles in [`assets/partials/_embed.scss`](../assets/partials/_embed.scss)

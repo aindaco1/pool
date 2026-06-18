@@ -566,6 +566,7 @@ describe('admin dashboard foundation', () => {
     expect(adminScss).toContain('grid-template-columns: var(--admin-marketing-qr-size) minmax(9.5rem, 1fr);');
     expect(adminScss).toContain('.admin-settings__label h3');
     expect(adminScss).toContain('.admin-marketing__referrals > h3');
+    expect(adminScss).toContain('.admin-marketing__referrals > h3 {\n  @include type-card-title;');
     expect(adminScss).toContain('.admin-content-block__media-placeholder--external');
     expect(adminScss).toContain('.admin-content-preview__media-placeholder--external');
     expect(adminScss).toContain('.content-block__media-placeholder--external');

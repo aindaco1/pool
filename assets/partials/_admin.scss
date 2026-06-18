@@ -2738,9 +2738,7 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-marketing__referrals > h3 {
-  font-size: $type--ui;
-  font-weight: 700;
-  line-height: 1.2;
+  @include type-card-title;
   margin: 0 0 8px;
 }
 
@@ -3163,6 +3161,20 @@ textarea.admin-settings__input--readonly {
   .admin-tabs__label,
   .admin-campaign-section-tabs__label {
     display: none;
+  }
+
+  .admin-campaign-settings__results .admin-campaign-section-tabs {
+    gap: 0;
+    justify-content: stretch;
+  }
+
+  .admin-campaign-settings__results .admin-campaign-section-tabs__tab {
+    flex: 1 1 0%;
+    min-width: 0;
+    overflow: hidden;
+    padding-left: 1px;
+    padding-right: 1px;
+    text-overflow: ellipsis;
   }
 }
 

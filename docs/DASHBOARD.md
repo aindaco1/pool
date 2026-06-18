@@ -74,7 +74,7 @@ The top-level dashboard order is:
 
 1. **Settings**: platform configuration, branding/SEO, pricing, tax, shipping, runner reports, design, users, performance, plan usage, debug, credential status, and runtime diagnostics.
 2. **Add-ons**: platform add-on availability and product details, visible only to super admins.
-3. **Campaigns**: role-scoped campaign settings, page content, rewards, campaign add-ons, stretch goals, ongoing items, diary entries, decisions, and Blast supporter announcements.
+3. **Campaigns**: role-scoped campaign settings, page content, rewards, campaign add-ons, stretch goals, ongoing items, diary entries, decisions, and supporter email blasts.
 4. **Analytics**: pledge-derived campaign and portfolio analytics.
 5. **Reports**: CSV preview/download for pledge and fulfillment reports.
 6. **Supporters**: role-scoped supporter browsing, filtering, sorting, and CSV export.
@@ -339,13 +339,13 @@ QR codes are generated in the browser from the current campaign URL builder outp
 
 ## Blast
 
-Campaigns -> Blast sends supporter announcements for the selected campaign without adding another top-level dashboard view. Campaign users may send blasts for campaigns assigned to them, and super admins may send for any campaign. Blast drafts are browser-local for now and reuse the campaign WYSIWYG content editor for email-ready headings, text, quotes, lists, links, uploaded campaign-hosted images, and YouTube/Vimeo video links. The dashboard automatically uploads staged Blast images through the same campaign media upload path used by Content and diary blocks before the dry run, so image files are committed under `assets/images/campaigns/<slug>/` and queued for repository media optimization before the email payload is built. The dashboard automatically runs the dry-run validation before Send test or Send blast; failed upload or audience checks explain the reason before any email send is attempted.
+Campaigns -> Blast sends supporter email blasts for the selected campaign without adding another top-level dashboard view. Campaign users may send blasts for campaigns assigned to them, and super admins may send for any campaign. Blast drafts are browser-local for now and reuse the campaign WYSIWYG content editor for email-ready headings, text, quotes, lists, links, uploaded campaign-hosted images, and YouTube/Vimeo video links. The dashboard automatically uploads staged Blast images through the same campaign media upload path used by Content and diary blocks before the dry run, so image files are committed under `assets/images/campaigns/<slug>/` and queued for repository media optimization before the email payload is built. The dashboard automatically runs the dry-run validation before Send test or Send blast; failed upload or audience checks explain the reason before any email send is attempted.
 
 Dry runs validate the message, compute the indexed audience count, and return a dry-run hash without rate-limit writes, audit writes, email sends, or KV lists. Test sends go only to the signed-in admin. Live sends require the matching dry-run hash for the exact message and audience, send through the shared Resend updates sender, and write one audit event after dispatch. The Blast tab shows read-only sent history from recent audit records, including subject, content, CTA Button Label, and CTA Button URL.
 
 Blast email rendering only includes hosted site images from `/assets/images/...`; arbitrary remote image URLs are omitted server-side. YouTube and Vimeo blocks render as email-safe links/buttons rather than iframe or video embeds because most email clients block embedded players.
 
-If `campaign-pledges:<slug>` is missing, announcement dry-runs and sends fail closed with `campaign_index_required`; rebuild the campaign index before sending. This avoids falling back to pledge namespace scans on an operator path that can run in production.
+If `campaign-pledges:<slug>` is missing, Blast dry-runs and sends fail closed with `campaign_index_required`; rebuild the campaign index before sending. This avoids falling back to pledge namespace scans on an operator path that can run in production.
 
 ## Media
 
