@@ -2,9 +2,9 @@
 
 ## Current Milestone
 
-**v1.0.6**
+**v1.0.7**
 
-The v1.0 feature set and release-hardening pass are complete. v1.0.6 focuses on richer campaign marketing tools, supporter email blasts, consent-based abandoned-checkout reminders, and a script-first local/production setup helper for fork operators. Remaining polish and product follow-ups for those surfaces are tracked under the v1.0.7 follow-up list below.
+The v1.0.6 release shipped richer campaign marketing tools, supporter email blasts, consent-based abandoned-checkout reminders, and a script-first local/production setup helper for fork operators. v1.0.7 focuses on the follow-up work tracked below: abandoned-checkout visibility, setup/deploy hardening, shared Marketing/Blast draft support, referral/UTM reporting, and a campaign-scoped WYSIWYG media picker.
 
 ## Completed
 

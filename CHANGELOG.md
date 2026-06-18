@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.7 - Unreleased
+
+Planned scope:
+
+- Add abandoned-checkout reminder visibility that avoids KV namespace scans and supporter PII.
+- Harden setup/deploy idempotency, provider readiness checks, and first-time operator guidance.
+- Add shared Marketing/Blast draft support and referral/UTM reporting only where access, retention, conflict, and KV-write rules stay bounded.
+- Add a campaign-scoped WYSIWYG media picker for existing uploaded images.
+
 ## v1.0.6 - 2026-06-18
 
 Release scope:
