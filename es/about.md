@@ -11,7 +11,7 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
-El hito de lanzamiento actual de la plataforma es **v1.0.5**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente añade vistas previas protegidas de campaña para personas revisoras de confianza, creación de campañas por superadministradores con correos de asignación para personas usuarias de campaña y archivado de campañas no activas por superadministradores.
+El hito de lanzamiento actual de la plataforma es **v1.0.6**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente añade herramientas de marketing de campaña más completas, blasts de correo para patrocinadores, recordatorios de checkout abandonado con consentimiento y un helper de configuración script-first para forks.
 
 ## Aportes de todo o nada
 
@@ -30,6 +30,8 @@ Si tu pago incluye más de una campaña, recibirás correos de confirmación y e
 
 Para campañas que aún no han lanzado, también puedes apuntarte a un recordatorio único de lanzamiento sin crear una cuenta ni iniciar un aporte.
 
+Durante el checkout, también puedes elegir recibir un solo recordatorio si sales antes de terminar tu aporte. Ese recordatorio es opcional, independiente de los recordatorios de lanzamiento e incluye un enlace para cancelar la suscripción.
+
 ## Cómo funcionan los enlaces mágicos por correo
 
 En lugar de pedirte que crees una contraseña, The Pool utiliza enlaces seguros por correo para comprobar que controlas un aporte.
@@ -38,6 +40,7 @@ En lugar de pedirte que crees una contraseña, The Pool utiliza enlaces seguros 
 - **Usa el enlace de gestión para hacer cambios**: desde ahí puedes revisar tu aporte, ajustarlo mientras la campaña siga activa, cancelarlo o actualizar tu tarjeta guardada.
 - **Los enlaces de comunidad son solo para patrocinadores**: si una campaña tiene activada la votación comunitaria, el correo también incluye un enlace a la comunidad de patrocinadores de esa campaña.
 - **Los recordatorios de lanzamiento son independientes**: si optas por recibir un recordatorio para una campaña próxima, The Pool envía un solo correo cuando esa campaña se activa e incluye un enlace para cancelar ese recordatorio.
+- **Los recordatorios de checkout requieren consentimiento**: si optas por un recordatorio de checkout abandonado, The Pool envía como máximo un seguimiento para ese checkout incompleto e incluye un enlace para cancelar la suscripción.
 - **Guarda el correo**: el enlace es la forma más rápida de volver a tu aporte más tarde. Si abres la página de comunidad en otro navegador o después de reiniciar tu sesión del navegador, volver a usar el enlace del correo es la forma más segura de recuperar el acceso.
 
 Si apoyaste varias campañas en un mismo pago, aun así las gestionarás por separado después.
@@ -76,6 +79,8 @@ La plataforma está diseñada para cineastas y equipos creativos que necesitan u
 - **Add-ons opcionales de plataforma**: ofrece merch de plataforma junto con los aportes cuando esté habilitado, con inventario y envío separados que no cuentan para la meta de financiación de la campaña.
 - **Add-ons de campaña**: vende merch o extras específicos de la campaña en el mismo flujo de aporte, manteniendo ingresos, inventario y envío ligados a esa campaña.
 - **Panel privado de administración**: da a personas de confianza un espacio enfocado para ajustes de campaña, contenido de página, recompensas, actualizaciones, decisiones, reportes, patrocinadores, analytics y enlaces de marketing.
+- **Herramientas de marketing de campaña**: crea enlaces con tracking, guarda códigos de referencia, descarga códigos QR de campaña y genera snippets de embed desde el tab Marketing del panel.
+- **Blasts de correo para patrocinadores**: envía blasts de correo por campaña desde Campaigns -> Blast, usando imágenes alojadas por la campaña y enlaces de video compatibles con email.
 - **Vistas previas protegidas de campaña**: comparte campañas en borrador o solo-preview de forma privada con personas usuarias asignadas y revisoras invitadas antes de que la página pública lance.
 - **Configuración de nuevas campañas**: las personas superadministradoras pueden crear una campaña privada en borrador a partir de un título y personas usuarias asignadas, y luego completar el resto desde el panel.
 - **Archivado de campañas**: las personas superadministradoras pueden archivar campañas no activas sin borrar la fuente ni los medios subidos de la campaña, manteniendo un registro revisable fuera de las listas activas.
@@ -106,7 +111,7 @@ The Pool es una plataforma de crowdfunding con arquitectura static-first. Las p�
 | Pagos | [Stripe](https://stripe.com) | Stripe controla los campos sensibles de pago, métodos guardados y cobros posteriores. |
 | Backend | [Cloudflare Workers](https://workers.cloudflare.com) y KV | El Worker valida totales, guarda aportes, sirve estadísticas en vivo, alimenta APIs del panel y maneja fulfillment más estado de liquidación por campaña. |
 | Panel de administración | Panel privado de The Pool | Las personas autorizadas pueden gestionar campañas, contenido, reportes, patrocinadores, analytics, enlaces de marketing, add-ons y usuarios sin editar archivos directamente. |
-| Correo | [Resend](https://resend.com) | Confirmaciones, enlaces de patrocinador, recordatorios de lanzamiento, actualizaciones de campaña y avisos de cobro usan una sola ruta de correo transaccional. |
+| Correo | [Resend](https://resend.com) | Confirmaciones, enlaces de patrocinador, recordatorios de lanzamiento, recordatorios de checkout, blasts de campaña, actualizaciones de campaña y avisos de cobro usan una sola ruta de correo transaccional. |
 
 El stack está pensado para equipos pequeños y forks. Cada servicio principal ofrece un nivel gratuito, y la plataforma evita trabajo dinámico innecesario siempre que puede. Las páginas públicas de campaña son estáticas, los datos públicos en vivo se combinan y se cachean en el navegador, y el Worker se reserva para operaciones que necesitan confianza del servidor.
 
@@ -130,4 +135,4 @@ The Pool es de código abierto. Toda la plataforma, el frontend, el Worker, la a
 
 *The Pool ha sido creado y es mantenido por [Dust Wave](https://dustwave.xyz).*
 
-_Última actualización: 12 de junio de 2026_
+_Última actualización: 18 de junio de 2026_

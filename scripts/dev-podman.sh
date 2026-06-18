@@ -27,6 +27,8 @@ PODMAN_SUPERVISE_INTERVAL="${PODMAN_SUPERVISE_INTERVAL:-2}"
 PODMAN_SUPERVISE_LOG_LINES="${PODMAN_SUPERVISE_LOG_LINES:-30}"
 PODMAN_STACK_START_ATTEMPTS="${PODMAN_STACK_START_ATTEMPTS:-3}"
 PODMAN_STACK_RETRY_DELAY="${PODMAN_STACK_RETRY_DELAY:-3}"
+PODMAN_SITE_READY_TIMEOUT="${PODMAN_SITE_READY_TIMEOUT:-180}"
+PODMAN_WORKER_READY_TIMEOUT="${PODMAN_WORKER_READY_TIMEOUT:-60}"
 
 detect_podman_socket() {
   podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true
@@ -247,6 +249,26 @@ kill_port_if_busy() {
   sleep 1
 }
 
+wait_for_port_release() {
+  local port="$1"
+  local label="$2"
+
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+
+  for _ in $(seq 1 20); do
+    if ! lsof -ti tcp:"$port" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "⚠️  Port $port is still in use after cleaning up $label."
+  lsof -nP -iTCP:"$port" -sTCP:LISTEN || true
+  return 1
+}
+
 ensure_podman_ready() {
   if ! command -v podman >/dev/null 2>&1; then
     echo "❌ Podman is required for --podman mode."
@@ -445,11 +467,13 @@ start_pod_containers() {
 
 start_dev_stack_once() {
   cleanup_pod
+  wait_for_port_release "$JEKYLL_PORT" "Jekyll" || return 1
+  wait_for_port_release "$WORKER_PORT" "Worker" || return 1
   if ! start_pod_containers; then
     cleanup_pod
     return 1
   fi
-  wait_for_http "http://127.0.0.1:${JEKYLL_PORT}" "Jekyll" || return 1
+  wait_for_site_http "http://127.0.0.1:${JEKYLL_PORT}" "Jekyll" || return 1
   wait_for_worker_http "http://127.0.0.1:${WORKER_PORT}/stats/does-not-exist" "Worker" || return 1
 }
 
@@ -475,18 +499,23 @@ start_dev_stack() {
   return 1
 }
 
-wait_for_http() {
+wait_for_site_http() {
   local url="$1"
   local label="$2"
-  for _ in $(seq 1 40); do
-    if curl -fsS "$url" >/dev/null 2>&1; then
+  local body=""
+
+  for _ in $(seq 1 "$PODMAN_SITE_READY_TIMEOUT"); do
+    body="$(curl -fsS "${url%/}/admin/" 2>/dev/null || true)"
+    if [[ "$body" == *'id="admin-auth-panel"'* ]]; then
       echo "✅ $label ready"
       return 0
     fi
     sleep 1
   done
 
-  echo "❌ $label failed to start"
+  echo "❌ $label failed to serve the expected admin page within ${PODMAN_SITE_READY_TIMEOUT}s"
+  echo "   Last $PODMAN_SUPERVISE_LOG_LINES $label log lines:"
+  podman logs --tail "$PODMAN_SUPERVISE_LOG_LINES" "$SITE_CONTAINER" 2>&1 | sed 's/^/   /' || true
   return 1
 }
 
@@ -562,7 +591,7 @@ supervise_dev_stack() {
     fi
 
     if ! container_running "$SITE_CONTAINER"; then
-      if ! restart_dev_container "$SITE_CONTAINER" "Jekyll" wait_for_http "http://127.0.0.1:${JEKYLL_PORT}"; then
+      if ! restart_dev_container "$SITE_CONTAINER" "Jekyll" wait_for_site_http "http://127.0.0.1:${JEKYLL_PORT}"; then
         retry_later "Jekyll restart failed"
       fi
     fi
@@ -579,7 +608,7 @@ wait_for_worker_http() {
   local url="$1"
   local label="$2"
   local status=""
-  for _ in $(seq 1 40); do
+  for _ in $(seq 1 "$PODMAN_WORKER_READY_TIMEOUT"); do
     status="$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || true)"
     if [ -n "$status" ] && [ "$status" != "000" ]; then
       echo "✅ $label ready"
@@ -588,7 +617,7 @@ wait_for_worker_http() {
     sleep 1
   done
 
-  echo "❌ $label failed to start"
+  echo "❌ $label failed to start within ${PODMAN_WORKER_READY_TIMEOUT}s"
   return 1
 }
 

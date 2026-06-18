@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Lista para creadores de campañas
-description: "Una lista práctica para preparar una campaña en The Pool: panel de administración, vistas previas protegidas, imágenes, video, textos, niveles, add-ons, enlaces para compartir, embeds, impuestos, envío, reportes y fulfillment."
+description: "Una lista práctica para preparar una campaña en The Pool: panel de administración, vistas previas protegidas, imágenes, video, textos, niveles, add-ons, enlaces para compartir, embeds, QR/referencias, blasts, impuestos, envío, reportes y fulfillment."
 permalink: /es/creator-campaign-checklist/
 lang: es
 indexable: false
@@ -29,12 +29,13 @@ La lista cubre:
 - recompensas físicas, envío, envío gratis y tarifas de respaldo
 - expectativas de impuestos y checkout
 - enlaces para compartir y embeds para promoción
+- QR, enlaces de referencia y preparación de Blasts para patrocinadores
 - reportes, fulfillment y entrega final
 - acceso al panel, borradores y expectativas de publicación
 
 ## Qué cambió desde v0.9.5
 
-Esta lista refleja los cambios de la plataforma hasta **v1.0.5**:
+Esta lista refleja los cambios de la plataforma hasta **v1.0.6**:
 
 - las personas creadoras pueden tener acceso específico al panel para editar campañas sin acceso directo al repositorio
 - las cargas de media en el panel soportan imágenes, video, audio, previews y optimización posterior en el repositorio con variantes WebP responsivas
@@ -48,6 +49,9 @@ Esta lista refleja los cambios de la plataforma hasta **v1.0.5**:
 - los analytics de campaña mantienen visible el ingreso bruto de campaña y también muestran el ingreso neto después de comisiones de procesamiento asignadas
 - las personas operadoras de plataforma pueden vigilar el uso de planes de Cloudflare y Resend desde el panel sin exponer tokens de proveedores al equipo creador
 - los equipos de campaña pueden usar enlaces de vista previa protegida para revisar borradores de campaña de forma privada antes del lanzamiento público
+- los equipos de campaña pueden crear URLs con tracking, guardar códigos de referencia y descargar códigos QR desde el tab Marketing
+- Campaigns -> Blast puede enviar correos a patrocinadores con imágenes alojadas por la campaña y enlaces de YouTube/Vimeo compatibles con email
+- el checkout puede recoger consentimiento explícito para un solo recordatorio de checkout abandonado, separado de recordatorios de lanzamiento y blasts de campaña
 - las mejoras de performance hacen más estable la primera carga, incluidos embeds hero de YouTube diferidos y entrega responsiva de imágenes, pero las campañas aún necesitan media optimizada y copy conciso
 
 ## Versión rápida
@@ -81,6 +85,8 @@ Esta lista refleja los cambios de la plataforma hasta **v1.0.5**:
 - video pitch de campaña
 - 3 a 8 imágenes adicionales
 - plan de promoción con el código embed de la campaña
+- destinos para QR/enlaces de referencia en impresos, venues, partners o bios sociales
+- plan para el primer Blast de lanzamiento o empuje final
 - captions para compartir en lanzamiento, campaña live, empuje final, campaña funded y campaña ended
 
 ### Si algo es físico
@@ -148,6 +154,8 @@ El panel puede gestionar:
 - contenido largo mediante el editor WYSIWYG de bloques
 - niveles, artículos de apoyo, add-ons de campaña, stretch goals, entradas de diario y decisiones
 - vistas previas de reportes, listas de patrocinadores, analytics, enlaces de marketing/referencia y accesos al constructor de embeds
+- descargas de QR de campaña y enlaces de referencia guardados
+- borradores de Blast, envíos de prueba, envíos live e historial enviado de solo lectura
 - textos de compartir y entradas de social preview mediante los mismos campos de título, blurb, imagen hero y estado que se muestran en la página pública
 - enlaces de vista previa protegida para personas revisoras de confianza antes de que la campaña sea pública
 
@@ -170,6 +178,7 @@ Notas operativas:
 - Los formularios de recordatorio para campañas próximas también pueden usar Cloudflare Turnstile; las claves y secretos los configuran las personas operadoras de plataforma, no las creadoras.
 - Los analytics distinguen ingresos brutos de campaña e ingresos netos después de comisiones de procesamiento asignadas, para ayudar a reconciliar totales sin ocultar la matemática pública de financiación.
 - Las fechas de lanzamiento y cierre se interpretan en la zona horaria de plataforma configurada por una persona superadministradora, así que conviene confirmarla antes de publicar copy sensible a horario.
+- Los borradores de Blast viven en el navegador hasta probarse o enviarse. Las imágenes seleccionadas se suben al directorio de assets de la campaña antes del dry run automático, mientras YouTube y Vimeo se convierten en enlaces compatibles con email.
 
 ## Imágenes y video
 
@@ -340,7 +349,7 @@ The Pool incluye un constructor de embed:
 - `/embed/campaign/?slug=tu-campaign-slug`
 - `/es/embed/campaign/?slug=tu-campaign-slug`
 
-El embed es un `iframe` vivo para sitios que aceptan HTML. Refleja el estado actual de la campaña, monto pledged, progreso, countdown, media y CTA. El mismo constructor también aparece dentro del tab Marketing del panel junto con herramientas para códigos de referencia y enlaces UTM guardados.
+El embed es un `iframe` vivo para sitios que aceptan HTML. Refleja el estado actual de la campaña, monto pledged, progreso, countdown, media y CTA. El mismo constructor también aparece dentro del tab Marketing del panel junto con herramientas para códigos de referencia, enlaces UTM guardados y descargas de QR.
 
 <figure class="creator-checklist-screenshot">
   <img src="/assets/images/checklists/creator-campaign-checklist/embed-builder.png" alt="Constructor de embed con controles de layout, tema, media, CTA, código y vista previa." loading="lazy">
@@ -351,6 +360,8 @@ Prepara:
 
 - URL principal de campaña
 - destinos donde se pegará el embed
+- destinos de QR: posters, tarjetas, señalización de venue, programas, postales o bios sociales
+- nombres de códigos de referencia para partners, prensa, venues, cast/crew o canales del equipo de campaña
 - modo preferido: completo o compacto
 - si debe mostrar media
 - copy de lanzamiento
@@ -362,9 +373,13 @@ Prepara:
   - funded: agradecer y explicar próximos pasos
   - ended: resumir el resultado y dónde seguir updates
 - blurb corto para email/newsletter
+- asunto y cuerpo breve para un Blast de lanzamiento o empuje final
+- CTA Button Label y CTA Button URL si el Blast necesita una acción clara
 - contactos de prensa o partners, si aplican
 
 Los botones de compartir usan la URL pública de campaña y texto por estado donde se permite. Facebook y otros destinos centrados en preview dependen principalmente del Open Graph title, description e imagen de la campaña.
+
+Prueba los QR desde la cámara de un teléfono real antes de imprimirlos o compartirlos ampliamente. El copy de Blast debe ser conciso, usar pocas imágenes y enlazar media alojada por la campaña en lugar de hotlinks remotos.
 
 ## Recompensas físicas y envío
 
@@ -453,6 +468,8 @@ Comportamiento:
 - correos de reportes y responsable de fulfillment
 - correos de editoras o editores del panel, si el equipo creador necesita acceso directo
 - destinos de embed/promoción para la semana de lanzamiento
+- destinos de QR/referencia y códigos de partners necesarios antes del lanzamiento
+- asunto, cuerpo y CTA del primer Blast para patrocinadores
 
 ## Checklist final
 
@@ -471,6 +488,8 @@ La campaña suele estar lista cuando:
 - reportes y fulfillment tienen responsables
 - el acceso al panel y la responsabilidad de publicación están confirmados
 - el embed fue probado en destinos de promoción
+- los QR descargan correctamente y escanean al URL de campaña/referencia esperado
+- cualquier Blast de lanzamiento o empuje final tiene asunto, cuerpo conciso, CTA Button Label y CTA Button URL
 - los captions y el preview social se sienten apropiados para estados upcoming, live, funded y ended
 - las imágenes tienen alt text
 - no quedan secciones placeholder

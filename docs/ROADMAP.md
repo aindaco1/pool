@@ -2,42 +2,42 @@
 
 ## Current Milestone
 
-**v1.0.5**
+**v1.0.6**
 
-The v1.0 feature set and release-hardening pass are complete. v1.0.5 focuses on protected draft-campaign collaboration: email-protected preview pages, dashboard-visible publisher links, explicitly invited reviewer links that expire in 24 hours, and super-admin new campaign creation with campaign-user assignment emails.
+The v1.0 feature set and release-hardening pass are complete. v1.0.6 focuses on richer campaign marketing tools, supporter email blasts, consent-based abandoned-checkout reminders, and a script-first local/production setup helper for fork operators. Remaining polish and product follow-ups for those surfaces are tracked under the v1.0.7 follow-up list below.
 
 ## Completed
 
 **Protected campaign previews and new campaign creation**
 
-- [x] Allow super admins and assigned campaign users to publish email-protected campaign preview pages
+- [x] Protected preview pages
   - Preview pages live at `/campaigns/:slug/preview/` and localized equivalents, but stay `noindex,nofollow,noarchive`, strict-origin referrer scoped for embedded media, no-store, outside public sitemap output, and excluded from public intent prefetching
   - Authenticated super admins and assigned campaign users can fetch preview payloads through the existing admin session and campaign-scope checks
   - Publishing admins receive a dashboard-visible signed preview link, explicitly invited reviewer emails receive signed preview links that expire in 24 hours, and the email copy says so clearly
   - Preview access validates token type, expiry, campaign slug, and allowed email against a 24-hour `campaign-preview-reviewers:<slug>` Worker KV allowlist instead of storing reviewer lists in GitHub-backed campaign front matter or public campaign JSON
   - New/preview-only campaigns remain invisible from public `/campaigns/:slug/`, homepage lists, localized campaign pages, community pages, `/api/campaigns.json`, add-on catalogs, share cards, and sitemap output until launched
-- [x] Add super-admin-only new campaign creation
+- [x] New campaign creation
   - Super admins can create a preview-only campaign from the Campaigns dashboard with only a required title
   - The flow can optionally assign one or more existing campaign users and optionally create one or more new campaign users with required names and emails
   - Campaign source is created locally in dev or through the existing GitHub-backed `_campaigns/<slug>.md` publish path in production, the normal rebuild is triggered when GitHub-backed, assigned/new users are saved in `admin-users:v1`, and an admin audit event is recorded
   - Assigned campaign users receive Resend-powered emails with the admin dashboard link when users are assigned
-- [x] Add super-admin-only campaign archiving for non-live campaigns
+- [x] Campaign archiving
   - The Campaigns -> Settings subtab shows Archive campaign below the background fields only to super admins when the campaign is not currently live
   - The Worker validates role, CSRF, campaign existence, and effective state, then archives locally in dev or dispatches `.github/workflows/archive-campaign.yml` in production
   - The archive move keeps campaign source and campaign-owned media in `archive/campaigns/<slug>/`, writes an archive manifest, and leaves media still referenced by other active campaigns in place
-- [x] Add lightweight multi-user editing safeguards
+- [x] Publish conflict protection
   - Campaign content and preview publishes carry a GitHub file SHA/base revision when available
   - Stale publishes are rejected with a specific conflict response so browser-local drafts remain intact and users can reload before publishing
 
 **Admin dashboard analytics and operations**
 
-- [x] Add net revenue analytics after allocated processor fees
-  - Existing Campaign revenue and Platform revenue cards remain gross category totals
-  - Net campaign revenue and Net platform revenue cards/table columns show gross category totals after each category's allocated processor-fee share
-  - Actual Stripe fees are allocated proportionally across campaign revenue, platform revenue, tax, and shipping when stored balance transaction data exists
-  - Active pledges and charged pledges still awaiting actual balance transaction data use the existing estimated Stripe fee model
+- [x] Gross and net revenue analytics
+  - Campaign revenue and Platform revenue remain gross category totals, while net cards/table columns subtract each category's allocated processor-fee share
+  - Successful supporter charges store Stripe balance transaction fee, net, gross, charge, and balance transaction IDs when available
+  - Analytics uses actual stored Stripe fee values for charged pledges and the existing estimated fee model for active pledges or older charged records without Stripe balance data
+  - A super-admin-only, CSRF-protected backfill path retrieves historical Stripe balance transaction data from campaign pledge indexes without KV list scans
   - Card and table labels keep gross and net values distinct for reconciliation
-- [x] Create a tracker that shows use of Cloudflare and Resend plans
+- [x] Plan usage tracker
   - Super admins can load Cloudflare Workers/KV and Resend quota usage from Settings -> Plan usage automatically when the section opens
   - The tracker shows plan names, progress bars, `used of limit` text, warning/critical thresholds, and plan-management links
   - Provider API tokens stay server-side; the browser receives only sanitized usage metrics and status messages
@@ -45,258 +45,237 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.5 focuses on 
 
 **Platform foundation**
 
-- [x] Core branding, formatting, and internationalization scaffolding
+- [x] Branding and i18n scaffolding
   - The Pool / Dust Wave platform branding
   - money formatting plugin
   - translation helper, `en.yml`, and example templates
-- [x] Cloudflare Worker backend and lifecycle automation
-  - pledge storage, stats, inventory, and emails
-  - auto-settle scheduler
-  - aggregated supporter charging
-  - DST-aware configurable platform timezone deadline handling across frontend + Worker
-  - automatic campaign state transitions
-- [x] Podman-backed local development and testing
-  - `./scripts/dev.sh --podman`
-  - containerized headless Playwright
-  - Podman-aware smoke/report helpers plus `podman:doctor` and `podman:self-check`
+- [x] Worker backend and automation
+  - pledge storage, stats, inventory, emails, auto-settlement, aggregated supporter charging, and automatic campaign state transitions
+  - campaign state, browser countdowns, Worker deadlines, scheduled reports, settlement checks, and admin date/time surfaces share the same `platform.timezone` / `PLATFORM_TIMEZONE` model
+  - the minute-level Worker scheduler persists `cron:lastRun` hourly instead of every minute, keeping cron health visible without baseline free-tier KV write churn
+- [x] Podman local development
+  - `./scripts/dev.sh --podman`, containerized headless Playwright, Podman-aware smoke/report helpers, `podman:doctor`, and `podman:self-check`
+  - host and Podman Worker development use Node 24 to match GitHub Actions deployments and avoid the obsolete Node 20 Wrangler path
+  - Wrangler 4 local development runs against Worker compatibility date `2026-05-03`, avoiding the older local-runtime polyfill crash under Node 24
+  - Podman Worker dependency setup uses `npm ci` so local container starts do not mutate `worker/package-lock.json`
+  - the Podman media optimizer includes `optipng` and `gifsicle` for local PNG/GIF source compression through the same repository media workflow
+- [x] Setup and deploy helper
+  - `npm run setup:deploy` / `scripts/setup-deploy.mjs` ships as a dependency-free Node CLI for local setup, production dry runs, config sync, Cloudflare KV creation/update, Worker secret writes, GitHub repository secret writes, auth helpers for `gh`/`wrangler`/optional Stripe CLI, and optional `wrangler deploy`
+  - The helper keeps production setup idempotency and operator confirmation front of mind, while avoiding app-wrapper complexity until the script-first workflow is stable
 
 **Campaign and public experience**
 
-- [x] Public campaign presentation system
+- [x] Campaign page presentation
   - campaign sorting
   - uniform campaign cards with featured-tier preview
   - two-column campaign layout
   - hero image / wide image / video variants
   - countdown pre-rendering
   - tier images and creator images
-- [x] Funding and supporter features on campaign pages
+  - campaign progress bars and milestone markers render static width/position classes so first load no longer waits for JavaScript to avoid collapsed marker layouts
+  - responsive image generation includes a `640w` WebP rung between the existing `480w` and `960w` variants for mobile campaign pages
+  - YouTube campaign hero videos render local poster/play facades and defer the remote iframe until supporter play intent
+- [x] Funding and community features
   - production phases with registry items
   - community decisions / voting
   - production diary
   - ongoing funding
   - stretch-goal-gated tiers with unlock animations
   - Hand Relations production launch
+- [x] Launch reminders
+  - upcoming campaign pages can collect one-time launch reminder signups through a slim localized form with Turnstile, rate limiting, campaign/email dedupe, signed unsubscribe links, and bounded dispatch jobs
+  - launch reminder delivery reuses the existing Resend email module, sender configuration, locale catalog, and pacing instead of adding a second email integration
+  - launch reminder dispatch and supporter confirmation retry queues maintain small queue-state markers so idle scheduled ticks skip KV namespace list scans, with hourly compatibility rechecks for manually inserted legacy jobs
+  - `_config.local.yml` can blank the reminder Turnstile site key so local development hides the widget consistently with local admin sign-in
 
 **Pledging and supporter management**
 
-- [x] No-account supporter management flow
+- [x] No-account supporter management
   - magic-link architecture
   - pledge success / cancelled pages
   - `/manage/` dashboard
   - supporter-only `/community/:slug/` access with session-scoped supporter tokens
   - pledge history tracking
-- [x] Flexible pledge composition
+- [x] Flexible pledges
   - support items and custom amounts flowing cart → Worker → KV → stats
   - live support-item stats tracking
   - multi-tier pledge support via `additionalTiers`
   - non-stackable tier support
   - post/live Manage Pledge support-item display rules
-- [x] Physical reward fulfillment basics
+- [x] Physical reward shipping
   - first-party physical-item detection
   - physical-tier shipping
   - checkout autofill and shipping-address support
+- [x] Abandoned-checkout reminders
+  - Abandoned-checkout reminders collect an explicit one-reminder opt-in, queue only after first-party Stripe session creation succeeds, delete on completed pledge persistence, suppress duplicate/signed-unsubscribed audiences, and send through the shared Resend email module
+  - Scheduling uses `abandoned-cart-queue:v1`, retention limits, sent/suppression markers, and bounded batches so idle cron ticks avoid KV list scans
 
 **Payments, inventory, and reporting**
 
-- [x] First-party Stripe checkout and payment-method updates
+- [x] Stripe checkout and card updates
   - native on-site Stripe payment step in the second checkout sidecar
   - `Update Card` using the same secure pattern
   - fully automated checkout E2E coverage
   - post-persistence live-stats/inventory refresh handling
   - checkout hardening around storage, caching, origin checks, and recovery retries
-- [x] Inventory integrity and campaign accounting
+- [x] Inventory and campaign accounting
   - live stats API
   - limited-tier inventory tracking
   - Durable-Object-backed oversell protection for scarce tiers
   - stats recalculation support for `additionalTiers`
-- [x] Reporting and supporter communications
+  - platform add-on inventory uses a durable sold-count projection that pledge create, modify, and cancel paths update, so normal inventory reads no longer rebuild sold counts by listing all pledges after bootstrap
+- [x] Supporter emails and reports
   - milestone notifications
   - tip-aware emails with full subtotal/tip/tax/shipping breakdowns
   - ledger-style pledge reports and fulfillment CSV exports
   - shipping included in reporting
   - automatic diary broadcasts use stable entry IDs so edited diary entries do not resend as new updates
-- [x] Actual Stripe fee/net analytics foundation
-  - successful supporter charges now capture Stripe balance transaction fee, net, gross, charge, and balance transaction IDs when available
-  - analytics uses actual stored Stripe fee values for charged pledges and keeps estimated fees for active pledges or older charged records without Stripe balance data
-  - a super-admin-only, CSRF-protected backfill path retrieves historical Stripe balance transaction data from campaign pledge indexes without KV list scans
-- [x] Projection repair follow-up work
+- [x] Projection integrity tools
   - read-only drift checks for per-campaign and all-campaign projection state
   - `./scripts/check-projections.sh` operator wrapper for local and Podman-backed checks
-  - mutable-pledge smoke coverage now verifies campaigns stay projection-clean after setup, modify, and cancel
+  - mutable-pledge smoke coverage verifies campaigns stay projection-clean after setup, modify, and cancel
   - clearer operator guidance around projection drift versus ledger/current-state report differences
-- [x] Platform-wide add-on products for backer upsells
-  - first-wave product import:
-    - `DUST WAVE T-Shirt`
-    - `DUST WAVE Sticker`
-    - `DUST WAVE Butterfingers T-Shirt`
-  - fixed-price global catalog items and simple variants now live in config
-  - cart sidecar and Manage Pledge can both add or subtract anchor-bound add-ons
-  - multi-campaign carts stay supported through an anchor-campaign model
-  - add-on revenue now rides canonical checkout, shipping, email, and reporting flows without counting toward campaign funding goals
-  - pledge and fulfillment exports now separate campaign pledge revenue from platform add-on revenue
-  - inventory, low-stock thresholds, sold-out variant filtering, and saved-truth stock awareness now exist for the first merch wave
-  - add-ons now render as shared product cards with image, description, quantity, variant selection, and one-click add/remove controls
-- [x] Campaign-specific add-on products
-  - campaigns can now define `campaign_add_ons` directly in front matter without introducing a second merch UI system
-  - cart sidecar keeps the same add-on card UX, but adds one shared `Campaign Add-ons` section below platform `Add-ons`
-  - Manage Pledge shows only the current pledge campaign’s campaign add-ons while reusing the same selected/available add-on card patterns
-  - campaign add-ons now count toward the owning campaign subtotal and goal-tracking math instead of behaving like platform merch
-  - campaign add-ons inherit the owning campaign’s shipping rules and fallback overrides, including in mixed multi-campaign carts
-  - physical global add-ons now combine into one separate platform shipment / shipping charge instead of borrowing campaign shipping behavior
-  - removing a campaign pledge from the cart now also removes campaign add-ons tied to that campaign
-  - pledge and fulfillment reports now keep platform add-ons and campaign add-ons operationally distinct, including fulfiller ownership
-  - Smoke Editable now includes imported campaign add-ons from the Dust Wave shop for browser, shipping, and report coverage
-- [x] Shipping calculator replacing the old flat physical-fee model
-  - USPS-backed live rating for domestic and international physical pledges
-  - deployment-level fallback shipping plus optional campaign-level fallback overrides
-  - deployment-level free-shipping default plus optional campaign overrides
-  - physical tier and support-item shipping metadata with shared presets for common goods
-  - Worker-canonical shipping totals in checkout, Manage Pledge, emails, reports, and fulfillment exports
-  - limited domestic shipping options with `standard`, `signature_required`, and `adult_signature_required`
-  - checkout and Manage Pledge UI now reflect live quotes, fallback quotes, and free-shipping states without inventing a browser-side shipping engine
-- [x] Shipping follow-up work
-  - real USPS credentialed smoke coverage now exists for domestic live rating, international live rating, fallback behavior, and signature-option flows
-  - the checkout country selector now reads from a dedicated shipping-country reference instead of burying USPS-aware destination data in runtime code
-  - campaigns with explicit flat-rate overrides now skip USPS entirely for those shipments
-  - deterministic manual-rate items like `sticker` and `signed_script` can skip USPS and use documented flat-mail pricing when they still qualify
-  - disc presets now try cheaper valid classes like `MEDIA_MAIL` before parcel services, while mixed shipments still fall back to the safer parcel model
-  - cart and checkout now stay in estimate mode until a live quote is actually possible, including ZIP-field hiding for shipments that already have known shipping
-  - the limited delivery-option selector is now wired through cart, checkout, Manage Pledge, saved totals, and supporter emails instead of stopping at quote preview
+- [x] Add-on products
+  - Platform add-ons support the first Dust Wave merch catalog (`DUST WAVE T-Shirt`, `DUST WAVE Sticker`, and `DUST WAVE Butterfingers T-Shirt`), fixed prices, simple variants, inventory, low-stock thresholds, sold-out filtering, and shared product cards
+  - Campaigns can define `campaign_add_ons` in front matter; cart and Manage Pledge show them with the same add-on card patterns under a campaign-owned section
+  - Multi-campaign carts use an anchor-campaign model, and removing a campaign pledge also removes campaign add-ons tied to that campaign
+  - Campaign add-ons count toward the owning campaign subtotal and goal, inherit that campaign's shipping rules, and stay distinct from platform add-ons in reports and fulfillment ownership
+  - Platform add-ons use separate platform revenue and fulfillment accounting, including a separate physical shipment/shipping charge for global add-ons
+  - The Smoke Editable fixture covers imported campaign add-ons from the Dust Wave shop for browser, shipping, and report coverage
+- [x] Shipping and delivery options
+  - USPS-backed domestic/international rating replaced the old flat physical-fee model, with deployment fallback shipping, optional campaign overrides, and deployment/campaign free-shipping controls
+  - Physical tiers and support items define shipping metadata with shared presets; deterministic manual-rate items like `sticker` and `signed_script` can skip USPS when eligible, and disc presets try cheaper valid classes like `MEDIA_MAIL` before parcel services
+  - Worker-canonical shipping totals flow through checkout, Manage Pledge, emails, reports, and fulfillment exports
+  - Delivery options support `standard`, `signature_required`, and `adult_signature_required` across cart, checkout, Manage Pledge, saved totals, and supporter emails
+  - Checkout country data comes from a shipping-country reference, campaigns with flat-rate overrides skip USPS, and carts stay in estimate mode until a live quote is possible
+  - Smoke coverage verifies real USPS domestic/international rating, fallback behavior, and signature-option flows
 
 **Creator tooling and content**
 
-- [x] Private admin dashboard for campaign editing and operations
+- [x] Admin dashboard
   - `/admin/` and `/es/admin/` private shells with noindex handling and localized dashboard copy
   - magic-link sign-in, role-scoped super-admin and campaign-user access, CSRF/origin checks, safe cookie handling, and read-only session checks
   - Cloudflare Turnstile challenge support protects the admin email sign-in submission before magic-link email delivery
   - Settings, Add-ons, Campaigns, Analytics, Reports, Supporters, Marketing, Users, Secrets & credentials, and Runtime diagnostics views
+  - super admins can set the default platform timezone from a select menu populated with supported IANA timezone options
   - Settings -> Users saves directly to Worker KV at `admin-users:v1` and emails sign-in instructions to newly created users when email is configured; Secrets & credentials remains status-only
   - Reports, Analytics, Supporters, content loads/previews, marketing link generation, and table filters avoid KV writes on normal read paths
   - Supporters and Analytics return empty read-only campaign views for campaigns without pledge indexes instead of blocking new/empty campaign dashboards
-  - block-based WYSIWYG content editing
-  - polymorphic block schema reused by campaign content and diary entries
-  - diary entry editing preserves stable entry IDs, and newly added diary entries receive title-based IDs during publish so automatic emails send only for genuinely new entries
+  - block-based WYSIWYG content editing uses one polymorphic block schema for campaign content and diary entries
+  - diary editing preserves stable entry IDs, title-based IDs for new entries, and inline emphasis spacing so automatic emails send only for genuinely new entries
   - full campaign schema for tiers, campaign add-ons, stretch goals, support items, diary, and decisions
-  - dashboard uploads route to convention-based asset directories, preserve existing IDs where needed, derive new IDs from names/labels, and clean up same-campaign dashboard-owned content/diary media that is no longer referenced
-  - dashboard media uploads stay source-preserving in the Worker, with image/video upload commits dispatching the external lossless image optimization, responsive WebP variant, and WebM derivative pipeline
+  - dashboard media uploads use convention-based asset directories, preserve existing IDs where needed, derive new IDs from names/labels, and dispatch lossless image optimization, responsive WebP variants, and WebM video derivatives with `scope=changed`
+  - content and diary publishes clean up same-campaign dashboard-owned media that is no longer referenced; audio uploads remain source-preserved
+  - diary hash links open the matching phase tab before scrolling to anchors such as `#diary-production`
   - physical product editors expose shipping presets or explicit package metadata while digital products hide shipping-only fields
-  - desktop/tablet/mobile responsive pass, accessibility pass, security pass, SEO noindex pass, and Spanish i18n pass
-  - focused unit, browser, and KV-write-budget coverage for admin dashboard flows
-- [x] Documentation consolidation and internal runbooks
+  - Settings -> Advanced performance exposes the intent-prefetch enabled state, delay, and page-view limit for super admins, with Worker config mirroring through `INTENT_PREFETCH_*`
+  - admin email sign-in keeps the existing Turnstile challenge after a login attempt and uses the shared dashboard status-message styling for more prominent auth feedback
+  - responsive, accessibility, security/noindex, Spanish i18n, browser, unit, and KV-write-budget coverage cover dashboard flows
+- [x] Campaign marketing tools
+  - Campaigns -> Marketing stays focused on campaign-link generation, saved referral codes, downloadable PNG/SVG QR codes, and the campaign embed builder without adding another top-level dashboard surface
+  - Saved referral codes store only the explicit campaign-scoped referral record; QR preview/downloads are browser-local and do not read or write KV
+  - Campaign QR generation was adapted from the MIT-licensed QR generator approach in `1612elphi/delphitools` for this stack's URL builder, saved referral links, and PNG/SVG download needs
+- [x] Supporter email blasts
+  - Campaigns -> Blast lets assigned campaign users and super admins send supporter email blasts to the campaign's indexed supporters using the shared WYSIWYG editor, subject, CTA Button Label, and CTA Button URL fields
+  - Blast drafts remain browser-local; automatic dry runs run before test/live sends, test sends go only to the signed-in admin, live sends require the matching dry-run hash, and sent history is shown read-only below the editor
+  - Blast image uploads reuse the campaign media upload/optimization path so email images are site-hosted under `assets/images/campaigns/<slug>/`; YouTube/Vimeo blocks render as email-safe links instead of embedded players
+- [x] Creator docs and runbooks
+  - the public Campaign Creator Checklist and Spanish checklist cover campaign add-ons, embed-code promotion, shipping fallback/free-shipping decisions, tax expectations, report recipients, fulfillment handoff, share-link planning, dashboard media uploads, launch reminders, platform timezone expectations, deferred YouTube hero embeds, and responsive WebP variants
+  - a Spanish creator checklist route exists at `/es/creator-campaign-checklist/`
 
 **Quality, accessibility, and design system**
 
-- [x] Automated quality baseline
-  - Vitest unit coverage
-  - Playwright E2E coverage
-  - stronger merge gate and local smoke coverage
-  - final v1.0 verification covered admin dashboard browser flows, premerge regression checks, and local Podman smoke through `/admin/`, `/es/admin/`, Settings, Add-ons, Campaigns, Analytics, Reports, Supporters, Marketing, and Users
-- [x] Accessibility compliance milestone
-  - stronger dialog, tab, tip-slider, error, and live-region semantics
+- [x] Quality checks
+  - Vitest unit coverage, Playwright E2E coverage, merge-gate checks, and local smoke coverage
+  - Admin dashboard browser coverage spans `/admin/`, `/es/admin/`, Settings, Add-ons, Campaigns, Analytics, Reports, Supporters, Marketing, and Users
+- [x] Public performance
+  - public pages load a lightweight cart-runtime loader first and defer the full cart stack until persisted cart state, recovery state, or clear supporter intent requires it
+  - same-origin public document prefetching follows a small local intent model with route allowlists, sensitive-query exclusions, network guards, low per-page limits, and a default-enabled config surface
+  - production Pages builds minify generated `_site` CSS/JS after Jekyll output, while Cloudflare remains responsible for gzip/Brotli/Zstandard transfer compression and Auto Minify stays disabled
+- [x] Accessibility
+  - dialog, tab, tip-slider, error, and live-region semantics
   - axe-backed critical-surface coverage
   - broader browser accessibility coverage across campaign, community, pledge-result, About, and Terms states
-  - shared public shells now keep skip links and stable `main-content` anchors, and the cart trigger exposes clearer accessible labels and expanded state
-- [x] Typography, elements, and layouts redesign
-  - shared tokens, typography, buttons, fields, and surfaces
-  - aligned public pages, campaign pages, cart / checkout, and Manage Pledge styling
-  - removal of stale parallel styling
-- [x] Mobile responsiveness pass
-  - focused audit-and-polish work rather than a redesign
-  - shared responsive fixes across campaign pages, cart / checkout, Manage Pledge, Update Card, community pages, and long-form content
-  - mobile browser regressions for overflow, scrollability, and reachable primary actions
-  - safe-area-aware cart/nav overlays, better small-screen summary wrapping, and larger remove/close tap targets are now part of the baseline
-- [x] Zero-regression styles reorganization to be cleaner, more efficient, and as DRY as possible
-  - shared Sass primitives now cover repeated card shells, stacked sections, responsive surfaces, tab lists, pill states, media-object grids, quantity steppers, and primary action buttons
-  - cart / checkout, Manage Pledge, campaign pages, community pages, and long-form content now lean on those shared patterns instead of carrying parallel near-duplicate styling
-  - add-on cards and Manage Pledge controls were normalized across desktop, tablet, and small-phone breakpoints without redesigning the established visual language
-  - Node 25 test compatibility was repaired so the style branch could stay validated on the default local toolchain
-  - the branch kept zero-regression pressure through focused Vitest coverage, Podman-backed Playwright mobile checks, and a full green merge gate
-- [x] Variable-first customization for forks
+  - shared public shells keep skip links and stable `main-content` anchors, and the cart trigger exposes clearer accessible labels and expanded state
+- [x] Design system and responsive layout
+  - shared tokens, typography, buttons, fields, card shells, stacked sections, responsive surfaces, tab lists, pill states, media-object grids, quantity steppers, and primary action buttons
+  - public pages, campaign pages, cart / checkout, Manage Pledge, Update Card, community pages, and long-form content use the same layout and responsive patterns instead of parallel styling
+  - mobile coverage includes overflow, scrollability, reachable primary actions, safe-area-aware cart/nav overlays, small-screen summary wrapping, and larger remove/close tap targets
+  - add-on cards and Manage Pledge controls are normalized across desktop, tablet, and small-phone breakpoints
+  - Node 25 test compatibility was repaired for the default local toolchain
+- [x] Fork customization
   - canonical `platform`, `pricing`, `design`, `checkout`, and `cache` settings
   - auto-synced Worker mirroring from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`
   - curated CSS theme-variable bridge emitted into `assets/main.css`
   - configurable core brand assets and documented no-code customization surface
-  - branded Stripe Elements and supporter emails now follow the shared design/config surface instead of a separate checkout/email theme path
-- [x] i18n completion with a Spanish language translation available
-  - `_config.yml` now owns supported languages, language labels, and curated localized public-page routes
-  - English + Spanish routes now exist for `/`, `/about/`, `/terms/`, `/pledge-success/`, `/pledge-cancelled/`, `/manage/`, `/community/`, and supporter community pages
+  - branded Stripe Elements and supporter emails follow the shared design/config surface instead of a separate checkout/email theme path
+- [x] Spanish localization
+  - `_config.yml` owns supported languages, language labels, and curated localized public-page routes
+  - English + Spanish routes exist for `/`, `/about/`, `/terms/`, `/pledge-success/`, `/pledge-cancelled/`, `/manage/`, `/community/`, and supporter community pages
   - a quieter footer language switcher plus shared route helpers preserve query strings and hashes for tokenized routes such as `/manage/?t=...`
-  - shared public campaign/community labels, site-owned cart/community/Manage Pledge runtime strings, campaign countdown/gallery/live-stats edge copy, and Worker supporter emails now read from locale data plus persisted `preferredLang`
-  - cart-button summaries, checkout tax-location helper copy, and localized public metadata now follow the same shared locale model
-- [x] SEO fundamentals baseline
-  - shared metadata now covers titles, descriptions, canonicals, OG/Twitter tags, and default social images across public layouts
+  - shared public campaign/community labels, site-owned cart/community/Manage Pledge runtime strings, campaign countdown/gallery/live-stats edge copy, and Worker supporter emails read from locale data plus persisted `preferredLang`
+  - cart-button summaries, checkout tax-location helper copy, and localized public metadata follow the same shared locale model
+- [x] SEO and structured metadata
+  - shared metadata covers titles, descriptions, canonicals, OG/Twitter tags, and default social images across public layouts
   - `robots.txt`, `sitemap.xml`, and explicit `noindex,nofollow` handling keep private/tokenized/supporter-only flows out of search intent
   - public pages emit conservative `Organization` / `WebSite` JSON-LD, and campaign pages emit conservative `CreativeWork` plus breadcrumb JSON-LD
-  - the public community hub now points people back to public campaign pages instead of directing crawlers into supporter-only routes
-  - stronger merge-gate and unit coverage now protect alternate-language metadata, sitemap inclusion, and the public crawl surface
-  - bounded fork-facing SEO config now covers `seo.x_handle`, `seo.same_as`, `seo.default_social_image_alt`, `seo.og_locale_overrides`, and whether the public community hub should remain indexable
-  - structured browser and Worker debug logging now ships as a config-driven developer aid with timestamps, severity labels, scoped prefixes, and browser global error capture
-  - public metadata now also emits language/app-name hints, secure social-image tags where possible, and locale-aware JSON-LD language/breadcrumb roots
-- [x] Campaign embeds and richer share previews
-  - campaign pages now link to a hosted locale-aware embed builder that generates copy-paste iframe code with layout, theme, media, and CTA options
+  - the public community hub points people back to public campaign pages instead of directing crawlers into supporter-only routes
+  - merge-gate and unit coverage protect alternate-language metadata, sitemap inclusion, and the public crawl surface
+  - bounded fork-facing SEO config covers `seo.x_handle`, `seo.same_as`, `seo.default_social_image_alt`, `seo.og_locale_overrides`, and whether the public community hub should remain indexable
+  - structured browser and Worker debug logging ships as a config-driven developer aid with timestamps, severity labels, scoped prefixes, and browser global error capture
+  - public metadata emits language/app-name hints, secure social-image tags where possible, and locale-aware JSON-LD language/breadcrumb roots
+- [x] Embeds and share previews
+  - campaign pages link to a hosted locale-aware embed builder that generates copy-paste iframe code with layout, theme, media, and CTA options
   - the embed widget uses live Worker-backed campaign state, auto-resizes after paste, and supports localized return links plus localized builder/runtime copy
   - the admin Marketing embed preview keeps progress fill, milestones, goal marker, and stretch-goal labels contained for video-led campaigns
-  - campaign pages now emit richer state-aware social metadata plus Worker-generated PNG share-card images, with SVG retained for internal preview/debug tooling
+  - campaign pages emit richer state-aware social metadata plus Worker-generated PNG share-card images, with SVG retained for internal preview/debug tooling
   - localized campaign routes, localized embed routes, and locale-aware share-card URLs keep embeds and rich previews aligned across English and Spanish
-- [x] v1.0.2 performance, sharing, and admin polish
-  - campaign progress bars and milestone markers now render static width/position classes so first load no longer waits for JavaScript to avoid collapsed marker layouts
-  - public pages load a lightweight cart-runtime loader first and defer the full cart stack until persisted cart state, recovery state, or clear supporter intent requires it
-  - same-origin public document prefetching now follows a small local intent model with route allowlists, sensitive-query exclusions, network guards, low per-page limits, and a default-enabled config surface
-  - Settings -> Advanced performance exposes the intent-prefetch enabled state, delay, and page-view limit for super admins, with Worker config mirroring through `INTENT_PREFETCH_*`
-  - production Pages builds now minify generated `_site` CSS/JS after Jekyll output, while Cloudflare remains responsible for gzip/Brotli/Zstandard transfer compression and Auto Minify stays disabled
-  - campaign pages now render reusable icon-only share links for Bluesky, X, Threads, Facebook, SMS, and email, using localized URLs, local PNG icon fallbacks for inline-SVG edge cases, and state-aware CTA text where platforms allow message text
+  - campaign pages render reusable icon-only share links for Bluesky, X, Threads, Facebook, SMS, and email, using localized URLs, local PNG icon fallbacks for inline-SVG edge cases, and state-aware CTA text where platforms allow message text
   - responsive share controls appear below the short blurb on mobile/tablet and above the embed button only on desktop
-  - admin email sign-in keeps the existing Turnstile challenge after a login attempt and uses the shared dashboard status-message styling for more prominent auth feedback
-  - the public Campaign Creator Checklist and Spanish checklist were updated for the v1.0.2 creator-facing changes, including share-link planning and dashboard media uploads
-- [x] v1.0.3 platform timezone, launch reminders, and media workflow hardening
-  - super admins can set the default platform timezone from a select menu populated with supported IANA timezone options
-  - Jekyll campaign state, browser countdowns, Worker deadline checks, campaign state transitions, scheduled campaign-runner reports, settlement checks, and admin date/time surfaces now share the same `platform.timezone` / `PLATFORM_TIMEZONE` model
-  - upcoming campaign pages can collect one-time launch reminder signups through a slim localized form with Turnstile, rate limiting, campaign/email dedupe, signed unsubscribe links, and bounded dispatch jobs
-  - launch reminder delivery reuses the existing Resend email module, sender configuration, locale catalog, and pacing instead of adding a second email integration
-  - the minute-level Worker scheduler now persists `cron:lastRun` hourly instead of every minute, keeping cron health visible without consuming the free-tier KV write budget as baseline churn
-  - launch reminder dispatch and supporter confirmation retry queues now maintain small queue-state markers so idle scheduled ticks skip KV namespace list scans, with hourly compatibility rechecks for manually inserted legacy jobs
-  - platform add-on inventory now uses a durable sold-count projection that pledge create, modify, and cancel paths update, so normal inventory reads no longer rebuild sold counts by listing all pledges after bootstrap
-  - `_config.local.yml` can blank the reminder Turnstile site key so local development hides the widget consistently with local admin sign-in
-  - the Podman media optimizer now includes `optipng` and `gifsicle` for local PNG/GIF source compression through the same repository media workflow
-  - responsive image generation now includes a `640w` WebP rung between the existing `480w` and `960w` variants for mobile campaign pages
-  - YouTube campaign hero videos now render local poster/play facades and defer the remote iframe until supporter play intent
-  - dashboard image/video uploads now request the `Optimize dashboard media` workflow with `scope=changed`, while audio uploads stay source-preserved
-  - dashboard content and diary publishing now deletes same-campaign dashboard-owned media that disappeared from content blocks or removed diary entries and is not referenced elsewhere
-  - dashboard-authored diary rich text now preserves inline emphasis spacing, and diary hash links open the matching phase tab before scrolling to anchors such as `#diary-production`
-  - the public creator checklists now describe the creator-facing v1.0.3 changes, including launch reminders, platform timezone expectations, deferred YouTube hero embeds, and responsive WebP variants
-- [x] Developer FAQ based on internal documentation
-- [x] Marketing landing page for the platform on a different domain
-- [x] Denial of service attack defense pass
-  - `RATELIMIT` KV is now a hard requirement, with fail-closed behavior when the binding is missing
+- [x] External website and FAQ
+  - `thepool.fund` hosts the platform marketing site and developer FAQ derived from internal documentation
+- [x] Denial-of-service protection
+  - `RATELIMIT` KV is a hard requirement, with fail-closed behavior when the binding is missing
   - public read endpoints stay intentionally roomy for campaign virality, while checkout, Manage Pledge, and admin mutations use targeted rate limits and request-size caps
-  - request-body parsing now rejects malformed or obviously oversized payloads earlier across the Worker surface
+  - request-body parsing rejects malformed or obviously oversized payloads earlier across the Worker surface
   - `/checkout-intent/abandon` uses an order-scoped retry budget instead of a naive per-IP limiter
-  - deployed Standard/Paid Workers now declare a conservative `cpu_ms = 100` ceiling as a denial-of-wallet backstop
-  - admin-only observability endpoints and `scripts/check-observability.sh` now expose webhook outcome summaries and sampled mutation timings for tuning
-- [x] Tax groundwork and checkout UX pass
-  - Worker/provider seam, provisional tax UI, and final-tax destination plumbing are now in place across cart, checkout, Manage Pledge, stored pledge data, and supporter emails
-  - current browser UX now keeps tax at `--` until checkout has enough destination data, instead of inventing a fake precise value too early
-  - custom checkout now collects billing tax location for digital-only carts, while physical/mixed carts stay address-first and support browser autofill again
-  - a free-first New Mexico path now exists through a vendored starter dataset plus optional EDAC refinement
-  - local smoke fixtures and merge-gate coverage now work under location-aware tax providers instead of assuming flat tax
-- [x] Reports for campaign runners
-  - campaign front matter now supports `runner_report_emails`, with empty/missing meaning no runner reports for that campaign
-  - `_config.yml` now exposes a bounded `reports.campaign_runner` customization surface for enablement, platform-timezone send time, summaries, attachments, and subject prefix
+  - deployed Standard/Paid Workers declare a conservative `cpu_ms = 100` ceiling as a denial-of-wallet backstop
+  - admin-only observability endpoints and `scripts/check-observability.sh` expose webhook outcome summaries and sampled mutation timings for tuning
+- [x] Tax and checkout UX
+  - Worker/provider seam, provisional tax UI, and final-tax destination plumbing cover cart, checkout, Manage Pledge, stored pledge data, and supporter emails
+  - browser UX keeps tax at `--` until checkout has enough destination data, instead of inventing a fake precise value too early
+  - custom checkout collects billing tax location for digital-only carts, while physical/mixed carts stay address-first and support browser autofill again
+  - a free-first New Mexico path exists through a vendored starter dataset plus optional EDAC refinement
+  - local smoke fixtures and merge-gate coverage work under location-aware tax providers instead of assuming flat tax
+- [x] Campaign runner reports
+  - campaign front matter supports `runner_report_emails`, with empty/missing meaning no runner reports for that campaign
+  - `_config.yml` exposes a bounded `reports.campaign_runner` customization surface for enablement, platform-timezone send time, summaries, attachments, and subject prefix
   - the Worker sends daily campaign-scoped pledge-ledger emails at the configured local send time for live campaigns and split post-deadline fulfillment emails for campaign vs. platform fulfillers
   - the dashboard Reports tab previews pledge/fulfillment rows and downloads CSVs without sending emails or writing sent markers
   - shared-secret report endpoints remain separate for script/operator workflows that intentionally send reports
-  - local CLI exports and scheduled Worker emails now share the same JS report core to avoid CSV drift
-- [x] v0.9.5 local-runtime parity and creator launch handoff
-  - Podman Worker development now runs on Node 24 to match GitHub Actions deployments
-  - host and Podman helper scripts now prefer Node 24 and no longer force the obsolete Node 20 Wrangler path
-  - Wrangler 4 local development runs against Worker compatibility date `2026-05-03`, avoiding the older local-runtime polyfill crash under Node 24
-  - Podman Worker dependency setup now uses `npm ci` so local container starts do not mutate `worker/package-lock.json`
-  - the public Campaign Creator Checklist now covers campaign add-ons, embed-code promotion, shipping fallback/free-shipping decisions, tax expectations, report recipients, and fulfillment handoff
-  - a Spanish creator checklist route now exists at `/es/creator-campaign-checklist/`
+  - local CLI exports and scheduled Worker emails share the same JS report core to avoid CSV drift
 
 ## Future Features
 
-- [ ] Further tax calculator work
+- [ ] v1.0.7 follow-ups
+  - [ ] Abandoned-checkout visibility
+    - Add a read-only admin visibility surface for abandoned-checkout reminder health that favors queue-state markers, aggregate counts, and recent outcomes over KV namespace scans or supporter PII
+    - Decide whether operators need scoped suppression or retry controls, and design them around explicit admin mutations, audit events, and minimal KV writes
+    - Document a production smoke path for validating reminder opt-in, suppression, unsubscribe, and completion cleanup against real provider credentials
+  - [ ] Setup and deploy hardening
+    - Harden production setup idempotency so the helper can detect and reuse existing Cloudflare KV namespaces and provider resources before creating new ones
+    - Add safe read-only readiness checks where provider APIs make that practical, including Stripe webhook configuration, Resend sender/domain verification, Turnstile widgets, USPS credentials, and ZIP.TAX credentials
+    - Expand the guided setup checklist for first-time fork operators with clearer manual steps when a provider cannot be fully automated
+    - Create a simple Mac/Windows/Linux app wrapper around the same setup core after the script-first workflow is stable
+  - [ ] Marketing drafts and reporting
+    - Add shared cross-admin Marketing/Blast drafts in KV only after access, conflict, expiry, retention, and write-budget rules are designed
+    - Consider referral/UTM performance reporting only if it can reuse existing pledge/referral data or a low-cardinality event model without high-volume KV writes
+  - [ ] WYSIWYG media picker
+    - Let Campaign Content, Diary, and Blast image blocks select existing uploaded campaign images from a scoped media library instead of requiring users to paste `/assets/...` paths
+    - Keep the picker campaign-scoped by default, with super-admin access to shared/default media only where that is already allowed by upload permissions
+    - Reuse the existing dashboard media directories, upload metadata, and same-campaign cleanup rules; do not introduce new KV state or duplicate media indexing unless a read-only manifest is needed for performance
+    - Once selection is available, consider making Source URL an advanced/edit-existing-path affordance rather than a primary field
+- [ ] Tax calculator expansion
   - Support USA and international
   - Target local / jurisdiction-level US rates, not just state-level rates
   - Near-term focus: finish New Mexico local gross receipts tax coverage so the calculator can be manually tested end to end with more confidence
@@ -304,16 +283,11 @@ The v1.0 feature set and release-hardening pass are complete. v1.0.5 focuses on 
   - Decide how much international logic should stay vendored offline versus optional provider-backed
   - Add a documented tax-data refresh/import workflow for future jurisdiction datasets
   - Future consideration: business tax handling such as VAT ID validation, reverse-charge flows, exemptions, and product tax classes
-- [ ] Add richer campaign marketing tools
-  - announcement composer with local drafts, read-only dry runs, and explicit live-send/audit writes
-  - optional abandoned-cart follow-up only after consent, retention, duplicate-send prevention, and free-tier-aware storage are designed
-- [ ] Support different prices per add-on variation
+- [ ] Variant-specific add-on prices
   - Extend platform and campaign add-on variant schemas so a variant can override base price without requiring duplicate products
   - Update cart, checkout, Manage Pledge, analytics, reports, and fulfillment exports to use the resolved variant price consistently
   - Preserve backwards compatibility for existing add-ons whose variants only define `id`, `label`, and `inventory`
   - Add admin dashboard validation so price overrides cannot be negative, malformed, or silently ignored
-- [ ] Create a simplified install script or simple Mac/Windows/Linux app to facilitate local and production deployment
-  - Use gh, cloudflare, and any other CLIs that will help automate setup tasks
 
 ## Known Issues
 

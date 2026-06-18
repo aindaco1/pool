@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   sendChargeSuccessEmail,
+  sendAbandonedCartEmail,
   sendLaunchReminderEmail,
   sendPaymentFailedEmail,
   sendPledgeCancelledEmail,
@@ -176,7 +177,32 @@ describe('supporter email tip breakdowns', () => {
     expect(payload.html).toContain('Sunder is live');
     expect(payload.html).toContain('https://pool.test/campaigns/sunder/');
     expect(payload.html).toContain('https://pledge.pool.test/launch-reminders/unsubscribe?t=token');
+    expect(payload.headers).toMatchObject({
+      'List-Unsubscribe': '<https://pledge.pool.test/launch-reminders/unsubscribe?t=token>',
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+    });
     expect(payload.reply_to).toBe('info@pool.test');
+  });
+
+  it('adds one-click unsubscribe headers to abandoned checkout reminders', async () => {
+    const fetchMock = mockResend();
+
+    await sendAbandonedCartEmail(env, {
+      email: 'fan@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'Sunder',
+      campaignUrl: 'https://pool.test/campaigns/sunder/',
+      unsubscribeUrl: 'https://pledge.pool.test/abandoned-cart/unsubscribe?t=token',
+      preferredLang: 'en'
+    });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.from).toBe('The Pool <updates@pool.test>');
+    expect(payload.to).toBe('fan@example.com');
+    expect(payload.headers).toMatchObject({
+      'List-Unsubscribe': '<https://pledge.pool.test/abandoned-cart/unsubscribe?t=token>',
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+    });
   });
 
   it('includes the platform tip line in pledge modified emails', async () => {

@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Campaign Creator Checklist
-description: A complete prep checklist for creators launching a campaign on The Pool, including dashboard handoff, protected previews, image, video, copy, tiers, add-ons, embeds, share links, tax, shipping, fulfillment, and optional campaign materials.
+description: A complete prep checklist for creators launching a campaign on The Pool, including dashboard handoff, protected previews, image, video, copy, tiers, add-ons, embeds, QR/referral links, supporter blasts, tax, shipping, fulfillment, and optional campaign materials.
 permalink: /creator-campaign-checklist/
 lang: en
 indexable: false
@@ -29,12 +29,13 @@ This checklist covers:
 - physical reward and shipping requirements
 - tax, free-shipping, and fallback expectations
 - promotion, share links, embeds, reporting, and fulfillment handoff
+- QR/referral links and supporter Blast prep
 - dashboard access, drafts, and publishing expectations
 - optional materials that make a campaign feel richer and more persuasive
 
 ## What Changed Since v0.9.5
 
-This checklist now reflects the creator-facing platform changes through **v1.0.5**:
+This checklist now reflects the creator-facing platform changes through **v1.0.6**:
 
 - creators can use campaign-specific dashboard access for normal edits instead of direct repository access
 - dashboard media uploads support images, video, audio, previews, and later repository optimization with responsive WebP variants
@@ -48,6 +49,9 @@ This checklist now reflects the creator-facing platform changes through **v1.0.5
 - campaign analytics now keep gross campaign revenue visible while also showing net campaign revenue after allocated processor fees
 - platform operators can monitor Cloudflare and Resend plan usage from the admin dashboard without exposing provider tokens to campaign teams
 - campaign teams can use protected preview links to review draft campaigns privately before public launch
+- campaign teams can build tracked campaign URLs, save referral codes, and download campaign QR codes from the Marketing tab
+- Campaigns -> Blast can send supporter email blasts with hosted campaign images and email-safe YouTube/Vimeo links
+- custom checkout can collect explicit consent for one abandoned-checkout reminder, which is separate from launch reminders and ordinary campaign blasts
 - public performance work makes campaign progress, share links, deferred YouTube hero embeds, responsive image delivery, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
 
 ## The Short Version
@@ -83,6 +87,8 @@ If a creator only reads one section, it should be this one.
 - 1 campaign pitch video
 - 3 to 8 additional stills or gallery images
 - a launch promotion plan that includes the campaign embed code
+- QR/referral link destinations for print, venues, partners, and social bios
+- a first supporter Blast plan for launch or final-push messaging
 - launch-week share captions for upcoming, live, final-push, funded, and ended states
 
 ### Required if anything is physical
@@ -157,6 +163,8 @@ The dashboard can manage:
 - long-form campaign content through the WYSIWYG block editor
 - tiers, support items, campaign add-ons, stretch goals, diary entries, and decisions
 - report previews, supporter lists, analytics, marketing/referral links, and embed-builder shortcuts
+- campaign QR downloads and saved referral links for promotion channels
+- supporter Blast drafting, test sends, live sends, and read-only sent history
 - share-link copy and social-preview inputs through the same title, blurb, hero image, and campaign-state fields shown on the public page
 - protected preview links for trusted reviewers before the campaign is public
 
@@ -179,6 +187,7 @@ Operational notes:
 - Upcoming campaign launch reminder forms may also use Cloudflare Turnstile; platform operators configure those keys and secrets, not campaign creators.
 - Campaign launch and deadline dates are interpreted in the platform timezone configured by a super admin, so confirm that timezone before publishing time-sensitive campaign copy.
 - Analytics distinguish gross campaign revenue from net campaign revenue after allocated processor fees, which helps creators reconcile campaign totals without hiding the public funding math.
+- Blast drafts are browser-local until sent or tested. Selected Blast images upload to the campaign asset path before the automatic dry run, while YouTube and Vimeo blocks become email-safe links instead of embedded players.
 
 ### Short Blurb Guidance
 
@@ -938,7 +947,7 @@ The Pool includes a hosted campaign embed builder at:
 - `/embed/campaign/?slug=your-campaign-slug`
 - `/es/embed/campaign/?slug=your-campaign-slug`, for Spanish-language pages
 
-The embed is a live `iframe` widget for websites that allow pasted HTML. It reflects current campaign state, pledged total, countdown/progress, media settings, and the campaign call to action. The same builder also appears inside the dashboard Marketing tab alongside saved referral-code and UTM-link tools.
+The embed is a live `iframe` widget for websites that allow pasted HTML. It reflects current campaign state, pledged total, countdown/progress, media settings, and the campaign call to action. The same builder also appears inside the dashboard Marketing tab alongside saved referral-code, UTM-link, and downloadable QR-code tools.
 
 <figure class="creator-checklist-screenshot">
   <img src="/assets/images/checklists/creator-campaign-checklist/embed-builder.png" alt="The campaign embed builder with layout, theme, media, call-to-action controls, embed code, and preview area." loading="lazy">
@@ -951,6 +960,8 @@ Creators should provide or confirm:
 
 - primary campaign URL
 - embed-code destinations, such as personal site, venue site, newsletter page, partner blog, or press page
+- QR-code destinations, such as posters, table cards, venue signage, programs, postcards, or QR-friendly social bios
+- referral-code names for partners, press, venues, cast/crew, or campaign-runner channels
 - preferred embed mode: full or compact
 - whether the embed should show campaign media
 - launch-day social copy
@@ -962,6 +973,8 @@ Creators should provide or confirm:
   - funded: thank supporters and point to next steps
   - ended: describe the result and where people should follow updates
 - 1 short email/newsletter blurb
+- 1 short Blast subject and body for launch or final-push supporters
+- CTA Button Label and CTA Button URL for any Blast that needs a clear next action
 - press or partner contacts, if relevant
 
 Good examples:
@@ -990,7 +1003,9 @@ Good examples:
 - campaign pages generate share-card metadata for social previews
 - campaign share buttons use the public campaign URL and state-aware text where supported, but Facebook and other preview-first destinations mostly use the Open Graph image/title/description
 - creators should test the embed on mobile wherever they paste it
+- QR codes should be tested from a real phone camera before printing or sharing broadly
 - if a host strips iframe code, use a normal campaign link plus the share-card preview instead
+- Blast copy should be concise, image-light, and linked to hosted campaign/media URLs rather than remote image hotlinks
 
 ## Physical Rewards and Shipping
 
@@ -1127,6 +1142,8 @@ If a creator wants a simple target package, this is a strong one:
 - report recipient emails and fulfillment owner
 - dashboard editor emails, if creators need direct campaign access
 - embed/promotion destinations for launch week
+- QR/referral destinations and any partner codes needed before launch
+- Blast subject/body/CTA copy for the first campaign supporter email
 
 ## Delivery Recommendations
 
@@ -1167,6 +1184,8 @@ A campaign is usually ready when:
 - report recipients and fulfillment owners are set
 - dashboard editor access and publishing responsibility are confirmed
 - the campaign embed has been checked for launch-promotion destinations
+- QR codes download correctly and scan to the expected campaign/referral URL
+- any launch or final-push Blast copy has a subject, concise body, CTA Button Label, and CTA Button URL
 - share captions and the generated social preview feel appropriate for upcoming, live, funded, and ended states
 - image alt text exists where needed
 - no section feels like placeholder copy
@@ -1203,6 +1222,8 @@ If someone needs the shortest possible prep version, send them this:
 - 3 to 8 gallery images
 - campaign pitch video
 - embed destinations and launch-promotion copy
+- QR/referral destinations
+- supporter Blast copy for launch or final-push updates
 - share captions for the campaign's major states
 
 ### If anything is physical

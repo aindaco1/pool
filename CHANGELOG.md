@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.0.6 - 2026-06-18
+
+Release scope:
+
+- Expanded **Campaigns -> Marketing** into a more complete campaign-promotion workspace without adding another top-level dashboard view. Campaign admins can build tracked URLs, save referral codes, preview/download campaign QR codes as PNG/SVG, and use the existing campaign embed builder from the same tab.
+- Added **Campaigns -> Blast** for supporter email blasts. Assigned campaign users and super admins can draft with the shared WYSIWYG content editor, upload campaign-hosted images through the existing media pipeline, link YouTube/Vimeo videos in an email-safe way, send tests to themselves, send live blasts to indexed campaign supporters, and review read-only sent history.
+- Added automatic Blast dry-run validation before test or live sends. Dry runs validate content and audience from the campaign pledge index without sending email, writing audit records, or listing KV namespaces; live sends require the matching dry-run hash and write the audit event after dispatch.
+- Added browser-local QR generation adapted from the MIT-licensed `1612elphi/delphitools` approach, keeping QR previews and downloads free of Worker reads/writes.
+- Added consent-based abandoned-checkout reminders for the first-party checkout path. Supporters must explicitly opt in, reminders queue only after Stripe session creation succeeds, completed pledges delete queued reminders, sent/suppressed audiences are deduped, and unsubscribe links are signed.
+- Kept abandoned-checkout scheduling free-tier aware with `abandoned-cart-queue:v1`, bounded batches, retention limits, sent/suppression markers, and idle cron ticks that skip KV namespace list scans.
+- Added the cross-platform `npm run setup:deploy` helper for local and production setup. The dependency-free Node CLI supports dry runs, local secret generation, config sync, Cloudflare KV creation/update, Worker secret writes, GitHub repository secret writes, `gh`/`wrangler`/optional Stripe CLI auth checks, and optional `wrangler deploy`.
+- Reused shared email, WYSIWYG, media-upload, QR/download, label/help/info-button, responsive admin layout, and audit patterns rather than adding parallel implementations.
+- Updated README, Worker README, dashboard docs, roadmap, security/performance notes, smoke checklist, creator checklist, public About/Terms pages, and targeted unit/browser coverage for the new 1.0.6 behavior.
+- Deferred deeper abandoned-checkout admin reporting, setup-helper idempotency/readiness checks, shared cross-admin marketing drafts, and a native setup app wrapper to v1.0.7 follow-up work.
+
 ## v1.0.5 - 2026-06-14
 
 Release scope:

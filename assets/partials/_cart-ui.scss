@@ -569,6 +569,27 @@ body.pool-cart-open {
   color: $color--primary;
 }
 
+.pool-first-party-cart__checkbox-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  margin-top: 12px;
+  @include type-ui;
+  color: $color--secondary;
+}
+
+.pool-first-party-cart__checkbox-field--full {
+  grid-column: 1 / -1;
+}
+
+.pool-first-party-cart__checkbox {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  accent-color: $color--primary;
+}
+
 .pool-first-party-cart__required-mark {
   color: #9f1239;
 }

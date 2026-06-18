@@ -299,7 +299,7 @@ describe('email HTML security', () => {
       campaignTitle: 'sunder',
       subject: 'Important update',
       heading: '<svg onload=alert(1)>',
-      body: 'Heads up<script>alert(2)</script>',
+      body: '## Heads up\n\nA **bold** update with [details](https://pool.test/campaigns/sunder/).\n\n<script>alert(2)</script>',
       ctaLabel: '<b>Click me</b>',
       ctaUrl: 'javascript:alert(3)',
       token: 'magic-token'
@@ -307,11 +307,44 @@ describe('email HTML security', () => {
 
     const payload = getEmailPayload(fetchMock);
     expect(payload.html).toContain('&lt;svg onload=alert(1)&gt;');
-    expect(payload.html).toContain('Heads up&lt;script&gt;alert(2)&lt;/script&gt;');
+    expect(payload.html).toContain('>Heads up</h2>');
+    expect(payload.html).toContain('<strong>bold</strong>');
+    expect(payload.html).toContain('href="https://pool.test/campaigns/sunder/"');
+    expect(payload.html).toContain('&lt;script&gt;alert(2)&lt;/script&gt;');
     expect(payload.html).not.toContain('javascript:alert(3)');
     expect(payload.html).not.toContain('&lt;b&gt;Click me&lt;/b&gt;');
     expect(payload.from).toBe('The Pool <updates@pool.test>');
     expect(payload.reply_to).toBe('info@pool.test');
+  });
+
+  it('renders announcement image and video blocks through safe email markup', async () => {
+    const fetchMock = mockResend();
+
+    await sendAnnouncementEmail(env, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      subject: 'Media update',
+      body: 'Fallback body',
+      contentBlocks: [
+        { type: 'text', body: '## Watch this\n\nA **media** update.' },
+        { type: 'image', src: '/assets/images/campaigns/sunder/blast.jpg', alt: '<Poster>', caption: 'New still' },
+        { type: 'video', provider: 'youtube', video_id: 'abcDEF123', caption: 'Trailer' },
+        { type: 'image', src: 'https://cdn.example.com/tracker.png', alt: 'remote' },
+        { type: 'image', src: 'javascript:alert(1)', alt: 'unsafe' }
+      ],
+      token: 'magic-token'
+    });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.html).toContain('>Watch this</h2>');
+    expect(payload.html).toContain('<strong>media</strong>');
+    expect(payload.html).toContain('src="https://pool.test/assets/images/campaigns/sunder/blast.jpg"');
+    expect(payload.html).toContain('alt="&lt;Poster&gt;"');
+    expect(payload.html).toContain('href="https://www.youtube.com/watch?v=abcDEF123"');
+    expect(payload.html).toContain('Watch on YouTube');
+    expect(payload.html).not.toContain('cdn.example.com');
+    expect(payload.html).not.toContain('javascript:alert(1)');
   });
 
   it('escapes stretch goal names in milestone emails', async () => {

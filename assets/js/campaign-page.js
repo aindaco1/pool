@@ -470,6 +470,21 @@ function initHeroVideo() {
 }
 
 function initYoutubeHeroFacades() {
+  document.querySelectorAll('[data-youtube-poster-fallback]').forEach((image) => {
+    if (!(image instanceof HTMLImageElement) || image.dataset.youtubePosterFallbackReady === 'true') return;
+    image.dataset.youtubePosterFallbackReady = 'true';
+    const fallback = image.getAttribute('data-youtube-poster-fallback') || '';
+    if (!fallback) return;
+    let didFallback = false;
+    const useFallback = () => {
+      if (didFallback || image.src === fallback) return;
+      didFallback = true;
+      image.src = fallback;
+    };
+    image.addEventListener('error', useFallback, { once: true });
+    if (image.complete && image.naturalWidth === 0) useFallback();
+  });
+
   document.querySelectorAll('[data-youtube-embed]').forEach((facade) => {
     if (facade.dataset.youtubeReady === 'true') return;
     facade.dataset.youtubeReady = 'true';

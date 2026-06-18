@@ -66,7 +66,7 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | `pledge-management` | DST-aware deadline enforcement through the configured platform timezone, cancel/modify/payment-method validation, pledge status transitions, multi-campaign independence, shipping in pledge records, API response shape |
 | `settlement` | Charge aggregation (including shipping fees), payment success/failure, retry flow, dry-run mode, edge cases, batched settlement, campaign pledge index, settlement dispatch, shipping in settlement, cron heartbeat |
 | `email-broadcasts` | Diary excerpt extraction (with ellipsis truncation), diary/milestone tracking helpers, milestone checking logic, rate limiting |
-| `email-tip` | Tip-aware supporter email breakdowns across confirmation / modified / cancelled / failed / charged emails, plus launch reminder email routing through the shared updates sender |
+| `email-tip` | Tip-aware supporter email breakdowns across confirmation / modified / cancelled / failed / charged emails, plus launch reminder and abandoned-checkout email routing through the shared updates sender |
 | `votes` | Email-based vote storage/dedup, vote status retrieval, campaign results, result aggregation |
 | `admin-dashboard` | Dashboard dirty-state tracking, settings serialization, content/editor normalization, staged media uploads, actual Stripe fee analytics/backfill, referral URL helpers, responsive/i18n support utilities |
 | `campaign-page` | Share-link URL construction, safe query preservation, state-aware share text, launch reminder form submission, public campaign controls, and SEO-sensitive campaign-page behavior |
@@ -103,7 +103,7 @@ This runs:
   - `tests/unit/worker-business-logic.test.ts`
   - `tests/unit/worker-ops-integrity.test.ts`
   - `tests/unit/stats-pagination.test.ts`
-  These Worker suites cover launch reminder signup validation, unsubscribe suppression, queued dispatch idempotency, and the shared Resend send path.
+  These Worker suites cover launch reminder signup validation, abandoned-checkout opt-in/dispatch/suppression, unsubscribe suppression, queued dispatch idempotency, and the shared Resend send path.
 - Content safety filter regressions in `tests/unit/content-safety-filter.test.ts`, including unsafe Markdown link schemes, dashboard-authored emphasis spacing, and strict structured-embed URL validation
 - Campaign-content audit coverage in `tests/unit/campaign-content-security.test.ts`, including the allowed inline HTML subset and rejection of disallowed raw tags
 - Durable Object tier-inventory serialization coverage in `tests/unit/tier-inventory-do.test.ts`
@@ -419,7 +419,7 @@ Browser-based tests for full user flows in `tests/e2e/`.
 - Settings -> Plan usage automatic loading, provider help text, localized provider links, and zero-write read budget
 - Gross campaign/platform revenue, net campaign/platform revenue after allocated processor fees, and exact-cent analytics presentation
 - Content editor WYSIWYG block editing, link/media settings, diary editor reuse, draft state, publish state, and mobile preview
-- Saved marketing referral codes, campaign URL builder, CSV exports, sorting, and zero-write read flows
+- Saved marketing referral codes, campaign URL builder, QR download behavior, Blast dry-run/test/live-send flows, sent Blast history, CSV exports, sorting, and zero-write read flows
 - Desktop/tablet/mobile responsiveness, including compact Spanish tablet menus
 - Axe checks for the authenticated dashboard shell
 
@@ -912,6 +912,7 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 - `TURNSTILE_SECRET_KEY` — Shared Cloudflare Turnstile secret when admin sign-in or launch reminder widgets are enabled
 - `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY` — Optional reminder-specific Turnstile secret if not using the shared secret
 - `LAUNCH_REMINDER_TOKEN_SECRET` — Optional reminder unsubscribe-token secret; falls back to `MAGIC_LINK_SECRET`
+- `ABANDONED_CART_TOKEN_SECRET` — Optional abandoned-checkout unsubscribe-token secret; falls back to `MAGIC_LINK_SECRET`
 - `GITHUB_TOKEN` — GitHub PAT with repo/workflow access for dashboard publish actions and rebuild triggers; optional only when you are not testing GitHub-backed publishing
 - `ADMIN_BOOTSTRAP_EMAILS` — Optional local/recovery super-admin email list for dashboard sign-in; local dev reads this from `worker/.dev.vars`
 - `ADMIN_USERS_JSON` — Optional seed/recovery admin user list mirrored from `_config.yml`; dashboard Users edits save to KV at `admin-users:v1`
@@ -935,5 +936,5 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 ### Resend Dashboard
 - **Domain**: Verify the domain portion of the sender addresses configured in `_config.yml` / Worker env. For this deployment, `PLEDGES_EMAIL_FROM` is `The Pool <pledges@pool.dustwave.xyz>`, so Resend must authorize `pool.dustwave.xyz`.
 - **API Key**: Create key with "Sending access" permission
-- Used for: All supporter-facing pledge email (confirmation, manage/community access, launch reminders, diary updates, announcements, reports, charge success, payment failure, cancellations)
+- Used for: All supporter-facing pledge email (confirmation, manage/community access, launch reminders, abandoned-checkout reminders, diary updates, Blast/announcement emails, reports, charge success, payment failure, cancellations)
 - Local dev note: even when `SITE_BASE` points at `127.0.0.1`, embedded email images still use the public `https://pool.dustwave.xyz` asset base so inbox previews do not show broken localhost image URLs.

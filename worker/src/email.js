@@ -52,6 +52,121 @@ function formatEmailText(value) {
   return escapeHtml(value).replace(/\r?\n/g, '<br>');
 }
 
+function renderAnnouncementInlineFormatting(value) {
+  return escapeHtml(value)
+    .replace(/&lt;u&gt;([^<]+?)&lt;\/u&gt;/g, '<u>$1</u>')
+    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    .replace(/(^|[\s(])_([^_\n]+)_/g, '$1<em>$2</em>');
+}
+
+function renderAnnouncementInlineMarkdown(value, theme, siteBase) {
+  const linkHtml = [];
+  const source = String(value ?? '').replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (_match, label, href) => {
+    const safeHref = safeExternalUrl(String(href || '').replace(/&amp;/g, '&'), siteBase);
+    if (!safeHref) return label;
+    const token = `ANNOUNCEMENT_LINK_${linkHtml.length}`;
+    linkHtml.push({
+      token,
+      html: `<a href="${escapeHtml(safeHref)}" style="color: ${theme.primaryColor}; text-decoration: underline;">${renderAnnouncementInlineFormatting(label)}</a>`
+    });
+    return token;
+  });
+  let html = renderAnnouncementInlineFormatting(source);
+  for (const item of linkHtml) {
+    html = html.replace(item.token, item.html);
+  }
+  return html;
+}
+
+function renderAnnouncementList(lines, tagName, theme, siteBase) {
+  const items = lines.map((line) => {
+    const text = line.replace(tagName === 'ol' ? /^\s*\d+[.)]\s+/ : /^\s*[-*]\s+/, '').trim();
+    return `<li style="margin: 0 0 8px 0;">${renderAnnouncementInlineMarkdown(text, theme, siteBase)}</li>`;
+  }).join('');
+  return `<${tagName} style="margin: 0 0 16px 0; padding-left: 22px; color: ${theme.textColor}; font-size: 15px; line-height: 1.55;">${items}</${tagName}>`;
+}
+
+function formatAnnouncementEmailBody(value, theme, siteBase) {
+  const chunks = String(value ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split(/\n{2,}/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+
+  if (!chunks.length) return '';
+
+  return chunks.map((chunk) => {
+    const lines = chunk.split('\n').map((line) => line.trim()).filter(Boolean);
+    if (!lines.length) return '';
+    const first = lines[0] || '';
+    const heading = lines.length === 1 ? first.match(/^(#{2,4})\s+(.+)$/) : null;
+    if (heading) {
+      const size = heading[1].length === 2 ? 20 : heading[1].length === 3 ? 17 : 15;
+      return `<h${heading[1].length} style="margin: 0 0 12px 0; color: ${theme.textColor}; font-size: ${size}px; line-height: 1.25;">${renderAnnouncementInlineMarkdown(heading[2], theme, siteBase)}</h${heading[1].length}>`;
+    }
+    if (lines.every((line) => /^\s*[-*]\s+/.test(line))) {
+      return renderAnnouncementList(lines, 'ul', theme, siteBase);
+    }
+    if (lines.every((line) => /^\s*\d+[.)]\s+/.test(line))) {
+      return renderAnnouncementList(lines, 'ol', theme, siteBase);
+    }
+    return `<p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.55; color: ${theme.textColor};">${lines.map((line) => renderAnnouncementInlineMarkdown(line, theme, siteBase)).join('<br>')}</p>`;
+  }).filter(Boolean).join('');
+}
+
+function safeAnnouncementMediaUrl(value, siteBase) {
+  return safeEmailHostedAssetUrl(value, siteBase);
+}
+
+function announcementVideoUrl(block = {}) {
+  const provider = String(block.provider || '').trim().toLowerCase();
+  const videoId = String(block.video_id || '').trim();
+  if (!/^[A-Za-z0-9_-]{3,128}$/.test(videoId)) return '';
+  if (provider === 'vimeo') return `https://vimeo.com/${encodeURIComponent(videoId)}`;
+  if (provider === 'youtube') return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+  return '';
+}
+
+function formatAnnouncementContentBlocks(blocks, theme, siteBase) {
+  return (Array.isArray(blocks) ? blocks : []).map((block) => {
+    const type = String(block?.type || '').trim();
+    if (type === 'text') {
+      return formatAnnouncementEmailBody(block.body || '', theme, siteBase);
+    }
+    if (type === 'quote') {
+      const quote = formatAnnouncementEmailBody(block.text || '', theme, siteBase);
+      const author = block.author
+        ? `<cite style="display: block; margin-top: 8px; color: ${theme.mutedTextColor}; font-style: normal;">${escapeHtml(block.author)}</cite>`
+        : '';
+      return quote ? `<blockquote style="border-left: 3px solid ${theme.primaryColor}; margin: 0 0 18px 0; padding-left: 16px;">${quote}${author}</blockquote>` : '';
+    }
+    if (type === 'image') {
+      const src = safeAnnouncementMediaUrl(block.src, siteBase);
+      if (!src) return '';
+      const caption = block.caption
+        ? `<figcaption style="margin-top: 8px; color: ${theme.mutedTextColor}; font-size: 13px; line-height: 1.45;">${formatAnnouncementEmailBody(block.caption, theme, siteBase)}</figcaption>`
+        : '';
+      return `<figure style="margin: 0 0 18px 0;"><img src="${escapeHtml(src)}" alt="${escapeHtml(block.alt || '')}" style="display: block; width: 100%; max-width: 100%; height: auto; border-radius: ${theme.buttonRadius};">${caption}</figure>`;
+    }
+    if (type === 'video') {
+      const href = announcementVideoUrl(block);
+      if (!href) return '';
+      const provider = block.provider === 'vimeo' ? 'Vimeo' : 'YouTube';
+      const caption = block.caption ? formatAnnouncementEmailBody(block.caption, theme, siteBase) : '';
+      return `<div style="margin: 0 0 18px 0; padding: 16px; border: 1px solid ${theme.borderColor}; border-radius: ${theme.buttonRadius};">
+        ${caption}
+        <a href="${escapeHtml(href)}" style="${getEmailSecondaryButtonStyle(theme)}">${escapeHtml(`Watch on ${provider}`)}</a>
+      </div>`;
+    }
+    if (type === 'divider') {
+      return `<hr style="border: 0; border-top: 1px solid ${theme.borderColor}; margin: 22px 0;">`;
+    }
+    return '';
+  }).filter(Boolean).join('');
+}
+
 function renderInlineEmphasis(value) {
   return escapeHtml(value)
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
@@ -278,6 +393,30 @@ function safeExternalUrl(pathOrUrl, siteBase) {
   } catch (_error) {
     return '';
   }
+}
+
+function safeEmailHostedAssetUrl(pathOrUrl, siteBase) {
+  if (!pathOrUrl) return '';
+  try {
+    const assetBase = getEmailAssetBase(siteBase);
+    const baseUrl = new URL(assetBase);
+    const resolved = new URL(pathOrUrl, baseUrl);
+    if (!SAFE_LINK_PROTOCOLS.has(resolved.protocol)) return '';
+    if (resolved.origin !== baseUrl.origin) return '';
+    if (!resolved.pathname.startsWith('/assets/images/')) return '';
+    return resolved.toString();
+  } catch (_error) {
+    return '';
+  }
+}
+
+function emailListUnsubscribeHeaders(unsubscribeUrl, siteBase) {
+  const href = safeExternalUrl(unsubscribeUrl, siteBase);
+  if (!href) return {};
+  return {
+    'List-Unsubscribe': `<${href}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+  };
 }
 
 function safeInstagramUrl(instagramUrl) {
@@ -720,6 +859,7 @@ export async function sendLaunchReminderEmail(env, { email, campaignSlug, campai
   const from = safeEmailHeaderText(getUpdatesEmailFrom(env) || getPledgesEmailFrom(env));
   const campaignHref = safeExternalUrl(campaignUrl, env.SITE_BASE) || safeSiteUrl(getLocalizedPath(`/campaigns/${encodeURIComponent(campaignSlug || '')}/`, lang), env.SITE_BASE);
   const unsubscribeHref = safeExternalUrl(unsubscribeUrl, env.WORKER_BASE || env.SITE_BASE);
+  const unsubscribeHeaders = emailListUnsubscribeHeaders(unsubscribeHref, env.WORKER_BASE || env.SITE_BASE);
   const subject = safeEmailHeaderText(buildEmailSubject(
     t('subjects.launch_reminder', 'Now live', { campaign: safeCampaignTitle }),
     safeCampaignTitle,
@@ -773,7 +913,8 @@ export async function sendLaunchReminderEmail(env, { email, campaignSlug, campai
       from,
       to: email,
       subject,
-      html
+      html,
+      ...(Object.keys(unsubscribeHeaders).length ? { headers: unsubscribeHeaders } : {})
     }, {
       errorLabel: 'Resend error (launch reminder)',
       failureLabel: 'Failed to send launch reminder email'
@@ -781,6 +922,99 @@ export async function sendLaunchReminderEmail(env, { email, campaignSlug, campai
     return { sent: true };
   } catch (error) {
     return { sent: false, reason: error?.message || 'Failed to send launch reminder email' };
+  }
+}
+
+export async function sendAbandonedCartEmail(env, { email, campaignSlug, campaignTitle, campaignTitles = [], campaignUrl, amountCents = 0, unsubscribeUrl, preferredLang } = {}) {
+  configureEmailLogging(env);
+  if (!env?.RESEND_API_KEY) {
+    return { sent: false, reason: 'RESEND_API_KEY not configured' };
+  }
+
+  const translator = await getEmailTranslator(env, preferredLang);
+  const { t, lang } = translator;
+  const theme = getEmailTheme(env);
+  const platformName = safeEmailHeaderText(getPlatformName(env) || 'The Pool') || 'The Pool';
+  const titles = Array.isArray(campaignTitles)
+    ? campaignTitles.map((title) => safeEmailHeaderText(title)).filter(Boolean)
+    : [];
+  const safeCampaignTitle = safeEmailHeaderText(
+    campaignTitle ||
+    (titles.length > 1 ? t('abandoned_cart.multiple_campaigns', 'your campaigns') : titles[0]) ||
+    campaignSlug ||
+    t('abandoned_cart.fallback_campaign', 'this campaign')
+  );
+  const from = safeEmailHeaderText(getUpdatesEmailFrom(env) || getPledgesEmailFrom(env));
+  const campaignHref = safeExternalUrl(campaignUrl, env.SITE_BASE) ||
+    safeSiteUrl(getLocalizedPath(`/campaigns/${encodeURIComponent(campaignSlug || '')}/`, lang), env.SITE_BASE);
+  const unsubscribeHref = safeExternalUrl(unsubscribeUrl, env.WORKER_BASE || env.SITE_BASE);
+  const unsubscribeHeaders = emailListUnsubscribeHeaders(unsubscribeHref, env.WORKER_BASE || env.SITE_BASE);
+  const subject = safeEmailHeaderText(buildEmailSubject(
+    t('subjects.abandoned_cart', 'Finish your pledge', { campaign: safeCampaignTitle }),
+    safeCampaignTitle,
+    ''
+  ));
+  const heading = t('abandoned_cart.heading', 'Finish your pledge for %{campaign}', { campaign: safeCampaignTitle });
+  const intro = t(
+    'abandoned_cart.intro',
+    'You asked for one reminder if you left checkout before finishing your pledge. You can still finish setting up your pledge.',
+    { campaign: safeCampaignTitle, platform: platformName }
+  );
+  const cta = t('abandoned_cart.cta', 'Finish pledge');
+  const footer = t(
+    'abandoned_cart.footer',
+    'You are receiving this because you asked for one checkout reminder before leaving %{platform}.',
+    { platform: platformName }
+  );
+  const unsubscribeLabel = t('abandoned_cart.unsubscribe', 'Do not send me checkout reminders');
+  const amount = Math.max(0, Number(amountCents || 0) || 0);
+  const amountBlock = amount > 0 ? `
+    <p style="margin: 0 0 16px 0; font-size: 14px; color: ${theme.mutedTextColor};">${escapeHtml(t('abandoned_cart.estimated_total', 'Estimated total if funded: $%{amount}', { amount: (amount / 100).toFixed(2) }))}</p>
+  ` : '';
+  const unsubscribeBlock = unsubscribeHref ? `
+    <p style="margin: 12px 0 0 0; font-size: 12px; color: ${theme.mutedTextColor};">
+      <a href="${escapeHtml(unsubscribeHref)}" style="color: ${theme.primaryColor}; text-decoration: underline;">${escapeHtml(unsubscribeLabel)}</a>
+    </p>
+  ` : '';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(heading))}
+  <div style="${getEmailCardStyle(theme)}">
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(intro)}</p>
+    ${amountBlock}
+    <p style="margin: 0;">
+      <a href="${escapeHtml(campaignHref)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(cta)}</a>
+    </p>
+  </div>
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(footer)}</p>
+    ${unsubscribeBlock}
+  </div>
+</body>
+</html>
+  `.trim();
+
+  try {
+    await sendResendEmail(env, {
+      from,
+      to: email,
+      subject,
+      html,
+      ...(Object.keys(unsubscribeHeaders).length ? { headers: unsubscribeHeaders } : {})
+    }, {
+      errorLabel: 'Resend error (abandoned checkout)',
+      failureLabel: 'Failed to send abandoned checkout reminder email'
+    });
+    return { sent: true };
+  } catch (error) {
+    return { sent: false, reason: error?.message || 'Failed to send abandoned checkout reminder email' };
   }
 }
 
@@ -1481,14 +1715,23 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
 /**
  * Send announcement email to supporters with optional highlighted CTA link
  */
-export async function sendAnnouncementEmail(env, { email, campaignSlug, campaignTitle, subject, heading, body, ctaLabel, ctaUrl, token, instagramUrl, hasDecisions, preferredLang }) {
+export async function sendAnnouncementEmail(env, { email, campaignSlug, campaignTitle, subject, heading, body, contentBlocks, ctaLabel, ctaUrl, token, instagramUrl, hasDecisions, preferredLang, testMode = false }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
-  const communityUrl = safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
-  const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
+  const hasSupporterToken = Boolean(token);
+  const communityUrl = hasSupporterToken
+    ? safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE)
+    : '';
+  const manageUrl = hasSupporterToken
+    ? safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE)
+    : '';
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { theme });
   const safeCtaHref = safeExternalUrl(ctaUrl, env.SITE_BASE);
+  const structuredContentHtml = Array.isArray(contentBlocks) && contentBlocks.length
+    ? formatAnnouncementContentBlocks(contentBlocks, theme, env.SITE_BASE)
+    : '';
+  const announcementContentHtml = structuredContentHtml || formatAnnouncementEmailBody(body, theme, env.SITE_BASE);
   
   const ctaBlock = ctaLabel && safeCtaHref ? `
   <div style="text-align: center; margin: 24px 0 32px 0;">
@@ -1497,22 +1740,7 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
     </a>
   </div>` : '';
   
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body style="${getEmailBodyStyle(theme)}">
-  ${renderEmailHeader(theme, escapeHtml(heading || subject))}
-  
-  <div style="${getEmailCardStyle(theme)}">
-    <p style="margin: 0; font-size: 15px; color: ${theme.textColor};">${formatEmailText(body)}</p>
-  </div>
-  
-  ${ctaBlock}
-  
+  const supporterAccessBlock = hasSupporterToken ? `
   <div style="margin-bottom: 32px;">
     <h2 style="font-size: 18px; margin: 0 0 16px 0;">${escapeHtml(t('common.your_supporter_access', 'Your Supporter Access'))}</h2>
     
@@ -1529,12 +1757,34 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
       </a>
       <p style="margin: 8px 0 0 0; font-size: 14px; color: ${theme.mutedTextColor};">${escapeHtml(t('common.manage_your_pledge_desc', 'Cancel, modify amount, or update payment method'))}</p>
     </div>
+  </div>` : '';
+
+  const footerText = testMode && !hasSupporterToken
+    ? t('common.announcement_preview', 'This is a test preview of a supporter announcement for %{campaign}.', { campaign: campaignTitle })
+    : t('common.because_you_backed', "You're receiving this because you backed %{campaign}.", { campaign: campaignTitle });
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(heading || subject))}
+
+  <div style="${getEmailCardStyle(theme)}">
+    ${announcementContentHtml}
   </div>
-  
+
+  ${ctaBlock}
+
+  ${supporterAccessBlock}
+
   ${instagramCTA}
-  
+
   <div style="${getEmailFooterStyle(theme)}">
-    <p style="margin: 0;">${escapeHtml(t('common.because_you_backed', "You're receiving this because you backed %{campaign}.", { campaign: campaignTitle }))}</p>
+    <p style="margin: 0;">${escapeHtml(footerText)}</p>
   </div>
 </body>
 </html>

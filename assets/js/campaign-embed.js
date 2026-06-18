@@ -34,6 +34,7 @@ const copyButton = document.querySelector('[data-campaign-embed-copy]');
 const copyStatus = document.querySelector('[data-campaign-embed-copy-status]');
 const closeLink = document.querySelector('[data-campaign-embed-close]');
 const isFramed = window.self !== window.top;
+const isAdminMarketingEmbed = builder?.hasAttribute('data-admin-marketing-embed') === true;
 const shouldSyncQuery = String(builder?.dataset.campaignEmbedSyncQuery || root.dataset.campaignEmbedSyncQuery || 'true') !== 'false';
 const shouldAutoload = String(builder?.dataset.campaignEmbedAutoload || root.dataset.campaignEmbedAutoload || 'true') !== 'false';
 
@@ -454,7 +455,7 @@ function renderMedia(campaign, embedOptions) {
   );
   const imageAlt = escapeHtml(campaign.heroImageAlt || campaign.title || currentSlug);
 
-  if (heroVideo && normalizeEmbedOptions(embedOptions).layout !== 'compact') {
+  if (heroVideo && !isAdminMarketingEmbed && normalizeEmbedOptions(embedOptions).layout !== 'compact') {
     if (/youtu\.be\/|youtube\.com\/watch\?v=|youtube\.com\/embed\//i.test(heroVideo)) {
       let videoId = '';
       if (heroVideo.indexOf('youtu.be/') !== -1) {

@@ -74,11 +74,11 @@ The top-level dashboard order is:
 
 1. **Settings**: platform configuration, branding/SEO, pricing, tax, shipping, runner reports, design, users, performance, plan usage, debug, credential status, and runtime diagnostics.
 2. **Add-ons**: platform add-on availability and product details, visible only to super admins.
-3. **Campaigns**: role-scoped campaign settings, page content, rewards, campaign add-ons, stretch goals, ongoing items, diary entries, and decisions.
+3. **Campaigns**: role-scoped campaign settings, page content, rewards, campaign add-ons, stretch goals, ongoing items, diary entries, decisions, and supporter email blasts.
 4. **Analytics**: pledge-derived campaign and portfolio analytics.
 5. **Reports**: CSV preview/download for pledge and fulfillment reports.
 6. **Supporters**: role-scoped supporter browsing, filtering, sorting, and CSV export.
-7. **Marketing**: referral URL builder, saved referral codes, launch snippets, and embed-builder controls.
+7. **Marketing**: referral URL builder, saved referral codes, downloadable campaign QR codes, and embed-builder controls.
 
 ## Settings
 
@@ -252,7 +252,7 @@ Supported block types include:
 - embed
 - divider
 
-The editor supports slash commands, keyboard undo for block changes, Markdown-style inline formatting, links, unordered/ordered lists, alignment controls, media settings, and mobile preview. **Save draft** stores a browser-local draft. **Publish** validates and writes through the Worker.
+The editor supports block insertion controls, keyboard undo for block changes, Markdown-style inline formatting, links, unordered/ordered lists, alignment controls, media settings, and mobile preview. **Save draft** stores a browser-local draft. **Publish** validates and writes through the Worker.
 
 Uploaded video blocks can include an explicit poster image. When no poster is set, the dashboard and public campaign page generate an in-browser poster from the video's first frame while keeping the playable video itself lazy-loaded until the user presses play.
 
@@ -323,16 +323,29 @@ Gross Campaign revenue and Platform revenue remain visible for reconciliation. N
 
 ## Marketing
 
-The Marketing tab builds campaign URLs with referral and UTM parameters, saves referral codes, generates launch snippets, and exposes the campaign embed-builder UI.
+The Marketing tab builds campaign URLs with referral and UTM parameters, shows the campaign QR preview/download controls beside the URL output, saves referral codes, and exposes the campaign embed-builder UI.
 
 Saved referral codes store:
 
 - referrer name
 - referral code
 - generated URL
+- QR code source metadata for the generated URL
 - creation timestamp
 
 The URL builder clears after saving and on refresh. Referral saves/edits/deletes are explicit KV mutations.
+
+QR codes are generated in the browser from the current campaign URL builder output or a saved referral URL, including referral and UTM parameters. The current builder preview updates without Worker calls, and PNG/SVG downloads are browser-local file downloads. QR preview and download actions do not read or write KV.
+
+## Blast
+
+Campaigns -> Blast sends supporter email blasts for the selected campaign without adding another top-level dashboard view. Campaign users may send blasts for campaigns assigned to them, and super admins may send for any campaign. Blast drafts are browser-local for now and reuse the campaign WYSIWYG content editor for email-ready headings, text, quotes, lists, links, uploaded campaign-hosted images, and YouTube/Vimeo video links. The dashboard automatically uploads staged Blast images through the same campaign media upload path used by Content and diary blocks before the dry run, so image files are committed under `assets/images/campaigns/<slug>/` and queued for repository media optimization before the email payload is built. The dashboard automatically runs the dry-run validation before Send test or Send blast; failed upload or audience checks explain the reason before any email send is attempted.
+
+Dry runs validate the message, compute the indexed audience count, and return a dry-run hash without rate-limit writes, audit writes, email sends, or KV lists. Test sends go only to the signed-in admin. Live sends require the matching dry-run hash for the exact message and audience, send through the shared Resend updates sender, and write one audit event after dispatch. The Blast tab shows read-only sent history from recent audit records, including subject, content, CTA Button Label, and CTA Button URL.
+
+Blast email rendering only includes hosted site images from `/assets/images/...`; arbitrary remote image URLs are omitted server-side. YouTube and Vimeo blocks render as email-safe links/buttons rather than iframe or video embeds because most email clients block embedded players.
+
+If `campaign-pledges:<slug>` is missing, Blast dry-runs and sends fail closed with `campaign_index_required`; rebuild the campaign index before sending. This avoids falling back to pledge namespace scans on an operator path that can run in production.
 
 ## Media
 
@@ -354,7 +367,7 @@ Recommended campaign media:
 - Default social image: large 16:9 or Open Graph-friendly image
 - Hero video: direct MP4/WebM/MOV upload up to 100 MB, or a YouTube/Vimeo URL
 
-The campaign Content editor and diary-entry content editors stage selected media in the browser first. The block shows the selected image, video, or audio selection immediately, but the file is not uploaded until the user publishes. During publish, the dashboard uploads staged media into the campaign asset directory, replaces the temporary browser preview with the final `/assets/...` path, and then commits the campaign YAML.
+The campaign Content editor, diary-entry content editors, and Blast image blocks stage selected media in the browser first. The block shows the selected image, video, or audio selection immediately, but the file is not uploaded until the user publishes content or sends/tests a Blast. During publish or Blast send, the dashboard uploads staged media into the campaign asset directory, replaces the temporary browser preview with the final `/assets/...` path, and then commits the campaign YAML or builds the Blast email payload.
 
 Campaign-scoped media uploads require access to that campaign. Super admins can upload any campaign media and platform/default media; campaign admins can upload only media for campaigns they manage. Platform add-on and platform brand uploads stay super-admin only.
 

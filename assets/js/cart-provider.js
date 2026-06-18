@@ -2518,13 +2518,15 @@
 
     const hasBillingAddress = Object.values(billingAddress).some((value) => String(value || '').trim());
     const hasCustomer = Object.values(customer).some((value) => String(value || '').trim());
+    const abandonedCartConsent = state?.cart?.abandonedCartConsent === true;
 
-    if (!email && !hasBillingAddress && !hasCustomer) {
+    if (!email && !hasBillingAddress && !hasCustomer && !abandonedCartConsent) {
       return null;
     }
 
     return {
       email,
+      abandonedCartConsent,
       billingAddress,
       customer,
       savedAt: Date.now()
@@ -2561,6 +2563,7 @@
 
       return {
         email: String(draft?.email || ''),
+        abandonedCartConsent: draft?.abandonedCartConsent === true,
         billingAddress: draft?.billingAddress && typeof draft.billingAddress === 'object'
           ? { ...draft.billingAddress }
           : {},
@@ -2934,6 +2937,7 @@
       resolveCartBundleAddOnAnchorCampaignSlug(persistedItems, persisted?.bundleAddOnAnchorCampaignSlug)
     );
     const draftEmail = String(draft?.email || '');
+    const abandonedCartConsent = draft?.abandonedCartConsent === true;
 
     return {
       cart: {
@@ -2944,6 +2948,7 @@
         subtotal: persistedTotals.subtotal || 0,
         total: persistedTotals.total || 0,
         email: draftEmail,
+        abandonedCartConsent,
         tipPercent: persistedTipPercent,
         bundleAddOnAnchorCampaignSlug: resolveCartBundleAddOnAnchorCampaignSlug(
           persistedItems,
@@ -3531,6 +3536,10 @@
                   >
                   <p id="pool-custom-checkout-email-error" class="pool-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
                 </div>
+                <label class="pool-first-party-cart__checkbox-field pool-first-party-cart__checkbox-field--full">
+                  <input class="pool-first-party-cart__checkbox" type="checkbox" data-cart-abandoned-consent ${state?.cart?.abandonedCartConsent === true ? 'checked' : ''}>
+                  <span>${escapeHtml(getRuntimeMessage('cart.abandonedCartConsent', 'Email me one reminder if I leave checkout before finishing this pledge.'))}</span>
+                </label>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line1">${escapeHtml(getRuntimeMessage('cart.addressLine1', 'Address line 1'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                   <input id="pool-custom-shipping-line1" name="shipping-address-line1" class="pool-first-party-cart__input" type="text" autocomplete="section-pool-checkout shipping address-line1" autocapitalize="words" aria-describedby="pool-custom-shipping-error" aria-invalid="${customCheckout?.shippingError ? 'true' : 'false'}" value="${escapeHtml(getPersistedCustomCheckoutShippingDraft()?.address?.line1 || '')}" data-cart-custom-shipping-field="line1">
@@ -3580,6 +3589,10 @@
                   >
                 <p id="pool-custom-checkout-email-error" class="pool-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
               </div>
+              <label class="pool-first-party-cart__checkbox-field">
+                <input class="pool-first-party-cart__checkbox" type="checkbox" data-cart-abandoned-consent ${state?.cart?.abandonedCartConsent === true ? 'checked' : ''}>
+                <span>${escapeHtml(getRuntimeMessage('cart.abandonedCartConsent', 'Email me one reminder if I leave checkout before finishing this pledge.'))}</span>
+              </label>
             </div>
           </div>
           ${!hasCustomCheckoutSession ? `
@@ -5326,6 +5339,13 @@
       if (emailValue) {
         payloadResult.payload.email = emailValue;
       }
+      const abandonedConsentField = getCartRoot()?.querySelector('[data-cart-abandoned-consent]');
+      const wantsAbandonedReminder = abandonedConsentField instanceof HTMLInputElement
+        ? abandonedConsentField.checked
+        : store.getState()?.cart?.abandonedCartConsent === true;
+      if (wantsAbandonedReminder) {
+        payloadResult.payload.abandonedCartConsent = true;
+      }
 
       try {
         const stripeReadyPromise = canUseCustomCheckoutUi() ? prewarmStripeJs() : null;
@@ -5635,6 +5655,14 @@
         if (emailField) {
           apiRoot.api.cart.update({
             email: emailField.value
+          });
+          return;
+        }
+
+        const abandonedConsentField = event.target?.closest?.('[data-cart-abandoned-consent]');
+        if (abandonedConsentField instanceof HTMLInputElement) {
+          apiRoot.api.cart.update({
+            abandonedCartConsent: abandonedConsentField.checked
           });
           return;
         }

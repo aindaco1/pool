@@ -37,7 +37,7 @@ This document covers the security architecture, known risks, applied hardening m
 | `admin-login:{hash}` | PLEDGES | One-time admin login nonce and email | **Medium** - ephemeral admin auth |
 | `admin-session:{hash}` | PLEDGES | Admin email, role, campaign scope, CSRF token, expiry | **High** - admin auth |
 | `admin-users:v1` | PLEDGES | Runtime admin users and campaign scopes | **High** - access control |
-| `admin-marketing-referrals:{slug}` | PLEDGES | Saved referral code metadata | **Low** - admin-authored marketing data |
+| `admin-marketing-referrals:{slug}` | PLEDGES | Saved referral code and QR source metadata | **Low** - admin-authored marketing data |
 | `campaign-preview-reviewers:{slug}` | PLEDGES | Normalized reviewer email allowlist for protected campaign previews, with 24-hour TTL | **Medium** - campaign-scoped email access list |
 | `admin-audit:{date}:{action}:{id}` | PLEDGES | Recent admin mutation audit events | **Medium** - admin identity + operational metadata |
 | `launch-reminder:{slug}:{emailHash}` | PLEDGES | Upcoming-campaign reminder email and opt-in metadata | **Medium** - campaign-scoped email |
@@ -45,6 +45,10 @@ This document covers the security architecture, known risks, applied hardening m
 | `launch-reminder-sent:{slug}:{emailHash}` | PLEDGES | Reminder send idempotency marker | **Low** - send state |
 | `launch-reminder-dispatch:{slug}` | PLEDGES | Bounded reminder dispatch job cursor/progress | **Low** - operational state |
 | `launch-reminder-dispatch-queue:v1` | PLEDGES | Reminder dispatch queue idle/pending marker | **Low** - operational state |
+| `abandoned-cart:{orderId}` | PLEDGES | Explicitly opted-in checkout reminder email and campaign snapshot | **Medium** - campaign-scoped email |
+| `abandoned-cart-sent:{emailHash}:{campaignSetHash}` | PLEDGES | Checkout reminder send idempotency marker | **Low** - send state |
+| `abandoned-cart-suppressed:{emailHash}` | PLEDGES | Checkout reminder unsubscribe marker | **Medium** - supporter email hash |
+| `abandoned-cart-queue:v1` | PLEDGES | Checkout reminder queue idle/pending marker | **Low** - operational state |
 | `supporter-email-retry:{orderId}` | PLEDGES | Queued supporter confirmation email retry payload | **Medium** - supporter email payload |
 | `supporter-email-retry-queue:v1` | PLEDGES | Supporter email retry idle/pending and next-attempt marker | **Low** - operational state |
 | `add-on-inventory-sold:v1` | PLEDGES | Platform add-on sold-count projection | **Low** - aggregate inventory state |
@@ -97,7 +101,7 @@ Settlement serialization is also Durable Object-backed. The `SETTLEMENT_COORDINA
 Runtime credentials are intentionally separated from editable site configuration:
 
 - Non-secret settings belong in `_config.yml`, `_config.local.yml`, or admin setting drafts.
-- Local development secrets belong in ignored `worker/.dev.vars`; run `npm run secrets:dev` to create/update that file safely. Use separate local-only values, not production backups.
+- Local development secrets belong in ignored `worker/.dev.vars`; run `npm run secrets:dev` or `npm run setup:deploy -- --mode=local` to create/update that file safely. Use separate local-only values, not production backups.
 - Production Worker credentials belong in Cloudflare Worker secrets through `wrangler secret put`.
 - Deploy credentials such as `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_CACHE_PURGE_TOKEN`, `ADMIN_BROADCAST_SECRET`, and `DIARY_CHECK_BYPASS_SECRET` belong in GitHub repository secrets only when GitHub Actions or operator scripts need to call those routes. Add `ADMIN_SETTLEMENT_SECRET` there only when a workflow actually calls settlement endpoints.
 - The admin plan usage tracker must use `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN` with read-only GraphQL Analytics scope, plus Billing Read if Workers plan auto-detection is enabled. Do not reuse the broader Wrangler deploy token for dashboard usage reads.
@@ -123,10 +127,11 @@ Admin mutations use these common protections:
 - Publish-time media cleanup is derived server-side from the previously loaded campaign data and the normalized campaign draft being committed. It only deletes safe root-relative dashboard-owned files under the same campaign's `assets/images`, `assets/videos`, or `assets/audio` directories, and it preserves external URLs, shared/default assets, and files still referenced elsewhere in the campaign.
 - Runtime-only admin users are saved only to KV at `admin-users:v1`; they are not serialized into `_config.yml`.
 - Marketing referral codes are saved only on explicit user action and are scoped to the campaign URL origin/path the admin account can access.
+- Campaigns -> Blast sends are scoped to campaigns the admin account can edit. Blast dry runs require the campaign pledge index and add no KV writes or list operations; live sends require a matching dry-run hash and write one audit event after dispatch.
 - New campaign creation is super-admin-only, writes a preview-only campaign Markdown file locally in dev or through the existing GitHub path in production, and keeps that campaign out of public route generation until launched. Creating new campaign users during that flow saves to `admin-users:v1` and emails assigned users through the shared admin email path when users are assigned.
 - Protected preview publication is scoped to super admins and assigned campaign users. It commits only preview flags to campaign Markdown, stores the publishing admin plus optional reviewer emails in a short-lived `campaign-preview-reviewers:{slug}` KV allowlist, returns a signed 24-hour dashboard link for the publishing admin, sends signed 24-hour reviewer links when optional reviewers are added, and records an audit event. Previewer emails must not be persisted in GitHub-backed campaign source, public campaign JSON, sitemap output, or generated metadata.
 - Campaign archiving is super-admin-only and unavailable for currently live campaigns. The Worker validates the CSRF token, role, slug, campaign existence, and effective state before moving files locally in dev or dispatching `.github/workflows/archive-campaign.yml` in production. Both archive paths validate the slug, move campaign source and campaign-owned media into `archive/campaigns/<slug>/`, skip media still referenced by other active campaigns, and write an `archive-manifest.json`.
-- The static admin shell uses a restrictive meta CSP with no inline scripts, limited Worker/API connections, and sandboxed preview iframes that receive only Worker-rendered preview HTML. Framing protection must be delivered as an HTTP header, such as `Content-Security-Policy: frame-ancestors 'none'` or `X-Frame-Options: DENY`; browsers ignore `frame-ancestors` inside meta CSP.
+- The static admin shell uses a restrictive meta CSP with no inline scripts, limited Worker/API connections, and sandboxed preview iframes that receive only Worker-rendered preview HTML. Preview iframes allow scripts but intentionally do not use `allow-same-origin`, avoiding the browser warning and escape risk that comes from combining both sandbox tokens. Admin editing and protected-preview surfaces render remote YouTube/Vimeo media as facades instead of loading live players on page load; the CSP allows static YouTube thumbnail images for those facades but still does not load YouTube player scripts in editor previews. Public campaign pages and copied public embeds can still render approved players. Framing protection must be delivered as an HTTP header, such as `Content-Security-Policy: frame-ancestors 'none'` or `X-Frame-Options: DENY`; browsers ignore `frame-ancestors` inside meta CSP.
 - Admin magic-link emails use internally generated login URLs and strip email-header control characters from admin-configurable sender/subject values before sending.
 
 ### Protected Campaign Preview Boundary
@@ -196,6 +201,8 @@ Community pages no longer persist the raw supporter bearer token in a long-lived
 Limited-tier inventory mutations now flow through a per-campaign Durable Object coordinator from checkout start onward. Scarce tiers are reserved before redirecting into Stripe, confirmed at successful persistence time, and only projected back into KV for public reads. That keeps race-sensitive inventory truth out of client-visible KV while preserving efficient public `/inventory/:slug` reads.
 
 The newer on-site Stripe checkout and `Update Card` flows now also fail more privately by default: Worker responses that carry Stripe session bootstrap data or order-specific completion state are served with `Cache-Control: private, no-store`, cross-site browser POSTs to checkout-start / checkout-complete / payment-method-start are rejected unless they originate from `SITE_BASE`, and the browser keeps only short-lived in-flight checkout markers for reservation recovery instead of leaving them in long-lived storage indefinitely. Long-lived cart persistence now keeps only cart structure and pricing inputs; contact and address drafts are downgraded to session-scoped storage, and `/checkout-intent/complete` has its own retry budget so local recovery can’t be spammed indefinitely. After successful pledge persistence, the checkout flow now also invalidates live stats/inventory caches immediately and leaves a short-lived refresh marker so restored campaign pages do not keep showing stale totals from pre-pledge browser state.
+
+Abandoned-checkout reminders are opt-in only. The browser sends `abandonedCartConsent` only when the supporter checks the reminder box, and the Worker queues a reminder only after Stripe creates a valid first-party Checkout Session. Reminder records are short-lived, use signed unsubscribe links, delete on successful pledge persistence for that order, and check campaign pledge indexes before sending so a later completed pledge suppresses stale abandoned-checkout email.
 
 ---
 
@@ -517,8 +524,9 @@ Covered write paths:
 - `/admin/users`
 - `/admin/campaigns/create`, `/admin/campaigns/archive`, and `/admin/campaign-preview/publish`
 - `/admin/marketing/referrals`
+- `/admin/marketing/announcement`
 
-The hardening rejects stored-XSS primitives such as raw `<script>`, event-handler attributes, unsafe Markdown links, parent-relative Markdown links, `javascript:`/`data:` URLs, CSS function/declaration injection, and unsafe asset paths. It also rejects settings mass assignment for dashboard-only rows and normalizes structured arrays for platform add-ons, campaign add-ons, tiers, support items, diary entries, stretch goals, ongoing items, and decisions. Media uploads are role-scoped, content-type allowlisted, size-limited, and written only to canonical dashboard asset directories.
+The hardening rejects stored-XSS primitives such as raw `<script>`, event-handler attributes, unsafe Markdown links, parent-relative Markdown links, `javascript:`/`data:` URLs, CSS function/declaration injection, and unsafe asset paths. It also rejects settings mass assignment for dashboard-only rows and normalizes structured arrays for platform add-ons, campaign add-ons, tiers, support items, diary entries, stretch goals, ongoing items, and decisions. Media uploads are role-scoped, content-type allowlisted, size-limited, and written only to canonical dashboard asset directories. Blast email rendering includes only site-hosted image paths and email-safe video links rather than arbitrary remote image hotlinks or iframe embeds.
 
 The browser dashboard also has defense-in-depth hardening around the editing shell: the admin page meta CSP avoids inline scripts, limits Worker/API connections, and keeps content previews in sandboxed iframes. Deployments should add framing protection through HTTP headers, such as `Content-Security-Policy: frame-ancestors 'none'` or `X-Frame-Options: DENY`, because meta CSP cannot enforce that directive. Magic-link email payloads strip CRLF/control characters from configurable header values before calling Resend so platform names or sender settings cannot create header-injection payloads.
 
@@ -535,6 +543,7 @@ Before deploying to production, verify these secrets are set:
 | Checkout Intent Secret | `CHECKOUT_INTENT_SECRET` | 32+ chars |
 | Magic Link Secret | `MAGIC_LINK_SECRET` | 32+ chars |
 | Launch Reminder Token Secret | `LAUNCH_REMINDER_TOKEN_SECRET` or `MAGIC_LINK_SECRET` fallback | 32+ chars |
+| Abandoned Checkout Token Secret | `ABANDONED_CART_TOKEN_SECRET` or `MAGIC_LINK_SECRET` fallback | 32+ chars |
 | Admin Session Secret | `ADMIN_SESSION_SECRET` | 32+ chars |
 | Admin Secret | `ADMIN_SECRET` | 32+ chars |
 | Settlement Admin Secret | `ADMIN_SETTLEMENT_SECRET` (optional, scoped) | 32+ chars |

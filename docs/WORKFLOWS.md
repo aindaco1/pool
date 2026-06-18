@@ -74,11 +74,15 @@ Pledges are stored in Cloudflare KV. Key patterns:
 | `launch-reminder-sent:{campaignSlug}:{emailHash}` | Launch reminder send idempotency marker |
 | `launch-reminder-dispatch:{campaignSlug}` | Bounded dispatch job cursor for a campaign that just became live |
 | `launch-reminder-dispatch-queue:v1` | Queue-state marker that lets idle launch reminder scheduled ticks skip dispatch list scans |
+| `abandoned-cart:{orderId}` | Explicitly opted-in abandoned-checkout reminder record |
+| `abandoned-cart-queue:v1` | Queue-state marker that lets idle abandoned-checkout scheduled ticks skip namespace scans |
+| `abandoned-cart-sent:{emailHash}:{campaignSetHash}` | Abandoned-checkout send idempotency marker |
+| `abandoned-cart-suppressed:{emailHash}` | Abandoned-checkout unsubscribe marker |
 | `supporter-email-retry:{orderId}` | Queued supporter confirmation email retry payload |
 | `supporter-email-retry-queue:v1` | Queue-state marker with the next due supporter email retry time |
 | `add-on-inventory-sold:v1` | Sold-count projection for platform add-on inventory |
 | `admin-users:v1` | Runtime dashboard users saved from **Settings -> Users** |
-| `admin-marketing-referrals:{campaignSlug}` | Saved referral code metadata for the dashboard Marketing tab |
+| `admin-marketing-referrals:{campaignSlug}` | Saved referral code and QR source metadata for the dashboard Marketing tab |
 
 Scarce-tier reservations and committed claim state now live in the per-campaign Durable Object coordinator rather than KV. `tier-inventory:{campaignSlug}` remains the public projection used by `/inventory/:slug` and `/live/:slug`.
 
@@ -342,8 +346,27 @@ Trigger a GitHub Pages rebuild (for state transitions).
 **Headers:** `Authorization: Bearer ADMIN_SECRET`  
 **Request:** `{ "reason": "campaign-state-change" }` (optional)
 
+### `POST /admin/marketing/announcement`
+Dry-run, test-send, or live-send a Campaigns -> Blast supporter email from the browser dashboard.
+
+The browser route requires a dashboard session, CSRF/origin checks, campaign scope, and an indexed `campaign-pledges:{slug}` audience. Dry runs validate the exact subject/content/CTA/audience and return a `dryRunHash` without sending email, writing audits, or listing KV namespaces. Test sends go only to the signed-in admin. Live sends require the matching dry-run hash and write one admin-audit event after dispatch.
+
+**Request:**
+```json
+{
+  "campaignSlug": "worst-movie-ever",
+  "subject": "Submissions close March 6th!",
+  "content": [
+    { "type": "text", "body": "The deadline is this Thursday at midnight in the platform timezone." }
+  ],
+  "ctaLabel": "Submit Your Reward",
+  "ctaUrl": "https://example.com/submit",
+  "dryRunHash": "required-for-live-send"
+}
+```
+
 ### `POST /admin/broadcast/announcement`
-Send a custom announcement email with optional CTA link to all campaign supporters.
+Legacy shared-secret operator endpoint for a custom announcement email with optional CTA link to all campaign supporters.
 
 **Headers:** `Authorization: Bearer ADMIN_BROADCAST_SECRET` when configured, otherwise `Authorization: Bearer ADMIN_SECRET`
 **Request:**
@@ -637,11 +660,11 @@ All emails show exact amounts with 2 decimal places (no rounding).
 - Includes: Supporter access links (community + manage), Instagram CTA (if campaign has Instagram URL)
 - Note: Excerpts strip markdown formatting; the full content is on the campaign page
 
-**Announcement** (sent via admin broadcast with optional CTA link)
+**Blast / Announcement** (sent via Campaigns -> Blast or legacy admin broadcast with optional CTA link)
 - Subject: "{Subject} | {Campaign Title}"
-- Contains: Custom heading, message body, optional highlighted CTA button (custom label + URL)
+- Contains: Campaign-scoped update content, optional hosted campaign images, email-safe YouTube/Vimeo links, and optional highlighted CTA button (custom label + URL)
 - Includes: Supporter access links (community + manage), Instagram CTA (if campaign has Instagram URL)
-- Endpoint: `POST /admin/broadcast/announcement`
+- Endpoints: `POST /admin/marketing/announcement` for browser Blast, `POST /admin/broadcast/announcement` for legacy operator sends
 
 **Launch Reminder** (sent once when an upcoming campaign becomes live)
 - Subject: "Now live | {Campaign Title}"

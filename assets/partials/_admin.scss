@@ -735,6 +735,20 @@ body.campaign-preview-render {
   position: relative;
 }
 
+.admin-settings__label h2,
+.admin-settings__label h3,
+.admin-settings__label h4 {
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-style: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  margin: 0;
+  text-transform: inherit;
+}
+
 .admin-plan-usage {
   display: grid;
   gap: 12px;
@@ -1269,6 +1283,20 @@ textarea.admin-settings__input--readonly {
   }
 }
 
+.admin-settings__video-embed-preview {
+  display: block;
+  max-height: 12rem;
+  width: 100%;
+
+  .video-embed {
+    width: 100%;
+  }
+
+  .hero__video--youtube {
+    margin-bottom: 0;
+  }
+}
+
 @media (min-width: 48rem) {
   .admin-settings__field-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1297,7 +1325,8 @@ textarea.admin-settings__input--readonly {
 
   .admin-settings__field-grid .admin-settings__image-preview img,
   .admin-settings__field-grid .admin-settings__image-preview video,
-  .admin-settings__field-grid .admin-settings__image-preview iframe {
+  .admin-settings__field-grid .admin-settings__image-preview iframe,
+  .admin-settings__field-grid .admin-settings__video-embed-preview {
     max-height: 100%;
   }
 }
@@ -1805,12 +1834,14 @@ textarea.admin-settings__input--readonly {
 .admin-content__blocks.long-content {
   @include admin-surface(18px);
   background: $surface--base;
+  margin-bottom: 0;
   margin-top: 10px;
   min-height: 24rem;
   padding: clamp(18px, 4vw, 48px);
 }
 
-.admin-content__blocks.long-content.admin-settings__diary-editor {
+.admin-content__blocks.long-content.admin-settings__diary-editor,
+.admin-blast__content-editor.admin-content__blocks.long-content {
   margin-top: 0;
   min-height: 0;
   padding: clamp(12px, 2vw, 20px);
@@ -2107,8 +2138,25 @@ textarea.admin-settings__input--readonly {
   text-align: center;
 }
 
+.admin-content-block__media-placeholder--external,
+.admin-content-preview__media-placeholder--external,
+.content-block__media-placeholder--external {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 6rem;
+}
+
+.admin-content-block__media-placeholder--external a,
+.admin-content-preview__media-placeholder--external a,
+.content-block__media-placeholder--external a {
+  color: $color--primary;
+  font-weight: 700;
+}
+
 .admin-content-block {
   .video-embed iframe,
+  .video-embed__external-link,
   .embed-container iframe {
     pointer-events: none;
   }
@@ -2124,6 +2172,66 @@ textarea.admin-settings__input--readonly {
     opacity: 0;
     pointer-events: none;
   }
+}
+
+.video-embed--external {
+  align-items: center;
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(circle at 50% 42%, rgba($surface--base, 0.12), transparent 34%),
+    linear-gradient(135deg, rgba($color--primary, 0.96), rgba($color--black, 0.98));
+  border: 1px solid $border--default;
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+  padding-bottom: 0;
+
+  &::after {
+    background: linear-gradient(180deg, rgba($color--black, 0.1), rgba($color--black, 0.45));
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 1;
+  }
+}
+
+.video-embed__external-thumbnail {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
+  width: 100%;
+  z-index: 0;
+}
+
+.video-embed__external-link {
+  align-items: center;
+  color: $surface--base;
+  display: flex;
+  font-size: $type--ui;
+  font-weight: 700;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: absolute;
+  text-align: center;
+  text-decoration: none;
+  z-index: 2;
+}
+
+.video-embed__external-play {
+  align-items: center;
+  background: rgba($surface--base, 0.94);
+  border-radius: 999px;
+  color: $color--primary;
+  display: inline-flex;
+  font-size: 1.45rem;
+  height: 3.2rem;
+  justify-content: center;
+  line-height: 1;
+  padding-left: 0.18rem;
+  width: 3.2rem;
 }
 
 .admin-content-insert {
@@ -2327,10 +2435,11 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-marketing__field--full,
+.admin-marketing__field--wide,
+.admin-marketing__url-row,
 .admin-marketing__actions,
 .admin-marketing__status,
-.admin-marketing__referrals,
-.admin-marketing__snippets {
+.admin-marketing__resources {
   grid-column: 1 / -1;
 }
 
@@ -2596,11 +2705,171 @@ textarea.admin-settings__input--readonly {
   }
 }
 
-.admin-marketing__snippets {
+.admin-marketing__resources {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 12px;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.admin-marketing__url-row {
+  --admin-marketing-qr-size: 120px;
+
+  align-items: start;
+  display: grid;
+  gap: 12px 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+}
+
+.admin-marketing__url-row .admin-marketing__field {
+  min-width: 0;
+}
+
+.admin-marketing__url-row #admin-marketing-url {
+  height: var(--admin-marketing-qr-size);
+  min-height: var(--admin-marketing-qr-size);
+  resize: none;
+}
+
+.admin-marketing__qr {
+  display: grid;
+  gap: 6px;
+  margin-top: 0;
+  min-width: 0;
+}
+
+.admin-marketing__referrals > h3 {
+  @include type-card-title;
+  margin: 0 0 8px;
+}
+
+.admin-marketing__qr-grid {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: var(--admin-marketing-qr-size) minmax(9.5rem, 1fr);
+}
+
+.admin-marketing__qr-preview {
+  align-items: center;
+  aspect-ratio: 1;
+  background: $surface--base;
+  border: 1px solid $border--default;
+  border-radius: var(--pool-radius-lg, 6px);
+  display: grid;
+  height: var(--admin-marketing-qr-size);
+  justify-items: center;
+  min-width: 0;
+  padding: 8px;
+  width: min(100%, var(--admin-marketing-qr-size));
+}
+
+.admin-marketing__qr-preview svg,
+.admin-marketing__qr-preview canvas {
+  display: block;
+  height: auto;
+  max-height: 100%;
+  max-width: 100%;
+  width: 100%;
+}
+
+.admin-marketing__qr-actions {
+  align-self: center;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-marketing__qr-actions .admin-dashboard__status {
+  min-height: 0;
+}
+
+.admin-marketing__qr-actions .admin-dashboard__status:empty {
+  display: none;
+}
+
+.admin-marketing__qr-actions .btn {
+  justify-content: center;
+  width: 100%;
+}
+
+.admin-blast {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-blast__grid {
+  display: grid;
+  gap: 10px 12px;
+  grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr);
+}
+
+.admin-blast__field {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-blast__field--full,
+.admin-blast__field--wide,
+.admin-blast__history {
+  grid-column: 1 / -1;
+}
+
+.admin-blast__actions {
+  @include admin-action-row;
+}
+
+.admin-blast__history {
+  background: $surface--base;
+  border: 1px solid $border--default;
+  border-radius: var(--pool-radius-lg, 6px);
+  color: $color--secondary;
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+  min-height: 44px;
+  overflow-wrap: anywhere;
+  padding: 12px;
+}
+
+.admin-blast__history h3 {
+  @include type-card-title;
+  margin: 0;
+}
+
+.admin-blast__history-card {
+  border-top: 1px solid $border--default;
+  display: grid;
+  gap: 6px;
+  padding-top: 12px;
+}
+
+.admin-blast__history-content,
+.admin-blast__history-body {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-blast__history figure {
+  margin: 0;
+}
+
+.admin-blast__history img {
+  border-radius: var(--pool-radius-lg, 6px);
+  display: block;
+  height: auto;
+  max-width: min(100%, 520px);
+}
+
+.admin-blast__history-video {
+  border: 1px solid $border--default;
+  border-radius: var(--pool-radius-lg, 6px);
+  padding: 10px;
+}
+
+.admin-blast__history-body > *,
+.admin-blast__history-content > * {
+  margin-bottom: 0;
+  margin-top: 0;
 }
 
 .admin-marketing__snippet {
@@ -2612,36 +2881,9 @@ textarea.admin-settings__input--readonly {
   overflow: hidden;
 }
 
-.admin-marketing__snippet .btn {
-  justify-self: stretch;
-  max-width: 100%;
-  min-width: 0;
-  white-space: normal;
-  width: 100%;
-}
-
-.admin-marketing__snippet-title {
-  font-weight: 700;
-  min-width: 0;
-}
-
-.admin-marketing__snippet-copy {
-  color: $color--secondary;
-  margin: 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
 .admin-marketing__referrals {
-  margin-top: 4px;
-
-  .admin-analytics__breakdown-title {
-    font-size: $type--ui;
-    font-weight: 700;
-    line-height: 1.2;
-    margin: 0 0 8px;
-  }
+  margin-top: 0;
+  min-width: 0;
 }
 
 .admin-marketing__embed {
@@ -2652,7 +2894,7 @@ textarea.admin-settings__input--readonly {
   overflow-x: auto;
 }
 
-.admin-marketing__referral-url {
+.admin-marketing__referral-link {
   display: inline-block;
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -2660,6 +2902,11 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-marketing__referral-actions {
+  @include admin-action-row(6px);
+  flex-wrap: nowrap;
+}
+
+.admin-marketing__referral-qr-actions {
   @include admin-action-row(6px);
   flex-wrap: nowrap;
 }
@@ -2878,9 +3125,6 @@ textarea.admin-settings__input--readonly {
     grid-template-columns: repeat(2, minmax(180px, 1fr)) auto;
   }
 
-  .admin-marketing__snippets {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (min-width: 900px) and (max-width: 1100px) {
@@ -2917,6 +3161,20 @@ textarea.admin-settings__input--readonly {
   .admin-tabs__label,
   .admin-campaign-section-tabs__label {
     display: none;
+  }
+
+  .admin-campaign-settings__results .admin-campaign-section-tabs {
+    gap: 0;
+    justify-content: stretch;
+  }
+
+  .admin-campaign-settings__results .admin-campaign-section-tabs__tab {
+    flex: 1 1 0%;
+    min-width: 0;
+    overflow: hidden;
+    padding-left: 1px;
+    padding-right: 1px;
+    text-overflow: ellipsis;
   }
 }
 
@@ -3031,7 +3289,9 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-reports__cards,
-  .admin-marketing__snippets,
+  .admin-marketing__resources,
+  .admin-marketing__url-row,
+  .admin-blast__grid,
   .admin-analytics__metrics,
   .admin-analytics__breakdowns,
   .admin-settings__results,
@@ -3109,14 +3369,15 @@ textarea.admin-settings__input--readonly {
     }
   }
 
-  .admin-marketing__referral-url {
+  .admin-marketing__referral-link {
     display: block;
     font-size: 0.95rem;
     line-height: 1.35;
     width: 100%;
   }
 
-  .admin-marketing__referral-actions {
+  .admin-marketing__referral-actions,
+  .admin-marketing__referral-qr-actions {
     display: grid;
     gap: 8px;
     grid-template-columns: repeat(2, minmax(0, 1fr));

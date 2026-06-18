@@ -137,9 +137,22 @@
               {% include admin-field-label.html for="admin-marketing-content" label_key="admin.marketing_content_label" help_key="admin.marketing_help_content" help_id="admin-marketing-help-content" lang=current_lang %}
               <input id="admin-marketing-content" class="admin-settings__input" name="utmContent" type="text" autocomplete="off" inputmode="text" aria-describedby="admin-marketing-help-content">
             </div>
-            <div class="admin-marketing__field admin-marketing__field--full">
-              {% include admin-field-label.html for="admin-marketing-url" label_key="admin.marketing_url_label" help_key="admin.marketing_help_url" help_id="admin-marketing-help-url" lang=current_lang %}
-              <textarea id="admin-marketing-url" class="admin-settings__input admin-settings__input--readonly" rows="3" readonly aria-describedby="admin-marketing-help-url"></textarea>
+            <div class="admin-marketing__url-row">
+              <div class="admin-marketing__field">
+                {% include admin-field-label.html for="admin-marketing-url" label_key="admin.marketing_url_label" help_key="admin.marketing_help_url" help_id="admin-marketing-help-url" lang=current_lang %}
+                <textarea id="admin-marketing-url" class="admin-settings__input admin-settings__input--readonly" rows="3" readonly aria-describedby="admin-marketing-help-url"></textarea>
+              </div>
+              <section class="admin-marketing__qr" aria-labelledby="admin-marketing-qr-title">
+                {% include admin-field-label.html label_key="admin.marketing_qr_title" help_key="admin.marketing_qr_help" help_id="admin-marketing-help-qr" lang=current_lang heading_tag="h3" heading_id="admin-marketing-qr-title" %}
+                <div class="admin-marketing__qr-grid">
+                  <div id="admin-marketing-qr-preview" class="admin-marketing__qr-preview" aria-live="polite"></div>
+                  <div class="admin-marketing__qr-actions">
+                    <button id="admin-marketing-qr-download-png" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_qr_download_png" lang=current_lang %}</button>
+                    <button id="admin-marketing-qr-download-svg" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_qr_download_svg" lang=current_lang %}</button>
+                    <div id="admin-marketing-qr-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+                  </div>
+                </div>
+              </section>
             </div>
             <div class="admin-marketing__actions">
               <button id="admin-marketing-copy-url" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_copy_url" lang=current_lang %}</button>
@@ -147,9 +160,10 @@
               <button id="admin-marketing-cancel-edit" class="btn btn--secondary" type="button" hidden>{% include t.html key="admin.marketing_cancel_edit" lang=current_lang %}</button>
             </div>
             <div id="admin-marketing-status" class="admin-dashboard__status admin-marketing__status" role="status" aria-live="polite"></div>
-            <div id="admin-marketing-referrals" class="admin-marketing__referrals"></div>
+            <div class="admin-marketing__resources">
+              <div id="admin-marketing-referrals" class="admin-marketing__referrals"></div>
+            </div>
           </form>
-          <div id="admin-marketing-snippets" class="admin-marketing__snippets" aria-live="polite"></div>
           <div class="admin-marketing__embed">
             {% include campaign-embed-builder.html lang=current_lang heading_tag="h3" autoload="false" sync_query="false" admin_marketing=true %}
           </div>
@@ -202,7 +216,7 @@
           <div class="admin-content__preview-grid">
             <section class="admin-content__preview-shell admin-content__preview-shell--mobile" aria-labelledby="admin-content-preview-mobile-title">
               <h3 id="admin-content-preview-mobile-title">{% include t.html key="admin.content_preview_mobile" lang=current_lang %}</h3>
-              <iframe id="admin-content-preview-mobile" title="{% include t.html key='admin.content_preview_mobile' lang=current_lang %}" sandbox="allow-scripts allow-same-origin allow-popups allow-presentation" allow="autoplay; fullscreen; picture-in-picture; encrypted-media"></iframe>
+              <iframe id="admin-content-preview-mobile" title="{% include t.html key='admin.content_preview_mobile' lang=current_lang %}" sandbox="allow-scripts allow-popups allow-presentation" allow="autoplay; fullscreen; picture-in-picture; encrypted-media"></iframe>
             </section>
           </div>
         </section>
@@ -283,7 +297,9 @@
     data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
     data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"></script>
   <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
+  <script src="/assets/js/form-control-identity.js?v={{ asset_version }}" defer></script>
   <script src="/assets/js/campaign-embed.js?v={{ asset_version }}" defer data-campaign-embed-script="true"></script>
+  <script src="/assets/js/vendor/qrcode-generator.js?v={{ asset_version }}" defer></script>
   <script src="/assets/js/video-first-frame-poster.js?v={{ asset_version }}" defer></script>
   <script
     src="/assets/js/admin-dashboard.js?v={{ asset_version }}"

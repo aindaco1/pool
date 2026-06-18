@@ -365,6 +365,12 @@ run_phase() {
   return "${status}"
 }
 
+host_site_ready() {
+  local body
+  body="$(curl -fsS "http://127.0.0.1:4000/admin/" 2>/dev/null || true)"
+  [[ "${body}" == *'id="admin-auth-panel"'* ]]
+}
+
 echo "==> Pre-merge regression checks"
 echo ""
 
@@ -486,19 +492,19 @@ if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
 else
   start_worker || exit 1
 
-  if ! curl -s "http://127.0.0.1:4000" >/dev/null 2>&1; then
+  if ! host_site_ready; then
     bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000 >/tmp/pool-premerge-jekyll.log 2>&1 &
     JEKYLL_PID=$!
   fi
 
   for _ in {1..60}; do
-    if curl -s "http://127.0.0.1:4000" >/dev/null 2>&1; then
+    if host_site_ready; then
       break
     fi
     sleep 1
   done
 
-  if ! curl -s "http://127.0.0.1:4000" >/dev/null 2>&1; then
+  if ! host_site_ready; then
     echo "Jekyll failed to start. See /tmp/pool-premerge-jekyll.log"
     exit 1
   fi

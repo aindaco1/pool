@@ -10,7 +10,7 @@ description: Learn how The Pool works, from all-or-nothing pledging to magic-lin
 
 **The Pool** is Dust Wave's crowdfunding platform for independent film and creative projects, built on open-source technology.
 
-The current platform release milestone is **v1.0.5**. The v1.0 feature set and launch hardening pass are complete, and the latest release adds protected campaign previews for trusted reviewers, super-admin campaign creation with campaign-user assignment emails, and super-admin archiving for non-live campaigns.
+The current platform release milestone is **v1.0.6**. The v1.0 feature set and launch hardening pass are complete, and the latest release adds richer campaign marketing tools, supporter email blasts, consent-based abandoned-checkout reminders, and a script-first setup helper for forks.
 
 ## All-or-Nothing Pledging
 
@@ -29,6 +29,8 @@ If your checkout includes more than one campaign, you'll receive separate confir
 
 For campaigns that have not launched yet, you can also sign up for a one-time launch reminder without creating an account or starting a pledge.
 
+During checkout, you may also choose to receive one reminder if you leave before finishing your pledge. That reminder is optional, separate from launch reminders, and includes an unsubscribe link.
+
 ## How Email Magic Links Work
 
 Instead of asking you to create a password, The Pool uses secure email links to prove that you control a pledge.
@@ -37,6 +39,7 @@ Instead of asking you to create a password, The Pool uses secure email links to 
 - **Use the manage link to make changes** — From there you can review your pledge, adjust it while the campaign is still live, cancel it, or update your saved card.
 - **Community links are supporter-only** — If a campaign has community voting enabled, the email also includes a supporter-community link for that campaign.
 - **Launch reminders are separate** — If you opt into a reminder for an upcoming campaign, The Pool sends one launch email when that campaign goes live and includes an unsubscribe link.
+- **Checkout reminders require consent** — If you opt into one abandoned-checkout reminder, The Pool sends at most one follow-up for that unfinished checkout and includes an unsubscribe link.
 - **Save the email** — The link is the fastest way back to your pledge later. If you open the community page in a new browser or after your browser session resets, using the email link again is the safest way to get back in.
 
 If you backed multiple campaigns in one checkout, you'll still manage them separately afterward.
@@ -75,6 +78,8 @@ The Pool is designed for filmmakers and creative teams that need a campaign they
 - **Optional platform add-ons** — Offer platform merch alongside pledges when enabled, with separate inventory and shipping handling that does not count toward a campaign's funding goal.
 - **Campaign add-ons** — Sell campaign-specific merch or extras in the same pledge flow while keeping revenue, inventory, and shipping tied to that campaign.
 - **Private admin dashboard** — Give trusted team members a focused workspace for campaign settings, page content, rewards, updates, decisions, reports, supporters, analytics, and marketing links.
+- **Campaign marketing tools** — Build tracked links, save referral codes, download campaign QR codes, and generate live embed snippets from the dashboard Marketing tab.
+- **Supporter email blasts** — Send campaign-scoped supporter email blasts from Campaigns -> Blast, using hosted campaign images and email-safe video links.
 - **Protected campaign previews** — Share draft or preview-only campaigns privately with assigned campaign users and explicitly invited reviewers before the public campaign page launches.
 - **New campaign setup** — Super admins can create a private draft campaign from a title and assigned campaign users, then fill in the rest of the campaign from the dashboard.
 - **Campaign archiving** — Super admins can archive non-live campaigns without deleting campaign source or uploaded media, keeping a reviewable record outside active campaign lists.
@@ -105,7 +110,7 @@ The Pool is a static-first crowdfunding stack. Public pages are generated ahead 
 | Payments | [Stripe](https://stripe.com) | Stripe owns the sensitive payment fields, saved payment methods, and later charges. |
 | Backend | [Cloudflare Workers](https://workers.cloudflare.com) and KV | The Worker validates totals, stores pledges, serves live stats, powers admin APIs, and handles fulfillment plus campaign-scoped settlement state. |
 | Admin dashboard | The Pool private dashboard | Authorized users can manage campaigns, content, reports, supporters, analytics, marketing links, add-ons, and users without editing files directly. |
-| Email | [Resend](https://resend.com) | Confirmation emails, supporter links, launch reminders, campaign updates, and charge notifications use one transactional email path. |
+| Email | [Resend](https://resend.com) | Confirmation emails, supporter links, launch reminders, checkout reminders, campaign blasts, campaign updates, and charge notifications use one transactional email path. |
 
 The stack is designed to be practical for small teams and forks. Each major service has a free tier, and the platform avoids unnecessary dynamic work wherever possible. Public campaign pages are static, public live data is combined and browser-cached, and the Worker is reserved for operations that need server-side trust.
 
@@ -129,4 +134,4 @@ The Pool is open source. The entire platform — frontend, Worker, automation, a
 
 *The Pool is created and maintained by [Dust Wave](https://dustwave.xyz).*
 
-_Last updated: June 12, 2026_
+_Last updated: June 18, 2026_

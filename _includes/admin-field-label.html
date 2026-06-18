@@ -1,9 +1,15 @@
 {%- capture admin_field_label_text -%}{% include t.html key=include.label_key lang=include.lang %}{%- endcapture -%}
 {%- capture admin_field_help_text -%}{% include t.html key=include.help_key lang=include.lang %}{%- endcapture -%}
+{%- assign admin_field_heading_tag = include.heading_tag | default: '' -%}
+{%- assign admin_field_heading_id = include.heading_id | default: include.help_id -%}
 <div class="admin-settings__label">
-  <label for="{{ include.for }}">
-    {{ admin_field_label_text | strip }}{% if include.required %} <span class="admin-settings__required" aria-hidden="true">*</span><span class="sr-only"> {% include t.html key='admin.required_label' lang=include.lang %}</span>{% endif %}
-  </label>
+  {%- if admin_field_heading_tag != '' -%}
+    <{{ admin_field_heading_tag }}{% if admin_field_heading_id %} id="{{ admin_field_heading_id }}"{% endif %}>{{ admin_field_label_text | strip }}</{{ admin_field_heading_tag }}>
+  {%- else -%}
+    <label for="{{ include.for }}">
+      {{ admin_field_label_text | strip }}{% if include.required %} <span class="admin-settings__required" aria-hidden="true">*</span><span class="sr-only"> {% include t.html key='admin.required_label' lang=include.lang %}</span>{% endif %}
+    </label>
+  {%- endif -%}
   <span class="admin-settings__help">
     <button
       class="admin-settings__help-button"

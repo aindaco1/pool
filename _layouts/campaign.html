@@ -20,7 +20,7 @@
   {% include cart-head.html %}
   {% assign campaign_hero_preload_image = "" %}
   {% if campaign_hero_has_youtube_video %}
-    {% assign campaign_hero_preload_image = page.hero_image_wide | default: page.hero_image %}
+    {% assign campaign_hero_preload_image = "" %}
   {% elsif campaign_hero_has_remote_video %}
     {% assign campaign_hero_preload_image = "" %}
   {% else %}
@@ -208,10 +208,15 @@
               {% assign yt_id = page.hero_video | split: "/embed/" | last | split: "?" | first %}
             {% endif %}
             {% capture yt_embed_title %}{% include t.html key='campaign.video_embed_title' lang=current_lang title=page.title %}{% endcapture %}
-            {% assign yt_poster = page.hero_image_wide | default: page.hero_image %}
+            {% assign yt_poster = "" %}
+            {% assign yt_poster_fallback = "" %}
+            {% if yt_id != "" %}
+              {% assign yt_poster = "https://i.ytimg.com/vi/" | append: yt_id | append: "/maxres1.jpg" %}
+              {% assign yt_poster_fallback = "https://i.ytimg.com/vi/" | append: yt_id | append: "/hq1.jpg" %}
+            {% endif %}
             <div class="hero__video hero__video--youtube hero__video--youtube-facade" data-youtube-embed data-youtube-src="https://www.youtube-nocookie.com/embed/{{ yt_id }}?autoplay=1&amp;rel=0" data-youtube-title="{{ yt_embed_title | escape }}">
               {% if yt_poster %}
-                {% include responsive-image.html src=yt_poster alt=page.title class="hero__video-poster" fetchpriority="high" decoding="async" sizes="(min-width: 900px) 760px, calc(100vw - 40px)" %}
+                <img src="{{ yt_poster | escape }}" alt="{{ page.title | escape }}" class="hero__video-poster" fetchpriority="high" decoding="async" data-youtube-poster-fallback="{{ yt_poster_fallback | escape }}">
               {% endif %}
               <button class="hero__video-play hero__video-play--youtube" type="button" data-youtube-play aria-label="{% include t.html key='campaign.play_video' lang=current_lang %}">
                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg>

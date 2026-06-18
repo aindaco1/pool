@@ -9,7 +9,7 @@ description: Revisa los términos de aporte, el procesamiento de pagos, el cumpl
 
 # Términos y pautas creativas
 
-Estos términos reflejan el hito de lanzamiento **v1.0.5** de la plataforma The Pool.
+Estos términos reflejan el hito de lanzamiento **v1.0.6** de la plataforma The Pool.
 
 ## Términos del aporte
 
@@ -20,6 +20,7 @@ Estos términos reflejan el hito de lanzamiento **v1.0.5** de la plataforma The 
 - Cuando esta implementación ofrece idiomas adicionales, esos enlaces enviados por correo para el aporte y la comunidad de patrocinadores pueden usar rutas localizadas sin dejar de autorizar el mismo aporte.
 - Un mismo pago puede incluir más de una campaña, pero cada campaña se guarda y se gestiona como un aporte independiente después del pago.
 - Los recordatorios de lanzamiento para campañas próximas son opcionales e independientes del aporte. Si te apuntas, The Pool envía un solo recordatorio cuando esa campaña se activa e incluye un enlace para cancelar ese recordatorio.
+- Los recordatorios de checkout abandonado son opcionales e independientes del aporte. Si das consentimiento explícito durante el checkout de primera parte, The Pool puede enviar un solo recordatorio para un checkout incompleto e incluye un enlace para cancelar la suscripción.
 - Algunas campañas pueden compartirse de forma privada antes del lanzamiento mediante enlaces de vista previa protegida. Los enlaces para revisoras son solo por invitación, limitados a una campaña y vencen después de 24 horas.
 - Todas las fechas límite de campaña usan la zona horaria configurada para esta implementación. Esta implementación usa `America/Denver` de forma predeterminada, salvo que las personas administradoras de plataforma la cambien.
 - Los votos de comunidad se limitan a las opciones publicadas en la página de patrocinadores de la campaña, y las decisiones cerradas no aceptan nuevos votos.
@@ -72,6 +73,8 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Los datos completos de tarjeta son gestionados y almacenados por Stripe. The Pool no almacena números completos de tarjeta ni valores CVC.
 - Las direcciones de correo electrónico y cualquier dato de envío necesario para el cumplimiento pueden almacenarse en nuestro sistema para la gestión del aporte, confirmaciones específicas de campaña, actualizaciones de campaña y cumplimiento de recompensas.
 - Si te apuntas a un recordatorio de lanzamiento para una campaña próxima, tu correo se guarda en registros de recordatorio limitados a esa campaña para que The Pool pueda enviar ese único recordatorio, evitar duplicados y respetar cancelaciones de ese recordatorio. Los formularios de recordatorio pueden usar Cloudflare Turnstile para reducir abuso.
+- Si optas por un recordatorio de checkout abandonado, tu correo y un registro limitado de recordatorio pueden guardarse brevemente para que The Pool pueda enviar un solo seguimiento, evitar duplicados, borrar el recordatorio después de un aporte completado y respetar cancelaciones de suscripción.
+- Las personas operadoras autorizadas de una campaña pueden enviar blasts de correo limitados a patrocinadores de campañas que pueden gestionar. Los blasts usan el sistema compartido de correo transaccional, pueden incluir imágenes alojadas por la campaña y enlaces ordinarios de campaña, y no deben exponer datos de patrocinadores de campañas no relacionadas.
 - Las personas organizadoras de campañas pueden recibir informes por campaña o exportaciones de cumplimiento con los datos de apoyo y pedido necesarios para operar esa campaña concreta, coordinar la entrega o enviar actualizaciones relacionadas con la producción. Esos informes se limitan a la campaña que apoyaste y no exponen aportes de campañas no relacionadas.
 - Las personas operadoras autorizadas también pueden ver filas de patrocinadores, reportes, analytics, datos de fulfillment y contenido de campaña desde el panel privado de administración de The Pool. El acceso del panel está limitado por rol: las personas usuarias de campaña solo ven las campañas asignadas, mientras que las administradoras de plataforma pueden ver datos operativos de toda la plataforma necesarios para operar The Pool.
 - Las personas operadoras autorizadas pueden usar vistas previas protegidas para revisar páginas de campaña en borrador antes del lanzamiento. Las listas de correos de revisoras explícitas se guardan solo durante la ventana breve de preview y no están pensadas para páginas públicas de campaña.
@@ -97,7 +100,7 @@ The Pool es una [plataforma de crowdfunding de código abierto](https://github.c
 - **[Stripe](https://stripe.com)**: campos de pago seguros, métodos de pago guardados y procesamiento de pagos
 - **[Cloudflare Workers](https://workers.cloudflare.com)**: API backend para validación canónica de aportes, almacenamiento de aportes, estadísticas en vivo y liquidación automatizada de campañas
 - **Panel privado de administración**: edición de campañas por rol, vistas previas protegidas, creación de campañas nuevas, reportes, analytics, vistas de patrocinadores, enlaces de marketing, gestión de usuarios y operaciones de plataforma
-- **[Resend](https://resend.com)**: correos transaccionales (confirmaciones, recordatorios de lanzamiento, actualizaciones y notificaciones de cobro)
+- **[Resend](https://resend.com)**: correos transaccionales (confirmaciones, recordatorios de lanzamiento, recordatorios de checkout, blasts de campaña, actualizaciones y notificaciones de cobro)
 
 Los datos de los aportes se almacenan en Cloudflare KV. Esta arquitectura implica menores costes operativos y hace que una mayor parte de tu aporte vaya directamente al proyecto, con las propinas opcionales ayudando a cubrir el mantenimiento de The Pool. Las compilaciones de producción también minifican los assets CSS/JS generados después de crear el sitio estático, generan variantes responsivas de imagen para páginas públicas y dejan que Cloudflare gestione la compresión de transferencia en el edge. La automatización del ciclo de vida de campañas usa la zona horaria configurada para mantener alineadas fechas límite, cuentas regresivas, reportes y comprobaciones de liquidación.
 
@@ -107,4 +110,4 @@ Si tienes preguntas sobre estos términos o sobre tu aporte, escribe a info@dust
 
 ---
 
-_Última actualización: 12 de junio de 2026_
+_Última actualización: 18 de junio de 2026_

@@ -1,6 +1,6 @@
 # The Pool - Pledge Worker
 
-Cloudflare Worker handling first-party checkout canonicalization, Stripe integration, pledge management, order-scoped supporter authentication, upcoming-campaign launch reminders, protected campaign previews, and the private browser admin dashboard APIs.
+Cloudflare Worker handling first-party checkout canonicalization, Stripe integration, pledge management, order-scoped supporter authentication, upcoming-campaign launch reminders, consent-based abandoned-checkout reminders, campaign supporter blasts, protected campaign previews, and the private browser admin dashboard APIs.
 
 For day-to-day local development, prefer the repo-root Podman path:
 
@@ -64,9 +64,11 @@ Campaign-runner reports use the configured platform timezone. `PLATFORM_TIMEZONE
 
 Upcoming-campaign launch reminders also run through the minute-level scheduler. Public campaign pages collect explicit opt-in email reminders only while a campaign is upcoming; the Worker stores campaign-scoped hashed signup keys, queues one dispatch job when that campaign becomes live, and sends through the existing Resend email module with the updates sender. The dispatch queue keeps `launch-reminder-dispatch-queue:v1` state so idle scheduled ticks skip dispatch namespace scans; queued jobs mark the state pending immediately, and idle state expires hourly for compatibility with manually inserted jobs. The reminder path does not add a second Resend API integration.
 
+Abandoned-checkout reminders use the same budget pattern. The browser shows an explicit one-reminder checkbox only in the custom first-party checkout contact surface, and `/checkout-intent/start` queues `abandoned-cart:{orderId}` only after Stripe successfully creates the Checkout Session. Successful webhook persistence deletes the same order's reminder record. The scheduled pass reads `abandoned-cart-queue:v1` first and skips namespace lists when idle or before the next due time; when due, it processes a bounded batch, checks the campaign pledge index to avoid emailing supporters who completed through another order, writes one sent marker per email/campaign set, and sends through the shared Resend email module with a signed `/abandoned-cart/unsubscribe` link. The optional `ABANDONED_CART_TOKEN_SECRET` falls back to `MAGIC_LINK_SECRET`.
+
 Supporter confirmation email retries use the same free-tier-aware pattern. Failed sends write `supporter-email-retry:{orderId}` plus `supporter-email-retry-queue:v1`, and the scheduled retry pass skips KV list scans while the queue is idle or before the next retry is due.
 
-Public campaign-page media optimization remains a static-site concern rather than a Worker runtime concern. The Worker preserves dashboard uploads as source files and dispatches the repository optimizer for committed image/video uploads; Jekyll templates, the repository media optimizer, and the deploy artifact step handle responsive WebP variants, local YouTube hero poster facades, and generated CSS/JS minification before the public Pages artifact is served.
+Public campaign-page media optimization remains a static-site concern rather than a Worker runtime concern. The Worker preserves dashboard uploads as source files and dispatches the repository optimizer for committed image/video uploads; Jekyll templates, the repository media optimizer, and the deploy artifact step handle responsive WebP variants, local YouTube hero poster facades, and generated CSS/JS minification before the public Pages artifact is served. Blast announcement image uploads reuse the campaign content upload kind and directory, so email images are site-hosted under `assets/images/campaigns/<slug>/` and optimized by the same repository workflow instead of adding Worker-side image processing or extra KV state.
 
 The sampling rate defaults to `0.1` and can be overridden with `OBSERVABILITY_SAMPLE_RATE=0.05` (or any `0-1` value) if a fork wants fewer or more sampled timing writes.
 
@@ -83,6 +85,15 @@ Those checks compare stored `campaign-pledges:{slug}`, `stats:{slug}`, and `tier
 The same “saved truth over draft state” rule now applies to platform add-ons: `_config.yml` defines the starting inventory baseline for each product or variant, while the Worker stores sold counts in `add-on-inventory-sold:v1`, updates that projection after pledge create, modify, or cancel events, and avoids repeated pledge namespace scans for normal inventory reads after the initial projection bootstrap.
 
 ## Setup
+
+For a guided cross-platform setup from the repo root, prefer:
+
+```bash
+npm run setup:deploy -- --mode=local
+npm run setup:deploy -- --mode=production --dry-run
+```
+
+The helper checks `gh`, `wrangler`, and optional Stripe CLI authentication, syncs `_config.yml` into this Worker config, creates KV namespaces, updates `wrangler.toml`, writes Worker secrets, writes GitHub repository secrets, and can deploy when passed `--deploy`. Review the dry run first; production secrets are prompted/generated separately and are not copied from ignored local `.dev.vars`.
 
 ### 1. Create KV Namespaces
 
@@ -164,6 +175,10 @@ wrangler secret put CLOUDFLARE_USAGE_API_TOKEN
 # Optional: scoped launch-reminder Turnstile / unsubscribe-token secrets
 wrangler secret put LAUNCH_REMINDER_TURNSTILE_SECRET_KEY
 wrangler secret put LAUNCH_REMINDER_TOKEN_SECRET
+
+# Optional: dedicated abandoned-checkout unsubscribe-token secret
+# Falls back to MAGIC_LINK_SECRET when omitted.
+wrangler secret put ABANDONED_CART_TOKEN_SECRET
 
 # USPS OAuth secret (keep the client id in site config)
 wrangler secret put USPS_CLIENT_SECRET
@@ -408,10 +423,12 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `GET /admin/marketing/referrals?campaignSlug=...` lists saved campaign referral codes without writing or scanning pledge truth
 - `POST /admin/marketing/referrals` explicitly saves or updates a campaign referral code with CSRF protection and one campaign-scoped KV write
 - `DELETE /admin/marketing/referrals` explicitly deletes a saved campaign referral code with CSRF protection and one campaign-scoped KV write
+- `GET /admin/marketing/announcements?campaignSlug=...` reads recent sent Blast history from bounded admin-audit records for the selected campaign
+- `POST /admin/marketing/announcement` dry-runs, test-sends, or live-sends a Campaigns -> Blast message with dashboard session, CSRF/origin checks, indexed-audience validation, matching dry-run hash enforcement for live sends, and one audit write after dispatch
 - `GET /admin/add-ons/inventory` reads platform add-on baseline, sold, remaining, and override state for super admins
 - `POST /admin/add-ons/inventory` explicitly sets, restocks, or resets platform add-on inventory baseline overrides with CSRF protection and audit logging
 
-Normal dashboard reads, supporter filters, pagination, pledge-derived analytics, marketing referral lists, report previews, CSV downloads, content loads, protected preview payload reads, content previews, and local editor drafts are designed to add zero KV writes and zero KV list operations. Plan usage loads are also KV read-only, but intentionally call Cloudflare and Resend provider APIs once when a super admin opens Settings -> Plan usage. Browser-initiated user saves, marketing referral saves, content publishes, preview publishes, new campaign creation, campaign archive operations, and inventory changes are explicit mutations: user saves write `admin-users:v1`, referral saves write one campaign-scoped referral list, content publishes commit to GitHub, trigger the rebuild workflow, and write one audit event, preview publishes write one short-lived `campaign-preview-reviewers:{slug}` access allowlist plus one audit event, new campaign creation may write `admin-users:v1` plus one audit event in addition to the campaign file write, and archive writes one audit event while local dev or `.github/workflows/archive-campaign.yml` moves source/media into `archive/campaigns/<slug>/`. If an older campaign is missing its `campaign-pledges:{slug}` projection, the dashboard endpoints return zero rows or `campaign_index_required` instead of falling back to a namespace scan; run the existing projection repair/rebuild tools explicitly when that happens.
+Normal dashboard reads, supporter filters, pagination, pledge-derived analytics, marketing referral lists, report previews, CSV downloads, content loads, protected preview payload reads, content previews, Blast dry runs, and local editor drafts are designed to add zero KV writes and zero KV list operations. Plan usage loads are also KV read-only, but intentionally call Cloudflare and Resend provider APIs once when a super admin opens Settings -> Plan usage. Browser-initiated user saves, marketing referral saves, live Blast sends, content publishes, preview publishes, new campaign creation, campaign archive operations, and inventory changes are explicit mutations: user saves write `admin-users:v1`, referral saves write one campaign-scoped referral list, live Blast sends write one audit event after dispatch, content publishes commit to GitHub, trigger the rebuild workflow, and write one audit event, preview publishes write one short-lived `campaign-preview-reviewers:{slug}` access allowlist plus one audit event, new campaign creation may write `admin-users:v1` plus one audit event in addition to the campaign file write, and archive writes one audit event while local dev or `.github/workflows/archive-campaign.yml` moves source/media into `archive/campaigns/<slug>/`. If an older campaign is missing its `campaign-pledges:{slug}` projection, the dashboard endpoints return zero rows or `campaign_index_required` instead of falling back to a namespace scan; run the existing projection repair/rebuild tools explicitly when that happens.
 
 Admin auth starts/exchanges and browser-admin mutations are rate limited through the `RATELIMIT` binding and return private/no-store failures when throttled. Normal authenticated reads such as session checks, dashboard summaries, supporter filters, report previews, analytics views, and content previews are intentionally not KV-rate-limited. Magic-link login tokens are one-time use, and session reads do not refresh near-expiry sessions or clean up expired sessions on the read path. Cookie-backed admin mutations require both the session CSRF token and a trusted same-site `Origin`/`Referer` or non-cross-site fetch context before durable writes.
 
@@ -419,7 +436,7 @@ When `TURNSTILE_SECRET_KEY` is configured, `POST /admin/auth/start` verifies the
 
 Platform add-on inventory uses `_config.yml` as the configured baseline, optional `add-on-inventory-overrides` KV state for operator restocks, and `add-on-inventory-sold:v1` for sold counts derived from saved pledge truth. Admin inventory page views do not load the inventory table automatically; the super-admin inventory read is explicit and uses the sold-count projection after bootstrap, while set/restock/reset actions write only the override state plus an audit event.
 
-The marketing-tool slice keeps campaign URL building, UTM/referral parameters, embed-builder shortcuts, local field preferences, and copy snippets in browser state. Saved referral codes are separate: listing them is a read-only campaign-scoped Worker call, and saving one is an explicit mutation.
+The marketing-tool slice keeps campaign URL building, UTM/referral parameters, embed-builder shortcuts, local field preferences, and copy snippets in browser state. Saved referral codes are separate: listing them is a read-only campaign-scoped Worker call, and saving one is an explicit mutation. Blast drafts stay browser-local; image upload is an explicit GitHub-backed media mutation before test/live sends, dry runs use the campaign pledge index without KV lists or writes, and live sends write only the required audit event after dispatch.
 
 ### POST /admin/broadcast/diary
 Send diary update notification to all campaign supporters. Requires `x-admin-key` header.
@@ -562,7 +579,7 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `PLATFORM_COMPANY_NAME` | Company/platform-author name used for platform-tip copy |
 | `SUPPORT_EMAIL` | Support contact mirrored from site config |
 | `PLEDGES_EMAIL_FROM` | Sender identity for pledge-related emails; its domain must be authorized in Resend |
-| `UPDATES_EMAIL_FROM` | Sender identity for update / milestone / announcement emails; its domain must be authorized in Resend |
+| `UPDATES_EMAIL_FROM` | Sender identity for update / milestone / Blast / announcement emails; its domain must be authorized in Resend |
 | `EMAIL_LOGO_PATH` | Supporter-email logo path mirrored from `platform.logo_path` |
 | `EMAIL_FONT_FAMILY` | Supporter-email body font stack mirrored from `design.font_body` |
 | `EMAIL_HEADING_FONT_FAMILY` | Supporter-email heading font stack mirrored from `design.font_display` |
@@ -622,7 +639,7 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 
 When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email images still fall back to the public `https://pool.dustwave.xyz` asset base so inbox clients do not receive broken localhost image URLs.
 
-Resend pacing is centralized as `RESEND_RATE_LIMIT_DELAY_MS` in `worker/src/email.js` and reused by supporter broadcasts, reports, and launch reminder dispatch. Keep new email workflows on the shared `sendResendEmail` / payload-builder path so sender identity, localization, branding, and rate-limit behavior do not drift.
+Resend pacing is centralized as `RESEND_RATE_LIMIT_DELAY_MS` in `worker/src/email.js` and reused by supporter broadcasts, reports, launch reminders, abandoned-checkout reminders, and Campaigns -> Blast sends. Keep new email workflows on the shared `sendResendEmail` / payload-builder path so sender identity, localization, branding, and rate-limit behavior do not drift.
 
 Fork note: treat those identity, email-branding, pricing, and shipping vars as mirrors of the structured site config in [`_config.yml`](../_config.yml), especially the `platform`, `design`, `pricing`, and `shipping` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior now, not Worker env toggles you should normally customize directly.
 

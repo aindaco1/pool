@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.0.5**. The v1.0 feature set and launch hardening pass are complete; v1.0.5 adds protected campaign previews for super admins, assigned campaign users, and explicitly invited reviewers, super-admin new campaign creation with campaign-user assignment emails, and super-admin campaign archiving for non-live campaigns.
+Current release milestone: **v1.0.6**. The v1.0 feature set and launch hardening pass are complete; v1.0.6 expands Campaigns -> Marketing with QR downloads, adds Campaigns -> Blast supporter email tooling, adds consent-based abandoned checkout reminders, and introduces a cross-platform setup/deployment helper for fork operators.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -27,6 +27,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Campaign lifecycle** — `upcoming` → `live` → `post` states with automatic transitions + Cloudflare cache purge
 - **Countdown timers** — configurable IANA platform timezone with automatic DST handling, pre-rendered to avoid flash
 - **Launch reminders** — Upcoming campaign pages can collect explicit email opt-ins, verify Turnstile challenges, dedupe signups by campaign/email, send one Resend-powered launch email when the campaign goes live, and honor unsubscribe/suppression markers before sending
+- **Consent-based checkout reminders** — Custom first-party checkout can collect an explicit one-reminder opt-in, queue a delayed abandoned-checkout email only after Stripe session creation succeeds, suppress it on completed pledges, and honor signed unsubscribe links
 - **Stable campaign progress rendering** — Funding bars and milestone markers render their positions in static HTML/CSS so first load does not wait for JavaScript to avoid layout collapse
 - **Production phases & registry** — Tabbed interface for itemized funding needs
 - **Community decisions** — Voting/polling for backer engagement with published option allowlists and closed-decision lockout
@@ -36,8 +37,9 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Serialized campaign settlement** — Scheduled and manual settlement routes use a per-campaign coordinator lock plus deterministic Stripe idempotency keys, so same-campaign charging cannot overlap while multi-campaign carts stay campaign-scoped
 - **Strict missing-pledge handling** — Magic-link pledge reads fail closed with `404` when the backing pledge record is missing
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
-- **Announcements** — Admin broadcast emails with custom CTA links to supporters
+- **Supporter blasts** — Campaign admins can send scoped supporter email blasts with WYSIWYG content, campaign-hosted images, email-safe video links, automatic dry runs, and custom CTA links
 - **Private admin dashboard** — Magic-link admin access for role-scoped settings, campaign editing, add-ons, supporters, reports, analytics, marketing/referral tools, users, and read-only secrets/diagnostics without exposing admin secrets in browser code
+- **Richer campaign marketing tools** — Campaigns -> Marketing can build tracked campaign links, save referral codes, and preview/download campaign QR codes as PNG/SVG; Campaigns -> Blast can draft supporter email blasts locally with the WYSIWYG content editor, upload hosted campaign images through the shared media optimizer path, link YouTube/Vimeo videos instead of embedding remote players in email, automatically dry-run audiences before test/live sends, test-send to the signed-in admin, send to the campaign's indexed supporters, and show read-only sent blast history
 - **Protected campaign previews** — Super admins and assigned campaign users can publish noindex, email-protected full-page previews for campaigns they can edit, with generic static shells, read-only pledge controls, dashboard-visible publisher links, optional invited reviewer links that expire in 24 hours, and preview access allowlists stored in short-lived Worker KV instead of campaign source.
 - **New campaign creation** — Super admins can create a preview-only campaign from the dashboard with only a title, optionally selecting one or more existing campaign users or creating one or more new users with required name/email.
 - **Campaign archiving** — Super admins can archive non-live campaigns from Campaigns -> Settings; local dev archives directly in the mounted repo, while production dispatches a validated GitHub Actions workflow that moves campaign source and campaign-owned media into `archive/campaigns/<slug>/` instead of deleting archived data.
@@ -81,12 +83,15 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 ## Quick Start
 
 ```bash
+npm run setup:deploy -- --mode=local
 npm run podman:doctor
 ./scripts/dev.sh --podman
 # Visit http://127.0.0.1:4000
 ```
 
 That is the recommended local development path. It boots Jekyll, the Worker, optional Stripe CLI forwarding, and the local support services together with the repo's current defaults.
+
+The setup helper is dependency-free Node and works on macOS, Windows, and Linux. Use `npm run setup:deploy -- --mode=production --dry-run` to preview Cloudflare KV, Worker secret, GitHub secret, and deploy steps before applying them. It intentionally keeps production Worker secrets separate from ignored local `worker/.dev.vars` values.
 
 The Worker dev container now runs on Node 24 to match GitHub Actions. Wrangler 4.87 also runs against the shared Worker `compatibility_date = "2026-05-03"` so local Miniflare/Workers behavior stays aligned with deployed runtime semantics.
 
@@ -154,7 +159,7 @@ See [docs/SEO.md](docs/SEO.md) for the current SEO fundamentals implementation a
 See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) for the current accessibility baseline and verified critical flows.
 See [docs/I18N.md](docs/I18N.md) for the locale model, shared translation sources, and localized route behavior.
 
-Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It covers recent creator-facing changes, including campaign add-ons, hosted embeds, share-link/social-preview planning, dashboard media uploads, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
+Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It covers recent creator-facing changes, including campaign add-ons, hosted embeds, QR/referral links, supporter Blast prep, share-link/social-preview planning, dashboard media uploads, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
 
 For localization, the supported model is:
 
@@ -190,7 +195,7 @@ Dashboard publish paths are intentionally split:
 - Super-admin new campaign creation writes a preview-only `_campaigns/<slug>.md` file through local repo writes in dev or the GitHub publish path in production, saves any assigned/new campaign users to `admin-users:v1`, emails assigned users when present, and keeps the public campaign page hidden until launch.
 - Super-admin campaign archive validates a non-live campaign in the Worker, records an audit event, and either archives locally in dev or dispatches `.github/workflows/archive-campaign.yml` in production to move campaign source and campaign-owned media into `archive/campaigns/<slug>/`.
 - Settings -> Users saves directly to Worker KV and does not use the publish button.
-- Marketing saved referral codes write one campaign-scoped KV record only when explicitly saved.
+- Marketing saved referral codes write one campaign-scoped KV record only when explicitly saved; QR previews and local Blast drafts do not write KV. Live Blast sends write the required audit event, and sent history reads recent audit records only when the Blast subtab is opened.
 - Reports, Analytics, Supporters, content loads/previews, local drafts, filters, sorting, and CSV downloads are read-only browsing flows.
 
 To create or update local secrets safely, run:
@@ -230,6 +235,15 @@ If you want to exercise the on-site Stripe checkout locally, add `STRIPE_PUBLISH
 
 For production, use Cloudflare Worker secrets for runtime credentials and GitHub repository secrets for deploy credentials or GitHub Actions automation. GitHub repository secrets do not automatically become Worker runtime secrets, so scoped admin credentials such as `ADMIN_SETTLEMENT_SECRET` and `ADMIN_BROADCAST_SECRET` must be set in Cloudflare too when deployed routes should enforce them. Do not put Stripe secret keys, webhook secrets, Resend keys, Turnstile secrets, USPS client secrets, ZIP.TAX keys, admin secrets, or Cloudflare API tokens in `_config.yml`.
 
+The cross-platform setup/deploy helper can drive the common production setup path:
+
+```bash
+npm run setup:deploy -- --mode=production --dry-run
+npm run setup:deploy -- --mode=production
+```
+
+It checks `gh`, `wrangler`, and optional Stripe CLI authentication; runs config sync; creates Cloudflare KV namespaces for `VOTES`, `PLEDGES`, and `RATELIMIT`; updates `worker/wrangler.toml` with returned namespace IDs; writes Worker secrets with `wrangler secret put`; writes GitHub repository secrets with `gh secret set`; and can run `wrangler deploy` when passed `--deploy`.
+
 Resend sender domains must match the configured sender addresses. For this deployment, pledge and update emails use `pool.dustwave.xyz` senders such as `The Pool <pledges@pool.dustwave.xyz>`, so the Resend API key must be authorized for `pool.dustwave.xyz`.
 
 ## Cloudflare Plan Guidance For Forks
@@ -247,7 +261,7 @@ The Pool is intentionally shaped so most traffic stays cheap:
 - the new read-only drift checks make it easier to confirm when projections are stale before running a repair path
 - limited-tier write paths now ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
 - platform add-on inventory reads use a sold-count projection after the initial bootstrap, so normal inventory refreshes do not list all pledge keys
-- launch reminder dispatch and supporter confirmation retry polling use queue-state markers; idle cron ticks skip KV list scans, and idle queues get an hourly compatibility recheck instead of minute-level or 15-minute namespace polling
+- launch reminder dispatch, supporter confirmation retry polling, and abandoned-checkout reminders use queue-state markers; idle cron ticks skip KV list scans, and idle queues get an hourly compatibility recheck instead of minute-level or 15-minute namespace polling
 - public read paths stay intentionally permissive so a legitimately popular campaign does not hit artificial anti-DoS ceilings, while the expensive checkout / Manage / admin writes carry the tighter rate limits and request-size caps
 - once a client is already over a rate limit window, repeated blocked requests no longer rewrite the same KV counter on every hit
 - `POST /checkout-intent/abandon` uses an order-scoped retry bucket so unload/retry cleanup stays friendly to shared IPs without leaving the release path wide open
@@ -364,7 +378,7 @@ The headless browser harness now builds a clean static `_site` and serves it wit
 - Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow
 - Unit, security, and headless E2E suites are green on this branch
 
-**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, launch reminder signup/unsubscribe/dispatch paths, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility (including axe-backed public-page checks across campaign, community, and pledge-result states, ARIA snapshots, and keyboard-only checkout/manage/community/public-control assertions), mobile viewport regressions for public pages and pledge flows, campaign states, secret exposure auditing, campaign-content HTML/link/embed auditing, serialized tier-inventory coordination, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
+**Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, launch reminder signup/unsubscribe/dispatch paths, abandoned-checkout opt-in/dispatch/suppression paths, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility (including axe-backed public-page checks across campaign, community, and pledge-result states, ARIA snapshots, and keyboard-only checkout/manage/community/public-control assertions), mobile viewport regressions for public pages and pledge flows, campaign states, secret exposure auditing, campaign-content HTML/link/embed auditing, serialized tier-inventory coordination, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
 
 For local merge smoke on mutable pledges, use:
 
@@ -444,6 +458,7 @@ worker/               # Cloudflare Worker (pledge.dustwave.xyz)
 scripts/              # Automation & reporting
   ├── dev.sh               # Start all dev services (host mode or Podman mode)
   ├── dev-podman.sh        # Rootless Podman launcher for Jekyll + Worker
+  ├── setup-deploy.mjs     # Cross-platform local/production setup helper
   ├── pledge-report.sh     # Ledger-style CSV report (history entries incl. tip columns)
   ├── fulfillment-report.sh # Aggregated CSV report (current state by backer, total incl. tip)
   ├── smoke-pledge-management.sh # Local end-to-end modify/cancel smoke on the test-only campaign
@@ -475,11 +490,20 @@ Required GitHub repository secrets for automatic Worker deployment:
 - optional `CLOUDFLARE_CACHE_PURGE_TOKEN` with zone cache-purge permissions if you want cache purging to use a token narrower than the deploy token. This is recommended; otherwise the deploy token must also be allowed to purge cache.
 - optional `DIARY_CHECK_BYPASS_SECRET` if Cloudflare WAF challenges the post-deploy diary check
 
+For a guided first-time setup, run:
+
+```bash
+npm run setup:deploy -- --mode=production --dry-run
+npm run setup:deploy -- --mode=production --deploy
+```
+
+Review the dry run before applying changes. The helper automates the repetitive setup but does not replace reviewing Cloudflare token scopes, GitHub repository permissions, Stripe webhook endpoints, Resend sender verification, Turnstile widgets, USPS/ZIP.TAX provider credentials, and the merge smoke checklist.
+
 Set the matching `ADMIN_BROADCAST_SECRET` or `ADMIN_SETTLEMENT_SECRET` in Cloudflare Worker secrets before relying on scoped route enforcement in production. Add `ADMIN_SETTLEMENT_SECRET` to GitHub repository secrets only if a GitHub Actions or operator workflow actually calls settlement endpoints. Keep separate local-only values in `worker/.dev.vars`; do not copy production values there as a backup.
 
 The workflow also needs GitHub Pages deployment permissions. Keep `pages: write` and `id-token: write` explicit on the Pages deploy job if you copy or refactor `.github/workflows/deploy.yml`.
 
-Dashboard-uploaded media is source-preserving when it enters the repository. Image and video uploads dispatch the separate **Optimize dashboard media** workflow with `scope=changed` after the GitHub commit succeeds; audio uploads remain source-preserved because that workflow does not process `assets/audio`. The workflow also runs on `main` for `assets/images/**`, `assets/videos/**`, `_campaigns/**`, and `_config.yml` changes; it compresses images when smaller output is available, generates responsive WebP variants for public image templates at `320w`, `480w`, `640w`, `960w`, and `1600w`, generates WebM derivatives for uploaded videos, rewrites literal video references after derivatives exist, and opens a pull request with those optimization changes instead of pushing directly to `main`. Use the manual `scope=all` workflow option when existing campaign media needs a full reprocess or non-dashboard media needs to be swept.
+Dashboard-uploaded media is source-preserving when it enters the repository. Image and video uploads dispatch the separate **Optimize dashboard media** workflow with `scope=changed` after the GitHub commit succeeds; audio uploads remain source-preserved because that workflow does not process `assets/audio`. Campaign Content, diary content, and Blast email image uploads all reuse this same campaign asset path, so email images are hosted on the site domain and optimized by the repository media workflow instead of being hotlinked from arbitrary external hosts. The workflow also runs on `main` for `assets/images/**`, `assets/videos/**`, `_campaigns/**`, and `_config.yml` changes; it compresses images when smaller output is available, generates responsive WebP variants for public image templates at `320w`, `480w`, `640w`, `960w`, and `1600w`, generates WebM derivatives for uploaded videos, rewrites literal video references after derivatives exist, and opens a pull request with those optimization changes instead of pushing directly to `main`. Use the manual `scope=all` workflow option when existing campaign media needs a full reprocess or non-dashboard media needs to be swept.
 
 If the diary check logs an HTTP `403` Cloudflare challenge page, the request is being stopped before it reaches the Worker. Add a Cloudflare WAF custom rule that skips managed challenges for:
 
@@ -507,6 +531,8 @@ The Worker powers:
 - tip-aware total calculation
 - supporter email delivery via Resend
 - upcoming-campaign launch reminder delivery through the shared Resend path
+- consent-based abandoned-checkout reminder delivery through the shared Resend path
+- Campaigns -> Blast supporter email delivery through the shared Resend path
 - batched settlement and retry flows
 - browser admin dashboard auth, read APIs, GitHub-backed publish APIs, protected campaign previews, new campaign creation, user management, marketing referral saves, and legacy shared-secret admin endpoints
 

@@ -407,7 +407,7 @@ describe('Multi-campaign pledge independence', () => {
     const campaigns = [
       { slug: 'campaign-a', goal_deadline: '2026-12-31' }, // Future
       { slug: 'campaign-b', goal_deadline: '2020-01-01' }, // Past
-      { slug: 'campaign-c', goal_deadline: '2026-06-15' }, // Future
+      { slug: 'campaign-c', goal_deadline: '2099-06-15' }, // Future
     ];
     
     const pledges = campaigns.map((c, i) => createMockPledge({

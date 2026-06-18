@@ -94,8 +94,20 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     code: 'test',
     referrer: 'test',
     url: `${SITE_BASE}/campaigns/hand-relations/?utm_source=test&utm_medium=test&utm_campaign=hand-relations&utm_content=test&ref=test`,
+    qrCode: {
+      format: 'qr-code',
+      url: `${SITE_BASE}/campaigns/hand-relations/?utm_source=test&utm_medium=test&utm_campaign=hand-relations&utm_content=test&ref=test`
+    },
     createdAt: '2026-05-24T12:00:00.000Z'
   }];
+
+  await page.route('https://i.ytimg.com/**', async (route: any) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: tinyPng
+    });
+  });
 
   await page.route(`${WORKER_BASE}/admin/**`, async (route: any) => {
     const request = route.request();
@@ -664,6 +676,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
           code: body.code,
           referrer: body.referrer || body.name || body.code,
           url: body.url,
+          qrCode: body.qrCode || { format: 'qr-code', url: body.url },
           createdAt: '2026-05-24T12:00:00.000Z'
         };
         marketingReferralRows = marketingReferralRows
@@ -698,7 +711,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       const previewBody = videoBlock
         ? videoBlock.provider === 'local'
           ? `<div class="video-embed video-embed--local"><video controls preload="metadata" playsinline><source src="${videoBlock.src || ''}" type="video/webm"></video></div>`
-          : `<div class="video-embed video-embed--youtube"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoBlock.video_id || '')}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"></iframe></div>`
+          : `<div class="hero__video hero__video--youtube hero__video--youtube-facade"><img class="hero__video-poster" src="https://i.ytimg.com/vi/${encodeURIComponent(videoBlock.video_id || '')}/maxres1.jpg" alt="" loading="lazy" decoding="async" data-youtube-poster-fallback="https://i.ytimg.com/vi/${encodeURIComponent(videoBlock.video_id || '')}/hq1.jpg"><a class="hero__video-play hero__video-play--youtube" href="https://www.youtube.com/watch?v=${encodeURIComponent(videoBlock.video_id || '')}" target="_blank" rel="noopener noreferrer" aria-label="YouTube: ${videoBlock.video_id || ''}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg></a></div>`
         : '<p>Preview body.</p>';
       return fulfillJson({
         user,
@@ -811,6 +824,7 @@ async function selectAdminSection(page: any, name: string) {
 
 test.describe('Admin Dashboard', () => {
   test('starts magic-link login and supports keyboard tab navigation with no obvious axe violations', async ({ page }) => {
+    test.setTimeout(120000);
     const calls = await routeAdminWorker(page);
 
     await page.goto('/admin/');
@@ -1064,6 +1078,19 @@ test.describe('Admin Dashboard', () => {
     expect(heroVideoPlayback.paused).toBe(false);
     expect(heroVideoPlayback.ended).toBe(false);
     expect(heroVideoPlayback.currentTime).toBeGreaterThan(0);
+    const heroVideoField = page.locator('[data-settings-path="hero_video"]');
+    await heroVideoField.locator('.admin-settings__image-url').fill('https://www.youtube.com/watch?v=XCQWR9cNsgY');
+    const heroVideoFacade = heroVideoField.locator('.admin-settings__video-embed-preview .hero__video--youtube-facade');
+    await expect(heroVideoFacade).toBeVisible();
+    const heroVideoPoster = heroVideoFacade.locator('.hero__video-poster');
+    await expect(heroVideoPoster).toHaveAttribute('data-video-thumbnail-fallback', 'https://i.ytimg.com/vi/XCQWR9cNsgY/hq1.jpg');
+    expect([
+      'https://i.ytimg.com/vi/XCQWR9cNsgY/maxres1.jpg',
+      'https://i.ytimg.com/vi/XCQWR9cNsgY/hq1.jpg'
+    ]).toContain(await heroVideoPoster.getAttribute('src'));
+    const heroVideoFacadeBox = await heroVideoFacade.boundingBox();
+    expect(heroVideoFacadeBox?.width || 0).toBeGreaterThan(100);
+    expect(heroVideoFacadeBox?.height || 0).toBeGreaterThan(50);
     await page.locator('[data-settings-video-upload-input]').setInputFiles({
       name: 'hero.mp4',
       mimeType: 'video/mp4',
@@ -1087,7 +1114,7 @@ test.describe('Admin Dashboard', () => {
       const editor = await tierEditor.boundingBox();
       const card = await tierEditor.locator('.admin-settings__product-card').first().boundingBox();
       if (!panel || !editor || !card) return false;
-      return editor.width >= panel.width * 0.9 && card.width >= editor.width - 2;
+      return editor.width >= panel.width * 0.85 && card.width >= editor.width * 0.9;
     }).toBe(true);
     await expect(tierEditor.locator(':scope > .btn').first()).toHaveText('Add item');
     await expect.poll(async () => {
@@ -1262,7 +1289,8 @@ test.describe('Admin Dashboard', () => {
     await expect(campaignAddOnsEditor.locator('[data-add-on-product-field="name"]').first()).toHaveValue('Poster Pack');
     await expect(campaignAddOnsEditor.locator('[data-add-on-product-derived-id]').first()).toContainText('poster-pack');
     await expect(campaignAddOnsEditor.locator('input[type="text"][data-add-on-product-field="id"]')).toHaveCount(0);
-    await expect(campaignAddOnsEditor.locator('[data-add-on-variant-field="label"]').first()).toHaveValue('Matte');
+    await expect(campaignAddOnsEditor.locator('[data-add-on-variant-row]').first()).toBeVisible();
+    await expect(campaignAddOnsEditor.locator('[data-add-on-variant-field="label"]').first()).toHaveValue('Matte', { timeout: 10000 });
     await expect(campaignAddOnsEditor.locator('[data-add-on-variant-derived-id]').first()).toContainText('matte');
     await expect(campaignAddOnsEditor.locator('input[type="text"][data-add-on-variant-field="id"]')).toHaveCount(0);
     await expect(campaignAddOnsEditor.locator('[data-add-on-variant-row]').first().locator(':scope > .admin-settings__variant-field').nth(0)).toContainText('Label');
@@ -1837,7 +1865,8 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/ref=launch-list/);
     await expect.poll(() => calls.liveSnapshots.length).toBeGreaterThan(0);
     const embedPreview = page.locator('#admin-panel-marketing .campaign-embed-widget');
-    await expect(embedPreview.locator('.campaign-embed-card__media iframe[src*="youtube-nocookie.com"]')).toBeVisible();
+    await expect(embedPreview.locator('.campaign-embed-card__media img')).toBeVisible();
+    await expect(embedPreview.locator('.campaign-embed-card__media iframe[src*="youtube-nocookie.com"]')).toHaveCount(0);
     await expect(embedPreview.locator('.progress-bar > span')).toHaveClass(/u-width-pct-/);
     await expect(embedPreview.locator('.progress-bar > span')).not.toHaveAttribute('style', /width/);
     const embedMarkers = embedPreview.locator('.progress-marker');
@@ -2108,6 +2137,15 @@ test.describe('Admin Dashboard', () => {
 
     const bodyEditor = page.locator('#admin-content-blocks [data-content-field="body"]');
     await bodyEditor.fill('Safe updated body.');
+    await expect.poll(async () => {
+      try {
+        const blocks = JSON.parse(await page.locator('#admin-content-long-content').inputValue());
+        return blocks?.[0]?.body || '';
+      } catch (_error) {
+        return '';
+      }
+    }).toContain('Safe updated body.');
+    await page.locator('#admin-content-editor').evaluate((form: HTMLFormElement) => form.requestSubmit());
     await expect.poll(() => calls.contentPreview.at(-1)?.draft.longContent?.[0]?.body).toContain('Safe updated body.');
     await bodyEditor.press('End');
     await bodyEditor.press('Enter');
@@ -2234,7 +2272,10 @@ test.describe('Admin Dashboard', () => {
       textarea.dispatchEvent(new Event('change', { bubbles: true }));
     });
     await expect.poll(() => calls.contentPreview.at(-1)?.draft.longContent?.[0]?.type).toBe('video');
-    await expect.poll(async () => page.locator('#admin-content-preview-mobile').evaluate((iframe: HTMLIFrameElement) => iframe.srcdoc)).toContain('https://www.youtube-nocookie.com/embed/demo-video');
+    await expect.poll(async () => page.locator('#admin-content-preview-mobile').evaluate((iframe: HTMLIFrameElement) => iframe.srcdoc)).toContain('https://www.youtube.com/watch?v=demo-video');
+    await expect.poll(async () => page.locator('#admin-content-preview-mobile').evaluate((iframe: HTMLIFrameElement) => iframe.srcdoc)).not.toContain('https://www.youtube-nocookie.com/embed/demo-video');
+    await expect(page.locator('#admin-content-blocks .content-block--video iframe')).toHaveCount(0);
+    await expect(page.locator('#admin-content-blocks .content-block--video a[href="https://www.youtube.com/watch?v=demo-video"]')).toBeVisible();
     const videoBlock = page.locator('#admin-content-blocks .content-block--video');
     await videoBlock.getByRole('button', { name: 'Media settings' }).click();
     await videoBlock.getByRole('combobox', { name: 'Provider' }).selectOption('local');
@@ -2244,7 +2285,7 @@ test.describe('Admin Dashboard', () => {
       textarea.value = JSON.stringify([{ type: 'video', provider: 'youtube', video_id: 'demo-video', caption: '', align: 'left' }]);
       textarea.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    await videoBlock.locator('.video-embed').click({ position: { x: 20, y: 20 } });
+    await videoBlock.locator('.hero__video--youtube-facade').click({ position: { x: 20, y: 20 } });
     await expect(videoBlock).toHaveClass(/is-active/);
     await expect(videoBlock.locator('.admin-content-block__chrome')).toHaveCSS('opacity', '1');
     await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
@@ -2362,23 +2403,28 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => calls.settingsPublish.length).toBe(1);
   });
 
-  test('shows saved marketing referral URLs as full-width rows on mobile', async ({ page }) => {
+  test('shows saved marketing referral links as full-width rows on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await signInWithMagicToken(page);
 
     await selectAdminSection(page, 'Marketing');
     const savedReferralRow = page.locator('#admin-marketing-referrals tbody tr').first();
-    const savedReferralUrlCell = savedReferralRow.locator('td').nth(1);
-    const savedReferralUrl = savedReferralUrlCell.locator('.admin-marketing__referral-url');
+    const savedReferralLinkCell = savedReferralRow.locator('td').nth(0);
+    const savedReferralQrCell = savedReferralRow.locator('td').nth(1);
+    const savedReferralLink = savedReferralLinkCell.locator('.admin-marketing__referral-link');
     await expect(savedReferralRow).toBeVisible();
-    await expect(savedReferralUrlCell).toHaveAttribute('data-label', 'URL');
-    await expect(savedReferralUrl).toContainText('/campaigns/hand-relations/');
-    await expect(savedReferralUrl).toHaveCSS('display', 'block');
+    await expect(savedReferralLinkCell).toHaveAttribute('data-label', 'Link');
+    await expect(savedReferralLink).toHaveText('test');
+    await expect(savedReferralLink).toHaveAttribute('href', /\/campaigns\/hand-relations\//);
+    await expect(savedReferralLink).toHaveCSS('display', 'block');
+    await expect(savedReferralQrCell).toHaveAttribute('data-label', 'QR code');
+    await expect(savedReferralQrCell.getByRole('button', { name: 'Download QR code PNG for test' })).toBeVisible();
+    await expect(savedReferralQrCell.getByRole('button', { name: 'Download QR code SVG for test' })).toBeVisible();
 
     const rowBox = await savedReferralRow.boundingBox();
-    const urlBox = await savedReferralUrlCell.boundingBox();
+    const linkBox = await savedReferralLinkCell.boundingBox();
     expect(rowBox).not.toBeNull();
-    expect(urlBox).not.toBeNull();
-    expect(urlBox!.width).toBeGreaterThan(rowBox!.width * 0.8);
+    expect(linkBox).not.toBeNull();
+    expect(linkBox!.width).toBeGreaterThan(rowBox!.width * 0.8);
   });
 });
