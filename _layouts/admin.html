@@ -158,10 +158,16 @@
               <button id="admin-marketing-copy-url" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_copy_url" lang=current_lang %}</button>
               <button id="admin-marketing-save-referral" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_save_referral" lang=current_lang %}</button>
               <button id="admin-marketing-cancel-edit" class="btn btn--secondary" type="button" hidden>{% include t.html key="admin.marketing_cancel_edit" lang=current_lang %}</button>
+              <button id="admin-marketing-load-draft" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_load_shared_draft" lang=current_lang %}</button>
+              <button id="admin-marketing-save-draft" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_save_shared_draft" lang=current_lang %}</button>
+              <button id="admin-marketing-clear-draft" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_clear_shared_draft" lang=current_lang %}</button>
             </div>
+            <div id="admin-marketing-draft-status" class="admin-dashboard__status admin-marketing__status" role="status" aria-live="polite"></div>
             <div id="admin-marketing-status" class="admin-dashboard__status admin-marketing__status" role="status" aria-live="polite"></div>
             <div class="admin-marketing__resources">
               <div id="admin-marketing-referrals" class="admin-marketing__referrals"></div>
+              <div id="admin-marketing-reporting" class="admin-marketing__reporting"></div>
+              <div id="admin-marketing-abandoned-health" class="admin-marketing__abandoned-health"></div>
             </div>
           </form>
           <div class="admin-marketing__embed">

@@ -61,8 +61,14 @@
   var marketingCopyUrl = document.getElementById('admin-marketing-copy-url');
   var marketingSaveReferral = document.getElementById('admin-marketing-save-referral');
   var marketingCancelEdit = document.getElementById('admin-marketing-cancel-edit');
+  var marketingLoadDraft = document.getElementById('admin-marketing-load-draft');
+  var marketingSaveDraft = document.getElementById('admin-marketing-save-draft');
+  var marketingClearDraft = document.getElementById('admin-marketing-clear-draft');
+  var marketingDraftStatus = document.getElementById('admin-marketing-draft-status');
   var marketingStatus = document.getElementById('admin-marketing-status');
   var marketingReferralsRoot = document.getElementById('admin-marketing-referrals');
+  var marketingReportingRoot = document.getElementById('admin-marketing-reporting');
+  var marketingAbandonedHealthRoot = document.getElementById('admin-marketing-abandoned-health');
   var marketingEmbedBuilder = document.querySelector('[data-admin-marketing-embed]');
   var marketingQrPreview = document.getElementById('admin-marketing-qr-preview');
   var marketingQrStatus = document.getElementById('admin-marketing-qr-status');
@@ -77,6 +83,10 @@
   var marketingAnnouncementSend = null;
   var marketingAnnouncementStatus = null;
   var marketingAnnouncementHistory = null;
+  var marketingAnnouncementDraftLoad = null;
+  var marketingAnnouncementDraftSave = null;
+  var marketingAnnouncementDraftClear = null;
+  var marketingAnnouncementDraftStatus = null;
   var analyticsCampaign = document.getElementById('admin-analytics-campaign');
   var analyticsStatus = document.getElementById('admin-analytics-status');
   var analyticsRoot = document.getElementById('admin-analytics-results');
@@ -134,6 +144,10 @@
   var marketingAnnouncementDryRunHash = '';
   var marketingAnnouncementDryRunSignature = '';
   var marketingAnnouncementDryRunCount = 0;
+  var marketingSharedDraftRevisions = {};
+  var marketingAnnouncementSharedDraftRevisions = {};
+  var marketingReportingLoading = '';
+  var marketingAbandonedHealthLoading = '';
   var contentStoragePrefix = 'pool-admin-content-draft:';
   var loadedContentCampaignSlug = '';
   var loadedContentBaseRevision = '';
@@ -3037,6 +3051,7 @@
         diaryEditor.className = 'admin-content__blocks long-content admin-settings__diary-editor';
         diaryEditor.dataset.diaryContentEditor = 'true';
         diaryEditor.dataset.contentEditorId = 'diary-' + (++contentEditorInstanceCounter);
+        diaryEditor.dataset.contentCampaignSlug = row?.campaignSlug || selectedContentCampaignSlug();
         var diaryActions = document.createElement('div');
         diaryActions.className = 'admin-settings__diary-actions';
         var diarySave = document.createElement('button');
@@ -3898,6 +3913,10 @@
     marketingAnnouncementSend = root.querySelector('[data-marketing-announcement-send]');
     marketingAnnouncementStatus = root.querySelector('[data-marketing-announcement-status]');
     marketingAnnouncementHistory = root.querySelector('[data-marketing-announcement-history]');
+    marketingAnnouncementDraftLoad = root.querySelector('[data-marketing-announcement-draft-load]');
+    marketingAnnouncementDraftSave = root.querySelector('[data-marketing-announcement-draft-save]');
+    marketingAnnouncementDraftClear = root.querySelector('[data-marketing-announcement-draft-clear]');
+    marketingAnnouncementDraftStatus = root.querySelector('[data-marketing-announcement-draft-status]');
   }
 
   function createCampaignBlastInputField(options) {
@@ -3914,7 +3933,7 @@
     return field;
   }
 
-  function createCampaignBlastContentField(baseId) {
+  function createCampaignBlastContentField(baseId, campaignSlug) {
     var field = document.createElement('div');
     field.className = 'admin-blast__field admin-blast__field--full';
     var labelId = baseId + '-content-label';
@@ -3930,6 +3949,7 @@
     editor.className = 'admin-content__blocks long-content admin-blast__content-editor';
     editor.dataset.contentEditorId = 'blast-' + baseId.replace(/^admin-blast-/, '');
     editor.dataset.contentEditorMode = 'blast';
+    editor.dataset.contentCampaignSlug = campaignSlug || '';
     editor.dataset.marketingAnnouncementContentEditor = 'true';
     editor.setAttribute('aria-labelledby', labelId);
     appendDescribedBy(editor, labelInfo.helpId);
@@ -3971,7 +3991,7 @@
       required: true
     }));
 
-    var contentField = createCampaignBlastContentField(baseId);
+    var contentField = createCampaignBlastContentField(baseId, campaignSlug);
     grid.append(contentField.field);
 
     var ctaLabel = document.createElement('input');
@@ -4003,6 +4023,31 @@
       className: 'admin-blast__field--wide'
     }));
 
+    var draftActions = document.createElement('div');
+    draftActions.className = 'admin-blast__draft-actions';
+    var loadDraftButton = document.createElement('button');
+    loadDraftButton.type = 'button';
+    loadDraftButton.className = 'btn btn--secondary';
+    loadDraftButton.dataset.marketingAnnouncementDraftLoad = 'true';
+    loadDraftButton.textContent = t('marketing_announcement_load_shared_draft', 'Load shared draft');
+    var saveDraftButton = document.createElement('button');
+    saveDraftButton.type = 'button';
+    saveDraftButton.className = 'btn btn--secondary';
+    saveDraftButton.dataset.marketingAnnouncementDraftSave = 'true';
+    saveDraftButton.textContent = t('marketing_announcement_save_shared_draft', 'Save shared draft');
+    var clearDraftButton = document.createElement('button');
+    clearDraftButton.type = 'button';
+    clearDraftButton.className = 'btn btn--secondary';
+    clearDraftButton.dataset.marketingAnnouncementDraftClear = 'true';
+    clearDraftButton.textContent = t('marketing_announcement_clear_shared_draft', 'Clear shared draft');
+    draftActions.append(loadDraftButton, saveDraftButton, clearDraftButton);
+
+    var draftStatus = document.createElement('div');
+    draftStatus.className = 'admin-dashboard__status admin-blast__draft-status';
+    draftStatus.dataset.marketingAnnouncementDraftStatus = 'true';
+    draftStatus.setAttribute('role', 'status');
+    draftStatus.setAttribute('aria-live', 'polite');
+
     var actions = document.createElement('div');
     actions.className = 'admin-blast__actions';
     var testButton = document.createElement('button');
@@ -4029,7 +4074,7 @@
     history.setAttribute('aria-live', 'polite');
     history.textContent = t('marketing_announcement_history_empty', 'No blasts have been sent for this campaign yet.');
 
-    root.append(grid, actions, status, history);
+    root.append(grid, draftActions, draftStatus, actions, status, history);
     var handleBlastDraftChange = function() {
       if (marketingAnnouncementHydrating) return;
       setActiveMarketingAnnouncementControls(root, campaignSlug);
@@ -4045,6 +4090,18 @@
     sendButton.addEventListener('click', function() {
       setActiveMarketingAnnouncementControls(root, campaignSlug);
       sendMarketingAnnouncement();
+    });
+    loadDraftButton.addEventListener('click', function() {
+      setActiveMarketingAnnouncementControls(root, campaignSlug);
+      loadMarketingAnnouncementSharedDraft();
+    });
+    saveDraftButton.addEventListener('click', function() {
+      setActiveMarketingAnnouncementControls(root, campaignSlug);
+      saveMarketingAnnouncementSharedDraft();
+    });
+    clearDraftButton.addEventListener('click', function() {
+      setActiveMarketingAnnouncementControls(root, campaignSlug);
+      clearMarketingAnnouncementSharedDraft();
     });
     contentField.editor.__contentStatus = status;
     attachContentBlockEditor(contentField.editor, contentField.textarea);
@@ -4617,6 +4674,8 @@
     resetMarketingBuilderFields();
     hydrateMarketingAnnouncementDraft();
     loadMarketingReferrals();
+    loadMarketingReporting();
+    loadMarketingAbandonedHealth();
     hydrateContentDraft();
     updateDirtyIndicators();
   }
@@ -4650,15 +4709,137 @@
 
   function writeMarketingDraft() {
     try {
-      localStorage.setItem(marketingStorageKey, JSON.stringify({
-        campaignSlug: marketingCampaign?.value || '',
-        source: marketingSource?.value || '',
-        medium: marketingMedium?.value || '',
-        content: marketingContent?.value || '',
-        ref: normalizeMarketingReferralCode(marketingReferrer?.value || marketingRef?.value || ''),
-        referrer: marketingReferrer?.value || ''
-      }));
+      localStorage.setItem(marketingStorageKey, JSON.stringify(currentMarketingBuilderDraft()));
     } catch (_error) {
+    }
+  }
+
+  function currentMarketingBuilderDraft() {
+    return {
+      campaignSlug: marketingCampaign?.value || '',
+      source: marketingSource?.value || '',
+      medium: marketingMedium?.value || '',
+      content: marketingContent?.value || '',
+      ref: normalizeMarketingReferralCode(marketingReferrer?.value || marketingRef?.value || ''),
+      referrer: marketingReferrer?.value || ''
+    };
+  }
+
+  function applyMarketingBuilderDraft(draft) {
+    if (!draft || typeof draft !== 'object') return;
+    if (marketingSource instanceof HTMLInputElement) marketingSource.value = draft.source || '';
+    if (marketingMedium instanceof HTMLInputElement) marketingMedium.value = draft.medium || '';
+    if (marketingContent instanceof HTMLInputElement) marketingContent.value = draft.content || '';
+    if (marketingReferrer instanceof HTMLInputElement) marketingReferrer.value = draft.referrer || '';
+    if (marketingRef instanceof HTMLInputElement) marketingRef.value = normalizeMarketingReferralCode(draft.referrer || draft.ref || '');
+    updateMarketingBuilder();
+    writeMarketingDraft();
+  }
+
+  function sharedMarketingDraftRevisionStore(surface) {
+    return surface === 'blast' ? marketingAnnouncementSharedDraftRevisions : marketingSharedDraftRevisions;
+  }
+
+  function sharedMarketingDraftRevision(surface, campaignSlug) {
+    return sharedMarketingDraftRevisionStore(surface)[String(campaignSlug || '')] || '';
+  }
+
+  function setSharedMarketingDraftRevision(surface, campaignSlug, revision) {
+    var slug = String(campaignSlug || '').trim();
+    if (!slug) return;
+    sharedMarketingDraftRevisionStore(surface)[slug] = String(revision || '');
+  }
+
+  function sharedMarketingDraftStatus(surface) {
+    return surface === 'blast' ? marketingAnnouncementDraftStatus : marketingDraftStatus;
+  }
+
+  function setSharedMarketingDraftStatus(surface, message) {
+    setText(sharedMarketingDraftStatus(surface), message || '');
+  }
+
+  function sharedMarketingDraftConflictMessage(surface) {
+    return surface === 'blast'
+      ? t('marketing_announcement_shared_draft_conflict', 'Shared Blast draft changed since you loaded it. Load the shared draft, then save again.')
+      : t('marketing_shared_draft_conflict', 'Shared Marketing draft changed since you loaded it. Load the shared draft, then save again.');
+  }
+
+  async function readSharedMarketingDraft(surface, campaignSlug) {
+    var params = new URLSearchParams({ campaignSlug, surface });
+    return requestJson('/admin/marketing/draft?' + params.toString(), { method: 'GET' });
+  }
+
+  async function writeSharedMarketingDraft(surface, campaignSlug, draft) {
+    return requestJson('/admin/marketing/draft', {
+      method: 'POST',
+      body: JSON.stringify({
+        campaignSlug,
+        surface,
+        draft,
+        baseRevision: sharedMarketingDraftRevision(surface, campaignSlug)
+      })
+    });
+  }
+
+  async function deleteSharedMarketingDraft(surface, campaignSlug) {
+    return requestJson('/admin/marketing/draft', {
+      method: 'DELETE',
+      body: JSON.stringify({ campaignSlug, surface })
+    });
+  }
+
+  async function loadMarketingSharedDraft() {
+    var campaign = selectedMarketingCampaign();
+    if (!campaign?.slug) return;
+    setSharedMarketingDraftStatus('marketing', t('marketing_shared_draft_loading', 'Loading shared Marketing draft...'));
+    try {
+      var data = await readSharedMarketingDraft('marketing', campaign.slug);
+      var draft = data?.draft;
+      if (!draft) {
+        setSharedMarketingDraftRevision('marketing', campaign.slug, '');
+        setSharedMarketingDraftStatus('marketing', t('marketing_shared_draft_empty', 'No shared Marketing draft is saved for this campaign.'));
+        return;
+      }
+      applyMarketingBuilderDraft(draft.draft || {});
+      setSharedMarketingDraftRevision('marketing', campaign.slug, draft.revision || '');
+      setSharedMarketingDraftStatus('marketing', t('marketing_shared_draft_loaded', 'Shared Marketing draft loaded. Expires %{date}.', {
+        date: draft.expiresAt ? new Date(draft.expiresAt).toLocaleDateString(lang || 'en') : ''
+      }));
+    } catch (error) {
+      logger.error('Failed to load shared Marketing draft', error);
+      setSharedMarketingDraftStatus('marketing', error?.data?.error || t('marketing_shared_draft_load_failed', 'Unable to load shared Marketing draft.'));
+    }
+  }
+
+  async function saveMarketingSharedDraft() {
+    var campaign = selectedMarketingCampaign();
+    if (!campaign?.slug) return;
+    updateMarketingBuilder();
+    setSharedMarketingDraftStatus('marketing', t('marketing_shared_draft_saving', 'Saving shared Marketing draft...'));
+    try {
+      var data = await writeSharedMarketingDraft('marketing', campaign.slug, currentMarketingBuilderDraft());
+      setSharedMarketingDraftRevision('marketing', campaign.slug, data?.draft?.revision || '');
+      setSharedMarketingDraftStatus('marketing', t('marketing_shared_draft_saved', 'Shared Marketing draft saved for 7 days.'));
+    } catch (error) {
+      logger.error('Failed to save shared Marketing draft', error);
+      setSharedMarketingDraftStatus('marketing', error?.data?.code === 'draft_conflict'
+        ? sharedMarketingDraftConflictMessage('marketing')
+        : (error?.data?.error || t('marketing_shared_draft_save_failed', 'Unable to save shared Marketing draft.')));
+    }
+  }
+
+  async function clearMarketingSharedDraft() {
+    var campaign = selectedMarketingCampaign();
+    if (!campaign?.slug) return;
+    if (!window.confirm(t('marketing_shared_draft_clear_confirm', 'Clear the shared Marketing draft for this campaign?'))) return;
+    setSharedMarketingDraftStatus('marketing', t('marketing_shared_draft_clearing', 'Clearing shared Marketing draft...'));
+    try {
+      await deleteSharedMarketingDraft('marketing', campaign.slug);
+      setSharedMarketingDraftRevision('marketing', campaign.slug, '');
+      setSharedMarketingDraftStatus('marketing', t('marketing_shared_draft_cleared', 'Shared Marketing draft cleared.'));
+    } catch (error) {
+      logger.error('Failed to clear shared Marketing draft', error);
+      setSharedMarketingDraftStatus('marketing', error?.data?.error || t('marketing_shared_draft_clear_failed', 'Unable to clear shared Marketing draft.'));
     }
   }
 
@@ -4682,11 +4863,6 @@
 
   function hydrateMarketingDraft() {
     var draft = readMarketingDraft();
-    if (marketingSource instanceof HTMLInputElement) marketingSource.value = draft.source || '';
-    if (marketingMedium instanceof HTMLInputElement) marketingMedium.value = draft.medium || '';
-    if (marketingContent instanceof HTMLInputElement) marketingContent.value = draft.content || '';
-    if (marketingReferrer instanceof HTMLInputElement) marketingReferrer.value = draft.referrer || '';
-    if (marketingRef instanceof HTMLInputElement) marketingRef.value = normalizeMarketingReferralCode(draft.referrer || draft.ref || '');
     if (
       marketingCampaign instanceof HTMLSelectElement &&
       draft.campaignSlug &&
@@ -4694,6 +4870,7 @@
     ) {
       marketingCampaign.value = draft.campaignSlug;
     }
+    applyMarketingBuilderDraft(draft);
   }
 
   function selectedMarketingCampaign() {
@@ -4992,6 +5169,79 @@
       marketingAnnouncementDryRunCount = 0;
     } finally {
       marketingAnnouncementHydrating = false;
+    }
+  }
+
+  function applyMarketingAnnouncementDraft(draft) {
+    marketingAnnouncementHydrating = true;
+    try {
+      if (marketingAnnouncementSubject instanceof HTMLInputElement) marketingAnnouncementSubject.value = draft?.subject || '';
+      setMarketingAnnouncementContentBlocks(marketingAnnouncementBlocksFromDraft({
+        content: draft?.contentBlocks || draft?.content || [],
+        body: draft?.body || ''
+      }));
+      if (marketingAnnouncementCtaLabel instanceof HTMLInputElement) marketingAnnouncementCtaLabel.value = draft?.ctaLabel || '';
+      if (marketingAnnouncementCtaUrl instanceof HTMLInputElement) marketingAnnouncementCtaUrl.value = draft?.ctaUrl || '';
+      marketingAnnouncementDryRunHash = '';
+      marketingAnnouncementDryRunSignature = '';
+      marketingAnnouncementDryRunCount = 0;
+    } finally {
+      marketingAnnouncementHydrating = false;
+    }
+    writeMarketingAnnouncementDraft();
+  }
+
+  async function loadMarketingAnnouncementSharedDraft() {
+    var campaignSlug = selectedMarketingAnnouncementCampaignSlug();
+    if (!campaignSlug) return;
+    setSharedMarketingDraftStatus('blast', t('marketing_announcement_shared_draft_loading', 'Loading shared Blast draft...'));
+    try {
+      var data = await readSharedMarketingDraft('blast', campaignSlug);
+      var draft = data?.draft;
+      if (!draft) {
+        setSharedMarketingDraftRevision('blast', campaignSlug, '');
+        setSharedMarketingDraftStatus('blast', t('marketing_announcement_shared_draft_empty', 'No shared Blast draft is saved for this campaign.'));
+        return;
+      }
+      applyMarketingAnnouncementDraft(draft.draft || {});
+      setSharedMarketingDraftRevision('blast', campaignSlug, draft.revision || '');
+      setSharedMarketingDraftStatus('blast', t('marketing_announcement_shared_draft_loaded', 'Shared Blast draft loaded. Expires %{date}.', {
+        date: draft.expiresAt ? new Date(draft.expiresAt).toLocaleDateString(lang || 'en') : ''
+      }));
+    } catch (error) {
+      logger.error('Failed to load shared Blast draft', error);
+      setSharedMarketingDraftStatus('blast', error?.data?.error || t('marketing_announcement_shared_draft_load_failed', 'Unable to load shared Blast draft.'));
+    }
+  }
+
+  async function saveMarketingAnnouncementSharedDraft() {
+    var campaignSlug = selectedMarketingAnnouncementCampaignSlug();
+    if (!campaignSlug) return;
+    setSharedMarketingDraftStatus('blast', t('marketing_announcement_shared_draft_saving', 'Saving shared Blast draft...'));
+    try {
+      var data = await writeSharedMarketingDraft('blast', campaignSlug, currentMarketingAnnouncementDraft());
+      setSharedMarketingDraftRevision('blast', campaignSlug, data?.draft?.revision || '');
+      setSharedMarketingDraftStatus('blast', t('marketing_announcement_shared_draft_saved', 'Shared Blast draft saved for 7 days.'));
+    } catch (error) {
+      logger.error('Failed to save shared Blast draft', error);
+      setSharedMarketingDraftStatus('blast', error?.data?.code === 'draft_conflict'
+        ? sharedMarketingDraftConflictMessage('blast')
+        : (error?.data?.error || t('marketing_announcement_shared_draft_save_failed', 'Unable to save shared Blast draft.')));
+    }
+  }
+
+  async function clearMarketingAnnouncementSharedDraft() {
+    var campaignSlug = selectedMarketingAnnouncementCampaignSlug();
+    if (!campaignSlug) return;
+    if (!window.confirm(t('marketing_announcement_shared_draft_clear_confirm', 'Clear the shared Blast draft for this campaign?'))) return;
+    setSharedMarketingDraftStatus('blast', t('marketing_announcement_shared_draft_clearing', 'Clearing shared Blast draft...'));
+    try {
+      await deleteSharedMarketingDraft('blast', campaignSlug);
+      setSharedMarketingDraftRevision('blast', campaignSlug, '');
+      setSharedMarketingDraftStatus('blast', t('marketing_announcement_shared_draft_cleared', 'Shared Blast draft cleared.'));
+    } catch (error) {
+      logger.error('Failed to clear shared Blast draft', error);
+      setSharedMarketingDraftStatus('blast', error?.data?.error || t('marketing_announcement_shared_draft_clear_failed', 'Unable to clear shared Blast draft.'));
     }
   }
 
@@ -5454,6 +5704,293 @@
     } catch (error) {
       logger.error('Failed to load saved referral codes', error);
       setText(marketingStatus, t('marketing_referrals_load_failed', 'Unable to load saved referral codes.'));
+    }
+  }
+
+  function marketingMetricTable(title, rows, options) {
+    var section = document.createElement('section');
+    section.className = 'admin-marketing__metric-table';
+    var heading = document.createElement('h4');
+    heading.textContent = title;
+    section.append(heading);
+    var visibleRows = (Array.isArray(rows) ? rows : []).filter(function(row) {
+      return row && (Number(row.pledgeCount || 0) > 0 || row.key);
+    }).slice(0, options?.limit || 8);
+    if (!visibleRows.length) {
+      var empty = document.createElement('p');
+      empty.className = 'admin-app__muted';
+      empty.textContent = options?.emptyText || t('marketing_reporting_empty_dimension', 'No activity yet.');
+      section.append(empty);
+      return section;
+    }
+    var table = document.createElement('table');
+    table.className = 'admin-marketing__reporting-table';
+    var thead = document.createElement('thead');
+    var headerRow = document.createElement('tr');
+    var labelHeader = options?.labelHeader || t('marketing_reporting_label_header', 'Label');
+    var pledgeHeader = t('marketing_reporting_pledges_header', 'Pledges');
+    var pledgedHeader = t('marketing_reporting_pledged_header', 'Pledged');
+    var chargedHeader = t('marketing_reporting_charged_header', 'Charged');
+    appendTableHeader(headerRow, [labelHeader, pledgeHeader, pledgedHeader, chargedHeader]);
+    thead.append(headerRow);
+    var tbody = document.createElement('tbody');
+    visibleRows.forEach(function(row) {
+      var tr = document.createElement('tr');
+      [
+        row.label || row.key || '',
+        formatNumber(row.pledgeCount),
+        formatMoneyExact(row.pledgedSubtotal),
+        formatMoneyExact(row.chargedAmount)
+      ].forEach(function(value, index) {
+        var td = document.createElement('td');
+        td.setAttribute('data-label', [labelHeader, pledgeHeader, pledgedHeader, chargedHeader][index]);
+        td.textContent = value;
+        tr.append(td);
+      });
+      tbody.append(tr);
+    });
+    table.append(thead, tbody);
+    section.append(table);
+    return section;
+  }
+
+  function renderMarketingReporting(data) {
+    if (!marketingReportingRoot) return;
+    marketingReportingRoot.replaceChildren();
+    var heading = document.createElement('h3');
+    heading.textContent = t('marketing_reporting_title', 'Campaign marketing performance');
+    var intro = document.createElement('p');
+    intro.className = 'admin-app__muted';
+    intro.textContent = t('marketing_reporting_intro', 'Campaign-scoped referral and UTM performance from indexed pledges.');
+    marketingReportingRoot.append(heading, intro);
+    if (!data || data.error) {
+      var error = document.createElement('p');
+      error.className = 'admin-app__muted';
+      error.textContent = data?.error || t('marketing_reporting_empty', 'Marketing performance is not available yet.');
+      marketingReportingRoot.append(error);
+      return;
+    }
+    var summary = document.createElement('div');
+    summary.className = 'admin-marketing__summary';
+    summary.append(
+      statCard('admin-marketing__stat', t('marketing_reporting_indexed', 'Indexed pledges'), formatNumber(data.indexedPledgeCount)),
+      statCard('admin-marketing__stat', t('marketing_reporting_saved_referrals', 'Saved referrals'), formatNumber(data.savedReferralCount))
+    );
+    var tables = document.createElement('div');
+    tables.className = 'admin-marketing__metric-grid';
+    tables.append(
+      marketingMetricTable(t('marketing_reporting_referrals', 'Referral links'), data.referrals || [], {
+        labelHeader: t('marketing_reporting_referrer_header', 'Referrer'),
+        emptyText: t('marketing_reporting_referrals_empty', 'No referral-attributed pledges yet.')
+      }),
+      marketingMetricTable(t('marketing_reporting_sources', 'UTM sources'), data.utm?.sources || [], {
+        labelHeader: t('marketing_reporting_source_header', 'Source')
+      }),
+      marketingMetricTable(t('marketing_reporting_mediums', 'UTM mediums'), data.utm?.mediums || [], {
+        labelHeader: t('marketing_reporting_medium_header', 'Medium')
+      }),
+      marketingMetricTable(t('marketing_reporting_contents', 'UTM contents'), data.utm?.contents || [], {
+        labelHeader: t('marketing_reporting_content_header', 'Content')
+      })
+    );
+    marketingReportingRoot.append(summary, tables);
+  }
+
+  async function loadMarketingReporting() {
+    if (!marketingReportingRoot) return;
+    var campaign = selectedMarketingCampaign();
+    if (!campaign?.slug) {
+      renderMarketingReporting(null);
+      return;
+    }
+    if (marketingReportingLoading === campaign.slug) return;
+    marketingReportingLoading = campaign.slug;
+    setText(marketingReportingRoot, t('marketing_reporting_loading', 'Loading campaign marketing performance...'));
+    try {
+      var params = new URLSearchParams({ campaignSlug: campaign.slug });
+      var data = await requestJson('/admin/marketing/reporting?' + params.toString(), { method: 'GET' });
+      if (selectedMarketingCampaign()?.slug !== campaign.slug) return;
+      renderMarketingReporting(data);
+    } catch (error) {
+      logger.error('Failed to load Marketing reporting', error);
+      if (selectedMarketingCampaign()?.slug !== campaign.slug) return;
+      renderMarketingReporting({
+        error: error?.data?.code === 'campaign_index_required'
+          ? t('marketing_reporting_index_required', 'Campaign pledge indexes must be rebuilt before marketing reporting can load.')
+          : (error?.data?.error || t('marketing_reporting_failed', 'Unable to load campaign marketing performance.'))
+      });
+    } finally {
+      if (marketingReportingLoading === campaign.slug) marketingReportingLoading = '';
+      var currentCampaign = selectedMarketingCampaign();
+      if (currentCampaign?.slug && currentCampaign.slug !== campaign.slug) loadMarketingReporting();
+    }
+  }
+
+  function abandonedMetricLabel(key) {
+    var labels = {
+      queued: t('abandoned_health_queued', 'Queued'),
+      sent: t('abandoned_health_sent', 'Sent'),
+      suppressed: t('abandoned_health_suppressed', 'Suppressed'),
+      completed: t('abandoned_health_completed', 'Completed'),
+      failed: t('abandoned_health_failed', 'Failed'),
+      alreadySent: t('abandoned_health_already_sent', 'Already sent')
+    };
+    return labels[key] || key;
+  }
+
+  function renderAbandonedHealthMetrics(container, totals) {
+    var metrics = document.createElement('div');
+    metrics.className = 'admin-marketing__summary';
+    ['queued', 'sent', 'suppressed', 'completed', 'failed'].forEach(function(key) {
+      metrics.append(statCard('admin-marketing__stat', abandonedMetricLabel(key), formatNumber(totals?.[key] || 0)));
+    });
+    container.append(metrics);
+  }
+
+  function renderAbandonedHealthSuppression(container, campaignSlug) {
+    var form = document.createElement('form');
+    form.className = 'admin-marketing__suppression';
+    var email = document.createElement('input');
+    email.className = 'admin-settings__input';
+    email.type = 'email';
+    email.name = 'abandonedCheckoutEmail';
+    email.autocomplete = 'email';
+    email.placeholder = t('abandoned_suppression_email_placeholder', 'supporter@example.com');
+    var labelInfo = createProductLabelRow(
+      t('abandoned_suppression_label', 'Scoped suppression controls'),
+      t('abandoned_suppression_help', 'Suppressing here stops abandoned-checkout reminder emails only for this supporter email on this campaign. It does not unsubscribe the supporter globally or change their pledge. Clear removes that campaign-scoped suppression.'),
+      'admin-abandoned-suppression-' + String(++collectionFieldIdCounter),
+      { htmlFor: 'admin-abandoned-suppression-email-' + String(collectionFieldIdCounter) }
+    );
+    email.id = labelInfo.label.htmlFor;
+    if (labelInfo.helpId) appendDescribedBy(email, labelInfo.helpId);
+    var actions = document.createElement('div');
+    actions.className = 'admin-marketing__suppression-actions';
+    var suppress = document.createElement('button');
+    suppress.type = 'submit';
+    suppress.className = 'btn btn--secondary';
+    suppress.dataset.abandonedSuppressionAction = 'suppress';
+    suppress.textContent = t('abandoned_suppression_set', 'Suppress reminders');
+    var clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'btn btn--secondary';
+    clear.dataset.abandonedSuppressionAction = 'clear';
+    clear.textContent = t('abandoned_suppression_clear', 'Clear suppression');
+    actions.append(suppress, clear);
+    var status = document.createElement('p');
+    status.className = 'admin-dashboard__status';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    form.append(labelInfo.row, email, actions, status);
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
+      mutateAbandonedCheckoutSuppression(campaignSlug, email.value, true, status);
+    });
+    clear.addEventListener('click', function() {
+      mutateAbandonedCheckoutSuppression(campaignSlug, email.value, false, status);
+    });
+    container.append(form);
+  }
+
+  function renderAbandonedHealthOutcomes(container, outcomes) {
+    var rows = Array.isArray(outcomes) ? outcomes.slice(0, 6) : [];
+    var heading = document.createElement('h4');
+    heading.textContent = t('abandoned_recent_outcomes_title', 'Recent reminder outcomes');
+    container.append(heading);
+    if (!rows.length) {
+      var empty = document.createElement('p');
+      empty.className = 'admin-app__muted';
+      empty.textContent = t('abandoned_recent_outcomes_empty', 'No abandoned-checkout reminder activity yet.');
+      container.append(empty);
+      return;
+    }
+    var list = document.createElement('ul');
+    list.className = 'admin-marketing__outcomes';
+    rows.forEach(function(row) {
+      var item = document.createElement('li');
+      item.textContent = [
+        row.type || row.counter || '',
+        row.reason || '',
+        row.at ? new Date(row.at).toLocaleString(lang || 'en') : ''
+      ].filter(Boolean).join(' - ');
+      list.append(item);
+    });
+    container.append(list);
+  }
+
+  function renderMarketingAbandonedHealth(data) {
+    if (!marketingAbandonedHealthRoot) return;
+    marketingAbandonedHealthRoot.replaceChildren();
+    var heading = document.createElement('h3');
+    heading.textContent = t('abandoned_health_title', 'Abandoned-checkout reminders');
+    var intro = document.createElement('p');
+    intro.className = 'admin-app__muted';
+    intro.textContent = t('abandoned_health_intro', 'Campaign-scoped health for queued, sent, suppressed, completed, and failed reminder emails.');
+    marketingAbandonedHealthRoot.append(heading, intro);
+    var campaignSlug = selectedMarketingCampaign()?.slug || data?.campaignSlug || '';
+    if (!data || data.error) {
+      var error = document.createElement('p');
+      error.className = 'admin-app__muted';
+      error.textContent = data?.error || t('abandoned_health_empty', 'Abandoned-checkout health is not available yet.');
+      marketingAbandonedHealthRoot.append(error);
+      if (campaignSlug) renderAbandonedHealthSuppression(marketingAbandonedHealthRoot, campaignSlug);
+      return;
+    }
+    renderAbandonedHealthMetrics(marketingAbandonedHealthRoot, data.campaign?.totals || data.totals || {});
+    renderAbandonedHealthSuppression(marketingAbandonedHealthRoot, campaignSlug);
+    renderAbandonedHealthOutcomes(marketingAbandonedHealthRoot, data.recentOutcomes || []);
+  }
+
+  async function loadMarketingAbandonedHealth() {
+    if (!marketingAbandonedHealthRoot) return;
+    var campaign = selectedMarketingCampaign();
+    if (!campaign?.slug) {
+      renderMarketingAbandonedHealth(null);
+      return;
+    }
+    if (marketingAbandonedHealthLoading === campaign.slug) return;
+    marketingAbandonedHealthLoading = campaign.slug;
+    setText(marketingAbandonedHealthRoot, t('abandoned_health_loading', 'Loading abandoned-checkout health...'));
+    try {
+      var params = new URLSearchParams({ campaignSlug: campaign.slug });
+      var data = await requestJson('/admin/abandoned-checkout/health?' + params.toString(), { method: 'GET' });
+      if (selectedMarketingCampaign()?.slug !== campaign.slug) return;
+      renderMarketingAbandonedHealth(data);
+    } catch (error) {
+      logger.error('Failed to load abandoned checkout health', error);
+      if (selectedMarketingCampaign()?.slug !== campaign.slug) return;
+      renderMarketingAbandonedHealth({
+        campaignSlug: campaign.slug,
+        error: error?.data?.error || t('abandoned_health_failed_load', 'Unable to load abandoned-checkout health.')
+      });
+    } finally {
+      if (marketingAbandonedHealthLoading === campaign.slug) marketingAbandonedHealthLoading = '';
+      var currentCampaign = selectedMarketingCampaign();
+      if (currentCampaign?.slug && currentCampaign.slug !== campaign.slug) loadMarketingAbandonedHealth();
+    }
+  }
+
+  async function mutateAbandonedCheckoutSuppression(campaignSlug, email, suppress, status) {
+    var normalizedEmail = String(email || '').trim();
+    if (!campaignSlug || !normalizedEmail) {
+      setText(status, t('abandoned_suppression_required', 'Enter a supporter email for this campaign.'));
+      return;
+    }
+    setText(status, suppress
+      ? t('abandoned_suppression_saving', 'Saving campaign-scoped suppression...')
+      : t('abandoned_suppression_clearing', 'Clearing campaign-scoped suppression...'));
+    try {
+      await requestJson('/admin/abandoned-checkout/suppression', {
+        method: suppress ? 'POST' : 'DELETE',
+        body: JSON.stringify({ campaignSlug, email: normalizedEmail })
+      });
+      setText(status, suppress
+        ? t('abandoned_suppression_saved', 'Reminder suppression saved for this campaign.')
+        : t('abandoned_suppression_cleared', 'Reminder suppression cleared for this campaign.'));
+      loadMarketingAbandonedHealth();
+    } catch (error) {
+      logger.error('Failed to update abandoned checkout suppression', error);
+      setText(status, error?.data?.error || t('abandoned_suppression_failed', 'Unable to update campaign-scoped suppression.'));
     }
   }
 
@@ -6741,6 +7278,127 @@
     return wrap;
   }
 
+  function createContentMediaLibraryButton(block, index, options) {
+    var wrap = document.createElement('div');
+    wrap.className = 'admin-content-block__field admin-content-block__media-library-field';
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn--secondary btn--small';
+    button.dataset.contentIndex = String(index);
+    button.dataset.contentAction = 'choose-media-library';
+    button.dataset.contentMediaKind = 'image';
+    button.dataset.contentMediaField = options?.field || 'src';
+    button.textContent = options?.buttonLabel || t('content_choose_existing_image', 'Choose existing image');
+    var labelInfo = createProductLabelRow(
+      options?.label || t('content_existing_image_label', 'Existing image'),
+      options?.help || t('content_existing_image_help', 'Choose an already uploaded campaign image. Super admins can also choose shared/default site images; campaign users see only this campaign\'s media. Use Source URL only to repair an existing /assets/... path.'),
+      'content-existing-image-' + String(index) + '-' + String(++collectionFieldIdCounter),
+      { labelId: 'content-existing-image-label-' + String(collectionFieldIdCounter) }
+    );
+    describeCompositeControl(button, labelInfo.helpId, options?.label || t('content_existing_image_label', 'Existing image'));
+    wrap.append(labelInfo.row, button);
+    return wrap;
+  }
+
+  function activeContentMediaCampaignSlug() {
+    var fromRoot = String(contentBlocksRoot?.dataset?.contentCampaignSlug || '').trim();
+    if (fromRoot) return fromRoot;
+    if (isBlastContentEditorMode()) return selectedMarketingAnnouncementCampaignSlug();
+    return selectedContentCampaignSlug();
+  }
+
+  function applyContentMediaLibrarySelection(button, mediaPath) {
+    var path = String(mediaPath || '').trim();
+    if (!path) return false;
+    var resolved = contentMediaUploadTarget(button);
+    if (!resolved) return false;
+    pushContentHistory();
+    clearPendingContentUpload(resolved.target, resolved.field);
+    resolved.target[resolved.field || 'src'] = path;
+    lastContentMutation = 'field';
+    syncContentJsonFromBlocks();
+    renderContentBlocks(resolved.index);
+    writeContentDraft({ schedulePreview: false });
+    setText(contentEditorStatusTarget(), t('content_media_library_selected', 'Existing image selected.'));
+    return true;
+  }
+
+  function renderContentMediaLibraryOptions(container, images) {
+    container.replaceChildren();
+    var rows = Array.isArray(images) ? images : [];
+    if (!rows.length) {
+      var empty = document.createElement('p');
+      empty.className = 'admin-app__muted';
+      empty.textContent = t('content_media_library_empty', 'No existing images are available for this campaign yet.');
+      container.append(empty);
+      return;
+    }
+    var list = document.createElement('div');
+    list.className = 'admin-content-media-library__list';
+    rows.forEach(function(image, index) {
+      var label = document.createElement('label');
+      label.className = 'admin-content-media-library__item';
+      var radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'contentMediaLibraryImage';
+      radio.value = image.path || '';
+      if (index === 0) radio.checked = true;
+      var preview = document.createElement('img');
+      preview.src = mediaPreviewUrl(image.path || '');
+      preview.alt = '';
+      preview.loading = 'lazy';
+      var text = document.createElement('span');
+      text.textContent = [
+        image.label || image.name || image.path || '',
+        image.scope === 'shared' ? t('content_media_library_shared', 'Shared') : t('content_media_library_campaign', 'Campaign')
+      ].filter(Boolean).join(' - ');
+      label.append(radio, preview, text);
+      list.append(label);
+    });
+    container.append(list);
+  }
+
+  function openContentMediaLibrary(button) {
+    if (!(button instanceof HTMLButtonElement)) return;
+    var root = contentBlocksRoot;
+    var field = activeContentJsonField;
+    var campaignSlug = activeContentMediaCampaignSlug();
+    if (!campaignSlug) {
+      setText(contentEditorStatusTarget(), t('content_media_library_campaign_required', 'Choose a campaign before selecting existing media.'));
+      return;
+    }
+    openAdminActionDialog(t('content_media_library_title', 'Choose existing image'), function(form, status, submit) {
+      submit.textContent = t('content_media_library_use', 'Use image');
+      submit.disabled = true;
+      var intro = document.createElement('p');
+      intro.className = 'admin-app__muted';
+      intro.textContent = t('content_media_library_intro', 'Select a campaign-hosted image. Super admins can also choose shared/default site images.');
+      var results = document.createElement('div');
+      results.className = 'admin-content-media-library';
+      results.textContent = t('content_media_library_loading', 'Loading images...');
+      form.append(intro, results);
+      var params = new URLSearchParams({ campaignSlug });
+      requestJson('/admin/media/library?' + params.toString(), { method: 'GET' }).then(function(data) {
+        renderContentMediaLibraryOptions(results, data.images || []);
+        submit.disabled = !(data.images || []).length;
+        setText(status, '');
+      }).catch(function(error) {
+        logger.error('Failed to load media library', error);
+        setText(status, error?.data?.error || t('content_media_library_failed', 'Unable to load existing images.'));
+        submit.disabled = true;
+      });
+    }, async function(form) {
+      var selected = form.querySelector('input[name="contentMediaLibraryImage"]:checked');
+      if (!(selected instanceof HTMLInputElement) || !selected.value) {
+        throw new Error(t('content_media_library_required', 'Choose an image first.'));
+      }
+      var applied = runContentEditorAction(root, field, function() {
+        return applyContentMediaLibrarySelection(button, selected.value);
+      });
+      if (!applied) throw new Error(t('content_media_library_apply_failed', 'Unable to apply the selected image.'));
+    });
+  }
+
   function createGalleryImageInput(tagName, block, index, imageIndex, field, labelText, options) {
     var wrap = document.createElement('div');
     wrap.className = 'admin-content-block__field';
@@ -7040,6 +7698,7 @@
         hideLabel: true
       })];
       imageControls.push(
+        createContentMediaLibraryButton(block, index),
         createContentInput('input', block, index, 'src', t('content_field_src', 'Source URL'), {
           help: isBlastContentEditorMode()
             ? t('content_field_src_blast_help', 'Upload new images whenever possible. Use Source URL to reuse an existing site-hosted /assets/images/... path or repair a saved path; external image URLs are not included in Blast emails.')
@@ -7982,7 +8641,10 @@
       contentBlocks = [];
       setText(contentStatus, t('content_json_invalid', 'Content blocks must be valid JSON.'));
     }
-    if (contentBlocksRoot) contentBlocksRoot.__contentBlocks = contentBlocks;
+    if (contentBlocksRoot) {
+      contentBlocksRoot.__contentBlocks = contentBlocks;
+      contentBlocksRoot.dataset.contentCampaignSlug = draft?.campaignSlug || selectedContentCampaignSlug();
+    }
     renderContentBlocks();
     resetContentDirtyBaseline();
   }
@@ -9460,7 +10122,10 @@
       writeMarketingDraft();
       if (event.target === marketingCampaign) {
         setMarketingEditingState('');
+        setText(marketingDraftStatus, '');
         loadMarketingReferrals();
+        loadMarketingReporting();
+        loadMarketingAbandonedHealth();
       }
     });
   }
@@ -9488,6 +10153,18 @@
       setMarketingEditingState('');
       setText(marketingStatus, '');
     });
+  }
+
+  if (marketingLoadDraft) {
+    marketingLoadDraft.addEventListener('click', loadMarketingSharedDraft);
+  }
+
+  if (marketingSaveDraft) {
+    marketingSaveDraft.addEventListener('click', saveMarketingSharedDraft);
+  }
+
+  if (marketingClearDraft) {
+    marketingClearDraft.addEventListener('click', clearMarketingSharedDraft);
   }
 
   if (analyticsCampaign) {
@@ -9618,6 +10295,8 @@
           applyContentLinkPanel(button.closest('[data-content-link-panel]')?.querySelector('[data-content-action="link-url"]'));
         } else if (action === 'link-remove') {
           removeActiveContentLink();
+        } else if (action === 'choose-media-library') {
+          openContentMediaLibrary(button);
         } else if (action === 'toggle-media-settings') {
           toggleMediaSettings(button);
         } else if (action === 'toggle-gallery-image-settings') {

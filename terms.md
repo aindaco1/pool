@@ -8,7 +8,7 @@ description: Review pledge terms, payment processing, fulfillment, and privacy d
 
 # Terms & Creative Guidelines
 
-These terms reflect The Pool platform release milestone **v1.0.6**.
+These terms reflect The Pool platform release milestone **v1.0.7**.
 
 ## Pledge Terms
 
@@ -73,13 +73,15 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - Email addresses and any shipping details needed for fulfillment may be stored in our system for pledge management, campaign-specific confirmations, campaign updates, and reward fulfillment.
 - If you sign up for an upcoming campaign launch reminder, your email is stored in campaign-scoped reminder records so The Pool can send that one reminder, avoid duplicate sends, and honor unsubscribes for that campaign. Reminder signups may use Cloudflare Turnstile to reduce abuse.
 - If you opt into an abandoned-checkout reminder, your email and a limited checkout reminder record may be stored briefly so The Pool can send one follow-up, avoid duplicate sends, delete the reminder after a completed pledge, and honor unsubscribe requests.
+- Authorized campaign operators may view aggregate abandoned-checkout reminder health for campaigns they manage and may set campaign-scoped suppression records. Those controls use hashed email identifiers and aggregate counters instead of exposing reminder recipient lists.
 - Authorized campaign operators may send campaign-scoped supporter blasts to supporters of campaigns they are allowed to manage. Blast emails use the shared transactional email system, may include hosted campaign images and ordinary campaign links, and should not expose unrelated campaign supporter data.
+- Authorized campaign operators may explicitly save shared Marketing or Blast drafts for campaigns they manage. These drafts are campaign-scoped, expire after a short retention window, and may include draft subject lines, campaign links, CTA text, and campaign-hosted media references.
 - Campaign organizers may receive campaign-scoped reports or fulfillment exports containing supporter/order details needed to run that specific campaign, coordinate delivery, or send production-related updates. Those reports stay limited to the campaign a supporter backed rather than exposing unrelated campaign pledges.
 - Authorized campaign operators may also view campaign-scoped supporter rows, reports, analytics, fulfillment data, and campaign content through The Pool's private admin dashboard. Dashboard access is role-scoped: campaign users see only assigned campaigns, while platform administrators may see platform-wide operational data needed to run The Pool.
 - Authorized campaign operators may use protected previews to review draft campaign pages before launch. Explicit reviewer email allowlists are stored only for the short preview window and are not intended for public campaign pages.
 - If a campaign is archived by an authorized platform administrator, campaign source data and campaign-owned uploaded media may be retained in the repository archive for operational records instead of being deleted.
 - When a pledge includes platform-fulfilled add-on items, platform operators may separately receive platform-only fulfillment exports limited to the items they must deliver.
-- Platform administrators may use the dashboard to manage campaign configuration, platform settings, add-ons, referral links, and authorized dashboard users. Secret values are kept in deployment secret stores or ignored local files, not in campaign content or dashboard drafts.
+- Platform administrators may use the dashboard to manage campaign configuration, platform settings, add-ons, referral links, shared marketing drafts, and authorized dashboard users. Secret values are kept in deployment secret stores or ignored local files, not in campaign content or dashboard drafts.
 - Inventory-limited platform add-ons use saved pledge state, not in-progress cart drafts, to determine remaining stock.
 - Inventory-limited campaign add-ons also use saved pledge state, not in-progress cart drafts, to determine remaining stock.
 - Supporter-community access in the browser may be remembered for the current session as a convenience, but the emailed magic link remains the source of truth for access.

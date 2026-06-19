@@ -30,6 +30,7 @@ const options = {
   skipKv: hasArg('--skip-kv'),
   skipSecrets: hasArg('--skip-secrets'),
   skipGithub: hasArg('--skip-github'),
+  skipReadiness: hasArg('--skip-readiness'),
   deploy: hasArg('--deploy'),
   help: hasArg('--help') || hasArg('-h')
 };
@@ -105,6 +106,7 @@ Options:
   --skip-kv             Skip Cloudflare KV namespace creation/update
   --skip-secrets        Skip Worker and GitHub secret writes
   --skip-github         Skip GitHub repo-secret setup
+  --skip-readiness      Skip read-only provider readiness checks
   --deploy              Run wrangler deploy after production setup
   -h, --help            Show this help
 
@@ -134,9 +136,9 @@ function mask(value) {
   return `${text.slice(0, 4)}...${text.slice(-4)}`;
 }
 
-function run(command, runArgs = [], { cwd = ROOT, input = '', allowFailure = false, capture = true, secretInput = false } = {}) {
+function run(command, runArgs = [], { cwd = ROOT, input = '', allowFailure = false, capture = true, secretInput = false, dryRunExec = false } = {}) {
   const printable = [command, ...runArgs].join(' ');
-  if (options.dryRun) {
+  if (options.dryRun && !dryRunExec) {
     logInfo(`[dry-run] ${printable}${input ? ` < ${secretInput ? '[secret]' : JSON.stringify(input)}` : ''}`);
     return { status: 0, stdout: '', stderr: '' };
   }
@@ -374,6 +376,76 @@ function parseNamespaceId(output) {
   return match?.[1] || '';
 }
 
+function readWranglerKvBindings() {
+  if (!fs.existsSync(WRANGLER_PATH)) return new Map();
+  const bindings = new Map();
+  const lines = fs.readFileSync(WRANGLER_PATH, 'utf8').split(/\r?\n/);
+  let current = null;
+  for (const line of lines) {
+    if (/^\s*\[\[(?:env\.dev\.)?kv_namespaces\]\]\s*$/.test(line)) {
+      if (current?.name) bindings.set(current.name, { ...(bindings.get(current.name) || {}), ...current });
+      current = {};
+      continue;
+    }
+    if (/^\s*\[\[/.test(line) && !/^\s*\[\[(?:env\.dev\.)?kv_namespaces\]\]\s*$/.test(line)) {
+      if (current?.name) bindings.set(current.name, { ...(bindings.get(current.name) || {}), ...current });
+      current = null;
+      continue;
+    }
+    if (!current) continue;
+    const match = line.match(/^\s*(name|binding|id|preview_id)\s*=\s*"([^"]*)"/);
+    if (match) current[match[1] === 'binding' ? 'name' : match[1]] = match[2];
+  }
+  if (current?.name) bindings.set(current.name, { ...(bindings.get(current.name) || {}), ...current });
+  return bindings;
+}
+
+function parseJsonArrayOutput(output) {
+  const text = String(output || '').trim();
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed?.result)) return parsed.result;
+  } catch {}
+  return [];
+}
+
+function listCloudflareKvNamespaces() {
+  const result = run('npx', ['wrangler', 'kv', 'namespace', 'list', '--json'], {
+    cwd: WORKER_DIR,
+    allowFailure: true,
+    dryRunExec: true
+  });
+  if (result.status !== 0) {
+    const fallback = run('npx', ['wrangler', 'kv:namespace', 'list', '--json'], {
+      cwd: WORKER_DIR,
+      allowFailure: true,
+      dryRunExec: true
+    });
+    if (fallback.status !== 0) {
+      logInfo('Unable to list Cloudflare KV namespaces; creation/reuse will rely on wrangler.toml and explicit create commands.');
+      return [];
+    }
+    return parseJsonArrayOutput(fallback.stdout);
+  }
+  return parseJsonArrayOutput(result.stdout);
+}
+
+function namespaceTitle(namespace) {
+  return String(namespace?.title || namespace?.name || namespace?.binding || '').trim();
+}
+
+function findExistingNamespace(namespaces, binding, preview = false) {
+  const expected = preview
+    ? new Set([`${binding}_preview`, `${binding}-preview`, `${binding} preview`].map((value) => value.toLowerCase()))
+    : new Set([binding.toLowerCase()]);
+  return (namespaces || []).find((namespace) => {
+    const title = namespaceTitle(namespace).toLowerCase();
+    return expected.has(title);
+  }) || null;
+}
+
 function updateWranglerKv(binding, ids) {
   if (!fs.existsSync(WRANGLER_PATH)) throw new Error('worker/wrangler.toml not found');
   const original = fs.readFileSync(WRANGLER_PATH, 'utf8');
@@ -436,12 +508,115 @@ function configureKvNamespaces() {
   }
 
   logStep('Create/update Cloudflare KV namespaces');
+  const configuredBindings = readWranglerKvBindings();
+  const discoveredNamespaces = listCloudflareKvNamespaces();
   for (const binding of KV_BINDINGS) {
-    const id = createKvNamespace(binding, false);
-    const previewId = createKvNamespace(binding, true);
+    const configured = configuredBindings.get(binding) || {};
+    const existing = findExistingNamespace(discoveredNamespaces, binding, false);
+    const existingPreview = findExistingNamespace(discoveredNamespaces, binding, true);
+    let id = String(existing?.id || configured.id || '').trim();
+    let previewId = String(existingPreview?.id || configured.preview_id || '').trim();
+
+    if (id) {
+      logInfo(`${binding}: reusing existing namespace ${id}`);
+    } else {
+      id = createKvNamespace(binding, false);
+      logInfo(`${binding}: planned/created namespace ${id}`);
+    }
+
+    if (previewId) {
+      logInfo(`${binding}: reusing existing preview namespace ${previewId}`);
+    } else {
+      previewId = createKvNamespace(binding, true);
+      logInfo(`${binding}: planned/created preview namespace ${previewId}`);
+    }
+
     updateWranglerKv(binding, { id, preview_id: previewId });
     logInfo(`${binding}: ${id} / preview ${previewId}`);
   }
+}
+
+function readinessStatus(label, ok, detail = '') {
+  logInfo(`${ok ? 'OK' : 'Check'}: ${label}${detail ? ` — ${detail}` : ''}`);
+}
+
+async function fetchJsonReadiness(url, { headers = {} } = {}) {
+  try {
+    const response = await fetch(url, { headers });
+    let body = null;
+    try {
+      body = await response.json();
+    } catch {}
+    return { ok: response.ok, status: response.status, body };
+  } catch (error) {
+    return { ok: false, status: 0, error: error?.message || 'request failed' };
+  }
+}
+
+function readinessEnv(name) {
+  return String(process.env[name] || '').trim();
+}
+
+async function runReadinessChecks() {
+  if (options.skipReadiness) {
+    logInfo('Readiness checks skipped');
+    return;
+  }
+
+  logStep('Run read-only provider readiness checks');
+
+  const ghRepo = run('gh', ['repo', 'view', '--json', 'nameWithOwner,url'], {
+    cwd: ROOT,
+    allowFailure: true,
+    dryRunExec: true
+  });
+  readinessStatus('GitHub repository access', ghRepo.status === 0, ghRepo.status === 0 ? 'repo metadata is readable' : 'run gh auth login or check repo access');
+
+  const githubSecrets = run('gh', ['secret', 'list'], {
+    cwd: ROOT,
+    allowFailure: true,
+    dryRunExec: true
+  });
+  readinessStatus('GitHub repository secrets access', githubSecrets.status === 0, githubSecrets.status === 0 ? 'secret names are listable' : 'manual secret review may be required');
+
+  const wranglerWhoami = run('npx', ['wrangler', 'whoami'], {
+    cwd: WORKER_DIR,
+    allowFailure: true,
+    dryRunExec: true
+  });
+  readinessStatus('Cloudflare Wrangler account access', wranglerWhoami.status === 0, wranglerWhoami.status === 0 ? 'wrangler can read account identity' : 'run wrangler login');
+
+  const kvNamespaces = listCloudflareKvNamespaces();
+  readinessStatus('Cloudflare KV namespace discovery', kvNamespaces.length > 0, kvNamespaces.length ? `${kvNamespaces.length} namespace(s) visible` : 'no namespaces visible yet or listing failed');
+
+  if (commandAvailable('stripe')) {
+    const stripeWebhooks = run('stripe', ['webhook_endpoints', 'list', '--limit', '10'], {
+      cwd: ROOT,
+      allowFailure: true,
+      dryRunExec: true
+    });
+    readinessStatus('Stripe webhook endpoint access', stripeWebhooks.status === 0, stripeWebhooks.status === 0 ? 'webhook endpoints are readable' : 'run stripe login or configure webhook manually');
+  } else {
+    readinessStatus('Stripe CLI webhook check', false, 'stripe CLI not installed; verify webhook endpoint manually');
+  }
+
+  const resendKey = readinessEnv('RESEND_API_KEY');
+  if (resendKey) {
+    const resend = await fetchJsonReadiness('https://api.resend.com/domains', {
+      headers: { Authorization: `Bearer ${resendKey}` }
+    });
+    readinessStatus('Resend domain access', resend.ok, resend.ok ? 'domains endpoint is readable' : `status ${resend.status || 'unavailable'}`);
+  } else {
+    readinessStatus('Resend domain access', false, 'set RESEND_API_KEY in the shell for a live readiness check, or verify sender/domain manually');
+  }
+
+  readinessStatus('Turnstile widgets', false, 'Cloudflare Turnstile widget discovery requires dashboard/API-token context; verify site key and Worker secret manually');
+
+  const uspsSecret = readinessEnv('USPS_CLIENT_SECRET');
+  readinessStatus('USPS credentials', Boolean(uspsSecret), uspsSecret ? 'secret present in shell for follow-up quote tests' : 'verify USPS client id/secret manually or with npm run test:usps');
+
+  const zipTaxKey = readinessEnv('ZIP_TAX_API_KEY');
+  readinessStatus('ZIP.TAX credentials', Boolean(zipTaxKey), zipTaxKey ? 'API key present in shell' : 'required only when tax.provider is zip_tax');
 }
 
 function putWorkerSecret(name, value) {
@@ -503,6 +678,7 @@ async function configureProduction() {
   ensureCommands([...REQUIRED_COMMANDS, ...PRODUCTION_COMMANDS]);
   ensureAuth();
   syncWorkerConfig();
+  await runReadinessChecks();
   configureKvNamespaces();
   await configureSecrets();
   deployWorkerIfRequested();
@@ -517,7 +693,7 @@ async function main() {
     throw new Error(`Unknown --mode=${options.mode}; expected local, production, or all`);
   }
   if (options.dryRun) {
-    logInfo('Dry run: no files, Cloudflare resources, GitHub secrets, or Worker secrets will be changed.');
+    logInfo('Dry run: no files, Cloudflare resources, GitHub secrets, Worker secrets, or deploys will be changed. Read-only provider checks may still run.');
   }
 
   if (options.mode === 'local' || options.mode === 'all') {

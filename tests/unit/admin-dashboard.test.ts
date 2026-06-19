@@ -385,6 +385,10 @@ describe('admin dashboard foundation', () => {
     expect(layout).toContain('id="admin-marketing-ref" class="admin-settings__input admin-settings__input--readonly" name="ref" type="text" autocomplete="off" inputmode="text" readonly');
     expect(layout).toContain('id="admin-marketing-save-referral"');
     expect(layout).toContain('id="admin-marketing-cancel-edit"');
+    expect(layout).toContain('id="admin-marketing-load-draft"');
+    expect(layout).toContain('id="admin-marketing-save-draft"');
+    expect(layout).toContain('id="admin-marketing-clear-draft"');
+    expect(layout).toContain('id="admin-marketing-draft-status"');
     expect(layout).not.toContain('id="admin-marketing-embed-link"');
     expect(layout).toContain('id="admin-marketing-url"');
     expect(layout).toContain('id="admin-marketing-help-campaign"');
@@ -402,6 +406,8 @@ describe('admin dashboard foundation', () => {
     expect(layout).not.toContain('id="admin-marketing-snippets"');
     expect(layout).toContain('class="admin-marketing__url-row"');
     expect(layout).toContain('id="admin-marketing-referrals"');
+    expect(layout).toContain('id="admin-marketing-reporting"');
+    expect(layout).toContain('id="admin-marketing-abandoned-health"');
     expect(layout).toContain('class="admin-marketing__resources"');
     expect(layout).toContain('id="admin-marketing-qr-preview"');
     expect(layout).toContain('id="admin-marketing-qr-download-png"');
@@ -434,7 +440,9 @@ describe('admin dashboard foundation', () => {
     expect(adminScript).toContain('contentEditorStatusTarget');
     expect(adminScript).toContain('contentField.editor.__contentStatus = status');
     expect(adminScript).toContain('blast.content[');
-    expect(adminScript).toContain("root.append(grid, actions, status, history)");
+    expect(adminScript).toContain("root.append(grid, draftActions, draftStatus, actions, status, history)");
+    expect(adminScript).toContain('loadMarketingAnnouncementSharedDraft');
+    expect(adminScript).toContain('saveMarketingAnnouncementSharedDraft');
     expect(adminScript).toContain("labelInfo.row.classList.add('admin-settings__label')");
     expect(adminScript).not.toContain('data-marketing-announcement-preview');
     expect(adminScript).not.toContain('renderMarketingAnnouncementPreview');
@@ -579,12 +587,20 @@ describe('admin dashboard foundation', () => {
     expect(adminScss).not.toContain('.video-embed__external-label');
     expect(adminScss).toContain('.admin-marketing__qr-actions .admin-dashboard__status:empty');
     expect(adminScss).toContain('width: min(100%, var(--admin-marketing-qr-size));');
+    expect(adminScss).toContain('.admin-marketing__metric-grid');
+    expect(adminScss).toContain('.admin-content-media-library__list');
+    expect(adminScss).toContain('.admin-content-block__media-library-field .btn');
     expect(adminScript).toContain('pool-admin-marketing-builder');
     expect(adminScript).toContain('pool-admin-marketing-announcements');
     expect(adminScript).toContain('syncMobileTabSelect');
     expect(adminScript).toContain('filenameBase');
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");
     expect(adminScript).toContain('/admin/marketing/referrals');
+    expect(adminScript).toContain('/admin/marketing/reporting');
+    expect(adminScript).toContain('/admin/marketing/draft');
+    expect(adminScript).toContain('/admin/abandoned-checkout/health');
+    expect(adminScript).toContain('/admin/abandoned-checkout/suppression');
+    expect(adminScript).toContain('/admin/media/library');
     expect(adminScript).toContain('/admin/marketing/announcement');
     expect(adminScript).toContain('/admin/marketing/announcements');
     expect(adminScript).toContain('function renderMarketingQr');
@@ -2995,6 +3011,80 @@ runner_report_emails:
     expectNoKvWritesOrLists(env, 'scoped campaign media upload');
   });
 
+  it('lists campaign image library with shared defaults only for super admins without KV writes', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_REF: 'main'
+    };
+    const { ctx, cookie } = await signInAdmin(env);
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture] });
+      }
+      if (url.includes('/contents/assets/images/campaigns/hand-relations')) {
+        return jsonResponse([
+          { name: 'hero.png', path: 'assets/images/campaigns/hand-relations/hero.png', type: 'file', sha: 'hero-sha' },
+          { name: 'hero-640.webp', path: 'assets/images/campaigns/hand-relations/hero-640.webp', type: 'file', sha: 'hero-640-sha' },
+          { name: 'notes.txt', path: 'assets/images/campaigns/hand-relations/notes.txt', type: 'file', sha: 'notes-sha' },
+          { name: 'archive', path: 'assets/images/campaigns/hand-relations/archive', type: 'dir', sha: 'dir-sha' }
+        ]);
+      }
+      if (url.includes('/contents/assets/images/defaults')) {
+        return jsonResponse([
+          { name: 'dust-wave-square.png', path: 'assets/images/defaults/dust-wave-square.png', type: 'file', sha: 'default-sha' },
+          { name: 'readme.md', path: 'assets/images/defaults/readme.md', type: 'file', sha: 'readme-sha' }
+        ]);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/media/library?campaignSlug=hand-relations', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.writeBudget).toEqual({ readOnly: true, kvWritesExpected: 0, kvListExpected: 0 });
+    expect(body.images).toEqual([
+      expect.objectContaining({ path: '/assets/images/campaigns/hand-relations/hero.png', scope: 'campaign' }),
+      expect.objectContaining({ path: '/assets/images/campaigns/hand-relations/hero-640.webp', scope: 'campaign' }),
+      expect.objectContaining({ path: '/assets/images/defaults/dust-wave-square.png', scope: 'shared' })
+    ]);
+    expect(body.images.map((image: { path: string }) => image.path)).not.toContain('/assets/images/campaigns/hand-relations/notes.txt');
+    expectNoKvWritesOrLists(env, 'super admin media library read');
+
+    const campaignUserEnv = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_REF: 'main'
+    };
+    (campaignUserEnv.PLEDGES as CountingKVNamespace).store.set(`admin-user:${await sha256Hex('creator@example.com')}`, JSON.stringify({
+      email: 'creator@example.com',
+      role: 'campaign_user',
+      campaignSlugs: ['hand-relations']
+    }));
+    const signedInCampaignUser = await signInAdmin(campaignUserEnv, 'creator@example.com');
+    resetKvCounters(campaignUserEnv);
+    const campaignUserResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/media/library?campaignSlug=hand-relations', {
+      method: 'GET',
+      headers: { Cookie: signedInCampaignUser.cookie }
+    }), campaignUserEnv, signedInCampaignUser.ctx);
+
+    expect(campaignUserResponse.status).toBe(200);
+    const campaignUserBody = await campaignUserResponse.json();
+    expect(campaignUserBody.images.every((image: { scope: string }) => image.scope === 'campaign')).toBe(true);
+    expect(campaignUserBody.images.map((image: { path: string }) => image.path)).not.toContain('/assets/images/defaults/dust-wave-square.png');
+    expectNoKvWritesOrLists(campaignUserEnv, 'campaign user media library read');
+  });
+
   it('uploads staged content editor audio to the campaign audio directory without KV writes', async () => {
     const env = {
       ...createEnv(),
@@ -4473,6 +4563,341 @@ diary:
     expect(ratelimit.putCalls).toBe(1);
     expect(ratelimit.deleteCalls).toBe(0);
     expect(ratelimit.listCalls).toBe(0);
+  });
+
+  it('shows campaign-scoped abandoned-checkout health without KV writes or list scans', async () => {
+    const env = createEnv();
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    pledges.store.set('admin-users:v1', JSON.stringify({
+      users: [{
+        name: 'Creator',
+        email: 'creator@example.com',
+        role: 'campaign_user',
+        campaignSlugs: ['hand-relations']
+      }]
+    }));
+    pledges.store.set('abandoned-cart-queue:v1', JSON.stringify({
+      version: 1,
+      hasPending: true,
+      nextDueAt: '2026-06-18T20:00:00.000Z'
+    }));
+    pledges.store.set('abandoned-cart-health:v1', JSON.stringify({
+      version: 1,
+      updatedAt: '2026-06-18T19:00:00.000Z',
+      totals: { queued: 3, pending: 1, sent: 1, skipped: 1, failed: 0, suppressed: 0, completed: 1, alreadySent: 0, invalid: 0 },
+      campaigns: {
+        'hand-relations': {
+          slug: 'hand-relations',
+          title: 'Hand Relations',
+          totals: { queued: 2, pending: 1, sent: 1, skipped: 0, failed: 0, suppressed: 0, completed: 0, alreadySent: 0, invalid: 0 },
+          lastQueuedAt: '2026-06-18T19:00:00.000Z',
+          recentOutcomes: [{ at: '2026-06-18T19:00:00.000Z', type: 'queued', reason: 'consented', campaignSlugs: ['hand-relations'] }]
+        },
+        sunder: {
+          slug: 'sunder',
+          title: 'Sunder',
+          totals: { queued: 1, pending: 0, sent: 0, skipped: 1, failed: 0, suppressed: 0, completed: 1, alreadySent: 0, invalid: 0 }
+        }
+      },
+      recentOutcomes: [
+        { at: '2026-06-18T19:00:00.000Z', type: 'queued', reason: 'consented', campaignSlugs: ['hand-relations'] },
+        { at: '2026-06-18T18:00:00.000Z', type: 'skipped', reason: 'completed', campaignSlugs: ['sunder'] }
+      ]
+    }));
+    const { ctx, cookie } = await signInAdmin(env, 'creator@example.com');
+    resetKvCounters(env);
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/abandoned-checkout/health?campaignSlug=hand-relations', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      scope: 'campaign',
+      campaignSlug: 'hand-relations',
+      queue: { hasPending: true, nextDueAt: '2026-06-18T20:00:00.000Z' },
+      campaign: {
+        slug: 'hand-relations',
+        totals: { queued: 2, pending: 1, sent: 1 }
+      },
+      writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
+    });
+    expect(body.recentOutcomes).toHaveLength(1);
+    expectNoKvWritesOrLists(env, 'abandoned checkout campaign health read');
+
+    resetKvCounters(env);
+    const allResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/abandoned-checkout/health', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(allResponse.status).toBe(400);
+    expectNoKvWritesOrLists(env, 'campaign user abandoned checkout portfolio rejection');
+  });
+
+  it('stores and clears campaign-scoped abandoned-checkout suppression only on explicit mutation', async () => {
+    const env = createEnv();
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    const ratelimit = env.RATELIMIT as CountingKVNamespace;
+    pledges.store.set('admin-users:v1', JSON.stringify({
+      users: [{
+        name: 'Creator',
+        email: 'creator@example.com',
+        role: 'campaign_user',
+        campaignSlugs: ['hand-relations']
+      }]
+    }));
+    const { ctx, cookie, csrfToken } = await signInAdmin(env, 'creator@example.com');
+    const emailHash = await sha256Hex('buyer@example.com');
+    resetKvCounters(env);
+
+    const suppressResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/abandoned-checkout/suppression', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        email: 'Buyer@Example.com'
+      })
+    }), env, ctx);
+
+    expect(suppressResponse.status).toBe(200);
+    await expect(suppressResponse.json()).resolves.toMatchObject({
+      success: true,
+      suppressed: true,
+      campaignSlug: 'hand-relations',
+      emailHash,
+      writeBudget: { readOnly: false, kvWritesExpected: 3, kvListExpected: 0 }
+    });
+    expect(pledges.store.has(`abandoned-cart-suppressed-campaign:hand-relations:${emailHash}`)).toBe(true);
+    expect(pledges.putCalls).toBe(3);
+    expect(pledges.deleteCalls).toBe(0);
+    expect(pledges.listCalls).toBe(0);
+    expect(ratelimit.putCalls).toBe(1);
+    expect(ratelimit.listCalls).toBe(0);
+
+    (env.RATELIMIT as CountingKVNamespace).store.clear();
+    resetKvCounters(env);
+    const clearResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/abandoned-checkout/suppression', {
+      method: 'DELETE',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        email: 'buyer@example.com'
+      })
+    }), env, ctx);
+
+    expect(clearResponse.status).toBe(200);
+    await expect(clearResponse.json()).resolves.toMatchObject({
+      success: true,
+      suppressed: false,
+      campaignSlug: 'hand-relations',
+      emailHash,
+      writeBudget: { readOnly: false, kvWritesExpected: 2, kvListExpected: 0 }
+    });
+    expect(pledges.store.has(`abandoned-cart-suppressed-campaign:hand-relations:${emailHash}`)).toBe(false);
+    expect(pledges.putCalls).toBe(2);
+    expect(pledges.deleteCalls).toBe(1);
+    expect(pledges.listCalls).toBe(0);
+    expect(ratelimit.putCalls).toBe(1);
+    expect(ratelimit.listCalls).toBe(0);
+  });
+
+  it('saves one shared Marketing draft per campaign with revision conflict protection', async () => {
+    const env = createEnv();
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    const ratelimit = env.RATELIMIT as CountingKVNamespace;
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    resetKvCounters(env);
+
+    const saveResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/draft', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        surface: 'marketing',
+        draft: {
+          source: 'newsletter',
+          medium: 'email',
+          content: 'launch',
+          referrer: 'Launch List'
+        }
+      })
+    }), env, ctx);
+
+    expect(saveResponse.status).toBe(200);
+    const saved = await saveResponse.json();
+    expect(saved).toMatchObject({
+      success: true,
+      campaignSlug: 'hand-relations',
+      surface: 'marketing',
+      draft: {
+        draft: {
+          source: 'newsletter',
+          medium: 'email',
+          content: 'launch',
+          ref: 'launch-list',
+          referrer: 'Launch List'
+        }
+      },
+      writeBudget: { readOnly: false, kvWritesExpected: 1, kvListExpected: 0 }
+    });
+    expect(saved.draft.revision).toMatch(/^[a-f0-9]{64}$/);
+    expect(pledges.putCalls).toBe(1);
+    expect(pledges.listCalls).toBe(0);
+    expect(ratelimit.putCalls).toBe(1);
+
+    resetKvCounters(env);
+    const readResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/draft?campaignSlug=hand-relations&surface=marketing', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(readResponse.status).toBe(200);
+    await expect(readResponse.json()).resolves.toMatchObject({
+      campaignSlug: 'hand-relations',
+      surface: 'marketing',
+      draft: {
+        revision: saved.draft.revision,
+        draft: { source: 'newsletter' }
+      },
+      writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
+    });
+    expectNoKvWritesOrLists(env, 'marketing shared draft read');
+
+    (env.RATELIMIT as CountingKVNamespace).store.clear();
+    resetKvCounters(env);
+    const conflictResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/draft', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        surface: 'marketing',
+        baseRevision: 'stale',
+        draft: { source: 'social' }
+      })
+    }), env, ctx);
+    expect(conflictResponse.status).toBe(409);
+    await expect(conflictResponse.json()).resolves.toMatchObject({
+      code: 'draft_conflict',
+      currentDraft: { revision: saved.draft.revision }
+    });
+    expect(pledges.putCalls).toBe(0);
+    expect(pledges.deleteCalls).toBe(0);
+    expect(pledges.listCalls).toBe(0);
+    expect(ratelimit.putCalls).toBe(1);
+  });
+
+  it('reads Marketing attribution reporting from the campaign index without KV writes or list scans', async () => {
+    const env = createEnv();
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    const { ctx, cookie } = await signInAdmin(env);
+    pledges.store.set('admin-marketing-referrals:hand-relations', JSON.stringify([
+      {
+        code: 'launch-list',
+        referrer: 'Launch List',
+        url: 'https://pool.test/campaigns/hand-relations/?ref=launch-list'
+      }
+    ]));
+    pledges.store.set('campaign-pledges:hand-relations', JSON.stringify(['mkt-1', 'mkt-2', 'mkt-3']));
+    pledges.store.set('pledge:mkt-1', JSON.stringify({
+      orderId: 'mkt-1',
+      email: 'one@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'active',
+      subtotal: 5000,
+      amount: 5600,
+      ref: 'launch-list',
+      utm: { source: 'newsletter', medium: 'email', campaign: 'launch', content: 'hero' }
+    }));
+    pledges.store.set('pledge:mkt-2', JSON.stringify({
+      orderId: 'mkt-2',
+      email: 'two@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'charged',
+      goalTrackingSubtotal: 7500,
+      amount: 8200,
+      attribution: { ref: 'unsaved-code', utmSource: 'social', utmMedium: 'organic' }
+    }));
+    pledges.store.set('pledge:mkt-3', JSON.stringify({
+      orderId: 'mkt-3',
+      email: 'three@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'cancelled',
+      subtotal: 2500,
+      amount: 2800,
+      ref: 'launch-list',
+      utmSource: 'newsletter'
+    }));
+    resetKvCounters(env);
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/reporting?campaignSlug=hand-relations', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      campaignSlug: 'hand-relations',
+      indexedPledgeCount: 3,
+      savedReferralCount: 1,
+      writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
+    });
+    expect(body.referrals).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'launch-list',
+        label: 'Launch List',
+        pledgeCount: 1,
+        pledgedSubtotal: 5000,
+        chargedAmount: 0
+      }),
+      expect.objectContaining({
+        key: 'unsaved-code',
+        pledgeCount: 1,
+        pledgedSubtotal: 7500,
+        chargedAmount: 8200
+      })
+    ]));
+    expect(body.utm.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'newsletter', pledgeCount: 1, pledgedSubtotal: 5000 }),
+      expect.objectContaining({ key: 'social', pledgeCount: 1, pledgedSubtotal: 7500, chargedAmount: 8200 })
+    ]));
+    expectNoKvWritesOrLists(env, 'marketing attribution reporting read');
+  });
+
+  it('fails Marketing attribution reporting closed when the campaign index is missing', async () => {
+    const env = createEnv();
+    const { ctx, cookie } = await signInAdmin(env);
+    resetKvCounters(env);
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/reporting?campaignSlug=hand-relations', {
+      method: 'GET',
+      headers: { Cookie: cookie }
+    }), env, ctx);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'campaign_index_required',
+      campaignSlug: 'hand-relations',
+      writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
+    });
+    expectNoKvWritesOrLists(env, 'missing index marketing reporting read');
   });
 
   it('dry-runs campaign announcements from the campaign index without KV writes or list scans', async () => {

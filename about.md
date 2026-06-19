@@ -10,7 +10,7 @@ description: Learn how The Pool works, from all-or-nothing pledging to magic-lin
 
 **The Pool** is Dust Wave's crowdfunding platform for independent film and creative projects, built on open-source technology.
 
-The current platform release milestone is **v1.0.6**. The v1.0 feature set and launch hardening pass are complete, and the latest release adds richer campaign marketing tools, supporter email blasts, consent-based abandoned-checkout reminders, and a script-first setup helper for forks.
+The current platform release milestone is **v1.0.7**. The v1.0 feature set and launch hardening pass are complete, and the latest release adds campaign-scoped abandoned-checkout visibility, setup/deploy readiness checks, shared Marketing and Blast drafts, referral/UTM reporting, and a scoped media picker for rich content image blocks.
 
 ## All-or-Nothing Pledging
 
@@ -78,13 +78,13 @@ The Pool is designed for filmmakers and creative teams that need a campaign they
 - **Optional platform add-ons** — Offer platform merch alongside pledges when enabled, with separate inventory and shipping handling that does not count toward a campaign's funding goal.
 - **Campaign add-ons** — Sell campaign-specific merch or extras in the same pledge flow while keeping revenue, inventory, and shipping tied to that campaign.
 - **Private admin dashboard** — Give trusted team members a focused workspace for campaign settings, page content, rewards, updates, decisions, reports, supporters, analytics, and marketing links.
-- **Campaign marketing tools** — Build tracked links, save referral codes, download campaign QR codes, and generate live embed snippets from the dashboard Marketing tab.
-- **Supporter email blasts** — Send campaign-scoped supporter email blasts from Campaigns -> Blast, using hosted campaign images and email-safe video links.
+- **Campaign marketing tools** — Build tracked links, save referral codes, download campaign QR codes, review referral/UTM performance, and generate live embed snippets from the dashboard Marketing tab.
+- **Supporter email blasts** — Send campaign-scoped supporter email blasts from Campaigns -> Blast, using shared drafts, hosted campaign images, and email-safe video links.
 - **Protected campaign previews** — Share draft or preview-only campaigns privately with assigned campaign users and explicitly invited reviewers before the public campaign page launches.
 - **New campaign setup** — Super admins can create a private draft campaign from a title and assigned campaign users, then fill in the rest of the campaign from the dashboard.
 - **Campaign archiving** — Super admins can archive non-live campaigns without deleting campaign source or uploaded media, keeping a reviewable record outside active campaign lists.
 - **Configurable platform timezone** — Super admins can choose the IANA timezone used for campaign deadlines, countdowns, scheduled reports, and lifecycle automation.
-- **Dashboard media uploads** — Stage campaign and diary images, video, and audio with previews, publish them into campaign asset paths through the normal reviewable workflow, trigger image/video optimization, and clean up dashboard-owned media that is no longer referenced.
+- **Dashboard media uploads** — Stage campaign and diary images, video, and audio with previews, select existing campaign images for rich content blocks, publish media into campaign asset paths through the normal reviewable workflow, trigger image/video optimization, and clean up dashboard-owned media that is no longer referenced.
 - **Reports when you need them** — Preview and download pledge or fulfillment CSVs from the dashboard, with optional campaign-runner emails during active campaigns.
 - **Upcoming-campaign reminders** — Let potential supporters opt into one launch email before a campaign opens, without creating accounts or mailing-list dependencies.
 - **Embeds for promotion** — Generate live campaign widgets for partner sites, press pages, creator portfolios, or sponsor pages.

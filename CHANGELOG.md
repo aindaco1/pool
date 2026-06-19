@@ -2,12 +2,14 @@
 
 ## v1.0.7 - Unreleased
 
-Planned scope:
+Release scope:
 
-- Add abandoned-checkout reminder visibility that avoids KV namespace scans and supporter PII.
-- Harden setup/deploy idempotency, provider readiness checks, and first-time operator guidance.
-- Add shared Marketing/Blast draft support and referral/UTM reporting only where access, retention, conflict, and KV-write rules stay bounded.
-- Add a campaign-scoped WYSIWYG media picker for existing uploaded images.
+- Added campaign-scoped abandoned-checkout reminder health in Marketing with aggregate queue/outcome counts, recent outcomes, scoped suppression/clear controls, hashed email identifiers, audit events, and no retry-specific abandoned-cart action.
+- Hardened `npm run setup:deploy` with Cloudflare KV namespace reuse, clearer dry-run reuse/create output, live read-only provider readiness checks, and `--skip-readiness` for narrow dry runs.
+- Added explicit shared Marketing and Blast drafts with one campaign-scoped KV record per surface, 7-day expiry, revision-conflict protection, and no background writes.
+- Added campaign marketing performance reporting for saved/unsaved referral codes and UTM source/medium/content aggregates using the existing campaign pledge index without KV namespace scans.
+- Added a shared WYSIWYG image media picker for Campaign Content, Diary, and Blast image blocks. Campaign users see campaign-scoped media; super admins can also select shared/default images. The picker is read-only and adds no new KV state.
+- Updated English/Spanish dashboard copy, README/Worker/Dashboard docs, roadmap, creator checklist, About/Terms context, and targeted unit coverage for the new behavior.
 
 ## v1.0.6 - 2026-06-18
 

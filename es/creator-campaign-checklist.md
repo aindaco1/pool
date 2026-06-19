@@ -35,10 +35,10 @@ La lista cubre:
 
 ## Qué cambió desde v0.9.5
 
-Esta lista refleja los cambios de la plataforma hasta **v1.0.6**:
+Esta lista refleja los cambios de la plataforma hasta **v1.0.7**:
 
 - las personas creadoras pueden tener acceso específico al panel para editar campañas sin acceso directo al repositorio
-- las cargas de media en el panel soportan imágenes, video, audio, previews y optimización posterior en el repositorio con variantes WebP responsivas
+- las cargas de media en el panel soportan imágenes, video, audio, previews, optimización posterior en el repositorio con variantes WebP responsivas y selección de imágenes existentes en bloques WYSIWYG
 - los add-ons de campaña pueden pertenecer a una sola campaña y contar hacia su meta
 - los correos de reportes pueden recibir ledgers diarios de pledges y exports de fulfillment después de la fecha límite
 - los embeds alojados dan un widget vivo para sitios web y páginas de partners que aceptan HTML
@@ -49,9 +49,9 @@ Esta lista refleja los cambios de la plataforma hasta **v1.0.6**:
 - los analytics de campaña mantienen visible el ingreso bruto de campaña y también muestran el ingreso neto después de comisiones de procesamiento asignadas
 - las personas operadoras de plataforma pueden vigilar el uso de planes de Cloudflare y Resend desde el panel sin exponer tokens de proveedores al equipo creador
 - los equipos de campaña pueden usar enlaces de vista previa protegida para revisar borradores de campaña de forma privada antes del lanzamiento público
-- los equipos de campaña pueden crear URLs con tracking, guardar códigos de referencia y descargar códigos QR desde el tab Marketing
-- Campaigns -> Blast puede enviar correos a patrocinadores con imágenes alojadas por la campaña y enlaces de YouTube/Vimeo compatibles con email
-- el checkout puede recoger consentimiento explícito para un solo recordatorio de checkout abandonado, separado de recordatorios de lanzamiento y blasts de campaña
+- los equipos de campaña pueden crear URLs con tracking, guardar códigos de referencia, descargar códigos QR, guardar borradores compartidos de Marketing y revisar performance de referencias/UTM desde el tab Marketing
+- Campaigns -> Blast puede guardar borradores compartidos y enviar correos a patrocinadores con imágenes alojadas por la campaña, imágenes existentes seleccionadas y enlaces de YouTube/Vimeo compatibles con email
+- el checkout puede recoger consentimiento explícito para un solo recordatorio de checkout abandonado, separado de recordatorios de lanzamiento y blasts de campaña; los equipos de campaña pueden revisar salud agregada de recordatorios y usar controles de supresión limitados sin ver PII del recordatorio
 - las mejoras de performance hacen más estable la primera carga, incluidos embeds hero de YouTube diferidos y entrega responsiva de imágenes, pero las campañas aún necesitan media optimizada y copy conciso
 
 ## Versión rápida

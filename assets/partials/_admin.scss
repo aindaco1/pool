@@ -2395,6 +2395,39 @@ textarea.admin-settings__input--readonly {
   }
 }
 
+.admin-content-block__media-library-field .btn {
+  justify-content: center;
+  width: 100%;
+}
+
+.admin-content-media-library__list {
+  display: grid;
+  gap: 8px;
+  max-height: min(56vh, 28rem);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.admin-content-media-library__item {
+  align-items: center;
+  border: 1px solid $border--default;
+  border-radius: var(--pool-radius-lg, 6px);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto 56px minmax(0, 1fr);
+  padding: 8px;
+}
+
+.admin-content-media-library__item img {
+  aspect-ratio: 1;
+  background: $surface--subtle;
+  border-radius: $radius--sm;
+  display: block;
+  object-fit: cover;
+  width: 56px;
+}
+
 .admin-content-block__rich-inline {
   width: 100%;
 
@@ -2439,6 +2472,7 @@ textarea.admin-settings__input--readonly {
 .admin-marketing__url-row,
 .admin-marketing__actions,
 .admin-marketing__status,
+.admin-marketing__draft-status,
 .admin-marketing__resources {
   grid-column: 1 / -1;
 }
@@ -2742,6 +2776,86 @@ textarea.admin-settings__input--readonly {
   margin: 0 0 8px;
 }
 
+.admin-marketing__reporting,
+.admin-marketing__abandoned-health {
+  @include admin-surface(12px);
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+
+  > h3 {
+    @include type-card-title;
+    margin: 0;
+  }
+
+  > p {
+    margin: 0;
+  }
+}
+
+.admin-marketing__summary {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+}
+
+.admin-marketing__stat {
+  background: $surface--subtle;
+  border: 1px solid $border--default;
+  border-radius: var(--pool-radius-lg, 6px);
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+}
+
+.admin-marketing__stat-value {
+  @include type-card-title;
+}
+
+.admin-marketing__stat-label {
+  @include type-ui;
+  color: $color--secondary;
+}
+
+.admin-marketing__metric-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-marketing__metric-table {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+
+  h4 {
+    @include type-ui;
+    margin: 0;
+  }
+}
+
+.admin-marketing__reporting-table {
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.admin-marketing__suppression {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-marketing__suppression-actions {
+  @include admin-action-row(6px);
+  justify-content: flex-start;
+}
+
+.admin-marketing__outcomes {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
 .admin-marketing__qr-grid {
   align-items: center;
   display: grid;
@@ -2810,11 +2924,14 @@ textarea.admin-settings__input--readonly {
 
 .admin-blast__field--full,
 .admin-blast__field--wide,
+.admin-blast__draft-actions,
+.admin-blast__draft-status,
 .admin-blast__history {
   grid-column: 1 / -1;
 }
 
-.admin-blast__actions {
+.admin-blast__actions,
+.admin-blast__draft-actions {
   @include admin-action-row;
 }
 
@@ -3291,6 +3408,7 @@ textarea.admin-settings__input--readonly {
   .admin-reports__cards,
   .admin-marketing__resources,
   .admin-marketing__url-row,
+  .admin-marketing__metric-grid,
   .admin-blast__grid,
   .admin-analytics__metrics,
   .admin-analytics__breakdowns,
@@ -3324,7 +3442,8 @@ textarea.admin-settings__input--readonly {
     overflow: visible;
   }
 
-  .admin-marketing__referrals-table {
+  .admin-marketing__referrals-table,
+  .admin-marketing__reporting-table {
     background: transparent;
     border: 0;
     border-radius: 0;

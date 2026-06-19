@@ -157,13 +157,16 @@ const IDLE_QUEUE_RECHECK_TTL_SECONDS = 60 * 60;
 const ABANDONED_CART_PREFIX = 'abandoned-cart:';
 const ABANDONED_CART_SENT_PREFIX = 'abandoned-cart-sent:';
 const ABANDONED_CART_SUPPRESSED_PREFIX = 'abandoned-cart-suppressed:';
+const ABANDONED_CART_CAMPAIGN_SUPPRESSED_PREFIX = 'abandoned-cart-suppressed-campaign:';
 const ABANDONED_CART_QUEUE_STATE_KEY = 'abandoned-cart-queue:v1';
+const ABANDONED_CART_HEALTH_KEY = 'abandoned-cart-health:v1';
 const ABANDONED_CART_TOKEN_SCOPE_UNSUBSCRIBE = 'abandoned-cart-unsubscribe';
 const ABANDONED_CART_TTL_SECONDS = 14 * 24 * 60 * 60;
 const ABANDONED_CART_SENT_TTL_SECONDS = 400 * 24 * 60 * 60;
 const ABANDONED_CART_SUPPRESSION_TTL_SECONDS = 400 * 24 * 60 * 60;
 const ABANDONED_CART_DEFAULT_DELAY_MS = 6 * 60 * 60 * 1000;
 const ABANDONED_CART_DEFAULT_BATCH_SIZE = 10;
+const ADMIN_MARKETING_DRAFT_TTL_SECONDS = 7 * 24 * 60 * 60;
 const SHARE_CARD_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=3600';
 const SHARE_CARD_RASTER_WIDTH = 1200;
 const SHARE_CARD_RASTER_HEIGHT = 630;
@@ -3578,6 +3581,189 @@ function getAbandonedCartSuppressionKey(emailHash) {
   return `${ABANDONED_CART_SUPPRESSED_PREFIX}${emailHash}`;
 }
 
+function getAbandonedCartCampaignSuppressionKey(campaignSlug, emailHash) {
+  return `${ABANDONED_CART_CAMPAIGN_SUPPRESSED_PREFIX}${campaignSlug}:${emailHash}`;
+}
+
+function emptyAbandonedCartHealth() {
+  return {
+    version: 1,
+    updatedAt: '',
+    queue: {
+      hasPending: false,
+      nextDueAt: '',
+      updatedAt: ''
+    },
+    totals: {
+      queued: 0,
+      pending: 0,
+      sent: 0,
+      skipped: 0,
+      failed: 0,
+      suppressed: 0,
+      completed: 0,
+      alreadySent: 0,
+      invalid: 0
+    },
+    campaigns: {},
+    recentOutcomes: []
+  };
+}
+
+function normalizeAbandonedCartHealth(value) {
+  const base = emptyAbandonedCartHealth();
+  if (!value || typeof value !== 'object') return base;
+  const totals = { ...base.totals };
+  for (const key of Object.keys(totals)) {
+    totals[key] = Math.max(0, Number(value?.totals?.[key] || 0) || 0);
+  }
+  const campaigns = {};
+  for (const [slug, campaign] of Object.entries(value.campaigns || {})) {
+    if (!isValidSlug(slug)) continue;
+    const campaignTotals = { ...base.totals };
+    for (const key of Object.keys(campaignTotals)) {
+      campaignTotals[key] = Math.max(0, Number(campaign?.totals?.[key] || 0) || 0);
+    }
+    campaigns[slug] = {
+      slug,
+      title: String(campaign?.title || ''),
+      totals: campaignTotals,
+      nextDueAt: String(campaign?.nextDueAt || ''),
+      lastQueuedAt: String(campaign?.lastQueuedAt || ''),
+      lastSentAt: String(campaign?.lastSentAt || ''),
+      lastSkippedAt: String(campaign?.lastSkippedAt || ''),
+      lastFailedAt: String(campaign?.lastFailedAt || ''),
+      lastSuppressedAt: String(campaign?.lastSuppressedAt || ''),
+      lastCompletedAt: String(campaign?.lastCompletedAt || ''),
+      recentOutcomes: Array.isArray(campaign?.recentOutcomes)
+        ? campaign.recentOutcomes.slice(0, 12).map(publicAbandonedCartOutcome).filter(Boolean)
+        : []
+    };
+  }
+  return {
+    version: 1,
+    updatedAt: String(value.updatedAt || ''),
+    queue: {
+      hasPending: value?.queue?.hasPending === true,
+      nextDueAt: String(value?.queue?.nextDueAt || ''),
+      updatedAt: String(value?.queue?.updatedAt || '')
+    },
+    totals,
+    campaigns,
+    recentOutcomes: Array.isArray(value.recentOutcomes)
+      ? value.recentOutcomes.slice(0, 20).map(publicAbandonedCartOutcome).filter(Boolean)
+      : []
+  };
+}
+
+function publicAbandonedCartOutcome(outcome = {}) {
+  if (!outcome || typeof outcome !== 'object') return null;
+  const campaignSlugs = getAbandonedCartCampaignSet(outcome.campaignSlugs || []);
+  return {
+    at: String(outcome.at || ''),
+    type: String(outcome.type || ''),
+    reason: String(outcome.reason || ''),
+    campaignSlugs,
+    campaignTitles: Array.isArray(outcome.campaignTitles)
+      ? outcome.campaignTitles.map((title) => String(title || '')).filter(Boolean).slice(0, 4)
+      : []
+  };
+}
+
+function incrementAbandonedCartCounter(target, key, delta = 1) {
+  if (!target || !Object.prototype.hasOwnProperty.call(target, key)) return;
+  target[key] = Math.max(0, Number(target[key] || 0) + delta);
+}
+
+function getAbandonedCartRecordCampaignSlugs(record = {}) {
+  return getAbandonedCartCampaignSet(record.campaignSlugs || []);
+}
+
+function getAbandonedCartRecordCampaignTitles(record = {}) {
+  const slugs = getAbandonedCartRecordCampaignSlugs(record);
+  const titles = Array.isArray(record.campaignTitles) ? record.campaignTitles : [];
+  return slugs.map((slug, index) => String(titles[index] || (slugs.length === 1 ? record.campaignTitle : '') || slug));
+}
+
+function applyAbandonedCartHealthEvent(summary, event = {}) {
+  const now = String(event.at || new Date().toISOString());
+  const type = String(event.type || '').trim();
+  const reason = String(event.reason || '').trim();
+  const campaignSlugs = getAbandonedCartCampaignSet(event.campaignSlugs || event.record?.campaignSlugs || []);
+  const campaignTitles = Array.isArray(event.campaignTitles)
+    ? event.campaignTitles.map((title) => String(title || ''))
+    : getAbandonedCartRecordCampaignTitles(event.record || {});
+  const pendingDelta = Number(event.pendingDelta || 0) || 0;
+  const counter = String(event.counter || '').trim();
+
+  summary.updatedAt = now;
+  if (event.queue) {
+    summary.queue = {
+      hasPending: event.queue.hasPending === true,
+      nextDueAt: String(event.queue.nextDueAt || ''),
+      updatedAt: now
+    };
+  }
+
+  if (counter) incrementAbandonedCartCounter(summary.totals, counter, 1);
+  if (pendingDelta) incrementAbandonedCartCounter(summary.totals, 'pending', pendingDelta);
+
+  const outcome = {
+    at: now,
+    type,
+    reason,
+    campaignSlugs,
+    campaignTitles
+  };
+  if (type) {
+    summary.recentOutcomes = [outcome, ...(summary.recentOutcomes || [])].slice(0, 20);
+  }
+
+  for (let index = 0; index < campaignSlugs.length; index += 1) {
+    const slug = campaignSlugs[index];
+    const campaign = summary.campaigns[slug] || {
+      slug,
+      title: '',
+      totals: { ...emptyAbandonedCartHealth().totals },
+      nextDueAt: '',
+      lastQueuedAt: '',
+      lastSentAt: '',
+      lastSkippedAt: '',
+      lastFailedAt: '',
+      lastSuppressedAt: '',
+      lastCompletedAt: '',
+      recentOutcomes: []
+    };
+    campaign.title = campaign.title || campaignTitles[index] || slug;
+    if (counter) incrementAbandonedCartCounter(campaign.totals, counter, 1);
+    if (pendingDelta) incrementAbandonedCartCounter(campaign.totals, 'pending', pendingDelta);
+    if (event.nextDueAt) campaign.nextDueAt = String(event.nextDueAt || '');
+    if (type === 'queued') campaign.lastQueuedAt = now;
+    if (type === 'sent') campaign.lastSentAt = now;
+    if (type === 'skipped') campaign.lastSkippedAt = now;
+    if (type === 'failed') campaign.lastFailedAt = now;
+    if (type === 'suppressed') campaign.lastSuppressedAt = now;
+    if (type === 'completed') campaign.lastCompletedAt = now;
+    if (type) campaign.recentOutcomes = [outcome, ...(campaign.recentOutcomes || [])].slice(0, 12);
+    summary.campaigns[slug] = campaign;
+  }
+}
+
+async function updateAbandonedCartHealth(env, event = {}) {
+  if (!env?.PLEDGES) return null;
+  const summary = normalizeAbandonedCartHealth(
+    await env.PLEDGES.get(ABANDONED_CART_HEALTH_KEY, { type: 'json' })
+  );
+  const events = Array.isArray(event) ? event : [event];
+  for (const item of events) {
+    applyAbandonedCartHealthEvent(summary, item);
+  }
+  await env.PLEDGES.put(ABANDONED_CART_HEALTH_KEY, JSON.stringify(summary), {
+    expirationTtl: ABANDONED_CART_SENT_TTL_SECONDS
+  });
+  return summary;
+}
+
 function normalizeAbandonedCartQueueState(value) {
   if (!value || typeof value !== 'object') return null;
   return {
@@ -3741,18 +3927,35 @@ async function queueAbandonedCheckoutFollowup(env, bundleManifest) {
   const record = await buildAbandonedCartSnapshot(env, bundleManifest);
   if (!record) return { queued: false, reason: 'not_consented' };
 
-  const [suppressed, alreadySent] = await Promise.all([
+  const [suppressed, scopedSuppression, alreadySent] = await Promise.all([
     env.PLEDGES.get(getAbandonedCartSuppressionKey(record.emailHash)),
+    getAbandonedCartScopedSuppression(env, record),
     env.PLEDGES.get(getAbandonedCartSentKey(record.emailHash, record.campaignSetHash))
   ]);
-  if (suppressed || alreadySent) {
-    return { queued: false, reason: suppressed ? 'suppressed' : 'already_sent' };
+  if (suppressed || scopedSuppression || alreadySent) {
+    const reason = alreadySent ? 'already_sent' : 'suppressed';
+    await updateAbandonedCartHealth(env, {
+      type: reason === 'already_sent' ? 'skipped' : 'suppressed',
+      reason,
+      record,
+      counter: reason === 'already_sent' ? 'alreadySent' : 'suppressed'
+    });
+    return { queued: false, reason };
   }
 
   await env.PLEDGES.put(getAbandonedCartKey(record.orderId), JSON.stringify(record), {
     expirationTtl: ABANDONED_CART_TTL_SECONDS
   });
   await writeAbandonedCartQueueState(env, true, record.sendAfter);
+  await updateAbandonedCartHealth(env, {
+    type: 'queued',
+    reason: 'consented',
+    record,
+    counter: 'queued',
+    pendingDelta: 1,
+    nextDueAt: record.sendAfter,
+    queue: { hasPending: true, nextDueAt: record.sendAfter }
+  });
   return { queued: true, orderId: record.orderId, sendAfter: record.sendAfter };
 }
 
@@ -3767,9 +3970,191 @@ async function queueAbandonedCheckoutFollowupQuietly(env, bundleManifest) {
   }
 }
 
-async function deleteAbandonedCheckoutFollowup(env, orderId) {
+async function deleteAbandonedCheckoutFollowup(env, orderId, options = {}) {
   if (!env?.PLEDGES || !orderId) return;
+  const record = await env.PLEDGES.get(getAbandonedCartKey(orderId), { type: 'json' });
   await env.PLEDGES.delete(getAbandonedCartKey(orderId));
+  if (record?.orderId) {
+    const reason = String(options.reason || 'completed').trim();
+    await updateAbandonedCartHealth(env, {
+      type: reason === 'unsubscribed' ? 'suppressed' : 'completed',
+      reason,
+      record,
+      counter: reason === 'unsubscribed' ? 'suppressed' : 'completed',
+      pendingDelta: -1
+    });
+  }
+}
+
+async function getAbandonedCartScopedSuppression(env, record = {}) {
+  if (!env?.PLEDGES || !record?.emailHash) return null;
+  for (const campaignSlug of getAbandonedCartRecordCampaignSlugs(record)) {
+    const suppression = await env.PLEDGES.get(getAbandonedCartCampaignSuppressionKey(campaignSlug, record.emailHash), { type: 'json' });
+    if (suppression) return suppression;
+  }
+  return null;
+}
+
+function publicAbandonedCartCampaignHealth(summary, campaignSlug, fallbackTitle = '') {
+  const normalized = normalizeAbandonedCartHealth(summary);
+  const row = normalized.campaigns[campaignSlug] || {
+    slug: campaignSlug,
+    title: fallbackTitle || campaignSlug,
+    totals: { ...emptyAbandonedCartHealth().totals },
+    nextDueAt: '',
+    lastQueuedAt: '',
+    lastSentAt: '',
+    lastSkippedAt: '',
+    lastFailedAt: '',
+    lastSuppressedAt: '',
+    lastCompletedAt: '',
+    recentOutcomes: []
+  };
+  return {
+    slug: campaignSlug,
+    title: row.title || fallbackTitle || campaignSlug,
+    totals: { ...emptyAbandonedCartHealth().totals, ...(row.totals || {}) },
+    nextDueAt: row.nextDueAt || '',
+    lastQueuedAt: row.lastQueuedAt || '',
+    lastSentAt: row.lastSentAt || '',
+    lastSkippedAt: row.lastSkippedAt || '',
+    lastFailedAt: row.lastFailedAt || '',
+    lastSuppressedAt: row.lastSuppressedAt || '',
+    lastCompletedAt: row.lastCompletedAt || '',
+    recentOutcomes: Array.isArray(row.recentOutcomes)
+      ? row.recentOutcomes.map(publicAbandonedCartOutcome).filter(Boolean)
+      : []
+  };
+}
+
+async function readAbandonedCartHealthSummary(env) {
+  const summary = normalizeAbandonedCartHealth(
+    await env.PLEDGES.get(ABANDONED_CART_HEALTH_KEY, { type: 'json' })
+  );
+  const queueState = normalizeAbandonedCartQueueState(
+    await env.PLEDGES.get(ABANDONED_CART_QUEUE_STATE_KEY, { type: 'json' })
+  );
+  if (queueState) {
+    summary.queue = {
+      hasPending: queueState.hasPending === true,
+      nextDueAt: queueState.nextDueAt || '',
+      updatedAt: summary.queue.updatedAt || ''
+    };
+  }
+  return summary;
+}
+
+async function handleAdminAbandonedCheckoutHealth(request, env) {
+  if (!env?.PLEDGES) {
+    return privateJsonResponse({ error: 'PLEDGES KV not configured' }, 503, env);
+  }
+
+  const url = new URL(request.url);
+  const requestedCampaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
+  const allCampaignsRequested = !requestedCampaignSlug || requestedCampaignSlug.toLowerCase() === 'all';
+
+  if (!allCampaignsRequested) {
+    const scoped = await getRoleScopedAdminCampaign(request, env, requestedCampaignSlug, 'campaign:read');
+    if (!scoped.ok) return scoped.response;
+    const summary = await readAbandonedCartHealthSummary(env);
+    return privateJsonResponse({
+      user: scoped.auth.user,
+      scope: 'campaign',
+      campaignSlug: requestedCampaignSlug,
+      queue: summary.queue,
+      totals: publicAbandonedCartCampaignHealth(summary, requestedCampaignSlug, scoped.campaign.title || requestedCampaignSlug).totals,
+      campaign: publicAbandonedCartCampaignHealth(summary, requestedCampaignSlug, scoped.campaign.title || requestedCampaignSlug),
+      recentOutcomes: summary.recentOutcomes.filter((outcome) => outcome.campaignSlugs.includes(requestedCampaignSlug)),
+      writeBudget: adminReadBudget({ kvListExpected: 0 }),
+      generatedAt: new Date().toISOString()
+    }, 200, env);
+  }
+
+  const auth = await requireAdminSession(request, env, 'campaign:read');
+  if (!auth.ok) return auth.response;
+  if (auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Campaign slug is required for campaign users.' }, 400, env);
+  }
+
+  const summary = await readAbandonedCartHealthSummary(env);
+  const { campaigns } = await getCampaigns(env);
+  const titles = new Map((campaigns || []).map((campaign) => [
+    String(campaign?.slug || ''),
+    String(campaign?.title || campaign?.slug || '')
+  ]));
+  const campaignSlugs = Array.from(new Set([
+    ...Object.keys(summary.campaigns || {}),
+    ...Array.from(titles.keys()).filter(Boolean)
+  ])).sort();
+  const campaignRows = campaignSlugs.map((campaignSlug) => (
+    publicAbandonedCartCampaignHealth(summary, campaignSlug, titles.get(campaignSlug) || campaignSlug)
+  ));
+
+  return privateJsonResponse({
+    user: auth.user,
+    scope: 'portfolio',
+    queue: summary.queue,
+    totals: summary.totals,
+    campaigns: campaignRows,
+    recentOutcomes: summary.recentOutcomes,
+    writeBudget: adminReadBudget({ kvListExpected: 0 }),
+    generatedAt: new Date().toISOString()
+  }, 200, env);
+}
+
+async function handleAdminAbandonedCheckoutSuppression(request, env, body = {}, suppress = true) {
+  if (!env?.PLEDGES) {
+    return privateJsonResponse({ error: 'PLEDGES KV not configured' }, 503, env);
+  }
+  const campaignSlug = String(body.campaignSlug || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'marketing:send', { requireCsrf: true });
+  if (!scoped.ok) return scoped.response;
+
+  const email = normalizeAbandonedCartEmail(body.email);
+  if (!isValidEmail(email)) {
+    return privateJsonResponse({ error: 'A valid email is required.' }, 400, env);
+  }
+
+  const emailHash = await sha256Hex(email);
+  const key = getAbandonedCartCampaignSuppressionKey(campaignSlug, emailHash);
+  const now = new Date().toISOString();
+  if (suppress) {
+    await env.PLEDGES.put(key, JSON.stringify({
+      version: 1,
+      campaignSlug,
+      emailHash,
+      source: 'admin',
+      suppressedAt: now,
+      suppressedBy: scoped.auth.user.email
+    }), { expirationTtl: ABANDONED_CART_SUPPRESSION_TTL_SECONDS });
+  } else {
+    await env.PLEDGES.delete(key);
+  }
+
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: suppress ? 'abandoned_checkout_suppression_set' : 'abandoned_checkout_suppression_cleared',
+    actorEmail: scoped.auth.user.email,
+    campaignSlug,
+    emailHash
+  });
+
+  await updateAbandonedCartHealth(env, {
+    type: suppress ? 'suppressed' : 'suppression_cleared',
+    reason: suppress ? 'admin_suppression' : 'admin_unsuppression',
+    campaignSlugs: [campaignSlug],
+    campaignTitles: [scoped.campaign.title || campaignSlug],
+    counter: suppress ? 'suppressed' : '',
+    at: now
+  });
+
+  return privateJsonResponse({
+    success: true,
+    suppressed: suppress === true,
+    campaignSlug,
+    emailHash,
+    auditKey,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: suppress ? 3 : 2, kvListExpected: 0 })
+  }, 200, env);
 }
 
 async function hasCompletedPledgeForAbandonedCart(env, record) {
@@ -3816,6 +4201,7 @@ async function processAbandonedCartFollowups(env, now = new Date()) {
   const results = { attempted: keys.length > 0, sent: 0, skipped: 0, failed: 0, checked: 0 };
   let hasPending = listing?.list_complete === false;
   let nextDueAt = '';
+  const healthEvents = [];
 
   for (const keyInfo of keys) {
     const key = keyInfo?.name || '';
@@ -3826,6 +4212,13 @@ async function processAbandonedCartFollowups(env, now = new Date()) {
     if (!record?.orderId || !record.email || !record.emailHash || !record.campaignSetHash) {
       await env.PLEDGES.delete(key);
       results.skipped++;
+      healthEvents.push({
+        type: 'skipped',
+        reason: 'invalid_record',
+        record,
+        counter: 'invalid',
+        pendingDelta: -1
+      });
       continue;
     }
 
@@ -3838,13 +4231,29 @@ async function processAbandonedCartFollowups(env, now = new Date()) {
       continue;
     }
 
-    const [suppressed, alreadySent] = await Promise.all([
+    const [suppressed, scopedSuppression, alreadySent] = await Promise.all([
       env.PLEDGES.get(getAbandonedCartSuppressionKey(record.emailHash)),
+      getAbandonedCartScopedSuppression(env, record),
       env.PLEDGES.get(getAbandonedCartSentKey(record.emailHash, record.campaignSetHash))
     ]);
-    if (suppressed || alreadySent || await hasCompletedPledgeForAbandonedCart(env, record)) {
+    const completed = suppressed || scopedSuppression || alreadySent
+      ? false
+      : await hasCompletedPledgeForAbandonedCart(env, record);
+    if (suppressed || scopedSuppression || alreadySent || completed) {
       await env.PLEDGES.delete(key);
       results.skipped++;
+      const reason = suppressed || scopedSuppression
+        ? 'suppressed'
+        : (alreadySent ? 'already_sent' : 'completed');
+      healthEvents.push({
+        type: reason === 'suppressed' ? 'suppressed' : 'skipped',
+        reason,
+        record,
+        counter: reason === 'suppressed'
+          ? 'suppressed'
+          : (reason === 'already_sent' ? 'alreadySent' : 'completed'),
+        pendingDelta: -1
+      });
       continue;
     }
 
@@ -3857,6 +4266,13 @@ async function processAbandonedCartFollowups(env, now = new Date()) {
       hasPending = true;
       nextDueAt = nextDueAt && Date.parse(nextDueAt) < Date.parse(record.sendAfter) ? nextDueAt : record.sendAfter;
       results.failed++;
+      healthEvents.push({
+        type: 'failed',
+        reason: 'token_secret_not_configured',
+        record,
+        counter: 'failed',
+        nextDueAt: record.sendAfter
+      });
       continue;
     }
 
@@ -3888,6 +4304,13 @@ async function processAbandonedCartFollowups(env, now = new Date()) {
       hasPending = true;
       nextDueAt = nextDueAt && Date.parse(nextDueAt) < Date.parse(record.sendAfter) ? nextDueAt : record.sendAfter;
       results.failed++;
+      healthEvents.push({
+        type: 'failed',
+        reason: 'send_failed',
+        record,
+        counter: 'failed',
+        nextDueAt: record.sendAfter
+      });
       continue;
     }
 
@@ -3896,10 +4319,21 @@ async function processAbandonedCartFollowups(env, now = new Date()) {
     });
     await env.PLEDGES.delete(key);
     results.sent++;
+    healthEvents.push({
+      type: 'sent',
+      reason: 'sent',
+      record,
+      counter: 'sent',
+      pendingDelta: -1
+    });
     await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
   }
 
   await writeAbandonedCartQueueState(env, hasPending, nextDueAt);
+  healthEvents.push({
+    queue: { hasPending, nextDueAt }
+  });
+  await updateAbandonedCartHealth(env, healthEvents);
   return results;
 }
 
@@ -3928,13 +4362,12 @@ async function handleAbandonedCartUnsubscribe(request, env) {
   const now = new Date().toISOString();
   await env.PLEDGES.put(getAbandonedCartSuppressionKey(emailHash), JSON.stringify({
     emailHash,
-    email: payload.email || '',
     suppressedAt: now,
     source: 'unsubscribe'
   }), { expirationTtl: ABANDONED_CART_SUPPRESSION_TTL_SECONDS });
 
   if (isFirstPartyOrderId(payload.orderId)) {
-    await deleteAbandonedCheckoutFollowup(env, payload.orderId);
+    await deleteAbandonedCheckoutFollowup(env, payload.orderId, { reason: 'unsubscribed' });
   }
 
   return abandonedCartHtmlResponse('Reminder unsubscribed', 'You will not receive this checkout reminder.');
@@ -4098,6 +4531,10 @@ function getStripeKey(env) {
   return env.STRIPE_SECRET_KEY;
 }
 
+function isSmokeStripeSecret(value) {
+  return /^sk_(?:test|live)_smoke$/i.test(String(value || '').trim());
+}
+
 function getStripeWebhookSecret(env) {
   if (getAppMode(env) === 'test' && env.STRIPE_WEBHOOK_SECRET_TEST) {
     return env.STRIPE_WEBHOOK_SECRET_TEST;
@@ -4213,6 +4650,10 @@ export default {
         return handleAdminLogoUpload(request, env);
       }
 
+      if (path === '/admin/media/library' && method === 'GET') {
+        return handleAdminMediaLibrary(request, env);
+      }
+
       if (path === '/admin/settings/image-upload' && method === 'POST') {
         return handleAdminImageUpload(request, env);
       }
@@ -4290,6 +4731,34 @@ export default {
         return handleAdminPlanUsage(request, env);
       }
 
+      if (path === '/admin/abandoned-checkout/health' && method === 'GET') {
+        return handleAdminAbandonedCheckoutHealth(request, env);
+      }
+
+      if (path === '/admin/abandoned-checkout/suppression' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminAbandonedCheckoutSuppression(request, env, parsedBody.body || {}, true);
+      }
+
+      if (path === '/admin/abandoned-checkout/suppression' && method === 'DELETE') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminAbandonedCheckoutSuppression(request, env, parsedBody.body || {}, false);
+      }
+
       if (path === '/admin/analytics/stripe-financials/backfill' && method === 'POST') {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
@@ -4298,6 +4767,38 @@ export default {
 
       if (path === '/admin/marketing/referrals' && method === 'GET') {
         return handleAdminMarketingReferrals(request, env);
+      }
+
+      if (path === '/admin/marketing/reporting' && method === 'GET') {
+        return handleAdminMarketingReporting(request, env);
+      }
+
+      if (path === '/admin/marketing/draft' && method === 'GET') {
+        return handleAdminMarketingDraftRead(request, env);
+      }
+
+      if (path === '/admin/marketing/draft' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminMarketingDraftSave(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/admin/marketing/draft' && method === 'DELETE') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminMarketingDraftDelete(request, env, parsedBody.body || {});
       }
 
       if (path === '/admin/marketing/referrals' && method === 'POST') {
@@ -8871,15 +9372,20 @@ async function handleTestSetup(request, env) {
     line1: '1228 W La Entrada'
   };
 
-  // Create a real Stripe test customer so payment method updates work
-  let stripeCustomerId = null;
-  try {
-    const stripe = createStripeClient(getStripeKey(env));
-    const customer = await stripe.customers.create({ email });
-    stripeCustomerId = customer.id;
-    console.log('📧 Created test Stripe customer:', stripeCustomerId);
-  } catch (err) {
-    console.error('Failed to create Stripe customer:', err.message);
+  // Create a real Stripe test customer when a real key is configured; merge/security
+  // gates use smoke keys and should stay fully local.
+  const stripeKey = getStripeKey(env);
+  const syntheticCustomerId = `cus_test_${String(email).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32) || 'local'}`;
+  let stripeCustomerId = syntheticCustomerId;
+  if (!isSmokeStripeSecret(stripeKey)) {
+    try {
+      const stripe = createStripeClient(stripeKey);
+      const customer = await stripe.customers.create({ email });
+      stripeCustomerId = customer.id;
+      console.log('📧 Created test Stripe customer:', stripeCustomerId);
+    } catch (err) {
+      console.error('Failed to create Stripe customer:', err.message);
+    }
   }
 
   const testPledges = [];
@@ -14876,6 +15382,90 @@ function shouldTriggerAdminMediaOptimization(filePath = '', contentType = '') {
   );
 }
 
+function isAdminMediaLibraryImagePath(filePath = '') {
+  return /\.(?:png|jpe?g|webp|gif|avif)$/i.test(String(filePath || '').trim());
+}
+
+function adminMediaLibraryLabel(filePath = '') {
+  return String(filePath || '')
+    .split('/')
+    .pop()
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function publicAdminMediaLibraryEntry(entry = {}, scope = 'campaign') {
+  const githubPath = String(entry.path || '').replace(/^\/+/, '');
+  return {
+    name: String(entry.name || githubPath.split('/').pop() || ''),
+    label: adminMediaLibraryLabel(githubPath),
+    path: `/${githubPath}`,
+    githubPath,
+    scope
+  };
+}
+
+async function listAdminMediaLibraryDirectory(env, directoryPath, scope) {
+  const listed = await listGitHubDirectory(env, directoryPath, { quiet: true });
+  if (!listed.ok) {
+    if (listed.status === 404) return { ok: true, entries: [] };
+    return listed;
+  }
+  return {
+    ok: true,
+    entries: (listed.entries || [])
+      .filter((entry) => entry.type === 'file' && isAdminMediaLibraryImagePath(entry.path))
+      .map((entry) => publicAdminMediaLibraryEntry(entry, scope))
+      .sort((a, b) => a.label.localeCompare(b.label) || a.githubPath.localeCompare(b.githubPath))
+  };
+}
+
+async function handleAdminMediaLibrary(request, env) {
+  const url = new URL(request.url);
+  const campaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'campaign:read');
+  if (!scoped.ok) return scoped.response;
+
+  const directories = [
+    { path: `assets/images/campaigns/${campaignSlug}`, scope: 'campaign' }
+  ];
+  if (scoped.auth.user.role === 'super_admin' && url.searchParams.get('includeShared') !== 'false') {
+    directories.push({ path: 'assets/images/defaults', scope: 'shared' });
+  }
+
+  const results = await Promise.all(directories.map((directory) => (
+    listAdminMediaLibraryDirectory(env, directory.path, directory.scope)
+  )));
+  const failed = results.find((result) => !result.ok);
+  if (failed) {
+    return privateJsonResponse({
+      error: failed.error || 'Unable to load media library.',
+      code: failed.code || 'media_library_unavailable',
+      writeBudget: adminReadBudget({ kvListExpected: 0 })
+    }, failed.status || 502, env);
+  }
+
+  const images = [];
+  const seen = new Set();
+  for (const result of results) {
+    for (const image of result.entries || []) {
+      if (!image.githubPath || seen.has(image.githubPath)) continue;
+      seen.add(image.githubPath);
+      images.push(image);
+    }
+  }
+
+  return privateJsonResponse({
+    user: scoped.auth.user,
+    campaignSlug,
+    images,
+    writeBudget: adminReadBudget({ kvListExpected: 0 }),
+    generatedAt: new Date().toISOString()
+  }, 200, env);
+}
+
 const ADMIN_CAMPAIGN_MEDIA_UPLOAD_KINDS = new Set([
   'campaign',
   'campaign-video',
@@ -15806,6 +16396,15 @@ function adminMarketingReferralKey(campaignSlug) {
   return `admin-marketing-referrals:${campaignSlug}`;
 }
 
+function adminMarketingDraftKey(campaignSlug, surface) {
+  return `admin-marketing-draft:${campaignSlug}:${surface}`;
+}
+
+function normalizeAdminMarketingDraftSurface(value) {
+  const surface = String(value || '').trim().toLowerCase();
+  return surface === 'blast' || surface === 'marketing' ? surface : '';
+}
+
 function normalizeAdminReferralCode(value) {
   return String(value || '')
     .trim()
@@ -15857,6 +16456,93 @@ function publicAdminMarketingReferral(record = {}) {
     createdAt: record.createdAt || null,
     updatedAt: record.updatedAt || null,
     createdBy: String(record.createdBy || '')
+  };
+}
+
+function normalizeAdminMarketingBuilderDraft(draft = {}) {
+  const source = normalizeAdminPlainText(draft.source || '', 'UTM source', { maxLength: 80 });
+  if (!source.ok) return source;
+  const medium = normalizeAdminPlainText(draft.medium || '', 'UTM medium', { maxLength: 80 });
+  if (!medium.ok) return medium;
+  const content = normalizeAdminPlainText(draft.content || '', 'UTM content', { maxLength: 120 });
+  if (!content.ok) return content;
+  const referrer = normalizeAdminPlainText(draft.referrer || draft.name || '', 'Referrer name', { maxLength: 120 });
+  if (!referrer.ok) return referrer;
+  const ref = normalizeAdminReferralCode(draft.ref || draft.code || referrer.value);
+  return {
+    ok: true,
+    value: {
+      source: source.value,
+      medium: medium.value,
+      content: content.value,
+      ref,
+      referrer: referrer.value
+    }
+  };
+}
+
+function normalizeAdminMarketingBlastDraft(draft = {}, env) {
+  const subject = normalizeAdminPlainText(draft.subject || '', 'Subject', { maxLength: 160 });
+  if (!subject.ok) return subject;
+  const body = normalizeAdminPlainText(draft.body || '', 'Announcement content', {
+    maxLength: 5000,
+    allowNewlines: true,
+    allowRawHtml: true
+  });
+  if (!body.ok) return body;
+  const contentBlocks = normalizeAdminMarketingAnnouncementContentBlocks(draft.contentBlocks || draft.content || []);
+  if (!contentBlocks.ok) return contentBlocks;
+  const ctaLabel = normalizeAdminPlainText(draft.ctaLabel || '', 'CTA button label', { maxLength: 80 });
+  if (!ctaLabel.ok) return ctaLabel;
+  const ctaUrl = normalizeAdminMarketingCtaUrl(draft.ctaUrl, env);
+  if (String(draft.ctaUrl || '').trim() && !ctaUrl) {
+    return { ok: false, error: 'CTA button URL must be a same-site http(s) URL.' };
+  }
+  return {
+    ok: true,
+    value: {
+      subject: subject.value,
+      body: body.value,
+      contentBlocks: contentBlocks.value,
+      ctaLabel: ctaLabel.value,
+      ctaUrl
+    }
+  };
+}
+
+function publicAdminMarketingDraft(record = null) {
+  if (!record || typeof record !== 'object') return null;
+  return {
+    campaignSlug: String(record.campaignSlug || ''),
+    surface: normalizeAdminMarketingDraftSurface(record.surface),
+    draft: record.draft || {},
+    revision: String(record.revision || ''),
+    updatedAt: String(record.updatedAt || ''),
+    updatedBy: String(record.updatedBy || ''),
+    expiresAt: String(record.expiresAt || '')
+  };
+}
+
+async function normalizeAdminMarketingSharedDraft(body = {}, env) {
+  const campaignSlug = String(body.campaignSlug || '').trim();
+  const surface = normalizeAdminMarketingDraftSurface(body.surface);
+  if (!surface) return { ok: false, error: 'Draft surface must be marketing or blast.' };
+  const draftSource = body.draft && typeof body.draft === 'object' ? body.draft : {};
+  const normalized = surface === 'blast'
+    ? normalizeAdminMarketingBlastDraft(draftSource, env)
+    : normalizeAdminMarketingBuilderDraft(draftSource);
+  if (!normalized.ok) return normalized;
+  const revisionInput = {
+    campaignSlug,
+    surface,
+    draft: normalized.value
+  };
+  return {
+    ok: true,
+    campaignSlug,
+    surface,
+    draft: normalized.value,
+    revision: await sha256Hex(stableStringify(revisionInput))
   };
 }
 
@@ -16277,6 +16963,224 @@ async function handleAdminMarketingReferralDelete(request, env, body = {}) {
     campaignSlug,
     deletedCode: code,
     referrals: nextReferrals.map(publicAdminMarketingReferral)
+  }, 200, env);
+}
+
+async function readAdminMarketingDraft(env, campaignSlug, surface) {
+  const record = await env.PLEDGES.get(adminMarketingDraftKey(campaignSlug, surface), { type: 'json' });
+  return publicAdminMarketingDraft(record);
+}
+
+async function handleAdminMarketingDraftRead(request, env) {
+  if (!env?.PLEDGES) {
+    return privateJsonResponse({ error: 'PLEDGES KV not configured' }, 503, env);
+  }
+  const url = new URL(request.url);
+  const campaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
+  const surface = normalizeAdminMarketingDraftSurface(url.searchParams.get('surface'));
+  if (!surface) {
+    return privateJsonResponse({ error: 'Draft surface must be marketing or blast.' }, 400, env);
+  }
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'campaign:read');
+  if (!scoped.ok) return scoped.response;
+  const draft = await readAdminMarketingDraft(env, campaignSlug, surface);
+  return privateJsonResponse({
+    user: scoped.auth.user,
+    campaignSlug,
+    surface,
+    draft,
+    ttlSeconds: ADMIN_MARKETING_DRAFT_TTL_SECONDS,
+    writeBudget: adminReadBudget({ kvListExpected: 0 })
+  }, 200, env);
+}
+
+async function handleAdminMarketingDraftSave(request, env, body = {}) {
+  if (!env?.PLEDGES) {
+    return privateJsonResponse({ error: 'PLEDGES KV not configured' }, 503, env);
+  }
+  const normalized = await normalizeAdminMarketingSharedDraft(body, env);
+  if (!normalized.ok) {
+    return privateJsonResponse({ error: normalized.error }, 400, env);
+  }
+  const scoped = await getRoleScopedAdminCampaign(request, env, normalized.campaignSlug, 'marketing:send', { requireCsrf: true });
+  if (!scoped.ok) return scoped.response;
+
+  const key = adminMarketingDraftKey(normalized.campaignSlug, normalized.surface);
+  const existing = publicAdminMarketingDraft(await env.PLEDGES.get(key, { type: 'json' }));
+  const baseRevision = String(body.baseRevision || '').trim();
+  if (existing?.revision && existing.revision !== baseRevision) {
+    return privateJsonResponse({
+      error: 'Shared draft changed since you loaded it.',
+      code: 'draft_conflict',
+      campaignSlug: normalized.campaignSlug,
+      surface: normalized.surface,
+      currentDraft: existing,
+      writeBudget: adminReadBudget({ kvListExpected: 0 })
+    }, 409, env);
+  }
+
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + ADMIN_MARKETING_DRAFT_TTL_SECONDS * 1000).toISOString();
+  const record = {
+    version: 1,
+    campaignSlug: normalized.campaignSlug,
+    surface: normalized.surface,
+    draft: normalized.draft,
+    revision: normalized.revision,
+    updatedAt: now,
+    updatedBy: scoped.auth.user.email,
+    expiresAt
+  };
+  await env.PLEDGES.put(key, JSON.stringify(record), { expirationTtl: ADMIN_MARKETING_DRAFT_TTL_SECONDS });
+  return privateJsonResponse({
+    success: true,
+    user: scoped.auth.user,
+    campaignSlug: normalized.campaignSlug,
+    surface: normalized.surface,
+    draft: publicAdminMarketingDraft(record),
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 1, kvListExpected: 0 })
+  }, 200, env);
+}
+
+async function handleAdminMarketingDraftDelete(request, env, body = {}) {
+  if (!env?.PLEDGES) {
+    return privateJsonResponse({ error: 'PLEDGES KV not configured' }, 503, env);
+  }
+  const campaignSlug = String(body.campaignSlug || '').trim();
+  const surface = normalizeAdminMarketingDraftSurface(body.surface);
+  if (!surface) {
+    return privateJsonResponse({ error: 'Draft surface must be marketing or blast.' }, 400, env);
+  }
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'marketing:send', { requireCsrf: true });
+  if (!scoped.ok) return scoped.response;
+
+  await env.PLEDGES.delete(adminMarketingDraftKey(campaignSlug, surface));
+  return privateJsonResponse({
+    success: true,
+    user: scoped.auth.user,
+    campaignSlug,
+    surface,
+    draft: null,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 1, kvListExpected: 0 })
+  }, 200, env);
+}
+
+function getAdminAttributionValue(pledge = {}, field) {
+  const utm = pledge?.utm && typeof pledge.utm === 'object' ? pledge.utm : {};
+  const attribution = pledge?.attribution && typeof pledge.attribution === 'object' ? pledge.attribution : {};
+  const marketing = pledge?.marketing && typeof pledge.marketing === 'object' ? pledge.marketing : {};
+  if (field === 'ref') {
+    return normalizeAdminReferralCode(
+      pledge?.referralCode ||
+      pledge?.referral ||
+      pledge?.ref ||
+      attribution.ref ||
+      marketing.ref ||
+      ''
+    ) || 'direct';
+  }
+  const camel = `utm${field.charAt(0).toUpperCase()}${field.slice(1)}`;
+  return String(
+    pledge?.[camel] ||
+    utm[field] ||
+    attribution[camel] ||
+    marketing[camel] ||
+    ''
+  ).trim() || 'none';
+}
+
+function createAdminAttributionMetric(key, label = '') {
+  return {
+    key,
+    label: label || key,
+    pledgeCount: 0,
+    pledgedSubtotal: 0,
+    chargedAmount: 0
+  };
+}
+
+function incrementAdminAttributionMetric(map, key, pledge, label = '') {
+  const normalizedKey = String(key || '').trim() || 'unknown';
+  const current = map.get(normalizedKey) || createAdminAttributionMetric(normalizedKey, label);
+  if (label && current.label === normalizedKey) current.label = label;
+  const status = getPledgeStatusLabel(pledge);
+  if (status !== 'cancelled') {
+    const bundleAddOns = Array.isArray(pledge?.bundleAddOns) ? pledge.bundleAddOns : [];
+    const platformAddOnRevenue = getPlatformBundleAddOnSubtotal(bundleAddOns);
+    const campaignSubtotal = pledge?.goalTrackingSubtotal !== undefined && pledge?.goalTrackingSubtotal !== null
+      ? Math.max(0, Number(pledge.goalTrackingSubtotal || 0) || 0)
+      : Math.max(0, (Number(pledge?.subtotal || 0) || 0) - platformAddOnRevenue);
+    current.pledgeCount += 1;
+    current.pledgedSubtotal += campaignSubtotal;
+  }
+  if (status === 'charged') {
+    current.chargedAmount += Number(pledge?.amount || 0) || 0;
+  }
+  map.set(normalizedKey, current);
+}
+
+function mapAdminAttributionMetrics(map) {
+  return Array.from(map.values()).sort((a, b) => (
+    b.pledgeCount - a.pledgeCount ||
+    b.pledgedSubtotal - a.pledgedSubtotal ||
+    a.key.localeCompare(b.key)
+  ));
+}
+
+async function handleAdminMarketingReporting(request, env) {
+  if (!env?.PLEDGES) {
+    return privateJsonResponse({ error: 'PLEDGES KV not configured' }, 503, env);
+  }
+  const url = new URL(request.url);
+  const campaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'campaign:read');
+  if (!scoped.ok) return scoped.response;
+
+  const orderIds = await getCampaignOrderIds(env, campaignSlug);
+  if (!Array.isArray(orderIds)) {
+    return adminIndexRequiredResponse(env, {
+      campaignSlug,
+      extra: {
+        error: 'Campaign pledge index must be rebuilt before marketing reporting can load.'
+      }
+    });
+  }
+
+  const referrals = await readAdminMarketingReferrals(env, campaignSlug);
+  const referralLabels = new Map(referrals.map((row) => [row.code, row.referrer || row.name || row.code]));
+  const dimensions = {
+    ref: new Map(),
+    source: new Map(),
+    medium: new Map(),
+    campaign: new Map(),
+    content: new Map()
+  };
+  for (const orderId of orderIds) {
+    const normalizedOrderId = String(orderId || '').trim();
+    if (!normalizedOrderId) continue;
+    const pledge = await env.PLEDGES.get(`pledge:${normalizedOrderId}`, { type: 'json' });
+    if (!pledge || String(pledge?.campaignSlug || '') !== campaignSlug) continue;
+    const ref = getAdminAttributionValue(pledge, 'ref');
+    incrementAdminAttributionMetric(dimensions.ref, ref, pledge, referralLabels.get(ref) || ref);
+    for (const field of ['source', 'medium', 'campaign', 'content']) {
+      incrementAdminAttributionMetric(dimensions[field], getAdminAttributionValue(pledge, field), pledge);
+    }
+  }
+
+  return privateJsonResponse({
+    user: scoped.auth.user,
+    campaignSlug,
+    indexedPledgeCount: orderIds.length,
+    referrals: mapAdminAttributionMetrics(dimensions.ref),
+    utm: {
+      sources: mapAdminAttributionMetrics(dimensions.source),
+      mediums: mapAdminAttributionMetrics(dimensions.medium),
+      campaigns: mapAdminAttributionMetrics(dimensions.campaign),
+      contents: mapAdminAttributionMetrics(dimensions.content)
+    },
+    savedReferralCount: referrals.length,
+    writeBudget: adminReadBudget({ kvListExpected: 0 }),
+    generatedAt: new Date().toISOString()
   }, 200, env);
 }
 

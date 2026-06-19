@@ -4,7 +4,7 @@
 
 **v1.0.7**
 
-The v1.0.6 release shipped richer campaign marketing tools, supporter email blasts, consent-based abandoned-checkout reminders, and a script-first local/production setup helper for fork operators. v1.0.7 focuses on the follow-up work tracked below: abandoned-checkout visibility, setup/deploy hardening, shared Marketing/Blast draft support, referral/UTM reporting, and a campaign-scoped WYSIWYG media picker.
+The v1.0.7 milestone hardens the v1.0.6 marketing, Blast, abandoned-checkout, and setup-helper work with bounded visibility, shared drafts, attribution reporting, provider readiness checks, idempotent setup behavior, and campaign-scoped WYSIWYG media selection.
 
 ## Completed
 
@@ -62,6 +62,8 @@ The v1.0.6 release shipped richer campaign marketing tools, supporter email blas
 - [x] Setup and deploy helper
   - `npm run setup:deploy` / `scripts/setup-deploy.mjs` ships as a dependency-free Node CLI for local setup, production dry runs, config sync, Cloudflare KV creation/update, Worker secret writes, GitHub repository secret writes, auth helpers for `gh`/`wrangler`/optional Stripe CLI, and optional `wrangler deploy`
   - The helper keeps production setup idempotency and operator confirmation front of mind, while avoiding app-wrapper complexity until the script-first workflow is stable
+  - Production setup now detects and reuses existing Cloudflare KV namespace bindings/resources before planning creation, including dry-run output that distinguishes reuse from create
+  - Read-only readiness checks can call live Cloudflare, GitHub, Stripe, Resend, Turnstile, USPS, and ZIP.TAX provider APIs during setup/dry runs, with `--skip-readiness` available when operators need a narrower local check
 
 **Campaign and public experience**
 
@@ -109,6 +111,8 @@ The v1.0.6 release shipped richer campaign marketing tools, supporter email blas
 - [x] Abandoned-checkout reminders
   - Abandoned-checkout reminders collect an explicit one-reminder opt-in, queue only after first-party Stripe session creation succeeds, delete on completed pledge persistence, suppress duplicate/signed-unsubscribed audiences, and send through the shared Resend email module
   - Scheduling uses `abandoned-cart-queue:v1`, retention limits, sent/suppression markers, and bounded batches so idle cron ticks avoid KV list scans
+  - Campaign admins can view campaign-scoped abandoned-checkout reminder health from aggregate queue/outcome counters without exposing supporter PII or listing KV namespaces
+  - Campaign-scoped suppression controls are explicit admin mutations with CSRF, audit events, hashed email identifiers, and no retry-specific abandoned-cart action
 
 **Payments, inventory, and reporting**
 
@@ -175,10 +179,17 @@ The v1.0.6 release shipped richer campaign marketing tools, supporter email blas
   - Campaigns -> Marketing stays focused on campaign-link generation, saved referral codes, downloadable PNG/SVG QR codes, and the campaign embed builder without adding another top-level dashboard surface
   - Saved referral codes store only the explicit campaign-scoped referral record; QR preview/downloads are browser-local and do not read or write KV
   - Campaign QR generation was adapted from the MIT-licensed QR generator approach in `1612elphi/delphitools` for this stack's URL builder, saved referral links, and PNG/SVG download needs
+  - Shared Marketing drafts use one campaign-scoped KV record with 7-day expiry, explicit load/save/clear controls, revision-conflict protection, and one bounded write only on user save/clear
+  - Campaign marketing performance reports reuse the existing campaign pledge index and saved referral labels to show referral and UTM source/medium/content aggregates without KV list scans
 - [x] Supporter email blasts
   - Campaigns -> Blast lets assigned campaign users and super admins send supporter email blasts to the campaign's indexed supporters using the shared WYSIWYG editor, subject, CTA Button Label, and CTA Button URL fields
   - Blast drafts remain browser-local; automatic dry runs run before test/live sends, test sends go only to the signed-in admin, live sends require the matching dry-run hash, and sent history is shown read-only below the editor
   - Blast image uploads reuse the campaign media upload/optimization path so email images are site-hosted under `assets/images/campaigns/<slug>/`; YouTube/Vimeo blocks render as email-safe links instead of embedded players
+  - Shared Blast drafts use the same explicit 7-day shared-draft model as Marketing, including revision conflicts and no automatic background writes
+- [x] WYSIWYG media selection
+  - Campaign Content, Diary, and Blast image blocks can choose existing campaign images from a scoped media-library dialog instead of requiring pasted `/assets/...` paths
+  - Super admins may also select shared/default images; campaign users see only media for campaigns they manage
+  - The picker is read-only, GitHub-directory-backed, and adds no new KV state or duplicate media index
 - [x] Creator docs and runbooks
   - the public Campaign Creator Checklist and Spanish checklist cover campaign add-ons, embed-code promotion, shipping fallback/free-shipping decisions, tax expectations, report recipients, fulfillment handoff, share-link planning, dashboard media uploads, launch reminders, platform timezone expectations, deferred YouTube hero embeds, and responsive WebP variants
   - a Spanish creator checklist route exists at `/es/creator-campaign-checklist/`
@@ -257,24 +268,11 @@ The v1.0.6 release shipped richer campaign marketing tools, supporter email blas
 
 ## Future Features
 
-- [ ] v1.0.7 follow-ups
-  - [ ] Abandoned-checkout visibility
-    - Add a read-only admin visibility surface for abandoned-checkout reminder health that favors queue-state markers, aggregate counts, and recent outcomes over KV namespace scans or supporter PII
-    - Decide whether operators need scoped suppression or retry controls, and design them around explicit admin mutations, audit events, and minimal KV writes
-    - Document a production smoke path for validating reminder opt-in, suppression, unsubscribe, and completion cleanup against real provider credentials
-  - [ ] Setup and deploy hardening
-    - Harden production setup idempotency so the helper can detect and reuse existing Cloudflare KV namespaces and provider resources before creating new ones
-    - Add safe read-only readiness checks where provider APIs make that practical, including Stripe webhook configuration, Resend sender/domain verification, Turnstile widgets, USPS credentials, and ZIP.TAX credentials
-    - Expand the guided setup checklist for first-time fork operators with clearer manual steps when a provider cannot be fully automated
-    - Create a simple Mac/Windows/Linux app wrapper around the same setup core after the script-first workflow is stable
-  - [ ] Marketing drafts and reporting
-    - Add shared cross-admin Marketing/Blast drafts in KV only after access, conflict, expiry, retention, and write-budget rules are designed
-    - Consider referral/UTM performance reporting only if it can reuse existing pledge/referral data or a low-cardinality event model without high-volume KV writes
-  - [ ] WYSIWYG media picker
-    - Let Campaign Content, Diary, and Blast image blocks select existing uploaded campaign images from a scoped media library instead of requiring users to paste `/assets/...` paths
-    - Keep the picker campaign-scoped by default, with super-admin access to shared/default media only where that is already allowed by upload permissions
-    - Reuse the existing dashboard media directories, upload metadata, and same-campaign cleanup rules; do not introduce new KV state or duplicate media indexing unless a read-only manifest is needed for performance
-    - Once selection is available, consider making Source URL an advanced/edit-existing-path affordance rather than a primary field
+- [ ] v1.0.8 follow-ups
+  - [ ] Setup app wrapper
+    - Create a simple Mac/Windows/Linux app wrapper around the same setup core after the script-first workflow remains stable across more fork installs
+  - [ ] Media library polish
+    - Consider making Source URL an advanced/edit-existing-path affordance after the scoped picker has been exercised in production
 - [ ] Tax calculator expansion
   - Support USA and international
   - Target local / jurisdiction-level US rates, not just state-level rates

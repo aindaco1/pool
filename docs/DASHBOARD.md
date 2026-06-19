@@ -323,7 +323,7 @@ Gross Campaign revenue and Platform revenue remain visible for reconciliation. N
 
 ## Marketing
 
-The Marketing tab builds campaign URLs with referral and UTM parameters, shows the campaign QR preview/download controls beside the URL output, saves referral codes, and exposes the campaign embed-builder UI.
+The Marketing tab builds campaign URLs with referral and UTM parameters, shows the campaign QR preview/download controls beside the URL output, saves referral codes, exposes the campaign embed-builder UI, loads/saves one shared campaign draft, shows referral/UTM performance from indexed pledges, and shows abandoned-checkout reminder health for the selected campaign.
 
 Saved referral codes store:
 
@@ -337,9 +337,15 @@ The URL builder clears after saving and on refresh. Referral saves/edits/deletes
 
 QR codes are generated in the browser from the current campaign URL builder output or a saved referral URL, including referral and UTM parameters. The current builder preview updates without Worker calls, and PNG/SVG downloads are browser-local file downloads. QR preview and download actions do not read or write KV.
 
+Shared Marketing drafts are explicit: users click **Load shared draft**, **Save shared draft**, or **Clear shared draft**. A draft is one campaign-scoped KV record with a 7-day TTL and a revision token so stale saves fail with a conflict instead of overwriting another admin's work. Loading and reporting are read-only; saving or clearing is the only draft write.
+
+Marketing performance reads the existing `campaign-pledges:<slug>` projection and pledge rows to show saved and unsaved referral-code performance plus UTM source, medium, and content aggregates. If the campaign pledge index is missing, the report fails closed with `campaign_index_required` instead of scanning pledge truth.
+
+The abandoned-checkout panel shows campaign-scoped reminder health from aggregate queue/outcome counters and recent outcomes without supporter PII. Scoped suppression controls write only when the admin clicks suppress or clear, store hashed email identifiers, and do not include a retry-this-specific-cart action.
+
 ## Blast
 
-Campaigns -> Blast sends supporter email blasts for the selected campaign without adding another top-level dashboard view. Campaign users may send blasts for campaigns assigned to them, and super admins may send for any campaign. Blast drafts are browser-local for now and reuse the campaign WYSIWYG content editor for email-ready headings, text, quotes, lists, links, uploaded campaign-hosted images, and YouTube/Vimeo video links. The dashboard automatically uploads staged Blast images through the same campaign media upload path used by Content and diary blocks before the dry run, so image files are committed under `assets/images/campaigns/<slug>/` and queued for repository media optimization before the email payload is built. The dashboard automatically runs the dry-run validation before Send test or Send blast; failed upload or audience checks explain the reason before any email send is attempted.
+Campaigns -> Blast sends supporter email blasts for the selected campaign without adding another top-level dashboard view. Campaign users may send blasts for campaigns assigned to them, and super admins may send for any campaign. Blast drafts stay browser-local unless an admin explicitly uses the shared draft buttons; shared Blast drafts use the same 7-day, revision-protected campaign-scoped KV model as Marketing drafts. Blast reuses the campaign WYSIWYG content editor for email-ready headings, text, quotes, lists, links, uploaded campaign-hosted images, existing campaign images from the media picker, and YouTube/Vimeo video links. The dashboard automatically uploads staged Blast images through the same campaign media upload path used by Content and diary blocks before the dry run, so image files are committed under `assets/images/campaigns/<slug>/` and queued for repository media optimization before the email payload is built. The dashboard automatically runs the dry-run validation before Send test or Send blast; failed upload or audience checks explain the reason before any email send is attempted.
 
 Dry runs validate the message, compute the indexed audience count, and return a dry-run hash without rate-limit writes, audit writes, email sends, or KV lists. Test sends go only to the signed-in admin. Live sends require the matching dry-run hash for the exact message and audience, send through the shared Resend updates sender, and write one audit event after dispatch. The Blast tab shows read-only sent history from recent audit records, including subject, content, CTA Button Label, and CTA Button URL.
 
@@ -368,6 +374,8 @@ Recommended campaign media:
 - Hero video: direct MP4/WebM/MOV upload up to 100 MB, or a YouTube/Vimeo URL
 
 The campaign Content editor, diary-entry content editors, and Blast image blocks stage selected media in the browser first. The block shows the selected image, video, or audio selection immediately, but the file is not uploaded until the user publishes content or sends/tests a Blast. During publish or Blast send, the dashboard uploads staged media into the campaign asset directory, replaces the temporary browser preview with the final `/assets/...` path, and then commits the campaign YAML or builds the Blast email payload.
+
+Image blocks in Campaign Content, Diary, and Blast can also choose an existing image from a scoped media-library dialog. The picker lists existing GitHub-backed image files under `assets/images/campaigns/<slug>/`; super admins can also choose shared/default files under `assets/images/defaults/`. The picker is read-only, adds no KV state, and sets the image block path directly. The Source URL field remains available for repair or advanced path editing.
 
 Campaign-scoped media uploads require access to that campaign. Super admins can upload any campaign media and platform/default media; campaign admins can upload only media for campaigns they manage. Platform add-on and platform brand uploads stay super-admin only.
 
@@ -448,4 +456,4 @@ Dashboard read endpoints rely on `campaign-pledges:{slug}` indexes and intention
 
 ---
 
-_Last updated: June 11, 2026_
+_Last updated: June 18, 2026_

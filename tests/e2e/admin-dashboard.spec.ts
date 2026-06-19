@@ -80,6 +80,11 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     logoUpload: [],
     imageUpload: [],
     marketingReferrals: [],
+    marketingReporting: [],
+    marketingDraft: [],
+    abandonedHealth: [],
+    abandonedSuppression: [],
+    mediaLibrary: [],
     liveSnapshots: [],
     contentLoad: [],
     contentPreview: [],
@@ -688,6 +693,99 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         campaignSlug: url.searchParams.get('campaignSlug') || body.campaignSlug || 'hand-relations',
         referrals: marketingReferralRows,
         writeBudget: { readOnly: method === 'GET', kvWritesExpected: method === 'GET' ? 0 : 1, kvListExpected: 0 }
+      });
+    }
+    if (url.pathname === '/admin/marketing/reporting') {
+      calls.marketingReporting.push({ method, query: Object.fromEntries(url.searchParams.entries()) });
+      return fulfillJson({
+        user,
+        campaignSlug: url.searchParams.get('campaignSlug') || 'hand-relations',
+        indexedPledgeCount: 2,
+        savedReferralCount: marketingReferralRows.length,
+        referrals: [{
+          key: 'test',
+          label: 'test',
+          pledgeCount: 1,
+          pledgedSubtotal: 5000,
+          chargedAmount: 0
+        }],
+        utm: {
+          sources: [{ key: 'email', label: 'email', pledgeCount: 1, pledgedSubtotal: 5000, chargedAmount: 0 }],
+          mediums: [{ key: 'social', label: 'social', pledgeCount: 1, pledgedSubtotal: 5000, chargedAmount: 0 }],
+          campaigns: [{ key: 'hand-relations', label: 'hand-relations', pledgeCount: 1, pledgedSubtotal: 5000, chargedAmount: 0 }],
+          contents: [{ key: 'launch', label: 'launch', pledgeCount: 1, pledgedSubtotal: 5000, chargedAmount: 0 }]
+        },
+        writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 },
+        generatedAt: '2026-06-18T12:00:00.000Z'
+      });
+    }
+    if (url.pathname === '/admin/marketing/draft') {
+      calls.marketingDraft.push({ method, query: Object.fromEntries(url.searchParams.entries()), body });
+      const surface = url.searchParams.get('surface') || body.surface || 'marketing';
+      const campaignSlug = url.searchParams.get('campaignSlug') || body.campaignSlug || 'hand-relations';
+      return fulfillJson({
+        user,
+        campaignSlug,
+        surface,
+        draft: method === 'GET' ? null : {
+          campaignSlug,
+          surface,
+          draft: body.draft || {},
+          revision: 'draft-revision-e2e',
+          updatedAt: '2026-06-18T12:00:00.000Z',
+          updatedBy: user.email,
+          expiresAt: '2026-06-25T12:00:00.000Z'
+        },
+        ttlSeconds: 604800,
+        writeBudget: { readOnly: method === 'GET', kvWritesExpected: method === 'GET' ? 0 : 1, kvListExpected: 0 }
+      });
+    }
+    if (url.pathname === '/admin/abandoned-checkout/health') {
+      calls.abandonedHealth.push({ method, query: Object.fromEntries(url.searchParams.entries()) });
+      const campaignSlug = url.searchParams.get('campaignSlug') || 'hand-relations';
+      return fulfillJson({
+        user,
+        scope: 'campaign',
+        campaignSlug,
+        queue: { hasPending: false, nextDueAt: '', updatedAt: '2026-06-18T12:00:00.000Z' },
+        totals: { queued: 1, pending: 0, sent: 1, skipped: 0, failed: 0, suppressed: 0, completed: 1, alreadySent: 0, invalid: 0 },
+        campaign: {
+          slug: campaignSlug,
+          title: 'Hand Relations',
+          totals: { queued: 1, pending: 0, sent: 1, skipped: 0, failed: 0, suppressed: 0, completed: 1, alreadySent: 0, invalid: 0 },
+          recentOutcomes: []
+        },
+        recentOutcomes: [],
+        writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 },
+        generatedAt: '2026-06-18T12:00:00.000Z'
+      });
+    }
+    if (url.pathname === '/admin/abandoned-checkout/suppression') {
+      calls.abandonedSuppression.push({ method, body });
+      return fulfillJson({
+        success: true,
+        suppressed: method === 'POST',
+        campaignSlug: body.campaignSlug || 'hand-relations',
+        emailHash: 'hash-e2e',
+        auditKey: 'admin-audit:abandoned-suppression',
+        writeBudget: { readOnly: false, kvWritesExpected: method === 'POST' ? 3 : 2, kvListExpected: 0 }
+      });
+    }
+    if (url.pathname === '/admin/media/library') {
+      calls.mediaLibrary.push({ method, query: Object.fromEntries(url.searchParams.entries()) });
+      const campaignSlug = url.searchParams.get('campaignSlug') || 'hand-relations';
+      return fulfillJson({
+        user,
+        campaignSlug,
+        images: [{
+          name: 'hero.png',
+          label: 'hero',
+          path: `/assets/images/campaigns/${campaignSlug}/hero.png`,
+          githubPath: `assets/images/campaigns/${campaignSlug}/hero.png`,
+          scope: 'campaign'
+        }],
+        writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 },
+        generatedAt: '2026-06-18T12:00:00.000Z'
       });
     }
     if (url.pathname === '/admin/content/campaign') {

@@ -38,6 +38,7 @@ This document covers the security architecture, known risks, applied hardening m
 | `admin-session:{hash}` | PLEDGES | Admin email, role, campaign scope, CSRF token, expiry | **High** - admin auth |
 | `admin-users:v1` | PLEDGES | Runtime admin users and campaign scopes | **High** - access control |
 | `admin-marketing-referrals:{slug}` | PLEDGES | Saved referral code and QR source metadata | **Low** - admin-authored marketing data |
+| `admin-marketing-draft:{slug}:{surface}` | PLEDGES | Explicit shared Marketing/Blast draft with short retention | **Medium** - admin-authored campaign email/link content |
 | `campaign-preview-reviewers:{slug}` | PLEDGES | Normalized reviewer email allowlist for protected campaign previews, with 24-hour TTL | **Medium** - campaign-scoped email access list |
 | `admin-audit:{date}:{action}:{id}` | PLEDGES | Recent admin mutation audit events | **Medium** - admin identity + operational metadata |
 | `launch-reminder:{slug}:{emailHash}` | PLEDGES | Upcoming-campaign reminder email and opt-in metadata | **Medium** - campaign-scoped email |
@@ -48,7 +49,9 @@ This document covers the security architecture, known risks, applied hardening m
 | `abandoned-cart:{orderId}` | PLEDGES | Explicitly opted-in checkout reminder email and campaign snapshot | **Medium** - campaign-scoped email |
 | `abandoned-cart-sent:{emailHash}:{campaignSetHash}` | PLEDGES | Checkout reminder send idempotency marker | **Low** - send state |
 | `abandoned-cart-suppressed:{emailHash}` | PLEDGES | Checkout reminder unsubscribe marker | **Medium** - supporter email hash |
+| `abandoned-cart-suppressed-campaign:{slug}:{emailHash}` | PLEDGES | Admin-managed campaign-scoped checkout reminder suppression marker | **Medium** - supporter email hash |
 | `abandoned-cart-queue:v1` | PLEDGES | Checkout reminder queue idle/pending marker | **Low** - operational state |
+| `abandoned-cart-health:v1` | PLEDGES | Aggregate checkout reminder queue/outcome health counters | **Low** - operational aggregate |
 | `supporter-email-retry:{orderId}` | PLEDGES | Queued supporter confirmation email retry payload | **Medium** - supporter email payload |
 | `supporter-email-retry-queue:v1` | PLEDGES | Supporter email retry idle/pending and next-attempt marker | **Low** - operational state |
 | `add-on-inventory-sold:v1` | PLEDGES | Platform add-on sold-count projection | **Low** - aggregate inventory state |
@@ -127,6 +130,9 @@ Admin mutations use these common protections:
 - Publish-time media cleanup is derived server-side from the previously loaded campaign data and the normalized campaign draft being committed. It only deletes safe root-relative dashboard-owned files under the same campaign's `assets/images`, `assets/videos`, or `assets/audio` directories, and it preserves external URLs, shared/default assets, and files still referenced elsewhere in the campaign.
 - Runtime-only admin users are saved only to KV at `admin-users:v1`; they are not serialized into `_config.yml`.
 - Marketing referral codes are saved only on explicit user action and are scoped to the campaign URL origin/path the admin account can access.
+- Shared Marketing/Blast drafts are saved only on explicit user action, scoped to one campaign and surface, expire after 7 days, and use revision tokens so stale saves do not overwrite another admin's work.
+- Marketing reporting and abandoned-checkout health use campaign pledge indexes or aggregate health state instead of KV namespace scans; reminder health responses expose counters and recent outcomes, not reminder recipient lists.
+- Campaign-scoped abandoned-checkout suppression controls require CSRF, store hashed email identifiers, and do not expose a retry-this-specific-cart action.
 - Campaigns -> Blast sends are scoped to campaigns the admin account can edit. Blast dry runs require the campaign pledge index and add no KV writes or list operations; live sends require a matching dry-run hash and write one audit event after dispatch.
 - New campaign creation is super-admin-only, writes a preview-only campaign Markdown file locally in dev or through the existing GitHub path in production, and keeps that campaign out of public route generation until launched. Creating new campaign users during that flow saves to `admin-users:v1` and emails assigned users through the shared admin email path when users are assigned.
 - Protected preview publication is scoped to super admins and assigned campaign users. It commits only preview flags to campaign Markdown, stores the publishing admin plus optional reviewer emails in a short-lived `campaign-preview-reviewers:{slug}` KV allowlist, returns a signed 24-hour dashboard link for the publishing admin, sends signed 24-hour reviewer links when optional reviewers are added, and records an audit event. Previewer emails must not be persisted in GitHub-backed campaign source, public campaign JSON, sitemap output, or generated metadata.
@@ -632,4 +638,4 @@ If the on-site payment step completes but the pledge doesn't appear yet (common 
 
 ---
 
-_Last updated: June 3, 2026_
+_Last updated: June 18, 2026_

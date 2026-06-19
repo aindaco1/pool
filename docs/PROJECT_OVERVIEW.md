@@ -26,7 +26,7 @@ Creators define campaigns in Markdown; backers pledge through The Pool’s first
 
 All code is versioned and auditable. Campaign editing now flows through the private admin dashboard or direct repo edits, with publishable changes still committed back to the repo through the Worker-controlled GitHub path.
 Super admins can create preview-only campaigns through that same path; those campaigns stay hidden from public campaign routes until launched. Super admins can also archive non-live campaigns through a validated GitHub Actions move into `archive/campaigns/<slug>/`, keeping archived source and media in the repository instead of deleting data. Protected preview reviewer email allowlists live in short-lived Worker KV records instead of campaign Markdown.
-Dashboard media uploads stay source-preserving at the Worker boundary: image/video uploads request the repository optimization workflow after commit, and content/diary/Blast publishes remove or reuse same-campaign dashboard-owned media through the shared campaign media rules instead of adding a second media system.
+Dashboard media uploads stay source-preserving at the Worker boundary: image/video uploads request the repository optimization workflow after commit, content/diary/Blast publishes remove or reuse same-campaign dashboard-owned media through the shared campaign media rules, and image blocks can select existing campaign media through a read-only GitHub directory picker instead of adding a second media index.
 
 ## Plan Efficiency Notes For Forks
 
@@ -35,7 +35,7 @@ The current architecture is deliberately optimized so Cloudflare deployments spe
 - campaign pages and the manage page prefer one combined `/live/:slug` read instead of separate stats + inventory requests
 - the browser caches live stats and inventory in `localStorage` for the configured TTLs, and hidden tabs stop refreshing until visible again
 - dashboard reports, supporters, analytics, settlement helpers, admin broadcast/Blast audience lookups, and stats / inventory reconciliation all prefer the `campaign-pledges:{slug}` index and avoid expensive namespace scans on normal read paths
-- dashboard content loads/previews, report previews/downloads, supporter filters, analytics views, marketing referral lists, QR previews/downloads, Blast dry runs, and local drafts are designed to add zero KV writes
+- dashboard content loads/previews, report previews/downloads, supporter filters, analytics views, marketing referral lists/reporting, abandoned-checkout health reads, media-library picker loads, QR previews/downloads, Blast dry runs, and local drafts are designed to add zero KV writes
 - protected preview payload reads are zero-write; publishing a protected preview writes one 24-hour preview access allowlist plus an audit event
 - campaign archive operations write one audit event; the source/media archive move runs locally in dev and in GitHub Actions for production
 - limited-tier write paths now ask the per-campaign coordinator for reservation-aware availability, while public inventory stays in KV as a projection
@@ -188,7 +188,7 @@ For current Cloudflare limits, see:
 11. **Performance work should stay static-first**: prefer stable Jekyll output, generated asset minification, lazy runtime loading, and conservative public-only prefetching before adding client complexity.
 12. **Media lifecycle work should stay repo-backed**: dashboard uploads commit source files first, repository automation owns native image/video optimization, and publish-time cleanup only removes same-campaign media that disappeared from authored content and is not referenced elsewhere.
 13. **Preview access data should stay out of source**: protected-preview Markdown carries only preview flags; preview access emails belong in short-lived Worker KV allowlists and signed 24-hour links.
-14. **Marketing tools should stay local or indexed where possible**: QR generation and drafts are browser-local, saved referral codes are explicit campaign-scoped KV mutations, and Blast dry runs must use campaign pledge indexes instead of namespace scans.
+14. **Marketing tools should stay local, indexed, or explicit**: QR generation stays browser-local, reporting and Blast dry runs use campaign pledge indexes, saved referral codes and shared drafts are explicit campaign-scoped KV mutations, stale shared drafts fail on revision conflicts, and none of these flows should fall back to namespace scans.
 
 ---
 

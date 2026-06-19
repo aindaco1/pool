@@ -11,7 +11,7 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
-El hito de lanzamiento actual de la plataforma es **v1.0.6**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente añade herramientas de marketing de campaña más completas, blasts de correo para patrocinadores, recordatorios de checkout abandonado con consentimiento y un helper de configuración script-first para forks.
+El hito de lanzamiento actual de la plataforma es **v1.0.7**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente añade visibilidad de checkout abandonado por campaña, comprobaciones de preparación para setup/deploy, borradores compartidos de Marketing y Blast, reportes de referencias/UTM y un selector de media limitado por campaña para bloques de imagen.
 
 ## Aportes de todo o nada
 
@@ -79,13 +79,13 @@ La plataforma está diseñada para cineastas y equipos creativos que necesitan u
 - **Add-ons opcionales de plataforma**: ofrece merch de plataforma junto con los aportes cuando esté habilitado, con inventario y envío separados que no cuentan para la meta de financiación de la campaña.
 - **Add-ons de campaña**: vende merch o extras específicos de la campaña en el mismo flujo de aporte, manteniendo ingresos, inventario y envío ligados a esa campaña.
 - **Panel privado de administración**: da a personas de confianza un espacio enfocado para ajustes de campaña, contenido de página, recompensas, actualizaciones, decisiones, reportes, patrocinadores, analytics y enlaces de marketing.
-- **Herramientas de marketing de campaña**: crea enlaces con tracking, guarda códigos de referencia, descarga códigos QR de campaña y genera snippets de embed desde el tab Marketing del panel.
-- **Blasts de correo para patrocinadores**: envía blasts de correo por campaña desde Campaigns -> Blast, usando imágenes alojadas por la campaña y enlaces de video compatibles con email.
+- **Herramientas de marketing de campaña**: crea enlaces con tracking, guarda códigos de referencia, descarga códigos QR de campaña, revisa performance de referencias/UTM y genera snippets de embed desde el tab Marketing del panel.
+- **Blasts de correo para patrocinadores**: envía blasts de correo por campaña desde Campaigns -> Blast, usando borradores compartidos, imágenes alojadas por la campaña y enlaces de video compatibles con email.
 - **Vistas previas protegidas de campaña**: comparte campañas en borrador o solo-preview de forma privada con personas usuarias asignadas y revisoras invitadas antes de que la página pública lance.
 - **Configuración de nuevas campañas**: las personas superadministradoras pueden crear una campaña privada en borrador a partir de un título y personas usuarias asignadas, y luego completar el resto desde el panel.
 - **Archivado de campañas**: las personas superadministradoras pueden archivar campañas no activas sin borrar la fuente ni los medios subidos de la campaña, manteniendo un registro revisable fuera de las listas activas.
 - **Zona horaria configurable de plataforma**: las personas superadministradoras pueden elegir la zona horaria IANA usada para fechas límite, cuentas regresivas, reportes programados y automatización del ciclo de vida.
-- **Cargas de media en el panel**: prepara imágenes, video y audio de campaña o diario con previews, publícalos en las rutas de assets de campaña, activa la optimización de imágenes/video y limpia media del panel que ya no esté referenciada.
+- **Cargas de media en el panel**: prepara imágenes, video y audio de campaña o diario con previews, selecciona imágenes existentes para bloques de contenido enriquecido, publícalas en las rutas de assets de campaña, activa la optimización de imágenes/video y limpia media del panel que ya no esté referenciada.
 - **Reportes cuando los necesites**: previsualiza y descarga CSVs de aportes o fulfillment desde el panel, con correos opcionales para responsables de campaña mientras la campaña está activa.
 - **Recordatorios para campañas próximas**: permite que posibles patrocinadores opten por un solo correo de lanzamiento antes de que una campaña abra, sin cuentas ni dependencias de lista de correo.
 - **Embeds para promoción**: genera widgets vivos de campaña para sitios aliados, páginas de prensa, portfolios de creadores o páginas de patrocinadores.

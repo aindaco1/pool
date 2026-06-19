@@ -923,6 +923,54 @@ describe('Worker business logic hardening', () => {
     await expect(kv.get('abandoned-cart:pool-intent-stale', { type: 'json' })).resolves.toBeNull();
   });
 
+  it('skips abandoned checkout reminders for campaign-scoped admin suppression', async () => {
+    const env = createEnv({ ABANDONED_CART_DELAY_MS: '0' });
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('abandoned-cart:pool-intent-suppressed', JSON.stringify({
+      version: 1,
+      status: 'pending',
+      orderId: 'pool-intent-suppressed',
+      email: 'buyer@example.com',
+      emailHash: 'buyer-hash',
+      preferredLang: 'en',
+      campaignSlugs: ['hand-relations'],
+      campaignSetHash: 'campaign-hash',
+      campaignTitle: 'Hand Relations',
+      campaignTitles: ['Hand Relations'],
+      campaignUrl: 'https://pool.test/campaigns/hand-relations/',
+      amountCents: 2500,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      sendAfter: '2026-01-01T00:00:00.000Z',
+      attempts: 0
+    }));
+    await kv.put('abandoned-cart-queue:v1', JSON.stringify({ version: 1, hasPending: true, nextDueAt: '2026-01-01T00:00:00.000Z' }));
+    await kv.put('abandoned-cart-suppressed-campaign:hand-relations:buyer-hash', JSON.stringify({
+      campaignSlug: 'hand-relations',
+      emailHash: 'buyer-hash',
+      source: 'admin'
+    }));
+
+    const scheduledWorker = worker as unknown as {
+      scheduled: (event: { cron: string }, env: Record<string, unknown>, ctx: { waitUntil: (promise: Promise<unknown>) => void }) => Promise<void>
+    };
+    await scheduledWorker.scheduled(
+      { cron: '* * * * *' },
+      env,
+      { waitUntil: () => {} }
+    );
+
+    expect(mockSendAbandonedCartEmail).not.toHaveBeenCalled();
+    await expect(kv.get('abandoned-cart:pool-intent-suppressed', { type: 'json' })).resolves.toBeNull();
+    await expect(kv.get('abandoned-cart-health:v1', { type: 'json' })).resolves.toMatchObject({
+      totals: expect.objectContaining({ suppressed: 1, pending: 0 }),
+      campaigns: {
+        'hand-relations': expect.objectContaining({
+          totals: expect.objectContaining({ suppressed: 1, pending: 0 })
+        })
+      }
+    });
+  });
+
   it('suppresses abandoned checkout reminders from a signed unsubscribe token', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as MockKVNamespace;

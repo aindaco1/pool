@@ -35,10 +35,10 @@ This checklist covers:
 
 ## What Changed Since v0.9.5
 
-This checklist now reflects the creator-facing platform changes through **v1.0.6**:
+This checklist now reflects the creator-facing platform changes through **v1.0.7**:
 
 - creators can use campaign-specific dashboard access for normal edits instead of direct repository access
-- dashboard media uploads support images, video, audio, previews, and later repository optimization with responsive WebP variants
+- dashboard media uploads support images, video, audio, previews, later repository optimization with responsive WebP variants, and selecting existing campaign images in WYSIWYG image blocks
 - campaign add-ons can be attached to one campaign and count toward that campaign's goal
 - campaign-runner report recipients can receive daily pledge ledgers and post-deadline fulfillment exports
 - hosted embeds give creators a live widget for websites and HTML-friendly partner pages
@@ -49,9 +49,9 @@ This checklist now reflects the creator-facing platform changes through **v1.0.6
 - campaign analytics now keep gross campaign revenue visible while also showing net campaign revenue after allocated processor fees
 - platform operators can monitor Cloudflare and Resend plan usage from the admin dashboard without exposing provider tokens to campaign teams
 - campaign teams can use protected preview links to review draft campaigns privately before public launch
-- campaign teams can build tracked campaign URLs, save referral codes, and download campaign QR codes from the Marketing tab
-- Campaigns -> Blast can send supporter email blasts with hosted campaign images and email-safe YouTube/Vimeo links
-- custom checkout can collect explicit consent for one abandoned-checkout reminder, which is separate from launch reminders and ordinary campaign blasts
+- campaign teams can build tracked campaign URLs, save referral codes, download campaign QR codes, save shared Marketing drafts, and review referral/UTM performance from the Marketing tab
+- Campaigns -> Blast can save shared drafts and send supporter email blasts with hosted campaign images, selected existing campaign images, and email-safe YouTube/Vimeo links
+- custom checkout can collect explicit consent for one abandoned-checkout reminder, which is separate from launch reminders and ordinary campaign blasts; campaign teams can review aggregate reminder health and use scoped suppression controls without seeing reminder PII
 - public performance work makes campaign progress, share links, deferred YouTube hero embeds, responsive image delivery, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
 
 ## The Short Version
