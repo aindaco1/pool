@@ -71,7 +71,7 @@ const WORKER_SECRETS = [
   { name: 'ADMIN_SESSION_SECRET', label: 'Browser admin session secret', required: true, generate: true },
   { name: 'CHECKOUT_INTENT_SECRET', label: 'Checkout intent HMAC secret', required: true, generate: true },
   { name: 'MAGIC_LINK_SECRET', label: 'Supporter/admin magic-link HMAC secret', required: true, generate: true },
-  { name: 'ABANDONED_CART_TOKEN_SECRET', label: 'Abandoned-checkout unsubscribe token secret', required: false, generate: true },
+  { name: 'ABANDONED_CART_TOKEN_SECRET', label: 'Abandoned-checkout reminder token secret', required: false, generate: true },
   { name: 'TURNSTILE_SECRET_KEY', label: 'Cloudflare Turnstile secret key', required: false },
   { name: 'ADMIN_TURNSTILE_SECRET_KEY', label: 'Admin-specific Turnstile secret key', required: false },
   { name: 'LAUNCH_REMINDER_TURNSTILE_SECRET_KEY', label: 'Launch reminder Turnstile secret key', required: false },

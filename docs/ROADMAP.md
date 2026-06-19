@@ -64,6 +64,7 @@ The v1.0.7 milestone hardens the v1.0.6 marketing, Blast, abandoned-checkout, an
   - The helper keeps production setup idempotency and operator confirmation front of mind, while avoiding app-wrapper complexity until the script-first workflow is stable
   - Production setup now detects and reuses existing Cloudflare KV namespace bindings/resources before planning creation, including dry-run output that distinguishes reuse from create
   - Read-only readiness checks can call live Cloudflare, GitHub, Stripe, Resend, Turnstile, USPS, and ZIP.TAX provider APIs during setup/dry runs, with `--skip-readiness` available when operators need a narrower local check
+  - Setup-helper subprocess tests exercise dry-run, temp-repo local secret generation, production KV create/reuse planning, generated Worker secret writes, and readiness probes with fake provider CLIs so coverage does not depend on live credentials
 
 **Campaign and public experience**
 
@@ -110,8 +111,9 @@ The v1.0.7 milestone hardens the v1.0.6 marketing, Blast, abandoned-checkout, an
   - checkout autofill and shipping-address support
 - [x] Abandoned-checkout reminders
   - Abandoned-checkout reminders collect an explicit one-reminder opt-in, queue only after first-party Stripe session creation succeeds, delete on completed pledge persistence, suppress duplicate/signed-unsubscribed audiences, and send through the shared Resend email module
+  - Signed reminder links restore a sanitized browser checkout draft for the same abandoned cart/contact context and start a fresh Stripe session without putting Stripe secrets in URLs
   - Scheduling uses `abandoned-cart-queue:v1`, retention limits, sent/suppression markers, and bounded batches so idle cron ticks avoid KV list scans
-  - Campaign admins can view campaign-scoped abandoned-checkout reminder health from aggregate queue/outcome counters without exposing supporter PII or listing KV namespaces
+  - Campaign admins can view campaign-scoped abandoned-checkout reminder health from aggregate queue/outcome counters without listing KV namespaces, and admin-created suppression rows show the suppressed email so they can be cleared from the table
   - Campaign-scoped suppression controls are explicit admin mutations with CSRF, audit events, hashed email identifiers, and no retry-specific abandoned-cart action
 
 **Payments, inventory, and reporting**
@@ -180,7 +182,8 @@ The v1.0.7 milestone hardens the v1.0.6 marketing, Blast, abandoned-checkout, an
   - Saved referral codes store only the explicit campaign-scoped referral record; QR preview/downloads are browser-local and do not read or write KV
   - Campaign QR generation was adapted from the MIT-licensed QR generator approach in `1612elphi/delphitools` for this stack's URL builder, saved referral links, and PNG/SVG download needs
   - Shared Marketing drafts use one campaign-scoped KV record with 7-day expiry, explicit load/save/clear controls, revision-conflict protection, and one bounded write only on user save/clear
-  - Campaign marketing performance reports reuse the existing campaign pledge index and saved referral labels to show referral and UTM source/medium/content aggregates without KV list scans
+- [x] Analytics attribution reporting
+  - Analytics reuses the existing campaign pledge index and saved referral labels to show referral and UTM source/medium/campaign/content aggregates without KV list scans or a duplicate Marketing-tab reporting surface
 - [x] Supporter email blasts
   - Campaigns -> Blast lets assigned campaign users and super admins send supporter email blasts to the campaign's indexed supporters using the shared WYSIWYG editor, subject, CTA Button Label, and CTA Button URL fields
   - Blast drafts remain browser-local; automatic dry runs run before test/live sends, test sends go only to the signed-in admin, live sends require the matching dry-run hash, and sent history is shown read-only below the editor
@@ -273,6 +276,8 @@ The v1.0.7 milestone hardens the v1.0.6 marketing, Blast, abandoned-checkout, an
     - Create a simple Mac/Windows/Linux app wrapper around the same setup core after the script-first workflow remains stable across more fork installs
   - [ ] Media library polish
     - Consider making Source URL an advanced/edit-existing-path affordance after the scoped picker has been exercised in production
+  - [ ] Dashboard tab persistence
+    - Remember the admin dashboard tab and Campaigns subtab a user last had open so refreshes return them to the same working context
 - [ ] Tax calculator expansion
   - Support USA and international
   - Target local / jurisdiction-level US rates, not just state-level rates

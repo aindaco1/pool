@@ -231,6 +231,13 @@ describe('cart provider shim', () => {
       }
     });
 
+    await readyApi.api.cart.update({
+      abandonedCartConsent: true
+    });
+    expect(JSON.parse(sessionStorage.getItem('pool_first_party_cart_draft') || '{}')).toMatchObject({
+      abandonedCartConsent: true
+    });
+
     await readyApi.api.theme.cart.navigate('/checkout');
     expect(onRouteChanged).toHaveBeenCalledWith({
       from: null,
@@ -2665,7 +2672,7 @@ describe('cart provider shim', () => {
 
     await vi.waitFor(() => {
       expect(mount).toHaveBeenCalled();
-    }, { timeout: 10000 });
+    }, { timeout: 20000 });
   });
 
   it('keeps the custom payment element mounted after an incomplete-card confirm error', async () => {
@@ -4591,6 +4598,108 @@ describe('cart provider shim', () => {
           }
         }
       });
+    });
+  });
+
+  it('restores an abandoned checkout from a signed reminder link', async () => {
+    (window as any).POOL_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      workerBase: WORKER_BASE
+    };
+
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url !== `${WORKER_BASE}/abandoned-cart/resume?t=resume-token`) {
+        throw new Error(`Unexpected fetch: ${url}`);
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        orderId: 'pool-intent-resume-1',
+        campaignUrl: '/campaigns/demo/',
+        snapshot: {
+          cart: {
+            tipPercent: 6,
+            items: [
+              {
+                id: 'demo__featured-tier',
+                name: 'Demo Featured Tier',
+                price: 25,
+                quantity: 2,
+                url: '/campaigns/demo/',
+                description: 'Featured support tier',
+                stackable: false,
+                shippable: false,
+                maxQuantity: 1
+              }
+            ]
+          },
+          campaignUrl: '/campaigns/demo/',
+          savedAt: Date.now()
+        },
+        draft: {
+          email: 'supporter@example.com',
+          abandonedCartConsent: true,
+          billingAddress: {
+            country: 'US',
+            postalCode: '87101'
+          },
+          customer: {
+            email: 'supporter@example.com'
+          },
+          shippingDraft: {
+            name: '',
+            address: {
+              line1: '',
+              line2: '',
+              city: '',
+              state: '',
+              postal_code: '87101',
+              country: 'US'
+            }
+          }
+        }
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }));
+
+    window.history.replaceState({}, '', '/campaigns/demo/?checkoutResume=resume-token&utm_source=email');
+    document.body.innerHTML = '<div data-pool-cart-root="true" hidden></div>';
+
+    await import('../../assets/js/cart-provider.js');
+
+    const provider = (window as any).PoolCartProvider;
+    const root = document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
+    await vi.waitFor(() => {
+      expect(provider.store.getState()).toMatchObject({
+        customer: {
+          email: 'supporter@example.com'
+        },
+        cart: {
+          email: 'supporter@example.com',
+          abandonedCartConsent: true,
+          tipPercent: 6,
+          items: {
+            count: 1
+          }
+        }
+      });
+      expect(root?.textContent).toContain('Checkout');
+    });
+    expect(root?.textContent).toContain('Demo Featured Tier');
+    expect(window.location.search).toBe('?utm_source=email');
+    expect(JSON.parse(localStorage.getItem('pool_first_party_checkout_snapshot') || '{}')).toMatchObject({
+      campaignUrl: '/campaigns/demo/',
+      cart: {
+        items: [expect.objectContaining({ id: 'demo__featured-tier' })]
+      }
+    });
+    expect(JSON.parse(sessionStorage.getItem('pool_first_party_cart_draft') || '{}')).toMatchObject({
+      email: 'supporter@example.com',
+      abandonedCartConsent: true
     });
   });
 

@@ -35,6 +35,8 @@
   border-radius: var(--pool-radius-lg, 6px);
 }
 
+$admin-section-gap: clamp(16px, 2vw, 24px);
+
 @mixin admin-table {
   @include prose-table(0);
   @include admin-surface(0);
@@ -133,6 +135,10 @@ body.campaign-preview-render {
   min-height: 1.5em;
 }
 
+.admin-dashboard__status:empty {
+  display: none;
+}
+
 .admin-dashboard__status[data-admin-prominent-status="true"] {
   @include admin-surface(12px 14px);
   align-items: center;
@@ -163,6 +169,79 @@ body.campaign-preview-render {
   .admin-dashboard__status-action {
     width: 100%;
   }
+}
+
+.admin-section-stack {
+  display: grid;
+  gap: $admin-section-gap;
+  margin-top: $admin-section-gap;
+  min-width: 0;
+}
+
+.admin-section-panel {
+  @include admin-surface(14px);
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  overflow: visible;
+}
+
+.admin-section-panel > h2,
+.admin-section-panel > h3,
+.admin-section-panel .campaign-embed-builder__intro h1,
+.admin-section-panel .campaign-embed-builder__intro h2,
+.admin-section-panel .campaign-embed-builder__intro h3 {
+  @include type-card-title;
+  margin: 0;
+}
+
+.admin-section-panel > p,
+.admin-section-panel .campaign-embed-builder__intro p {
+  color: $color--secondary;
+  margin: 0;
+}
+
+.admin-stat-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.admin-stat-card,
+.admin-analytics__card,
+.admin-reports__card {
+  border: 1px solid $border--default;
+  border-radius: var(--pool-radius-lg, 6px);
+  min-width: 0;
+  overflow: visible;
+  padding: 12px;
+}
+
+.admin-stat-card__value {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.admin-stat-card__label {
+  align-items: center;
+  color: $color--secondary;
+  display: inline-flex;
+  gap: 6px;
+  margin-top: 4px;
+  position: relative;
+}
+
+.admin-card-heading {
+  @include admin-label;
+  align-items: center;
+  display: inline-flex;
+  font-family: $font-family--body;
+  gap: 6px;
+  line-height: 1.2;
+  margin: 0;
+  position: relative;
 }
 
 .admin-app__toolbar-actions {
@@ -1091,6 +1170,7 @@ textarea.admin-settings__input--readonly {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
+  font-size: $type--ui;
   min-height: 2.625rem;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 
@@ -1927,6 +2007,10 @@ textarea.admin-settings__input--readonly {
   }
 }
 
+.admin-content-block:has(.admin-content-block__settings-panel:not([hidden])) .admin-content-block__settings-button {
+  display: none;
+}
+
 .admin-content-block__chrome-row {
   align-items: center;
   display: flex;
@@ -2472,8 +2556,7 @@ textarea.admin-settings__input--readonly {
 .admin-marketing__url-row,
 .admin-marketing__actions,
 .admin-marketing__status,
-.admin-marketing__draft-status,
-.admin-marketing__resources {
+.admin-marketing__draft-status {
   grid-column: 1 / -1;
 }
 
@@ -2739,12 +2822,6 @@ textarea.admin-settings__input--readonly {
   }
 }
 
-.admin-marketing__resources {
-  display: grid;
-  gap: 16px;
-  margin-top: 4px;
-}
-
 .admin-marketing__url-row {
   --admin-marketing-qr-size: 120px;
 
@@ -2771,74 +2848,6 @@ textarea.admin-settings__input--readonly {
   min-width: 0;
 }
 
-.admin-marketing__referrals > h3 {
-  @include type-card-title;
-  margin: 0 0 8px;
-}
-
-.admin-marketing__reporting,
-.admin-marketing__abandoned-health {
-  @include admin-surface(12px);
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-
-  > h3 {
-    @include type-card-title;
-    margin: 0;
-  }
-
-  > p {
-    margin: 0;
-  }
-}
-
-.admin-marketing__summary {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-}
-
-.admin-marketing__stat {
-  background: $surface--subtle;
-  border: 1px solid $border--default;
-  border-radius: var(--pool-radius-lg, 6px);
-  display: grid;
-  gap: 2px;
-  padding: 10px;
-}
-
-.admin-marketing__stat-value {
-  @include type-card-title;
-}
-
-.admin-marketing__stat-label {
-  @include type-ui;
-  color: $color--secondary;
-}
-
-.admin-marketing__metric-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.admin-marketing__metric-table {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-
-  h4 {
-    @include type-ui;
-    margin: 0;
-  }
-}
-
-.admin-marketing__reporting-table {
-  font-size: 0.9rem;
-  width: 100%;
-}
-
 .admin-marketing__suppression {
   display: grid;
   gap: 8px;
@@ -2849,11 +2858,9 @@ textarea.admin-settings__input--readonly {
   justify-content: flex-start;
 }
 
-.admin-marketing__outcomes {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding-left: 1.2rem;
+.admin-marketing__suppression-status:empty,
+.admin-marketing__outcomes-status:empty {
+  display: none;
 }
 
 .admin-marketing__qr-grid {
@@ -3003,11 +3010,15 @@ textarea.admin-settings__input--readonly {
   min-width: 0;
 }
 
-.admin-marketing__embed {
-  margin-top: 24px;
+.campaign-embed-builder.admin-section-panel {
+  margin-bottom: 0;
 }
 
 .admin-marketing__referrals-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-marketing__outcomes-table-wrap {
   overflow-x: auto;
 }
 
@@ -3052,11 +3063,7 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-analytics__summary {
-  @include admin-surface(14px);
-  display: grid;
-  gap: 12px;
   margin-top: 12px;
-  overflow: visible;
 }
 
 .admin-analytics__metrics,
@@ -3071,22 +3078,6 @@ textarea.admin-settings__input--readonly {
 
 .admin-analytics__breakdowns {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.admin-analytics__card {
-  border: 1px solid $border--default;
-  overflow: visible;
-  padding: 12px;
-
-  h3 {
-    font-size: $type--ui;
-    line-height: 1.2;
-    margin: 0 0 8px;
-  }
-}
-
-.admin-reports__card {
-  @include admin-surface(14px);
 }
 
 .admin-reports__card-value,
@@ -3158,6 +3149,7 @@ textarea.admin-settings__input--readonly {
 .admin-inventory__table,
 .admin-analytics__table,
 .admin-marketing__referrals-table,
+.admin-marketing__outcomes-table,
 .admin-supporters__table {
   @include admin-table;
 }
@@ -3406,9 +3398,8 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-reports__cards,
-  .admin-marketing__resources,
+  .admin-marketing__sections,
   .admin-marketing__url-row,
-  .admin-marketing__metric-grid,
   .admin-blast__grid,
   .admin-analytics__metrics,
   .admin-analytics__breakdowns,
@@ -3438,12 +3429,13 @@ textarea.admin-settings__input--readonly {
     overflow: visible;
   }
 
-  .admin-marketing__referrals-table-wrap {
+  .admin-marketing__referrals-table-wrap,
+  .admin-marketing__outcomes-table-wrap {
     overflow: visible;
   }
 
   .admin-marketing__referrals-table,
-  .admin-marketing__reporting-table {
+  .admin-marketing__outcomes-table {
     background: transparent;
     border: 0;
     border-radius: 0;
@@ -3532,10 +3524,6 @@ textarea.admin-settings__input--readonly {
 
   .admin-content-block.is-active > .admin-content-block__settings-button {
     display: none;
-  }
-
-  .admin-content-block.is-active:has(.admin-content-block__settings-panel:not([hidden])) > .admin-content-block__settings-button {
-    display: inline-flex;
   }
 
   .admin-content-block.is-active .admin-content-block__chrome,

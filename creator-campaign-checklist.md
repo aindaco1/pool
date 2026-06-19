@@ -49,7 +49,7 @@ This checklist now reflects the creator-facing platform changes through **v1.0.7
 - campaign analytics now keep gross campaign revenue visible while also showing net campaign revenue after allocated processor fees
 - platform operators can monitor Cloudflare and Resend plan usage from the admin dashboard without exposing provider tokens to campaign teams
 - campaign teams can use protected preview links to review draft campaigns privately before public launch
-- campaign teams can build tracked campaign URLs, save referral codes, download campaign QR codes, save shared Marketing drafts, and review referral/UTM performance from the Marketing tab
+- campaign teams can build tracked campaign URLs, save referral codes, download campaign QR codes, save shared Marketing drafts, and review referral/UTM performance from Analytics
 - Campaigns -> Blast can save shared drafts and send supporter email blasts with hosted campaign images, selected existing campaign images, and email-safe YouTube/Vimeo links
 - custom checkout can collect explicit consent for one abandoned-checkout reminder, which is separate from launch reminders and ordinary campaign blasts; campaign teams can review aggregate reminder health and use scoped suppression controls without seeing reminder PII
 - public performance work makes campaign progress, share links, deferred YouTube hero embeds, responsive image delivery, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
@@ -1006,6 +1006,7 @@ Good examples:
 - QR codes should be tested from a real phone camera before printing or sharing broadly
 - if a host strips iframe code, use a normal campaign link plus the share-card preview instead
 - Blast copy should be concise, image-light, and linked to hosted campaign/media URLs rather than remote image hotlinks
+- teams running their own fork should rehearse `npm run setup:deploy -- --mode=production --dry-run` before launch so provider readiness, KV namespace reuse, secrets, and deploy steps are reviewed before supporters arrive
 
 ## Physical Rewards and Shipping
 

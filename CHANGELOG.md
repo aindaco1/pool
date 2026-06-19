@@ -1,13 +1,13 @@
 # Changelog
 
-## v1.0.7 - Unreleased
+## v1.0.7 - 2026-06-19
 
 Release scope:
 
-- Added campaign-scoped abandoned-checkout reminder health in Marketing with aggregate queue/outcome counts, recent outcomes, scoped suppression/clear controls, hashed email identifiers, audit events, and no retry-specific abandoned-cart action.
-- Hardened `npm run setup:deploy` with Cloudflare KV namespace reuse, clearer dry-run reuse/create output, live read-only provider readiness checks, and `--skip-readiness` for narrow dry runs.
+- Added campaign-scoped abandoned-checkout reminder health in Marketing with aggregate queue/outcome counts, recent outcomes, scoped suppression/clear controls, hashed email identifiers, audit events, signed checkout resume links, and no retry-specific abandoned-cart action.
+- Hardened `npm run setup:deploy` with Cloudflare KV namespace reuse, clearer dry-run reuse/create output, live read-only provider readiness checks, `--skip-readiness` for narrow dry runs, and subprocess-based unit coverage for dry-run, local-secret, production-KV, readiness, and generated-secret paths.
 - Added explicit shared Marketing and Blast drafts with one campaign-scoped KV record per surface, 7-day expiry, revision-conflict protection, and no background writes.
-- Added campaign marketing performance reporting for saved/unsaved referral codes and UTM source/medium/content aggregates using the existing campaign pledge index without KV namespace scans.
+- Added Analytics referral/UTM performance reporting for saved and unsaved campaign links, including UTM source/medium/campaign/content aggregates from existing campaign pledge indexes without KV namespace scans.
 - Added a shared WYSIWYG image media picker for Campaign Content, Diary, and Blast image blocks. Campaign users see campaign-scoped media; super admins can also select shared/default images. The picker is read-only and adds no new KV state.
 - Updated English/Spanish dashboard copy, README/Worker/Dashboard docs, roadmap, creator checklist, About/Terms context, and targeted unit coverage for the new behavior.
 

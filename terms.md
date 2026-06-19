@@ -72,7 +72,7 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - Full card details are handled and stored by Stripe. The Pool does not store full card numbers or CVC values.
 - Email addresses and any shipping details needed for fulfillment may be stored in our system for pledge management, campaign-specific confirmations, campaign updates, and reward fulfillment.
 - If you sign up for an upcoming campaign launch reminder, your email is stored in campaign-scoped reminder records so The Pool can send that one reminder, avoid duplicate sends, and honor unsubscribes for that campaign. Reminder signups may use Cloudflare Turnstile to reduce abuse.
-- If you opt into an abandoned-checkout reminder, your email and a limited checkout reminder record may be stored briefly so The Pool can send one follow-up, avoid duplicate sends, delete the reminder after a completed pledge, and honor unsubscribe requests.
+- If you opt into an abandoned-checkout reminder, your email and a limited checkout reminder record may be stored briefly so The Pool can send one follow-up, avoid duplicate sends, restore the unfinished checkout context from a signed reminder link, delete the reminder after a completed pledge, and honor unsubscribe requests.
 - Authorized campaign operators may view aggregate abandoned-checkout reminder health for campaigns they manage and may set campaign-scoped suppression records. Those controls use hashed email identifiers and aggregate counters instead of exposing reminder recipient lists.
 - Authorized campaign operators may send campaign-scoped supporter blasts to supporters of campaigns they are allowed to manage. Blast emails use the shared transactional email system, may include hosted campaign images and ordinary campaign links, and should not expose unrelated campaign supporter data.
 - Authorized campaign operators may explicitly save shared Marketing or Blast drafts for campaigns they manage. These drafts are campaign-scoped, expire after a short retention window, and may include draft subject lines, campaign links, CTA text, and campaign-hosted media references.
@@ -111,4 +111,4 @@ For questions about these terms or your pledge, email us at info@dustwave.xyz.
 
 ---
 
-_Last updated: June 18, 2026_
+_Last updated: June 19, 2026_

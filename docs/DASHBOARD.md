@@ -317,13 +317,15 @@ The Supporters tab shows role-scoped supporter rows with live filtering, sorting
 
 Analytics is derived from existing pledge indexes and campaign summaries. It should not create analytics-specific KV writes on view.
 
-The dashboard shows cards for pledge totals, revenue categories, net revenue after allocated processor fees, tax, shipping, Stripe fees, pledge status, supporters, average pledge, campaign add-ons, referral attribution, UTM source, fulfillment type, language, and other pledge-derived breakdowns. Money values display exact cents.
+The dashboard shows cards for pledge totals, revenue categories, net revenue after allocated processor fees, tax, shipping, Stripe fees, pledge status, supporters, average pledge, campaign add-ons, referral attribution, UTM source/medium/campaign/content, fulfillment type, language, and other pledge-derived breakdowns. Money values display exact cents.
+
+If a campaign is missing its `campaign-pledges:<slug>` projection, Analytics stays read-only, returns a zeroed campaign row, and shows a non-blocking missing-index notice instead of listing pledge truth or failing the Marketing tab.
 
 Gross Campaign revenue and Platform revenue remain visible for reconciliation. Net campaign revenue and Net platform revenue subtract each category's allocated share of actual Stripe processor fees when stored balance transaction data exists. Active pledges and older charged pledge rows without actual Stripe balance data continue to use the standard planning estimate. Super-admin-only backfills can safely retrieve historical balance transaction data from Stripe without KV list scans through `POST /admin/analytics/stripe-financials/backfill`.
 
 ## Marketing
 
-The Marketing tab builds campaign URLs with referral and UTM parameters, shows the campaign QR preview/download controls beside the URL output, saves referral codes, exposes the campaign embed-builder UI, loads/saves one shared campaign draft, shows referral/UTM performance from indexed pledges, and shows abandoned-checkout reminder health for the selected campaign.
+The Marketing tab builds campaign URLs with referral and UTM parameters, shows the campaign QR preview/download controls beside the URL output, saves referral codes, exposes the campaign embed-builder UI, loads/saves one shared campaign draft, and shows abandoned-checkout reminder health for the selected campaign. Referral and UTM performance lives in Analytics so campaign performance reporting stays in one place.
 
 Saved referral codes store:
 
@@ -337,11 +339,9 @@ The URL builder clears after saving and on refresh. Referral saves/edits/deletes
 
 QR codes are generated in the browser from the current campaign URL builder output or a saved referral URL, including referral and UTM parameters. The current builder preview updates without Worker calls, and PNG/SVG downloads are browser-local file downloads. QR preview and download actions do not read or write KV.
 
-Shared Marketing drafts are explicit: users click **Load shared draft**, **Save shared draft**, or **Clear shared draft**. A draft is one campaign-scoped KV record with a 7-day TTL and a revision token so stale saves fail with a conflict instead of overwriting another admin's work. Loading and reporting are read-only; saving or clearing is the only draft write.
+Shared Marketing drafts are explicit: users click **Load shared draft**, **Save shared draft**, or **Clear shared draft**. A draft is one campaign-scoped KV record with a 7-day TTL and a revision token so stale saves fail with a conflict instead of overwriting another admin's work. Loading is read-only; saving or clearing is the only draft write.
 
-Marketing performance reads the existing `campaign-pledges:<slug>` projection and pledge rows to show saved and unsaved referral-code performance plus UTM source, medium, and content aggregates. If the campaign pledge index is missing, the report fails closed with `campaign_index_required` instead of scanning pledge truth.
-
-The abandoned-checkout panel shows campaign-scoped reminder health from aggregate queue/outcome counters and recent outcomes without supporter PII. Scoped suppression controls write only when the admin clicks suppress or clear, store hashed email identifiers, and do not include a retry-this-specific-cart action.
+The abandoned-checkout panel shows campaign-scoped reminder health from aggregate queue/outcome counters and recent outcomes without KV listing. Admin-created suppression outcomes include the suppressed email address so admins can clear that suppression from the recent outcomes table; suppression mutations still happen only on explicit action and do not include a retry-this-specific-cart action.
 
 ## Blast
 

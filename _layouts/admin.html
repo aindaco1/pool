@@ -164,14 +164,11 @@
             </div>
             <div id="admin-marketing-draft-status" class="admin-dashboard__status admin-marketing__status" role="status" aria-live="polite"></div>
             <div id="admin-marketing-status" class="admin-dashboard__status admin-marketing__status" role="status" aria-live="polite"></div>
-            <div class="admin-marketing__resources">
-              <div id="admin-marketing-referrals" class="admin-marketing__referrals"></div>
-              <div id="admin-marketing-reporting" class="admin-marketing__reporting"></div>
-              <div id="admin-marketing-abandoned-health" class="admin-marketing__abandoned-health"></div>
-            </div>
           </form>
-          <div class="admin-marketing__embed">
-            {% include campaign-embed-builder.html lang=current_lang heading_tag="h3" autoload="false" sync_query="false" admin_marketing=true %}
+          <div class="admin-marketing__sections admin-section-stack">
+            <div id="admin-marketing-referrals" class="admin-marketing__referrals admin-section-panel"></div>
+            <div id="admin-marketing-abandoned-health" class="admin-marketing__abandoned-health admin-section-panel"></div>
+            {% include campaign-embed-builder.html lang=current_lang heading_tag="h3" autoload="false" sync_query="false" admin_marketing=true class="admin-section-panel" %}
           </div>
         </section>
 

@@ -73,7 +73,7 @@ Esta sección solo se aplica a campañas que solicitan expresamente aportes crea
 - Los datos completos de tarjeta son gestionados y almacenados por Stripe. The Pool no almacena números completos de tarjeta ni valores CVC.
 - Las direcciones de correo electrónico y cualquier dato de envío necesario para el cumplimiento pueden almacenarse en nuestro sistema para la gestión del aporte, confirmaciones específicas de campaña, actualizaciones de campaña y cumplimiento de recompensas.
 - Si te apuntas a un recordatorio de lanzamiento para una campaña próxima, tu correo se guarda en registros de recordatorio limitados a esa campaña para que The Pool pueda enviar ese único recordatorio, evitar duplicados y respetar cancelaciones de ese recordatorio. Los formularios de recordatorio pueden usar Cloudflare Turnstile para reducir abuso.
-- Si optas por un recordatorio de checkout abandonado, tu correo y un registro limitado de recordatorio pueden guardarse brevemente para que The Pool pueda enviar un solo seguimiento, evitar duplicados, borrar el recordatorio después de un aporte completado y respetar cancelaciones de suscripción.
+- Si optas por un recordatorio de checkout abandonado, tu correo y un registro limitado de recordatorio pueden guardarse brevemente para que The Pool pueda enviar un solo seguimiento, evitar duplicados, restaurar el contexto del checkout incompleto desde un enlace firmado de recordatorio, borrar el recordatorio después de un aporte completado y respetar cancelaciones de suscripción.
 - Las personas operadoras autorizadas de una campaña pueden ver salud agregada de recordatorios de checkout abandonado para campañas que gestionan y pueden crear supresiones por campaña. Esos controles usan identificadores de correo hasheados y contadores agregados en lugar de exponer listas de destinatarios de recordatorios.
 - Las personas operadoras autorizadas de una campaña pueden enviar blasts de correo limitados a patrocinadores de campañas que pueden gestionar. Los blasts usan el sistema compartido de correo transaccional, pueden incluir imágenes alojadas por la campaña y enlaces ordinarios de campaña, y no deben exponer datos de patrocinadores de campañas no relacionadas.
 - Las personas operadoras autorizadas pueden guardar explícitamente borradores compartidos de Marketing o Blast para campañas que gestionan. Estos borradores están limitados a una campaña, expiran después de una ventana corta de retención y pueden incluir asuntos en borrador, enlaces de campaña, texto de CTA y referencias a media alojada por la campaña.
@@ -112,4 +112,4 @@ Si tienes preguntas sobre estos términos o sobre tu aporte, escribe a info@dust
 
 ---
 
-_Última actualización: 18 de junio de 2026_
+_Última actualización: 19 de junio de 2026_

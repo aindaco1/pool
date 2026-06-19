@@ -47,6 +47,7 @@ This document covers the security architecture, known risks, applied hardening m
 | `launch-reminder-dispatch:{slug}` | PLEDGES | Bounded reminder dispatch job cursor/progress | **Low** - operational state |
 | `launch-reminder-dispatch-queue:v1` | PLEDGES | Reminder dispatch queue idle/pending marker | **Low** - operational state |
 | `abandoned-cart:{orderId}` | PLEDGES | Explicitly opted-in checkout reminder email and campaign snapshot | **Medium** - campaign-scoped email |
+| `abandoned-cart-resume:{orderId}` | PLEDGES | Short-lived signed-link checkout resume snapshot after a reminder sends | **Medium** - campaign-scoped email and sanitized cart snapshot |
 | `abandoned-cart-sent:{emailHash}:{campaignSetHash}` | PLEDGES | Checkout reminder send idempotency marker | **Low** - send state |
 | `abandoned-cart-suppressed:{emailHash}` | PLEDGES | Checkout reminder unsubscribe marker | **Medium** - supporter email hash |
 | `abandoned-cart-suppressed-campaign:{slug}:{emailHash}` | PLEDGES | Admin-managed campaign-scoped checkout reminder suppression marker | **Medium** - supporter email hash |
@@ -131,7 +132,7 @@ Admin mutations use these common protections:
 - Runtime-only admin users are saved only to KV at `admin-users:v1`; they are not serialized into `_config.yml`.
 - Marketing referral codes are saved only on explicit user action and are scoped to the campaign URL origin/path the admin account can access.
 - Shared Marketing/Blast drafts are saved only on explicit user action, scoped to one campaign and surface, expire after 7 days, and use revision tokens so stale saves do not overwrite another admin's work.
-- Marketing reporting and abandoned-checkout health use campaign pledge indexes or aggregate health state instead of KV namespace scans; reminder health responses expose counters and recent outcomes, not reminder recipient lists.
+- Analytics attribution reporting and abandoned-checkout health use campaign pledge indexes or aggregate health state instead of KV namespace scans; reminder health responses expose counters and recent outcomes, not reminder recipient lists.
 - Campaign-scoped abandoned-checkout suppression controls require CSRF, store hashed email identifiers, and do not expose a retry-this-specific-cart action.
 - Campaigns -> Blast sends are scoped to campaigns the admin account can edit. Blast dry runs require the campaign pledge index and add no KV writes or list operations; live sends require a matching dry-run hash and write one audit event after dispatch.
 - New campaign creation is super-admin-only, writes a preview-only campaign Markdown file locally in dev or through the existing GitHub path in production, and keeps that campaign out of public route generation until launched. Creating new campaign users during that flow saves to `admin-users:v1` and emails assigned users through the shared admin email path when users are assigned.
@@ -208,7 +209,7 @@ Limited-tier inventory mutations now flow through a per-campaign Durable Object 
 
 The newer on-site Stripe checkout and `Update Card` flows now also fail more privately by default: Worker responses that carry Stripe session bootstrap data or order-specific completion state are served with `Cache-Control: private, no-store`, cross-site browser POSTs to checkout-start / checkout-complete / payment-method-start are rejected unless they originate from `SITE_BASE`, and the browser keeps only short-lived in-flight checkout markers for reservation recovery instead of leaving them in long-lived storage indefinitely. Long-lived cart persistence now keeps only cart structure and pricing inputs; contact and address drafts are downgraded to session-scoped storage, and `/checkout-intent/complete` has its own retry budget so local recovery can’t be spammed indefinitely. After successful pledge persistence, the checkout flow now also invalidates live stats/inventory caches immediately and leaves a short-lived refresh marker so restored campaign pages do not keep showing stale totals from pre-pledge browser state.
 
-Abandoned-checkout reminders are opt-in only. The browser sends `abandonedCartConsent` only when the supporter checks the reminder box, and the Worker queues a reminder only after Stripe creates a valid first-party Checkout Session. Reminder records are short-lived, use signed unsubscribe links, delete on successful pledge persistence for that order, and check campaign pledge indexes before sending so a later completed pledge suppresses stale abandoned-checkout email.
+Abandoned-checkout reminders are opt-in only. The browser sends `abandonedCartConsent` only when the supporter checks the reminder box, and the Worker queues a reminder only after Stripe creates a valid first-party Checkout Session. Reminder records are short-lived, use signed unsubscribe links, delete on successful pledge persistence for that order, and check campaign pledge indexes before sending so a later completed pledge suppresses stale abandoned-checkout email. After a reminder sends, the Worker stores a separate short-lived `abandoned-cart-resume:{orderId}` snapshot for signed resume links; that snapshot contains only the sanitized cart/contact fields needed to rebuild a fresh checkout session and never puts Stripe secrets in the URL.
 
 ---
 
@@ -549,7 +550,7 @@ Before deploying to production, verify these secrets are set:
 | Checkout Intent Secret | `CHECKOUT_INTENT_SECRET` | 32+ chars |
 | Magic Link Secret | `MAGIC_LINK_SECRET` | 32+ chars |
 | Launch Reminder Token Secret | `LAUNCH_REMINDER_TOKEN_SECRET` or `MAGIC_LINK_SECRET` fallback | 32+ chars |
-| Abandoned Checkout Token Secret | `ABANDONED_CART_TOKEN_SECRET` or `MAGIC_LINK_SECRET` fallback | 32+ chars |
+| Abandoned Checkout Token Secret | `ABANDONED_CART_TOKEN_SECRET` or `MAGIC_LINK_SECRET` fallback for reminder unsubscribe/resume links | 32+ chars |
 | Admin Session Secret | `ADMIN_SESSION_SECRET` | 32+ chars |
 | Admin Secret | `ADMIN_SECRET` | 32+ chars |
 | Settlement Admin Secret | `ADMIN_SETTLEMENT_SECRET` (optional, scoped) | 32+ chars |

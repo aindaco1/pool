@@ -867,10 +867,52 @@ describe('Worker business logic hardening', () => {
       email: 'buyer@example.com',
       campaignSlug: 'hand-relations',
       campaignTitle: 'Hand Relations',
+      resumeUrl: expect.stringContaining('checkoutResume=token'),
       unsubscribeUrl: expect.stringContaining('/abandoned-cart/unsubscribe?t=token')
     }));
     await expect(kv.get(`abandoned-cart:${orderId}`, { type: 'json' })).resolves.toBeNull();
     expect(Array.from(kv.store.keys()).some(key => key.startsWith('abandoned-cart-sent:'))).toBe(true);
+    const resumeKey = Array.from(kv.store.keys()).find(key => key.startsWith('abandoned-cart-resume:'));
+    expect(resumeKey).toBe(`abandoned-cart-resume:${orderId}`);
+    const resumeRecord = await kv.get(String(resumeKey), { type: 'json' });
+    expect(resumeRecord).toMatchObject({
+      orderId,
+      email: 'buyer@example.com',
+      campaignSlugs: ['hand-relations'],
+      resumeSnapshot: {
+        cart: {
+          items: [expect.objectContaining({
+            id: 'hand-relations__frame-slot',
+            name: 'Buy 1 Frame'
+          })]
+        }
+      }
+    });
+    mockVerifyToken.mockResolvedValueOnce({
+      scope: 'abandoned-cart-resume',
+      orderId,
+      emailHash: resumeRecord.emailHash,
+      campaignSetHash: resumeRecord.campaignSetHash
+    });
+    const resumeResponse = await worker.fetch(
+      new Request('https://pool.test/abandoned-cart/resume?t=resume-token'),
+      env,
+      { waitUntil: () => {} }
+    );
+    expect(resumeResponse.status).toBe(200);
+    await expect(resumeResponse.json()).resolves.toMatchObject({
+      success: true,
+      orderId,
+      snapshot: {
+        cart: {
+          items: [expect.objectContaining({ id: 'hand-relations__frame-slot' })]
+        }
+      },
+      draft: {
+        email: 'buyer@example.com',
+        abandonedCartConsent: true
+      }
+    });
     await expect(kv.get('abandoned-cart-queue:v1', { type: 'json' })).resolves.toMatchObject({
       hasPending: false
     });

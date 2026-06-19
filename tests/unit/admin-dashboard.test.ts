@@ -406,9 +406,14 @@ describe('admin dashboard foundation', () => {
     expect(layout).not.toContain('id="admin-marketing-snippets"');
     expect(layout).toContain('class="admin-marketing__url-row"');
     expect(layout).toContain('id="admin-marketing-referrals"');
-    expect(layout).toContain('id="admin-marketing-reporting"');
+    expect(layout).not.toContain('id="admin-marketing-reporting"');
     expect(layout).toContain('id="admin-marketing-abandoned-health"');
-    expect(layout).toContain('class="admin-marketing__resources"');
+    expect(layout).toContain('class="admin-marketing__sections admin-section-stack"');
+    expect(layout).toContain('id="admin-marketing-referrals" class="admin-marketing__referrals admin-section-panel"');
+    expect(layout).toContain('id="admin-marketing-abandoned-health" class="admin-marketing__abandoned-health admin-section-panel"');
+    const marketingFormStart = layout.indexOf('id="admin-marketing-form"');
+    const marketingFormEnd = layout.indexOf('</form>', marketingFormStart);
+    expect(marketingFormEnd).toBeLessThan(layout.indexOf('id="admin-marketing-referrals"'));
     expect(layout).toContain('id="admin-marketing-qr-preview"');
     expect(layout).toContain('id="admin-marketing-qr-download-png"');
     expect(layout).toContain('id="admin-marketing-qr-download-svg"');
@@ -455,6 +460,7 @@ describe('admin dashboard foundation', () => {
     expect(layout).toContain('autoload="false"');
     expect(layout).toContain('sync_query="false"');
     expect(layout).toContain('admin_marketing=true');
+    expect(layout).toContain('class="admin-section-panel"');
     expect(layout).toContain('/assets/js/form-control-identity.js');
     expect(embedBuilder).toContain('data-admin-marketing-embed="true"');
     expect(embedBuilder).toContain('data-campaign-embed-autoload="{{ embed_autoload }}"');
@@ -561,11 +567,23 @@ describe('admin dashboard foundation', () => {
     expect(adminScss).toContain('display: grid;');
     expect(adminScss).toContain('[data-admin-prominent-status="true"]');
     expect(adminScss).toContain('.admin-dashboard__status-action');
+    expect(adminScss).toContain('.admin-dashboard__status:empty');
     expect(adminScss).toContain('.admin-campaigns > .admin-campaigns__status');
     expect(adminScss).toContain('.admin-content-block.is-active .admin-content-block__chrome');
+    expect(adminScss).toContain('.admin-content-block:has(.admin-content-block__settings-panel:not([hidden])) .admin-content-block__settings-button');
     expect(adminScss).toContain('.admin-settings__field-grid--count-5');
     expect(adminScss).toContain('repeat(auto-fit, minmax(8rem, 1fr))');
-    expect(adminScss).toContain('.admin-marketing__resources');
+    expect(adminScss).toContain('$admin-section-gap');
+    expect(adminScss).toContain('gap: $admin-section-gap;');
+    expect(adminScss).toContain('margin-top: $admin-section-gap;');
+    expect(adminScss).toContain('.admin-marketing__sections');
+    expect(adminScss).toContain('.admin-section-stack');
+    expect(adminScss).toContain('.admin-section-panel');
+    expect(adminScss).toContain('.admin-section-panel > h3');
+    expect(adminScss).toContain('.admin-section-panel .campaign-embed-builder__intro h3');
+    expect(adminScss).toContain('.admin-stat-grid');
+    expect(adminScss).toContain('.admin-stat-card');
+    expect(adminScss).toContain('.admin-card-heading');
     expect(adminScss).toContain('.admin-marketing__url-row');
     expect(adminScss).toContain('--admin-marketing-qr-size: 120px;');
     expect(adminScss).toContain('grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);');
@@ -573,8 +591,31 @@ describe('admin dashboard foundation', () => {
     expect(adminScss).toContain('height: var(--admin-marketing-qr-size);');
     expect(adminScss).toContain('grid-template-columns: var(--admin-marketing-qr-size) minmax(9.5rem, 1fr);');
     expect(adminScss).toContain('.admin-settings__label h3');
-    expect(adminScss).toContain('.admin-marketing__referrals > h3');
-    expect(adminScss).toContain('.admin-marketing__referrals > h3 {\n  @include type-card-title;');
+    expect(adminScript).toContain("card.className = 'admin-stat-card ' + baseClass;");
+    expect(adminScript).toContain("metrics.className = 'admin-stat-grid admin-marketing__summary';");
+    expect(adminScript).toContain("summary.className = 'admin-analytics__summary admin-section-panel';");
+    expect(adminScript).toContain("heading.className = 'admin-card-heading admin-analytics__breakdown-title';");
+    expect(adminScript).toContain("labelInfo.row.classList.add('admin-card-heading');");
+    expect(adminScript).toContain("input.id = row.inputId || row.id || 'admin-email-list-' + String(collectionFieldIdCounter++);");
+    expect(adminScript).toContain('email.commitPending?.();');
+    expect(adminScript).toContain("suppress.textContent = t('abandoned_suppression_set', 'Suppress');");
+    expect(adminScript).not.toContain("clear.dataset.abandonedSuppressionAction = 'clear'");
+    expect(adminScript).toContain("table.className = 'admin-marketing__outcomes-table';");
+    expect(adminScript).toContain("t('abandoned_recent_outcomes_help'");
+    expect(adminScript).toContain('function canClearAbandonedOutcome');
+    expect(adminScript).toContain("var emailHeader = t('abandoned_recent_outcomes_email_header', 'Email');");
+    expect(adminScript).toContain("t('abandoned_recent_outcomes_email_unavailable', 'Email not recorded')");
+    expect(adminScript).toContain("status.className = 'admin-dashboard__status admin-marketing__outcomes-status';");
+    expect(adminScript).toContain('for (const payload of payloads)');
+    expect(enI18n).toContain('abandoned_suppression_label: "Reminder suppression"');
+    expect(enI18n).toContain('abandoned_suppression_set: "Suppress"');
+    expect(enI18n).toContain('abandoned_recent_outcomes_clear: "Clear"');
+    expect(enI18n).toContain('abandoned_recent_outcomes_help:');
+    expect(enI18n).toContain('abandoned_recent_outcomes_email_header: "Email"');
+    expect(adminScss).toContain('.admin-marketing__outcomes-table-wrap');
+    expect(adminScss).toContain('.admin-marketing__outcomes-table');
+    expect(adminScss).toContain('.admin-marketing__suppression-status:empty');
+    expect(adminScss).toContain('font-family: $font-family--body;');
     expect(adminScss).toContain('.admin-content-block__media-placeholder--external');
     expect(adminScss).toContain('.admin-content-preview__media-placeholder--external');
     expect(adminScss).toContain('.content-block__media-placeholder--external');
@@ -587,7 +628,6 @@ describe('admin dashboard foundation', () => {
     expect(adminScss).not.toContain('.video-embed__external-label');
     expect(adminScss).toContain('.admin-marketing__qr-actions .admin-dashboard__status:empty');
     expect(adminScss).toContain('width: min(100%, var(--admin-marketing-qr-size));');
-    expect(adminScss).toContain('.admin-marketing__metric-grid');
     expect(adminScss).toContain('.admin-content-media-library__list');
     expect(adminScss).toContain('.admin-content-block__media-library-field .btn');
     expect(adminScript).toContain('pool-admin-marketing-builder');
@@ -596,7 +636,10 @@ describe('admin dashboard foundation', () => {
     expect(adminScript).toContain('filenameBase');
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");
     expect(adminScript).toContain('/admin/marketing/referrals');
-    expect(adminScript).toContain('/admin/marketing/reporting');
+    expect(adminScript).not.toContain('/admin/marketing/reporting');
+    expect(adminScript).toContain('analytics_utm_medium_breakdown');
+    expect(adminScript).toContain('analytics_utm_campaign_breakdown');
+    expect(adminScript).toContain('analytics_utm_content_breakdown');
     expect(adminScript).toContain('/admin/marketing/draft');
     expect(adminScript).toContain('/admin/abandoned-checkout/health');
     expect(adminScript).toContain('/admin/abandoned-checkout/suppression');
@@ -4207,6 +4250,7 @@ diary:
       preferredLang: 'en',
       referralCode: 'newsletter',
       utmSource: 'email',
+      utm: { medium: 'newsletter', campaign: 'launch', content: 'hero' },
       bundleAddOns: [
         { productId: 'dust-wave-sticker', quantity: 2, unitPrice: 300 },
         { productId: 'hand-relations__zine', quantity: 1, unitPrice: 1200, scope: 'campaign', campaignSlug: 'hand-relations' }
@@ -4235,7 +4279,7 @@ diary:
       tipAmount: 250,
       preferredLang: 'es',
       ref: 'creator',
-      attribution: { utmSource: 'instagram' }
+      attribution: { utmSource: 'instagram', utmMedium: 'social', utmCampaign: 'retargeting', utmContent: 'story' }
     }));
     pledges.store.set('admin-marketing-referrals:hand-relations', JSON.stringify([
       { code: 'newsletter', referrer: 'Newsletter partner', campaignSlug: 'hand-relations' },
@@ -4296,6 +4340,22 @@ diary:
       newsletter: 'Newsletter partner',
       creator: 'Creator circle'
     });
+    expect(body.utmSourceBreakdown).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'email', count: 1, amount: 7000 }),
+      expect.objectContaining({ key: 'instagram', count: 1, amount: 5000 })
+    ]));
+    expect(body.utmMediumBreakdown).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'newsletter', count: 1, amount: 7000 }),
+      expect.objectContaining({ key: 'social', count: 1, amount: 5000 })
+    ]));
+    expect(body.utmCampaignBreakdown).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'launch', count: 1, amount: 7000 }),
+      expect.objectContaining({ key: 'retargeting', count: 1, amount: 5000 })
+    ]));
+    expect(body.utmContentBreakdown).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'hero', count: 1, amount: 7000 }),
+      expect.objectContaining({ key: 'story', count: 1, amount: 5000 })
+    ]));
 
     expect(pledges.putCalls).toBe(0);
     expect(pledges.deleteCalls).toBe(0);
@@ -4591,7 +4651,11 @@ diary:
           title: 'Hand Relations',
           totals: { queued: 2, pending: 1, sent: 1, skipped: 0, failed: 0, suppressed: 0, completed: 0, alreadySent: 0, invalid: 0 },
           lastQueuedAt: '2026-06-18T19:00:00.000Z',
-          recentOutcomes: [{ at: '2026-06-18T19:00:00.000Z', type: 'queued', reason: 'consented', campaignSlugs: ['hand-relations'] }]
+          recentOutcomes: [
+            { at: '2026-06-18T19:00:00.000Z', type: 'queued', reason: 'consented', campaignSlugs: ['hand-relations'] },
+            { at: '2026-06-18T18:30:00.000Z', type: 'suppressed', reason: 'admin_suppression', campaignSlugs: ['hand-relations'] },
+            { at: '2026-06-18T18:45:00.000Z', type: 'suppression_cleared', reason: 'admin_unsuppression', campaignSlugs: ['hand-relations'] }
+          ]
         },
         sunder: {
           slug: 'sunder',
@@ -4601,6 +4665,8 @@ diary:
       },
       recentOutcomes: [
         { at: '2026-06-18T19:00:00.000Z', type: 'queued', reason: 'consented', campaignSlugs: ['hand-relations'] },
+        { at: '2026-06-18T18:45:00.000Z', type: 'suppression_cleared', reason: 'admin_unsuppression', campaignSlugs: ['hand-relations'] },
+        { at: '2026-06-18T18:30:00.000Z', type: 'suppressed', reason: 'admin_suppression', campaignSlugs: ['hand-relations'] },
         { at: '2026-06-18T18:00:00.000Z', type: 'skipped', reason: 'completed', campaignSlugs: ['sunder'] }
       ]
     }));
@@ -4674,6 +4740,24 @@ diary:
       writeBudget: { readOnly: false, kvWritesExpected: 3, kvListExpected: 0 }
     });
     expect(pledges.store.has(`abandoned-cart-suppressed-campaign:hand-relations:${emailHash}`)).toBe(true);
+    const healthAfterSuppress = JSON.parse(pledges.store.get('abandoned-cart-health:v1') || '{}');
+    expect(healthAfterSuppress.recentOutcomes[0]).toMatchObject({
+      type: 'suppressed',
+      reason: 'admin_suppression',
+      emailHash,
+      email: 'buyer@example.com'
+    });
+    expect(JSON.stringify(healthAfterSuppress)).not.toContain('Buyer@Example.com');
+    const legacySuppressionOutcome = {
+      at: '2026-06-18T20:18:33.000Z',
+      type: 'suppressed',
+      reason: 'admin_suppression',
+      campaignSlugs: ['hand-relations'],
+      campaignTitles: ['Hand Relations']
+    };
+    healthAfterSuppress.recentOutcomes.push(legacySuppressionOutcome);
+    healthAfterSuppress.campaigns['hand-relations'].recentOutcomes.push(legacySuppressionOutcome);
+    pledges.store.set('abandoned-cart-health:v1', JSON.stringify(healthAfterSuppress));
     expect(pledges.putCalls).toBe(3);
     expect(pledges.deleteCalls).toBe(0);
     expect(pledges.listCalls).toBe(0);
@@ -4691,7 +4775,7 @@ diary:
       },
       body: JSON.stringify({
         campaignSlug: 'hand-relations',
-        email: 'buyer@example.com'
+        emailHash
       })
     }), env, ctx);
 
@@ -4704,6 +4788,16 @@ diary:
       writeBudget: { readOnly: false, kvWritesExpected: 2, kvListExpected: 0 }
     });
     expect(pledges.store.has(`abandoned-cart-suppressed-campaign:hand-relations:${emailHash}`)).toBe(false);
+    const healthAfterClear = JSON.parse(pledges.store.get('abandoned-cart-health:v1') || '{}');
+    const adminSuppressionRows = (healthAfterClear.recentOutcomes || []).filter((row: Record<string, unknown>) => (
+      row.type === 'suppressed' && row.reason === 'admin_suppression'
+    ));
+    const campaignSuppressionRows = (healthAfterClear.campaigns?.['hand-relations']?.recentOutcomes || [])
+      .filter((row: Record<string, unknown>) => row.type === 'suppressed' && row.reason === 'admin_suppression');
+    expect(adminSuppressionRows).toHaveLength(0);
+    expect(campaignSuppressionRows).toHaveLength(0);
+    expect(JSON.stringify(healthAfterClear)).not.toContain('suppression_cleared');
+    expect(JSON.stringify(healthAfterClear)).not.toContain('admin_unsuppression');
     expect(pledges.putCalls).toBe(2);
     expect(pledges.deleteCalls).toBe(1);
     expect(pledges.listCalls).toBe(0);
@@ -4801,103 +4895,6 @@ diary:
     expect(pledges.deleteCalls).toBe(0);
     expect(pledges.listCalls).toBe(0);
     expect(ratelimit.putCalls).toBe(1);
-  });
-
-  it('reads Marketing attribution reporting from the campaign index without KV writes or list scans', async () => {
-    const env = createEnv();
-    const pledges = env.PLEDGES as CountingKVNamespace;
-    const { ctx, cookie } = await signInAdmin(env);
-    pledges.store.set('admin-marketing-referrals:hand-relations', JSON.stringify([
-      {
-        code: 'launch-list',
-        referrer: 'Launch List',
-        url: 'https://pool.test/campaigns/hand-relations/?ref=launch-list'
-      }
-    ]));
-    pledges.store.set('campaign-pledges:hand-relations', JSON.stringify(['mkt-1', 'mkt-2', 'mkt-3']));
-    pledges.store.set('pledge:mkt-1', JSON.stringify({
-      orderId: 'mkt-1',
-      email: 'one@example.com',
-      campaignSlug: 'hand-relations',
-      pledgeStatus: 'active',
-      subtotal: 5000,
-      amount: 5600,
-      ref: 'launch-list',
-      utm: { source: 'newsletter', medium: 'email', campaign: 'launch', content: 'hero' }
-    }));
-    pledges.store.set('pledge:mkt-2', JSON.stringify({
-      orderId: 'mkt-2',
-      email: 'two@example.com',
-      campaignSlug: 'hand-relations',
-      pledgeStatus: 'charged',
-      goalTrackingSubtotal: 7500,
-      amount: 8200,
-      attribution: { ref: 'unsaved-code', utmSource: 'social', utmMedium: 'organic' }
-    }));
-    pledges.store.set('pledge:mkt-3', JSON.stringify({
-      orderId: 'mkt-3',
-      email: 'three@example.com',
-      campaignSlug: 'hand-relations',
-      pledgeStatus: 'cancelled',
-      subtotal: 2500,
-      amount: 2800,
-      ref: 'launch-list',
-      utmSource: 'newsletter'
-    }));
-    resetKvCounters(env);
-
-    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/reporting?campaignSlug=hand-relations', {
-      method: 'GET',
-      headers: { Cookie: cookie }
-    }), env, ctx);
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toMatchObject({
-      campaignSlug: 'hand-relations',
-      indexedPledgeCount: 3,
-      savedReferralCount: 1,
-      writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
-    });
-    expect(body.referrals).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        key: 'launch-list',
-        label: 'Launch List',
-        pledgeCount: 1,
-        pledgedSubtotal: 5000,
-        chargedAmount: 0
-      }),
-      expect.objectContaining({
-        key: 'unsaved-code',
-        pledgeCount: 1,
-        pledgedSubtotal: 7500,
-        chargedAmount: 8200
-      })
-    ]));
-    expect(body.utm.sources).toEqual(expect.arrayContaining([
-      expect.objectContaining({ key: 'newsletter', pledgeCount: 1, pledgedSubtotal: 5000 }),
-      expect.objectContaining({ key: 'social', pledgeCount: 1, pledgedSubtotal: 7500, chargedAmount: 8200 })
-    ]));
-    expectNoKvWritesOrLists(env, 'marketing attribution reporting read');
-  });
-
-  it('fails Marketing attribution reporting closed when the campaign index is missing', async () => {
-    const env = createEnv();
-    const { ctx, cookie } = await signInAdmin(env);
-    resetKvCounters(env);
-
-    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/marketing/reporting?campaignSlug=hand-relations', {
-      method: 'GET',
-      headers: { Cookie: cookie }
-    }), env, ctx);
-
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'campaign_index_required',
-      campaignSlug: 'hand-relations',
-      writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
-    });
-    expectNoKvWritesOrLists(env, 'missing index marketing reporting read');
   });
 
   it('dry-runs campaign announcements from the campaign index without KV writes or list scans', async () => {

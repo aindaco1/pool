@@ -75,6 +75,7 @@ Pledges are stored in Cloudflare KV. Key patterns:
 | `launch-reminder-dispatch:{campaignSlug}` | Bounded dispatch job cursor for a campaign that just became live |
 | `launch-reminder-dispatch-queue:v1` | Queue-state marker that lets idle launch reminder scheduled ticks skip dispatch list scans |
 | `abandoned-cart:{orderId}` | Explicitly opted-in abandoned-checkout reminder record |
+| `abandoned-cart-resume:{orderId}` | Short-lived signed-link checkout resume snapshot created only after a reminder sends |
 | `abandoned-cart-queue:v1` | Queue-state marker that lets idle abandoned-checkout scheduled ticks skip namespace scans |
 | `abandoned-cart-sent:{emailHash}:{campaignSetHash}` | Abandoned-checkout send idempotency marker |
 | `abandoned-cart-suppressed:{emailHash}` | Abandoned-checkout unsubscribe marker |
@@ -370,13 +371,13 @@ The browser route requires a dashboard session, CSRF/origin checks, campaign sco
 
 ### Marketing dashboard helpers
 
-`GET /admin/marketing/reporting?campaignSlug=...` reads referral and UTM performance from the campaign pledge index. Missing indexes fail closed with `campaign_index_required` instead of listing pledge truth.
+Referral and UTM performance lives in `GET /admin/analytics`, which reads campaign pledge indexes and returns referral plus UTM source/medium/campaign/content breakdowns without listing pledge truth. Missing campaign indexes produce a non-blocking Analytics notice instead of a Marketing-tab failure.
 
 `GET /admin/marketing/draft?campaignSlug=...&surface=marketing|blast`, `POST /admin/marketing/draft`, and `DELETE /admin/marketing/draft` load, save, and clear explicit shared drafts. Draft writes are campaign-scoped, expire after 7 days, and carry a revision token so stale saves return a conflict.
 
 `GET /admin/media/library?campaignSlug=...` lists existing campaign images for WYSIWYG image blocks. Campaign users see only assigned campaign media; super admins can also choose shared/default images. The picker reads GitHub directories and does not create KV state.
 
-`GET /admin/abandoned-checkout/health?campaignSlug=...` reads aggregate abandoned-checkout reminder health without recipient PII or KV list operations. `POST` and `DELETE /admin/abandoned-checkout/suppression` explicitly set or clear campaign-scoped reminder suppressions with CSRF, hashed email identifiers, audit events, and bounded KV writes.
+`GET /admin/abandoned-checkout/health?campaignSlug=...` reads aggregate abandoned-checkout reminder health without KV list operations. Admin-created suppression outcomes include the suppressed email so the dashboard can show and clear those rows. `POST` and `DELETE /admin/abandoned-checkout/suppression` explicitly set or clear campaign-scoped reminder suppressions with CSRF, hashed email identifiers, audit events, and bounded KV writes. Signed reminder resume links read `abandoned-cart-resume:{orderId}` and restore a sanitized browser checkout snapshot so supporters can start a fresh Stripe session from the same campaign/cart context.
 
 ### `POST /admin/broadcast/announcement`
 Legacy shared-secret operator endpoint for a custom announcement email with optional CTA link to all campaign supporters.
@@ -416,7 +417,7 @@ Primary flows:
 - Super-admin **Archive campaign** is available only for non-live campaigns. The Worker validates role, CSRF, campaign slug, and effective state, then archives directly in the mounted repo for local dev or dispatches `.github/workflows/archive-campaign.yml` in production; the archive move writes `archive-manifest.json` and keeps campaign source/media under `archive/campaigns/<slug>/`.
 - **Settings -> Users** saves directly to Worker KV at `admin-users:v1`.
 - Saved referral codes and shared Marketing/Blast drafts save to campaign-scoped KV only when explicitly saved or cleared.
-- **Marketing** reporting and abandoned-checkout health read indexed/aggregate data without KV namespace scans.
+- **Analytics** attribution reporting and **Marketing** abandoned-checkout health read indexed/aggregate data without KV namespace scans.
 - **Reports** previews pledge/fulfillment rows and downloads CSVs; it does not send email and does not mark reports as sent.
 - **Analytics** uses stored actual Stripe fee/net data when available and exposes a super-admin backfill for older charged pledges.
 - Content-editor media uploads stage files locally, upload on publish or Blast send, and commit source-preserved assets through the GitHub-backed path; image/video uploads then request the `Optimize dashboard media` workflow with `scope=changed` for image compression, responsive WebP variants (`320w`, `480w`, `640w`, `960w`, `1600w`), and video derivatives. Image blocks can also choose existing campaign images from a scoped read-only media picker. Publish also deletes same-campaign dashboard-owned media that disappeared from content blocks or removed diary entries and is not referenced elsewhere in the campaign.

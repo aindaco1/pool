@@ -67,7 +67,6 @@
   var marketingDraftStatus = document.getElementById('admin-marketing-draft-status');
   var marketingStatus = document.getElementById('admin-marketing-status');
   var marketingReferralsRoot = document.getElementById('admin-marketing-referrals');
-  var marketingReportingRoot = document.getElementById('admin-marketing-reporting');
   var marketingAbandonedHealthRoot = document.getElementById('admin-marketing-abandoned-health');
   var marketingEmbedBuilder = document.querySelector('[data-admin-marketing-embed]');
   var marketingQrPreview = document.getElementById('admin-marketing-qr-preview');
@@ -146,7 +145,6 @@
   var marketingAnnouncementDryRunCount = 0;
   var marketingSharedDraftRevisions = {};
   var marketingAnnouncementSharedDraftRevisions = {};
-  var marketingReportingLoading = '';
   var marketingAbandonedHealthLoading = '';
   var contentStoragePrefix = 'pool-admin-content-draft:';
   var loadedContentCampaignSlug = '';
@@ -957,12 +955,12 @@
 
   function statCard(baseClass, label, value) {
     var card = document.createElement('section');
-    card.className = baseClass;
+    card.className = 'admin-stat-card ' + baseClass;
     var valueNode = document.createElement('span');
-    valueNode.className = baseClass + '-value';
+    valueNode.className = 'admin-stat-card__value ' + baseClass + '-value';
     valueNode.textContent = value;
     var labelNode = document.createElement('span');
-    labelNode.className = baseClass + '-label';
+    labelNode.className = 'admin-stat-card__label ' + baseClass + '-label';
     labelNode.textContent = label;
     card.append(valueNode, labelNode);
     return card;
@@ -1927,8 +1925,12 @@
     input.type = 'email';
     input.inputMode = 'email';
     input.autocomplete = 'email';
+    input.id = row.inputId || row.id || 'admin-email-list-' + String(collectionFieldIdCounter++);
+    input.name = row.name || input.id;
     input.className = 'admin-settings__email-list-input';
+    if (row.placeholder) input.placeholder = row.placeholder;
     input.setAttribute('aria-label', row.label || t('email_label_generic', 'Email'));
+    if (row.describedBy) appendDescribedBy(input, row.describedBy);
     root.value = '';
 
     function values() {
@@ -1993,6 +1995,12 @@
       addEmail(input.value);
       input.value = '';
     };
+    root.clear = function() {
+      list.replaceChildren();
+      input.value = '';
+      syncValue();
+    };
+    root.emailValues = values;
     root.append(list, input);
     syncValue();
     return root;
@@ -3317,7 +3325,7 @@
     var actions = document.createElement('div');
     actions.className = 'admin-settings__actions admin-settings__user-actions';
     var status = document.createElement('p');
-    status.className = 'admin-dashboard__status';
+    status.className = 'admin-dashboard__status admin-marketing__suppression-status';
     status.dataset.adminUsersStatus = 'true';
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
@@ -4674,7 +4682,6 @@
     resetMarketingBuilderFields();
     hydrateMarketingAnnouncementDraft();
     loadMarketingReferrals();
-    loadMarketingReporting();
     loadMarketingAbandonedHealth();
     hydrateContentDraft();
     updateDirtyIndicators();
@@ -5707,125 +5714,6 @@
     }
   }
 
-  function marketingMetricTable(title, rows, options) {
-    var section = document.createElement('section');
-    section.className = 'admin-marketing__metric-table';
-    var heading = document.createElement('h4');
-    heading.textContent = title;
-    section.append(heading);
-    var visibleRows = (Array.isArray(rows) ? rows : []).filter(function(row) {
-      return row && (Number(row.pledgeCount || 0) > 0 || row.key);
-    }).slice(0, options?.limit || 8);
-    if (!visibleRows.length) {
-      var empty = document.createElement('p');
-      empty.className = 'admin-app__muted';
-      empty.textContent = options?.emptyText || t('marketing_reporting_empty_dimension', 'No activity yet.');
-      section.append(empty);
-      return section;
-    }
-    var table = document.createElement('table');
-    table.className = 'admin-marketing__reporting-table';
-    var thead = document.createElement('thead');
-    var headerRow = document.createElement('tr');
-    var labelHeader = options?.labelHeader || t('marketing_reporting_label_header', 'Label');
-    var pledgeHeader = t('marketing_reporting_pledges_header', 'Pledges');
-    var pledgedHeader = t('marketing_reporting_pledged_header', 'Pledged');
-    var chargedHeader = t('marketing_reporting_charged_header', 'Charged');
-    appendTableHeader(headerRow, [labelHeader, pledgeHeader, pledgedHeader, chargedHeader]);
-    thead.append(headerRow);
-    var tbody = document.createElement('tbody');
-    visibleRows.forEach(function(row) {
-      var tr = document.createElement('tr');
-      [
-        row.label || row.key || '',
-        formatNumber(row.pledgeCount),
-        formatMoneyExact(row.pledgedSubtotal),
-        formatMoneyExact(row.chargedAmount)
-      ].forEach(function(value, index) {
-        var td = document.createElement('td');
-        td.setAttribute('data-label', [labelHeader, pledgeHeader, pledgedHeader, chargedHeader][index]);
-        td.textContent = value;
-        tr.append(td);
-      });
-      tbody.append(tr);
-    });
-    table.append(thead, tbody);
-    section.append(table);
-    return section;
-  }
-
-  function renderMarketingReporting(data) {
-    if (!marketingReportingRoot) return;
-    marketingReportingRoot.replaceChildren();
-    var heading = document.createElement('h3');
-    heading.textContent = t('marketing_reporting_title', 'Campaign marketing performance');
-    var intro = document.createElement('p');
-    intro.className = 'admin-app__muted';
-    intro.textContent = t('marketing_reporting_intro', 'Campaign-scoped referral and UTM performance from indexed pledges.');
-    marketingReportingRoot.append(heading, intro);
-    if (!data || data.error) {
-      var error = document.createElement('p');
-      error.className = 'admin-app__muted';
-      error.textContent = data?.error || t('marketing_reporting_empty', 'Marketing performance is not available yet.');
-      marketingReportingRoot.append(error);
-      return;
-    }
-    var summary = document.createElement('div');
-    summary.className = 'admin-marketing__summary';
-    summary.append(
-      statCard('admin-marketing__stat', t('marketing_reporting_indexed', 'Indexed pledges'), formatNumber(data.indexedPledgeCount)),
-      statCard('admin-marketing__stat', t('marketing_reporting_saved_referrals', 'Saved referrals'), formatNumber(data.savedReferralCount))
-    );
-    var tables = document.createElement('div');
-    tables.className = 'admin-marketing__metric-grid';
-    tables.append(
-      marketingMetricTable(t('marketing_reporting_referrals', 'Referral links'), data.referrals || [], {
-        labelHeader: t('marketing_reporting_referrer_header', 'Referrer'),
-        emptyText: t('marketing_reporting_referrals_empty', 'No referral-attributed pledges yet.')
-      }),
-      marketingMetricTable(t('marketing_reporting_sources', 'UTM sources'), data.utm?.sources || [], {
-        labelHeader: t('marketing_reporting_source_header', 'Source')
-      }),
-      marketingMetricTable(t('marketing_reporting_mediums', 'UTM mediums'), data.utm?.mediums || [], {
-        labelHeader: t('marketing_reporting_medium_header', 'Medium')
-      }),
-      marketingMetricTable(t('marketing_reporting_contents', 'UTM contents'), data.utm?.contents || [], {
-        labelHeader: t('marketing_reporting_content_header', 'Content')
-      })
-    );
-    marketingReportingRoot.append(summary, tables);
-  }
-
-  async function loadMarketingReporting() {
-    if (!marketingReportingRoot) return;
-    var campaign = selectedMarketingCampaign();
-    if (!campaign?.slug) {
-      renderMarketingReporting(null);
-      return;
-    }
-    if (marketingReportingLoading === campaign.slug) return;
-    marketingReportingLoading = campaign.slug;
-    setText(marketingReportingRoot, t('marketing_reporting_loading', 'Loading campaign marketing performance...'));
-    try {
-      var params = new URLSearchParams({ campaignSlug: campaign.slug });
-      var data = await requestJson('/admin/marketing/reporting?' + params.toString(), { method: 'GET' });
-      if (selectedMarketingCampaign()?.slug !== campaign.slug) return;
-      renderMarketingReporting(data);
-    } catch (error) {
-      logger.error('Failed to load Marketing reporting', error);
-      if (selectedMarketingCampaign()?.slug !== campaign.slug) return;
-      renderMarketingReporting({
-        error: error?.data?.code === 'campaign_index_required'
-          ? t('marketing_reporting_index_required', 'Campaign pledge indexes must be rebuilt before marketing reporting can load.')
-          : (error?.data?.error || t('marketing_reporting_failed', 'Unable to load campaign marketing performance.'))
-      });
-    } finally {
-      if (marketingReportingLoading === campaign.slug) marketingReportingLoading = '';
-      var currentCampaign = selectedMarketingCampaign();
-      if (currentCampaign?.slug && currentCampaign.slug !== campaign.slug) loadMarketingReporting();
-    }
-  }
-
   function abandonedMetricLabel(key) {
     var labels = {
       queued: t('abandoned_health_queued', 'Queued'),
@@ -5840,7 +5728,7 @@
 
   function renderAbandonedHealthMetrics(container, totals) {
     var metrics = document.createElement('div');
-    metrics.className = 'admin-marketing__summary';
+    metrics.className = 'admin-stat-grid admin-marketing__summary';
     ['queued', 'sent', 'suppressed', 'completed', 'failed'].forEach(function(key) {
       metrics.append(statCard('admin-marketing__stat', abandonedMetricLabel(key), formatNumber(totals?.[key] || 0)));
     });
@@ -5850,53 +5738,66 @@
   function renderAbandonedHealthSuppression(container, campaignSlug) {
     var form = document.createElement('form');
     form.className = 'admin-marketing__suppression';
-    var email = document.createElement('input');
-    email.className = 'admin-settings__input';
-    email.type = 'email';
-    email.name = 'abandonedCheckoutEmail';
-    email.autocomplete = 'email';
-    email.placeholder = t('abandoned_suppression_email_placeholder', 'supporter@example.com');
+    var emailId = 'admin-abandoned-suppression-email-' + String(++collectionFieldIdCounter);
     var labelInfo = createProductLabelRow(
-      t('abandoned_suppression_label', 'Scoped suppression controls'),
-      t('abandoned_suppression_help', 'Suppressing here stops abandoned-checkout reminder emails only for this supporter email on this campaign. It does not unsubscribe the supporter globally or change their pledge. Clear removes that campaign-scoped suppression.'),
-      'admin-abandoned-suppression-' + String(++collectionFieldIdCounter),
-      { htmlFor: 'admin-abandoned-suppression-email-' + String(collectionFieldIdCounter) }
+      t('abandoned_suppression_label', 'Reminder suppression'),
+      t('abandoned_suppression_help', 'Add one or more supporter email addresses. Suppress stops abandoned-checkout reminders for these supporters on this campaign only; clear removes that campaign-specific suppression.'),
+      'admin-abandoned-suppression-' + String(collectionFieldIdCounter),
+      { htmlFor: emailId }
     );
-    email.id = labelInfo.label.htmlFor;
-    if (labelInfo.helpId) appendDescribedBy(email, labelInfo.helpId);
+    labelInfo.row.classList.add('admin-card-heading');
+    var email = createEmailListInput({
+      label: t('abandoned_suppression_label', 'Reminder suppression'),
+      name: 'abandonedCheckoutEmail',
+      inputId: emailId,
+      placeholder: t('abandoned_suppression_email_placeholder', 'supporter@example.com, another@example.com'),
+      describedBy: labelInfo.helpId
+    });
+    email.classList.add('admin-marketing__suppression-email-list');
     var actions = document.createElement('div');
     actions.className = 'admin-marketing__suppression-actions';
     var suppress = document.createElement('button');
     suppress.type = 'submit';
     suppress.className = 'btn btn--secondary';
     suppress.dataset.abandonedSuppressionAction = 'suppress';
-    suppress.textContent = t('abandoned_suppression_set', 'Suppress reminders');
-    var clear = document.createElement('button');
-    clear.type = 'button';
-    clear.className = 'btn btn--secondary';
-    clear.dataset.abandonedSuppressionAction = 'clear';
-    clear.textContent = t('abandoned_suppression_clear', 'Clear suppression');
-    actions.append(suppress, clear);
+    suppress.textContent = t('abandoned_suppression_set', 'Suppress');
+    actions.append(suppress);
     var status = document.createElement('p');
-    status.className = 'admin-dashboard__status';
+    status.className = 'admin-dashboard__status admin-marketing__outcomes-status';
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
     form.append(labelInfo.row, email, actions, status);
     form.addEventListener('submit', function(event) {
       event.preventDefault();
-      mutateAbandonedCheckoutSuppression(campaignSlug, email.value, true, status);
-    });
-    clear.addEventListener('click', function() {
-      mutateAbandonedCheckoutSuppression(campaignSlug, email.value, false, status);
+      email.commitPending?.();
+      mutateAbandonedCheckoutSuppression(campaignSlug, email.value, true, status, email);
     });
     container.append(form);
   }
 
-  function renderAbandonedHealthOutcomes(container, outcomes) {
+  function abandonedOutcomeValueLabel(value) {
+    var normalized = String(value || '').trim();
+    return normalized ? titleCaseAnalyticsKey(normalized) : '';
+  }
+
+  function canClearAbandonedOutcome(row) {
+    return String(row?.type || '') === 'suppressed' &&
+      String(row?.reason || '') === 'admin_suppression' &&
+      (
+        /^[a-f0-9]{64}$/i.test(String(row?.emailHash || '').trim()) ||
+        String(row?.email || '').trim().includes('@')
+      );
+  }
+
+  function renderAbandonedHealthOutcomes(container, outcomes, campaignSlug) {
     var rows = Array.isArray(outcomes) ? outcomes.slice(0, 6) : [];
-    var heading = document.createElement('h4');
-    heading.textContent = t('abandoned_recent_outcomes_title', 'Recent reminder outcomes');
-    container.append(heading);
+    var labelInfo = createProductLabelRow(
+      t('abandoned_recent_outcomes_title', 'Recent reminder outcomes'),
+      t('abandoned_recent_outcomes_help', 'Shows recent abandoned-checkout reminder suppression activity for this campaign. Clear removes an active admin suppression without adding another outcome row.'),
+      'admin-abandoned-recent-outcomes-' + String(collectionFieldIdCounter++)
+    );
+    labelInfo.row.classList.add('admin-card-heading');
+    container.append(labelInfo.row);
     if (!rows.length) {
       var empty = document.createElement('p');
       empty.className = 'admin-app__muted';
@@ -5904,18 +5805,66 @@
       container.append(empty);
       return;
     }
-    var list = document.createElement('ul');
-    list.className = 'admin-marketing__outcomes';
+    var wrap = document.createElement('div');
+    wrap.className = 'admin-marketing__outcomes-table-wrap';
+    var table = document.createElement('table');
+    table.className = 'admin-marketing__outcomes-table';
+    var thead = document.createElement('thead');
+    var headerRow = document.createElement('tr');
+    var emailHeader = t('abandoned_recent_outcomes_email_header', 'Email');
+    var reasonHeader = t('abandoned_recent_outcomes_reason_header', 'Reason');
+    var dateHeader = t('abandoned_recent_outcomes_date_header', 'Date');
+    var actionsHeader = t('abandoned_recent_outcomes_actions_header', 'Actions');
+    appendTableHeader(headerRow, [emailHeader, reasonHeader, dateHeader, actionsHeader]);
+    thead.append(headerRow);
+    var tbody = document.createElement('tbody');
+    var status = document.createElement('p');
+    status.className = 'admin-dashboard__status admin-marketing__outcomes-status';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
     rows.forEach(function(row) {
-      var item = document.createElement('li');
-      item.textContent = [
-        row.type || row.counter || '',
-        row.reason || '',
-        row.at ? new Date(row.at).toLocaleString(lang || 'en') : ''
-      ].filter(Boolean).join(' - ');
-      list.append(item);
+      var tr = document.createElement('tr');
+      var emailCell = document.createElement('td');
+      emailCell.setAttribute('data-label', emailHeader);
+      emailCell.textContent = String(row.email || '').trim() || (
+        String(row.type || '') === 'suppressed'
+          ? t('abandoned_recent_outcomes_email_unavailable', 'Email not recorded')
+          : abandonedOutcomeValueLabel(row.type || row.counter)
+      );
+      var reasonCell = document.createElement('td');
+      reasonCell.setAttribute('data-label', reasonHeader);
+      reasonCell.textContent = abandonedOutcomeValueLabel(row.reason);
+      var dateCell = document.createElement('td');
+      dateCell.setAttribute('data-label', dateHeader);
+      dateCell.textContent = row.at ? new Date(row.at).toLocaleString(lang || 'en') : '';
+      var actionsCell = document.createElement('td');
+      actionsCell.setAttribute('data-label', actionsHeader);
+      if (String(row.type || '') === 'suppressed') {
+        var clear = document.createElement('button');
+        clear.type = 'button';
+        clear.className = 'btn btn--secondary btn--small';
+        clear.textContent = t('abandoned_recent_outcomes_clear', 'Clear');
+        if (canClearAbandonedOutcome(row)) {
+          clear.setAttribute('aria-label', t('abandoned_recent_outcomes_clear_label', 'Clear reminder suppression for %{email}', {
+            email: String(row.email || '').trim() || t('abandoned_recent_outcomes_email_unavailable', 'Email not recorded')
+          }));
+          clear.addEventListener('click', function() {
+            mutateAbandonedCheckoutSuppression(campaignSlug, String(row.email || ''), false, status, null, {
+              emailHash: String(row.emailHash || '').trim()
+            });
+          });
+        } else {
+          clear.disabled = true;
+          clear.setAttribute('aria-label', t('abandoned_recent_outcomes_clear_unavailable', 'Clear unavailable because this older suppression did not record an email address.'));
+        }
+        actionsCell.append(clear);
+      }
+      tr.append(emailCell, reasonCell, dateCell, actionsCell);
+      tbody.append(tr);
     });
-    container.append(list);
+    table.append(thead, tbody);
+    wrap.append(table);
+    container.append(wrap, status);
   }
 
   function renderMarketingAbandonedHealth(data) {
@@ -5925,7 +5874,7 @@
     heading.textContent = t('abandoned_health_title', 'Abandoned-checkout reminders');
     var intro = document.createElement('p');
     intro.className = 'admin-app__muted';
-    intro.textContent = t('abandoned_health_intro', 'Campaign-scoped health for queued, sent, suppressed, completed, and failed reminder emails.');
+    intro.textContent = t('abandoned_health_intro', 'See where this campaign’s checkout reminder emails stand: queued, sent, suppressed, completed, or failed.');
     marketingAbandonedHealthRoot.append(heading, intro);
     var campaignSlug = selectedMarketingCampaign()?.slug || data?.campaignSlug || '';
     if (!data || data.error) {
@@ -5938,7 +5887,7 @@
     }
     renderAbandonedHealthMetrics(marketingAbandonedHealthRoot, data.campaign?.totals || data.totals || {});
     renderAbandonedHealthSuppression(marketingAbandonedHealthRoot, campaignSlug);
-    renderAbandonedHealthOutcomes(marketingAbandonedHealthRoot, data.recentOutcomes || []);
+    renderAbandonedHealthOutcomes(marketingAbandonedHealthRoot, data.recentOutcomes || [], campaignSlug);
   }
 
   async function loadMarketingAbandonedHealth() {
@@ -5970,9 +5919,14 @@
     }
   }
 
-  async function mutateAbandonedCheckoutSuppression(campaignSlug, email, suppress, status) {
-    var normalizedEmail = String(email || '').trim();
-    if (!campaignSlug || !normalizedEmail) {
+  async function mutateAbandonedCheckoutSuppression(campaignSlug, email, suppress, status, emailControl, options) {
+    var emailHash = String(options?.emailHash || '').trim().toLowerCase();
+    var canClearByHash = suppress !== true && /^[a-f0-9]{64}$/i.test(emailHash);
+    var normalizedEmails = Array.from(new Set(String(email || '')
+      .split(',')
+      .map(function(value) { return value.trim(); })
+      .filter(Boolean)));
+    if (!campaignSlug || (!normalizedEmails.length && !canClearByHash)) {
       setText(status, t('abandoned_suppression_required', 'Enter a supporter email for this campaign.'));
       return;
     }
@@ -5980,13 +5934,19 @@
       ? t('abandoned_suppression_saving', 'Saving campaign-scoped suppression...')
       : t('abandoned_suppression_clearing', 'Clearing campaign-scoped suppression...'));
     try {
-      await requestJson('/admin/abandoned-checkout/suppression', {
-        method: suppress ? 'POST' : 'DELETE',
-        body: JSON.stringify({ campaignSlug, email: normalizedEmail })
-      });
+      var payloads = canClearByHash
+        ? [{ emailHash }]
+        : normalizedEmails.map(function(normalizedEmail) { return { email: normalizedEmail }; });
+      for (const payload of payloads) {
+        await requestJson('/admin/abandoned-checkout/suppression', {
+          method: suppress ? 'POST' : 'DELETE',
+          body: JSON.stringify({ campaignSlug, ...payload })
+        });
+      }
       setText(status, suppress
         ? t('abandoned_suppression_saved', 'Reminder suppression saved for this campaign.')
         : t('abandoned_suppression_cleared', 'Reminder suppression cleared for this campaign.'));
+      emailControl?.clear?.();
       loadMarketingAbandonedHealth();
     } catch (error) {
       logger.error('Failed to update abandoned checkout suppression', error);
@@ -6169,6 +6129,18 @@
       if (!normalized || normalized === 'none') return t('analytics_utm_none', 'No UTM source');
       return titleCaseAnalyticsKey(normalized);
     }
+    if (group === 'utmMedium') {
+      if (!normalized || normalized === 'none') return t('analytics_utm_medium_none', 'No UTM medium');
+      return titleCaseAnalyticsKey(normalized);
+    }
+    if (group === 'utmCampaign') {
+      if (!normalized || normalized === 'none') return t('analytics_utm_campaign_none', 'No UTM campaign');
+      return titleCaseAnalyticsKey(normalized);
+    }
+    if (group === 'utmContent') {
+      if (!normalized || normalized === 'none') return t('analytics_utm_content_none', 'No UTM content');
+      return titleCaseAnalyticsKey(normalized);
+    }
     if (group === 'fulfillment') {
       if (normalized === 'physical') return t('analytics_fulfillment_physical', 'Physical');
       if (normalized === 'digital') return t('analytics_fulfillment_digital', 'Digital');
@@ -6197,8 +6169,8 @@
   function renderAnalyticsBreakdown(title, rows, group, options) {
     var card = document.createElement('section');
     card.className = 'admin-analytics__card';
-    var heading = document.createElement('div');
-    heading.className = 'admin-analytics__breakdown-title';
+    var heading = document.createElement('p');
+    heading.className = 'admin-card-heading admin-analytics__breakdown-title';
     heading.textContent = title;
     card.append(heading);
     var list = document.createElement('ul');
@@ -6345,7 +6317,7 @@
       ? Number(totals.pledgedAmount || 0) / Number(totals.pledgeCount || 1)
       : 0;
     var summary = document.createElement('section');
-    summary.className = 'admin-analytics__summary';
+    summary.className = 'admin-analytics__summary admin-section-panel';
     var metrics = document.createElement('div');
     metrics.className = 'admin-analytics__metrics';
     metrics.append(
@@ -6369,6 +6341,14 @@
     );
     summary.append(metrics);
 
+    var missingCampaigns = Array.isArray(data?.missingCampaigns) ? data.missingCampaigns : [];
+    if (missingCampaigns.length) {
+      var missingNotice = document.createElement('p');
+      missingNotice.className = 'admin-dashboard__status admin-analytics__index-notice';
+      missingNotice.textContent = t('analytics_index_missing_notice', 'Some campaign pledge indexes are missing, so analytics may be incomplete until indexes are rebuilt.');
+      summary.append(missingNotice);
+    }
+
     var referralLabels = data?.referralLabels || {};
     var breakdowns = document.createElement('div');
     breakdowns.className = 'admin-analytics__breakdowns';
@@ -6376,6 +6356,9 @@
       renderAnalyticsBreakdown(t('analytics_referral_breakdown', 'Referral codes'), data?.referralBreakdown || [], 'referral', { referralLabels: referralLabels }),
       renderAnalyticsBreakdown(t('analytics_language_breakdown', 'Language'), data?.languageBreakdown || [], 'language'),
       renderAnalyticsBreakdown(t('analytics_utm_breakdown', 'UTM sources'), data?.utmSourceBreakdown || [], 'utm'),
+      renderAnalyticsBreakdown(t('analytics_utm_medium_breakdown', 'UTM mediums'), data?.utmMediumBreakdown || [], 'utmMedium'),
+      renderAnalyticsBreakdown(t('analytics_utm_campaign_breakdown', 'UTM campaigns'), data?.utmCampaignBreakdown || [], 'utmCampaign'),
+      renderAnalyticsBreakdown(t('analytics_utm_content_breakdown', 'UTM contents'), data?.utmContentBreakdown || [], 'utmContent'),
       renderAnalyticsBreakdown(t('analytics_fulfillment_breakdown', 'Fulfillment type'), analyticsFulfillmentBreakdown(totals), 'fulfillment')
     );
     summary.append(breakdowns);
@@ -10124,7 +10107,6 @@
         setMarketingEditingState('');
         setText(marketingDraftStatus, '');
         loadMarketingReferrals();
-        loadMarketingReporting();
         loadMarketingAbandonedHealth();
       }
     });

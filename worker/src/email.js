@@ -925,7 +925,7 @@ export async function sendLaunchReminderEmail(env, { email, campaignSlug, campai
   }
 }
 
-export async function sendAbandonedCartEmail(env, { email, campaignSlug, campaignTitle, campaignTitles = [], campaignUrl, amountCents = 0, unsubscribeUrl, preferredLang } = {}) {
+export async function sendAbandonedCartEmail(env, { email, campaignSlug, campaignTitle, campaignTitles = [], campaignUrl, resumeUrl = '', amountCents = 0, unsubscribeUrl, preferredLang } = {}) {
   configureEmailLogging(env);
   if (!env?.RESEND_API_KEY) {
     return { sent: false, reason: 'RESEND_API_KEY not configured' };
@@ -947,6 +947,7 @@ export async function sendAbandonedCartEmail(env, { email, campaignSlug, campaig
   const from = safeEmailHeaderText(getUpdatesEmailFrom(env) || getPledgesEmailFrom(env));
   const campaignHref = safeExternalUrl(campaignUrl, env.SITE_BASE) ||
     safeSiteUrl(getLocalizedPath(`/campaigns/${encodeURIComponent(campaignSlug || '')}/`, lang), env.SITE_BASE);
+  const ctaHref = safeExternalUrl(resumeUrl, env.SITE_BASE) || campaignHref;
   const unsubscribeHref = safeExternalUrl(unsubscribeUrl, env.WORKER_BASE || env.SITE_BASE);
   const unsubscribeHeaders = emailListUnsubscribeHeaders(unsubscribeHref, env.WORKER_BASE || env.SITE_BASE);
   const subject = safeEmailHeaderText(buildEmailSubject(
@@ -990,7 +991,7 @@ export async function sendAbandonedCartEmail(env, { email, campaignSlug, campaig
     <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(intro)}</p>
     ${amountBlock}
     <p style="margin: 0;">
-      <a href="${escapeHtml(campaignHref)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(cta)}</a>
+      <a href="${escapeHtml(ctaHref)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(cta)}</a>
     </p>
   </div>
   <div style="${getEmailFooterStyle(theme)}">

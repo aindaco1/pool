@@ -35,12 +35,13 @@ The current architecture is deliberately optimized so Cloudflare deployments spe
 - campaign pages and the manage page prefer one combined `/live/:slug` read instead of separate stats + inventory requests
 - the browser caches live stats and inventory in `localStorage` for the configured TTLs, and hidden tabs stop refreshing until visible again
 - dashboard reports, supporters, analytics, settlement helpers, admin broadcast/Blast audience lookups, and stats / inventory reconciliation all prefer the `campaign-pledges:{slug}` index and avoid expensive namespace scans on normal read paths
-- dashboard content loads/previews, report previews/downloads, supporter filters, analytics views, marketing referral lists/reporting, abandoned-checkout health reads, media-library picker loads, QR previews/downloads, Blast dry runs, and local drafts are designed to add zero KV writes
+- dashboard content loads/previews, report previews/downloads, supporter filters, analytics views, marketing referral lists, abandoned-checkout health reads, media-library picker loads, QR previews/downloads, Blast dry runs, and local drafts are designed to add zero KV writes
 - protected preview payload reads are zero-write; publishing a protected preview writes one 24-hour preview access allowlist plus an audit event
 - campaign archive operations write one audit event; the source/media archive move runs locally in dev and in GitHub Actions for production
 - limited-tier write paths now ask the per-campaign coordinator for reservation-aware availability, while public inventory stays in KV as a projection
 - platform add-on inventory uses a sold-count projection after bootstrap instead of rebuilding from pledge namespace scans on normal reads
 - launch reminder dispatch, abandoned-checkout reminders, and supporter confirmation retry polling use queue-state markers, so idle scheduled ticks skip KV list scans and fall back to hourly compatibility checks
+- sent abandoned-checkout reminders can create one short-lived resume snapshot, allowing signed email links to restore the same sanitized cart/contact draft and start a fresh Stripe session without putting Stripe secrets in URLs
 - rate limiting still fails closed, but repeated blocked requests inside the same window no longer rewrite the same KV counter on every hit
 
 That means the real ceiling for most forks is usually **KV writes from successful pledge activity**, not public read traffic or idle list polling. `RATELIMIT` is now a hard requirement for supported deployments, but that does not by itself make the Free plan non-viable for the project's intended small-scale crowdfunding shape.
@@ -188,7 +189,7 @@ For current Cloudflare limits, see:
 11. **Performance work should stay static-first**: prefer stable Jekyll output, generated asset minification, lazy runtime loading, and conservative public-only prefetching before adding client complexity.
 12. **Media lifecycle work should stay repo-backed**: dashboard uploads commit source files first, repository automation owns native image/video optimization, and publish-time cleanup only removes same-campaign media that disappeared from authored content and is not referenced elsewhere.
 13. **Preview access data should stay out of source**: protected-preview Markdown carries only preview flags; preview access emails belong in short-lived Worker KV allowlists and signed 24-hour links.
-14. **Marketing tools should stay local, indexed, or explicit**: QR generation stays browser-local, reporting and Blast dry runs use campaign pledge indexes, saved referral codes and shared drafts are explicit campaign-scoped KV mutations, stale shared drafts fail on revision conflicts, and none of these flows should fall back to namespace scans.
+14. **Marketing tools should stay local, indexed, or explicit**: QR generation stays browser-local, Analytics attribution and Blast dry runs use campaign pledge indexes, saved referral codes and shared drafts are explicit campaign-scoped KV mutations, stale shared drafts fail on revision conflicts, and none of these flows should fall back to namespace scans.
 
 ---
 

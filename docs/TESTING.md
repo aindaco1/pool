@@ -68,7 +68,7 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | `email-broadcasts` | Diary excerpt extraction (with ellipsis truncation), diary/milestone tracking helpers, milestone checking logic, rate limiting |
 | `email-tip` | Tip-aware supporter email breakdowns across confirmation / modified / cancelled / failed / charged emails, plus launch reminder and abandoned-checkout email routing through the shared updates sender |
 | `votes` | Email-based vote storage/dedup, vote status retrieval, campaign results, result aggregation |
-| `admin-dashboard` | Dashboard dirty-state tracking, settings serialization, content/editor normalization, staged media uploads/media picker, actual Stripe fee analytics/backfill, marketing shared drafts/reporting, abandoned-checkout health/suppression, referral URL helpers, responsive/i18n support utilities |
+| `admin-dashboard` | Dashboard dirty-state tracking, settings serialization, content/editor normalization, staged media uploads/media picker, actual Stripe fee analytics/backfill, Analytics attribution reporting, marketing shared drafts, abandoned-checkout health/suppression, referral URL helpers, responsive/i18n support utilities |
 | `campaign-page` | Share-link URL construction, safe query preservation, state-aware share text, launch reminder form submission, public campaign controls, and SEO-sensitive campaign-page behavior |
 | `page-prefetch` | Same-origin public-route allowlisting, sensitive-query exclusions, network guards, delay/limit handling, and document prefetch hint creation |
 | `cart-runtime-loader` | Lazy cart-runtime boot, persisted/recovery cart detection, idempotent loading, and user-intent triggers |
@@ -103,7 +103,9 @@ This runs:
   - `tests/unit/worker-business-logic.test.ts`
   - `tests/unit/worker-ops-integrity.test.ts`
   - `tests/unit/stats-pagination.test.ts`
-  These Worker suites cover launch reminder signup validation, abandoned-checkout opt-in/dispatch/suppression, campaign-scoped suppression, aggregate health counters, unsubscribe suppression, queued dispatch idempotency, and the shared Resend send path.
+  - `tests/unit/setup-deploy-script.test.ts`
+- Worker suites cover launch reminder signup validation, abandoned-checkout opt-in/dispatch/suppression, signed checkout resume links, campaign-scoped suppression, aggregate health counters, unsubscribe suppression, queued dispatch idempotency, and the shared Resend send path.
+- Setup-helper tests run the deployment CLI in temporary repo copies with fake `npm`, `npx`/Wrangler, `gh`, `stripe`, and `ruby` commands. They cover help/error handling, dry-run no-write behavior, KV namespace reuse/create planning, non-interactive local secret generation, generated production Worker secrets, and read-only readiness probes without live provider mutations.
 - Content safety filter regressions in `tests/unit/content-safety-filter.test.ts`, including unsafe Markdown link schemes, dashboard-authored emphasis spacing, and strict structured-embed URL validation
 - Campaign-content audit coverage in `tests/unit/campaign-content-security.test.ts`, including the allowed inline HTML subset and rejection of disallowed raw tags
 - Durable Object tier-inventory serialization coverage in `tests/unit/tier-inventory-do.test.ts`
@@ -914,7 +916,7 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 - `TURNSTILE_SECRET_KEY` — Shared Cloudflare Turnstile secret when admin sign-in or launch reminder widgets are enabled
 - `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY` — Optional reminder-specific Turnstile secret if not using the shared secret
 - `LAUNCH_REMINDER_TOKEN_SECRET` — Optional reminder unsubscribe-token secret; falls back to `MAGIC_LINK_SECRET`
-- `ABANDONED_CART_TOKEN_SECRET` — Optional abandoned-checkout unsubscribe-token secret; falls back to `MAGIC_LINK_SECRET`
+- `ABANDONED_CART_TOKEN_SECRET` — Optional abandoned-checkout reminder token secret for unsubscribe and resume links; falls back to `MAGIC_LINK_SECRET`
 - `GITHUB_TOKEN` — GitHub PAT with repo/workflow access for dashboard publish actions and rebuild triggers; optional only when you are not testing GitHub-backed publishing
 - `ADMIN_BOOTSTRAP_EMAILS` — Optional local/recovery super-admin email list for dashboard sign-in; local dev reads this from `worker/.dev.vars`
 - `ADMIN_USERS_JSON` — Optional seed/recovery admin user list mirrored from `_config.yml`; dashboard Users edits save to KV at `admin-users:v1`

@@ -49,7 +49,7 @@ Esta lista refleja los cambios de la plataforma hasta **v1.0.7**:
 - los analytics de campaña mantienen visible el ingreso bruto de campaña y también muestran el ingreso neto después de comisiones de procesamiento asignadas
 - las personas operadoras de plataforma pueden vigilar el uso de planes de Cloudflare y Resend desde el panel sin exponer tokens de proveedores al equipo creador
 - los equipos de campaña pueden usar enlaces de vista previa protegida para revisar borradores de campaña de forma privada antes del lanzamiento público
-- los equipos de campaña pueden crear URLs con tracking, guardar códigos de referencia, descargar códigos QR, guardar borradores compartidos de Marketing y revisar performance de referencias/UTM desde el tab Marketing
+- los equipos de campaña pueden crear URLs con tracking, guardar códigos de referencia, descargar códigos QR, guardar borradores compartidos de Marketing y revisar performance de referencias/UTM desde Analíticas
 - Campaigns -> Blast puede guardar borradores compartidos y enviar correos a patrocinadores con imágenes alojadas por la campaña, imágenes existentes seleccionadas y enlaces de YouTube/Vimeo compatibles con email
 - el checkout puede recoger consentimiento explícito para un solo recordatorio de checkout abandonado, separado de recordatorios de lanzamiento y blasts de campaña; los equipos de campaña pueden revisar salud agregada de recordatorios y usar controles de supresión limitados sin ver PII del recordatorio
 - las mejoras de performance hacen más estable la primera carga, incluidos embeds hero de YouTube diferidos y entrega responsiva de imágenes, pero las campañas aún necesitan media optimizada y copy conciso
@@ -379,7 +379,7 @@ Prepara:
 
 Los botones de compartir usan la URL pública de campaña y texto por estado donde se permite. Facebook y otros destinos centrados en preview dependen principalmente del Open Graph title, description e imagen de la campaña.
 
-Prueba los QR desde la cámara de un teléfono real antes de imprimirlos o compartirlos ampliamente. El copy de Blast debe ser conciso, usar pocas imágenes y enlazar media alojada por la campaña en lugar de hotlinks remotos.
+Prueba los QR desde la cámara de un teléfono real antes de imprimirlos o compartirlos ampliamente. El copy de Blast debe ser conciso, usar pocas imágenes y enlazar media alojada por la campaña en lugar de hotlinks remotos. Los equipos que operan su propio fork deberían ensayar `npm run setup:deploy -- --mode=production --dry-run` antes del lanzamiento para revisar preparación de proveedores, reutilización de namespaces KV, secretos y pasos de deploy antes de que lleguen patrocinadores.
 
 ## Recompensas físicas y envío
 

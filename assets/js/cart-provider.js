@@ -11,6 +11,7 @@
   const ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_KEY = 'pool_active_custom_checkout_order_id';
   const FIRST_PARTY_CART_STATE_KEY = 'pool_first_party_cart_state';
   const FIRST_PARTY_CART_DRAFT_KEY = 'pool_first_party_cart_draft';
+  const ABANDONED_CHECKOUT_RESUME_PARAM = 'checkoutResume';
   const PENDING_PLEDGE_KEY = 'pool_pending_pledge';
   const LIVE_REFRESH_MARKER_KEY = 'pool_live_refresh_needed';
   const ADD_ON_ITEM_PREFIX = 'addon__';
@@ -2466,6 +2467,25 @@
     } catch (_error) {}
   }
 
+  function writeFirstPartyCheckoutSnapshotPayload(snapshot) {
+    if (!Array.isArray(snapshot?.cart?.items) || snapshot.cart.items.length === 0) return false;
+
+    try {
+      localStorage.setItem(FIRST_PARTY_CHECKOUT_SNAPSHOT_KEY, JSON.stringify({
+        cart: {
+          tipPercent: sanitizeTipPercent(snapshot?.cart?.tipPercent, getDefaultPlatformTipPercent()),
+          bundleAddOnAnchorCampaignSlug: String(snapshot?.cart?.bundleAddOnAnchorCampaignSlug || ''),
+          items: snapshot.cart.items.map((item) => normalizeCartItem(item))
+        },
+        campaignUrl: String(snapshot?.campaignUrl || '/'),
+        savedAt: Date.now()
+      }));
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function readFirstPartyCheckoutSnapshot() {
     const storage = getLocalStorageSafe();
     if (!storage) return null;
@@ -2544,6 +2564,33 @@
         return;
       }
       storage.setItem(FIRST_PARTY_CART_DRAFT_KEY, JSON.stringify(payload));
+    } catch (_error) {}
+  }
+
+  function writeFirstPartyCartDraftPayload(draft) {
+    const storage = getSessionStorageSafe();
+    if (!storage || !draft || typeof draft !== 'object') return;
+
+    const email = String(draft.email || '').trim();
+    const billingAddress = draft.billingAddress && typeof draft.billingAddress === 'object'
+      ? { ...draft.billingAddress }
+      : {};
+    const customer = draft.customer && typeof draft.customer === 'object'
+      ? { ...draft.customer }
+      : (email ? { email } : {});
+    const abandonedCartConsent = draft.abandonedCartConsent === true;
+    const hasBillingAddress = Object.values(billingAddress).some((value) => String(value || '').trim());
+    const hasCustomer = Object.values(customer).some((value) => String(value || '').trim());
+    if (!email && !hasBillingAddress && !hasCustomer && !abandonedCartConsent) return;
+
+    try {
+      storage.setItem(FIRST_PARTY_CART_DRAFT_KEY, JSON.stringify({
+        email,
+        abandonedCartConsent,
+        billingAddress,
+        customer,
+        savedAt: Date.now()
+      }));
     } catch (_error) {}
   }
 
@@ -3250,6 +3297,8 @@
       const draft = readFirstPartyCartDraftState();
       const nextEmail = String(draft?.email || snapshot?.cart?.email || '');
       const nextTipPercent = sanitizeTipPercent(snapshot?.cart?.tipPercent, getDefaultPlatformTipPercent());
+      const nextAbandonedCartConsent = draft?.abandonedCartConsent === true ||
+        store.getState()?.cart?.abandonedCartConsent === true;
       const totals = calculateCartTotals(
         nextItems,
         nextTipPercent,
@@ -3271,6 +3320,7 @@
           ...totals,
           email: nextEmail,
           tipPercent: nextTipPercent,
+          abandonedCartConsent: nextAbandonedCartConsent,
           billingAddress: draft?.billingAddress || store.getState().cart?.billingAddress || {},
           items: {
             count: nextItems.length,
@@ -3538,7 +3588,7 @@
                 </div>
                 <label class="pool-first-party-cart__checkbox-field pool-first-party-cart__checkbox-field--full">
                   <input class="pool-first-party-cart__checkbox" type="checkbox" data-cart-abandoned-consent ${state?.cart?.abandonedCartConsent === true ? 'checked' : ''}>
-                  <span>${escapeHtml(getRuntimeMessage('cart.abandonedCartConsent', 'Email me one reminder if I leave checkout before finishing this pledge.'))}</span>
+                  <span>${escapeHtml(getRuntimeMessage('cart.abandonedCartConsent', 'Send me one reminder if I don’t finish today.'))}</span>
                 </label>
                 <div class="pool-first-party-cart__field pool-first-party-cart__field--full">
                   <label class="pool-first-party-cart__field-label" for="pool-custom-shipping-line1">${escapeHtml(getRuntimeMessage('cart.addressLine1', 'Address line 1'))} <span class="pool-first-party-cart__required-mark" aria-hidden="true">*</span></label>
@@ -3591,7 +3641,7 @@
               </div>
               <label class="pool-first-party-cart__checkbox-field">
                 <input class="pool-first-party-cart__checkbox" type="checkbox" data-cart-abandoned-consent ${state?.cart?.abandonedCartConsent === true ? 'checked' : ''}>
-                <span>${escapeHtml(getRuntimeMessage('cart.abandonedCartConsent', 'Email me one reminder if I leave checkout before finishing this pledge.'))}</span>
+                <span>${escapeHtml(getRuntimeMessage('cart.abandonedCartConsent', 'Send me one reminder if I don’t finish today.'))}</span>
               </label>
             </div>
           </div>
@@ -5823,6 +5873,58 @@
       document.addEventListener('click', document._poolFirstPartyRecoveryHandler);
     }
 
+    function takeAbandonedCheckoutResumeToken() {
+      let url;
+      try {
+        url = new URL(window.location.href);
+      } catch (_error) {
+        return '';
+      }
+
+      const token = String(url.searchParams.get(ABANDONED_CHECKOUT_RESUME_PARAM) || '').trim();
+      if (!token) return '';
+      url.searchParams.delete(ABANDONED_CHECKOUT_RESUME_PARAM);
+      try {
+        window.history.replaceState(window.history.state, document.title, `${url.pathname}${url.search}${url.hash}`);
+      } catch (_error) {}
+      return token;
+    }
+
+    async function consumeAbandonedCheckoutResumeToken() {
+      const token = takeAbandonedCheckoutResumeToken();
+      if (!token) return false;
+
+      try {
+        const response = await fetch(
+          `${getWorkerBase()}/abandoned-cart/resume?t=${encodeURIComponent(token)}`,
+          { cache: 'no-store' }
+        );
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.success !== true) return false;
+        if (!writeFirstPartyCheckoutSnapshotPayload(payload.snapshot)) return false;
+        writeFirstPartyCartDraftPayload(payload.draft);
+        persistCustomCheckoutDraftState(payload.draft?.email, payload.draft?.shippingDraft || null);
+        const snapshot = readFirstPartyCheckoutSnapshot();
+        if (!restoreCheckoutFromSnapshot(snapshot)) return false;
+        setCheckoutUiState({
+          status: 'idle',
+          error: '',
+          customCheckout: payload.draft?.shippingDraft
+            ? {
+                ...(checkoutUiState.customCheckout || {}),
+                shippingDraft: payload.draft.shippingDraft,
+                shippingError: ''
+              }
+            : checkoutUiState.customCheckout
+        });
+        await apiRoot.api.theme.cart.open();
+        await apiRoot.api.theme.cart.navigate(CHECKOUT_VIEW_ROUTE);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    }
+
     const apiRoot = {
       version: 'poolcart-first-party-scaffold',
       summary: {
@@ -6192,6 +6294,10 @@
     } else if (isPledgeCancelledPath()) {
       renderCancelledRecoveryCard();
       hydrateRecoveryCardFromBackend();
+    }
+
+    if (!isPledgeSuccessPath()) {
+      consumeAbandonedCheckoutResumeToken();
     }
 
     const readyPromise = Promise.resolve(apiRoot);

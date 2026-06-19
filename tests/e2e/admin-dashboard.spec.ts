@@ -80,7 +80,6 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     logoUpload: [],
     imageUpload: [],
     marketingReferrals: [],
-    marketingReporting: [],
     marketingDraft: [],
     abandonedHealth: [],
     abandonedSuppression: [],
@@ -630,6 +629,9 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         referralBreakdown: [{ key: 'newsletter', count: 1, amount: 5000 }],
         languageBreakdown: [{ key: 'en', count: 1, amount: 5000 }],
         utmSourceBreakdown: [{ key: 'email', count: 1, amount: 5000 }],
+        utmMediumBreakdown: [{ key: 'newsletter', count: 1, amount: 5000 }],
+        utmCampaignBreakdown: [{ key: 'hand-relations', count: 1, amount: 5000 }],
+        utmContentBreakdown: [{ key: 'launch-list', count: 1, amount: 5000 }],
         writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
       });
     }
@@ -693,30 +695,6 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         campaignSlug: url.searchParams.get('campaignSlug') || body.campaignSlug || 'hand-relations',
         referrals: marketingReferralRows,
         writeBudget: { readOnly: method === 'GET', kvWritesExpected: method === 'GET' ? 0 : 1, kvListExpected: 0 }
-      });
-    }
-    if (url.pathname === '/admin/marketing/reporting') {
-      calls.marketingReporting.push({ method, query: Object.fromEntries(url.searchParams.entries()) });
-      return fulfillJson({
-        user,
-        campaignSlug: url.searchParams.get('campaignSlug') || 'hand-relations',
-        indexedPledgeCount: 2,
-        savedReferralCount: marketingReferralRows.length,
-        referrals: [{
-          key: 'test',
-          label: 'test',
-          pledgeCount: 1,
-          pledgedSubtotal: 5000,
-          chargedAmount: 0
-        }],
-        utm: {
-          sources: [{ key: 'email', label: 'email', pledgeCount: 1, pledgedSubtotal: 5000, chargedAmount: 0 }],
-          mediums: [{ key: 'social', label: 'social', pledgeCount: 1, pledgedSubtotal: 5000, chargedAmount: 0 }],
-          campaigns: [{ key: 'hand-relations', label: 'hand-relations', pledgeCount: 1, pledgedSubtotal: 5000, chargedAmount: 0 }],
-          contents: [{ key: 'launch', label: 'launch', pledgeCount: 1, pledgedSubtotal: 5000, chargedAmount: 0 }]
-        },
-        writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 },
-        generatedAt: '2026-06-18T12:00:00.000Z'
       });
     }
     if (url.pathname === '/admin/marketing/draft') {
@@ -1847,7 +1825,7 @@ test.describe('Admin Dashboard', () => {
       textarea.dispatchEvent(new Event('change', { bubbles: true }));
     });
     const mobileMediaBlock = page.locator('#admin-content-blocks .content-block--image');
-    const mobileMediaSettings = mobileMediaBlock.getByRole('button', { name: 'Media settings' });
+    const mobileMediaSettings = mobileMediaBlock.locator('[data-content-action="toggle-media-settings"]');
     await mobileMediaBlock.locator('img').click();
     await expect(mobileMediaBlock.locator('.admin-content-block__chrome')).toHaveCSS('display', 'grid');
     await expect(mobileMediaSettings).toBeHidden();
@@ -1856,7 +1834,8 @@ test.describe('Admin Dashboard', () => {
     await mobileMediaSettings.click();
     await expect(mobileMediaBlock.locator('.admin-content-block__settings-panel')).toBeVisible();
     await expect(mobileMediaBlock.locator('.admin-content-block__chrome')).toHaveCSS('display', 'none');
-    await mobileMediaSettings.click();
+    await expect(mobileMediaSettings).toBeHidden();
+    await page.locator('#admin-panel-campaigns').click({ position: { x: 6, y: 6 } });
     await expect(mobileMediaBlock.locator('.admin-content-block__settings-panel')).toBeHidden();
     await expect(mobileMediaBlock.locator('.admin-content-block__chrome')).toHaveCSS('display', 'none');
     await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
@@ -1979,6 +1958,7 @@ test.describe('Admin Dashboard', () => {
     await selectAdminSection(page, 'Analytics');
     await expect.poll(() => calls.analytics.length).toBe(1);
     await expect(page.locator('#admin-analytics-results')).toContainText('Pledged');
+    await expect(page.locator('#admin-analytics-results')).toContainText('UTM mediums');
 
     await selectAdminSection(page, 'Campaigns');
     await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="content"]').click();
@@ -2128,11 +2108,13 @@ test.describe('Admin Dashboard', () => {
     await expect(mediaBlock.getByText('Open media settings to preview this block.')).toBeVisible();
     await expect(mediaBlock.getByLabel('Caption')).toHaveAttribute('data-placeholder', 'Optional caption - hidden unless filled');
     await expect(mediaBlock.locator('.admin-content-block__settings-panel')).toBeHidden();
-    const settingsButton = mediaBlock.getByRole('button', { name: 'Media settings' });
+    const settingsButton = mediaBlock.locator('[data-content-action="toggle-media-settings"]');
+    await expect(settingsButton).toHaveAttribute('aria-label', 'Media settings');
     await expect(settingsButton).toHaveAttribute('aria-expanded', 'false');
     await settingsButton.click();
     await expect(settingsButton).toHaveAttribute('aria-expanded', 'true');
     await expect(mediaBlock.locator('.admin-content-block__settings-panel')).toBeVisible();
+    await expect(settingsButton).toBeHidden();
     await expect(mediaBlock.locator('.admin-content-block__chrome')).toHaveCSS('opacity', '0');
     await expect(mediaBlock.locator('.admin-content-block__settings-panel')).toHaveAttribute('role', 'group');
     await expect(mediaBlock.locator('.admin-content-block__settings-panel')).toHaveAttribute('aria-labelledby', /admin-content-media-settings-/);

@@ -19,6 +19,7 @@
  *   POST /launch-reminders   - Save an upcoming campaign launch reminder signup
  *   GET  /launch-reminders/unsubscribe - Suppress a launch reminder signup
  *   GET  /abandoned-cart/unsubscribe - Suppress abandoned-checkout reminder emails
+ *   GET  /abandoned-cart/resume - Restore a signed abandoned-checkout snapshot
  *   GET  /share/campaign/:slug.png - Get crawler-safe campaign share-card image
  *   GET  /share/campaign/:slug.svg - Get internal/debug campaign share-card image
  *   POST /stats/:slug/check - Check stats/index/inventory projection drift (admin)
@@ -155,12 +156,14 @@ const SUPPORTER_EMAIL_RETRY_BATCH_SIZE = 10;
 const SUPPORTER_EMAIL_RETRY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const IDLE_QUEUE_RECHECK_TTL_SECONDS = 60 * 60;
 const ABANDONED_CART_PREFIX = 'abandoned-cart:';
+const ABANDONED_CART_RESUME_PREFIX = 'abandoned-cart-resume:';
 const ABANDONED_CART_SENT_PREFIX = 'abandoned-cart-sent:';
 const ABANDONED_CART_SUPPRESSED_PREFIX = 'abandoned-cart-suppressed:';
 const ABANDONED_CART_CAMPAIGN_SUPPRESSED_PREFIX = 'abandoned-cart-suppressed-campaign:';
 const ABANDONED_CART_QUEUE_STATE_KEY = 'abandoned-cart-queue:v1';
 const ABANDONED_CART_HEALTH_KEY = 'abandoned-cart-health:v1';
 const ABANDONED_CART_TOKEN_SCOPE_UNSUBSCRIBE = 'abandoned-cart-unsubscribe';
+const ABANDONED_CART_TOKEN_SCOPE_RESUME = 'abandoned-cart-resume';
 const ABANDONED_CART_TTL_SECONDS = 14 * 24 * 60 * 60;
 const ABANDONED_CART_SENT_TTL_SECONDS = 400 * 24 * 60 * 60;
 const ABANDONED_CART_SUPPRESSION_TTL_SECONDS = 400 * 24 * 60 * 60;
@@ -3573,6 +3576,10 @@ function getAbandonedCartKey(orderId) {
   return `${ABANDONED_CART_PREFIX}${orderId}`;
 }
 
+function getAbandonedCartResumeKey(orderId) {
+  return `${ABANDONED_CART_RESUME_PREFIX}${orderId}`;
+}
+
 function getAbandonedCartSentKey(emailHash, campaignSetHash) {
   return `${ABANDONED_CART_SENT_PREFIX}${emailHash}:${campaignSetHash}`;
 }
@@ -3659,15 +3666,29 @@ function normalizeAbandonedCartHealth(value) {
 function publicAbandonedCartOutcome(outcome = {}) {
   if (!outcome || typeof outcome !== 'object') return null;
   const campaignSlugs = getAbandonedCartCampaignSet(outcome.campaignSlugs || []);
-  return {
+  const type = String(outcome.type || '');
+  const reason = String(outcome.reason || '');
+  const emailHash = String(outcome.emailHash || '').trim().toLowerCase();
+  const email = normalizeAbandonedCartEmail(outcome.email);
+  const hasEmailHash = /^[a-f0-9]{64}$/.test(emailHash);
+  if (type === 'suppression_cleared') return null;
+  if (type === 'suppressed' && reason === 'admin_suppression' && !hasEmailHash && !isValidEmail(email)) {
+    return null;
+  }
+  const publicOutcome = {
     at: String(outcome.at || ''),
-    type: String(outcome.type || ''),
-    reason: String(outcome.reason || ''),
+    type,
+    reason,
     campaignSlugs,
     campaignTitles: Array.isArray(outcome.campaignTitles)
       ? outcome.campaignTitles.map((title) => String(title || '')).filter(Boolean).slice(0, 4)
       : []
   };
+  if (hasEmailHash) publicOutcome.emailHash = emailHash;
+  if (type === 'suppressed' && reason === 'admin_suppression' && isValidEmail(email)) {
+    publicOutcome.email = email;
+  }
+  return publicOutcome;
 }
 
 function incrementAbandonedCartCounter(target, key, delta = 1) {
@@ -3715,6 +3736,14 @@ function applyAbandonedCartHealthEvent(summary, event = {}) {
     campaignSlugs,
     campaignTitles
   };
+  const emailHash = String(event.emailHash || '').trim().toLowerCase();
+  if (type === 'suppressed' && reason === 'admin_suppression' && /^[a-f0-9]{64}$/.test(emailHash)) {
+    outcome.emailHash = emailHash;
+  }
+  const email = normalizeAbandonedCartEmail(event.email);
+  if (type === 'suppressed' && reason === 'admin_suppression' && isValidEmail(email)) {
+    outcome.email = email;
+  }
   if (type) {
     summary.recentOutcomes = [outcome, ...(summary.recentOutcomes || [])].slice(0, 20);
   }
@@ -3764,6 +3793,55 @@ async function updateAbandonedCartHealth(env, event = {}) {
   return summary;
 }
 
+function isAbandonedCartAdminSuppressionOutcome(outcome = {}, campaignSlug = '', emailHash = '') {
+  if (!outcome || typeof outcome !== 'object') return false;
+  if (String(outcome.type || '') !== 'suppressed') return false;
+  if (String(outcome.reason || '') !== 'admin_suppression') return false;
+  const slugs = getAbandonedCartCampaignSet(outcome.campaignSlugs || []);
+  if (campaignSlug && !slugs.includes(campaignSlug)) return false;
+  const outcomeEmailHash = String(outcome.emailHash || '').trim().toLowerCase();
+  if (/^[a-f0-9]{64}$/.test(outcomeEmailHash)) {
+    return outcomeEmailHash === emailHash;
+  }
+  return true;
+}
+
+function removeAbandonedCartAdminSuppressionOutcomes(summary, campaignSlug, emailHash) {
+  if (!summary || typeof summary !== 'object') return false;
+  let changed = false;
+  const keepOutcome = (outcome) => !isAbandonedCartAdminSuppressionOutcome(outcome, campaignSlug, emailHash);
+  const recentOutcomes = Array.isArray(summary.recentOutcomes) ? summary.recentOutcomes : [];
+  const filteredRecentOutcomes = recentOutcomes.filter(keepOutcome);
+  if (filteredRecentOutcomes.length !== recentOutcomes.length) {
+    summary.recentOutcomes = filteredRecentOutcomes;
+    changed = true;
+  }
+  const campaign = summary.campaigns?.[campaignSlug];
+  if (campaign && Array.isArray(campaign.recentOutcomes)) {
+    const filteredCampaignOutcomes = campaign.recentOutcomes.filter(keepOutcome);
+    if (filteredCampaignOutcomes.length !== campaign.recentOutcomes.length) {
+      campaign.recentOutcomes = filteredCampaignOutcomes;
+      changed = true;
+    }
+  }
+  if (changed) summary.updatedAt = new Date().toISOString();
+  return changed;
+}
+
+async function clearAbandonedCartAdminSuppressionHealth(env, campaignSlug, emailHash) {
+  if (!env?.PLEDGES) return null;
+  const summary = normalizeAbandonedCartHealth(
+    await env.PLEDGES.get(ABANDONED_CART_HEALTH_KEY, { type: 'json' })
+  );
+  if (!removeAbandonedCartAdminSuppressionOutcomes(summary, campaignSlug, emailHash)) {
+    return summary;
+  }
+  await env.PLEDGES.put(ABANDONED_CART_HEALTH_KEY, JSON.stringify(summary), {
+    expirationTtl: ABANDONED_CART_SENT_TTL_SECONDS
+  });
+  return summary;
+}
+
 function normalizeAbandonedCartQueueState(value) {
   if (!value || typeof value !== 'object') return null;
   return {
@@ -3806,6 +3884,169 @@ function getAbandonedCartUnsubscribeUrl(env, token) {
   const url = new URL('/abandoned-cart/unsubscribe', base);
   url.searchParams.set('t', token);
   return url.toString();
+}
+
+function getAbandonedCartResumeUrl(campaignUrl, token, env) {
+  const base = String(env?.SITE_BASE || '').trim() || 'https://pool.dustwave.xyz';
+  const url = new URL(String(campaignUrl || '/'), base);
+  url.searchParams.set('checkoutResume', token);
+  return url.toString();
+}
+
+function normalizeResumeSnapshotUrl(value) {
+  return String(value || '').trim();
+}
+
+function buildAbandonedCartResumeTierItem(campaign, campaignUrl, tierItem = {}) {
+  const tier = tierItem.tier || {};
+  const tierId = normalizeTierId(tierItem.id);
+  if (!tierId) return null;
+  const remaining = Number(tier.remaining);
+  return {
+    id: `${campaign.slug}__${tierId}`,
+    name: String(tier.name || tierId),
+    price: Number(tier.price || 0) || 0,
+    quantity: Math.max(1, Number(tierItem.qty || 1)),
+    url: campaignUrl,
+    description: String(tier.description || ''),
+    imageUrl: normalizeResumeSnapshotUrl(tier.image || tier.image_url || ''),
+    stackable: tier.stackable === true,
+    shippable: String(tier.category || '').trim().toLowerCase() === 'physical',
+    maxQuantity: Number.isFinite(remaining) && remaining > 0 ? remaining : undefined
+  };
+}
+
+function buildAbandonedCartResumeSupportItem(campaign, campaignUrl, supportItem = {}) {
+  const supportItemId = String(supportItem.id || '').trim();
+  if (!supportItemId) return null;
+  const definitions = buildSupportItemDefinitionMap(campaign);
+  const definition = definitions.get(supportItemId) || {};
+  const amount = Math.max(0, Number(supportItem.amount || 0) || 0);
+  if (amount <= 0) return null;
+  return {
+    id: `${campaign.slug}__support__${supportItemId}`,
+    name: String(definition.label || supportItemId),
+    price: amount,
+    quantity: 1,
+    url: campaignUrl,
+    description: String(definition.need || definition.description || ''),
+    imageUrl: normalizeResumeSnapshotUrl(definition.image || definition.image_url || ''),
+    stackable: false,
+    shippable: false
+  };
+}
+
+function buildAbandonedCartResumeCustomSupportItem(campaign, campaignUrl, amount = 0) {
+  const normalizedAmount = Math.max(0, Number(amount || 0) || 0);
+  if (normalizedAmount <= 0) return null;
+  return {
+    id: `${campaign.slug}__custom-support`,
+    name: 'Additional support',
+    price: normalizedAmount,
+    quantity: 1,
+    url: campaignUrl,
+    description: '',
+    imageUrl: '',
+    stackable: false,
+    shippable: false
+  };
+}
+
+function buildAbandonedCartResumeAddOnItem(addOn = {}) {
+  const productId = String(addOn.productId || '').trim();
+  if (!productId) return null;
+  const variantId = String(addOn.variantId || '').trim();
+  const customFields = [];
+  if (variantId) customFields.push({ name: '_variant_id', value: variantId });
+  if (addOn.variantLabel) customFields.push({ name: '_variant_label', value: String(addOn.variantLabel || '') });
+  if (addOn.category) customFields.push({ name: '_category', value: String(addOn.category || '') });
+  if (addOn.scope) customFields.push({ name: '_addon_scope', value: String(addOn.scope || '') });
+  if (addOn.campaignSlug) customFields.push({ name: '_addon_campaign_slug', value: String(addOn.campaignSlug || '') });
+  if (addOn.campaignTitle) customFields.push({ name: '_addon_campaign_title', value: String(addOn.campaignTitle || '') });
+  return {
+    id: variantId ? `${ADD_ON_ITEM_PREFIX}${productId}__variant__${variantId}` : `${ADD_ON_ITEM_PREFIX}${productId}`,
+    name: String(addOn.name || productId),
+    price: Math.max(0, Number(addOn.unitPrice || 0) || 0) / 100,
+    quantity: Math.max(1, Number(addOn.quantity || 1)),
+    url: String(addOn.sourceUrl || '/'),
+    description: String(addOn.description || ''),
+    imageUrl: normalizeResumeSnapshotUrl(addOn.imageUrl || ''),
+    stackable: true,
+    shippable: String(addOn.category || '').trim().toLowerCase() === 'physical',
+    customFields
+  };
+}
+
+function buildAbandonedCartResumeSnapshot(env, checkoutGroups = [], bundleManifest = {}) {
+  const preferredLang = normalizePreferredLang(bundleManifest.preferredLang, DEFAULT_I18N_LANG);
+  const items = [];
+  let campaignUrl = '';
+
+  for (const group of checkoutGroups || []) {
+    const campaign = group?.campaign || {};
+    if (!campaign?.slug || !group?.canonicalContribution) continue;
+    const url = getCampaignSiteUrl(env, campaign, preferredLang);
+    if (!campaignUrl) campaignUrl = url;
+    for (const tierItem of group.canonicalContribution.selectedTiers || []) {
+      const item = buildAbandonedCartResumeTierItem(campaign, url, tierItem);
+      if (item) items.push(item);
+    }
+    for (const supportItem of group.canonicalContribution.supportItems || []) {
+      const item = buildAbandonedCartResumeSupportItem(campaign, url, supportItem);
+      if (item) items.push(item);
+    }
+    const customItem = buildAbandonedCartResumeCustomSupportItem(campaign, url, group.canonicalContribution.customAmount);
+    if (customItem) items.push(customItem);
+  }
+
+  for (const addOn of bundleManifest.bundleAddOns || []) {
+    const item = buildAbandonedCartResumeAddOnItem(addOn);
+    if (item) items.push(item);
+  }
+
+  if (!items.length) return null;
+
+  return {
+    cart: {
+      tipPercent: Number(bundleManifest.tipPercent || 0) || 0,
+      bundleAddOnAnchorCampaignSlug: String(bundleManifest.bundleAddOnAnchorCampaignSlug || ''),
+      items
+    },
+    campaignUrl: campaignUrl || '/',
+    savedAt: Date.now()
+  };
+}
+
+function buildAbandonedCartResumeDraft(record = {}) {
+  const email = normalizeAbandonedCartEmail(record.email);
+  const billingAddress = record.billingAddress && typeof record.billingAddress === 'object'
+    ? { ...record.billingAddress }
+    : {};
+  const shippingAddress = record.shippingAddress && typeof record.shippingAddress === 'object'
+    ? { ...record.shippingAddress }
+    : {};
+  const shippingPostalCode = String(shippingAddress.postalCode || shippingAddress.postal_code || '').trim();
+  const shippingCountry = String(shippingAddress.country || '').trim().toUpperCase();
+  const shippingDraft = shippingCountry || shippingPostalCode
+    ? {
+        name: '',
+        address: {
+          line1: String(shippingAddress.line1 || shippingAddress.address1 || '').trim(),
+          line2: String(shippingAddress.line2 || shippingAddress.address2 || '').trim(),
+          city: String(shippingAddress.city || '').trim(),
+          state: String(shippingAddress.state || '').trim(),
+          postal_code: shippingPostalCode,
+          country: shippingCountry || 'US'
+        }
+      }
+    : null;
+  return {
+    email,
+    abandonedCartConsent: true,
+    billingAddress,
+    customer: email ? { email } : {},
+    shippingDraft
+  };
 }
 
 function abandonedCartHtmlResponse(title, body, status = 200) {
@@ -3913,6 +4154,15 @@ async function buildAbandonedCartSnapshot(env, bundleManifest) {
     campaignTitles: campaigns.map((campaign) => campaign.title),
     campaignUrl: primaryCampaign.url,
     amountCents: Number(consent.amountCents ?? bundleManifest?.totals?.amount ?? 0) || 0,
+    billingAddress: bundleManifest?.billingAddress && typeof bundleManifest.billingAddress === 'object'
+      ? { ...bundleManifest.billingAddress }
+      : null,
+    shippingAddress: bundleManifest?.shippingAddress && typeof bundleManifest.shippingAddress === 'object'
+      ? { ...bundleManifest.shippingAddress }
+      : null,
+    resumeSnapshot: bundleManifest?.resumeSnapshot && typeof bundleManifest.resumeSnapshot === 'object'
+      ? bundleManifest.resumeSnapshot
+      : null,
     createdAt: new Date(nowMs).toISOString(),
     sendAfter,
     attempts: 0,
@@ -4110,12 +4360,14 @@ async function handleAdminAbandonedCheckoutSuppression(request, env, body = {}, 
   const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'marketing:send', { requireCsrf: true });
   if (!scoped.ok) return scoped.response;
 
+  const bodyEmailHash = String(body.emailHash || '').trim().toLowerCase();
+  const canClearByHash = suppress !== true && /^[a-f0-9]{64}$/.test(bodyEmailHash);
   const email = normalizeAbandonedCartEmail(body.email);
-  if (!isValidEmail(email)) {
+  if (!canClearByHash && !isValidEmail(email)) {
     return privateJsonResponse({ error: 'A valid email is required.' }, 400, env);
   }
 
-  const emailHash = await sha256Hex(email);
+  const emailHash = canClearByHash ? bodyEmailHash : await sha256Hex(email);
   const key = getAbandonedCartCampaignSuppressionKey(campaignSlug, emailHash);
   const now = new Date().toISOString();
   if (suppress) {
@@ -4123,6 +4375,7 @@ async function handleAdminAbandonedCheckoutSuppression(request, env, body = {}, 
       version: 1,
       campaignSlug,
       emailHash,
+      email,
       source: 'admin',
       suppressedAt: now,
       suppressedBy: scoped.auth.user.email
@@ -4138,14 +4391,20 @@ async function handleAdminAbandonedCheckoutSuppression(request, env, body = {}, 
     emailHash
   });
 
-  await updateAbandonedCartHealth(env, {
-    type: suppress ? 'suppressed' : 'suppression_cleared',
-    reason: suppress ? 'admin_suppression' : 'admin_unsuppression',
-    campaignSlugs: [campaignSlug],
-    campaignTitles: [scoped.campaign.title || campaignSlug],
-    counter: suppress ? 'suppressed' : '',
-    at: now
-  });
+  if (suppress) {
+    await updateAbandonedCartHealth(env, {
+      type: 'suppressed',
+      reason: 'admin_suppression',
+      campaignSlugs: [campaignSlug],
+      campaignTitles: [scoped.campaign.title || campaignSlug],
+      emailHash,
+      email,
+      counter: 'suppressed',
+      at: now
+    });
+  } else {
+    await clearAbandonedCartAdminSuppressionHealth(env, campaignSlug, emailHash);
+  }
 
   return privateJsonResponse({
     success: true,
@@ -4276,12 +4535,25 @@ async function processAbandonedCartFollowups(env, now = new Date()) {
       continue;
     }
 
-    const token = await generateToken(tokenSecret, {
+    const unsubscribeToken = await generateToken(tokenSecret, {
       scope: ABANDONED_CART_TOKEN_SCOPE_UNSUBSCRIBE,
       orderId: record.orderId,
       emailHash: record.emailHash,
       email: record.email
     }, 30);
+    const hasResumeSnapshot = Array.isArray(record.resumeSnapshot?.cart?.items) &&
+      record.resumeSnapshot.cart.items.length > 0;
+    const resumeToken = hasResumeSnapshot
+      ? await generateToken(tokenSecret, {
+          scope: ABANDONED_CART_TOKEN_SCOPE_RESUME,
+          orderId: record.orderId,
+          emailHash: record.emailHash,
+          campaignSetHash: record.campaignSetHash
+        }, 14)
+      : '';
+    const resumeUrl = resumeToken
+      ? getAbandonedCartResumeUrl(record.campaignUrl || '', resumeToken, env)
+      : '';
 
     const result = await sendAbandonedCartEmail(env, {
       email: record.email,
@@ -4289,8 +4561,9 @@ async function processAbandonedCartFollowups(env, now = new Date()) {
       campaignTitle: record.campaignTitle || '',
       campaignTitles: record.campaignTitles || [],
       campaignUrl: record.campaignUrl || '',
+      resumeUrl,
       amountCents: Number(record.amountCents || 0) || 0,
-      unsubscribeUrl: getAbandonedCartUnsubscribeUrl(env, token),
+      unsubscribeUrl: getAbandonedCartUnsubscribeUrl(env, unsubscribeToken),
       preferredLang: record.preferredLang || DEFAULT_I18N_LANG
     });
 
@@ -4317,6 +4590,24 @@ async function processAbandonedCartFollowups(env, now = new Date()) {
     await env.PLEDGES.put(getAbandonedCartSentKey(record.emailHash, record.campaignSetHash), now.toISOString(), {
       expirationTtl: ABANDONED_CART_SENT_TTL_SECONDS
     });
+    if (hasResumeSnapshot) {
+      await env.PLEDGES.put(getAbandonedCartResumeKey(record.orderId), JSON.stringify({
+        version: 1,
+        orderId: record.orderId,
+        email: record.email,
+        emailHash: record.emailHash,
+        campaignSetHash: record.campaignSetHash,
+        campaignSlugs: getAbandonedCartRecordCampaignSlugs(record),
+        campaignUrl: record.campaignUrl || '',
+        billingAddress: record.billingAddress || null,
+        shippingAddress: record.shippingAddress || null,
+        resumeSnapshot: record.resumeSnapshot,
+        createdAt: record.createdAt || '',
+        sentAt: now.toISOString()
+      }), {
+        expirationTtl: ABANDONED_CART_TTL_SECONDS
+      });
+    }
     await env.PLEDGES.delete(key);
     results.sent++;
     healthEvents.push({
@@ -4368,9 +4659,62 @@ async function handleAbandonedCartUnsubscribe(request, env) {
 
   if (isFirstPartyOrderId(payload.orderId)) {
     await deleteAbandonedCheckoutFollowup(env, payload.orderId, { reason: 'unsubscribed' });
+    await env.PLEDGES.delete(getAbandonedCartResumeKey(payload.orderId));
   }
 
   return abandonedCartHtmlResponse('Reminder unsubscribed', 'You will not receive this checkout reminder.');
+}
+
+async function handleAbandonedCartResume(request, env) {
+  if (!env?.PLEDGES) {
+    return privateJsonResponse({ error: 'Reminder resume storage is not configured.' }, 503, env);
+  }
+
+  const tokenSecret = getAbandonedCartTokenSecret(env);
+  if (!tokenSecret) {
+    return privateJsonResponse({ error: 'Reminder resume links are not configured.' }, 503, env);
+  }
+
+  const url = new URL(request.url);
+  const token = String(url.searchParams.get('t') || '').trim();
+  const payload = token ? await verifyToken(tokenSecret, token, env) : null;
+  const orderId = String(payload?.orderId || '').trim();
+  const emailHash = String(payload?.emailHash || '').trim().toLowerCase();
+  const campaignSetHash = String(payload?.campaignSetHash || '').trim().toLowerCase();
+  if (
+    !payload ||
+    payload.scope !== ABANDONED_CART_TOKEN_SCOPE_RESUME ||
+    !isFirstPartyOrderId(orderId) ||
+    !/^[a-f0-9]{64}$/.test(emailHash)
+  ) {
+    return privateJsonResponse({ error: 'Reminder link is invalid or expired.' }, 400, env);
+  }
+
+  const record = await env.PLEDGES.get(getAbandonedCartResumeKey(orderId), { type: 'json' }) ||
+    await env.PLEDGES.get(getAbandonedCartKey(orderId), { type: 'json' });
+  const recordEmailHash = String(record?.emailHash || '').trim().toLowerCase();
+  const recordCampaignSetHash = String(record?.campaignSetHash || '').trim().toLowerCase();
+  const snapshot = record?.resumeSnapshot;
+  if (
+    !record ||
+    recordEmailHash !== emailHash ||
+    (campaignSetHash && recordCampaignSetHash && recordCampaignSetHash !== campaignSetHash) ||
+    !Array.isArray(snapshot?.cart?.items) ||
+    snapshot.cart.items.length === 0
+  ) {
+    return privateJsonResponse({ error: 'Reminder checkout is no longer available.' }, 404, env);
+  }
+
+  return privateJsonResponse({
+    success: true,
+    orderId,
+    campaignUrl: String(record.campaignUrl || snapshot.campaignUrl || ''),
+    snapshot: {
+      ...snapshot,
+      savedAt: Date.now()
+    },
+    draft: buildAbandonedCartResumeDraft(record)
+  }, 200, env);
 }
 
 async function claimSelectedTierInventory(env, campaignSlug, selectedTiers = [], campaign) {
@@ -4769,10 +5113,6 @@ export default {
         return handleAdminMarketingReferrals(request, env);
       }
 
-      if (path === '/admin/marketing/reporting' && method === 'GET') {
-        return handleAdminMarketingReporting(request, env);
-      }
-
       if (path === '/admin/marketing/draft' && method === 'GET') {
         return handleAdminMarketingDraftRead(request, env);
       }
@@ -4923,6 +5263,10 @@ export default {
 
       if (path === '/abandoned-cart/unsubscribe' && method === 'GET') {
         return handleAbandonedCartUnsubscribe(request, env);
+      }
+
+      if (path === '/abandoned-cart/resume' && method === 'GET') {
+        return handleAbandonedCartResume(request, env);
       }
 
       if (path === '/checkout-intent/summary' && method === 'GET') {
@@ -6010,6 +6354,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
     },
     tipPercent: normalizedTipPercent,
     billingAddress: normalizedBillingAddress.valid ? normalizedBillingAddress.destination : null,
+    shippingAddress: normalizedDestination.valid ? normalizedDestination.destination : null,
     totals: bundleTotals,
     campaigns: checkoutGroups.map((group) => ({
       orderId: checkoutGroups.length === 1 ? orderId : buildBundleOrderId(orderId, group.campaignSlug),
@@ -6025,6 +6370,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
       totals: group.canonicalContribution.totals
     }))
   };
+  bundleManifest.resumeSnapshot = buildAbandonedCartResumeSnapshot(env, checkoutGroups, bundleManifest);
 
   if (env.PLEDGES) {
     await env.PLEDGES.put(
@@ -16001,11 +16347,32 @@ function getAdminReferralKey(pledge = {}) {
 }
 
 function getAdminUtmSourceKey(pledge = {}) {
+  return getAdminUtmKey(pledge, 'source');
+}
+
+function getAdminUtmMediumKey(pledge = {}) {
+  return getAdminUtmKey(pledge, 'medium');
+}
+
+function getAdminUtmCampaignKey(pledge = {}) {
+  return getAdminUtmKey(pledge, 'campaign');
+}
+
+function getAdminUtmContentKey(pledge = {}) {
+  return getAdminUtmKey(pledge, 'content');
+}
+
+function getAdminUtmKey(pledge = {}, field = 'source') {
+  const normalizedField = String(field || '').trim();
+  const utm = pledge?.utm && typeof pledge.utm === 'object' ? pledge.utm : {};
+  const attribution = pledge?.attribution && typeof pledge.attribution === 'object' ? pledge.attribution : {};
+  const marketing = pledge?.marketing && typeof pledge.marketing === 'object' ? pledge.marketing : {};
+  const camel = `utm${normalizedField.charAt(0).toUpperCase()}${normalizedField.slice(1)}`;
   return String(
-    pledge?.utmSource ||
-    pledge?.utm?.source ||
-    pledge?.attribution?.utmSource ||
-    pledge?.marketing?.utmSource ||
+    pledge?.[camel] ||
+    utm[normalizedField] ||
+    attribution[camel] ||
+    marketing[camel] ||
     ''
   ).trim() || 'none';
 }
@@ -16107,6 +16474,9 @@ function applyPledgeToAdminAnalytics(analytics, campaign, pledge = {}, supporter
   );
   incrementAdminAnalyticsBreakdown(analytics.referralBreakdown, getAdminReferralKey(pledge), amount);
   incrementAdminAnalyticsBreakdown(analytics.utmSourceBreakdown, getAdminUtmSourceKey(pledge), amount);
+  incrementAdminAnalyticsBreakdown(analytics.utmMediumBreakdown, getAdminUtmMediumKey(pledge), amount);
+  incrementAdminAnalyticsBreakdown(analytics.utmCampaignBreakdown, getAdminUtmCampaignKey(pledge), amount);
+  incrementAdminAnalyticsBreakdown(analytics.utmContentBreakdown, getAdminUtmContentKey(pledge), amount);
 }
 
 async function buildAdminCampaignAnalytics(env, campaign) {
@@ -16126,6 +16496,9 @@ async function buildAdminCampaignAnalytics(env, campaign) {
     languageBreakdown: new Map(),
     referralBreakdown: new Map(),
     utmSourceBreakdown: new Map(),
+    utmMediumBreakdown: new Map(),
+    utmCampaignBreakdown: new Map(),
+    utmContentBreakdown: new Map(),
     pledgeIndexPresent: Array.isArray(orderIds)
   };
   analytics.totals.campaignCount = 1;
@@ -16156,7 +16529,10 @@ async function buildAdminCampaignAnalytics(env, campaign) {
       statusBreakdown: mapAdminAnalyticsBreakdown(analytics.statusBreakdown),
       languageBreakdown: mapAdminAnalyticsBreakdown(analytics.languageBreakdown),
       referralBreakdown: mapAdminAnalyticsBreakdown(analytics.referralBreakdown),
-      utmSourceBreakdown: mapAdminAnalyticsBreakdown(analytics.utmSourceBreakdown)
+      utmSourceBreakdown: mapAdminAnalyticsBreakdown(analytics.utmSourceBreakdown),
+      utmMediumBreakdown: mapAdminAnalyticsBreakdown(analytics.utmMediumBreakdown),
+      utmCampaignBreakdown: mapAdminAnalyticsBreakdown(analytics.utmCampaignBreakdown),
+      utmContentBreakdown: mapAdminAnalyticsBreakdown(analytics.utmContentBreakdown)
     }
   };
 }
@@ -16250,12 +16626,18 @@ async function handleAdminAnalytics(request, env) {
   const languageBreakdown = new Map();
   const referralBreakdown = new Map();
   const utmSourceBreakdown = new Map();
+  const utmMediumBreakdown = new Map();
+  const utmCampaignBreakdown = new Map();
+  const utmContentBreakdown = new Map();
   for (const campaign of campaignAnalytics) {
     mergeAdminAnalyticsTotals(totals, campaign.totals);
     mergeAdminAnalyticsBreakdowns(statusBreakdown, campaign.statusBreakdown);
     mergeAdminAnalyticsBreakdowns(languageBreakdown, campaign.languageBreakdown);
     mergeAdminAnalyticsBreakdowns(referralBreakdown, campaign.referralBreakdown);
     mergeAdminAnalyticsBreakdowns(utmSourceBreakdown, campaign.utmSourceBreakdown);
+    mergeAdminAnalyticsBreakdowns(utmMediumBreakdown, campaign.utmMediumBreakdown);
+    mergeAdminAnalyticsBreakdowns(utmCampaignBreakdown, campaign.utmCampaignBreakdown);
+    mergeAdminAnalyticsBreakdowns(utmContentBreakdown, campaign.utmContentBreakdown);
   }
   const referralLabels = await readAdminAnalyticsReferralLabels(env, campaignAnalytics);
 
@@ -16271,6 +16653,9 @@ async function handleAdminAnalytics(request, env) {
     referralBreakdown: mapAdminAnalyticsBreakdown(referralBreakdown),
     referralLabels,
     utmSourceBreakdown: mapAdminAnalyticsBreakdown(utmSourceBreakdown),
+    utmMediumBreakdown: mapAdminAnalyticsBreakdown(utmMediumBreakdown),
+    utmCampaignBreakdown: mapAdminAnalyticsBreakdown(utmCampaignBreakdown),
+    utmContentBreakdown: mapAdminAnalyticsBreakdown(utmContentBreakdown),
     writeBudget: adminReadBudget(),
     generatedAt: new Date().toISOString()
   }, 200, env);
@@ -17062,125 +17447,6 @@ async function handleAdminMarketingDraftDelete(request, env, body = {}) {
     surface,
     draft: null,
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 1, kvListExpected: 0 })
-  }, 200, env);
-}
-
-function getAdminAttributionValue(pledge = {}, field) {
-  const utm = pledge?.utm && typeof pledge.utm === 'object' ? pledge.utm : {};
-  const attribution = pledge?.attribution && typeof pledge.attribution === 'object' ? pledge.attribution : {};
-  const marketing = pledge?.marketing && typeof pledge.marketing === 'object' ? pledge.marketing : {};
-  if (field === 'ref') {
-    return normalizeAdminReferralCode(
-      pledge?.referralCode ||
-      pledge?.referral ||
-      pledge?.ref ||
-      attribution.ref ||
-      marketing.ref ||
-      ''
-    ) || 'direct';
-  }
-  const camel = `utm${field.charAt(0).toUpperCase()}${field.slice(1)}`;
-  return String(
-    pledge?.[camel] ||
-    utm[field] ||
-    attribution[camel] ||
-    marketing[camel] ||
-    ''
-  ).trim() || 'none';
-}
-
-function createAdminAttributionMetric(key, label = '') {
-  return {
-    key,
-    label: label || key,
-    pledgeCount: 0,
-    pledgedSubtotal: 0,
-    chargedAmount: 0
-  };
-}
-
-function incrementAdminAttributionMetric(map, key, pledge, label = '') {
-  const normalizedKey = String(key || '').trim() || 'unknown';
-  const current = map.get(normalizedKey) || createAdminAttributionMetric(normalizedKey, label);
-  if (label && current.label === normalizedKey) current.label = label;
-  const status = getPledgeStatusLabel(pledge);
-  if (status !== 'cancelled') {
-    const bundleAddOns = Array.isArray(pledge?.bundleAddOns) ? pledge.bundleAddOns : [];
-    const platformAddOnRevenue = getPlatformBundleAddOnSubtotal(bundleAddOns);
-    const campaignSubtotal = pledge?.goalTrackingSubtotal !== undefined && pledge?.goalTrackingSubtotal !== null
-      ? Math.max(0, Number(pledge.goalTrackingSubtotal || 0) || 0)
-      : Math.max(0, (Number(pledge?.subtotal || 0) || 0) - platformAddOnRevenue);
-    current.pledgeCount += 1;
-    current.pledgedSubtotal += campaignSubtotal;
-  }
-  if (status === 'charged') {
-    current.chargedAmount += Number(pledge?.amount || 0) || 0;
-  }
-  map.set(normalizedKey, current);
-}
-
-function mapAdminAttributionMetrics(map) {
-  return Array.from(map.values()).sort((a, b) => (
-    b.pledgeCount - a.pledgeCount ||
-    b.pledgedSubtotal - a.pledgedSubtotal ||
-    a.key.localeCompare(b.key)
-  ));
-}
-
-async function handleAdminMarketingReporting(request, env) {
-  if (!env?.PLEDGES) {
-    return privateJsonResponse({ error: 'PLEDGES KV not configured' }, 503, env);
-  }
-  const url = new URL(request.url);
-  const campaignSlug = String(url.searchParams.get('campaignSlug') || '').trim();
-  const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'campaign:read');
-  if (!scoped.ok) return scoped.response;
-
-  const orderIds = await getCampaignOrderIds(env, campaignSlug);
-  if (!Array.isArray(orderIds)) {
-    return adminIndexRequiredResponse(env, {
-      campaignSlug,
-      extra: {
-        error: 'Campaign pledge index must be rebuilt before marketing reporting can load.'
-      }
-    });
-  }
-
-  const referrals = await readAdminMarketingReferrals(env, campaignSlug);
-  const referralLabels = new Map(referrals.map((row) => [row.code, row.referrer || row.name || row.code]));
-  const dimensions = {
-    ref: new Map(),
-    source: new Map(),
-    medium: new Map(),
-    campaign: new Map(),
-    content: new Map()
-  };
-  for (const orderId of orderIds) {
-    const normalizedOrderId = String(orderId || '').trim();
-    if (!normalizedOrderId) continue;
-    const pledge = await env.PLEDGES.get(`pledge:${normalizedOrderId}`, { type: 'json' });
-    if (!pledge || String(pledge?.campaignSlug || '') !== campaignSlug) continue;
-    const ref = getAdminAttributionValue(pledge, 'ref');
-    incrementAdminAttributionMetric(dimensions.ref, ref, pledge, referralLabels.get(ref) || ref);
-    for (const field of ['source', 'medium', 'campaign', 'content']) {
-      incrementAdminAttributionMetric(dimensions[field], getAdminAttributionValue(pledge, field), pledge);
-    }
-  }
-
-  return privateJsonResponse({
-    user: scoped.auth.user,
-    campaignSlug,
-    indexedPledgeCount: orderIds.length,
-    referrals: mapAdminAttributionMetrics(dimensions.ref),
-    utm: {
-      sources: mapAdminAttributionMetrics(dimensions.source),
-      mediums: mapAdminAttributionMetrics(dimensions.medium),
-      campaigns: mapAdminAttributionMetrics(dimensions.campaign),
-      contents: mapAdminAttributionMetrics(dimensions.content)
-    },
-    savedReferralCount: referrals.length,
-    writeBudget: adminReadBudget({ kvListExpected: 0 }),
-    generatedAt: new Date().toISOString()
   }, 200, env);
 }
 
