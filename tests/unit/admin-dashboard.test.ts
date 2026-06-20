@@ -5253,6 +5253,9 @@ diary:
       valid: true,
       campaignSlug: 'hand-relations'
     });
+    expect(preview.preview.html).toContain('https://fonts.googleapis.com/css?family=Inter:400,700');
+    expect(preview.preview.html).toContain('https://use.typekit.net/hoj2yet.css');
+    expect(preview.preview.html).toContain('/assets/main.css');
     expect(preview.preview.html).toContain('Hand Relations Preview');
     expect(preview.preview.html).toContain('<strong>safe</strong>');
     expect(preview.preview.html).toContain('<em>legacy emphasis</em>');

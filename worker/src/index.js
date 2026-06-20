@@ -15112,7 +15112,7 @@ function buildAdminCampaignPreviewPayload(campaign = {}, actor = {}, env = {}, l
         ? campaign.longContent
         : []
   };
-  const preview = buildAdminContentPreview(draft, campaign);
+  const preview = buildAdminContentPreview(draft, campaign, env);
   const previewCampaign = {
     ...campaign,
     title: preview.normalizedDraft.title,
@@ -18418,7 +18418,7 @@ function normalizeAdminDraftLongContent(blocks = []) {
   return (Array.isArray(blocks) ? blocks : []).filter((block) => !isEmptyAdminDraftTextBlock(block));
 }
 
-function buildAdminContentPreview(draft, campaign) {
+function buildAdminContentPreview(draft, campaign, env = {}) {
   const errors = [];
   const warnings = [];
   const title = draft.title || campaign?.title || '';
@@ -18438,12 +18438,16 @@ function buildAdminContentPreview(draft, campaign) {
   const blocksHtml = blocks.map((block, index) => renderAdminContentBlock(block, index, renderErrors)).join('\n');
   errors.push(...renderErrors);
 
+  const siteBase = adminPreviewSiteBase(env);
+  const mainCss = siteBase ? `${siteBase}/assets/main.css` : '/assets/main.css';
   const previewHtml = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/assets/main.css">
+  ${siteBase ? `<base href="${escapeAdminPreviewAttribute(`${siteBase}/`)}">` : ''}
+  ${adminPreviewFontHead()}
+  <link rel="stylesheet" href="${escapeAdminPreviewAttribute(mainCss)}">
 </head>
 <body class="admin-content-preview">
   <main>
@@ -18518,7 +18522,7 @@ async function handleAdminContentPreview(request, env, body = {}) {
   const scoped = await getRoleScopedAdminCampaign(request, env, draft.campaignSlug);
   if (!scoped.ok) return scoped.response;
 
-  const preview = buildAdminContentPreview(draft, scoped.campaign);
+  const preview = buildAdminContentPreview(draft, scoped.campaign, env);
   return privateJsonResponse({
     user: scoped.auth.user,
     campaignSlug: scoped.campaign.slug,
@@ -18660,7 +18664,7 @@ async function handleAdminContentPublish(request, env) {
     return privateJsonResponse({ error: 'Missing publish intent' }, 400, env);
   }
 
-  const preview = buildAdminContentPreview(draft, scoped.campaign);
+  const preview = buildAdminContentPreview(draft, scoped.campaign, env);
   if (!preview.valid) {
     return privateJsonResponse({
       user: scoped.auth.user,
