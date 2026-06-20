@@ -9,7 +9,6 @@ Release scope:
 - Added explicit shared Marketing and Blast drafts with one campaign-scoped KV record per surface, 7-day expiry, revision-conflict protection, and no background writes.
 - Added Analytics referral/UTM performance reporting for saved and unsaved campaign links, including UTM source/medium/campaign/content aggregates from existing campaign pledge indexes without KV namespace scans.
 - Added a shared WYSIWYG image media picker for Campaign Content, Diary, and Blast image blocks. Campaign users see campaign-scoped media; super admins can also select shared/default images. The picker is read-only and adds no new KV state.
-- Updated English/Spanish dashboard copy, README/Worker/Dashboard docs, roadmap, creator checklist, About/Terms context, and targeted unit coverage for the new behavior.
 
 ## v1.0.6 - 2026-06-18
 
@@ -22,9 +21,6 @@ Release scope:
 - Added consent-based abandoned-checkout reminders for the first-party checkout path. Supporters must explicitly opt in, reminders queue only after Stripe session creation succeeds, completed pledges delete queued reminders, sent/suppressed audiences are deduped, and unsubscribe links are signed.
 - Kept abandoned-checkout scheduling free-tier aware with `abandoned-cart-queue:v1`, bounded batches, retention limits, sent/suppression markers, and idle cron ticks that skip KV namespace list scans.
 - Added the cross-platform `npm run setup:deploy` helper for local and production setup. The dependency-free Node CLI supports dry runs, local secret generation, config sync, Cloudflare KV creation/update, Worker secret writes, GitHub repository secret writes, `gh`/`wrangler`/optional Stripe CLI auth checks, and optional `wrangler deploy`.
-- Reused shared email, WYSIWYG, media-upload, QR/download, label/help/info-button, responsive admin layout, and audit patterns rather than adding parallel implementations.
-- Updated README, Worker README, dashboard docs, roadmap, security/performance notes, smoke checklist, creator checklist, public About/Terms pages, and targeted unit/browser coverage for the new 1.0.6 behavior.
-- Deferred deeper abandoned-checkout admin reporting, setup-helper idempotency/readiness checks, shared cross-admin marketing drafts, and a native setup app wrapper to v1.0.7 follow-up work.
 
 ## v1.0.5 - 2026-06-14
 
@@ -38,7 +34,6 @@ Release scope:
 - Added lightweight multi-user editing safeguards with GitHub base-revision checks for campaign content and preview publishes, stale-publish conflicts, local draft preservation, and audit events for create, preview publish, archive, and content publish actions.
 - Kept the new dashboard UI accessible, localized, mobile-responsive, and DRY by reusing shared admin label/help/info-button, email-list, modal, focus, and status patterns.
 - Improved Podman local development resilience with supervised service restarts, stale Podman recovery attempts, local repo helper support for create/archive testing, and updated Podman documentation.
-
 - Added GitHub-backed protected preview publication at `/admin/campaign-preview/publish`, no-store preview payload reads at `/admin/campaign-preview/:slug`, generic noindex preview shells at `/campaigns/:slug/preview/` for every campaign slug so emailed links do not depend on a post-publish rebuild, and 24-hour KV preview access allowlists at `campaign-preview-reviewers:<slug>`.
 - Added signed 24-hour dashboard preview links for the publishing admin, optional signed reviewer preview emails, and campaign-assignment emails through the shared Resend email theme and i18n catalog.
 - Rendered protected preview payloads as full read-only campaign page previews with campaign CSS/fonts loaded, media embeds enabled, and pledge controls disabled.
