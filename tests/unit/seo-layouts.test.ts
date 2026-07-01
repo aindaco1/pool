@@ -8,6 +8,28 @@ function readRepoFile(...segments: string[]) {
   return fs.readFileSync(path.join(repoRoot, ...segments), 'utf8');
 }
 
+function templateFilesWithLocalScripts(...roots: string[]) {
+  const files: string[] = [];
+  const visit = (currentPath: string) => {
+    for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+      const entryPath = path.join(currentPath, entry.name);
+      if (entry.isDirectory()) {
+        visit(entryPath);
+        continue;
+      }
+      if (!entry.name.endsWith('.html')) continue;
+      const source = fs.readFileSync(entryPath, 'utf8');
+      if (source.includes('src="/assets/js/')) files.push(entryPath);
+    }
+  };
+  roots.forEach((root) => visit(path.join(repoRoot, root)));
+  return files;
+}
+
+function localScriptTags(source: string) {
+  return source.match(/<script\b(?=[^>]*\bsrc="\/assets\/js\/)[^>]*>/g) || [];
+}
+
 describe('SEO templates', () => {
   it('routes public layouts through the shared seo include', () => {
     const defaultLayout = readRepoFile('_layouts', 'default.html');
@@ -35,7 +57,7 @@ describe('SEO templates', () => {
     expect(defaultLayout).toContain('translation_key=page.translation_key');
     expect(campaignLayout).toContain('translation_key=page.translation_key');
     expect(defaultLayout).toContain('{% if page.live_stats %}');
-    expect(defaultLayout).toContain('<script src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>');
+    expect(defaultLayout).toContain('<script data-cfasync="false" src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>');
     expect(campaignLayout).toContain('campaign_hero_has_remote_video');
     expect(campaignLayout).toContain('campaign_hero_has_youtube_video');
     expect(campaignLayout).toContain('{% elsif campaign_hero_has_remote_video %}');
@@ -74,8 +96,8 @@ describe('SEO templates', () => {
     expect(galleryBlock).toContain('responsive-image.html src=img.src');
     expect(readRepoFile('_includes', 'progress.html')).toContain('responsive-image.html src=include.progress_background');
     expect(readRepoFile('_includes', 'support-items.html')).toContain('responsive-image.html src=include.campaign.progress_background');
-    expect(campaignLayout).toContain('<script src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>');
-    expect(campaignLayout).toContain('<script src="/assets/js/campaign.js?v={{ asset_version }}" defer></script>');
+    expect(campaignLayout).toContain('<script data-cfasync="false" src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>');
+    expect(campaignLayout).toContain('<script data-cfasync="false" src="/assets/js/campaign.js?v={{ asset_version }}" defer></script>');
     expect(campaignLayout).toContain('campaign-share-links.html class="campaign-share--mobile"');
     expect(campaignLayout).toContain('campaign-share-links.html class="campaign-share--sidebar"');
     expect(campaignLayout).toContain('campaign_social_share_text');
@@ -117,6 +139,18 @@ describe('SEO templates', () => {
     expect(cartRuntimeFoot).not.toContain('<link rel="preconnect" href="https://api.stripe.com"');
     expect(homePage).toContain('live_stats: true');
     expect(spanishHomePage).toContain('live_stats: true');
+  });
+
+  it('opts first-party script tags out of Cloudflare Rocket Loader', () => {
+    const missing = templateFilesWithLocalScripts('_includes', '_layouts').flatMap((filePath) => {
+      const source = fs.readFileSync(filePath, 'utf8');
+      return localScriptTags(source)
+        .filter((tag) => !tag.includes('data-cfasync="false"'))
+        .map((tag) => `${path.relative(repoRoot, filePath)}: ${tag}`);
+    });
+
+    expect(missing).toEqual([]);
+    expect(readRepoFile('assets', 'js', 'vendor', 'qrcode-generator.js')).toContain('window.qrcode = qrcode');
   });
 
   it('marks private pledge and supporter layouts as noindex', () => {

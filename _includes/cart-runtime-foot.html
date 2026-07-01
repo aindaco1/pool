@@ -3,6 +3,7 @@
 {%- capture add_ons_catalog_json -%}{% include add-ons-catalog-json.html %}{%- endcapture -%}
 {%- assign asset_version = site.time | date: "%s" -%}
 <script
+  data-cfasync="false"
   src="/assets/js/pool-config.js?v={{ asset_version }}"
   defer
   data-pool-config-script="true"
@@ -18,7 +19,7 @@
   data-platform-timezone="{{ site.platform.timezone | default: 'America/Denver' | escape }}"
   data-sales-tax-rate="{{ site.pricing.sales_tax_rate | default: 0.07875 }}"
   data-flat-shipping-rate="{{ site.pricing.flat_shipping_rate | default: 3.00 }}"
-    data-shipping-origin-zip="{{ site.shipping.origin_zip | default: '' }}"
+  data-shipping-origin-zip="{{ site.shipping.origin_zip | default: '' }}"
   data-shipping-origin-country="{{ site.shipping.origin_country | default: 'US' }}"
   data-shipping-fallback-flat-rate="{{ site.shipping.fallback_flat_rate | default: 3.00 }}"
   data-shipping-free-shipping-default="{{ site.shipping.free_shipping_default | default: false }}"
@@ -36,13 +37,14 @@
   data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
   data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"
   data-stripe-publishable-key="{{ site.checkout.stripe_publishable_key | default: '' }}"></script>
-<script src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
-<script src="/assets/js/form-control-identity.js?v={{ asset_version }}" defer></script>
+<script data-cfasync="false" src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
+<script data-cfasync="false" src="/assets/js/form-control-identity.js?v={{ asset_version }}" defer></script>
 {%- comment -%}Keep checkout domains discoverable without opening Stripe connections before cart intent.{%- endcomment -%}
 <link rel="dns-prefetch" href="//js.stripe.com">
 <link rel="dns-prefetch" href="//api.stripe.com">
 <div hidden data-pool-cart-root="true"></div>
 <script
+  data-cfasync="false"
   src="/assets/js/cart-runtime-loader.js?v={{ asset_version }}"
   defer
   data-pool-cart-runtime-loader="true"

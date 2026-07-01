@@ -10,7 +10,7 @@ description: Learn how The Pool works, from all-or-nothing pledging to magic-lin
 
 **The Pool** is Dust Wave's crowdfunding platform for independent film and creative projects, built on open-source technology.
 
-The current platform release milestone is **v1.0.7**. The v1.0 feature set and launch hardening pass are complete, and the latest release adds campaign-scoped abandoned-checkout visibility, tested setup/deploy readiness checks, shared Marketing and Blast drafts, referral/UTM reporting, and a scoped media picker for rich content image blocks.
+The current platform release milestone is **v1.0.8**. The v1.0 feature set and launch hardening pass are complete, and the latest release adds Store-derived runtime hardening, lazy authenticated Marketing reads, remembered admin dashboard tab/subtab context, and stronger locale completeness checks.
 
 ## All-or-Nothing Pledging
 
@@ -78,6 +78,7 @@ The Pool is designed for filmmakers and creative teams that need a campaign they
 - **Optional platform add-ons** — Offer platform merch alongside pledges when enabled, with separate inventory and shipping handling that does not count toward a campaign's funding goal.
 - **Campaign add-ons** — Sell campaign-specific merch or extras in the same pledge flow while keeping revenue, inventory, and shipping tied to that campaign.
 - **Private admin dashboard** — Give trusted team members a focused workspace for campaign settings, page content, rewards, updates, decisions, reports, supporters, analytics, and marketing links.
+- **Remembered dashboard workspace** — When an admin reloads the dashboard, the browser can return them to their last allowed tab, Settings section, selected campaign, and Campaigns subtab without storing that UI state in Worker data.
 - **Campaign marketing tools** — Build tracked links, save referral codes, download campaign QR codes, generate live embed snippets from the dashboard Marketing tab, and review referral/UTM performance in Analytics.
 - **Supporter email blasts** — Send campaign-scoped supporter email blasts from Campaigns -> Blast, using shared drafts, hosted campaign images, and email-safe video links.
 - **Protected campaign previews** — Share draft or preview-only campaigns privately with assigned campaign users and explicitly invited reviewers before the public campaign page launches.

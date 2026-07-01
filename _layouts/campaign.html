@@ -373,10 +373,11 @@
   {% include site-footer.html lang=current_lang translation_key=page.translation_key localized_paths=page.localized_paths %}
 
   {% include cart-foot.html %}
-  <script src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>
-  <script src="/assets/js/campaign.js?v={{ asset_version }}" defer></script>
-  <script src="/assets/js/video-first-frame-poster.js" defer></script>
+  <script data-cfasync="false" src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>
+  <script data-cfasync="false" src="/assets/js/campaign.js?v={{ asset_version }}" defer></script>
+  <script data-cfasync="false" src="/assets/js/video-first-frame-poster.js" defer></script>
   <script
+    data-cfasync="false"
     src="/assets/js/campaign-page.js"
     defer
     data-campaign-page-script="true"

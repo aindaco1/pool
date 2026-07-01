@@ -11,7 +11,7 @@ description: Aprende cómo funciona The Pool, desde los aportes todo o nada hast
 
 **The Pool** es la plataforma de crowdfunding de Dust Wave para cine independiente y proyectos creativos, construida sobre tecnología de código abierto.
 
-El hito de lanzamiento actual de la plataforma es **v1.0.7**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente añade visibilidad de checkout abandonado por campaña, comprobaciones probadas de preparación para setup/deploy, borradores compartidos de Marketing y Blast, reportes de referencias/UTM y un selector de media limitado por campaña para bloques de imagen.
+El hito de lanzamiento actual de la plataforma es **v1.0.8**. El conjunto de funciones de v1.0 y el endurecimiento de lanzamiento ya están completos, y la versión más reciente añade endurecimiento de runtime derivado de Store, lecturas de Marketing diferidas y autenticadas, contexto recordado de tabs/subtabs del panel y comprobaciones más fuertes de completitud de locales.
 
 ## Aportes de todo o nada
 
@@ -79,6 +79,7 @@ La plataforma está diseñada para cineastas y equipos creativos que necesitan u
 - **Add-ons opcionales de plataforma**: ofrece merch de plataforma junto con los aportes cuando esté habilitado, con inventario y envío separados que no cuentan para la meta de financiación de la campaña.
 - **Add-ons de campaña**: vende merch o extras específicos de la campaña en el mismo flujo de aporte, manteniendo ingresos, inventario y envío ligados a esa campaña.
 - **Panel privado de administración**: da a personas de confianza un espacio enfocado para ajustes de campaña, contenido de página, recompensas, actualizaciones, decisiones, reportes, patrocinadores, analytics y enlaces de marketing.
+- **Espacio de trabajo recordado en el panel**: cuando una persona administradora recarga el panel, el navegador puede volver a su último tab permitido, sección de Settings, campaña seleccionada y subtab de Campaigns sin guardar ese estado de UI en datos del Worker.
 - **Herramientas de marketing de campaña**: crea enlaces con tracking, guarda códigos de referencia, descarga códigos QR de campaña, genera snippets de embed desde el tab Marketing del panel y revisa performance de referencias/UTM en Analíticas.
 - **Blasts de correo para patrocinadores**: envía blasts de correo por campaña desde Campaigns -> Blast, usando borradores compartidos, imágenes alojadas por la campaña y enlaces de video compatibles con email.
 - **Vistas previas protegidas de campaña**: comparte campañas en borrador o solo-preview de forma privada con personas usuarias asignadas y revisoras invitadas antes de que la página pública lance.

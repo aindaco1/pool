@@ -33,7 +33,7 @@
 
   {% include cart-foot.html %}
   {% if page.live_stats %}
-  <script src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>
+  <script data-cfasync="false" src="/assets/js/live-stats.js?v={{ asset_version }}" defer></script>
   {% endif %}
   {% include page-prefetch.html %}
 </body>

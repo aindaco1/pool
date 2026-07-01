@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.8 - 2026-07-01
+
+Release scope:
+
+- Ported Store-derived Cloudflare Rocket Loader hardening by opting Pool first-party layout/include scripts out with `data-cfasync="false"`, covering public campaign, cart, preview, manage, community, pledge-result, and admin surfaces.
+- Hardened admin Marketing data loading so saved referral codes and abandoned-checkout health load lazily only when an authenticated admin opens Marketing, with campaign-scoped in-flight and loaded-state guards.
+- Remembered the last admin dashboard tab plus Settings section, selected Campaigns campaign, and Campaigns subtab in browser-local state so reloads return admins to the same working context without Worker or KV writes.
+- Added an explicit QR vendor browser-global shim so the admin Marketing QR builder does not rely on optimizer-sensitive classic-script globals.
+- Added a locale completeness audit and unit coverage to keep supported i18n catalogs aligned with English.
+- Added template regression coverage that scans layouts/includes for local first-party scripts missing the Rocket Loader opt-out.
+- Moved Vitest config files to ESM `.mts` modules and updated scripts/Jekyll excludes to avoid Vite's deprecated CJS Node API path.
+
 ## v1.0.7 - 2026-06-19
 
 Release scope:

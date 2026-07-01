@@ -52,6 +52,7 @@ The dashboard intentionally separates read-only browsing, local drafting, KV wri
 | Action | Storage / side effect |
 |--------|------------------------|
 | Dashboard summary, analytics, reports, supporters, table filtering, and content preview | Read-only; should add zero KV writes |
+| Dashboard tab/subtab restoration | Browser-local UI state only; remembers the last allowed top-level tab, Settings section, selected Campaigns campaign, and Campaigns subtab without Worker, KV, or GitHub writes |
 | Content editor **Save draft** | Browser-local draft only |
 | Campaign content/settings publish | Worker validates input, writes to GitHub-backed files, triggers the normal rebuild/deploy path, and records an audit event |
 | Protected preview publish | Worker validates campaign scope and base revision, writes only preview flags to GitHub-backed campaign Markdown, stores the publishing admin plus optional reviewer emails in `PLEDGES` KV at `campaign-preview-reviewers:<slug>` with a 24-hour TTL, returns a dashboard-visible signed link for the publisher, sends signed links to optional reviewers, and records an audit event |
@@ -79,6 +80,8 @@ The top-level dashboard order is:
 5. **Reports**: CSV preview/download for pledge and fulfillment reports.
 6. **Supporters**: role-scoped supporter browsing, filtering, sorting, and CSV export.
 7. **Marketing**: referral URL builder, saved referral codes, downloadable campaign QR codes, and embed-builder controls.
+
+On reload, the dashboard restores the last allowed top-level tab from browser-local state. It also restores the last Settings sidebar section and the last selected Campaigns campaign/subtab when those surfaces are still available to the signed-in admin. Role checks still win: campaign users are never restored into super-admin-only Settings or Add-ons tabs, and missing campaigns or subtabs fall back to the first available option.
 
 ## Settings
 

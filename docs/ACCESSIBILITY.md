@@ -64,6 +64,7 @@ The recent accessibility hardening pass added:
   - Settings -> Plan usage provider headings that reuse the shared admin label/help pattern, polite loading status, accessible progressbar text, and responsive metric cards
   - Create new campaign and protected Preview dialogs that reuse the shared admin label/help/info-button pattern, native fields, email-list token input, dialog focus handling, and polite status messaging
   - sortable data tables that expose `aria-sort` state and sort buttons
+  - reload restoration for the last allowed top-level tab, Settings section, selected Campaigns campaign, and Campaigns subtab while keeping APG tab roles, `aria-selected`, and roving `tabindex` in sync
 
 ## Critical Surfaces
 

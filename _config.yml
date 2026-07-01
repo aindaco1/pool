@@ -29,16 +29,16 @@ exclude:
   - package.json
   - package-lock.json
   - playwright.config.js
-  - vitest.config.ts
-  - vitest.security.config.ts
+  - vitest.config.mts
+  - vitest.security.config.mts
   - Containerfile.dev
   - Containerfile.playwright.dev
 
 # Structured platform settings for forks.
 platform:
   name: The Pool
-  version: "1.0.5"
-  release_label: "v1.0.5"
+  version: "1.0.8"
+  release_label: "v1.0.8"
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   pledges_email_from: "The Pool <pledges@pool.dustwave.xyz>"

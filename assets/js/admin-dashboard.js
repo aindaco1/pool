@@ -120,13 +120,16 @@
   var supportersNext = document.getElementById('admin-supporters-next');
   var supporterSort = { key: '', direction: 'asc' };
 
+  var adminDashboardStateStorageKey = 'pool-admin-dashboard-state:v1';
+  var adminDashboardState = readAdminDashboardState();
   var currentUser = null;
   var currentCsrf = '';
   var currentCampaigns = [];
   var currentSettings = null;
-  var selectedSettingsSectionId = '';
+  var selectedSettingsSectionId = sanitizedAdminStateValue(adminDashboardState.settingsSection);
   var currentCampaignSettingsSections = [];
-  var selectedCampaignSettingsSlug = '';
+  var selectedCampaignSettingsSlug = sanitizedAdminStateValue(adminDashboardState.campaignSlug);
+  var selectedCampaignSettingsSubtabs = normalizedAdminStateMap(adminDashboardState.campaignSubtabs);
   var supporterCursor = 0;
   var supporterNextCursor = null;
   var supporterFilterTimer = 0;
@@ -145,6 +148,9 @@
   var marketingAnnouncementDryRunCount = 0;
   var marketingSharedDraftRevisions = {};
   var marketingAnnouncementSharedDraftRevisions = {};
+  var marketingReferralsLoadedCampaignSlug = '';
+  var marketingReferralsLoadingCampaignSlug = '';
+  var marketingAbandonedHealthLoadedCampaignSlug = '';
   var marketingAbandonedHealthLoading = '';
   var contentStoragePrefix = 'pool-admin-content-draft:';
   var loadedContentCampaignSlug = '';
@@ -179,6 +185,10 @@
   var turnstileToken = '';
   var adminLoginAttemptStarted = false;
 
+  if (selectedCampaignSettingsSlug && adminDashboardState.campaignSubtab && !selectedCampaignSettingsSubtabs[selectedCampaignSettingsSlug]) {
+    selectedCampaignSettingsSubtabs[selectedCampaignSettingsSlug] = sanitizedAdminStateValue(adminDashboardState.campaignSubtab);
+  }
+
   function t(key, fallback, replacements) {
     var text = messages[key] || fallback || key;
     Object.keys(replacements || {}).forEach(function(name) {
@@ -195,6 +205,50 @@
       .replace(/\+/g, ' plus ')
       .replace(/[^a-z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '');
+  }
+
+  function sanitizedAdminStateValue(value) {
+    var text = String(value || '').trim();
+    return /^[A-Za-z0-9_-]+$/.test(text) ? text : '';
+  }
+
+  function normalizedAdminStateMap(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return Object.keys(value).reduce(function(map, key) {
+      var normalizedKey = sanitizedAdminStateValue(key);
+      var normalizedValue = sanitizedAdminStateValue(value[key]);
+      if (normalizedKey && normalizedValue) map[normalizedKey] = normalizedValue;
+      return map;
+    }, {});
+  }
+
+  function readAdminDashboardState() {
+    try {
+      return normalizedAdminDashboardState(JSON.parse(localStorage.getItem(adminDashboardStateStorageKey) || '{}'));
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function normalizedAdminDashboardState(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return {
+      tab: sanitizedAdminStateValue(value.tab),
+      settingsSection: sanitizedAdminStateValue(value.settingsSection),
+      campaignSlug: sanitizedAdminStateValue(value.campaignSlug),
+      campaignSubtab: sanitizedAdminStateValue(value.campaignSubtab),
+      campaignSubtabs: normalizedAdminStateMap(value.campaignSubtabs)
+    };
+  }
+
+  function writeAdminDashboardState(patch) {
+    adminDashboardState = Object.assign({}, adminDashboardState, patch || {}, {
+      updatedAt: new Date().toISOString()
+    });
+    try {
+      localStorage.setItem(adminDashboardStateStorageKey, JSON.stringify(adminDashboardState));
+    } catch (_error) {
+    }
   }
 
   function optionTranslationKeyPrefix(row, scope) {
@@ -870,6 +924,40 @@
     });
   }
 
+  function activeAdminTabName() {
+    return tabButtons.find(function(button) {
+      return button instanceof HTMLButtonElement && button.getAttribute('aria-selected') === 'true';
+    })?.dataset?.adminTab || 'settings';
+  }
+
+  function isAdminTabActive(name) {
+    return activeAdminTabName() === name;
+  }
+
+  function restoredAdminTabForUser(user) {
+    var tabName = sanitizedAdminStateValue(adminDashboardState.tab);
+    var allowedTabs = ['settings', 'addons', 'campaigns', 'analytics', 'reports', 'supporters', 'marketing'];
+    if (!allowedTabs.includes(tabName)) return '';
+    if (user?.role !== 'super_admin' && ['settings', 'addons'].includes(tabName)) return '';
+    return tabName;
+  }
+
+  function canLoadMarketingData() {
+    return Boolean(currentUser?.email && currentCsrf);
+  }
+
+  function loadMarketingData() {
+    if (!canLoadMarketingData() || !isAdminTabActive('marketing')) return;
+    var campaignSlug = selectedMarketingCampaign()?.slug || '';
+    if (!campaignSlug) {
+      renderMarketingReferrals([]);
+      renderMarketingAbandonedHealth(null);
+      return;
+    }
+    if (marketingReferralsLoadedCampaignSlug !== campaignSlug) loadMarketingReferrals();
+    if (marketingAbandonedHealthLoadedCampaignSlug !== campaignSlug) loadMarketingAbandonedHealth();
+  }
+
   function syncAdminTabsForRole(user) {
     var canManagePlatform = user?.role === 'super_admin';
     var settingsTab = document.querySelector('[data-admin-tab="settings"]');
@@ -884,11 +972,9 @@
       return button instanceof HTMLButtonElement && button.getAttribute('aria-selected') === 'true';
     });
     var activeTab = activeButton?.dataset?.adminTab || '';
-    if (!canManagePlatform && (activeTab === 'settings' || activeTab === 'addons')) {
-      activateAdminTab('campaigns');
-    } else {
-      activateAdminTab(activeTab || (canManagePlatform ? 'settings' : 'campaigns'));
-    }
+    var targetTab = restoredAdminTabForUser(user) || activeTab || (canManagePlatform ? 'settings' : 'campaigns');
+    if (!canManagePlatform && (targetTab === 'settings' || targetTab === 'addons')) targetTab = 'campaigns';
+    activateAdminTab(targetTab);
   }
 
   function activateAdminTab(name, options) {
@@ -916,14 +1002,14 @@
       mountContentEditorForCampaign(selectedCampaignSettingsSlug);
       loadContentCampaign({ skipIfLoaded: true });
     }
+    if (targetName === 'marketing') loadMarketingData();
     syncAdminMobileTabs();
+    if (options?.persist !== false) writeAdminDashboardState({ tab: targetName });
     if (options?.focus === true) targetButton?.focus();
   }
 
   function activeAdminStatus() {
-    var activeTab = tabButtons.find(function(button) {
-      return button instanceof HTMLButtonElement && button.getAttribute('aria-selected') === 'true';
-    })?.dataset?.adminTab || 'settings';
+    var activeTab = activeAdminTabName();
     if (activeTab === 'settings') return settingsStatus;
     if (activeTab === 'campaigns') return campaignStatus || contentStatus;
     if (activeTab === 'addons') return addOnsStatus;
@@ -4150,8 +4236,12 @@
 
   function selectCampaignSettingsSubtab(panel, subtabId, options) {
     if (!(panel instanceof HTMLElement)) return;
-    var nextSubtabId = subtabId || panel.querySelector('[data-campaign-settings-subtab]')?.dataset?.campaignSettingsSubtab || 'settings';
-    panel.querySelectorAll('[data-campaign-settings-subtab]').forEach(function(button) {
+    var buttons = Array.from(panel.querySelectorAll('[data-campaign-settings-subtab]'));
+    var nextSubtabId = sanitizedAdminStateValue(subtabId) || panel.querySelector('[data-campaign-settings-subtab]')?.dataset?.campaignSettingsSubtab || 'settings';
+    if (!buttons.some(function(button) { return button.dataset.campaignSettingsSubtab === nextSubtabId; })) {
+      nextSubtabId = buttons[0]?.dataset?.campaignSettingsSubtab || 'settings';
+    }
+    buttons.forEach(function(button) {
       var selected = button.dataset.campaignSettingsSubtab === nextSubtabId;
       button.setAttribute('aria-selected', selected ? 'true' : 'false');
       button.tabIndex = selected ? 0 : -1;
@@ -4167,6 +4257,17 @@
       loadMarketingAnnouncementHistory();
     }
     syncCampaignSubtabMobileTabs(panel);
+    var campaignSlug = sanitizedAdminStateValue(panel.dataset.campaignSettingsPanel || selectedCampaignSettingsSlug);
+    if (campaignSlug && options?.persist !== false) {
+      selectedCampaignSettingsSubtabs[campaignSlug] = nextSubtabId;
+      var patch = {
+        campaignSlug: campaignSlug,
+        campaignSubtab: nextSubtabId,
+        campaignSubtabs: Object.assign({}, selectedCampaignSettingsSubtabs)
+      };
+      if (isAdminTabActive('campaigns')) patch.tab = 'campaigns';
+      writeAdminDashboardState(patch);
+    }
   }
 
   function handleCampaignSettingsSubtabKeydown(event, panel, button) {
@@ -4186,8 +4287,24 @@
     selectCampaignSettingsSubtab(panel, buttons[nextIndex]?.dataset?.campaignSettingsSubtab || 'settings', { focus: true });
   }
 
-  function selectCampaignSettings(slug) {
-    selectedCampaignSettingsSlug = slug || selectedCampaignSettingsSlug || campaignSettingsSlug(currentCampaignSettingsSections[0]) || '';
+  function selectedCampaignSubtabForSlug(slug) {
+    var normalizedSlug = sanitizedAdminStateValue(slug);
+    return selectedCampaignSettingsSubtabs[normalizedSlug] || (
+      normalizedSlug && normalizedSlug === selectedCampaignSettingsSlug
+        ? sanitizedAdminStateValue(adminDashboardState.campaignSubtab)
+        : ''
+    ) || 'settings';
+  }
+
+  function selectCampaignSettings(slug, options) {
+    var nextSlug = sanitizedAdminStateValue(slug) || selectedCampaignSettingsSlug || campaignSettingsSlug(currentCampaignSettingsSections[0]) || '';
+    if (
+      currentCampaignSettingsSections.length &&
+      !currentCampaignSettingsSections.some(function(section) { return campaignSettingsSlug(section) === nextSlug; })
+    ) {
+      nextSlug = campaignSettingsSlug(currentCampaignSettingsSections[0]) || '';
+    }
+    selectedCampaignSettingsSlug = nextSlug;
     if (contentCampaign instanceof HTMLSelectElement && selectedCampaignSettingsSlug) {
       contentCampaign.value = selectedCampaignSettingsSlug;
     }
@@ -4207,10 +4324,21 @@
     setCampaignPreviewStatusForLink(activePreviewForCampaign(selectedCampaignSettingsSlug), {
       campaignSlug: selectedCampaignSettingsSlug
     });
+    var activePanel = campaignSettingsRoot?.querySelector?.('[data-campaign-settings-panel="' + cssEscape(selectedCampaignSettingsSlug) + '"]');
+    if (activePanel instanceof HTMLElement) {
+      selectCampaignSettingsSubtab(activePanel, selectedCampaignSubtabForSlug(selectedCampaignSettingsSlug), {
+        persist: options?.persist
+      });
+    }
     if (document.querySelector('[data-admin-tab-panel="campaigns"]')?.hidden === false) {
       loadContentCampaign({ skipIfLoaded: true });
     }
     syncCampaignSettingsMobileTabs();
+    if (options?.persist !== false && selectedCampaignSettingsSlug) {
+      var patch = { campaignSlug: selectedCampaignSettingsSlug };
+      if (isAdminTabActive('campaigns')) patch.tab = 'campaigns';
+      writeAdminDashboardState(patch);
+    }
   }
 
   function renderCampaignSettingsTabs(campaignSections) {
@@ -4308,10 +4436,10 @@
       });
       panel.append(subtabList, subtabPanels);
       campaignSettingsRoot.append(panel);
-      selectCampaignSettingsSubtab(panel, 'settings');
+      selectCampaignSettingsSubtab(panel, selectedCampaignSubtabForSlug(slug), { persist: false });
       updateDerivedCampaignFields(slug);
     });
-    selectCampaignSettings(selectedCampaignSettingsSlug);
+    selectCampaignSettings(selectedCampaignSettingsSlug, { persist: false });
   }
 
   function settingsSectionId(section, index, usedIds) {
@@ -4354,6 +4482,9 @@
     }
     updateDirtyIndicators();
     syncSettingsSectionMobileTabs();
+    if (options?.persist !== false && selectedSettingsSectionId) {
+      writeAdminDashboardState({ settingsSection: selectedSettingsSectionId });
+    }
   }
 
   function handleSettingsSectionTabKeydown(event, button) {
@@ -4681,8 +4812,7 @@
     renderAnalyticsOptions(campaigns);
     resetMarketingBuilderFields();
     hydrateMarketingAnnouncementDraft();
-    loadMarketingReferrals();
-    loadMarketingAbandonedHealth();
+    loadMarketingData();
     hydrateContentDraft();
     updateDirtyIndicators();
   }
@@ -5579,6 +5709,7 @@
         })
       });
       if (marketingEditingOriginalCode === code) setMarketingEditingState('');
+      marketingReferralsLoadedCampaignSlug = campaign.slug;
       renderMarketingReferrals(data.referrals || []);
       setText(marketingStatus, t('marketing_referral_deleted', 'Referral code deleted.'));
     } catch (error) {
@@ -5701,16 +5832,24 @@
     if (!marketingReferralsRoot) return;
     var campaign = selectedMarketingCampaign();
     if (!campaign?.slug) {
+      marketingReferralsLoadedCampaignSlug = '';
       renderMarketingReferrals([]);
       return;
     }
+    if (!canLoadMarketingData()) return;
+    if (marketingReferralsLoadingCampaignSlug === campaign.slug) return;
+    marketingReferralsLoadingCampaignSlug = campaign.slug;
     try {
       var params = new URLSearchParams({ campaignSlug: campaign.slug });
       var data = await requestJson('/admin/marketing/referrals?' + params.toString(), { method: 'GET' });
+      if (selectedMarketingCampaign()?.slug !== campaign.slug) return;
+      marketingReferralsLoadedCampaignSlug = campaign.slug;
       renderMarketingReferrals(data.referrals || []);
     } catch (error) {
       logger.error('Failed to load saved referral codes', error);
       setText(marketingStatus, t('marketing_referrals_load_failed', 'Unable to load saved referral codes.'));
+    } finally {
+      if (marketingReferralsLoadingCampaignSlug === campaign.slug) marketingReferralsLoadingCampaignSlug = '';
     }
   }
 
@@ -5890,13 +6029,17 @@
     renderAbandonedHealthOutcomes(marketingAbandonedHealthRoot, data.recentOutcomes || [], campaignSlug);
   }
 
-  async function loadMarketingAbandonedHealth() {
+  async function loadMarketingAbandonedHealth(options) {
     if (!marketingAbandonedHealthRoot) return;
+    var force = options?.force === true;
     var campaign = selectedMarketingCampaign();
     if (!campaign?.slug) {
+      marketingAbandonedHealthLoadedCampaignSlug = '';
       renderMarketingAbandonedHealth(null);
       return;
     }
+    if (!canLoadMarketingData()) return;
+    if (!force && marketingAbandonedHealthLoadedCampaignSlug === campaign.slug) return;
     if (marketingAbandonedHealthLoading === campaign.slug) return;
     marketingAbandonedHealthLoading = campaign.slug;
     setText(marketingAbandonedHealthRoot, t('abandoned_health_loading', 'Loading abandoned-checkout health...'));
@@ -5904,6 +6047,7 @@
       var params = new URLSearchParams({ campaignSlug: campaign.slug });
       var data = await requestJson('/admin/abandoned-checkout/health?' + params.toString(), { method: 'GET' });
       if (selectedMarketingCampaign()?.slug !== campaign.slug) return;
+      marketingAbandonedHealthLoadedCampaignSlug = campaign.slug;
       renderMarketingAbandonedHealth(data);
     } catch (error) {
       logger.error('Failed to load abandoned checkout health', error);
@@ -5915,7 +6059,7 @@
     } finally {
       if (marketingAbandonedHealthLoading === campaign.slug) marketingAbandonedHealthLoading = '';
       var currentCampaign = selectedMarketingCampaign();
-      if (currentCampaign?.slug && currentCampaign.slug !== campaign.slug) loadMarketingAbandonedHealth();
+      if (currentCampaign?.slug && currentCampaign.slug !== campaign.slug) loadMarketingData();
     }
   }
 
@@ -5947,7 +6091,7 @@
         ? t('abandoned_suppression_saved', 'Reminder suppression saved for this campaign.')
         : t('abandoned_suppression_cleared', 'Reminder suppression cleared for this campaign.'));
       emailControl?.clear?.();
-      loadMarketingAbandonedHealth();
+      loadMarketingAbandonedHealth({ force: true });
     } catch (error) {
       logger.error('Failed to update abandoned checkout suppression', error);
       setText(status, error?.data?.error || t('abandoned_suppression_failed', 'Unable to update campaign-scoped suppression.'));
@@ -5996,6 +6140,7 @@
         })
       });
       setMarketingEditingState('');
+      marketingReferralsLoadedCampaignSlug = campaign.slug;
       renderMarketingReferrals(data.referrals || []);
       resetMarketingBuilderFields();
       setText(marketingStatus, t('marketing_referral_saved', 'Referral code saved.'));
@@ -10106,8 +10251,7 @@
       if (event.target === marketingCampaign) {
         setMarketingEditingState('');
         setText(marketingDraftStatus, '');
-        loadMarketingReferrals();
-        loadMarketingAbandonedHealth();
+        loadMarketingData();
       }
     });
   }

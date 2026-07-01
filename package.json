@@ -1,6 +1,6 @@
 {
   "name": "pool",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "**Dust Wave's open crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)",
   "main": "index.js",
   "directories": {
@@ -14,6 +14,7 @@
     "test:unit:coverage": "vitest run --coverage",
     "test:content-security": "node ./scripts/audit-campaign-content.mjs",
     "test:secrets": "node ./scripts/audit-secrets.mjs",
+    "test:i18n": "ruby ./scripts/check-i18n-completeness.rb",
     "test:premerge": "./scripts/pre-merge-regression.sh",
     "test:e2e": "./scripts/test-e2e.sh",
     "test:e2e:quick": "playwright test --headed",
@@ -26,9 +27,9 @@
     "secrets:dev": "./scripts/configure-dev-secrets.sh",
     "podman:doctor": "./scripts/podman-doctor.sh",
     "podman:self-check": "./scripts/podman-self-check.sh",
-    "test:security": "vitest run --config vitest.security.config.ts",
-    "test:security:podman": "./scripts/podman-stack-run.sh npx vitest run --config vitest.security.config.ts",
-    "test:security:staging": "WORKER_URL=https://pledge-staging.dustwave.xyz vitest run --config vitest.security.config.ts",
+    "test:security": "vitest run --config vitest.security.config.mts",
+    "test:security:podman": "./scripts/podman-stack-run.sh npx vitest run --config vitest.security.config.mts",
+    "test:security:staging": "WORKER_URL=https://pledge-staging.dustwave.xyz vitest run --config vitest.security.config.mts",
     "test:usps": "node ./scripts/usps-smoke.mjs",
     "assets:minify": "node ./scripts/minify-site-assets.mjs --write",
     "assets:minify:check": "node ./scripts/minify-site-assets.mjs --check",
@@ -45,6 +46,6 @@
     "axe-core": "^4.11.2",
     "esbuild": "^0.21.5",
     "jsdom": "^24.0.0",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.1"
   }
 }

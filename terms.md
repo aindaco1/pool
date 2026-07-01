@@ -8,7 +8,7 @@ description: Review pledge terms, payment processing, fulfillment, and privacy d
 
 # Terms & Creative Guidelines
 
-These terms reflect The Pool platform release milestone **v1.0.7**.
+These terms reflect The Pool platform release milestone **v1.0.8**.
 
 ## Pledge Terms
 
@@ -90,6 +90,7 @@ This section applies only to campaigns that explicitly solicit creative submissi
 - Public campaign pages may defer selected third-party media embeds, such as YouTube hero videos, until you choose to play them. Until then, the page may show a local poster image instead of contacting that third-party embed provider.
 - Campaign share links may preserve safe public referral or UTM query parameters so campaign runners can understand public promotion sources. They do not preserve token, order, email, session, or other sensitive query parameters.
 - Authorized platform operators may load Cloudflare and Resend plan-usage status in the private admin dashboard. Those provider checks use server-side credentials and do not send pledge details, supporter emails, shipping addresses, or payment data to the usage endpoints.
+- The private admin dashboard may remember an authorized operator's last tab/subtab workspace in that browser. This UI preference is local to the browser and is not used to grant access beyond the signed-in admin role.
 - We do not sell your information. We share it only as necessary for payment processing, transactional email delivery, abuse prevention, shipping quote calculation, and reward fulfillment.
 
 ## Platform & Technology

@@ -8,6 +8,7 @@ This guide covers the automated test suites, local test infrastructure, and manu
 npm run test:unit          # Unit tests (Vitest) — ~700ms
 npm run test:unit:watch    # Watch mode
 npm run test:unit:coverage # With coverage report
+npm run test:i18n          # Supported locale catalog completeness check
 npm run test:secrets       # Secret exposure audit for local env files
 npm run test:premerge      # Merge-readiness checks for changed Worker logic
 npm run test:e2e           # E2E tests (Playwright) — fully automated browser coverage
@@ -69,6 +70,7 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | `email-tip` | Tip-aware supporter email breakdowns across confirmation / modified / cancelled / failed / charged emails, plus launch reminder and abandoned-checkout email routing through the shared updates sender |
 | `votes` | Email-based vote storage/dedup, vote status retrieval, campaign results, result aggregation |
 | `admin-dashboard` | Dashboard dirty-state tracking, settings serialization, content/editor normalization, staged media uploads/media picker, actual Stripe fee analytics/backfill, Analytics attribution reporting, marketing shared drafts, abandoned-checkout health/suppression, referral URL helpers, responsive/i18n support utilities |
+| `i18n-completeness` | Supported locale catalogs stay aligned with the English nested key surface |
 | `campaign-page` | Share-link URL construction, safe query preservation, state-aware share text, launch reminder form submission, public campaign controls, and SEO-sensitive campaign-page behavior |
 | `page-prefetch` | Same-origin public-route allowlisting, sensitive-query exclusions, network guards, delay/limit handling, and document prefetch hint creation |
 | `cart-runtime-loader` | Lazy cart-runtime boot, persisted/recovery cart detection, idempotent loading, and user-intent triggers |

@@ -10,6 +10,7 @@
   {% include cart-runtime-head.html %}
   {% include seo-meta.html lang=current_lang title=page.title description=page.description indexable=false %}
   <script
+    data-cfasync="false"
     src="/assets/js/pool-config.js?v={{ asset_version }}"
     defer
     data-pool-config-script="true"
@@ -23,7 +24,7 @@
     data-platform-support-email="{{ site.platform.support_email | default: '' | escape }}"
     data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"
     data-platform-timezone="{{ site.platform.timezone | default: 'America/Denver' | escape }}"></script>
-  <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
+  <script data-cfasync="false" src="/assets/js/logger.js?v={{ asset_version }}" defer data-pool-logger-script="true"></script>
 </head>
 <body class="campaign-embed-page">
   <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
@@ -31,6 +32,6 @@
     <a href="/" class="campaign-embed-shell__close pool-first-party-cart__close" data-campaign-embed-close aria-label="{% include t.html key='embed.back_to_campaign' lang=current_lang %}" title="{% include t.html key='embed.back_to_campaign' lang=current_lang %}" hidden>&times;</a>
     {{ content }}
   </main>
-  <script src="/assets/js/campaign-embed.js?v={{ asset_version }}" defer data-campaign-embed-script="true"></script>
+  <script data-cfasync="false" src="/assets/js/campaign-embed.js?v={{ asset_version }}" defer data-campaign-embed-script="true"></script>
 </body>
 </html>

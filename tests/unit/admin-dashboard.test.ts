@@ -632,6 +632,18 @@ describe('admin dashboard foundation', () => {
     expect(adminScss).toContain('.admin-content-block__media-library-field .btn');
     expect(adminScript).toContain('pool-admin-marketing-builder');
     expect(adminScript).toContain('pool-admin-marketing-announcements');
+    expect(adminScript).toContain("pool-admin-dashboard-state:v1");
+    expect(adminScript).toContain('function readAdminDashboardState');
+    expect(adminScript).toContain('function writeAdminDashboardState');
+    expect(adminScript).toContain('function restoredAdminTabForUser');
+    expect(adminScript).toContain("if (user?.role !== 'super_admin' && ['settings', 'addons'].includes(tabName)) return '';");
+    expect(adminScript).toContain('settingsSection: sanitizedAdminStateValue(value.settingsSection)');
+    expect(adminScript).toContain('campaignSubtabs: normalizedAdminStateMap(value.campaignSubtabs)');
+    expect(adminScript).toContain('function selectedCampaignSubtabForSlug');
+    expect(adminScript).toContain('function loadMarketingData');
+    expect(adminScript).toContain("if (targetName === 'marketing') loadMarketingData();");
+    expect(adminScript).toContain('marketingReferralsLoadedCampaignSlug');
+    expect(adminScript).toContain('loadMarketingAbandonedHealth({ force: true })');
     expect(adminScript).toContain('syncMobileTabSelect');
     expect(adminScript).toContain('filenameBase');
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");

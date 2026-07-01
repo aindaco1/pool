@@ -35,7 +35,7 @@ This checklist covers:
 
 ## What Changed Since v0.9.5
 
-This checklist now reflects the creator-facing platform changes through **v1.0.7**:
+This checklist now reflects the creator-facing platform changes through **v1.0.8**:
 
 - creators can use campaign-specific dashboard access for normal edits instead of direct repository access
 - dashboard media uploads support images, video, audio, previews, later repository optimization with responsive WebP variants, and selecting existing campaign images in WYSIWYG image blocks
@@ -51,6 +51,7 @@ This checklist now reflects the creator-facing platform changes through **v1.0.7
 - campaign teams can use protected preview links to review draft campaigns privately before public launch
 - campaign teams can build tracked campaign URLs, save referral codes, download campaign QR codes, save shared Marketing drafts, and review referral/UTM performance from Analytics
 - Campaigns -> Blast can save shared drafts and send supporter email blasts with hosted campaign images, selected existing campaign images, and email-safe YouTube/Vimeo links
+- dashboard reloads return campaign teams to their last allowed tab, selected campaign, and Campaigns subtab so repeated content, Marketing, and Blast work resumes in place
 - custom checkout can collect explicit consent for one abandoned-checkout reminder, which is separate from launch reminders and ordinary campaign blasts; campaign teams can review aggregate reminder health and use scoped suppression controls without seeing reminder PII
 - public performance work makes campaign progress, share links, deferred YouTube hero embeds, responsive image delivery, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
 

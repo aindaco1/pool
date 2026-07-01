@@ -1724,6 +1724,69 @@ test.describe('Admin Dashboard', () => {
     await expectNoAxeViolations(page);
   });
 
+  test('restores the last allowed dashboard tab and subtab after session reload', async ({ page }) => {
+    const calls = await signInWithMagicToken(page);
+    await selectSettingsSection(page, 'Advanced performance');
+    await selectAdminSection(page, 'Campaigns');
+    await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="tiers"]').click();
+    await expect(page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="tiers"]')).toHaveAttribute('aria-selected', 'true');
+
+    await expect.poll(() => page.evaluate(() => {
+      return JSON.parse(window.localStorage.getItem('pool-admin-dashboard-state:v1') || '{}');
+    })).toMatchObject({
+      tab: 'campaigns',
+      settingsSection: 'advanced-performance',
+      campaignSlug: 'hand-relations',
+      campaignSubtab: 'tiers',
+      campaignSubtabs: {
+        'hand-relations': 'tiers'
+      }
+    });
+
+    await page.route(`${WORKER_BASE}/admin/session`, async (route: any) => {
+      await route.fulfill({
+        status: 200,
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          user: { email: 'admin@example.com', role: 'super_admin', campaignSlugs: [] },
+          csrfToken: 'csrf-test-token',
+          expiresAt: '2026-05-16T23:00:00.000Z'
+        })
+      });
+    });
+    await page.reload();
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await expect(page.locator('#admin-tab-campaigns')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#admin-campaign-settings-tab-hand-relations')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="tiers"]')).toHaveAttribute('aria-selected', 'true');
+    await selectAdminSection(page, 'Settings');
+    await expect(page.locator('#admin-settings-section-tabs button').filter({ hasText: 'Advanced performance' }).first()).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => calls.summary.length).toBeGreaterThan(1);
+    await expect.poll(() => calls.settings.length).toBeGreaterThan(1);
+  });
+
+  test('does not restore campaign users into super-admin-only dashboard tabs', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('pool-admin-dashboard-state:v1', JSON.stringify({
+        tab: 'settings',
+        settingsSection: 'users',
+        campaignSlug: 'hand-relations',
+        campaignSubtab: 'tiers',
+        campaignSubtabs: {
+          'hand-relations': 'tiers'
+        }
+      }));
+    });
+    await routeAdminWorker(page, { role: 'campaign_user' });
+
+    await page.goto('/admin/?admin_login=creator-token');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await expect(page.locator('#admin-tab-settings')).toBeHidden();
+    await expect(page.locator('#admin-tab-addons')).toBeHidden();
+    await expect(page.locator('#admin-tab-campaigns')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="tiers"]')).toHaveAttribute('aria-selected', 'true');
+  });
+
   test('keeps admin layouts responsive on tablet and mobile viewports', async ({ page }) => {
     await page.setViewportSize({ width: 912, height: 1368 });
     await signInWithMagicToken(page);

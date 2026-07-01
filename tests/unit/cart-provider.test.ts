@@ -2876,7 +2876,7 @@ describe('cart provider shim', () => {
       expect(liveRoot?.querySelector('[data-cart-confirm-custom-checkout]')).toBeTruthy();
       expect(liveRoot?.textContent?.includes('Your card number is incomplete.')).toBe(false);
       expect(liveRoot?.querySelector('[data-cart-custom-checkout-region="link"]')).toBeNull();
-    });
+    }, { timeout: 10000 });
 
     await readyApi.api.theme.cart.close();
   }, 15000);

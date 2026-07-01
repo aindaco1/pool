@@ -84,7 +84,7 @@ When changing cart or checkout loading, verify with browser network tools that a
 
 The admin dashboard should keep normal browsing read-only and bounded. Reports, supporters, analytics attribution, abandoned-checkout health, Blast dry runs, and similar campaign views should use existing `campaign-pledges:<slug>` projections or small aggregate state instead of KV namespace scans. Media-library picker loads should read GitHub directories and should not create KV state.
 
-Durable dashboard writes should be tied to explicit user actions. Saved referral codes, shared Marketing/Blast drafts, campaign-scoped abandoned-checkout suppressions, Blast live sends, content publishes, protected previews, and campaign creation/archive actions are allowed mutations; page loads, field edits, preview generation, QR generation/downloads, reporting loads, and local drafts should not write KV. When adding an admin feature, document whether it is read-only, local-only, GitHub-backed, or KV-backed before wiring the UI.
+Durable dashboard writes should be tied to explicit user actions. Saved referral codes, shared Marketing/Blast drafts, campaign-scoped abandoned-checkout suppressions, Blast live sends, content publishes, protected previews, and campaign creation/archive actions are allowed mutations; page loads, field edits, preview generation, QR generation/downloads, reporting loads, remembered tab/subtab UI state, and local drafts should not write KV. When adding an admin feature, document whether it is read-only, local-only, GitHub-backed, or KV-backed before wiring the UI.
 
 ## Generated Asset Minification
 

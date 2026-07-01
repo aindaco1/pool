@@ -2,9 +2,9 @@
 
 ## Current Milestone
 
-**v1.0.7**
+**v1.0.8**
 
-The v1.0.7 milestone hardens the v1.0.6 marketing, Blast, abandoned-checkout, and setup-helper work with bounded visibility, shared drafts, attribution reporting, provider readiness checks, idempotent setup behavior, and campaign-scoped WYSIWYG media selection.
+The v1.0.8 milestone ports the Store-derived runtime hardening that fits this project, keeps Marketing reads lazy and authenticated, remembers admin dashboard tab/subtab context in browser-local state, and adds locale completeness checks so supported translation catalogs stay aligned.
 
 ## Completed
 
@@ -176,6 +176,7 @@ The v1.0.7 milestone hardens the v1.0.6 marketing, Blast, abandoned-checkout, an
   - physical product editors expose shipping presets or explicit package metadata while digital products hide shipping-only fields
   - Settings -> Advanced performance exposes the intent-prefetch enabled state, delay, and page-view limit for super admins, with Worker config mirroring through `INTENT_PREFETCH_*`
   - admin email sign-in keeps the existing Turnstile challenge after a login attempt and uses the shared dashboard status-message styling for more prominent auth feedback
+  - dashboard reloads restore the last allowed top-level tab, Settings section, selected Campaigns campaign, and Campaigns subtab from browser-local state without adding Worker or KV writes
   - responsive, accessibility, security/noindex, Spanish i18n, browser, unit, and KV-write-budget coverage cover dashboard flows
 - [x] Campaign marketing tools
   - Campaigns -> Marketing stays focused on campaign-link generation, saved referral codes, downloadable PNG/SVG QR codes, and the campaign embed builder without adding another top-level dashboard surface
@@ -271,13 +272,11 @@ The v1.0.7 milestone hardens the v1.0.6 marketing, Blast, abandoned-checkout, an
 
 ## Future Features
 
-- [ ] v1.0.8 follow-ups
+- [ ] Post-v1.0.8 follow-ups
   - [ ] Setup app wrapper
     - Create a simple Mac/Windows/Linux app wrapper around the same setup core after the script-first workflow remains stable across more fork installs
   - [ ] Media library polish
     - Consider making Source URL an advanced/edit-existing-path affordance after the scoped picker has been exercised in production
-  - [ ] Dashboard tab persistence
-    - Remember the admin dashboard tab and Campaigns subtab a user last had open so refreshes return them to the same working context
 - [ ] Tax calculator expansion
   - Support USA and international
   - Target local / jurisdiction-level US rates, not just state-level rates

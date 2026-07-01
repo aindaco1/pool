@@ -35,7 +35,7 @@ La lista cubre:
 
 ## Qué cambió desde v0.9.5
 
-Esta lista refleja los cambios de la plataforma hasta **v1.0.7**:
+Esta lista refleja los cambios de la plataforma hasta **v1.0.8**:
 
 - las personas creadoras pueden tener acceso específico al panel para editar campañas sin acceso directo al repositorio
 - las cargas de media en el panel soportan imágenes, video, audio, previews, optimización posterior en el repositorio con variantes WebP responsivas y selección de imágenes existentes en bloques WYSIWYG
@@ -51,6 +51,7 @@ Esta lista refleja los cambios de la plataforma hasta **v1.0.7**:
 - los equipos de campaña pueden usar enlaces de vista previa protegida para revisar borradores de campaña de forma privada antes del lanzamiento público
 - los equipos de campaña pueden crear URLs con tracking, guardar códigos de referencia, descargar códigos QR, guardar borradores compartidos de Marketing y revisar performance de referencias/UTM desde Analíticas
 - Campaigns -> Blast puede guardar borradores compartidos y enviar correos a patrocinadores con imágenes alojadas por la campaña, imágenes existentes seleccionadas y enlaces de YouTube/Vimeo compatibles con email
+- al recargar el panel, los equipos de campaña vuelven a su último tab permitido, campaña seleccionada y subtab de Campaigns para retomar trabajo de contenido, Marketing o Blast en el mismo lugar
 - el checkout puede recoger consentimiento explícito para un solo recordatorio de checkout abandonado, separado de recordatorios de lanzamiento y blasts de campaña; los equipos de campaña pueden revisar salud agregada de recordatorios y usar controles de supresión limitados sin ver PII del recordatorio
 - las mejoras de performance hacen más estable la primera carga, incluidos embeds hero de YouTube diferidos y entrega responsiva de imágenes, pero las campañas aún necesitan media optimizada y copy conciso
 
