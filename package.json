@@ -44,8 +44,9 @@
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "axe-core": "^4.11.2",
-    "esbuild": "^0.21.5",
+    "esbuild": "^0.28.1",
     "jsdom": "^24.0.0",
-    "vitest": "^1.6.1"
+    "vite": "^8.1.2",
+    "vitest": "^4.1.9"
   }
 }

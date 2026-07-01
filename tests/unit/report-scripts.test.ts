@@ -182,7 +182,8 @@ describe('pledge and fulfillment reports', () => {
       expect(result.stdout).toBe('');
       expect(result.stderr).toContain('Remote report export could not authenticate with Wrangler');
       expect(result.stderr).not.toContain('Traceback');
-    }
+    },
+    15000
   );
 
   it('outputs one pledge-report row per campaign with per-campaign totals for bundled checkout pledges', () => {

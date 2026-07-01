@@ -1715,7 +1715,7 @@
       }
 
       pledges = mergePledgesByCampaign(pledges);
-      renderPledges();
+      await renderPledges();
     } catch (err) {
       showError(err.message);
     }
@@ -2551,13 +2551,14 @@
   });
 
   async function renderPledges() {
-    document.getElementById('pledge-loading').hidden = true;
+    const loading = document.getElementById('pledge-loading');
     const container = document.getElementById('pledges-list');
-    container.hidden = false;
     pledges = sortPledgesByProjectRecency(pledges);
 
     if (pledges.length === 0) {
       container.innerHTML = `<p class="manage-pledge__empty">${escapeHtml(getRuntimeMessage('manage.noActivePledges', 'No active pledges found.'))}</p>`;
+      if (loading) loading.hidden = true;
+      container.hidden = false;
       return;
     }
 
@@ -2599,6 +2600,8 @@
         setupPaymentFailedActions(pledge, index);
       }
     });
+    if (loading) loading.hidden = true;
+    container.hidden = false;
   }
 
   function renderPledgeCard(pledge, campaign, index) {

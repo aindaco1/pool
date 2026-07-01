@@ -29,6 +29,9 @@
   const DEFAULT_PLATFORM_NAME = 'The Pool';
   const DEFAULT_FLAT_SHIPPING_RATE = 3;
   const DEFAULT_SALES_TAX_RATE = 0.07875;
+  const PROVIDER_INSTANCE_KEY = '__poolCartProviderInstanceId';
+  const providerInstanceId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  window[PROVIDER_INSTANCE_KEY] = providerInstanceId;
   const FOCUSABLE_SELECTOR = [
     'a[href]',
     'button:not([disabled])',
@@ -580,6 +583,10 @@
       .replace(/\s+/g, ' ')
       .trim()
       .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+  }
+
+  function isCurrentProviderInstance() {
+    return window[PROVIDER_INSTANCE_KEY] === providerInstanceId;
   }
 
   function getRequestedRuntime() {
@@ -3506,6 +3513,7 @@
     }
 
     function renderFirstPartyCart() {
+      if (!isCurrentProviderInstance()) return;
       const root = ensureFirstPartyCartRoot();
       document.documentElement.classList.toggle('pool-cart-open', Boolean(root) && isCartOpen);
       document.body.classList.toggle('pool-cart-open', Boolean(root) && isCartOpen);

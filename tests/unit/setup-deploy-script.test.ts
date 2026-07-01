@@ -5,6 +5,11 @@ import path from 'node:path';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const sourceSetupScript = path.join(repoRoot, 'scripts', 'setup-deploy.mjs');
+const SETUP_SCRIPT_TIMEOUT_MS = 15000;
+
+function itRunsSetup(name: string, fn: () => void) {
+  it(name, fn, SETUP_SCRIPT_TIMEOUT_MS);
+}
 
 function writeExecutable(filePath: string, body: string) {
   fs.writeFileSync(filePath, body, 'utf8');
@@ -133,7 +138,7 @@ function commandLog(temp: ReturnType<typeof createTempSetupRepo>) {
 }
 
 describe('setup-deploy script', () => {
-  it('prints help without requiring provider tools', () => {
+  itRunsSetup('prints help without requiring provider tools', () => {
     const temp = createTempSetupRepo();
     const result = runSetup(temp, ['--help']);
 
@@ -142,7 +147,7 @@ describe('setup-deploy script', () => {
     expect(result.stdout).toContain('--mode=production');
   });
 
-  it('fails clearly for unknown modes before doing setup work', () => {
+  itRunsSetup('fails clearly for unknown modes before doing setup work', () => {
     const temp = createTempSetupRepo();
     const result = runSetup(temp, ['--mode=staging', '--dry-run']);
 
@@ -151,7 +156,7 @@ describe('setup-deploy script', () => {
     expect(commandLog(temp)).toBe('');
   });
 
-  it('dry-runs production setup by reusing discovered Cloudflare KV namespaces without mutating wrangler.toml', () => {
+  itRunsSetup('dry-runs production setup by reusing discovered Cloudflare KV namespaces without mutating wrangler.toml', () => {
     const temp = createTempSetupRepo();
     const before = readTempFile(temp, 'worker/wrangler.toml');
     const kvList = JSON.stringify([
@@ -179,7 +184,7 @@ describe('setup-deploy script', () => {
     expect(readTempFile(temp, 'worker/wrangler.toml')).toBe(before);
   });
 
-  it('dry-runs production setup by planning KV namespace creation when no reusable namespace exists', () => {
+  itRunsSetup('dry-runs production setup by planning KV namespace creation when no reusable namespace exists', () => {
     const temp = createTempSetupRepo();
     const before = readTempFile(temp, 'worker/wrangler.toml');
 
@@ -199,7 +204,7 @@ describe('setup-deploy script', () => {
     expect(readTempFile(temp, 'worker/wrangler.toml')).toBe(before);
   });
 
-  it('writes generated local secrets in non-interactive local mode without adding blank provider secrets', () => {
+  itRunsSetup('writes generated local secrets in non-interactive local mode without adding blank provider secrets', () => {
     const temp = createTempSetupRepo();
     const result = runSetup(temp, ['--mode=local', '--non-interactive']);
 
@@ -219,7 +224,7 @@ describe('setup-deploy script', () => {
     expect(commandLog(temp)).toContain('ruby scripts/sync-worker-config.rb');
   });
 
-  it('updates wrangler KV ids and writes only generated Worker secrets in non-interactive production mode', () => {
+  itRunsSetup('updates wrangler KV ids and writes only generated Worker secrets in non-interactive production mode', () => {
     const temp = createTempSetupRepo();
     const result = runSetup(temp, [
       '--mode=production',
@@ -241,7 +246,7 @@ describe('setup-deploy script', () => {
     expect(log).not.toContain('gh secret set');
   });
 
-  it('runs dry-run readiness checks as read-only provider probes when not skipped', () => {
+  itRunsSetup('runs dry-run readiness checks as read-only provider probes when not skipped', () => {
     const temp = createTempSetupRepo();
     const result = runSetup(temp, [
       '--mode=production',

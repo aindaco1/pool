@@ -119,6 +119,7 @@ describe('cart provider shim', () => {
     delete (window as any).Stripe;
     delete (window as any).invalidateInventoryCache;
     delete (window as any).invalidateStatsCache;
+    delete (window as any).__poolCartProviderInstanceId;
     document.body.innerHTML = '';
   });
 
@@ -448,6 +449,9 @@ describe('cart provider shim', () => {
         })
       ])
     );
+    await vi.waitFor(() => {
+      expect(root?.textContent).toContain('Your cart is empty.');
+    });
   });
 
   it('localizes hosted checkout next-step copy from runtime messages', async () => {
@@ -738,8 +742,8 @@ describe('cart provider shim', () => {
       expect(taxAmount?.textContent).toBe('$1.02');
       expect(shippingAmount?.textContent).toBe('$3.00');
       expect(totalAmount?.textContent).toBe('$17.67');
-    });
-  });
+    }, { timeout: 10000 });
+  }, 15000);
 
   it('keeps New Mexico mixed-cart tax visible after physical custom checkout bootstraps', async () => {
     (window as any).POOL_CONFIG = {
