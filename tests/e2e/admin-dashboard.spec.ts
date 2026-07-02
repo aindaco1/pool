@@ -156,7 +156,8 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       });
     }
     if (url.pathname === '/admin/settings') {
-      calls.settings.push({ method });
+      const params = Object.fromEntries(url.searchParams.entries());
+      calls.settings.push({ method, params });
       return fulfillJson({
         user,
         scope: role === 'super_admin' ? 'platform' : 'campaign',
@@ -920,6 +921,7 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('tab', { name: 'Campaigns' })).toBeVisible();
     await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
     await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
+    await expect.poll(() => calls.settings[0]?.params?.preferredLang).toBe('en');
     await selectSettingsSection(page, 'Platform');
     await expect(page.locator('#admin-settings-publish')).toBeVisible();
     const settingsHeaderHeight = await page.locator('#admin-panel-settings .admin-settings__header').evaluate((element: HTMLElement) => element.getBoundingClientRect().height);

@@ -1,24 +1,19 @@
 ---
 layout: null
 permalink: /sitemap.xml
+sitemap: false
 ---
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  {% assign public_pages = site.pages | where_exp: "item", "item.sitemap != false and item.layout == 'default'" %}
-  {% for item in public_pages %}
-    {% if item.translation_key == 'community_index' and site.seo.index_public_community_hub == false %}
-      {% continue %}
-    {% endif %}
-  <url>
-    <loc>{{ site.platform.site_url | default: site.url }}{{ item.url }}</loc>
-    <lastmod>{{ item.last_modified_at | default: item.date | default: site.time | date_to_xmlschema }}</lastmod>
-  </url>
-  {% endfor %}
-  {% assign public_campaigns = site.campaigns | where_exp: "item", "item.test_only != true and item.preview_only != true and item.published != false and item.sitemap != false" %}
-  {% for item in public_campaigns %}
-  <url>
-    <loc>{{ site.platform.site_url | default: site.url }}{{ item.url }}</loc>
-    <lastmod>{{ item.last_modified_at | default: item.date | default: site.time | date_to_xmlschema }}</lastmod>
-  </url>
-  {% endfor %}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+{%- assign public_pages = site.pages | where_exp: "item", "item.sitemap != false and item.indexable != false and item.test_only != true" | where_exp: "item", "item.layout == 'default' or item.layout == 'campaign'" -%}
+{%- for item in public_pages -%}
+  {%- if item.translation_key == 'community_index' and site.seo.index_public_community_hub == false -%}
+    {%- continue -%}
+  {%- endif -%}
+  {%- include seo-sitemap-url.xml item=item -%}
+{%- endfor -%}
+{%- assign public_campaigns = site.campaigns | where_exp: "item", "item.test_only != true and item.preview_only != true and item.published != false and item.sitemap != false and item.indexable != false" -%}
+{%- for item in public_campaigns -%}
+  {%- include seo-sitemap-url.xml item=item -%}
+{%- endfor -%}
 </urlset>

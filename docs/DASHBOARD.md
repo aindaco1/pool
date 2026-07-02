@@ -106,6 +106,8 @@ https://www.instagram.com/example
 https://www.imdb.com/name/nm0000000/
 ```
 
+The dashboard sends the current preferred language when loading settings. Browser-side row normalization still owns most Pool admin label localization, but the request keeps the Worker settings schema ready for future server-localized field labels and option text.
+
 The local stack can override `SITE_BASE` and `WORKER_BASE` from `_config.local.yml`, but `scripts/sync-worker-config.rb` keeps `CANONICAL_SITE_BASE` and `CANONICAL_WORKER_BASE` pinned to the production values from `_config.yml`. That lets the local dashboard show production publish targets without breaking localhost requests.
 
 ### Checkout

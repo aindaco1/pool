@@ -9,6 +9,7 @@ npm run test:unit          # Unit tests (Vitest) — ~700ms
 npm run test:unit:watch    # Watch mode
 npm run test:unit:coverage # With coverage report
 npm run test:i18n          # Supported locale catalog completeness check
+npm run test:seo           # Generated-site SEO/crawl audit; build _site first
 npm run test:secrets       # Secret exposure audit for local env files
 npm run test:premerge      # Merge-readiness checks for changed Worker logic
 npm run test:e2e           # E2E tests (Playwright) — fully automated browser coverage
@@ -118,7 +119,7 @@ This runs:
 - Full unit suite via `npm run test:unit`
 - Security suite via `npm run test:security` against an auto-started local Worker
 - Podman-backed security suite via `npm run test:security:podman` when you want the site/Worker stack booted and exercised in the same invocation
-- First-party build artifact checks that run Jekyll, minify generated `_site` CSS/JS assets, and verify the minified output has no remaining savings
+- First-party build artifact checks that run Jekyll, minify generated `_site` CSS/JS assets, verify the minified output has no remaining savings, and run `npm run test:seo` against generated crawl/metadata output
 - Public-page performance and sharing regressions through unit coverage for intent prefetching, lazy cart-runtime loading, generated asset minification, and campaign share-link behavior
 - Playwright headless E2E via `npm run test:e2e:headless`
 
@@ -221,6 +222,16 @@ npx vitest run \
   tests/unit/seo-layouts.test.ts \
   tests/unit/site-asset-minification.test.ts
 ```
+
+For generated crawl and structured metadata output, build and minify the site first, then run:
+
+```bash
+SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
+npm run assets:minify
+npm run test:seo
+```
+
+The SEO audit checks the built pages, `robots.txt`, `sitemap.xml`, canonical URLs, hreflang alternates, Open Graph/Twitter metadata, and JSON-LD. Local test-only campaigns can be built for smoke coverage but remain intentionally absent from the sitemap.
 
 On GitHub, the same gate runs automatically in the `Merge Smoke` workflow for pull requests targeting `main`.
 

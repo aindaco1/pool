@@ -24,6 +24,7 @@ Use these as practical targets rather than claims that every local test run will
 - no eager full cart stack on an anonymous public first load
 - no public document prefetches on private, tokenized, checkout, admin, manage, or supporter-community routes
 - generated CSS/JS assets pass `npm run assets:minify:check`
+- generated crawl/metadata output passes `npm run test:seo` after a Jekyll build
 - Cloudflare serves text assets with transfer compression and without Auto Minify
 
 ## Platform Model
@@ -51,6 +52,7 @@ Current guardrails:
 - campaign hero images are emitted with preload and high fetch priority where the layout knows the likely LCP asset
 - YouTube campaign hero videos render a local poster/play facade first and load the YouTube iframe only after play intent
 - common scripts use `defer` or lazy dynamic loading instead of parser-blocking script tags
+- full document layouts opt out of mobile automatic phone/date/address/email detection so iOS does not restyle operational copy or campaign text unexpectedly
 - private/admin surfaces stay `noindex` and should not inherit public prefetch behavior
 
 When changing campaign chrome, verify:

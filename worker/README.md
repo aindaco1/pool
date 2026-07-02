@@ -70,6 +70,8 @@ Supporter confirmation email retries use the same free-tier-aware pattern. Faile
 
 Public campaign-page media optimization remains a static-site concern rather than a Worker runtime concern. The Worker preserves dashboard uploads as source files and dispatches the repository optimizer for committed image/video uploads; Jekyll templates, the repository media optimizer, and the deploy artifact step handle responsive WebP variants, local YouTube hero poster facades, and generated CSS/JS minification before the public Pages artifact is served. Blast announcement image uploads reuse the campaign content upload kind and directory, so email images are site-hosted under `assets/images/campaigns/<slug>/` and optimized by the same repository workflow instead of adding Worker-side image processing or extra KV state.
 
+Public SEO and crawl validation is also a static-site concern. Build `_site`, minify generated assets, then run `npm run test:seo` from the repo root to validate generated robots, sitemap, canonicals, hreflang alternates, social metadata, and JSON-LD before changing Worker share-card or public campaign URL behavior.
+
 The sampling rate defaults to `0.1` and can be overridden with `OBSERVABILITY_SAMPLE_RATE=0.05` (or any `0-1` value) if a fork wants fewer or more sampled timing writes.
 
 Worker-side stats and inventory repair now also treat `campaign-pledges:{slug}` as projection state instead of permanent truth. If a campaign index drifts from the underlying active pledge records, the recalc paths repair it automatically while rebuilding campaign totals and limited-tier inventory.

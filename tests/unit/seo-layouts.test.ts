@@ -34,6 +34,12 @@ describe('SEO templates', () => {
   it('routes public layouts through the shared seo include', () => {
     const defaultLayout = readRepoFile('_layouts', 'default.html');
     const campaignLayout = readRepoFile('_layouts', 'campaign.html');
+    const adminLayout = readRepoFile('_layouts', 'admin.html');
+    const manageLayout = readRepoFile('_layouts', 'manage.html');
+    const communityLayout = readRepoFile('_layouts', 'community.html');
+    const pledgeResultLayout = readRepoFile('_layouts', 'pledge-result.html');
+    const campaignEmbedLayout = readRepoFile('_layouts', 'campaign-embed.html');
+    const campaignPreviewLayout = readRepoFile('_layouts', 'campaign-preview.html');
     const header = readRepoFile('_includes', 'header.html');
     const footer = readRepoFile('_includes', 'site-footer.html');
     const cartRuntimeHead = readRepoFile('_includes', 'cart-runtime-head.html');
@@ -52,6 +58,18 @@ describe('SEO templates', () => {
 
     expect(defaultLayout).toContain('{% include seo-meta.html');
     expect(campaignLayout).toContain('{% include seo-meta.html');
+    for (const layout of [
+      defaultLayout,
+      campaignLayout,
+      adminLayout,
+      manageLayout,
+      communityLayout,
+      pledgeResultLayout,
+      campaignEmbedLayout,
+      campaignPreviewLayout
+    ]) {
+      expect(layout).toContain('<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">');
+    }
     expect(defaultLayout).toContain('{% include seo-json-ld.html');
     expect(campaignLayout).toContain('{% include seo-json-ld.html');
     expect(defaultLayout).toContain('translation_key=page.translation_key');
@@ -182,16 +200,27 @@ describe('SEO templates', () => {
   it('publishes crawl files with a sitemap and private-route exclusions', () => {
     const robots = readRepoFile('robots.txt');
     const sitemap = readRepoFile('sitemap.xml');
+    const sitemapUrlInclude = readRepoFile('_includes', 'seo-sitemap-url.xml');
+    const packageJson = readRepoFile('package.json');
+    const premerge = readRepoFile('scripts', 'pre-merge-regression.sh');
 
     expect(robots).toContain('Sitemap: {{ site.platform.site_url | default: site.url }}/sitemap.xml');
     expect(robots).toContain('Disallow: /manage/');
     expect(robots).toContain('Disallow: /admin/');
     expect(robots).toContain('Disallow: /es/admin/');
     expect(robots).toContain('Disallow: /pledge-success/');
-    expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+    expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">');
     expect(sitemap).toContain("item.layout == 'default'");
+    expect(sitemap).toContain("item.layout == 'default' or item.layout == 'campaign'");
+    expect(sitemap).toContain('item.indexable != false');
     expect(sitemap).toContain("item.test_only != true");
-    expect(sitemap).toContain('<lastmod>');
+    expect(sitemap).toContain('seo-sitemap-url.xml');
+    expect(sitemapUrlInclude).toContain('<lastmod>');
+    expect(sitemapUrlInclude).toContain('xhtml:link rel="alternate"');
+    expect(sitemapUrlInclude).toContain('hreflang="x-default"');
+    expect(sitemapUrlInclude).toContain('localized-url.html lang=lang');
+    expect(packageJson).toContain('"test:seo": "node ./scripts/audit-seo.mjs"');
+    expect(premerge).toContain('SEO_SITE_DIR=_site node ./scripts/audit-seo.mjs');
   });
 
   it('keeps the public community hub pointing at public campaign pages', () => {

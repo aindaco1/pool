@@ -10032,7 +10032,8 @@
   async function loadSettings() {
     setText(settingsStatus, t('settings_loading', 'Loading settings...'));
     try {
-      var data = await requestJson('/admin/settings', { method: 'GET' });
+      var params = new URLSearchParams({ preferredLang: lang || 'en' });
+      var data = await requestJson('/admin/settings?' + params.toString(), { method: 'GET' });
       renderSettings(data);
       setText(settingsStatus, '');
       updateDirtyIndicators();

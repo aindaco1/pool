@@ -11,6 +11,9 @@ Release scope:
 - Added a locale completeness audit and unit coverage to keep supported i18n catalogs aligned with English.
 - Added template regression coverage that scans layouts/includes for local first-party scripts missing the Rocket Loader opt-out.
 - Moved Vitest config files to ESM `.mts` modules and updated scripts/Jekyll excludes to avoid Vite's deprecated CJS Node API path.
+- Added a generated-site SEO audit (`npm run test:seo`) adapted from Store, wired it into the merge gate, and moved sitemap URL rendering into a shared include that emits localized hreflang alternates.
+- Added mobile metadata/CSS polish from Store so public, admin, manage, community, embed, preview, and pledge-result document heads opt out of automatic phone/date/address/email detection while shared controls inherit the current theme consistently.
+- Updated the admin settings request to send the current preferred language, keeping Pool's existing client-side i18n row normalization ready for Worker-side schema localization.
 
 ## v1.0.7 - 2026-06-19
 

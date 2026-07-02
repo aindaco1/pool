@@ -4,7 +4,7 @@
 
 **v1.0.8**
 
-The v1.0.8 milestone ports the Store-derived runtime hardening that fits this project, keeps Marketing reads lazy and authenticated, remembers admin dashboard tab/subtab context in browser-local state, and adds locale completeness checks so supported translation catalogs stay aligned.
+The v1.0.8 milestone ports the Store-derived runtime hardening that fits this project, keeps Marketing reads lazy and authenticated, remembers admin dashboard tab/subtab context in browser-local state, adds locale completeness checks so supported translation catalogs stay aligned, and brings Store's generated-site SEO audit pattern into Pool's merge gate.
 
 ## Completed
 
@@ -239,6 +239,8 @@ The v1.0.8 milestone ports the Store-derived runtime hardening that fits this pr
   - bounded fork-facing SEO config covers `seo.x_handle`, `seo.same_as`, `seo.default_social_image_alt`, `seo.og_locale_overrides`, and whether the public community hub should remain indexable
   - structured browser and Worker debug logging ships as a config-driven developer aid with timestamps, severity labels, scoped prefixes, and browser global error capture
   - public metadata emits language/app-name hints, secure social-image tags where possible, and locale-aware JSON-LD language/breadcrumb roots
+  - sitemap URL rendering is shared through `_includes/seo-sitemap-url.xml`, including localized `xhtml:link` alternates for localized public pages and campaign pages
+  - `npm run test:seo` validates built crawl files, canonicals, hreflang alternates, social metadata, and JSON-LD as part of the merge gate
 - [x] Embeds and share previews
   - campaign pages link to a hosted locale-aware embed builder that generates copy-paste iframe code with layout, theme, media, and CTA options
   - the embed widget uses live Worker-backed campaign state, auto-resizes after paste, and supports localized return links plus localized builder/runtime copy

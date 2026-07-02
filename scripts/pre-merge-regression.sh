@@ -200,7 +200,7 @@ verify_build_artifacts() {
     echo "robots.txt is missing the manage-route disallow"
     return 1
   fi
-  if ! rg -n '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9">' _site/sitemap.xml >/dev/null; then
+  if ! rg -n '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9" xmlns:xhtml="http://www\.w3\.org/1999/xhtml">' _site/sitemap.xml >/dev/null; then
     echo "sitemap.xml is missing the expected urlset root"
     return 1
   fi
@@ -242,6 +242,10 @@ verify_build_artifacts() {
   fi
   if rg -n '<loc>.+/admin/' _site/sitemap.xml >/dev/null; then
     echo "sitemap.xml unexpectedly includes the admin route"
+    return 1
+  fi
+  if ! SEO_SITE_DIR=_site node ./scripts/audit-seo.mjs >/dev/null; then
+    echo "SEO audit failed for generated build artifacts"
     return 1
   fi
 }
