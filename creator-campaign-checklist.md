@@ -33,12 +33,14 @@ This checklist covers:
 - dashboard access, drafts, and publishing expectations
 - optional materials that make a campaign feel richer and more persuasive
 
-## What Changed Since v0.9.5
+## Current Platform Notes
 
-This checklist now reflects the creator-facing platform changes through **v1.0.8**:
+This checklist reflects the creator-facing platform behavior in **v1.0.8**:
 
 - creators can use campaign-specific dashboard access for normal edits instead of direct repository access
-- dashboard media uploads support images, video, audio, previews, later repository optimization with responsive WebP variants, and selecting existing campaign images in WYSIWYG image blocks
+- super admins can create preview-only campaigns from a title, optionally assign or create campaign users, and keep the campaign hidden from public routes until launch
+- super admins can archive non-live campaigns without deleting their source or campaign-owned media
+- dashboard media uploads support images, video, audio, local previews, later repository optimization with responsive WebP variants and WebM derivatives, and selecting existing campaign images in WYSIWYG image blocks
 - campaign add-ons can be attached to one campaign and count toward that campaign's goal
 - campaign-runner report recipients can receive daily pledge ledgers and post-deadline fulfillment exports
 - hosted embeds give creators a live widget for websites and HTML-friendly partner pages
@@ -47,13 +49,13 @@ This checklist now reflects the creator-facing platform changes through **v1.0.8
 - upcoming campaigns can collect one-time launch reminder signups before pledging opens
 - campaign launch/deadline timing follows the deployment's configured platform timezone
 - campaign analytics now keep gross campaign revenue visible while also showing net campaign revenue after allocated processor fees
-- platform operators can monitor Cloudflare and Resend plan usage from the admin dashboard without exposing provider tokens to campaign teams
+- platform operators can monitor Cloudflare and Resend plan usage from the admin dashboard without exposing provider tokens in browser code
 - campaign teams can use protected preview links to review draft campaigns privately before public launch
-- campaign teams can build tracked campaign URLs, save referral codes, download campaign QR codes, save shared Marketing drafts, and review referral/UTM performance from Analytics
-- Campaigns -> Blast can save shared drafts and send supporter email blasts with hosted campaign images, selected existing campaign images, and email-safe YouTube/Vimeo links
+- campaign teams can build tracked campaign URLs, save referral codes, generate browser-local QR previews/downloads, save explicit shared Marketing drafts, and review referral/UTM performance from Analytics
+- Campaigns -> Blast can save explicit shared drafts and send supporter email blasts with hosted campaign images, selected existing campaign images, and email-safe YouTube/Vimeo links
 - dashboard reloads return campaign teams to their last allowed tab, selected campaign, and Campaigns subtab so repeated content, Marketing, and Blast work resumes in place
-- custom checkout can collect explicit consent for one abandoned-checkout reminder, which is separate from launch reminders and ordinary campaign blasts; campaign teams can review aggregate reminder health and use scoped suppression controls without seeing reminder PII
-- public performance work makes campaign progress, share links, deferred YouTube hero embeds, responsive image delivery, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
+- custom checkout can collect explicit consent for one abandoned-checkout reminder, which is separate from launch reminders and ordinary campaign blasts; campaign teams can review aggregate reminder health and use scoped suppression controls without retrying individual carts
+- public performance and SEO work make campaign progress, share links, localized metadata, generated share cards, deferred YouTube hero embeds, responsive image delivery, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
 
 ## The Short Version
 
@@ -62,7 +64,7 @@ If a creator only reads one section, it should be this one.
 ### Required at launch
 
 - campaign title
-- slug
+- slug, or approval of the dashboard-derived slug before public links are shared
 - creator name
 - category
 - funding goal
@@ -135,7 +137,7 @@ These are the foundational fields every campaign should have.
 | Item | Required | Guidance |
 |------|----------|----------|
 | Campaign title | Yes | Aim for 2 to 8 words. Short, memorable, readable at card size. |
-| Slug | Yes | Lowercase, hyphenated, stable. Example: `midnight-picnic`. |
+| Slug | Yes by launch | Lowercase, hyphenated, stable. The dashboard can derive it from the title for preview-only creation, but approve it before public links are shared. Example: `midnight-picnic`. |
 | Creator name | Yes | Public-facing display name. |
 | Category | Yes | Short and legible. Example: `Short Film`, `Feature Film`, `Album`, `Zine`. |
 | Funding goal | Yes | Whole-dollar amount. |
@@ -179,6 +181,8 @@ Before launch, confirm:
 
 Operational notes:
 
+- A super admin can create a preview-only campaign with only a title, then assign existing campaign users or create new campaign users. The campaign remains hidden from public campaign routes, embeds, share cards, sitemap output, and prefetching until launched.
+- Super admins can archive non-live campaigns. Archiving moves campaign source and campaign-owned media into the archive path instead of deleting the work.
 - New tier, support item, add-on, decision, and variant IDs can be derived from names/labels in the dashboard; legacy IDs should stay stable.
 - Content editor drafts are local until saved/published, so creators should not treat unsaved browser drafts as the source of truth.
 - Publishing campaign or settings changes commits through the platform workflow and may take time to deploy.
@@ -188,7 +192,8 @@ Operational notes:
 - Upcoming campaign launch reminder forms may also use Cloudflare Turnstile; platform operators configure those keys and secrets, not campaign creators.
 - Campaign launch and deadline dates are interpreted in the platform timezone configured by a super admin, so confirm that timezone before publishing time-sensitive campaign copy.
 - Analytics distinguish gross campaign revenue from net campaign revenue after allocated processor fees, which helps creators reconcile campaign totals without hiding the public funding math.
-- Blast drafts are browser-local until sent or tested. Selected Blast images upload to the campaign asset path before the automatic dry run, while YouTube and Vimeo blocks become email-safe links instead of embedded players.
+- Marketing and Blast shared drafts are explicit Load / Save / Clear actions with short-lived campaign-scoped storage; ordinary editor drafts stay browser-local.
+- Blast images upload to the campaign asset path before automatic dry-run validation, while YouTube and Vimeo blocks become email-safe links instead of embedded players.
 
 ### Short Blurb Guidance
 
@@ -312,7 +317,7 @@ Use these for concept art, stills, behind-the-scenes images, moodboards, process
 - **Recommended formats:** `WebP`, `JPG`, `PNG`
 - **Recommended file size:** ideally under `500 to 600 KB` each
 
-The dashboard preserves original uploads. In v1.0.3, dashboard image/video uploads request the repository media workflow after publish, and that workflow can generate `320w`, `480w`, `640w`, `960w`, and `1600w` WebP variants for public pages. Creators should still export images near the recommended dimensions and crops before upload.
+The dashboard preserves original uploads. Image and video uploads request the repository media workflow after the GitHub commit succeeds; that workflow can optimize source images, generate `320w`, `480w`, `640w`, `960w`, and `1600w` WebP variants for public pages, and create WebM video derivatives. Audio uploads remain source-preserved. Creators should still export images near the recommended dimensions and crops before upload.
 
 Each public-facing image should also include:
 
@@ -577,6 +582,23 @@ Provide:
 - alt text for each image
 - optional caption
 
+#### Video blocks
+
+Provide:
+
+- video file or approved video URL
+- poster image, if available
+- title
+- optional caption
+
+#### Audio blocks
+
+Provide:
+
+- audio file
+- title
+- optional caption
+
 #### Embed blocks
 
 Provide:
@@ -585,7 +607,7 @@ Provide:
 - title
 - optional caption
 
-Approved structured embeds should use `https://` URLs from supported providers such as YouTube, Vimeo, Spotify, or Instagram. If a creator wants to include a different embed provider, flag it before launch so it can be reviewed for security, layout, and mobile behavior.
+Approved structured embeds must use exact trusted `https://` URLs from supported providers: YouTube, Vimeo, or Spotify. Instagram can be used as a social/profile link or email CTA where configured, but it is not a structured embed provider. If a creator wants to include a different embed provider, flag it before launch so it can be reviewed for security, layout, and mobile behavior.
 
 ## Reward and Tier Strategy
 
@@ -964,7 +986,9 @@ Creators should provide or confirm:
 - QR-code destinations, such as posters, table cards, venue signage, programs, postcards, or QR-friendly social bios
 - referral-code names for partners, press, venues, cast/crew, or campaign-runner channels
 - preferred embed mode: full or compact
+- preferred embed theme: default, warm, or ocean
 - whether the embed should show campaign media
+- whether the embed should show the campaign call to action
 - launch-day social copy
 - 3 to 5 short share captions
 - state-specific share copy:
@@ -1005,8 +1029,10 @@ Good examples:
 - campaign share buttons use the public campaign URL and state-aware text where supported, but Facebook and other preview-first destinations mostly use the Open Graph image/title/description
 - creators should test the embed on mobile wherever they paste it
 - QR codes should be tested from a real phone camera before printing or sharing broadly
+- QR previews and PNG/SVG downloads are browser-local; saving a referral code is the explicit persistence step
 - if a host strips iframe code, use a normal campaign link plus the share-card preview instead
 - Blast copy should be concise, image-light, and linked to hosted campaign/media URLs rather than remote image hotlinks
+- shared Marketing and Blast drafts are not autosave; use the explicit shared-draft buttons when multiple admins need the same campaign draft
 - teams running their own fork should rehearse `npm run setup:deploy -- --mode=production --dry-run` before launch so provider readiness, KV namespace reuse, secrets, and deploy steps are reviewed before supporters arrive
 
 ## Physical Rewards and Shipping
@@ -1143,6 +1169,7 @@ If a creator wants a simple target package, this is a strong one:
 - `0 to 2` launch-ready community decisions
 - report recipient emails and fulfillment owner
 - dashboard editor emails, if creators need direct campaign access
+- optional preview reviewer emails for pre-launch private review
 - embed/promotion destinations for launch week
 - QR/referral destinations and any partner codes needed before launch
 - Blast subject/body/CTA copy for the first campaign supporter email
@@ -1185,6 +1212,7 @@ A campaign is usually ready when:
 - tax wording does not overpromise beyond configured checkout behavior
 - report recipients and fulfillment owners are set
 - dashboard editor access and publishing responsibility are confirmed
+- preview-only campaign visibility, protected preview reviewers, and any archive/cancel decision are understood before launch
 - the campaign embed has been checked for launch-promotion destinations
 - QR codes download correctly and scan to the expected campaign/referral URL
 - any launch or final-push Blast copy has a subject, concise body, CTA Button Label, and CTA Button URL
@@ -1199,7 +1227,7 @@ If someone needs the shortest possible prep version, send them this:
 ### Required
 
 - campaign title
-- slug
+- slug, or approval of the dashboard-derived slug before public links are shared
 - creator name
 - category
 - funding goal
@@ -1246,7 +1274,7 @@ This checklist is meant to help creators deliver everything needed for a campaig
 <nav class="creator-checklist-toc" aria-labelledby="creator-checklist-toc-title">
   <h2 id="creator-checklist-toc-title">Contents</h2>
   <ol>
-    <li><a href="#what-changed-since-v095">What Changed Since v0.9.5</a></li>
+    <li><a href="#current-platform-notes">Current Platform Notes</a></li>
     <li><a href="#the-short-version">The Short Version</a></li>
     <li><a href="#what-makes-a-campaign-feel-complete">What Makes a Campaign Feel Complete</a></li>
     <li><a href="#core-campaign-information">Core Campaign Information</a></li>
