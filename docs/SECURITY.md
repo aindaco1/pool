@@ -114,7 +114,7 @@ Runtime credentials are intentionally separated from editable site configuration
 - GitHub repository secrets are not Worker runtime secrets. Scoped admin route enforcement requires the matching `ADMIN_BROADCAST_SECRET` or `ADMIN_SETTLEMENT_SECRET` to be present in Cloudflare Worker secrets too.
 - The admin dashboard may show Configured/Missing status for runtime credentials, but it must not expose, edit, serialize, or publish secret values.
 
-This boundary prevents the admin dashboard from becoming a credential store and keeps forks from accidentally committing Stripe, Resend, USPS, ZIP.TAX, or Cloudflare tokens while still making missing setup visible to operators.
+This boundary prevents the admin dashboard from becoming a credential store and keeps forks from accidentally committing Stripe, Resend, USPS, ZIP.TAX, or Cloudflare tokens while still making missing setup visible to operators. See [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for Stripe and settlement setup, and [EMAIL.md](./EMAIL.md) for Resend setup.
 
 ### Admin Dashboard Input Security Model
 
@@ -214,7 +214,7 @@ Abandoned-checkout reminders are opt-in only. The browser sends `abandonedCartCo
 
 ---
 
-### SEC-002: Fail Closed on Missing Stripe Webhook Secret (✅ FIXED)
+### SEC-002: Do Not Process Missing Stripe Webhook Secret (✅ FIXED)
 
 **File:** `worker/src/index.js` (handleStripeWebhook)
 
@@ -230,8 +230,8 @@ if (webhookSecret) {
 ```javascript
 const webhookSecret = getStripeWebhookSecret(env);
 if (!webhookSecret) {
-  console.error('CRITICAL: Stripe webhook secret not configured');
-  return jsonResponse({ error: 'Webhook not configured' }, 500);
+  console.warn('Stripe webhook secret not configured for this mode, acknowledging receipt');
+  return jsonResponse({ received: true, skipped: 'webhook secret not configured' }, 200);
 }
 
 const { valid, error } = await verifyStripeSignature(body, sig, webhookSecret);
@@ -239,6 +239,8 @@ if (!valid) {
   return jsonResponse({ error: 'Invalid signature' }, 401);
 }
 ```
+
+The Worker acknowledges missing-secret webhooks to avoid infinite Stripe retries for the wrong mode, but it does not parse or apply the event. Production readiness should still treat a missing live webhook secret as a deployment defect.
 
 ---
 
@@ -544,6 +546,8 @@ The browser dashboard also has defense-in-depth hardening around the editing she
 
 Before deploying to production, verify these secrets are set:
 
+Payment-specific setup is documented in [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md). Email-specific setup is documented in [EMAIL.md](./EMAIL.md).
+
 | Secret | Environment Variable | Min Length |
 |--------|---------------------|------------|
 | Stripe API Key | `STRIPE_SECRET_KEY_LIVE` | N/A |
@@ -622,6 +626,8 @@ If the on-site payment step completes but the pledge doesn't appear yet (common 
      -d '{"sessionId": "cs_test_..."}'
    ```
 3. The endpoint fetches the checkout session from Stripe and creates the pledge if it doesn't exist
+
+See [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for the fuller webhook recovery and reconciliation runbook.
 
 **Prevention:**
 - Use `scripts/dev.sh` which runs the Worker with local KV simulation

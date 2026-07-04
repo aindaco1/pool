@@ -6,6 +6,8 @@ Use this alongside:
 
 - [README.md](../README.md) for the current product and architecture overview
 - [docs/CUSTOMIZATION.md](./CUSTOMIZATION.md) for the supported fork-facing config surface
+- [docs/PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for Stripe setup, checkout canonicalization, webhooks, settlement, and reconciliation
+- [docs/EMAIL.md](./EMAIL.md) for Resend setup, sender identity, email templates, localization, and delivery behavior
 - [docs/TESTING.md](./TESTING.md) for local verification and merge-gate expectations
 - [docs/I18N.md](./I18N.md) for locale routing and translation rules
 - [docs/SEO.md](./SEO.md) for metadata, share cards, and indexing behavior
@@ -45,6 +47,8 @@ When you need to understand or change behavior, start here:
 - [`tests/`](../tests): unit, security, and E2E expectations
 - [`scripts/`](../scripts): local dev, merge gate, smoke tests, reports, and sync helpers
 - [`docs/DASHBOARD.md`](./DASHBOARD.md): private admin dashboard editing and operations reference
+- [`docs/PAYMENT_PROCESSOR.md`](./PAYMENT_PROCESSOR.md): payment processor setup, flow, and operations reference
+- [`docs/EMAIL.md`](./EMAIL.md): email setup and integration reference
 
 ## Safe Workflow
 
@@ -117,6 +121,7 @@ Start with:
 - site runtime in [`assets/js/`](../assets/js)
 - campaign/cart/manage templates in [`_includes/`](../_includes) and [`_layouts/`](../_layouts)
 - Worker checkout logic in [`worker/src/`](../worker/src)
+- payment processor guidance in [docs/PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md)
 
 Always assume there is a site-side piece and a Worker-side piece.
 
@@ -139,6 +144,7 @@ Start with:
 - Worker mail logic in [`worker/src/`](../worker/src)
 - translation copy in [`_data/i18n/`](../_data/i18n)
 - contact/sender identity in [`_config.yml`](../_config.yml)
+- email setup and type coverage in [docs/EMAIL.md](./EMAIL.md)
 
 If you touch deliverability-sensitive behavior, also sanity-check:
 
@@ -215,6 +221,8 @@ Countdowns, pledge controls, and embed/share-preview state should respect the ef
 ## Best Docs For Specific Work
 
 - Fork config and branding: [docs/CUSTOMIZATION.md](./CUSTOMIZATION.md)
+- Payment processor setup and settlement: [docs/PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md)
+- Email setup and templates: [docs/EMAIL.md](./EMAIL.md)
 - Local dev and merge verification: [docs/TESTING.md](./TESTING.md)
 - Podman setup and limits: [docs/PODMAN.md](./PODMAN.md)
 - Localization model: [docs/I18N.md](./I18N.md)

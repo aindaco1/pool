@@ -158,6 +158,8 @@ See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for the supported no-code cus
 See [docs/SEO.md](docs/SEO.md) for the current SEO fundamentals implementation and supported SEO surface.
 See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) for the current accessibility baseline and verified critical flows.
 See [docs/I18N.md](docs/I18N.md) for the locale model, shared translation sources, and localized route behavior.
+See [docs/PAYMENT_PROCESSOR.md](docs/PAYMENT_PROCESSOR.md) for the Stripe setup, checkout, webhook, settlement, and reconciliation model.
+See [docs/EMAIL.md](docs/EMAIL.md) for the Resend sender setup, email types, localization, and delivery behavior.
 
 Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It covers recent creator-facing changes, including campaign add-ons, hosted embeds, QR/referral links, supporter Blast prep, share-link/social-preview planning, dashboard media uploads, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
 
@@ -231,7 +233,7 @@ npm run podman:doctor
 npm run podman:self-check
 ```
 
-If you want to exercise the on-site Stripe checkout locally, add `STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...` to [`worker/.dev.vars`](worker/.dev.vars) before starting the stack.
+If you want to exercise the on-site Stripe checkout locally, add `STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...` to [`worker/.dev.vars`](worker/.dev.vars) before starting the stack. The full Stripe setup and local webhook flow are documented in [docs/PAYMENT_PROCESSOR.md](docs/PAYMENT_PROCESSOR.md).
 
 For production, use Cloudflare Worker secrets for runtime credentials and GitHub repository secrets for deploy credentials or GitHub Actions automation. GitHub repository secrets do not automatically become Worker runtime secrets, so scoped admin credentials such as `ADMIN_SETTLEMENT_SECRET` and `ADMIN_BROADCAST_SECRET` must be set in Cloudflare too when deployed routes should enforce them. Do not put Stripe secret keys, webhook secrets, Resend keys, Turnstile secrets, USPS client secrets, ZIP.TAX keys, admin secrets, or Cloudflare API tokens in `_config.yml`.
 
@@ -244,7 +246,7 @@ npm run setup:deploy -- --mode=production
 
 It checks `gh`, `wrangler`, and optional Stripe CLI authentication; runs config sync; performs read-only readiness checks where credentials are available; creates or reuses Cloudflare KV namespaces for `VOTES`, `PLEDGES`, and `RATELIMIT`; updates `worker/wrangler.toml` with returned namespace IDs; writes Worker secrets with `wrangler secret put`; writes GitHub repository secrets with `gh secret set`; and can run `wrangler deploy` when passed `--deploy`. Use `--skip-readiness` when you want a narrower dry run that avoids live provider probes.
 
-Resend sender domains must match the configured sender addresses. For this deployment, pledge and update emails use `pool.dustwave.xyz` senders such as `The Pool <pledges@pool.dustwave.xyz>`, so the Resend API key must be authorized for `pool.dustwave.xyz`.
+Resend sender domains must match the configured sender addresses. For this deployment, pledge and update emails use `pool.dustwave.xyz` senders such as `The Pool <pledges@pool.dustwave.xyz>`, so the Resend API key must be authorized for `pool.dustwave.xyz`. See [docs/EMAIL.md](docs/EMAIL.md) for the full email setup and integration guide.
 
 ## Cloudflare Plan Guidance For Forks
 
@@ -398,13 +400,15 @@ See [TESTING.md](docs/TESTING.md) for full testing guide and [SECURITY.md](docs/
 
 See [`docs/`](docs/) for full documentation:
 
-Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md), [CUSTOMIZATION.md](docs/CUSTOMIZATION.md), [SECURITY.md](docs/SECURITY.md), and [TESTING.md](docs/TESTING.md).
+Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md), [CUSTOMIZATION.md](docs/CUSTOMIZATION.md), [PAYMENT_PROCESSOR.md](docs/PAYMENT_PROCESSOR.md), [EMAIL.md](docs/EMAIL.md), [SECURITY.md](docs/SECURITY.md), and [TESTING.md](docs/TESTING.md).
 
 - [CONTRIBUTING.md](docs/CONTRIBUTING.md) — Getting started, setup & contribution guide
 - [CHANGELOG.md](CHANGELOG.md) — Release notes
 - [PODMAN.md](docs/PODMAN.md) — Rootless Podman local dev path for Jekyll + Worker
 - [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) — System architecture
 - [WORKFLOWS.md](docs/WORKFLOWS.md) — Pledge lifecycle, magic links & charge flow
+- [PAYMENT_PROCESSOR.md](docs/PAYMENT_PROCESSOR.md) — Stripe setup, checkout canonicalization, webhooks, settlement, and reconciliation
+- [EMAIL.md](docs/EMAIL.md) — Resend sender setup, transactional/campaign email types, localization, and delivery behavior
 - [DEV_NOTES.md](docs/DEV_NOTES.md) — Development notes, content model & FAQ
 - [TESTING.md](docs/TESTING.md) — Full testing guide & secrets reference
 - [SECURITY.md](docs/SECURITY.md) — Security architecture, rate limiting & pen testing

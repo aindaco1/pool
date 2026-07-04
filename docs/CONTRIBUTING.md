@@ -53,10 +53,12 @@ bundle exec jekyll clean
 1. Root `README.md` — High-level purpose & architecture
 2. `docs/PROJECT_OVERVIEW.md` — How all parts fit together
 3. `docs/WORKFLOWS.md` — Pledge lifecycle, magic links & charge flow
-4. `docs/DEV_NOTES.md` — Integration notes, content model & gotchas
-5. `docs/TESTING.md` — Full testing guide (includes secrets setup)
-6. `docs/ROADMAP.md` — Planned features
-7. `docs/DASHBOARD.md` — Admin dashboard editing and operations
+4. `docs/PAYMENT_PROCESSOR.md` — Stripe setup, checkout, webhooks, settlement, and reconciliation
+5. `docs/EMAIL.md` — Resend setup, email types, localization, and delivery behavior
+6. `docs/DEV_NOTES.md` — Integration notes, content model & gotchas
+7. `docs/TESTING.md` — Full testing guide (includes secrets setup)
+8. `docs/ROADMAP.md` — Planned features
+9. `docs/DASHBOARD.md` — Admin dashboard editing and operations
 
 For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `docs/SECURITY.md`, and `docs/SEO.md`; the admin shell has explicit requirements for keyboard access, Spanish strings, input normalization, and `noindex`.
 
@@ -157,7 +159,7 @@ For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `do
 - **Local custom checkout**: add `STRIPE_PUBLISHABLE_KEY_TEST` to `worker/.dev.vars`
 - **Admin dashboard**: local dev grants bootstrap super-admin access through `ADMIN_BOOTSTRAP_EMAILS` in ignored `worker/.dev.vars`; fork admins should put production access in `_config.yml` `admin.users`, `ADMIN_USERS_JSON`, or the dashboard Users screen. The Users screen saves to KV, not GitHub.
 
-See [TESTING.md](TESTING.md) for full secrets reference.
+See [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md), [EMAIL.md](EMAIL.md), and [TESTING.md](TESTING.md) for the full payment, email, and secrets references.
 
 ---
 
@@ -166,6 +168,7 @@ See [TESTING.md](TESTING.md) for full secrets reference.
 - Secrets live only in GitHub Actions + Cloudflare vars; never in repo
 - The dashboard **Secrets & credentials** section is read-only status. Do not add secret editing or secret persistence to `_config.yml`, campaign YAML, KV user records, or dashboard drafts.
 - Validate Stripe webhook signatures
+- Keep Resend sender domains aligned with `PLEDGES_EMAIL_FROM` and `UPDATES_EMAIL_FROM`
 - Never commit API keys or tokens
 
 ---

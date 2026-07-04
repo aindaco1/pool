@@ -564,6 +564,8 @@ npx wrangler dev --env dev --port 8787
 
 ## 2. Resend Setup
 
+Use [EMAIL.md](./EMAIL.md) as the full email setup and integration reference. This section is the short manual testing path.
+
 ### Create Account & API Key
 
 1. Sign up at [resend.com](https://resend.com)
@@ -602,6 +604,8 @@ curl -X POST 'https://api.resend.com/emails' \
 ---
 
 ## 3. Stripe Setup (Test Mode)
+
+Use [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) as the full Stripe setup, webhook, settlement, and reconciliation reference. This section is the short local test-mode path.
 
 ### Get Test Keys
 
@@ -898,7 +902,8 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 ## 8. Production Checklist
 
 - [ ] Switch Stripe to live keys
-- [ ] Verify the Resend sender domain used by `PLEDGES_EMAIL_FROM` and `UPDATES_EMAIL_FROM` (for this deployment, `pool.dustwave.xyz`)
+- [ ] Review [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for Stripe live keys, webhook secrets, settlement credentials, and reconciliation checks
+- [ ] Verify the Resend sender domain used by `PLEDGES_EMAIL_FROM` and `UPDATES_EMAIL_FROM` (for this deployment, `pool.dustwave.xyz`); see [EMAIL.md](./EMAIL.md)
 - [ ] If launch reminders or admin Turnstile widgets are enabled, verify the public site keys and matching Worker Turnstile secrets are set
 - [ ] Deploy Worker: `wrangler deploy`
 - [ ] Set up Stripe webhook in dashboard → `https://pledge.dustwave.xyz/webhooks/stripe`

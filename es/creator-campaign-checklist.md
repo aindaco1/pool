@@ -37,7 +37,8 @@ La lista cubre:
 
 Esta lista refleja los cambios de la plataforma hasta **v1.0.8**:
 
-- las personas creadoras pueden tener acceso específico al panel para editar campañas sin acceso directo al repositorio
+- las personas creadoras y sus equipos pueden tener acceso específico al panel para preparar campañas, editar contenido, revisar vistas previas, reportes, analytics, marketing y Blast sin acceso directo al repositorio
+- las personas superadministradoras inicializan campañas de solo preview, asignan o crean usuarios de campaña y manejan controles de plataforma; el trabajo diario de preparación queda en manos del equipo asignado
 - las cargas de media en el panel soportan imágenes, video, audio, previews, optimización posterior en el repositorio con variantes WebP responsivas y selección de imágenes existentes en bloques WYSIWYG
 - los add-ons de campaña pueden pertenecer a una sola campaña y contar hacia su meta
 - los correos de reportes pueden recibir ledgers diarios de pledges y exports de fulfillment después de la fecha límite
@@ -147,7 +148,7 @@ La campaña debe explicar rápido:
 
 ## Handoff del panel de administración
 
-The Pool usa un panel privado para la edición normal de campañas y operaciones. Las personas creadoras no necesitan acceso directo al repositorio para los cambios soportados.
+The Pool usa un panel privado para la edición normal de campañas y operaciones. Las personas creadoras no necesitan acceso directo al repositorio para los cambios soportados, y los usuarios de campaña asignados deben tratar el panel como su espacio principal de preparación.
 
 El panel puede gestionar:
 
@@ -164,16 +165,17 @@ Antes del lanzamiento, confirma:
 
 - qué correos del equipo creador deben tener acceso específico a la campaña
 - qué personas revisoras externas, si las hay, deben recibir enlaces de vista previa protegida
-- quién puede publicar cambios de campaña
-- si una administradora de plataforma debe revisar los cambios antes del lanzamiento
+- quién del equipo creador es responsable de publicar cambios de campaña desde el panel
+- si se requiere revisión de plataforma antes del lanzamiento, especialmente para precios, impuestos, envío, inventario o cambios sensibles a proveedores
 - qué campos deben quedarse estables cuando ya existan enlaces públicos, especialmente slug, URL, precios, inventario, envío e impuestos
 
 Notas operativas:
 
+- Una persona superadministradora puede crear una campaña de solo preview con un título, asignar usuarios existentes o crear usuarios nuevos. A partir de ahí, el equipo asignado puede completar la campaña desde el panel. La campaña queda oculta de rutas públicas, embeds, share cards, sitemap y prefetching hasta el lanzamiento.
 - Los IDs nuevos de niveles, artículos, add-ons, decisiones y variantes pueden derivarse del nombre o label en el panel; los IDs heredados deben mantenerse estables.
 - Los borradores del editor son locales hasta que se guarden o publiquen, así que no deben tratarse como fuente de verdad.
 - Publicar cambios de campaña o configuración pasa por el flujo de la plataforma y puede tardar en desplegarse.
-- Los enlaces de vista previa protegida expiran después de 24 horas, pueden regenerarse desde el panel por una persona autorizada y no hacen visible una campaña de solo preview en las rutas públicas.
+- Los enlaces de vista previa protegida expiran después de 24 horas, pueden regenerarse desde el panel por una persona autorizada de la campaña y no hacen visible una campaña de solo preview en las rutas públicas.
 - La gestión de usuarios es separada: los usuarios del panel se guardan en Worker KV y no crean commits en GitHub.
 - El sign-in del panel puede pedir un desafío de Cloudflare Turnstile antes de enviar el magic link por email.
 - Los formularios de recordatorio para campañas próximas también pueden usar Cloudflare Turnstile; las claves y secretos los configuran las personas operadoras de plataforma, no las creadoras.

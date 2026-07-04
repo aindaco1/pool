@@ -28,6 +28,8 @@ All code is versioned and auditable. Campaign editing now flows through the priv
 Super admins can create preview-only campaigns through that same path; those campaigns stay hidden from public campaign routes until launched. Super admins can also archive non-live campaigns through a validated GitHub Actions move into `archive/campaigns/<slug>/`, keeping archived source and media in the repository instead of deleting data. Protected preview reviewer email allowlists live in short-lived Worker KV records instead of campaign Markdown.
 Dashboard media uploads stay source-preserving at the Worker boundary: image/video uploads request the repository optimization workflow after commit, content/diary/Blast publishes remove or reuse same-campaign dashboard-owned media through the shared campaign media rules, and image blocks can select existing campaign media through a read-only GitHub directory picker instead of adding a second media index.
 
+For deeper setup and operations, see [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for the Stripe/settlement model and [EMAIL.md](./EMAIL.md) for the Resend email system.
+
 ## Plan Efficiency Notes For Forks
 
 The current architecture is deliberately optimized so Cloudflare deployments spend their budget on pledge mutations rather than casual browsing:
@@ -76,6 +78,8 @@ For current Cloudflare limits, see:
 ---
 
 ## Funding Flow
+
+See [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for the full Stripe setup, checkout canonicalization, webhook, settlement, and reconciliation runbook. The summary below is the product-level flow.
 
 1. **Visitor pledges** through the first-party cart → Worker creates a setup-mode Stripe Checkout Session, and the existing second checkout sidecar mounts secure Stripe payment UI on-site. One checkout can include items from multiple campaigns. Cart and checkout show subtotal, shipping, sales tax, and optional Dust Wave tip from a shared pricing model.
 2. **Stripe** saves a card through that on-site payment step, returning IDs to the Worker.
@@ -154,9 +158,9 @@ For current Cloudflare limits, see:
 
 1. ✅ Domain: `pool.dustwave.xyz` (CNAME to GitHub Pages).  
 2. ✅ First-party cart runtime enabled in site config and local build.  
-3. ✅ Cloudflare Worker deployed (`pledge.dustwave.xyz`) with Stripe + Worker signing secrets.  
+3. ✅ Cloudflare Worker deployed (`pledge.dustwave.xyz`) with Stripe + Worker signing secrets; see [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md).
 4. ✅ Stripe webhook configured → Worker `/webhooks/stripe`.  
-5. ✅ Repo secrets set: `STRIPE_SECRET_KEY`, `CHECKOUT_INTENT_SECRET`, and admin/email secrets.  
+5. ✅ Repo secrets set: `STRIPE_SECRET_KEY`, `CHECKOUT_INTENT_SECRET`, admin secrets, and Resend secrets; see [EMAIL.md](./EMAIL.md).
 6. ✅ Minute-level Worker scheduler enabled with platform-timezone daily gates — check via `GET /admin/cron/status`.
 7. ✅ Cloudflare cache purge configured (preferred: API token/account ID; legacy email/key auth still works if explicitly configured).  
 8. ✅ Test campaign runs end-to-end in Stripe test mode.

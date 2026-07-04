@@ -46,6 +46,8 @@ Treat [`_config.local.yml`](../_config.local.yml) as a thin override file for lo
 The sync target is [`worker/wrangler.toml`](../worker/wrangler.toml), and the repo’s supported dev/test entry points keep it aligned automatically.
 
 See [CUSTOMIZATION.md](../docs/CUSTOMIZATION.md) for the supported no-code fork surface, including which settings are site-only and which are auto-mirrored to the Worker.
+See [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for Stripe checkout, webhook, settlement, and reconciliation details.
+See [EMAIL.md](./EMAIL.md) for Resend sender setup, email types, localization, and delivery behavior.
 
 Current mirrored Worker values worth treating as part of the supported customization surface:
 
