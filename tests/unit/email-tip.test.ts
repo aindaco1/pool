@@ -205,6 +205,32 @@ describe('supporter email tip breakdowns', () => {
     });
   });
 
+  it('supports release email dry runs without calling Resend', async () => {
+    const fetchMock = mockResend();
+
+    const result = await sendSupporterEmail({
+      ...env,
+      POOL_EMAIL_DRY_RUN: 'true'
+    }, {
+      email: 'supporter@example.com',
+      campaignSlug: 'sunder',
+      campaignTitle: 'sunder',
+      subtotal: 3500,
+      tax: 276,
+      shipping: 300,
+      tipAmount: 210,
+      tipPercent: 6,
+      token: 'magic-token'
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      dryRun: true,
+      to: 'supporter@example.com',
+      subject: 'Pledge confirmed | sunder'
+    });
+  });
+
   it('includes the platform tip line in pledge modified emails', async () => {
     const fetchMock = mockResend();
 

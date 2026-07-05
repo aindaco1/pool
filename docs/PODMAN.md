@@ -164,6 +164,7 @@ The browser helper scripts can now boot against the Podman-backed stack:
 ./scripts/fulfillment-report.sh --podman --local
 npm run test:security:podman
 npm run test:e2e:headless:podman
+npm run release:smoke -- --evidence-file /tmp/pool-release-smoke.md
 ```
 
 Remote production report exports can also run through the worker container. Create a Cloudflare user API token with **Account / Workers KV Storage / Read** access to the account that owns the `PLEDGES` KV namespace, then store it with the account id in an ignored local env file such as `worker/.dev.vars`:
@@ -183,6 +184,8 @@ Run:
 The report wrappers load Cloudflare auth from `.env`, `.env.local`, `.env.cloudflare`, and `worker/.dev.vars`, pass it into `podman exec`, and print progress to stderr so redirected CSV files remain clean.
 
 `./scripts/test-e2e.sh --podman` is now fully automated browser coverage. The dedicated `./scripts/test-checkout.sh --podman` helper remains the manual interactive path when you specifically want to drive a real checkout in your own browser. The automated headless browser suite runs in its own Playwright container and reuses the already-running site/Worker instead of trying to boot Jekyll inside the test container.
+
+The release smoke wrapper uses the same Podman-backed E2E path when Podman is available. Pass `--podman-e2e` to require that phase for release evidence, or `--skip-podman-e2e` only when another logged run already covers the same browser surface.
 
 For focused dashboard browser coverage against the Podman-backed stack, use:
 

@@ -388,6 +388,7 @@ export ADMIN_SECRET="${ADMIN_SECRET:-test-admin-secret}"
 export ADMIN_BOOTSTRAP_EMAILS="${ADMIN_BOOTSTRAP_EMAILS:-admin@example.com}"
 export MAGIC_LINK_SECRET="${MAGIC_LINK_SECRET:-test-magic-link-secret}"
 export RESEND_API_KEY="${RESEND_API_KEY:-re_test_smoke}"
+export POOL_EMAIL_DRY_RUN="${POOL_EMAIL_DRY_RUN:-true}"
 SMOKE_ADMIN_SECRET="${ADMIN_SECRET}"
 
 prefer_current_node_path || true
@@ -405,6 +406,12 @@ run_phase "1. Secret audit" npm run test:secrets
 run_phase "2. Syntax checks" bash -lc '
   node --check worker/src/index.js
   node --check worker/src/stats.js
+  node --check scripts/release-i18n-seo-evidence.mjs
+  node --check scripts/release-pledge-evidence.mjs
+  node --check scripts/release-payment-smoke.mjs
+  node --check scripts/release-provider-checks.mjs
+  node --check scripts/release-screen-reader-evidence.mjs
+  bash -n scripts/release-smoke.sh scripts/release-a11y-evidence.sh
 '
 
 run_phase "3. Focused regression suites" npx vitest run \
@@ -413,6 +420,12 @@ run_phase "3. Focused regression suites" npx vitest run \
   tests/unit/stats-pagination.test.ts
 
 run_phase "4. Full unit suite" npm run test:unit
+
+run_phase "4b. Release evidence command sanity" bash -lc '
+  npm run release:smoke -- --help >/dev/null
+  npm run release:providers -- --help >/dev/null
+  WORKER_URL= WORKER_BASE= SITE_URL= SITE_BASE= npm run release:payment-smoke -- --no-dev-vars
+'
 
 USE_PODMAN_JEKYLL=false
 if prepare_host_jekyll; then
@@ -466,6 +479,7 @@ if [[ -f worker/.dev.vars ]]; then
     grep -q '^ADMIN_SECRET=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "ADMIN_SECRET=${ADMIN_SECRET}"
     grep -q '^ADMIN_BOOTSTRAP_EMAILS=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "ADMIN_BOOTSTRAP_EMAILS=${ADMIN_BOOTSTRAP_EMAILS}"
     grep -q '^RESEND_API_KEY=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "RESEND_API_KEY=${RESEND_API_KEY}"
+    grep -q '^POOL_EMAIL_DRY_RUN=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "POOL_EMAIL_DRY_RUN=${POOL_EMAIL_DRY_RUN}"
     grep -q '^MAGIC_LINK_SECRET=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "MAGIC_LINK_SECRET=${MAGIC_LINK_SECRET}"
     grep -q '^STRIPE_WEBHOOK_SECRET=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}"
   } > worker/.dev.vars
@@ -477,6 +491,7 @@ SITE_BASE=${SITE_BASE}
 ADMIN_SECRET=${ADMIN_SECRET}
 ADMIN_BOOTSTRAP_EMAILS=${ADMIN_BOOTSTRAP_EMAILS}
 RESEND_API_KEY=${RESEND_API_KEY}
+POOL_EMAIL_DRY_RUN=${POOL_EMAIL_DRY_RUN}
 MAGIC_LINK_SECRET=${MAGIC_LINK_SECRET}
 STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
 EOF

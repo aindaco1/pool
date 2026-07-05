@@ -454,6 +454,7 @@ npm run test:security
 Payment-focused checks:
 
 ```bash
+npm run release:payment-smoke -- --no-dev-vars
 npx vitest run \
   tests/unit/checkout-intent.test.ts \
   tests/unit/settlement.test.ts \
@@ -469,6 +470,18 @@ Local full-flow helpers:
 ./scripts/smoke-pledge-management.sh --podman
 ./scripts/check-projections.sh --podman
 ```
+
+For local release evidence that exercises mutable pledge paths without sending email:
+
+```bash
+PAYMENT_SMOKE_ALLOW_MUTATION=1 \
+PAYMENT_SMOKE_WORKER_URL=http://127.0.0.1:8787 \
+PAYMENT_SMOKE_SITE_URL=http://127.0.0.1:4000 \
+POOL_EMAIL_DRY_RUN=true \
+npm run release:payment-smoke -- --local-mutation
+```
+
+The payment smoke refuses production Pool hosts for mutation evidence unless `PAYMENT_SMOKE_ALLOW_PRODUCTION=1` is explicitly set.
 
 Manual Stripe test cards:
 

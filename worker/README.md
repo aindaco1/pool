@@ -592,6 +592,8 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `SUPPORT_EMAIL` | Support contact mirrored from site config |
 | `PLEDGES_EMAIL_FROM` | Sender identity for pledge-related emails; its domain must be authorized in Resend |
 | `UPDATES_EMAIL_FROM` | Sender identity for update / milestone / Blast / announcement emails; its domain must be authorized in Resend |
+| `POOL_EMAIL_DRY_RUN` | Optional no-send release evidence mode for supporter/update emails; truthy values skip the Resend request and return a dry-run id |
+| `RESEND_EMAIL_DRY_RUN` | Compatibility alias for no-send Resend evidence mode |
 | `EMAIL_LOGO_PATH` | Supporter-email logo path mirrored from `platform.logo_path` |
 | `EMAIL_FONT_FAMILY` | Supporter-email body font stack mirrored from `design.font_body` |
 | `EMAIL_HEADING_FONT_FAMILY` | Supporter-email heading font stack mirrored from `design.font_display` |

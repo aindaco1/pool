@@ -2,19 +2,6 @@
 
 Use this checklist before merging branches that change checkout, webhook persistence, pledge management, inventory, settlement, or supporter broadcasts.
 
-This version is tuned for the current checkout and Worker business-logic behavior on `main`.
-
-## Scope For This Branch
-
-These behaviors changed intentionally and should **not** be treated as regressions during smoke testing:
-
-- Magic links are order-scoped instead of email-scoped.
-- `/checkout-intent/start` now reserves scarce limited inventory before payment confirmation, and successful persistence confirms that reservation.
-- Legacy `GET /checkout` is disabled.
-- Settlement only marks a campaign fully settled when no active pledges were skipped.
-- Campaigns -> Marketing now includes browser-local QR download tools, and Campaigns -> Blast contains supporter email blast drafting/sending tools for each campaign.
-- Custom first-party checkout can queue a consent-based abandoned-checkout reminder; the field should be absent from checkout payloads unless the supporter opted in.
-
 ## Environment
 
 Set these for the operator shell before starting:
@@ -66,6 +53,14 @@ npm run setup:deploy -- --mode=production --dry-run --skip-auth --skip-secrets
 ```
 
 Use `--skip-readiness` for a narrow local-only rehearsal, or leave readiness enabled when you want the helper to perform read-only GitHub, Wrangler, Stripe, Resend, USPS, and ZIP.TAX checks with whatever provider credentials are available. The unit suite also includes fake-CLI coverage for the setup helper, so merge-gate testing should catch regressions in dry-run planning, KV reuse/create behavior, local secret generation, and generated Worker secret writes before live smoke.
+
+For release sign-off, capture the combined evidence wrapper output:
+
+```bash
+npm run release:smoke -- --evidence-file /tmp/pool-release-smoke.md
+```
+
+Use focused reruns such as `npm run release:a11y-evidence`, `npm run release:i18n-seo-evidence`, `npm run release:pledge-evidence`, `npm run release:providers -- --no-dev-vars`, and `npm run release:payment-smoke -- --no-dev-vars` when a release note needs narrower evidence.
 
 Recommended local setup for modify/cancel smoke:
 

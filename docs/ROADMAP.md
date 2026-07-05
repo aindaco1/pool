@@ -4,7 +4,7 @@
 
 **v1.0.8**
 
-The v1.0.8 milestone ports the Store-derived runtime hardening that fits this project, keeps Marketing reads lazy and authenticated, remembers admin dashboard tab/subtab context in browser-local state, adds locale completeness checks so supported translation catalogs stay aligned, and brings Store's generated-site SEO audit pattern into Pool's merge gate.
+The v1.0.8 milestone ports the Store-derived runtime hardening that fits this project, keeps Marketing reads lazy and authenticated, remembers admin dashboard tab/subtab context in browser-local state, adds locale completeness checks so supported translation catalogs stay aligned, brings Store's generated-site SEO audit pattern into Pool's merge gate, and adapts Store's release-evidence tooling to Pool's campaign/pledge model.
 
 ## Completed
 
@@ -203,6 +203,12 @@ The v1.0.8 milestone ports the Store-derived runtime hardening that fits this pr
 - [x] Quality checks
   - Vitest unit coverage, Playwright E2E coverage, merge-gate checks, and local smoke coverage
   - Admin dashboard browser coverage spans `/admin/`, `/es/admin/`, Settings, Add-ons, Campaigns, Analytics, Reports, Supporters, Marketing, and Users
+  - Merge-gate sanity checks cover release script syntax plus `release:smoke`, provider evidence, and payment smoke command surfaces without sending email
+- [x] Release evidence automation
+  - `npm run release:smoke` wraps premerge, setup/deploy readiness dry run, Podman E2E when available, focused accessibility evidence, optional screen-reader transcript evidence, rendered i18n/SEO evidence, pledge/report evidence, provider readiness, and payment smoke readiness
+  - focused commands cover accessibility, rendered i18n/SEO, pledge/report, provider readiness, payment smoke, and optional VoiceOver/Whisper transcript evidence
+  - the Release Provider Evidence GitHub Actions workflow provides strict Cloudflare DNS API evidence through dedicated DNS-read secrets
+  - `POOL_EMAIL_DRY_RUN` / `RESEND_EMAIL_DRY_RUN` let release evidence render email payloads without calling Resend
 - [x] Public performance
   - public pages load a lightweight cart-runtime loader first and defer the full cart stack until persisted cart state, recovery state, or clear supporter intent requires it
   - same-origin public document prefetching follows a small local intent model with route allowlists, sensitive-query exclusions, network guards, low per-page limits, and a default-enabled config surface
@@ -212,6 +218,7 @@ The v1.0.8 milestone ports the Store-derived runtime hardening that fits this pr
   - axe-backed critical-surface coverage
   - broader browser accessibility coverage across campaign, community, pledge-result, About, and Terms states
   - shared public shells keep skip links and stable `main-content` anchors, and the cart trigger exposes clearer accessible labels and expanded state
+  - release evidence checks campaign pledge focus order, launch-reminder live status updates, reduced-motion campaign cart surfaces, high-zoom behavior, keyboard paths, and mobile overflow
 - [x] Design system and responsive layout
   - shared tokens, typography, buttons, fields, card shells, stacked sections, responsive surfaces, tab lists, pill states, media-object grids, quantity steppers, and primary action buttons
   - public pages, campaign pages, cart / checkout, Manage Pledge, Update Card, community pages, and long-form content use the same layout and responsive patterns instead of parallel styling
@@ -241,6 +248,7 @@ The v1.0.8 milestone ports the Store-derived runtime hardening that fits this pr
   - public metadata emits language/app-name hints, secure social-image tags where possible, and locale-aware JSON-LD language/breadcrumb roots
   - sitemap URL rendering is shared through `_includes/seo-sitemap-url.xml`, including localized `xhtml:link` alternates for localized public pages and campaign pages
   - `npm run test:seo` validates built crawl files, canonicals, hreflang alternates, social metadata, and JSON-LD as part of the merge gate
+  - release i18n/SEO evidence samples rendered English and Spanish public pages, active campaign metadata, private-route noindex shells, sitemap alternates, robots boundaries, and route copy
 - [x] Embeds and share previews
   - campaign pages link to a hosted locale-aware embed builder that generates copy-paste iframe code with layout, theme, media, and CTA options
   - the embed widget uses live Worker-backed campaign state, auto-resizes after paste, and supports localized return links plus localized builder/runtime copy
@@ -274,6 +282,12 @@ The v1.0.8 milestone ports the Store-derived runtime hardening that fits this pr
 
 ## Future Features
 
+- [ ] Cross-repo parity and docs-as-code discipline
+  - Treat Store and Pool feature parity as transferable implementation slices, not a mandate to copy product surfaces. Shared slices include setup/readiness, media authoring, performance gates, security posture, admin audit/session controls, accessibility evidence expansions, i18n QA, SEO sampling expansions, release smoke hardening, payment reconciliation, backup discipline, tax-provider hardening, and add-on price-resolution rules
+  - Keep Pool-specific nouns and storage boundaries intact: `_campaigns/`, pledge/order records, `PLEDGES`, `VOTES`, per-campaign Durable Object coordination, platform/campaign add-ons, protected campaign previews, Manage Pledge, supporter community/votes, embeds/share cards, campaign diaries, Blast, launch reminders, abandoned-checkout reminders, and the Pool admin dashboard
+  - When Store lands a stronger implementation first, port only the reusable primitive and document the Pool mapping in the relevant Pool docs; for example, Store product/default media selection maps to Pool campaign/default media selection, not to Store's `_products` catalog, R2 download library, coupons, ticket/RSVP, or order lookup surfaces
+  - When Pool lands a stronger implementation first, keep regression notes that help Store adopt the primitive without changing Pool behavior or weakening campaign/pledge semantics
+  - Keep docs-as-code current by updating the owning document and tests with each slice, not only this roadmap, so README, `worker/README.md`, and the relevant `docs/*.md` files match the implemented source of truth
 - [ ] Guided setup TUI wrapper
   - Build a thin, good-looking terminal UI around the existing `scripts/setup-deploy.mjs` setup core instead of creating a separate desktop app or duplicating provider logic
   - Take interface cues from modern terminal-first tools such as [Hermes Agent CLI](https://hermes-agent.nousresearch.com/docs/user-guide/cli) and [Amp CLI](https://ampcode.com/manual): clear status area, responsive progress, keyboard-friendly navigation, streaming task output, interrupt/retry affordances, and a polished command palette feel
@@ -308,13 +322,14 @@ The v1.0.8 milestone ports the Store-derived runtime hardening that fits this pr
   - Add an admin session/device review view with recent login metadata and explicit session revocation, using the existing admin auth/session/audit model rather than a separate account system
   - Expand admin audit events into a searchable dashboard audit view with filters and CSV export, reusing existing KV-backed audit records and keeping sensitive payloads redacted
   - Add scheduled secret/config posture checks that warn when production-required secrets, webhook endpoints, allowed origins, provider readiness, or admin user posture drift from expected config; surface results through admin diagnostics and/or GitHub issues instead of silently mutating runtime state
-  - Add release-artifact support for the documented manual VoiceOver and NVDA pass, including checklist evidence for public campaign pages, cart/checkout, Manage Pledge, creator dashboard editing, reports, and admin auth flows
-  - Expand automated accessibility coverage to mounted checkout/payment surfaces when Stripe test fixtures are available, plus high-zoom screenshots for cart, checkout, Manage Pledge, campaign editing, reports, supporter tables, and campaign embed builder controls
+  - Expand release-artifact support beyond the optional VoiceOver/Whisper helper to the documented manual VoiceOver and NVDA pass, including checklist evidence for public campaign pages, cart/checkout, Manage Pledge, creator dashboard editing, reports, and admin auth flows
+  - Expand automated accessibility coverage beyond the current campaign focus/status/reduced-motion release evidence to mounted checkout/payment surfaces when Stripe test fixtures are available, plus high-zoom screenshots for cart, checkout, Manage Pledge, campaign editing, reports, supporter tables, and campaign embed builder controls
+  - Keep long campaign titles, tier/add-on/variant labels, filenames, referral/UTM labels, supporter emails/names, Blast subjects, and dense tablet/mobile admin rows in regression fixtures so layout hardening covers real creator/admin content
   - Move remaining hardcoded public/admin runtime strings into `_data/i18n/*` or runtime message JSON as they are touched, and add localized QA snapshots for checkout errors, Manage Pledge, campaign creation/editing, report downloads, Blast sends, and fulfillment/status copy
   - Define a translator/native-speaker review loop before adding locales beyond English and Spanish, including localized campaign metadata, alternate links, JSON-LD language values, emails, and dashboard help text
   - Keep Podman smoke coverage aligned with the host merge gate, add troubleshooting notes for stale `gvproxy`, port conflicts, and first-run image rebuilds if they recur, and consider a scheduled Podman E2E CI job if runner support remains reliable
-  - Add rendered SEO QA samples for active campaigns and localized campaign pages, including canonical URLs, alternate links, Open Graph/Twitter tags, JSON-LD, share-card URLs, sitemap inclusion, and noindex handling for admin, preview, Manage Pledge, checkout, and supporter-only routes
-  - Add a dedicated release smoke script and evidence checklist for paid physical pledges, digital-only pledges, platform and campaign add-ons, Manage Pledge modify/cancel/update-card paths, launch reminders, abandoned-checkout reminders, supporter email blasts, settlement, pledge/fulfillment reports, analytics, and admin downloads
+  - Expand rendered SEO QA beyond the current release samples with more active campaigns, localized campaign pages, share-card URL checks, and noindex handling for preview, checkout, and supporter-only routes
+  - Expand the dedicated release smoke script and evidence checklist beyond the current pledge/report/payment/provider baseline for paid physical pledges, digital-only pledges, platform and campaign add-ons, Manage Pledge modify/cancel/update-card paths, launch reminders, abandoned-checkout reminders, supporter email blasts, settlement, pledge/fulfillment reports, analytics, and admin downloads
   - Update `docs/PERFORMANCE.md`, `docs/SECURITY.md`, `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `docs/PODMAN.md`, `docs/SEO.md`, `docs/TESTING.md`, `docs/DASHBOARD.md`, and `docs/WORKFLOWS.md` as each hardening slice lands so the release procedure stays docs-as-code rather than tribal knowledge
 - [ ] Payment integrity hardening from the Fintech Engineering Handbook
   - Keep the current architecture: Stripe remains the processor, Stripe owns card data, the Cloudflare Worker remains the canonical payment boundary, KV remains pledge/projection storage, Durable Objects serialize scarce inventory and settlement, and the Worker scheduler handles bounded background work

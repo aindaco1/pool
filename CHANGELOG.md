@@ -12,6 +12,11 @@ Release scope:
 - Added template regression coverage that scans layouts/includes for local first-party scripts missing the Rocket Loader opt-out.
 - Moved Vitest config files to ESM `.mts` modules and updated scripts/Jekyll excludes to avoid Vite's deprecated CJS Node API path.
 - Added a generated-site SEO audit (`npm run test:seo`) adapted from Store, wired it into the merge gate, and moved sitemap URL rendering into a shared include that emits localized hreflang alternates.
+- Adapted release-evidence tooling for Pool with `release:smoke`, focused accessibility, rendered i18n/SEO, pledge/report evidence, provider readiness, payment smoke, and optional screen-reader transcript commands.
+- Added a Release Provider Evidence GitHub Actions workflow for strict Cloudflare DNS evidence through a dedicated DNS-read token.
+- Added Pool no-send email dry-run support through `POOL_EMAIL_DRY_RUN` / `RESEND_EMAIL_DRY_RUN` so release smokes can render supporter/report/admin email payloads without calling Resend.
+- Added Pool-specific release accessibility evidence for campaign pledge focus order, launch-reminder live status updates, and reduced-motion campaign cart surfaces.
+- Integrated release evidence command sanity into the merge gate and enabled Pool email dry-run mode for local/CI merge smoke runs.
 - Added mobile metadata/CSS polish from Store so public, admin, manage, community, embed, preview, and pledge-result document heads opt out of automatic phone/date/address/email detection while shared controls inherit the current theme consistently.
 - Updated the admin settings request to send the current preferred language, keeping Pool's existing client-side i18n row normalization ready for Worker-side schema localization.
 

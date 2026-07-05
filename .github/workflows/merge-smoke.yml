@@ -24,6 +24,7 @@ jobs:
       ADMIN_SECRET: test-admin-secret
       MAGIC_LINK_SECRET: test-magic-link-secret
       RESEND_API_KEY: re_test_smoke
+      POOL_EMAIL_DRY_RUN: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v6

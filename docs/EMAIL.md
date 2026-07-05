@@ -333,7 +333,10 @@ Useful broader checks:
 npm run test:unit
 npm run test:i18n
 npm run test:secrets
+npm run release:payment-smoke -- --no-dev-vars
 ```
+
+For release evidence that should render email payloads without calling Resend, set `POOL_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`. The shared send path returns a dry-run id and skips the provider request, which lets pledge, report, launch-reminder, abandoned-checkout, and Blast-adjacent smoke checks prove payload construction without sending mail.
 
 Manual smoke:
 

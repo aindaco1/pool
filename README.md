@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.0.8**. The v1.0.7 release shipped abandoned-checkout visibility, setup/deploy hardening, shared Marketing/Blast draft support, referral/UTM reporting, and a campaign-scoped WYSIWYG media picker. v1.0.8 focuses on Store-derived runtime hardening, lazy authenticated Marketing reads, remembered admin dashboard tab/subtab context, stronger locale completeness checks, and generated-site SEO/crawl validation.
+Current release milestone: **v1.0.8**. The v1.0.7 release shipped abandoned-checkout visibility, setup/deploy hardening, shared Marketing/Blast draft support, referral/UTM reporting, and a campaign-scoped WYSIWYG media picker. v1.0.8 focuses on Store-derived runtime hardening, lazy authenticated Marketing reads, remembered admin dashboard tab/subtab context, stronger locale completeness checks, generated-site SEO/crawl validation, and Pool-specific release evidence automation.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -301,6 +301,12 @@ One deployment nuance: Cloudflare's configurable `limits` block is only enforced
 ```bash
 npm run test:premerge  # Syntax + full/focused regressions + first-party build checks + local smoke + security + headless E2E
 npm run test:secrets   # Secret exposure audit against local env files, tracked files, and git history
+npm run release:smoke -- --evidence-file /tmp/pool-release-smoke.md # Release sign-off wrapper
+npm run release:a11y-evidence # Focused campaign/cart accessibility evidence
+npm run release:i18n-seo-evidence # Rendered i18n/SEO evidence over built _site
+npm run release:pledge-evidence # Worker-backed pledge/report evidence
+npm run release:providers -- --no-dev-vars # Read-only external provider readiness
+npm run release:payment-smoke -- --no-dev-vars # Payment contract and no-send smoke evidence
 npm run test:unit      # Unit tests (Vitest)
 npm run test:e2e       # E2E tests (Playwright) — fully automated browser coverage
 npm run test:e2e:headless # CI-style automated browser suite
@@ -315,6 +321,8 @@ npm run media:optimize:check # Check uploaded media for pending optimization/der
 npm run media:optimize:check:podman # Same media check inside the Podman toolchain
 npm test               # Run unit + e2e
 ```
+
+For production release sign-off, prefer `npm run release:smoke -- --evidence-file /tmp/pool-release-smoke.md`. It wraps the merge gate, setup/deploy readiness dry run, Podman E2E when available, focused accessibility evidence, rendered i18n/SEO evidence, pledge/report evidence, provider checks, and payment smoke readiness. Use the `--skip-*` flags only when the skipped item is covered by separate evidence in the release notes.
 
 Local reporting:
 ```bash
@@ -492,6 +500,7 @@ Required GitHub repository secrets for automatic Worker deployment:
 - `ADMIN_SECRET` for the post-deploy diary check
 - optional `ADMIN_BROADCAST_SECRET` for the post-deploy diary check when the Worker uses scoped broadcast credentials
 - optional `CLOUDFLARE_CACHE_PURGE_TOKEN` with zone cache-purge permissions if you want cache purging to use a token narrower than the deploy token. This is recommended; otherwise the deploy token must also be allowed to purge cache.
+- optional `CLOUDFLARE_DNS_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_ZONE` for the Release Provider Evidence workflow. The DNS token should be read-only with Zone / DNS / Read for the production zone.
 - optional `DIARY_CHECK_BYPASS_SECRET` if Cloudflare WAF challenges the post-deploy diary check
 
 For a guided first-time setup, run:

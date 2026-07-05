@@ -537,6 +537,15 @@ function buildResendPayload(env, payload) {
   };
 }
 
+function emailDryRunValueEnabled(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  return raw === '1' || raw === 'true';
+}
+
+function emailDryRunEnabled(env = {}) {
+  return emailDryRunValueEnabled(env.POOL_EMAIL_DRY_RUN) || emailDryRunValueEnabled(env.RESEND_EMAIL_DRY_RUN);
+}
+
 function summarizeProviderError(raw) {
   const text = String(raw || '').replace(/\s+/g, ' ').trim();
   if (!text) return '';
@@ -558,13 +567,23 @@ function summarizeProviderError(raw) {
 }
 
 async function sendResendEmail(env, payload, { errorLabel = 'Resend error', failureLabel = 'Failed to send email' } = {}) {
+  const preparedPayload = buildResendPayload(env, payload);
+  if (emailDryRunEnabled(env)) {
+    return {
+      id: `email_dry_run_${Date.now()}`,
+      dryRun: true,
+      to: preparedPayload.to,
+      subject: preparedPayload.subject
+    };
+  }
+
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${env.RESEND_API_KEY}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(buildResendPayload(env, payload))
+    body: JSON.stringify(preparedPayload)
   });
 
   if (!response.ok) {
@@ -574,7 +593,7 @@ async function sendResendEmail(env, payload, { errorLabel = 'Resend error', fail
     throw new Error(`${failureLabel}: ${response.status}${error ? ` (${error})` : ''}`);
   }
 
-  return response.json();
+  return response.json().catch(() => ({}));
 }
 
 export async function sendAdminLoginEmail(env, { email, loginUrl, lang }) {
