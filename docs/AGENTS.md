@@ -8,6 +8,7 @@ Use this alongside:
 - [docs/CUSTOMIZATION.md](./CUSTOMIZATION.md) for the supported fork-facing config surface
 - [docs/PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for Stripe setup, checkout canonicalization, webhooks, settlement, and reconciliation
 - [docs/EMAIL.md](./EMAIL.md) for Resend setup, sender identity, email templates, localization, and delivery behavior
+- [docs/ETHICAL_RISK.md](./ETHICAL_RISK.md) for ethical risk review prompts around data, money, messaging, automation, public sharing, and admin power
 - [docs/TESTING.md](./TESTING.md) for local verification and merge-gate expectations
 - [docs/I18N.md](./I18N.md) for locale routing and translation rules
 - [docs/SEO.md](./SEO.md) for metadata, share cards, and indexing behavior
@@ -218,6 +219,10 @@ Protected campaign previews are also private. Preview-only campaigns should stay
 
 Countdowns, pledge controls, and embed/share-preview state should respect the effective campaign state, especially after deadlines.
 
+### 8. Ethical risk review belongs with product changes
+
+If a change affects money, data collection, supporter messaging, admin power, analytics, automation, public visibility, or shareability, run the [Ethical Risk review](./ETHICAL_RISK.md) while the implementation is still easy to adjust. Do not treat ethical abuse cases as separate from security, accessibility, or product correctness.
+
 ## Best Docs For Specific Work
 
 - Fork config and branding: [docs/CUSTOMIZATION.md](./CUSTOMIZATION.md)
@@ -232,6 +237,7 @@ Countdowns, pledge controls, and embed/share-preview state should respect the ef
 - Add-on product model: [docs/ADD_ON_PRODUCTS.md](./ADD_ON_PRODUCTS.md)
 - Dashboard/editor flow: [docs/DASHBOARD.md](./DASHBOARD.md)
 - Security posture and guardrails: [docs/SECURITY.md](./SECURITY.md)
+- Ethical risk review: [docs/ETHICAL_RISK.md](./ETHICAL_RISK.md)
 - Release/merge checklist mindset: [docs/MERGE_SMOKE_CHECKLIST.md](./MERGE_SMOKE_CHECKLIST.md)
 
 ## Good LLM Behavior In This Repo
@@ -242,6 +248,7 @@ If you are an LLM helping with this codebase:
 - prefer small, local edits that preserve established patterns
 - update tests when behavior changes
 - keep public-site, Worker, email, and i18n consequences in mind together
+- check ethical risk when changing data use, money, messaging, admin permissions, automation, public sharing, or attention mechanics
 - avoid inventing new config surfaces when an existing one already fits
 - prefer repo-relative documentation links, not machine-specific paths
 - do not silently drop locale support, embed behavior, or share-preview behavior while changing campaign pages

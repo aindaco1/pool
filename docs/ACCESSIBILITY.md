@@ -10,6 +10,7 @@ The current accessibility priorities are:
 - improve ARIA semantics and keyboard behavior on interactive surfaces
 - avoid introducing security regressions, especially around the on-site Stripe checkout flow
 - add automated checks for critical journeys instead of relying only on manual review
+- review how changes affect different user groups, including localized users, keyboard-only users, screen-reader users, mobile users, and supporters under time or money pressure
 
 ## Current Baseline
 
@@ -89,6 +90,7 @@ Accessibility changes should preserve these constraints:
 - do not add long-lived browser persistence for accessibility state
 - do not weaken CSP or checkout hardening to support convenience behavior
 - prefer native elements and low-risk semantic improvements over custom widgets
+- avoid interaction patterns that pressure users into pledging, tipping, accepting reminders, or sharing before they understand cost, consent, and state
 
 ## Admin Dashboard Model
 

@@ -101,6 +101,7 @@ Treat any of these as merge blockers:
 - a single magic link can still enumerate or modify another order
 - settlement marks a campaign complete while active pledges still need attention
 - milestone, diary, or announcement sends miss supporters or duplicate unexpectedly
+- a money, data, messaging, admin, automation, public sharing, or indexing change skips the required [Ethical Risk review](./ETHICAL_RISK.md)
 
 ## Checklist
 
@@ -288,6 +289,7 @@ Smoke completed on <date> in <staging|local>.
 - Limited inventory behavior: pass
 - Threshold gating: pass
 - Settlement dry/live: pass
+- Ethical Risk review: pass / not applicable
 - Backfill: pass
 - Broadcast pagination/milestones: pass
 - Admin dashboard smoke, if relevant: pass

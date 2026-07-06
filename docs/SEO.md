@@ -8,6 +8,7 @@ This document describes The Pool's current SEO model in 2026. It is intentionall
 - keep the fork-facing SEO surface small and trustworthy
 - preserve accessibility, privacy, and security boundaries
 - avoid SEO tactics that create thin, misleading, or junk content
+- apply the [Ethical Risk review](./ETHICAL_RISK.md) before changing metadata, share cards, public indexing, or social distribution in ways that could misstate campaign status, scarcity, deadlines, or private access
 
 ## Current Implementation
 

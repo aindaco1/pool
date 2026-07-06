@@ -180,6 +180,18 @@ Stateless HMAC-signed tokens (no database needed):
 
 Each token only authorizes its own order. A valid link no longer grants email-wide access to every pledge on the same address, and a valid token without a real backing pledge now fails closed instead of returning a synthetic placeholder.
 
+## Supporter Trust Boundaries
+
+The pledge lifecycle should remain understandable to a supporter who never reads the code. Use [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a workflow change affects data collection, money, reminders, campaign visibility, admin power, or public sharing.
+
+Trust-sensitive workflow rules:
+
+- Browser UI can preview and explain state, but the Worker must canonicalize money, inventory, permissions, and persistence.
+- Supporters should be able to distinguish estimated vs final tax/shipping, draft vs committed pledge state, active vs closed campaigns, and reminder signup vs required checkout steps.
+- Email reminders and campaign updates should be opt-in or pledge-scoped, deduped, suppressible where appropriate, and sent through dry-run-aware paths.
+- Private, tokenized, preview, admin, and supporter-only routes should not become indexable, prefetched, or share-card targets.
+- Bulk or automated workflows should have bounded batches, audit records, idempotency, and operator evidence before live sends or mutations.
+
 ---
 
 ## Worker API Routes

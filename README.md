@@ -408,7 +408,7 @@ See [TESTING.md](docs/TESTING.md) for full testing guide and [SECURITY.md](docs/
 
 See [`docs/`](docs/) for full documentation:
 
-Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md), [CUSTOMIZATION.md](docs/CUSTOMIZATION.md), [PAYMENT_PROCESSOR.md](docs/PAYMENT_PROCESSOR.md), [EMAIL.md](docs/EMAIL.md), [SECURITY.md](docs/SECURITY.md), and [TESTING.md](docs/TESTING.md).
+Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md), [CUSTOMIZATION.md](docs/CUSTOMIZATION.md), [PAYMENT_PROCESSOR.md](docs/PAYMENT_PROCESSOR.md), [EMAIL.md](docs/EMAIL.md), [SECURITY.md](docs/SECURITY.md), [ETHICAL_RISK.md](docs/ETHICAL_RISK.md), and [TESTING.md](docs/TESTING.md).
 
 - [CONTRIBUTING.md](docs/CONTRIBUTING.md) — Getting started, setup & contribution guide
 - [CHANGELOG.md](CHANGELOG.md) — Release notes
@@ -420,6 +420,7 @@ Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT
 - [DEV_NOTES.md](docs/DEV_NOTES.md) — Development notes, content model & FAQ
 - [TESTING.md](docs/TESTING.md) — Full testing guide & secrets reference
 - [SECURITY.md](docs/SECURITY.md) — Security architecture, rate limiting & pen testing
+- [ETHICAL_RISK.md](docs/ETHICAL_RISK.md) — Ethical risk review prompts for data, money, messaging, admin, sharing, and automation changes
 - [ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — Accessibility standards, critical surfaces, and current coverage
 - [CUSTOMIZATION.md](docs/CUSTOMIZATION.md) — Supported fork-facing branding, pricing, and design overrides
 - [EMBEDS.md](docs/EMBEDS.md) — Hosted campaign widget routes, options, localization, and resize model

@@ -2,6 +2,8 @@
 
 This document covers the security architecture, known risks, applied hardening measures, accepted tradeoffs, and penetration testing procedures for The Pool crowdfunding platform.
 
+Use this alongside [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a change creates new data use, supporter messaging, admin power, public sharing, automation, or engagement pressure. Security review should cover not only credential compromise and code injection, but also realistic misuse by spammers, harassers, fraudsters, careless admins, and overly aggressive growth workflows.
+
 ## Security Architecture
 
 ### Authentication Mechanisms
@@ -99,6 +101,23 @@ Settlement serialization is also Durable Object-backed. The `SETTLEMENT_COORDINA
 ---
 
 ## Applied Hardening Notes
+
+### Ethical Abuse And Misuse Review
+
+The Pool's highest-impact abuse cases often cross product, security, privacy, and trust boundaries. Run the [Ethical Risk review](./ETHICAL_RISK.md) before shipping features that change:
+
+- public discoverability, embeds, social previews, SEO metadata, referral links, or QR codes
+- supporter email, reminders, Blast, diary/milestone broadcasts, preview invitations, or report delivery
+- checkout totals, tips, taxes, shipping, inventory scarcity, settlement, or pledge modification
+- admin roles, campaign scope, protected previews, campaign creation/archive, media upload, or GitHub-backed publishing
+- analytics, provider plan usage, exports, backups, restore behavior, or new third-party data flows
+
+Security sign-off should answer the same practical questions each time:
+
+- What data becomes easier to collect, infer, export, or expose?
+- Which private/tokenized state could accidentally become indexed, prefetched, shared, or emailed?
+- How could a malicious actor use this surface for spam, harassment, fraud, doxxing, payment abuse, or misleading public claims?
+- What explicit consent, scoping, rate limiting, audit logging, no-store/noindex behavior, dry-run validation, or recovery path keeps the risk bounded?
 
 ### Secret Storage Boundaries
 
@@ -576,6 +595,8 @@ openssl rand -base64 32
 ## Penetration Testing
 
 See [tests/security/README.md](../tests/security/README.md) for the pen test suite.
+
+For product-abuse review, pair the security suite with the Ethical Risk checklist. Red-team at least one malicious or careless-operator scenario for any feature that can send messages, change money, expose data, publish public content, or alter admin permissions.
 
 Run security tests:
 ```bash

@@ -403,6 +403,7 @@ The dashboard follows these project rules:
 - Role and campaign scoping are enforced server-side.
 - Secrets are never stored in `_config.yml`, campaign YAML, dashboard drafts, KV user records, or GitHub commits.
 - Preview access emails are stored only in short-lived Worker KV allowlists, not in campaign Markdown, public JSON, sitemap output, or generated page metadata.
+- Changes that add bulk messaging, marketing distribution, analytics, role changes, public visibility, or new data retention should include the [Ethical Risk review](./ETHICAL_RISK.md).
 - Shared admin label/help components should be used for new fields.
 - Hidden editor chrome should not be keyboard-reachable.
 - Sortable tables should expose `aria-sort`.

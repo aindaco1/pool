@@ -17,7 +17,7 @@ If you specifically work from the `worker/` directory, the Worker npm scripts no
 
 Treat `_config.local.yml` as an override-only file for localhost-specific values. The canonical fork-facing settings should live in the repo-root `_config.yml`, and the Worker mirror will follow from there.
 
-Use [`docs/PAYMENT_PROCESSOR.md`](../docs/PAYMENT_PROCESSOR.md) for Stripe setup, checkout, webhook, settlement, and reconciliation details. Use [`docs/EMAIL.md`](../docs/EMAIL.md) for Resend sender setup, email types, localization, and delivery behavior.
+Use [`docs/PAYMENT_PROCESSOR.md`](../docs/PAYMENT_PROCESSOR.md) for Stripe setup, checkout, webhook, settlement, and reconciliation details. Use [`docs/EMAIL.md`](../docs/EMAIL.md) for Resend sender setup, email types, localization, and delivery behavior. Use [`docs/ETHICAL_RISK.md`](../docs/ETHICAL_RISK.md) before adding Worker behavior that changes money, data collection, messaging, automation, public sharing, analytics, or admin power.
 
 Campaign-runner report delivery follows that same pattern:
 

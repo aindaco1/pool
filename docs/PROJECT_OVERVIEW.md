@@ -177,6 +177,7 @@ See [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for the full Stripe setup, ch
 - **Automation over ops:** GitHub Actions perform all time-based events.  
 - **Open handoff:** Campaign and platform state remains reviewable as Markdown/YAML, even when routine edits happen through the dashboard.
 - **Design consistency:** Uses the same visual language as dust-wave-shop for brand coherence.
+- **Risk-aware stewardship:** Product changes that affect money, data, messaging, automation, public visibility, or admin power should include the [Ethical Risk review](./ETHICAL_RISK.md) while tradeoffs are still easy to change.
 
 ## Critical Learnings
 

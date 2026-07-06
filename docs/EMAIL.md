@@ -291,6 +291,19 @@ Supporter confirmation failures enqueue:
 
 The scheduler drains retry work only when due. Resend pacing is centralized as `RESEND_RATE_LIMIT_DELAY_MS` in `worker/src/email.js` and is reused by broadcasts, reports, launch reminders, abandoned-checkout reminders, and Blast.
 
+## Consent And Trust
+
+Email changes should follow the [Ethical Risk review](./ETHICAL_RISK.md) when they add new audiences, triggers, reminders, reports, or marketing surfaces.
+
+Rules:
+
+- Send supporter communications only from an explicit pledge, explicit signup, admin-authorized campaign scope, or documented operational need.
+- Keep launch reminders and abandoned-checkout reminders opt-in, bounded, deduped, and suppressible.
+- Run dry-run or no-send evidence before new bulk-send paths.
+- Do not use urgency, scarcity, or personalization in a way that misrepresents campaign state, inventory, deadlines, tax, shipping, fees, or pledge totals.
+- Keep plain-text bodies, localized links, sender identity, and support/reply-to behavior understandable without requiring the recipient to inspect HTML.
+- Treat Blast, diary, milestone, preview, and assignment emails as trust-sensitive surfaces; review who receives them, what data they reveal, and how a mistaken send can be contained.
+
 ## Copy And Localization
 
 Human-facing copy should stay short, direct, and localizable.

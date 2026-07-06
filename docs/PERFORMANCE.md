@@ -11,6 +11,7 @@ This guide covers the current platform performance model, the knobs forks can tu
 - avoid loading checkout, cart, admin, or management code until the user expresses intent
 - keep public pages crawlable and functional without relying on JavaScript for core content
 - never speculate on private, tokenized, checkout, admin, or supporter routes
+- avoid performance or prefetch behavior that pressures user action, hides state, or creates background traffic for flows users did not intend
 - make performance features configurable from `_config.yml` and the admin dashboard where forks may need different traffic tradeoffs
 - measure changes against real built assets, not only source files
 

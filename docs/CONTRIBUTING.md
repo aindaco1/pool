@@ -55,10 +55,11 @@ bundle exec jekyll clean
 3. `docs/WORKFLOWS.md` — Pledge lifecycle, magic links & charge flow
 4. `docs/PAYMENT_PROCESSOR.md` — Stripe setup, checkout, webhooks, settlement, and reconciliation
 5. `docs/EMAIL.md` — Resend setup, email types, localization, and delivery behavior
-6. `docs/DEV_NOTES.md` — Integration notes, content model & gotchas
-7. `docs/TESTING.md` — Full testing guide (includes secrets setup)
-8. `docs/ROADMAP.md` — Planned features
-9. `docs/DASHBOARD.md` — Admin dashboard editing and operations
+6. `docs/ETHICAL_RISK.md` — Ethical risk review prompts for data, money, messaging, automation, public sharing, and admin power
+7. `docs/DEV_NOTES.md` — Integration notes, content model & gotchas
+8. `docs/TESTING.md` — Full testing guide (includes secrets setup)
+9. `docs/ROADMAP.md` — Planned features
+10. `docs/DASHBOARD.md` — Admin dashboard editing and operations
 
 For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `docs/SECURITY.md`, and `docs/SEO.md`; the admin shell has explicit requirements for keyboard access, Spanish strings, input normalization, and `noindex`.
 
@@ -130,6 +131,7 @@ For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `do
 ### Pull Requests
 - Keep PRs focused and under ~300 lines when possible
 - Fill out the PR template, include screenshots for UI changes, and include desktop/tablet/mobile screenshots for admin dashboard layout changes
+- Include an Ethical Risk review when a PR changes money, data collection, supporter messaging, admin access, public sharing, automation, analytics, or engagement mechanics
 - Link issues with `Closes #123`
 
 ### Labels
@@ -147,6 +149,7 @@ For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `do
 - [ ] Review `assets/js/` cart & pledge scripts
 - [ ] Read `worker/src/` to understand the backend (pledge storage, stats, charging)
 - [ ] Open `/admin/` locally with the default dev admin email path and understand the dashboard publish vs KV-save split
+- [ ] Read `docs/ETHICAL_RISK.md` before changing checkout, emails, analytics, admin power, public visibility, or data retention
 - [ ] Verify `CNAME` is set to `pool.dustwave.xyz`
 
 ---

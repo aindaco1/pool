@@ -83,6 +83,21 @@ Provider checks are read-only and use shell credentials first. In CI, the Releas
 
 Set `POOL_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true` for no-send email evidence during local mutation smoke. The payment smoke keeps pledge mutation evidence opt-in through `--local-mutation` / `PAYMENT_SMOKE_ALLOW_MUTATION=1` and refuses production hosts unless explicitly overridden.
 
+## Ethical Risk Review
+
+Automated tests cannot prove that a product change is ethically safe. For features that touch money, supporter data, messaging, analytics, automation, public sharing, or admin power, include a short [Ethical Risk review](./ETHICAL_RISK.md) in the PR or release notes.
+
+Useful evidence includes:
+
+- consent and opt-out behavior for reminders, Blast, previews, and supporter communications
+- dry-run/no-send evidence before bulk email or report delivery
+- noindex, sitemap, social-preview, and prefetch checks for private/tokenized surfaces
+- Worker-canonical total checks for campaign progress, add-ons, tips, tax, shipping, inventory, and settlement
+- accessibility and i18n checks for affected user-facing flows
+- an abuse-path note for how the feature could be used for spam, harassment, fraud, doxxing, misleading claims, or excessive engagement pressure
+
+Treat new hidden tracking, unbounded notifications, misleading public metadata, browser-trusted money logic, or public exposure of private/tokenized state as release blockers until mitigated.
+
 ---
 
 ## Unit Tests (Vitest)
