@@ -4,7 +4,7 @@
 
 **v1.0.9**
 
-The v1.0.9 milestone adapts the Store v1.0.6/v1.0.7 production-operations work to Pool's pledge model: classified encrypted recovery, four-hour recovery objectives, bulk admin reads, session/audit controls, performance and cache evidence gates, posture/localization automation, and reviewed production deployment.
+The v1.0.9 milestone incorporates classified encrypted recovery, four-hour recovery objectives, bulk admin reads, session/audit controls, performance and cache evidence gates, posture/localization automation, and reviewed production deployment.
 
 ## Completed
 
@@ -65,6 +65,11 @@ The v1.0.9 milestone adapts the Store v1.0.6/v1.0.7 production-operations work t
   - Production setup now detects and reuses existing Cloudflare KV namespace bindings/resources before planning creation, including dry-run output that distinguishes reuse from create
   - Read-only readiness checks can call live Cloudflare, GitHub, Stripe, Resend, Turnstile, USPS, and ZIP.TAX provider APIs during setup/dry runs, with `--skip-readiness` available when operators need a narrower local check
   - Setup-helper subprocess tests exercise dry-run, temp-repo local secret generation, production KV create/reuse planning, generated Worker secret writes, and readiness probes with fake provider CLIs so coverage does not depend on live credentials
+- [x] Backup, restore, and disaster recovery runbook
+  - Classified Git, `PLEDGES`, `VOTES`, `RATELIMIT`, Stripe, and Durable Object boundaries in `config/pool-data-inventory.json`, with four-hour pledge/vote/admin RPO/RTO and approved 7-daily/5-weekly/12-monthly/release retention
+  - Added metadata and encrypted captured-value snapshots, checksums, decryptability proof, safe retention pruning, append-only off-device copies, and readiness checks without secret-value export
+  - Added classification-driven local/preview/production restore plans, authoritative-value validation, derived-state rebuilds, quarantine exclusions, exact preview cleanup, readback verification, and explicit payment/maintenance/approval production gates
+  - Documented restore order, Durable Object non-import policy, provider reconciliation, production acknowledgements, and post-restore checks in `docs/BACKUP_RESTORE.md`
 
 **Campaign and public experience**
 
@@ -141,6 +146,8 @@ The v1.0.9 milestone adapts the Store v1.0.6/v1.0.7 production-operations work t
   - `./scripts/check-projections.sh` operator wrapper for local and Podman-backed checks
   - mutable-pledge smoke coverage verifies campaigns stay projection-clean after setup, modify, and cancel
   - clearer operator guidance around projection drift versus ledger/current-state report differences
+- [x] Recovery reconciliation
+  - Added read-only Stripe PaymentIntent reconciliation so recovery evidence can compare restored pledge truth with processor state without creating or mutating payments
 - [x] Add-on products
   - Platform add-ons support the first Dust Wave merch catalog (`DUST WAVE T-Shirt`, `DUST WAVE Sticker`, and `DUST WAVE Butterfingers T-Shirt`), fixed prices, simple variants, inventory, low-stock thresholds, sold-out filtering, and shared product cards
   - Campaigns can define `campaign_add_ons` in front matter; cart and Manage Pledge show them with the same add-on card patterns under a campaign-owned section
@@ -209,6 +216,8 @@ The v1.0.9 milestone adapts the Store v1.0.6/v1.0.7 production-operations work t
   - focused commands cover accessibility, rendered i18n/SEO, pledge/report, provider readiness, payment smoke, and optional VoiceOver/Whisper transcript evidence
   - the Release Provider Evidence GitHub Actions workflow provides strict Cloudflare DNS API evidence through dedicated DNS-read secrets
   - `POOL_EMAIL_DRY_RUN` / `RESEND_EMAIL_DRY_RUN` let release evidence render email payloads without calling Resend
+- [x] Disaster recovery automation
+  - Added low-traffic preflight, weekly synthetic rehearsals, and an opt-in protected quarterly captured-data preview drill with byte-verified off-account archive readback
 - [x] Public performance
   - public pages load a lightweight cart-runtime loader first and defer the full cart stack until persisted cart state, recovery state, or clear supporter intent requires it
   - same-origin public document prefetching follows a small local intent model with route allowlists, sensitive-query exclusions, network guards, low per-page limits, and a default-enabled config surface
@@ -345,12 +354,6 @@ The v1.0.9 milestone adapts the Store v1.0.6/v1.0.7 production-operations work t
   - Keep any production payment test transactions clearly tagged, normal-booked, and reconciled through the same pledge/payment paths rather than hidden behind special-case accounting or reporting behavior
   - Add a narrowly scoped maker/checker path only for manual money-affecting recovery operations that are not already automated or retry-safe, using existing admin sessions, role scopes, CSRF, and audit records rather than introducing a separate approval service
   - Document the new journal, reconciliation breaks, and outbox in `docs/PAYMENT_PROCESSOR.md`, `docs/WORKFLOWS.md`, `docs/SECURITY.md`, and `worker/README.md`, including retention, PII, and operator runbooks
-- [x] Backup, restore, and disaster recovery runbook
-  - Classified Git, `PLEDGES`, `VOTES`, `RATELIMIT`, Stripe, and Durable Object boundaries in `config/pool-data-inventory.json`, with four-hour pledge/vote/admin RPO/RTO and approved 7-daily/5-weekly/12-monthly/release retention
-  - Added metadata and encrypted captured-value snapshots, checksums, decryptability proof, safe retention pruning, append-only off-device copies, and readiness checks without secret-value export
-  - Added classification-driven local/preview/production restore plans, authoritative-value validation, derived-state rebuilds, quarantine exclusions, exact preview cleanup, readback verification, and explicit payment/maintenance/approval production gates
-  - Added read-only Stripe PaymentIntent reconciliation, low-traffic preflight, weekly synthetic rehearsals, and an opt-in protected quarterly captured-data preview drill with byte-verified off-account archive readback
-  - Documented restore order, Durable Object non-import policy, provider reconciliation, production acknowledgements, and post-restore checks in `docs/BACKUP_RESTORE.md`
 - [ ] Tax calculator expansion and compliance hardening
   - Start from the current implemented baseline: `worker/src/tax.js` already provides `flat`, `offline_rules`, `nm_grt`, and `zip_tax` provider modes; `_config.yml` mirrors non-secret `tax.*` settings into `worker/wrangler.toml`; `/tax/quote`, checkout, Manage Pledge, stored pledge `taxDetails`, emails, analytics, and reports already use Worker-calculated tax totals; and the browser keeps tax provisional as `--` until it has enough destination detail
   - Keep the current architecture DRY: the Worker remains the only tax authority, cart and Manage Pledge keep requesting quotes instead of duplicating tax math, `_config.yml` owns non-secret provider settings, Worker secrets own provider keys, and reports/analytics continue reading persisted `tax` / `taxDetails` instead of recalculating historical obligations from today's catalog or rate data
