@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "owner": "Pool operations",
+  "recoveryObjectives": {
+    "gitConfigBuild": { "rpo": "each release", "rtoHours": 1 },
+    "pledgesVotesAndAdminState": { "rpoHours": 4, "rtoHours": 4 },
+    "preChange": { "rpo": "before bulk repair, restore, inventory reset, settlement recovery, or provider migration", "rtoHours": 1 }
+  },
+  "retention": {
+    "daily": 7,
+    "weekly": 5,
+    "monthly": 12,
+    "releaseSnapshots": true,
+    "offAccountCopiesMinimum": 1,
+    "encryptionRequiredForSensitiveValues": true
+  },
+  "recoveryPolicyApproval": {
+    "schemaVersion": 1,
+    "status": "approved",
+    "approvedBy": "Pool owner/operator",
+    "approvedAt": "2026-07-12",
+    "activeSalesSnapshotIntervalHours": 4,
+    "objectivesAndRetentionAccepted": true,
+    "reviewOnMaterialDataOrProviderChange": true
+  },
+  "families": [
+    { "id": "pledges", "binding": "PLEDGES", "type": "kv", "prefix": "pledge:", "classification": "authoritative", "sensitivity": "restricted-pii-payment-metadata", "backupValues": true, "restoreDefault": "restore", "restorePhase": 3, "validation": "valid JSON; orderId matches key; campaignSlug and pledgeStatus present" },
+    { "id": "admin-users", "binding": "PLEDGES", "type": "kv", "prefix": "admin-users:v1", "classification": "authoritative", "sensitivity": "restricted-admin-pii", "backupValues": true, "restoreDefault": "restore-with-break-glass-review", "restorePhase": 2, "validation": "versioned JSON with unique valid admin emails and known roles" },
+    { "id": "addon-inventory-overrides", "binding": "PLEDGES", "type": "kv", "prefix": "add-on-inventory-overrides", "classification": "authoritative", "sensitivity": "internal", "backupValues": true, "restoreDefault": "restore", "restorePhase": 4, "validation": "JSON with non-negative inventory values" },
+    { "id": "marketing-referrals", "binding": "PLEDGES", "type": "kv", "prefix": "admin-marketing-referrals:", "classification": "authoritative", "sensitivity": "internal-commercial", "backupValues": true, "restoreDefault": "restore", "restorePhase": 4, "validation": "JSON array with unique URL-safe referral codes" },
+    { "id": "launch-reminders", "binding": "PLEDGES", "type": "kv", "prefix": "launch-reminder:", "classification": "authoritative", "sensitivity": "restricted-hashed-identity", "backupValues": true, "restoreDefault": "restore-before-reminders", "restorePhase": 4, "validation": "valid reminder consent record" },
+    { "id": "launch-reminder-suppressions", "binding": "PLEDGES", "type": "kv", "prefix": "launch-reminder-suppressed:", "classification": "authoritative", "sensitivity": "restricted-hashed-identity", "backupValues": true, "restoreDefault": "restore-before-reminders", "restorePhase": 4, "validation": "valid suppression record" },
+    { "id": "abandoned-cart-suppressions", "binding": "PLEDGES", "type": "kv", "prefix": "abandoned-cart-suppressed:", "classification": "authoritative", "sensitivity": "restricted-hashed-identity", "backupValues": true, "restoreDefault": "restore-before-reminders", "restorePhase": 4, "validation": "valid suppression record" },
+    { "id": "abandoned-cart-campaign-suppressions", "binding": "PLEDGES", "type": "kv", "prefix": "abandoned-cart-suppressed-campaign:", "classification": "authoritative", "sensitivity": "restricted-hashed-identity", "backupValues": true, "restoreDefault": "restore-before-reminders", "restorePhase": 4, "validation": "valid campaign suppression record" },
+    { "id": "votes", "binding": "VOTES", "type": "kv", "prefix": "vote:", "classification": "authoritative", "sensitivity": "restricted-supporter-identity", "backupValues": true, "restoreDefault": "restore", "restorePhase": 5, "validation": "keyed campaign decision vote with non-empty option" },
+    { "id": "vote-results", "binding": "VOTES", "type": "kv", "prefix": "results:", "classification": "derived-rebuildable", "sensitivity": "internal-aggregate", "backupValues": false, "restoreDefault": "rebuild", "restorePhase": 7, "validation": "non-negative option counts derived from votes" },
+
+    { "id": "stripe-events", "binding": "PLEDGES", "type": "kv", "prefix": "stripe-event:", "classification": "idempotency-control", "sensitivity": "internal-provider-id", "backupValues": true, "restoreDefault": "restore-before-webhooks", "restorePhase": 5, "validation": "processed marker keyed by Stripe event ID" },
+    { "id": "campaign-charged", "binding": "PLEDGES", "type": "kv", "prefix": "campaign-charged:", "classification": "idempotency-control", "sensitivity": "internal-payment-control", "backupValues": true, "restoreDefault": "restore-after-stripe-review", "restorePhase": 5, "validation": "campaign settlement completion marker" },
+    { "id": "launch-reminder-sent", "binding": "PLEDGES", "type": "kv", "prefix": "launch-reminder-sent:", "classification": "idempotency-control", "sensitivity": "restricted-hashed-identity", "backupValues": true, "restoreDefault": "restore-before-reminders", "restorePhase": 5, "validation": "sent marker" },
+    { "id": "abandoned-cart-sent", "binding": "PLEDGES", "type": "kv", "prefix": "abandoned-cart-sent:", "classification": "idempotency-control", "sensitivity": "restricted-hashed-identity", "backupValues": true, "restoreDefault": "restore-before-reminders", "restorePhase": 5, "validation": "sent marker" },
+    { "id": "diary-sent", "binding": "PLEDGES", "type": "kv", "prefix": "diary-sent:", "classification": "idempotency-control", "sensitivity": "internal", "backupValues": true, "restoreDefault": "restore-before-broadcasts", "restorePhase": 5, "validation": "campaign diary entry send markers" },
+    { "id": "milestones-sent", "binding": "PLEDGES", "type": "kv", "prefix": "milestones:", "classification": "idempotency-control", "sensitivity": "internal", "backupValues": true, "restoreDefault": "restore-before-broadcasts", "restorePhase": 5, "validation": "campaign milestone send markers" },
+    { "id": "campaign-runner-report-sent", "binding": "PLEDGES", "type": "kv", "prefix": "campaign-runner-report:", "classification": "idempotency-control", "sensitivity": "internal", "backupValues": true, "restoreDefault": "restore-before-report-jobs", "restorePhase": 5, "validation": "campaign report send marker" },
+
+    { "id": "email-index", "binding": "PLEDGES", "type": "kv", "prefix": "email:", "classification": "derived-rebuildable", "sensitivity": "restricted-pii", "backupValues": false, "restoreDefault": "rebuild", "restorePhase": 7, "validation": "email to existing pledge order IDs" },
+    { "id": "campaign-pledge-index", "binding": "PLEDGES", "type": "kv", "prefix": "campaign-pledges:", "classification": "derived-rebuildable", "sensitivity": "internal-order-ids", "backupValues": false, "restoreDefault": "rebuild", "restorePhase": 7, "validation": "campaign to existing pledge order IDs" },
+    { "id": "campaign-stats", "binding": "PLEDGES", "type": "kv", "prefix": "stats:", "classification": "derived-rebuildable", "sensitivity": "public-aggregate", "backupValues": false, "restoreDefault": "rebuild", "restorePhase": 7, "validation": "non-negative campaign aggregates" },
+    { "id": "tier-inventory", "binding": "PLEDGES", "type": "kv", "prefix": "tier-inventory:", "classification": "derived-rebuildable", "sensitivity": "internal", "backupValues": false, "restoreDefault": "reconcile", "restorePhase": 7, "validation": "non-negative tier sold counts" },
+    { "id": "addon-inventory-sold", "binding": "PLEDGES", "type": "kv", "prefix": "add-on-inventory-sold:v1", "classification": "derived-rebuildable", "sensitivity": "internal", "backupValues": false, "restoreDefault": "rebuild", "restorePhase": 7, "validation": "non-negative add-on sold counts" },
+    { "id": "launch-reminder-queue", "binding": "PLEDGES", "type": "kv", "prefix": "launch-reminder-dispatch-queue:v1", "classification": "derived-rebuildable", "sensitivity": "internal", "backupValues": false, "restoreDefault": "rebuild-after-privacy-review", "restorePhase": 7, "validation": "bounded queue summary" },
+    { "id": "abandoned-cart-queue", "binding": "PLEDGES", "type": "kv", "prefix": "abandoned-cart-queue:v1", "classification": "derived-rebuildable", "sensitivity": "internal", "backupValues": false, "restoreDefault": "rebuild-after-privacy-review", "restorePhase": 7, "validation": "bounded queue summary" },
+    { "id": "abandoned-cart-health", "binding": "PLEDGES", "type": "kv", "prefix": "abandoned-cart-health:v1", "classification": "derived-rebuildable", "sensitivity": "internal-aggregate", "backupValues": false, "restoreDefault": "rebuild", "restorePhase": 7, "validation": "aggregate health summary" },
+    { "id": "supporter-email-retry-queue", "binding": "PLEDGES", "type": "kv", "prefix": "supporter-email-retry-queue:v1", "classification": "derived-rebuildable", "sensitivity": "internal", "backupValues": false, "restoreDefault": "rebuild-after-duplicate-send-review", "restorePhase": 7, "validation": "bounded queue summary" },
+
+    { "id": "admin-audit", "binding": "PLEDGES", "type": "kv", "prefix": "admin-audit:", "classification": "incident-evidence", "sensitivity": "restricted-admin-activity", "backupValues": true, "restoreDefault": "restore-if-incident-required", "restorePhase": 6, "validation": "valid event JSON with action and createdAt" },
+    { "id": "observability", "binding": "PLEDGES", "type": "kv", "prefix": "observability:", "classification": "incident-evidence", "sensitivity": "internal-sanitized", "backupValues": false, "restoreDefault": "do-not-restore", "restorePhase": 8, "validation": "bounded aggregate/recent observation" },
+
+    { "id": "admin-sessions", "binding": "PLEDGES", "type": "kv", "prefix": "admin-session:", "classification": "ephemeral-quarantined", "sensitivity": "secret-session", "backupValues": false, "restoreDefault": "quarantine", "restorePhase": 9, "validation": "never restore" },
+    { "id": "admin-login-history", "binding": "PLEDGES", "type": "kv", "prefix": "admin-login-history:", "classification": "incident-evidence", "sensitivity": "restricted-admin-activity", "backupValues": true, "restoreDefault": "restore-if-incident-required", "restorePhase": 6, "validation": "valid event JSON with email, createdAt, summarized client metadata, and no raw IP or user agent" },
+    { "id": "admin-login-nonces", "binding": "PLEDGES", "type": "kv", "prefix": "admin-login:", "classification": "ephemeral-quarantined", "sensitivity": "secret-login-token", "backupValues": false, "restoreDefault": "quarantine", "restorePhase": 9, "validation": "never restore" },
+    { "id": "campaign-preview-reviewers", "binding": "PLEDGES", "type": "kv", "prefix": "campaign-preview-reviewers:", "classification": "ephemeral-quarantined", "sensitivity": "restricted-reviewer-pii", "backupValues": false, "restoreDefault": "quarantine", "restorePhase": 9, "validation": "never restore" },
+    { "id": "checkout-scratch", "binding": "PLEDGES", "type": "kv", "prefix": "pending-", "classification": "ephemeral-quarantined", "sensitivity": "restricted-checkout-pii", "backupValues": false, "restoreDefault": "quarantine", "restorePhase": 9, "validation": "never restore" },
+    { "id": "abandoned-cart-pending", "binding": "PLEDGES", "type": "kv", "prefix": "abandoned-cart:", "classification": "ephemeral-quarantined", "sensitivity": "restricted-cart-pii", "backupValues": false, "restoreDefault": "quarantine", "restorePhase": 9, "validation": "do not restore to avoid duplicate reminders" },
+    { "id": "abandoned-cart-resume", "binding": "PLEDGES", "type": "kv", "prefix": "abandoned-cart-resume:", "classification": "ephemeral-quarantined", "sensitivity": "restricted-cart-pii", "backupValues": false, "restoreDefault": "quarantine", "restorePhase": 9, "validation": "never restore" },
+    { "id": "supporter-email-retry-pending", "binding": "PLEDGES", "type": "kv", "prefix": "supporter-email-retry:", "classification": "ephemeral-quarantined", "sensitivity": "restricted-supporter-pii", "backupValues": false, "restoreDefault": "quarantine", "restorePhase": 9, "validation": "restore only after duplicate-send review" },
+    { "id": "launch-reminder-dispatch", "binding": "PLEDGES", "type": "kv", "prefix": "launch-reminder-dispatch:", "classification": "ephemeral-quarantined", "sensitivity": "restricted-hashed-identity", "backupValues": false, "restoreDefault": "quarantine", "restorePhase": 9, "validation": "restore only after duplicate-send review" },
+    { "id": "marketing-drafts", "binding": "PLEDGES", "type": "kv", "prefix": "admin-marketing-draft:", "classification": "ephemeral-quarantined", "sensitivity": "internal", "backupValues": false, "restoreDefault": "quarantine", "restorePhase": 9, "validation": "never restore" },
+    { "id": "cron-markers", "binding": "PLEDGES", "type": "kv", "prefix": "cron:", "classification": "ephemeral-quarantined", "sensitivity": "internal", "backupValues": false, "restoreDefault": "quarantine", "restorePhase": 9, "validation": "never restore" },
+    { "id": "rate-limits", "binding": "RATELIMIT", "type": "kv", "prefix": "rl:", "classification": "ephemeral-quarantined", "sensitivity": "internal-network-metadata", "backupValues": false, "restoreDefault": "quarantine", "restorePhase": 9, "validation": "never restore" },
+
+    { "id": "checkout-intents", "binding": "CHECKOUT_INTENTS", "type": "durable-object", "prefix": "*", "classification": "ephemeral-quarantined", "sensitivity": "secret-checkout-capability", "backupValues": false, "restoreDefault": "expire-not-import", "restorePhase": 9, "validation": "never import Durable Object storage" },
+    { "id": "tier-inventory-coordinator", "binding": "TIER_INVENTORY_COORDINATOR", "type": "durable-object", "prefix": "*", "classification": "derived-rebuildable", "sensitivity": "internal-pledge-state", "backupValues": false, "restoreDefault": "reconcile-not-import", "restorePhase": 7, "validation": "rebuild from restored pledge truth and campaign config" },
+    { "id": "settlement-coordinator", "binding": "SETTLEMENT_COORDINATOR", "type": "durable-object", "prefix": "*", "classification": "ephemeral-quarantined", "sensitivity": "internal-payment-lock", "backupValues": false, "restoreDefault": "expire-and-reconcile-not-import", "restorePhase": 9, "validation": "never import locks; reconcile Stripe and campaign settlement state" }
+  ]
+}

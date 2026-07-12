@@ -5665,7 +5665,10 @@ describe('Worker business logic hardening', () => {
       sampleRate: 1
     });
     expect(summaryPayload.summaries[0].operations.checkout_intent_abandon).toMatchObject({
-      count: 1
+      count: 1,
+      p50Ms: expect.any(Number),
+      p95Ms: expect.any(Number),
+      p99Ms: expect.any(Number)
     });
   });
 

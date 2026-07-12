@@ -80,8 +80,12 @@ describe('Rate Limiting Security Tests', () => {
       console.log('/checkout-intent/start burst response statuses:', statuses);
       
       const rateLimited = responses.filter(r => r.status === 429);
+      const unavailable = responses.filter(r => r.status === 503);
       expect(rateLimited.length).toBeGreaterThan(0);
-      expect(statuses.every(status => status === 400 || status === 429)).toBe(true);
+      expect(statuses.every(status => status === 400 || status === 429 || status === 503)).toBe(true);
+      for (const response of unavailable) {
+        await expect(response.json()).resolves.toMatchObject({ error: 'Rate limiting unavailable' });
+      }
     });
 
     it('should rate limit vote spam bursts before token validation', async () => {

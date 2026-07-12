@@ -9,6 +9,31 @@ function readWorkflow(name: string) {
 }
 
 describe('workflow security posture', () => {
+  it('pins every third-party action to an immutable commit and keeps read-only workflow permissions explicit', () => {
+    const workflowDir = path.join(repoRoot, '.github', 'workflows');
+    const workflowNames = fs.readdirSync(workflowDir).filter((name) => name.endsWith('.yml'));
+    const actionRef = /^\s*uses:\s*[^\s@]+@([^\s#]+)(?:\s+#.*)?$/gm;
+    for (const name of workflowNames) {
+      const workflow = readWorkflow(name);
+      for (const match of workflow.matchAll(actionRef)) {
+        expect(match[1], `${name} has a mutable action ref`).toMatch(/^[a-f0-9]{40}$/);
+      }
+    }
+    expect(readWorkflow('merge-smoke.yml')).toContain('permissions:\n  contents: read');
+    expect(readWorkflow('release-provider-evidence.yml')).toContain('permissions:\n  contents: read');
+  });
+
+  it('separates automatic Pages refreshes from manually approved Worker deployments', () => {
+    const pages = readWorkflow('deploy.yml');
+    const production = readWorkflow('deploy-production.yml');
+    expect(pages).toContain('name: Refresh Production Pages');
+    expect(pages).not.toContain('wrangler deploy');
+    expect(production).toContain('name: Deploy Production');
+    expect(production).toContain('workflow_dispatch:');
+    expect(production).toContain('Reviewed release branch, tag, or commit');
+    expect(production).toContain('npx wrangler deploy');
+  });
+
   it('pins cache purging to the Cloudflare API instead of an unpinned third-party action', () => {
     const deploy = readWorkflow('deploy.yml');
 

@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.0.8**. The v1.0.7 release shipped abandoned-checkout visibility, setup/deploy hardening, shared Marketing/Blast draft support, referral/UTM reporting, and a campaign-scoped WYSIWYG media picker. v1.0.8 focuses on Store-derived runtime hardening, lazy authenticated Marketing reads, remembered admin dashboard tab/subtab context, stronger locale completeness checks, generated-site SEO/crawl validation, and Pool-specific release evidence automation.
+Current release milestone: **v1.0.9**. This release adapts the production-operations hardening proven in Store v1.0.6 and v1.0.7 to Pool's pledge, campaign, vote, and settlement model: encrypted recovery tooling, a four-hour recovery objective, production posture checks, bulk admin reads, session/audit controls, evidence-gated caching, performance budgets, and safer deployment workflows.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -39,6 +39,8 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Production diary** — Rich content updates with auto-broadcast emails to supporters
 - **Supporter blasts** — Campaign admins can send scoped supporter email blasts with WYSIWYG content, campaign-hosted images, email-safe video links, automatic dry runs, and custom CTA links
 - **Private admin dashboard** — Magic-link admin access for role-scoped settings, campaign editing, add-ons, supporters, reports, analytics, marketing/referral tools, users, and read-only secrets/diagnostics without exposing admin secrets in browser code; the browser remembers the last allowed dashboard tab and subtab context across reloads without writing Worker/KV state
+- **Admin operations controls** — Super admins can review privacy-minimized active/recent sessions, revoke sessions explicitly, search audit metadata, and export formula-safe audit CSVs through protected Worker APIs
+- **Recovery discipline** — Classified encrypted snapshots, checksum verification, preview restores, synthetic rehearsals, Stripe reconciliation, off-device copies, and retention automation target a four-hour RPO/RTO with 7 daily, 5 weekly, 12 monthly, and release snapshots
 - **Richer campaign marketing tools** — Campaigns -> Marketing can build tracked campaign links, save referral codes, preview/download campaign QR codes as PNG/SVG, and save shared drafts; Analytics reviews referral/UTM performance from indexed pledges; Campaigns -> Blast can draft supporter email blasts with the WYSIWYG content editor, save shared drafts explicitly, upload or select hosted campaign images through the shared media path, link YouTube/Vimeo videos instead of embedding remote players in email, automatically dry-run audiences before test/live sends, test-send to the signed-in admin, send to the campaign's indexed supporters, and show read-only sent blast history
 - **Protected campaign previews** — Super admins and assigned campaign users can publish noindex, email-protected full-page previews for campaigns they can edit, with generic static shells, read-only pledge controls, dashboard-visible publisher links, optional invited reviewer links that expire in 24 hours, and preview access allowlists stored in short-lived Worker KV instead of campaign source.
 - **New campaign creation** — Super admins can create a preview-only campaign from the dashboard with only a title, optionally selecting one or more existing campaign users or creating one or more new users with required name/email.
@@ -93,7 +95,7 @@ That is the recommended local development path. It boots Jekyll, the Worker, opt
 
 The setup helper is dependency-free Node and works on macOS, Windows, and Linux. Use `npm run setup:deploy -- --mode=production --dry-run` to preview Cloudflare KV, Worker secret, GitHub secret, readiness, and deploy steps before applying them. It intentionally keeps production Worker secrets separate from ignored local `worker/.dev.vars` values, and the setup path is covered by fake-CLI unit tests so dry runs, KV reuse/create planning, generated local secrets, and production secret writes stay testable without live provider mutations.
 
-The Worker dev container now runs on Node 24 to match GitHub Actions. Wrangler 4.87 also runs against the shared Worker `compatibility_date = "2026-05-03"` so local Miniflare/Workers behavior stays aligned with deployed runtime semantics.
+The Worker dev container now runs on Node 24 to match GitHub Actions. Wrangler 4.110 also runs against the shared Worker `compatibility_date = "2026-05-03"` so local Miniflare/Workers behavior stays aligned with deployed runtime semantics.
 
 If you want to rebuild the Podman dev images after dependency or base-image changes:
 ```bash
@@ -413,6 +415,7 @@ Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT
 - [CONTRIBUTING.md](docs/CONTRIBUTING.md) — Getting started, setup & contribution guide
 - [CHANGELOG.md](CHANGELOG.md) — Release notes
 - [PODMAN.md](docs/PODMAN.md) — Rootless Podman local dev path for Jekyll + Worker
+- [BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) — Backup, restore, retention, reconciliation, and disaster-recovery runbook
 - [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) — System architecture
 - [WORKFLOWS.md](docs/WORKFLOWS.md) — Pledge lifecycle, magic links & charge flow
 - [PAYMENT_PROCESSOR.md](docs/PAYMENT_PROCESSOR.md) — Stripe setup, checkout canonicalization, webhooks, settlement, and reconciliation
@@ -502,6 +505,7 @@ Required GitHub repository secrets for automatic Worker deployment:
 - optional `ADMIN_BROADCAST_SECRET` for the post-deploy diary check when the Worker uses scoped broadcast credentials
 - optional `CLOUDFLARE_CACHE_PURGE_TOKEN` with zone cache-purge permissions if you want cache purging to use a token narrower than the deploy token. This is recommended; otherwise the deploy token must also be allowed to purge cache.
 - optional `CLOUDFLARE_DNS_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_ZONE` for the Release Provider Evidence workflow. The DNS token should be read-only with Zone / DNS / Read for the production zone.
+- `CLOUDFLARE_CACHE_RULES_API_TOKEN` plus `CLOUDFLARE_ZONE_ID` for applying/reconciling the path-scoped admin response rule. Use a dedicated token with Cache Rules Edit; public post-deploy verification does not need credentials.
 - optional `DIARY_CHECK_BYPASS_SECRET` if Cloudflare WAF challenges the post-deploy diary check
 
 For a guided first-time setup, run:

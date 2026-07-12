@@ -30,12 +30,16 @@ ${body}
 function createTempSetupRepo() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pool-setup-deploy-'));
   const scriptsDir = path.join(root, 'scripts');
+  const scriptsLibDir = path.join(scriptsDir, 'lib');
   const workerDir = path.join(root, 'worker');
   const binDir = path.join(root, 'fake-bin');
   fs.mkdirSync(scriptsDir, { recursive: true });
+  fs.mkdirSync(scriptsLibDir, { recursive: true });
   fs.mkdirSync(workerDir, { recursive: true });
   fs.mkdirSync(binDir, { recursive: true });
   fs.copyFileSync(sourceSetupScript, path.join(scriptsDir, 'setup-deploy.mjs'));
+  fs.copyFileSync(path.join(repoRoot, 'scripts', 'lib', 'command-runner.mjs'), path.join(scriptsLibDir, 'command-runner.mjs'));
+  fs.copyFileSync(path.join(repoRoot, 'scripts', 'lib', 'stripe-cli-auth.mjs'), path.join(scriptsLibDir, 'stripe-cli-auth.mjs'));
   fs.writeFileSync(path.join(scriptsDir, 'sync-worker-config.rb'), 'puts "synced"\n', 'utf8');
   fs.writeFileSync(path.join(workerDir, '.dev.vars.example'), '# local dev secrets\n', 'utf8');
   fs.writeFileSync(path.join(workerDir, 'wrangler.toml'), `name = "pool-worker"
@@ -79,7 +83,10 @@ exit 0
 `);
   writeFakeCli(binDir, 'stripe', `
 if [ "\${1:-}" = "--version" ]; then echo "stripe version 1.0.0"; exit 0; fi
-if [ "\${1:-}" = "whoami" ]; then echo "test@example.com"; exit 0; fi
+if [ "\${1:-}" = "config" ] && [ "\${2:-}" = "--list" ]; then
+  printf '%s\n' "test_mode_api_key = 'rk_test_setup'" "test_mode_key_expires_at = '2099-01-01'"
+  exit 0
+fi
 if [ "\${1:-}" = "webhook_endpoints" ]; then echo '{"data":[]}'; exit 0; fi
 exit 0
 `);

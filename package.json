@@ -1,6 +1,6 @@
 {
   "name": "pool",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "**Dust Wave's open crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)",
   "main": "index.js",
   "directories": {
@@ -32,6 +32,20 @@
     "test:e2e:ui": "playwright test --ui",
     "sync:worker-config": "ruby ./scripts/sync-worker-config.rb",
     "setup:deploy": "node ./scripts/setup-deploy.mjs",
+    "backup:inventory:audit": "node ./scripts/audit-pool-data-inventory.mjs",
+    "backup:plan": "node ./scripts/pool-backup.mjs --dry-run",
+    "backup:snapshot": "node ./scripts/pool-backup.mjs",
+    "backup:readiness": "node ./scripts/pool-backup-readiness.mjs",
+    "backup:retention": "node ./scripts/pool-backup-retention.mjs",
+    "backup:offsite": "node ./scripts/pool-backup-offsite-copy.mjs",
+    "restore:plan": "node ./scripts/pool-restore.mjs",
+    "restore:rehearse": "node ./scripts/rehearse-pool-restore.mjs",
+    "recovery:traffic-preflight": "node ./scripts/pool-recovery-traffic-preflight.mjs",
+    "recovery:reconcile": "node ./scripts/pool-recovery-reconciliation.mjs",
+    "cloudflare:admin-response-rule": "node ./scripts/configure-cloudflare-admin-response-rule.mjs",
+    "performance:budget": "node ./scripts/audit-performance-budgets.mjs",
+    "production:posture": "node ./scripts/audit-production-posture.mjs",
+    "localization:review": "node ./scripts/localization-review.mjs",
     "secrets:dev": "./scripts/configure-dev-secrets.sh",
     "podman:doctor": "./scripts/podman-doctor.sh",
     "podman:self-check": "./scripts/podman-self-check.sh",
@@ -51,10 +65,12 @@
   "license": "ISC",
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "axe-core": "^4.11.2",
     "esbuild": "^0.28.1",
     "jsdom": "^24.0.0",
+    "smol-toml": "^1.7.0",
     "vite": "^8.1.2",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }

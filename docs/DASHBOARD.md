@@ -28,6 +28,15 @@ Admin users have two roles:
 
 Admin user edits made in **Settings -> Users** save directly to Worker KV at `admin-users:v1`. They do not publish to GitHub and do not trigger a site deploy. `_config.yml` and `ADMIN_USERS_JSON` remain seed/recovery sources.
 
+Super-admin operator APIs also provide session and audit review:
+
+- `GET /admin/sessions` lists active and recent sessions with browser/OS/device classes and a keyed network fingerprint; it never stores a full IP address, full user agent, or precise location.
+- `POST /admin/sessions/revoke` requires same-origin CSRF protection and revokes one exact session ID while recording an audit event.
+- `GET /admin/audit` searches by action, exact admin email, campaign, date, or bounded free-text query.
+- `GET /admin/audit.csv` exports the same filtered event set and prefixes spreadsheet formula-leading values.
+
+Turnstile JavaScript is deferred until the initial `/admin/session` request proves that the sign-in panel is needed. Existing authenticated dashboard visits do not pay for the challenge runtime.
+
 ## Local Development
 
 Use the Podman stack so the static site and Worker run together:

@@ -2,7 +2,7 @@
 
 The Pool uses a **no-account, email-based pledge management system**. Backers save a payment method through Stripe in The Pool's on-site payment step, manage pledges via order-scoped magic links, and are only charged if the campaign is funded.
 
-For setup, processor operations, and reconciliation, use [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md). For sender setup, email types, localization, and delivery behavior, use [EMAIL.md](./EMAIL.md).
+For setup, processor operations, and reconciliation, use [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md). For classified snapshots, recovery ordering, and restore gates, use [BACKUP_RESTORE.md](./BACKUP_RESTORE.md). For sender setup, email types, localization, and delivery behavior, use [EMAIL.md](./EMAIL.md).
 
 ## Key Differentiators
 

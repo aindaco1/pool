@@ -222,6 +222,7 @@ groups = [
   ]],
   ['Stripe checkout and webhooks', %w[
     STRIPE_SECRET_KEY STRIPE_SECRET_KEY_TEST STRIPE_PUBLISHABLE_KEY_TEST STRIPE_WEBHOOK_SECRET STRIPE_WEBHOOK_SECRET_TEST
+    FILM_STRIPE_SUMMARY_ADAPTER_SECRET
   ]],
   ['Email delivery and Resend plan usage', %w[
     RESEND_API_KEY PLAN_USAGE_RESEND_PLAN RESEND_EMAILS_MONTHLY_LIMIT RESEND_EMAILS_DAILY_LIMIT
@@ -318,6 +319,7 @@ ensure_generated_secret "ADMIN_SESSION_SECRET"
 prompt_optional_secret "STRIPE_SECRET_KEY_TEST" "Stripe test secret key"
 prompt_optional_secret "STRIPE_WEBHOOK_SECRET_TEST" "Stripe test webhook signing secret"
 prompt_optional_secret "STRIPE_PUBLISHABLE_KEY_TEST" "Stripe test publishable key"
+prompt_optional_secret "FILM_STRIPE_SUMMARY_ADAPTER_SECRET" "Film Stripe summary adapter bearer secret"
 prompt_optional_secret "RESEND_API_KEY" "Resend API key"
 prompt_optional_secret "USPS_CLIENT_SECRET" "USPS client secret"
 prompt_optional_secret "ZIP_TAX_API_KEY" "ZIP.TAX API key"

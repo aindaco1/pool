@@ -28,6 +28,10 @@
  *   POST /inventory/:slug/recalculate - Recalculate tier inventory from pledges (admin)
  *   POST /admin/projections/check - Check projection drift across campaigns (admin)
  *   GET  /admin/session         - Read current browser admin session
+ *   GET  /admin/sessions        - Review active and recent browser admin sessions
+ *   POST /admin/sessions/revoke - Revoke an active browser admin session
+ *   GET  /admin/audit           - Search role-restricted admin audit events
+ *   GET  /admin/audit.csv       - Export role-restricted admin audit events
  *   GET  /admin/dashboard/summary - Read role-scoped admin dashboard summary
  *   GET  /admin/settings      - Read role-scoped admin settings/config snapshot
  *   POST /admin/settings/preview - Validate admin settings changes without writes
@@ -99,6 +103,12 @@ import { normalizeShippingDestination, quoteCampaignShipment } from './shipping.
 import { normalizeTaxDestination, quoteTax } from './tax.js';
 import { buildFulfillmentReport, buildPledgeLedgerReport, rebuildCsvReport } from './reports.js';
 import {
+  adminPoolPledgeSnapshotIsUnchanged,
+  buildAdminPoolPledgeSnapshotMetadata,
+  normalizePoolPledgeOrderId,
+  readPoolPledgeBatch
+} from './admin-pool-read-model.js';
+import {
   ensureLaunchReminderDispatchForCampaign,
   handleLaunchReminderSignup,
   handleLaunchReminderUnsubscribe,
@@ -124,7 +134,9 @@ import {
   handleAdminAuthStart,
   handleAdminLogout,
   handleAdminSession,
+  listAdminSessionReview,
   requireAdminSession,
+  revokeAdminSessionById,
   saveStoredAdminUsers,
   verifyAdminAuthStartChallenge
 } from './admin-auth.js';
@@ -179,6 +191,8 @@ const MAX_ADMIN_IMAGE_UPLOAD_BODY_BYTES = 12 * 1024 * 1024;
 const MAX_ADMIN_AUDIO_UPLOAD_BODY_BYTES = 36 * 1024 * 1024;
 const MAX_ADMIN_VIDEO_UPLOAD_BODY_BYTES = 140 * 1024 * 1024;
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 256 * 1024;
+const MAX_FILM_STRIPE_SUMMARY_BODY_BYTES = 16 * 1024;
+const FILM_STRIPE_SUMMARY_MAX_REFS = 100;
 const RATELIMIT_REQUIRED_ERROR = 'Rate limit storage not configured';
 const OBSERVABILITY_RETENTION_SECONDS = 14 * 24 * 60 * 60;
 const OBSERVABILITY_RECENT_EVENT_LIMIT = 25;
@@ -186,6 +200,7 @@ const OBSERVABILITY_MAX_DAYS = 7;
 const DEFAULT_OBSERVABILITY_SAMPLE_RATE = 0.1;
 const CAMPAIGN_RUNNER_REPORT_MARKER_TTL_SECONDS = 180 * 24 * 60 * 60;
 const ADMIN_AUDIT_EVENT_TTL_SECONDS = 400 * 24 * 60 * 60;
+const MAX_ADMIN_AUDIT_EXPORT_EVENTS = 2000;
 const CAMPAIGN_PREVIEW_LINK_TTL_SECONDS = 24 * 60 * 60;
 const CAMPAIGN_PREVIEW_LINK_TTL_DAYS = 1;
 const CAMPAIGN_PREVIEW_REVIEWER_TTL_SECONDS = CAMPAIGN_PREVIEW_LINK_TTL_SECONDS;
@@ -1195,6 +1210,26 @@ function requireTrustedSiteOrigin(request, env) {
   return Array.isArray(orderIds) ? orderIds : null;
   }
 
+  const POOL_PLEDGE_BULK_READ_LIMIT = 100;
+
+  async function readPoolPledgesByOrderIds(env, orderIds = []) {
+  if (!env?.PLEDGES) return { pledges: [], requested: 0, readOperations: 0 };
+  const normalizedOrderIds = orderIds
+    .map(normalizePoolPledgeOrderId)
+    .filter(Boolean);
+  const pledges = [];
+  let readOperations = 0;
+  for (let offset = 0; offset < normalizedOrderIds.length; offset += POOL_PLEDGE_BULK_READ_LIMIT) {
+    const batch = normalizedOrderIds.slice(offset, offset + POOL_PLEDGE_BULK_READ_LIMIT);
+    const values = await readPoolPledgeBatch(env.PLEDGES, batch);
+    readOperations += 1;
+    for (const value of values) {
+      if (value && typeof value === 'object') pledges.push(value);
+    }
+  }
+  return { pledges, requested: normalizedOrderIds.length, readOperations };
+  }
+
   async function addToCampaignIndex(env, campaignSlug, orderId) {
   if (!env.PLEDGES) return;
   const key = getCampaignIndexKey(campaignSlug);
@@ -1526,6 +1561,22 @@ function updateDurationStats(target, durationMs) {
     ? safeDuration
     : Math.min(Number(target.minMs ?? safeDuration), safeDuration);
   target.lastMs = safeDuration;
+  const bucket = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
+    .find((maximum) => safeDuration <= maximum);
+  target.histogram = target.histogram || {};
+  const bucketKey = bucket ? String(bucket) : 'inf';
+  target.histogram[bucketKey] = Number(target.histogram[bucketKey] || 0) + 1;
+}
+
+function durationPercentile(histogram = {}, count = 0, percentile = 0.5, fallback = 0) {
+  if (!count || !histogram || typeof histogram !== 'object') return fallback;
+  const rank = Math.max(1, Math.ceil(count * percentile));
+  let seen = 0;
+  for (const boundary of ['10', '25', '50', '100', '250', '500', '1000', '2500', '5000', '10000', 'inf']) {
+    seen += Number(histogram[boundary] || 0);
+    if (seen >= rank) return boundary === 'inf' ? fallback : Number(boundary);
+  }
+  return fallback;
 }
 
 function finalizeDurationStats(target = {}) {
@@ -1537,7 +1588,10 @@ function finalizeDurationStats(target = {}) {
     avgMs: count > 0 ? Number((totalMs / count).toFixed(2)) : 0,
     minMs: count > 0 ? Number(target.minMs || 0) : 0,
     maxMs: Number(target.maxMs || 0),
-    lastMs: Number(target.lastMs || 0)
+    lastMs: Number(target.lastMs || 0),
+    p50Ms: durationPercentile(target.histogram, count, 0.5, Number(target.maxMs || 0)),
+    p95Ms: durationPercentile(target.histogram, count, 0.95, Number(target.maxMs || 0)),
+    p99Ms: durationPercentile(target.histogram, count, 0.99, Number(target.maxMs || 0))
   };
 }
 
@@ -1748,6 +1802,7 @@ const RATE_LIMITS = {
   abandon: { prefix: 'rl:abandon', limit: 12, windowSeconds: 60 },      // 12 abandon attempts/min/order
   votes: { prefix: 'rl:votes', limit: 45, windowSeconds: 60 },          // 45 vote reads/writes/min/IP
   launchReminder: { prefix: 'rl:launch-reminder', limit: 5, windowSeconds: 60 }, // 5 launch reminder signups/min/IP
+  filmStripeSummary: { prefix: 'rl:film-stripe-summary', limit: 30, windowSeconds: 60, privateResponse: true },
   admin: { prefix: 'rl:admin', limit: 5, windowSeconds: 60 },       // 5 admin calls/min
   pledgeRead: { prefix: 'rl:pledge-read', limit: 120, windowSeconds: 60 },   // 120 manage reads/min/IP
   pledgeWrite: { prefix: 'rl:pledge-write', limit: 30, windowSeconds: 60 }   // 30 manage mutations/min/IP
@@ -4966,6 +5021,28 @@ export default {
         return handleAdminSession(request, env);
       }
 
+      if (path === '/admin/sessions' && method === 'GET') {
+        return handleAdminSessions(request, env);
+      }
+
+      if (path === '/admin/sessions/revoke' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        return handleAdminSessionRevoke(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/admin/audit' && method === 'GET') {
+        return handleAdminAudit(request, env);
+      }
+
+      if (path === '/admin/audit.csv' && method === 'GET') {
+        return handleAdminAuditCsv(request, env);
+      }
+
       if (path === '/admin/logout' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
         if (!bodyLimit.ok) return bodyLimit.response;
@@ -5107,6 +5184,14 @@ export default {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminStripeFinancialsBackfill(request, env);
+      }
+
+      if (path === '/film/stripe-summary' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_FILM_STRIPE_SUMMARY_BODY_BYTES, { privateResponse: true });
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.filmStripeSummary);
+        if (!rl.allowed) return rl.response;
+        return handleFilmStripeSummaryAdapter(request, env);
       }
 
       if (path === '/admin/marketing/referrals' && method === 'GET') {
@@ -8715,8 +8800,8 @@ async function settleCampaign(campaignSlug, env, options = {}) {
   const pledgesByEmail = {};
   let skippedNoCustomer = 0;
 
-  for (const orderId of orderIds) {
-    const pledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+  const { pledges: campaignPledges } = await readPoolPledgesByOrderIds(env, orderIds);
+  for (const pledge of campaignPledges) {
     if (pledge && 
         pledge.campaignSlug === campaignSlug && 
         pledge.pledgeStatus === 'active' &&
@@ -9370,8 +9455,12 @@ async function handleSettleBatch(request, env) {
 
   // Read all pledges in this batch
   const pledges = [];
+  const batchRead = await readPoolPledgesByOrderIds(env, orderIds);
+  const pledgesByOrderId = new Map(
+    batchRead.pledges.map((pledge) => [String(pledge?.orderId || ''), pledge])
+  );
   for (const orderId of orderIds) {
-    const pledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+    const pledge = pledgesByOrderId.get(String(orderId || ''));
     if (!pledge) {
       results.details.push({ orderId, status: 'not_found' });
       results.skipped++;
@@ -9583,8 +9672,9 @@ async function handleRebuildCampaignIndex(request, campaignSlug, env) {
   let cursor = undefined;
   do {
     const page = await env.PLEDGES.list({ prefix: 'pledge:', cursor });
-    for (const key of page.keys) {
-      const pledge = await env.PLEDGES.get(key.name, { type: 'json' });
+    const pageOrderIds = page.keys.map((key) => String(key?.name || '').replace(/^pledge:/, ''));
+    const { pledges } = await readPoolPledgesByOrderIds(env, pageOrderIds);
+    for (const pledge of pledges) {
       if (pledge && pledge.campaignSlug === campaignSlug && pledge.pledgeStatus !== 'cancelled') {
         orderIds.push(pledge.orderId);
       }
@@ -9631,9 +9721,9 @@ async function handleBackfillCustomers(request, campaignSlug, env) {
   // Find pledges missing stripeCustomerId
   const needsBackfill = [];
 
-  for (const orderId of orderIds) {
-    const key = `pledge:${orderId}`;
-    const pledge = await env.PLEDGES.get(key, { type: 'json' });
+  const { pledges: indexedPledges } = await readPoolPledgesByOrderIds(env, orderIds);
+  for (const pledge of indexedPledges) {
+    const key = `pledge:${pledge?.orderId || ''}`;
     if (pledge &&
         pledge.campaignSlug === campaignSlug &&
         pledge.pledgeStatus === 'active' &&
@@ -9900,8 +9990,8 @@ async function getCampaignSupporters(env, campaignSlug, { allowListFallback = tr
   const orderIds = await getCampaignOrderIds(env, campaignSlug);
 
   if (Array.isArray(orderIds)) {
-    for (const orderId of orderIds) {
-      const pledgeData = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+    const { pledges } = await readPoolPledgesByOrderIds(env, orderIds);
+    for (const pledgeData of pledges) {
       if (!pledgeData) continue;
       if (pledgeData.campaignSlug !== campaignSlug) continue;
       if (pledgeData.pledgeStatus === 'cancelled') continue;
@@ -9926,9 +10016,10 @@ async function getCampaignSupporters(env, campaignSlug, { allowListFallback = tr
   }
 
   const pledgeKeys = await listAllPledgeKeys(env);
+  const fallbackOrderIds = pledgeKeys.map((key) => String(key?.name || '').replace(/^pledge:/, ''));
+  const { pledges: fallbackPledges } = await readPoolPledgesByOrderIds(env, fallbackOrderIds);
 
-  for (const key of pledgeKeys) {
-    const pledgeData = await env.PLEDGES.get(key.name, { type: 'json' });
+  for (const pledgeData of fallbackPledges) {
     if (!pledgeData) continue;
     if (pledgeData.campaignSlug !== campaignSlug) continue;
     if (pledgeData.pledgeStatus === 'cancelled') continue;
@@ -9957,8 +10048,8 @@ async function getCampaignReportPledges(env, campaignSlug) {
   const orderIds = await getCampaignOrderIds(env, campaignSlug);
 
   if (Array.isArray(orderIds)) {
-    for (const orderId of orderIds) {
-      const pledgeData = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+    const { pledges: indexedPledges } = await readPoolPledgesByOrderIds(env, orderIds);
+    for (const pledgeData of indexedPledges) {
       if (!pledgeData) continue;
       if (pledgeData.campaignSlug !== campaignSlug) continue;
       pledges.push(pledgeData);
@@ -9967,8 +10058,9 @@ async function getCampaignReportPledges(env, campaignSlug) {
   }
 
   const pledgeKeys = await listAllPledgeKeys(env);
-  for (const key of pledgeKeys) {
-    const pledgeData = await env.PLEDGES.get(key.name, { type: 'json' });
+  const fallbackOrderIds = pledgeKeys.map((key) => String(key?.name || '').replace(/^pledge:/, ''));
+  const { pledges: fallbackPledges } = await readPoolPledgesByOrderIds(env, fallbackOrderIds);
+  for (const pledgeData of fallbackPledges) {
     if (!pledgeData) continue;
     if (pledgeData.campaignSlug !== campaignSlug) continue;
     pledges.push(pledgeData);
@@ -9993,16 +10085,14 @@ async function getIndexedCampaignReportPledges(env, campaignSlug) {
   }
 
   const pledges = [];
-  for (const orderId of orderIds) {
-    const normalizedOrderId = String(orderId || '').trim();
-    if (!normalizedOrderId) continue;
-    const pledgeData = await env.PLEDGES.get(`pledge:${normalizedOrderId}`, { type: 'json' });
+  const { pledges: indexedPledges, readOperations } = await readPoolPledgesByOrderIds(env, orderIds);
+  for (const pledgeData of indexedPledges) {
     if (!pledgeData) continue;
     if (String(pledgeData?.campaignSlug || '') !== campaignSlug) continue;
     pledges.push(pledgeData);
   }
 
-  return { ok: true, pledges, indexed: orderIds.length };
+  return { ok: true, pledges, indexed: orderIds.length, readOperations };
 }
 
 function getCampaignRunnerStatsSummary(campaign, stats, env, reportKind, pledges = [], now = new Date()) {
@@ -16505,10 +16595,8 @@ async function buildAdminCampaignAnalytics(env, campaign) {
   analytics.totals.indexedPledgeCount = normalizedOrderIds.length;
 
   const supporterEmails = new Set();
-  for (const orderId of normalizedOrderIds) {
-    const normalizedOrderId = String(orderId || '').trim();
-    if (!normalizedOrderId) continue;
-    const pledge = await env.PLEDGES.get(`pledge:${normalizedOrderId}`, { type: 'json' });
+  const { pledges, readOperations } = await readPoolPledgesByOrderIds(env, normalizedOrderIds);
+  for (const pledge of pledges) {
     if (!pledge || String(pledge?.campaignSlug || '') !== campaignSlug) continue;
     applyPledgeToAdminAnalytics(analytics, campaign, pledge, supporterEmails);
   }
@@ -16517,6 +16605,8 @@ async function buildAdminCampaignAnalytics(env, campaign) {
   return {
     ok: true,
     supporterEmails: Array.from(supporterEmails),
+    pledges,
+    readOperations,
     analytics: {
       slug: analytics.slug,
       title: analytics.title,
@@ -16608,11 +16698,15 @@ async function handleAdminAnalytics(request, env) {
 
   const campaignAnalytics = [];
   const supporterEmails = new Set();
+  const snapshotPledges = [];
+  let readOperations = 0;
   for (const campaign of selectedCampaigns) {
     const built = await buildAdminCampaignAnalytics(env, campaign);
     for (const email of built.supporterEmails || []) {
       supporterEmails.add(email);
     }
+    snapshotPledges.push(...(built.pledges || []));
+    readOperations += Number(built.readOperations || 0);
     campaignAnalytics.push(built.analytics);
   }
   const missingCampaigns = campaignAnalytics
@@ -16640,25 +16734,197 @@ async function handleAdminAnalytics(request, env) {
     mergeAdminAnalyticsBreakdowns(utmContentBreakdown, campaign.utmContentBreakdown);
   }
   const referralLabels = await readAdminAnalyticsReferralLabels(env, campaignAnalytics);
+  const snapshot = buildAdminPoolPledgeSnapshotMetadata(snapshotPledges);
+  const unchanged = adminPoolPledgeSnapshotIsUnchanged(snapshot, {
+    watermark: url.searchParams.get('watermark'),
+    since: url.searchParams.get('since')
+  });
 
   return privateJsonResponse({
     user: auth.user,
     scope: allCampaignsRequested ? 'portfolio' : 'campaign',
     campaignSlug: allCampaignsRequested ? null : requestedCampaignSlug,
     totals,
-    campaigns: campaignAnalytics,
+    campaigns: unchanged ? [] : campaignAnalytics,
     missingCampaigns,
-    statusBreakdown: mapAdminAnalyticsBreakdown(statusBreakdown),
-    languageBreakdown: mapAdminAnalyticsBreakdown(languageBreakdown),
-    referralBreakdown: mapAdminAnalyticsBreakdown(referralBreakdown),
+    statusBreakdown: unchanged ? [] : mapAdminAnalyticsBreakdown(statusBreakdown),
+    languageBreakdown: unchanged ? [] : mapAdminAnalyticsBreakdown(languageBreakdown),
+    referralBreakdown: unchanged ? [] : mapAdminAnalyticsBreakdown(referralBreakdown),
     referralLabels,
-    utmSourceBreakdown: mapAdminAnalyticsBreakdown(utmSourceBreakdown),
-    utmMediumBreakdown: mapAdminAnalyticsBreakdown(utmMediumBreakdown),
-    utmCampaignBreakdown: mapAdminAnalyticsBreakdown(utmCampaignBreakdown),
-    utmContentBreakdown: mapAdminAnalyticsBreakdown(utmContentBreakdown),
+    utmSourceBreakdown: unchanged ? [] : mapAdminAnalyticsBreakdown(utmSourceBreakdown),
+    utmMediumBreakdown: unchanged ? [] : mapAdminAnalyticsBreakdown(utmMediumBreakdown),
+    utmCampaignBreakdown: unchanged ? [] : mapAdminAnalyticsBreakdown(utmCampaignBreakdown),
+    utmContentBreakdown: unchanged ? [] : mapAdminAnalyticsBreakdown(utmContentBreakdown),
+    unchanged,
+    snapshot,
+    readOperations,
     writeBudget: adminReadBudget(),
     generatedAt: new Date().toISOString()
   }, 200, env);
+}
+
+function filmStripeSummaryAdapterSecret(env = {}) {
+  return configuredSecret(env.FILM_STRIPE_SUMMARY_ADAPTER_SECRET || env.STRIPE_SUMMARY_ADAPTER_SECRET);
+}
+
+function requireFilmStripeSummaryAdapterAuth(request, env) {
+  const secret = filmStripeSummaryAdapterSecret(env);
+  if (!secret) {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'Film Stripe summary adapter is not configured' }, 503, env)
+    };
+  }
+
+  const authHeader = request.headers.get('Authorization') || '';
+  const bearerPrefix = 'Bearer ';
+  const bearerToken = authHeader.startsWith(bearerPrefix)
+    ? authHeader.slice(bearerPrefix.length)
+    : '';
+  if (!bearerToken || !timingSafeEqual(bearerToken, secret)) {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'Unauthorized' }, 401, env)
+    };
+  }
+
+  return { ok: true };
+}
+
+function normalizeFilmStripeSummaryId(value, maxLength = 160) {
+  return String(value || '')
+    .trim()
+    .replace(/[^\w.:-]+/g, '_')
+    .slice(0, maxLength);
+}
+
+function normalizeFilmStripeSummaryRefs(value) {
+  const refs = Array.isArray(value) ? value : [];
+  const normalizedRefs = [];
+  const seen = new Set();
+  for (const item of refs) {
+    const ref = String(item || '').trim();
+    if (!isValidSlug(ref) || seen.has(ref)) continue;
+    seen.add(ref);
+    normalizedRefs.push(ref);
+    if (normalizedRefs.length >= FILM_STRIPE_SUMMARY_MAX_REFS) break;
+  }
+  return normalizedRefs;
+}
+
+function emptyFilmStripePoolSummary(mappedRefCount = 0, generatedAt = new Date().toISOString()) {
+  return {
+    source: 'pool',
+    status: 'empty',
+    generatedAt,
+    currency: 'USD',
+    dataBoundary: 'summary_only',
+    mappedRefCount,
+    matchedRefCount: 0,
+    missingRefCount: mappedRefCount,
+    totals: {
+      grossAmountCents: 0,
+      feeAmountCents: 0,
+      netAmountCents: 0,
+      pledgedAmountCents: 0,
+      chargedAmountCents: 0,
+      orderRevenueCents: 0,
+      paymentFailedAmountCents: 0,
+      refundedAmountCents: 0,
+      disputedAmountCents: 0
+    },
+    counts: {
+      paymentCount: 0,
+      paymentFailedCount: 0,
+      refundCount: 0,
+      disputeCount: 0,
+      invoiceCount: 0,
+      payoutCount: 0
+    }
+  };
+}
+
+function addFilmStripePoolTotals(target, totals = {}) {
+  target.grossAmountCents += Math.max(0, Number(totals.actualStripeGrossAmount || 0) || 0);
+  target.feeAmountCents += Math.max(0, Number(totals.actualStripeFeeAmount || 0) || 0);
+  target.netAmountCents += Math.max(0, Number(totals.actualStripeNetAmount || 0) || 0);
+  target.pledgedAmountCents += Math.max(0, Number(totals.pledgedAmount || 0) || 0);
+  target.chargedAmountCents += Math.max(0, Number(totals.chargedAmount || 0) || 0);
+  target.paymentFailedAmountCents += Math.max(0, Number(totals.paymentFailedAmount || 0) || 0);
+}
+
+function addFilmStripePoolCounts(target, totals = {}) {
+  target.paymentCount += Math.max(0, Number(totals.chargedPledgeCount || 0) || 0);
+  target.paymentFailedCount += Math.max(0, Number(totals.paymentFailedPledgeCount || 0) || 0);
+}
+
+function filmStripePoolSummaryHasMetrics(summary) {
+  return Object.values(summary.totals).some((value) => Number(value || 0) > 0) ||
+    Object.values(summary.counts).some((value) => Number(value || 0) > 0);
+}
+
+async function buildFilmStripePoolSummary(env, mappedRefs = []) {
+  const generatedAt = new Date().toISOString();
+  const summary = emptyFilmStripePoolSummary(mappedRefs.length, generatedAt);
+  if (!mappedRefs.length) return summary;
+
+  const { campaigns } = await getCampaigns(env);
+  const campaignMap = new Map((campaigns || []).map((campaign) => [String(campaign?.slug || ''), campaign]));
+  for (const campaignSlug of mappedRefs) {
+    const campaign = campaignMap.get(campaignSlug);
+    if (!campaign) continue;
+    const built = await buildAdminCampaignAnalytics(env, campaign);
+    if (!built.ok || !built.analytics) continue;
+    summary.matchedRefCount += 1;
+    addFilmStripePoolTotals(summary.totals, built.analytics.totals || {});
+    addFilmStripePoolCounts(summary.counts, built.analytics.totals || {});
+  }
+
+  summary.missingRefCount = Math.max(0, summary.mappedRefCount - summary.matchedRefCount);
+  summary.status = filmStripePoolSummaryHasMetrics(summary) ? 'available' : 'empty';
+  return summary;
+}
+
+async function handleFilmStripeSummaryAdapter(request, env) {
+  const auth = requireFilmStripeSummaryAdapterAuth(request, env);
+  if (!auth.ok) return auth.response;
+
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_FILM_STRIPE_SUMMARY_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const body = parsedBody.body || {};
+  if (String(body.source || '').trim().toLowerCase() !== 'pool') {
+    return privateJsonResponse({ error: 'Invalid summary source' }, 400, env);
+  }
+  if (String(body.dataBoundary || '').trim() !== 'summary_only') {
+    return privateJsonResponse({ error: 'Invalid data boundary' }, 400, env);
+  }
+
+  const workspaceId = normalizeFilmStripeSummaryId(body.workspaceId);
+  const projectId = normalizeFilmStripeSummaryId(body.projectId);
+  const mappedRefs = normalizeFilmStripeSummaryRefs(body.mappedRefs);
+  if (!workspaceId || !projectId || mappedRefs.length === 0) {
+    return privateJsonResponse({ error: 'workspaceId, projectId, and mappedRefs are required' }, 400, env);
+  }
+
+  const summary = await buildFilmStripePoolSummary(env, mappedRefs);
+  await recordAdminAuditEvent(env, {
+    action: 'film_stripe_summary_adapter:read',
+    source: 'pool',
+    workspaceId,
+    projectId,
+    dataBoundary: 'summary_only',
+    mappedRefCount: summary.mappedRefCount,
+    matchedRefCount: summary.matchedRefCount,
+    missingRefCount: summary.missingRefCount,
+    status: summary.status
+  });
+
+  return privateJsonResponse(summary, 200, env);
 }
 
 async function handleAdminStripeFinancialsBackfill(request, env) {
@@ -16716,10 +16982,8 @@ async function handleAdminStripeFinancialsBackfill(request, env) {
     }
 
     const pledgesByPaymentIntent = new Map();
-    for (const orderId of orderIds) {
-      const normalizedOrderId = String(orderId || '').trim();
-      if (!normalizedOrderId) continue;
-      const pledge = await env.PLEDGES.get(`pledge:${normalizedOrderId}`, { type: 'json' });
+    const { pledges } = await readPoolPledgesByOrderIds(env, orderIds);
+    for (const pledge of pledges) {
       if (!pledge || String(pledge?.campaignSlug || '') !== campaignSlug) continue;
       if (getPledgeStatusLabel(pledge) !== 'charged') continue;
       if (getStoredStripeFinancials(pledge)?.source === 'actual') {
@@ -18794,12 +19058,14 @@ async function handleAdminSupporters(request, env) {
   const supporters = [];
   let matched = 0;
   let scanned = 0;
+  let readOperations = 0;
+  const snapshotPledges = [];
 
   for (const entry of indexedCampaigns) {
-    for (let index = 0; index < entry.orderIds.length; index += 1) {
-      const orderId = String(entry.orderIds[index] || '').trim();
-      if (!orderId) continue;
-      const pledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
+    const batch = await readPoolPledgesByOrderIds(env, entry.orderIds);
+    readOperations += batch.readOperations;
+    snapshotPledges.push(...batch.pledges);
+    for (const pledge of batch.pledges) {
       scanned += 1;
       if (!pledge || String(pledge?.campaignSlug || '') !== entry.campaignSlug) continue;
       if (!pledgeMatchesAdminSupporterFilters(pledge, filters)) continue;
@@ -18814,6 +19080,11 @@ async function handleAdminSupporters(request, env) {
     }
   }
   const nextCursor = matched > cursor + supporters.length ? cursor + supporters.length : null;
+  const snapshot = buildAdminPoolPledgeSnapshotMetadata(snapshotPledges);
+  const unchanged = adminPoolPledgeSnapshotIsUnchanged(snapshot, {
+    watermark: url.searchParams.get('watermark'),
+    since: url.searchParams.get('since')
+  });
 
   return privateJsonResponse({
     user: auth.user,
@@ -18828,7 +19099,7 @@ async function handleAdminSupporters(request, env) {
       title: campaign.title || campaign.slug,
       effectiveState: getEffectiveState(campaign, env) || campaign?.state || 'unknown'
     })),
-    supporters,
+    supporters: unchanged ? [] : supporters,
     missingCampaigns,
     page: {
       limit,
@@ -18839,6 +19110,9 @@ async function handleAdminSupporters(request, env) {
       indexed,
       scanned
     },
+    unchanged,
+    snapshot,
+    readOperations,
     filters,
     writeBudget: adminReadBudget(),
     generatedAt: new Date().toISOString()
@@ -19076,17 +19350,272 @@ function getAdminAuditEventKey(action, now = new Date()) {
   return `admin-audit:${dateKey}:${safeAction}:${id}`;
 }
 
+function normalizeAdminAuditDate(value = '') {
+  const text = String(value || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+}
+
+function adminAuditExportPrefix(request) {
+  const url = new URL(request.url);
+  const date = normalizeAdminAuditDate(url.searchParams.get('date'));
+  return date ? `admin-audit:${date}:` : 'admin-audit:';
+}
+
+async function listAdminAuditEventKeys(env, prefix = 'admin-audit:') {
+  if (!env?.PLEDGES?.list) {
+    return { ok: false, status: 503, error: 'Audit storage unavailable' };
+  }
+  const keys = [];
+  let cursor = undefined;
+  let listCalls = 0;
+  let truncated = false;
+  do {
+    const listing = await env.PLEDGES.list({ prefix, cursor, limit: 1000 });
+    listCalls += 1;
+    keys.push(...(Array.isArray(listing?.keys) ? listing.keys : []));
+    cursor = listing?.cursor;
+    truncated = keys.length >= MAX_ADMIN_AUDIT_EXPORT_EVENTS || listCalls >= 20;
+    if (listing?.list_complete !== false || !cursor || truncated) break;
+  } while (true);
+  return { ok: true, keys: keys.slice(0, MAX_ADMIN_AUDIT_EXPORT_EVENTS), listCalls, truncated };
+}
+
+async function readAdminAuditValues(env, keys = []) {
+  const keyNames = keys.map((key) => String(key?.name || key || '').trim()).filter(Boolean);
+  const values = [];
+  for (let offset = 0; offset < keyNames.length; offset += 100) {
+    const batch = keyNames.slice(offset, offset + 100);
+    let bulkValues = null;
+    try {
+      bulkValues = await env.PLEDGES.get(batch, { type: 'json' });
+    } catch {
+      // Local KV adapters may support only single-key reads.
+    }
+    if (bulkValues && typeof bulkValues.get === 'function') {
+      values.push(...batch.map((key) => bulkValues.get(key) ?? null));
+      continue;
+    }
+    for (const key of batch) values.push(await env.PLEDGES.get(key, { type: 'json' }));
+  }
+  return values;
+}
+
+function publicAdminAuditRow(row = {}) {
+  return {
+    key: String(row.key || ''),
+    createdAt: String(row.createdAt || ''),
+    action: String(row.action || ''),
+    adminEmail: String(row.adminEmail || row.actorEmail || ''),
+    adminRole: String(row.adminRole || row.actorRole || ''),
+    campaignSlug: String(row.campaignSlug || ''),
+    orderId: String(row.orderId || ''),
+    productId: String(row.productId || ''),
+    source: String(row.source || ''),
+    status: String(row.status || ''),
+    changedFields: Array.isArray(row.changedFields) ? row.changedFields.map(String).slice(0, 50) : []
+  };
+}
+
+function adminAuditMetadata(key, event = {}) {
+  return publicAdminAuditRow({ key, ...event });
+}
+
+function adminAuditFiltersFromRequest(request) {
+  const url = new URL(request.url);
+  return {
+    action: String(url.searchParams.get('action') || '').trim().toLowerCase().slice(0, 120),
+    email: String(url.searchParams.get('email') || '').trim().toLowerCase().slice(0, 254),
+    campaignSlug: String(url.searchParams.get('campaignSlug') || '').trim().toLowerCase().slice(0, 120),
+    query: String(url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 120)
+  };
+}
+
+function adminAuditSearchValue(row = {}) {
+  const publicRow = publicAdminAuditRow(row);
+  return Object.values(publicRow)
+    .flatMap((value) => Array.isArray(value) ? value : [value])
+    .map((value) => String(value || '').toLowerCase())
+    .join(' ');
+}
+
+function filterAdminAuditRows(rows = [], filters = {}) {
+  return rows.filter((row) => {
+    const publicRow = publicAdminAuditRow(row);
+    if (filters.action && !publicRow.action.toLowerCase().includes(filters.action)) return false;
+    if (filters.email && publicRow.adminEmail.toLowerCase() !== filters.email) return false;
+    if (filters.campaignSlug && publicRow.campaignSlug.toLowerCase() !== filters.campaignSlug) return false;
+    if (filters.query && !adminAuditSearchValue(publicRow).includes(filters.query)) return false;
+    return true;
+  });
+}
+
+async function buildAdminAuditSearchRows(request, env) {
+  const listed = await listAdminAuditEventKeys(env, adminAuditExportPrefix(request));
+  if (!listed.ok) return listed;
+  const rows = [];
+  const keysNeedingValues = [];
+  for (const key of listed.keys) {
+    const keyName = String(key?.name || '').trim();
+    if (!keyName) continue;
+    if (key?.metadata && typeof key.metadata === 'object' && key.metadata.createdAt && key.metadata.action) {
+      rows.push({ ...key.metadata, key: keyName });
+    } else {
+      keysNeedingValues.push(keyName);
+    }
+  }
+  const values = await readAdminAuditValues(env, keysNeedingValues);
+  values.forEach((event, index) => {
+    if (event && typeof event === 'object') rows.push({ key: keysNeedingValues[index], ...event });
+  });
+  rows.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')) ||
+    String(b.key || '').localeCompare(String(a.key || '')));
+  return {
+    ok: true,
+    rows,
+    page: {
+      listed: listed.keys.length,
+      returned: rows.length,
+      listCalls: listed.listCalls,
+      valueReads: keysNeedingValues.length,
+      truncated: listed.truncated
+    }
+  };
+}
+
+function adminAuditDetailsJson(event = {}) {
+  const detail = { ...event };
+  ['key', 'createdAt', 'action', 'adminEmail', 'actorEmail', 'adminRole', 'actorRole', 'campaignSlug', 'orderId', 'productId', 'source', 'status', 'changedFields']
+    .forEach((key) => delete detail[key]);
+  return Object.keys(detail).length ? JSON.stringify(detail) : '';
+}
+
+function protectAdminAuditCsvCell(value) {
+  const text = String(value ?? '');
+  return /^[=+\-@]/.test(text) ? `'${text}` : text;
+}
+
+function adminAuditRowsCsv(rows = []) {
+  const header = [
+    'key', 'created_at', 'action', 'admin_email', 'admin_role', 'campaign_slug',
+    'order_id', 'product_id', 'source', 'status', 'changed_fields', 'details_json'
+  ];
+  const csvRows = rows.map((row) => {
+    const publicRow = publicAdminAuditRow(row);
+    return [
+      publicRow.key, publicRow.createdAt, publicRow.action, publicRow.adminEmail,
+      publicRow.adminRole, publicRow.campaignSlug, publicRow.orderId, publicRow.productId,
+      publicRow.source, publicRow.status, publicRow.changedFields.join('|'), adminAuditDetailsJson(row)
+    ].map(protectAdminAuditCsvCell);
+  });
+  return rebuildCsvReport({ header, rows: csvRows }).csv;
+}
+
+async function requireSuperAdminAuditAccess(request, env) {
+  const auth = await requireAdminSession(request, env, 'campaign:read');
+  if (!auth.ok) return auth;
+  if (auth.user.role !== 'super_admin') {
+    return { ok: false, response: privateJsonResponse({ error: 'Forbidden' }, 403, env) };
+  }
+  return auth;
+}
+
+async function handleAdminAudit(request, env) {
+  const auth = await requireSuperAdminAuditAccess(request, env);
+  if (!auth.ok) return auth.response;
+  const built = await buildAdminAuditSearchRows(request, env);
+  if (!built.ok) return privateJsonResponse({ error: built.error }, built.status || 503, env);
+  const filters = adminAuditFiltersFromRequest(request);
+  const url = new URL(request.url);
+  const requestedLimit = Number.parseInt(String(url.searchParams.get('limit') || '100'), 10);
+  const limit = Math.max(1, Math.min(250, Number.isFinite(requestedLimit) ? requestedLimit : 100));
+  const filtered = filterAdminAuditRows(built.rows, filters);
+  return privateJsonResponse({
+    rows: filtered.slice(0, limit).map(publicAdminAuditRow),
+    page: { ...built.page, matched: filtered.length, returned: Math.min(filtered.length, limit), limit },
+    filters,
+    writeBudget: adminReadBudget({ kvListExpected: built.page.listCalls, kvReadsExpected: built.page.valueReads }),
+    generatedAt: new Date().toISOString()
+  }, 200, env);
+}
+
+async function handleAdminAuditCsv(request, env) {
+  const auth = await requireSuperAdminAuditAccess(request, env);
+  if (!auth.ok) return auth.response;
+  const built = await buildAdminAuditSearchRows(request, env);
+  if (!built.ok) return privateJsonResponse({ error: built.error }, built.status || 503, env);
+  const rows = filterAdminAuditRows(built.rows, adminAuditFiltersFromRequest(request));
+  const dateKey = normalizeAdminAuditDate(new URL(request.url).searchParams.get('date')) || new Date().toISOString().slice(0, 10);
+  return csvResponse(adminAuditRowsCsv(rows), `pool-admin-audit-${dateKey}.csv`, env);
+}
+
 async function recordAdminAuditEvent(env, event = {}) {
   if (!env?.PLEDGES) return null;
   const now = new Date();
   const action = String(event.action || 'admin_event').trim() || 'admin_event';
   const key = getAdminAuditEventKey(action, now);
-  await env.PLEDGES.put(key, JSON.stringify({
+  const storedEvent = {
     ...event,
     action,
     createdAt: now.toISOString()
-  }), { expirationTtl: ADMIN_AUDIT_EVENT_TTL_SECONDS });
+  };
+  await env.PLEDGES.put(key, JSON.stringify(storedEvent), {
+    expirationTtl: ADMIN_AUDIT_EVENT_TTL_SECONDS,
+    metadata: adminAuditMetadata(key, storedEvent)
+  });
   return key;
+}
+
+async function handleAdminSessions(request, env) {
+  const auth = await requireAdminSession(request, env, 'campaign:read');
+  if (!auth.ok) return auth.response;
+  if (auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Forbidden' }, 403, env);
+  }
+  const sessions = await listAdminSessionReview(env);
+  return privateJsonResponse({
+    ...sessions,
+    active: sessions.active.map((session) => ({
+      ...session,
+      current: session.id === auth.sessionId
+    })),
+    privacy: {
+      storesFullIp: false,
+      storesFullUserAgent: false,
+      storesPreciseLocation: false,
+      networkIdentifier: 'keyed fingerprint'
+    },
+    generatedAt: new Date().toISOString()
+  }, 200, env);
+}
+
+async function handleAdminSessionRevoke(request, env, body = {}) {
+  const auth = await requireAdminSession(request, env, 'settings:publish', { requireCsrf: true });
+  if (!auth.ok) return auth.response;
+  if (auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Forbidden' }, 403, env);
+  }
+  const revoked = await revokeAdminSessionById(env, body.id);
+  if (!revoked.ok) {
+    return privateJsonResponse({ error: revoked.error }, revoked.status || 400, env);
+  }
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'admin_session:revoke',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    revokedAdminEmail: revoked.session.email,
+    revokedSessionId: revoked.session.id.slice(0, 12),
+    revokedSessionCreatedAt: revoked.session.createdAt
+  });
+  return privateJsonResponse({
+    success: true,
+    revoked: {
+      email: revoked.session.email,
+      id: revoked.session.id,
+      createdAt: revoked.session.createdAt
+    },
+    auditKey,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: auditKey ? 1 : 0 })
+  }, 200, env);
 }
 
 function flattenAdminAddOnInventory(snapshot = {}, catalog = {}) {

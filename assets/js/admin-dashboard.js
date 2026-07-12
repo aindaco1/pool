@@ -899,6 +899,12 @@
     if (app) app.hidden = true;
     if (logoutButton) logoutButton.hidden = true;
     setAuthStatus(message || '');
+    if (hasAdminTurnstile()) {
+      ensureAdminTurnstile().catch(function(error) {
+        logger.warn('Admin challenge failed to load', error);
+        setAuthStatus(t('challenge_failed', 'Security check failed. Please try again.'));
+      });
+    }
   }
 
   function showApp(user) {
@@ -10092,13 +10098,6 @@
   }
 
   if (loginForm) {
-    if (hasAdminTurnstile()) {
-      ensureAdminTurnstile().catch(function(error) {
-        logger.warn('Admin challenge failed to load', error);
-        setAuthStatus(t('challenge_failed', 'Security check failed. Please try again.'));
-      });
-    }
-
     loginForm.addEventListener('submit', async function(event) {
       event.preventDefault();
       var email = String(emailInput?.value || '').trim();
@@ -10130,6 +10129,8 @@
         } else {
           setAuthStatus(t('login_failed', 'Unable to start admin sign-in.'));
         }
+      } finally {
+        adminLoginAttemptStarted = false;
       }
     });
   }

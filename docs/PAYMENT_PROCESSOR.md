@@ -2,7 +2,7 @@
 
 The Pool uses Stripe as its payment processor, with the Cloudflare Worker as the canonical checkout, pledge, webhook, and settlement boundary. The public site can collect cart intent, but the Worker rebuilds the money shape, creates Stripe sessions, persists pledges, and later charges saved payment methods only when an all-or-nothing campaign succeeds.
 
-This document describes the current implementation from setup through integration. It also folds in relevant fintech engineering practices from Voytek Pitula's [Fintech Engineering Handbook](https://w.pitula.me/fintech-engineering-handbook/) as operating guidance for The Pool.
+This document describes the current implementation from setup through integration. Payment-specific snapshot reconciliation and the gates required before settlement resumes after recovery are documented in [BACKUP_RESTORE.md](./BACKUP_RESTORE.md). It also folds in relevant fintech engineering practices from Voytek Pitula's [Fintech Engineering Handbook](https://w.pitula.me/fintech-engineering-handbook/) as operating guidance for The Pool.
 
 ## Current Model
 

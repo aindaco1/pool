@@ -324,6 +324,7 @@ describe('admin dashboard foundation', () => {
     const archiveCampaignWorkflow = readRepoFile('.github', 'workflows', 'archive-campaign.yml');
     const pagePrefetchScript = readRepoFile('assets', 'js', 'page-prefetch.js');
     const mainScss = readRepoFile('assets', 'main.scss');
+    const adminBundleScss = readRepoFile('assets', 'admin.scss');
     const adminScss = readRepoFile('assets', 'partials', '_admin.scss');
     const adminScript = readRepoFile('assets', 'js', 'admin-dashboard.js');
     const enI18n = readRepoFile('_data', 'i18n', 'en.yml');
@@ -556,7 +557,9 @@ describe('admin dashboard foundation', () => {
     expect(campaignPreviewPlugin).not.toContain("campaign.data['preview_only']");
     expect(campaignPreviewPlugin).not.toContain("campaign.data['preview_enabled']");
     expect(pagePrefetchScript).toContain("'t'");
-    expect(mainScss).toContain('@import "partials/admin";');
+    expect(mainScss).not.toContain('@import "partials/admin";');
+    expect(adminBundleScss).toContain('@import "partials/admin";');
+    expect(layout).toContain('/assets/admin.css');
     expect(adminScss).toContain('@media (max-width: 1100px)');
     expect(adminScss).toContain('.admin-tabs__list');
     expect(adminScss).toContain('overflow-x: auto;');

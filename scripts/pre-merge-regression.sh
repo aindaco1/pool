@@ -3,17 +3,51 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-ruby ./scripts/sync-worker-config.rb >/dev/null
-
 WORKER_PID=""
 JEKYLL_PID=""
 TEMP_DEV_VARS=""
+TEMP_LOCAL_CONFIG=""
 ORIGINAL_DEV_VARS_BACKUP=""
 LOG_DIR="$(mktemp -d /tmp/pool-premerge-logs.XXXXXX)"
 declare -a PHASE_RESULTS=()
 HOST_JEKYLL_STATUS="unknown"
 HOST_JEKYLL_FAILURE_REASON=""
 HOST_JEKYLL_LOG=""
+
+prepare_local_config() {
+  if [[ -f _config.local.yml ]]; then
+    return 0
+  fi
+
+  TEMP_LOCAL_CONFIG="_config.local.yml"
+  cat > "${TEMP_LOCAL_CONFIG}" <<'YAML'
+# Temporary localhost overrides for clean-checkout regression testing.
+url: http://127.0.0.1:4000
+
+platform:
+  site_url: "http://127.0.0.1:4000"
+  worker_url: "http://127.0.0.1:8787"
+
+show_test_campaigns: true
+
+tax:
+  provider: nm_grt
+
+admin:
+  turnstile_site_key: ""
+
+launch_reminders:
+  turnstile_site_key: ""
+YAML
+}
+
+search_text() {
+  if command -v rg >/dev/null 2>&1; then
+    command rg "$@"
+  else
+    grep -E "$@"
+  fi
+}
 
 prefer_podman_path() {
   local candidate=""
@@ -91,9 +125,9 @@ prepare_host_jekyll() {
   fi
 
   HOST_JEKYLL_STATUS="bundle_install_failed"
-  if [[ -f "${HOST_JEKYLL_LOG}" ]] && rg -q "can no longer be found in that source" "${HOST_JEKYLL_LOG}"; then
+  if [[ -f "${HOST_JEKYLL_LOG}" ]] && search_text -q "can no longer be found in that source" "${HOST_JEKYLL_LOG}"; then
     HOST_JEKYLL_FAILURE_REASON="locked gem version is unavailable from RubyGems"
-  elif [[ -f "${HOST_JEKYLL_LOG}" ]] && rg -q "extensions are not built" "${HOST_JEKYLL_LOG}"; then
+  elif [[ -f "${HOST_JEKYLL_LOG}" ]] && search_text -q "extensions are not built" "${HOST_JEKYLL_LOG}"; then
     HOST_JEKYLL_FAILURE_REASON="native gem extensions are missing on the host Ruby"
   else
     HOST_JEKYLL_FAILURE_REASON="bundle install failed"
@@ -161,7 +195,7 @@ build_with_podman_jekyll() {
     -v "$PWD:/workspace" \
     -v pool-dev-bundle:/usr/local/bundle \
     localhost/pool-dev-site:latest \
-    bash -lc 'cd /workspace && SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet'
+    bash -lc 'set -euo pipefail; cd /workspace; bundle config set path "${BUNDLE_PATH:-/usr/local/bundle}" >/dev/null; bundle check >/dev/null 2>&1 || bundle install; SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet'
 
   minify_site_assets
 }
@@ -180,8 +214,16 @@ minify_site_assets() {
 }
 
 verify_build_artifacts() {
-  if ! rg -n '\.pool-first-party-cart__panel' _site/assets/main.css >/dev/null; then
+  if ! search_text -n '\.pool-first-party-cart__panel' _site/assets/main.css >/dev/null; then
     echo "main.css is missing expected first-party cart UI styles"
+    return 1
+  fi
+  if [[ ! -f _site/assets/admin.css ]] || ! search_text -n '\.admin-dashboard' _site/assets/admin.css >/dev/null; then
+    echo "admin.css is missing expected isolated dashboard styles"
+    return 1
+  fi
+  if ! node ./scripts/audit-performance-budgets.mjs >/dev/null; then
+    echo "Generated asset performance budgets failed"
     return 1
   fi
   if [[ ! -f _site/robots.txt ]]; then
@@ -192,35 +234,35 @@ verify_build_artifacts() {
     echo "sitemap.xml is missing from the built site"
     return 1
   fi
-  if ! rg -n 'Sitemap: .+/sitemap\.xml' _site/robots.txt >/dev/null; then
+  if ! search_text -n 'Sitemap: .+/sitemap\.xml' _site/robots.txt >/dev/null; then
     echo "robots.txt is missing its sitemap pointer"
     return 1
   fi
-  if ! rg -n 'Disallow: /manage/' _site/robots.txt >/dev/null; then
+  if ! search_text -n 'Disallow: /manage/' _site/robots.txt >/dev/null; then
     echo "robots.txt is missing the manage-route disallow"
     return 1
   fi
-  if ! rg -n '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9" xmlns:xhtml="http://www\.w3\.org/1999/xhtml">' _site/sitemap.xml >/dev/null; then
+  if ! search_text -n '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9" xmlns:xhtml="http://www\.w3\.org/1999/xhtml">' _site/sitemap.xml >/dev/null; then
     echo "sitemap.xml is missing the expected urlset root"
     return 1
   fi
-  if ! rg -n '<loc>.+/campaigns/' _site/sitemap.xml >/dev/null; then
+  if ! search_text -n '<loc>.+/campaigns/' _site/sitemap.xml >/dev/null; then
     echo "sitemap.xml is missing public campaign URLs"
     return 1
   fi
-  if ! rg -n 'application/ld\+json' _site/index.html >/dev/null; then
+  if ! search_text -n 'application/ld\+json' _site/index.html >/dev/null; then
     echo "Home page is missing JSON-LD"
     return 1
   fi
-  if ! rg -n 'application/ld\+json' _site/campaigns/*/index.html >/dev/null; then
+  if ! search_text -n 'application/ld\+json' _site/campaigns/*/index.html >/dev/null; then
     echo "Campaign pages are missing JSON-LD"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/manage/index.html >/dev/null; then
+  if ! search_text -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/manage/index.html >/dev/null; then
     echo "Manage page is missing noindex robots metadata"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/admin/index.html >/dev/null; then
+  if ! search_text -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/admin/index.html >/dev/null; then
     echo "Admin page is missing noindex robots metadata"
     return 1
   fi
@@ -228,19 +270,19 @@ verify_build_artifacts() {
     echo "Generated CSS/JS assets still have minification savings"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/es/admin/index.html >/dev/null; then
+  if ! search_text -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/es/admin/index.html >/dev/null; then
     echo "Spanish admin page is missing noindex robots metadata"
     return 1
   fi
-  if rg -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/admin/index.html >/dev/null; then
+  if search_text -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/admin/index.html >/dev/null; then
     echo "Admin page is emitting public social or structured-data metadata"
     return 1
   fi
-  if rg -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/es/admin/index.html >/dev/null; then
+  if search_text -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/es/admin/index.html >/dev/null; then
     echo "Spanish admin page is emitting public social or structured-data metadata"
     return 1
   fi
-  if rg -n '<loc>.+/admin/' _site/sitemap.xml >/dev/null; then
+  if search_text -n '<loc>.+/admin/' _site/sitemap.xml >/dev/null; then
     echo "sitemap.xml unexpectedly includes the admin route"
     return 1
   fi
@@ -297,9 +339,15 @@ cleanup() {
   if [[ -n "${ORIGINAL_DEV_VARS_BACKUP}" && -f "${ORIGINAL_DEV_VARS_BACKUP}" ]]; then
     mv "${ORIGINAL_DEV_VARS_BACKUP}" worker/.dev.vars
   fi
+  if [[ -n "${TEMP_LOCAL_CONFIG}" && -f "${TEMP_LOCAL_CONFIG}" ]]; then
+    rm -f "${TEMP_LOCAL_CONFIG}"
+  fi
 }
 
 trap cleanup EXIT
+
+prepare_local_config
+ruby ./scripts/sync-worker-config.rb >/dev/null
 
 if [[ "${1:-}" = "__podman_build_check" ]]; then
   build_with_podman_jekyll
@@ -502,6 +550,8 @@ start_worker || exit 1
 run_phase "6. Security suite" npm run test:security
 
 stop_worker
+
+run_phase "6b. Podman release resource check" env PODMAN_REQUIRE_RELEASE_RESOURCES=true npm run podman:doctor
 
 if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
   reset_podman_dev_artifacts || exit 1
