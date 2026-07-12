@@ -2,11 +2,32 @@
 
 ## Current Milestone
 
-**v1.0.9**
+**v1.1.0**
 
-The v1.0.9 milestone incorporates classified encrypted recovery, four-hour recovery objectives, bulk admin reads, session/audit controls, performance and cache evidence gates, posture/localization automation, and reviewed production deployment.
+The v1.1.0 milestone adds variant-specific add-on pricing and completes the Store-aligned production-quality/admin-operations release gate without importing Store-only catalog, ticket, RSVP, SKU, download, or R2 systems.
 
 ## Completed
+
+**Variant-specific add-on prices**
+
+- [x] Shared price contract and historical accounting
+  - Platform `_config.yml` add-ons and campaign `campaign_add_ons` accept optional variant `price`; blank inherits the product price and explicit zero remains a valid override
+  - Browser runtimes share `resolveAddOnUnitPriceCents`, legacy cart/Manage fallbacks implement the same rule, and variant product state carries `priceCents`
+  - Cart and Manage Pledge selectors show differing variant prices and update card/subtotal state through the existing selection flow
+  - The Worker rejects browser price authority, canonicalizes new or changed selections from the current catalog, and preserves persisted `unitPrice` for unchanged historical pledge lines
+  - The platform/campaign admin editors expose localized optional variant prices, reject negative or malformed values, and serialize `price` only for real overrides
+  - Existing add-ons require no migration because variants without `price` continue inheriting their product price
+
+**Production quality gates and admin operations hardening**
+
+- [x] Store-aligned release gates adapted to Pool
+  - One performance-budget config governs generated JavaScript/CSS ceilings, Lighthouse categories/Web Vitals/resource limits, dashboard/Worker timing targets, Workers Cache evidence policy, and public/private cache targets
+  - Scriptable Lighthouse and cache-policy evidence cover core public, campaign, admin, generated JSON, static asset, and private Worker routes; evaluator unit tests run without live provider credentials
+  - Existing bounded Worker timing histograms now surface p50/p95/p99/max and slow-route summaries in Settings -> Runtime diagnostics without a second telemetry store or customer/request payloads
+  - Pool v1.0.9 session/device review and revocation, searchable audit filters/CSV, full provider/security readiness, production-posture drift checks, localization packets, pinned deployment workflows, and scheduled Podman coverage remain the shared admin-operations baseline
+  - Workers Cache remains disabled until representative Pool evidence proves at least the configured 40% p95 improvement, matching the Store decision rather than enabling it speculatively
+  - Automated accessibility/i18n/SEO checks remain release gates; human VoiceOver/NVDA and native-Spanish review are documented optional evidence
+  - Store-only product, SKU, ticket/RSVP, signed-download, and R2 download-abuse systems remain intentionally excluded
 
 **Protected campaign previews and new campaign creation**
 
@@ -321,25 +342,6 @@ The v1.0.9 milestone incorporates classified encrypted recovery, four-hour recov
   - Keep cleanup conservative and explainable: publish-time cleanup should continue deleting only same-campaign dashboard-owned media that disappeared from normalized content and is not referenced elsewhere
   - Extend tests around media picker usability, optimization-state rendering, broken-reference warnings, cleanup safety, responsive image selection, and Blast image payload safety without duplicating the optimizer's own native-tool checks
   - Update creator-facing docs with media naming, alt-text, source/derivative expectations, optimization warnings, replacement behavior, and when to ask a platform operator for shared/default media
-- [ ] Production quality gates and admin operations hardening
-  - Adapt the relevant Store Future Work hardening to The Pool without importing Store-only product, ticket/RSVP, R2 download, or storefront catalog systems; focus on public campaigns, embeds, cart/checkout, Manage Pledge, admin dashboard, campaign creator workflows, Worker routes, and scheduled jobs
-  - Add lightweight performance budgets for campaign pages, embeds, cart, checkout, Manage Pledge, and admin routes, covering JavaScript size, CSS size, image/video weight, critical route timing, Worker response time, and dashboard table/render latency
-  - Add repeatable Lighthouse/PageSpeed checks for core public routes and embeds before production deploys, keeping the checks scriptable and optional where external provider credentials or stable URLs are unavailable
-  - Surface Worker timing percentiles and slow-route summaries in Settings -> Plan usage or Runtime diagnostics by reusing existing observability samples instead of adding a second telemetry backend
-  - Add cache-status checks for static assets, generated JSON feeds, campaign pages, embed assets, share-card responses, and private/no-store routes so public performance improvements do not weaken checkout, admin, preview, or tokenized cache rules
-  - Expand setup/readiness checks so they mirror the full security guide: Worker secrets, Stripe webhooks, Resend senders, Turnstile widgets, USPS and ZIP.TAX credentials, `RATELIMIT`, CSP, allowed origins, admin bootstrap users, protected previews, lookup/manage tokens, reminders, and production mode
-  - Add an admin session/device review view with recent login metadata and explicit session revocation, using the existing admin auth/session/audit model rather than a separate account system
-  - Expand admin audit events into a searchable dashboard audit view with filters and CSV export, reusing existing KV-backed audit records and keeping sensitive payloads redacted
-  - Add scheduled secret/config posture checks that warn when production-required secrets, webhook endpoints, allowed origins, provider readiness, or admin user posture drift from expected config; surface results through admin diagnostics and/or GitHub issues instead of silently mutating runtime state
-  - Expand release-artifact support beyond the optional VoiceOver/Whisper helper to the documented manual VoiceOver and NVDA pass, including checklist evidence for public campaign pages, cart/checkout, Manage Pledge, creator dashboard editing, reports, and admin auth flows
-  - Expand automated accessibility coverage beyond the current campaign focus/status/reduced-motion release evidence to mounted checkout/payment surfaces when Stripe test fixtures are available, plus high-zoom screenshots for cart, checkout, Manage Pledge, campaign editing, reports, supporter tables, and campaign embed builder controls
-  - Keep long campaign titles, tier/add-on/variant labels, filenames, referral/UTM labels, supporter emails/names, Blast subjects, and dense tablet/mobile admin rows in regression fixtures so layout hardening covers real creator/admin content
-  - Move remaining hardcoded public/admin runtime strings into `_data/i18n/*` or runtime message JSON as they are touched, and add localized QA snapshots for checkout errors, Manage Pledge, campaign creation/editing, report downloads, Blast sends, and fulfillment/status copy
-  - Define a translator/native-speaker review loop before adding locales beyond English and Spanish, including localized campaign metadata, alternate links, JSON-LD language values, emails, and dashboard help text
-  - Keep Podman smoke coverage aligned with the host merge gate, add troubleshooting notes for stale `gvproxy`, port conflicts, and first-run image rebuilds if they recur, and consider a scheduled Podman E2E CI job if runner support remains reliable
-  - Expand rendered SEO QA beyond the current release samples with more active campaigns, localized campaign pages, share-card URL checks, and noindex handling for preview, checkout, and supporter-only routes
-  - Expand the dedicated release smoke script and evidence checklist beyond the current pledge/report/payment/provider baseline for paid physical pledges, digital-only pledges, platform and campaign add-ons, Manage Pledge modify/cancel/update-card paths, launch reminders, abandoned-checkout reminders, supporter email blasts, settlement, pledge/fulfillment reports, analytics, and admin downloads
-  - Update `docs/PERFORMANCE.md`, `docs/SECURITY.md`, `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `docs/PODMAN.md`, `docs/SEO.md`, `docs/TESTING.md`, `docs/DASHBOARD.md`, and `docs/WORKFLOWS.md` as each hardening slice lands so the release procedure stays docs-as-code rather than tribal knowledge
 - [ ] Payment integrity hardening from the Fintech Engineering Handbook
   - Keep the current architecture: Stripe remains the processor, Stripe owns card data, the Cloudflare Worker remains the canonical payment boundary, KV remains pledge/projection storage, Durable Objects serialize scarce inventory and settlement, and the Worker scheduler handles bounded background work
   - Avoid adding a full double-entry ledger unless The Pool later adds refunds, payouts, stored balances, multi-currency money movement, or marketplace-style splits; for the current pledge model, prefer a lightweight append-only payment event journal that references existing pledge/order/campaign IDs
@@ -373,18 +375,6 @@ The v1.0.9 milestone incorporates classified encrypted recovery, four-hour recov
   - Add reconciliation and remittance support: create tax liability exports grouped by provider, source, jurisdiction, location code, effective rate, taxable subtotal, taxable shipping, tax collected, campaign/platform ownership, and refund/cancel/modify deltas; ensure reports preserve historical stored tax details even after provider settings or catalog categories change
   - Extend testing at the right layers: unit tests for tax-line construction and provider adapters, fixture tests for NM starter/API fallback and ZIP.TAX shipping taxability, Worker tests for checkout and Manage Pledge tax deltas, browser tests for provisional/error/fallback UI states, report tests for tax liability exports, and setup tests for provider credential/readiness handling
   - Update docs after implementation: `docs/CUSTOMIZATION.md`, `docs/WORKFLOWS.md`, `docs/TESTING.md`, `docs/SECURITY.md`, `worker/README.md`, `docs/PAYMENT_PROCESSOR.md`, creator checklists, and dashboard help text should explain provider selection, fallback policy, refresh cadence, tax category behavior, stored evidence, and what operators must verify with a tax professional
-- [ ] Variant-specific add-on prices
-  - Adapt the Store pattern carefully: Store already supports variant prices for first-class `_products` and its add-on suggestion runtime resolves `variant.price ?? product.price`, but Pool should borrow only that price-resolution behavior rather than Store's broader product catalog, download, SKU, and R2 model
-  - Keep Pool's current architecture: platform add-ons stay in `_config.yml` under `add_ons.products`, campaign add-ons stay in campaign front matter under `campaign_add_ons`, `/api/add-ons.json` remains the static shared catalog, the Worker remains authoritative for totals, and persisted `bundleAddOns.unitPrice` stays the cents-denominated value used by checkout, Manage Pledge, emails, analytics, reports, and fulfillment
-  - Add a single shared price-resolution rule for add-ons: a variant may define optional dollar `price`; when present and valid it overrides the product base price, and when absent or blank the product price remains the fallback so existing `id`/`label`/`inventory` variants keep their current behavior
-  - Implement DRY helpers instead of ad hoc math: add browser-side `resolveAddOnUnitPriceCents(product, variant)` in the shared add-on utility, add the Worker-side equivalent used by `validateBundleAddOns`, and update the legacy inline `PoolAddOnUtils` fallback inside `assets/js/cart-provider.js` so older boot paths do not drift
-  - Update cart and Manage Pledge product-state normalization so each variant state carries `priceCents`, product cards display the selected variant price or an appropriate price range, and changing a variant with a different price updates subtotal, tax/shipping preview inputs, save-button dirty state, and Stripe checkout line items through the existing add-on selection flow
-  - Update Worker canonicalization so submitted browser prices are never trusted: `validateBundleAddOns` should recalculate `unitPrice` from the catalog and selected variant, reject invalid products/variants as it does now, and keep inventory allowance logic quantity-only so `add-on-inventory-sold:v1` and inventory overrides do not need a schema change
-  - Extend admin dashboard add-on editors for both platform and campaign add-ons with an optional variant Price field beside variant label/inventory, localized help text that explains blank means inherit base price, validation that rejects negative/malformed/nonfinite prices, and YAML serialization that writes `price` only when a real variant override exists
-  - Keep `/api/add-ons.json` and `POOL_CONFIG.addOns` as the only catalog surfaces; since the Liquid include already emits raw `variants`, the implementation should only need tests proving variant `price` survives config/front matter into browser and Worker catalog reads
-  - Preserve reporting/accounting boundaries: campaign-scoped variant add-ons still count toward campaign subtotal and funding progress, platform add-ons still stay in platform add-on revenue, and reports/analytics/fulfillment exports should continue reading persisted `unitPrice` instead of re-resolving historical prices from the current catalog
-  - Add coverage across the existing harnesses: unit tests for add-on utility price resolution and product-state display, Worker tests for checkout manifest and Manage Pledge recalculation with different variant prices, admin-dashboard tests for validation/YAML serialization, report tests for persisted unit-price output, and a focused browser/E2E path that changes a variant and observes subtotal/save-state changes
-  - Update `docs/ADD_ON_PRODUCTS.md`, creator checklist copy, and dashboard/help text with examples of inherited versus variant-specific add-on prices, including a warning that changing catalog prices affects future checkouts while existing pledges keep the saved `unitPrice`
 
 ## Known Issues
 

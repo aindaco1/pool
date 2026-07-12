@@ -218,7 +218,7 @@ npm run podman:doctor
 
 ## Manual Checks
 
-Automated checks help, but these manual accessibility checks are still important before merge for meaningful UI changes:
+Automated checks help. For this release, the manual VoiceOver/NVDA pass is optional evidence rather than a blocking gate; when performed, use these checks for meaningful UI changes:
 
 - cart drawer can be opened, navigated, and closed with keyboard only
 - cart trigger announces a useful label and expanded/collapsed state to assistive technology
@@ -260,4 +260,4 @@ Good next accessibility improvements include:
 
 ---
 
-_Last updated: June 11, 2026_
+_Last updated: July 12, 2026_

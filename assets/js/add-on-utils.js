@@ -49,6 +49,17 @@
     return variants.find((variant) => String(variant?.id || '') === String(variantId || '')) || null;
   }
 
+  function resolveAddOnUnitPriceCents(product, variant) {
+    const rawVariantPrice = variant?.price;
+    const hasVariantPrice = rawVariantPrice !== null &&
+      rawVariantPrice !== undefined &&
+      String(rawVariantPrice).trim() !== '';
+    const resolvedPrice = hasVariantPrice ? Number(rawVariantPrice) : Number(product?.price || 0);
+    return Number.isFinite(resolvedPrice) && resolvedPrice >= 0
+      ? Math.round(resolvedPrice * 100)
+      : 0;
+  }
+
   function getConfiguredInventory(entry) {
     const parsed = Number(entry?.inventory);
     return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
@@ -66,8 +77,9 @@
     const variants = Array.isArray(product.variants) ? product.variants : [];
     let variantId = String(selection?.variantId || '').trim();
     let variantLabel = String(selection?.variantLabel || '').trim();
+    let variant = null;
     if (variants.length > 0) {
-      const variant = findVariant(product, variantId);
+      variant = findVariant(product, variantId);
       if (!variant) return null;
       variantId = String(variant.id || '');
       variantLabel = String(variant.label || variantId);
@@ -86,7 +98,13 @@
       campaignSlug: String(product.campaign_slug || ''),
       campaignTitle: String(product.campaign_title || ''),
       quantity,
-      unitPrice: Math.round(Number(product.price || 0) * 100),
+      unitPrice: selection?.unitPrice !== null &&
+        selection?.unitPrice !== undefined &&
+        String(selection.unitPrice).trim() !== '' &&
+        Number.isSafeInteger(Number(selection.unitPrice)) &&
+        Number(selection.unitPrice) >= 0
+        ? Number(selection.unitPrice)
+        : resolveAddOnUnitPriceCents(product, variant),
       category: String(product.category || 'digital'),
       shipping_preset: product.shipping_preset || null,
       shipping: resolveProductShipping(product),
@@ -121,7 +139,7 @@
           name: String(product.name || ''),
           description: String(product.description || ''),
           imageUrl: String(product.image_url || ''),
-          unitPrice: Math.round(Number(product.price || 0) * 100),
+          unitPrice: resolveAddOnUnitPriceCents(product, null),
           category: String(product.category || 'digital'),
           sourceUrl: String(product.source_url || ''),
           scope: String(product.scope || 'platform'),
@@ -138,7 +156,7 @@
         name: String(product.name || ''),
         description: String(product.description || ''),
         imageUrl: String(product.image_url || ''),
-        unitPrice: Math.round(Number(product.price || 0) * 100),
+        unitPrice: resolveAddOnUnitPriceCents(product, variant),
         category: String(product.category || 'digital'),
         sourceUrl: String(product.source_url || ''),
         scope: String(product.scope || 'platform'),
@@ -215,6 +233,7 @@
         return {
           id: variantId,
           label: String(variant?.label || variantId),
+          priceCents: resolveAddOnUnitPriceCents(product, variant),
           inventory: configuredInventory,
           sold,
           remaining,
@@ -257,7 +276,10 @@
         scope: String(product?.scope || 'platform'),
         campaignSlug: String(product?.campaign_slug || ''),
         campaignTitle: String(product?.campaign_title || ''),
-        priceCents: Math.round(Number(product?.price || 0) * 100),
+        basePriceCents: resolveAddOnUnitPriceCents(product, null),
+        priceCents: hasVariants
+          ? (defaultVariant?.priceCents ?? resolveAddOnUnitPriceCents(product, null))
+          : resolveAddOnUnitPriceCents(product, null),
         category: String(product?.category || 'digital'),
         variantOptionName: String(product?.variant_option_name || 'Option'),
         inventory: configuredInventory,
@@ -378,6 +400,7 @@
     getLowStockThreshold,
     findProduct,
     findVariant,
+    resolveAddOnUnitPriceCents,
     getSelectionKey,
     getOptionLabel,
     normalizeSelection,

@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.1.0 - 2026-07-12
+
+Release scope:
+
+- Added optional variant-specific prices to platform and campaign add-ons. Blank prices inherit the product base price, explicit zero-dollar overrides remain valid, and cart/Manage Pledge cards update the displayed price when the selected variant changes.
+- Kept money authority in the Worker: new or changed add-on variants are repriced from the current catalog, submitted browser prices are ignored, and an unchanged product/variant on an existing pledge preserves its persisted historical `unitPrice` through quantity-only edits.
+- Extended the shared add-on model, legacy browser fallbacks, admin product editor, validation, and YAML serialization without introducing a second catalog or migrating existing products.
+- Added centralized Lighthouse and cache-policy release evidence alongside the existing generated-asset budgets, including private/no-store regression checks and unit-tested evaluators. Workers Cache remains disabled until representative evidence proves the configured p95 benefit.
+- Surfaced existing bounded Worker p50/p95/p99 timing samples and the slowest routes in Settings -> Runtime diagnostics without collecting request or customer payloads or adding another telemetry backend.
+- Retained the Store-aligned operations hardening already shipped in Pool v1.0.9: full readiness/posture checks, session/device review and revocation, searchable redacted audit records and formula-safe CSV, localization review packets, Podman release coverage, and reviewed production deployment.
+- Kept manual VoiceOver/NVDA and native-Spanish review as optional release evidence; automated accessibility and locale-completeness checks remain required.
+
 ## v1.0.9 - 2026-07-12
 
 Release scope:

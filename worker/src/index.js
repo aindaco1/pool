@@ -2728,6 +2728,17 @@ function resolveBundleAddOnAnchorCampaignSlug(rawAnchorCampaignSlug, carts = [])
   return cartCampaignSlugs[0];
 }
 
+function resolveBundleAddOnUnitPriceCents(product, variant = null) {
+  const rawVariantPrice = variant?.price;
+  const hasVariantPrice = rawVariantPrice !== null &&
+    rawVariantPrice !== undefined &&
+    String(rawVariantPrice).trim() !== '';
+  const resolvedPrice = hasVariantPrice ? Number(rawVariantPrice) : Number(product?.price || 0);
+  return Number.isFinite(resolvedPrice) && resolvedPrice >= 0
+    ? Math.round(resolvedPrice * 100)
+    : null;
+}
+
 async function validateBundleAddOns(env, bundleAddOns = [], { currentSelections = [] } = {}) {
   if (!Array.isArray(bundleAddOns) || bundleAddOns.length === 0) {
     return { valid: true, bundleAddOns: [] };
@@ -2743,12 +2754,19 @@ async function validateBundleAddOns(env, bundleAddOns = [], { currentSelections 
   const normalizedSelections = [];
   const selectedProducts = new Set();
   const allowanceByKey = new Map();
+  const historicalUnitPriceByKey = new Map();
   for (const currentSelection of Array.isArray(currentSelections) ? currentSelections : []) {
     const allowanceProductId = String(currentSelection?.productId || '').trim();
     const allowanceVariantId = String(currentSelection?.variantId || '').trim();
     const allowanceQty = Number(currentSelection?.quantity || 0);
     if (!allowanceProductId || !isPositiveInteger(allowanceQty)) continue;
-    allowanceByKey.set(`${allowanceProductId}::${allowanceVariantId}`, allowanceQty);
+    const allowanceKey = `${allowanceProductId}::${allowanceVariantId}`;
+    allowanceByKey.set(allowanceKey, allowanceQty);
+    const rawSavedUnitPrice = currentSelection?.unitPrice;
+    const savedUnitPrice = Number(rawSavedUnitPrice);
+    if (rawSavedUnitPrice !== null && rawSavedUnitPrice !== undefined && String(rawSavedUnitPrice).trim() !== '' && Number.isSafeInteger(savedUnitPrice) && savedUnitPrice >= 0) {
+      historicalUnitPriceByKey.set(allowanceKey, savedUnitPrice);
+    }
   }
 
   for (const selection of bundleAddOns) {
@@ -2772,14 +2790,15 @@ async function validateBundleAddOns(env, bundleAddOns = [], { currentSelections 
     const normalizedVariantId = String(selection?.variantId || '').trim();
     let resolvedVariantId = '';
     let resolvedVariantLabel = '';
+    let resolvedVariant = null;
 
     if (variants.length > 0) {
-      const variant = variants.find((entry) => String(entry?.id || '') === normalizedVariantId);
-      if (!variant) {
+      resolvedVariant = variants.find((entry) => String(entry?.id || '') === normalizedVariantId) || null;
+      if (!resolvedVariant) {
         return { valid: false, error: `Add-on "${productId}" requires a valid variant selection` };
       }
-      resolvedVariantId = String(variant.id || '');
-      resolvedVariantLabel = String(variant.label || resolvedVariantId);
+      resolvedVariantId = String(resolvedVariant.id || '');
+      resolvedVariantLabel = String(resolvedVariant.label || resolvedVariantId);
     }
 
     const productInventory = inventorySnapshot?.products?.[productId] || null;
@@ -2800,6 +2819,11 @@ async function validateBundleAddOns(env, bundleAddOns = [], { currentSelections 
       };
     }
 
+    const selectionKey = `${productId}::${resolvedVariantId}`;
+    const catalogUnitPrice = resolveBundleAddOnUnitPriceCents(product, resolvedVariant);
+    if (catalogUnitPrice === null) {
+      return { valid: false, error: `Add-on "${productId}" has an invalid catalog price` };
+    }
     normalizedSelections.push({
       productId,
       name: String(product.name || productId),
@@ -2811,7 +2835,9 @@ async function validateBundleAddOns(env, bundleAddOns = [], { currentSelections 
       variantId: resolvedVariantId,
       variantLabel: resolvedVariantLabel,
       quantity,
-      unitPrice: Math.round(Number(product.price || 0) * 100),
+      unitPrice: historicalUnitPriceByKey.has(selectionKey)
+        ? historicalUnitPriceByKey.get(selectionKey)
+        : catalogUnitPrice,
       category: String(product.category || 'digital'),
       shipping_preset: product.shipping_preset || null,
       shipping: product.shipping || null
@@ -9416,14 +9442,20 @@ async function handlePerformanceObservability(request, env) {
   const url = new URL(request.url);
   const days = clampObservabilityDays(url.searchParams.get('days'));
   const summaries = await listObservabilitySummaries(env, 'performance', days);
+  const slowRoutes = summaries.flatMap((summary) => Object.entries(summary.operations || {}).map(([operation, metrics]) => ({
+    date: summary.date,
+    operation,
+    ...metrics
+  }))).sort((a, b) => Number(b.p95Ms || b.maxMs || 0) - Number(a.p95Ms || a.maxMs || 0)).slice(0, 20);
 
-  return jsonResponse({
+  return privateJsonResponse({
     success: true,
     days,
     sampleRate: getObservabilitySampleRate(env),
     now: new Date().toISOString(),
-    summaries
-  });
+    summaries,
+    slowRoutes
+  }, 200, env);
 }
 
 async function handleSettleBatch(request, env) {
@@ -13272,7 +13304,12 @@ async function handleAdminSettings(request, env) {
       adminSettingsSection('Runtime diagnostics', [
         ['Current site base', env.SITE_BASE, readOnlyAdminSettingHelp('The site origin the current Worker runtime is configured to trust for browser requests.')],
         ['Current Worker base', env.WORKER_BASE, readOnlyAdminSettingHelp('The Worker API base URL used by the current runtime environment.')],
-        ['CORS allowed origin', env.CORS_ALLOWED_ORIGIN, readOnlyAdminSettingHelp('The browser origin allowed to make credentialed admin and checkout requests to the Worker.')]
+        ['CORS allowed origin', env.CORS_ALLOWED_ORIGIN, readOnlyAdminSettingHelp('The browser origin allowed to make credentialed admin and checkout requests to the Worker.')],
+        ['', '', {
+          input: 'performance-observability',
+          hideLabel: true,
+          help: 'Sampled Worker route timings help administrators identify slow operations without exposing request or customer data.'
+        }]
       ])
     );
   }
@@ -13952,6 +13989,14 @@ function normalizeAdminAddOnProducts(value, schema = {}) {
         ? null
         : Number(variant.inventory);
       const normalizedVariant = { id: variantId, label };
+      const rawVariantPrice = variant.price;
+      if (rawVariantPrice !== '' && rawVariantPrice !== undefined && rawVariantPrice !== null) {
+        const variantPrice = Number(rawVariantPrice);
+        if (!Number.isFinite(variantPrice) || variantPrice < 0) {
+          return { ok: false, error: `Variant "${variantId}" price must be a non-negative number.` };
+        }
+        normalizedVariant.price = Number(variantPrice.toFixed(2));
+      }
       if (variantInventory !== null) {
         if (!Number.isInteger(variantInventory) || variantInventory < 0) return { ok: false, error: `Variant "${variantId}" inventory must be a non-negative whole number.` };
         normalizedVariant.inventory = variantInventory;
@@ -15508,6 +15553,7 @@ function serializeAdminAddOnProductsYaml(products = [], indent = '  ') {
       lines.push(`${indent}    variants:`);
       for (const variant of product.variants) {
         const entry = { id: variant.id, label: variant.label };
+        if (variant.price !== undefined) entry.price = Number(variant.price);
         if (variant.inventory !== undefined) entry.inventory = Number(variant.inventory);
         lines.push(`${indent}      - ${yamlAdminInlineObject(entry)}`);
       }

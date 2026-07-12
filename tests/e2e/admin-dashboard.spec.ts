@@ -1384,21 +1384,25 @@ test.describe('Admin Dashboard', () => {
       return campaignAddOnsEditor.locator('[data-add-on-variant-row]').first().evaluate((row: Element) => {
         const cells = Array.from(row.querySelectorAll(':scope > .admin-settings__variant-field'));
         const remove = row.querySelector(':scope > button');
-        if (cells.length < 3 || !(remove instanceof HTMLElement)) return false;
+        if (cells.length < 4 || !(remove instanceof HTMLElement)) return false;
         const columns = getComputedStyle(row).gridTemplateColumns.split(' ').filter(Boolean);
         const removeStyle = getComputedStyle(remove);
         const labels = cells.map((cell) => cell.querySelector('.admin-settings__product-label')?.getBoundingClientRect());
         const widths = columns.map((column) => Number.parseFloat(column));
         const derived = row.querySelector('[data-add-on-variant-derived-id]')?.getBoundingClientRect();
+        const price = row.querySelector('[data-add-on-variant-field="price"]')?.getBoundingClientRect();
         const inventory = row.querySelector('[data-add-on-variant-field="inventory"]')?.getBoundingClientRect();
         if (labels.some((label) => !label)) return false;
-        return columns.length === 3
+        return columns.length === 4
           && widths.every((width) => Math.abs(width - widths[0]) < 2)
           && removeStyle.gridColumnStart === '1'
           && removeStyle.gridColumnEnd === '-1'
           && Math.abs((labels[0]?.y || 0) - (labels[1]?.y || 0)) < 4
           && Math.abs((labels[0]?.y || 0) - (labels[2]?.y || 0)) < 4
-          && Boolean(derived && inventory && Math.abs((derived.y + derived.height / 2) - (inventory.y + inventory.height / 2)) < 4)
+          && Math.abs((labels[0]?.y || 0) - (labels[3]?.y || 0)) < 4
+          && Boolean(derived && price && inventory
+            && Math.abs((derived.y + derived.height / 2) - (price.y + price.height / 2)) < 4
+            && Math.abs((derived.y + derived.height / 2) - (inventory.y + inventory.height / 2)) < 4)
           && cells.every((cell) => cell.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING);
       });
     }).toBe(true);

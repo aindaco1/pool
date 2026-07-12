@@ -126,6 +126,7 @@ Scarce-tier reservations and committed claim state now live in the per-campaign 
 - `additionalTiers` — Array of `{ id, qty }` for multi-tier pledges (when `single_tier_only: false`)
 - `tipPercent` / `tipAmount` — Optional The Pool platform tip stored separately from campaign subtotal
 - Bundled multi-campaign checkouts are persisted as separate pledge records, one per campaign
+- Add-on variants may override their product base price. The Worker resolves current catalog prices for new or changed selections, while an unchanged persisted product/variant retains its saved `bundleAddOns.unitPrice` through quantity-only edits; reports and emails use that historical saved value.
 
 **History entries:**
 Each history entry tracks a pledge event with full context:

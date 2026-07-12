@@ -10,7 +10,7 @@ The platform supports two add-on scopes that intentionally share the same card U
 Both scopes:
 
 - use the same cart and Manage Pledge card UI
-- support fixed-price items and simple variants
+- support base prices plus optional variant-specific price overrides
 - participate in canonical Worker-side totals, persistence, and inventory tracking
 - derive scarcity from saved pledge state rather than unsaved cart drafts
 
@@ -101,8 +101,12 @@ add_ons:
       variants:
         - { id: xs, label: XS, inventory: 1 }
         - { id: s, label: S, inventory: 2 }
-        - { id: m, label: M, inventory: 4 }
+        - { id: m, label: M, price: 27.50, inventory: 4 }
 ```
+
+Variant `price` is optional. A missing or blank value inherits the product `price`; a numeric value, including `0`, overrides it for that variant. The dashboard labels this field **Price override** and omits it from YAML when left blank, so existing add-ons and variants require no migration.
+
+The Worker is the price authority. Cart and Manage Pledge display catalog prices for new selections, but checkout and pledge modification recalculate them server-side. Existing pledge lines keep their saved cents-denominated `unitPrice` when the product and variant are unchanged, including quantity-only edits. Selecting a different variant uses that variant's current catalog price. Reports, analytics, emails, and fulfillment continue reading the persisted historical price rather than repricing old pledges.
 
 Campaign add-ons use the same product shape, but they live in campaign front matter:
 
@@ -274,7 +278,4 @@ This keeps operational ownership clear without changing the supporter-facing add
 
 ## Remaining Follow-Up
 
-The biggest remaining slices are:
-
-- support different prices per add-on variation
-- keep accessibility, mobile responsiveness, and i18n support at the same standard as the rest of the platform as the catalog grows
+The biggest remaining slice is keeping accessibility, mobile responsiveness, and i18n support at the same standard as the rest of the platform as the catalog grows.

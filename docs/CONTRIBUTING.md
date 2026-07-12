@@ -114,7 +114,7 @@ For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `do
 
 🚧 **Active focus:**
 - Merge-gate discipline and release-readiness audits across accessibility, customization, dashboard, i18n, performance, security, and SEO
-- Tax calculator depth, richer campaign marketing tools, add-on variant pricing, and post-release hardening for protected campaign previews and new campaign creation
+- Tax calculator depth, richer campaign marketing tools, and post-release hardening for protected campaign previews and new campaign creation
 
 ---
 

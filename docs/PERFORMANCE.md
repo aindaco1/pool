@@ -28,6 +28,8 @@ Use these as practical targets rather than claims that every local test run will
 - generated crawl/metadata output passes `npm run test:seo` after a Jekyll build
 - Cloudflare serves text assets with transfer compression and without Auto Minify
 - generated assets pass `npm run performance:budget` against `config/performance-budgets.json`
+- core release routes pass `npm run test:performance:lighthouse` against the same configuration when the local Podman stack is available
+- deployed public/private cache headers pass `npm run test:cache-policy`
 
 ## Platform Model
 
@@ -43,11 +45,29 @@ Important repo surfaces:
 - [`assets/js/page-prefetch.js`](../assets/js/page-prefetch.js): intent-based document prefetch runtime
 - [`scripts/minify-site-assets.mjs`](../scripts/minify-site-assets.mjs): generated CSS/JS minification
 - [`scripts/audit-performance-budgets.mjs`](../scripts/audit-performance-budgets.mjs): measured total and named-asset release ceilings
+- [`scripts/performance-lighthouse.mjs`](../scripts/performance-lighthouse.mjs): Lighthouse category, Web Vital, and transferred-resource release evidence
+- [`scripts/audit-cache-policy.mjs`](../scripts/audit-cache-policy.mjs): deployed public-cache and private/no-store policy evidence
 - [`scripts/sync-worker-config.rb`](../scripts/sync-worker-config.rb): site-to-Worker config mirroring
 
 Admin-only Sass is emitted as `assets/admin.css` and loaded only by the admin layout, keeping roughly 73 KB of minified dashboard CSS off public campaign pages. Adobe display-font CSS is activated after DOM readiness with a no-script fallback; Inter remains the body-font dependency. Workers Cache remains disabled for the Pool admin read model until a representative benchmark proves at least a 40% p95 improvement. Store v1.0.7 did not meet that threshold, so parity means carrying the evidence gate—not enabling the cache switch by assumption.
 
 Worker performance summaries retain bounded latency histograms and expose approximate p50/p95/p99 alongside count, average, minimum, maximum, and last duration. They do not retain request bodies or customer identifiers.
+
+Super admins can inspect the slowest sampled routes for the last seven days under **Settings -> Runtime diagnostics**. The table is a read-only view of the existing summaries, sorted by p95 and capped at 20 rows; it does not add another telemetry store.
+
+## Release Performance Evidence
+
+The Store-aligned model keeps the expensive browser measurements in release evidence rather than requiring them on every pull request:
+
+```bash
+npm run test:performance:budgets
+npm run test:performance:lighthouse
+npm run test:cache-policy
+```
+
+Use `test:performance:lighthouse:host` when a compatible local Chromium is already available. `SITE_BASE` and `WORKER_BASE` may override the production defaults for cache-policy checks. Evidence JSON contains no credentials or customer data and can be written with each script's `--output=...` option.
+
+The unit suite tests the budget evaluators without network access. Lighthouse regression ceilings are calibrated to the current media-rich routes under throttled local measurement; they prevent unreviewed regressions but do not replace the stricter LCP/INP/CLS optimization targets above. A release may skip live Lighthouse or cache evidence only when the required stable route/provider is unavailable, and the missing evidence should be called out in release sign-off.
 
 ## Critical Rendering
 

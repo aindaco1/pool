@@ -182,6 +182,12 @@
       const variants = Array.isArray(product?.variants) ? product.variants : [];
       return variants.find((variant) => String(variant?.id || '') === String(variantId || '')) || null;
     },
+    resolveAddOnUnitPriceCents: function(product, variant) {
+      const rawVariantPrice = variant?.price;
+      const hasVariantPrice = rawVariantPrice !== null && rawVariantPrice !== undefined && String(rawVariantPrice).trim() !== '';
+      const resolvedPrice = hasVariantPrice ? Number(rawVariantPrice) : Number(product?.price || 0);
+      return Number.isFinite(resolvedPrice) && resolvedPrice >= 0 ? Math.round(resolvedPrice * 100) : 0;
+    },
     getSelectionKey: function(selection) {
       return `${String(selection?.productId || '').trim()}::${String(selection?.variantId || '').trim()}`;
     },
@@ -202,7 +208,7 @@
             description: String(product?.description || ''),
             imageUrl: String(product?.image_url || ''),
             sourceUrl: String(product?.source_url || ''),
-            unitPrice: Math.round(Number(product?.price || 0) * 100),
+            unitPrice: this.resolveAddOnUnitPriceCents(product, null),
             category: String(product?.category || 'digital'),
             scope: String(product?.scope || 'platform'),
             campaignSlug: String(product?.campaign_slug || ''),
@@ -218,7 +224,7 @@
           description: String(product?.description || ''),
           imageUrl: String(product?.image_url || ''),
           sourceUrl: String(product?.source_url || ''),
-          unitPrice: Math.round(Number(product?.price || 0) * 100),
+          unitPrice: this.resolveAddOnUnitPriceCents(product, variant),
           category: String(product?.category || 'digital'),
           scope: String(product?.scope || 'platform'),
           campaignSlug: String(product?.campaign_slug || ''),
@@ -235,8 +241,9 @@
       const variants = Array.isArray(product?.variants) ? product.variants : [];
       let variantId = String(selection?.variantId || '').trim();
       let variantLabel = String(selection?.variantLabel || '').trim();
+      let variant = null;
       if (variants.length > 0) {
-        const variant = this.findVariant(product, variantId);
+        variant = this.findVariant(product, variantId);
         if (!variant) return null;
         variantId = String(variant.id || '');
         variantLabel = String(variant.label || variantId);
@@ -255,7 +262,13 @@
         campaignSlug: String(product.campaign_slug || ''),
         campaignTitle: String(product.campaign_title || ''),
         quantity,
-        unitPrice: Math.round(Number(product.price || 0) * 100),
+        unitPrice: selection?.unitPrice !== null &&
+          selection?.unitPrice !== undefined &&
+          String(selection.unitPrice).trim() !== '' &&
+          Number.isSafeInteger(Number(selection.unitPrice)) &&
+          Number(selection.unitPrice) >= 0
+          ? Number(selection.unitPrice)
+          : this.resolveAddOnUnitPriceCents(product, variant),
         category: String(product.category || 'digital'),
         shipping_preset: product.shipping_preset || null,
         shipping: product.shipping || null,
@@ -345,6 +358,7 @@
           return {
             id: variantId,
             label: String(variant?.label || variantId),
+            priceCents: this.resolveAddOnUnitPriceCents(product, variant),
             inventory: configuredInventory,
             sold: Math.max(0, Number(variantSnapshot?.sold || 0)),
             remaining,
@@ -377,7 +391,10 @@
           scope: String(product?.scope || 'platform'),
           campaignSlug: String(product?.campaign_slug || ''),
           campaignTitle: String(product?.campaign_title || ''),
-          priceCents: Math.round(Number(product?.price || 0) * 100),
+          basePriceCents: this.resolveAddOnUnitPriceCents(product, null),
+          priceCents: hasVariants
+            ? (defaultVariant?.priceCents ?? this.resolveAddOnUnitPriceCents(product, null))
+            : this.resolveAddOnUnitPriceCents(product, null),
           category: String(product?.category || 'digital'),
           variantOptionName: String(product?.variant_option_name || 'Option'),
           inventory: configuredInventory,
@@ -667,9 +684,10 @@
         data-editable-max-quantity="${escapeAttribute(String(Math.max(1, Number(variant.editableMaxQuantity ?? variant.maxQuantity ?? 1))))}"
         data-remaining="${escapeAttribute(String(Number.isFinite(Number(variant.remaining)) ? Number(variant.remaining) : ''))}"
         data-low-stock="${variant.lowStock ? 'true' : 'false'}"
+        data-price-cents="${escapeAttribute(String(Math.max(0, Number(variant.priceCents || 0))))}"
         ${variant.id === selectedVariantId ? ' selected' : ''}
       >
-        ${escapeHtml(variant.label)}
+        ${escapeHtml(variant.label)}${Number(variant.priceCents) !== Number(product.basePriceCents) ? ` — ${escapeHtml(formatMoney(variant.priceCents || 0))}` : ''}
       </option>
     `).join('');
   }
@@ -835,7 +853,7 @@
               <div class="addon-product-card__main">
                 <div class="addon-product-card__header">
                   <strong class="addon-product-card__name">${escapeHtml(product.name)}</strong>
-                  <span class="addon-product-card__price">${formatMoney(product.priceCents || 0)}</span>
+                  <span class="addon-product-card__price" data-manage-addon-price>${formatMoney(selectedVariant?.priceCents ?? product.priceCents ?? 0)}</span>
                 </div>
                 ${product.description ? `<p class="addon-product-card__description">${escapeHtml(product.description)}</p>` : ''}
               </div>
@@ -967,6 +985,7 @@
     const variantField = card.querySelector('[data-manage-addon-variant]');
     const quantityField = card.querySelector('[data-manage-addon-quantity]');
     const statusField = card.querySelector('[data-manage-addon-status]');
+    const priceField = card.querySelector('[data-manage-addon-price]');
     if (!(quantityField instanceof HTMLInputElement)) return;
     if (!(variantField instanceof HTMLSelectElement)) {
       const fallbackMax = Math.max(1, parseInt(quantityField.getAttribute('max') || '1', 10) || 1);
@@ -986,6 +1005,9 @@
     const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
     quantityField.max = String(maxQuantity);
     quantityField.value = String(Math.min(maxQuantity, currentQuantity));
+    if (priceField instanceof HTMLElement) {
+      priceField.textContent = formatMoney(Math.max(0, Number(selectedOption?.getAttribute('data-price-cents') || 0)));
+    }
 
     if (!(statusField instanceof HTMLElement)) return;
     if (Number.isFinite(remaining) && remaining > 0) {
@@ -3317,9 +3339,23 @@
     });
 
     function upsertSelectedBundleAddOn(productId, variantId, quantity) {
+      const existingSelection = selectedBundleAddOns.find((selection) => (
+        selection.productId === productId && String(selection.variantId || '') === String(variantId || '')
+      ));
       selectedBundleAddOns = selectedBundleAddOns.filter((selection) => selection.productId !== productId);
       if (quantity > 0) {
-        selectedBundleAddOns.push({ productId, variantId, quantity });
+        selectedBundleAddOns.push({
+          productId,
+          variantId,
+          quantity,
+          ...(existingSelection?.unitPrice !== null &&
+            existingSelection?.unitPrice !== undefined &&
+            String(existingSelection.unitPrice).trim() !== '' &&
+            Number.isSafeInteger(Number(existingSelection.unitPrice)) &&
+            Number(existingSelection.unitPrice) >= 0
+            ? { unitPrice: Number(existingSelection.unitPrice) }
+            : {})
+        });
       }
       refreshSummary();
     }

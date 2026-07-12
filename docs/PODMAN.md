@@ -189,6 +189,14 @@ The report wrappers load Cloudflare auth from `.env`, `.env.local`, `.env.cloudf
 
 The release smoke wrapper uses the same Podman-backed E2E path when Podman is available. Pass `--podman-e2e` to require that phase for release evidence, or `--skip-podman-e2e` only when another logged run already covers the same browser surface.
 
+Core-route Lighthouse evidence also uses the Podman stack:
+
+```bash
+npm run test:performance:lighthouse
+```
+
+This is release evidence, not an every-PR requirement. Use the host variant only when a compatible local Chromium is already installed.
+
 For focused dashboard browser coverage against the Podman-backed stack, use:
 
 ```bash

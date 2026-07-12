@@ -1395,12 +1395,110 @@
     return root;
   }
 
+  function renderPerformanceObservability(root, data) {
+    var results = root.querySelector('[data-performance-observability-results]');
+    if (!results) return;
+    results.replaceChildren();
+    var routes = Array.isArray(data?.slowRoutes) ? data.slowRoutes : [];
+    var note = document.createElement('p');
+    note.className = 'admin-app__muted';
+    note.textContent = t('performance_observability_note', 'Sample rate %{rate}%. Percentiles are bounded histogram estimates and do not include request or customer data.', {
+      rate: Math.round(Number(data?.sampleRate || 0) * 100)
+    });
+    results.append(note);
+    if (!routes.length) {
+      var empty = document.createElement('p');
+      empty.className = 'admin-app__muted';
+      empty.textContent = t('performance_observability_empty', 'No sampled Worker route timing is available for this period.');
+      results.append(empty);
+      return;
+    }
+    var table = document.createElement('table');
+    table.className = 'admin-settings__table';
+    var head = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    [
+      t('performance_observability_route', 'Route'),
+      t('performance_observability_date', 'Date'),
+      t('performance_observability_samples', 'Samples'),
+      'p50', 'p95', 'p99', t('performance_observability_max', 'Max')
+    ].forEach(function(label) {
+      var th = document.createElement('th');
+      th.textContent = label;
+      headRow.append(th);
+    });
+    head.append(headRow);
+    table.append(head);
+    var body = document.createElement('tbody');
+    routes.forEach(function(route) {
+      var row = document.createElement('tr');
+      [
+        route.operation || 'unknown', route.date || '', String(route.count || 0),
+        String(route.p50Ms || 0) + ' ms', String(route.p95Ms || 0) + ' ms',
+        String(route.p99Ms || 0) + ' ms', String(route.maxMs || 0) + ' ms'
+      ].forEach(function(value) {
+        var cell = document.createElement('td');
+        cell.textContent = value;
+        row.append(cell);
+      });
+      body.append(row);
+    });
+    table.append(body);
+    results.append(table);
+  }
+
+  async function loadPerformanceObservability(root) {
+    if (!(root instanceof HTMLElement) || root.dataset.performanceObservabilityState === 'loading') return;
+    var status = root.querySelector('[data-performance-observability-status]');
+    root.dataset.performanceObservabilityState = 'loading';
+    if (status) status.textContent = t('performance_observability_loading', 'Loading Worker timing...');
+    try {
+      var data = await requestJson('/admin/observability/performance?days=7', { method: 'GET' });
+      renderPerformanceObservability(root, data);
+      if (status) status.textContent = '';
+      root.dataset.performanceObservabilityState = 'loaded';
+    } catch (error) {
+      logger.error('Failed to load Worker timing', error);
+      if (status) status.textContent = t('performance_observability_failed', 'Unable to load Worker timing.');
+      root.dataset.performanceObservabilityState = 'failed';
+    }
+  }
+
+  function createPerformanceObservability() {
+    var root = document.createElement('div');
+    root.className = 'admin-performance-observability';
+    root.dataset.performanceObservability = 'true';
+    var refresh = document.createElement('button');
+    refresh.type = 'button';
+    refresh.className = 'btn btn--secondary btn--small';
+    refresh.textContent = t('performance_observability_refresh', 'Refresh timing');
+    refresh.addEventListener('click', function() {
+      root.dataset.performanceObservabilityState = '';
+      loadPerformanceObservability(root);
+    });
+    var status = document.createElement('p');
+    status.className = 'admin-app__muted';
+    status.dataset.performanceObservabilityStatus = 'true';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    var results = document.createElement('div');
+    results.dataset.performanceObservabilityResults = 'true';
+    root.append(refresh, status, results);
+    return root;
+  }
+
   function appendSettingsControl(parent, row, section, index) {
     var describedById = settingsHelpId(row, section?.title, index);
     if (row?.input === 'plan-usage') {
       var tracker = createPlanUsageTracker();
       describeCompositeControl(tracker, describedById, row?.label || '');
       parent.append(tracker);
+      return;
+    }
+    if (row?.input === 'performance-observability') {
+      var performanceTracker = createPerformanceObservability();
+      describeCompositeControl(performanceTracker, describedById, row?.label || '');
+      parent.append(performanceTracker);
       return;
     }
     if (row?.input === 'content-editor') {
@@ -1501,7 +1599,7 @@
       var tr = document.createElement('tr');
       tr.dataset.settingsRowLabel = row?.label || '';
       applySettingsVisibleWhenDataset(tr, row);
-      var renderFullWidth = options?.fullWidthRows === true || row?.input === 'settings-field-grid' || row?.input === 'plan-usage';
+      var renderFullWidth = options?.fullWidthRows === true || row?.input === 'settings-field-grid' || row?.input === 'plan-usage' || row?.input === 'performance-observability';
       if (renderFullWidth) tr.classList.add('admin-settings__row--full');
       var th = document.createElement('th');
       th.scope = 'row';
@@ -3519,7 +3617,7 @@
           row.querySelectorAll('[data-add-on-variant-field]').forEach(function(field) {
             var key = field.dataset.addOnVariantField;
             if (!key) return;
-            variant[key] = key === 'inventory'
+            variant[key] = key === 'inventory' || key === 'price'
               ? (field.value === '' ? '' : Number(field.value))
               : field.value || '';
           });
@@ -3551,6 +3649,7 @@
         variants: t('add_on_help_variants', 'Optional product variations supporters can choose, such as sizes or formats.'),
         variant_id: t('add_on_help_variant_id', 'Stable identifier for this variant. Existing variants keep their IDs; new variant IDs are derived from the label.'),
         variant_label: t('add_on_help_variant_label', 'Public variant label shown to supporters, such as Small, Large, or Digital download.'),
+        variant_price: t('add_on_help_variant_price', 'Optional dollar price for this variant. Leave blank to inherit the product price.'),
         variant_inventory: t('add_on_help_variant_inventory', 'Optional stock count for this specific variant. Leave blank when variant inventory is unlimited or managed elsewhere.')
       };
       return help[key] || '';
@@ -3694,6 +3793,7 @@
         row.append(
           variantField(addOnFieldLabel('label', 'Label'), 'label', variant?.label || '', { type: 'text', help: addOnProductHelp('variant_label') }),
           derivedAddOnVariantIdField(variant),
+          variantField(t('add_on_field_variant_price', 'Price override'), 'price', variant?.price ?? '', { type: 'number', min: 0, step: '0.01', help: addOnProductHelp('variant_price') }),
           variantField(addOnFieldLabel('inventory', 'Inventory'), 'inventory', variant?.inventory ?? '', { type: 'number', min: 0, step: '1', help: addOnProductHelp('variant_inventory') })
         );
         updateAddOnVariantDerivedId(row);
@@ -3701,6 +3801,7 @@
         row.append(
           variantField(addOnFieldLabel('label', 'Label'), 'label', variant?.label || '', { type: 'text', help: addOnProductHelp('variant_label') }),
           variantField(addOnFieldLabel('id', 'ID'), 'id', variant?.id || '', { type: 'text', help: addOnProductHelp('variant_id') }),
+          variantField(t('add_on_field_variant_price', 'Price override'), 'price', variant?.price ?? '', { type: 'number', min: 0, step: '0.01', help: addOnProductHelp('variant_price') }),
           variantField(addOnFieldLabel('inventory', 'Inventory'), 'inventory', variant?.inventory ?? '', { type: 'number', min: 0, step: '1', help: addOnProductHelp('variant_inventory') })
         );
       }
@@ -3742,7 +3843,7 @@
       addVariant.className = 'btn btn--secondary btn--small';
       addVariant.textContent = t('add_variant', 'Add variant');
       addVariant.addEventListener('click', function() {
-        rows.prepend(renderVariant({ id: '', label: '', inventory: '' }));
+        rows.prepend(renderVariant({ id: '', label: '', price: '', inventory: '' }));
         syncValue();
       });
       wrap.append(heading, addVariant, rows);
@@ -4474,6 +4575,7 @@
     });
     var activePanel = settingsRoot.querySelector('[data-settings-section-panel="' + cssEscape(selectedSettingsSectionId) + '"]');
     activePanel?.querySelectorAll?.('[data-plan-usage-tracker]').forEach(loadPlanUsageTracker);
+    activePanel?.querySelectorAll?.('[data-performance-observability]').forEach(loadPerformanceObservability);
     var hasPublishableControls = Boolean(activePanel?.querySelector?.('[data-settings-path]:not([data-settings-runtime-only="true"])'));
     activeSettingsSectionHasPublishableControls = hasPublishableControls;
     var settingsPublishActions = settingsPublish?.closest?.('.admin-settings__actions');

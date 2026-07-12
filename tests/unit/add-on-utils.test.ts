@@ -26,7 +26,7 @@ const ADD_ON_CONFIG = {
       variant_option_name: 'Size',
       variants: [
         { id: 'm', label: 'M', inventory: 4 },
-        { id: 'l', label: 'L', inventory: 4 }
+        { id: 'l', label: 'L', price: 30, inventory: 4 }
       ]
     },
     {
@@ -205,5 +205,27 @@ describe('add-on utils', () => {
 
     expect(zine.category).toBe('digital');
     expect(zine.shipping).toBeNull();
+  });
+
+  it('resolves variant price overrides, including zero, and otherwise inherits the product price', async () => {
+    await import('../../assets/js/add-on-utils.js');
+
+    const addOnUtils = (window as Window & { PoolAddOnUtils?: any }).PoolAddOnUtils;
+    const product = ADD_ON_CONFIG.products.find((entry) => entry.id === 'dust-wave-tshirt');
+
+    expect(addOnUtils.resolveAddOnUnitPriceCents(product, product?.variants[0])).toBe(2500);
+    expect(addOnUtils.resolveAddOnUnitPriceCents(product, product?.variants[1])).toBe(3000);
+    expect(addOnUtils.resolveAddOnUnitPriceCents(product, { price: 0 })).toBe(0);
+    expect(addOnUtils.normalizeSelection({
+      productId: 'dust-wave-tshirt',
+      variantId: 'l',
+      quantity: 2
+    }, ADD_ON_CONFIG)).toMatchObject({ unitPrice: 3000 });
+
+    const options = addOnUtils.flattenCatalogOptions(ADD_ON_CONFIG);
+    expect(options.find((entry: any) => entry.variantId === 'l')).toMatchObject({ unitPrice: 3000 });
+    const states = addOnUtils.buildProductStateEntries(ADD_ON_CONFIG, [], null);
+    const tshirt = states.find((entry: any) => entry.productId === 'dust-wave-tshirt');
+    expect(tshirt.variants.find((entry: any) => entry.id === 'l')).toMatchObject({ priceCents: 3000 });
   });
 });

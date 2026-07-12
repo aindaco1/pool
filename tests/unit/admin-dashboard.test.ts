@@ -1719,6 +1719,35 @@ campaign_add_ons:
     expectNoKvWritesOrLists(env, 'unsafe settings preview rejection');
   });
 
+  it('rejects invalid add-on variant price overrides before publishing', async () => {
+    const env = createEnv();
+    const { cookie, ctx } = await signInAdmin(env);
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/preview', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        changes: [{
+          path: 'add_ons.products',
+          value: JSON.stringify([{
+            id: 'shirt',
+            name: 'Shirt',
+            description: '',
+            image_url: '',
+            price: 25,
+            category: 'digital',
+            variants: [{ id: 'large', label: 'Large', price: -1 }]
+          }])
+        }]
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      errors: [expect.stringContaining('Variant "large" price must be a non-negative number')]
+    });
+  });
+
   it('returns role-scoped admin settings without KV writes', async () => {
     const env = createEnv();
     const { ctx, cookie } = await signInAdmin(env);
@@ -2639,7 +2668,11 @@ runner_report_emails:
           shipping_preset: 'sticker',
           inventory: 25,
           source_url: 'https://shop.example.test/new-sticker',
-          variants: []
+          variant_option_name: 'Finish',
+          variants: [
+            { id: 'matte', label: 'Matte', inventory: 10 },
+            { id: 'holographic', label: 'Holographic', price: 6.5, inventory: 15 }
+          ]
         }, {
           id: 'new-poster',
           name: 'New Poster',
@@ -2749,6 +2782,8 @@ runner_report_emails:
     expect(configContent).toContain('low_stock_threshold: 3');
     expect(configContent).toContain('id: "new-sticker"');
     expect(configContent).toContain('price: 4.00');
+    expect(configContent).toContain('{ id: "matte", label: "Matte", inventory: 10 }');
+    expect(configContent).toContain('{ id: "holographic", label: "Holographic", price: 6.5, inventory: 15 }');
     expect(configContent).toContain('id: "new-poster"');
     expect(configContent).toContain('shipping:\n        weight_oz: 5\n        packaging_weight_oz: 3\n        length_in: 18\n        width_in: 3\n        height_in: 3\n        stack_height_in: 0.5');
     const campaignContent = Buffer.from(campaignPut?.body.content || '', 'base64').toString('utf8');

@@ -467,7 +467,7 @@ const addOnCatalogFixture = {
       variant_option_name: 'Size',
       variants: [
         { id: 'm', label: 'M', inventory: 4 },
-        { id: 'l', label: 'L', inventory: 4 }
+        { id: 'l', label: 'L', price: 30, inventory: 4 }
       ]
     },
     {
@@ -1242,7 +1242,7 @@ describe('Worker business logic hardening', () => {
     });
   });
 
-  it('sends a modification email when add-on contents change without changing totals', async () => {
+  it('uses the current variant price when a pledge changes variants', async () => {
     mockVerifyToken.mockResolvedValue({
       email: 'buyer@example.com',
       campaignSlug: 'hand-relations',
@@ -1312,6 +1312,9 @@ describe('Worker business logic hardening', () => {
     );
 
     expect(response.status).toBe(200);
+    await expect(kv.get('pledge:pool-intent-same-price-123', { type: 'json' })).resolves.toMatchObject({
+      bundleAddOns: [expect.objectContaining({ variantId: 'l', unitPrice: 3000 })]
+    });
     expect(mockSendPledgeModifiedEmail).toHaveBeenCalledTimes(1);
     expect(mockSendPledgeModifiedEmail).toHaveBeenCalledWith(
       env,
@@ -1329,6 +1332,66 @@ describe('Worker business logic hardening', () => {
         })
       })
     );
+  });
+
+  it('preserves a saved add-on price when the product and variant are unchanged', async () => {
+    mockVerifyToken.mockResolvedValue({
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      orderId: 'pool-intent-historical-price-123'
+    });
+
+    const env = createEnv();
+    const kv = env.PLEDGES as MockKVNamespace;
+    await kv.put('pledge:pool-intent-historical-price-123', JSON.stringify({
+      orderId: 'pool-intent-historical-price-123',
+      email: 'buyer@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'active',
+      charged: false,
+      tierId: 'frame-slot',
+      tierName: 'Buy 1 Frame',
+      tierQty: 1,
+      additionalTiers: [],
+      supportItems: [],
+      customAmount: 0,
+      subtotal: 3000,
+      goalTrackingSubtotal: 1000,
+      tax: 0,
+      shipping: 300,
+      tipPercent: 0,
+      tipAmount: 0,
+      amount: 3300,
+      shippingOption: 'standard',
+      preferredLang: 'en',
+      shippingAddress: { postalCode: '80205', country: 'US' },
+      bundleAddOns: [{
+        productId: 'dust-wave-tshirt',
+        name: 'DUST WAVE T-Shirt',
+        variantId: 'm',
+        variantLabel: 'M',
+        quantity: 1,
+        unitPrice: 2000,
+        category: 'physical',
+        shipping_preset: 'tshirt'
+      }]
+    }));
+
+    const response = await worker.fetch(new Request('https://pool.test/pledge/modify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: 'magic-token',
+        orderId: 'pool-intent-historical-price-123',
+        preferredLang: 'en',
+        bundleAddOns: [{ productId: 'dust-wave-tshirt', variantId: 'm', quantity: 2 }]
+      })
+    }), env, { waitUntil: () => {} });
+
+    expect(response.status).toBe(200);
+    await expect(kv.get('pledge:pool-intent-historical-price-123', { type: 'json' })).resolves.toMatchObject({
+      bundleAddOns: [expect.objectContaining({ variantId: 'm', quantity: 2, unitPrice: 2000 })]
+    });
   });
 
   it('includes the updated delivery option in the modification email payload', async () => {
@@ -5660,6 +5723,7 @@ describe('Worker business logic hardening', () => {
     );
 
     expect(summaryResponse.status).toBe(200);
+    expect(summaryResponse.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
     const summaryPayload = await summaryResponse.json();
     expect(summaryPayload).toMatchObject({
       sampleRate: 1
@@ -5670,6 +5734,13 @@ describe('Worker business logic hardening', () => {
       p95Ms: expect.any(Number),
       p99Ms: expect.any(Number)
     });
+    expect(summaryPayload.slowRoutes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        operation: 'checkout_intent_abandon',
+        count: 1,
+        p95Ms: expect.any(Number)
+      })
+    ]));
   });
 
   it('rate limits repeated pledge mutations before token validation', async () => {

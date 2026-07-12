@@ -104,6 +104,19 @@ Treat these as release blockers until explicitly resolved:
 - Keep platform health visible through operational evidence such as failed sends, rate-limit pressure, projection drift, accessibility coverage, i18n completeness, provider readiness, and abuse-path tests.
 - Revisit this guide when the product adds new audiences, new data uses, new automation, or new distribution channels.
 
+## v1.1.0 Review Record
+
+- Feature: variant-specific add-on pricing plus production-quality/admin diagnostics hardening
+- Affected users: supporters choosing add-ons, supporters modifying pledges, campaign creators, super admins, and operators
+- Relevant risk zones: economic inequality/user understanding, implicit trust, and surveillance/data control
+- What could go wrong: a browser could understate a selected price; a catalog edit could silently reprice an old pledge; a blank or zero override could be misread; performance diagnostics could retain sensitive request data; a public-cache optimization could leak a private response
+- Data collected or exposed: no new supporter fields or telemetry payloads; diagnostics flatten existing bounded aggregate histograms only
+- Consent, opt-out, and recourse: supporters see the selected variant price before checkout and can remove/change it; existing pledges retain their booked line price unless the variant changes; admin price changes use the existing preview/publish and audit model
+- Abuse/misuse mitigations: Worker-canonical price resolution, historical persisted `unitPrice`, non-negative validation, explicit zero handling, private/no-store cache gates, bounded/redacted timing summaries, and no Store download/R2 systems
+- Accessibility/i18n impact: new admin labels/help exist in English and Spanish; automated locale/accessibility checks remain gates; human screen-reader and native-Spanish review remain optional evidence
+- Tests or evidence: shared utility, cart, Manage Pledge, Worker checkout/modification, admin validation/YAML, performance evaluator, cache-policy, observability, i18n, and release evidence coverage
+- Follow-ups accepted: no product migration is needed; Workers Cache remains disabled until representative evidence proves the configured p95 improvement
+
 ---
 
-_Last updated: July 6, 2026_
+_Last updated: July 12, 2026_

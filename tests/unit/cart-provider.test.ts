@@ -28,7 +28,7 @@ const ADD_ON_CONFIG = {
       category: 'physical',
       variants: [
         { id: 'm', label: 'M', inventory: 4 },
-        { id: 'l', label: 'L', inventory: 1 }
+        { id: 'l', label: 'L', price: 30, inventory: 1 }
       ]
     },
     {
@@ -579,9 +579,11 @@ describe('cart provider shim', () => {
 
     await vi.waitFor(() => {
       const quantityInput = document.querySelector('[data-cart-addon-product-quantity][data-addon-product-id="dust-wave-tshirt"]') as HTMLInputElement | null;
+      const price = document.querySelector('[data-cart-addon-product="dust-wave-tshirt"] [data-cart-addon-price]');
       expect(variantSelect.value).toBe('l');
       expect(quantityInput?.max).toBe('1');
       expect(quantityInput?.value).toBe('1');
+      expect(price?.textContent).toContain('$30.00');
     });
 
   });

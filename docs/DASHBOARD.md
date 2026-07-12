@@ -72,6 +72,7 @@ The dashboard intentionally separates read-only browsing, local drafting, KV wri
 | Marketing referral save/edit/delete | Campaign-scoped KV mutation for saved referral codes |
 | Settings -> Users save | Single KV write to `admin-users:v1` |
 | Settings -> Plan usage | Read-only Cloudflare/Resend provider API calls; zero KV writes or list operations |
+| Settings -> Runtime diagnostics timing | Read-only bounded observability summaries; zero new telemetry stores and no request/customer payloads |
 | Secrets & credentials | Read-only status only; secret values are never shown, edited, serialized, or published |
 
 Normal dashboard reads must stay within the KV-write budget described in `worker/README.md` and covered by tests.
@@ -145,6 +146,10 @@ Advanced performance settings expose the safe public intent-prefetch controls:
 
 The defaults are intentionally conservative and apply only to public same-origin document links. Admin, checkout, Manage Pledge, supporter-community, tokenized, external, and sensitive-query links are excluded by the runtime. Publishing these settings updates `_config.yml`, mirrors the `INTENT_PREFETCH_*` Worker vars, and requires the normal static rebuild before public pages use the new values.
 
+### Runtime Diagnostics
+
+Runtime diagnostics shows the effective site/Worker origins and CORS boundary. It also loads a read-only seven-day table of the slowest sampled Worker operations, including bounded p50, p95, p99, maximum duration, date, and sample count. Refreshing the table reuses the existing performance-observability summaries and does not collect request bodies, customer data, or a second set of telemetry records.
+
 ### Plan Usage
 
 Plan usage is a super-admin-only read-only section for operational provider limits. It loads automatically when **Settings -> Plan usage** opens and refreshes only when the admin reloads the page.
@@ -192,9 +197,11 @@ Each product supports:
 - inventory
 - source URL
 - variant option name
-- variants with label, derived read-only ID, and inventory
+- variants with label, derived read-only ID, optional price override, and inventory
 
 Digital add-ons hide shipping fields. Physical add-ons can use a preset or explicit package dimensions.
+
+Leaving a variant price blank inherits the product base price. Publishing writes a variant `price` only for a valid non-negative override; existing product/variant IDs and variants without overrides remain unchanged.
 
 ## Campaigns
 
