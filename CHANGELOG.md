@@ -5,12 +5,13 @@
 Release scope:
 
 - Added optional variant-specific prices to platform and campaign add-ons. Blank prices inherit the product base price, explicit zero-dollar overrides remain valid, and cart/Manage Pledge cards update the displayed price when the selected variant changes.
-- Kept money authority in the Worker: new or changed add-on variants are repriced from the current catalog, submitted browser prices are ignored, and an unchanged product/variant on an existing pledge preserves its persisted historical `unitPrice` through quantity-only edits.
-- Extended the shared add-on model, legacy browser fallbacks, admin product editor, validation, and YAML serialization without introducing a second catalog or migrating existing products.
-- Added centralized Lighthouse and cache-policy release evidence alongside the existing generated-asset budgets, including private/no-store regression checks and unit-tested evaluators. Workers Cache remains disabled until representative evidence proves the configured p95 benefit.
-- Surfaced existing bounded Worker p50/p95/p99 timing samples and the slowest routes in Settings -> Runtime diagnostics without collecting request or customer payloads or adding another telemetry backend.
-- Retained the Store-aligned operations hardening already shipped in Pool v1.0.9: full readiness/posture checks, session/device review and revocation, searchable redacted audit records and formula-safe CSV, localization review packets, Podman release coverage, and reviewed production deployment.
-- Kept manual VoiceOver/NVDA and native-Spanish review as optional release evidence; automated accessibility and locale-completeness checks remain required.
+- Kept money authority in the Worker: new or changed add-on variants are repriced from the current catalog, submitted browser prices are ignored, and an unchanged product/variant on an existing pledge preserves its valid historical `unitPrice` through quantity-only edits.
+- Extended the shared add-on model, legacy browser fallbacks, admin product editor, validation, and YAML serialization without introducing a second catalog or migrating existing products. Product, variant, catalog, and historical prices cannot bypass the canonical `$1,000,000` amount ceiling.
+- Replaced eager full-size campaign-card backgrounds with responsive WebP sources and lazy decoding, reducing the measured throttled homepage transfer from roughly 4.0 MB to 1.5 MB and LCP from roughly 20.3 seconds to 5.4–6.6 seconds.
+- Added centralized, route-specific Lighthouse and expanded cache-policy release evidence alongside the existing generated-asset budgets. Eleven deployed public/private targets are covered, and Workers Cache remains disabled until representative evidence proves the configured p95 benefit.
+- Made dashboard and Worker timing limits executable: browser tests consume readiness, tab-switch, and table-render budgets; the Worker samples dashboard summary/settings reads; and a redacted authenticated audit evaluates configured p95 ceilings without collecting request or customer payloads.
+- Hardened admin failures so unauthorized responses are private and non-cacheable, and pinned the compatible clean Lighthouse release so both production-only and full dependency audits pass with no known vulnerabilities.
+- Moved and refreshed `AGENTS.md` at the repository root so contributors and coding agents automatically discover the current checkout, security, performance, recovery, and release invariants.
 
 ## v1.0.9 - 2026-07-12
 
