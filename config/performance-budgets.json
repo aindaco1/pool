@@ -14,23 +14,35 @@
   },
   "lighthouse": {
     "routes": ["/", "/campaigns/hand-relations/", "/terms/"],
-    "baselineNote": "Regression ceilings are calibrated to the current media-rich Pool routes under throttled local Lighthouse. The stricter Core Web Vital targets in docs/PERFORMANCE.md remain optimization goals. Private admin behavior is covered by cache-policy and browser gates rather than public SEO scoring.",
+    "baselineNote": "Route-specific regression ceilings are calibrated from the 1.1.0 throttled local Lighthouse evidence after responsive campaign-card backgrounds reduced homepage image transfer. These are release gates; the stricter Core Web Vital targets in docs/PERFORMANCE.md remain optimization goals.",
     "categories": {
-      "performance": 0.35,
       "accessibility": 0.95,
       "best-practices": 0.75,
       "seo": 0.95
     },
     "audits": {
-      "largest-contentful-paint": 24000,
       "cumulative-layout-shift": 0.1,
-      "total-blocking-time": 4000
+      "total-blocking-time": 2000
     },
     "resourceBytes": {
-      "total": 4200000,
-      "image": 3500000,
-      "stylesheet": 300000,
-      "third-party": 2000000
+      "stylesheet": 300000
+    },
+    "routeBudgets": {
+      "/": {
+        "categories": { "performance": 0.65 },
+        "audits": { "largest-contentful-paint": 8000 },
+        "resourceBytes": { "total": 1800000, "image": 1050000, "stylesheet": 200000, "third-party": 300000 }
+      },
+      "/campaigns/hand-relations/": {
+        "categories": { "performance": 0.55 },
+        "audits": { "largest-contentful-paint": 15000 },
+        "resourceBytes": { "total": 3600000, "image": 1500000, "stylesheet": 300000, "third-party": 1500000 }
+      },
+      "/terms/": {
+        "categories": { "performance": 0.65 },
+        "audits": { "largest-contentful-paint": 8000 },
+        "resourceBytes": { "total": 850000, "image": 100000, "stylesheet": 200000, "third-party": 300000 }
+      }
     }
   },
   "dashboard": {
@@ -39,8 +51,10 @@
     "tableRenderMs": 1500
   },
   "workerRoutes": {
-    "adminWarmP95Ms": 750,
-    "adminNoChangeP95Ms": 250,
+    "operations": {
+      "admin_dashboard_summary": 750,
+      "admin_settings": 750
+    },
     "minimumCacheP95ImprovementPercent": 40
   },
   "workersCache": {
@@ -52,6 +66,11 @@
     { "id": "main-css", "base": "site", "path": "/assets/main.css", "status": 200, "type": "public", "minimumMaxAge": 14400 },
     { "id": "campaign-json", "base": "site", "path": "/api/campaigns.json", "status": 200, "type": "public", "minimumMaxAge": 300 },
     { "id": "campaign-page", "base": "site", "path": "/campaigns/hand-relations/", "status": 200, "type": "public", "minimumMaxAge": 300 },
+    { "id": "cart-runtime-loader", "base": "site", "path": "/assets/js/cart-runtime-loader.js", "status": 200, "type": "public", "minimumMaxAge": 14400 },
+    { "id": "add-ons-json", "base": "site", "path": "/api/add-ons.json", "status": 200, "type": "public", "minimumMaxAge": 300 },
+    { "id": "campaign-embed", "base": "site", "path": "/embed/campaign/?slug=hand-relations", "status": 200, "type": "public", "minimumMaxAge": 300 },
+    { "id": "manage-shell", "base": "site", "path": "/manage/", "status": 200, "type": "public", "minimumMaxAge": 300 },
+    { "id": "campaign-preview-shell", "base": "site", "path": "/campaigns/hand-relations/preview/", "status": 200, "type": "public", "minimumMaxAge": 300 },
     { "id": "admin-html", "base": "site", "path": "/admin/", "status": 200, "type": "private" },
     { "id": "admin-session", "base": "worker", "path": "/admin/session", "status": 401, "type": "private" }
   ]

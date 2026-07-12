@@ -4,7 +4,7 @@
   {%- capture campaign_url -%}{% include localized-url.html lang=current_lang translation_key=include.campaign.translation_key localized_paths=include.campaign.localized_paths path=include.campaign.url %}{%- endcapture -%}
   {% if include.campaign.campaign_background %}
   <div class="campaign-card__background" aria-hidden="true">
-    <img src="{{ include.campaign.campaign_background }}" alt="" class="campaign-card__background-image">
+    {% include responsive-image.html src=include.campaign.campaign_background alt="" class="campaign-card__background-image" picture_class="campaign-card__background-picture" aria_hidden=true loading="lazy" decoding="async" sizes="(min-width: 900px) 360px, 100vw" %}
   </div>
   {% endif %}
   {% if include.campaign.hero_image %}

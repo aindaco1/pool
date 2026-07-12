@@ -15,15 +15,17 @@ The v1.1.0 milestone adds variant-specific add-on pricing and completes the Stor
   - Browser runtimes share `resolveAddOnUnitPriceCents`, legacy cart/Manage fallbacks implement the same rule, and variant product state carries `priceCents`
   - Cart and Manage Pledge selectors show differing variant prices and update card/subtotal state through the existing selection flow
   - The Worker rejects browser price authority, canonicalizes new or changed selections from the current catalog, and preserves persisted `unitPrice` for unchanged historical pledge lines
-  - The platform/campaign admin editors expose localized optional variant prices, reject negative or malformed values, and serialize `price` only for real overrides
+  - The platform/campaign admin editors expose localized optional variant prices, reject negative, malformed, or above-ceiling values, and serialize `price` only for real overrides; the Worker independently enforces the canonical `$1,000,000` amount ceiling
   - Existing add-ons require no migration because variants without `price` continue inheriting their product price
 
 **Production quality gates and admin operations hardening**
 
 - [x] Store-aligned release gates adapted to Pool
-  - One performance-budget config governs generated JavaScript/CSS ceilings, Lighthouse categories/Web Vitals/resource limits, dashboard/Worker timing targets, Workers Cache evidence policy, and public/private cache targets
-  - Scriptable Lighthouse and cache-policy evidence cover core public, campaign, admin, generated JSON, static asset, and private Worker routes; evaluator unit tests run without live provider credentials
-  - Existing bounded Worker timing histograms now surface p50/p95/p99/max and slow-route summaries in Settings -> Runtime diagnostics without a second telemetry store or customer/request payloads
+  - One performance-budget config governs generated JavaScript/CSS ceilings, route-specific Lighthouse categories/Web Vitals/resource limits, executable dashboard/Worker timing targets, Workers Cache evidence policy, and public/private cache targets
+  - Scriptable Lighthouse and cache-policy evidence cover core public, campaign, runtime shell, admin, generated JSON, static asset, and private Worker routes; evaluator unit tests run without live provider credentials
+  - Existing bounded Worker timing histograms now sample the dashboard summary and settings reads, surface p50/p95/p99/max and slow-route summaries in Settings -> Runtime diagnostics, and feed a redacted authenticated p95 release audit without a second telemetry store or customer/request payloads
+  - Homepage campaign-card backgrounds reuse responsive WebP derivatives and lazy loading, cutting the measured home transfer from roughly 4.0 MB to 1.5 MB and repeated throttled LCP from roughly 20.3 seconds to 5.4-6.6 seconds
+  - Both production and full dependency audits pass after pinning the compatible clean Lighthouse release
   - Pool v1.0.9 session/device review and revocation, searchable audit filters/CSV, full provider/security readiness, production-posture drift checks, localization packets, pinned deployment workflows, and scheduled Podman coverage remain the shared admin-operations baseline
   - Workers Cache remains disabled until representative Pool evidence proves at least the configured 40% p95 improvement, matching the Store decision rather than enabling it speculatively
   - Automated accessibility/i18n/SEO checks remain release gates; human VoiceOver/NVDA and native-Spanish review are documented optional evidence

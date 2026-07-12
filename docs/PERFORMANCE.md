@@ -30,6 +30,7 @@ Use these as practical targets rather than claims that every local test run will
 - generated assets pass `npm run performance:budget` against `config/performance-budgets.json`
 - core release routes pass `npm run test:performance:lighthouse` against the same configuration when the local Podman stack is available
 - deployed public/private cache headers pass `npm run test:cache-policy`
+- authenticated Worker admin reads pass `npm run test:performance:runtime` against redacted observability evidence before production sign-off
 
 ## Platform Model
 
@@ -47,6 +48,7 @@ Important repo surfaces:
 - [`scripts/audit-performance-budgets.mjs`](../scripts/audit-performance-budgets.mjs): measured total and named-asset release ceilings
 - [`scripts/performance-lighthouse.mjs`](../scripts/performance-lighthouse.mjs): Lighthouse category, Web Vital, and transferred-resource release evidence
 - [`scripts/audit-cache-policy.mjs`](../scripts/audit-cache-policy.mjs): deployed public-cache and private/no-store policy evidence
+- [`scripts/audit-runtime-performance.mjs`](../scripts/audit-runtime-performance.mjs): authenticated p95 evidence for configured Worker operations
 - [`scripts/sync-worker-config.rb`](../scripts/sync-worker-config.rb): site-to-Worker config mirroring
 
 Admin-only Sass is emitted as `assets/admin.css` and loaded only by the admin layout, keeping roughly 73 KB of minified dashboard CSS off public campaign pages. Adobe display-font CSS is activated after DOM readiness with a no-script fallback; Inter remains the body-font dependency. Workers Cache remains disabled for the Pool admin read model until a representative benchmark proves at least a 40% p95 improvement. Store v1.0.7 did not meet that threshold, so parity means carrying the evidence gate—not enabling the cache switch by assumption.
@@ -54,6 +56,8 @@ Admin-only Sass is emitted as `assets/admin.css` and loaded only by the admin la
 Worker performance summaries retain bounded latency histograms and expose approximate p50/p95/p99 alongside count, average, minimum, maximum, and last duration. They do not retain request bodies or customer identifiers.
 
 Super admins can inspect the slowest sampled routes for the last seven days under **Settings -> Runtime diagnostics**. The table is a read-only view of the existing summaries, sorted by p95 and capped at 20 rows; it does not add another telemetry store.
+
+The browser suite consumes the `dashboard.initialReadyMs`, `dashboard.tabSwitchMs`, and `dashboard.tableRenderMs` limits directly. The Worker records `admin_dashboard_summary` and `admin_settings` samples, and the runtime audit consumes the configured p95 ceilings. Do not add an unconsumed timing value to the configuration and describe it as a gate.
 
 ## Release Performance Evidence
 
@@ -63,11 +67,14 @@ The Store-aligned model keeps the expensive browser measurements in release evid
 npm run test:performance:budgets
 npm run test:performance:lighthouse
 npm run test:cache-policy
+npm run test:performance:runtime -- --input=/path/to/redacted-performance-observability.json
 ```
 
 Use `test:performance:lighthouse:host` when a compatible local Chromium is already available. `SITE_BASE` and `WORKER_BASE` may override the production defaults for cache-policy checks. Evidence JSON contains no credentials or customer data and can be written with each script's `--output=...` option.
 
-The unit suite tests the budget evaluators without network access. Lighthouse regression ceilings are calibrated to the current media-rich routes under throttled local measurement; they prevent unreviewed regressions but do not replace the stricter LCP/INP/CLS optimization targets above. A release may skip live Lighthouse or cache evidence only when the required stable route/provider is unavailable, and the missing evidence should be called out in release sign-off.
+For a direct authenticated read, set `ADMIN_PERFORMANCE_TOKEN` to a scoped admin bearer value and pass `--worker-base=<url>` instead of `--input`. The output contains only operation names, sample counts, p95 values, and configured ceilings; it does not echo the token or raw observability payload.
+
+The unit suite tests all budget evaluators without network access. Lighthouse uses shared accessibility/CLS/TBT constraints plus route-specific performance, LCP, and transfer ceilings so a lightweight terms page cannot regress to a campaign-page budget. These release ceilings prevent unreviewed regressions but do not replace the stricter LCP/INP/CLS optimization targets above. A release may skip live Lighthouse, cache, or authenticated runtime evidence only when the required stable route/provider or credential is unavailable, and the omission must be recorded in release sign-off.
 
 ## Critical Rendering
 
@@ -77,6 +84,7 @@ Current guardrails:
 
 - progress bars and marker positions render static width/left utility classes in Jekyll output so they do not start collapsed while JavaScript loads
 - campaign hero images are emitted with preload and high fetch priority where the layout knows the likely LCP asset
+- homepage campaign-card backgrounds use generated responsive WebP sources, lazy loading, and async decoding instead of eagerly transferring full-size PNGs
 - YouTube campaign hero videos render a local poster/play facade first and load the YouTube iframe only after play intent
 - common scripts use `defer` or lazy dynamic loading instead of parser-blocking script tags
 - full document layouts opt out of mobile automatic phone/date/address/email detection so iOS does not restyle operational copy or campaign text unexpectedly
@@ -273,6 +281,7 @@ When changing live reads:
 - invalidate browser caches after successful pledge persistence
 - keep stale recovery behavior private to the browser and avoid long-lived sensitive storage
 - use `GET /admin/observability/performance` to inspect sampled Worker timings on deployed or local environments
+- keep `/admin/observability/performance` authenticated and `private, no-store`; unit coverage checks both authenticated and unauthorized responses, and post-deploy smoke should verify the live header
 
 ## KV List Budget
 

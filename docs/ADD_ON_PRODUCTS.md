@@ -106,6 +106,8 @@ add_ons:
 
 Variant `price` is optional. A missing or blank value inherits the product `price`; a numeric value, including `0`, overrides it for that variant. The dashboard labels this field **Price override** and omits it from YAML when left blank, so existing add-ons and variants require no migration.
 
+Product and variant prices must be between `$0` and `$1,000,000`, inclusive. The dashboard rejects a catalog value outside that range before publish, the Worker independently rejects an out-of-range catalog price, and an out-of-range historical cent value is not preserved over the current valid catalog price. This matches the canonical checkout amount ceiling and prevents an unusable catalog from publishing successfully.
+
 The Worker is the price authority. Cart and Manage Pledge display catalog prices for new selections, but checkout and pledge modification recalculate them server-side. Existing pledge lines keep their saved cents-denominated `unitPrice` when the product and variant are unchanged, including quantity-only edits. Selecting a different variant uses that variant's current catalog price. Reports, analytics, emails, and fulfillment continue reading the persisted historical price rather than repricing old pledges.
 
 Campaign add-ons use the same product shape, but they live in campaign front matter:

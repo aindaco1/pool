@@ -1847,7 +1847,7 @@ function requireAdmin(request, env, scope = 'default') {
   
   if (!credential) {
     console.error(`CRITICAL: admin secret not configured for ${scope} scope`);
-    return { ok: false, response: jsonResponse({ error: 'Admin not configured' }, 500) };
+    return { ok: false, response: privateJsonResponse({ error: 'Admin not configured' }, 500, env) };
   }
   
   // Check Bearer token in Authorization header
@@ -1864,7 +1864,7 @@ function requireAdmin(request, env, scope = 'default') {
     return { ok: true };
   }
   
-  return { ok: false, response: jsonResponse({ error: 'Unauthorized' }, 401) };
+  return { ok: false, response: privateJsonResponse({ error: 'Unauthorized' }, 401, env) };
 }
 
 function getCampaignDeadlineDate(dateString, env = {}) {
@@ -2734,9 +2734,10 @@ function resolveBundleAddOnUnitPriceCents(product, variant = null) {
     rawVariantPrice !== undefined &&
     String(rawVariantPrice).trim() !== '';
   const resolvedPrice = hasVariantPrice ? Number(rawVariantPrice) : Number(product?.price || 0);
-  return Number.isFinite(resolvedPrice) && resolvedPrice >= 0
+  const cents = Number.isFinite(resolvedPrice) && resolvedPrice >= 0
     ? Math.round(resolvedPrice * 100)
     : null;
+  return isValidAmount(cents) ? cents : null;
 }
 
 async function validateBundleAddOns(env, bundleAddOns = [], { currentSelections = [] } = {}) {
@@ -2764,7 +2765,7 @@ async function validateBundleAddOns(env, bundleAddOns = [], { currentSelections 
     allowanceByKey.set(allowanceKey, allowanceQty);
     const rawSavedUnitPrice = currentSelection?.unitPrice;
     const savedUnitPrice = Number(rawSavedUnitPrice);
-    if (rawSavedUnitPrice !== null && rawSavedUnitPrice !== undefined && String(rawSavedUnitPrice).trim() !== '' && Number.isSafeInteger(savedUnitPrice) && savedUnitPrice >= 0) {
+    if (rawSavedUnitPrice !== null && rawSavedUnitPrice !== undefined && String(rawSavedUnitPrice).trim() !== '' && isValidAmount(savedUnitPrice)) {
       historicalUnitPriceByKey.set(allowanceKey, savedUnitPrice);
     }
   }
@@ -5076,11 +5077,11 @@ export default {
       }
 
       if (path === '/admin/dashboard/summary' && method === 'GET') {
-        return handleAdminDashboardSummary(request, env);
+        return withObservedOperation(env, ctx, 'admin_dashboard_summary', () => handleAdminDashboardSummary(request, env));
       }
 
       if (path === '/admin/settings' && method === 'GET') {
-        return handleAdminSettings(request, env);
+        return withObservedOperation(env, ctx, 'admin_settings', () => handleAdminSettings(request, env));
       }
 
       if (path === '/admin/settings/preview' && method === 'POST') {
@@ -13931,7 +13932,10 @@ function normalizeAdminAddOnProducts(value, schema = {}) {
     const category = String(product.category || 'physical').trim().toLowerCase();
     if (!['physical', 'digital'].includes(category)) return { ok: false, error: `Product "${id}" category must be physical or digital.` };
     const price = Number(product.price);
-    if (!Number.isFinite(price) || price < 0) return { ok: false, error: `Product "${id}" needs a non-negative price.` };
+    const priceCents = Math.round(price * 100);
+    if (!Number.isFinite(price) || price < 0 || price > 1000000 || !isValidAmount(priceCents)) {
+      return { ok: false, error: `Product "${id}" price must be between $0 and $1,000,000.` };
+    }
     const description = normalizeAdminRichTextStorageValue(product.description || '', `Product "${id}" description`, { maxLength: 2000 });
     if (!description.ok) return description;
     const imageUrl = normalizeAdminAssetReference(product.image_url || product.imageUrl || '', `Product "${id}" image`);
@@ -13992,8 +13996,9 @@ function normalizeAdminAddOnProducts(value, schema = {}) {
       const rawVariantPrice = variant.price;
       if (rawVariantPrice !== '' && rawVariantPrice !== undefined && rawVariantPrice !== null) {
         const variantPrice = Number(rawVariantPrice);
-        if (!Number.isFinite(variantPrice) || variantPrice < 0) {
-          return { ok: false, error: `Variant "${variantId}" price must be a non-negative number.` };
+        const variantPriceCents = Math.round(variantPrice * 100);
+        if (!Number.isFinite(variantPrice) || variantPrice < 0 || variantPrice > 1000000 || !isValidAmount(variantPriceCents)) {
+          return { ok: false, error: `Variant "${variantId}" price must be between $0 and $1,000,000.` };
         }
         normalizedVariant.price = Number(variantPrice.toFixed(2));
       }

@@ -231,6 +231,10 @@ The newer on-site Stripe checkout and `Update Card` flows now also fail more pri
 
 Release cache evidence is centralized in `config/performance-budgets.json` and runs with `npm run test:cache-policy`. It verifies that public pages/assets meet minimum cache lifetimes while admin/session targets remain `private, no-store`; a performance change that weakens a private route is a release failure. Workers Cache remains disabled unless representative evidence clears the configured p95 improvement threshold.
 
+Add-on pricing is bounded at the same `$1,000,000` ceiling as canonical checkout amounts. Admin product and variant normalization rejects larger values before GitHub publish, Worker catalog resolution rechecks the resulting cents, and an out-of-range saved historical `unitPrice` is never trusted as a price-preservation override.
+
+Release dependency review runs both `npm audit --omit=dev --audit-level=moderate` and the full `npm audit --audit-level=moderate`. Production findings are blockers. Dev-only findings in build or release tooling must be removed, pinned to a clean supported version, or explicitly accepted with scope and rationale. Pool pins Lighthouse `12.6.1` because the later transitive Sentry/OpenTelemetry chain carried a moderate allocation advisory while this compatible release audits cleanly.
+
 Abandoned-checkout reminders are opt-in only. The browser sends `abandonedCartConsent` only when the supporter checks the reminder box, and the Worker queues a reminder only after Stripe creates a valid first-party Checkout Session. Reminder records are short-lived, use signed unsubscribe links, delete on successful pledge persistence for that order, and check campaign pledge indexes before sending so a later completed pledge suppresses stale abandoned-checkout email. After a reminder sends, the Worker stores a separate short-lived `abandoned-cart-resume:{orderId}` snapshot for signed resume links; that snapshot contains only the sanitized cart/contact fields needed to rebuild a fresh checkout session and never puts Stripe secrets in the URL.
 
 ---
@@ -605,6 +609,8 @@ Run security tests:
 npm run test:secrets            # Audit local secret exposure in files + history
 npm run test:security           # Against local Worker
 npm run test:security:staging   # Against a staging worker, if you maintain one
+npm audit --omit=dev --audit-level=moderate
+npm audit --audit-level=moderate
 ```
 
 `npm run test:premerge` now includes the secret audit automatically, so local merge gating checks both security behavior and accidental credential exposure.

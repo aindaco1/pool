@@ -1744,7 +1744,51 @@ campaign_add_ons:
 
     expect(response.status).toBe(422);
     await expect(response.json()).resolves.toMatchObject({
-      errors: [expect.stringContaining('Variant "large" price must be a non-negative number')]
+      errors: [expect.stringContaining('Variant "large" price must be between $0 and $1,000,000')]
+    });
+  });
+
+  it('rejects product and variant prices above the canonical checkout amount ceiling', async () => {
+    const env = createEnv();
+    const { cookie, ctx } = await signInAdmin(env);
+
+    const productResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/preview', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        changes: [{
+          path: 'add_ons.products',
+          value: JSON.stringify([{
+            id: 'rare-print', name: 'Rare print', description: '', image_url: '',
+            price: 1000000.01, category: 'digital', variants: []
+          }])
+        }]
+      })
+    }), env, ctx);
+
+    expect(productResponse.status).toBe(422);
+    await expect(productResponse.json()).resolves.toMatchObject({
+      errors: [expect.stringContaining('Product "rare-print" price must be between $0 and $1,000,000')]
+    });
+
+    const variantResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/preview', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        changes: [{
+          path: 'add_ons.products',
+          value: JSON.stringify([{
+            id: 'shirt', name: 'Shirt', description: '', image_url: '',
+            price: 25, category: 'digital',
+            variants: [{ id: 'collector', label: 'Collector', price: 1000000.01 }]
+          }])
+        }]
+      })
+    }), env, ctx);
+
+    expect(variantResponse.status).toBe(422);
+    await expect(variantResponse.json()).resolves.toMatchObject({
+      errors: [expect.stringContaining('Variant "collector" price must be between $0 and $1,000,000')]
     });
   });
 

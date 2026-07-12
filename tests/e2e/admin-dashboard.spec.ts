@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
 import path from 'node:path';
 
 const WORKER_BASE = 'http://127.0.0.1:8787';
@@ -9,6 +10,7 @@ const JSON_HEADERS = {
   'access-control-allow-credentials': 'true'
 };
 const axePath = path.resolve(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
+const performanceBudgets = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'config', 'performance-budgets.json'), 'utf8'));
 const tinyPng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
   'base64'
@@ -900,6 +902,26 @@ async function selectAdminSection(page: any, name: string) {
 }
 
 test.describe('Admin Dashboard', () => {
+  test('keeps dashboard readiness, tab switching, and supporter table rendering within budgets', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    const readyStartedAt = Date.now();
+    await page.goto('/admin/?admin_login=admin-token');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+    await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
+    expect(Date.now() - readyStartedAt).toBeLessThanOrEqual(performanceBudgets.dashboard.initialReadyMs);
+
+    const tabStartedAt = Date.now();
+    await selectAdminSection(page, 'Analytics');
+    await expect(page.locator('#admin-panel-analytics')).toBeVisible();
+    expect(Date.now() - tabStartedAt).toBeLessThanOrEqual(performanceBudgets.dashboard.tabSwitchMs);
+
+    const tableStartedAt = Date.now();
+    await selectAdminSection(page, 'Supporters');
+    await expect(page.locator('.admin-supporters__table')).toBeVisible();
+    expect(Date.now() - tableStartedAt).toBeLessThanOrEqual(performanceBudgets.dashboard.tableRenderMs);
+  });
+
   test('starts magic-link login and supports keyboard tab navigation with no obvious axe violations', async ({ page }) => {
     test.setTimeout(120000);
     const calls = await routeAdminWorker(page);

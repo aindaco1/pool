@@ -1105,6 +1105,39 @@ describe('Worker business logic hardening', () => {
     });
   });
 
+  it('rejects an add-on catalog price above the canonical checkout amount ceiling', async () => {
+    const excessiveCatalog = JSON.parse(JSON.stringify(addOnCatalogFixture));
+    excessiveCatalog.products.find((product: { id: string }) => product.id === 'dust-wave-tshirt')
+      .variants.find((variant: { id: string }) => variant.id === 'l').price = 1000000.01;
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [campaignFixture, singleTierCampaignFixture, smokeEditableCampaignFixture, metadataFallbackCampaignFixture] });
+      }
+      if (url === 'https://pool.test/api/add-ons.json') return jsonResponse(excessiveCatalog);
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(new Request('https://pool.test/checkout-intent/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: [
+          { id: 'hand-relations__frame-slot', quantity: 1 },
+          { id: 'addon__dust-wave-tshirt__variant__l', quantity: 1 }
+        ],
+        email: 'buyer@example.com',
+        bundleAddOnAnchorCampaignSlug: 'hand-relations'
+      })
+    }), createEnv(), { waitUntil: () => {} });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Add-on "dust-wave-tshirt" has an invalid catalog price'
+    });
+    expect(mockStripeClient.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
   it('returns remaining add-on inventory without counting merch toward campaign funding', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as MockKVNamespace;
@@ -1391,6 +1424,25 @@ describe('Worker business logic hardening', () => {
     expect(response.status).toBe(200);
     await expect(kv.get('pledge:pool-intent-historical-price-123', { type: 'json' })).resolves.toMatchObject({
       bundleAddOns: [expect.objectContaining({ variantId: 'm', quantity: 2, unitPrice: 2000 })]
+    });
+
+    const stored = await kv.get('pledge:pool-intent-historical-price-123', { type: 'json' });
+    stored.bundleAddOns[0].unitPrice = 100000001;
+    await kv.put('pledge:pool-intent-historical-price-123', JSON.stringify(stored));
+    const excessiveHistoricalResponse = await worker.fetch(new Request('https://pool.test/pledge/modify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: 'magic-token',
+        orderId: 'pool-intent-historical-price-123',
+        preferredLang: 'en',
+        bundleAddOns: [{ productId: 'dust-wave-tshirt', variantId: 'm', quantity: 3 }]
+      })
+    }), env, { waitUntil: () => {} });
+
+    expect(excessiveHistoricalResponse.status).toBe(200);
+    await expect(kv.get('pledge:pool-intent-historical-price-123', { type: 'json' })).resolves.toMatchObject({
+      bundleAddOns: [expect.objectContaining({ variantId: 'm', quantity: 3, unitPrice: 2500 })]
     });
   });
 
@@ -5741,6 +5793,17 @@ describe('Worker business logic hardening', () => {
         p95Ms: expect.any(Number)
       })
     ]));
+  });
+
+  it('keeps unauthorized performance observability responses private and non-cacheable', async () => {
+    const response = await worker.fetch(
+      new Request('https://pool.test/admin/observability/performance?days=1'),
+      createEnv({ ADMIN_SECRET: 'admin-secret' }),
+      { waitUntil: () => {} }
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
   });
 
   it('rate limits repeated pledge mutations before token validation', async () => {

@@ -62,6 +62,17 @@ npm run release:smoke -- --evidence-file /tmp/pool-release-smoke.md
 
 Use focused reruns such as `npm run release:a11y-evidence`, `npm run release:i18n-seo-evidence`, `npm run release:pledge-evidence`, `npm run release:providers -- --no-dev-vars`, and `npm run release:payment-smoke -- --no-dev-vars` when a release note needs narrower evidence.
 
+For a production-quality release, also capture the generated-asset, route-specific Lighthouse, deployed cache, and authenticated Worker timing gates:
+
+```bash
+npm run test:performance:budgets
+npm run test:performance:lighthouse
+npm run test:cache-policy
+npm run test:performance:runtime -- --input=/path/to/redacted-performance-observability.json
+npm audit --omit=dev --audit-level=moderate
+npm audit --audit-level=moderate
+```
+
 Recommended local setup for modify/cancel smoke:
 
 ```bash
@@ -101,6 +112,8 @@ Treat any of these as merge blockers:
 - a single magic link can still enumerate or modify another order
 - settlement marks a campaign complete while active pledges still need attention
 - milestone, diary, or announcement sends miss supporters or duplicate unexpectedly
+- a route-specific Lighthouse, generated-asset, deployed cache, dashboard interaction, or authenticated Worker p95 budget fails
+- a production dependency audit finding remains, or a dev-only finding lacks an explicit resolution/rationale
 - a money, data, messaging, admin, automation, public sharing, or indexing change skips the required [Ethical Risk review](./ETHICAL_RISK.md)
 
 ## Checklist
@@ -269,12 +282,13 @@ Run this section when the branch changes dashboard UI, admin Worker routes, camp
 7. As a super admin, verify the Campaigns sidebar first row is the `+` button, create a preview-only campaign with multiple existing/new campaign users, and confirm assigned users receive the dashboard-link email when Resend is configured.
 8. In **Content**, verify **Publish** and **Preview** appear together. Publish a protected preview, confirm the dashboard shows the current user's preview link, add optional reviewer emails, confirm the email copy says the link expires in 24 hours, and confirm previewer emails are not written to campaign Markdown or public JSON.
 9. In **Content** and **Diary Entries**, add/edit a content block, verify WYSIWYG preview behavior, open the image-block media picker, confirm campaign users see only campaign media, and confirm `Save Draft` only enables when the local draft differs from the saved value.
-10. In **Add-ons** and campaign **Add-Ons**, verify physical products show shipping preset / package fields, digital products hide shipping fields, and product/variant IDs derive from names/labels for new entries.
+10. In **Add-ons** and campaign **Add-Ons**, verify physical products show shipping preset / package fields, digital products hide shipping fields, product/variant IDs derive from names/labels for new entries, blank variant prices inherit the product price, explicit zero is preserved, differing variant prices update the displayed subtotal, and prices above `$1,000,000` fail preview validation.
 11. In **Analytics**, **Reports**, and **Supporters**, verify the default `All` view only shows campaigns available to the current admin, gross and net revenue amounts show exact cents where applicable, referral/UTM source/medium/campaign/content breakdowns load from indexed pledges, and CSV export matches the visible rows.
 12. In **Marketing**, save/edit/delete a referral code, verify the URL builder clears after save/refresh, confirm the QR preview updates from the current campaign URL, download PNG/SVG QR files, use **Save shared draft** / **Load shared draft** / **Clear shared draft**, confirm abandoned-checkout health loads without KV listing, verify admin-created suppression rows show the suppressed email with a Clear action, and confirm the embedded campaign builder still works.
 13. In first-party checkout, confirm the abandoned-checkout reminder box is unchecked by default, uses benefit copy, persists after being checked, and signed reminder links restore the abandoned cart/contact draft before starting a fresh Stripe session.
 14. In **Campaigns -> Blast**, draft a supporter email blast with text plus a hosted image, selected existing image, or YouTube/Vimeo block; use **Save shared draft** / **Load shared draft** / **Clear shared draft**; click **Send test** and verify the automatic dry-run returns an audience count/hash before the test email goes to the signed-in admin. Then click **Send blast**, confirm the live send, and verify sent history records subject, content, CTA Button Label, and CTA Button URL below the editor. Use a campaign with a rebuilt `campaign-pledges:<slug>` index; missing indexes should fail closed with `campaign_index_required` before any email send.
 15. For `/es/admin/`, verify translated tab labels, Plan usage labels/links, Create new campaign / Preview copy, and tablet/mobile navigation do not overflow.
+16. In **Settings -> Runtime diagnostics**, verify sampled `admin_dashboard_summary` and `admin_settings` rows appear after normal use, contain only bounded aggregate timing data, and the endpoint remains private/no-store.
 
 ## Sign-Off Template
 
@@ -293,6 +307,8 @@ Smoke completed on <date> in <staging|local>.
 - Backfill: pass
 - Broadcast pagination/milestones: pass
 - Admin dashboard smoke, if relevant: pass
+- Performance budgets/Lighthouse/cache/runtime evidence: pass / omission documented
+- Production and full dependency audit: pass
 - Create new campaign/protected preview smoke, if relevant: pass
 
 Notes:

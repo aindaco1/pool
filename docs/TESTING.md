@@ -12,6 +12,7 @@ npm run test:i18n          # Supported locale catalog completeness check
 npm run test:seo           # Generated-site SEO/crawl audit; build _site first
 npm run test:performance:budgets  # Generated JS/CSS release ceilings
 npm run test:performance:lighthouse # Core-route Lighthouse evidence in Podman
+npm run test:performance:runtime # Authenticated/redacted Worker p95 evidence; requires input or token
 npm run test:cache-policy  # Deployed public/private cache-header evidence
 npm run test:secrets       # Secret exposure audit for local env files
 npm run test:premerge      # Merge-readiness checks for changed Worker logic
@@ -82,10 +83,11 @@ npm run release:providers -- --no-dev-vars
 npm run release:payment-smoke -- --no-dev-vars
 npm run test:performance:budgets
 npm run test:performance:lighthouse
+npm run test:performance:runtime -- --input=/path/to/redacted-performance-observability.json
 npm run test:cache-policy
 ```
 
-Lighthouse and deployed cache-policy checks follow the Store release-evidence model and are not required on every pull request. Their pure evaluators remain covered by the unit suite. Human VoiceOver, NVDA, and native-Spanish reviews are optional release evidence; automated accessibility, i18n completeness, and rendered SEO checks remain required.
+Lighthouse, deployed cache-policy, and authenticated Worker timing checks follow the Store release-evidence model and are not required on every pull request. Their pure evaluators remain covered by the unit suite, while dashboard readiness/tab/table limits are exercised by the admin browser suite. Human VoiceOver, NVDA, and native-Spanish reviews are optional release evidence; automated accessibility, i18n completeness, and rendered SEO checks remain required.
 
 Provider checks are read-only and use shell credentials first. In CI, the Release Provider Evidence workflow runs `npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars` with `CLOUDFLARE_DNS_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_ZONE`.
 

@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import { collectAssetBudgetEvidence } from '../../scripts/audit-performance-budgets.mjs';
 import { evaluateCachePolicyTarget } from '../../scripts/audit-cache-policy.mjs';
-import { evaluateLighthouseResult } from '../../scripts/performance-lighthouse.mjs';
+import { evaluateLighthouseResult, lighthouseBudgetsForRoute } from '../../scripts/performance-lighthouse.mjs';
+import { evaluateWorkerPerformanceEvidence } from '../../scripts/audit-runtime-performance.mjs';
 
 describe('production performance gates', () => {
   it('enforces generated totals and named file budgets from one config', () => {
@@ -78,5 +79,41 @@ describe('production performance gates', () => {
         ] } }
       }
     }, budgets)).toMatchObject({ ok: false });
+  });
+
+  it('merges shared Lighthouse limits with tighter route-specific budgets', () => {
+    expect(lighthouseBudgetsForRoute({
+      categories: { accessibility: 0.95 },
+      audits: { 'cumulative-layout-shift': 0.1 },
+      resourceBytes: { stylesheet: 300000 },
+      routeBudgets: {
+        '/terms/': {
+          categories: { performance: 0.65 },
+          audits: { 'largest-contentful-paint': 8000 },
+          resourceBytes: { total: 850000, stylesheet: 200000 }
+        }
+      }
+    }, '/terms/')).toEqual({
+      categories: { accessibility: 0.95, performance: 0.65 },
+      audits: { 'cumulative-layout-shift': 0.1, 'largest-contentful-paint': 8000 },
+      resourceBytes: { stylesheet: 200000, total: 850000 }
+    });
+  });
+
+  it('fails Worker route evidence when a configured operation is slow or missing', () => {
+    const budgets = { operations: { admin_dashboard_summary: 750, admin_settings: 750 } };
+    expect(evaluateWorkerPerformanceEvidence({ summaries: [{ operations: {
+      admin_dashboard_summary: { count: 8, p95Ms: 320 },
+      admin_settings: { count: 4, p95Ms: 610 }
+    } }] }, budgets)).toMatchObject({ ok: true });
+    expect(evaluateWorkerPerformanceEvidence({ slowRoutes: [
+      { operation: 'admin_dashboard_summary', count: 8, p95Ms: 900 }
+    ] }, budgets)).toMatchObject({
+      ok: false,
+      checks: expect.arrayContaining([
+        expect.objectContaining({ operation: 'admin_dashboard_summary', failure: 'p95_above_budget' }),
+        expect.objectContaining({ operation: 'admin_settings', failure: 'missing_samples' })
+      ])
+    });
   });
 });

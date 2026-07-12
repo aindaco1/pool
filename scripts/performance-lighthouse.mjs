@@ -39,6 +39,15 @@ export function evaluateLighthouseResult(lhr = {}, budgets = {}) {
   return { ok: checks.every((check) => check.ok), checks };
 }
 
+export function lighthouseBudgetsForRoute(lighthouseConfig = {}, routePath = '/') {
+  const overrides = lighthouseConfig.routeBudgets?.[routePath] || {};
+  return {
+    categories: { ...(lighthouseConfig.categories || {}), ...(overrides.categories || {}) },
+    audits: { ...(lighthouseConfig.audits || {}), ...(overrides.audits || {}) },
+    resourceBytes: { ...(lighthouseConfig.resourceBytes || {}), ...(overrides.resourceBytes || {}) }
+  };
+}
+
 export async function collectLighthouseEvidence(options = {}) {
   const config = options.config || JSON.parse(fs.readFileSync(options.configPath || DEFAULT_CONFIG, 'utf8'));
   const baseUrl = String(options.baseUrl || 'http://127.0.0.1:4000').replace(/\/$/, '');
@@ -49,11 +58,12 @@ export async function collectLighthouseEvidence(options = {}) {
   const routes = [];
   try {
     for (const routePath of config.lighthouse.routes || []) {
+      const routeBudgets = lighthouseBudgetsForRoute(config.lighthouse, routePath);
       const result = await lighthouse(`${baseUrl}${routePath}`, {
         port: chrome.port,
         output: 'json',
         logLevel: 'error',
-        onlyCategories: Object.keys(config.lighthouse.categories || {})
+        onlyCategories: Object.keys(routeBudgets.categories || {})
       });
       if (!result?.lhr) throw new Error(`Lighthouse did not return a result for ${routePath}.`);
       if (options.rawOutputDirectory) {
@@ -63,7 +73,7 @@ export async function collectLighthouseEvidence(options = {}) {
           : `${routePath.replace(/^\/+|\/+$/g, '').replace(/[^a-z0-9]+/gi, '-')}.json`;
         fs.writeFileSync(path.join(options.rawOutputDirectory, filename), `${JSON.stringify(result.lhr)}\n`);
       }
-      const evaluated = evaluateLighthouseResult(result.lhr, config.lighthouse);
+      const evaluated = evaluateLighthouseResult(result.lhr, routeBudgets);
       routes.push({ path: routePath, ...evaluated });
     }
   } finally {
