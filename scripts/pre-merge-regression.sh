@@ -41,6 +41,14 @@ launch_reminders:
 YAML
 }
 
+search_text() {
+  if command -v rg >/dev/null 2>&1; then
+    command rg "$@"
+  else
+    grep -E "$@"
+  fi
+}
+
 prefer_podman_path() {
   local candidate=""
   for candidate in \
@@ -117,9 +125,9 @@ prepare_host_jekyll() {
   fi
 
   HOST_JEKYLL_STATUS="bundle_install_failed"
-  if [[ -f "${HOST_JEKYLL_LOG}" ]] && rg -q "can no longer be found in that source" "${HOST_JEKYLL_LOG}"; then
+  if [[ -f "${HOST_JEKYLL_LOG}" ]] && search_text -q "can no longer be found in that source" "${HOST_JEKYLL_LOG}"; then
     HOST_JEKYLL_FAILURE_REASON="locked gem version is unavailable from RubyGems"
-  elif [[ -f "${HOST_JEKYLL_LOG}" ]] && rg -q "extensions are not built" "${HOST_JEKYLL_LOG}"; then
+  elif [[ -f "${HOST_JEKYLL_LOG}" ]] && search_text -q "extensions are not built" "${HOST_JEKYLL_LOG}"; then
     HOST_JEKYLL_FAILURE_REASON="native gem extensions are missing on the host Ruby"
   else
     HOST_JEKYLL_FAILURE_REASON="bundle install failed"
@@ -206,11 +214,11 @@ minify_site_assets() {
 }
 
 verify_build_artifacts() {
-  if ! rg -n '\.pool-first-party-cart__panel' _site/assets/main.css >/dev/null; then
+  if ! search_text -n '\.pool-first-party-cart__panel' _site/assets/main.css >/dev/null; then
     echo "main.css is missing expected first-party cart UI styles"
     return 1
   fi
-  if [[ ! -f _site/assets/admin.css ]] || ! rg -n '\.admin-dashboard' _site/assets/admin.css >/dev/null; then
+  if [[ ! -f _site/assets/admin.css ]] || ! search_text -n '\.admin-dashboard' _site/assets/admin.css >/dev/null; then
     echo "admin.css is missing expected isolated dashboard styles"
     return 1
   fi
@@ -226,35 +234,35 @@ verify_build_artifacts() {
     echo "sitemap.xml is missing from the built site"
     return 1
   fi
-  if ! rg -n 'Sitemap: .+/sitemap\.xml' _site/robots.txt >/dev/null; then
+  if ! search_text -n 'Sitemap: .+/sitemap\.xml' _site/robots.txt >/dev/null; then
     echo "robots.txt is missing its sitemap pointer"
     return 1
   fi
-  if ! rg -n 'Disallow: /manage/' _site/robots.txt >/dev/null; then
+  if ! search_text -n 'Disallow: /manage/' _site/robots.txt >/dev/null; then
     echo "robots.txt is missing the manage-route disallow"
     return 1
   fi
-  if ! rg -n '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9" xmlns:xhtml="http://www\.w3\.org/1999/xhtml">' _site/sitemap.xml >/dev/null; then
+  if ! search_text -n '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9" xmlns:xhtml="http://www\.w3\.org/1999/xhtml">' _site/sitemap.xml >/dev/null; then
     echo "sitemap.xml is missing the expected urlset root"
     return 1
   fi
-  if ! rg -n '<loc>.+/campaigns/' _site/sitemap.xml >/dev/null; then
+  if ! search_text -n '<loc>.+/campaigns/' _site/sitemap.xml >/dev/null; then
     echo "sitemap.xml is missing public campaign URLs"
     return 1
   fi
-  if ! rg -n 'application/ld\+json' _site/index.html >/dev/null; then
+  if ! search_text -n 'application/ld\+json' _site/index.html >/dev/null; then
     echo "Home page is missing JSON-LD"
     return 1
   fi
-  if ! rg -n 'application/ld\+json' _site/campaigns/*/index.html >/dev/null; then
+  if ! search_text -n 'application/ld\+json' _site/campaigns/*/index.html >/dev/null; then
     echo "Campaign pages are missing JSON-LD"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/manage/index.html >/dev/null; then
+  if ! search_text -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/manage/index.html >/dev/null; then
     echo "Manage page is missing noindex robots metadata"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/admin/index.html >/dev/null; then
+  if ! search_text -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/admin/index.html >/dev/null; then
     echo "Admin page is missing noindex robots metadata"
     return 1
   fi
@@ -262,19 +270,19 @@ verify_build_artifacts() {
     echo "Generated CSS/JS assets still have minification savings"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/es/admin/index.html >/dev/null; then
+  if ! search_text -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/es/admin/index.html >/dev/null; then
     echo "Spanish admin page is missing noindex robots metadata"
     return 1
   fi
-  if rg -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/admin/index.html >/dev/null; then
+  if search_text -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/admin/index.html >/dev/null; then
     echo "Admin page is emitting public social or structured-data metadata"
     return 1
   fi
-  if rg -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/es/admin/index.html >/dev/null; then
+  if search_text -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/es/admin/index.html >/dev/null; then
     echo "Spanish admin page is emitting public social or structured-data metadata"
     return 1
   fi
-  if rg -n '<loc>.+/admin/' _site/sitemap.xml >/dev/null; then
+  if search_text -n '<loc>.+/admin/' _site/sitemap.xml >/dev/null; then
     echo "sitemap.xml unexpectedly includes the admin route"
     return 1
   fi

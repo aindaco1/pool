@@ -25,4 +25,11 @@ describe('package release scripts', () => {
     expect(premerge).toContain('show_test_campaigns: true');
     expect(premerge).toContain('rm -f "${TEMP_LOCAL_CONFIG}"');
   });
+
+  it('does not require ripgrep on clean CI runners', () => {
+    const premerge = readFileSync(join(repoRoot, 'scripts', 'pre-merge-regression.sh'), 'utf8');
+    expect(premerge).toContain('if command -v rg');
+    expect(premerge).toContain('grep -E "$@"');
+    expect(premerge).toContain('search_text -n');
+  });
 });
