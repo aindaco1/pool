@@ -8,6 +8,7 @@ PLAYWRIGHT_IMAGE="localhost/pool-dev-playwright:latest"
 PLAYWRIGHT_NODE_MODULES_VOLUME="pool-dev-playwright-node-modules"
 PODMAN_REBUILD="${PODMAN_REBUILD:-0}"
 PODMAN_STACK_STARTED=false
+TEMP_LOCAL_CONFIG=""
 
 prefer_podman_path() {
   local candidate=""
@@ -26,8 +27,12 @@ prefer_podman_path() {
 }
 
 cleanup() {
-  if [ "$PODMAN_STACK_STARTED" = "true" ] && [ -n "${DEV_PID:-}" ]; then
-    kill "$DEV_PID" 2>/dev/null || true
+  if [ "$PODMAN_STACK_STARTED" = "true" ]; then
+    podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
+    podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
+  fi
+  if [ -n "$TEMP_LOCAL_CONFIG" ] && [ -f "$TEMP_LOCAL_CONFIG" ]; then
+    rm -f "$TEMP_LOCAL_CONFIG"
   fi
 }
 
@@ -60,8 +65,18 @@ shared_stack_ready() {
 if ! shared_stack_ready; then
   echo "📦 Starting shared Podman dev stack..." >&2
   PODMAN_PLAYWRIGHT_LOG="${PODMAN_PLAYWRIGHT_LOG:-/tmp/pool-playwright-podman.log}"
-  PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_PLAYWRIGHT_LOG" 2>&1
+
+  if [ ! -f _config.local.yml ]; then
+    TEMP_LOCAL_CONFIG="_config.local.yml"
+    cp _config.test.yml "$TEMP_LOCAL_CONFIG"
+  fi
+
   PODMAN_STACK_STARTED=true
+  if ! PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_PLAYWRIGHT_LOG" 2>&1; then
+    echo "❌ Podman dev stack startup failed. Last log lines:" >&2
+    tail -n 120 "$PODMAN_PLAYWRIGHT_LOG" >&2 || true
+    exit 1
+  fi
 
   echo "⏳ Waiting for Podman-backed site and worker..." >&2
   for _ in {1..60}; do
@@ -77,15 +92,6 @@ if ! shared_stack_ready; then
   fi
 fi
 
-cleanup() {
-  if [ "$PODMAN_STACK_STARTED" = "true" ]; then
-    podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
-    podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
-  fi
-}
-
-trap cleanup EXIT
-
 if [ "$PODMAN_REBUILD" = "1" ] || ! podman image exists "$PLAYWRIGHT_IMAGE"; then
   echo "🔨 Building $PLAYWRIGHT_IMAGE..." >&2
   podman build -t "$PLAYWRIGHT_IMAGE" -f "$ROOT_DIR/Containerfile.playwright.dev" "$ROOT_DIR" >&2
@@ -93,7 +99,7 @@ fi
 
 podman volume exists "$PLAYWRIGHT_NODE_MODULES_VOLUME" >/dev/null 2>&1 || podman volume create "$PLAYWRIGHT_NODE_MODULES_VOLUME" >/dev/null
 
-exec podman run --rm \
+podman run --rm \
   --pod pool-dev-pod \
   -v "$ROOT_DIR:/workspace" \
   -v "$PLAYWRIGHT_NODE_MODULES_VOLUME:/workspace/node_modules" \

@@ -20,10 +20,22 @@ describe('package release scripts', () => {
 
   it('creates and removes localhost Jekyll overrides for clean checkouts', () => {
     const premerge = readFileSync(join(repoRoot, 'scripts', 'pre-merge-regression.sh'), 'utf8');
+    const testConfig = readFileSync(join(repoRoot, '_config.test.yml'), 'utf8');
     expect(premerge).toContain('prepare_local_config');
     expect(premerge).toContain('TEMP_LOCAL_CONFIG="_config.local.yml"');
-    expect(premerge).toContain('show_test_campaigns: true');
+    expect(premerge).toContain('cp _config.test.yml "${TEMP_LOCAL_CONFIG}"');
+    expect(testConfig).toContain('show_test_campaigns: true');
     expect(premerge).toContain('rm -f "${TEMP_LOCAL_CONFIG}"');
+  });
+
+  it('makes Podman Playwright startup clean-checkout safe and diagnosable', () => {
+    const podmanPlaywright = readFileSync(join(repoRoot, 'scripts', 'podman-playwright-run.sh'), 'utf8');
+    const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'podman-e2e.yml'), 'utf8');
+    expect(podmanPlaywright).toContain('cp _config.test.yml "$TEMP_LOCAL_CONFIG"');
+    expect(podmanPlaywright).toContain('tail -n 120 "$PODMAN_PLAYWRIGHT_LOG"');
+    expect(podmanPlaywright).toContain('rm -f "$TEMP_LOCAL_CONFIG"');
+    expect(podmanPlaywright).not.toContain('exec podman run --rm');
+    expect(workflow).toContain('/tmp/pool-playwright-podman.log');
   });
 
   it('does not require ripgrep on clean CI runners', () => {
