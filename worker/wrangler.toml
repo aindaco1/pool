@@ -147,6 +147,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - STRIPE_SECRET_KEY_LIVE / STRIPE_SECRET_KEY_TEST
 # - STRIPE_WEBHOOK_SECRET_LIVE / STRIPE_WEBHOOK_SECRET_TEST
 # - STRIPE_WEBHOOK_SECRET      (webhook signing secret)
+# - FILM_STRIPE_SUMMARY_ADAPTER_SECRET (shared bearer secret for Film summary-only aggregate reads)
 # - USPS_CLIENT_SECRET         (USPS OAuth client secret for live shipping quotes)
 # - ADMIN_SETTLEMENT_SECRET    (scoped settlement endpoint secret; rejects ADMIN_SECRET when set)
 # - ADMIN_BROADCAST_SECRET     (scoped broadcast/diary/milestone endpoint secret; rejects ADMIN_SECRET when set)

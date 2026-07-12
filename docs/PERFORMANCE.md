@@ -27,6 +27,7 @@ Use these as practical targets rather than claims that every local test run will
 - generated CSS/JS assets pass `npm run assets:minify:check`
 - generated crawl/metadata output passes `npm run test:seo` after a Jekyll build
 - Cloudflare serves text assets with transfer compression and without Auto Minify
+- generated assets pass `npm run performance:budget` against `config/performance-budgets.json`
 
 ## Platform Model
 
@@ -41,7 +42,12 @@ Important repo surfaces:
 - [`assets/js/cart-runtime-loader.js`](../assets/js/cart-runtime-loader.js): lazy cart runtime bootstrap
 - [`assets/js/page-prefetch.js`](../assets/js/page-prefetch.js): intent-based document prefetch runtime
 - [`scripts/minify-site-assets.mjs`](../scripts/minify-site-assets.mjs): generated CSS/JS minification
+- [`scripts/audit-performance-budgets.mjs`](../scripts/audit-performance-budgets.mjs): measured total and named-asset release ceilings
 - [`scripts/sync-worker-config.rb`](../scripts/sync-worker-config.rb): site-to-Worker config mirroring
+
+Admin-only Sass is emitted as `assets/admin.css` and loaded only by the admin layout, keeping roughly 73 KB of minified dashboard CSS off public campaign pages. Adobe display-font CSS is activated after DOM readiness with a no-script fallback; Inter remains the body-font dependency. Workers Cache remains disabled for the Pool admin read model until a representative benchmark proves at least a 40% p95 improvement. Store v1.0.7 did not meet that threshold, so parity means carrying the evidence gate—not enabling the cache switch by assumption.
+
+Worker performance summaries retain bounded latency histograms and expose approximate p50/p95/p99 alongside count, average, minimum, maximum, and last duration. They do not retain request bodies or customer identifiers.
 
 ## Critical Rendering
 

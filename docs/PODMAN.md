@@ -84,6 +84,8 @@ npm run podman:doctor
 npm run podman:self-check
 ```
 
+On macOS and Windows, normal development warns when the Podman machine has less than 6144 MiB. `npm run test:premerge` and required `npm run release:smoke -- --podman-e2e` phases enforce that minimum before long suites. Resize a stopped machine with `podman machine set --memory 6144`, restart it, and rerun the doctor. The weekly/manual `.github/workflows/podman-e2e.yml` workflow separately exercises the rootless Linux Podman path without deploying anything.
+
 `npm run podman:self-check` is the strongest automated confidence pass on this branch. It runs the doctor, boots the Podman-backed stack, runs the worker smoke, and runs the automated Playwright suite in a container.
 
 More specifically, the self-check covers:

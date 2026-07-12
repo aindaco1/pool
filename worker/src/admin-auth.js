@@ -7,6 +7,8 @@ export const ADMIN_USERS_KV_KEY = 'admin-users:v1';
 
 const ADMIN_LOGIN_TTL_SECONDS = 15 * 60;
 const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60;
+const ADMIN_LOGIN_HISTORY_TTL_SECONDS = 30 * 24 * 60 * 60;
+const ADMIN_SESSION_LIST_LIMIT = 200;
 const ADMIN_TURNSTILE_ACTION = 'admin_login';
 
 function privateAdminJsonResponse(data, status = 200, env = null, extraHeaders = {}) {
@@ -294,6 +296,67 @@ function shouldExposeAdminLoginUrl(env) {
   return isLocalAdminUrl(env?.SITE_BASE) || isLocalAdminUrl(env?.WORKER_BASE) || isLocalAdminUrl(env?.CORS_ALLOWED_ORIGIN);
 }
 
+function summarizeAdminUserAgent(value = '') {
+  const userAgent = String(value || '');
+  const browser = /Edg\//.test(userAgent)
+    ? 'Edge'
+    : /Firefox\//.test(userAgent)
+      ? 'Firefox'
+      : /CriOS\//.test(userAgent)
+        ? 'Chrome iOS'
+        : /Chrome\//.test(userAgent)
+          ? 'Chrome'
+          : /Safari\//.test(userAgent)
+            ? 'Safari'
+            : 'Other';
+  const operatingSystem = /iPhone|iPad|iPod/.test(userAgent)
+    ? 'iOS/iPadOS'
+    : /Mac OS X/.test(userAgent)
+      ? 'macOS'
+      : /Android/.test(userAgent)
+        ? 'Android'
+        : /Windows/.test(userAgent)
+          ? 'Windows'
+          : /Linux/.test(userAgent)
+            ? 'Linux'
+            : 'Other';
+  const device = /iPad|Tablet/.test(userAgent)
+    ? 'Tablet'
+    : /Mobile|iPhone|Android/.test(userAgent)
+      ? 'Mobile'
+      : 'Desktop';
+  return { browser, operatingSystem, device };
+}
+
+async function adminNetworkFingerprint(request, env) {
+  const address = String(request.headers.get('CF-Connecting-IP') || '').trim();
+  const secret = getAdminSecret(env);
+  if (!address || !secret) return '';
+  return (await hmacSign(secret, `admin-network:${address}`)).slice(0, 16);
+}
+
+async function recordAdminLoginHistory(request, env, sessionKey, session = {}) {
+  if (!env?.PLEDGES) return;
+  const createdAt = String(session.createdAt || new Date().toISOString());
+  const dateKey = createdAt.slice(0, 10);
+  const eventId = typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${randomToken(8)}`;
+  const historyRecord = {
+    sessionKey,
+    email: normalizeEmail(session.email),
+    role: session.role === 'super_admin' ? 'super_admin' : 'campaign_user',
+    createdAt,
+    expiresAt: String(session.expiresAt || ''),
+    client: summarizeAdminUserAgent(request.headers.get('User-Agent') || ''),
+    networkId: await adminNetworkFingerprint(request, env)
+  };
+  await env.PLEDGES.put(`admin-login-history:${dateKey}:${eventId}`, JSON.stringify(historyRecord), {
+    expirationTtl: ADMIN_LOGIN_HISTORY_TTL_SECONDS,
+    metadata: historyRecord
+  });
+}
+
 function getAdminTurnstileSecret(env) {
   return getTurnstileSecret(env, ['TURNSTILE_SECRET_KEY', 'ADMIN_TURNSTILE_SECRET_KEY']);
 }
@@ -495,6 +558,7 @@ export async function handleAdminAuthExchange(request, env, body = {}) {
   if (!loginRecord || normalizeEmail(loginRecord.email) !== normalizeEmail(payload.email)) {
     return privateAdminJsonResponse({ error: 'Invalid or expired token' }, 401, env);
   }
+  await env.PLEDGES.delete(nonceKey);
 
   const user = await resolveAdminUser(env, loginRecord.email);
   if (!user) {
@@ -504,8 +568,8 @@ export async function handleAdminAuthExchange(request, env, body = {}) {
   const sessionToken = randomToken(32);
   const csrfToken = randomToken(24);
   const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_SECONDS * 1000).toISOString();
-  await env.PLEDGES.delete(nonceKey);
-  await env.PLEDGES.put(`admin-session:${await sha256Hex(sessionToken)}`, JSON.stringify({
+  const sessionKey = `admin-session:${await sha256Hex(sessionToken)}`;
+  const sessionRecord = {
     email: user.email,
     role: user.role,
     campaignSlugs: user.campaignSlugs || [],
@@ -513,7 +577,9 @@ export async function handleAdminAuthExchange(request, env, body = {}) {
     preferredLang: normalizeLang(loginRecord.preferredLang),
     createdAt: new Date().toISOString(),
     expiresAt
-  }), { expirationTtl: ADMIN_SESSION_TTL_SECONDS });
+  };
+  await env.PLEDGES.put(sessionKey, JSON.stringify(sessionRecord), { expirationTtl: ADMIN_SESSION_TTL_SECONDS });
+  await recordAdminLoginHistory(request, env, sessionKey, sessionRecord);
 
   return privateAdminJsonResponse({
     success: true,
@@ -525,13 +591,97 @@ export async function handleAdminAuthExchange(request, env, body = {}) {
   });
 }
 
+async function listAdminKeys(env, prefix, limit = ADMIN_SESSION_LIST_LIMIT) {
+  if (!env?.PLEDGES?.list) return [];
+  const listing = await env.PLEDGES.list({ prefix, limit: Math.max(1, Math.min(1000, limit)) });
+  return Array.isArray(listing?.keys) ? listing.keys : [];
+}
+
+export async function listAdminSessionReview(env) {
+  const [sessionKeys, historyKeys] = await Promise.all([
+    listAdminKeys(env, 'admin-session:'),
+    listAdminKeys(env, 'admin-login-history:', 1000)
+  ]);
+  const now = Date.now();
+  const active = [];
+  for (const key of sessionKeys) {
+    const keyName = String(key?.name || '');
+    if (!/^admin-session:[a-f0-9]{64}$/.test(keyName)) continue;
+    const session = await env.PLEDGES.get(keyName, { type: 'json' });
+    if (!session?.email || new Date(session.expiresAt || 0).getTime() <= now) continue;
+    active.push({
+      id: keyName.slice('admin-session:'.length),
+      email: normalizeEmail(session.email),
+      role: session.role === 'super_admin' ? 'super_admin' : 'campaign_user',
+      createdAt: String(session.createdAt || ''),
+      expiresAt: String(session.expiresAt || '')
+    });
+  }
+  const activeIds = new Set(active.map((session) => session.id));
+  const historyBySessionId = new Map();
+  const recent = [];
+  for (const key of historyKeys) {
+    const keyName = String(key?.name || '');
+    if (!keyName.startsWith('admin-login-history:')) continue;
+    const record = key?.metadata && typeof key.metadata === 'object'
+      ? key.metadata
+      : await env.PLEDGES.get(keyName, { type: 'json' });
+    if (!record?.email || !record?.createdAt) continue;
+    const sessionId = String(record.sessionKey || '').replace(/^admin-session:/, '');
+    if (/^[a-f0-9]{64}$/.test(sessionId)) historyBySessionId.set(sessionId, record);
+    recent.push({
+      email: normalizeEmail(record.email),
+      role: record.role === 'super_admin' ? 'super_admin' : 'campaign_user',
+      createdAt: String(record.createdAt || ''),
+      expiresAt: String(record.expiresAt || ''),
+      client: record.client && typeof record.client === 'object' ? record.client : {},
+      networkId: String(record.networkId || ''),
+      active: activeIds.has(sessionId)
+    });
+  }
+  active.forEach((session) => {
+    const history = historyBySessionId.get(session.id) || {};
+    session.client = history.client && typeof history.client === 'object' ? history.client : {};
+    session.networkId = String(history.networkId || '');
+  });
+  active.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  recent.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return {
+    active: active.slice(0, ADMIN_SESSION_LIST_LIMIT),
+    recent: recent.slice(0, ADMIN_SESSION_LIST_LIMIT),
+    retentionDays: ADMIN_LOGIN_HISTORY_TTL_SECONDS / (24 * 60 * 60)
+  };
+}
+
+export async function revokeAdminSessionById(env, id = '') {
+  const normalized = String(id || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(normalized)) {
+    return { ok: false, status: 400, error: 'Invalid admin session ID' };
+  }
+  const key = `admin-session:${normalized}`;
+  const session = await env?.PLEDGES?.get(key, { type: 'json' });
+  if (!session?.email) return { ok: false, status: 404, error: 'Admin session not found' };
+  await env.PLEDGES.delete(key);
+  return {
+    ok: true,
+    session: {
+      id: normalized,
+      email: normalizeEmail(session.email),
+      role: session.role === 'super_admin' ? 'super_admin' : 'campaign_user',
+      createdAt: String(session.createdAt || ''),
+      expiresAt: String(session.expiresAt || '')
+    }
+  };
+}
+
 export async function requireAdminSession(request, env, permission = 'campaign:read', options = {}) {
   const sessionToken = getCookie(request, ADMIN_SESSION_COOKIE);
   if (!sessionToken || !env?.PLEDGES) {
     return { ok: false, response: privateAdminJsonResponse({ error: 'Unauthorized' }, 401, env) };
   }
 
-  const session = await env.PLEDGES.get(`admin-session:${await sha256Hex(sessionToken)}`, { type: 'json' });
+  const sessionId = await sha256Hex(sessionToken);
+  const session = await env.PLEDGES.get(`admin-session:${sessionId}`, { type: 'json' });
   if (!session?.email || !session?.expiresAt || new Date(session.expiresAt).getTime() <= Date.now()) {
     return { ok: false, response: privateAdminJsonResponse({ error: 'Unauthorized' }, 401, env) };
   }
@@ -565,6 +715,7 @@ export async function requireAdminSession(request, env, permission = 'campaign:r
     ok: true,
     user: publicUser(user),
     session,
+    sessionId,
     csrfToken: session.csrfToken
   };
 }

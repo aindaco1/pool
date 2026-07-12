@@ -1,6 +1,6 @@
 # Testing Guide
 
-This guide covers the automated test suites, local test infrastructure, and manual verification paths.
+This guide covers the automated test suites, local test infrastructure, and manual verification paths. Weekly synthetic recovery, protected preview drills, and post-restore verification are documented in [BACKUP_RESTORE.md](./BACKUP_RESTORE.md).
 
 ## Quick Reference
 

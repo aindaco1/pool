@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.0.9 - 2026-07-12
+
+Release scope:
+
+- Adapted the Store v1.0.6/v1.0.7 backup and disaster-recovery model to Pool's Git, `PLEDGES`, `VOTES`, `RATELIMIT`, Stripe, and Durable Object boundaries, with an approved four-hour RPO/RTO and 7-daily/5-weekly/12-monthly plus release-snapshot retention policy.
+- Added checksum-covered metadata and encrypted KV-value snapshots, repository-boundary checks, age/GPG encryption verification, release receipts, safe retention pruning, append-only off-device copies, and readiness evidence without secret-value export.
+- Added classification-driven restore plans for local, preview, and production; authoritative-family validation; derived-state rebuilds; quarantine exclusions; exact preview cleanup; readback verification; and explicit production maintenance, Stripe, settlement, conflict, pre-restore-snapshot, and acknowledgement gates.
+- Added synthetic weekly restore rehearsals and quarterly low-traffic protected preview drills with captured-production data disabled until protected credentials and operator approval are configured. Protected drills upload to S3-compatible off-account storage and verify a byte-identical download before restore.
+- Added read-only Stripe reconciliation for snapshot pledge totals and PaymentIntent state, plus aggregate-only Cloudflare traffic preflight evidence.
+- Split routine Pages refreshes from manual reviewed Worker/full production deployment, pinned all GitHub Actions to immutable commits, added monthly Dependabot coverage for Actions and both npm projects, and made Stripe CLI probes non-interactive.
+- Added a shared Pool pledge read model with deterministic privacy-safe watermarks, no-change responses, and production KV bulk reads in batches of 100 across analytics, supporters, reports, index repair, settlement, and financial backfills.
+- Added privacy-minimized admin login history, active/recent session review, explicit session revocation, searchable audit metadata, formula-safe audit CSV exports, and deferred Turnstile loading until unauthenticated state is known.
+- Added a managed Cloudflare admin response-rule reconciler and public verification for `private, no-store, no-transform, max-age=0, must-revalidate` on English and Spanish admin routes.
+- Split admin-only CSS from the public stylesheet, deferred Adobe display-font CSS, established measured generated-asset budgets, and kept Workers Cache disabled until representative evidence shows at least a 40% p95 benefit.
+- Added weekly production-posture drift checks, monthly source-hashed Spanish review packets without claiming professional review, a scheduled Podman E2E workflow, and a 6 GiB Podman release-suite resource gate.
+- Added sanitized JSON provider-evidence artifacts for downstream recovery/posture workflows, with failure/warning/skip counts and explicit credential/customer-data exclusions.
+- Bumped the site and Worker packages to v1.0.9 and documented the complete recovery/operator procedure.
+
 ## v1.0.8 - 2026-07-01
 
 Release scope:

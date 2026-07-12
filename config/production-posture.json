@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "requiredSecrets": [
+    "ADMIN_SECRET",
+    "ADMIN_SESSION_SECRET",
+    "MAGIC_LINK_SECRET",
+    "CHECKOUT_INTENT_SECRET",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "RESEND_API_KEY",
+    "USPS_CLIENT_SECRET"
+  ],
+  "recommendedSecrets": [
+    "ADMIN_SETTLEMENT_SECRET",
+    "ADMIN_BROADCAST_SECRET",
+    "TURNSTILE_SECRET_KEY",
+    "FILM_STRIPE_SUMMARY_ADAPTER_SECRET"
+  ],
+  "requiredKvBindings": ["PLEDGES", "VOTES", "RATELIMIT"],
+  "requiredDurableObjectBindings": ["CHECKOUT_INTENTS", "TIER_INVENTORY_COORDINATOR", "SETTLEMENT_COORDINATOR"],
+  "expectedStripeWebhookPath": "/webhooks/stripe"
+}

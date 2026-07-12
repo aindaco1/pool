@@ -1,0 +1,126 @@
+name: Quarterly Recovery Operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_protected_drill:
+        description: 'Request the protected captured-data preview restore after preflight'
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    - cron: '17 4 1 1,4,7,10 *'
+      timezone: 'America/Denver'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-operations
+  cancel-in-progress: false
+
+jobs:
+  traffic-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production-observability
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ANALYTICS_API_TOKEN: ${{ secrets.CLOUDFLARE_ANALYTICS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_WORKER_SCRIPT_NAME: ${{ vars.CLOUDFLARE_WORKER_SCRIPT_NAME || 'pledge-worker' }}
+      RECOVERY_MAX_RECENT_WORKER_REQUESTS: ${{ vars.RECOVERY_MAX_RECENT_WORKER_REQUESTS || '100' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify low-traffic recovery window
+        run: >-
+          npm run recovery:traffic-preflight --
+          --strict
+          --recent-minutes=15
+          --maximum-requests="${RECOVERY_MAX_RECENT_WORKER_REQUESTS}"
+          --maximum-errors=0
+          --output=recovery-traffic-preflight.json
+
+      - name: Require the traffic gate
+        run: node -e 'const e=require("./recovery-traffic-preflight.json"); if(e.traffic.lowTraffic!==true) process.exit(1)'
+
+      - name: Upload traffic preflight
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: recovery-traffic-preflight-${{ github.run_id }}
+          path: recovery-traffic-preflight.json
+          retention-days: 7
+
+  protected-preview-restore:
+    if: ${{ vars.RECOVERY_DRILL_ENABLED == 'true' && (github.event_name == 'schedule' || inputs.run_protected_drill) }}
+    needs: traffic-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production-recovery
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      POOL_BACKUP_ENCRYPTION_RECIPIENT: ${{ secrets.POOL_BACKUP_ENCRYPTION_RECIPIENT }}
+      POOL_BACKUP_AGE_IDENTITY: ${{ secrets.POOL_BACKUP_AGE_IDENTITY }}
+      STRIPE_RECOVERY_READ_KEY: ${{ secrets.STRIPE_RECOVERY_READ_KEY }}
+      POOL_RECOVERY_ARCHIVE_S3_URI: ${{ secrets.POOL_RECOVERY_ARCHIVE_S3_URI }}
+      POOL_RECOVERY_ARCHIVE_ACCESS_KEY_ID: ${{ secrets.POOL_RECOVERY_ARCHIVE_ACCESS_KEY_ID }}
+      POOL_RECOVERY_ARCHIVE_SECRET_ACCESS_KEY: ${{ secrets.POOL_RECOVERY_ARCHIVE_SECRET_ACCESS_KEY }}
+      POOL_RECOVERY_ARCHIVE_REGION: ${{ vars.POOL_RECOVERY_ARCHIVE_REGION || 'us-east-1' }}
+      POOL_RECOVERY_ARCHIVE_S3_ENDPOINT: ${{ vars.POOL_RECOVERY_ARCHIVE_S3_ENDPOINT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install protected recovery dependencies
+        run: |
+          npm ci
+          npm ci --prefix worker
+          sudo apt-get update
+          sudo apt-get install -y age awscli
+
+      - name: Download traffic preflight
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: recovery-traffic-preflight-${{ github.run_id }}
+          path: ${{ runner.temp }}/recovery-preflight
+
+      - name: Run protected encrypted snapshot and preview restore
+        run: bash ./scripts/protected-pool-recovery-drill.sh
+        env:
+          POOL_RECOVERY_TRAFFIC_EVIDENCE: ${{ runner.temp }}/recovery-preflight/recovery-traffic-preflight.json
+          POOL_RECOVERY_ENCRYPTED_DIR: ${{ runner.temp }}/pool-quarterly-encrypted
+          POOL_RECOVERY_DRILL_EVIDENCE_DIR: ${{ runner.temp }}/pool-quarterly-evidence
+
+      - name: Upload sanitized drill evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: quarterly-recovery-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/pool-quarterly-evidence
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Upload encrypted recovery snapshot
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: quarterly-encrypted-snapshot-${{ github.run_id }}
+          path: ${{ runner.temp }}/pool-quarterly-encrypted
+          retention-days: 90

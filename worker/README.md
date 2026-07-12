@@ -17,7 +17,7 @@ If you specifically work from the `worker/` directory, the Worker npm scripts no
 
 Treat `_config.local.yml` as an override-only file for localhost-specific values. The canonical fork-facing settings should live in the repo-root `_config.yml`, and the Worker mirror will follow from there.
 
-Use [`docs/PAYMENT_PROCESSOR.md`](../docs/PAYMENT_PROCESSOR.md) for Stripe setup, checkout, webhook, settlement, and reconciliation details. Use [`docs/EMAIL.md`](../docs/EMAIL.md) for Resend sender setup, email types, localization, and delivery behavior. Use [`docs/ETHICAL_RISK.md`](../docs/ETHICAL_RISK.md) before adding Worker behavior that changes money, data collection, messaging, automation, public sharing, analytics, or admin power.
+Use [`docs/PAYMENT_PROCESSOR.md`](../docs/PAYMENT_PROCESSOR.md) for Stripe setup, checkout, webhook, settlement, and reconciliation details. Use [`docs/BACKUP_RESTORE.md`](../docs/BACKUP_RESTORE.md) for classified snapshots, preview restore, retention, and disaster recovery. Use [`docs/EMAIL.md`](../docs/EMAIL.md) for Resend sender setup, email types, localization, and delivery behavior. Use [`docs/ETHICAL_RISK.md`](../docs/ETHICAL_RISK.md) before adding Worker behavior that changes money, data collection, messaging, automation, public sharing, analytics, or admin power.
 
 Campaign-runner report delivery follows that same pattern:
 
@@ -137,6 +137,9 @@ STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...
 # Stripe Webhook Secrets
 wrangler secret put STRIPE_WEBHOOK_SECRET_LIVE
 wrangler secret put STRIPE_WEBHOOK_SECRET_TEST
+
+# Optional: Film summary-only aggregate adapter
+wrangler secret put FILM_STRIPE_SUMMARY_ADAPTER_SECRET
 
 # First-party checkout intent signing secret
 wrangler secret put CHECKOUT_INTENT_SECRET
@@ -348,6 +351,9 @@ Return the same campaign share-card concept as SVG for internal preview/debug to
 ### POST /webhooks/stripe
 Stripe webhook endpoint (signature verified).
 
+### POST /film/stripe-summary
+Server-to-server Film adapter for summary-only Stripe aggregates. Requires `Authorization: Bearer <FILM_STRIPE_SUMMARY_ADAPTER_SECRET>`, `dataBoundary: "summary_only"`, `source: "pool"`, and mapped campaign slugs in `mappedRefs`. The response is limited to aggregate money/count fields, mapped-ref counts, status, generated timestamp, and currency. It does not return supporter emails, payment intent IDs, charge IDs, balance transaction IDs, or card/payment-method data, and it writes a metadata-only admin audit event.
+
 ### POST /tax/quote
 Return a Worker-calculated tax preview for cart / checkout UI.
 
@@ -421,6 +427,7 @@ The private `/admin/` and `/es/admin/` shells use cookie-backed Worker routes in
 - `GET /admin/analytics` reads role-scoped pledge-derived revenue, status, language, referral, UTM source/medium/campaign/content, and campaign/platform split metrics without writing analytics state; dashboard currency presentation keeps exact cents
 - `GET /admin/plan-usage` lets super admins load Cloudflare and Resend plan usage from provider APIs without exposing provider tokens to the browser or writing KV state; the dashboard loads it automatically when Settings -> Plan usage is opened
 - `POST /admin/analytics/stripe-financials/backfill` lets super admins backfill actual Stripe fee/net values from Stripe balance transactions for charged pledges, using campaign pledge indexes instead of KV list scans
+- `POST /film/stripe-summary` exposes Film-facing Pool aggregates only after bearer adapter auth; mapped refs are campaign slugs, and the response stays summary-only
 - `GET /admin/content/campaign?campaignSlug=...` loads role-scoped campaign content into the browser editor without persisting a draft
 - `POST /admin/content/preview` validates and renders role-scoped campaign content drafts without publishing, auditing, or writing KV
 - `POST /admin/content/publish` validates the same draft, updates the campaign Markdown file through GitHub, triggers the normal rebuild workflow, and writes one audit event

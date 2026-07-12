@@ -6,6 +6,7 @@ import path from 'node:path';
 import process from 'node:process';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { stripeCliAuthState } from './lib/stripe-cli-auth.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORKER_DIR = path.join(ROOT, 'worker');
@@ -51,6 +52,7 @@ const LOCAL_OPTIONAL_SECRETS = [
   'STRIPE_SECRET_KEY_TEST',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_WEBHOOK_SECRET_TEST',
+  'FILM_STRIPE_SUMMARY_ADAPTER_SECRET',
   'RESEND_API_KEY',
   'TURNSTILE_SECRET_KEY',
   'ADMIN_TURNSTILE_SECRET_KEY',
@@ -66,6 +68,7 @@ const WORKER_SECRETS = [
   { name: 'STRIPE_SECRET_KEY_TEST', label: 'Stripe test secret key', required: false },
   { name: 'STRIPE_WEBHOOK_SECRET', label: 'Stripe webhook signing secret', required: true },
   { name: 'STRIPE_WEBHOOK_SECRET_TEST', label: 'Stripe test webhook signing secret', required: false },
+  { name: 'FILM_STRIPE_SUMMARY_ADAPTER_SECRET', label: 'Film Stripe summary adapter bearer secret', required: false },
   { name: 'RESEND_API_KEY', label: 'Resend API key', required: true },
   { name: 'ADMIN_SECRET', label: 'Admin automation secret', required: true, generate: true },
   { name: 'ADMIN_SESSION_SECRET', label: 'Browser admin session secret', required: true, generate: true },
@@ -354,15 +357,21 @@ function ensureAuth() {
     logInfo('wrangler authenticated');
   }
 
-  if (commandAvailable('stripe')) {
-    const stripeStatus = run('stripe', ['whoami'], { allowFailure: true });
-    if (stripeStatus.status !== 0) {
-      run('stripe', ['login'], { capture: false });
-    } else {
-      logInfo('stripe authenticated');
-    }
-  } else {
+  const stripeAuth = stripeCliAuthState({
+    cwd: ROOT,
+    commandAvailableFn: commandAvailable,
+    runCommandFn: (command, commandArgs, commandOptions) => run(command, commandArgs, {
+      ...commandOptions,
+      allowFailure: true,
+      dryRunExec: true
+    })
+  });
+  if (!stripeAuth.available) {
     logInfo('stripe CLI not found; skipping optional Stripe auth helper');
+  } else if (!stripeAuth.authenticated) {
+    run('stripe', ['login'], { capture: false });
+  } else {
+    logInfo('stripe authenticated');
   }
 }
 
@@ -597,7 +606,7 @@ async function runReadinessChecks() {
     });
     readinessStatus('Stripe webhook endpoint access', stripeWebhooks.status === 0, stripeWebhooks.status === 0 ? 'webhook endpoints are readable' : 'run stripe login or configure webhook manually');
   } else {
-    readinessStatus('Stripe CLI webhook check', false, 'stripe CLI not installed; verify webhook endpoint manually');
+    readinessStatus('Stripe CLI webhook check', false, `${stripeAuth.reason}; verify webhook endpoint manually`);
   }
 
   const resendKey = readinessEnv('RESEND_API_KEY');

@@ -184,6 +184,14 @@ verify_build_artifacts() {
     echo "main.css is missing expected first-party cart UI styles"
     return 1
   fi
+  if [[ ! -f _site/assets/admin.css ]] || ! rg -n '\.admin-dashboard' _site/assets/admin.css >/dev/null; then
+    echo "admin.css is missing expected isolated dashboard styles"
+    return 1
+  fi
+  if ! node ./scripts/audit-performance-budgets.mjs >/dev/null; then
+    echo "Generated asset performance budgets failed"
+    return 1
+  fi
   if [[ ! -f _site/robots.txt ]]; then
     echo "robots.txt is missing from the built site"
     return 1
@@ -502,6 +510,8 @@ start_worker || exit 1
 run_phase "6. Security suite" npm run test:security
 
 stop_worker
+
+run_phase "6b. Podman release resource check" env PODMAN_REQUIRE_RELEASE_RESOURCES=true npm run podman:doctor
 
 if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
   reset_podman_dev_artifacts || exit 1

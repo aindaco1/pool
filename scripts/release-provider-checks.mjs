@@ -4,7 +4,8 @@ import dns from 'node:dns/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { stripeCliAuthState } from './lib/stripe-cli-auth.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORKER_DIR = path.join(ROOT, 'worker');
@@ -21,7 +22,13 @@ const useDevVars = !noDevVars;
 const cloudflareDnsOnly = hasArg('--cloudflare-dns-only') ||
   process.env.RELEASE_PROVIDER_CLOUDFLARE_DNS_ONLY === '1';
 const help = hasArg('--help') || hasArg('-h');
+const jsonOutput = (() => {
+  const prefix = '--json-output=';
+  const match = args.find((arg) => arg.startsWith(prefix));
+  return match ? match.slice(prefix.length).trim() : '';
+})();
 const CHECK_TIMEOUT_MS = Number(process.env.RELEASE_PROVIDER_TIMEOUT_MS || 10000);
+const generatedAt = new Date().toISOString();
 
 if (help) {
   console.log(`Usage: npm run release:providers -- [options]
@@ -34,6 +41,8 @@ Options:
              injected but unrelated provider secrets may not be available.
   --no-dev-vars
              Do not read worker/.dev.vars. Use this for clean-shell CI probes.
+  --json-output=<path>
+             Write the sanitized result summary used by posture/readiness jobs.
   --help     Show this help.
 
 The provider probe is read-only. It checks public DNS and, when credentials are
@@ -46,6 +55,49 @@ USPS quote smoke may also use worker/.dev.vars. It never prints secret values.`)
 
 const results = [];
 const requiresDedicatedCloudflareDnsToken = cloudflareDnsOnly && strict;
+
+export function buildProviderEvidence(entries, options = {}) {
+  const normalized = Array.isArray(entries) ? entries.map((entry) => ({
+    status: String(entry?.status || ''),
+    label: String(entry?.label || ''),
+    detail: String(entry?.detail || '')
+  })) : [];
+  const failCount = normalized.filter((entry) => entry.status === 'FAIL').length;
+  const warnCount = normalized.filter((entry) => entry.status === 'WARN').length;
+  const skipCount = normalized.filter((entry) => entry.status === 'SKIP').length;
+  return {
+    schemaVersion: 1,
+    generatedAt: String(options.generatedAt || new Date().toISOString()),
+    strict: options.strict === true,
+    cloudflareDnsOnly: options.cloudflareDnsOnly === true,
+    usedDevVars: options.usedDevVars === true,
+    status: failCount > 0 ? 'fail' : warnCount > 0 ? 'warning' : skipCount > 0 ? 'incomplete' : 'pass',
+    failCount,
+    warnCount,
+    skipCount,
+    results: normalized,
+    containsCredentials: false,
+    containsCustomerData: false
+  };
+}
+
+function finalizeResults() {
+  const evidence = buildProviderEvidence(results, {
+    generatedAt,
+    strict,
+    cloudflareDnsOnly,
+    usedDevVars: useDevVars
+  });
+  if (jsonOutput) {
+    const outputPath = path.resolve(ROOT, jsonOutput);
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
+  }
+  console.log('');
+  console.log(`Summary: ${evidence.failCount} fail, ${evidence.warnCount} warn, ${evidence.skipCount} skip`);
+  if (evidence.failCount || (strict && (evidence.warnCount || evidence.skipCount))) process.exitCode = 1;
+  return evidence;
+}
 
 function add(status, label, detail = '') {
   results.push({ status, label, detail });
@@ -227,13 +279,14 @@ async function listStripeWebhooksWithApi(key) {
   return { ok: true, status: webhooks.status, data: webhooks.body?.data || [] };
 }
 
-function listStripeWebhooksWithCli({ live = false } = {}) {
-  if (!commandAvailable('stripe')) return { ok: false, reason: 'stripe CLI not found', data: [] };
+function listStripeWebhooksWithCli({ live = false, authState } = {}) {
+  const auth = authState || stripeCliAuthState({ cwd: ROOT, mode: live ? 'live' : 'test' });
+  if (!auth.authenticated) return { ok: false, reason: auth.reason, data: [] };
   const args = ['webhook_endpoints', 'list', '--limit', '100'];
   if (live) args.push('--live');
   const result = run('stripe', args, { cwd: ROOT });
   if (result.status !== 0) {
-    return { ok: false, reason: String(result.stderr || result.stdout || 'stripe CLI failed').trim(), data: [] };
+    return { ok: false, reason: 'authenticated stripe CLI request failed', data: [] };
   }
   const parsed = parseJsonOutput(result.stdout);
   if (!parsed) return { ok: false, reason: 'stripe CLI returned non-JSON output', data: [] };
@@ -372,7 +425,7 @@ async function main() {
   const workerHost = hostFromUrl(workerBase);
 
   console.log('Pool release provider checks');
-  console.log(`Generated: ${new Date().toISOString()}`);
+  console.log(`Generated: ${generatedAt}`);
   console.log(`Strict: ${strict ? 'yes' : 'no'}`);
   console.log(`Dev vars: ${useDevVars ? 'yes' : 'no'}`);
   console.log(`Cloudflare DNS only: ${cloudflareDnsOnly ? 'yes' : 'no'}`);
@@ -468,17 +521,14 @@ async function main() {
   }
 
   if (cloudflareDnsOnly) {
-    const failCount = results.filter((entry) => entry.status === 'FAIL').length;
-    const warnCount = results.filter((entry) => entry.status === 'WARN').length;
-    const skipCount = results.filter((entry) => entry.status === 'SKIP').length;
-    console.log('');
-    console.log(`Summary: ${failCount} fail, ${warnCount} warn, ${skipCount} skip`);
-
-    if (failCount || (strict && (warnCount || skipCount))) process.exit(1);
+    finalizeResults();
     return;
   }
 
-  const stripeLiveCli = listStripeWebhooksWithCli({ live: true });
+  const stripeLiveCli = listStripeWebhooksWithCli({
+    live: true,
+    authState: stripeCliAuthState({ cwd: ROOT, mode: 'live' })
+  });
   if (stripeLiveCli.ok) {
     const liveEndpoint = findRequiredStripeWebhook(stripeLiveCli.data, workerBase, { livemode: true });
     if (liveEndpoint) add('PASS', 'Stripe production webhook endpoint', `live endpoint targets ${workerBase}/webhooks/stripe with required events`);
@@ -501,7 +551,10 @@ async function main() {
     }
   }
 
-  const stripeTestCli = listStripeWebhooksWithCli({ live: false });
+  const stripeTestCli = listStripeWebhooksWithCli({
+    live: false,
+    authState: stripeCliAuthState({ cwd: ROOT, mode: 'test' })
+  });
   if (stripeTestCli.ok) {
     const testEndpoint = findRequiredStripeWebhook(stripeTestCli.data, workerBase, { livemode: false });
     if (testEndpoint) {
@@ -549,16 +602,12 @@ async function main() {
     else add('FAIL', 'USPS quote smoke', String(result.stderr || result.stdout || 'npm run test:usps failed').split(/\r?\n/).filter(Boolean).slice(-1)[0] || 'npm run test:usps failed');
   }
 
-  const failCount = results.filter((entry) => entry.status === 'FAIL').length;
-  const warnCount = results.filter((entry) => entry.status === 'WARN').length;
-  const skipCount = results.filter((entry) => entry.status === 'SKIP').length;
-  console.log('');
-  console.log(`Summary: ${failCount} fail, ${warnCount} warn, ${skipCount} skip`);
-
-  if (failCount || (strict && (warnCount || skipCount))) process.exit(1);
+  finalizeResults();
 }
 
-main().catch((error) => {
-  console.error(error?.stack || error?.message || String(error));
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error?.stack || error?.message || String(error));
+    process.exit(1);
+  });
+}

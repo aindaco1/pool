@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "siteDirectory": "_site",
+    "javascriptTotalBytes": 1075000,
+    "cssTotalBytes": 240000,
+    "files": {
+      "assets/js/admin-dashboard.js": 440000,
+      "assets/js/cart-provider.js": 235000,
+      "assets/js/campaign-page.js": 30000,
+      "assets/main.css": 175000,
+      "assets/admin.css": 90000
+    }
+  },
+  "lighthouse": {
+    "routes": ["/", "/campaigns/hand-relations/", "/terms/", "/admin/"],
+    "categories": {
+      "performance": 0.8,
+      "accessibility": 0.95,
+      "best-practices": 0.9,
+      "seo": 0.95
+    },
+    "audits": {
+      "largest-contentful-paint": 4000,
+      "cumulative-layout-shift": 0.1,
+      "total-blocking-time": 300
+    },
+    "resourceBytes": {
+      "total": 1200000,
+      "image": 400000,
+      "stylesheet": 175000,
+      "third-party": 100000
+    }
+  },
+  "dashboard": {
+    "initialReadyMs": 3000,
+    "tabSwitchMs": 750,
+    "tableRenderMs": 1500
+  },
+  "workerRoutes": {
+    "adminWarmP95Ms": 750,
+    "adminNoChangeP95Ms": 250,
+    "minimumCacheP95ImprovementPercent": 40
+  },
+  "workersCache": {
+    "enabled": false,
+    "reason": "No Pool route may enable Workers Cache without representative evidence showing at least the configured p95 improvement. Store 1.0.7 did not meet that gate."
+  },
+  "cachePolicy": [
+    { "id": "home", "base": "site", "path": "/", "status": 200, "type": "public", "minimumMaxAge": 300 },
+    { "id": "main-css", "base": "site", "path": "/assets/main.css", "status": 200, "type": "public", "minimumMaxAge": 14400 },
+    { "id": "campaign-json", "base": "site", "path": "/api/campaigns.json", "status": 200, "type": "public", "minimumMaxAge": 300 },
+    { "id": "campaign-page", "base": "site", "path": "/campaigns/hand-relations/", "status": 200, "type": "public", "minimumMaxAge": 300 },
+    { "id": "admin-html", "base": "site", "path": "/admin/", "status": 200, "type": "private" },
+    { "id": "admin-session", "base": "worker", "path": "/admin/session", "status": 401, "type": "private" }
+  ]
+}

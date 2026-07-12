@@ -1,6 +1,6 @@
 # Security Guide
 
-This document covers the security architecture, known risks, applied hardening measures, accepted tradeoffs, and penetration testing procedures for The Pool crowdfunding platform.
+This document covers the security architecture, known risks, applied hardening measures, accepted tradeoffs, and penetration testing procedures for The Pool crowdfunding platform. Encrypted backup boundaries, quarantined session/rate-limit state, off-device handling, and production restore approvals are defined in [BACKUP_RESTORE.md](./BACKUP_RESTORE.md).
 
 Use this alongside [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a change creates new data use, supporter messaging, admin power, public sharing, automation, or engagement pressure. Security review should cover not only credential compromise and code injection, but also realistic misuse by spammers, harassers, fraudsters, careless admins, and overly aggressive growth workflows.
 
