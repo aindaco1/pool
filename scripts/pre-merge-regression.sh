@@ -161,7 +161,7 @@ build_with_podman_jekyll() {
     -v "$PWD:/workspace" \
     -v pool-dev-bundle:/usr/local/bundle \
     localhost/pool-dev-site:latest \
-    bash -lc 'cd /workspace && SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet'
+    bash -lc 'set -euo pipefail; cd /workspace; bundle config set path "${BUNDLE_PATH:-/usr/local/bundle}" >/dev/null; bundle check >/dev/null 2>&1 || bundle install; SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet'
 
   minify_site_assets
 }

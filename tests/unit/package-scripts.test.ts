@@ -10,4 +10,11 @@ describe('package release scripts', () => {
     expect(packageJson.scripts['test:unit:coverage']).toBe('vitest run --coverage');
     expect(packageJson.devDependencies['@vitest/coverage-v8']).toBeTruthy();
   });
+
+  it('bootstraps Jekyll gems when the Podman bundle volume is empty', () => {
+    const premerge = readFileSync(join(repoRoot, 'scripts', 'pre-merge-regression.sh'), 'utf8');
+    expect(premerge).toContain('bundle config set path');
+    expect(premerge).toContain('bundle check >/dev/null 2>&1 || bundle install');
+    expect(premerge).toContain('SKIP_TESTS=1 bundle exec jekyll build');
+  });
 });
