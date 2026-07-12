@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const repoRoot = '/Users/aindaco1/Library/Mobile Documents/com~apple~CloudDocs/pool';
+const repoRoot = process.cwd();
 
 function buildPledge({
   orderId,
@@ -146,7 +146,8 @@ process.exit(1);
 
   rmSync(tempDir, { recursive: true, force: true });
 
-  expect(result.status).toBe(0);
+  expect(result.error, result.error?.message).toBeUndefined();
+  expect(result.status, result.stderr || result.stdout).toBe(0);
   return result.stdout.trim().split(/\r?\n/);
 }
 
