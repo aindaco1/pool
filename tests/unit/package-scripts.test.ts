@@ -17,4 +17,12 @@ describe('package release scripts', () => {
     expect(premerge).toContain('bundle check >/dev/null 2>&1 || bundle install');
     expect(premerge).toContain('SKIP_TESTS=1 bundle exec jekyll build');
   });
+
+  it('creates and removes localhost Jekyll overrides for clean checkouts', () => {
+    const premerge = readFileSync(join(repoRoot, 'scripts', 'pre-merge-regression.sh'), 'utf8');
+    expect(premerge).toContain('prepare_local_config');
+    expect(premerge).toContain('TEMP_LOCAL_CONFIG="_config.local.yml"');
+    expect(premerge).toContain('show_test_campaigns: true');
+    expect(premerge).toContain('rm -f "${TEMP_LOCAL_CONFIG}"');
+  });
 });

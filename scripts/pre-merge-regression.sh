@@ -3,17 +3,43 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-ruby ./scripts/sync-worker-config.rb >/dev/null
-
 WORKER_PID=""
 JEKYLL_PID=""
 TEMP_DEV_VARS=""
+TEMP_LOCAL_CONFIG=""
 ORIGINAL_DEV_VARS_BACKUP=""
 LOG_DIR="$(mktemp -d /tmp/pool-premerge-logs.XXXXXX)"
 declare -a PHASE_RESULTS=()
 HOST_JEKYLL_STATUS="unknown"
 HOST_JEKYLL_FAILURE_REASON=""
 HOST_JEKYLL_LOG=""
+
+prepare_local_config() {
+  if [[ -f _config.local.yml ]]; then
+    return 0
+  fi
+
+  TEMP_LOCAL_CONFIG="_config.local.yml"
+  cat > "${TEMP_LOCAL_CONFIG}" <<'YAML'
+# Temporary localhost overrides for clean-checkout regression testing.
+url: http://127.0.0.1:4000
+
+platform:
+  site_url: "http://127.0.0.1:4000"
+  worker_url: "http://127.0.0.1:8787"
+
+show_test_campaigns: true
+
+tax:
+  provider: nm_grt
+
+admin:
+  turnstile_site_key: ""
+
+launch_reminders:
+  turnstile_site_key: ""
+YAML
+}
 
 prefer_podman_path() {
   local candidate=""
@@ -305,9 +331,15 @@ cleanup() {
   if [[ -n "${ORIGINAL_DEV_VARS_BACKUP}" && -f "${ORIGINAL_DEV_VARS_BACKUP}" ]]; then
     mv "${ORIGINAL_DEV_VARS_BACKUP}" worker/.dev.vars
   fi
+  if [[ -n "${TEMP_LOCAL_CONFIG}" && -f "${TEMP_LOCAL_CONFIG}" ]]; then
+    rm -f "${TEMP_LOCAL_CONFIG}"
+  fi
 }
 
 trap cleanup EXIT
+
+prepare_local_config
+ruby ./scripts/sync-worker-config.rb >/dev/null
 
 if [[ "${1:-}" = "__podman_build_check" ]]; then
   build_with_podman_jekyll
