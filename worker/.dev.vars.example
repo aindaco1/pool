@@ -45,11 +45,19 @@ FILM_STRIPE_SUMMARY_ADAPTER_SECRET=
 
 # Email delivery and Resend plan usage.
 RESEND_API_KEY=
+# Optional in local development. Set to the signing secret Resend returns when
+# a webhook endpoint is created for /webhooks/resend.
+RESEND_WEBHOOK_SECRET=
+EMAIL_OUTBOX_ENABLED=true
 # Resend safe API probes may expose rate-limit headers without monthly sent
 # usage. These optional overrides keep the admin Plan usage display explicit.
 PLAN_USAGE_RESEND_PLAN=
 RESEND_EMAILS_MONTHLY_LIMIT=
 RESEND_EMAILS_DAILY_LIMIT=
+
+# Payment reconciliation runs automatically in live mode. Tests remain off by
+# default unless this is explicitly enabled.
+PAYMENT_RECONCILIATION_ENABLED=false
 
 # Dashboard publish, report helpers, and Cloudflare plan usage.
 GITHUB_TOKEN=

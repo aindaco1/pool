@@ -69,9 +69,38 @@
  */
 
 import { generateToken, verifyToken } from './token.js';
-import { RESEND_RATE_LIMIT_DELAY_MS, sendSupporterEmail, sendPaymentFailedEmail, sendPledgeModifiedEmail, sendPledgeCancelledEmail, sendDiaryUpdateEmail, sendMilestoneEmail, sendChargeSuccessEmail, sendAnnouncementEmail, sendCampaignRunnerReportEmail, sendAdminUserCreatedEmail, sendCampaignAssignmentEmail, sendCampaignPreviewEmail, sendAbandonedCartEmail } from './email.js';
+import {
+  RESEND_RATE_LIMIT_DELAY_MS,
+  sendSupporterEmail as sendSupporterEmailDirect,
+  sendPaymentFailedEmail as sendPaymentFailedEmailDirect,
+  sendPledgeModifiedEmail as sendPledgeModifiedEmailDirect,
+  sendPledgeCancelledEmail as sendPledgeCancelledEmailDirect,
+  sendDiaryUpdateEmail as sendDiaryUpdateEmailDirect,
+  sendMilestoneEmail as sendMilestoneEmailDirect,
+  sendChargeSuccessEmail as sendChargeSuccessEmailDirect,
+  sendAnnouncementEmail as sendAnnouncementEmailDirect,
+  sendCampaignRunnerReportEmail as sendCampaignRunnerReportEmailDirect,
+  sendAdminUserCreatedEmail as sendAdminUserCreatedEmailDirect,
+  sendCampaignAssignmentEmail as sendCampaignAssignmentEmailDirect,
+  sendCampaignPreviewEmail as sendCampaignPreviewEmailDirect,
+  sendAbandonedCartEmail as sendAbandonedCartEmailDirect
+} from './email.js';
+import {
+  enqueueEmailOutbox,
+  processEmailOutbox,
+  processResendWebhook,
+  verifyResendWebhook,
+  CAMPAIGN_EMAIL_SUPPRESSION_PREFIX
+} from './email-outbox.js';
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
+import {
+  MEDIA_MANIFEST_PATH,
+  classifyMediaPath,
+  mediaPathLabel,
+  mediaPlacementBudget,
+  normalizeMediaManifest
+} from './media-catalog.js';
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
 import { applyAddOnInventoryProjectionDelta, ensureAddOnInventorySoldProjection, getAddOns, getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
 import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges, checkCampaignProjectionDrift } from './stats.js';
@@ -151,7 +180,79 @@ function configureWorkerLogging(env) {
   console = getScopedConsole(env, 'index');
 }
 
+function emailOutboxOptions(payload = {}) {
+  const cleaned = { ...(payload || {}) };
+  const dedupeKey = String(cleaned._outboxDedupeKey || '');
+  const expiresAt = String(cleaned._outboxExpiresAt || '');
+  delete cleaned._outboxDedupeKey;
+  delete cleaned._outboxExpiresAt;
+  return { payload: cleaned, dedupeKey, expiresAt };
+}
+
+async function queuePoolEmail(env, kind, payload = {}) {
+  const options = emailOutboxOptions(payload);
+  const directForTests = getAppMode(env) === 'test' && String(env.EMAIL_OUTBOX_ENABLED || '').toLowerCase() !== 'true';
+  const directForDryRun = String(env.POOL_EMAIL_DRY_RUN || env.RESEND_EMAIL_DRY_RUN || '').toLowerCase() === 'true';
+  const outboxDisabled = String(env.EMAIL_OUTBOX_ENABLED || '').trim().toLowerCase() === 'false';
+  if (outboxDisabled && ['announcement', 'diary', 'milestone'].includes(kind)) {
+    options.payload = await withCampaignEmailUnsubscribe(env, options.payload);
+  }
+  if (directForTests || directForDryRun || outboxDisabled) {
+    if (kind === 'supporter') return sendSupporterEmailDirect(env, options.payload);
+    if (kind === 'payment_failed') return sendPaymentFailedEmailDirect(env, options.payload);
+    if (kind === 'pledge_modified') return sendPledgeModifiedEmailDirect(env, options.payload);
+    if (kind === 'pledge_cancelled') return sendPledgeCancelledEmailDirect(env, options.payload);
+    if (kind === 'diary') return sendDiaryUpdateEmailDirect(env, options.payload);
+    if (kind === 'milestone') return sendMilestoneEmailDirect(env, options.payload);
+    if (kind === 'charge_success') return sendChargeSuccessEmailDirect(env, options.payload);
+    if (kind === 'announcement') return sendAnnouncementEmailDirect(env, options.payload);
+    if (kind === 'report') return sendCampaignRunnerReportEmailDirect(env, options.payload);
+    if (kind === 'admin_user_created') return sendAdminUserCreatedEmailDirect(env, options.payload);
+    if (kind === 'campaign_assignment') return sendCampaignAssignmentEmailDirect(env, options.payload);
+    if (kind === 'campaign_preview') return sendCampaignPreviewEmailDirect(env, options.payload);
+    if (kind === 'abandoned_cart') return sendAbandonedCartEmailDirect(env, options.payload);
+  }
+  if (['announcement', 'diary', 'milestone'].includes(kind)) {
+    options.payload = await withCampaignEmailUnsubscribe(env, options.payload);
+  }
+  const queued = await enqueueEmailOutbox(env, {
+    kind,
+    payload: options.payload,
+    dedupeKey: options.dedupeKey,
+    expiresAt: options.expiresAt,
+    campaignSlug: options.payload.campaignSlug || ''
+  });
+  if (queued?.sent === false) throw new Error(queued.reason || 'Unable to queue email');
+  return queued;
+}
+
+const sendSupporterEmail = (env, payload) => queuePoolEmail(env, 'supporter', payload);
+const sendPaymentFailedEmail = (env, payload) => queuePoolEmail(env, 'payment_failed', payload);
+const sendPledgeModifiedEmail = (env, payload) => queuePoolEmail(env, 'pledge_modified', payload);
+const sendPledgeCancelledEmail = (env, payload) => queuePoolEmail(env, 'pledge_cancelled', payload);
+const sendDiaryUpdateEmail = (env, payload) => queuePoolEmail(env, 'diary', payload);
+const sendMilestoneEmail = (env, payload) => queuePoolEmail(env, 'milestone', payload);
+const sendChargeSuccessEmail = (env, payload) => queuePoolEmail(env, 'charge_success', payload);
+const sendCampaignRunnerReportEmail = (env, payload) => queuePoolEmail(env, 'report', payload);
+const sendAdminUserCreatedEmail = (env, payload) => queuePoolEmail(env, 'admin_user_created', payload);
+const sendCampaignAssignmentEmail = (env, payload) => queuePoolEmail(env, 'campaign_assignment', payload);
+const sendCampaignPreviewEmail = (env, payload) => queuePoolEmail(env, 'campaign_preview', payload);
+const sendAbandonedCartEmail = (env, payload) => queuePoolEmail(env, 'abandoned_cart', payload);
+const sendAnnouncementEmail = (env, payload) => payload?.testMode === true
+  ? sendAnnouncementEmailDirect(env, payload)
+  : queuePoolEmail(env, 'announcement', payload);
+
 const STRIPE_CUSTOM_UI_MODE_API_VERSION = '2026-02-25.clover';
+const STRIPE_EVENT_MARKER_TTL_SECONDS = 35 * 24 * 60 * 60;
+const STRIPE_PROCESSOR_JOURNAL_PREFIX = 'processor-event:v1:';
+const STRIPE_PROCESSOR_JOURNAL_TTL_SECONDS = 400 * 24 * 60 * 60;
+const RECONCILIATION_BREAK_PREFIX = 'reconciliation-break:v1:';
+const RECONCILIATION_BREAK_TTL_SECONDS = 400 * 24 * 60 * 60;
+const SETTLEMENT_GROUP_PREFIX = 'settlement-group:v1:';
+const SETTLEMENT_GROUP_TTL_SECONDS = 400 * 24 * 60 * 60;
+const STRIPE_IDEMPOTENCY_RETRY_WINDOW_MS = 23 * 60 * 60 * 1000;
+const SETTLEMENT_JOB_STALE_MS = 30 * 60 * 1000;
+const SETTLEMENT_JOB_TTL_SECONDS = 400 * 24 * 60 * 60;
 const PRIVATE_NO_STORE_CACHE_CONTROL = 'private, no-store, max-age=0';
 const DEFAULT_I18N_LANG = 'en';
 const ADD_ON_ITEM_PREFIX = 'addon__';
@@ -176,6 +277,7 @@ const ABANDONED_CART_QUEUE_STATE_KEY = 'abandoned-cart-queue:v1';
 const ABANDONED_CART_HEALTH_KEY = 'abandoned-cart-health:v1';
 const ABANDONED_CART_TOKEN_SCOPE_UNSUBSCRIBE = 'abandoned-cart-unsubscribe';
 const ABANDONED_CART_TOKEN_SCOPE_RESUME = 'abandoned-cart-resume';
+const CAMPAIGN_EMAIL_UNSUBSCRIBE_SCOPE = 'campaign-email-unsubscribe';
 const ABANDONED_CART_TTL_SECONDS = 14 * 24 * 60 * 60;
 const ABANDONED_CART_SENT_TTL_SECONDS = 400 * 24 * 60 * 60;
 const ABANDONED_CART_SUPPRESSION_TTL_SECONDS = 400 * 24 * 60 * 60;
@@ -1224,7 +1326,14 @@ function requireTrustedSiteOrigin(request, env) {
     const values = await readPoolPledgeBatch(env.PLEDGES, batch);
     readOperations += 1;
     for (const value of values) {
-      if (value && typeof value === 'object') pledges.push(value);
+      if (value && typeof value === 'object') {
+        pledges.push({
+          ...value,
+          currency: normalizePaymentCurrency(value.currency),
+          valueTime: value.valueTime || value.createdAt || null,
+          bookedAt: value.bookedAt || value.createdAt || null
+        });
+      }
     }
   }
   return { pledges, requested: normalizedOrderIds.length, readOperations };
@@ -1270,11 +1379,11 @@ function requireTrustedSiteOrigin(request, env) {
 function getSettlementNeedsAttention(batchResult = {}) {
   const details = Array.isArray(batchResult.details) ? batchResult.details : [];
   const skippedNeedingAttention = details.filter(detail =>
-    detail?.status === 'not_found' || detail?.status === 'missing_stripe_ids'
+    detail?.status === 'not_found' || detail?.status === 'missing_stripe_ids' || detail?.status === 'ambiguous_charge_requires_review'
   ).length;
   return {
     skippedNeedingAttention,
-    unresolved: (batchResult.failed || 0) + skippedNeedingAttention
+    unresolved: (batchResult.failed || 0) + Math.max(skippedNeedingAttention, Number(batchResult.needsAttention || 0))
   };
   }
 
@@ -1288,7 +1397,7 @@ function getAppMode(env = {}) {
   const needsAttention = (job.totalNeedsAttention || 0) > 0;
   job.status = needsAttention ? 'needs_attention' : 'done';
   job.completedAt = Date.now();
-  await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: 604800 });
+  await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: SETTLEMENT_JOB_TTL_SECONDS });
   if (!needsAttention) {
     await env.PLEDGES.put(`campaign-charged:${campaignSlug}`, new Date().toISOString());
   }
@@ -2191,6 +2300,65 @@ function stripeErrorLogContext(err = {}) {
     statusCode: err?.statusCode || err?.status || null,
     requestId: err?.requestId || err?.request_id || null
   };
+}
+
+function normalizePaymentCurrency(value = 'usd') {
+  const currency = String(value || 'usd').trim().toLowerCase();
+  return /^[a-z]{3}$/.test(currency) ? currency : 'usd';
+}
+
+function stripeProcessorJournalKey(now = new Date()) {
+  return `${STRIPE_PROCESSOR_JOURNAL_PREFIX}${now.toISOString()}:${crypto.randomUUID()}`;
+}
+
+async function recordStripeProcessorJournal(env, event = {}) {
+  if (!env?.PLEDGES) return null;
+  const now = new Date();
+  const record = {
+    version: 1,
+    processor: 'stripe',
+    kind: String(event.kind || 'api_request'),
+    intent: String(event.intent || ''),
+    campaignSlug: String(event.campaignSlug || ''),
+    orderId: String(event.orderId || ''),
+    eventId: String(event.eventId || ''),
+    eventType: String(event.eventType || ''),
+    objectId: String(event.objectId || ''),
+    objectType: String(event.objectType || ''),
+    method: String(event.method || ''),
+    path: String(event.path || ''),
+    responseStatus: Number(event.status || event.responseStatus || 0) || 0,
+    outcome: String(event.outcome || (event.success ? 'succeeded' : 'failed')),
+    errorType: String(event.errorType || ''),
+    errorCode: String(event.errorCode || ''),
+    requestId: String(event.requestId || ''),
+    idempotencyKey: String(event.idempotencyKey || ''),
+    stripeVersion: String(event.stripeVersion || STRIPE_CUSTOM_UI_MODE_API_VERSION),
+    mode: getAppMode(env),
+    currency: normalizePaymentCurrency(event.currency),
+    valueTime: event.valueTime || null,
+    bookedAt: now.toISOString(),
+    processorAvailableAt: event.processorAvailableAt || null,
+    reconciliationStatus: String(event.reconciliationStatus || 'pending')
+  };
+  const key = stripeProcessorJournalKey(now);
+  await env.PLEDGES.put(key, JSON.stringify(record), { expirationTtl: STRIPE_PROCESSOR_JOURNAL_TTL_SECONDS });
+  return key;
+}
+
+function createPoolStripeClient(env, context = {}) {
+  return createStripeClient(getStripeKey(env), {
+    stripeVersion: STRIPE_CUSTOM_UI_MODE_API_VERSION,
+    onRequest: (event) => recordStripeProcessorJournal(env, {
+      ...event,
+      kind: 'api_request',
+      intent: context.intent || '',
+      campaignSlug: context.campaignSlug || '',
+      orderId: context.orderId || '',
+      currency: context.currency || 'usd',
+      valueTime: context.valueTime || null
+    })
+  });
 }
 
 function stripeObjectId(value) {
@@ -3492,6 +3660,285 @@ async function settlementChargeIdempotencyKey(campaignSlug, pledges = [], amount
   return `settle:${campaignSlug}:${hex.slice(0, 48)}`;
 }
 
+async function settlementGroupKey(campaignSlug, idempotencyKey) {
+  return `${SETTLEMENT_GROUP_PREFIX}${campaignSlug}:${(await sha256Hex(idempotencyKey)).slice(0, 40)}`;
+}
+
+function normalizeSettlementGroup(value = {}) {
+  if (!value || typeof value !== 'object') return null;
+  return {
+    ...value,
+    status: String(value.status || ''),
+    firstAttemptAt: String(value.firstAttemptAt || ''),
+    paymentIntentId: String(value.paymentIntentId || '')
+  };
+}
+
+async function writeSettlementGroup(env, key, record) {
+  await env.PLEDGES.put(key, JSON.stringify(record), { expirationTtl: SETTLEMENT_GROUP_TTL_SECONDS });
+}
+
+async function resolveSettlementPaymentIntent(env, stripe, {
+  campaignSlug,
+  pledges,
+  amount,
+  customerId,
+  paymentMethodId
+}) {
+  const idempotencyKey = await settlementChargeIdempotencyKey(campaignSlug, pledges, amount, paymentMethodId);
+  const groupKey = await settlementGroupKey(campaignSlug, idempotencyKey);
+  let group = normalizeSettlementGroup(await env.PLEDGES.get(groupKey, { type: 'json' }));
+
+  if (group?.status === 'succeeded' && group.paymentIntentId) {
+    return {
+      paymentIntent: await stripe.paymentIntents.retrieve(group.paymentIntentId, { expand: STRIPE_FINANCIAL_EXPAND }),
+      idempotencyKey,
+      groupKey,
+      recovered: true
+    };
+  }
+
+  const firstAttemptMs = Date.parse(group?.firstAttemptAt || '');
+  if (
+    group?.status === 'submitted' &&
+    Number.isFinite(firstAttemptMs) &&
+    Date.now() - firstAttemptMs > STRIPE_IDEMPOTENCY_RETRY_WINDOW_MS
+  ) {
+    return { needsAttention: true, idempotencyKey, groupKey, group };
+  }
+
+  const now = new Date().toISOString();
+  group = {
+    version: 1,
+    status: 'submitted',
+    campaignSlug,
+    orderIds: pledges.map((pledge) => pledge.orderId).sort(),
+    amount,
+    currency: 'usd',
+    idempotencyKey,
+    firstAttemptAt: group?.firstAttemptAt || now,
+    lastAttemptAt: now,
+    attempts: Number(group?.attempts || 0) + 1,
+    paymentIntentId: group?.paymentIntentId || '',
+    updatedAt: now
+  };
+  await writeSettlementGroup(env, groupKey, group);
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.create(withStripeFinancialExpansion({
+      amount,
+      currency: 'usd',
+      customer: customerId,
+      payment_method: paymentMethodId,
+      off_session: true,
+      confirm: true,
+      metadata: {
+        campaignSlug,
+        pledgeCount: pledges.length.toString(),
+        orderIds: pledges.map((pledge) => pledge.orderId).join(',')
+      }
+    }), { idempotencyKey });
+    group = {
+      ...group,
+      status: paymentIntent.status === 'succeeded' ? 'succeeded' : 'processor_action_required',
+      paymentIntentId: String(paymentIntent.id || ''),
+      processorStatus: String(paymentIntent.status || ''),
+      valueTime: Number(paymentIntent.created) > 0 ? new Date(paymentIntent.created * 1000).toISOString() : now,
+      updatedAt: new Date().toISOString()
+    };
+    await writeSettlementGroup(env, groupKey, group);
+    return { paymentIntent, idempotencyKey, groupKey, group, recovered: false };
+  } catch (error) {
+    group = {
+      ...group,
+      status: error.objectId ? 'processor_failed' : 'submitted',
+      paymentIntentId: String(error.objectId || group.paymentIntentId || ''),
+      errorType: String(error.type || error.name || 'Error'),
+      errorCode: String(error.code || ''),
+      updatedAt: new Date().toISOString()
+    };
+    await writeSettlementGroup(env, groupKey, group);
+    throw error;
+  }
+}
+
+async function reconciliationBreakKey(campaignSlug, kind, sourceObjectIds = []) {
+  const digest = await sha256Hex(stableStringify({
+    campaignSlug,
+    kind,
+    sourceObjectIds: sourceObjectIds.filter(Boolean).sort()
+  }));
+  return `${RECONCILIATION_BREAK_PREFIX}${campaignSlug}:${kind}:${digest.slice(0, 32)}`;
+}
+
+async function upsertReconciliationBreak(env, issue, now = new Date()) {
+  const key = await reconciliationBreakKey(issue.campaignSlug, issue.kind, issue.sourceObjectIds);
+  const existing = await env.PLEDGES.get(key, { type: 'json' });
+  const record = {
+    version: 1,
+    status: 'open',
+    severity: issue.severity || 'warning',
+    kind: issue.kind,
+    campaignSlug: issue.campaignSlug,
+    sourceObjectIds: issue.sourceObjectIds || [],
+    orderIds: issue.orderIds || [],
+    expected: issue.expected || null,
+    actual: issue.actual || null,
+    firstSeenAt: existing?.firstSeenAt || now.toISOString(),
+    lastSeenAt: now.toISOString(),
+    occurrences: Number(existing?.occurrences || 0) + 1,
+    notes: Array.isArray(existing?.notes) ? existing.notes.slice(-20) : []
+  };
+  await env.PLEDGES.put(key, JSON.stringify(record), { expirationTtl: RECONCILIATION_BREAK_TTL_SECONDS });
+  return { key, ...record };
+}
+
+async function listCampaignReconciliationBreaks(env, campaignSlug, limit = 100) {
+  if (!env?.PLEDGES) return [];
+  const listing = await env.PLEDGES.list({ prefix: `${RECONCILIATION_BREAK_PREFIX}${campaignSlug}:`, limit });
+  const rows = [];
+  for (const key of listing.keys || []) {
+    const value = await env.PLEDGES.get(key.name, { type: 'json' });
+    if (value) rows.push({ key: key.name, ...value });
+  }
+  return rows.sort((a, b) => String(b.lastSeenAt || '').localeCompare(String(a.lastSeenAt || '')));
+}
+
+async function reconcileCampaignPayments(env, campaignSlug, { now = new Date(), maxPaymentIntents = 20 } = {}) {
+  if (!env?.PLEDGES) return { attempted: false, campaignSlug, skippedReason: 'storage_not_configured', checked: 0, breaks: [] };
+  const orderIds = await getCampaignOrderIds(env, campaignSlug);
+  if (!orderIds) return { attempted: false, campaignSlug, skippedReason: 'campaign_index_missing', checked: 0, breaks: [] };
+  const { pledges } = await readPoolPledgesByOrderIds(env, orderIds);
+  const issues = [];
+  const paymentIntentGroups = new Map();
+
+  for (const pledge of pledges) {
+    if (!pledge || pledge.campaignSlug !== campaignSlug) continue;
+    const paymentIntentId = String(pledge.stripePaymentIntentId || '');
+    if ((pledge.charged || pledge.pledgeStatus === 'charged') && !paymentIntentId) {
+      issues.push({
+        campaignSlug,
+        kind: 'charged_pledge_missing_payment_intent',
+        severity: 'critical',
+        sourceObjectIds: [pledge.orderId],
+        orderIds: [pledge.orderId],
+        expected: 'stripePaymentIntentId',
+        actual: null
+      });
+      continue;
+    }
+    if (!paymentIntentId) continue;
+    const group = paymentIntentGroups.get(paymentIntentId) || [];
+    group.push(pledge);
+    paymentIntentGroups.set(paymentIntentId, group);
+  }
+
+  const stripe = createPoolStripeClient(env, { intent: 'payment_reconciliation', campaignSlug });
+  const groups = Array.from(paymentIntentGroups.entries()).slice(0, Math.max(1, maxPaymentIntents));
+  for (const [paymentIntentId, group] of groups) {
+    try {
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: STRIPE_FINANCIAL_EXPAND });
+      const expectedAmount = group.reduce((sum, pledge) => sum + Math.max(0, Number(pledge.amount || 0) || 0), 0);
+      const charged = group.some((pledge) => pledge.charged || pledge.pledgeStatus === 'charged');
+      const sourceIds = [paymentIntentId, ...group.map((pledge) => pledge.orderId)];
+      if (charged && paymentIntent.status !== 'succeeded') {
+        issues.push({
+          campaignSlug,
+          kind: 'charged_pledge_processor_not_succeeded',
+          severity: 'critical',
+          sourceObjectIds: sourceIds,
+          orderIds: group.map((pledge) => pledge.orderId),
+          expected: 'succeeded',
+          actual: String(paymentIntent.status || '')
+        });
+      }
+      if (!charged && paymentIntent.status === 'succeeded') {
+        issues.push({
+          campaignSlug,
+          kind: 'succeeded_payment_intent_unbooked',
+          severity: 'critical',
+          sourceObjectIds: sourceIds,
+          orderIds: group.map((pledge) => pledge.orderId),
+          expected: 'charged pledge state',
+          actual: group.map((pledge) => pledge.pledgeStatus)
+        });
+      }
+      if (Number(paymentIntent.amount || 0) !== expectedAmount) {
+        issues.push({
+          campaignSlug,
+          kind: 'payment_intent_amount_mismatch',
+          severity: 'critical',
+          sourceObjectIds: sourceIds,
+          orderIds: group.map((pledge) => pledge.orderId),
+          expected: expectedAmount,
+          actual: Number(paymentIntent.amount || 0)
+        });
+      }
+      if (normalizePaymentCurrency(paymentIntent.currency) !== normalizePaymentCurrency(group[0]?.currency)) {
+        issues.push({
+          campaignSlug,
+          kind: 'payment_intent_currency_mismatch',
+          severity: 'critical',
+          sourceObjectIds: sourceIds,
+          orderIds: group.map((pledge) => pledge.orderId),
+          expected: normalizePaymentCurrency(group[0]?.currency),
+          actual: normalizePaymentCurrency(paymentIntent.currency)
+        });
+      }
+    } catch (error) {
+      issues.push({
+        campaignSlug,
+        kind: 'payment_intent_unavailable',
+        severity: 'warning',
+        sourceObjectIds: [paymentIntentId],
+        orderIds: group.map((pledge) => pledge.orderId),
+        expected: 'retrievable Stripe PaymentIntent',
+        actual: String(error.code || error.type || 'unavailable')
+      });
+    }
+  }
+
+  const settlementJob = await env.PLEDGES.get(`settlement-job:${campaignSlug}`, { type: 'json' });
+  const settlementActivityAt = Number(settlementJob?.lastBatchAt || settlementJob?.startedAt || 0);
+  if (settlementJob?.status === 'running' && settlementActivityAt > 0 && now.getTime() - settlementActivityAt > SETTLEMENT_JOB_STALE_MS) {
+    issues.push({
+      campaignSlug,
+      kind: 'settlement_job_stale',
+      severity: 'warning',
+      sourceObjectIds: [`settlement-job:${campaignSlug}`],
+      orderIds: settlementJob.currentBatch?.orderIds || [],
+      expected: `activity within ${SETTLEMENT_JOB_STALE_MS}ms`,
+      actual: settlementActivityAt
+    });
+  }
+
+  const openBreaks = [];
+  for (const issue of issues) openBreaks.push(await upsertReconciliationBreak(env, issue, now));
+  const seenKeys = new Set(openBreaks.map((row) => row.key));
+  const existing = await listCampaignReconciliationBreaks(env, campaignSlug);
+  for (const row of existing) {
+    if (row.status !== 'open' || seenKeys.has(row.key)) continue;
+    await env.PLEDGES.put(row.key, JSON.stringify({
+      ...row,
+      key: undefined,
+      status: 'resolved',
+      resolvedAt: now.toISOString(),
+      lastCheckedAt: now.toISOString()
+    }), { expirationTtl: RECONCILIATION_BREAK_TTL_SECONDS });
+  }
+
+  return {
+    attempted: true,
+    campaignSlug,
+    currency: 'usd',
+    checked: pledges.length,
+    paymentIntentsChecked: groups.length,
+    truncated: paymentIntentGroups.size > groups.length,
+    breaks: openBreaks,
+    reconciledAt: now.toISOString()
+  };
+}
+
 async function buildTierInventorySnapshot(env, campaignSlug, campaign = null) {
   if (hasTierInventoryCoordinator(env)) {
     try {
@@ -3966,6 +4413,67 @@ function getAbandonedCartUnsubscribeUrl(env, token) {
   const url = new URL('/abandoned-cart/unsubscribe', base);
   url.searchParams.set('t', token);
   return url.toString();
+}
+
+function getCampaignEmailUnsubscribeUrl(env, token) {
+  const base = String(getWorkerBase(env) || env?.SITE_BASE || '').trim() || 'https://pool.dustwave.xyz';
+  const url = new URL('/campaign-email/unsubscribe', base);
+  url.searchParams.set('t', token);
+  return url.toString();
+}
+
+async function withCampaignEmailUnsubscribe(env, payload = {}) {
+  if (payload.unsubscribeUrl) return payload;
+  const campaignSlug = String(payload.campaignSlug || '').trim();
+  const email = String(payload.email || '').trim().toLowerCase();
+  const secret = String(env?.MAGIC_LINK_SECRET || '').trim();
+  if (!campaignSlug || !email) return payload;
+  if (!secret) throw new Error('Campaign update unsubscribe signing is not configured');
+  const emailHash = await sha256Hex(email);
+  const token = await generateToken(secret, {
+    scope: CAMPAIGN_EMAIL_UNSUBSCRIBE_SCOPE,
+    campaignSlug,
+    emailHash
+  }, 3650);
+  return { ...payload, unsubscribeUrl: getCampaignEmailUnsubscribeUrl(env, token) };
+}
+
+function campaignEmailUnsubscribeResponse(title, message, status = 200) {
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeAdminPreviewHtml(title)}</title></head><body><main><h1>${escapeAdminPreviewHtml(title)}</h1><p>${escapeAdminPreviewHtml(message)}</p></main></body></html>`, {
+    status,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'private, no-store, max-age=0',
+      'X-Robots-Tag': 'noindex, nofollow, noarchive',
+      'Referrer-Policy': 'no-referrer',
+      ...SECURITY_HEADERS
+    }
+  });
+}
+
+async function handleCampaignEmailUnsubscribe(request, env) {
+  if (!env?.PLEDGES || !env?.MAGIC_LINK_SECRET) {
+    return campaignEmailUnsubscribeResponse('Unsubscribe unavailable', 'Campaign email preferences are temporarily unavailable.', 503);
+  }
+  const token = new URL(request.url).searchParams.get('t') || '';
+  const payload = token ? await verifyToken(env.MAGIC_LINK_SECRET, token, env) : null;
+  const campaignSlug = String(payload?.campaignSlug || '').trim();
+  const emailHash = String(payload?.emailHash || '').trim().toLowerCase();
+  if (payload?.scope !== CAMPAIGN_EMAIL_UNSUBSCRIBE_SCOPE || !isValidSlug(campaignSlug) || !/^[a-f0-9]{64}$/.test(emailHash)) {
+    return campaignEmailUnsubscribeResponse('Invalid unsubscribe link', 'This unsubscribe link is invalid or expired.', 400);
+  }
+  await env.PLEDGES.put(`${CAMPAIGN_EMAIL_SUPPRESSION_PREFIX}${campaignSlug}:${emailHash}`, JSON.stringify({
+    version: 1,
+    campaignSlug,
+    emailHash,
+    source: 'one_click',
+    suppressedAt: new Date().toISOString()
+  }));
+  if (request.method === 'POST') return new Response('', {
+    status: 200,
+    headers: { 'Cache-Control': 'private, no-store, max-age=0', 'X-Robots-Tag': 'noindex, nofollow, noarchive', ...SECURITY_HEADERS }
+  });
+  return campaignEmailUnsubscribeResponse('Campaign updates unsubscribed', 'You will no longer receive non-transactional updates for this campaign.');
 }
 
 function getAbandonedCartResumeUrl(campaignUrl, token, env) {
@@ -4744,6 +5252,9 @@ async function handleAbandonedCartUnsubscribe(request, env) {
     await env.PLEDGES.delete(getAbandonedCartResumeKey(payload.orderId));
   }
 
+  if (String(request.method || 'GET').toUpperCase() === 'POST') {
+    return new Response(null, { status: 200, headers: { 'Cache-Control': PRIVATE_NO_STORE_CACHE_CONTROL } });
+  }
   return abandonedCartHtmlResponse('Reminder unsubscribed', 'You will not receive this checkout reminder.');
 }
 
@@ -5102,6 +5613,10 @@ export default {
         return handleAdminMediaLibrary(request, env);
       }
 
+      if (path === '/admin/media/optimize' && method === 'POST') {
+        return handleAdminMediaOptimize(request, env);
+      }
+
       if (path === '/admin/settings/image-upload' && method === 'POST') {
         return handleAdminImageUpload(request, env);
       }
@@ -5369,12 +5884,16 @@ export default {
         return handleLaunchReminderSignup(request, env, parsedBody.body || {});
       }
 
-      if (path === '/launch-reminders/unsubscribe' && method === 'GET') {
+      if (path === '/launch-reminders/unsubscribe' && (method === 'GET' || method === 'POST')) {
         return handleLaunchReminderUnsubscribe(request, env);
       }
 
-      if (path === '/abandoned-cart/unsubscribe' && method === 'GET') {
+      if (path === '/abandoned-cart/unsubscribe' && (method === 'GET' || method === 'POST')) {
         return handleAbandonedCartUnsubscribe(request, env);
+      }
+
+      if (path === '/campaign-email/unsubscribe' && (method === 'GET' || method === 'POST')) {
+        return handleCampaignEmailUnsubscribe(request, env);
       }
 
       if (path === '/abandoned-cart/resume' && method === 'GET') {
@@ -5399,6 +5918,12 @@ export default {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STRIPE_WEBHOOK_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
         return handleStripeWebhook(request, env, ctx);
+      }
+
+      if (path === '/webhooks/resend' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STRIPE_WEBHOOK_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        return handleResendWebhook(request, env);
       }
 
       if (path === '/pledge' && method === 'GET') {
@@ -5634,6 +6159,11 @@ export default {
         return handleCheckAllProjectionDrift(request, env);
       }
 
+      if (path.startsWith('/admin/reconciliation/') && (method === 'GET' || method === 'POST')) {
+        const campaignSlug = path.replace('/admin/reconciliation/', '');
+        return handleAdminPaymentReconciliation(request, campaignSlug, env);
+      }
+
       // Admin: Recover a missed Stripe checkout session (creates pledge from completed session)
       if (path === '/admin/recover-checkout' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
@@ -5719,6 +6249,18 @@ export default {
     // Heartbeat: record cron execution
     if (env.PLEDGES && shouldRecordCronHeartbeat(cronExpression, now)) {
       await env.PLEDGES.put('cron:lastRun', now.toISOString(), { expirationTtl: 172800 });
+    }
+
+    if ((!cronExpression || cronExpression === PLATFORM_SCHEDULER_CRON) && String(env.EMAIL_OUTBOX_ENABLED || '').trim().toLowerCase() !== 'false') {
+      try {
+        const outboxResults = await processEmailOutbox(env, { now, limit: 10 });
+        if (env.PLEDGES && outboxResults.attempted) {
+          await env.PLEDGES.put('cron:lastEmailOutboxRun', now.toISOString(), { expirationTtl: 172800 });
+        }
+        console.log('📬 Email outbox cron complete:', outboxResults);
+      } catch (outboxError) {
+        console.error('📬 Email outbox cron failed:', outboxError);
+      }
     }
 
     const shouldRunRetry = cronExpression === SUPPORTER_EMAIL_RETRY_CRON ||
@@ -5814,7 +6356,7 @@ export default {
     
     try {
       const campaigns = await getCampaigns(env);
-      const results = { checked: 0, settlementDispatched: 0, transitioned: 0, launchReminderDispatchQueued: 0, errors: [] };
+      const results = { checked: 0, settlementDispatched: 0, transitioned: 0, launchReminderDispatchQueued: 0, reconciled: 0, reconciliationBreaks: 0, errors: [] };
       let needsRebuild = false;
       
       for (const campaign of campaigns.campaigns || campaigns) {
@@ -5890,6 +6432,7 @@ export default {
           if (
             settleResult.supportersCharged > 0 &&
             settleResult.supportersFailed === 0 &&
+            (settleResult.needsAttention || 0) === 0 &&
             (settleResult.skippedNoCustomer || 0) === 0
           ) {
             await env.PLEDGES.put(`campaign-charged:${campaign.slug}`, new Date().toISOString());
@@ -5901,6 +6444,22 @@ export default {
           console.error(`❌ Settlement failed for ${campaign.slug}:`, settleErr.message);
         } finally {
           await releaseSettlementLockQuietly(env, campaign.slug, settlementLock, 'scheduled');
+        }
+        }
+
+      const reconciliationEnabled = env.PAYMENT_RECONCILIATION_ENABLED === undefined
+        ? getAppMode(env) === 'live'
+        : String(env.PAYMENT_RECONCILIATION_ENABLED).trim().toLowerCase() === 'true';
+      if (reconciliationEnabled && getStripeKey(env)) {
+        for (const campaign of campaigns.campaigns || campaigns) {
+          try {
+            const reconciliation = await reconcileCampaignPayments(env, campaign.slug, { now, maxPaymentIntents: 20 });
+            if (!reconciliation.attempted) continue;
+            results.reconciled++;
+            results.reconciliationBreaks += reconciliation.breaks.length;
+          } catch (reconciliationError) {
+            results.errors.push({ campaign: campaign.slug, type: 'reconciliation', error: reconciliationError.message });
+          }
         }
       }
       
@@ -6116,17 +6675,23 @@ async function clearSupporterEmailRetry(env, orderId) {
 async function attemptSupporterEmailDelivery(env, { orderId, payload, attempts = 0 }) {
   const normalizedOrderId = String(orderId || '').trim();
   try {
-    await sendSupporterEmail(env, payload);
+    const delivery = await sendSupporterEmail(env, {
+      ...payload,
+      _outboxDedupeKey: `supporter-confirmation:${normalizedOrderId}`
+    });
+    const queued = delivery?.queued === true;
     await clearSupporterEmailRetry(env, normalizedOrderId);
     await updatePledgeEmailDeliveryState(env, normalizedOrderId, {
-      emailSent: true,
+      emailSent: !queued,
+      emailQueued: queued,
       emailError: null,
-      emailSentAt: new Date().toISOString(),
+      emailSentAt: queued ? null : new Date().toISOString(),
+      emailQueuedAt: queued ? new Date().toISOString() : null,
       emailRetryQueuedAt: null,
       emailRetryAttempts: Number(attempts || 0),
       emailNextRetryAt: null
     });
-    return { ok: true };
+    return { ok: true, queued };
   } catch (err) {
     const message = err?.message || 'Unknown supporter email error';
     const retryRecord = await queueSupporterEmailRetry(env, {
@@ -6443,6 +7008,8 @@ async function handleFirstPartyCheckoutStart(request, env) {
   const orderId = `pool-intent-${nonce}`;
   const bundleManifest = {
     orderId,
+    currency: 'usd',
+    bookedAt: new Date().toISOString(),
     checkoutProvider: 'first_party',
     preferredLang: normalizedPreferredLang,
     abandonedCart: wantsAbandonedCartReminder ? {
@@ -6471,6 +7038,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
     campaigns: checkoutGroups.map((group) => ({
       orderId: checkoutGroups.length === 1 ? orderId : buildBundleOrderId(orderId, group.campaignSlug),
       campaignSlug: group.campaignSlug,
+      currency: 'usd',
       tierId: group.canonicalContribution.tierId || '',
       tierName: group.canonicalContribution.tierName || '',
       tierQty: group.canonicalContribution.tierQty || 1,
@@ -6520,7 +7088,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
     return privateJsonResponse({ error: reservationErr.message }, 409, env);
   }
 
-  const stripe = createStripeClient(getStripeKey(env));
+  const stripe = createPoolStripeClient(env, { intent: 'checkout_create' });
   const { usingCustomCheckoutUi, stripePublishableKey } = resolveCheckoutUiRuntime(env);
 
   try {
@@ -6987,7 +7555,7 @@ async function handleFirstPartyCheckoutComplete(request, env, ctx) {
     }, 200, env);
   }
 
-  const stripe = createStripeClient(getStripeKey(env));
+  const stripe = createPoolStripeClient(env, { intent: 'checkout_complete' });
 
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -7047,9 +7615,9 @@ async function handleFirstPartyCheckoutComplete(request, env, ctx) {
 
     if (!customerId) {
       try {
-        const newCustomer = await stripe.customers.create({ email });
+        const newCustomer = await stripe.customers.create({ email }, { idempotencyKey: `customer:checkout:${orderId}` });
         if (newCustomer.id) {
-          await stripe.paymentMethods.attach(paymentMethodId, { customer: newCustomer.id });
+          await stripe.paymentMethods.attach(paymentMethodId, { customer: newCustomer.id }, { idempotencyKey: `payment-method:attach:${orderId}` });
           customerId = newCustomer.id;
         }
       } catch (custErr) {
@@ -7254,10 +7822,14 @@ async function processFirstPartyCheckoutBundle({
     }
 
     const now = new Date().toISOString();
+    const valueTime = Number(session?.created) > 0 ? new Date(Number(session.created) * 1000).toISOString() : now;
     const pledgeData = {
       orderId: pledgeOrderId,
       email,
       campaignSlug,
+      currency: normalizePaymentCurrency(bundleManifest?.currency),
+      valueTime,
+      bookedAt: now,
       preferredLang: normalizePreferredLang(bundleManifest?.preferredLang, DEFAULT_I18N_LANG),
       tierId: canonicalContribution.tierId,
       tierName: canonicalContribution.tierName,
@@ -7288,6 +7860,9 @@ async function processFirstPartyCheckoutBundle({
       updatedAt: now,
       history: [{
         type: 'created',
+        currency: normalizePaymentCurrency(bundleManifest?.currency),
+        valueTime,
+        bookedAt: now,
         subtotal: canonicalContribution.totals.subtotal,
         tax: canonicalContribution.totals.tax,
         taxDetails: canonicalContribution.totals.taxDetails,
@@ -7382,6 +7957,25 @@ async function processFirstPartyCheckoutBundle({
   return jsonResponse({ received: true, bundled: true, pledges: processedCampaigns });
 }
 
+async function handleResendWebhook(request, env) {
+  const secret = String(env.RESEND_WEBHOOK_SECRET || '').trim();
+  if (!secret) return jsonResponse({ error: 'Resend webhook is not configured' }, 503);
+  const bodyRead = await readRequestTextWithinLimit(request, env, MAX_STRIPE_WEBHOOK_BODY_BYTES);
+  if (!bodyRead.ok) return bodyRead.response;
+  const rawBody = bodyRead.text;
+  const headers = {
+    id: request.headers.get('svix-id'),
+    timestamp: request.headers.get('svix-timestamp'),
+    signature: request.headers.get('svix-signature')
+  };
+  const verified = await verifyResendWebhook(rawBody, headers, secret);
+  if (!verified.valid) return jsonResponse({ error: 'Invalid signature' }, 401);
+  let event;
+  try { event = JSON.parse(rawBody); } catch { return jsonResponse({ error: 'Invalid payload' }, 400); }
+  const result = await processResendWebhook(env, event, verified.id);
+  return jsonResponse({ received: true, duplicate: result.duplicate === true });
+}
+
 async function handleStripeWebhook(request, env, ctx) {
   console.log('📨 Stripe webhook received');
   const startedAt = Date.now();
@@ -7390,6 +7984,8 @@ async function handleStripeWebhook(request, env, ctx) {
   let observedEventId = '';
   let observedEventType = 'unknown';
   let observedOrderId = '';
+  let eventKey = '';
+  let eventLeaseId = '';
   const finishWebhook = (response, outcome, extra = {}) => {
     queueBackgroundTask(
       ctx,
@@ -7403,6 +7999,27 @@ async function handleStripeWebhook(request, env, ctx) {
       }),
       `webhook observation (${outcome})`
     );
+    const journalEventId = extra.eventId ?? observedEventId;
+    if (journalEventId) {
+      queueBackgroundTask(
+        ctx,
+        recordStripeProcessorJournal(env, {
+          kind: 'webhook',
+          intent: 'webhook_process',
+          eventId: journalEventId,
+          eventType: extra.eventType ?? observedEventType,
+          orderId: extra.orderId ?? observedOrderId,
+          objectId: extra.objectId || '',
+          status: response?.status || 0,
+          outcome,
+          valueTime: extra.valueTime || null
+        }),
+        `processor journal (${outcome})`
+      );
+    }
+    if (response?.status >= 400 && outcome !== 'processing_in_progress' && env.PLEDGES && eventKey) {
+      queueBackgroundTask(ctx, env.PLEDGES.delete(eventKey), `release webhook lease (${outcome})`);
+    }
     return response;
   };
 
@@ -7457,20 +8074,34 @@ async function handleStripeWebhook(request, env, ctx) {
   observedEventType = String(event?.type || 'unknown').trim() || 'unknown';
   console.log('📨 Event type:', event.type);
 
-  const eventKey = env.PLEDGES ? `stripe-event:${event.id}` : null;
+  eventKey = env.PLEDGES ? `stripe-event:${event.id}` : '';
+  eventLeaseId = crypto.randomUUID();
   const markStripeEventProcessed = async () => {
     if (env.PLEDGES && eventKey) {
-      await env.PLEDGES.put(eventKey, 'processed', { expirationTtl: 86400 });
+      await env.PLEDGES.put(eventKey, 'processed', { expirationTtl: STRIPE_EVENT_MARKER_TTL_SECONDS });
     }
   };
 
   // Idempotency: skip if we've already processed this event
   if (env.PLEDGES && eventKey) {
-    const alreadyProcessed = await env.PLEDGES.get(eventKey);
-    if (alreadyProcessed) {
+    const markerRaw = await env.PLEDGES.get(eventKey);
+    let marker = markerRaw;
+    try { marker = markerRaw ? JSON.parse(markerRaw) : null; } catch {}
+    if (marker === 'processed' || marker?.status === 'processed') {
       console.log('📨 Skipping duplicate event:', event.id);
       return finishWebhook(jsonResponse({ received: true }), 'duplicate_event');
     }
+    const leaseAgeMs = marker?.startedAt ? Date.now() - Date.parse(marker.startedAt) : Number.POSITIVE_INFINITY;
+    if (marker?.status === 'processing' && Number.isFinite(leaseAgeMs) && leaseAgeMs < 10 * 60 * 1000) {
+      return finishWebhook(jsonResponse({ error: 'Webhook event is already processing' }, 409), 'processing_in_progress');
+    }
+    await env.PLEDGES.put(eventKey, JSON.stringify({
+      status: 'processing',
+      eventId: event.id,
+      eventType: event.type,
+      leaseId: eventLeaseId,
+      startedAt: new Date().toISOString()
+    }), { expirationTtl: STRIPE_EVENT_MARKER_TTL_SECONDS });
   }
 
   if (event.type === 'checkout.session.completed') {
@@ -7542,7 +8173,7 @@ async function handleStripeWebhook(request, env, ctx) {
         null
       );
 
-      const stripe = createStripeClient(getStripeKey(env));
+      const stripe = createPoolStripeClient(env, { intent: 'webhook_checkout_complete', orderId: observedOrderId });
       const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
       const paymentMethodId = setupIntent.payment_method;
 
@@ -7556,9 +8187,9 @@ async function handleStripeWebhook(request, env, ctx) {
       // Last resort: create a customer and attach the payment method
       if (!customerId) {
         try {
-          const newCustomer = await stripe.customers.create({ email });
+          const newCustomer = await stripe.customers.create({ email }, { idempotencyKey: `customer:webhook:${orderId}` });
           if (newCustomer.id) {
-            await stripe.paymentMethods.attach(paymentMethodId, { customer: newCustomer.id });
+            await stripe.paymentMethods.attach(paymentMethodId, { customer: newCustomer.id }, { idempotencyKey: `payment-method:attach:${orderId}` });
             customerId = newCustomer.id;
             console.log('📨 Created fallback customer:', customerId);
           }
@@ -7623,7 +8254,7 @@ async function handleStripeWebhook(request, env, ctx) {
                   console.log('💳 Auto-retrying charge for updated payment method:', orderId);
                   
                   try {
-                    const retryStripe = createStripeClient(getStripeKey(env));
+                    const retryStripe = createPoolStripeClient(env, { intent: 'payment_method_update_retry', orderId: existingPledge.orderId, campaignSlug });
                     const paymentIntent = await retryStripe.paymentIntents.create(withStripeFinancialExpansion({
                       amount: existingPledge.amount,
                       currency: 'usd',
@@ -7818,10 +8449,14 @@ async function handleStripeWebhook(request, env, ctx) {
           }
 
           const now = new Date().toISOString();
+          const valueTime = Number(session?.created) > 0 ? new Date(Number(session.created) * 1000).toISOString() : now;
           const pledgeData = {
             orderId,
             email,
             campaignSlug,
+            currency: normalizePaymentCurrency(bundleManifest?.currency),
+            valueTime,
+            bookedAt: now,
             preferredLang: normalizePreferredLang(bundleManifest?.preferredLang || preferredLang, DEFAULT_I18N_LANG),
             tierId: canonicalContribution.tierId,
             tierName: canonicalContribution.tierName,
@@ -7852,6 +8487,9 @@ async function handleStripeWebhook(request, env, ctx) {
             updatedAt: now,
             history: [{
               type: 'created',
+              currency: normalizePaymentCurrency(bundleManifest?.currency),
+              valueTime,
+              bookedAt: now,
               subtotal: canonicalContribution.totals.subtotal,
               tax: canonicalContribution.totals.tax,
               taxDetails: canonicalContribution.totals.taxDetails,
@@ -8728,7 +9366,7 @@ async function handleUpdatePaymentMethod(request, env) {
     }
   }
 
-  const stripe = createStripeClient(getStripeKey(env));
+  const stripe = createPoolStripeClient(env, { intent: 'payment_method_update' });
   const { usingCustomCheckoutUi, stripePublishableKey } = resolveCheckoutUiRuntime(env);
   
   const sessionParams = {
@@ -8817,7 +9455,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
     throw new Error('PLEDGES KV not configured');
   }
 
-  const stripe = createStripeClient(getStripeKey(env));
+  const stripe = createPoolStripeClient(env, { intent: 'settlement_campaign', campaignSlug });
   const orderIds = await getCampaignOrderIds(env, campaignSlug);
   if (!orderIds) {
     throw new Error(`Campaign pledge index missing for ${campaignSlug}. Run /admin/rebuild/${campaignSlug} first.`);
@@ -8831,7 +9469,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
   for (const pledge of campaignPledges) {
     if (pledge && 
         pledge.campaignSlug === campaignSlug && 
-        pledge.pledgeStatus === 'active' &&
+        (pledge.pledgeStatus === 'active' || pledge.pledgeStatus === 'payment_failed') &&
         !pledge.charged &&
         pledge.stripePaymentMethodId) {
       
@@ -8897,6 +9535,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
     supportersCharged: 0,
     supportersFailed: 0,
     skippedNoCustomer,
+    needsAttention: 0,
     pledgesCharged: 0, 
     errors: [],
     totalCharged: 0
@@ -8904,31 +9543,28 @@ async function settleCampaign(campaignSlug, env, options = {}) {
 
   for (const supporter of supportersToCharge) {
     try {
-      // Create ONE PaymentIntent for all pledges from this supporter
-      const paymentIntent = await stripe.paymentIntents.create(withStripeFinancialExpansion({
+      const resolvedIntent = await resolveSettlementPaymentIntent(env, stripe, {
+        campaignSlug,
+        pledges: supporter.pledges,
         amount: supporter.totalAmount,
-        currency: 'usd',
-        customer: supporter.customerId,
-        payment_method: supporter.paymentMethodId,
-        off_session: true,
-        confirm: true,
-        metadata: {
-          campaignSlug,
-          email: supporter.email,
-          pledgeCount: supporter.pledges.length.toString(),
-          orderIds: supporter.pledges.map(p => p.orderId).join(',')
-        }
-      }), {
-        idempotencyKey: await settlementChargeIdempotencyKey(
-          campaignSlug,
-          supporter.pledges,
-          supporter.totalAmount,
-          supporter.paymentMethodId
-        )
+        customerId: supporter.customerId,
+        paymentMethodId: supporter.paymentMethodId
       });
+      if (resolvedIntent.needsAttention) {
+        results.needsAttention += supporter.pledges.length;
+        results.errors.push({
+          totalAmount: supporter.totalAmount,
+          pledgeCount: supporter.pledges.length,
+          orderIds: supporter.pledges.map((pledge) => pledge.orderId),
+          error: 'Ambiguous prior charge requires operator review before retry'
+        });
+        continue;
+      }
+      const paymentIntent = resolvedIntent.paymentIntent;
 
       if (paymentIntent.status === 'succeeded') {
         const chargedAt = new Date().toISOString();
+        const valueTime = Number(paymentIntent.created) > 0 ? new Date(paymentIntent.created * 1000).toISOString() : chargedAt;
         applyStripeFinancialsToPledges(supporter.pledges, paymentIntent, null, chargedAt);
         
         // Update ALL pledges for this supporter as charged
@@ -8937,7 +9573,24 @@ async function settleCampaign(campaignSlug, env, options = {}) {
           pledge.pledgeStatus = 'charged';
           pledge.chargedAt = chargedAt;
           pledge.stripePaymentIntentId = paymentIntent.id;
+          pledge.currency = normalizePaymentCurrency(paymentIntent.currency || pledge.currency);
+          pledge.valueTime = valueTime;
+          pledge.bookedAt = chargedAt;
+          pledge.processorAvailableAt = pledge.stripeFinancials?.availableOn
+            ? new Date(Number(pledge.stripeFinancials.availableOn) * 1000).toISOString()
+            : null;
+          pledge.lastPaymentError = null;
           pledge.updatedAt = chargedAt;
+          pledge.history = Array.isArray(pledge.history) ? pledge.history : [];
+          pledge.history.push({
+            type: 'settled',
+            currency: pledge.currency,
+            amount: pledge.amount,
+            paymentIntentId: paymentIntent.id,
+            valueTime,
+            bookedAt: chargedAt,
+            processorAvailableAt: pledge.processorAvailableAt
+          });
           await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
         }
 
@@ -9227,6 +9880,7 @@ async function handleSettleCampaign(request, campaignSlug, env) {
     if (
       results.supportersCharged > 0 &&
       results.supportersFailed === 0 &&
+      (results.needsAttention || 0) === 0 &&
       (results.skippedNoCustomer || 0) === 0 &&
       env.PLEDGES
     ) {
@@ -9301,12 +9955,15 @@ async function handleSettleDispatch(request, campaignSlug, env) {
       }
 
       job = {
+        version: 1,
         status: 'running',
+        currency: 'usd',
         cursor: 0,
         total: orderIds.length,
         orderIds,
         settlementLockOwner: settlementLock.owner,
         startedAt: Date.now(),
+        bookedAt: new Date().toISOString(),
         lastBatchAt: null,
         batchesCompleted: 0,
         totalCharged: 0,
@@ -9316,6 +9973,11 @@ async function handleSettleDispatch(request, campaignSlug, env) {
       };
     } else {
       job.settlementLockOwner = settlementLock.owner;
+      const lastActivityAt = Number(job.lastBatchAt || job.startedAt || 0);
+      if (lastActivityAt > 0 && Date.now() - lastActivityAt > SETTLEMENT_JOB_STALE_MS) {
+        job.staleResumeCount = Number(job.staleResumeCount || 0) + 1;
+        job.resumedAt = new Date().toISOString();
+      }
     }
 
     if (job.cursor >= job.total) {
@@ -9335,6 +9997,13 @@ async function handleSettleDispatch(request, campaignSlug, env) {
     if (!settlementCredential) {
       return jsonResponse({ error: 'Admin not configured' }, 500);
     }
+
+    job.currentBatch = {
+      cursor: job.cursor,
+      orderIds: batch,
+      startedAt: new Date().toISOString()
+    };
+    await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: SETTLEMENT_JOB_TTL_SECONDS });
 
     const batchRes = await fetch(`${env.WORKER_BASE}/admin/settle-batch`, {
       method: 'POST',
@@ -9357,9 +10026,10 @@ async function handleSettleDispatch(request, campaignSlug, env) {
     job.totalSkipped += batchResult.skipped || 0;
     const needsAttention = getSettlementNeedsAttention(batchResult);
     job.totalNeedsAttention += needsAttention.unresolved;
+    job.currentBatch = null;
 
     // Save progress
-    await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: 604800 });
+    await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: SETTLEMENT_JOB_TTL_SECONDS });
 
     // Chain: self-invoke for the next batch if more remain
     if (job.cursor < job.total) {
@@ -9393,7 +10063,7 @@ async function handleSettleDispatch(request, campaignSlug, env) {
     console.error(`❌ Batch settlement failed for ${campaignSlug}:`, err.message);
     if (job) {
       job.lastError = err.message;
-      await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: 604800 });
+      await env.PLEDGES.put(jobKey, JSON.stringify(job), { expirationTtl: SETTLEMENT_JOB_TTL_SECONDS });
     }
     return jsonResponse({
       error: err.message,
@@ -9416,6 +10086,41 @@ async function handleCronStatus(request, env) {
     lastError,
     now: new Date().toISOString()
   });
+}
+
+async function handleAdminPaymentReconciliation(request, campaignSlug, env) {
+  const method = String(request.method || 'GET').toUpperCase();
+  const auth = await requireAdminSession(request, env, method === 'POST' ? 'settings:publish' : 'campaign:read', {
+    requireCsrf: method === 'POST',
+    campaignSlug
+  });
+  if (!auth.ok) return auth.response;
+  if (!isValidSlug(campaignSlug)) return privateJsonResponse({ error: 'Invalid campaign slug.' }, 400, env);
+  if (method === 'GET') {
+    return privateJsonResponse({
+      campaignSlug,
+      breaks: await listCampaignReconciliationBreaks(env, campaignSlug),
+      writeBudget: adminReadBudget({ kvListExpected: 1 })
+    }, 200, env);
+  }
+  if (auth.user.role !== 'super_admin') return privateJsonResponse({ error: 'Forbidden' }, 403, env);
+  const rateLimit = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+  if (!rateLimit.allowed) return rateLimit.response;
+  const result = await reconcileCampaignPayments(env, campaignSlug);
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'payment:reconcile',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    campaignSlug,
+    checked: result.checked,
+    openBreaks: result.breaks?.length || 0
+  });
+  return privateJsonResponse({
+    success: true,
+    ...result,
+    auditKey,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: (result.breaks?.length || 0) + (auditKey ? 1 : 0) })
+  }, 200, env);
 }
 
 async function handleWebhookObservability(request, env) {
@@ -9483,8 +10188,8 @@ async function handleSettleBatch(request, env) {
     return jsonResponse({ error: 'PLEDGES KV not configured' }, 500);
   }
 
-  const stripe = createStripeClient(getStripeKey(env));
-  const results = { charged: 0, skipped: 0, failed: 0, errors: [], details: [] };
+  const stripe = createPoolStripeClient(env, { intent: 'settlement_batch' });
+  const results = { charged: 0, skipped: 0, failed: 0, needsAttention: 0, errors: [], details: [] };
 
   // Read all pledges in this batch
   const pledges = [];
@@ -9572,47 +10277,53 @@ async function handleSettleBatch(request, env) {
         }
       }
 
-      // Reset any payment_failed status before charging
-      for (const p of data.pledges) {
-        if (p.pledgeStatus === 'payment_failed') {
-          p.pledgeStatus = 'active';
-          p.lastPaymentError = null;
-          await env.PLEDGES.put(`pledge:${p.orderId}`, JSON.stringify(p));
-        }
-      }
-
       try {
-        const paymentIntent = await stripe.paymentIntents.create(withStripeFinancialExpansion({
+        const resolvedIntent = await resolveSettlementPaymentIntent(env, stripe, {
+          campaignSlug,
+          pledges: data.pledges,
           amount: data.totalAmount,
-          currency: 'usd',
-          customer: customerId,
-          payment_method: paymentMethodId,
-          off_session: true,
-          confirm: true,
-          metadata: {
-            campaignSlug,
-            email,
-            pledgeCount: data.pledges.length.toString(),
-            orderIds: data.pledges.map(p => p.orderId).join(',')
-          }
-        }), {
-          idempotencyKey: await settlementChargeIdempotencyKey(
-            campaignSlug,
-            data.pledges,
-            data.totalAmount,
-            paymentMethodId
-          )
+          customerId,
+          paymentMethodId
         });
+        if (resolvedIntent.needsAttention) {
+          results.needsAttention += data.pledges.length;
+          results.details.push({
+            email,
+            status: 'ambiguous_charge_requires_review',
+            orderIds: data.pledges.map((pledge) => pledge.orderId),
+            idempotencyKey: resolvedIntent.idempotencyKey
+          });
+          continue;
+        }
+        const paymentIntent = resolvedIntent.paymentIntent;
 
         if (paymentIntent.status === 'succeeded') {
           const chargedAt = new Date().toISOString();
+          const valueTime = Number(paymentIntent.created) > 0 ? new Date(paymentIntent.created * 1000).toISOString() : chargedAt;
           applyStripeFinancialsToPledges(data.pledges, paymentIntent, null, chargedAt);
           for (const pledge of data.pledges) {
             pledge.charged = true;
             pledge.pledgeStatus = 'charged';
             pledge.chargedAt = chargedAt;
             pledge.stripePaymentIntentId = paymentIntent.id;
+            pledge.currency = normalizePaymentCurrency(paymentIntent.currency || pledge.currency);
+            pledge.valueTime = valueTime;
+            pledge.bookedAt = chargedAt;
+            pledge.processorAvailableAt = pledge.stripeFinancials?.availableOn
+              ? new Date(Number(pledge.stripeFinancials.availableOn) * 1000).toISOString()
+              : null;
+            pledge.lastPaymentError = null;
             pledge.updatedAt = chargedAt;
+            pledge.history = Array.isArray(pledge.history) ? pledge.history : [];
+            pledge.history.push({
+              type: 'settled',
+              currency: pledge.currency,
+              amount: pledge.amount,
+              paymentIntentId: paymentIntent.id,
+              valueTime,
+              bookedAt: chargedAt,
+              processorAvailableAt: pledge.processorAvailableAt
+            });
             await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
           }
 
@@ -9733,7 +10444,7 @@ async function handleBackfillCustomers(request, campaignSlug, env) {
   }
 
   const BATCH_SIZE = 5;
-  const stripe = createStripeClient(getStripeKey(env));
+  const stripe = createPoolStripeClient(env, { intent: 'customer_backfill', campaignSlug });
   const parsedBody = await parseOptionalJsonRequestBody(request, env, {
     maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
     emptyValue: {}
@@ -9789,7 +10500,7 @@ async function handleBackfillCustomers(request, campaignSlug, env) {
       const customer = await stripe.customers.create({
         email: pledge.email,
         metadata: { source: 'backfill', orderId: pledge.orderId, campaignSlug }
-      });
+      }, { idempotencyKey: `customer:backfill:${pledge.orderId}` });
 
       if (!customer.id) {
         throw new Error(customer.error?.message || 'Customer creation failed');
@@ -9798,7 +10509,7 @@ async function handleBackfillCustomers(request, campaignSlug, env) {
       // Attach the existing payment method to the new customer
       await stripe.paymentMethods.attach(pledge.stripePaymentMethodId, {
         customer: customer.id
-      });
+      }, { idempotencyKey: `payment-method:backfill:${pledge.orderId}` });
 
       // Update pledge in KV
       pledge.stripeCustomerId = customer.id;
@@ -9848,7 +10559,7 @@ async function handleTestSetup(request, env) {
   let stripeCustomerId = syntheticCustomerId;
   if (!isSmokeStripeSecret(stripeKey)) {
     try {
-      const stripe = createStripeClient(stripeKey);
+      const stripe = createStripeClient(stripeKey, { stripeVersion: STRIPE_CUSTOM_UI_MODE_API_VERSION });
       const customer = await stripe.customers.create({ email });
       stripeCustomerId = customer.id;
       console.log('📧 Created test Stripe customer:', stripeCustomerId);
@@ -12519,6 +13230,7 @@ function adminSecretStatusRows(env) {
     ['Admin broadcast secret', status(env.ADMIN_BROADCAST_SECRET || env.BROADCAST_ADMIN_SECRET, false), readOnlyAdminSettingHelp('Optional scoped Bearer secret for diary, milestone, and announcement automation. When configured, broadcast routes reject the broader admin recovery secret.')],
     ['Admin Turnstile secret', status(env.TURNSTILE_SECRET_KEY || env.ADMIN_TURNSTILE_SECRET_KEY, turnstileRequired), readOnlyAdminSettingHelp('Cloudflare Turnstile secret used to verify admin email sign-in challenges. Required when the admin Turnstile widget is enabled.')],
     ['Resend API key', status(env.RESEND_API_KEY), readOnlyAdminSettingHelp('Email provider API key used for admin magic links, pledge emails, and campaign notifications. Never store it in _config.yml.')],
+    ['Resend webhook secret', status(env.RESEND_WEBHOOK_SECRET, false), readOnlyAdminSettingHelp('Optional Resend/Svix signing secret for delivery, bounce, complaint, and suppression evidence. Production should configure it after creating /webhooks/resend.')],
     ['USPS client secret', status(env.USPS_CLIENT_SECRET, uspsRequired), readOnlyAdminSettingHelp('USPS OAuth client secret for live shipping quotes. Required only when USPS is enabled; the client ID remains non-secret config.')],
     ['ZIP.TAX API key', status(env.ZIP_TAX_API_KEY || env.TAX_API_KEY, zipTaxRequired), readOnlyAdminSettingHelp('ZIP.TAX API key for jurisdiction-level tax lookup. Required only when the ZIP.TAX provider is selected.')],
     ['Cloudflare usage analytics token', status(env.CLOUDFLARE_USAGE_API_TOKEN || env.CLOUDFLARE_ANALYTICS_API_TOKEN, false), readOnlyAdminSettingHelp('Optional read-only Cloudflare GraphQL Analytics token for the admin plan usage tracker. Keep deploy tokens separate from usage tokens.')],
@@ -15372,11 +16084,14 @@ async function buildCampaignPreviewEmails(env, campaign, reviewerLinks = [], aut
       if (!link?.ok || !link.email || !link.previewUrl) throw new Error(link?.error || 'Unable to generate preview link.');
       const result = await sendCampaignPreviewEmail(env, {
         email: link.email,
+        campaignSlug: campaign.slug,
         campaignTitle: campaign.title || campaign.slug,
         previewUrl: link.previewUrl,
         expiresHours: 24,
         invitedBy: auth.user.email,
-        lang
+        lang,
+        _outboxDedupeKey: `campaign-preview:${campaign.slug}:${link.email}:${link.previewUrl}`,
+        _outboxExpiresAt: new Date(Date.now() + (23 * 60 * 60 * 1000)).toISOString()
       });
       results.push({
         email: link.email,
@@ -15869,43 +16584,62 @@ function shouldTriggerAdminMediaOptimization(filePath = '', contentType = '') {
   );
 }
 
-function isAdminMediaLibraryImagePath(filePath = '') {
-  return /\.(?:png|jpe?g|webp|gif|avif)$/i.test(String(filePath || '').trim());
+function adminMediaLibraryRecentKey(filePath = '') {
+  return String(filePath || '').match(/-(\d{8}-\d{6})\.[a-z0-9]+$/i)?.[1] || '';
 }
 
-function adminMediaLibraryLabel(filePath = '') {
-  return String(filePath || '')
-    .split('/')
-    .pop()
-    .replace(/\.[a-z0-9]+$/i, '')
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function publicAdminMediaLibraryEntry(entry = {}, scope = 'campaign') {
+function publicAdminMediaLibraryEntry(entry = {}, scope = 'campaign', knownPaths = new Set(), manifestAssets = new Map()) {
   const githubPath = String(entry.path || '').replace(/^\/+/, '');
+  const classified = classifyMediaPath(githubPath, knownPaths);
+  if (!classified || classified.role !== 'source') return null;
+  const manifest = manifestAssets.get(githubPath) || {};
   return {
     name: String(entry.name || githubPath.split('/').pop() || ''),
-    label: adminMediaLibraryLabel(githubPath),
+    label: String(manifest.label || mediaPathLabel(githubPath)),
     path: `/${githubPath}`,
     githubPath,
-    scope
+    contentSha: String(entry.sha || ''),
+    scope,
+    type: classified.type,
+    role: 'source',
+    bytes: Number(manifest.bytes || 0) || null,
+    width: Number(manifest.width || 0) || null,
+    height: Number(manifest.height || 0) || null,
+    durationMs: Number(manifest.durationMs || 0) || null,
+    optimizationStatus: String(manifest.optimizationStatus || 'pending_manifest'),
+    derivatives: Array.isArray(manifest.derivatives) ? manifest.derivatives : [],
+    missingDerivatives: Array.isArray(manifest.missingDerivatives) ? manifest.missingDerivatives : [],
+    skippedDerivatives: Array.isArray(manifest.skippedDerivatives) ? manifest.skippedDerivatives : [],
+    warnings: Array.isArray(manifest.warnings) ? manifest.warnings : [],
+    references: Array.isArray(manifest.references) ? manifest.references : [],
+    recentKey: adminMediaLibraryRecentKey(githubPath)
   };
 }
 
-async function listAdminMediaLibraryDirectory(env, directoryPath, scope) {
+async function loadAdminMediaOptimizationManifest(env) {
+  const file = await getGitHubTextFile(env, MEDIA_MANIFEST_PATH);
+  if (!file.ok) return normalizeMediaManifest({});
+  try {
+    return normalizeMediaManifest(JSON.parse(file.content || '{}'));
+  } catch {
+    return normalizeMediaManifest({});
+  }
+}
+
+async function listAdminMediaLibraryDirectory(env, directoryPath, scope, manifestAssets = new Map()) {
   const listed = await listGitHubDirectory(env, directoryPath, { quiet: true });
   if (!listed.ok) {
     if (listed.status === 404) return { ok: true, entries: [] };
     return listed;
   }
+  const files = (listed.entries || []).filter((entry) => entry.type === 'file');
+  const knownPaths = new Set(files.map((entry) => String(entry.path || '').replace(/^\/+/, '')));
   return {
     ok: true,
-    entries: (listed.entries || [])
-      .filter((entry) => entry.type === 'file' && isAdminMediaLibraryImagePath(entry.path))
-      .map((entry) => publicAdminMediaLibraryEntry(entry, scope))
-      .sort((a, b) => a.label.localeCompare(b.label) || a.githubPath.localeCompare(b.githubPath))
+    files: Array.from(knownPaths),
+    entries: files
+      .map((entry) => publicAdminMediaLibraryEntry(entry, scope, knownPaths, manifestAssets))
+      .filter(Boolean)
   };
 }
 
@@ -15915,15 +16649,31 @@ async function handleAdminMediaLibrary(request, env) {
   const scoped = await getRoleScopedAdminCampaign(request, env, campaignSlug, 'campaign:read');
   if (!scoped.ok) return scoped.response;
 
+  const requestedType = String(url.searchParams.get('type') || 'all').trim().toLowerCase();
+  if (!['all', 'image', 'video', 'audio'].includes(requestedType)) {
+    return privateJsonResponse({ error: 'Media type must be all, image, video, or audio.' }, 400, env);
+  }
+  const search = String(url.searchParams.get('search') || '').trim().toLowerCase().slice(0, 100);
+  const sort = String(url.searchParams.get('sort') || 'recent').trim().toLowerCase() === 'name' ? 'name' : 'recent';
+  const placement = String(url.searchParams.get('placement') || 'gallery').trim().toLowerCase();
+  const placementBudget = mediaPlacementBudget(placement);
+  const manifest = await loadAdminMediaOptimizationManifest(env);
+  const manifestAssets = new Map((manifest.assets || []).map((asset) => [String(asset.path || ''), asset]));
   const directories = [
-    { path: `assets/images/campaigns/${campaignSlug}`, scope: 'campaign' }
+    { path: `assets/images/campaigns/${campaignSlug}`, scope: 'campaign' },
+    { path: `assets/videos/campaigns/${campaignSlug}`, scope: 'campaign' },
+    { path: `assets/audio/campaigns/${campaignSlug}`, scope: 'campaign' }
   ];
   if (scoped.auth.user.role === 'super_admin' && url.searchParams.get('includeShared') !== 'false') {
-    directories.push({ path: 'assets/images/defaults', scope: 'shared' });
+    directories.push(
+      { path: 'assets/images/defaults', scope: 'shared' },
+      { path: 'assets/videos/defaults', scope: 'shared' },
+      { path: 'assets/audio/defaults', scope: 'shared' }
+    );
   }
 
   const results = await Promise.all(directories.map((directory) => (
-    listAdminMediaLibraryDirectory(env, directory.path, directory.scope)
+    listAdminMediaLibraryDirectory(env, directory.path, directory.scope, manifestAssets)
   )));
   const failed = results.find((result) => !result.ok);
   if (failed) {
@@ -15934,23 +16684,92 @@ async function handleAdminMediaLibrary(request, env) {
     }, failed.status || 502, env);
   }
 
-  const images = [];
+  const media = [];
+  const knownFiles = new Set();
   const seen = new Set();
   for (const result of results) {
-    for (const image of result.entries || []) {
-      if (!image.githubPath || seen.has(image.githubPath)) continue;
-      seen.add(image.githubPath);
-      images.push(image);
+    for (const path of result.files || []) knownFiles.add(path);
+    for (const item of result.entries || []) {
+      if (!item.githubPath || seen.has(item.githubPath)) continue;
+      if (requestedType !== 'all' && item.type !== requestedType) continue;
+      if (search && !`${item.label} ${item.name} ${item.githubPath}`.toLowerCase().includes(search)) continue;
+      seen.add(item.githubPath);
+      if (item.type === 'image' && item.bytes && item.bytes > placementBudget.maxBytes) {
+        item.warnings = Array.from(new Set([...(item.warnings || []), 'placement_over_budget']));
+      }
+      media.push(item);
     }
   }
+  media.sort((a, b) => sort === 'name'
+    ? a.label.localeCompare(b.label) || a.githubPath.localeCompare(b.githubPath)
+    : String(b.recentKey || '').localeCompare(String(a.recentKey || '')) || a.label.localeCompare(b.label));
+
+  const campaignReferences = collectAdminDashboardCampaignMediaPaths(scoped.campaign || {}, campaignSlug);
+  const brokenReferences = Array.from(campaignReferences)
+    .filter((repoPath) => !knownFiles.has(repoPath))
+    .map((repoPath) => ({ path: `/${repoPath}`, githubPath: repoPath, reason: 'missing_file' }))
+    .sort((a, b) => a.githubPath.localeCompare(b.githubPath));
 
   return privateJsonResponse({
     user: scoped.auth.user,
     campaignSlug,
-    images,
+    media,
+    images: media.filter((item) => item.type === 'image'),
+    filters: { type: requestedType, search, sort, placement },
+    placementBudget,
+    manifest: { version: manifest.version, available: (manifest.assets || []).length > 0 },
+    brokenReferences,
     writeBudget: adminReadBudget({ kvListExpected: 0 }),
     generatedAt: new Date().toISOString()
   }, 200, env);
+}
+
+async function handleAdminMediaOptimize(request, env) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.body || {};
+  const scope = String(body.scope || 'changed').trim().toLowerCase();
+  const campaignSlug = String(body.campaignSlug || '').trim();
+  if (!['changed', 'all'].includes(scope)) {
+    return privateJsonResponse({ error: 'Optimization scope must be changed or all.' }, 400, env);
+  }
+  const permission = scope === 'all' ? 'settings:publish' : 'campaign:edit_content';
+  const auth = await requireAdminSession(request, env, permission, {
+    requireCsrf: true,
+    ...(campaignSlug ? { campaignSlug } : {})
+  });
+  if (!auth.ok) return auth.response;
+  if (scope === 'all' && auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Only super admins can request a full media optimization run.' }, 403, env);
+  }
+  if (scope === 'changed' && !isValidSlug(campaignSlug)) {
+    return privateJsonResponse({ error: 'Changed-media optimization requires a valid campaign slug.' }, 400, env);
+  }
+
+  const optimization = await triggerMediaOptimization(env, { scope });
+  if (!optimization.triggered) {
+    return privateJsonResponse({
+      error: optimization.reason || 'Unable to dispatch media optimization.',
+      optimization
+    }, 502, env);
+  }
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'media:optimize',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    campaignSlug: campaignSlug || undefined,
+    scope
+  });
+  return privateJsonResponse({
+    success: true,
+    optimization,
+    auditKey,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: auditKey ? 1 : 0 })
+  }, 202, env);
 }
 
 const ADMIN_CAMPAIGN_MEDIA_UPLOAD_KINDS = new Set([
@@ -16009,7 +16828,23 @@ function normalizeAdminMediaUpload(body = {}, options = {}) {
     : { ...body, filename };
   const safeBase = adminUploadSlug(adminUploadBaseName(uploadBaseBody, extension), options.defaultFilename || 'upload');
   const directory = adminUploadDirectory({ ...body, contentType }, options);
-  const filePath = `${directory}/${safeBase}-${adminUploadTimestamp()}.${extension}`;
+  const requestedReplacement = String(body.replaceGithubPath || '').trim().replace(/^\/+/, '');
+  const replaceSha = String(body.replaceSha || '').trim();
+  let filePath = `${directory}/${safeBase}-${adminUploadTimestamp()}.${extension}`;
+  if (requestedReplacement) {
+    const campaignSlug = normalizeAdminUploadCampaignSlug(body.campaignSlug);
+    const replacementPath = normalizeAdminDashboardCampaignMediaPath(`/${requestedReplacement}`, campaignSlug);
+    if (!replacementPath || !replacementPath.startsWith(`${directory}/`)) {
+      return { ok: false, error: `${label} replacement must be an existing file owned by this campaign.` };
+    }
+    if (adminMediaPathExtension(replacementPath) !== `.${extension}`) {
+      return { ok: false, error: `${label} replacement must keep the existing file type.` };
+    }
+    if (!/^[a-f0-9]{40,64}$/i.test(replaceSha)) {
+      return { ok: false, error: `${label} replacement requires the current repository revision.` };
+    }
+    filePath = replacementPath;
+  }
   return {
     ok: true,
     base64,
@@ -16017,7 +16852,8 @@ function normalizeAdminMediaUpload(body = {}, options = {}) {
     publicPath: `/${filePath}`,
     estimatedBytes,
     contentType,
-    processing: adminUploadProcessingSummary(contentType, extension)
+    processing: adminUploadProcessingSummary(contentType, extension),
+    replaceSha: requestedReplacement ? replaceSha : undefined
   };
 }
 
@@ -16056,7 +16892,8 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     env,
     normalized.filePath,
     normalized.base64,
-    `Upload ${options.commitLabel || 'admin media'} ${normalized.filePath}`
+    `${normalized.replaceSha ? 'Replace' : 'Upload'} ${options.commitLabel || 'admin media'} ${normalized.filePath}`,
+    normalized.replaceSha
   );
   if (!uploaded.ok) {
     return privateJsonResponse({
@@ -16073,6 +16910,7 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     success: true,
     path: normalized.publicPath,
     githubPath: normalized.filePath,
+    contentSha: uploaded.contentSha,
     commitSha: uploaded.commitSha,
     commitUrl: uploaded.commitUrl,
     contentType: normalized.contentType,
@@ -17007,7 +17845,7 @@ async function handleAdminStripeFinancialsBackfill(request, env) {
     return privateJsonResponse({ error: 'Campaign not found' }, 404, env);
   }
 
-  const stripe = createStripeClient(getStripeKey(env));
+  const stripe = createPoolStripeClient(env, { intent: 'stripe_financials_backfill' });
   const summary = {
     dryRun,
     campaignsChecked: 0,
@@ -17085,8 +17923,8 @@ async function handleAdminStripeFinancialsBackfill(request, env) {
     success: summary.errors.length === 0,
     ...summary,
     writeBudget: adminWriteBudget({
-      readOnly: dryRun,
-      kvWritesExpected: dryRun ? 0 : summary.pledgesUpdated,
+      readOnly: false,
+      kvWritesExpected: summary.paymentIntentsChecked + (dryRun ? 0 : summary.pledgesUpdated),
       kvListExpected: 0
     })
   }, summary.errors.length ? 207 : 200, env);
@@ -17364,7 +18202,7 @@ async function adminMarketingAnnouncementDryRunHash({ campaignSlug, message, sup
   }));
 }
 
-async function sendAdminMarketingAnnouncementToSupporter(env, campaign, supporter, message) {
+async function sendAdminMarketingAnnouncementToSupporter(env, campaign, supporter, message, dispatchHash) {
   const token = await generateToken(env.MAGIC_LINK_SECRET, {
     orderId: supporter.orderId,
     email: supporter.email,
@@ -17384,7 +18222,8 @@ async function sendAdminMarketingAnnouncementToSupporter(env, campaign, supporte
     ctaUrl: message.ctaUrl,
     token,
     instagramUrl: campaign.instagram,
-    hasDecisions: campaign?.has_decisions === true
+    hasDecisions: campaign?.has_decisions === true,
+    _outboxDedupeKey: `admin-announcement:${dispatchHash}:${supporter.orderId || supporter.email}`
   });
 }
 
@@ -17473,7 +18312,7 @@ async function handleAdminMarketingAnnouncement(request, env, body = {}) {
       await new Promise((resolve) => setTimeout(resolve, RESEND_RATE_LIMIT_DELAY_MS));
     }
     try {
-      await sendAdminMarketingAnnouncementToSupporter(env, campaign, supporter, message);
+      await sendAdminMarketingAnnouncementToSupporter(env, campaign, supporter, message, dryRunHash);
       results.sent += 1;
     } catch (err) {
       results.failed += 1;
@@ -18050,11 +18889,16 @@ function validateAdminContentBlock(block, index, errors, warnings) {
   if (type === 'image') {
     const src = normalizeAdminContentAsset(block.src || '', `${path}.src`, errors, { required: true });
     const alt = normalizeAdminContentPlainText(block.alt || '', `${path}.alt`, errors, { maxLength: 300 });
-    if (!alt.trim()) warnings.push(`${path}.alt should describe the image.`);
+    const hasDecorativeFlag = Object.prototype.hasOwnProperty.call(block, 'decorative');
+    const decorative = block.decorative === true || (!hasDecorativeFlag && !alt.trim());
+    if (!decorative && !alt.trim()) errors.push(`${path}.alt is required unless the image is marked decorative.`);
+    if (decorative && alt.trim()) warnings.push(`${path}.alt was cleared because decorative images need empty alt text.`);
+    if (!hasDecorativeFlag && decorative) warnings.push(`${path}.decorative was inferred for a legacy image with empty alt text; review it before publishing.`);
     return {
       type,
       src,
-      alt,
+      alt: decorative ? '' : alt,
+      decorative,
       caption: normalizeAdminContentRichText(block.caption || '', `${path}.caption`, errors, { maxLength: 1000 }),
       align: normalizeAdminContentAlignment(block.align)
     };
@@ -18068,12 +18912,21 @@ function validateAdminContentBlock(block, index, errors, warnings) {
       type,
       layout: normalizeAdminContentGalleryLayout(block.layout),
       caption_style: normalizeAdminContentGalleryCaptionStyle(block.caption_style),
-      images: images.map((image, imageIndex) => ({
-        src: normalizeAdminContentAsset(image?.src || '', `${path}.images[${imageIndex}].src`, errors, { required: true }),
-        alt: normalizeAdminContentPlainText(image?.alt || '', `${path}.images[${imageIndex}].alt`, errors, { maxLength: 300 }),
-        caption: normalizeAdminContentRichText(image?.caption || '', `${path}.images[${imageIndex}].caption`, errors, { maxLength: 1000 }),
-        _fieldName: `${path}.images[${imageIndex}]`
-      })),
+      images: images.map((image, imageIndex) => {
+        const imagePath = `${path}.images[${imageIndex}]`;
+        const alt = normalizeAdminContentPlainText(image?.alt || '', `${imagePath}.alt`, errors, { maxLength: 300 });
+        const hasDecorativeFlag = Object.prototype.hasOwnProperty.call(image || {}, 'decorative');
+        const decorative = image?.decorative === true || (!hasDecorativeFlag && !alt.trim());
+        if (!decorative && !alt.trim()) errors.push(`${imagePath}.alt is required unless the image is marked decorative.`);
+        if (!hasDecorativeFlag && decorative) warnings.push(`${imagePath}.decorative was inferred for a legacy image with empty alt text; review it before publishing.`);
+        return {
+          src: normalizeAdminContentAsset(image?.src || '', `${imagePath}.src`, errors, { required: true }),
+          alt: decorative ? '' : alt,
+          decorative,
+          caption: normalizeAdminContentRichText(image?.caption || '', `${imagePath}.caption`, errors, { maxLength: 1000 }),
+          _fieldName: imagePath
+        };
+      }),
       caption: normalizeAdminContentRichText(block.caption || '', `${path}.caption`, errors, { maxLength: 1000 }),
       align: normalizeAdminContentAlignment(block.align)
     };
@@ -18893,6 +19746,7 @@ function serializeAdminContentBlockToYaml(block = {}) {
   } else if (block.type === 'image') {
     lines.push(`    src: ${yamlQuoteAdminString(block.src || '')}`);
     lines.push(`    alt: ${yamlQuoteAdminString(block.alt || '')}`);
+    if (block.decorative === true) lines.push('    decorative: true');
     yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
   } else if (block.type === 'gallery') {
     const layout = normalizeAdminContentGalleryLayout(block.layout);
@@ -18903,6 +19757,7 @@ function serializeAdminContentBlockToYaml(block = {}) {
     for (const image of block.images || []) {
       lines.push(`      - src: ${yamlQuoteAdminString(image.src || '')}`);
       lines.push(`        alt: ${yamlQuoteAdminString(image.alt || '')}`);
+      if (image.decorative === true) lines.push('        decorative: true');
       yamlAdminOptionalScalar(lines, 'caption', image.caption, '        ');
     }
     yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
@@ -20226,7 +21081,7 @@ async function handleRecoverCheckout(request, env) {
     return jsonResponse({ error: 'Missing sessionId or orderId' }, 400);
   }
 
-  const stripe = createStripeClient(getStripeKey(env));
+  const stripe = createPoolStripeClient(env, { intent: 'admin_recovery' });
   
   try {
     let session;
@@ -20365,6 +21220,9 @@ async function handleRecoverCheckout(request, env) {
       orderId: pledgeOrderId,
       email,
       campaignSlug,
+      currency: 'usd',
+      valueTime: Number(session.created) > 0 ? new Date(session.created * 1000).toISOString() : new Date().toISOString(),
+      bookedAt: new Date().toISOString(),
       preferredLang: normalizePreferredLang(metadata.preferredLang, DEFAULT_I18N_LANG),
       tierId: canonicalContribution.tierId,
       tierName: canonicalContribution.tierName,

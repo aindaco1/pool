@@ -8,6 +8,11 @@ import {
   rewriteMediaReferences,
   webmDerivativePathForVideo
 } from '../../scripts/optimize-media.mjs';
+import {
+  classifyMediaPath,
+  expectedMediaDerivativePaths,
+  mediaPlacementBudget
+} from '../../worker/src/media-catalog.js';
 
 function webpFixture(chunks) {
   const chunkBuffers = chunks.flatMap(([type, payload]) => {
@@ -83,5 +88,38 @@ describe('media optimization script helpers', () => {
       'hero_video: /assets/videos/campaigns/their-love/proof.webm',
       'poster: /assets/images/campaigns/their-love/poster.jpg'
     ].join('\n'));
+  });
+
+  it('classifies source and generated media without exposing derivatives as independent sources', () => {
+    const known = new Set([
+      'assets/images/campaigns/their-love/hero.png',
+      'assets/images/campaigns/their-love/hero-640.webp',
+      'assets/videos/campaigns/their-love/proof.mp4',
+      'assets/videos/campaigns/their-love/proof.webm',
+      'assets/audio/campaigns/their-love/theme.mp3'
+    ]);
+
+    expect(classifyMediaPath('assets/images/campaigns/their-love/hero.png', known)).toMatchObject({
+      type: 'image', role: 'source', scope: 'campaign', campaignSlug: 'their-love'
+    });
+    expect(classifyMediaPath('assets/images/campaigns/their-love/hero-640.webp', known)).toMatchObject({
+      type: 'image', role: 'derived', sourcePath: 'assets/images/campaigns/their-love/hero.png', derivativeWidth: 640
+    });
+    expect(classifyMediaPath('assets/videos/campaigns/their-love/proof.webm', known)).toMatchObject({
+      type: 'video', role: 'derived', sourcePath: 'assets/videos/campaigns/their-love/proof.mp4'
+    });
+    expect(classifyMediaPath('assets/audio/campaigns/their-love/theme.mp3', known)).toMatchObject({
+      type: 'audio', role: 'source'
+    });
+  });
+
+  it('derives placement-aware optimization expectations from the shared policy', () => {
+    expect(expectedMediaDerivativePaths('assets/images/campaigns/their-love/hero.png', { width: 700 }))
+      .toEqual([
+        'assets/images/campaigns/their-love/hero-320.webp',
+        'assets/images/campaigns/their-love/hero-480.webp',
+        'assets/images/campaigns/their-love/hero-640.webp'
+      ]);
+    expect(mediaPlacementBudget('blast')).toMatchObject({ maxBytes: 1_000_000, label: 'Blast image' });
   });
 });

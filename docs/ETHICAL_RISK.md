@@ -117,6 +117,19 @@ Treat these as release blockers until explicitly resolved:
 - Tests or evidence: shared utility, cart, Manage Pledge, Worker checkout/modification, admin validation/YAML, performance evaluator, cache-policy, observability, i18n, and release evidence coverage
 - Follow-ups accepted: no product migration is needed; Workers Cache remains disabled until representative evidence proves the configured p95 improvement
 
+## v1.1.1 Review Record
+
+- Feature: creator media workflow plus Stripe settlement/reconciliation and durable email delivery hardening
+- Affected users: supporters whose cards settle or whose email is delivered/suppressed, campaign creators selecting media, super admins, and recovery operators
+- Relevant risk zones: money movement, consent/communications, privacy/retention, accessibility, and concentrated admin power
+- What could go wrong: an ambiguous processor timeout could cause a duplicate charge; stale settlement work could be marked complete; an email retry could duplicate a campaign message; bounce data could become a shadow audience profile; a creator could publish inaccessible or oversized media; replace could overwrite another campaign's asset
+- Data collected or exposed: redacted Stripe IDs/status/timing and short-lived frozen email payloads are new operational state; processor journal rows exclude raw provider payloads and supporter email, delivery evidence is minimized, and campaign/global suppression uses email hashes
+- Consent, opt-out, and recourse: campaign updates include signed one-click unsubscribe checked immediately before delivery; payment mail remains transactional; creators explicitly mark decorative images and see known references/warnings before replace
+- Abuse/misuse mitigations: deterministic idempotency, pre-charge settlement persistence, needs-attention stops after the provider horizon, reconciliation breaks, no manual ambiguous-charge endpoint, role/campaign/SHA-scoped media replacement, and no Resend Contacts/Broadcast audience sync
+- Accessibility/i18n impact: accessible media type tabs, searchable text metadata, required meaningful alt text, explicit decorative state, and aligned English/Spanish copy; no human Spanish review is claimed
+- Tests or evidence: settlement crash/resume, Stripe client errors/idempotency, outbox retries/suppression/webhook signatures, authenticated reconciliation, media manifest/picker/editor, 127 security tests, 107 browser tests, and full release evidence
+- Follow-ups accepted: configure the signed Resend delivery webhook at deployment; maker/checker recovery stays disabled until two distinct super-admin operators exist
+
 ---
 
 _Last updated: July 12, 2026_

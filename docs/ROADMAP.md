@@ -2,9 +2,9 @@
 
 ## Current Milestone
 
-**v1.1.0**
+**v1.1.1**
 
-The v1.1.0 milestone adds variant-specific add-on pricing and completes the Store-aligned production-quality/admin-operations release gate without importing Store-only catalog, ticket, RSVP, SKU, download, or R2 systems.
+The v1.1.1 milestone completes the repository-backed media library/optimization workflow and Stripe-focused payment integrity hardening without adding a second media database, a full accounting ledger, or unsafe manual charge recovery.
 
 ## Completed
 
@@ -146,6 +146,17 @@ The v1.1.0 milestone adds variant-specific add-on pricing and completes the Stor
 
 **Payments, inventory, and reporting**
 
+- [x] Payment integrity hardening
+  - New payment and checkout records carry explicit USD currency plus value-time, Worker booking-time, and processor-availability timing where Stripe exposes it; legacy records default safely to USD during reads
+  - Stripe API calls pin an explicit version, normalize provider errors, use deterministic idempotency for retry-safe writes, and emit a bounded redacted `processor-event:v1:*` journal without card data, raw webhook payloads, or supporter email addresses
+  - Webhooks use a processing lease before side effects and retain processed markers for 35 days, so concurrent delivery returns a retryable conflict while stale work can safely resume
+  - Settlement persists `settlement-group:v1:*` state before charging, resumes successful processor objects, reuses safe keys inside Stripe's 24-hour idempotency window, and stops for operator review rather than blindly retrying ambiguous work after that window
+  - Settlement jobs persist current-batch checkpoints, detect stale work, retain operational state for 400 days, and do not mark campaigns charged while missing-customer, failed, or needs-attention pledges remain
+  - Scheduled and super-admin-triggered reconciliation compares indexed pledge truth with Stripe PaymentIntents and settlement jobs, then stores explicit open/resolved `reconciliation-break:v1:*` records without namespace scans
+  - Production email side effects share a durable `email-outbox:v1:*` path with frozen payloads, deterministic Resend idempotency, bounded retries, crash leases, provider delivery webhooks, permanent-bounce/complaint suppression, and 400-day minimal delivery evidence
+  - Diary, milestone, and announcement email now include signed campaign-scoped RFC 8058 one-click unsubscribe handling; transaction, admin-login, and test email semantics remain distinct
+  - Manual ambiguous-money recovery remains disabled because two distinct super-admin operators are not currently available; automated idempotent recovery and explicit reconciliation breaks are the supported path
+
 - [x] Stripe checkout and card updates
   - native on-site Stripe payment step in the second checkout sidecar
   - `Update Card` using the same secure pattern
@@ -187,6 +198,15 @@ The v1.1.0 milestone adds variant-specific add-on pricing and completes the Stor
   - Smoke coverage verifies real USPS domestic/international rating, fallback behavior, and signature-option flows
 
 **Creator tooling and content**
+
+- [x] Media library usability and optimization workflow
+  - The existing repository is still the only media store; a deterministic rebuildable `_data/media-optimization-manifest.json` describes campaign/shared image, video, and audio sources plus generated derivatives, hashes, dimensions, duration, size, references, and warnings
+  - Campaign media browsing now supports search, image/video/audio tabs, recent/name sorting, thumbnails and metadata, campaign/shared scope, source/derived status, reference locations, optimization state, and broken-reference warnings
+  - Creators can pick campaign images, local videos/posters, and audio without pasting paths, safely replace a same-campaign source using its current GitHub SHA, and dispatch the existing changed/all optimization workflow under role scope
+  - Meaningful images require alt text while explicit decorative images persist empty alt text; legacy empty-alt images remain compatible with a warning
+  - Shared placement budgets warn about oversized hero, gallery, tier, Blast, and poster media without creating a second blocking policy or Worker-side processor
+  - Generated responsive image/video files are hidden as standalone picker choices, while intentionally skipped larger derivatives remain recorded so they are not misreported as missing
+  - Unit coverage protects manifest classification, placement budgets, picker filtering, editor behavior, and accessibility semantics; the existing native optimizer check remains authoritative for derivative generation
 
 - [x] Admin dashboard
   - `/admin/` and `/es/admin/` private shells with noindex handling and localized dashboard copy
@@ -331,33 +351,6 @@ The v1.1.0 milestone adds variant-specific add-on pricing and completes the Stor
   - Add transcript/log export that redacts secrets and captures setup decisions, provider statuses, command versions, and failure reasons for support without creating a new telemetry backend
   - Add smoke-test shortcuts after setup, such as `podman:doctor`, `./scripts/dev.sh --podman`, `./scripts/test-checkout.sh --podman`, `npm run test:secrets`, and `npm run test:i18n`, while still leaving actual test orchestration in existing scripts
   - Keep implementation small and cross-platform: prefer a Node TUI layer over the current setup core, avoid Electron/native packaging until the terminal wrapper proves useful, and document any platform-specific terminal limitations
-- [ ] Media library usability and optimization workflow
-  - Improve the existing campaign-scoped media picker and upload path for creators without adding a second media index, KV-backed media database, or alternate storage backend
-  - Make Source URL an advanced/edit-existing-path affordance so normal creators pick from existing campaign media, upload a new file, or replace a referenced file without pasting `/assets/...` paths by hand
-  - Add creator-friendly media browsing: campaign-scoped filters, image/video/audio type tabs, thumbnail previews, filename/search filtering, recently uploaded assets, dimensions/duration/file-size display, and clear source-vs-derived labels
-  - Improve accessibility and publishing quality at the point of use: required alt text for meaningful images, decorative-image handling, captions where supported, focal/crop guidance for square hero, wide hero, cards, social previews, and email-safe Blast images
-  - Add safe replace/reuse flows that show where an asset is referenced across campaign content, diary entries, hero fields, tier/add-on images, Blast drafts, embeds, and social/share surfaces before changing or removing it
-  - Surface optimization status in the dashboard by reusing the repository media optimizer outputs: source file, generated WebP widths, generated WebM derivatives, pending optimization, stale derivative, missing derivative, and oversized source warnings
-  - Add repair actions that dispatch or suggest the existing media optimization workflow with `scope=changed` or `scope=all`, rather than introducing Worker-side image/video processing
-  - Add broken-reference checks for campaign-owned media so creators see missing files, deleted source assets, failed derivative generation, and email image paths that will not resolve publicly
-  - Add lightweight performance budgets for common placements, including hero image, gallery image, tier image, Blast image, and video poster, with warnings instead of hard blocks unless the file is unsafe or unsupported
-  - Keep cleanup conservative and explainable: publish-time cleanup should continue deleting only same-campaign dashboard-owned media that disappeared from normalized content and is not referenced elsewhere
-  - Extend tests around media picker usability, optimization-state rendering, broken-reference warnings, cleanup safety, responsive image selection, and Blast image payload safety without duplicating the optimizer's own native-tool checks
-  - Update creator-facing docs with media naming, alt-text, source/derivative expectations, optimization warnings, replacement behavior, and when to ask a platform operator for shared/default media
-- [ ] Payment integrity hardening from the Fintech Engineering Handbook
-  - Keep the current architecture: Stripe remains the processor, Stripe owns card data, the Cloudflare Worker remains the canonical payment boundary, KV remains pledge/projection storage, Durable Objects serialize scarce inventory and settlement, and the Worker scheduler handles bounded background work
-  - Avoid adding a full double-entry ledger unless The Pool later adds refunds, payouts, stored balances, multi-currency money movement, or marketplace-style splits; for the current pledge model, prefer a lightweight append-only payment event journal that references existing pledge/order/campaign IDs
-  - Add explicit `currency` metadata to newly persisted pledge, checkout manifest, settlement, report, and analytics rows, defaulting older rows to the deployment's current USD assumption during reads instead of introducing multi-currency behavior
-  - Add clearer payment timing fields without duplicating existing history: value time for supporter/Stripe events, Worker booking time for persistence, and settlement/processor availability time when Stripe balance transaction data is available
-  - Add a bounded, redacted processor-event journal for high-value Stripe interactions and webhooks, storing event IDs, object IDs, request intent, response status, idempotency key, mode, timestamps, reconciliation status, and only the minimal raw provider payload needed for recovery or audit, with explicit retention and PII minimization
-  - Reuse existing observability summaries and Stripe financial backfill logic to build periodic reconciliation jobs that compare pledge truth, settlement jobs, Stripe PaymentIntents, webhook idempotency markers, and stored fee/net data through `campaign-pledges:{slug}` indexes instead of namespace scans
-  - Represent reconciliation differences as explicit `reconciliation-break:*` records with status, severity, source object IDs, first/last seen timestamps, and operator notes; dashboard views and scripts should read those records rather than inventing a second reporting model
-  - Move payment-adjacent side effects toward a small KV-backed outbox shared by supporter confirmations, payment failure/success emails, report emails, diary/milestone broadcasts, and Blast sends, so pledge persistence and notification delivery can be retried independently through the existing scheduler and Resend helper
-  - Harden settlement resumability by making each batch step re-run-safe, adding stale-job detection, and recording enough per-batch state to resume or safely roll forward without recharging supporters
-  - Add invariant and crash/resume tests using the existing Vitest and smoke harnesses: no duplicate charged pledge for one settlement group, no charged pledge without Stripe PaymentIntent ID, campaign subtotal projections equal active pledge truth after create/modify/cancel sequences, failed emails stay retryable without mutating pledge truth, and repeated webhooks/batches remain idempotent
-  - Keep any production payment test transactions clearly tagged, normal-booked, and reconciled through the same pledge/payment paths rather than hidden behind special-case accounting or reporting behavior
-  - Add a narrowly scoped maker/checker path only for manual money-affecting recovery operations that are not already automated or retry-safe, using existing admin sessions, role scopes, CSRF, and audit records rather than introducing a separate approval service
-  - Document the new journal, reconciliation breaks, and outbox in `docs/PAYMENT_PROCESSOR.md`, `docs/WORKFLOWS.md`, `docs/SECURITY.md`, and `worker/README.md`, including retention, PII, and operator runbooks
 - [ ] Tax calculator expansion and compliance hardening
   - Start from the current implemented baseline: `worker/src/tax.js` already provides `flat`, `offline_rules`, `nm_grt`, and `zip_tax` provider modes; `_config.yml` mirrors non-secret `tax.*` settings into `worker/wrangler.toml`; `/tax/quote`, checkout, Manage Pledge, stored pledge `taxDetails`, emails, analytics, and reports already use Worker-calculated tax totals; and the browser keeps tax provisional as `--` until it has enough destination detail
   - Keep the current architecture DRY: the Worker remains the only tax authority, cart and Manage Pledge keep requesting quotes instead of duplicating tax math, `_config.yml` owns non-secret provider settings, Worker secrets own provider keys, and reports/analytics continue reading persisted `tax` / `taxDetails` instead of recalculating historical obligations from today's catalog or rate data

@@ -566,8 +566,35 @@ function summarizeProviderError(raw) {
   return text.slice(0, 320);
 }
 
-async function sendResendEmail(env, payload, { errorLabel = 'Resend error', failureLabel = 'Failed to send email' } = {}) {
-  const preparedPayload = buildResendPayload(env, payload);
+export class ResendApiError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = 'ResendApiError';
+    this.type = String(details.type || 'resend_api_error');
+    this.statusCode = Number(details.statusCode || 0) || 0;
+    this.retryAfterSeconds = Number(details.retryAfterSeconds || 0) || 0;
+    this.retryable = details.retryable === true;
+    this.ambiguous = details.ambiguous === true;
+  }
+}
+
+function parseResendErrorPayload(raw) {
+  try {
+    const parsed = JSON.parse(String(raw || '{}'));
+    return {
+      type: String(parsed.name || parsed.type || parsed.code || 'resend_api_error'),
+      message: summarizeProviderError(raw)
+    };
+  } catch {
+    return { type: 'resend_api_error', message: summarizeProviderError(raw) };
+  }
+}
+
+export async function sendPreparedResendEmail(env, preparedPayload, {
+  idempotencyKey = '',
+  errorLabel = 'Resend error',
+  failureLabel = 'Failed to send email'
+} = {}) {
   if (emailDryRunEnabled(env)) {
     return {
       id: `email_dry_run_${Date.now()}`,
@@ -577,23 +604,64 @@ async function sendResendEmail(env, payload, { errorLabel = 'Resend error', fail
     };
   }
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(preparedPayload)
-  });
+  let response;
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'the-pool-worker/1.1.1',
+        ...(idempotencyKey ? { 'Idempotency-Key': String(idempotencyKey).slice(0, 256) } : {})
+      },
+      body: JSON.stringify(preparedPayload)
+    });
+  } catch {
+    throw new ResendApiError(`${failureLabel}: provider response was not received`, {
+      type: 'network_error',
+      retryable: true,
+      ambiguous: true
+    });
+  }
 
   if (!response.ok) {
     const rawError = await response.text();
-    const error = summarizeProviderError(rawError);
-    console.error(`${errorLabel}:`, { status: response.status, error: error || 'No response body' });
-    throw new Error(`${failureLabel}: ${response.status}${error ? ` (${error})` : ''}`);
+    const parsed = parseResendErrorPayload(rawError);
+    const retryAfterSeconds = Number.parseInt(String(response.headers?.get?.('retry-after') || '0'), 10) || 0;
+    const retryable = response.status === 409 || response.status === 429 || response.status >= 500;
+    console.error(`${errorLabel}:`, { status: response.status, error: parsed.message || 'No response body', type: parsed.type });
+    throw new ResendApiError(`${failureLabel}: ${response.status}${parsed.message ? ` (${parsed.message})` : ''}`, {
+      type: parsed.type,
+      statusCode: response.status,
+      retryAfterSeconds,
+      retryable,
+      ambiguous: response.status >= 500
+    });
   }
 
   return response.json().catch(() => ({}));
+}
+
+async function sendResendEmail(env, payload, { errorLabel = 'Resend error', failureLabel = 'Failed to send email' } = {}) {
+  const preparedPayload = buildResendPayload(env, payload);
+  if (emailDryRunValueEnabled(env.POOL_EMAIL_CAPTURE_PAYLOAD)) {
+    env.__POOL_CAPTURED_EMAIL_PAYLOAD = preparedPayload;
+    return { captured: true, payload: preparedPayload };
+  }
+  if (emailDryRunEnabled(env)) {
+    return {
+      id: `email_dry_run_${Date.now()}`,
+      dryRun: true,
+      to: preparedPayload.to,
+      subject: preparedPayload.subject
+    };
+  }
+
+  return sendPreparedResendEmail(env, preparedPayload, {
+    idempotencyKey: env.POOL_EMAIL_IDEMPOTENCY_KEY,
+    errorLabel,
+    failureLabel
+  });
 }
 
 export async function sendAdminLoginEmail(env, { email, loginUrl, lang }) {
@@ -1500,7 +1568,7 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
 /**
  * Send diary update notification to supporters
  */
-export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, diaryPhase, token, instagramUrl, hasDecisions, preferredLang }) {
+export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, diaryPhase, token, instagramUrl, hasDecisions, preferredLang, unsubscribeUrl }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
@@ -1509,6 +1577,8 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
   const campaignUrl = safeSiteUrl(`/campaigns/${encodeURIComponent(campaignSlug)}/${diaryAnchor}`, env.SITE_BASE);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { theme });
+  const unsubscribeHref = safeExternalUrl(unsubscribeUrl, env.WORKER_BASE || env.SITE_BASE);
+  const unsubscribeHeaders = emailListUnsubscribeHeaders(unsubscribeHref, env.WORKER_BASE || env.SITE_BASE);
   
   const html = `
 <!DOCTYPE html>
@@ -1553,6 +1623,7 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
   
   <div style="${getEmailFooterStyle(theme)}">
     <p style="margin: 0;">${escapeHtml(t('common.because_you_backed', "You're receiving this because you backed %{campaign}.", { campaign: campaignTitle }))}</p>
+    ${unsubscribeHref ? `<p style="margin: 8px 0 0 0;"><a href="${escapeHtml(unsubscribeHref)}" style="color: ${theme.primaryColor};">${escapeHtml(t('common.unsubscribe_campaign_updates', 'Unsubscribe from campaign updates'))}</a></p>` : ''}
   </div>
 </body>
 </html>
@@ -1565,7 +1636,8 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
       t('subjects.diary_update', '%{title}', { title: diaryTitle, campaign: campaignTitle }),
       campaignTitle
     ),
-    html
+    html,
+    ...(Object.keys(unsubscribeHeaders).length ? { headers: unsubscribeHeaders } : {})
   }, {
     errorLabel: 'Resend error (diary)',
     failureLabel: 'Failed to send diary email'
@@ -1642,13 +1714,15 @@ export async function sendPledgeCancelledEmail(env, { email, campaignSlug, campa
  * Send goal milestone notification to supporters
  * @param {string} milestone - 'one-third' | 'two-thirds' | 'goal' | 'stretch'
  */
-export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTitle, milestone, pledgedAmount, goalAmount, stretchGoalName, token, instagramUrl, preferredLang }) {
+export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTitle, milestone, pledgedAmount, goalAmount, stretchGoalName, token, instagramUrl, preferredLang, unsubscribeUrl }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
   const campaignUrl = safeSiteUrl(`/campaigns/${encodeURIComponent(campaignSlug)}/`, env.SITE_BASE);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { theme });
+  const unsubscribeHref = safeExternalUrl(unsubscribeUrl, env.WORKER_BASE || env.SITE_BASE);
+  const unsubscribeHeaders = emailListUnsubscribeHeaders(unsubscribeHref, env.WORKER_BASE || env.SITE_BASE);
   
   const milestoneConfig = {
     'one-third': {
@@ -1708,6 +1782,7 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
   <div style="${getEmailFooterStyle(theme)}">
     <p style="margin: 0 0 8px 0;">${escapeHtml(t('common.because_you_backed', "You're receiving this because you backed %{campaign}.", { campaign: campaignTitle }))}</p>
     <a href="${manageUrl}" style="color: ${theme.primaryColor};">${escapeHtml(t('common.manage_your_pledge', 'Manage Your Pledge'))}</a>
+    ${unsubscribeHref ? `<p style="margin: 8px 0 0 0;"><a href="${escapeHtml(unsubscribeHref)}" style="color: ${theme.primaryColor};">${escapeHtml(t('common.unsubscribe_campaign_updates', 'Unsubscribe from campaign updates'))}</a></p>` : ''}
   </div>
 </body>
 </html>
@@ -1725,7 +1800,8 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
       }),
       campaignTitle
     ),
-    html
+    html,
+    ...(Object.keys(unsubscribeHeaders).length ? { headers: unsubscribeHeaders } : {})
   }, {
     errorLabel: 'Resend error (milestone)',
     failureLabel: 'Failed to send milestone email'
@@ -1735,7 +1811,7 @@ export async function sendMilestoneEmail(env, { email, campaignSlug, campaignTit
 /**
  * Send announcement email to supporters with optional highlighted CTA link
  */
-export async function sendAnnouncementEmail(env, { email, campaignSlug, campaignTitle, subject, heading, body, contentBlocks, ctaLabel, ctaUrl, token, instagramUrl, hasDecisions, preferredLang, testMode = false }) {
+export async function sendAnnouncementEmail(env, { email, campaignSlug, campaignTitle, subject, heading, body, contentBlocks, ctaLabel, ctaUrl, token, instagramUrl, hasDecisions, preferredLang, testMode = false, unsubscribeUrl }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
@@ -1748,6 +1824,8 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
     : '';
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { theme });
   const safeCtaHref = safeExternalUrl(ctaUrl, env.SITE_BASE);
+  const unsubscribeHref = safeExternalUrl(unsubscribeUrl, env.WORKER_BASE || env.SITE_BASE);
+  const unsubscribeHeaders = emailListUnsubscribeHeaders(unsubscribeHref, env.WORKER_BASE || env.SITE_BASE);
   const structuredContentHtml = Array.isArray(contentBlocks) && contentBlocks.length
     ? formatAnnouncementContentBlocks(contentBlocks, theme, env.SITE_BASE)
     : '';
@@ -1805,6 +1883,7 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
 
   <div style="${getEmailFooterStyle(theme)}">
     <p style="margin: 0;">${escapeHtml(footerText)}</p>
+    ${unsubscribeHref ? `<p style="margin: 8px 0 0 0;"><a href="${escapeHtml(unsubscribeHref)}" style="color: ${theme.primaryColor};">${escapeHtml(t('common.unsubscribe_campaign_updates', 'Unsubscribe from campaign updates'))}</a></p>` : ''}
   </div>
 </body>
 </html>
@@ -1817,7 +1896,8 @@ export async function sendAnnouncementEmail(env, { email, campaignSlug, campaign
       t('subjects.announcement', '%{subject}', { subject, campaign: campaignTitle }),
       campaignTitle
     ),
-    html
+    html,
+    ...(Object.keys(unsubscribeHeaders).length ? { headers: unsubscribeHeaders } : {})
   }, {
     errorLabel: 'Resend error (announcement)',
     failureLabel: 'Failed to send announcement email'

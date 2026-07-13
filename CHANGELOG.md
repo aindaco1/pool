@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.1.1 - 2026-07-12
+
+Release scope:
+
+- Added a deterministic, rebuildable repository media manifest covering campaign/shared images, video, and audio; source hashes, dimensions, duration, file size, responsive WebP/WebM derivatives, reference locations, optimization state, and intentionally skipped larger derivatives stay reviewable in Git.
+- Expanded the existing dashboard media picker with search, accessible type tabs, recent/name sorting, rich metadata, optimization and placement-budget warnings, reference visibility, broken-reference reporting, local video/poster/audio selection, and role-scoped repair actions through the existing optimizer workflow.
+- Added safe same-campaign source replacement with GitHub SHA conflict protection, kept generated derivatives out of standalone picker results, and retained the repository as the only media authority—no KV media database or alternate storage backend was introduced.
+- Added explicit decorative-image authoring while requiring alt text for meaningful images; legacy empty-alt content remains compatible with a migration warning.
+- Hardened Stripe integration with an explicit API version, normalized redacted errors/observability, deterministic idempotency on retry-safe writes, explicit USD/timing metadata, 35-day webhook markers with processing leases, and a 400-day minimal processor-event journal.
+- Made settlement crash/resume-safe with durable pre-charge group state, safe reuse within Stripe's idempotency window, stale-job checkpoints, successful PaymentIntent recovery, and needs-attention stops instead of blind recharges after ambiguous outcomes.
+- Added scheduled and super-admin-triggered reconciliation of indexed pledge truth, Stripe PaymentIntents, and settlement jobs, recording open/resolved `reconciliation-break:v1:*` evidence without KV namespace scans.
+- Routed production transactional, report, campaign update, Blast, launch-reminder, and abandoned-checkout email through a shared KV outbox with frozen payloads, deterministic Resend idempotency, bounded retries, crash leases, provider delivery webhooks, and privacy-minimized long-term delivery evidence; admin login and test sends remain immediate.
+- Added signed campaign-scoped one-click unsubscribe for diary, milestone, and announcement email plus local permanent-bounce/complaint suppression compatible with Resend's email and webhook APIs.
+- Added focused media, Stripe client, outbox, webhook-signature, retry, suppression, and existing Worker regression coverage; updated setup, Worker configuration, payment/email/security/workflow/dashboard/testing documentation, and roadmap status for the completed release.
+
 ## v1.1.0 - 2026-07-12
 
 Release scope:

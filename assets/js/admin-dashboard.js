@@ -6997,7 +6997,7 @@
       case 'quote':
         return { type: 'quote', text: '', author: '', align: align };
       case 'image':
-        return { type: 'image', src: '', alt: '', caption: '', align: align };
+        return { type: 'image', src: '', alt: '', decorative: false, caption: '', align: align };
       case 'gallery':
         return { type: 'gallery', layout: 'grid', caption_style: 'inline', images: [], caption: '', align: align };
       case 'video':
@@ -7025,6 +7025,7 @@
             return {
               src: String(image?.src || ''),
               alt: String(image?.alt || ''),
+              decorative: image?.decorative === true,
               caption: String(image?.caption || '')
             };
           })
@@ -7043,7 +7044,7 @@
         normalized.provider = contentVideoProvider(block.provider);
         return;
       }
-      normalized[key] = String(block[key] || '');
+      normalized[key] = key === 'decorative' ? block[key] === true : String(block[key] || '');
     });
     normalized.align = contentBlockAlignment(block.align);
     return normalized;
@@ -7461,6 +7462,26 @@
     control.value = field === 'images' ? galleryImagesToText(block.images) : String(block[field] || '');
     if (tagName === 'textarea') control.rows = options?.rows || 3;
     if (options?.placeholder) control.placeholder = options.placeholder;
+    if (options?.disabled) control.disabled = true;
+    var labelInfo = createProductLabelRow(labelText, options?.help || '', controlId, { htmlFor: controlId });
+    if (labelInfo.helpId) appendDescribedBy(control, labelInfo.helpId);
+    wrap.append(labelInfo.row, control);
+    return wrap;
+  }
+
+  function createContentCheckbox(block, index, field, labelText, options) {
+    var wrap = document.createElement('div');
+    wrap.className = 'admin-content-block__field admin-content-block__checkbox-field';
+    var controlId = 'admin-content-field-' + String(index) + '-' + String(field) + '-' + (++collectionFieldIdCounter);
+    var control = document.createElement('input');
+    control.id = controlId;
+    control.type = 'checkbox';
+    control.checked = options?.imageIndex !== undefined
+      ? block.images?.[options.imageIndex]?.[field] === true
+      : block[field] === true;
+    control.dataset.contentIndex = String(index);
+    control.dataset.contentField = field;
+    if (options?.imageIndex !== undefined) control.dataset.contentImageIndex = String(options.imageIndex);
     var labelInfo = createProductLabelRow(labelText, options?.help || '', controlId, { htmlFor: controlId });
     if (labelInfo.helpId) appendDescribedBy(control, labelInfo.helpId);
     wrap.append(labelInfo.row, control);
@@ -7515,6 +7536,7 @@
   }
 
   function createContentMediaLibraryButton(block, index, options) {
+    var kind = options?.kind || 'image';
     var wrap = document.createElement('div');
     wrap.className = 'admin-content-block__field admin-content-block__media-library-field';
     var button = document.createElement('button');
@@ -7522,16 +7544,17 @@
     button.className = 'btn btn--secondary btn--small';
     button.dataset.contentIndex = String(index);
     button.dataset.contentAction = 'choose-media-library';
-    button.dataset.contentMediaKind = 'image';
+    button.dataset.contentMediaKind = kind;
     button.dataset.contentMediaField = options?.field || 'src';
-    button.textContent = options?.buttonLabel || t('content_choose_existing_image', 'Choose existing image');
+    button.dataset.contentMediaPlacement = options?.placement || (isBlastContentEditorMode() ? 'blast' : (options?.field === 'poster' ? 'poster' : 'gallery'));
+    button.textContent = options?.buttonLabel || t('content_choose_existing_media', 'Choose existing ' + kind);
     var labelInfo = createProductLabelRow(
-      options?.label || t('content_existing_image_label', 'Existing image'),
-      options?.help || t('content_existing_image_help', 'Choose an already uploaded campaign image. Super admins can also choose shared/default site images; campaign users see only this campaign\'s media. Use Source URL only to repair an existing /assets/... path.'),
+      options?.label || t('content_existing_media_label', 'Existing media'),
+      options?.help || t('content_existing_media_help', 'Choose an already uploaded campaign file. Super admins can also choose shared/default site media; campaign users see only this campaign\'s files. Use Source URL only to repair an existing /assets/... path.'),
       'content-existing-image-' + String(index) + '-' + String(++collectionFieldIdCounter),
       { labelId: 'content-existing-image-label-' + String(collectionFieldIdCounter) }
     );
-    describeCompositeControl(button, labelInfo.helpId, options?.label || t('content_existing_image_label', 'Existing image'));
+    describeCompositeControl(button, labelInfo.helpId, options?.label || t('content_existing_media_label', 'Existing media'));
     wrap.append(labelInfo.row, button);
     return wrap;
   }
@@ -7559,39 +7582,107 @@
     return true;
   }
 
-  function renderContentMediaLibraryOptions(container, images) {
+  function formatMediaLibraryBytes(value) {
+    var bytes = Number(value || 0);
+    if (!bytes) return t('content_media_size_unknown', 'Size unavailable');
+    if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1) + ' MB';
+    return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  }
+
+  function formatMediaLibraryDuration(value) {
+    var seconds = Math.max(0, Math.round(Number(value || 0) / 1000));
+    if (!seconds) return '';
+    return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
+  }
+
+  function renderContentMediaLibraryPreview(item) {
+    if (item.type === 'image') {
+      var image = document.createElement('img');
+      image.src = mediaPreviewUrl(item.path || '');
+      image.alt = '';
+      image.loading = 'lazy';
+      return image;
+    }
+    var preview = document.createElement('span');
+    preview.className = 'admin-content-media-library__type-preview';
+    preview.setAttribute('aria-hidden', 'true');
+    preview.textContent = item.type === 'video' ? '▶' : '♪';
+    return preview;
+  }
+
+  function renderContentMediaLibraryOptions(container, media, state) {
     container.replaceChildren();
-    var rows = Array.isArray(images) ? images : [];
+    var rows = (Array.isArray(media) ? media : []).filter(function(item) {
+      if (state.type !== 'all' && item.type !== state.type) return false;
+      var query = String(state.search || '').trim().toLowerCase();
+      return !query || [item.label, item.name, item.githubPath].join(' ').toLowerCase().includes(query);
+    }).sort(function(a, b) {
+      if (state.sort === 'name') return String(a.label || '').localeCompare(String(b.label || ''));
+      return String(b.recentKey || '').localeCompare(String(a.recentKey || '')) || String(a.label || '').localeCompare(String(b.label || ''));
+    });
     if (!rows.length) {
       var empty = document.createElement('p');
       empty.className = 'admin-app__muted';
-      empty.textContent = t('content_media_library_empty', 'No existing images are available for this campaign yet.');
+      empty.textContent = t('content_media_library_empty', 'No matching media is available for this campaign yet.');
       container.append(empty);
       return;
     }
     var list = document.createElement('div');
     list.className = 'admin-content-media-library__list';
-    rows.forEach(function(image, index) {
+    rows.forEach(function(item, index) {
       var label = document.createElement('label');
       label.className = 'admin-content-media-library__item';
       var radio = document.createElement('input');
       radio.type = 'radio';
-      radio.name = 'contentMediaLibraryImage';
-      radio.value = image.path || '';
-      if (index === 0) radio.checked = true;
-      var preview = document.createElement('img');
-      preview.src = mediaPreviewUrl(image.path || '');
-      preview.alt = '';
-      preview.loading = 'lazy';
+      radio.name = 'contentMediaLibraryAsset';
+      radio.value = item.path || '';
+      radio.dataset.mediaType = item.type || '';
+      radio.dataset.mediaIndex = String(media.indexOf(item));
+      if (index === 0 && item.type === state.targetKind) radio.checked = true;
       var text = document.createElement('span');
-      text.textContent = [
-        image.label || image.name || image.path || '',
-        image.scope === 'shared' ? t('content_media_library_shared', 'Shared') : t('content_media_library_campaign', 'Campaign')
-      ].filter(Boolean).join(' - ');
-      label.append(radio, preview, text);
+      text.className = 'admin-content-media-library__item-copy';
+      var title = document.createElement('strong');
+      title.textContent = item.label || item.name || item.path || '';
+      var scope = item.scope === 'shared' ? t('content_media_library_shared', 'Shared') : t('content_media_library_campaign', 'Campaign');
+      var dimensions = item.width && item.height ? item.width + '×' + item.height : '';
+      var duration = formatMediaLibraryDuration(item.durationMs);
+      var metadata = document.createElement('span');
+      metadata.className = 'admin-app__muted';
+      metadata.textContent = [scope, item.type, dimensions || duration, formatMediaLibraryBytes(item.bytes)].filter(Boolean).join(' · ');
+      var optimization = document.createElement('span');
+      optimization.className = 'admin-content-media-library__status admin-content-media-library__status--' + String(item.optimizationStatus || 'pending_manifest');
+      optimization.textContent = item.optimizationStatus === 'ready'
+        ? t('content_media_ready', 'Optimized')
+        : item.optimizationStatus === 'missing_derivatives'
+          ? t('content_media_missing_derivatives', 'Missing derivatives')
+          : item.optimizationStatus === 'not_applicable'
+            ? t('content_media_source_only', 'Source file')
+            : t('content_media_pending_manifest', 'Optimization pending');
+      text.append(title, metadata, optimization);
+      if ((item.references || []).length) {
+        var details = document.createElement('details');
+        var summary = document.createElement('summary');
+        summary.textContent = t('content_media_references', 'Used in %{count} repository location(s)', { count: item.references.length });
+        var references = document.createElement('ul');
+        item.references.forEach(function(reference) {
+          var row = document.createElement('li');
+          row.textContent = reference.path + (reference.count > 1 ? ' (' + reference.count + ')' : '');
+          references.append(row);
+        });
+        details.append(summary, references);
+        text.append(details);
+      }
+      if ((item.warnings || []).length || (item.missingDerivatives || []).length) {
+        var warning = document.createElement('span');
+        warning.className = 'admin-content-media-library__warning';
+        warning.textContent = t('content_media_warning', 'Review optimization or file-size warnings before publishing.');
+        text.append(warning);
+      }
+      label.append(radio, renderContentMediaLibraryPreview(item), text);
       list.append(label);
     });
     container.append(list);
+    state.onSelection?.();
   }
 
   function openContentMediaLibrary(button) {
@@ -7603,20 +7694,154 @@
       setText(contentEditorStatusTarget(), t('content_media_library_campaign_required', 'Choose a campaign before selecting existing media.'));
       return;
     }
-    openAdminActionDialog(t('content_media_library_title', 'Choose existing image'), function(form, status, submit) {
-      submit.textContent = t('content_media_library_use', 'Use image');
+    var targetKind = String(button.dataset.contentMediaKind || 'image');
+    openAdminActionDialog(t('content_media_library_title', 'Choose existing media'), function(form, status, submit) {
+      submit.textContent = t('content_media_library_use', 'Use media');
       submit.disabled = true;
       var intro = document.createElement('p');
       intro.className = 'admin-app__muted';
-      intro.textContent = t('content_media_library_intro', 'Select a campaign-hosted image. Super admins can also choose shared/default site images.');
+      intro.textContent = t('content_media_library_intro', 'Search campaign-hosted source media, review optimization status and references, or request repository-side repair.');
+      var controls = document.createElement('div');
+      controls.className = 'admin-content-media-library__controls';
+      var tabs = document.createElement('div');
+      tabs.className = 'admin-content-media-library__tabs';
+      tabs.setAttribute('role', 'tablist');
+      tabs.setAttribute('aria-label', t('content_media_type_filter', 'Media type'));
+      var state = { type: targetKind, targetKind: targetKind, search: '', sort: 'recent', media: [], onSelection: null };
+      ['all', 'image', 'video', 'audio'].forEach(function(type) {
+        var tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'btn btn--secondary btn--small';
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('aria-selected', type === state.type ? 'true' : 'false');
+        tab.dataset.mediaTypeTab = type;
+        tab.textContent = type === 'all' ? t('content_media_all', 'All') : type.charAt(0).toUpperCase() + type.slice(1);
+        tabs.append(tab);
+      });
+      var searchLabel = document.createElement('label');
+      searchLabel.className = 'admin-content-media-library__search';
+      var searchText = document.createElement('span');
+      searchText.textContent = t('content_media_search', 'Search files');
+      var searchInput = document.createElement('input');
+      searchInput.type = 'search';
+      searchInput.autocomplete = 'off';
+      searchLabel.append(searchText, searchInput);
+      var sortLabel = document.createElement('label');
+      var sortText = document.createElement('span');
+      sortText.textContent = t('content_media_sort', 'Sort');
+      var sortSelect = document.createElement('select');
+      [['recent', t('content_media_recent', 'Recently uploaded')], ['name', t('content_media_name', 'Filename')]].forEach(function(optionRow) {
+        var option = document.createElement('option');
+        option.value = optionRow[0];
+        option.textContent = optionRow[1];
+        sortSelect.append(option);
+      });
+      sortLabel.append(sortText, sortSelect);
+      controls.append(tabs, searchLabel, sortLabel);
       var results = document.createElement('div');
       results.className = 'admin-content-media-library';
-      results.textContent = t('content_media_library_loading', 'Loading images...');
-      form.append(intro, results);
-      var params = new URLSearchParams({ campaignSlug });
+      results.textContent = t('content_media_library_loading', 'Loading media...');
+      var operations = document.createElement('div');
+      operations.className = 'admin-content-media-library__operations';
+      var replaceLabel = document.createElement('label');
+      replaceLabel.className = 'btn btn--secondary btn--small';
+      replaceLabel.textContent = t('content_media_replace', 'Replace selected file');
+      var replaceInput = document.createElement('input');
+      replaceInput.type = 'file';
+      replaceInput.hidden = true;
+      replaceLabel.append(replaceInput);
+      var optimizeButton = document.createElement('button');
+      optimizeButton.type = 'button';
+      optimizeButton.className = 'btn btn--secondary btn--small';
+      optimizeButton.textContent = t('content_media_optimize_changed', 'Repair changed media');
+      operations.append(replaceLabel, optimizeButton);
+      var broken = document.createElement('div');
+      broken.className = 'admin-content-media-library__broken';
+      form.append(intro, controls, broken, results, operations);
+      function selectedMedia() {
+        var selected = form.querySelector('input[name="contentMediaLibraryAsset"]:checked');
+        if (!(selected instanceof HTMLInputElement)) return null;
+        return state.media[Number(selected.dataset.mediaIndex)] || null;
+      }
+      state.onSelection = function() {
+        var selected = selectedMedia();
+        submit.disabled = !selected || selected.type !== targetKind;
+        replaceLabel.hidden = !selected || selected.scope !== 'campaign' || selected.type !== targetKind || !selected.contentSha;
+        replaceInput.accept = targetKind === 'image' ? 'image/png,image/jpeg,image/webp,image/gif' : targetKind === 'video' ? 'video/mp4,video/webm,video/quicktime' : 'audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/wav,audio/webm';
+      };
+      function rerender() {
+        renderContentMediaLibraryOptions(results, state.media, state);
+        tabs.querySelectorAll('[role="tab"]').forEach(function(tab) {
+          tab.setAttribute('aria-selected', tab.dataset.mediaTypeTab === state.type ? 'true' : 'false');
+        });
+      }
+      tabs.addEventListener('click', function(event) {
+        var tab = event.target.closest?.('[data-media-type-tab]');
+        if (!(tab instanceof HTMLButtonElement)) return;
+        state.type = tab.dataset.mediaTypeTab || 'all';
+        rerender();
+      });
+      searchInput.addEventListener('input', function() { state.search = searchInput.value; rerender(); });
+      sortSelect.addEventListener('change', function() { state.sort = sortSelect.value; rerender(); });
+      results.addEventListener('change', state.onSelection);
+      optimizeButton.addEventListener('click', async function() {
+        optimizeButton.disabled = true;
+        try {
+          await requestJson('/admin/media/optimize', { method: 'POST', body: JSON.stringify({ scope: 'changed', campaignSlug: campaignSlug }) });
+          setText(status, t('content_media_optimize_requested', 'Media optimization repair requested. Refresh after the workflow finishes.'));
+        } catch (error) {
+          setText(status, error?.data?.error || t('content_media_optimize_failed', 'Unable to request media optimization.'));
+        } finally {
+          optimizeButton.disabled = false;
+        }
+      });
+      replaceInput.addEventListener('change', async function() {
+        var selected = selectedMedia();
+        var file = replaceInput.files?.[0];
+        if (!selected || !file) return;
+        replaceInput.disabled = true;
+        setText(status, t('content_media_replacing', 'Replacing media...'));
+        try {
+          var endpoint = targetKind === 'image' ? '/admin/settings/image-upload' : targetKind === 'video' ? '/admin/settings/video-upload' : '/admin/settings/audio-upload';
+          var data = await requestJson(endpoint, { method: 'POST', body: JSON.stringify({
+            kind: targetKind === 'image' ? 'campaign-content' : targetKind === 'video' ? 'campaign-content-video' : 'campaign-content-audio',
+            campaignSlug: campaignSlug,
+            filename: file.name,
+            contentType: file.type,
+            content: await readFileAsDataUrl(file),
+            replaceGithubPath: selected.githubPath,
+            replaceSha: selected.contentSha
+          }) });
+          selected.contentSha = data.contentSha || selected.contentSha;
+          selected.optimizationStatus = 'pending_manifest';
+          setText(status, t('content_media_replaced', 'Media replaced. Existing references keep the same path; optimization was requested.'));
+          rerender();
+        } catch (error) {
+          setText(status, error?.data?.error || t('content_media_replace_failed', 'Unable to replace the selected media.'));
+        } finally {
+          replaceInput.value = '';
+          replaceInput.disabled = false;
+        }
+      });
+      var params = new URLSearchParams({
+        campaignSlug: campaignSlug,
+        placement: button.dataset.contentMediaPlacement || 'gallery'
+      });
       requestJson('/admin/media/library?' + params.toString(), { method: 'GET' }).then(function(data) {
-        renderContentMediaLibraryOptions(results, data.images || []);
-        submit.disabled = !(data.images || []).length;
+        state.media = data.media || data.images || [];
+        rerender();
+        broken.replaceChildren();
+        if ((data.brokenReferences || []).length) {
+          var brokenHeading = document.createElement('strong');
+          brokenHeading.textContent = t('content_media_broken_title', 'Broken campaign media references');
+          var brokenList = document.createElement('ul');
+          data.brokenReferences.forEach(function(reference) {
+            var item = document.createElement('li');
+            item.textContent = reference.path;
+            brokenList.append(item);
+          });
+          broken.append(brokenHeading, brokenList);
+        }
         setText(status, '');
       }).catch(function(error) {
         logger.error('Failed to load media library', error);
@@ -7624,14 +7849,15 @@
         submit.disabled = true;
       });
     }, async function(form) {
-      var selected = form.querySelector('input[name="contentMediaLibraryImage"]:checked');
+      var selected = form.querySelector('input[name="contentMediaLibraryAsset"]:checked');
       if (!(selected instanceof HTMLInputElement) || !selected.value) {
-        throw new Error(t('content_media_library_required', 'Choose an image first.'));
+        throw new Error(t('content_media_library_required', 'Choose media first.'));
       }
+      if (selected.dataset.mediaType !== targetKind) throw new Error(t('content_media_library_type_mismatch', 'Choose a matching media type.'));
       var applied = runContentEditorAction(root, field, function() {
         return applyContentMediaLibrarySelection(button, selected.value);
       });
-      if (!applied) throw new Error(t('content_media_library_apply_failed', 'Unable to apply the selected image.'));
+      if (!applied) throw new Error(t('content_media_library_apply_failed', 'Unable to apply the selected media.'));
     });
   }
 
@@ -7647,6 +7873,7 @@
     control.value = String(block.images?.[imageIndex]?.[field] || '');
     if (tagName === 'textarea') control.rows = options?.rows || 3;
     if (options?.placeholder) control.placeholder = options.placeholder;
+    if (options?.disabled) control.disabled = true;
     var labelInfo = createProductLabelRow(labelText, options?.help || '', controlId, { htmlFor: controlId });
     if (labelInfo.helpId) appendDescribedBy(control, labelInfo.helpId);
     wrap.append(labelInfo.row, control);
@@ -7940,8 +8167,12 @@
             ? t('content_field_src_blast_help', 'Upload new images whenever possible. Use Source URL to reuse an existing site-hosted /assets/images/... path or repair a saved path; external image URLs are not included in Blast emails.')
             : t('content_field_src_help', 'Upload new images whenever possible. Use Source URL to reuse an existing uploaded /assets/... path or repair a saved path; external image URLs are not supported.')
         }),
+        createContentCheckbox(block, index, 'decorative', t('content_field_decorative', 'Decorative image'), {
+          help: t('content_field_decorative_help', 'Use only when the image adds no information. Decorative images use empty alt text and are skipped by screen readers.')
+        }),
         createContentInput('input', block, index, 'alt', t('content_field_alt', 'Alt text'), {
-          help: t('content_field_alt_help', 'Describe the meaningful content of the image for screen readers and people browsing without images.')
+          help: block.decorative ? t('content_field_alt_decorative_help', 'Alt text stays empty for a decorative image.') : t('content_field_alt_help', 'Required for meaningful images. Describe the information or purpose, not every visual detail.'),
+          disabled: block.decorative === true
         })
       );
       fields.append.apply(fields, imageControls);
@@ -7994,6 +8225,11 @@
             label: t('content_upload_video', 'Upload video'),
             hideLabel: true
           }),
+          createContentMediaLibraryButton(block, index, {
+            kind: 'video',
+            label: t('content_existing_video_label', 'Existing video'),
+            buttonLabel: t('content_choose_existing_video', 'Choose existing video')
+          }),
           createContentInput('input', block, index, 'src', t('content_field_video_src', 'Source URL'), {
             help: t('content_field_video_src_help', 'Use an internal uploaded video path from this dashboard, such as /assets/videos/campaigns/example/video.webm.')
           }),
@@ -8004,6 +8240,12 @@
             label: t('content_upload_poster_image', 'Upload poster image'),
             buttonLabel: t('content_upload_poster_image', 'Upload poster image'),
             hideLabel: true
+          }),
+          createContentMediaLibraryButton(block, index, {
+            kind: 'image',
+            field: 'poster',
+            label: t('content_existing_poster_label', 'Existing poster image'),
+            buttonLabel: t('content_choose_existing_poster', 'Choose existing poster')
           })
         );
       } else {
@@ -8020,6 +8262,11 @@
           kind: 'audio',
           label: t('content_upload_audio', 'Upload audio'),
           hideLabel: true
+        }),
+        createContentMediaLibraryButton(block, index, {
+          kind: 'audio',
+          label: t('content_existing_audio_label', 'Existing audio'),
+          buttonLabel: t('content_choose_existing_audio', 'Choose existing audio')
         }),
         createContentInput('input', block, index, 'src', t('content_field_src', 'Source URL'), {
           help: t('content_field_audio_src_help', 'Use an internal uploaded audio path from this dashboard, such as /assets/audio/campaigns/example/audio.mp3.')
@@ -8075,8 +8322,13 @@
       createGalleryImageInput('input', block, index, imageIndex, 'src', t('content_field_src', 'Source URL'), {
         help: t('content_field_src_help', 'Upload new images whenever possible. Use Source URL to reuse an existing uploaded /assets/... path or repair a saved path; external image URLs are not supported.')
       }),
+      createContentCheckbox(block, index, 'decorative', t('content_field_decorative', 'Decorative image'), {
+        imageIndex: imageIndex,
+        help: t('content_field_decorative_help', 'Use only when the image adds no information. Decorative images use empty alt text and are skipped by screen readers.')
+      }),
       createGalleryImageInput('input', block, index, imageIndex, 'alt', t('content_field_alt', 'Alt text'), {
-        help: t('content_field_alt_help', 'Describe the meaningful content of the image for screen readers and people browsing without images.')
+        help: block.images?.[imageIndex]?.decorative ? t('content_field_alt_decorative_help', 'Alt text stays empty for a decorative image.') : t('content_field_alt_help', 'Required for meaningful images. Describe the information or purpose, not every visual detail.'),
+        disabled: block.images?.[imageIndex]?.decorative === true
       }),
       createGalleryImageCaptionInput(block, index, imageIndex)
     );
@@ -8255,7 +8507,7 @@
     if (control.dataset.contentAction === 'add-gallery-image-upload') {
       if (block.type !== 'gallery') return null;
       if (!Array.isArray(block.images)) block.images = [];
-      var image = { src: '', alt: '', caption: '' };
+      var image = { src: '', alt: '', decorative: false, caption: '' };
       block.images.push(image);
       return { block: block, target: image, index: index, imageIndex: block.images.length - 1, field: 'src' };
     }
@@ -8346,7 +8598,8 @@
     if (control.dataset.contentImageIndex !== undefined && block.type === 'gallery') {
       var imageIndex = Number(control.dataset.contentImageIndex);
       if (!Number.isInteger(imageIndex) || !block.images?.[imageIndex]) return;
-      block.images[imageIndex][field] = control.value;
+      block.images[imageIndex][field] = control instanceof HTMLInputElement && control.type === 'checkbox' ? control.checked : control.value;
+      if (field === 'decorative' && control.checked) block.images[imageIndex].alt = '';
       if (field === 'caption') {
         var galleryItem = contentBlocksRoot?.querySelector?.('[data-content-index="' + index + '"] .gallery__item[data-content-image-index="' + imageIndex + '"]');
         renderGalleryImageCaption(galleryItem, control.value);
@@ -8355,6 +8608,13 @@
       block.images = galleryTextToImages(control.value);
     } else if (field === 'provider') {
       block.provider = contentVideoProvider(control.value);
+      syncContentJsonFromBlocks();
+      renderContentBlocks(index);
+      openContentMediaSettings(index);
+      return;
+    } else if (control instanceof HTMLInputElement && control.type === 'checkbox') {
+      block[field] = control.checked;
+      if (field === 'decorative' && control.checked) block.alt = '';
       syncContentJsonFromBlocks();
       renderContentBlocks(index);
       openContentMediaSettings(index);

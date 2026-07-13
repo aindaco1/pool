@@ -2492,6 +2492,57 @@ textarea.admin-settings__input--readonly {
   padding-right: 2px;
 }
 
+.admin-content-media-library__controls,
+.admin-content-media-library__operations,
+.admin-content-media-library__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-content-media-library__controls {
+  align-items: end;
+  margin-bottom: 12px;
+
+  label {
+    display: grid;
+    gap: 4px;
+    min-width: min(100%, 12rem);
+  }
+
+  input,
+  select {
+    border: 1px solid $border--strong;
+    border-radius: $radius--sm;
+    font: inherit;
+    padding: 8px 10px;
+
+    @include admin-control-focus;
+  }
+}
+
+.admin-content-media-library__tabs {
+  flex-basis: 100%;
+}
+
+.admin-content-media-library__tabs [aria-selected="true"] {
+  border-color: $color--primary;
+  box-shadow: inset 0 -2px 0 $color--primary;
+}
+
+.admin-content-media-library__operations {
+  margin-top: 12px;
+}
+
+.admin-content-media-library__broken,
+.admin-content-media-library__warning {
+  color: $color--danger-text;
+}
+
+.admin-content-media-library__broken:empty {
+  display: none;
+}
+
 .admin-content-media-library__item {
   align-items: center;
   border: 1px solid $border--default;
@@ -2503,13 +2554,46 @@ textarea.admin-settings__input--readonly {
   padding: 8px;
 }
 
-.admin-content-media-library__item img {
+.admin-content-media-library__item img,
+.admin-content-media-library__type-preview {
   aspect-ratio: 1;
   background: $surface--subtle;
   border-radius: $radius--sm;
   display: block;
   object-fit: cover;
   width: 56px;
+}
+
+.admin-content-media-library__type-preview {
+  align-items: center;
+  display: flex;
+  font-size: 1.5rem;
+  justify-content: center;
+}
+
+.admin-content-media-library__item-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+
+  details,
+  ul {
+    margin: 2px 0 0;
+  }
+}
+
+.admin-content-media-library__status {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.admin-content-media-library__status--ready {
+  color: $color--success-dark;
+}
+
+.admin-content-media-library__status--missing_derivatives,
+.admin-content-media-library__status--pending_manifest {
+  color: $color--warning-text;
 }
 
 .admin-content-block__rich-inline {

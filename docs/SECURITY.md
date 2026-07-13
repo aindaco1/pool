@@ -30,9 +30,12 @@ Use this alongside [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a change creates ne
 | `stats:{slug}` | PLEDGES | Aggregate totals | **Low** - public |
 | `tier-inventory:{slug}` | PLEDGES | Tier claim counts | **Low** - public |
 | `stripe-event:{id}` | PLEDGES | "processed" flag | **Low** - idempotency |
+| `processor-event:v1:{time}:{id}` | PLEDGES | Redacted Stripe request/webhook IDs, status, intent, timing, idempotency, reconciliation state; 400-day TTL | **Medium** - payment operations metadata |
 | `campaign-pledges:{slug}` | PLEDGES | Array of order IDs per campaign | **Low** - index |
 | `campaign-charged:{slug}` | PLEDGES | Settlement completion timestamp | **Low** - flag |
 | `settlement-job:{slug}` | PLEDGES | Settlement batch progress | **Low** - ephemeral |
+| `settlement-group:v1:{slug}:{hash}` | PLEDGES | Durable pre-charge/submitted/result state and processor ID; 400-day TTL | **Medium** - payment operations metadata |
+| `reconciliation-break:v1:{slug}:{kind}:{hash}` | PLEDGES | Open/resolved processor-vs-pledge differences and object/order IDs; 400-day TTL | **Medium** - payment operations metadata |
 | `pending-extras:{orderId}` | PLEDGES | Temporary support item / custom amount checkout extras | **Low** - ephemeral |
 | `pending-tiers:{orderId}` | PLEDGES | Temporary overflow tier metadata during checkout | **Low** - ephemeral |
 | `cron:lastRun` | PLEDGES | Last persisted hourly cron execution timestamp | **Low** - monitoring |
@@ -57,6 +60,11 @@ Use this alongside [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a change creates ne
 | `abandoned-cart-health:v1` | PLEDGES | Aggregate checkout reminder queue/outcome health counters | **Low** - operational aggregate |
 | `supporter-email-retry:{orderId}` | PLEDGES | Queued supporter confirmation email retry payload | **Medium** - supporter email payload |
 | `supporter-email-retry-queue:v1` | PLEDGES | Supporter email retry idle/pending and next-attempt marker | **Low** - operational state |
+| `email-outbox:v1:{hash}` | PLEDGES | Frozen provider payload and recipient while delivery is pending; 30-day TTL | **High** - transient email content + PII |
+| `email-delivery:v1:{hash}` | PLEDGES | Minimal provider ID, content hash, category, status, timing; 400-day TTL | **Low** - delivery evidence |
+| `email-suppression:v1:{emailHash}` | PLEDGES | Hashed permanent-bounce/complaint/provider suppression; 400-day TTL | **Medium** - consent/deliverability metadata |
+| `campaign-email-suppression:v1:{slug}:{emailHash}` | PLEDGES | Hashed one-click campaign update suppression | **Medium** - consent metadata |
+| `resend-webhook:v1:{svixId}` | PLEDGES | Signed Resend event dedupe marker; 35-day TTL | **Low** - idempotency |
 | `add-on-inventory-sold:v1` | PLEDGES | Platform add-on sold-count projection | **Low** - aggregate inventory state |
 | `vote:{slug}:{decision}:{email}` | VOTES | Vote choice | **Medium** - links supporter to vote |
 | `results:{slug}:{decision}` | VOTES | Vote tallies | **Low** - semi-public |
