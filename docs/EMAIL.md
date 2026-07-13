@@ -7,6 +7,7 @@ The email system is Worker-owned so pledge state, localization, branding, magic 
 ## Source Files
 
 - `worker/src/email.js` builds and sends email payloads.
+- `worker/src/email-outbox.js` owns durable enqueue, frozen rendering, retries, Resend event verification, and suppression.
 - `worker/src/index.js` calls email helpers from checkout, pledge management, scheduler, admin, report, and Blast routes.
 - `_data/i18n/en.yml` and `_data/i18n/es.yml` hold shared UI/runtime/email copy.
 - `assets/i18n.json` is the generated catalog the Worker can fetch for localized email copy.
@@ -86,6 +87,18 @@ Email branding uses a curated mirror of `platform.*` and `design.*`:
 - `EMAIL_BUTTON_RADIUS`
 
 When `SITE_BASE` is localhost, embedded email images fall back to the public site asset base so inbox clients do not receive broken localhost image URLs.
+
+### 5. Configure Delivery Webhooks
+
+Production delivery does not require Resend Contacts or Broadcasts. Pool remains the audience and consent source of truth and sends one `/emails` request per recipient.
+
+Create a Resend webhook endpoint for:
+
+```text
+https://pledge.dustwave.xyz/webhooks/resend
+```
+
+Subscribe to delivered, bounced, complained, failed, and suppressed email events, then store the returned Svix signing secret as `RESEND_WEBHOOK_SECRET`. The Worker verifies the raw body, `svix-id`, timestamp, and signature before updating delivery state. Open/click tracking is not used for payment or audience truth.
 
 ## Email Types
 
@@ -275,21 +288,29 @@ Current behavior:
 
 ## Delivery And Retry
 
-`sendResendEmail` is the central delivery helper. It:
+Production sends use `email-outbox:v1:*` records. Persistence happens before the Resend side effect, and the minute scheduler drains bounded batches. Each job:
+
+- has a deterministic Pool job ID and Resend `Idempotency-Key`
+- renders once, freezes the exact provider payload, and records a content hash
+- uses a processing lease so crashed work can resume
+- respects `Retry-After`, quota responses, and bounded exponential delay
+- refuses blind retry after an ambiguous response outlives Resend's 24-hour idempotency window
+- expires transient payload data after 30 days and retains only minimal `email-delivery:v1:*` evidence for 400 days
+
+`sendPreparedResendEmail` is the central provider helper. It:
 
 - posts to `https://api.resend.com/emails`
 - uses `Authorization: Bearer ${RESEND_API_KEY}`
 - includes HTML and plain-text bodies
 - applies reply-to when `SUPPORT_EMAIL` is configured
 - summarizes Resend provider errors
-- throws on non-OK responses
+- returns normalized retryability, ambiguity, status, and provider error type on non-OK responses
 
-Supporter confirmation failures enqueue:
+The older `supporter-email-retry:*` queue remains readable during migration, but retries now hand final delivery to the shared outbox. Admin sign-in magic links and explicit test sends remain immediate because delaying them would make the interaction unusable.
 
-- `supporter-email-retry:{orderId}`
-- `supporter-email-retry-queue:v1`
+Diary, milestone, and live announcement mail carries a signed campaign-scoped `List-Unsubscribe` URL and RFC 8058 `List-Unsubscribe-Post` header. GET shows a human confirmation; POST returns a blank success and writes an indefinite hashed campaign suppression. Transactional pledge/payment mail is not suppressed by campaign marketing preferences.
 
-The scheduler drains retry work only when due. Resend pacing is centralized as `RESEND_RATE_LIMIT_DELAY_MS` in `worker/src/email.js` and is reused by broadcasts, reports, launch reminders, abandoned-checkout reminders, and Blast.
+Permanent bounces, complaints, and provider suppressions create a hashed local `email-suppression:v1:*` marker. The outbox checks both global and campaign suppression immediately before provider delivery.
 
 ## Consent And Trust
 
@@ -337,6 +358,7 @@ npm run test:unit -- \
   tests/unit/email-tip.test.ts \
   tests/unit/email-security.test.ts \
   tests/unit/email-broadcasts.test.ts \
+  tests/unit/email-outbox.test.ts \
   tests/unit/worker-ops-integrity.test.ts
 ```
 

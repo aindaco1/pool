@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.1.0**. This release adds Worker-canonical variant-specific add-on pricing with historical pledge-price preservation, then completes the Store-aligned production quality gate with Lighthouse, cache-policy, asset-budget, and slow-route evidence while retaining Pool's existing session, audit, posture, localization, Podman, and readiness hardening.
+Current release milestone: **v1.1.1**. This release completes the repository-backed media library/optimization workflow and Stripe-focused payment integrity hardening, including durable settlement/reconciliation state and a shared Resend outbox, without adding a second media database, payment ledger, or unsafe manual charge-recovery path.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -487,14 +487,18 @@ tests/                # Test suites
 
 ## Deployment
 
-Push `main` to deploy production:
+Push reviewed changes to `main` to refresh the production GitHub Pages site:
+
 ```bash
 git push origin main
 ```
 
-That GitHub Actions workflow now deploys both:
+Worker releases use the manually dispatched **Deploy Production** GitHub Actions workflow with a reviewed immutable branch, tag, or commit in its `ref` input. For a normal release, merge the release branch to `main`, then dispatch **Deploy Production** with `ref=main`. That workflow deploys both:
+
 - the GitHub Pages site
 - the Cloudflare Worker from `worker/wrangler.toml`
+
+Routine **Refresh Production Pages** runs, including scheduled campaign-state refreshes, do not deploy the Worker.
 
 The Pages build runs Jekyll first, then `npm run assets:minify` against generated `_site/assets/**/*.css` and `_site/assets/**/*.js` before uploading the artifact. Source files stay readable in the repository; Cloudflare still handles gzip/Brotli/Zstandard compression at the edge, so Cloudflare Auto Minify should stay disabled.
 

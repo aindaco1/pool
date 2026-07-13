@@ -222,10 +222,10 @@ groups = [
   ]],
   ['Stripe checkout and webhooks', %w[
     STRIPE_SECRET_KEY STRIPE_SECRET_KEY_TEST STRIPE_PUBLISHABLE_KEY_TEST STRIPE_WEBHOOK_SECRET STRIPE_WEBHOOK_SECRET_TEST
-    FILM_STRIPE_SUMMARY_ADAPTER_SECRET
+    FILM_STRIPE_SUMMARY_ADAPTER_SECRET PAYMENT_RECONCILIATION_ENABLED
   ]],
   ['Email delivery and Resend plan usage', %w[
-    RESEND_API_KEY PLAN_USAGE_RESEND_PLAN RESEND_EMAILS_MONTHLY_LIMIT RESEND_EMAILS_DAILY_LIMIT
+    RESEND_API_KEY RESEND_WEBHOOK_SECRET EMAIL_OUTBOX_ENABLED PLAN_USAGE_RESEND_PLAN RESEND_EMAILS_MONTHLY_LIMIT RESEND_EMAILS_DAILY_LIMIT
   ]],
   ['Dashboard publish, report helpers, and Cloudflare plan usage', %w[
     GITHUB_TOKEN CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_USAGE_API_TOKEN CLOUDFLARE_ANALYTICS_API_TOKEN
@@ -321,6 +321,7 @@ prompt_optional_secret "STRIPE_WEBHOOK_SECRET_TEST" "Stripe test webhook signing
 prompt_optional_secret "STRIPE_PUBLISHABLE_KEY_TEST" "Stripe test publishable key"
 prompt_optional_secret "FILM_STRIPE_SUMMARY_ADAPTER_SECRET" "Film Stripe summary adapter bearer secret"
 prompt_optional_secret "RESEND_API_KEY" "Resend API key"
+prompt_optional_secret "RESEND_WEBHOOK_SECRET" "Resend delivery webhook signing secret"
 prompt_optional_secret "USPS_CLIENT_SECRET" "USPS client secret"
 prompt_optional_secret "ZIP_TAX_API_KEY" "ZIP.TAX API key"
 prompt_optional_secret "CLOUDFLARE_API_TOKEN" "Cloudflare user API token for local report/export scripts"

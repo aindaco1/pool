@@ -18,7 +18,8 @@ const mockStripeClient = {
     attach: vi.fn()
   },
   paymentIntents: {
-    create: vi.fn()
+    create: vi.fn(),
+    retrieve: vi.fn()
   }
 };
 
@@ -269,6 +270,7 @@ beforeEach(() => {
   mockStripeClient.customers.create.mockImplementation(async ({ email }: { email: string }) => ({ id: `cus_${email}` }));
   mockStripeClient.paymentMethods.attach.mockResolvedValue({});
   mockStripeClient.paymentIntents.create.mockResolvedValue({ id: 'pi_test', status: 'succeeded' });
+  mockStripeClient.paymentIntents.retrieve.mockResolvedValue({ id: 'pi_test', status: 'succeeded', amount: 0, currency: 'usd' });
   vi.useRealTimers();
   resetCampaignRuntimeStateForTests();
 
@@ -1067,6 +1069,50 @@ describe('worker operational integrity', () => {
     expect(mockStripeClient.paymentIntents.create).toHaveBeenCalledTimes(1);
     const requestOptions = mockStripeClient.paymentIntents.create.mock.calls[0][1];
     expect(requestOptions.idempotencyKey).toMatch(/^settle:hand-relations:[a-f0-9]{48}$/);
+  });
+
+  it('stops an ambiguous settlement after the Stripe idempotency horizon instead of charging again', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-01T12:00:00.000Z'));
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['order-ambiguous-settle-1']));
+    await kv.put('pledge:order-ambiguous-settle-1', JSON.stringify({
+      orderId: 'order-ambiguous-settle-1', email: 'buyer@example.com', campaignSlug: 'hand-relations',
+      amount: 3000000, subtotal: 3000000, tax: 0, shipping: 0, pledgeStatus: 'active', charged: false,
+      stripeCustomerId: 'cus_ambiguous', stripePaymentMethodId: 'pm_ambiguous', updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+    await kv.put('stats:hand-relations', JSON.stringify({
+      campaignSlug: 'hand-relations', pledgedAmount: 3000000, pledgeCount: 1, tierCounts: {}, supportItems: {}, updatedAt: '2026-03-31T00:00:00.000Z'
+    }));
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://pool.test/api/campaigns.json') {
+        return jsonResponse({ campaigns: [{ ...campaignFixture, goal_deadline: '2020-01-01' }] });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+    const settleRequest = () => worker.fetch(new Request('https://pool.test/admin/settle/hand-relations', {
+      method: 'POST', headers: { Authorization: 'Bearer admin-secret', 'Content-Type': 'application/json' }, body: '{}'
+    }), env, { waitUntil: () => {} });
+
+    mockStripeClient.paymentIntents.create.mockRejectedValueOnce(Object.assign(new Error('provider response was not received'), {
+      type: 'network_error', retryable: true
+    }));
+    const first = await settleRequest();
+    expect(first.status).toBe(200);
+    expect(mockStripeClient.paymentIntents.create).toHaveBeenCalledTimes(1);
+    const groupKey = [...kv.store.keys()].find((key) => key.startsWith('settlement-group:v1:hand-relations:'));
+    expect(groupKey).toBeTruthy();
+    const group = await kv.get(groupKey as string, { type: 'json' });
+    expect(group).toMatchObject({ status: 'submitted', attempts: 1, paymentIntentId: '' });
+
+    vi.setSystemTime(new Date('2026-04-02T12:01:00.000Z'));
+    const second = await settleRequest();
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toMatchObject({ needsAttention: 1, supportersCharged: 0 });
+    expect(mockStripeClient.paymentIntents.create).toHaveBeenCalledTimes(1);
+    expect(await kv.get('campaign-charged:hand-relations')).toBeNull();
   });
 
   it('does not mark scheduled settlement complete when active pledges are skipped for missing customers', async () => {

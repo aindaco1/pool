@@ -32,6 +32,8 @@ PLATFORM_TIMEZONE = "America/Denver"
 SUPPORT_EMAIL = "info@dustwave.xyz"
 PLEDGES_EMAIL_FROM = "The Pool <pledges@pool.dustwave.xyz>"
 UPDATES_EMAIL_FROM = "The Pool <updates@pool.dustwave.xyz>"
+EMAIL_OUTBOX_ENABLED = "true"
+PAYMENT_RECONCILIATION_ENABLED = "true"
 PLATFORM_FOOTER_LOGO_PATH = "/assets/images/defaults/dust-wave-square.png"
 PLATFORM_FAVICON_PATH = "/assets/images/defaults/favicon.png"
 PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH = "/assets/images/defaults/dust-wave-square.png"
@@ -140,6 +142,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - MAGIC_LINK_SECRET          (HMAC secret for token signing)
 # - CHECKOUT_INTENT_SECRET     (HMAC secret for first-party checkout intent signing)
 # - RESEND_API_KEY             (Resend email API key)
+# - RESEND_WEBHOOK_SECRET      (Resend/Svix webhook signing secret for delivery and suppression events)
 # - ADMIN_SECRET               (Admin API key for recovery/rebuild endpoints and scoped-secret fallback)
 # - TURNSTILE_SECRET_KEY       (shared Cloudflare Turnstile secret for admin sign-in and launch reminder challenges)
 #
@@ -194,6 +197,8 @@ PLATFORM_TIMEZONE = "America/Denver"
 SUPPORT_EMAIL = "info@dustwave.xyz"
 PLEDGES_EMAIL_FROM = "The Pool <pledges@pool.dustwave.xyz>"
 UPDATES_EMAIL_FROM = "The Pool <updates@pool.dustwave.xyz>"
+EMAIL_OUTBOX_ENABLED = "true"
+PAYMENT_RECONCILIATION_ENABLED = "false"
 PLATFORM_FOOTER_LOGO_PATH = "/assets/images/defaults/dust-wave-square.png"
 PLATFORM_FAVICON_PATH = "/assets/images/defaults/favicon.png"
 PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH = "/assets/images/defaults/dust-wave-square.png"

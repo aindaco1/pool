@@ -33,6 +33,7 @@ If a change affects pricing, availability, campaign progress, pledge state, emai
 - [`_config.local.yml`](./_config.local.yml): machine-local overrides only
 - [`_campaigns/`](./_campaigns): campaign content, tiers, goals, diary data, and campaign add-ons
 - [`_data/i18n/`](./_data/i18n): shared localized UI, runtime, and email copy
+- [`_data/media-optimization-manifest.json`](./_data/media-optimization-manifest.json): rebuildable repository media metadata; source files remain authoritative
 - [`_layouts/`](./_layouts) and [`_includes/`](./_includes): public pages, campaign pages, embeds, SEO, and locale helpers
 - [`assets/`](./assets): browser runtime, Sass, themes, and generated localized assets
 - [`worker/src/`](./worker/src): authoritative checkout, webhooks, statistics, emails, settlement, administration, and reports
@@ -103,7 +104,11 @@ Keep subtotal, variant price overrides, tips, tax, shipping, campaign contributi
 
 ### Email and supporter communication
 
-Check Worker mail logic, `_data/i18n/`, sender configuration, and [docs/EMAIL.md](./docs/EMAIL.md). Preserve domain alignment, `reply_to`, plain-text output, hosted media URLs, and the boundary between transactional and promotional content.
+Check Worker mail logic, `_data/i18n/`, sender configuration, and [docs/EMAIL.md](./docs/EMAIL.md). Preserve domain alignment, `reply_to`, plain-text output, hosted media URLs, durable outbox/idempotency behavior, campaign/global suppression, and the boundary between transactional and promotional content. Admin login and explicit test sends remain immediate.
+
+### Media
+
+The repository asset tree is authoritative. Rebuild `_data/media-optimization-manifest.json` with `npm run media:manifest`; do not create a KV-backed media catalog. Use the existing GitHub optimizer dispatch for changed/all repair, preserve source files and intentionally skipped larger derivatives, require alt text for meaningful images, and use explicit decorative-image state for empty alt text.
 
 ### Embeds, SEO, and share cards
 
@@ -125,6 +130,8 @@ Shared system strings belong in `_data/i18n/<lang>.yml`; creator-authored campai
 8. **Performance thresholds are executable.** A value in configuration is not a gate until a test or audit consumes it. Distinguish measured baseline from the release threshold, use route-specific public budgets, and keep authenticated runtime evidence free of secrets and personal data.
 9. **Dependency findings are scoped and resolved deliberately.** Run the production audit and the full audit. Pin or replace vulnerable release tooling when a safe supported version exists; document any accepted dev-only finding.
 10. **Ethical review travels with product changes.** Review money, data, messaging, analytics, automation, admin power, visibility, and shareability while the implementation is still easy to change.
+11. **Payment recovery must not invent a second charge.** Persist settlement intent before Stripe calls, reuse deterministic idempotency inside the provider window, and stop ambiguous old work for reconciliation. Do not add manual money-moving recovery without distinct maker/checker operators.
+12. **Email delivery is separate from pledge truth.** Production notification side effects go through the shared outbox; provider failure must not roll back or mutate canonical pledge state.
 
 ## Documentation map
 

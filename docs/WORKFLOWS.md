@@ -619,39 +619,22 @@ This section summarizes pledge-related email behavior. The complete Resend setup
 
 The Worker handles all pledge-related email via Resend.
 
+In production, callers enqueue a durable `email-outbox:v1:*` record instead of waiting on Resend. The scheduler freezes the rendered payload on first attempt, sends it with a deterministic provider idempotency key, and keeps pledge truth independent from notification retry. Test sends, dry-run rendering, and admin login links remain immediate. Signed Resend events at `POST /webhooks/resend` update minimal delivery state and hashed suppression; Pool does not sync pledge audiences into Resend Contacts or Broadcasts.
+
+Diary, milestone, and live announcement mail includes a campaign-scoped RFC 8058 one-click unsubscribe URL. Suppression is checked immediately before provider delivery. Payment and pledge lifecycle mail remains transactional.
+
 ### Resend Integration (Worker)
 
 The Worker sends supporter emails after Stripe webhook confirms the setup-mode session. The sender domain must be authorized for the configured Resend API key; for this deployment, pledge confirmations use `The Pool <pledges@pool.dustwave.xyz>` because `pool.dustwave.xyz` is the authorized sending domain.
 
 ```js
 // In Worker: POST /webhooks/stripe handler
-async function sendSupporterEmail(env, { email, campaignSlug, campaignTitle, amount, token }) {
-  const manageUrl = `${env.SITE_BASE}/manage/?t=${token}`;
-  const communityUrl = `${env.SITE_BASE}/community/${campaignSlug}/?t=${token}`;
-  
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: env.PLEDGES_EMAIL_FROM,
-      to: email,
-      subject: `Pledge confirmed | ${campaignTitle}`,
-      html: `
-        <h1>Thanks for backing ${campaignTitle}!</h1>
-        <p><strong>Pledge amount:</strong> $${(amount / 100).toFixed(2)}</p>
-        <p><strong>Remember:</strong> Your card is saved but won't be charged unless this campaign reaches its goal.</p>
-        <hr>
-        <h2>Your Supporter Access</h2>
-        <p>No account needed — these links are your keys:</p>
-        <p><a href="${manageUrl}">Manage Your Pledge</a> — Cancel, modify, or update payment method</p>
-        <p><a href="${communityUrl}">Supporter Community</a> — Vote on creative decisions</p>
-        <hr>
-        <p style="color:#666;font-size:12px;">Save this email! You'll need these links to manage your pledge.</p>
-      `
-    })
+async function sendSupporterEmail(env, { orderId, email, campaignSlug, campaignTitle, amount, token }) {
+  return enqueueEmailOutbox(env, {
+    kind: 'supporter',
+    campaignSlug,
+    dedupeKey: `supporter-confirmation:${orderId}`,
+    payload: { email, campaignSlug, campaignTitle, amount, token }
   });
 }
 ```

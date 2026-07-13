@@ -43,8 +43,11 @@ Current state surfaces:
 - `campaign-pledges:{slug}` indexes order IDs for reports, settlement, backfills, and dashboard reads.
 - `stats:{slug}` and `tier-inventory:{slug}` are rebuildable projections.
 - `stripe-event:{event.id}` prevents duplicate webhook processing.
+- `processor-event:v1:*` retains redacted Stripe request/webhook evidence for 400 days.
 - `checkout-intent:{orderId}` stores the checkout manifest used to persist bundled checkouts.
 - `settlement-job:{slug}` tracks batched settlement progress.
+- `settlement-group:v1:{slug}:*` records the durable pre-charge state for one deterministic supporter/campaign charge group.
+- `reconciliation-break:v1:{slug}:*` records explicit open or resolved differences between pledge truth, settlement work, and Stripe.
 - webhook and performance observability summaries live in `PLEDGES` KV for operator review.
 
 The current system does not maintain a double-entry ledger. If The Pool later holds balances, splits payouts, supports refunds, or handles multi-party money movement, add a true append-only ledger with derived balances instead of extending pledge projections into accounting truth.
@@ -60,6 +63,7 @@ Current controls:
 - Limited-tier reservation and settlement are serialized through Durable Objects.
 - Stripe webhook signatures are verified over the raw request body.
 - Stripe calls use idempotency keys where repeat execution could create duplicate money movement.
+- Stripe API requests pin `2026-02-25.clover` until an intentional tested upgrade changes the shared client constant.
 - Settlement uses deterministic idempotency keys per campaign/supporter charge group.
 - Sensitive checkout responses are `private, no-store`.
 - Checkout and payment-method POST routes require the trusted site origin.
@@ -291,6 +295,10 @@ Current behavior:
 - The most recent saved payment method for the supporter/campaign group is used.
 - The Worker creates one off-session Stripe PaymentIntent per supporter/campaign group.
 - Stripe idempotency keys are deterministic for the campaign/supporter charge group.
+- Before Stripe is called, `settlement-group:v1:*` is persisted as `submitted`; successful processor IDs and statuses are written back to the same record.
+- Retries inside the 24-hour Stripe idempotency horizon reuse the same key. A successful stored PaymentIntent is retrieved instead of recreated.
+- A no-response attempt older than 23 hours becomes `needsAttention`; settlement does not invent a new key or blindly recharge the supporter.
+- `settlement-job:{slug}` stores the current batch checkpoint before self-dispatch and marks stale resumptions for operator evidence.
 - Successful pledges are marked `charged`.
 - Failed pledges are marked `payment_failed` and emailed an Update Card link.
 - `campaign-charged:{slug}` is written only when no active pledge remains unresolved.
@@ -320,6 +328,9 @@ Pledge money fields are integer cents:
   "tipPercent": 5,
   "tipAmount": 250,
   "amount": 5944,
+  "currency": "usd",
+  "valueTime": "2026-01-15T12:00:00Z",
+  "bookedAt": "2026-01-15T12:00:01Z",
   "stripeCustomerId": "cus_...",
   "stripePaymentMethodId": "pm_...",
   "stripeSetupIntentId": "seti_...",
@@ -350,6 +361,8 @@ Charged pledges may also store actual Stripe financial data:
 - `stripeFinancials.source`
 
 Dashboard analytics prefer actual Stripe balance transaction data where present and label estimates when actuals are missing.
+
+Older records without `currency` are read as USD. This is a compatibility default, not multi-currency support. `valueTime` describes when the supporter/processor event occurred, `bookedAt` describes Worker persistence, and `processorAvailableAt` is populated only when Stripe balance data exposes availability timing.
 
 ### Projection Records
 
@@ -384,7 +397,7 @@ The Pool does not store:
 - full payment processor ledgers
 - permanent balances
 
-The current implementation also does not persist raw Stripe webhook payloads by default. It verifies over the raw body, stores idempotency and observability summaries, and can retrieve Stripe objects again when recovery/backfill is needed. If operational requirements change, add bounded raw-event retention with a PII policy and retention window.
+The current implementation does not persist raw Stripe webhook payloads. It verifies over the raw body, stores IDs/status/timing and redacted request intent, and retrieves Stripe objects again when recovery or backfill is needed. Processor journal rows exclude card data, addresses, raw metadata payloads, and supporter email addresses.
 
 ## Operations
 
@@ -432,12 +445,25 @@ The backfill uses campaign pledge indexes and grouped Stripe PaymentIntent looku
 
 ### Reconciliation Checklist
 
+Reconciliation runs daily in live mode when `PAYMENT_RECONCILIATION_ENABLED=true` and can be invoked by a super admin:
+
+```text
+GET  /admin/reconciliation/:slug
+POST /admin/reconciliation/:slug
+```
+
+It uses `campaign-pledges:{slug}` and bounded PaymentIntent retrievals. It detects charged pledges missing a PaymentIntent, charged/non-succeeded mismatches, succeeded but unbooked intents, amount/currency differences, unavailable processor objects, and stale settlement jobs. Current differences are `open`; an old break absent from a later run is marked `resolved`, preserving first/last seen and occurrence counts.
+
+An open critical break is evidence to stop and investigate, not authority to create a replacement charge. Manual ambiguous charge recovery remains disabled until two distinct super-admin operators are available for a real maker/checker control.
+
 Before and after settlement:
 
 - Confirm the campaign is past deadline in `PLATFORM_TIMEZONE`.
 - Run settlement dry-run when possible.
 - Check projection drift.
 - Review webhook observability.
+- Run campaign payment reconciliation and review open critical breaks.
+- Review `submitted` settlement groups older than 23 hours; verify Stripe directly before any code or data intervention.
 - Check `payment_failed` rows and supporter retry emails.
 - Backfill Stripe financials when analytics need actual fee/net values.
 - Compare dashboard Reports CSVs with pledge/fulfillment script output for high-stakes fulfillment work.
@@ -449,6 +475,7 @@ Fast local checks:
 ```bash
 npm run test:unit
 npm run test:security
+npx vitest run tests/unit/stripe-client.test.ts tests/unit/email-outbox.test.ts tests/unit/worker-ops-integrity.test.ts
 ```
 
 Payment-focused checks:

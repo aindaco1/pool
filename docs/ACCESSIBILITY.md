@@ -62,6 +62,8 @@ The recent accessibility hardening pass added:
   - WYSIWYG content-editor chrome that is only keyboard-reachable when the relevant block is active
   - content-editor media upload controls with labeled native file inputs, visible focus on the styled upload button, upload status regions, and browser-local previews before publish
   - gallery image caption settings that reuse the shared label/help pattern and expose the hover-caption editor as a labeled rich-text textbox
+  - media-library search plus image/video/audio filters implemented as an accessible tablist, with selected state, keyboard-reachable metadata/reference details, and named repair/replace actions
+  - required alt text for meaningful content images and an explicit decorative-image control that disables and clears alt text instead of treating a blank field as an authoring shortcut
   - Settings -> Plan usage provider headings that reuse the shared admin label/help pattern, polite loading status, accessible progressbar text, and responsive metric cards
   - Create new campaign and protected Preview dialogs that reuse the shared admin label/help/info-button pattern, native fields, email-list token input, dialog focus handling, and polite status messaging
   - sortable data tables that expose `aria-sort` state and sort buttons
@@ -105,6 +107,7 @@ The admin dashboard has enough custom UI that it needs its own accessibility rul
 - Media settings panels should expose expanded/collapsed state from the gear button and a labeled group for the revealed settings.
 - Content-editor media uploads should use the shared upload control pattern so the native file input has an accessible name, an upload-status description, and the same focus treatment as other dashboard upload buttons.
 - Gallery block settings and individual gallery-image settings should stay visually and semantically distinct, but both should reuse the shared admin field label/help components.
+- Generated derivatives should not appear as duplicate picker choices; source cards expose derivative status in text so assistive-technology users receive the same optimization context as thumbnail users.
 - Sortable admin tables should use real buttons in column headers, maintain `aria-sort`, and keep export buttons outside horizontally scrollable table regions.
 - Save/Publish status messages should use polite status regions; validation or blocking errors should remain near the relevant field or workflow.
 - Create/Preview modal fields should use the same shared admin info-button/help implementation as Settings and Campaign fields; avoid one-off inline help that can clip against modal edges.

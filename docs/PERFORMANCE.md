@@ -294,9 +294,10 @@ Current guardrails:
 - launch reminder dispatch uses `launch-reminder-dispatch-queue:v1` so idle scheduled ticks do not list `launch-reminder-dispatch:*`
 - abandoned-checkout reminders use `abandoned-cart-queue:v1` so idle scheduled ticks do not list `abandoned-cart:*`; signed resume links use separate short-lived `abandoned-cart-resume:{orderId}` records created only after successful reminder sends
 - supporter confirmation email retry uses `supporter-email-retry-queue:v1` so retry polling skips `supporter-email-retry:*` scans while idle or before the next attempt is due
+- the shared email outbox uses `email-outbox-queue:v1` so the minute scheduler lists `email-outbox:v1:*` only while work is pending or during the hourly compatibility recheck
 - idle queue-state markers expire hourly, which keeps compatibility with manually inserted jobs without returning to minute-level namespace polling
 
-Under normal no-queue traffic, expect roughly `48-75` KV list requests over 24 hours. Active launch reminder batches, due abandoned-checkout reminders, and due supporter email retries still list their bounded queue prefixes when actual work is pending.
+Under normal no-queue traffic, expect roughly `72-100` KV list requests over 24 hours. Active launch reminder batches, due abandoned-checkout reminders, due legacy supporter retries, and pending shared email jobs still list their bounded queue prefixes when actual work exists.
 
 ## Media Optimization
 
@@ -309,7 +310,10 @@ Use the repository media pipeline for source media:
 ```bash
 npm run media:optimize
 npm run media:optimize:check
+npm run media:manifest
 ```
+
+`_data/media-optimization-manifest.json` is a deterministic rebuildable index, not a second media store. It records source hashes, size, dimensions/duration, generated WebP/WebM derivatives, references, and warnings. Dashboard placement budgets for hero, gallery, tier, Blast, and poster media are advisory and reuse this manifest; unsafe types and missing required alt text remain hard validation failures. If an attempted derivative is larger than its source, the source hash and skipped width are recorded so check mode does not misclassify the intentional omission as drift.
 
 If the host machine does not have the native optimizers installed, use the Podman-backed wrappers instead:
 

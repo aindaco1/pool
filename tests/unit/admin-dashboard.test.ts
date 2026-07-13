@@ -124,6 +124,7 @@ function createEnv() {
     CANONICAL_SITE_BASE: 'https://pool.dustwave.xyz',
     CANONICAL_WORKER_BASE: 'https://pledge.dustwave.xyz',
     APP_MODE: 'test',
+    OBSERVABILITY_SAMPLE_RATE: '0',
     ADMIN_EXPOSE_LOGIN_LINK: 'true',
     PLATFORM_AUTHOR: 'Dust Wave',
     SALES_TAX_RATE: '0.07625',
@@ -136,13 +137,15 @@ function createEnv() {
 }
 
 async function signInAdmin(env: ReturnType<typeof createEnv>, email = 'admin@example.com') {
-  const ctx = { waitUntil: vi.fn() };
+  const pending: Promise<unknown>[] = [];
+  const ctx = { waitUntil: vi.fn((promise: Promise<unknown>) => pending.push(Promise.resolve(promise))) };
   const startResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/auth/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, preferredLang: 'en' })
   }), env, ctx);
   const startBody = await startResponse.json();
+  await Promise.allSettled(pending.splice(0));
   const loginToken = new URL(startBody.loginUrl).searchParams.get('admin_login');
   const exchangeResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/auth/exchange', {
     method: 'POST',
@@ -150,6 +153,7 @@ async function signInAdmin(env: ReturnType<typeof createEnv>, email = 'admin@exa
     body: JSON.stringify({ token: loginToken, preferredLang: 'en' })
   }), env, ctx);
   const exchangeBody = await exchangeResponse.json();
+  await Promise.allSettled(pending.splice(0));
   return {
     ctx,
     response: exchangeResponse,
@@ -901,25 +905,8 @@ tiers:
 
   it('keeps admin session and dashboard summary reads free of KV writes', async () => {
     const env = createEnv();
-    const ctx = { waitUntil: vi.fn() };
-
-    const startResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/auth/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@example.com', preferredLang: 'en' })
-    }), env, ctx);
-    const startBody = await startResponse.json();
-    expect(startResponse.status).toBe(200);
-    expect(startBody.loginUrl).toContain('/admin/?admin_login=');
-
-    const loginToken = new URL(startBody.loginUrl).searchParams.get('admin_login');
-    const exchangeResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/auth/exchange', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: loginToken, preferredLang: 'en' })
-    }), env, ctx);
+    const { ctx, response: exchangeResponse, cookie } = await signInAdmin(env);
     expect(exchangeResponse.status).toBe(200);
-    const cookie = exchangeResponse.headers.get('Set-Cookie')?.split(';')[0] || '';
     expect(cookie).toContain('pool_admin_session=');
 
     (env.PLEDGES as CountingKVNamespace).resetCounts();
@@ -3008,6 +2995,71 @@ runner_report_emails:
     expectNoKvWritesOrLists(env, 'content editor image upload');
   });
 
+  it('replaces only a same-campaign media source at its current GitHub revision', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_REF: 'main'
+    };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const githubCalls: GitHubFetchCall[] = [];
+    const replaceSha = 'a'.repeat(40);
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      const dispatchResponse = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
+      if (dispatchResponse) return dispatchResponse;
+      if (url.endsWith('/contents/assets/images/campaigns/hand-relations/hero.png') && method === 'PUT') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        githubCalls.push({ url, method, body });
+        return jsonResponse({
+          content: { path: 'assets/images/campaigns/hand-relations/hero.png', sha: 'b'.repeat(40) },
+          commit: { sha: 'replace-commit', html_url: 'https://github.test/replace-commit' }
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/image-upload', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        filename: 'hero.png',
+        contentType: 'image/png',
+        content: 'data:image/png;base64,aGVsbG8=',
+        kind: 'campaign-content',
+        campaignSlug: 'hand-relations',
+        fieldPath: 'long_content[0].src',
+        replaceGithubPath: 'assets/images/campaigns/hand-relations/hero.png',
+        replaceSha
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      path: '/assets/images/campaigns/hand-relations/hero.png',
+      contentSha: 'b'.repeat(40),
+      mediaOptimization: { triggered: true }
+    });
+    const putCall = githubPutCalls(githubCalls)[0];
+    expect(putCall.body.sha).toBe(replaceSha);
+    expect(putCall.body.message).toContain('Replace admin image');
+    expectChangedMediaOptimizationDispatch(githubCalls);
+
+    const invalid = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/image-upload', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        filename: 'hero.png', contentType: 'image/png', content: 'data:image/png;base64,aGVsbG8=',
+        kind: 'campaign-content', campaignSlug: 'hand-relations', fieldPath: 'long_content[0].src',
+        replaceGithubPath: 'assets/images/campaigns/another-campaign/hero.png', replaceSha
+      })
+    }), env, ctx);
+    expect(invalid.status).toBe(400);
+  });
+
   it('uploads staged Blast images through the campaign media optimizer without KV writes', async () => {
     const env = {
       ...createEnv(),
@@ -3162,6 +3214,26 @@ runner_report_emails:
       if (url === 'https://pool.test/api/campaigns.json') {
         return jsonResponse({ campaigns: [campaignFixture] });
       }
+      if (url.includes('/contents/_data/media-optimization-manifest.json')) {
+        const manifest = {
+          version: 1,
+          assets: [{
+            path: 'assets/images/campaigns/hand-relations/hero.png',
+            label: 'Hero',
+            type: 'image',
+            bytes: 120000,
+            width: 1200,
+            height: 800,
+            optimizationStatus: 'ready',
+            derivatives: [{ path: 'assets/images/campaigns/hand-relations/hero-640.webp', width: 640 }],
+            missingDerivatives: [],
+            skippedDerivatives: [],
+            warnings: [],
+            references: [{ path: '_campaigns/hand-relations.md', count: 1 }]
+          }]
+        };
+        return jsonResponse({ content: Buffer.from(JSON.stringify(manifest)).toString('base64'), encoding: 'base64', sha: 'manifest-sha' });
+      }
       if (url.includes('/contents/assets/images/campaigns/hand-relations')) {
         return jsonResponse([
           { name: 'hero.png', path: 'assets/images/campaigns/hand-relations/hero.png', type: 'file', sha: 'hero-sha' },
@@ -3176,6 +3248,9 @@ runner_report_emails:
           { name: 'readme.md', path: 'assets/images/defaults/readme.md', type: 'file', sha: 'readme-sha' }
         ]);
       }
+      if (url.includes('/contents/assets/videos/') || url.includes('/contents/assets/audio/')) {
+        return jsonResponse([], 200);
+      }
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3189,10 +3264,11 @@ runner_report_emails:
     const body = await response.json();
     expect(body.writeBudget).toEqual({ readOnly: true, kvWritesExpected: 0, kvListExpected: 0 });
     expect(body.images).toEqual([
-      expect.objectContaining({ path: '/assets/images/campaigns/hand-relations/hero.png', scope: 'campaign' }),
-      expect.objectContaining({ path: '/assets/images/campaigns/hand-relations/hero-640.webp', scope: 'campaign' }),
-      expect.objectContaining({ path: '/assets/images/defaults/dust-wave-square.png', scope: 'shared' })
+      expect.objectContaining({ path: '/assets/images/defaults/dust-wave-square.png', scope: 'shared' }),
+      expect.objectContaining({ path: '/assets/images/campaigns/hand-relations/hero.png', scope: 'campaign' })
     ]);
+    expect(body.images.map((image: { path: string }) => image.path)).not.toContain('/assets/images/campaigns/hand-relations/hero-640.webp');
+    expect(body.images[1]).toMatchObject({ optimizationStatus: 'ready', width: 1200, height: 800 });
     expect(body.images.map((image: { path: string }) => image.path)).not.toContain('/assets/images/campaigns/hand-relations/notes.txt');
     expectNoKvWritesOrLists(env, 'super admin media library read');
 
@@ -3220,6 +3296,51 @@ runner_report_emails:
     expect(campaignUserBody.images.every((image: { scope: string }) => image.scope === 'campaign')).toBe(true);
     expect(campaignUserBody.images.map((image: { path: string }) => image.path)).not.toContain('/assets/images/defaults/dust-wave-square.png');
     expectNoKvWritesOrLists(campaignUserEnv, 'campaign user media library read');
+  });
+
+  it('dispatches changed media repair for campaign users and reserves full repair for super admins', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-token',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo',
+      GITHUB_REF: 'main'
+    };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const githubCalls: GitHubFetchCall[] = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = String(init?.method || 'GET');
+      const dispatchResponse = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
+      if (dispatchResponse) return dispatchResponse;
+      if (url === 'https://pool.test/api/campaigns.json') return jsonResponse({ campaigns: [campaignFixture] });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+
+    const changed = await worker.fetch(new Request('https://pledge.pool.test/admin/media/optimize', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({ campaignSlug: 'hand-relations', scope: 'changed' })
+    }), env, ctx);
+    expect(changed.status).toBe(202);
+    await expect(changed.json()).resolves.toMatchObject({ success: true, optimization: { triggered: true } });
+    expectChangedMediaOptimizationDispatch(githubCalls);
+
+    const campaignEnv = {
+      ...env,
+      PLEDGES: new CountingKVNamespace(),
+      RATELIMIT: new CountingKVNamespace()
+    };
+    (campaignEnv.PLEDGES as CountingKVNamespace).store.set(`admin-user:${await sha256Hex('creator@example.com')}`, JSON.stringify({
+      email: 'creator@example.com', role: 'campaign_user', campaignSlugs: ['hand-relations']
+    }));
+    const campaignSession = await signInAdmin(campaignEnv, 'creator@example.com');
+    const full = await worker.fetch(new Request('https://pledge.pool.test/admin/media/optimize', {
+      method: 'POST',
+      headers: { Cookie: campaignSession.cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': campaignSession.csrfToken },
+      body: JSON.stringify({ campaignSlug: 'hand-relations', scope: 'all' })
+    }), campaignEnv, campaignSession.ctx);
+    expect(full.status).toBe(403);
   });
 
   it('uploads staged content editor audio to the campaign audio directory without KV writes', async () => {
@@ -4521,7 +4642,7 @@ diary:
       paymentIntentsChecked: 1,
       pledgesMatched: 1,
       pledgesUpdated: 1,
-      writeBudget: { readOnly: false, kvWritesExpected: 1, kvListExpected: 0 }
+      writeBudget: { readOnly: false, kvWritesExpected: 2, kvListExpected: 0 }
     });
     const stored = await pledges.get('pledge:order-backfill-1', { type: 'json' });
     expect(stored.stripeFinancials).toMatchObject({
@@ -4533,10 +4654,56 @@ diary:
       feeAmount: 320,
       netAmount: 9680
     });
-    expect(pledges.putCalls).toBe(1);
+    expect(pledges.putCalls).toBe(2);
     expect(pledges.listCalls).toBe(0);
     expect(ratelimit.putCalls).toBe(1);
     expect(ratelimit.listCalls).toBe(0);
+  });
+
+  it('records an explicit reconciliation break for a charged pledge missing its Stripe PaymentIntent', async () => {
+    const env = createEnv();
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    pledges.store.set('campaign-pledges:hand-relations', JSON.stringify(['order-reconciliation-1']));
+    pledges.store.set('pledge:order-reconciliation-1', JSON.stringify({
+      orderId: 'order-reconciliation-1',
+      email: 'reconcile@example.com',
+      campaignSlug: 'hand-relations',
+      pledgeStatus: 'charged',
+      charged: true,
+      amount: 10000,
+      subtotal: 10000,
+      currency: 'usd'
+    }));
+
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/reconciliation/hand-relations', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: '{}'
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      attempted: true,
+      campaignSlug: 'hand-relations',
+      checked: 1,
+      breaks: [expect.objectContaining({
+        status: 'open',
+        severity: 'critical',
+        kind: 'charged_pledge_missing_payment_intent',
+        orderIds: ['order-reconciliation-1']
+      })]
+    });
+    const breakKey = [...pledges.store.keys()].find((key) => key.startsWith('reconciliation-break:v1:hand-relations:'));
+    expect(breakKey).toBeTruthy();
+    expect(await pledges.get(breakKey as string, { type: 'json' })).toMatchObject({
+      status: 'open',
+      occurrences: 1
+    });
   });
 
   it('stores and lists saved marketing referral codes only on explicit save', async () => {

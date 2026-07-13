@@ -121,9 +121,10 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | `live-stats.js` | `formatMoney`, `updateProgressBar`, `updateMarkerState`, `checkTierUnlocks`, `checkLateSupport`, `updateSupportItems`, `updateTierInventory` |
 | `platform-tip` | Tip sanitization, tip percent derivation, tip amount calculation |
 | `pledge-management` | DST-aware deadline enforcement through the configured platform timezone, cancel/modify/payment-method validation, pledge status transitions, multi-campaign independence, shipping in pledge records, API response shape |
-| `settlement` | Charge aggregation (including shipping fees), payment success/failure, retry flow, dry-run mode, edge cases, batched settlement, campaign pledge index, settlement dispatch, shipping in settlement, cron heartbeat |
+| `settlement` / `stripe-client` | Charge aggregation, deterministic settlement, Stripe API version/idempotency/error normalization, payment success/failure, retry flow, batched dispatch, stale/resume state, campaign pledge index, and cron heartbeat |
 | `email-broadcasts` | Diary excerpt extraction (with ellipsis truncation), diary/milestone tracking helpers, milestone checking logic, rate limiting |
 | `email-tip` | Tip-aware supporter email breakdowns across confirmation / modified / cancelled / failed / charged emails, plus launch reminder and abandoned-checkout email routing through the shared updates sender |
+| `email-outbox` | Durable enqueue dedupe, frozen payload/idempotency, provider retry timing, campaign/global suppression, Resend webhook signature verification, and delivery evidence |
 | `votes` | Email-based vote storage/dedup, vote status retrieval, campaign results, result aggregation |
 | `admin-dashboard` | Dashboard dirty-state tracking, settings serialization, content/editor normalization, staged media uploads/media picker, actual Stripe fee analytics/backfill, Analytics attribution reporting, marketing shared drafts, abandoned-checkout health/suppression, referral URL helpers, responsive/i18n support utilities |
 | `i18n-completeness` | Supported locale catalogs stay aligned with the English nested key surface |
@@ -131,7 +132,7 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | `page-prefetch` | Same-origin public-route allowlisting, sensitive-query exclusions, network guards, delay/limit handling, and document prefetch hint creation |
 | `cart-runtime-loader` | Lazy cart-runtime boot, persisted/recovery cart detection, idempotent loading, and user-intent triggers |
 | `site-asset-minification` | Generated `_site` CSS/JS minification behavior and check-mode failure cases |
-| `media-optimization-script` | Changed-file selection, lossless image optimization decisions, video derivative naming, and source-to-WebM reference rewrites |
+| `media-optimization-script` | Changed-file selection, source/derived classification, deterministic manifests, placement budgets, lossless image optimization decisions, video derivative naming, and source-to-WebM reference rewrites |
 
 ### Running
 
@@ -657,6 +658,8 @@ curl -X POST 'https://api.resend.com/emails' \
   }'
 ```
 
+For production delivery evidence, also create `https://pledge.dustwave.xyz/webhooks/resend`, subscribe to delivered/bounced/complained/failed/suppressed events, and store its signing secret as `RESEND_WEBHOOK_SECRET`. Unit tests synthesize signed events; they do not call live Resend.
+
 ---
 
 ## 3. Stripe Setup (Test Mode)
@@ -963,6 +966,9 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 - [ ] If launch reminders or admin Turnstile widgets are enabled, verify the public site keys and matching Worker Turnstile secrets are set
 - [ ] Deploy Worker: `wrangler deploy`
 - [ ] Set up Stripe webhook in dashboard → `https://pledge.dustwave.xyz/webhooks/stripe`
+- [ ] Set up Resend delivery webhook → `https://pledge.dustwave.xyz/webhooks/resend` and set `RESEND_WEBHOOK_SECRET`
+- [ ] Confirm `EMAIL_OUTBOX_ENABLED=true` and `PAYMENT_RECONCILIATION_ENABLED=true` in the live Worker
+- [ ] Run media manifest/optimization check and inspect dashboard broken-reference warnings
 - [ ] Test with a real $1 pledge
 
 ## 9. Secrets Reference
@@ -981,6 +987,7 @@ Expected: Returns `{ success: true }` and triggers GitHub workflow.
 - `MAGIC_LINK_SECRET` — Random 32+ char string for HMAC token signing
 - `CAMPAIGN_PREVIEW_SECRET` — Optional dedicated preview reviewer-link signing secret; if omitted, the Worker falls back to existing signing secrets
 - `RESEND_API_KEY` — Resend API key for supporter emails (re_...)
+- `RESEND_WEBHOOK_SECRET` — Resend/Svix signing secret for delivery and suppression events (whsec_...)
 - `ADMIN_SECRET` — Random string for admin API endpoints
 - `ADMIN_SETTLEMENT_SECRET` — Optional scoped admin secret for settlement endpoints; use a separate local-only value in `worker/.dev.vars`
 - `ADMIN_BROADCAST_SECRET` — Optional scoped admin secret for diary, milestone, and announcement endpoints; also add it to GitHub repository secrets for the post-deploy diary check when enabled

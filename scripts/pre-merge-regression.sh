@@ -435,18 +435,27 @@ run_phase "1. Secret audit" npm run test:secrets
 
 run_phase "2. Syntax checks" bash -lc '
   node --check worker/src/index.js
+  node --check worker/src/email.js
+  node --check worker/src/email-outbox.js
+  node --check worker/src/media-catalog.js
+  node --check worker/src/stripe.js
   node --check worker/src/stats.js
+  node --check scripts/optimize-media.mjs
   node --check scripts/release-i18n-seo-evidence.mjs
   node --check scripts/release-pledge-evidence.mjs
   node --check scripts/release-payment-smoke.mjs
   node --check scripts/release-provider-checks.mjs
   node --check scripts/release-screen-reader-evidence.mjs
+  node scripts/optimize-media.mjs --check --manifest-only >/dev/null
   bash -n scripts/release-smoke.sh scripts/release-a11y-evidence.sh
 '
 
 run_phase "3. Focused regression suites" npx vitest run \
   tests/unit/worker-business-logic.test.ts \
   tests/unit/worker-ops-integrity.test.ts \
+  tests/unit/email-outbox.test.ts \
+  tests/unit/stripe-client.test.ts \
+  tests/unit/media-optimization-script.test.ts \
   tests/unit/stats-pagination.test.ts
 
 run_phase "4. Full unit suite" npm run test:unit

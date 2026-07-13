@@ -1,5 +1,6 @@
 import { getCampaign, getEffectiveState } from './campaigns.js';
-import { RESEND_RATE_LIMIT_DELAY_MS, sendLaunchReminderEmail } from './email.js';
+import { RESEND_RATE_LIMIT_DELAY_MS, sendLaunchReminderEmail as sendLaunchReminderEmailDirect } from './email.js';
+import { enqueueEmailOutbox } from './email-outbox.js';
 import { getPlatformName } from './provider-config.js';
 import { generateToken, verifyToken } from './token.js';
 import { isValidEmail, isValidSlug, jsonResponse, SECURITY_HEADERS } from './validation.js';
@@ -285,6 +286,9 @@ export async function handleLaunchReminderUnsubscribe(request, env) {
     source: 'unsubscribe'
   }), { expirationTtl: SUPPRESSION_TTL_SECONDS });
 
+  if (String(request.method || 'GET').toUpperCase() === 'POST') {
+    return new Response(null, { status: 200, headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
+  }
   return launchReminderHtmlResponse('Reminder unsubscribed', 'You will not receive this launch reminder.');
 }
 
@@ -402,14 +406,23 @@ async function processLaunchReminderJob(env, jobKey, job, now) {
     }, 365);
     const campaignTitle = signup.campaignTitle || campaign?.title || job.campaignTitle || campaignSlug;
     const preferredLang = normalizeLang(signup.preferredLang);
-    const result = await sendLaunchReminderEmail(env, {
+    const emailPayload = {
       email: signup.email,
       campaignSlug,
       campaignTitle,
       campaignUrl: getCampaignUrl(campaign || { slug: campaignSlug }, preferredLang, env),
       unsubscribeUrl: getUnsubscribeUrl(env, token),
       preferredLang
-    });
+    };
+    const directForTests = String(env.APP_MODE || '').toLowerCase() === 'test' && String(env.EMAIL_OUTBOX_ENABLED || '').toLowerCase() !== 'true';
+    const result = directForTests
+      ? await sendLaunchReminderEmailDirect(env, emailPayload)
+      : await enqueueEmailOutbox(env, {
+          kind: 'launch_reminder',
+          payload: emailPayload,
+          campaignSlug,
+          dedupeKey: `launch-reminder:${campaignSlug}:${signup.emailHash}`
+        });
 
     if (!result?.sent) {
       failed++;
