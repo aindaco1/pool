@@ -75,6 +75,10 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     inventoryWrite: [],
     analytics: [],
     planUsage: [],
+    adminSessions: [],
+    adminSessionRevoke: [],
+    adminAudit: [],
+    adminAuditCsv: [],
     settings: [],
     settingsPreview: [],
     settingsPublish: [],
@@ -106,6 +110,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     },
     createdAt: '2026-05-24T12:00:00.000Z'
   }];
+  const revokedSessionIds = new Set<string>();
 
   await page.route('https://i.ytimg.com/**', async (route: any) => {
     await route.fulfill({
@@ -157,6 +162,129 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         writeBudget: { readOnly: true, kvWritesExpected: 0 }
       });
     }
+    if (url.pathname === '/admin/sessions' && method === 'GET') {
+      calls.adminSessions.push({ method });
+      const active = [{
+        id: 'session-current',
+        email: 'admin@example.com',
+        createdAt: '2026-05-16T21:00:00.000Z',
+        expiresAt: '2026-05-16T23:00:00.000Z',
+        current: true,
+        active: true,
+        networkId: 'network-current',
+        client: { browser: 'Chrome', operatingSystem: 'macOS', device: 'Desktop' }
+      }, {
+        id: 'session-other',
+        email: 'other-admin@example.com',
+        createdAt: '2026-05-16T20:00:00.000Z',
+        expiresAt: '2026-05-16T22:00:00.000Z',
+        current: false,
+        active: true,
+        networkId: 'network-other',
+        client: { browser: 'Safari', operatingSystem: 'iOS', device: 'Mobile' }
+      }].filter((session) => !revokedSessionIds.has(session.id));
+      return fulfillJson({
+        active,
+        recent: active.concat([{
+          id: 'session-expired',
+          email: 'admin@example.com',
+          createdAt: '2026-05-14T18:00:00.000Z',
+          expiresAt: '2026-05-14T20:00:00.000Z',
+          active: false,
+          networkId: 'network-prior',
+          client: { browser: 'Firefox', operatingSystem: 'Linux', device: 'Desktop' }
+        }]),
+        retentionDays: 30,
+        privacy: {
+          storesFullIp: false,
+          storesFullUserAgent: false,
+          storesPreciseLocation: false,
+          networkIdentifier: 'keyed fingerprint'
+        }
+      });
+    }
+    if (url.pathname === '/admin/sessions/revoke' && method === 'POST') {
+      calls.adminSessionRevoke.push({
+        body,
+        csrf: request.headers()['x-pool-admin-csrf']
+      });
+      revokedSessionIds.add(body.id);
+      return fulfillJson({ success: true, revoked: { id: body.id, email: 'other-admin@example.com' } });
+    }
+    if (url.pathname === '/admin/audit.csv') {
+      calls.adminAuditCsv.push(Object.fromEntries(url.searchParams.entries()));
+      return route.fulfill({
+        status: 200,
+        headers: {
+          ...JSON_HEADERS,
+          'content-type': 'text/csv; charset=utf-8',
+          'content-disposition': 'attachment; filename="pool-admin-audit-2026-05-16.csv"',
+          'access-control-expose-headers': 'Content-Disposition'
+        },
+        body: 'created_at,action,admin_email,campaign_slug\n2026-05-16T20:00:00.000Z,settings:publish,admin@example.com,hand-relations\n'
+      });
+    }
+    if (url.pathname === '/admin/audit') {
+      const params = Object.fromEntries(url.searchParams.entries());
+      calls.adminAudit.push(params);
+      return fulfillJson({
+        rows: [
+          {
+            key: 'admin-audit:2026-05-16:settings-publish:e2e',
+            createdAt: '2026-05-16T20:00:00.000Z',
+            action: 'settings:publish',
+            adminEmail: 'admin@example.com',
+            adminRole: 'super_admin',
+            campaignSlug: 'hand-relations',
+            orderId: '',
+            productId: '',
+            source: 'dashboard',
+            status: 'published',
+            changedFields: ['title', 'description']
+          },
+          {
+            key: 'admin-audit:2026-05-16:future-widget-sync-started:e2e',
+            createdAt: '2026-05-16T19:00:00.000Z',
+            action: 'future_widget:sync_started',
+            adminEmail: 'admin@example.com',
+            adminRole: 'super_admin',
+            campaignSlug: '',
+            orderId: '',
+            productId: '',
+            source: 'dashboard',
+            status: 'started',
+            changedFields: []
+          },
+          {
+            key: 'admin-audit:2026-05-16:film-stripe-summary-read:e2e',
+            createdAt: '2026-05-16T18:00:00.000Z',
+            action: 'film_stripe_summary_adapter:read',
+            adminEmail: '',
+            adminRole: '',
+            campaignSlug: '',
+            orderId: '',
+            productId: '',
+            source: 'pool',
+            status: 'empty',
+            changedFields: []
+          },
+          {
+            key: 'admin-audit:2026-05-16:local-campaign-created:e2e',
+            createdAt: '2026-05-16T17:00:00.000Z',
+            action: 'campaign:create_new',
+            adminEmail: 'admin@example.com',
+            adminRole: 'super_admin',
+            campaignSlug: 'codex-local-no-user-1781471804598',
+            orderId: '',
+            productId: '',
+            source: 'dashboard',
+            status: 'succeeded',
+            changedFields: []
+          }
+        ],
+        page: { matched: 4, returned: 4, limit: 100, truncated: false }
+      });
+    }
     if (url.pathname === '/admin/settings') {
       const params = Object.fromEntries(url.searchParams.entries());
       calls.settings.push({ method, params });
@@ -175,6 +303,30 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
                 { label: 'Default timezone', value: 'America/Denver', rawValue: 'America/Denver', editable: true, path: 'platform.timezone', type: 'string', input: 'select', options: [{ value: 'America/Denver', label: 'America/Denver' }, { value: 'Europe/London', label: 'Europe/London' }] },
                 { label: 'App mode', value: 'test' },
                 { label: 'CORS allowed origin', value: SITE_BASE }
+              ].map(withFieldHelp)
+            }, {
+              title: 'Brand & SEO',
+              rows: [
+                {
+                  label: 'Return policy country', value: 'US', rawValue: 'US', editable: true,
+                  path: 'seo.merchant_return_policy.applicable_country', type: 'string', input: 'select',
+                  layoutGroup: 'brand-return-policy',
+                  options: [{ value: 'US', label: 'United States' }, { value: 'CA', label: 'Canada' }],
+                  help: 'Two-letter country code emitted with the no-returns merchant policy in Shopping product structured data.'
+                },
+                {
+                  label: 'Return policy type', value: 'Returns not permitted', rawValue: 'Returns not permitted',
+                  editable: false, path: '', type: 'string', input: 'text', layoutGroup: 'brand-return-policy',
+                  help: 'Pool currently publishes a no-returns policy. Add matching Terms and structured-data support before enabling a different return model.'
+                }
+              ]
+            }, {
+              title: 'Checkout',
+              rows: [
+                {
+                  label: 'Stripe publishable key', value: 'pk_test_pool', rawValue: 'pk_test_pool', editable: true,
+                  path: 'checkout.stripe_publishable_key', type: 'string', input: 'stripe-publishable-key'
+                }
               ].map(withFieldHelp)
             }, {
               title: 'Pricing',
@@ -232,49 +384,6 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
                 { label: 'USPS enabled', value: 'No', rawValue: 'false', editable: true, path: 'shipping.usps.enabled', type: 'boolean', input: 'boolean' },
                 { label: 'USPS client ID', value: 'Not configured', rawValue: '', editable: true, path: 'shipping.usps.client_id', type: 'string', input: 'text', visibleWhen: { path: 'shipping.usps.enabled', value: 'true' } },
                 { label: 'USPS API base', value: 'Not configured', rawValue: '', editable: true, path: 'shipping.usps.api_base', type: 'string', input: 'url', placeholder: 'Default: https://apis.usps.com', visibleWhen: { path: 'shipping.usps.enabled', value: 'true' }, help: 'Optional override. Leave blank to use the production USPS default: https://apis.usps.com.' }
-              ].map(withFieldHelp)
-            }, {
-              title: 'Platform add-ons',
-              rows: [
-                { label: 'Enabled', value: 'Yes', rawValue: true, editable: true, path: 'add_ons.enabled', type: 'boolean', input: 'boolean', layoutGroup: 'add-ons-enabled-stock' },
-                { label: 'Low stock threshold', value: '5', rawValue: 5, editable: true, path: 'add_ons.low_stock_threshold', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'add-ons-enabled-stock', visibleWhen: { path: 'add_ons.enabled', value: 'true' } },
-                {
-                  label: 'Products',
-                  value: '2 products',
-                  rawValue: [
-                    {
-                      id: 'dust-wave-sticker',
-                      name: 'DUST WAVE Sticker',
-                      description: 'A vinyl sticker.',
-                      image_url: '/assets/images/add-ons/sticker.png',
-                      price: 3,
-                      category: 'physical',
-                      shipping_preset: 'sticker',
-                      inventory: 50,
-                      source_url: 'https://shop.example.test/sticker',
-                      variants: []
-                    },
-                    {
-                      id: 'dust-wave-shirt',
-                      name: 'DUST WAVE Shirt',
-                      description: 'A soft shirt.',
-                      image_url: '/assets/images/add-ons/shirt.png',
-                      price: 25,
-                      category: 'physical',
-                      shipping_preset: 'shirt',
-                      variant_option_name: 'Size',
-                      variants: [
-                        { id: 's', label: 'Small', inventory: 2 },
-                        { id: 'm', label: 'Medium', inventory: 4 }
-                      ]
-                    }
-                  ],
-                  editable: true,
-                  path: 'add_ons.products',
-                  type: 'add_on_products',
-                  input: 'add-on-products',
-                  visibleWhen: { path: 'add_ons.enabled', value: 'true' }
-                }
               ].map(withFieldHelp)
             }, {
               title: 'Campaign runner reports',
@@ -341,13 +450,61 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
                 }
               ]
             }, {
-              title: 'Advanced performance',
+              title: 'Admin sessions',
+              rows: [{
+                label: '', value: '', rawValue: '', editable: false, path: '', type: 'string',
+                input: 'admin-session-review', hideLabel: true,
+                help: 'Review active and recent administrator sign-ins, then revoke sessions that should no longer have access.'
+              }]
+            }, {
+              title: 'Audit log',
+              rows: [{
+                label: '', value: '', rawValue: '', editable: false, path: '', type: 'string',
+                input: 'admin-audit-review', hideLabel: true,
+                help: 'Search redacted administrator activity and export the same filtered events as a private CSV.'
+              }]
+            }, {
+              title: 'Platform add-ons',
               rows: [
-                { label: 'Intent prefetch enabled', value: 'true', rawValue: 'true', editable: true, path: 'performance.intent_prefetch_enabled', type: 'boolean', input: 'boolean', layoutGroup: 'intent-prefetch-enabled' },
-                { label: 'Intent prefetch delay ms', value: '90', rawValue: '90', editable: true, path: 'performance.intent_prefetch_delay_ms', type: 'number', input: 'integer', min: 0, step: 10, layoutGroup: 'intent-prefetch-tuning' },
-                { label: 'Intent prefetch limit', value: '3', rawValue: '3', editable: true, path: 'performance.intent_prefetch_limit', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'intent-prefetch-tuning' },
-                { label: 'Live stats cache TTL seconds', value: '300', rawValue: '300', editable: true, path: 'cache.live_stats_ttl_seconds', type: 'number', input: 'integer', layoutGroup: 'cache-live-ttl' },
-                { label: 'Live inventory cache TTL seconds', value: '300', rawValue: '300', editable: true, path: 'cache.live_inventory_ttl_seconds', type: 'number', input: 'integer', layoutGroup: 'cache-live-ttl' }
+                { label: 'Enabled', value: 'Yes', rawValue: true, editable: true, path: 'add_ons.enabled', type: 'boolean', input: 'boolean', layoutGroup: 'add-ons-enabled-stock' },
+                { label: 'Low stock threshold', value: '5', rawValue: 5, editable: true, path: 'add_ons.low_stock_threshold', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'add-ons-enabled-stock', visibleWhen: { path: 'add_ons.enabled', value: 'true' } },
+                {
+                  label: 'Products',
+                  value: '2 products',
+                  rawValue: [
+                    {
+                      id: 'dust-wave-sticker',
+                      name: 'DUST WAVE Sticker',
+                      description: 'A vinyl sticker.',
+                      image_url: '/assets/images/add-ons/sticker.png',
+                      price: 3,
+                      category: 'physical',
+                      shipping_preset: 'sticker',
+                      inventory: 50,
+                      source_url: 'https://shop.example.test/sticker',
+                      variants: []
+                    },
+                    {
+                      id: 'dust-wave-shirt',
+                      name: 'DUST WAVE Shirt',
+                      description: 'A soft shirt.',
+                      image_url: '/assets/images/add-ons/shirt.png',
+                      price: 25,
+                      category: 'physical',
+                      shipping_preset: 'shirt',
+                      variant_option_name: 'Size',
+                      variants: [
+                        { id: 's', label: 'Small', inventory: 2 },
+                        { id: 'm', label: 'Medium', inventory: 4 }
+                      ]
+                    }
+                  ],
+                  editable: true,
+                  path: 'add_ons.products',
+                  type: 'add_on_products',
+                  input: 'add-on-products',
+                  visibleWhen: { path: 'add_ons.enabled', value: 'true' }
+                }
               ].map(withFieldHelp)
             }, {
               title: 'Plan usage',
@@ -361,6 +518,15 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
                 input: 'plan-usage',
                 hideLabel: true
               }]
+            }, {
+              title: 'Advanced performance',
+              rows: [
+                { label: 'Intent prefetch enabled', value: 'true', rawValue: 'true', editable: true, path: 'performance.intent_prefetch_enabled', type: 'boolean', input: 'boolean', layoutGroup: 'intent-prefetch-enabled' },
+                { label: 'Intent prefetch delay ms', value: '90', rawValue: '90', editable: true, path: 'performance.intent_prefetch_delay_ms', type: 'number', input: 'integer', min: 0, step: 10, layoutGroup: 'intent-prefetch-tuning' },
+                { label: 'Intent prefetch limit', value: '3', rawValue: '3', editable: true, path: 'performance.intent_prefetch_limit', type: 'number', input: 'integer', min: 0, step: 1, layoutGroup: 'intent-prefetch-tuning' },
+                { label: 'Live stats cache TTL seconds', value: '300', rawValue: '300', editable: true, path: 'cache.live_stats_ttl_seconds', type: 'number', input: 'integer', layoutGroup: 'cache-live-ttl' },
+                { label: 'Live inventory cache TTL seconds', value: '300', rawValue: '300', editable: true, path: 'cache.live_inventory_ttl_seconds', type: 'number', input: 'integer', layoutGroup: 'cache-live-ttl' }
+              ].map(withFieldHelp)
             }, {
               title: 'Debug',
               rows: [
@@ -922,6 +1088,148 @@ test.describe('Admin Dashboard', () => {
     expect(Date.now() - tableStartedAt).toBeLessThanOrEqual(performanceBudgets.dashboard.tableRenderMs);
   });
 
+  test('reviews admin sessions and searches the redacted audit log from Settings', async ({ page }) => {
+    const calls = await signInWithMagicToken(page);
+
+    await selectSettingsSection(page, 'Admin sessions');
+    await expect.poll(() => calls.adminSessions.length).toBe(1);
+    const sessionReview = page.locator('[data-admin-session-review]');
+    await expect(sessionReview).toContainText('Active sessions: 2');
+    await expect(sessionReview).toContainText('without full IP addresses, full user agents, or precise location');
+    await expect(sessionReview).toContainText('Current session');
+    const otherSession = sessionReview.locator('tr').filter({ hasText: 'other-admin@example.com' }).first();
+    page.once('dialog', (dialog) => dialog.accept());
+    await otherSession.getByRole('button', { name: 'Revoke' }).click();
+    await expect.poll(() => calls.adminSessionRevoke.length).toBe(1);
+    expect(calls.adminSessionRevoke[0]).toEqual({
+      body: { id: 'session-other' },
+      csrf: 'csrf-test-token'
+    });
+    await expect.poll(() => calls.adminSessions.length).toBe(2);
+    await expect(sessionReview).toContainText('Session revoked.');
+    await expect(sessionReview.locator('tr').filter({ hasText: 'other-admin@example.com' })).toHaveCount(0);
+
+    await selectSettingsSection(page, 'Audit log');
+    await expect.poll(() => calls.adminAudit.length).toBe(1);
+    const auditReview = page.locator('[data-admin-audit-review]');
+    await expect(auditReview).toContainText('Sensitive event payloads are excluded.');
+    const publishedSettingsAction = auditReview.locator('td[data-raw-action="settings:publish"]');
+    const publishedSettingsRow = publishedSettingsAction.locator('..');
+    await expect(publishedSettingsAction).toHaveText('Platform settings published');
+    await expect(publishedSettingsAction).toHaveAttribute('title', 'Internal action: settings:publish');
+    await expect(auditReview).toContainText('Future widget sync started');
+    const campaignTarget = publishedSettingsRow.locator('td[data-raw-target="hand-relations"]');
+    await expect(campaignTarget).toHaveText('Campaign: Hand Relations');
+    await expect(campaignTarget).toHaveAttribute('title', 'Internal target: campaign=hand-relations');
+    await expect(publishedSettingsRow.locator('td').nth(4)).toHaveText('Published · Fields changed: Title, Description');
+    const futureAction = auditReview.locator('td[data-raw-action="future_widget:sync_started"]');
+    const futureRow = futureAction.locator('..');
+    await expect(futureRow.locator('td[data-raw-target="dashboard"]')).toHaveText('Admin dashboard');
+    await expect(futureRow.locator('td').nth(4)).toHaveText('Started');
+    const filmStripeRow = auditReview.locator('td[data-raw-action="film_stripe_summary_adapter:read"]').locator('..');
+    await expect(filmStripeRow.locator('td[data-raw-target="pool"]')).toHaveText('The Pool platform');
+    await expect(filmStripeRow.locator('td').nth(4)).toHaveText('No matching summary data');
+    const localCampaignTarget = auditReview.locator('td[data-raw-target="codex-local-no-user-1781471804598"]');
+    await expect(localCampaignTarget).toHaveText('Campaign: Local test campaign (unassigned)');
+    await expect(localCampaignTarget).toHaveAttribute('title', 'Internal target: campaign=codex-local-no-user-1781471804598');
+    const auditHelpButtons = auditReview.locator('.admin-settings__help-button');
+    await expect(auditHelpButtons).toHaveCount(6);
+    await expect(auditReview.locator('label .admin-settings__help-button')).toHaveCount(0);
+    const dateHelpButton = auditReview.getByRole('button', { name: 'About Date' });
+    const dateHelpId = await dateHelpButton.getAttribute('aria-describedby');
+    expect(dateHelpId).toBeTruthy();
+    const dateHelp = auditReview.locator(`#${dateHelpId}`);
+    await expect(dateHelp).toHaveText('Show events recorded on one calendar date.');
+    await expect(dateHelp).toBeHidden();
+    await dateHelpButton.hover();
+    await expect(dateHelp).toBeVisible();
+    await expect(auditReview.getByRole('button', { name: 'About Action' })).toBeVisible();
+    await expect(auditReview.getByRole('button', { name: 'About Admin email' })).toBeVisible();
+    await expect(auditReview.getByRole('button', { name: 'About Campaign' })).toBeVisible();
+    await expect(auditReview.getByRole('button', { name: 'About Search' })).toBeVisible();
+    const statusHelpButton = auditReview.getByRole('button', { name: 'About Status / changes' });
+    await expect(statusHelpButton).toHaveAttribute('aria-describedby', /admin-setting-help-/);
+    await expect(auditReview.locator('[name="date"]')).toHaveAttribute('aria-describedby', /admin-setting-help-/);
+    await expect(auditReview.locator('[name="action"]')).toContainText('Platform settings published');
+    await expect(auditReview.locator('[name="email"]')).toHaveAttribute('placeholder', 'admin@example.com');
+    await expect(auditReview.locator('[name="campaignSlug"]')).toContainText('Hand Relations');
+    await expect(auditReview.locator('[name="q"]')).toHaveAttribute('placeholder', 'Target, status, or changed field');
+    await auditReview.locator('[name="date"]').fill('2026-05-16');
+    await auditReview.locator('[name="action"]').selectOption('settings:publish');
+    await auditReview.locator('[name="email"]').fill('admin@example.com');
+    await auditReview.locator('[name="campaignSlug"]').selectOption('hand-relations');
+    await auditReview.locator('[name="q"]').fill('published');
+    await auditReview.getByRole('button', { name: 'Apply filters' }).click();
+    await expect.poll(() => calls.adminAudit.length).toBe(2);
+    expect(calls.adminAudit[1]).toEqual({
+      date: '2026-05-16',
+      action: 'settings:publish',
+      email: 'admin@example.com',
+      campaignSlug: 'hand-relations',
+      q: 'published'
+    });
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      auditReview.getByRole('button', { name: 'Export filtered CSV' }).click()
+    ]);
+    expect(download.suggestedFilename()).toBe('pool-admin-audit-2026-05-16.csv');
+    await expect.poll(() => calls.adminAuditCsv.length).toBe(1);
+    expect(calls.adminAuditCsv[0]).toEqual(calls.adminAudit[1]);
+    await expect(auditReview).toContainText('Audit CSV download started.');
+    await expectNoAxeViolations(page);
+  });
+
+  test('keeps admin session and audit reviews contained and readable across responsive viewports', async ({ page }) => {
+    await signInWithMagicToken(page);
+
+    for (const viewport of [
+      { name: 'desktop', width: 1440, height: 1000 },
+      { name: 'tablet', width: 912, height: 1368 },
+      { name: 'mobile', width: 390, height: 844 }
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+      await selectSettingsSection(page, 'Admin sessions');
+      const sessionReview = page.locator('[data-admin-session-review]');
+      const otherSession = sessionReview.locator('tr').filter({ hasText: 'other-admin@example.com' }).first();
+      await expect(otherSession.getByRole('button', { name: 'Revoke' })).toBeVisible();
+      await expect(sessionReview).toContainText('The current session stays protected.');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2), viewport.name).toBe(true);
+
+      const sessionTable = sessionReview.locator('.admin-settings-review__table').first();
+      if (viewport.name === 'mobile') {
+        await expect(sessionTable.locator('td').first()).toHaveAttribute('data-label', 'Admin');
+        expect(await sessionTable.evaluate((table) => getComputedStyle(table).display)).toBe('block');
+        expect(await sessionTable.locator('thead').evaluate((head) => getComputedStyle(head).position)).toBe('absolute');
+        expect(await sessionReview.locator('.admin-app__muted').first().evaluate((summary) => summary.getBoundingClientRect().width)).toBeGreaterThan(250);
+      } else {
+        expect(await sessionTable.evaluate((table) => getComputedStyle(table).display)).toBe('table');
+      }
+
+      await selectSettingsSection(page, 'Audit log');
+      const auditReview = page.locator('[data-admin-audit-review]');
+      await expect(auditReview.getByRole('button', { name: 'Apply filters' })).toBeVisible();
+      await expect(auditReview.getByRole('button', { name: 'Export filtered CSV' })).toBeVisible();
+      await expect(auditReview.locator('.admin-settings__help-button')).toHaveCount(6);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2), viewport.name).toBe(true);
+      expect(await auditReview.evaluate((review) => {
+        const group = review.closest('.admin-settings__group');
+        const filters = review.querySelector('.admin-audit-review__filters');
+        if (!(group instanceof HTMLElement) || !(filters instanceof HTMLElement)) return false;
+        return filters.getBoundingClientRect().right <= group.getBoundingClientRect().right + 2;
+      }), viewport.name).toBe(true);
+
+      const auditTable = auditReview.locator('.admin-settings-review__table').first();
+      if (viewport.name === 'mobile') {
+        await expect(auditTable.locator('td').first()).toHaveAttribute('data-label', 'Time');
+        expect(await auditTable.evaluate((table) => getComputedStyle(table).display)).toBe('block');
+      } else {
+        expect(await auditTable.evaluate((table) => getComputedStyle(table).display)).toBe('table');
+      }
+    }
+  });
+
   test('starts magic-link login and supports keyboard tab navigation with no obvious axe violations', async ({ page }) => {
     test.setTimeout(120000);
     const calls = await routeAdminWorker(page);
@@ -934,8 +1242,12 @@ test.describe('Admin Dashboard', () => {
 
     await expect.poll(() => calls.authStart.length).toBe(1);
     expect(calls.authStart[0]).toMatchObject({ email: 'admin@example.com', preferredLang: 'en' });
-
-    await page.goto('/admin/?admin_login=admin-token');
+    const localAdminLink = page.getByRole('link', { name: 'Open admin' });
+    await expect(page.locator('#admin-auth-status')).toContainText('Development login link is ready.');
+    await expect(page.locator('#admin-auth-status')).not.toContainText('?admin_login=');
+    await expect(localAdminLink).toHaveAttribute('href', `${SITE_BASE}/admin/?admin_login=test-token`);
+    await localAdminLink.click();
+    await expect.poll(() => calls.authExchange.length).toBe(1);
     await expect(page.locator('#admin-app')).toBeVisible();
     await expect(page.getByText('Signed in as admin@example.com')).toBeVisible();
     await expect(page.getByRole('tab').nth(0)).toHaveText('Settings');
@@ -944,6 +1256,24 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
     await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
     await expect.poll(() => calls.settings[0]?.params?.preferredLang).toBe('en');
+    await expect(page.locator('#admin-settings-section-tabs button')).toHaveText([
+      'Platform',
+      'Brand & SEO',
+      'Checkout',
+      'Pricing',
+      'Tax',
+      'Shipping',
+      'Campaign runner reports',
+      'Design',
+      'Users',
+      'Admin sessions',
+      'Audit log',
+      'Plan usage',
+      'Advanced performance',
+      'Debug',
+      'Secrets & credentials',
+      'Runtime diagnostics'
+    ]);
     await selectSettingsSection(page, 'Platform');
     await expect(page.locator('#admin-settings-publish')).toBeVisible();
     const settingsHeaderHeight = await page.locator('#admin-panel-settings .admin-settings__header').evaluate((element: HTMLElement) => element.getBoundingClientRect().height);
@@ -2001,6 +2331,33 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => page.locator('#admin-tab-marketing').evaluate((element: HTMLElement) => {
       return window.getComputedStyle(element, '::after').content.replace(/^"|"$/g, '');
     })).toBe('Promo');
+    await selectSettingsSection(page, 'Marca y SEO');
+    await expect(page.getByLabel('País de la política de devoluciones', { exact: true })).toHaveValue('US');
+    await expect(page.locator('#admin-settings-results')).toContainText('No se permiten devoluciones');
+    await selectSettingsSection(page, 'Sesiones de administración');
+    await expect.poll(() => calls.adminSessions.length).toBe(1);
+    await expect(page.locator('[data-admin-session-review]')).toContainText('Sesiones activas: 2');
+    await expect(page.locator('[data-admin-session-review]')).toContainText('Sesión actual');
+    await expect(page.getByRole('button', { name: 'Actualizar sesiones' })).toBeVisible();
+    await selectSettingsSection(page, 'Registro de auditoría');
+    await expect.poll(() => calls.adminAudit.length).toBe(1);
+    const localizedAction = page.locator('[data-admin-audit-review] td[data-raw-action="settings:publish"]');
+    const localizedRow = localizedAction.locator('..');
+    await expect(localizedAction).toHaveText('Configuración de la plataforma publicada');
+    await expect(localizedAction).toHaveAttribute('title', 'Acción interna: settings:publish');
+    await expect(localizedRow.locator('td[data-raw-target="hand-relations"]')).toHaveText('Campaña: Hand Relations');
+    await expect(localizedRow.locator('td').nth(4)).toHaveText('Publicado · Campos modificados: Título, Descripción');
+    const localizedAudit = page.locator('[data-admin-audit-review]');
+    await expect(localizedAudit.locator('td[data-raw-target="codex-local-no-user-1781471804598"]')).toHaveText('Campaña: Campaña de prueba local (sin asignar)');
+    await expect(localizedAudit.locator('.admin-settings__help-button')).toHaveCount(6);
+    await expect(localizedAudit.getByRole('button', { name: 'Acerca de Fecha' })).toBeVisible();
+    await expect(localizedAudit.getByRole('button', { name: 'Acerca de Estado / cambios' })).toHaveAttribute('aria-describedby', /admin-setting-help-/);
+    await expect(localizedAudit.locator('[name="action"]')).toContainText('Configuración de la plataforma publicada');
+    await expect(localizedAudit.locator('[name="campaignSlug"]')).toContainText('Hand Relations');
+    await expect(localizedAudit.locator('[name="email"]')).toHaveAttribute('placeholder', 'admin@ejemplo.com');
+    await expect(localizedAudit.locator('[name="q"]')).toHaveAttribute('placeholder', 'Objetivo, estado o campo modificado');
+    await expect(page.getByRole('textbox', { name: 'Correo del administrador', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Exportar CSV filtrado' })).toBeVisible();
   });
 
   test('previews reports and downloads CSVs', async ({ page }) => {

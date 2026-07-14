@@ -13,6 +13,7 @@ creator_image: /assets/images/campaigns/their-love/crew-james.png
 creator_name: "James Clare"
 category: "Drama, Romance, Short Film"
 short_blurb: "Eric and Sam, from exciting beginnings to uncertain horizons, ask what it means to truly love."
+last_modified_at: 2026-07-13
 show_ongoing: false
 single_tier_only: false
 stretch_hidden: false
@@ -123,6 +124,11 @@ long_content:
         caption: |
           <strong>Julian Massey - Eric</strong><br>Julian Massey is an Albuquerque-based film and theatre actor. He is looking forward to working on the project, building more set experience, and collaborating with this group.
 featured_tier_id: ill-never-forget-you
+# The featured physical tier is the only Shopping candidate. Keep disabled until
+# an exact, publicly supportable availability date is confirmed.
+shopping:
+  enabled: false
+  availability_date: ""
 
 stretch_goals:
   - threshold: 3500

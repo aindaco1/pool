@@ -39,11 +39,11 @@
     <span aria-hidden="true">{% include t.html key="tiers.unlocked" lang=current_lang %}</span>
   </div>
   {% endif %}
-  {% if include.tier.image %}
+  {% unless include.show_image == false %}{% if include.tier.image %}
     {% include responsive-image.html src=include.tier.image alt=include.tier.name class="tier-card__image" loading="lazy" decoding="async" sizes="(min-width: 1100px) 320px, (min-width: 700px) 45vw, 100vw" %}
-  {% endif %}
-  <h3>{{ include.tier.name | escape }} — {{ include.tier.price | money }}</h3>
-  <p>{{ include.tier.description | safe_rich_text }}</p>
+  {% endif %}{% endunless %}
+  {% unless include.show_title == false %}<h3>{{ include.tier.name | escape }} — {{ include.tier.price | money }}</h3>{% endunless %}
+  {% unless include.show_description == false %}<p>{{ include.tier.description | safe_rich_text }}</p>{% endunless %}
   {% if include.tier.limit_total %}
     <p class="limit">{% include t.html key="tiers.limit_label" lang=current_lang %} <span data-live-limit>{{ include.tier.limit_total }}</span> · {% include t.html key="tiers.remaining_label" lang=current_lang %} <span data-live-remaining>{{ include.tier.remaining }}</span></p>
   {% endif %}

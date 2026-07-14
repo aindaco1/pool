@@ -16,6 +16,9 @@ describe('package release scripts', () => {
     expect(premerge).toContain('bundle config set path');
     expect(premerge).toContain('bundle check >/dev/null 2>&1 || bundle install');
     expect(premerge).toContain('SKIP_TESTS=1 bundle exec jekyll build');
+    expect(premerge).toContain("bash -lc 'set -euo pipefail; cd /workspace;");
+    expect(premerge).toContain("--quiet' || return 1");
+    expect(premerge).toContain('--quiet || return 1');
   });
 
   it('creates and removes localhost Jekyll overrides for clean checkouts', () => {

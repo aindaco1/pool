@@ -62,6 +62,10 @@ function isCampaignRoute(route) {
   return /^\/(?:es\/)?campaigns\/[^/]+\/$/.test(route);
 }
 
+function isShoppingProductRoute(route) {
+  return /^\/(?:es\/)?campaigns\/[^/]+\/rewards\/[^/]+\/$/.test(route);
+}
+
 function campaignSlugForRoute(route) {
   return route.match(/^\/(?:es\/)?campaigns\/([^/]+)\/$/)?.[1] || '';
 }
@@ -161,6 +165,8 @@ if (!fs.existsSync(robotsPath)) errors.push('missing /robots.txt');
 
 if (fs.existsSync(sitemapPath)) {
   const sitemapText = readFile(sitemapPath);
+  if (sitemapText.charCodeAt(0) === 0xfeff) errors.push('sitemap.xml: must not start with a UTF-8 BOM');
+  if (!sitemapText.startsWith('<?xml')) errors.push('sitemap.xml: XML declaration must be the first bytes');
   if (!sitemapText.includes('xmlns:xhtml="http://www.w3.org/1999/xhtml"')) {
     errors.push('sitemap.xml: missing xhtml namespace for hreflang alternates');
   }
@@ -168,11 +174,20 @@ if (fs.existsSync(sitemapPath)) {
     errors.push('sitemap.xml: missing hreflang alternate links');
   }
   const sitemapDocument = new JSDOM(sitemapText, { contentType: 'text/xml' }).window.document;
+  if (sitemapDocument.querySelector('parsererror')) errors.push('sitemap.xml: malformed XML');
   for (const loc of Array.from(sitemapDocument.querySelectorAll('loc')).map((node) => node.textContent.trim())) {
+    if (sitemapLocs.has(loc)) errors.push(`sitemap.xml: duplicate loc (${loc})`);
     sitemapLocs.add(loc);
     const parsed = assertAbsoluteSiteUrl(loc, siteBase, 'sitemap loc', '/sitemap.xml', errors);
     if (parsed && isPrivateRoute(parsed.pathname.replace(/\/?$/, '/'))) {
       errors.push(`sitemap.xml: private route included (${parsed.pathname})`);
+    }
+  }
+  for (const lastmod of Array.from(sitemapDocument.querySelectorAll('lastmod')).map((node) => node.textContent.trim())) {
+    const timestamp = Date.parse(lastmod);
+    if (!Number.isFinite(timestamp)) errors.push(`sitemap.xml: invalid lastmod (${lastmod || 'empty'})`);
+    if (Number.isFinite(timestamp) && timestamp > Date.now() + 5 * 60 * 1000) {
+      errors.push(`sitemap.xml: future lastmod (${lastmod})`);
     }
   }
 }
@@ -263,10 +278,54 @@ for (const filePath of htmlFiles) {
   }
 
   const graph = flattenGraph(parseJsonLd(document, route, errors));
-  if (!graph.some((node) => hasType(node, 'Organization'))) {
+  const organization = graph.find((node) => hasType(node, 'Organization'));
+  if (!organization) {
     errors.push(`${route}: JSON-LD missing Organization`);
+  } else {
+    const availableLanguages = organization.contactPoint?.availableLanguage;
+    if (!Array.isArray(availableLanguages) || availableLanguages.length === 0 || availableLanguages.some((language) => typeof language !== 'string' || !/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(language))) {
+      errors.push(`${route}: Organization contactPoint availableLanguage must be a nonempty language-code array`);
+    }
+    const returnPolicy = organization.hasMerchantReturnPolicy;
+    if (!returnPolicy || typeof returnPolicy !== 'object') {
+      errors.push(`${route}: Organization JSON-LD missing merchant return policy`);
+    } else {
+      for (const field of ['applicableCountry', 'returnPolicyCategory']) {
+        if (!returnPolicy[field]) errors.push(`${route}: MerchantReturnPolicy missing ${field}`);
+      }
+      if (returnPolicy.returnPolicyCategory === 'https://schema.org/MerchantReturnNotPermitted' && returnPolicy.merchantReturnDays) {
+        errors.push(`${route}: no-returns MerchantReturnPolicy must not publish merchantReturnDays`);
+      }
+    }
   }
-  if (isCampaignRoute(route)) {
+  if (isShoppingProductRoute(route)) {
+    const product = graph.find((node) => hasType(node, 'Product'));
+    if (!product) {
+      errors.push(`${route}: JSON-LD missing Product`);
+    } else {
+      for (const field of ['name', 'description', 'image', 'sku', 'brand']) {
+        if (!product[field]) errors.push(`${route}: Product missing ${field}`);
+      }
+      const offer = Array.isArray(product.offers) ? product.offers[0] : product.offers;
+      if (!offer || typeof offer !== 'object') {
+        errors.push(`${route}: Product JSON-LD missing Offer`);
+      } else {
+        for (const field of ['url', 'price', 'priceCurrency', 'availability', 'itemCondition', 'seller', 'hasMerchantReturnPolicy']) {
+          if (offer[field] === undefined || offer[field] === null || offer[field] === '') {
+            errors.push(`${route}: Offer missing ${field}`);
+          }
+        }
+      }
+    }
+    if (!graph.some((node) => hasType(node, 'BreadcrumbList'))) {
+      errors.push(`${route}: JSON-LD missing BreadcrumbList`);
+    }
+    for (const property of ['product:price:amount', 'product:price:currency', 'product:availability']) {
+      if (!document.querySelector(`meta[property="${property}"]`)?.getAttribute('content')) {
+        errors.push(`${route}: missing ${property}`);
+      }
+    }
+  } else if (isCampaignRoute(route)) {
     if (!graph.some((node) => hasType(node, 'CreativeWork'))) {
       errors.push(`${route}: JSON-LD missing CreativeWork`);
     }

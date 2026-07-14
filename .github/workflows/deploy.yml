@@ -122,6 +122,9 @@ jobs:
         env:
           SITE_BASE: https://pool.dustwave.xyz
 
+      - name: Verify public crawl endpoints
+        run: npm run test:crawl-endpoints -- --base=https://pool.dustwave.xyz --attempts=6 --retry-delay-ms=5000
+
       - name: Check for new diary entries
         if: success()
         env:

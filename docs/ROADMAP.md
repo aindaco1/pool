@@ -2,11 +2,33 @@
 
 ## Current Milestone
 
-**v1.1.1**
+**v1.1.2**
 
-The v1.1.1 milestone completes the repository-backed media library/optimization workflow and Stripe-focused payment integrity hardening without adding a second media database, a full accounting ledger, or unsafe manual charge recovery.
+The v1.1.2 milestone strengthens Google crawl verification, prepares one honest featured physical reward per campaign for future Shopping onboarding, and refreshes public policies and bilingual About/Terms content without adding a second product catalog.
 
 ## Completed
+
+**Search, Shopping readiness, and public policy refresh**
+
+- [x] Sitemap and live crawl verification
+  - Sitemap `lastmod` values now come only from real content dates instead of changing for every build
+  - The generated SEO audit rejects malformed XML, duplicate URLs, invalid or future dates, private routes, and incoherent structured data
+  - Production deploys compare ordinary and Google Inspection sitemap responses, require correct XML/robots content types, and fetch every submitted public URL with bounded propagation retries
+- [x] Featured-reward product pages
+  - Campaign Shopping support reuses the existing `featured_tier_id`, reward data, localized route model, cart button, seller identity, and merchant policy instead of creating a second catalog
+  - Enabling fails closed unless the featured reward is physical and has a positive price, image, description, and exact availability date after the campaign deadline and within one year
+  - Focused product pages expose visible preorder, availability, shipping, and final-sale facts with aligned Open Graph and `Product` / `Offer` / breadcrumb data; expired or upcoming campaign offers become `OutOfStock`
+  - The current Their Love candidate remains disabled; exact availability, Merchant Center setup, feed/destination configuration, and Shopping activation are tracked as Future Features rather than release claims
+- [x] Public policies and bilingual content
+  - Terms now publish stable shipping and no-returns anchors, a clear final-sale default, a seven-day fulfillment-problem reporting guideline, carrier-record verification, good-faith untracked review, available remedies, and nonwaivable-rights language
+  - About and Terms use `_config.yml` author/company and support-email values, avoid stale release copy, and keep English/Spanish section parity
+  - Shared UI and documentation target neutral US/Latin American Spanish; the owner completed the final fluent review for v1.1.2 on 2026-07-14 in addition to automated completeness checks
+- [x] Store v1.0.8 carryover review
+  - Pool v1.1.0/v1.1.1 already contains the applicable shared price, media, Stripe, reconciliation, and email-outbox slices
+  - The hosted-runner AWS CLI recovery fix was carried over; Store's multi-processor order filter does not apply because Pool is Stripe-only and campaign-scoped
+  - Settings now exposes Pool's existing privacy-minimized Admin sessions and searchable Audit log APIs, including session revocation, campaign-aware filtering, and private CSV export
+  - Brand & SEO exposes the Shopping return-policy country while keeping the no-returns type read-only so dashboard state, public Terms, and JSON-LD cannot silently diverge
+  - Store readiness, Workers Cache, global catalog marketing, product/SKU, coupon, ticket, order, download, and R2 surfaces remain excluded or mapped to existing Pool-native controls
 
 **Variant-specific add-on prices**
 
@@ -334,6 +356,10 @@ The v1.1.1 milestone completes the repository-backed media library/optimization 
 
 ## Future Features
 
+- [ ] Google Shopping launch for the featured Their Love reward
+  - Keep `shopping.enabled: false` until the featured poster's exact expected availability date is confirmed and the visible campaign timeline can publish the same honest date
+  - Create and verify Merchant Center, then configure the feed and Shopping destination from the existing campaign/featured-tier source before expecting Shopping-tab placement; do not create a second product catalog
+  - After those prerequisites pass, enable the existing Shopping product through the dashboard or canonical campaign source and verify the rendered offer, feed acceptance, destination status, and public Shopping placement
 - [ ] Cross-repo parity and docs-as-code discipline
   - Treat Store and Pool feature parity as transferable implementation slices, not a mandate to copy product surfaces. Shared slices include setup/readiness, media authoring, performance gates, security posture, admin audit/session controls, accessibility evidence expansions, i18n QA, SEO sampling expansions, release smoke hardening, payment reconciliation, backup discipline, tax-provider hardening, and add-on price-resolution rules
   - Keep Pool-specific nouns and storage boundaries intact: `_campaigns/`, pledge/order records, `PLEDGES`, `VOTES`, per-campaign Durable Object coordination, platform/campaign add-ons, protected campaign previews, Manage Pledge, supporter community/votes, embeds/share cards, campaign diaries, Blast, launch reminders, abandoned-checkout reminders, and the Pool admin dashboard

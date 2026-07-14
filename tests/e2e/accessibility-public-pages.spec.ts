@@ -92,6 +92,61 @@ test.describe('Public Page Accessibility', () => {
     await expect(activeCard).toBeInViewport();
   });
 
+  test('policy links stay in the footer on larger screens and move below Terms in the mobile menu', async ({ page }) => {
+    await page.goto('/');
+
+    for (const viewport of [
+      { name: 'desktop', width: 1280, height: 900 },
+      { name: 'tablet', width: 820, height: 1180 }
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      const footer = page.locator('.site-footer');
+      const copyright = footer.locator('.site-footer__copyright');
+      const shipping = footer.getByRole('link', { name: 'Shipping', exact: true });
+      const returns = footer.getByRole('link', { name: 'Return Policy', exact: true });
+      await expect(shipping, viewport.name).toBeVisible();
+      await expect(returns, viewport.name).toBeVisible();
+      await expect(shipping).toHaveAttribute('href', '/terms/#shipping-policy');
+      await expect(returns).toHaveAttribute('href', '/terms/#returns-refunds');
+      await expect(page.locator('#mobile-nav .site-header__mobile-policy-link').first()).toBeHidden();
+      await expectNoHorizontalOverflow(page);
+
+      expect(await copyright.evaluate((element) => {
+        const copyrightBox = element.getBoundingClientRect();
+        const policiesBox = element.parentElement?.querySelector('.site-footer__policies')?.getBoundingClientRect();
+        return Boolean(policiesBox && policiesBox.left >= copyrightBox.right);
+      }), viewport.name).toBe(true);
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const footer = page.locator('.site-footer');
+    await expect(footer.locator('.site-footer__policies')).toBeHidden();
+    const menu = page.locator('#mobile-nav');
+    const terms = menu.getByRole('link', { name: 'Terms', exact: true });
+    const shipping = menu.getByRole('link', { name: 'Shipping', exact: true });
+    const returns = menu.getByRole('link', { name: 'Return Policy', exact: true });
+    await expect(shipping).toBeHidden();
+    await page.getByRole('button', { name: 'Open menu' }).click();
+    await expect(shipping).toBeVisible();
+    await expect(returns).toBeVisible();
+    await expect(shipping).toHaveAttribute('href', '/terms/#shipping-policy');
+    await expect(returns).toHaveAttribute('href', '/terms/#returns-refunds');
+    expect(await terms.evaluate((element) => {
+      const shippingLink = element.parentElement?.querySelector('.site-header__mobile-policy-link');
+      return Boolean(shippingLink && (element.compareDocumentPosition(shippingLink) & Node.DOCUMENT_POSITION_FOLLOWING));
+    })).toBe(true);
+    expect((await shipping.boundingBox())?.y || 0).toBeGreaterThan((await terms.boundingBox())?.y || 0);
+    await expectNoHorizontalOverflow(page);
+
+    await page.goto('/es/');
+    await expect(page.locator('.site-footer__policies')).toBeHidden();
+    await page.getByRole('button', { name: 'Abrir menú' }).click();
+    const spanishMenu = page.locator('#mobile-nav');
+    await expect(spanishMenu.getByRole('link', { name: 'Envío', exact: true })).toBeVisible();
+    await expect(spanishMenu.getByRole('link', { name: 'Política de devoluciones', exact: true })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
   test('home page has no obvious axe violations', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('main')).toBeVisible();
@@ -144,7 +199,7 @@ test.describe('Public Page Accessibility', () => {
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
       'heading "What Is The Pool?"',
-      'heading "The Technology"'
+      'heading "For creators"'
     ]);
   });
 
@@ -168,7 +223,7 @@ test.describe('Public Page Accessibility', () => {
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
       'heading "¿Qué es The Pool?"',
-      'heading "La tecnología"'
+      'heading "Para creadores"'
     ]);
   });
 
@@ -180,7 +235,7 @@ test.describe('Public Page Accessibility', () => {
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
       'heading "Términos y pautas creativas"',
-      'heading "Procesamiento de pagos"'
+      'heading "4. Envío y preparación de recompensas"'
     ]);
   });
 
@@ -206,9 +261,9 @@ test.describe('Public Page Accessibility', () => {
     await expect(page.locator('main')).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await expect(page.locator('h1')).toBeInViewport();
-    const technologyHeading = page.locator('h2').filter({ hasText: 'The Technology' });
-    await technologyHeading.scrollIntoViewIfNeeded();
-    await expect(technologyHeading).toBeInViewport();
+    const creatorHeading = page.locator('h2').filter({ hasText: 'For creators' });
+    await creatorHeading.scrollIntoViewIfNeeded();
+    await expect(creatorHeading).toBeInViewport();
   });
 
   test('terms page has no obvious axe violations', async ({ page }) => {
@@ -218,7 +273,7 @@ test.describe('Public Page Accessibility', () => {
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
       'heading "Terms & Creative Guidelines"',
-      'heading "Payment Processing"'
+      'heading "4. Shipping and fulfillment"'
     ]);
   });
 

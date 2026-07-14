@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.1.2 - 2026-07-14
+
+Release scope:
+
+- Fixed misleading sitemap freshness by emitting `lastmod` only from real page/campaign dates, and expanded the generated audit to reject malformed XML, duplicates, invalid/future timestamps, private URLs, and structured-data drift.
+- Added a dependency-free post-deploy crawl audit that compares ordinary and Google Inspection sitemap responses, validates sitemap/robots status and MIME types, and fetches every submitted public URL with bounded propagation retries.
+- Added fail-closed, localized Shopping product pages that reuse a campaign's featured physical tier, existing cart behavior, configured author/company identity, and policy data. Product publishing requires an explicit enable switch plus complete physical-reward facts and an exact expected availability date.
+- Kept the Their Love featured poster candidate disabled; confirming its exact availability date and completing Merchant Center verification plus feed/destination setup remain explicit Future Features before Shopping-tab placement is expected.
+- Added Organization merchant return-policy/contact data, focused Product/Offer metadata, and direct links to stable Shipping and Return Policy anchors beside the DUST WAVE footer mark on desktop/tablet and below Terms in the mobile menu; automated checks ensure that a no-returns policy never publishes a fictitious return window.
+- Rewrote the public About and Terms pages in English and neutral US/Latin American Spanish, using `_config.yml` identity/contact values and documenting all-or-nothing charging, shipping, final-sale defaults, fulfillment-error handling, seven-day reporting verification, privacy, and creative-submission rules.
+- Reviewed Store v1.0.8 carryover: Pool already contained the relevant price, media, Stripe, reconciliation, and durable-email work; adopted the GitHub-hosted AWS CLI recovery fix; exposed the existing session review/revocation and audit search/CSV APIs through localized Settings sections; made their shared info-button guidance, filters, tables, revoke controls, plain-language actions, normalized targets (including generated local test slugs), and status/change explanations responsive and understandable from desktop through mobile while retaining canonical identifiers for filtering, diagnostics, and export; aligned shared Settings sections to Store's order while retaining Pool-specific seams; adapted Brand & SEO to the no-returns Shopping policy; and excluded Store-specific readiness, cache, catalog, order, coupon, ticket, download, R2, and multi-processor surfaces.
+- Matched Store's local admin sign-in affordance by rendering the development-only returned login URL as a localized **Open admin** link while keeping deployed sign-in links email-only.
+- Hardened the pre-merge Jekyll helpers so a failed host or Podman build cannot fall through to minification and validate stale `_site` output; the release gate now proves a fresh generated build before artifact checks.
+
 ## v1.1.1 - 2026-07-12
 
 Release scope:
