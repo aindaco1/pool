@@ -48,6 +48,29 @@ function isPrivatePath(pathname) {
   return PRIVATE_PATH_PATTERNS.some((pattern) => pattern.test(pathname));
 }
 
+function validateSitemapUrls(values, { baseUrl, label = 'sitemap', entryLabel = 'loc' }) {
+  const errors = [];
+  const urls = [];
+  const seen = new Set();
+  for (const rawValue of values) {
+    const value = String(rawValue || '').trim();
+    let parsed;
+    try {
+      parsed = new URL(value);
+    } catch {
+      errors.push(`${label} ${entryLabel} is not an absolute URL: ${value || 'empty'}`);
+      continue;
+    }
+    if (parsed.origin !== baseUrl) errors.push(`${label} ${entryLabel} points outside ${baseUrl}: ${value}`);
+    if (parsed.search || parsed.hash) errors.push(`${label} ${entryLabel} has a query or fragment: ${value}`);
+    if (isPrivatePath(parsed.pathname)) errors.push(`${label} contains a private route: ${parsed.pathname}`);
+    if (seen.has(value)) errors.push(`${label} contains duplicate ${entryLabel}: ${value}`);
+    seen.add(value);
+    urls.push(value);
+  }
+  return { errors, urls };
+}
+
 export function validateSitemapResponse({ response, body, baseUrl }) {
   const errors = [];
   const urls = [];
@@ -65,23 +88,12 @@ export function validateSitemapResponse({ response, body, baseUrl }) {
 
   const locMatches = Array.from(String(body || '').matchAll(/<loc>([\s\S]*?)<\/loc>/gi));
   if (locMatches.length === 0) errors.push('sitemap contains no loc entries');
-  const seen = new Set();
-  for (const match of locMatches) {
-    const value = decodeXmlText(match[1]).trim();
-    let parsed;
-    try {
-      parsed = new URL(value);
-    } catch {
-      errors.push(`sitemap loc is not an absolute URL: ${value || 'empty'}`);
-      continue;
-    }
-    if (parsed.origin !== baseUrl) errors.push(`sitemap loc points outside ${baseUrl}: ${value}`);
-    if (parsed.search || parsed.hash) errors.push(`sitemap loc has a query or fragment: ${value}`);
-    if (isPrivatePath(parsed.pathname)) errors.push(`sitemap contains a private route: ${parsed.pathname}`);
-    if (seen.has(value)) errors.push(`sitemap contains duplicate loc: ${value}`);
-    seen.add(value);
-    urls.push(value);
-  }
+  const validatedUrls = validateSitemapUrls(
+    locMatches.map((match) => decodeXmlText(match[1])),
+    { baseUrl }
+  );
+  errors.push(...validatedUrls.errors);
+  urls.push(...validatedUrls.urls);
 
   const lastmods = Array.from(String(body || '').matchAll(/<lastmod>([\s\S]*?)<\/lastmod>/gi));
   for (const match of lastmods) {
@@ -93,6 +105,35 @@ export function validateSitemapResponse({ response, body, baseUrl }) {
     }
   }
   return { errors, urls };
+}
+
+export function validateTextSitemapResponse({ response, body, baseUrl }) {
+  const errors = [];
+  const rawBody = String(body || '').replace(/\r\n/g, '\n');
+  if (response.status !== 200) errors.push(`text sitemap returned HTTP ${response.status}`);
+  if (!responseType(response).startsWith('text/plain')) {
+    errors.push(`text sitemap content type is ${responseType(response) || 'missing'}`);
+  }
+  if (rawBody.charCodeAt(0) === 0xfeff) errors.push('text sitemap starts with a UTF-8 BOM');
+  if (looksLikeHtml(rawBody) || looksLikeChallenge(rawBody)) {
+    errors.push('text sitemap response looks like HTML or a bot challenge');
+  }
+
+  const lines = rawBody.split('\n');
+  if (lines.at(-1) === '') lines.pop();
+  if (lines.length === 0 || lines.every((line) => line.trim() === '')) {
+    errors.push('text sitemap contains no URLs');
+  }
+  if (lines.some((line) => line === '' || line !== line.trim())) {
+    errors.push('text sitemap must contain exactly one unpadded URL per non-empty line');
+  }
+  const validatedUrls = validateSitemapUrls(lines, {
+    baseUrl,
+    label: 'text sitemap',
+    entryLabel: 'URL'
+  });
+  errors.push(...validatedUrls.errors);
+  return { errors, urls: validatedUrls.urls };
 }
 
 export function validateRobotsResponse({ response, body, baseUrl }) {
@@ -128,6 +169,19 @@ async function auditOnce({ baseUrl, fetchFn }) {
   const inspectionValidation = validateSitemapResponse({ ...inspection, baseUrl });
   errors.push(...inspectionValidation.errors.map((error) => `inspection user agent: ${error}`));
   if (ordinary.body !== inspection.body) errors.push('sitemap body differs for the Inspection Tool user agent');
+
+  const textOrdinary = await fetchText(fetchFn, `${baseUrl}/sitemap.txt`, 'Pool crawl endpoint audit/1.1');
+  const textInspection = await fetchText(fetchFn, `${baseUrl}/sitemap.txt`, INSPECTION_USER_AGENT);
+  const textSitemap = validateTextSitemapResponse({ ...textOrdinary, baseUrl });
+  errors.push(...textSitemap.errors);
+  const textInspectionValidation = validateTextSitemapResponse({ ...textInspection, baseUrl });
+  errors.push(...textInspectionValidation.errors.map((error) => `inspection user agent: ${error}`));
+  if (textOrdinary.body !== textInspection.body) {
+    errors.push('text sitemap body differs for the Inspection Tool user agent');
+  }
+  if (JSON.stringify(sitemap.urls) !== JSON.stringify(textSitemap.urls)) {
+    errors.push('XML and text sitemap URL lists differ');
+  }
 
   const robots = await fetchText(fetchFn, `${baseUrl}/robots.txt`, INSPECTION_USER_AGENT);
   errors.push(...validateRobotsResponse({ ...robots, baseUrl }));

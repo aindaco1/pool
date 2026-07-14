@@ -1,19 +1,19 @@
 # Roadmap
 
-## Current Milestone
-
-**v1.1.2**
-
-The v1.1.2 milestone strengthens Google crawl verification, prepares one honest featured physical reward per campaign for future Shopping onboarding, and refreshes public policies and bilingual About/Terms content without adding a second product catalog.
-
 ## Completed
 
-**Search, Shopping readiness, and public policy refresh**
+**Search and Google crawl readiness**
 
 - [x] Sitemap and live crawl verification
   - Sitemap `lastmod` values now come only from real content dates instead of changing for every build
+  - Jekyll's implicit collection `date` is excluded from sitemap and campaign SEO metadata so deployment timestamps cannot appear as content publication or modification dates
+  - `/sitemap.txt` is generated from the same public-item selector as `/sitemap.xml`, and automated generated-site and post-deploy audits require the two URL lists to match exactly
   - The generated SEO audit rejects malformed XML, duplicate URLs, invalid or future dates, private routes, and incoherent structured data
   - Production deploys compare ordinary and Google Inspection sitemap responses, require correct XML/robots content types, and fetch every submitted public URL with bounded propagation retries
+  - Cloudflare analytics confirmed Search Console live inspection requests arrived from Google ASN 15169 with the official `Google-InspectionTool` user agent and were not mitigated, ruling out Pool firewall and origin denial as the observed generic live-test error
+
+**Shopping readiness and public policy refresh**
+
 - [x] Featured-reward product pages
   - Campaign Shopping support reuses the existing `featured_tier_id`, reward data, localized route model, cart button, seller identity, and merchant policy instead of creating a second catalog
   - Enabling fails closed unless the featured reward is physical and has a positive price, image, description, and exact availability date after the campaign deadline and within one year
@@ -23,12 +23,7 @@ The v1.1.2 milestone strengthens Google crawl verification, prepares one honest 
   - Terms now publish stable shipping and no-returns anchors, a clear final-sale default, a seven-day fulfillment-problem reporting guideline, carrier-record verification, good-faith untracked review, available remedies, and nonwaivable-rights language
   - About and Terms use `_config.yml` author/company and support-email values, avoid stale release copy, and keep English/Spanish section parity
   - Shared UI and documentation target neutral US/Latin American Spanish; the owner completed the final fluent review for v1.1.2 on 2026-07-14 in addition to automated completeness checks
-- [x] Store v1.0.8 carryover review
-  - Pool v1.1.0/v1.1.1 already contains the applicable shared price, media, Stripe, reconciliation, and email-outbox slices
-  - The hosted-runner AWS CLI recovery fix was carried over; Store's multi-processor order filter does not apply because Pool is Stripe-only and campaign-scoped
-  - Settings now exposes Pool's existing privacy-minimized Admin sessions and searchable Audit log APIs, including session revocation, campaign-aware filtering, and private CSV export
   - Brand & SEO exposes the Shopping return-policy country while keeping the no-returns type read-only so dashboard state, public Terms, and JSON-LD cannot silently diverge
-  - Store readiness, Workers Cache, global catalog marketing, product/SKU, coupon, ticket, order, download, and R2 surfaces remain excluded or mapped to existing Pool-native controls
 
 **Variant-specific add-on prices**
 
@@ -42,6 +37,10 @@ The v1.1.2 milestone strengthens Google crawl verification, prepares one honest 
 
 **Production quality gates and admin operations hardening**
 
+- [x] Store v1.0.8 release carryover review
+  - Pool v1.1.0/v1.1.1 already contains the applicable shared price, media, Stripe, reconciliation, and email-outbox slices
+  - The hosted-runner AWS CLI recovery fix was carried over; Store's multi-processor order filter does not apply because Pool is Stripe-only and campaign-scoped
+  - Store readiness, Workers Cache, global catalog marketing, product/SKU, coupon, ticket, order, download, and R2 surfaces remain excluded or mapped to existing Pool-native controls
 - [x] Store-aligned release gates adapted to Pool
   - One performance-budget config governs generated JavaScript/CSS ceilings, route-specific Lighthouse categories/Web Vitals/resource limits, executable dashboard/Worker timing targets, Workers Cache evidence policy, and public/private cache targets
   - Scriptable Lighthouse and cache-policy evidence cover core public, campaign, runtime shell, admin, generated JSON, static asset, and private Worker routes; evaluator unit tests run without live provider credentials
@@ -76,6 +75,10 @@ The v1.1.2 milestone strengthens Google crawl verification, prepares one honest 
 
 **Admin dashboard analytics and operations**
 
+- [x] Store-aligned Settings administration
+  - Settings follows the Store ordering for shared sections while preserving Pool-specific controls
+  - Pool's privacy-minimized Admin sessions and searchable Audit log APIs are exposed through responsive, localized views with session revocation, campaign-aware filtering, human-readable actions/targets/status, and private CSV export
+  - Local development magic-link login presents a direct super-admin dashboard link without exposing the raw token as display text
 - [x] Gross and net revenue analytics
   - Campaign revenue and Platform revenue remain gross category totals, while net cards/table columns subtract each category's allocated processor-fee share
   - Successful supporter charges store Stripe balance transaction fee, net, gross, charge, and balance transaction IDs when available

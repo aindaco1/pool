@@ -212,7 +212,13 @@ describe('SEO templates', () => {
   it('publishes crawl files with a sitemap and private-route exclusions', () => {
     const robots = readRepoFile('robots.txt');
     const sitemap = readRepoFile('sitemap.xml');
+    const textSitemap = readRepoFile('sitemap.txt');
+    const sitemapItemsInclude = readRepoFile('_includes', 'seo-sitemap-items.liquid');
     const sitemapUrlInclude = readRepoFile('_includes', 'seo-sitemap-url.xml');
+    const textSitemapUrlInclude = readRepoFile('_includes', 'seo-sitemap-url.txt');
+    const seoMeta = readRepoFile('_includes', 'seo-meta.html');
+    const seoJsonLd = readRepoFile('_includes', 'seo-json-ld.html');
+    const shoppingProductGenerator = readRepoFile('_plugins', 'campaign_shopping_product_pages.rb');
     const packageJson = readRepoFile('package.json');
     const premerge = readRepoFile('scripts', 'pre-merge-regression.sh');
 
@@ -222,17 +228,27 @@ describe('SEO templates', () => {
     expect(robots).toContain('Disallow: /es/admin/');
     expect(robots).toContain('Disallow: /pledge-success/');
     expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">');
-    expect(sitemap).toContain("item.layout == 'default'");
-    expect(sitemap).toContain("item.layout == 'default' or item.layout == 'campaign'");
-    expect(sitemap).toContain('item.indexable != false');
-    expect(sitemap).toContain("item.test_only != true");
-    expect(sitemap).toContain('seo-sitemap-url.xml');
+    expect(sitemap).toContain("seo-sitemap-items.liquid format='xml'");
+    expect(textSitemap).toContain("seo-sitemap-items.liquid format='text'");
+    expect(textSitemap).toContain('permalink: /sitemap.txt');
+    expect(sitemapItemsInclude).toContain("item.layout == 'default' or item.layout == 'campaign'");
+    expect(sitemapItemsInclude).toContain('item.indexable != false');
+    expect(sitemapItemsInclude).toContain("item.test_only != true");
+    expect(sitemapItemsInclude).toContain('public_pages | concat: public_campaigns');
+    expect(sitemapItemsInclude).toContain('seo-sitemap-url.xml');
+    expect(sitemapItemsInclude).toContain('seo-sitemap-url.txt');
+    expect(textSitemapUrlInclude).toContain('{{ include.site_base }}{{ include.item.url }}');
     expect(sitemapUrlInclude).toContain('<lastmod>');
-    expect(sitemapUrlInclude).toContain('if item.last_modified_at or item.date');
-    expect(sitemapUrlInclude).not.toContain('default: site.time');
+    expect(sitemapUrlInclude).toContain('if item.last_modified_at');
+    expect(sitemapUrlInclude).not.toContain('item.date');
     expect(sitemapUrlInclude).toContain('xhtml:link rel="alternate"');
     expect(sitemapUrlInclude).toContain('hreflang="x-default"');
     expect(sitemapUrlInclude).toContain('localized-url.html lang=lang');
+    expect(seoMeta).toContain('page.published_at | default: page.start_date');
+    expect(seoMeta).not.toContain('page.date');
+    expect(seoJsonLd).toContain('page.published_at | default: page.start_date');
+    expect(seoJsonLd).not.toContain('page.date');
+    expect(shoppingProductGenerator).not.toContain("campaign.data['date']");
     expect(packageJson).toContain('"test:seo": "node ./scripts/audit-seo.mjs"');
     expect(premerge).toContain('SEO_SITE_DIR=_site node ./scripts/audit-seo.mjs');
   });
