@@ -42,6 +42,7 @@ describe('SEO templates', () => {
     const campaignPreviewLayout = readRepoFile('_layouts', 'campaign-preview.html');
     const header = readRepoFile('_includes', 'header.html');
     const footer = readRepoFile('_includes', 'site-footer.html');
+    const policyLinks = readRepoFile('_includes', 'policy-links.html');
     const cartRuntimeHead = readRepoFile('_includes', 'cart-runtime-head.html');
     const cartRuntimeFoot = readRepoFile('_includes', 'cart-runtime-foot.html');
     const responsiveImage = readRepoFile('_includes', 'responsive-image.html');
@@ -105,6 +106,17 @@ describe('SEO templates', () => {
     expect(header).toContain('widths="320,480"');
     expect(footer).toContain('responsive-image.html src=footer_logo_path');
     expect(footer).toContain('widths="320,480"');
+    expect(footer.indexOf('site-footer__policies')).toBeGreaterThan(footer.indexOf('site-footer__copyright'));
+    expect(footer.indexOf('site-footer__policies')).toBeLessThan(footer.indexOf('site-footer__meta'));
+    expect(footer).toContain('{% include policy-links.html lang=current_lang %}');
+    expect(header).toContain('{% include policy-links.html lang=current_lang link_class="site-header__mobile-policy-link" %}');
+    expect(header.indexOf('policy-links.html')).toBeGreaterThan(header.indexOf('key="nav.terms"'));
+    expect(policyLinks).toContain('#shipping-policy');
+    expect(policyLinks).toContain('#returns-refunds');
+    expect(policyLinks).toContain('key="nav.shipping_policy"');
+    expect(policyLinks).toContain('key="nav.return_policy"');
+    expect(readRepoFile('_data', 'i18n', 'en.yml')).toContain('return_policy: "Return Policy"');
+    expect(readRepoFile('_data', 'i18n', 'es.yml')).toContain('return_policy: "Política de devoluciones"');
     expect(responsiveImage).toContain('<source type="image/webp" srcset="{{ responsive_srcset | escape }}"');
     expect(responsiveImage).toContain('default: "320,480,640,960,1600"');
     expect(campaignLayout).toContain('responsive-image.html src=page.hero_image_wide');
@@ -216,6 +228,8 @@ describe('SEO templates', () => {
     expect(sitemap).toContain("item.test_only != true");
     expect(sitemap).toContain('seo-sitemap-url.xml');
     expect(sitemapUrlInclude).toContain('<lastmod>');
+    expect(sitemapUrlInclude).toContain('if item.last_modified_at or item.date');
+    expect(sitemapUrlInclude).not.toContain('default: site.time');
     expect(sitemapUrlInclude).toContain('xhtml:link rel="alternate"');
     expect(sitemapUrlInclude).toContain('hreflang="x-default"');
     expect(sitemapUrlInclude).toContain('localized-url.html lang=lang');
@@ -323,6 +337,8 @@ describe('SEO templates', () => {
     const campaignLayout = readRepoFile('_layouts', 'campaign.html');
     const seoJsonLd = readRepoFile('_includes', 'seo-json-ld.html');
     const localizedCampaignPlugin = readRepoFile('_plugins', 'localized_campaign_pages.rb');
+    const workerConfigSync = readRepoFile('scripts', 'sync-worker-config.rb');
+    const wrangler = readRepoFile('worker', 'wrangler.toml');
 
     expect(footer).toContain('translation_key=current_translation_key');
     expect(footer).toContain('localized_paths=current_localized_paths');
@@ -332,10 +348,57 @@ describe('SEO templates', () => {
     expect(campaignLayout).toContain('translation_key=page.translation_key localized_paths=page.localized_paths');
     expect(seoJsonLd).toContain("localized-url.html lang=current_lang translation_key='home'");
     expect(seoJsonLd).toContain('availableLanguage');
+    expect(seoJsonLd).toContain('assign available_languages = site.i18n.supported_langs');
+    expect(seoJsonLd).not.toContain("site.i18n.supported_langs | default: current_lang | split: '|'");
     expect(seoJsonLd).toContain('"inLanguage": {{ current_lang | jsonify }}');
+    expect(seoJsonLd).toContain('hasMerchantReturnPolicy');
+    expect(seoJsonLd).toContain('MerchantReturnNotPermitted');
+    expect(seoJsonLd).toContain('site.platform.support_email');
+    expect(workerConfigSync).toContain("'SEO_RETURN_POLICY_APPLICABLE_COUNTRY'");
+    expect(workerConfigSync).toContain("'SEO_RETURN_POLICY_CATEGORY'");
+    expect(workerConfigSync).toContain("seo['merchant_return_policy']");
+    expect(wrangler).toContain('SEO_RETURN_POLICY_APPLICABLE_COUNTRY = "US"');
+    expect(wrangler).toContain('SEO_RETURN_POLICY_CATEGORY = "https://schema.org/MerchantReturnNotPermitted"');
     expect(localizedCampaignPlugin).toContain('class LocalizedCampaignPage < PageWithoutAFile');
     expect(localizedCampaignPlugin).toContain("campaign.data['localized_paths'] = localized_paths");
     expect(localizedCampaignPlugin).toContain("File.join(lang.to_s, 'campaigns', slug.to_s)");
+  });
+
+  it('publishes only an explicitly enabled featured physical reward as a Shopping product', () => {
+    const plugin = readRepoFile('_plugins', 'campaign_shopping_product_pages.rb');
+    const productInclude = readRepoFile('_includes', 'campaign-shopping-product.html');
+    const tierCard = readRepoFile('_includes', 'tier-card.html');
+    const seoMeta = readRepoFile('_includes', 'seo-meta.html');
+    const seoJsonLd = readRepoFile('_includes', 'seo-json-ld.html');
+    const campaign = readRepoFile('_campaigns', 'their-love.md');
+
+    expect(plugin).toContain("campaign.data['featured_tier_id']");
+    expect(plugin).toContain("campaign.data['shopping']");
+    expect(plugin).toContain("shopping['enabled'] == true");
+    expect(plugin).toContain("tier['category'].to_s == 'physical'");
+    expect(plugin).toContain("availability_date must not precede the campaign deadline");
+    expect(plugin).toContain("availability_date must be within one year of the build date");
+    expect(plugin).toContain("'https://schema.org/PreOrder'");
+    expect(plugin).toContain("'https://schema.org/OutOfStock'");
+    expect(productInclude).toContain('include tier-card.html');
+    expect(productInclude).toContain('shopping_product.preorder_disclosure');
+    expect(productInclude).toContain('#shipping-policy');
+    expect(productInclude).toContain('#returns-refunds');
+    expect(tierCard).toContain('include.show_image == false');
+    expect(seoMeta).toContain('page.shopping_product == true');
+    expect(seoMeta).toContain('product:price:currency');
+    expect(seoJsonLd).toContain('"@type": "Product"');
+    expect(seoJsonLd).toContain('"@type": "Offer"');
+    expect(seoJsonLd).toContain('site.author');
+    expect(campaign).toContain('shopping:\n  enabled: false\n  availability_date: ""');
+  });
+
+  it('deep-merges local nested overrides without erasing canonical platform identity', () => {
+    const localConfigPlugin = readRepoFile('_plugins', 'local_config.rb');
+
+    expect(localConfigPlugin).toContain('def self.deep_merge(base, override)');
+    expect(localConfigPlugin).toContain('PoolLocalConfig.deep_merge(PoolLocalConfig.deep_merge(base, site.config), local)');
+    expect(localConfigPlugin).not.toContain('site.config.merge!(local)');
   });
 
   it('keeps the public navigation focused on canonical public pages', () => {

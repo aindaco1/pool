@@ -1,0 +1,26 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign campaign = page.campaign -%}
+{%- assign tier = page.product_tier -%}
+{%- assign shopping = page.product_shopping -%}
+{%- assign seller_name = site.platform.company_name | default: site.author -%}
+{%- assign product_brand = shopping.brand | default: campaign.title -%}
+{%- capture campaign_url -%}{% include localized-url.html lang=current_lang translation_key=campaign.translation_key localized_paths=campaign.localized_paths path=campaign.url %}{%- endcapture -%}
+{%- capture terms_url -%}{% include localized-url.html lang=current_lang translation_key='terms' %}{%- endcapture -%}
+<article class="shopping-product">
+  <p><a href="{{ campaign_url | strip }}">{% include t.html key="shopping_product.view_campaign" lang=current_lang title=campaign.title %}</a></p>
+  <h1>{{ tier.name | escape }}</h1>
+
+  {% if tier.image %}
+    {% include responsive-image.html src=tier.image alt=tier.name class="shopping-product__image" loading="eager" fetchpriority="high" decoding="async" sizes="(min-width: 760px) 640px, 100vw" %}
+  {% endif %}
+
+  <p>{{ tier.description | safe_rich_text }}</p>
+  <p><strong>{% include t.html key="shopping_product.price" lang=current_lang %}:</strong> {{ tier.price | money }}</p>
+  <p><strong>{% include t.html key="shopping_product.brand" lang=current_lang %}:</strong> {{ product_brand | escape }} · <strong>{% include t.html key="shopping_product.seller" lang=current_lang %}:</strong> {{ seller_name | escape }}</p>
+  <p>{% include t.html key="shopping_product.preorder_disclosure" lang=current_lang title=campaign.title %}</p>
+  <p><strong>{% include t.html key="shopping_product.expected_availability" lang=current_lang %}:</strong> {% include localized-date.html date=shopping.availability_date lang=current_lang format='long' %}</p>
+  <p>{% if campaign.free_shipping == true %}{% include t.html key="shopping_product.free_shipping" lang=current_lang %}{% else %}{% include t.html key="shopping_product.shipping_at_checkout" lang=current_lang %}{% endif %}</p>
+  <p>{% include t.html key="shopping_product.final_sale" lang=current_lang %} <a href="{{ terms_url | strip }}#shipping-policy">{% include t.html key="shopping_product.shipping_policy" lang=current_lang %}</a> · <a href="{{ terms_url | strip }}#returns-refunds">{% include t.html key="shopping_product.return_policy" lang=current_lang %}</a></p>
+
+  {% include tier-card.html campaign=campaign tier=tier state=page.product_campaign_state show_image=false show_title=false show_description=false %}
+</article>

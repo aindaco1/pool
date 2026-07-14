@@ -35,6 +35,8 @@ TOP_LEVEL_ORDER = [
   'SEO_DEFAULT_SOCIAL_IMAGE_ALT',
   'SEO_X_HANDLE',
   'SEO_SAME_AS',
+  'SEO_RETURN_POLICY_APPLICABLE_COUNTRY',
+  'SEO_RETURN_POLICY_CATEGORY',
   'SEO_INDEX_PUBLIC_COMMUNITY_HUB',
   'STRIPE_PUBLISHABLE_KEY',
   'EMAIL_LOGO_PATH',
@@ -113,6 +115,8 @@ DEV_ENV_ORDER = [
   'SEO_DEFAULT_SOCIAL_IMAGE_ALT',
   'SEO_X_HANDLE',
   'SEO_SAME_AS',
+  'SEO_RETURN_POLICY_APPLICABLE_COUNTRY',
+  'SEO_RETURN_POLICY_CATEGORY',
   'SEO_INDEX_PUBLIC_COMMUNITY_HUB',
   'STRIPE_PUBLISHABLE_KEY',
   'EMAIL_LOGO_PATH',
@@ -368,6 +372,7 @@ def build_mirror_values(config, existing)
   checkout = config['checkout'] || {}
   cache = config['cache'] || {}
   performance = config['performance'] || {}
+  seo_return_policy = seo['merchant_return_policy'] || {}
 
   {
     'SITE_BASE' => platform['site_url'] || config['url'] || existing['SITE_BASE'],
@@ -394,6 +399,8 @@ def build_mirror_values(config, existing)
     'SEO_DEFAULT_SOCIAL_IMAGE_ALT' => seo.key?('default_social_image_alt') ? seo['default_social_image_alt'].to_s : existing['SEO_DEFAULT_SOCIAL_IMAGE_ALT'],
     'SEO_X_HANDLE' => seo.key?('x_handle') ? seo['x_handle'].to_s : existing['SEO_X_HANDLE'],
     'SEO_SAME_AS' => csv_value(seo['same_as'], existing['SEO_SAME_AS']),
+    'SEO_RETURN_POLICY_APPLICABLE_COUNTRY' => seo_return_policy.key?('applicable_country') ? seo_return_policy['applicable_country'].to_s : existing['SEO_RETURN_POLICY_APPLICABLE_COUNTRY'],
+    'SEO_RETURN_POLICY_CATEGORY' => seo_return_policy.key?('return_policy_category') ? seo_return_policy['return_policy_category'].to_s : existing['SEO_RETURN_POLICY_CATEGORY'],
     'SEO_INDEX_PUBLIC_COMMUNITY_HUB' => seo.key?('index_public_community_hub') ? (seo['index_public_community_hub'] ? 'true' : 'false') : existing['SEO_INDEX_PUBLIC_COMMUNITY_HUB'],
     'STRIPE_PUBLISHABLE_KEY' => checkout.key?('stripe_publishable_key') ? checkout['stripe_publishable_key'].to_s : existing['STRIPE_PUBLISHABLE_KEY'],
     'EMAIL_LOGO_PATH' => platform.key?('logo_path') ? platform['logo_path'].to_s : existing['EMAIL_LOGO_PATH'],

@@ -3,113 +3,93 @@ layout: default
 title: Terms & Creative Guidelines
 lang: en
 translation_key: terms
-description: Review pledge terms, payment processing, fulfillment, and privacy details for The Pool.
+description: Review The Pool's pledge, payment, shipping, no-returns, fulfillment, privacy, and creative-submission policies.
+last_modified_at: 2026-07-13
 ---
+{% assign operator_name = site.platform.company_name | default: site.author %}
+{% assign support_email = site.platform.support_email %}
 
 # Terms & Creative Guidelines
 
-These terms reflect The Pool platform release milestone **v1.0.8**.
+**Effective July 13, 2026.** These terms govern use of The Pool, a crowdfunding service operated by {{ operator_name }}. By using the site, submitting a pledge, or providing content, you agree to these terms and to any campaign-specific terms shown before checkout. If campaign-specific terms conflict with these terms, the more specific term controls for that campaign unless prohibited by law.
 
-## Pledge Terms
+## 1. Eligibility and acceptable use
 
-- All pledges are **all-or-nothing**. Your card is saved securely but charged **only if** the campaign reaches its goal by the deadline.
-- If a campaign does not reach its funding goal, your card will not be charged.
-- You can modify or cancel your pledge anytime before the campaign ends using the magic link in your confirmation email.
-- **No account required** — manage your pledge entirely via email links.
-- Where this deployment offers additional languages, those emailed pledge links and supporter-community links may use localized routes while still authorizing the same pledge.
-- A single checkout may include more than one campaign, but each campaign is stored and managed as its own pledge after checkout.
-- Upcoming campaign launch reminders are optional and separate from pledging. If you opt in, The Pool sends one reminder when that campaign goes live and includes an unsubscribe link.
-- Abandoned-checkout reminders are optional and separate from pledging. If you explicitly opt in during first-party checkout, The Pool may send one reminder for an unfinished checkout and includes an unsubscribe link.
-- Some campaigns may be shared privately before launch through protected preview links. Reviewer preview links are invitation-only, campaign-scoped, and expire after 24 hours.
-- All campaign deadlines use this deployment's configured platform timezone. This deployment defaults to `America/Denver` unless platform administrators change it.
-- Community votes are limited to the published options on a campaign's supporter page, and closed decisions do not accept new votes.
-- If a manage link points to a pledge that no longer exists, The Pool treats it as unavailable instead of reconstructing placeholder pledge access.
-- Public campaign pages may include share links for external platforms, SMS, and email. Those links are for public campaign URLs only and do not include pledge-management, checkout, supporter-community, admin, or magic-link tokens.
+You must be able to enter a binding agreement and must provide accurate contact, payment, tax, and shipping information. Do not misuse the service, interfere with its operation, probe private access, impersonate another person, submit unlawful material, or use the platform to violate another person's rights.
 
-## Payment Processing
+## 2. All-or-nothing pledges
 
-- Your card details are handled by **Stripe's secure payment fields** embedded in The Pool checkout. We do not store full card numbers or CVC values. No charge is made until the campaign succeeds.
-- If a campaign is funded, all pledges from the same email for that campaign are combined into a single charge.
-- If one checkout includes more than one funded campaign, each funded campaign may produce its own charge because pledges and settlement are campaign-scoped.
-- You may add an **optional platform tip** from 0% to 15% during checkout. The default tip is 5%.
-- Optional platform tips support maintenance of The Pool and are included in your pledge total, but **do not count toward a campaign's funding goal**.
-- This deployment may also offer **optional platform add-ons** alongside a pledge. Platform add-ons support maintenance of The Pool, are included in your pledge total, and **do not count toward a campaign's funding goal**.
-- A campaign may also offer **optional campaign add-ons** alongside its pledge tiers. Campaign add-ons are included in your pledge total, **do count toward that campaign's funding goal**, and remain associated with that campaign for reporting and fulfillment.
-- Sales tax is applied according to the tax rules configured for this deployment. Depending on the deployment, that may be a flat configured rate or a location-aware tax calculation based on the billing or shipping destination you provide during checkout or later pledge changes.
-- Physical product pledges, physical campaign add-ons, or physical platform add-ons may include deployment-configured shipping charges. Depending on this deployment and campaign settings, shipping may be quoted from USPS, use a configured fallback rate, include free-shipping overrides, or offer limited domestic signature-upgrade options. Campaign add-ons follow the owning campaign's shipping rules; physical platform add-ons may be charged as a separate platform shipment. Your shipping address is collected during checkout so physical rewards can be fulfilled.
-- For some digital-only or mixed carts, The Pool may also ask for enough billing location information to calculate tax before finalizing the pledge total. If a precise tax result is not yet available, the cart may show tax as an estimate until checkout has enough destination detail.
-- If a delivery option is available for your shipment and you change it in checkout or Manage Pledge, the stored shipping total and pledge total are recalculated from the saved pledge state before the change is persisted.
-- If you modify a pledge, The Pool recalculates totals from the saved pledge state and the campaign or add-on definitions in effect for that deployment, rather than trusting browser-submitted money fields.
-- Transactional emails and supporter access links may reflect this deployment's configured branding and localized route structure, but each emailed manage link still authorizes only the pledge tied to that specific order.
-- Scheduled campaign-runner reports, campaign state changes, and settlement checks use the same configured platform timezone as campaign deadlines. Settlement checks are serialized by campaign to avoid duplicate campaign charging.
+- A pledge is a conditional commitment to support a campaign. Stripe saves your payment method, but no campaign charge is made when you first pledge.
+- You may change or cancel a pledge through its secure management link while the campaign is still open.
+- If the campaign does not reach its goal by the deadline, the campaign pledge is not charged.
+- If the campaign reaches its goal, The Pool may charge the saved payment method after the campaign ends. Pledges for the same successful campaign and email address may be combined into one charge; different campaigns are settled separately.
+- Reward tiers, direct campaign support, custom campaign amounts, and campaign add-ons count toward that campaign's goal. Tax, shipping, platform add-ons, and optional platform tips do not.
+- A failed or expired payment method can prevent a pledge from being completed. We may contact you to update it, but we do not promise that every failed payment can be recovered.
 
-## Creative Control & Submissions
+## 3. Prices, payment, tax, and optional charges
 
-This section applies only to campaigns that explicitly solicit creative submissions (e.g., naming rights, story ideas, custom messages). If a campaign does not include submission-based tiers, this section does not apply to your pledge.
+Prices are shown in U.S. dollars unless stated otherwise. The server verifies current catalog prices, selected variants, shipping, tax, tips, add-ons, and campaign totals before saving or charging a pledge. Browser-displayed totals may remain estimates until enough destination information is available.
 
-- You grant us a broad, irrevocable license to use submitted media/text in the production.
-- We retain creative discretion; unsafe, illegal, defamatory or unworkable instructions will be rejected.
-- Submissions must comply with our content guidelines (no hate speech, harassment, or illegal content).
-- We reserve the right to adapt or modify submissions to fit the creative vision and production constraints.
+Stripe handles full card numbers and security codes; The Pool does not store them. Applicable sales tax and shipping are shown during checkout when they can be calculated. Optional platform tips and optional add-ons are identified separately before you confirm the pledge.
 
-## Fulfillment
+## 4. Shipping and fulfillment
+{: #shipping-policy}
 
-- Fulfillment timing may adjust with production realities.
-- We will provide regular updates on production progress and delivery timelines.
-- Digital rewards will be delivered via email to the address provided during pledge.
-- Physical rewards, physical campaign add-ons, and physical platform add-ons are shipped to the address collected during checkout. Any shipping charge shown during checkout is stored with the pledge and included in your pledge total.
+- Physical rewards and products ship to the address saved with the pledge. You are responsible for checking it and using the pledge-management link to submit permitted changes before fulfillment begins.
+- Unless a campaign says otherwise, physical items ship from New Mexico, United States. Available destinations, shipping methods, free-shipping terms, signature options, and charges are the ones shown during checkout.
+- Campaign and product pages may show an estimated availability or delivery period. These are good-faith estimates, not guaranteed delivery dates. Creative production, manufacturing, inventory, weather, customs, carrier operations, and other events can cause delays.
+- If international delivery is offered, the recipient is responsible for import duties, brokerage fees, and local taxes not collected during checkout unless the campaign explicitly says otherwise.
+- Risk of carrier delay or loss is reviewed using the available tracking, address, and fulfillment records. Contact us promptly if tracking appears stalled, delivered to the wrong location, or marked delivered when the package was not received.
+- Digital rewards are delivered to the email address associated with the pledge unless the campaign states another method.
 
-## Refunds & Cancellations
+## 5. No returns, fulfillment problems, and refunds
+{: #returns-refunds}
 
-- **Before funding:** Cancel anytime via your pledge management link. Your card will not be charged.
-- **After funding:** Once a campaign reaches its goal and charges are processed, refunds are handled on a case-by-case basis.
-- Cancelled pledges are never charged.
-- Contact us at info@dustwave.xyz for refund requests or issues.
+**Default policy: no returns or exchanges.** Once a successful campaign pledge or product order is charged, rewards, campaign add-ons, and platform products are final sale. We do not accept returns or exchanges for change of mind, preference, fit, or sizing.
 
-## Privacy & Data
+This final-sale policy does not remove remedies for a damaged, defective, incorrect, or missing item:
 
-- We collect only the information necessary to process pledges and fulfill rewards: email, name, pledge/order details, and, for physical rewards, physical campaign add-ons, or physical platform add-ons, a shipping address.
-- Full card details are handled and stored by Stripe. The Pool does not store full card numbers or CVC values.
-- Email addresses and any shipping details needed for fulfillment may be stored in our system for pledge management, campaign-specific confirmations, campaign updates, and reward fulfillment.
-- If you sign up for an upcoming campaign launch reminder, your email is stored in campaign-scoped reminder records so The Pool can send that one reminder, avoid duplicate sends, and honor unsubscribes for that campaign. Reminder signups may use Cloudflare Turnstile to reduce abuse.
-- If you opt into an abandoned-checkout reminder, your email and a limited checkout reminder record may be stored briefly so The Pool can send one follow-up, avoid duplicate sends, restore the unfinished checkout context from a signed reminder link, delete the reminder after a completed pledge, and honor unsubscribe requests.
-- Authorized campaign operators may view aggregate abandoned-checkout reminder health for campaigns they manage and may set campaign-scoped suppression records. Those controls use hashed email identifiers and aggregate counters instead of exposing reminder recipient lists.
-- Authorized campaign operators may send campaign-scoped supporter blasts to supporters of campaigns they are allowed to manage. Blast emails use the shared transactional email system, may include hosted campaign images and ordinary campaign links, and should not expose unrelated campaign supporter data.
-- Authorized campaign operators may explicitly save shared Marketing or Blast drafts for campaigns they manage. These drafts are campaign-scoped, expire after a short retention window, and may include draft subject lines, campaign links, CTA text, and campaign-hosted media references.
-- Campaign organizers may receive campaign-scoped reports or fulfillment exports containing supporter/order details needed to run that specific campaign, coordinate delivery, or send production-related updates. Those reports stay limited to the campaign a supporter backed rather than exposing unrelated campaign pledges.
-- Authorized campaign operators may also view campaign-scoped supporter rows, reports, analytics, fulfillment data, and campaign content through The Pool's private admin dashboard. Dashboard access is role-scoped: campaign users see only assigned campaigns, while platform administrators may see platform-wide operational data needed to run The Pool.
-- Authorized campaign operators may use protected previews to review draft campaign pages before launch. Explicit reviewer email allowlists are stored only for the short preview window and are not intended for public campaign pages.
-- If a campaign is archived by an authorized platform administrator, campaign source data and campaign-owned uploaded media may be retained in the repository archive for operational records instead of being deleted.
-- When a pledge includes platform-fulfilled add-on items, platform operators may separately receive platform-only fulfillment exports limited to the items they must deliver.
-- Platform administrators may use the dashboard to manage campaign configuration, platform settings, add-ons, referral links, shared marketing drafts, and authorized dashboard users. Secret values are kept in deployment secret stores or ignored local files, not in campaign content or dashboard drafts.
-- Inventory-limited platform add-ons use saved pledge state, not in-progress cart drafts, to determine remaining stock.
-- Inventory-limited campaign add-ons also use saved pledge state, not in-progress cart drafts, to determine remaining stock.
-- Supporter-community access in the browser may be remembered for the current session as a convenience, but the emailed magic link remains the source of truth for access.
-- Public pages may prefetch eligible same-origin public pages after hover, focus, or touch intent to make normal navigation faster. This prefetch behavior excludes admin, checkout, Manage Pledge, supporter-community, tokenized, external, and sensitive-query links.
-- Protected preview pages are private review surfaces. They are excluded from public sitemap, social-preview, and indexing intent until a campaign is launched publicly.
-- Public campaign pages may defer selected third-party media embeds, such as YouTube hero videos, until you choose to play them. Until then, the page may show a local poster image instead of contacting that third-party embed provider.
-- Campaign share links may preserve safe public referral or UTM query parameters so campaign runners can understand public promotion sources. They do not preserve token, order, email, session, or other sensitive query parameters.
-- Authorized platform operators may load Cloudflare and Resend plan-usage status in the private admin dashboard. Those provider checks use server-side credentials and do not send pledge details, supporter emails, shipping addresses, or payment data to the usage endpoints.
-- The private admin dashboard may remember an authorized operator's last tab/subtab workspace in that browser. This UI preference is local to the browser and is not used to grant access beyond the signed-in admin role.
-- We do not sell your information. We share it only as necessary for payment processing, transactional email delivery, abuse prevention, shipping quote calculation, and reward fulfillment.
+1. Email [{{ support_email }}](mailto:{{ support_email }}) as soon as reasonably possible and ordinarily within **seven calendar days after the carrier marks the shipment delivered**.
+2. Include the pledge or order reference, a description of the problem, and clear photos of the item, packaging, and shipping label when reasonably available.
+3. We verify the report against available carrier tracking and fulfillment records. If a shipment has no tracking or no reliable delivered timestamp, we review timing and evidence in good faith.
+4. When the report is verified, the available remedy may be repair, replacement, completion of missing items, or a refund for the affected item, depending on the problem and available inventory.
 
-## Platform & Technology
+The seven-day period is a **problem-reporting guideline, not a return window**. Reporting later does not waive rights that cannot legally be waived, although delay may make carrier claims or factual verification harder.
 
-The Pool is an [open-source crowdfunding platform](https://github.com/aindaco1/pool) built with:
+Before a campaign is funded, you may cancel the pledge while it remains open and no campaign charge will be made. If a charged reward cannot be fulfilled, the campaign or {{ operator_name }} will provide an updated plan and may offer a later delivery, a reasonable substitute with your agreement, or a refund for the unfulfilled item. Duplicate charges, processor errors, suspected fraud, and legally required refunds are reviewed separately from ordinary returns.
 
-- **Jekyll on [GitHub Pages](https://docs.github.com/en/pages)** — Static site generation
-- **The Pool cart runtime** — First-party cart management, checkout sidecars, pledge review, and lazy public-page loading until cart state or supporter intent requires the full cart stack
-- **[Stripe](https://stripe.com)** — Secure payment fields, saved payment methods, and payment processing
-- **[Cloudflare Workers](https://workers.cloudflare.com)** — Backend API for canonical pledge validation, pledge storage, live stats, and automated campaign settlement
-- **Private admin dashboard** — Role-scoped campaign editing, protected previews, new campaign creation, reports, analytics, supporter views, marketing links, user management, and platform operations
-- **[Resend](https://resend.com)** — Transactional emails (confirmations, launch reminders, checkout reminders, campaign blasts, updates, charge notifications)
+## 6. Campaign risks and creator responsibility
 
-Pledge data is stored in Cloudflare KV. This architecture means lower overhead costs and more of your pledge goes directly to the project, with optional platform tips helping cover maintenance of The Pool itself. Production builds also minify generated CSS/JS assets after static site generation, generate responsive image variants for public pages, and let Cloudflare handle transfer compression at the edge. Campaign lifecycle automation uses the configured platform timezone so deadlines, countdowns, reports, and settlement checks stay aligned.
+Crowdfunding supports work that may still be in development. Creative plans, schedules, designs, casting, production methods, and fulfillment details can change. Campaign creators are responsible for describing their project honestly, using funds for the stated project, communicating material changes, and making reasonable efforts to complete promised rewards. The Pool provides the platform and operational tools but does not guarantee that every project or reward will be completed exactly as first described.
 
-## Questions
+## 7. Creative submissions
 
-For questions about these terms or your pledge, email us at info@dustwave.xyz.
+This section applies only when a campaign explicitly asks for names, messages, images, recordings, story ideas, or other supporter-created material. You confirm that you have the right to submit the material. You grant the campaign creator and {{ operator_name }} a worldwide, royalty-free license to host, reproduce, edit, adapt, and use it for the campaign, related production, fulfillment, and promotion. A campaign may reject or modify material that is unsafe, unlawful, defamatory, infringing, hateful, harassing, technically unusable, or inconsistent with the project's creative direction.
 
----
+## 8. Communications and access links
 
-_Last updated: June 19, 2026_
+Pledge confirmations, payment notices, fulfillment messages, and material campaign updates are transactional communications. Optional launch and abandoned-checkout reminders require the consent described at signup and include an unsubscribe method. Secure pledge-management, supporter-community, preview, and administration links must not be shared with unauthorized people. Access can be revoked when a link expires, is misused, or no longer points to an active record.
+
+## 9. Privacy and data
+
+The Pool collects information needed to operate the service, including contact details, pledge and order data, campaign interactions, and shipping information for physical items. Stripe handles full payment-card details. Cloudflare provides site and Worker infrastructure; Resend delivers email; and shipping, tax, and abuse-prevention providers receive limited data when their service is needed.
+
+Authorized campaign operators may access supporter, reporting, and fulfillment information only for campaigns they are permitted to manage. Platform administrators may access information needed to operate, secure, reconcile, support, back up, or restore the platform. We do not sell personal information. Records may be retained for fulfillment, accounting, fraud prevention, legal obligations, dispute handling, and disaster recovery, then deleted or minimized when no longer reasonably needed.
+
+To ask a privacy question or request a review of information associated with your email, contact [{{ support_email }}](mailto:{{ support_email }}). We may need to verify that you control the relevant email or pledge before responding.
+
+## 10. Intellectual property and open source
+
+Campaign creators retain rights in their campaign materials subject to the permissions needed to display, promote, administer, and archive their campaigns. The Pool name, branding, and site content remain the property of their respective owners. The platform source code is available under the license published in its [GitHub repository](https://github.com/aindaco1/pool); that software license does not grant rights to campaign media, supporter submissions, trademarks, or private data.
+
+## 11. Availability, disclaimers, and liability
+
+The service is provided on an “as available” basis. We work to keep pledge records, settlement, email, and public pages reliable, but do not promise uninterrupted or error-free operation. To the fullest extent permitted by law, {{ operator_name }} is not liable for indirect, incidental, special, consequential, or punitive damages arising from use of the service, campaign performance, production changes, or carrier delays. Nothing in these terms excludes liability or consumer rights that cannot legally be excluded.
+
+## 12. Changes to these terms
+
+We may update these terms to reflect product, legal, or operational changes. The effective date above will change when the public terms change materially. Changes apply prospectively unless law requires otherwise. Material campaign-specific changes should also be communicated to affected supporters through the campaign's normal update channels.
+
+## 13. Contact
+
+Questions about a pledge, payment, shipment, fulfillment problem, privacy, or these terms can be sent to [{{ support_email }}](mailto:{{ support_email }}). Include the campaign name and pledge or order reference when applicable; do not email full card numbers or security codes.

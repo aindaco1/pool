@@ -10,6 +10,9 @@ seo:
   same_as: []
   index_public_community_hub: true
   default_social_image_alt: "The Pool"
+  merchant_return_policy:
+    applicable_country: US
+    return_policy_category: https://schema.org/MerchantReturnNotPermitted
   og_locale_overrides:
     en: en_US
     es: es_ES
@@ -37,8 +40,8 @@ exclude:
 # Structured platform settings for forks.
 platform:
   name: The Pool
-  version: "1.1.1"
-  release_label: "v1.1.1"
+  version: "1.1.2"
+  release_label: "v1.1.2"
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   pledges_email_from: "The Pool <pledges@pool.dustwave.xyz>"

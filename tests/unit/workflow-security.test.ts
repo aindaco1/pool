@@ -32,6 +32,8 @@ describe('workflow security posture', () => {
     expect(production).toContain('workflow_dispatch:');
     expect(production).toContain('Reviewed release branch, tag, or commit');
     expect(production).toContain('npx wrangler deploy');
+    expect(pages).toContain('npm run test:crawl-endpoints -- --base=https://pool.dustwave.xyz');
+    expect(production).toContain('npm run test:crawl-endpoints -- --base=https://pool.dustwave.xyz');
   });
 
   it('pins cache purging to the Cloudflare API instead of an unpinned third-party action', () => {
@@ -67,5 +69,13 @@ describe('workflow security posture', () => {
     expect(workflow).toContain("path.join('archive', 'campaigns', slug)");
     expect(workflow).not.toContain('rm -rf');
     expect(workflow).not.toContain('pull_request_target');
+  });
+
+  it('uses the hosted AWS CLI for protected recovery instead of the unavailable Ubuntu apt package', () => {
+    const recovery = readWorkflow('recovery-operations.yml');
+
+    expect(recovery).toContain('sudo apt-get install -y age');
+    expect(recovery).toContain('aws --version');
+    expect(recovery).not.toContain('sudo apt-get install -y age awscli');
   });
 });

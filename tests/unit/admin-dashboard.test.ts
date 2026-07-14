@@ -683,6 +683,8 @@ describe('admin dashboard foundation', () => {
     expect(adminScript).toContain('function activePreviewForCampaign');
     expect(adminScript).toContain('data-campaign-preview-status');
     expect(adminScript).toContain('function setAuthStatus');
+    expect(adminScript).toContain('function setAdminLoginStartStatus');
+    expect(adminScript).toContain("t('dev_link_open', 'Open admin')");
     expect(adminScript).toContain('var adminLoginAttemptStarted = false;');
     expect(adminScript).toContain('if (adminLoginAttemptStarted) return;');
     expect(adminScript).not.toContain('resetAdminTurnstile');
@@ -1675,6 +1677,7 @@ campaign_add_ons:
           { path: 'platform.timezone', value: 'Not/AZone' },
           { path: 'hero_video', campaignSlug: 'hand-relations', value: 'https://example.test/not-a-video' },
           { path: 'seo.same_as', value: 'https://example.test/profile\njavascript:alert(1)' },
+          { path: 'seo.merchant_return_policy.applicable_country', value: 'XX' },
           { path: 'design.font_body', value: 'Inter; background:url(javascript:alert(1))' },
           { path: 'short_blurb', campaignSlug: 'hand-relations', value: 'Help us [win](javascript:alert(1)).' },
           {
@@ -1699,6 +1702,7 @@ campaign_add_ons:
     expect(errors).toContain('Default timezone must be a supported IANA timezone');
     expect(errors).toContain('Hero video must be an uploaded MP4, WebM, or MOV video path, or a YouTube or Vimeo URL');
     expect(errors).toContain('Same-as links contains an invalid URL');
+    expect(errors).toContain('Return policy country must be one of the available options');
     expect(errors).toContain('Body font must be a simple CSS font stack');
     expect(errors).toContain('Short blurb includes an unsafe link URL');
     expect(errors).toContain('Diary entry "Unsafe diary" content is invalid');
@@ -1796,20 +1800,40 @@ campaign_add_ons:
       expect.objectContaining({ title: 'Platform' }),
       expect.objectContaining({ title: 'Secrets & credentials' }),
       expect.objectContaining({ title: 'Runtime diagnostics' }),
+      expect.objectContaining({ title: 'Admin sessions' }),
+      expect.objectContaining({ title: 'Audit log' }),
       expect.objectContaining({ title: 'Pricing' }),
       expect.objectContaining({ title: 'Platform add-ons' })
     ]));
     const sectionTitles = body.sections.map((section: { title: string }) => section.title);
-    expect(sectionTitles).not.toContain('Canonical URLs');
-    expect(sectionTitles.indexOf('Design')).toBeLessThan(sectionTitles.indexOf('Users'));
-    expect(sectionTitles.indexOf('Users')).toBeLessThan(sectionTitles.indexOf('Advanced performance'));
-    expect(body.sections.slice(-2).map((section: { title: string }) => section.title)).toEqual([
+    expect(sectionTitles).toEqual([
+      'Platform',
+      'Brand & SEO',
+      'Checkout',
+      'Pricing',
+      'Tax',
+      'Shipping',
+      'Campaign runner reports',
+      'Design',
+      'Users',
+      'Admin sessions',
+      'Audit log',
+      'Platform add-ons',
+      'Plan usage',
+      'Advanced performance',
+      'Debug',
       'Secrets & credentials',
       'Runtime diagnostics'
     ]);
     const planUsageRows = body.sections.find((section: { title: string }) => section.title === 'Plan usage').rows;
     expect(planUsageRows).toEqual([
       expect.objectContaining({ label: '', input: 'plan-usage', hideLabel: true })
+    ]);
+    expect(body.sections.find((section: { title: string }) => section.title === 'Admin sessions').rows).toEqual([
+      expect.objectContaining({ label: '', input: 'admin-session-review', hideLabel: true, editable: false })
+    ]);
+    expect(body.sections.find((section: { title: string }) => section.title === 'Audit log').rows).toEqual([
+      expect.objectContaining({ label: '', input: 'admin-audit-review', hideLabel: true, editable: false })
     ]);
     const settingsRows = [...body.sections, ...body.campaigns].flatMap((section: { rows: Array<{ help?: string }> }) => section.rows);
     expect(settingsRows.length).toBeGreaterThan(20);
@@ -2020,6 +2044,8 @@ campaign_add_ons:
       'X handle',
       'Default social image alt',
       'Same-as links',
+      'Return policy country',
+      'Return policy type',
       'Index public community hub'
     ]);
     expect(brandRows).toEqual(expect.arrayContaining([
@@ -2044,6 +2070,22 @@ campaign_add_ons:
         editable: true,
         placeholder: expect.stringContaining('https://www.instagram.com/your-handle'),
         help: expect.stringContaining('structured SEO data')
+      }),
+      expect.objectContaining({
+        label: 'Return policy country',
+        input: 'select',
+        path: 'seo.merchant_return_policy.applicable_country',
+        rawValue: 'US',
+        layoutGroup: 'brand-return-policy',
+        editable: true
+      }),
+      expect.objectContaining({
+        label: 'Return policy type',
+        value: 'Returns not permitted',
+        path: '',
+        layoutGroup: 'brand-return-policy',
+        editable: false,
+        help: expect.stringContaining('matching Terms')
       }),
       expect.objectContaining({ label: 'Index public community hub', type: 'boolean', path: 'seo.index_public_community_hub', editable: true })
     ]));
@@ -2599,6 +2641,9 @@ debug:
   verbose_console_logging: true
 seo:
   same_as: []
+  merchant_return_policy:
+    applicable_country: US
+    return_policy_category: https://schema.org/MerchantReturnNotPermitted
 admin:
   local_bootstrap_emails:
     - "admin@example.com"
@@ -2685,6 +2730,7 @@ runner_report_emails:
       { path: 'platform.timezone', value: 'Europe/London' },
       { path: 'platform.pledges_email_from', value: 'The Pool <pledges@pool.test>' },
       { path: 'seo.same_as', value: 'https://example.test/profile\nhttps://social.example.test/pool' },
+      { path: 'seo.merchant_return_policy.applicable_country', value: 'CA' },
       { path: 'debug.verbose_console_logging', value: 'false' },
       { path: 'add_ons.low_stock_threshold', value: '3' },
       {
@@ -2808,6 +2854,8 @@ runner_report_emails:
     expect(configContent).toContain('timezone: "Europe/London"');
     expect(configContent).toContain('pledges_email_from: "The Pool <pledges@pool.test>"');
     expect(configContent).toContain('same_as:\n    - "https://example.test/profile"\n    - "https://social.example.test/pool"');
+    expect(configContent).toContain('applicable_country: "CA"');
+    expect(configContent).toContain('return_policy_category: https://schema.org/MerchantReturnNotPermitted');
     expect(configContent).toContain('verbose_console_logging: false');
     expect(configContent).toContain('users: []');
     expect(configContent).toContain('low_stock_threshold: 3');

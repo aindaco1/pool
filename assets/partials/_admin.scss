@@ -783,6 +783,69 @@ body.campaign-preview-render {
   }
 }
 
+.admin-settings-review__actions {
+  @include admin-action-row($space-sm);
+  margin-top: 12px;
+}
+
+.admin-settings-review__table-wrap {
+  box-sizing: border-box;
+  margin-top: 12px;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-settings-review__table {
+  @include admin-table;
+
+  td {
+    overflow-wrap: anywhere;
+  }
+
+  .btn {
+    white-space: nowrap;
+  }
+}
+
+.admin-session-review,
+.admin-audit-review,
+.admin-session-review__results,
+.admin-audit-review__results {
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-session-review__results h4,
+.admin-audit-review__results h4 {
+  margin-bottom: 8px;
+  margin-top: 20px;
+}
+
+.admin-audit-review__filters {
+  align-items: end;
+  display: grid;
+  gap: 10px 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+
+  .btn {
+    justify-self: start;
+  }
+}
+
+.admin-audit-review__field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+
+  label {
+    @include admin-label;
+  }
+}
+
 .admin-settings__field-grid {
   display: grid;
   gap: 16px;
@@ -802,7 +865,14 @@ body.campaign-preview-render {
   width: 100%;
 }
 
+.admin-settings__row--full,
 .admin-settings__row--full > td {
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-settings__row--full > td {
+  max-width: 0;
   padding-left: 0;
 }
 
@@ -3477,7 +3547,8 @@ textarea.admin-settings__input--readonly {
   .admin-reports__form,
   .admin-marketing__form,
   .admin-content__form,
-  .admin-supporters__filters {
+  .admin-supporters__filters,
+  .admin-audit-review__filters {
     grid-template-columns: 1fr;
   }
 
@@ -3511,6 +3582,10 @@ textarea.admin-settings__input--readonly {
 
   .admin-settings__table {
     overflow: visible;
+  }
+
+  .admin-settings__row--full > td {
+    max-width: none;
   }
 
   .admin-marketing__referrals-table-wrap,
@@ -3562,6 +3637,68 @@ textarea.admin-settings__input--readonly {
       @include admin-label;
       content: attr(data-label);
     }
+  }
+
+  .admin-settings-review__table-wrap {
+    overflow: visible;
+  }
+
+  .admin-settings-review__table {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    display: block;
+    overflow: visible;
+
+    thead {
+      border: 0;
+      clip: rect(0, 0, 0, 0);
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      padding: 0;
+      position: absolute;
+      white-space: nowrap;
+      width: 1px;
+    }
+
+    tbody {
+      display: grid;
+      gap: 10px;
+    }
+
+    tbody tr {
+      @include admin-surface($space-sm);
+      display: grid;
+      gap: 10px;
+    }
+
+    th,
+    td {
+      display: grid;
+      gap: 4px;
+      padding: 0;
+      width: 100%;
+    }
+
+    td {
+      grid-template-columns: minmax(6.5rem, 0.4fr) minmax(0, 1fr);
+    }
+
+    td::before {
+      @include admin-label;
+      content: attr(data-label);
+    }
+
+    td .btn {
+      justify-self: start;
+    }
+  }
+
+  .admin-audit-review__filters .btn {
+    justify-content: center;
+    width: 100%;
   }
 
   .admin-marketing__referral-link {

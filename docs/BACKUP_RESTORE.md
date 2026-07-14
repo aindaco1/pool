@@ -187,6 +187,7 @@ The restore script requires the exact production acknowledgement `POOL_PRODUCTIO
 
 - `.github/workflows/recovery-readiness.yml` runs weekly synthetic readiness and restore rehearsal. It contains synthetic data only and is safe to keep active.
 - `.github/workflows/recovery-operations.yml` runs the quarterly low-traffic preflight. The captured-production protected drill remains disabled unless `RECOVERY_DRILL_ENABLED=true` and the `production-recovery` environment provides the age, Stripe, Cloudflare, and restricted S3-compatible archive credentials.
+- GitHub-hosted Ubuntu runners provide AWS CLI v2. The protected job installs `age` through apt and verifies the hosted `aws` binary with `aws --version`; do not request the unavailable/obsolete apt `awscli` package on that runner image.
 - The protected drill uploads the encrypted archive and manifest to off-account storage, downloads both, proves byte equality, decrypts, reconciles Stripe, restores to preview, verifies, and cleans up exact snapshot-owned keys.
 - Escrow the age identity separately from GitHub and the archive provider before enabling captured-data drills. A private identity that exists only as a GitHub environment secret is sufficient for automation but is not an independent disaster-recovery copy.
 - No workflow performs a production restore.

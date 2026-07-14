@@ -10,6 +10,7 @@ npm run test:unit:watch    # Watch mode
 npm run test:unit:coverage # With coverage report
 npm run test:i18n          # Supported locale catalog completeness check
 npm run test:seo           # Generated-site SEO/crawl audit; build _site first
+npm run test:crawl-endpoints -- --base=https://pool.dustwave.xyz  # Live sitemap/robots/URL fetch audit
 npm run test:performance:budgets  # Generated JS/CSS release ceilings
 npm run test:performance:lighthouse # Core-route Lighthouse evidence in Podman
 npm run test:performance:runtime # Authenticated/redacted Worker p95 evidence; requires input or token
@@ -182,6 +183,7 @@ This runs:
 
 The pre-merge script now auto-starts Jekyll with `_config.yml,_config.local.yml` when needed so the local-only `smoke-editable` campaign is available during merge gating, and the Playwright harness uses the same combined config locally.
 That gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. If the host Ruby path still cannot build cleanly, it falls back to a Podman-backed Jekyll build plus the remaining Podman-aware smoke/browser helpers instead of failing on host setup alone.
+Both Jekyll helpers fail immediately when their build command fails, so minification and artifact validation cannot accidentally reuse stale `_site` output.
 For headless browser runs, Playwright now builds a static `_site` and serves that output with a lightweight HTTP server instead of using `jekyll serve`, which keeps automated browser checks closer to the real published asset layout.
 
 This branch now defaults to the first-party cart/runtime path in both `_config.yml` and `_config.local.yml`, and the browser path no longer supports the old hosted-cart runtime.
@@ -289,6 +291,14 @@ npm run test:seo
 ```
 
 The SEO audit checks the built pages, `robots.txt`, `sitemap.xml`, canonical URLs, hreflang alternates, Open Graph/Twitter metadata, and JSON-LD. Local test-only campaigns can be built for smoke coverage but remain intentionally absent from the sitemap.
+
+After a production deploy, verify the actual origin-facing crawl surface:
+
+```bash
+npm run test:crawl-endpoints -- --base=https://pool.dustwave.xyz --attempts=6 --retry-delay-ms=5000
+```
+
+This dependency-free audit is safe to run in the deploy job after the root build dependencies are gone. It compares ordinary and Google Inspection sitemap bodies, enforces XML/robots MIME types, checks canonical sitemap URLs, and fetches every submitted page. A normal Cloudflare JavaScript-detection injection in an otherwise complete HTML page is permitted; an interstitial without the page's canonical link and main content fails. Bounded retries cover normal propagation without turning a persistent crawl defect into a warning.
 
 On GitHub, the same gate runs automatically in the `Merge Smoke` workflow for pull requests targeting `main`.
 

@@ -12341,6 +12341,7 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['seo.default_social_image_alt', { label: 'Default social image alt', type: 'string', input: 'text', layoutGroup: 'brand-x-social-alt', help: 'Fallback alt text that describes the default social share image for screen readers and metadata consumers.' }],
   ['seo.x_handle', { label: 'X handle', type: 'string', input: 'text', layoutGroup: 'brand-x-social-alt', help: 'Optional X/Twitter handle used for Twitter card metadata. Include or omit the @ sign.' }],
   ['seo.same_as', { label: 'Same-as links', type: 'list', input: 'url-list', placeholder: 'https://www.instagram.com/your-handle\nhttps://www.youtube.com/@your-channel', help: 'Official public profile URLs for this platform or organization, used in structured SEO data to connect the site to its social/web presence. Add one URL per line.' }],
+  ['seo.merchant_return_policy.applicable_country', { label: 'Return policy country', type: 'string', input: 'select', options: ADMIN_ORIGIN_COUNTRY_OPTIONS, layoutGroup: 'brand-return-policy', help: 'Two-letter country code emitted with the no-returns merchant policy in Shopping product structured data.' }],
   ['seo.index_public_community_hub', { label: 'Index public community hub', type: 'boolean', help: 'Whether search engines may index the public supporter-community hub.' }],
   ['checkout.stripe_publishable_key', { label: 'Stripe publishable key', type: 'string', input: 'stripe-publishable-key', help: 'Non-secret Stripe publishable key used by the browser checkout UI. Stripe secret and webhook keys must remain Worker secrets.' }],
   ['pricing.sales_tax_rate', { label: 'Sales Tax Rate', type: 'number', input: 'percent', min: 0, max: 1, step: 0.0001, displayMultiplier: 100, submitDivisor: 100, layoutGroup: 'pricing-tax-shipping', help: 'The fallback sales tax rate shown as a percentage, such as 7.625 for a 7.625% rate.' }],
@@ -12433,6 +12434,8 @@ const ADMIN_CAMPAIGN_SETTING_SCHEMA = new Map([
   ['goal_amount', { label: 'Goal amount', type: 'number', input: 'currency', min: 0, step: 1, layoutGroup: 'campaign-goal-charged', help: 'Funding target in USD used for progress bars, summaries, checkout context, and reports.' }],
   ['runner_report_emails', { label: 'Runner report emails', type: 'list', input: 'email-list', help: 'Recipients for campaign-runner pledge and fulfillment reports. Type an email and press comma or Enter to add it.' }],
   ['featured_tier_id', { label: 'Featured tier', type: 'string', input: 'select', help: 'Existing pledge tier to highlight first or more prominently on campaign pages.' }],
+  ['shopping.enabled', { label: 'Shopping product enabled', type: 'boolean', layoutGroup: 'campaign-shopping', help: 'Publishes the featured physical tier on a focused, indexable product page for search and a future Merchant Center feed.' }],
+  ['shopping.availability_date', { label: 'Shopping availability date', type: 'string', input: 'date', layoutGroup: 'campaign-shopping', help: 'Exact expected availability date for the featured physical reward. Required before Shopping product publishing can be enabled.' }],
   ['single_tier_only', { label: 'Single tier mode', type: 'boolean', layoutGroup: 'campaign-tier-ongoing', help: 'Limits each pledge to one tier selection. Tier quantity is still controlled by each tier\'s Stackable setting.' }],
   ['stretch_goals', { label: 'Stretch goals', type: 'campaign_collection', input: 'campaign-collection', collection: 'stretch_goals', help: 'Funding milestones shown on the campaign page and unlocked as pledge totals grow.' }],
   ['stretch_hidden', { label: 'Hide locked stretch goals', type: 'boolean', layoutGroup: 'campaign-stretch-late-support', help: 'Hides locked stretch-goal details until their thresholds are reached.' }],
@@ -12523,6 +12526,8 @@ function publicCampaignSettings(campaign = {}, env = {}) {
     progressBackground: campaign.progress_background || '',
     runnerReportEmails: Array.isArray(campaign.runner_report_emails) ? campaign.runner_report_emails : [],
     featuredTierId: campaign.featured_tier_id || '',
+    shoppingEnabled: campaign.shopping?.enabled === true,
+    shoppingAvailabilityDate: campaign.shopping?.availability_date || '',
     singleTierOnly: campaign.single_tier_only === true,
     stretchGoals: Array.isArray(campaign.stretch_goals) ? campaign.stretch_goals : [],
     stretchHidden: campaign.stretch_hidden !== false,
@@ -12616,6 +12621,8 @@ function campaignSettingsSection(campaign = {}, env = {}, options = {}) {
     ['Campaign add-ons', settings.campaignAddOns, editableAdminSetting('campaign_add_ons', 'add_on_products', settings.slug)],
     ['Content editor', '', editableAdminSetting('content_editor', 'content_editor', settings.slug)],
     ['Featured tier', settings.featuredTierId, featuredTierSetting],
+    ['Shopping product enabled', settings.shoppingEnabled, editableAdminSetting('shopping.enabled', 'boolean', settings.slug)],
+    ['Shopping availability date', settings.shoppingAvailabilityDate, editableAdminSetting('shopping.availability_date', 'string', settings.slug)],
     ['Tiers', settings.tiers, editableAdminSetting('tiers', 'campaign_collection', settings.slug)],
     ['Support items', settings.supportItems, editableAdminSetting('support_items', 'campaign_collection', settings.slug)],
     ['Diary entries', settings.diary, editableAdminSetting('diary', 'campaign_collection', settings.slug)],
@@ -13908,6 +13915,11 @@ async function handleAdminSettings(request, env) {
   const platformFooterLogoPath = env.PLATFORM_FOOTER_LOGO_PATH || platformLogoPath;
   const platformFaviconPath = env.PLATFORM_FAVICON_PATH || '/assets/images/defaults/favicon.png';
   const platformDefaultSocialImagePath = env.PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH || platformLogoPath;
+  const seoReturnPolicyCountry = env.SEO_RETURN_POLICY_APPLICABLE_COUNTRY || env.SHIPPING_ORIGIN_COUNTRY || 'US';
+  const seoReturnPolicyCategory = env.SEO_RETURN_POLICY_CATEGORY || 'https://schema.org/MerchantReturnNotPermitted';
+  const seoReturnPolicyLabel = seoReturnPolicyCategory === 'https://schema.org/MerchantReturnNotPermitted'
+    ? 'Returns not permitted'
+    : seoReturnPolicyCategory;
 
   if (auth.user.role === 'super_admin') {
     sections.push(
@@ -13934,6 +13946,8 @@ async function handleAdminSettings(request, env) {
         ['X handle', env.SEO_X_HANDLE, editableAdminSetting('seo.x_handle')],
         ['Default social image alt', env.SEO_DEFAULT_SOCIAL_IMAGE_ALT || env.PLATFORM_NAME, editableAdminSetting('seo.default_social_image_alt')],
         ['Same-as links', seoSameAs, editableAdminSetting('seo.same_as', 'list')],
+        ['Return policy country', seoReturnPolicyCountry, editableAdminSetting('seo.merchant_return_policy.applicable_country')],
+        ['Return policy type', seoReturnPolicyLabel, readOnlyAdminSettingHelp('Pool currently publishes a no-returns policy. Add matching Terms and structured-data support before enabling a different return model.', 'brand-return-policy')],
         ['Index public community hub', env.SEO_INDEX_PUBLIC_COMMUNITY_HUB ?? 'true', editableAdminSetting('seo.index_public_community_hub', 'boolean')]
       ]),
       adminSettingsSection('Checkout', [
@@ -13991,10 +14005,30 @@ async function handleAdminSettings(request, env) {
           currentUserEmail: auth.user.email
         }]
       ]),
+      adminSettingsSection('Admin sessions', [
+        ['', '', {
+          input: 'admin-session-review',
+          hideLabel: true,
+          help: 'Review active and recent administrator sign-ins, then revoke sessions that should no longer have access.'
+        }]
+      ]),
+      adminSettingsSection('Audit log', [
+        ['', '', {
+          input: 'admin-audit-review',
+          hideLabel: true,
+          help: 'Search redacted administrator activity and export the same filtered events as a private CSV.'
+        }]
+      ]),
       adminSettingsSection('Platform add-ons', [
         ['Enabled', addOns?.enabled === true, editableAdminSetting('add_ons.enabled', 'boolean')],
         ['Low stock threshold', addOns?.low_stock_threshold ?? 5, editableAdminSetting('add_ons.low_stock_threshold', 'number')],
         ['Products', platformAddOnProducts, editableAdminSetting('add_ons.products', 'add_on_products')]
+      ]),
+      adminSettingsSection('Plan usage', [
+        ['', '', {
+          input: 'plan-usage',
+          hideLabel: true
+        }]
       ]),
       adminSettingsSection('Advanced performance', [
         ['Intent prefetch enabled', env.INTENT_PREFETCH_ENABLED ?? 'true', editableAdminSetting('performance.intent_prefetch_enabled', 'boolean')],
@@ -14002,12 +14036,6 @@ async function handleAdminSettings(request, env) {
         ['Intent prefetch limit', env.INTENT_PREFETCH_LIMIT || '3', editableAdminSetting('performance.intent_prefetch_limit', 'number')],
         ['Live stats cache TTL seconds', env.LIVE_STATS_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_stats_ttl_seconds', 'number')],
         ['Live inventory cache TTL seconds', env.LIVE_INVENTORY_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_inventory_ttl_seconds', 'number')]
-      ]),
-      adminSettingsSection('Plan usage', [
-        ['', '', {
-          input: 'plan-usage',
-          hideLabel: true
-        }]
       ]),
       adminSettingsSection('Debug', [
         ['Console logging enabled', env.DEBUG_CONSOLE_LOGGING_ENABLED, editableAdminSetting('debug.console_logging_enabled', 'boolean')],
