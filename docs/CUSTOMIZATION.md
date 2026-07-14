@@ -283,13 +283,14 @@ Current SEO fundamentals are intentionally bounded. Forks should treat these as 
 - `platform.default_social_image_path`
 - localized page `title` / `description` front matter on public pages
 - campaign `title`, `short_blurb`, and hero images
+- optional authored `published_at` and `last_modified_at` front matter for campaign article dates, plus `last_modified_at` on any sitemap entry that should publish a freshness hint
 
 That surface currently controls:
 
 - canonical URLs
 - meta descriptions
 - Open Graph and Twitter previews
-- sitemap URL generation
+- shared XML/text sitemap URL generation; `robots.txt` advertises only the canonical XML sitemap
 - site-wide `Organization` / `WebSite` JSON-LD
 - campaign `CreativeWork` / breadcrumb JSON-LD
 - fallback social-image alt text
@@ -298,7 +299,7 @@ That surface currently controls:
 The implementation is deliberately narrow:
 
 - private/tokenized/supporter-only flows are marked `noindex`
-- `robots.txt` and `sitemap.xml` only advertise the public surface
+- `robots.txt`, `sitemap.xml`, and its generated `sitemap.txt` diagnostic only expose the same public surface
 - there is no giant per-page SEO settings matrix beyond the content fields the site already supports
 
 Example:

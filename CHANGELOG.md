@@ -14,6 +14,12 @@ Release scope:
 - Matched Store's local admin sign-in affordance by rendering the development-only returned login URL as a localized **Open admin** link while keeping deployed sign-in links email-only.
 - Hardened the pre-merge Jekyll helpers so a failed host or Podman build cannot fall through to minification and validate stale `_site` output; the release gate now proves a fresh generated build before artifact checks.
 
+Post-release cleanup:
+
+- Removed the remaining implicit Jekyll collection-date fallback from sitemap, Open Graph article, JSON-LD, and generated Shopping-product metadata so deployments cannot impersonate content publication or modification dates. Sitemap `lastmod` now requires an authored `last_modified_at`; campaign article dates use explicit `published_at` when provided and otherwise the campaign start date.
+- Added `/sitemap.txt` as a generated diagnostic sitemap using the exact same shared public-item selector as `/sitemap.xml`, without advertising a second canonical sitemap in `robots.txt`. Generated and post-deploy audits require its URL list to match the XML sitemap exactly and compare ordinary versus Google Inspection responses for both formats.
+- Recorded post-deployment evidence that Search Console's official Inspection Tool reached the production sitemap from Google-owned addresses without Cloudflare mitigation while receiving a valid HTTP 200 XML response, isolating the remaining generic live-test error from the site's firewall and origin behavior.
+
 ## v1.1.1 - 2026-07-12
 
 Release scope:

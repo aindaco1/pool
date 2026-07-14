@@ -30,10 +30,12 @@ The current baseline includes:
 - Worker-generated campaign share-card PNGs for public social metadata, with SVG retained for internal preview/debug tooling
 - generated [`robots.txt`](../robots.txt)
 - generated [`sitemap.xml`](../sitemap.xml)
-- shared sitemap URL rendering in [`_includes/seo-sitemap-url.xml`](../_includes/seo-sitemap-url.xml), including localized `xhtml:link` alternates where a page or campaign has localized routes
-- content-derived sitemap `lastmod` values only; a build does not claim that every public URL changed
+- generated diagnostic [`sitemap.txt`](../sitemap.txt), intentionally not advertised as a second canonical sitemap in `robots.txt`
+- shared public sitemap selection in [`_includes/seo-sitemap-items.liquid`](../_includes/seo-sitemap-items.liquid), with XML rendering and localized `xhtml:link` alternates in [`_includes/seo-sitemap-url.xml`](../_includes/seo-sitemap-url.xml)
+- authored sitemap `lastmod` values only through `last_modified_at`; Jekyll's implicit collection `date` and build time are never treated as content changes
+- campaign article publication and modification metadata derived from explicit `published_at`, `last_modified_at`, or the campaign start date rather than Jekyll's deployment-time collection date
 - a generated-site SEO audit at [`scripts/audit-seo.mjs`](../scripts/audit-seo.mjs), exposed as `npm run test:seo` and wired into the merge gate
-- a live crawl-endpoint audit at [`scripts/audit-crawl-endpoints.mjs`](../scripts/audit-crawl-endpoints.mjs) that compares ordinary and Google Inspection responses, validates sitemap/robots status and content types, and fetches every submitted public URL after production deploys
+- a live crawl-endpoint audit at [`scripts/audit-crawl-endpoints.mjs`](../scripts/audit-crawl-endpoints.mjs) that compares ordinary and Google Inspection responses for both sitemap formats, requires identical XML/text URL lists, validates sitemap/robots status and content types, and fetches every submitted public URL after production deploys
 - explicit `noindex,nofollow` on tokenized or supporter-only layouts
 - explicit `noindex,nofollow,noarchive`, `sitemap: false`, robots disallows, and disabled social metadata on the private admin dashboard
 - protected campaign preview shells with `noindex,nofollow,noarchive`, no social metadata, no JSON-LD, no public sitemap inclusion, and no public prefetch eligibility
@@ -48,6 +50,7 @@ The main implementation files are:
 
 - [/_includes/seo-meta.html](../_includes/seo-meta.html)
 - [/_includes/seo-json-ld.html](../_includes/seo-json-ld.html)
+- [/_includes/seo-sitemap-items.liquid](../_includes/seo-sitemap-items.liquid)
 - [/_layouts/campaign.html](../_layouts/campaign.html)
 - [/_plugins/campaign_shopping_product_pages.rb](../_plugins/campaign_shopping_product_pages.rb)
 - [/_includes/campaign-shopping-product.html](../_includes/campaign-shopping-product.html)
@@ -56,6 +59,7 @@ The main implementation files are:
 - [/scripts/audit-crawl-endpoints.mjs](../scripts/audit-crawl-endpoints.mjs)
 - [/robots.txt](../robots.txt)
 - [/sitemap.xml](../sitemap.xml)
+- [/sitemap.txt](../sitemap.txt)
 
 Campaign social previews default to a Worker-generated, crawler-friendly PNG that uses live campaign progress. A campaign can still override that with `social_image` when it needs a fixed static raster image, ideally JPEG or PNG at `1200 x 630`.
 
@@ -236,6 +240,7 @@ When checking a deployment manually:
 - visible campaign share links use the canonical campaign URL and do not replace the metadata-driven social card contract
 - `robots.txt` is reachable and only exposes intended public crawl paths
 - `sitemap.xml` is reachable and only includes intended public URLs
+- `sitemap.txt` is reachable, contains one absolute URL per line, and exactly matches the XML sitemap URL list
 - `npm run test:seo` passes against a freshly built `_site`
 - private/tokenized pages emit `noindex` where appropriate
 - `/admin/` and `/es/admin/` emit `noindex,nofollow,noarchive`, do not appear in `sitemap.xml`, and do not emit social-preview or JSON-LD metadata
@@ -245,7 +250,7 @@ When checking a deployment manually:
 - localized campaign pages keep coherent canonical and alternate links
 - localized pages keep coherent JSON-LD language and breadcrumb roots
 - an enabled Shopping product generates coherent English/Spanish routes, visible preorder facts, `og:type=product`, `Product` / `Offer` / breadcrumb data, and sitemap alternates
-- `npm run test:crawl-endpoints -- --base=https://pool.dustwave.xyz` confirms the deployed sitemap and every submitted URL are directly fetchable without an HTML interstitial
+- `npm run test:crawl-endpoints -- --base=https://pool.dustwave.xyz` confirms both deployed sitemap formats and every submitted URL are directly fetchable without an HTML interstitial
 - metadata additions do not create accessibility or performance regressions
 
 ## Non-Goals

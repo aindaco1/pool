@@ -216,6 +216,10 @@ verify_build_artifacts() {
     echo "sitemap.xml is missing from the built site"
     return 1
   fi
+  if [[ ! -f _site/sitemap.txt ]]; then
+    echo "sitemap.txt is missing from the built site"
+    return 1
+  fi
   if ! search_text -n 'Sitemap: .+/sitemap\.xml' _site/robots.txt >/dev/null; then
     echo "robots.txt is missing its sitemap pointer"
     return 1
