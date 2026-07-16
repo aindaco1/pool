@@ -284,6 +284,10 @@
   - focused commands cover accessibility, rendered i18n/SEO, pledge/report, provider readiness, payment smoke, and optional VoiceOver/Whisper transcript evidence
   - the Release Provider Evidence GitHub Actions workflow provides strict Cloudflare DNS API evidence through dedicated DNS-read secrets
   - `POOL_EMAIL_DRY_RUN` / `RESEND_EMAIL_DRY_RUN` let release evidence render email payloads without calling Resend
+- [x] Cross-repo parity and docs-as-code
+  - [MERGE_SMOKE_CHECKLIST.md](MERGE_SMOKE_CHECKLIST.md), [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md), [TESTING.md](TESTING.md), and [release-evidence/](release-evidence/) document the Pool release discipline.
+  - Pool/Store parity rules treat shared work as transferable primitives while preserving Pool-specific nouns, storage boundaries, checkout, pledging, campaigns, admin, inventory, and SEO behavior.
+  - Pool release notes are tracked in [../CHANGELOG.md](../CHANGELOG.md), while this roadmap keeps the current capability inventory and future feature plan.
 - [x] Disaster recovery automation
   - Added low-traffic preflight, weekly synthetic rehearsals, and an opt-in protected quarterly captured-data preview drill with byte-verified off-account archive readback
 - [x] Public performance
@@ -363,12 +367,6 @@
   - Keep `shopping.enabled: false` until the featured poster's exact expected availability date is confirmed and the visible campaign timeline can publish the same honest date
   - Create and verify Merchant Center, then configure the feed and Shopping destination from the existing campaign/featured-tier source before expecting Shopping-tab placement; do not create a second product catalog
   - After those prerequisites pass, enable the existing Shopping product through the dashboard or canonical campaign source and verify the rendered offer, feed acceptance, destination status, and public Shopping placement
-- [ ] Cross-repo parity and docs-as-code discipline
-  - Treat Store and Pool feature parity as transferable implementation slices, not a mandate to copy product surfaces. Shared slices include setup/readiness, media authoring, performance gates, security posture, admin audit/session controls, accessibility evidence expansions, i18n QA, SEO sampling expansions, release smoke hardening, payment reconciliation, backup discipline, tax-provider hardening, and add-on price-resolution rules
-  - Keep Pool-specific nouns and storage boundaries intact: `_campaigns/`, pledge/order records, `PLEDGES`, `VOTES`, per-campaign Durable Object coordination, platform/campaign add-ons, protected campaign previews, Manage Pledge, supporter community/votes, embeds/share cards, campaign diaries, Blast, launch reminders, abandoned-checkout reminders, and the Pool admin dashboard
-  - When Store lands a stronger implementation first, port only the reusable primitive and document the Pool mapping in the relevant Pool docs; for example, Store product/default media selection maps to Pool campaign/default media selection, not to Store's `_products` catalog, R2 download library, coupons, ticket/RSVP, or order lookup surfaces
-  - When Pool lands a stronger implementation first, keep regression notes that help Store adopt the primitive without changing Pool behavior or weakening campaign/pledge semantics
-  - Keep docs-as-code current by updating the owning document and tests with each slice, not only this roadmap, so README, `worker/README.md`, and the relevant `docs/*.md` files match the implemented source of truth
 - [ ] Guided setup TUI wrapper
   - Build a thin, good-looking terminal UI around the existing `scripts/setup-deploy.mjs` setup core instead of creating a separate desktop app or duplicating provider logic
   - Take interface cues from modern terminal-first tools such as [Hermes Agent CLI](https://hermes-agent.nousresearch.com/docs/user-guide/cli) and [Amp CLI](https://ampcode.com/manual): clear status area, responsive progress, keyboard-friendly navigation, streaming task output, interrupt/retry affordances, and a polished command palette feel
