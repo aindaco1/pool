@@ -331,6 +331,7 @@ describe('admin dashboard foundation', () => {
     const adminBundleScss = readRepoFile('assets', 'admin.scss');
     const adminScss = readRepoFile('assets', 'partials', '_admin.scss');
     const adminScript = readRepoFile('assets', 'js', 'admin-dashboard.js');
+    const adminSettingsReviewScript = readRepoFile('assets', 'js', 'admin-settings-review.js');
     const enI18n = readRepoFile('_data', 'i18n', 'en.yml');
     const esI18n = readRepoFile('_data', 'i18n', 'es.yml');
 
@@ -746,6 +747,11 @@ describe('admin dashboard foundation', () => {
     expect(adminScss).toContain('.admin-campaign-new-users__row');
     expect(adminScript).toContain('loadedContentBaseRevision');
     expect(adminScript).toContain('pool-admin-content-draft:');
+    expect(adminScript).toContain("new URL('admin-settings-review.js', script.src)");
+    expect(adminScript).toContain("moduleScript.dataset.cfasync = 'false'");
+    expect(adminSettingsReviewScript).toContain('global.PoolAdminSettingsReview');
+    expect(adminSettingsReviewScript).toContain('createSessionReview: createSessionReview');
+    expect(adminSettingsReviewScript).toContain('createAuditReview: createAuditReview');
   });
 
   it('keeps English and Spanish admin translation keys in parity', () => {
@@ -766,7 +772,8 @@ describe('admin dashboard foundation', () => {
   it('keeps admin dashboard runtime translation keys in the admin catalog', () => {
     const enAdminKeys = new Set(extractTwoSpaceKeys(extractTopLevelYamlBlock(readRepoFile('_data', 'i18n', 'en.yml'), 'admin')));
     const adminScript = readRepoFile('assets', 'js', 'admin-dashboard.js');
-    const directKeys = Array.from(adminScript.matchAll(/\bt\(\s*['"]([^'"]+)['"]/g), (match) => match[1])
+    const adminSettingsReviewScript = readRepoFile('assets', 'js', 'admin-settings-review.js');
+    const directKeys = Array.from(`${adminScript}\n${adminSettingsReviewScript}`.matchAll(/\bt\(\s*['"]([^'"]+)['"]/g), (match) => match[1])
       .filter((key) => !key.endsWith('_'));
 
     expect(directKeys.filter((key) => !enAdminKeys.has(key))).toEqual([]);

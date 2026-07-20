@@ -144,9 +144,11 @@ if (!fs.existsSync(siteDir)) {
 
 const htmlFiles = walkFiles(siteDir, '.html');
 const sitemapPath = path.join(siteDir, 'sitemap.xml');
+const textSitemapPath = path.join(siteDir, 'sitemap.txt');
 const robotsPath = path.join(siteDir, 'robots.txt');
 const errors = [];
 const sitemapLocs = new Set();
+const sitemapUrls = [];
 const seenCanonicals = new Map();
 const excludedCampaignSlugs = parseExcludedCampaignSlugs();
 
@@ -161,6 +163,7 @@ if (!process.env.SEO_SITE_BASE && fs.existsSync(sitemapPath)) {
 }
 
 if (!fs.existsSync(sitemapPath)) errors.push('missing /sitemap.xml');
+if (!fs.existsSync(textSitemapPath)) errors.push('missing /sitemap.txt');
 if (!fs.existsSync(robotsPath)) errors.push('missing /robots.txt');
 
 if (fs.existsSync(sitemapPath)) {
@@ -178,6 +181,7 @@ if (fs.existsSync(sitemapPath)) {
   for (const loc of Array.from(sitemapDocument.querySelectorAll('loc')).map((node) => node.textContent.trim())) {
     if (sitemapLocs.has(loc)) errors.push(`sitemap.xml: duplicate loc (${loc})`);
     sitemapLocs.add(loc);
+    sitemapUrls.push(loc);
     const parsed = assertAbsoluteSiteUrl(loc, siteBase, 'sitemap loc', '/sitemap.xml', errors);
     if (parsed && isPrivateRoute(parsed.pathname.replace(/\/?$/, '/'))) {
       errors.push(`sitemap.xml: private route included (${parsed.pathname})`);
@@ -189,6 +193,31 @@ if (fs.existsSync(sitemapPath)) {
     if (Number.isFinite(timestamp) && timestamp > Date.now() + 5 * 60 * 1000) {
       errors.push(`sitemap.xml: future lastmod (${lastmod})`);
     }
+  }
+}
+
+if (fs.existsSync(textSitemapPath)) {
+  const rawTextSitemap = readFile(textSitemapPath).replace(/\r\n/g, '\n');
+  if (rawTextSitemap.charCodeAt(0) === 0xfeff) errors.push('sitemap.txt: must not start with a UTF-8 BOM');
+  const textSitemapLines = rawTextSitemap.split('\n');
+  if (textSitemapLines.at(-1) === '') textSitemapLines.pop();
+  if (textSitemapLines.length === 0) errors.push('sitemap.txt: contains no URLs');
+  if (textSitemapLines.some((line) => line === '' || line !== line.trim())) {
+    errors.push('sitemap.txt: must contain exactly one unpadded URL per non-empty line');
+  }
+  const textSitemapUrls = [];
+  const seenTextSitemapUrls = new Set();
+  for (const url of textSitemapLines) {
+    if (seenTextSitemapUrls.has(url)) errors.push(`sitemap.txt: duplicate URL (${url})`);
+    seenTextSitemapUrls.add(url);
+    textSitemapUrls.push(url);
+    const parsed = assertAbsoluteSiteUrl(url, siteBase, 'text sitemap URL', '/sitemap.txt', errors);
+    if (parsed && isPrivateRoute(parsed.pathname.replace(/\/?$/, '/'))) {
+      errors.push(`sitemap.txt: private route included (${parsed.pathname})`);
+    }
+  }
+  if (JSON.stringify(textSitemapUrls) !== JSON.stringify(sitemapUrls)) {
+    errors.push('sitemap.txt: URL list must exactly match sitemap.xml');
   }
 }
 

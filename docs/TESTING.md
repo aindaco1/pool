@@ -290,7 +290,7 @@ npm run assets:minify
 npm run test:seo
 ```
 
-The SEO audit checks the built pages, `robots.txt`, `sitemap.xml`, canonical URLs, hreflang alternates, Open Graph/Twitter metadata, and JSON-LD. Local test-only campaigns can be built for smoke coverage but remain intentionally absent from the sitemap.
+The SEO audit checks the built pages, `robots.txt`, `sitemap.xml`, the matching one-URL-per-line diagnostic `sitemap.txt`, canonical URLs, authored freshness hints, hreflang alternates, Open Graph/Twitter metadata, and JSON-LD. Local test-only campaigns can be built for smoke coverage but remain intentionally absent from either sitemap format.
 
 After a production deploy, verify the actual origin-facing crawl surface:
 
@@ -298,7 +298,7 @@ After a production deploy, verify the actual origin-facing crawl surface:
 npm run test:crawl-endpoints -- --base=https://pool.dustwave.xyz --attempts=6 --retry-delay-ms=5000
 ```
 
-This dependency-free audit is safe to run in the deploy job after the root build dependencies are gone. It compares ordinary and Google Inspection sitemap bodies, enforces XML/robots MIME types, checks canonical sitemap URLs, and fetches every submitted page. A normal Cloudflare JavaScript-detection injection in an otherwise complete HTML page is permitted; an interstitial without the page's canonical link and main content fails. Bounded retries cover normal propagation without turning a persistent crawl defect into a warning.
+This dependency-free audit is safe to run in the deploy job after the root build dependencies are gone. It compares ordinary and Google Inspection bodies for the XML and text sitemaps, requires their ordered public URL lists to match, enforces XML/text/robots MIME types, checks the canonical XML sitemap advertisement, and fetches every submitted page. A normal Cloudflare JavaScript-detection injection in an otherwise complete HTML page is permitted; an interstitial without the page's canonical link and main content fails. Bounded retries cover normal propagation without turning a persistent crawl defect into a warning.
 
 On GitHub, the same gate runs automatically in the `Merge Smoke` workflow for pull requests targeting `main`.
 

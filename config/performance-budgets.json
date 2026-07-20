@@ -6,6 +6,7 @@
     "cssTotalBytes": 240000,
     "files": {
       "assets/js/admin-dashboard.js": 525000,
+      "assets/js/admin-settings-review.js": 35000,
       "assets/js/cart-provider.js": 280000,
       "assets/js/campaign-page.js": 30000,
       "assets/main.css": 175000,

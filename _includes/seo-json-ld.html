@@ -124,8 +124,8 @@
       "isPartOf": {
         "@id": {{ website_id | jsonify }}
       },
-      "datePublished": {{ page.date | default: page.start_date | date_to_xmlschema | jsonify }},
-      "dateModified": {{ page.last_modified_at | default: page.date | default: page.start_date | date_to_xmlschema | jsonify }},
+      "datePublished": {{ page.published_at | default: page.start_date | date_to_xmlschema | jsonify }},
+      "dateModified": {{ page.last_modified_at | default: page.published_at | default: page.start_date | date_to_xmlschema | jsonify }},
       "creator": {
         "@type": "Organization",
         "name": {{ page.creator_name | default: site.platform.default_creator_name | default: organization_name | jsonify }}

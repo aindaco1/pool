@@ -41,8 +41,8 @@
 {%- assign image_type = include.image_type | default: page.social_image_type -%}
 {%- assign twitter_handle = site.seo.x_handle | default: '' | replace: '@', '' | strip -%}
 {%- assign twitter_card = include.twitter_card -%}
-{%- assign article_published_time = page.date | default: page.start_date -%}
-{%- assign article_modified_time = page.last_modified_at | default: page.date | default: page.start_date -%}
+{%- assign article_published_time = page.published_at | default: page.start_date -%}
+{%- assign article_modified_time = page.last_modified_at | default: page.published_at | default: page.start_date -%}
 {%- assign og_locale = current_lang | replace: '-', '_' -%}
 {%- assign locale_override = site.seo.og_locale_overrides[current_lang] -%}
 {%- if locale_override and locale_override != '' -%}

@@ -156,22 +156,28 @@ function assertCampaignRoute(route, lang) {
 
 function assertSitemapAndRobots() {
   const sitemapPath = path.join(SITE_DIR, 'sitemap.xml');
+  const textSitemapPath = path.join(SITE_DIR, 'sitemap.txt');
   const robotsPath = path.join(SITE_DIR, 'robots.txt');
   const problems = [];
   if (!fs.existsSync(sitemapPath)) problems.push('sitemap.xml missing');
+  if (!fs.existsSync(textSitemapPath)) problems.push('sitemap.txt missing');
   if (!fs.existsSync(robotsPath)) problems.push('robots.txt missing');
   const sitemap = fs.existsSync(sitemapPath) ? fs.readFileSync(sitemapPath, 'utf8') : '';
+  const textSitemap = fs.existsSync(textSitemapPath) ? fs.readFileSync(textSitemapPath, 'utf8') : '';
   const robots = fs.existsSync(robotsPath) ? fs.readFileSync(robotsPath, 'utf8') : '';
   for (const privateRoute of ['/admin/', '/es/admin/', '/manage/', '/es/manage/', '/pledge-success/', '/pledge-cancelled/']) {
     if (sitemap.includes(privateRoute)) problems.push(`sitemap includes ${privateRoute}`);
   }
   if (!sitemap.includes('xhtml:link rel="alternate"')) problems.push('sitemap hreflang alternates missing');
+  const xmlUrls = Array.from(sitemap.matchAll(/<loc>([^<]+)<\/loc>/g), (match) => match[1].trim());
+  const textUrls = textSitemap.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (JSON.stringify(xmlUrls) !== JSON.stringify(textUrls)) problems.push('XML/text sitemap URL lists differ');
   if (!robots.includes('Disallow: /admin/')) problems.push('robots does not disallow /admin/');
   if (!robots.includes('Disallow: /es/admin/')) problems.push('robots does not disallow /es/admin/');
   if (!robots.includes('Disallow: /manage/')) problems.push('robots does not disallow /manage/');
   if (!robots.includes('Disallow: /campaigns/*/preview/')) problems.push('robots does not disallow campaign previews');
   if (!/^Sitemap:\s+https?:\/\/.+\/sitemap\.xml/m.test(robots)) problems.push('robots sitemap directive missing');
-  return problems.length ? fail('Sitemap and robots release evidence', problems.join('; ')) : pass('Sitemap and robots release evidence', 'public/private crawl boundaries are correct');
+  return problems.length ? fail('Sitemap and robots release evidence', problems.join('; ')) : pass('Sitemap and robots release evidence', 'matching XML/text public crawl boundaries are correct');
 }
 
 function assertRouteCopy() {

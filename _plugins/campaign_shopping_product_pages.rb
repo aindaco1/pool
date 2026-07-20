@@ -29,7 +29,7 @@ module Jekyll
         'product_campaign_state' => campaign_state,
         'product_offer_availability' => offer_availability,
         'shopping_product' => true,
-        'last_modified_at' => campaign.data['last_modified_at'] || campaign.data['date'],
+        'last_modified_at' => campaign.data['last_modified_at'],
         'localized_paths' => localized_paths,
         'translation_key' => translation_key
       }
