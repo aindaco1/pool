@@ -19,6 +19,9 @@ Release preparation:
   generator into the pinned shared boundary. Pool still loads the same
   characterized implementation through its static admin shell; only the
   source authority and generated path changed.
+- Centralized the Worker provider identity and added a release-contract test
+  that keeps root/Worker packages and locks, canonical config, release label,
+  Stripe, and Resend aligned to v1.2.0.
 
 ## v1.1.2 - 2026-07-14
 
