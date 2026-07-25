@@ -10,6 +10,10 @@ Release preparation:
   typed product-neutral crypto and Stripe mechanics for Podcast without moving
   Pool business rules or changing Pool's existing Turnstile adapter.
 - Kept Pool's campaign, pledge, configuration, session, storage, and deployment authority independent; the submodule contains no Pool data or secrets and can be rolled back by pointer.
+- Advanced `@dustwave/worker-core` to 0.3.0 and added an inert, fail-closed
+  Pool-to-Podcast grant/revoke client with a shared high-entropy one-time-code
+  contract. Product/tier mapping, durable delivery, and supporter issuance
+  remain disabled until their explicit configuration and staging gate.
 
 ## v1.1.2 - 2026-07-14
 

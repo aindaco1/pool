@@ -22,6 +22,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Configurable pricing and tax-provider settings** — `pricing.*` and `tax.*` live in `_config.yml`, and the mirrored Worker vars are auto-synced into `worker/wrangler.toml` so browser previews, provisional tax states, and server-side totals stay aligned
 - **Physical & digital tiers** — Physical items trigger shipping address capture during checkout plus Worker-calculated USPS quotes, configured fallback rates, and optional domestic signature upgrades when enabled
 - **Order-scoped magic links** — Each supporter link only manages its own pledge/order
+- **Podcast benefit bridge foundation** — A disabled-by-default, signed Pool-to-Podcast grant/revoke client shares the exact one-time-code contract with the Podcast runtime; no tier/product mapping or supporter grant is active yet
 - **Safer supporter sessions** — Community pages keep supporter access in browser session storage instead of a long-lived token cookie
 - **Stretch goals** — Auto-unlock at funding thresholds
 - **Campaign lifecycle** — `upcoming` → `live` → `post` states with automatic transitions + Cloudflare cache purge

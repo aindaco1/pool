@@ -29,6 +29,9 @@ TOP_LEVEL_ORDER = [
   'UPDATES_EMAIL_FROM',
   'EMAIL_OUTBOX_ENABLED',
   'PAYMENT_RECONCILIATION_ENABLED',
+  'PODCAST_BENEFITS_ENABLED',
+  'PODCAST_BRIDGE_URL',
+  'PODCAST_BRIDGE_TIMEOUT_MS',
   'PLATFORM_FOOTER_LOGO_PATH',
   'PLATFORM_FAVICON_PATH',
   'PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH',
@@ -109,6 +112,9 @@ DEV_ENV_ORDER = [
   'UPDATES_EMAIL_FROM',
   'EMAIL_OUTBOX_ENABLED',
   'PAYMENT_RECONCILIATION_ENABLED',
+  'PODCAST_BENEFITS_ENABLED',
+  'PODCAST_BRIDGE_URL',
+  'PODCAST_BRIDGE_TIMEOUT_MS',
   'PLATFORM_FOOTER_LOGO_PATH',
   'PLATFORM_FAVICON_PATH',
   'PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH',
@@ -358,6 +364,7 @@ def build_mirror_values(config, existing)
   platform = config['platform'] || {}
   email = config['email'] || {}
   payments = config['payments'] || {}
+  podcast_benefits = config['podcast_benefits'] || {}
   admin = config['admin'] || {}
   pricing = config['pricing'] || {}
   tax = config['tax'] || {}
@@ -393,6 +400,9 @@ def build_mirror_values(config, existing)
     'UPDATES_EMAIL_FROM' => platform['updates_email_from'] || existing['UPDATES_EMAIL_FROM'],
     'EMAIL_OUTBOX_ENABLED' => email.key?('outbox_enabled') ? (email['outbox_enabled'] ? 'true' : 'false') : existing['EMAIL_OUTBOX_ENABLED'],
     'PAYMENT_RECONCILIATION_ENABLED' => payments.key?('reconciliation_enabled') ? (payments['reconciliation_enabled'] ? 'true' : 'false') : existing['PAYMENT_RECONCILIATION_ENABLED'],
+    'PODCAST_BENEFITS_ENABLED' => podcast_benefits.key?('enabled') ? (podcast_benefits['enabled'] ? 'true' : 'false') : existing['PODCAST_BENEFITS_ENABLED'],
+    'PODCAST_BRIDGE_URL' => podcast_benefits.key?('bridge_url') ? podcast_benefits['bridge_url'].to_s : existing['PODCAST_BRIDGE_URL'],
+    'PODCAST_BRIDGE_TIMEOUT_MS' => podcast_benefits.key?('bridge_timeout_ms') ? format_int(podcast_benefits['bridge_timeout_ms']) : existing['PODCAST_BRIDGE_TIMEOUT_MS'],
     'PLATFORM_FOOTER_LOGO_PATH' => platform.key?('footer_logo_path') ? platform['footer_logo_path'].to_s : existing['PLATFORM_FOOTER_LOGO_PATH'],
     'PLATFORM_FAVICON_PATH' => platform.key?('favicon_path') ? platform['favicon_path'].to_s : existing['PLATFORM_FAVICON_PATH'],
     'PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH' => platform.key?('default_social_image_path') ? platform['default_social_image_path'].to_s : existing['PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH'],
@@ -467,6 +477,18 @@ dev_values = build_mirror_values(dev_config, existing_dev).merge(
   'ADMIN_LOCAL_REPO_WRITES_ENABLED' => 'true',
   'ADMIN_LOCAL_REPO_SERVICE' => 'http://127.0.0.1:8799'
 )
+# The committed development defaults are deliberately localhost. Preserve
+# those existing values unless `_config.local.yml` explicitly opts into a
+# different development origin. Otherwise a normal sync with only the base
+# production config would silently point local requests at live services.
+local_platform = local_config['platform'] || {}
+unless local_config.key?('url') || local_platform.key?('site_url')
+  dev_values['SITE_BASE'] = existing_dev['SITE_BASE']
+  dev_values['CORS_ALLOWED_ORIGIN'] = existing_dev['CORS_ALLOWED_ORIGIN']
+end
+unless local_platform.key?('worker_url')
+  dev_values['WORKER_BASE'] = existing_dev['WORKER_BASE']
+end
 top_values['APP_MODE'] = 'live'
 top_values['CANONICAL_SITE_BASE'] = top_values['SITE_BASE']
 top_values['CANONICAL_WORKER_BASE'] = top_values['WORKER_BASE']

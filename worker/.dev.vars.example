@@ -31,6 +31,8 @@ MAGIC_LINK_SECRET=
 TURNSTILE_SECRET_KEY=
 ADMIN_TURNSTILE_REQUIRED=false
 ADMIN_TURNSTILE_BYPASS=false
+# Dedicated HMAC secret shared only with the matching Podcast environment.
+POOL_PODCAST_BRIDGE_SECRET=
 
 # Stripe checkout and webhooks.
 # Prefer the *_TEST variables for local development. STRIPE_SECRET_KEY and

@@ -2102,6 +2102,7 @@ campaign_add_ons:
       expect.objectContaining({ label: 'Checkout intent secret', value: 'Missing', editable: false }),
       expect.objectContaining({ label: 'Magic link secret', value: 'Configured', editable: false }),
       expect.objectContaining({ label: 'Admin session secret', value: 'Optional / not configured', editable: false }),
+      expect.objectContaining({ label: 'Pool–Podcast bridge secret', value: 'Optional / not configured', editable: false }),
       expect.objectContaining({ label: 'Cloudflare deploy credentials', value: 'GitHub secret / local shell only', editable: false })
     ]));
     secretRows.forEach((row: { path?: string; rawValue?: string; value?: string }) => {
