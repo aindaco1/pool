@@ -472,7 +472,7 @@ describe('admin dashboard foundation', () => {
     expect(embedBuilder).toContain('data-campaign-embed-autoload="{{ embed_autoload }}"');
     expect(embedBuilder).toContain('data-campaign-embed-sync-query="{{ embed_sync_query }}"');
     expect(layout).toContain('/assets/js/campaign-embed.js');
-    expect(layout).toContain('/assets/js/vendor/qrcode-generator.js');
+    expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/vendor/qrcode-generator.js');
     expect(embedScript).toContain('isAdminMarketingEmbed');
     expect(embedScript).toContain('heroVideo && !isAdminMarketingEmbed');
     expect(layout.indexOf('id="admin-marketing-campaign"')).toBeLessThan(layout.indexOf('id="admin-marketing-referrer"'));

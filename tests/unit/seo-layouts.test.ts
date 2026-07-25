@@ -180,7 +180,17 @@ describe('SEO templates', () => {
     });
 
     expect(missing).toEqual([]);
-    expect(readRepoFile('assets', 'js', 'vendor', 'qrcode-generator.js')).toContain('window.qrcode = qrcode');
+    expect(
+      readRepoFile(
+        'shared',
+        'dust-wave-platform',
+        'packages',
+        'admin-shell',
+        'src',
+        'vendor',
+        'qrcode-generator.js'
+      )
+    ).toContain('window.qrcode = qrcode');
   });
 
   it('marks private pledge and supporter layouts as noindex', () => {

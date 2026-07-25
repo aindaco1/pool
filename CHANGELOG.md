@@ -14,6 +14,11 @@ Release preparation:
   Pool-to-Podcast grant/revoke client with a shared high-entropy one-time-code
   contract. Product/tier mapping, durable delivery, and supporter issuance
   remain disabled until their explicit configuration and staging gate.
+- Advanced the shared workspace to 0.6.0 and
+  `@dustwave/admin-shell` 0.2.0, moving Pool and Store's byte-identical QR
+  generator into the pinned shared boundary. Pool still loads the same
+  characterized implementation through its static admin shell; only the
+  source authority and generated path changed.
 
 ## v1.1.2 - 2026-07-14
 
