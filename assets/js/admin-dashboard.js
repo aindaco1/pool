@@ -18,6 +18,7 @@
   var siteUrl = config.platform?.siteUrl || config.siteUrl || window.location.origin || '';
   var canonicalSiteUrl = script.dataset.canonicalSiteUrl || '';
   var canonicalWorkerBase = script.dataset.canonicalWorkerBase || '';
+  var credentialedDownloadModulePromise = null;
 
   var authPanel = document.getElementById('admin-auth-panel');
   var loginForm = document.getElementById('admin-login-form');
@@ -894,39 +895,33 @@
     return data;
   }
 
+  function credentialedDownloads() {
+    var moduleUrl = String(script.dataset.adminDownloadModule || '').trim();
+    if (!moduleUrl) {
+      return Promise.reject(new Error('Shared download module is not configured'));
+    }
+    if (!credentialedDownloadModulePromise) {
+      credentialedDownloadModulePromise = import(moduleUrl);
+    }
+    return credentialedDownloadModulePromise;
+  }
+
   async function requestBlob(path, options) {
     var headers = Object.assign({}, options?.headers || {});
-    var response = await fetch(apiUrl(path), Object.assign({}, options || {}, {
-      credentials: 'include',
-      headers: headers
-    }));
-    if (!response.ok) {
-      var data = await response.json().catch(function() { return {}; });
-      var error = new Error(data.error || 'Request failed');
-      error.response = response;
-      error.data = data;
-      throw error;
-    }
-    return {
-      blob: await response.blob(),
-      filename: getFilenameFromDisposition(response.headers.get('Content-Disposition'))
-    };
+    var tools = await credentialedDownloads();
+    return tools.requestCredentialedBlob(apiUrl(path), {
+      fetchImpl: fetch,
+      method: options?.method || 'GET',
+      headers: headers,
+      signal: options?.signal,
+      maximumBytes: 16 * 1024 * 1024,
+      allowedContentTypes: ['text/csv']
+    });
   }
 
-  function getFilenameFromDisposition(disposition) {
-    var match = String(disposition || '').match(/filename="([^"]+)"/);
-    return match ? match[1] : '';
-  }
-
-  function downloadBlobResult(result, fallbackFilename) {
-    var objectUrl = URL.createObjectURL(result.blob);
-    var link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = result.filename || fallbackFilename;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(objectUrl);
+  async function downloadBlobResult(result, fallbackFilename) {
+    var tools = await credentialedDownloads();
+    return tools.triggerBlobDownload(result, fallbackFilename);
   }
 
   function showAuth(message) {
@@ -10152,7 +10147,7 @@
     setText(reportStatus, t('downloading_report', 'Preparing CSV download...'));
     try {
       var result = await requestBlob('/admin/reports/campaign-runner.csv?' + reportQueryParams().toString(), { method: 'GET' });
-      downloadBlobResult(result, 'campaign-runner-report.csv');
+      await downloadBlobResult(result, 'campaign-runner-report.csv');
       setText(reportStatus, t('download_started', 'CSV download started.'));
     } catch (error) {
       logger.error('Failed to download report CSV', error);

@@ -473,6 +473,11 @@ describe('admin dashboard foundation', () => {
     expect(embedBuilder).toContain('data-campaign-embed-sync-query="{{ embed_sync_query }}"');
     expect(layout).toContain('/assets/js/campaign-embed.js');
     expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/vendor/qrcode-generator.js');
+    expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/credentialed-download.js?v={{ asset_version }}');
+    expect(adminScript).toContain('requestCredentialedBlob');
+    expect(adminScript).toContain('triggerBlobDownload');
+    expect(adminScript).toContain('maximumBytes: 16 * 1024 * 1024');
+    expect(adminScript).not.toContain('response.blob()');
     expect(embedScript).toContain('isAdminMarketingEmbed');
     expect(embedScript).toContain('heroVideo && !isAdminMarketingEmbed');
     expect(layout.indexOf('id="admin-marketing-campaign"')).toBeLessThan(layout.indexOf('id="admin-marketing-referrer"'));

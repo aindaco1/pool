@@ -191,6 +191,16 @@ describe('SEO templates', () => {
         'qrcode-generator.js'
       )
     ).toContain('window.qrcode = qrcode');
+    expect(
+      readRepoFile(
+        'shared',
+        'dust-wave-platform',
+        'packages',
+        'admin-shell',
+        'src',
+        'credentialed-download.js'
+      )
+    ).toContain('requestCredentialedBlob');
   });
 
   it('marks private pledge and supporter layouts as noindex', () => {
