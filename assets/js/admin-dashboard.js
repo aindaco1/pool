@@ -179,8 +179,6 @@
   var collectionFieldIdCounter = 0;
   var contentEditorInstanceCounter = 0;
   var activeSettingsSectionHasPublishableControls = true;
-  var mobileTabSelectIdCounter = 0;
-  var mobileTabSelects = new WeakMap();
   var turnstileLoadPromise = null;
   var turnstileWidgetId = null;
   var turnstileToken = '';
@@ -530,52 +528,32 @@
 
   function syncMobileTabSelect(tablist, options) {
     if (!(tablist instanceof HTMLElement)) return;
-    var buttons = Array.from(tablist.querySelectorAll(options?.buttonSelector || '[role="tab"]'))
-      .filter(function(button) {
-        return button instanceof HTMLButtonElement && !button.hidden;
-      });
-    var state = mobileTabSelects.get(tablist);
-    if (!state) {
-      var wrapper = document.createElement('div');
-      wrapper.className = 'admin-mobile-tab-select';
-      var selectId = (tablist.id || 'admin-mobile-tab-select') + '-' + String(++mobileTabSelectIdCounter);
-      var label = document.createElement('label');
-      label.className = 'admin-mobile-tab-select__label';
-      label.setAttribute('for', selectId);
-      var select = document.createElement('select');
-      select.id = selectId;
-      select.className = 'admin-settings__input admin-mobile-tab-select__control';
-      wrapper.append(label, select);
-      tablist.insertAdjacentElement('afterend', wrapper);
-      state = { wrapper: wrapper, label: label, select: select };
-      mobileTabSelects.set(tablist, state);
+    var tabsApi = window.DustWaveAdminShellTabs;
+    if (!tabsApi?.mountResponsiveTabSelect) {
+      logger.error('Shared responsive admin tabs did not initialize.');
+      return;
     }
-
-    state.label.textContent = options?.label || tablist.getAttribute('aria-label') || t('mobile_menu_label', 'Choose section');
-    state.wrapper.hidden = tablist.hidden || buttons.length < 2;
-    state.select.replaceChildren();
-    var selectedValue = '';
-    buttons.forEach(function(button) {
-      var value = String(options?.value ? options.value(button) : button.id || button.textContent || '');
-      var option = document.createElement('option');
-      option.value = value;
-      option.textContent = (button.textContent || value).trim();
-      state.select.append(option);
-      if (button.getAttribute('aria-selected') === 'true') selectedValue = value;
+    tabsApi.mountResponsiveTabSelect(tablist, {
+      activate: options?.activate,
+      buttonSelector: options?.buttonSelector || '[role="tab"]',
+      label: options?.label || tablist.getAttribute('aria-label') || t('mobile_menu_label', 'Choose section'),
+      labelClass: 'admin-mobile-tab-select__label',
+      optionLabel: function(button, value) {
+        return (button.textContent || value).trim();
+      },
+      selectClass: 'admin-settings__input admin-mobile-tab-select__control',
+      tabList: tablist,
+      tabs: function() {
+        return Array.from(tablist.querySelectorAll(options?.buttonSelector || '[role="tab"]'))
+          .filter(function(button) {
+            return button instanceof HTMLButtonElement && !button.hidden;
+          });
+      },
+      value: function(button) {
+        return String(options?.value ? options.value(button) : button.id || button.textContent || '');
+      },
+      wrapperClass: 'admin-mobile-tab-select'
     });
-    if (selectedValue) state.select.value = selectedValue;
-    state.select.onchange = function() {
-      var value = state.select.value;
-      var targetButton = buttons.find(function(button) {
-        return String(options?.value ? options.value(button) : button.id || button.textContent || '') === value;
-      });
-      if (!(targetButton instanceof HTMLButtonElement)) return;
-      if (typeof options?.activate === 'function') {
-        options.activate(value, targetButton);
-      } else {
-        targetButton.click();
-      }
-    };
   }
 
   function syncAdminMobileTabs() {
