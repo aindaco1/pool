@@ -624,6 +624,10 @@ npm audit --audit-level=moderate
 ```
 
 `npm run test:premerge` now includes the secret audit automatically, so local merge gating checks both security behavior and accidental credential exposure.
+The command is a thin Pool policy adapter over the shared Dust Wave scanner:
+it preserves the ignored `worker/.dev.vars` and test-fixture rules, scans
+tracked credential forms plus exact local values in the worktree/history, and
+never prints or partially masks a matched value.
 
 For local runs, keep `CHECKOUT_INTENT_SECRET` configured if you want the live-worker checkout-start suite to exercise the real first-party signing path.
 
