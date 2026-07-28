@@ -664,6 +664,9 @@ describe('admin dashboard foundation', () => {
     expect(adminScript).toContain(
       'size: window.DustWaveAdminShellTurnstile?.responsiveSize?.('
     );
+    expect(adminScss).toMatch(
+      /@media \(max-width: 339px\)[\s\S]+\.admin-auth__turnstile[\s\S]+min-height: 140px/
+    );
     expect(adminScript).toContain('filenameBase');
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");
     expect(adminScript).toContain('/admin/marketing/referrals');
