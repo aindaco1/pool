@@ -660,6 +660,10 @@ describe('admin dashboard foundation', () => {
     expect(adminScript).toContain('syncMobileTabSelect');
     expect(adminScript).toContain('window.DustWaveAdminShellTabs');
     expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/tabs-browser.js?v={{ asset_version }}');
+    expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/turnstile-browser.js?v={{ asset_version }}');
+    expect(adminScript).toContain(
+      'size: window.DustWaveAdminShellTurnstile?.responsiveSize?.('
+    );
     expect(adminScript).toContain('filenameBase');
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");
     expect(adminScript).toContain('/admin/marketing/referrals');

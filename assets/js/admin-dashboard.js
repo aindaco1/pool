@@ -474,7 +474,9 @@
       action: 'admin_login',
       appearance: 'always',
       execution: 'render',
-      size: 'flexible',
+      size: window.DustWaveAdminShellTurnstile?.responsiveSize?.(
+        turnstileWidgetRoot
+      ) || 'compact',
       theme: 'light',
       callback: function(token) {
         turnstileToken = String(token || '');
