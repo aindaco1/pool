@@ -10621,11 +10621,15 @@
     });
   }
 
-  window.addEventListener('beforeunload', function(event) {
-    if (!adminHasUnsavedChanges()) return;
-    event.preventDefault();
-    event.returnValue = '';
-  });
+  var unsavedChangesApi = window.DustWaveAdminShellUnsavedChanges;
+  if (!unsavedChangesApi?.mountUnsavedChangesGuard) {
+    logger.error('Shared unsaved-change guard did not initialize.');
+  } else {
+    unsavedChangesApi.mountUnsavedChangesGuard({
+      eventTarget: window,
+      hasUnsavedChanges: adminHasUnsavedChanges
+    });
+  }
 
   if (tabButtons.length) {
     applyAdminTabCompactLabels();

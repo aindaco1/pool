@@ -24,6 +24,11 @@ Release preparation:
   restored HTML through the existing allowlist sanitizer; Pool behavior is
   unchanged until a form opts into it, and rollback remains a one-commit
   submodule-pointer change.
+- Advanced `@dustwave/admin-shell` to 0.8.0 and replaced Pool's inline browser
+  exit listener with the shared fail-closed unsaved-change lifecycle guard.
+  Pool retains its characterized content, settings, and administrator dirty
+  baselines; Store remains unchanged until its separate editor baselines have a
+  safe aggregate adapter.
 - Centralized the Worker provider identity and added a release-contract test
   that keeps root/Worker packages and locks, canonical config, release label,
   Stripe, and Resend aligned to v1.2.0.
