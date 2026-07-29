@@ -19,6 +19,11 @@ Release preparation:
   generator into the pinned shared boundary. Pool still loads the same
   characterized implementation through its static admin shell; only the
   source authority and generated path changed.
+- Advanced the pinned shared workspace to 0.8.1 and
+  `@dustwave/admin-shell` 0.7.1. The additive rich-editor `setHtml` API routes
+  restored HTML through the existing allowlist sanitizer; Pool behavior is
+  unchanged until a form opts into it, and rollback remains a one-commit
+  submodule-pointer change.
 - Centralized the Worker provider identity and added a release-contract test
   that keeps root/Worker packages and locks, canonical config, release label,
   Stripe, and Resend aligned to v1.2.0.
