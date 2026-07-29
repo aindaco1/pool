@@ -29,6 +29,10 @@ Release preparation:
   Pool retains its characterized content, settings, and administrator dirty
   baselines; Store remains unchanged until its separate editor baselines have a
   safe aggregate adapter.
+- Advanced `@dustwave/admin-shell` to 0.8.1 and routed Pool's characterized
+  dirty-action class, state attribute, localized label, and clean-state
+  disabling through the shared primitive. Pool retains every editor baseline,
+  force-disabled rule, and focus-ring style.
 - Centralized the Worker provider identity and added a release-contract test
   that keeps root/Worker packages and locks, canonical config, release label,
   Stripe, and Resend aligned to v1.2.0.

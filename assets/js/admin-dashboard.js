@@ -649,13 +649,12 @@
   }
 
   function setDirtyButtonState(button, dirty, cleanText, dirtyText, options) {
-    if (!(button instanceof HTMLButtonElement)) return;
-    button.classList.toggle('is-dirty', Boolean(dirty));
-    button.dataset.dirtyState = dirty ? 'dirty' : 'clean';
-    button.textContent = dirty ? dirtyText : cleanText;
-    if (options?.disableWhenClean !== false) {
-      button.disabled = !dirty || Boolean(options?.forceDisabled);
+    var sharedSetter = window.DustWaveAdminShellDirtyControls?.setDirtyButtonState;
+    if (typeof sharedSetter === 'function') {
+      return sharedSetter(button, dirty, cleanText, dirtyText, options);
     }
+    if (button instanceof HTMLButtonElement) button.disabled = true;
+    return false;
   }
 
   function resetSettingsDirtyBaseline(roots, changes) {

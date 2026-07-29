@@ -659,8 +659,10 @@ describe('admin dashboard foundation', () => {
     expect(adminScript).toContain('loadMarketingAbandonedHealth({ force: true })');
     expect(adminScript).toContain('syncMobileTabSelect');
     expect(adminScript).toContain('window.DustWaveAdminShellTabs');
+    expect(adminScript).toContain('window.DustWaveAdminShellDirtyControls');
     expect(adminScript).toContain('window.DustWaveAdminShellUnsavedChanges');
     expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/tabs-browser.js?v={{ asset_version }}');
+    expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/dirty-controls-browser.js?v={{ asset_version }}');
     expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/unsaved-changes-browser.js?v={{ asset_version }}');
     expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/turnstile-browser.js?v={{ asset_version }}');
     expect(adminScript).toContain(
