@@ -11,6 +11,36 @@ describe('package release scripts', () => {
     expect(packageJson.devDependencies['@vitest/coverage-v8']).toBeTruthy();
   });
 
+  it('keeps the supported Node runtime explicit and consistent', () => {
+    const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+    const rootNodeVersion = readFileSync(join(repoRoot, '.nvmrc'), 'utf8').trim();
+    const workerNodeVersion = readFileSync(join(repoRoot, 'worker', '.nvmrc'), 'utf8').trim();
+    const npmConfig = readFileSync(join(repoRoot, '.npmrc'), 'utf8');
+
+    expect(packageJson.engines.node).toBe('^22.22.2 || ^24.15.0 || ^26.0.0');
+    expect(rootNodeVersion).toBe('24.15.0');
+    expect(workerNodeVersion).toBe(rootNodeVersion);
+    expect(npmConfig).toContain('engine-strict=true');
+  });
+
+  it('keeps the Playwright package, container, fallback, and docs aligned', () => {
+    const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+    const packageVersion = String(packageJson.devDependencies['@playwright/test']).replace(/^[~^]/, '');
+    const image = `mcr.microsoft.com/playwright:v${packageVersion}-noble`;
+    const containerfile = readFileSync(join(repoRoot, 'Containerfile.playwright.dev'), 'utf8');
+    const podmanLauncher = readFileSync(join(repoRoot, 'scripts', 'dev-podman.sh'), 'utf8');
+    const podmanDocs = readFileSync(join(repoRoot, 'docs', 'PODMAN.md'), 'utf8');
+
+    expect(containerfile).toContain(`FROM ${image}`);
+    expect(podmanLauncher).toContain(image);
+    expect(podmanDocs).toContain(image);
+  });
+
+  it('groups only minor and patch root development updates', () => {
+    const dependabot = readFileSync(join(repoRoot, '.github', 'dependabot.yml'), 'utf8');
+    expect(dependabot).toMatch(/root-development-dependencies:[\s\S]*update-types:\s*\n\s*- minor\s*\n\s*- patch/);
+  });
+
   it('bootstraps Jekyll gems when the Podman bundle volume is empty', () => {
     const premerge = readFileSync(join(repoRoot, 'scripts', 'pre-merge-regression.sh'), 'utf8');
     expect(premerge).toContain('bundle config set path');

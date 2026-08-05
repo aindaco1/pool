@@ -646,8 +646,8 @@ ensure_podman_ready
 build_image_if_needed "$SITE_IMAGE" "$ROOT_DIR" "$ROOT_DIR/Containerfile.dev"
 if [ -z "$WORKER_NODE_IMAGE" ] && \
    ! podman image exists "docker.io/library/node:24-bookworm-slim" && \
-   podman image exists "mcr.microsoft.com/playwright:v1.57.0-noble"; then
-  WORKER_NODE_IMAGE="mcr.microsoft.com/playwright:v1.57.0-noble"
+   podman image exists "mcr.microsoft.com/playwright:v1.62.1-noble"; then
+  WORKER_NODE_IMAGE="mcr.microsoft.com/playwright:v1.62.1-noble"
   echo "ℹ️  Using cached Playwright Node 24 image for the Worker dev base."
 fi
 

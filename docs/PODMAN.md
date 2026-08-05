@@ -207,7 +207,7 @@ That focused suite is the preferred local browser check for admin UI changes suc
 
 For host-side commands that need a Podman-backed site/Worker without assuming detached stack persistence, use [`scripts/podman-stack-run.sh`](../scripts/podman-stack-run.sh). `npm run test:security:podman` uses that wrapper to boot the stack, run the security suite, and tear the stack down in one invocation.
 
-The Worker container defaults to `node:24-bookworm-slim`. If a local Podman image pull stalls but the Playwright image is already cached, the launcher can reuse `mcr.microsoft.com/playwright:v1.57.0-noble` as a Node 24 base so development still matches the GitHub Actions Node 24 runtime.
+The Worker container defaults to `node:24-bookworm-slim`. If a local Podman image pull stalls but the Playwright image is already cached, the launcher can reuse `mcr.microsoft.com/playwright:v1.62.1-noble` as a Node 24 base so development still matches the GitHub Actions Node 24 runtime. Use `nvm use` from the repository root to select the supported Node 24.15 baseline before running host-side npm commands.
 
 For the host-side headless browser path, Playwright now builds a clean static `_site` and serves it with a lightweight HTTP server instead of relying on `jekyll serve`. That keeps browser regressions closer to the real published asset shape and avoids some WEBrick instability during parallel runs.
 
