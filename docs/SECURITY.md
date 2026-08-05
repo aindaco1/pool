@@ -19,6 +19,7 @@ Use this alongside [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a change creates ne
 | **Launch Reminder Challenge** | `POST /launch-reminders` | Optional/expected Cloudflare Turnstile verification before reminder signup writes |
 | **Admin Recovery Secret** | Automation and recovery `/admin/*` endpoints | `Authorization: Bearer <secret>` or `x-admin-key` header for script-driven operations |
 | **Scoped Admin Secrets** | Settlement and broadcast automation endpoints | Optional `ADMIN_SETTLEMENT_SECRET` and `ADMIN_BROADCAST_SECRET`; when configured, the scoped route rejects the broader `ADMIN_SECRET` |
+| **Podcast Benefit Bridge** | Outbound Pool grant/revoke events | Dedicated HMAC-SHA256 signature over `{timestamp}.{exact body}`, exact endpoint validation, five-minute receiver freshness window, stable event IDs, and a disabled-by-default Pool kill switch |
 | **Test Mode Guard** | `/test/*` | `APP_MODE === 'test'` environment check |
 
 ### Data Storage (Cloudflare KV)
@@ -593,6 +594,7 @@ Payment-specific setup is documented in [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESS
 | Admin Secret | `ADMIN_SECRET` | 32+ chars |
 | Settlement Admin Secret | `ADMIN_SETTLEMENT_SECRET` (optional, scoped) | 32+ chars |
 | Broadcast Admin Secret | `ADMIN_BROADCAST_SECRET` (optional, scoped) | 32+ chars |
+| Pool–Podcast Bridge Secret | `POOL_PODCAST_BRIDGE_SECRET` (required only when Podcast benefits are enabled) | 32+ chars |
 | Turnstile Secret | `TURNSTILE_SECRET_KEY`, `ADMIN_TURNSTILE_SECRET_KEY`, or `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY` | N/A |
 | Resend API Key | `RESEND_API_KEY` | N/A |
 | Cloudflare Usage Analytics Token | `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN` | GraphQL Analytics Read; optional Billing Read for plan detection |
@@ -622,6 +624,10 @@ npm audit --audit-level=moderate
 ```
 
 `npm run test:premerge` now includes the secret audit automatically, so local merge gating checks both security behavior and accidental credential exposure.
+The command is a thin Pool policy adapter over the shared Dust Wave scanner:
+it preserves the ignored `worker/.dev.vars` and test-fixture rules, scans
+tracked credential forms plus exact local values in the worktree/history, and
+never prints or partially masks a matched value.
 
 For local runs, keep `CHECKOUT_INTENT_SECRET` configured if you want the live-worker checkout-start suite to exercise the real first-party signing path.
 

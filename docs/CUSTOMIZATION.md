@@ -541,6 +541,28 @@ By contrast, global `add_ons.products` remain platform merch:
 - they do not count toward campaign funding totals
 - physical global add-ons combine into one separate platform shipment / shipping charge
 
+### `podcast_benefits`
+
+Use `podcast_benefits` for the non-secret boundary between Pool rewards and the
+separate Dust Wave Podcast runtime:
+
+- `enabled` is an explicit kill switch and defaults to `false`
+- `bridge_url` must be the exact Podcast
+  `/v1/internal/pool/grants` endpoint
+- `bridge_timeout_ms` accepts a bounded 1–15 second provider timeout
+- `mappings` is the future product/tier-to-show configuration and remains empty
+  until the operator chooses a qualifying Pool product or tier, entitlement
+  duration, and issuance lifecycle
+
+The matching `POOL_PODCAST_BRIDGE_SECRET` never belongs in `_config.yml`; set
+an independently generated value in Worker secrets or ignored
+`worker/.dev.vars`, and install that same environment-specific value in
+Podcast. The current release exposes and tests only the signed delivery
+primitive. It does not scan pledges, issue codes, enqueue email, or change
+checkout/settlement behavior while `mappings` is empty and the kill switch is
+off. A local `_config.local.yml` may override `bridge_url` with the matching
+local Podcast Worker endpoint for an isolated integration test.
+
 ### `reports`
 
 Use `reports` for campaign-runner report behavior that must stay aligned with Worker scheduling and dashboard report generation.

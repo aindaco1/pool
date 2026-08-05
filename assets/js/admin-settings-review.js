@@ -420,7 +420,13 @@
         setText(status, t('admin_audit_exporting', 'Preparing audit CSV...'));
         try {
           var query = auditQuery(root);
-          downloadBlobResult(await requestBlob('/admin/audit.csv' + (query ? '?' + query : ''), { method: 'GET' }), 'pool-admin-audit.csv');
+          await downloadBlobResult(
+            await requestBlob(
+              '/admin/audit.csv' + (query ? '?' + query : ''),
+              { method: 'GET' }
+            ),
+            'pool-admin-audit.csv'
+          );
           setText(status, t('admin_audit_export_started', 'Audit CSV download started.'));
         } catch (error) {
           logger.error('Failed to download audit CSV', error);

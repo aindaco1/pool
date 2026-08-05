@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.2.0 - Unreleased
+
+Release preparation:
+
+- Added the pinned `aindaco1/dust-wave-platform` submodule as the versioned boundary for primitives shared with Store, Dust Wave, and Podcast.
+- Moved the byte-identical Turnstile implementation into `@dustwave/worker-core` while retaining Pool's local import seam and adding a consumer contract test.
+- Advanced the shared boundary to `@dustwave/worker-core` 0.2.0, which adds
+  typed product-neutral crypto and Stripe mechanics for Podcast without moving
+  Pool business rules or changing Pool's existing Turnstile adapter.
+- Kept Pool's campaign, pledge, configuration, session, storage, and deployment authority independent; the submodule contains no Pool data or secrets and can be rolled back by pointer.
+- Advanced `@dustwave/worker-core` to 0.3.0 and added an inert, fail-closed
+  Pool-to-Podcast grant/revoke client with a shared high-entropy one-time-code
+  contract. Product/tier mapping, durable delivery, and supporter issuance
+  remain disabled until their explicit configuration and staging gate.
+- Advanced the shared workspace to 0.6.0 and
+  `@dustwave/admin-shell` 0.2.0, moving Pool and Store's byte-identical QR
+  generator into the pinned shared boundary. Pool still loads the same
+  characterized implementation through its static admin shell; only the
+  source authority and generated path changed.
+- Advanced the pinned shared workspace to 0.8.1 and
+  `@dustwave/admin-shell` 0.7.1. The additive rich-editor `setHtml` API routes
+  restored HTML through the existing allowlist sanitizer; Pool behavior is
+  unchanged until a form opts into it, and rollback remains a one-commit
+  submodule-pointer change.
+- Advanced `@dustwave/admin-shell` to 0.8.0 and replaced Pool's inline browser
+  exit listener with the shared fail-closed unsaved-change lifecycle guard.
+  Pool retains its characterized content, settings, and administrator dirty
+  baselines; Store remains unchanged until its separate editor baselines have a
+  safe aggregate adapter.
+- Advanced `@dustwave/admin-shell` to 0.8.1 and routed Pool's characterized
+  dirty-action class, state attribute, localized label, and clean-state
+  disabling through the shared primitive. Pool retains every editor baseline,
+  force-disabled rule, and focus-ring style.
+- Centralized the Worker provider identity and added a release-contract test
+  that keeps root/Worker packages and locks, canonical config, release label,
+  Stripe, and Resend aligned to v1.2.0.
+
 ## v1.1.2 - 2026-07-14
 
 Release scope:

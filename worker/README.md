@@ -42,6 +42,15 @@ The Worker mirror also carries the public intent-prefetch knobs used by generate
 
 Those come from `performance.intent_prefetch_*` in the repo-root config and are editable by super admins in **Settings -> Advanced performance**. They are mirrored for config parity and operational visibility; the actual prefetch runtime still loads only on public static layouts and rejects private, tokenized, checkout, admin, supporter, and sensitive-query routes in the browser.
 
+The disabled Podcast benefit bridge is also mirrored from
+`podcast_benefits.enabled`, `bridge_url`, and `bridge_timeout_ms`. Its dedicated
+`POOL_PODCAST_BRIDGE_SECRET` must be installed independently in the matching
+Pool and Podcast environments. The current client validates the exact endpoint,
+normalizes the shared high-entropy code contract, signs the exact JSON body,
+rejects redirects, bounds the response, and classifies retryable failures. It
+is not connected to checkout, settlement, email, or any product/tier mapping
+until that mapping and durable delivery lifecycle are explicitly selected.
+
 Write-path DoS protection now requires a `RATELIMIT` KV namespace. If that binding is missing, the Worker fails closed with `503` instead of running without abuse protection. Public live-data reads stay intentionally roomy for campaign spikes, while checkout, Manage Pledge, and admin mutations use the tighter per-IP caps documented in [`docs/SECURITY.md`](../docs/SECURITY.md). That requirement adds safety, not a new assumption that every fork must immediately outgrow the Workers Free plan.
 
 Deployed Standard/Paid Workers now also set `limits.cpu_ms = 100` in [`wrangler.toml`](./wrangler.toml). That limit is not enforced in local development and is not a Workers Free override; it is a conservative denial-of-wallet ceiling for paid deployments that still leaves comfortable room above the currently observed fast-path request timings in the unit harness.

@@ -2,6 +2,8 @@
  * Stripe utilities for Cloudflare Workers
  */
 
+import { WORKER_USER_AGENT } from './version.js';
+
 export const DEFAULT_STRIPE_API_VERSION = '2026-02-25.clover';
 
 export class StripeApiError extends Error {
@@ -136,7 +138,7 @@ export function createStripeClient(secretKey, clientOptions = {}) {
       headers: {
         'Authorization': `Bearer ${secretKey}`,
         'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'the-pool-worker/1.1.1'
+        'User-Agent': WORKER_USER_AGENT
       }
     };
 

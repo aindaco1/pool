@@ -442,6 +442,7 @@ run_phase "2. Syntax checks" bash -lc '
   node --check worker/src/email.js
   node --check worker/src/email-outbox.js
   node --check worker/src/media-catalog.js
+  node --check worker/src/podcast-benefits.js
   node --check worker/src/stripe.js
   node --check worker/src/stats.js
   node --check scripts/optimize-media.mjs

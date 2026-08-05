@@ -26,6 +26,7 @@ import {
   getUpdatesEmailFrom
 } from './provider-config.js';
 import { getScopedConsole } from './logger.js';
+import { WORKER_USER_AGENT } from './version.js';
 
 const FALLBACK_SITE_BASE = DEFAULT_SITE_BASE;
 const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
@@ -611,7 +612,7 @@ export async function sendPreparedResendEmail(env, preparedPayload, {
       headers: {
         'Authorization': `Bearer ${env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
-        'User-Agent': 'the-pool-worker/1.1.1',
+        'User-Agent': WORKER_USER_AGENT,
         ...(idempotencyKey ? { 'Idempotency-Key': String(idempotencyKey).slice(0, 256) } : {})
       },
       body: JSON.stringify(preparedPayload)
