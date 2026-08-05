@@ -16,7 +16,8 @@ Dir.mktmpdir do |destination|
   site = Jekyll::Site.new(Jekyll.configuration({
     'source' => root,
     'destination' => destination,
-    'quiet' => true
+    'quiet' => true,
+    'time' => Time.utc(2026, 7, 1, 12, 0, 0)
   }))
   site.read
   campaign = site.collections['campaigns'].docs.find { |doc| doc.data['slug'] == 'their-love' }
