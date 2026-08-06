@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.2.8 - 2026-08-06
+
+### Shared inventory state mechanics
+
+- Advanced the immutable Platform pin to `v0.21.0`
+  (`98533957456eed4bb2eae6f474b9072a419b64bc`), adopted
+  `@dustwave/inventory-core` `0.1.0`, and Worker Core `0.10.0`.
+- Replaced Pool's duplicate count-map, snapshot-cloning, reservation expiry,
+  and reserved-count helpers with shared pure mechanics while preserving the
+  stored campaign snapshot as authoritative over later bootstrap input.
+- Added an independent pre-move regression for Pool's bootstrap policy. The
+  full coordinator contract continues to cover atomic selection changes,
+  competing claims, reservation confirmation/release, expiry cleanup, and
+  legacy inventory migration.
+- Pool retains all Durable Object transactions, KV writes, campaign/tier
+  labels, checkout and pledge transitions, TTL selection, routes, deployment,
+  and independent rollback.
+
 ## v1.2.7 - 2026-08-06
 
 ### Shared logging and media-catalog mechanics
