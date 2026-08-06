@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.2.12 - 2026-08-06
+
+### Shared durable-outbox mechanics
+
+- Advanced the immutable Platform pin to `v0.25.0`
+  (`4f1c7c042456da1a86116c24c7d346dfaddb21b4`) and Worker Core `0.12.0`.
+- Replaced duplicate canonical job IDs, bounded record/queue creation,
+  due/lease/expiry classification, retry delay, redacted error evidence,
+  email/tag normalization, and Resend event mechanics with shared primitives.
+- Pool retains KV operations, template rendering, global/campaign suppression,
+  provider sends and scheduling, pledge effects, credentials, deployment, and
+  independent rollback. Existing frozen-payload and idempotency tests pass.
+
 ## v1.2.11 - 2026-08-06
 
 ### Shared bounded tax-provider transport

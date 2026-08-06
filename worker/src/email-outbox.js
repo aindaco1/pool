@@ -1,6 +1,22 @@
 import {
   verifyResendWebhook as verifySharedResendWebhook
 } from '../../shared/dust-wave-platform/packages/worker-core/src/resend.js';
+import { sha256Hex } from '../../shared/dust-wave-platform/packages/worker-core/src/crypto.js';
+import {
+  classifyOutboxJob,
+  createOutboxJobId,
+  createOutboxJobRecord,
+  createOutboxQueueState,
+  normalizeOutboxEmail as normalizeEmail,
+  outboxDeliveryErrorEvidence,
+  outboxRetryDelayMs,
+  outboxWebhookDeliveryStatus,
+  outboxWebhookShouldSuppress,
+  outboxWebhookTags,
+  safeOutboxTagValue as safeTagValue,
+  stableOutboxStringify as stableStringify,
+  validOutboxJobId
+} from '../../shared/dust-wave-platform/packages/worker-core/src/outbox.js';
 
 export const EMAIL_OUTBOX_PREFIX = 'email-outbox:v1:';
 export const EMAIL_OUTBOX_QUEUE_STATE_KEY = 'email-outbox-queue:v1';
@@ -32,27 +48,8 @@ const TEMPLATE_SENDERS = Object.freeze({
   abandoned_cart: 'sendAbandonedCartEmail'
 });
 
-function stableStringify(value) {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
-}
-
-async function sha256Hex(value) {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value || '')));
-  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function normalizeEmail(value = '') {
-  return String(value || '').trim().toLowerCase();
-}
-
 function recipientFromPayload(payload = {}) {
   return normalizeEmail(payload.email || (Array.isArray(payload.to) ? payload.to[0] : payload.to));
-}
-
-function safeTagValue(value = '') {
-  return String(value || '').replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 256) || 'none';
 }
 
 function outboxJobKey(jobId) {
@@ -73,12 +70,11 @@ async function campaignSuppressionKey(campaignSlug, email) {
 
 async function writeQueueState(env, { hasPending, nextDueAt = '' }) {
   if (!env?.PLEDGES) return;
-  await env.PLEDGES.put(EMAIL_OUTBOX_QUEUE_STATE_KEY, JSON.stringify({
-    version: 1,
-    hasPending: hasPending === true,
-    nextDueAt: hasPending ? String(nextDueAt || '') : '',
-    updatedAt: new Date().toISOString()
-  }), { expirationTtl: hasPending ? EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS : 60 * 60 });
+  await env.PLEDGES.put(
+    EMAIL_OUTBOX_QUEUE_STATE_KEY,
+    JSON.stringify(createOutboxQueueState({ hasPending, nextDueAt })),
+    { expirationTtl: hasPending ? EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS : 60 * 60 }
+  );
 }
 
 export async function enqueueEmailOutbox(env, {
@@ -90,8 +86,7 @@ export async function enqueueEmailOutbox(env, {
 }) {
   if (!env?.PLEDGES) return { sent: false, queued: false, reason: 'Email outbox storage is not configured' };
   if (!TEMPLATE_SENDERS[kind]) return { sent: false, queued: false, reason: 'Unsupported email outbox template' };
-  const normalizedDedupeKey = String(dedupeKey || stableStringify(payload));
-  const jobId = await sha256Hex(`${kind}:${normalizedDedupeKey}`);
+  const jobId = await createOutboxJobId({ kind, dedupeKey, payload });
   const [delivered, existing] = await Promise.all([
     env.PLEDGES.get(deliveryKey(jobId), { type: 'json' }),
     env.PLEDGES.get(outboxJobKey(jobId), { type: 'json' })
@@ -103,30 +98,18 @@ export async function enqueueEmailOutbox(env, {
     return { sent: true, queued: true, deduped: true, jobId };
   }
 
-  const now = new Date().toISOString();
-  const record = {
-    version: 1,
+  const created = createOutboxJobRecord({
     jobId,
     kind,
-    status: 'pending',
-    campaignSlug: String(campaignSlug || payload?.campaignSlug || ''),
     payload,
-    contentHash: '',
-    providerPayload: null,
-    providerId: '',
-    attempts: 0,
-    createdAt: existing?.createdAt || now,
-    nextAttemptAt: now,
-    firstAttemptAt: '',
-    lastAttemptAt: '',
-    expiresAt: String(expiresAt || '')
-  };
-  const serialized = JSON.stringify(record);
-  if (new TextEncoder().encode(serialized).byteLength > MAX_FROZEN_PROVIDER_PAYLOAD_BYTES) {
-    return { sent: false, queued: false, reason: 'Email payload exceeds the durable outbox limit', jobId };
-  }
-  await env.PLEDGES.put(outboxJobKey(jobId), serialized, { expirationTtl: EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS });
-  await writeQueueState(env, { hasPending: true, nextDueAt: now });
+    metadata: { campaignSlug: String(campaignSlug || payload?.campaignSlug || '') },
+    existing,
+    expiresAt,
+    maxRecordBytes: MAX_FROZEN_PROVIDER_PAYLOAD_BYTES
+  });
+  if (!created.ok) return { sent: false, queued: false, reason: created.reason, jobId };
+  await env.PLEDGES.put(outboxJobKey(jobId), created.serialized, { expirationTtl: EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS });
+  await writeQueueState(env, { hasPending: true, nextDueAt: created.record.nextAttemptAt });
   return { sent: true, queued: true, deduped: false, jobId };
 }
 
@@ -148,12 +131,6 @@ async function renderProviderPayload(env, job) {
     throw new Error('Rendered email exceeds the durable outbox limit');
   }
   return providerPayload;
-}
-
-function retryDelayMs(error, attempts) {
-  if (error?.retryAfterSeconds > 0) return Math.min(24 * 60 * 60 * 1000, error.retryAfterSeconds * 1000);
-  if (error?.type === 'daily_quota_exceeded' || error?.type === 'monthly_quota_exceeded') return 24 * 60 * 60 * 1000;
-  return Math.min(24 * 60 * 60 * 1000, Math.max(60 * 1000, (2 ** Math.min(attempts, 8)) * 60 * 1000));
 }
 
 async function isMarketingRecipientSuppressed(env, job) {
@@ -184,23 +161,21 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
 
   for (const key of listing.keys || []) {
     const job = await env.PLEDGES.get(key.name, { type: 'json' });
-    if (!job || ['sent', 'failed', 'ambiguous', 'expired', 'suppressed'].includes(job.status)) continue;
+    const disposition = classifyOutboxJob(job, { now, leaseMs: EMAIL_PROCESSING_LEASE_MS });
+    if (disposition.state === 'missing' || disposition.state === 'terminal') continue;
     results.checked++;
-    const dueMs = Date.parse(job.nextAttemptAt || '');
-    if (Number.isFinite(dueMs) && dueMs > now.getTime()) {
+    if (disposition.state === 'not_due') {
       hasPending = true;
-      if (!nextDueAt || dueMs < Date.parse(nextDueAt)) nextDueAt = job.nextAttemptAt;
+      if (!nextDueAt || Date.parse(disposition.nextDueAt) < Date.parse(nextDueAt)) nextDueAt = disposition.nextDueAt;
       continue;
     }
-    const expiresMs = Date.parse(job.expiresAt || '');
-    if (Number.isFinite(expiresMs) && expiresMs <= now.getTime()) {
+    if (disposition.state === 'expired') {
       await env.PLEDGES.put(deliveryKey(job.jobId), JSON.stringify({ version: 1, status: 'expired', kind: job.kind, campaignSlug: job.campaignSlug, updatedAt: now.toISOString() }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
       await env.PLEDGES.delete(key.name);
       results.failed++;
       continue;
     }
-    const processingMs = Date.parse(job.lastAttemptAt || '');
-    if (job.status === 'processing' && Number.isFinite(processingMs) && now.getTime() - processingMs < EMAIL_PROCESSING_LEASE_MS) {
+    if (disposition.state === 'leased') {
       hasPending = true;
       continue;
     }
@@ -257,17 +232,19 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
           campaignSlug: job.campaignSlug,
           contentHash: job.contentHash,
           attempts: job.attempts,
-          lastError: { type: String(error?.type || error?.name || 'Error'), statusCode: Number(error?.statusCode || 0) || 0 },
+          lastError: outboxDeliveryErrorEvidence(error),
           updatedAt: now.toISOString()
         }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
         await env.PLEDGES.delete(key.name);
         results.failed++;
         continue;
       }
-      const next = new Date(now.getTime() + retryDelayMs(error, job.attempts));
+      const next = new Date(now.getTime() + outboxRetryDelayMs(error, job.attempts, {
+        quotaTypes: ['daily_quota_exceeded', 'monthly_quota_exceeded']
+      }));
       job.status = 'retry';
       job.nextAttemptAt = next.toISOString();
-      job.lastError = { type: String(error?.type || error?.name || 'Error'), statusCode: Number(error?.statusCode || 0) || 0 };
+      job.lastError = outboxDeliveryErrorEvidence(error);
       job.updatedAt = now.toISOString();
       await env.PLEDGES.put(key.name, JSON.stringify(job), { expirationTtl: EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS });
       hasPending = true;
@@ -292,33 +269,26 @@ export async function verifyResendWebhook(rawBody, headers, secret, now = new Da
   };
 }
 
-function webhookTags(data = {}) {
-  if (Array.isArray(data.tags)) return Object.fromEntries(data.tags.map((tag) => [tag.name, tag.value]));
-  return data.tags && typeof data.tags === 'object' ? data.tags : {};
-}
-
 export async function processResendWebhook(env, event, svixId) {
   if (!env?.PLEDGES) return { processed: false, reason: 'storage_not_configured' };
   const markerKey = `${RESEND_WEBHOOK_MARKER_PREFIX}${svixId}`;
   if (await env.PLEDGES.get(markerKey)) return { processed: false, duplicate: true };
   const type = String(event?.type || '');
   const data = event?.data || {};
-  const tags = webhookTags(data);
+  const tags = outboxWebhookTags(data);
   const jobId = String(tags.pool_job || '');
   const providerId = String(data.email_id || '');
-  if (jobId && /^[a-f0-9]{64}$/i.test(jobId)) {
+  if (validOutboxJobId(jobId)) {
     const key = deliveryKey(jobId);
     const delivery = await env.PLEDGES.get(key, { type: 'json' }) || { version: 1, providerId };
     delivery.providerId = delivery.providerId || providerId;
     delivery.lastEvent = type;
     delivery.lastEventAt = String(event.created_at || new Date().toISOString());
-    if (type === 'email.delivered') delivery.status = 'delivered';
-    else if (['email.bounced', 'email.complained', 'email.failed', 'email.suppressed'].includes(type)) delivery.status = type.replace('email.', '');
+    delivery.status = outboxWebhookDeliveryStatus(type) || delivery.status;
     await env.PLEDGES.put(key, JSON.stringify(delivery), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
   }
 
-  const shouldSuppress = type === 'email.complained' || type === 'email.suppressed' ||
-    (type === 'email.bounced' && String(data.bounce?.type || '').toLowerCase() === 'permanent');
+  const shouldSuppress = outboxWebhookShouldSuppress(event);
   if (shouldSuppress) {
     for (const email of Array.isArray(data.to) ? data.to : []) {
       const normalized = normalizeEmail(email);
