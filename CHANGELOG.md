@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.2.3 - 2026-08-06
+
+### Shared cryptographic primitives
+
+- Replaced Pool's characterized SHA-256, HMAC-SHA-256, high-entropy token,
+  cookie parsing, email normalization, and constant-work string-comparison
+  copies with the immutable `@dustwave/worker-core` `0.6.0` implementation
+  already pinned by Pool through Platform `v0.15.0`.
+- Kept authentication policy, login-token shape, session and CSRF records,
+  permissions, routes, KV storage, credentials, release, and rollback in Pool;
+  the local HMAC adapter preserves Pool's existing argument order.
+- Raised the obsolete no-`randomUUID` login-history fallback from 8 to 16
+  random bytes so it satisfies Platform's token-entropy contract without
+  changing the normal Workers runtime path.
+- Added consumer contract coverage for the exact digest, URL-safe signature
+  and token shapes, encoded cookies, normalized email, constant-work equality,
+  and rejection of undersized tokens, alongside the existing login replay,
+  session, CSRF, and redacted-history suites.
+
 ## v1.2.2 - 2026-08-06
 
 ### Shared Platform consolidation
