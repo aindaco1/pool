@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.2.5 - 2026-08-06
+
+### Shared session security mechanics
+
+- Advanced the immutable Platform pin to `v0.17.0`
+  (`3a526defd21d692292c73652966a044167f881d7`) and Worker Core `0.8.0`.
+- Replaced Pool's characterized login-token encoding/verification,
+  session-cookie serialization/clearing, and same-origin request checks with
+  bounded shared primitives through thin Pool policy adapters.
+- Preserved the exact secure admin cookie, current missing-origin-header and
+  local unconfigured-origin behavior, 15-minute login TTL, eight-hour session
+  TTL, one-time nonce consumption, fixed session expiry, and independent
+  rollback.
+- Added rejection coverage for extra token segments and retained the existing
+  replay, expiry, CSRF, cross-origin, role/scope, and no-durable-write failure
+  contracts.
+- Pool continues to own secret selection, login/session records, campaign
+  authorization, CSRF tokens and header names, routes, storage, email,
+  credentials, deployment, and rollback.
+
 ## v1.2.4 - 2026-08-06
 
 ### Shared Resend security and retry mechanics
