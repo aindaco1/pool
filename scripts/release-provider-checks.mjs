@@ -5,7 +5,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import {
+  buildProviderEvidence,
+  providerEvidenceShouldFail
+} from '../shared/dust-wave-platform/packages/release-core/src/provider-evidence.js';
 import { stripeCliAuthState } from './lib/stripe-cli-auth.mjs';
+
+export { buildProviderEvidence };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORKER_DIR = path.join(ROOT, 'worker');
@@ -56,31 +62,6 @@ USPS quote smoke may also use worker/.dev.vars. It never prints secret values.`)
 const results = [];
 const requiresDedicatedCloudflareDnsToken = cloudflareDnsOnly && strict;
 
-export function buildProviderEvidence(entries, options = {}) {
-  const normalized = Array.isArray(entries) ? entries.map((entry) => ({
-    status: String(entry?.status || ''),
-    label: String(entry?.label || ''),
-    detail: String(entry?.detail || '')
-  })) : [];
-  const failCount = normalized.filter((entry) => entry.status === 'FAIL').length;
-  const warnCount = normalized.filter((entry) => entry.status === 'WARN').length;
-  const skipCount = normalized.filter((entry) => entry.status === 'SKIP').length;
-  return {
-    schemaVersion: 1,
-    generatedAt: String(options.generatedAt || new Date().toISOString()),
-    strict: options.strict === true,
-    cloudflareDnsOnly: options.cloudflareDnsOnly === true,
-    usedDevVars: options.usedDevVars === true,
-    status: failCount > 0 ? 'fail' : warnCount > 0 ? 'warning' : skipCount > 0 ? 'incomplete' : 'pass',
-    failCount,
-    warnCount,
-    skipCount,
-    results: normalized,
-    containsCredentials: false,
-    containsCustomerData: false
-  };
-}
-
 function finalizeResults() {
   const evidence = buildProviderEvidence(results, {
     generatedAt,
@@ -95,7 +76,7 @@ function finalizeResults() {
   }
   console.log('');
   console.log(`Summary: ${evidence.failCount} fail, ${evidence.warnCount} warn, ${evidence.skipCount} skip`);
-  if (evidence.failCount || (strict && (evidence.warnCount || evidence.skipCount))) process.exitCode = 1;
+  if (providerEvidenceShouldFail(evidence)) process.exitCode = 1;
   return evidence;
 }
 

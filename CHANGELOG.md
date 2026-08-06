@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.2.2 - 2026-08-06
+
+### Shared Platform consolidation
+
+- Advanced the exact `dust-wave-platform` gitlink to immutable `v0.15.0`
+  (`2e79a8d70cb6d30805ea141e53d32f9387441756`), including
+  `@dustwave/worker-core` `0.6.0` and `@dustwave/release-core` `0.1.0`.
+- Replaced Pool's characterized Worker CORS/security response, timezone/date,
+  and Stripe transport copies with thin Pool policy adapters. Pool keeps its
+  private origin, campaign aliases, Stripe API version and provider identity,
+  payment rules, persistence, and deployment authority.
+- Replaced exact Wrangler inventory, KV backup transformation, checksum,
+  command-result, and provider-evidence copies with pinned Platform primitives;
+  Pool continues to own every command, credential, provider call, environment
+  ID, release gate, rollout, and rollback.
+- Expanded consumer tests for private-origin fallback, full JSON security
+  headers, daylight-saving boundaries, Stripe provider identity, missing
+  credentials/object IDs, and the exact Platform package/source pin.
+- Avoided constructing a Stripe client during reconciliation when the indexed
+  pledge batch contains no provider objects, preserving the local-only missing
+  PaymentIntent evidence path and eliminating unnecessary provider setup.
+
 ## v1.2.1 - 2026-08-06
 
 Release preparation:

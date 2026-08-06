@@ -3839,8 +3839,10 @@ async function reconcileCampaignPayments(env, campaignSlug, { now = new Date(), 
     paymentIntentGroups.set(paymentIntentId, group);
   }
 
-  const stripe = createPoolStripeClient(env, { intent: 'payment_reconciliation', campaignSlug });
   const groups = Array.from(paymentIntentGroups.entries()).slice(0, Math.max(1, maxPaymentIntents));
+  const stripe = groups.length
+    ? createPoolStripeClient(env, { intent: 'payment_reconciliation', campaignSlug })
+    : null;
   for (const [paymentIntentId, group] of groups) {
     try {
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: STRIPE_FINANCIAL_EXPAND });

@@ -31,15 +31,21 @@ function createTempSetupRepo() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pool-setup-deploy-'));
   const scriptsDir = path.join(root, 'scripts');
   const scriptsLibDir = path.join(scriptsDir, 'lib');
+  const releaseCoreDir = path.join(root, 'shared', 'dust-wave-platform', 'packages', 'release-core', 'src');
   const workerDir = path.join(root, 'worker');
   const binDir = path.join(root, 'fake-bin');
   fs.mkdirSync(scriptsDir, { recursive: true });
   fs.mkdirSync(scriptsLibDir, { recursive: true });
+  fs.mkdirSync(releaseCoreDir, { recursive: true });
   fs.mkdirSync(workerDir, { recursive: true });
   fs.mkdirSync(binDir, { recursive: true });
   fs.copyFileSync(sourceSetupScript, path.join(scriptsDir, 'setup-deploy.mjs'));
   fs.copyFileSync(path.join(repoRoot, 'scripts', 'lib', 'command-runner.mjs'), path.join(scriptsLibDir, 'command-runner.mjs'));
   fs.copyFileSync(path.join(repoRoot, 'scripts', 'lib', 'stripe-cli-auth.mjs'), path.join(scriptsLibDir, 'stripe-cli-auth.mjs'));
+  fs.copyFileSync(
+    path.join(repoRoot, 'shared', 'dust-wave-platform', 'packages', 'release-core', 'src', 'command-result.js'),
+    path.join(releaseCoreDir, 'command-result.js')
+  );
   fs.writeFileSync(path.join(scriptsDir, 'sync-worker-config.rb'), 'puts "synced"\n', 'utf8');
   fs.writeFileSync(path.join(workerDir, '.dev.vars.example'), '# local dev secrets\n', 'utf8');
   fs.writeFileSync(path.join(workerDir, 'wrangler.toml'), `name = "pool-worker"
