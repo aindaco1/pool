@@ -483,7 +483,7 @@ The important rule is:
 
 - do not turn shipping quotes into a high-write KV subsystem
 
-The checkout country selector is now fed from [`_data/shipping_countries.yml`](../_data/shipping_countries.yml), which keeps USPS destination maintenance in a dedicated source instead of burying it in browser runtime code.
+The checkout country selector is fed from the generated [`_data/shipping_countries.yml`](../_data/shipping_countries.yml) snapshot. Platform owns the canonical registry beside `shipping-core`; use `npm run shipping-countries:sync` after a pin update and `npm run shipping-countries:check` to detect drift.
 
 ## Worker and Frontend Touchpoints
 

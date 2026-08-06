@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.2.9 - 2026-08-06
+
+### Shared USPS transport and country registry
+
+- Advanced the immutable Platform pin to `v0.22.0`
+  (`514c00932d5fb2fa05ee6f7cebb7ea44d9426d78`) and Shipping Core `0.2.0`.
+- Replaced Pool's duplicate USPS OAuth, rate-search, timeout, token/quote cache,
+  and provider-cooldown implementation with a thin configuration adapter.
+- Made Platform's 95-country YAML the canonical source and added explicit
+  check/write sync commands plus a byte-equality pin regression for Pool's
+  Jekyll snapshot.
+- Provider credentials remain request-only; mail-class/token/cache state is
+  bounded; timeout, 401 refresh, 429/5xx cooldown, fallback, and full shipping
+  behavior remain covered. Pool retains address eligibility, campaign rates,
+  checkout/fulfillment effects, storage, routes, deployment, and rollback.
+
 ## v1.2.8 - 2026-08-06
 
 ### Shared inventory state mechanics

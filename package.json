@@ -1,6 +1,6 @@
 {
   "name": "pool",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "description": "**Dust Wave's open crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)",
   "main": "index.js",
   "directories": {
@@ -59,6 +59,8 @@
     "test:security:podman": "./scripts/podman-stack-run.sh npx vitest run --config vitest.security.config.mts",
     "test:security:staging": "WORKER_URL=https://pledge-staging.dustwave.xyz vitest run --config vitest.security.config.mts",
     "test:usps": "node ./scripts/usps-smoke.mjs",
+    "shipping-countries:check": "node ./shared/dust-wave-platform/packages/shipping-core/bin/sync-shipping-countries.mjs ./_data/shipping_countries.yml",
+    "shipping-countries:sync": "node ./shared/dust-wave-platform/packages/shipping-core/bin/sync-shipping-countries.mjs ./_data/shipping_countries.yml --write",
     "assets:minify": "node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --write",
     "assets:minify:check": "node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --check",
     "media:optimize": "node ./scripts/optimize-media.mjs --write",

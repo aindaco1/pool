@@ -382,7 +382,7 @@ Important secret boundary:
 - keep the companion `USPS_CLIENT_SECRET` in Worker secrets or `worker/.dev.vars`
 - do not commit the secret into Jekyll config
 
-The checkout destination list is intentionally separate from those knobs now. Maintain the currently allowed shipping countries in [`_data/shipping_countries.yml`](../_data/shipping_countries.yml) instead of editing browser runtime code.
+The checkout destination list is intentionally separate from those knobs. Platform owns the canonical registry at `packages/shipping-core/data/shipping-countries.yml`; refresh the generated [`_data/shipping_countries.yml`](../_data/shipping_countries.yml) snapshot with `npm run shipping-countries:sync` after advancing the exact Platform pin. `npm run shipping-countries:check` fails on drift.
 
 Example:
 
