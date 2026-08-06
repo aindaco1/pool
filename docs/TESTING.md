@@ -43,7 +43,7 @@ npm test                   # Run all tests
 
 `./scripts/test-e2e.sh --podman` is now the fully automated browser path. Use `./scripts/test-checkout.sh --podman` when you specifically want to drive the checkout manually in a real browser.
 
-The local Worker test path now prefers Node 24, matching GitHub Actions. The host scripts fall back to Node 22 if a fork has that installed, but they no longer force Node 20 because Wrangler 4 requires Node 22 or newer.
+The local Worker test path now prefers Node 24, matching GitHub Actions. Run `nvm use` from the repository root to select the supported Node 24.15 baseline. The host scripts fall back to Node 22.22.2 or newer if a fork has that installed; unsupported odd-numbered Node releases are rejected by npm so jsdom and the test runner do not silently run outside their declared engine ranges.
 
 For the accessibility-focused browser slice, use:
 
