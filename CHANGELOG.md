@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.2.10 - 2026-08-06
+
+### Shared bounded GitHub transport
+
+- Advanced the immutable Platform pin to `v0.23.0`
+  (`a0006c3e0c3f8ab814387491753989956adbbe94`) and Worker Core `0.11.0`.
+- Replaced Pool's duplicate workflow dispatch and Contents API client with a
+  thin adapter while preserving rebuild, media-optimization, campaign-archive,
+  file publication, directory-list, and idempotent delete behavior.
+- Requests now reject redirects, time out, bound paths, refs, workflow inputs,
+  content, and provider responses, and return normalized errors without raw
+  network exceptions or credentials. Pool retains repository defaults,
+  content and workflow policy, logging, authorization, effects, deployment,
+  and independent rollback.
+
 ## v1.2.9 - 2026-08-06
 
 ### Shared USPS transport and country registry
