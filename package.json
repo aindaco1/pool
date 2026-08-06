@@ -1,6 +1,6 @@
 {
   "name": "pool",
-  "version": "1.2.13",
+  "version": "1.2.14",
   "description": "**Dust Wave's open crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)",
   "main": "index.js",
   "directories": {

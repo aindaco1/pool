@@ -8,15 +8,15 @@
 @import "partials/mixins";
 
 // Import partials - base & layout
-@import "partials/base";
+@import "base";
 @import "partials/layout";
 
 // Import partials - components
-@import "partials/buttons";
+@import "buttons";
 @import "partials/forms";
 @import "partials/cards";
 @import "partials/progress";
-@import "partials/modal";
+@import "modal";
 
 // Import partials - page-specific
 @import "partials/campaign";
@@ -26,8 +26,8 @@
 @import "partials/creator-checklist";
 
 // Import partials - content & utilities
-@import "partials/content-blocks";
-@import "partials/utilities";
+@import "content-blocks";
+@import "utilities";
 @import "partials/accessibility";
 @import "partials/cart-ui";
 
