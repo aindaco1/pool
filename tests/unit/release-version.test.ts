@@ -33,10 +33,11 @@ describe('release version contract', () => {
     expect(versions).toEqual(versions.map(() => WORKER_VERSION));
     expect(readPlatformValue('release_label')).toBe(`v${WORKER_VERSION}`);
     expect(WORKER_USER_AGENT).toBe(`the-pool-worker/${WORKER_VERSION}`);
-    for (const providerSource of ['worker/src/email.js', 'worker/src/stripe.js']) {
-      const source = readFileSync(`${repositoryRoot}/${providerSource}`, 'utf8');
-      expect(source).toMatch(/['"]User-Agent['"]:\s*WORKER_USER_AGENT/);
-      expect(source).not.toMatch(/the-pool-worker\/\d/);
-    }
+    const emailSource = readFileSync(`${repositoryRoot}/worker/src/email.js`, 'utf8');
+    const stripeSource = readFileSync(`${repositoryRoot}/worker/src/stripe.js`, 'utf8');
+    expect(emailSource).toMatch(/['"]User-Agent['"]:\s*WORKER_USER_AGENT/);
+    expect(stripeSource).toContain('userAgent: clientOptions.userAgent || WORKER_USER_AGENT');
+    expect(emailSource).not.toMatch(/the-pool-worker\/\d/);
+    expect(stripeSource).not.toMatch(/the-pool-worker\/\d/);
   });
 });

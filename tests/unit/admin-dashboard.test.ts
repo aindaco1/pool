@@ -4655,7 +4655,10 @@ diary:
   });
 
   it('backfills actual Stripe financials for charged pledges without KV list scans', async () => {
-    const env = createEnv();
+    const env = {
+      ...createEnv(),
+      STRIPE_SECRET_KEY: 'sk_test_fixture'
+    };
     const { ctx, cookie, csrfToken } = await signInAdmin(env);
     const pledges = env.PLEDGES as CountingKVNamespace;
     const ratelimit = env.RATELIMIT as CountingKVNamespace;
