@@ -1,13 +1,23 @@
 # Changelog
 
-## v1.2.1 - Unreleased
+## v1.2.1 - 2026-08-06
 
 Release preparation:
 
-- Advanced the exact `dust-wave-platform` gitlink to workspace `0.11.5`,
-  including `@dustwave/admin-shell` `0.10.2` and `@dustwave/worker-core`
-  `0.3.6`, while keeping campaign, pledge, payment, storage, and deployment
-  authority within Pool.
+- Migrated the byte-identical header navigation, live announcements, Worker
+  timezone primitives, New Mexico GRT starter snapshot, updater, and generated
+  asset minifier to immutable `dust-wave-platform` `v0.12.0` packages.
+- Removed Pool's duplicate source copies while retaining its templates,
+  localization, scheduling, tax-provider policy, campaign/pledge data, build
+  orchestration, credentials, and independent deployment authority.
+- Preserved the existing consumer characterization suites and added the new
+  shared paths and exact package versions to the executable Platform pin gate.
+
+- Advanced the exact `dust-wave-platform` gitlink through workspace `0.12.0`,
+  including `@dustwave/admin-shell` `0.10.2`, `@dustwave/build-core` `0.1.0`,
+  `@dustwave/site-shell` `0.1.0`, `@dustwave/tax-core` `0.2.0`, and
+  `@dustwave/worker-core` `0.4.0`, while keeping campaign, pledge, payment,
+  storage, and deployment authority within Pool.
 - Added an executable consumer contract for the immutable gitlink, canonical
   submodule remote, package versions, and every raw shared module Pool serves
   or imports.

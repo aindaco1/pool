@@ -44,7 +44,7 @@ Important repo surfaces:
 - [`_includes/page-prefetch.html`](../_includes/page-prefetch.html): public document prefetch include
 - [`assets/js/cart-runtime-loader.js`](../assets/js/cart-runtime-loader.js): lazy cart runtime bootstrap
 - [`assets/js/page-prefetch.js`](../assets/js/page-prefetch.js): intent-based document prefetch runtime
-- [`scripts/minify-site-assets.mjs`](../scripts/minify-site-assets.mjs): generated CSS/JS minification
+- [`@dustwave/build-core`](../shared/dust-wave-platform/packages/build-core/src/site-assets.js): pinned generated CSS/JS minification
 - [`scripts/audit-performance-budgets.mjs`](../scripts/audit-performance-budgets.mjs): measured total and named-asset release ceilings
 - [`scripts/performance-lighthouse.mjs`](../scripts/performance-lighthouse.mjs): Lighthouse category, Web Vital, and transferred-resource release evidence
 - [`scripts/audit-cache-policy.mjs`](../scripts/audit-cache-policy.mjs): deployed public-cache and private/no-store policy evidence
