@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
 PODMAN_STACK_STARTED=false
+TEMP_LOCAL_CONFIG=""
 
 prefer_podman_path() {
   local candidate=""
@@ -26,6 +27,9 @@ cleanup() {
   if [ "$PODMAN_STACK_STARTED" = "true" ]; then
     podman rm -f pool-dev-site pool-dev-worker >/dev/null 2>&1 || true
     podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
+  fi
+  if [ -n "$TEMP_LOCAL_CONFIG" ] && [ -f "$TEMP_LOCAL_CONFIG" ]; then
+    rm -f "$TEMP_LOCAL_CONFIG"
   fi
 }
 
@@ -60,6 +64,12 @@ shared_stack_ready() {
 if ! shared_stack_ready; then
   echo "📦 Starting shared Podman dev stack..." >&2
   PODMAN_STACK_LOG="${PODMAN_STACK_LOG:-/tmp/pool-podman-stack-run.log}"
+
+  if [ ! -f _config.local.yml ]; then
+    TEMP_LOCAL_CONFIG="_config.local.yml"
+    cp _config.test.yml "$TEMP_LOCAL_CONFIG"
+  fi
+
   PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_STACK_LOG" 2>&1
   PODMAN_STACK_STARTED=true
 

@@ -5,6 +5,7 @@ set -euo pipefail
 
 USE_PODMAN=false
 PODMAN_STARTED_BY_SCRIPT=false
+TEMP_LOCAL_CONFIG=""
 
 for arg in "$@"; do
   if [ "$arg" = "--podman" ]; then
@@ -97,6 +98,9 @@ cleanup() {
   if [ "$PODMAN_STARTED_BY_SCRIPT" = "true" ]; then
     cleanup_podman_stack
   fi
+  if [ -n "$TEMP_LOCAL_CONFIG" ] && [ -f "$TEMP_LOCAL_CONFIG" ]; then
+    rm -f "$TEMP_LOCAL_CONFIG"
+  fi
 }
 
 command -v curl >/dev/null 2>&1 || fail "curl is required"
@@ -114,6 +118,10 @@ if [ "$USE_PODMAN" = "true" ]; then
     echo "✅ Reusing existing Podman dev stack"
   else
     echo "📦 Starting shared Podman dev stack..."
+    if [ ! -f _config.local.yml ]; then
+      TEMP_LOCAL_CONFIG="_config.local.yml"
+      cp _config.test.yml "$TEMP_LOCAL_CONFIG"
+    fi
     PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/pool-smoke-podman.log}"
     PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1
     PODMAN_STARTED_BY_SCRIPT=true
@@ -199,14 +207,14 @@ can_cancel=$(echo "$pledges" | jq -r '.[0].canCancel')
 pass "manage link exposes mutable pledge state"
 
 if [ -n "$inventory_tier_id" ] && [ "$inventory_tier_qty" -gt 0 ]; then
-  initial_claimed=$(echo "$initial_inventory" | jq -r --arg tier "$inventory_tier_id" '.tiers[$tier].claimed // 0')
-  claimed_after_setup=$(echo "$post_setup_inventory" | jq -r --arg tier "$inventory_tier_id" '.tiers[$tier].claimed // 0')
+  initial_claimed=$(echo "$initial_inventory" | jq -r --arg tier "$inventory_tier_id" '(.tiers // .)[$tier].claimed // 0')
+  claimed_after_setup=$(echo "$post_setup_inventory" | jq -r --arg tier "$inventory_tier_id" '(.tiers // .)[$tier].claimed // 0')
   expected_claimed_after_setup=$((initial_claimed + inventory_tier_qty))
   if [ "$claimed_after_setup" = "$expected_claimed_after_setup" ]; then
     pass "limited inventory claim recorded"
   else
-    warn "fixture setup did not change $inventory_tier_id claimed count from $initial_claimed to $expected_claimed_after_setup (observed $claimed_after_setup); continuing with coherence checks"
-    expected_claimed_after_setup="$claimed_after_setup"
+    compact_inventory_response="$(echo "$post_setup_inventory_response" | jq -c '{success, inventory}')"
+    fail "fixture setup did not change $inventory_tier_id claimed count from $initial_claimed to $expected_claimed_after_setup (observed $claimed_after_setup; response $compact_inventory_response)"
   fi
 else
   expected_claimed_after_setup=''
@@ -241,7 +249,7 @@ fi
 expected_pledge_count_after_modify=$(echo "$post_setup_stats" | jq -r '.pledgeCount // 0')
 [ "$(echo "$post_modify_stats" | jq -r '.pledgeCount // 0')" = "$expected_pledge_count_after_modify" ] || fail "expected pledgeCount to stay at $expected_pledge_count_after_modify after modify"
 if [ -n "$inventory_tier_id" ] && [ -n "$expected_claimed_after_setup" ]; then
-  [ "$(echo "$post_modify_inventory" | jq -r --arg tier "$inventory_tier_id" '.tiers[$tier].claimed // 0')" = "$expected_claimed_after_setup" ] || fail "modify should preserve $inventory_tier_id claim at $expected_claimed_after_setup"
+  [ "$(echo "$post_modify_inventory" | jq -r --arg tier "$inventory_tier_id" '(.tiers // .)[$tier].claimed // 0')" = "$expected_claimed_after_setup" ] || fail "modify should preserve $inventory_tier_id claim at $expected_claimed_after_setup"
 fi
 pass "modify preserves stats and inventory coherently"
 
@@ -269,7 +277,7 @@ fi
 [ "$(echo "$post_cancel_stats" | jq -r '.pledgeCount // 0')" = "$initial_pledge_count" ] || fail "expected pledgeCount to return to $initial_pledge_count after cancel"
 [ "$(echo "$post_cancel_stats" | jq -r '.pledgedAmount // 0')" = "$initial_pledged_amount" ] || fail "expected pledgedAmount to return to $initial_pledged_amount after cancel"
 if [ -n "$inventory_tier_id" ] && [ -n "$initial_claimed" ]; then
-  [ "$(echo "$post_cancel_inventory" | jq -r --arg tier "$inventory_tier_id" '.tiers[$tier].claimed // 0')" = "$initial_claimed" ] || fail "expected $inventory_tier_id claim count to return to $initial_claimed after cancel"
+  [ "$(echo "$post_cancel_inventory" | jq -r --arg tier "$inventory_tier_id" '(.tiers // .)[$tier].claimed // 0')" = "$initial_claimed" ] || fail "expected $inventory_tier_id claim count to return to $initial_claimed after cancel"
 fi
 pass "cancel releases stats and inventory"
 

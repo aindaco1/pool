@@ -1,6 +1,33 @@
 # Changelog
 
-## v1.2.0 - Unreleased
+## v1.2.1 - Unreleased
+
+Release preparation:
+
+- Advanced the exact `dust-wave-platform` gitlink to workspace `0.11.5`,
+  including `@dustwave/admin-shell` `0.10.2` and `@dustwave/worker-core`
+  `0.3.6`, while keeping campaign, pledge, payment, storage, and deployment
+  authority within Pool.
+- Added an executable consumer contract for the immutable gitlink, canonical
+  submodule remote, package versions, and every raw shared module Pool serves
+  or imports.
+- Enabled safe local-identifier minification in generated JavaScript while
+  preserving browser globals and the existing production asset budgets.
+- Made the Podman release wrappers clean-checkout safe on macOS by using a
+  portable Playwright image lookup and an ephemeral local Jekyll test config.
+- Replaced single-sample Lighthouse decisions with the median of three runs,
+  preventing one noisy sample from falsely failing or approving a release.
+- Promoted the mutable-pledge fixture inventory check from a warning to a hard
+  release gate, aligned its unit campaign fixture with the built campaign, and
+  normalized both inventory endpoint response shapes before asserting counts.
+- Made deployment setup dry-runs non-interactive around secret planning, so
+  provider values are neither requested nor passed to a CLI during rehearsal.
+- Pinned patched transitive `undici` and `ip-address` releases for local test
+  and deployment tooling, clearing both production and full npm audits.
+- Preserved the disabled-by-default Podcast benefit bridge and Pool's
+  independently reversible release identity.
+
+## v1.2.0 - 2026-08-05
 
 Release preparation:
 

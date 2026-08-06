@@ -451,11 +451,22 @@ run_phase "2. Syntax checks" bash -lc '
   node --check scripts/release-payment-smoke.mjs
   node --check scripts/release-provider-checks.mjs
   node --check scripts/release-screen-reader-evidence.mjs
+  node --check scripts/minify-site-assets.mjs
+  node --check scripts/audit-performance-budgets.mjs
+  node --check scripts/performance-lighthouse.mjs
+  node --check scripts/setup-deploy.mjs
   node scripts/optimize-media.mjs --check --manifest-only >/dev/null
-  bash -n scripts/release-smoke.sh scripts/release-a11y-evidence.sh
+  bash -n scripts/release-smoke.sh scripts/release-a11y-evidence.sh scripts/dev-podman.sh scripts/podman-stack-run.sh scripts/smoke-pledge-management.sh
 '
 
 run_phase "3. Focused regression suites" npx vitest run \
+  tests/unit/platform-pin.test.ts \
+  tests/unit/release-version.test.ts \
+  tests/unit/site-asset-minification.test.ts \
+  tests/unit/performance-budgets.test.ts \
+  tests/unit/performance-gates.test.ts \
+  tests/unit/package-scripts.test.ts \
+  tests/unit/setup-deploy-script.test.ts \
   tests/unit/worker-business-logic.test.ts \
   tests/unit/worker-ops-integrity.test.ts \
   tests/unit/email-outbox.test.ts \
@@ -517,15 +528,27 @@ if [[ -f worker/.dev.vars ]]; then
   ORIGINAL_DEV_VARS_BACKUP="$(mktemp)"
   cp worker/.dev.vars "${ORIGINAL_DEV_VARS_BACKUP}"
   {
-    cat "${ORIGINAL_DEV_VARS_BACKUP}"
-    grep -q '^STRIPE_SECRET_KEY=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}"
-    grep -q '^SITE_BASE=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "SITE_BASE=${SITE_BASE}"
-    grep -q '^ADMIN_SECRET=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "ADMIN_SECRET=${ADMIN_SECRET}"
-    grep -q '^ADMIN_BOOTSTRAP_EMAILS=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "ADMIN_BOOTSTRAP_EMAILS=${ADMIN_BOOTSTRAP_EMAILS}"
-    grep -q '^RESEND_API_KEY=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "RESEND_API_KEY=${RESEND_API_KEY}"
-    grep -q '^POOL_EMAIL_DRY_RUN=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "POOL_EMAIL_DRY_RUN=${POOL_EMAIL_DRY_RUN}"
-    grep -q '^MAGIC_LINK_SECRET=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "MAGIC_LINK_SECRET=${MAGIC_LINK_SECRET}"
-    grep -q '^STRIPE_WEBHOOK_SECRET=' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}"
+    awk -F= '
+      BEGIN {
+        required["STRIPE_SECRET_KEY"] = 1
+        required["SITE_BASE"] = 1
+        required["ADMIN_SECRET"] = 1
+        required["ADMIN_BOOTSTRAP_EMAILS"] = 1
+        required["RESEND_API_KEY"] = 1
+        required["POOL_EMAIL_DRY_RUN"] = 1
+        required["MAGIC_LINK_SECRET"] = 1
+        required["STRIPE_WEBHOOK_SECRET"] = 1
+      }
+      !($1 in required && length(substr($0, index($0, "=") + 1)) == 0)
+    ' "${ORIGINAL_DEV_VARS_BACKUP}"
+    grep -qE '^STRIPE_SECRET_KEY=.+$' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}"
+    grep -qE '^SITE_BASE=.+$' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "SITE_BASE=${SITE_BASE}"
+    grep -qE '^ADMIN_SECRET=.+$' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "ADMIN_SECRET=${ADMIN_SECRET}"
+    grep -qE '^ADMIN_BOOTSTRAP_EMAILS=.+$' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "ADMIN_BOOTSTRAP_EMAILS=${ADMIN_BOOTSTRAP_EMAILS}"
+    grep -qE '^RESEND_API_KEY=.+$' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "RESEND_API_KEY=${RESEND_API_KEY}"
+    grep -qE '^POOL_EMAIL_DRY_RUN=.+$' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "POOL_EMAIL_DRY_RUN=${POOL_EMAIL_DRY_RUN}"
+    grep -qE '^MAGIC_LINK_SECRET=.+$' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "MAGIC_LINK_SECRET=${MAGIC_LINK_SECRET}"
+    grep -qE '^STRIPE_WEBHOOK_SECRET=.+$' "${ORIGINAL_DEV_VARS_BACKUP}" || echo "STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}"
   } > worker/.dev.vars
 else
   TEMP_DEV_VARS="worker/.dev.vars"
