@@ -27,6 +27,10 @@ import {
 } from './provider-config.js';
 import { getScopedConsole } from './logger.js';
 import { WORKER_USER_AGENT } from './version.js';
+import {
+  classifyResendFailure,
+  ResendApiError
+} from '../../shared/dust-wave-platform/packages/worker-core/src/resend.js';
 
 const FALLBACK_SITE_BASE = DEFAULT_SITE_BASE;
 const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
@@ -567,17 +571,7 @@ function summarizeProviderError(raw) {
   return text.slice(0, 320);
 }
 
-export class ResendApiError extends Error {
-  constructor(message, details = {}) {
-    super(message);
-    this.name = 'ResendApiError';
-    this.type = String(details.type || 'resend_api_error');
-    this.statusCode = Number(details.statusCode || 0) || 0;
-    this.retryAfterSeconds = Number(details.retryAfterSeconds || 0) || 0;
-    this.retryable = details.retryable === true;
-    this.ambiguous = details.ambiguous === true;
-  }
-}
+export { ResendApiError };
 
 function parseResendErrorPayload(raw) {
   try {
@@ -618,25 +612,23 @@ export async function sendPreparedResendEmail(env, preparedPayload, {
       body: JSON.stringify(preparedPayload)
     });
   } catch {
+    const failure = classifyResendFailure(0);
     throw new ResendApiError(`${failureLabel}: provider response was not received`, {
       type: 'network_error',
-      retryable: true,
-      ambiguous: true
+      ...failure
     });
   }
 
   if (!response.ok) {
     const rawError = await response.text();
     const parsed = parseResendErrorPayload(rawError);
-    const retryAfterSeconds = Number.parseInt(String(response.headers?.get?.('retry-after') || '0'), 10) || 0;
-    const retryable = response.status === 409 || response.status === 429 || response.status >= 500;
+    const failure = classifyResendFailure(response.status, {
+      retryAfter: response.headers?.get?.('retry-after') || ''
+    });
     console.error(`${errorLabel}:`, { status: response.status, error: parsed.message || 'No response body', type: parsed.type });
     throw new ResendApiError(`${failureLabel}: ${response.status}${parsed.message ? ` (${parsed.message})` : ''}`, {
       type: parsed.type,
-      statusCode: response.status,
-      retryAfterSeconds,
-      retryable,
-      ambiguous: response.status >= 500
+      ...failure
     });
   }
 
