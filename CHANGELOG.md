@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.2.7 - 2026-08-06
+
+### Shared logging and media-catalog mechanics
+
+- Advanced the immutable Platform pin to `v0.19.0`
+  (`1bfbdd403fc9efafb8d261dd846cedb9d52ed444`), Worker Core `0.9.0`, and
+  Media Core `0.4.0`.
+- Replaced Pool's duplicate scoped-console implementation and site-media
+  catalog mechanics with thin campaign-policy adapters while preserving the
+  existing product/runtime prefixes, severity policy, manifest shape,
+  placement budgets, derivative paths, and public media behavior.
+- Added independent media characterization before migration and fail-closed
+  traversal coverage. Shared labels, scopes, error fields, media paths, and
+  known-path sets are now bounded.
+- Pool retains environment/config parsing, logging policy and destinations,
+  campaign/default scope and slug policy, content, filesystem access,
+  transforms, admin routes, storage, deployment, and rollback.
+
 ## v1.2.6 - 2026-08-06
 
 ### Shared deterministic shipping mechanics
