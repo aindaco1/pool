@@ -389,4 +389,36 @@ describe('TierInventoryCoordinator', () => {
       updatedAt: expect.any(String)
     });
   });
+
+  it('keeps the stored campaign snapshot authoritative over later bootstrap data', async () => {
+    const state = new MockDurableObjectState();
+    await state.storage.put('state', {
+      inventory: { reward: { limit: 2, claimed: 1, label: 'Reviewed' } },
+      reservations: {},
+      updatedAt: '2026-08-06T12:00:00.000Z'
+    });
+    const coordinator = new TierInventoryCoordinator(
+      state as never,
+      { PLEDGES: new MockKVNamespace() } as never
+    );
+
+    const response = await coordinator.fetch(new Request('https://tier-inventory/snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        campaignSlug: 'hand-relations',
+        inventory: {
+          reward: { limit: 9, claimed: 0, label: 'Draft' },
+          extra: { limit: 1, claimed: 0 }
+        }
+      })
+    }));
+
+    expect(await response.json()).toEqual({
+      success: true,
+      inventory: { reward: { limit: 2, claimed: 1, label: 'Reviewed' } },
+      reservedCounts: {},
+      updatedAt: '2026-08-06T12:00:00.000Z'
+    });
+  });
 });
