@@ -1,6 +1,6 @@
 {
   "name": "pool",
-  "version": "1.2.17",
+  "version": "1.2.18",
   "description": "**Dust Wave's open crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)",
   "main": "index.js",
   "directories": {
@@ -61,8 +61,8 @@
     "test:usps": "node ./scripts/usps-smoke.mjs",
     "shipping-countries:check": "node ./shared/dust-wave-platform/packages/shipping-core/bin/sync-shipping-countries.mjs ./_data/shipping_countries.yml",
     "shipping-countries:sync": "node ./shared/dust-wave-platform/packages/shipping-core/bin/sync-shipping-countries.mjs ./_data/shipping_countries.yml --write",
-    "assets:minify": "node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --write",
-    "assets:minify:check": "node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --check",
+    "assets:minify": "node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --asset-dir assets --asset-dir shared/dust-wave-platform/packages/site-shell/src --write",
+    "assets:minify:check": "node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --asset-dir assets --asset-dir shared/dust-wave-platform/packages/site-shell/src --check",
     "media:optimize": "node ./scripts/optimize-media.mjs --write",
     "media:optimize:check": "node ./scripts/optimize-media.mjs --check",
     "media:manifest": "node ./scripts/optimize-media.mjs --write --manifest-only",

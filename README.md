@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release branch milestone: **v1.2.17**. Pool pins immutable `dust-wave-platform` `v0.30.0`; shared Design Core now supplies forms and policy-injected layout/mixins with byte-equivalent generated CSS while Pool retains its tokens, geometry policy, templates, content, credentials, deployment authority, and one-commit rollback.
+Current release branch milestone: **v1.2.18**. Pool pins immutable `dust-wave-platform` `v0.31.0`; Build Core now minifies the generated copies of the pinned Site Shell scripts through an explicit traversal-safe allowlist while Pool retains its source assets, budgets, build orchestration, credentials, deployment authority, and one-commit rollback.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -504,7 +504,7 @@ Worker releases use the manually dispatched **Deploy Production** GitHub Actions
 
 Routine **Refresh Production Pages** runs, including scheduled campaign-state refreshes, do not deploy the Worker.
 
-The Pages build runs Jekyll first, then `npm run assets:minify` against generated `_site/assets/**/*.css` and `_site/assets/**/*.js` before uploading the artifact. Source files stay readable in the repository; Cloudflare still handles gzip/Brotli/Zstandard compression at the edge, so Cloudflare Auto Minify should stay disabled.
+The Pages build runs Jekyll first, then `npm run assets:minify` against generated `_site/assets` CSS/JavaScript and the generated copies of the pinned Site Shell browser scripts before uploading the artifact. The selected roots are explicit and traversal-safe; source files stay readable in the repository. Cloudflare still handles gzip/Brotli/Zstandard compression at the edge, so Cloudflare Auto Minify should stay disabled.
 
 Required GitHub repository secrets for automatic Worker deployment:
 - `CLOUDFLARE_API_TOKEN` from a **user API token** created under **My Profile -> API Tokens**, using the **Edit Cloudflare Workers** template and scoped to this account and the `dustwave.xyz` zone. Do not use an account-owned API token; Wrangler still calls user-scoped endpoints such as memberships during deploy.
