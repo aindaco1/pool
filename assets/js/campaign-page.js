@@ -576,6 +576,10 @@ function loadLaunchReminderTurnstile() {
 }
 
 function getLaunchReminderTurnstileSize(form) {
+  const root = form.querySelector('[data-launch-reminder-turnstile]');
+  const responsiveSize =
+    window.DustWaveAdminShellTurnstile?.responsiveSize?.(root);
+  if (responsiveSize === 'compact') return 'compact';
   return form.closest('.launch-reminder--sidebar') ? 'normal' : 'flexible';
 }
 

@@ -18,6 +18,7 @@
   var siteUrl = config.platform?.siteUrl || config.siteUrl || window.location.origin || '';
   var canonicalSiteUrl = script.dataset.canonicalSiteUrl || '';
   var canonicalWorkerBase = script.dataset.canonicalWorkerBase || '';
+  var credentialedDownloadModulePromise = null;
 
   var authPanel = document.getElementById('admin-auth-panel');
   var loginForm = document.getElementById('admin-login-form');
@@ -178,8 +179,6 @@
   var collectionFieldIdCounter = 0;
   var contentEditorInstanceCounter = 0;
   var activeSettingsSectionHasPublishableControls = true;
-  var mobileTabSelectIdCounter = 0;
-  var mobileTabSelects = new WeakMap();
   var turnstileLoadPromise = null;
   var turnstileWidgetId = null;
   var turnstileToken = '';
@@ -475,7 +474,9 @@
       action: 'admin_login',
       appearance: 'always',
       execution: 'render',
-      size: 'flexible',
+      size: window.DustWaveAdminShellTurnstile?.responsiveSize?.(
+        turnstileWidgetRoot
+      ) || 'compact',
       theme: 'light',
       callback: function(token) {
         turnstileToken = String(token || '');
@@ -529,52 +530,32 @@
 
   function syncMobileTabSelect(tablist, options) {
     if (!(tablist instanceof HTMLElement)) return;
-    var buttons = Array.from(tablist.querySelectorAll(options?.buttonSelector || '[role="tab"]'))
-      .filter(function(button) {
-        return button instanceof HTMLButtonElement && !button.hidden;
-      });
-    var state = mobileTabSelects.get(tablist);
-    if (!state) {
-      var wrapper = document.createElement('div');
-      wrapper.className = 'admin-mobile-tab-select';
-      var selectId = (tablist.id || 'admin-mobile-tab-select') + '-' + String(++mobileTabSelectIdCounter);
-      var label = document.createElement('label');
-      label.className = 'admin-mobile-tab-select__label';
-      label.setAttribute('for', selectId);
-      var select = document.createElement('select');
-      select.id = selectId;
-      select.className = 'admin-settings__input admin-mobile-tab-select__control';
-      wrapper.append(label, select);
-      tablist.insertAdjacentElement('afterend', wrapper);
-      state = { wrapper: wrapper, label: label, select: select };
-      mobileTabSelects.set(tablist, state);
+    var tabsApi = window.DustWaveAdminShellTabs;
+    if (!tabsApi?.mountResponsiveTabSelect) {
+      logger.error('Shared responsive admin tabs did not initialize.');
+      return;
     }
-
-    state.label.textContent = options?.label || tablist.getAttribute('aria-label') || t('mobile_menu_label', 'Choose section');
-    state.wrapper.hidden = tablist.hidden || buttons.length < 2;
-    state.select.replaceChildren();
-    var selectedValue = '';
-    buttons.forEach(function(button) {
-      var value = String(options?.value ? options.value(button) : button.id || button.textContent || '');
-      var option = document.createElement('option');
-      option.value = value;
-      option.textContent = (button.textContent || value).trim();
-      state.select.append(option);
-      if (button.getAttribute('aria-selected') === 'true') selectedValue = value;
+    tabsApi.mountResponsiveTabSelect(tablist, {
+      activate: options?.activate,
+      buttonSelector: options?.buttonSelector || '[role="tab"]',
+      label: options?.label || tablist.getAttribute('aria-label') || t('mobile_menu_label', 'Choose section'),
+      labelClass: 'admin-mobile-tab-select__label',
+      optionLabel: function(button, value) {
+        return (button.textContent || value).trim();
+      },
+      selectClass: 'admin-settings__input admin-mobile-tab-select__control',
+      tabList: tablist,
+      tabs: function() {
+        return Array.from(tablist.querySelectorAll(options?.buttonSelector || '[role="tab"]'))
+          .filter(function(button) {
+            return button instanceof HTMLButtonElement && !button.hidden;
+          });
+      },
+      value: function(button) {
+        return String(options?.value ? options.value(button) : button.id || button.textContent || '');
+      },
+      wrapperClass: 'admin-mobile-tab-select'
     });
-    if (selectedValue) state.select.value = selectedValue;
-    state.select.onchange = function() {
-      var value = state.select.value;
-      var targetButton = buttons.find(function(button) {
-        return String(options?.value ? options.value(button) : button.id || button.textContent || '') === value;
-      });
-      if (!(targetButton instanceof HTMLButtonElement)) return;
-      if (typeof options?.activate === 'function') {
-        options.activate(value, targetButton);
-      } else {
-        targetButton.click();
-      }
-    };
   }
 
   function syncAdminMobileTabs() {
@@ -668,13 +649,12 @@
   }
 
   function setDirtyButtonState(button, dirty, cleanText, dirtyText, options) {
-    if (!(button instanceof HTMLButtonElement)) return;
-    button.classList.toggle('is-dirty', Boolean(dirty));
-    button.dataset.dirtyState = dirty ? 'dirty' : 'clean';
-    button.textContent = dirty ? dirtyText : cleanText;
-    if (options?.disableWhenClean !== false) {
-      button.disabled = !dirty || Boolean(options?.forceDisabled);
+    var sharedSetter = window.DustWaveAdminShellDirtyControls?.setDirtyButtonState;
+    if (typeof sharedSetter === 'function') {
+      return sharedSetter(button, dirty, cleanText, dirtyText, options);
     }
+    if (button instanceof HTMLButtonElement) button.disabled = true;
+    return false;
   }
 
   function resetSettingsDirtyBaseline(roots, changes) {
@@ -894,39 +874,33 @@
     return data;
   }
 
+  function credentialedDownloads() {
+    var moduleUrl = String(script.dataset.adminDownloadModule || '').trim();
+    if (!moduleUrl) {
+      return Promise.reject(new Error('Shared download module is not configured'));
+    }
+    if (!credentialedDownloadModulePromise) {
+      credentialedDownloadModulePromise = import(moduleUrl);
+    }
+    return credentialedDownloadModulePromise;
+  }
+
   async function requestBlob(path, options) {
     var headers = Object.assign({}, options?.headers || {});
-    var response = await fetch(apiUrl(path), Object.assign({}, options || {}, {
-      credentials: 'include',
-      headers: headers
-    }));
-    if (!response.ok) {
-      var data = await response.json().catch(function() { return {}; });
-      var error = new Error(data.error || 'Request failed');
-      error.response = response;
-      error.data = data;
-      throw error;
-    }
-    return {
-      blob: await response.blob(),
-      filename: getFilenameFromDisposition(response.headers.get('Content-Disposition'))
-    };
+    var tools = await credentialedDownloads();
+    return tools.requestCredentialedBlob(apiUrl(path), {
+      fetchImpl: fetch,
+      method: options?.method || 'GET',
+      headers: headers,
+      signal: options?.signal,
+      maximumBytes: 16 * 1024 * 1024,
+      allowedContentTypes: ['text/csv']
+    });
   }
 
-  function getFilenameFromDisposition(disposition) {
-    var match = String(disposition || '').match(/filename="([^"]+)"/);
-    return match ? match[1] : '';
-  }
-
-  function downloadBlobResult(result, fallbackFilename) {
-    var objectUrl = URL.createObjectURL(result.blob);
-    var link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = result.filename || fallbackFilename;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(objectUrl);
+  async function downloadBlobResult(result, fallbackFilename) {
+    var tools = await credentialedDownloads();
+    return tools.triggerBlobDownload(result, fallbackFilename);
   }
 
   function showAuth(message) {
@@ -10152,7 +10126,7 @@
     setText(reportStatus, t('downloading_report', 'Preparing CSV download...'));
     try {
       var result = await requestBlob('/admin/reports/campaign-runner.csv?' + reportQueryParams().toString(), { method: 'GET' });
-      downloadBlobResult(result, 'campaign-runner-report.csv');
+      await downloadBlobResult(result, 'campaign-runner-report.csv');
       setText(reportStatus, t('download_started', 'CSV download started.'));
     } catch (error) {
       logger.error('Failed to download report CSV', error);
@@ -10646,11 +10620,15 @@
     });
   }
 
-  window.addEventListener('beforeunload', function(event) {
-    if (!adminHasUnsavedChanges()) return;
-    event.preventDefault();
-    event.returnValue = '';
-  });
+  var unsavedChangesApi = window.DustWaveAdminShellUnsavedChanges;
+  if (!unsavedChangesApi?.mountUnsavedChangesGuard) {
+    logger.error('Shared unsaved-change guard did not initialize.');
+  } else {
+    unsavedChangesApi.mountUnsavedChangesGuard({
+      eventTarget: window,
+      hasUnsavedChanges: adminHasUnsavedChanges
+    });
+  }
 
   if (tabButtons.length) {
     applyAdminTabCompactLabels();

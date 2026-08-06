@@ -34,6 +34,9 @@ PLEDGES_EMAIL_FROM = "The Pool <pledges@pool.dustwave.xyz>"
 UPDATES_EMAIL_FROM = "The Pool <updates@pool.dustwave.xyz>"
 EMAIL_OUTBOX_ENABLED = "true"
 PAYMENT_RECONCILIATION_ENABLED = "true"
+PODCAST_BENEFITS_ENABLED = "false"
+PODCAST_BRIDGE_URL = "https://feeds.dustwave.xyz/v1/internal/pool/grants"
+PODCAST_BRIDGE_TIMEOUT_MS = "5000"
 PLATFORM_FOOTER_LOGO_PATH = "/assets/images/defaults/dust-wave-square.png"
 PLATFORM_FAVICON_PATH = "/assets/images/defaults/favicon.png"
 PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH = "/assets/images/defaults/dust-wave-square.png"
@@ -147,6 +150,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - RESEND_WEBHOOK_SECRET      (Resend/Svix webhook signing secret for delivery and suppression events)
 # - ADMIN_SECRET               (Admin API key for recovery/rebuild endpoints and scoped-secret fallback)
 # - TURNSTILE_SECRET_KEY       (shared Cloudflare Turnstile secret for admin sign-in and launch reminder challenges)
+# - POOL_PODCAST_BRIDGE_SECRET (dedicated HMAC secret for Podcast benefit grant/revoke delivery when enabled)
 #
 # Optional (for separate test/live keys):
 # - STRIPE_SECRET_KEY_LIVE / STRIPE_SECRET_KEY_TEST
@@ -201,6 +205,9 @@ PLEDGES_EMAIL_FROM = "The Pool <pledges@pool.dustwave.xyz>"
 UPDATES_EMAIL_FROM = "The Pool <updates@pool.dustwave.xyz>"
 EMAIL_OUTBOX_ENABLED = "true"
 PAYMENT_RECONCILIATION_ENABLED = "false"
+PODCAST_BENEFITS_ENABLED = "false"
+PODCAST_BRIDGE_URL = "https://feeds.dustwave.xyz/v1/internal/pool/grants"
+PODCAST_BRIDGE_TIMEOUT_MS = "5000"
 PLATFORM_FOOTER_LOGO_PATH = "/assets/images/defaults/dust-wave-square.png"
 PLATFORM_FAVICON_PATH = "/assets/images/defaults/favicon.png"
 PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH = "/assets/images/defaults/dust-wave-square.png"

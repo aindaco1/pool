@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release milestone: **v1.1.2**. This release hardens deployed sitemap verification, adds fail-closed featured-reward product pages for future Google Shopping onboarding, publishes clear shipping and no-returns policies, and refreshes the English/Spanish public About and Terms copy.
+Current release branch milestone: **v1.2.1**. This release advances Pool to the immutable `dust-wave-platform` `0.11.5` workspace while preserving Pool's deployment, data, pledge, payment, and business-rule boundaries.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -22,6 +22,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Configurable pricing and tax-provider settings** — `pricing.*` and `tax.*` live in `_config.yml`, and the mirrored Worker vars are auto-synced into `worker/wrangler.toml` so browser previews, provisional tax states, and server-side totals stay aligned
 - **Physical & digital tiers** — Physical items trigger shipping address capture during checkout plus Worker-calculated USPS quotes, configured fallback rates, and optional domestic signature upgrades when enabled
 - **Order-scoped magic links** — Each supporter link only manages its own pledge/order
+- **Podcast benefit bridge foundation** — A disabled-by-default, signed Pool-to-Podcast grant/revoke client shares the exact one-time-code contract with the Podcast runtime; no tier/product mapping or supporter grant is active yet
 - **Safer supporter sessions** — Community pages keep supporter access in browser session storage instead of a long-lived token cookie
 - **Stretch goals** — Auto-unlock at funding thresholds
 - **Campaign lifecycle** — `upcoming` → `live` → `post` states with automatic transitions + Cloudflare cache purge
@@ -85,6 +86,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 ## Quick Start
 
 ```bash
+git submodule update --init --recursive
 npm run setup:deploy -- --mode=local
 npm run podman:doctor
 ./scripts/dev.sh --podman
@@ -92,6 +94,8 @@ npm run podman:doctor
 ```
 
 That is the recommended local development path. It boots Jekyll, the Worker, optional Stripe CLI forwarding, and the local support services together with the repo's current defaults.
+
+Clone with `--recurse-submodules` when possible. Existing checkouts must run the submodule command above before installing or testing; CI pins and initializes the recorded shared-platform commit rather than following its moving branch.
 
 The setup helper is dependency-free Node and works on macOS, Windows, and Linux. Use `npm run setup:deploy -- --mode=production --dry-run` to preview Cloudflare KV, Worker secret, GitHub secret, readiness, and deploy steps before applying them. It intentionally keeps production Worker secrets separate from ignored local `worker/.dev.vars` values, and the setup path is covered by fake-CLI unit tests so dry runs, KV reuse/create planning, generated local secrets, and production secret writes stay testable without live provider mutations.
 

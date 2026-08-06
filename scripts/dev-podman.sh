@@ -17,6 +17,7 @@ SITE_IMAGE="localhost/pool-dev-site:latest"
 WORKER_IMAGE="localhost/pool-dev-worker:latest"
 PODMAN_DEV_LABEL="pool.dev.stack=pool"
 WORKER_NODE_IMAGE="${PODMAN_WORKER_NODE_IMAGE:-}"
+PLAYWRIGHT_NODE_IMAGE="${PODMAN_PLAYWRIGHT_NODE_IMAGE:-$(awk '$1 == "FROM" && index($2, "mcr.microsoft.com/playwright:") == 1 { print $2; exit }' "$ROOT_DIR/Containerfile.playwright.dev")}"
 SITE_VOLUME="pool-dev-bundle"
 WORKER_NODE_MODULES_VOLUME="pool-dev-worker-node-modules"
 SKIP_STRIPE="${SKIP_STRIPE:-false}"
@@ -645,9 +646,10 @@ ensure_podman_ready
 
 build_image_if_needed "$SITE_IMAGE" "$ROOT_DIR" "$ROOT_DIR/Containerfile.dev"
 if [ -z "$WORKER_NODE_IMAGE" ] && \
+   [ -n "$PLAYWRIGHT_NODE_IMAGE" ] && \
    ! podman image exists "docker.io/library/node:24-bookworm-slim" && \
-   podman image exists "mcr.microsoft.com/playwright:v1.62.1-noble"; then
-  WORKER_NODE_IMAGE="mcr.microsoft.com/playwright:v1.62.1-noble"
+   podman image exists "$PLAYWRIGHT_NODE_IMAGE"; then
+  WORKER_NODE_IMAGE="$PLAYWRIGHT_NODE_IMAGE"
   echo "ℹ️  Using cached Playwright Node 24 image for the Worker dev base."
 fi
 

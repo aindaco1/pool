@@ -1201,15 +1201,21 @@ async function buildCampaignShareCardPng(options) {
   }
 }
 
-// SEC-006: Timing-safe string comparison to prevent timing attacks
+const TIMING_SAFE_COMPARE_CODE_UNITS = 256;
+
+// SEC-006: Bounded, fixed-work string comparison to prevent timing attacks.
 function timingSafeEqual(a, b) {
-  if (!a || !b) return false;
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  const left = String(a ?? '');
+  const right = String(b ?? '');
+  let result = left.length ^ right.length;
+  for (let i = 0; i < TIMING_SAFE_COMPARE_CODE_UNITS; i++) {
+    result |= (left.charCodeAt(i) || 0) ^ (right.charCodeAt(i) || 0);
   }
-  return result === 0;
+  return left.length > 0 &&
+    right.length > 0 &&
+    left.length <= TIMING_SAFE_COMPARE_CODE_UNITS &&
+    right.length <= TIMING_SAFE_COMPARE_CODE_UNITS &&
+    result === 0;
   }
 
 function getSiteOrigin(env) {
@@ -13235,6 +13241,7 @@ function adminSecretStatusRows(env) {
     ['Admin recovery secret', status(env.ADMIN_SECRET), readOnlyAdminSettingHelp('Bearer secret used by protected admin automation and recovery endpoints. Keep this in Worker or GitHub secrets only.')],
     ['Admin settlement secret', status(env.ADMIN_SETTLEMENT_SECRET || env.SETTLEMENT_ADMIN_SECRET, false), readOnlyAdminSettingHelp('Optional scoped Bearer secret for settlement endpoints. When configured, settlement routes reject the broader admin recovery secret.')],
     ['Admin broadcast secret', status(env.ADMIN_BROADCAST_SECRET || env.BROADCAST_ADMIN_SECRET, false), readOnlyAdminSettingHelp('Optional scoped Bearer secret for diary, milestone, and announcement automation. When configured, broadcast routes reject the broader admin recovery secret.')],
+    ['Pool–Podcast bridge secret', status(env.POOL_PODCAST_BRIDGE_SECRET, false), readOnlyAdminSettingHelp('Dedicated HMAC secret for the disabled-by-default Podcast benefit bridge. Never reuse a Stripe, admin, session, or email signing secret.')],
     ['Admin Turnstile secret', status(env.TURNSTILE_SECRET_KEY || env.ADMIN_TURNSTILE_SECRET_KEY, turnstileRequired), readOnlyAdminSettingHelp('Cloudflare Turnstile secret used to verify admin email sign-in challenges. Required when the admin Turnstile widget is enabled.')],
     ['Resend API key', status(env.RESEND_API_KEY), readOnlyAdminSettingHelp('Email provider API key used for admin magic links, pledge emails, and campaign notifications. Never store it in _config.yml.')],
     ['Resend webhook secret', status(env.RESEND_WEBHOOK_SECRET, false), readOnlyAdminSettingHelp('Optional Resend/Svix signing secret for delivery, bounce, complaint, and suppression evidence. Production should configure it after creating /webhooks/resend.')],

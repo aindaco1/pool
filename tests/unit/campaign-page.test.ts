@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const repoRoot = resolve(__dirname, '..', '..');
 
 function renderCampaignPage() {
   document.body.innerHTML = `
@@ -99,7 +103,15 @@ describe('campaign page script', () => {
     delete (document as any).activeElement;
     delete (window as any).POOL_CONFIG;
     delete (window as any).POOL_TIME;
+    delete (window as any).DustWaveAdminShellTurnstile;
     document.body.innerHTML = '';
+  });
+
+  it('loads the shared responsive Turnstile helper before the campaign runtime', () => {
+    const layout = readFileSync(resolve(repoRoot, '_layouts', 'campaign.html'), 'utf8');
+    const helper = '/shared/dust-wave-platform/packages/admin-shell/src/turnstile-browser.js';
+    expect(layout).toContain(helper);
+    expect(layout.indexOf(helper)).toBeLessThan(layout.indexOf('/assets/js/campaign-page.js'));
   });
 
   it('binds support scrolling and unlocks the community teaser in dev mode', async () => {
@@ -246,6 +258,46 @@ describe('campaign page script', () => {
 
     expect(renderMock.mock.calls[0][1]).toMatchObject({ size: 'normal' });
     expect(renderMock.mock.calls[1][1]).toMatchObject({ size: 'flexible' });
+  });
+
+  it('uses the shared compact size when the reminder container is below 300px', async () => {
+    document.body.innerHTML = `
+      <section class="launch-reminder launch-reminder--sidebar">
+        <form data-launch-reminder-form data-campaign-slug="demo" data-lang="en" data-turnstile-site-key="site-key">
+          <input name="email" type="email" value="sidebar@example.com">
+          <input name="consent" type="hidden" value="true">
+          <button type="submit">Remind me</button>
+          <div data-launch-reminder-turnstile></div>
+          <p data-launch-reminder-status></p>
+        </form>
+      </section>
+      <script data-campaign-page-script="true" data-campaign-slug="demo"></script>
+    `;
+    const renderMock = vi.fn(() => 'widget-id');
+    const responsiveSize = vi.fn(() => 'compact');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ ok: true }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    )));
+    vi.stubGlobal('turnstile', {
+      render: renderMock,
+      getResponse: vi.fn(() => 'turnstile-token'),
+      reset: vi.fn()
+    });
+    (window as any).DustWaveAdminShellTurnstile = { responsiveSize };
+
+    await import('../../assets/js/campaign-page.js');
+
+    const form = document.querySelector('[data-launch-reminder-form]') as HTMLFormElement;
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const root = form.querySelector('[data-launch-reminder-turnstile]');
+    expect(responsiveSize).toHaveBeenCalledWith(root);
+    expect(renderMock).toHaveBeenCalledWith(
+      root,
+      expect.objectContaining({ size: 'compact' })
+    );
   });
 
   it('uses hidden state and width classes for countdown and video shell', async () => {

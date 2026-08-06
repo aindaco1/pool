@@ -1,6 +1,6 @@
 {
   "name": "pool",
-  "version": "1.1.2",
+  "version": "1.2.1",
   "description": "**Dust Wave's open crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)",
   "main": "index.js",
   "directories": {
@@ -83,5 +83,9 @@
     "smol-toml": "^1.7.1",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "ip-address": "10.4.0",
+    "undici": "7.29.0"
   }
 }

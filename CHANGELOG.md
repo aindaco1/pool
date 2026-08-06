@@ -1,5 +1,71 @@
 # Changelog
 
+## v1.2.1 - Unreleased
+
+Release preparation:
+
+- Advanced the exact `dust-wave-platform` gitlink to workspace `0.11.5`,
+  including `@dustwave/admin-shell` `0.10.2` and `@dustwave/worker-core`
+  `0.3.6`, while keeping campaign, pledge, payment, storage, and deployment
+  authority within Pool.
+- Added an executable consumer contract for the immutable gitlink, canonical
+  submodule remote, package versions, and every raw shared module Pool serves
+  or imports.
+- Enabled safe local-identifier minification in generated JavaScript while
+  preserving browser globals and the existing production asset budgets.
+- Made the Podman release wrappers clean-checkout safe on macOS by using a
+  portable Playwright image lookup and an ephemeral local Jekyll test config.
+- Replaced single-sample Lighthouse decisions with the median of three runs,
+  preventing one noisy sample from falsely failing or approving a release.
+- Promoted the mutable-pledge fixture inventory check from a warning to a hard
+  release gate, aligned its unit campaign fixture with the built campaign, and
+  normalized both inventory endpoint response shapes before asserting counts.
+- Made deployment setup dry-runs non-interactive around secret planning, so
+  provider values are neither requested nor passed to a CLI during rehearsal.
+- Pinned patched transitive `undici` and `ip-address` releases for local test
+  and deployment tooling, clearing both production and full npm audits.
+- Hardened legacy admin-secret comparison to fixed bounded work and replaced a
+  one-request timing check with alternating median samples on isolated IPs.
+- Preserved the disabled-by-default Podcast benefit bridge and Pool's
+  independently reversible release identity.
+
+## v1.2.0 - 2026-08-05
+
+Release preparation:
+
+- Added the pinned `aindaco1/dust-wave-platform` submodule as the versioned boundary for primitives shared with Store, Dust Wave, and Podcast.
+- Moved the byte-identical Turnstile implementation into `@dustwave/worker-core` while retaining Pool's local import seam and adding a consumer contract test.
+- Advanced the shared boundary to `@dustwave/worker-core` 0.2.0, which adds
+  typed product-neutral crypto and Stripe mechanics for Podcast without moving
+  Pool business rules or changing Pool's existing Turnstile adapter.
+- Kept Pool's campaign, pledge, configuration, session, storage, and deployment authority independent; the submodule contains no Pool data or secrets and can be rolled back by pointer.
+- Advanced `@dustwave/worker-core` to 0.3.0 and added an inert, fail-closed
+  Pool-to-Podcast grant/revoke client with a shared high-entropy one-time-code
+  contract. Product/tier mapping, durable delivery, and supporter issuance
+  remain disabled until their explicit configuration and staging gate.
+- Advanced the shared workspace to 0.6.0 and
+  `@dustwave/admin-shell` 0.2.0, moving Pool and Store's byte-identical QR
+  generator into the pinned shared boundary. Pool still loads the same
+  characterized implementation through its static admin shell; only the
+  source authority and generated path changed.
+- Advanced the pinned shared workspace to 0.8.1 and
+  `@dustwave/admin-shell` 0.7.1. The additive rich-editor `setHtml` API routes
+  restored HTML through the existing allowlist sanitizer; Pool behavior is
+  unchanged until a form opts into it, and rollback remains a one-commit
+  submodule-pointer change.
+- Advanced `@dustwave/admin-shell` to 0.8.0 and replaced Pool's inline browser
+  exit listener with the shared fail-closed unsaved-change lifecycle guard.
+  Pool retains its characterized content, settings, and administrator dirty
+  baselines; Store remains unchanged until its separate editor baselines have a
+  safe aggregate adapter.
+- Advanced `@dustwave/admin-shell` to 0.8.1 and routed Pool's characterized
+  dirty-action class, state attribute, localized label, and clean-state
+  disabling through the shared primitive. Pool retains every editor baseline,
+  force-disabled rule, and focus-ring style.
+- Centralized the Worker provider identity and added a release-contract test
+  that keeps root/Worker packages and locks, canonical config, release label,
+  Stripe, and Resend aligned to v1.2.0.
+
 ## v1.1.2 - 2026-07-14
 
 Release scope:

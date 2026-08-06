@@ -5,7 +5,11 @@ import { describe, expect, it } from 'vitest';
 
 import { collectAssetBudgetEvidence } from '../../scripts/audit-performance-budgets.mjs';
 import { evaluateCachePolicyTarget } from '../../scripts/audit-cache-policy.mjs';
-import { evaluateLighthouseResult, lighthouseBudgetsForRoute } from '../../scripts/performance-lighthouse.mjs';
+import {
+  evaluateLighthouseResult,
+  evaluateLighthouseRuns,
+  lighthouseBudgetsForRoute
+} from '../../scripts/performance-lighthouse.mjs';
 import { evaluateWorkerPerformanceEvidence } from '../../scripts/audit-runtime-performance.mjs';
 
 describe('production performance gates', () => {
@@ -97,6 +101,22 @@ describe('production performance gates', () => {
       categories: { accessibility: 0.95, performance: 0.65 },
       audits: { 'cumulative-layout-shift': 0.1, 'largest-contentful-paint': 8000 },
       resourceBytes: { stylesheet: 200000, total: 850000 }
+    });
+  });
+
+  it('uses the median of three Lighthouse samples so one noisy run cannot waive or fail a release', () => {
+    const budgets = { categories: { performance: 0.65 }, audits: {}, resourceBytes: {} };
+    const result = (score: number) => ({ categories: { performance: { score } }, audits: {} });
+
+    expect(evaluateLighthouseRuns([result(0.64), result(0.71), result(0.72)], budgets)).toMatchObject({
+      sampleCount: 3,
+      ok: true,
+      checks: [{ id: 'category:performance', actual: 0.71, minimum: 0.65, ok: true }]
+    });
+    expect(evaluateLighthouseRuns([result(0.62), result(0.64), result(0.8)], budgets)).toMatchObject({
+      sampleCount: 3,
+      ok: false,
+      checks: [{ id: 'category:performance', actual: 0.64, minimum: 0.65, ok: false }]
     });
   });
 

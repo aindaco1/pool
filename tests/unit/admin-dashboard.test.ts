@@ -472,7 +472,12 @@ describe('admin dashboard foundation', () => {
     expect(embedBuilder).toContain('data-campaign-embed-autoload="{{ embed_autoload }}"');
     expect(embedBuilder).toContain('data-campaign-embed-sync-query="{{ embed_sync_query }}"');
     expect(layout).toContain('/assets/js/campaign-embed.js');
-    expect(layout).toContain('/assets/js/vendor/qrcode-generator.js');
+    expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/vendor/qrcode-generator.js');
+    expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/credentialed-download.js?v={{ asset_version }}');
+    expect(adminScript).toContain('requestCredentialedBlob');
+    expect(adminScript).toContain('triggerBlobDownload');
+    expect(adminScript).toContain('maximumBytes: 16 * 1024 * 1024');
+    expect(adminScript).not.toContain('response.blob()');
     expect(embedScript).toContain('isAdminMarketingEmbed');
     expect(embedScript).toContain('heroVideo && !isAdminMarketingEmbed');
     expect(layout.indexOf('id="admin-marketing-campaign"')).toBeLessThan(layout.indexOf('id="admin-marketing-referrer"'));
@@ -653,6 +658,19 @@ describe('admin dashboard foundation', () => {
     expect(adminScript).toContain('marketingReferralsLoadedCampaignSlug');
     expect(adminScript).toContain('loadMarketingAbandonedHealth({ force: true })');
     expect(adminScript).toContain('syncMobileTabSelect');
+    expect(adminScript).toContain('window.DustWaveAdminShellTabs');
+    expect(adminScript).toContain('window.DustWaveAdminShellDirtyControls');
+    expect(adminScript).toContain('window.DustWaveAdminShellUnsavedChanges');
+    expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/tabs-browser.js?v={{ asset_version }}');
+    expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/dirty-controls-browser.js?v={{ asset_version }}');
+    expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/unsaved-changes-browser.js?v={{ asset_version }}');
+    expect(layout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/turnstile-browser.js?v={{ asset_version }}');
+    expect(adminScript).toContain(
+      'size: window.DustWaveAdminShellTurnstile?.responsiveSize?.('
+    );
+    expect(adminScss).toMatch(
+      /@media \(max-width: 339px\)[\s\S]+\.admin-auth__turnstile[\s\S]+min-height: 140px/
+    );
     expect(adminScript).toContain('filenameBase');
     expect(adminScript).toContain("url.searchParams.set('utm_campaign', campaign.slug)");
     expect(adminScript).toContain('/admin/marketing/referrals');
@@ -2102,6 +2120,7 @@ campaign_add_ons:
       expect.objectContaining({ label: 'Checkout intent secret', value: 'Missing', editable: false }),
       expect.objectContaining({ label: 'Magic link secret', value: 'Configured', editable: false }),
       expect.objectContaining({ label: 'Admin session secret', value: 'Optional / not configured', editable: false }),
+      expect.objectContaining({ label: 'Pool–Podcast bridge secret', value: 'Optional / not configured', editable: false }),
       expect.objectContaining({ label: 'Cloudflare deploy credentials', value: 'GitHub secret / local shell only', editable: false })
     ]));
     secretRows.forEach((row: { path?: string; rawValue?: string; value?: string }) => {

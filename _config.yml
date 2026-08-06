@@ -40,8 +40,8 @@ exclude:
 # Structured platform settings for forks.
 platform:
   name: The Pool
-  version: "1.1.2"
-  release_label: "v1.1.2"
+  version: "1.2.1"
+  release_label: "v1.2.1"
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   pledges_email_from: "The Pool <pledges@pool.dustwave.xyz>"
@@ -60,6 +60,14 @@ email:
 
 payments:
   reconciliation_enabled: true
+
+podcast_benefits:
+  # The bridge and every product/tier mapping remain off until a controlled
+  # staging grant/revoke exercise has passed.
+  enabled: false
+  bridge_url: "https://feeds.dustwave.xyz/v1/internal/pool/grants"
+  bridge_timeout_ms: 5000
+  mappings: []
 
 admin:
   # Canonical production URLs surfaced in the local admin UI even when
