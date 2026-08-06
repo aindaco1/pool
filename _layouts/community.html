@@ -178,7 +178,7 @@
     data-pool-logger-script="true"
     data-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
     data-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"></script>
-  <script data-cfasync="false" src="/assets/js/form-control-identity.js" defer></script>
+  {% include form-control-identity-script.html %}
   <script
     data-cfasync="false"
     src="/assets/js/community-page.js"

@@ -28,10 +28,10 @@
       }
     },
     {
-      file: 'shipping-option-utils.js',
+      file: '/shared/dust-wave-platform/packages/site-shell/src/shipping-option-utils-browser.js',
       key: 'shipping-option-utils',
       ready: function() {
-        return Boolean(window.PoolShippingOptionUtils);
+        return Boolean(window.DustWaveShippingOptionUtils);
       }
     },
     {

@@ -105,7 +105,7 @@
   let activeManageDialogReturnFocus = null;
   const shippingQuoteState = new Map();
   const taxQuoteState = new Map();
-  const shippingOptionUtils = window.PoolShippingOptionUtils || {
+  const shippingOptionUtils = window.DustWaveShippingOptionUtils || {
     normalizeSelection: function(availableOptions, selectedOption, defaultOption) {
       const options = Array.isArray(availableOptions) ? availableOptions : [];
       const requested = String(selectedOption || '').trim().toLowerCase();

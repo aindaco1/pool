@@ -1071,7 +1071,7 @@ test.describe('Admin Dashboard', () => {
   test('keeps dashboard readiness, tab switching, and supporter table rendering within budgets', async ({ page }) => {
     const calls = await routeAdminWorker(page);
     const readyStartedAt = Date.now();
-    await page.goto('/admin/?admin_login=admin-token');
+    await page.goto('/admin/?admin_login=admin-token', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#admin-app')).toBeVisible();
     await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
     await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
