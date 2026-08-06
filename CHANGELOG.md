@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.2.17 - 2026-08-06
+
+### Policy-injected shared design foundations
+
+- Advanced the immutable Platform pin to `v0.30.0`
+  (`499e6c1994d79be6049ef204fefd728f22b8093e`) and adopted Design Core `0.2.0`.
+- Removed Pool's local form, layout, and mixin partials. Pool now injects its
+  padding-based centered gutter plus brand-title spacing, animation identity,
+  mobile type scale, and line width before importing neutral shared Sass.
+- Characterized generated output before and after migration: `main.css`
+  remained `d3568877d0f31903ccf02a7b37c82220115146609141457a5ae84969c123ea95`
+  and `admin.css` remained
+  `a398fef8d7d257092f1685dab132e9d98a87bbadba347a90a62fd5c081445e84`
+  byte-for-byte.
+- Added pin and compile-time policy regressions. The extraction adds no browser
+  request or runtime code; Pool retains tokens, import order, templates,
+  content, CSS budgets, deployment, and independent rollback.
+
 ## v1.2.16 - 2026-08-06
 
 ### Shared Site Shell browser primitives
