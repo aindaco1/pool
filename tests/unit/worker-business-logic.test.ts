@@ -366,6 +366,16 @@ const smokeEditableCampaignFixture = {
       sold_out: false,
       stackable: true,
       category: 'digital'
+    },
+    {
+      id: 'limited-poster',
+      name: 'Limited Poster',
+      price: 25,
+      limit_total: 5,
+      remaining: 5,
+      sold_out: false,
+      stackable: false,
+      category: 'physical'
     }
   ],
   support_items: [
@@ -4622,6 +4632,9 @@ describe('Worker business logic hardening', () => {
     );
     const storedPledge = await kv.get('pledge:test-order-smoke-editable-smoke-local-example-com', { type: 'json' });
     expect(storedPledge).toMatchObject({
+      pledgeStatus: 'active',
+      charged: false,
+      additionalTiers: [{ id: 'limited-poster', qty: 1 }],
       billingAddress: {
         country: 'US',
         state: 'NM',
@@ -4629,6 +4642,19 @@ describe('Worker business logic hardening', () => {
         postalCode: '87048',
         line1: '1228 W La Entrada'
       }
+    });
+
+    const inventoryResponse = await worker.fetch(
+      new Request('https://pool.test/inventory/smoke-editable/recalculate', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer admin-secret' }
+      }),
+      env,
+      { waitUntil: () => {} }
+    );
+    expect(inventoryResponse.status).toBe(200);
+    expect(await inventoryResponse.json()).toMatchObject({
+      inventory: { 'limited-poster': { limit: 5, claimed: 1 } }
     });
   });
 

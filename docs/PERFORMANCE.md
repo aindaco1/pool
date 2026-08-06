@@ -74,7 +74,7 @@ Use `test:performance:lighthouse:host` when a compatible local Chromium is alrea
 
 For a direct authenticated read, set `ADMIN_PERFORMANCE_TOKEN` to a scoped admin bearer value and pass `--worker-base=<url>` instead of `--input`. The output contains only operation names, sample counts, p95 values, and configured ceilings; it does not echo the token or raw observability payload.
 
-The unit suite tests all budget evaluators without network access. Lighthouse uses shared accessibility/CLS/TBT constraints plus route-specific performance, LCP, and transfer ceilings so a lightweight terms page cannot regress to a campaign-page budget. These release ceilings prevent unreviewed regressions but do not replace the stricter LCP/INP/CLS optimization targets above. A release may skip live Lighthouse, cache, or authenticated runtime evidence only when the required stable route/provider or credential is unavailable, and the omission must be recorded in release sign-off.
+The unit suite tests all budget evaluators without network access. Lighthouse uses the median of three runs, shared accessibility/CLS/TBT constraints, and route-specific performance, LCP, and transfer ceilings so a lightweight terms page cannot regress to a campaign-page budget and a single noisy sample cannot decide a release. These release ceilings prevent unreviewed regressions but do not replace the stricter LCP/INP/CLS optimization targets above. A release may skip live Lighthouse, cache, or authenticated runtime evidence only when the required stable route/provider or credential is unavailable, and the omission must be recorded in release sign-off.
 
 ## Critical Rendering
 

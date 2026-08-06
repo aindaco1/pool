@@ -318,30 +318,39 @@ describe('Authorization Security Tests', () => {
 
   describe('Admin Secret Brute Force Protection', () => {
     it('should not leak timing information on wrong vs right secret length', async () => {
-      // This is a basic timing attack check
-      // In practice, should use constant-time comparison
-      
       const shortSecret = 'a';
       const longSecret = 'a'.repeat(100);
-      
-      const startShort = performance.now();
-      await securityFetch('/admin/rebuild', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${shortSecret}` },
-        body: '{}'
-      });
-      const durationShort = performance.now() - startShort;
-      
-      const startLong = performance.now();
-      await securityFetch('/admin/rebuild', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${longSecret}` },
-        body: '{}'
-      });
-      const durationLong = performance.now() - startLong;
-      
-      // Durations should be similar (within reasonable variance)
-      // This is a weak test due to network variance, but can catch obvious issues
+      const shortDurations: number[] = [];
+      const longDurations: number[] = [];
+      const measure = async (secret: string, requestIp: string) => {
+        const startedAt = performance.now();
+        const response = await securityFetch('/admin/rebuild', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${secret}`,
+            'CF-Connecting-IP': requestIp,
+            'X-Forwarded-For': requestIp
+          },
+          body: '{}'
+        });
+        expect(response.status).toBe(401);
+        return performance.now() - startedAt;
+      };
+
+      for (let index = 0; index < 7; index += 1) {
+        const requestIp = `203.0.113.${100 + index}`;
+        if (index % 2 === 0) {
+          shortDurations.push(await measure(shortSecret, requestIp));
+          longDurations.push(await measure(longSecret, requestIp));
+        } else {
+          longDurations.push(await measure(longSecret, requestIp));
+          shortDurations.push(await measure(shortSecret, requestIp));
+        }
+      }
+
+      const median = (durations: number[]) => [...durations].sort((left, right) => left - right)[Math.floor(durations.length / 2)];
+      const durationShort = median(shortDurations);
+      const durationLong = median(longDurations);
       const ratio = Math.max(durationShort, durationLong) / Math.min(durationShort, durationLong);
       expect(ratio).toBeLessThan(3); // Should not differ by more than 3x
     });

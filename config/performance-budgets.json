@@ -14,8 +14,9 @@
     }
   },
   "lighthouse": {
+    "runs": 3,
     "routes": ["/", "/campaigns/hand-relations/", "/terms/"],
-    "baselineNote": "Route-specific regression ceilings are calibrated from the 1.1.0 throttled local Lighthouse evidence after responsive campaign-card backgrounds reduced homepage image transfer. These are release gates; the stricter Core Web Vital targets in docs/PERFORMANCE.md remain optimization goals.",
+    "baselineNote": "Route-specific regression ceilings are calibrated from the 1.1.0 throttled local Lighthouse evidence after responsive campaign-card backgrounds reduced homepage image transfer. Release evidence uses the median of three runs to reject regressions without making one noisy sample authoritative. These are release gates; the stricter Core Web Vital targets in docs/PERFORMANCE.md remain optimization goals.",
     "categories": {
       "accessibility": 0.95,
       "best-practices": 0.75,
