@@ -1201,15 +1201,21 @@ async function buildCampaignShareCardPng(options) {
   }
 }
 
-// SEC-006: Timing-safe string comparison to prevent timing attacks
+const TIMING_SAFE_COMPARE_CODE_UNITS = 256;
+
+// SEC-006: Bounded, fixed-work string comparison to prevent timing attacks.
 function timingSafeEqual(a, b) {
-  if (!a || !b) return false;
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  const left = String(a ?? '');
+  const right = String(b ?? '');
+  let result = left.length ^ right.length;
+  for (let i = 0; i < TIMING_SAFE_COMPARE_CODE_UNITS; i++) {
+    result |= (left.charCodeAt(i) || 0) ^ (right.charCodeAt(i) || 0);
   }
-  return result === 0;
+  return left.length > 0 &&
+    right.length > 0 &&
+    left.length <= TIMING_SAFE_COMPARE_CODE_UNITS &&
+    right.length <= TIMING_SAFE_COMPARE_CODE_UNITS &&
+    result === 0;
   }
 
 function getSiteOrigin(env) {

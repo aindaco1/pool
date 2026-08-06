@@ -24,6 +24,8 @@ Release preparation:
   provider values are neither requested nor passed to a CLI during rehearsal.
 - Pinned patched transitive `undici` and `ip-address` releases for local test
   and deployment tooling, clearing both production and full npm audits.
+- Hardened legacy admin-secret comparison to fixed bounded work and replaced a
+  one-request timing check with alternating median samples on isolated IPs.
 - Preserved the disabled-by-default Podcast benefit bridge and Pool's
   independently reversible release identity.
 
