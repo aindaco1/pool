@@ -5,15 +5,22 @@
 
 // Import partials - foundation
 @import "partials/variables";
-@import "partials/mixins";
+$dustwave-fit-layout-gutter-mode: padding;
+$dustwave-fit-layout-wide-inline-gutter: clamp(32px, 8vw, 128px);
+$dustwave-fit-layout-xsm-inline-gutter: $space-md;
+@import "mixins";
 
 // Import partials - base & layout
 @import "base";
-@import "partials/layout";
+$dustwave-brand-title-letter-spacing: -0.03em;
+$dustwave-brand-title-animation-name: pool-brand-shimmer;
+$dustwave-brand-title-xsm-font-size: clamp(24px, 7.6vw, 32px);
+$dustwave-brand-title-xsm-max-width: 10ch;
+@import "layout";
 
 // Import partials - components
 @import "buttons";
-@import "partials/forms";
+@import "forms";
 @import "partials/cards";
 @import "partials/progress";
 @import "modal";

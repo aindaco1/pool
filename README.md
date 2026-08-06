@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release branch milestone: **v1.2.16**. Pool pins immutable `dust-wave-platform` `v0.29.0`; shared Site Shell browser mechanics now cover cart summaries, deferred stylesheets, form-control identity, and shipping-option selection while Pool injects product policy and retains templates, content, credentials, deployment authority, and one-commit rollback.
+Current release branch milestone: **v1.2.17**. Pool pins immutable `dust-wave-platform` `v0.30.0`; shared Design Core now supplies forms and policy-injected layout/mixins with byte-equivalent generated CSS while Pool retains its tokens, geometry policy, templates, content, credentials, deployment authority, and one-commit rollback.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
