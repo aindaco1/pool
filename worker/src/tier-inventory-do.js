@@ -1,6 +1,21 @@
 import { DEFAULT_CHECKOUT_INTENT_TTL_SECONDS } from './checkout-intent.js';
+import {
+  cloneInventory,
+  cloneReservations,
+  createInventoryStateMechanics,
+  getReservationCounts,
+  getReservedCounts,
+  normalizeCountMap
+} from '../../shared/dust-wave-platform/packages/inventory-core/src/index.js';
 
 const DEFAULT_RESERVATION_TTL_SECONDS = DEFAULT_CHECKOUT_INTENT_TTL_SECONDS;
+const {
+  buildReservationEntry,
+  normalizeState
+} = createInventoryStateMechanics({
+  defaultReservationTtlSeconds: DEFAULT_RESERVATION_TTL_SECONDS,
+  bootstrapStrategy: 'replace'
+});
 
 export class TierInventoryCoordinator {
   constructor(ctx, env) {
@@ -345,16 +360,6 @@ function validatePayload(body) {
   };
 }
 
-function normalizeCountMap(map) {
-  const normalized = {};
-  for (const [key, value] of Object.entries(map || {})) {
-    const qty = Number(value || 0);
-    if (!key || !Number.isFinite(qty) || qty < 0) continue;
-    normalized[key] = Math.floor(qty);
-  }
-  return normalized;
-}
-
 async function getWorkingState(storage, bootstrapInventory) {
   const storedState = await storage.get('state');
   if (storedState && typeof storedState === 'object') {
@@ -387,88 +392,9 @@ async function putWorkingState(storage, state) {
   });
 }
 
-function normalizeState(state, bootstrapInventory) {
-  const inventory = cloneInventory(state?.inventory || bootstrapInventory || {});
-  const { reservations, cleanedExpiredReservations } = normalizeReservations(state?.reservations || {});
-  return {
-    inventory,
-    reservations,
-    updatedAt: typeof state?.updatedAt === 'string' ? state.updatedAt : null,
-    cleanedExpiredReservations
-  };
-}
-
 async function syncInventoryToKv(env, campaignSlug, inventory) {
   if (!env?.PLEDGES || !inventory) return;
   await env.PLEDGES.put(`tier-inventory:${campaignSlug}`, JSON.stringify(inventory));
-}
-
-function cloneInventory(inventory) {
-  return JSON.parse(JSON.stringify(inventory || {}));
-}
-
-function cloneReservations(reservations) {
-  return JSON.parse(JSON.stringify(reservations || {}));
-}
-
-function getReservedCounts(reservations = {}, excludedReservationId = null) {
-  const counts = {};
-  for (const [reservationId, reservation] of Object.entries(reservations || {})) {
-    if (excludedReservationId && reservationId === excludedReservationId) continue;
-    for (const [tierId, qty] of Object.entries(getReservationCounts(reservation))) {
-      counts[tierId] = (counts[tierId] || 0) + qty;
-    }
-  }
-  return counts;
-}
-
-function buildReservationEntry(counts, now = Date.now()) {
-  return {
-    counts: normalizeCountMap(counts),
-    expiresAt: new Date(now + (DEFAULT_RESERVATION_TTL_SECONDS * 1000)).toISOString()
-  };
-}
-
-function getReservationCounts(reservation) {
-  if (!reservation || typeof reservation !== 'object') return {};
-  if (reservation.counts && typeof reservation.counts === 'object') {
-    return normalizeCountMap(reservation.counts);
-  }
-  return normalizeCountMap(reservation);
-}
-
-function normalizeReservations(reservations) {
-  const normalized = {};
-  let cleanedExpiredReservations = false;
-  const now = Date.now();
-
-  for (const [reservationId, reservation] of Object.entries(reservations || {})) {
-    if (!reservationId) continue;
-
-    const counts = getReservationCounts(reservation);
-    if (Object.keys(counts).length === 0) continue;
-
-    const expiresAt = normalizeReservationExpiry(reservation, now);
-    if (!expiresAt) {
-      cleanedExpiredReservations = true;
-      continue;
-    }
-
-    normalized[reservationId] = {
-      counts,
-      expiresAt
-    };
-  }
-
-  return { reservations: normalized, cleanedExpiredReservations };
-}
-
-function normalizeReservationExpiry(reservation, now = Date.now()) {
-  const rawExpiresAt = typeof reservation?.expiresAt === 'string' ? reservation.expiresAt : '';
-  const parsed = rawExpiresAt ? Date.parse(rawExpiresAt) : NaN;
-  const expiryMs = Number.isFinite(parsed) ? parsed : now + (DEFAULT_RESERVATION_TTL_SECONDS * 1000);
-  if (expiryMs <= now) return null;
-  return new Date(expiryMs).toISOString();
 }
 
 function jsonResponse(data, status = 200) {

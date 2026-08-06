@@ -66,6 +66,13 @@ describe('Pool admin session review', () => {
     }), env, { token });
 
     expect(exchange.status).toBe(200);
+    const sessionCookie = exchange.headers.get('Set-Cookie') || '';
+    expect(sessionCookie).toContain('pool_admin_session=');
+    expect(sessionCookie).toContain('Path=/admin');
+    expect(sessionCookie).toContain('HttpOnly');
+    expect(sessionCookie).toContain('SameSite=Lax');
+    expect(sessionCookie).toContain('Max-Age=28800');
+    expect(sessionCookie).toContain('Secure');
     const review = await listAdminSessionReview(env);
     expect(review.retentionDays).toBe(30);
     expect(review.active).toHaveLength(1);

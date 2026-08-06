@@ -3937,6 +3937,13 @@ diary:
     }), env, ctx);
     const loginToken = new URL((await startResponse.json()).loginUrl).searchParams.get('admin_login');
 
+    const malformedResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/auth/exchange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: `${loginToken}.suffix`, preferredLang: 'en' })
+    }), env, ctx);
+    expect(malformedResponse.status).toBe(401);
+
     const firstExchangeResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/auth/exchange', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
