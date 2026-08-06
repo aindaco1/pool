@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.2.11 - 2026-08-06
+
+### Shared bounded tax-provider transport
+
+- Advanced the immutable Platform pin to `v0.24.0`
+  (`16ccc75209f1b07044299a60c0ff26520fe70607`) and Tax Core `0.3.0`.
+- Replaced Pool's duplicate Zip-Tax and New Mexico GRT fetch, address-build,
+  street-parse, and source-normalization code with shared bounded transport.
+- Provider URLs require HTTPS, redirects are rejected, timeouts abort, and
+  request/response data is bounded without returning credentials or raw
+  network errors. Pool retains provider/fallback selection, campaign
+  taxability, quote calculation, checkout effects, deployment, and rollback.
+
 ## v1.2.10 - 2026-08-06
 
 ### Shared bounded GitHub transport
