@@ -24,7 +24,9 @@ Use these as practical targets rather than claims that every local test run will
 - CLS under `0.1`, with progress bars, hero media, tier cards, and live stats reserving stable space
 - no eager full cart stack on an anonymous public first load
 - no public document prefetches on private, tokenized, checkout, admin, manage, or supporter-community routes
-- generated CSS/JS assets pass `npm run assets:minify:check`
+- generated CSS/JS assets and pinned Site Shell copies pass `npm run assets:minify:check`
+- the six generated Site Shell scripts total 9,531 raw bytes after Build Core
+  minification (15,573 before; 6,042 bytes or 38.8% removed)
 - generated crawl/metadata output passes `npm run test:seo` after a Jekyll build
 - Cloudflare serves text assets with transfer compression and without Auto Minify
 - generated assets pass `npm run performance:budget` against `config/performance-budgets.json`
@@ -44,7 +46,7 @@ Important repo surfaces:
 - [`_includes/page-prefetch.html`](../_includes/page-prefetch.html): public document prefetch include
 - [`assets/js/cart-runtime-loader.js`](../assets/js/cart-runtime-loader.js): lazy cart runtime bootstrap
 - [`assets/js/page-prefetch.js`](../assets/js/page-prefetch.js): intent-based document prefetch runtime
-- [`@dustwave/build-core`](../shared/dust-wave-platform/packages/build-core/src/site-assets.js): pinned generated CSS/JS minification
+- [`@dustwave/build-core`](../shared/dust-wave-platform/packages/build-core/src/site-assets.js): pinned, allowlisted generated CSS/JS and Site Shell minification
 - [`scripts/audit-performance-budgets.mjs`](../scripts/audit-performance-budgets.mjs): measured total and named-asset release ceilings
 - [`scripts/performance-lighthouse.mjs`](../scripts/performance-lighthouse.mjs): Lighthouse category, Web Vital, and transferred-resource release evidence
 - [`scripts/audit-cache-policy.mjs`](../scripts/audit-cache-policy.mjs): deployed public-cache and private/no-store policy evidence
