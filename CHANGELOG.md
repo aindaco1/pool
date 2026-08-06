@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.2.16 - 2026-08-06
+
+### Shared Site Shell browser primitives
+
+- Advanced the immutable Platform pin to `v0.29.0`
+  (`7ed3d9b0220b88126235a3b7edfd507f8846f56d`) and adopted Site Shell `0.2.0`.
+- Removed Pool's duplicate cart-icon, deferred-stylesheet, form-control identity,
+  and shipping-option browser implementations. Thin Liquid policy includes keep
+  Pool's cache key, provider and event names, accessible labels, control-ID
+  prefix and dataset priority local.
+- Preserved lazy cart loading and versioned shared URLs, so the extraction adds
+  no eager cart-runtime requests and keeps independent submodule rollback.
+- Added consumer characterization for shipping choices, cart totals and labels,
+  dynamically inserted controls, stylesheet deferral, runtime loading, exact
+  package versions, every consumed shared source path, and explicit size budgets
+  for each deployed Site Shell browser primitive.
+- Stabilized the admin readiness budget around DOM and application readiness so
+  unrelated post-DOM third-party font or media latency cannot mask regressions
+  in Pool's own dashboard initialization path.
+
 ## v1.2.15 - 2026-08-06
 
 ### Shared release-evidence runtime

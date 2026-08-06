@@ -467,7 +467,7 @@ describe('admin dashboard foundation', () => {
     expect(layout).toContain('sync_query="false"');
     expect(layout).toContain('admin_marketing=true');
     expect(layout).toContain('class="admin-section-panel"');
-    expect(layout).toContain('/assets/js/form-control-identity.js');
+    expect(layout).toContain('{% include form-control-identity-script.html');
     expect(embedBuilder).toContain('data-admin-marketing-embed="true"');
     expect(embedBuilder).toContain('data-campaign-embed-autoload="{{ embed_autoload }}"');
     expect(embedBuilder).toContain('data-campaign-embed-sync-query="{{ embed_sync_query }}"');

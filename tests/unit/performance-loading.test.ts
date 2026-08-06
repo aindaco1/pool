@@ -16,8 +16,9 @@ describe('Pool performance loading policy', () => {
     const head = read('_includes', 'cart-runtime-head.html');
     expect(head).toContain('media="print" data-deferred-stylesheet="true"');
     expect(head).toContain('<noscript><link rel="stylesheet" href="https://use.typekit.net/hoj2yet.css"></noscript>');
-    expect(head).toContain('/assets/js/deferred-stylesheets.js');
-    expect(read('assets', 'js', 'deferred-stylesheets.js')).toContain("stylesheet.media = 'all'");
+    expect(head).toContain('/shared/dust-wave-platform/packages/site-shell/src/deferred-stylesheets-browser.js');
+    expect(read('shared', 'dust-wave-platform', 'packages', 'site-shell', 'src', 'deferred-stylesheets-browser.js'))
+      .toContain("stylesheet.media = 'all'");
   });
 
   it('serves campaign-card backgrounds responsively and outside the eager critical path', () => {

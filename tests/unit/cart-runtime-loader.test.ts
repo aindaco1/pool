@@ -50,7 +50,7 @@ function installRuntimeScriptHarness(providerClick = vi.fn()) {
           (window as any).PoolAddOnUtils = {};
           break;
         case 'shipping-option-utils':
-          (window as any).PoolShippingOptionUtils = {};
+          (window as any).DustWaveShippingOptionUtils = {};
           break;
         case 'stripe-checkout-sidecar':
           (window as any).PoolStripeCheckoutSidecar = {};
@@ -107,7 +107,7 @@ describe('cart runtime loader', () => {
     delete (window as any).PoolCartRuntime;
     delete (window as any).PoolCartProvider;
     delete (window as any).PoolAddOnUtils;
-    delete (window as any).PoolShippingOptionUtils;
+    delete (window as any).DustWaveShippingOptionUtils;
     delete (window as any).PoolStripeCheckoutSidecar;
     delete (window as any).__PoolCartRuntimeCartUiLoaded;
     delete (window as any).__PoolBuyButtonsLoaded;
@@ -122,7 +122,7 @@ describe('cart runtime loader', () => {
     delete (window as any).PoolCartRuntime;
     delete (window as any).PoolCartProvider;
     delete (window as any).PoolAddOnUtils;
-    delete (window as any).PoolShippingOptionUtils;
+    delete (window as any).DustWaveShippingOptionUtils;
     delete (window as any).PoolStripeCheckoutSidecar;
     delete (window as any).__PoolCartRuntimeCartUiLoaded;
     delete (window as any).__PoolBuyButtonsLoaded;
@@ -144,6 +144,11 @@ describe('cart runtime loader', () => {
     const scriptVersions = Array.from(document.querySelectorAll<HTMLScriptElement>('script[data-pool-cart-runtime-script]'))
       .map((script) => new URL(script.src).searchParams.get('v'));
     expect(scriptVersions).toEqual(runtimeScriptKeys.map(() => '456'));
+    expect(new URL(document.querySelector<HTMLScriptElement>(
+      'script[data-pool-cart-runtime-script="shipping-option-utils"]'
+    )?.src || '').pathname).toBe(
+      '/shared/dust-wave-platform/packages/site-shell/src/shipping-option-utils-browser.js'
+    );
   });
 
   it('loads the runtime and replays the original add button click', async () => {
