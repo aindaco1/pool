@@ -195,10 +195,14 @@ tax:
 
 If you enable `zip_tax`, also set the Worker secret `ZIP_TAX_API_KEY`. Keep that secret out of `_config.yml`.
 
-The vendored New Mexico starter file lives in [`worker/src/tax-data/nm-grt-starter.js`](../worker/src/tax-data/nm-grt-starter.js). Refresh it with:
+The vendored New Mexico starter snapshot is pinned in
+[`@dustwave/tax-core`](../shared/dust-wave-platform/packages/tax-core/src/nm-grt-starter.js).
+Refresh it only in a Platform release checkout, review the generated diff, and
+then advance Pool's immutable pin. From the Platform repository root:
 
 ```bash
-node ./scripts/update-nm-grt-starter.mjs
+node ./packages/tax-core/bin/update-nm-grt-starter.mjs \
+  --output ./packages/tax-core/src/nm-grt-starter.js
 ```
 
 ### `i18n`

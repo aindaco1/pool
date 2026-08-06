@@ -1,7 +1,7 @@
 import SalesTax from 'sales-tax';
 
 import { getSalesTaxRate, getShippingOriginCountry } from './provider-config.js';
-import { NM_GRT_STARTER_LOCATIONS } from './tax-data/nm-grt-starter.js';
+import { NM_GRT_STARTER_LOCATIONS } from '../../shared/dust-wave-platform/packages/tax-core/src/nm-grt-starter.js';
 
 const TAX_PROVIDERS = ['flat', 'offline_rules', 'external', 'zip_tax', 'nm_grt'];
 const DEFAULT_ZIP_TAX_API_BASE = 'https://api.zip-tax.com';
