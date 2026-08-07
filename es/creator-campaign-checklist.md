@@ -6,7 +6,7 @@ permalink: /es/creator-campaign-checklist/
 lang: es
 indexable: false
 translation_key: creator_campaign_checklist
-last_modified_at: 2026-08-04
+last_modified_at: 2026-08-06
 ---
 
 <div class="creator-checklist-layout">
@@ -36,10 +36,11 @@ La lista cubre:
 
 ## Notas de la plataforma actual
 
-Esta lista refleja el comportamiento de la plataforma en la versión actual, **v1.1.2**:
+Esta lista refleja el comportamiento para creadores de la versión actual, **v1.2.19**. Las mejoras compartidas de Platform y Jekyll fortalecen el runtime y el build sin cambiar que The Pool conserva el control del contenido, la publicación, el fulfillment y los accesos:
 
 - las personas creadoras y sus equipos pueden tener acceso específico al panel para preparar campañas, editar contenido, revisar vistas previas, reportes, analytics, marketing y Blast sin acceso directo al repositorio
 - las personas superadministradoras inicializan campañas de solo preview, asignan o crean usuarios de campaña y manejan controles de plataforma; el trabajo diario de preparación queda en manos del equipo asignado
+- las personas superadministradoras pueden archivar campañas que no estén live; el source y la media de la campaña se mueven al archivo en vez de borrarse
 - la biblioteca de media permite buscar y filtrar imágenes, video y audio de la campaña; ver dimensiones, duración, peso, referencias, estado de optimización, derivados faltantes y advertencias de uso; y reemplazar de forma segura fuentes de la misma campaña sin cambiar su ruta pública
 - las imágenes con significado requieren alt text; las imágenes puramente decorativas deben marcarse de forma explícita
 - los add-ons de campaña pueden pertenecer a una sola campaña y contar hacia su meta

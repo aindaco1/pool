@@ -29,6 +29,7 @@ PODMAN_SUPERVISE_LOG_LINES="${PODMAN_SUPERVISE_LOG_LINES:-30}"
 PODMAN_STACK_START_ATTEMPTS="${PODMAN_STACK_START_ATTEMPTS:-3}"
 PODMAN_STACK_RETRY_DELAY="${PODMAN_STACK_RETRY_DELAY:-3}"
 PODMAN_SITE_READY_TIMEOUT="${PODMAN_SITE_READY_TIMEOUT:-180}"
+PODMAN_WORKER_INSTALL_TIMEOUT="${PODMAN_WORKER_INSTALL_TIMEOUT:-600}"
 PODMAN_WORKER_READY_TIMEOUT="${PODMAN_WORKER_READY_TIMEOUT:-60}"
 
 detect_podman_socket() {
@@ -605,10 +606,39 @@ supervise_dev_stack() {
   done
 }
 
+worker_dependencies_ready() {
+  podman exec "$WORKER_CONTAINER" node -e '
+    const { createHash } = require("node:crypto");
+    const { existsSync, readFileSync } = require("node:fs");
+    const root = "/workspace/worker";
+    const current = createHash("sha256")
+      .update(readFileSync(`${root}/package-lock.json`))
+      .digest("hex");
+    const marker = `${root}/node_modules/.package-lock.sha256`;
+    const wrangler = `${root}/node_modules/.bin/wrangler`;
+    if (!existsSync(marker) || !existsSync(wrangler)) process.exit(1);
+    if (readFileSync(marker, "utf8").trim() !== current) process.exit(1);
+  ' >/dev/null 2>&1
+}
+
 wait_for_worker_http() {
   local url="$1"
   local label="$2"
   local status=""
+
+  for _ in $(seq 1 "$PODMAN_WORKER_INSTALL_TIMEOUT"); do
+    if worker_dependencies_ready; then
+      break
+    fi
+    sleep 1
+  done
+
+  if ! worker_dependencies_ready; then
+    echo "❌ $label dependencies did not install within ${PODMAN_WORKER_INSTALL_TIMEOUT}s"
+    podman logs --tail "$PODMAN_SUPERVISE_LOG_LINES" "$WORKER_CONTAINER" 2>&1 | sed 's/^/   /' || true
+    return 1
+  fi
+
   for _ in $(seq 1 "$PODMAN_WORKER_READY_TIMEOUT"); do
     status="$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || true)"
     if [ -n "$status" ] && [ "$status" != "000" ]; then

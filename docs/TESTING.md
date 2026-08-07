@@ -8,6 +8,25 @@ pre-merge gate runs this check before builds and also rejects the template
 submodule from generated site output. `npm run jekyll-template:sync` is an
 explicit upgrade-branch operation, not a build step.
 
+Pool `v1.2.19` records Platform `v0.31.0` and Jekyll Template `v0.1.0` as exact
+gitlinks. After cloning, switching branches, or reviewing a shared dependency
+upgrade, initialize the recorded commits and run the narrow pin/drift contract
+before broader tests:
+
+```bash
+git submodule update --init --recursive
+npx vitest run tests/unit/platform-pin.test.ts tests/unit/jekyll-template-pin.test.ts
+npm run jekyll-template:check
+```
+
+If a host-only Worker suddenly returns `503` while the Podman-backed smoke path
+passes, stop the host dev stack and inspect the ignored local
+`worker/.wrangler/state` directory for a Cloud Drive conflict copy such as
+`v3 2`. Move only that duplicate local-development directory aside and restart
+the Worker; do not change `wrangler.toml`, remote namespaces, or tracked data.
+The Podman wrappers use isolated state and reset it for reproducible runtime
+checks.
+
 ## Quick Reference
 
 ```bash
@@ -586,7 +605,7 @@ See [tests/security/README.md](../tests/security/README.md) for details.
 
 ## Manual Testing Prerequisites
 
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (`npm install -g wrangler`)
+- Repository-locked [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) via `npm ci` and `npx wrangler`
 - [Stripe CLI](https://stripe.com/docs/stripe-cli) for webhook testing
 - Stripe account (test mode)
 - Resend account (free tier: 3,000 emails/month)

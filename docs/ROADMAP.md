@@ -22,7 +22,7 @@
 - [x] Public policies and bilingual content
   - Terms now publish stable shipping and no-returns anchors, a clear final-sale default, a seven-day fulfillment-problem reporting guideline, carrier-record verification, good-faith untracked review, available remedies, and nonwaivable-rights language
   - About and Terms use `_config.yml` author/company and support-email values, avoid stale release copy, and keep English/Spanish section parity
-  - Shared UI and documentation target neutral US/Latin American Spanish; the owner completed the final fluent review for v1.1.2 on 2026-07-14 in addition to automated completeness checks
+  - Shared UI and documentation target neutral US/Latin American Spanish; the owner completed the final fluent review on 2026-07-14 in addition to automated completeness checks
   - Brand & SEO exposes the Shopping return-policy country while keeping the no-returns type read-only so dashboard state, public Terms, and JSON-LD cannot silently diverge
 
 **Variant-specific add-on prices**
@@ -37,9 +37,9 @@
 
 **Production quality gates and admin operations hardening**
 
-- [x] Store v1.0.8 release carryover review
-  - Pool v1.1.0/v1.1.1 already contains the applicable shared price, media, Stripe, reconciliation, and email-outbox slices
-  - The hosted-runner AWS CLI recovery fix was carried over; Store's multi-processor order filter does not apply because Pool is Stripe-only and campaign-scoped
+- [x] Cross-project operations review
+  - Pool uses the applicable shared price, media, Stripe, reconciliation, and email-outbox primitives without duplicating Store-owned product behavior
+  - The hosted-runner AWS CLI recovery fix is shared; Store's multi-processor order filter does not apply because Pool is Stripe-only and campaign-scoped
   - Store readiness, Workers Cache, global catalog marketing, product/SKU, coupon, ticket, order, download, and R2 surfaces remain excluded or mapped to existing Pool-native controls
 - [x] Store-aligned release gates adapted to Pool
   - One performance-budget config governs generated JavaScript/CSS ceilings, route-specific Lighthouse categories/Web Vitals/resource limits, executable dashboard/Worker timing targets, Workers Cache evidence policy, and public/private cache targets
@@ -47,7 +47,7 @@
   - Existing bounded Worker timing histograms now sample the dashboard summary and settings reads, surface p50/p95/p99/max and slow-route summaries in Settings -> Runtime diagnostics, and feed a redacted authenticated p95 release audit without a second telemetry store or customer/request payloads
   - Homepage campaign-card backgrounds reuse responsive WebP derivatives and lazy loading, cutting the measured home transfer from roughly 4.0 MB to 1.5 MB and repeated throttled LCP from roughly 20.3 seconds to 5.4-6.6 seconds
   - Both production and full dependency audits pass after pinning the compatible clean Lighthouse release
-  - Pool v1.0.9 session/device review and revocation, searchable audit filters/CSV, full provider/security readiness, production-posture drift checks, localization packets, pinned deployment workflows, and scheduled Podman coverage remain the shared admin-operations baseline
+  - Session/device review and revocation, searchable audit filters/CSV, full provider/security readiness, production-posture drift checks, localization packets, pinned deployment workflows, and scheduled Podman coverage form the shared admin-operations baseline
   - Workers Cache remains disabled until representative Pool evidence proves at least the configured 40% p95 improvement, matching the Store decision rather than enabling it speculatively
   - Automated accessibility/i18n/SEO checks remain release gates; human VoiceOver/NVDA and native-Spanish review are documented optional evidence
   - Store-only product, SKU, ticket/RSVP, signed-download, and R2 download-abuse systems remain intentionally excluded
@@ -93,6 +93,9 @@
 
 **Platform foundation**
 
+- [x] Independently versioned shared primitives
+  - Pool pins immutable Platform packages for characterized Worker, admin, browser, design, build, release, shipping, tax, inventory, media, and test mechanics
+  - Campaigns, pledges, routes, storage, templates, content, localization, credentials, provider policy, deployment, and rollback remain Pool-owned
 - [x] Versioned Jekyll golden-project integration
   - Seventeen shared Liquid includes and Ruby plugins have one separately versioned, digest-bound template source with explicit check/sync tooling
   - Pool retains checked-in copies, Jekyll configuration, routes, data, localization, content, deployment, and independent rollback; the template submodule is excluded from public output

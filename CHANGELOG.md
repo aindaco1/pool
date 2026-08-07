@@ -17,6 +17,26 @@
   credential. Pool retains routes, data, localization, content, configuration,
   tests, deployment authority, and independent one-commit rollback.
 
+### Post-release maintenance and documentation
+
+- Stabilized the dashboard readiness budget so it measures the cold-navigation
+  application request chain through the first summary/settings requests while
+  retaining visible-dashboard, tab-switch, and supporter-table assertions;
+  host-side assertion polling no longer creates a false performance failure.
+- Split cold Podman Worker dependency installation from runtime readiness: a
+  bounded, lock-hash-verified install grace period prevents slow `npm ci`
+  downloads from being killed and restarted by the existing 60-second Worker
+  health budget, while warm volumes continue immediately.
+- Made the static `POOL_CONFIG` browser contract wait for DOM readiness rather
+  than unrelated full-page resource completion, eliminating the only flaky
+  result in the complete 113-test browser gate without weakening its config
+  assertions.
+- Reconciled the root, Worker, testing, developer, performance, dashboard,
+  i18n, roadmap, and English/Spanish creator-checklist documentation with the
+  active Platform `v0.31.0`, Jekyll Template `v0.1.0`, Pool `v1.2.19`, Node 24,
+  and Wrangler 4.118 contracts without changing creator or deployment
+  authority.
+
 ## v1.2.18 - 2026-08-06
 
 ### Allowlisted shared-browser asset minification

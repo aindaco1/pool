@@ -110,6 +110,9 @@ describe('package release scripts', () => {
     expect(podmanStack).toContain('rm -f "$TEMP_LOCAL_CONFIG"');
     expect(podmanDev).toContain('index($2, "mcr.microsoft.com/playwright:") == 1');
     expect(podmanDev).not.toContain('~ /^mcr\\\\.microsoft\\\\.com');
+    expect(podmanDev).toContain('PODMAN_WORKER_INSTALL_TIMEOUT="${PODMAN_WORKER_INSTALL_TIMEOUT:-600}"');
+    expect(podmanDev).toContain('node_modules/.package-lock.sha256');
+    expect(podmanDev).toContain('dependencies did not install within ${PODMAN_WORKER_INSTALL_TIMEOUT}s');
     expect(workflow).toContain('/tmp/pool-playwright-podman.log');
   });
 

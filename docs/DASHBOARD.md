@@ -130,7 +130,7 @@ The default timezone field is a select menu backed by supported IANA timezone va
 
 Brand and search fields include logo, footer logo, favicon, default social image, X handle, default social image alt text, same-as links, merchant return-policy country, and whether the public community hub is indexable.
 
-Pool v1.1.2 publishes a no-returns policy in both public Terms and Shopping structured data. The country is editable from Brand & SEO and remains canonical in `_config.yml`; the policy type is read-only as **Returns not permitted**. Do not expose a finite or unlimited return-policy control until the public Terms, JSON-LD fields, validation, and fulfillment operations all support that model together.
+Pool publishes a no-returns policy in both public Terms and Shopping structured data. The country is editable from Brand & SEO and remains canonical in `_config.yml`; the policy type is read-only as **Returns not permitted**. Do not expose a finite or unlimited return-policy control until the public Terms, JSON-LD fields, validation, and fulfillment operations all support that model together.
 
 Use one same-as URL per line. Use canonical public profile URLs, for example:
 
