@@ -4,8 +4,8 @@ Cloudflare Worker handling first-party checkout canonicalization, Stripe integra
 
 ## Shared Platform boundary
 
-Pool `v1.2.19` pins Dust Wave Platform `v0.31.0` at exact commit
-`5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579`. The Worker consumes the pinned
+Pool `v1.2.20` pins Dust Wave Platform `v0.32.0` at exact commit
+`85165a16ac6923b438514bdce0a9957c1804db5f`. The Worker consumes the pinned
 `worker-core`, `shipping-core`, `tax-core`, `inventory-core`, and `media-core`
 packages for characterized, runtime-neutral mechanics. Pool retains every
 route, request schema, campaign/pledge model, Durable Object and KV policy,

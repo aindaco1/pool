@@ -36,7 +36,7 @@ La lista cubre:
 
 ## Notas de la plataforma actual
 
-Esta lista refleja el comportamiento para creadores de la versión actual, **v1.2.19**. Las mejoras compartidas de Platform y Jekyll fortalecen el runtime y el build sin cambiar que The Pool conserva el control del contenido, la publicación, el fulfillment y los accesos:
+Esta lista refleja el comportamiento para creadores de la versión actual, **v1.2.20**. Las mejoras compartidas de Platform y Jekyll fortalecen el runtime, el build y las demostraciones locales del producto sin cambiar que The Pool conserva el control del contenido, la publicación, el fulfillment y los accesos:
 
 - las personas creadoras y sus equipos pueden tener acceso específico al panel para preparar campañas, editar contenido, revisar vistas previas, reportes, analytics, marketing y Blast sin acceso directo al repositorio
 - las personas superadministradoras inicializan campañas de solo preview, asignan o crean usuarios de campaña y manejan controles de plataforma; el trabajo diario de preparación queda en manos del equipo asignado

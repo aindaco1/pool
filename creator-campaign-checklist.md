@@ -36,7 +36,7 @@ This checklist covers:
 
 ## Current Platform Notes
 
-This checklist reflects the creator-facing behavior in the current release, **v1.2.19**. The shared Platform and Jekyll upgrades improve common runtime and build foundations without changing the rule that campaign content, publishing decisions, fulfillment, and creator access remain owned by The Pool:
+This checklist reflects the creator-facing behavior in the current release, **v1.2.20**. The shared Platform and Jekyll upgrades improve common runtime, build, and local product-demonstration foundations without changing the rule that campaign content, publishing decisions, fulfillment, and creator access remain owned by The Pool:
 
 - creators and campaign teams can use campaign-specific dashboard access for normal campaign setup, edits, previews, reports, analytics, marketing links, and supporter Blast work instead of direct repository access
 - super admins bootstrap preview-only campaigns, assign or create campaign users, and handle platform-only controls, while assigned campaign users own day-to-day campaign prep

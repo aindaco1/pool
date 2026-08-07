@@ -81,6 +81,12 @@ describe('package release scripts', () => {
     expect(premerge).toContain('rm -f "${TEMP_LOCAL_CONFIG}"');
   });
 
+  it('preserves the selected Ruby and Node toolchain for Playwright web-server startup', () => {
+    const playwrightConfig = readFileSync(join(repoRoot, 'playwright.config.js'), 'utf8');
+    expect(playwrightConfig).toContain('command: "bash -c');
+    expect(playwrightConfig).not.toContain('command: "bash -lc');
+  });
+
   it('replaces empty local test secrets with non-empty smoke defaults without retaining the temporary file', () => {
     const premerge = readFileSync(join(repoRoot, 'scripts', 'pre-merge-regression.sh'), 'utf8');
     expect(premerge).toContain("grep -qE '^STRIPE_WEBHOOK_SECRET=.+$'");

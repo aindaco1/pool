@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.2.20 - 2026-08-06
+
+### Reusable product-video workflow
+
+- Advanced the immutable Platform pin to `v0.32.0`
+  (`85165a16ac6923b438514bdce0a9957c1804db5f`) and adopted
+  Product Video Core `0.1.0`.
+- Replaced the stale local-only worktree engine with a thin Pool adapter that
+  retains Jekyll preview startup, the `smoke-editable` fixture/selectors,
+  capture presentation CSS, editorial timing, optional marketing destination,
+  generated media, and publication authority.
+- Added production-length capture/render commands plus a short real-interface
+  smoke flow, consumer characterization, syntax coverage, and clean-checkout
+  `_config.test.yml` startup.
+
+### Security, performance, and rollback
+
+- Capture stays loopback-only from Pool, same-origin, and declarative; output
+  is confined below `tmp/product-video`, existing runs are preserved, and no
+  recursive caller-selected cleanup remains. FFmpeg/FFprobe run without a
+  shell and capture fails when effective frame rate misses its configured
+  floor. Every completed render must also decode an alpha plane before its
+  FFprobe evidence can report success.
+- Capture CSS is injected only into the local Playwright frame and is not
+  linked from production templates, so the feature adds no production request
+  or browser runtime. Jekyll and the release gate exclude and reject the
+  complete generated `tmp` tree so local frames, renders, and nested previews
+  cannot enter a Pages artifact. Pool can roll back the exact Platform gitlink and local
+  adapter independently without affecting Store, Podcast, or Dust Wave.
+- Playwright web-server startup now preserves the caller-selected rbenv and
+  Node 24 toolchain instead of opening a login shell that could fall back to
+  macOS system Ruby before any browser test ran.
+- Default all-format rendering is covered on macOS Bash 3.2 as well as modern
+  shells; strict-mode empty format lists no longer abort before FFmpeg starts.
+
 ## v1.2.19 - 2026-08-06
 
 ### Separately versioned Jekyll golden-project contract
