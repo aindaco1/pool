@@ -31,6 +31,9 @@
   than unrelated full-page resource completion, eliminating the only flaky
   result in the complete 113-test browser gate without weakening its config
   assertions.
+- Bounded pre-merge Worker/Jekyll process-tree cleanup and added a stubborn
+  child regression, preventing a fully passing hosted gate from remaining
+  alive until the workflow timeout because a server ignored termination.
 - Reconciled the root, Worker, testing, developer, performance, dashboard,
   i18n, roadmap, and English/Spanish creator-checklist documentation with the
   active Platform `v0.31.0`, Jekyll Template `v0.1.0`, Pool `v1.2.19`, Node 24,

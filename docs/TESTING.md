@@ -27,6 +27,12 @@ the Worker; do not change `wrangler.toml`, remote namespaces, or tracked data.
 The Podman wrappers use isolated state and reset it for reproducible runtime
 checks.
 
+The pre-merge gate also owns every Worker and Jekyll process it starts. Cleanup
+signals the complete child tree, waits only for a bounded grace period, then
+force-stops any survivor. A focused regression uses a deliberately stubborn
+child process to ensure a fully passing gate cannot hang until the CI job
+timeout after printing its phase summary.
+
 ## Quick Reference
 
 ```bash
