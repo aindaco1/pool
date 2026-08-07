@@ -93,6 +93,9 @@
 
 **Platform foundation**
 
+- [x] Versioned Jekyll golden-project integration
+  - Seventeen shared Liquid includes and Ruby plugins have one separately versioned, digest-bound template source with explicit check/sync tooling
+  - Pool retains checked-in copies, Jekyll configuration, routes, data, localization, content, deployment, and independent rollback; the template submodule is excluded from public output
 - [x] Branding and i18n scaffolding
   - The Pool / Dust Wave platform branding
   - money formatting plugin
