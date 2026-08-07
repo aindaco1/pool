@@ -9,6 +9,7 @@ TEMP_DEV_VARS=""
 TEMP_LOCAL_CONFIG=""
 ORIGINAL_DEV_VARS_BACKUP=""
 LOG_DIR="$(mktemp -d /tmp/pool-premerge-logs.XXXXXX)"
+PREMERGE_PROCESS_STOP_TIMEOUT_TICKS="${PREMERGE_PROCESS_STOP_TIMEOUT_TICKS:-20}"
 declare -a PHASE_RESULTS=()
 HOST_JEKYLL_STATUS="unknown"
 HOST_JEKYLL_FAILURE_REASON=""
@@ -291,10 +292,77 @@ reset_podman_dev_artifacts() {
   podman pod rm -f pool-dev-pod >/dev/null 2>&1 || true
 }
 
+process_tree_pids() {
+  local root_pid="$1"
+  ps -eo pid=,ppid= | awk -v root_pid="${root_pid}" '
+    {
+      parent[$1] = $2
+    }
+    function descends_from_root(pid, current) {
+      current = pid
+      while (current in parent && walked[current] != pid) {
+        walked[current] = pid
+        if (parent[current] == root_pid) return 1
+        current = parent[current]
+      }
+      return 0
+    }
+    END {
+      for (pid in parent) {
+        if (descends_from_root(pid)) print pid
+      }
+      print root_pid
+    }
+  '
+}
+
+process_is_running() {
+  local pid="$1"
+  local state=""
+  kill -0 "${pid}" 2>/dev/null || return 1
+  state="$(ps -o stat= -p "${pid}" 2>/dev/null | tr -d '[:space:]' || true)"
+  [[ -n "${state}" && "${state}" != Z* ]]
+}
+
+stop_process_tree() {
+  local root_pid="$1"
+  local process_pid=""
+  local tick=0
+  local any_running=false
+  local -a process_pids=()
+
+  [[ -n "${root_pid}" ]] || return 0
+  while IFS= read -r process_pid; do
+    [[ -n "${process_pid}" ]] && process_pids+=("${process_pid}")
+  done < <(process_tree_pids "${root_pid}")
+
+  for process_pid in "${process_pids[@]}"; do
+    kill -TERM "${process_pid}" 2>/dev/null || true
+  done
+
+  for ((tick = 0; tick < PREMERGE_PROCESS_STOP_TIMEOUT_TICKS; tick += 1)); do
+    any_running=false
+    for process_pid in "${process_pids[@]}"; do
+      if process_is_running "${process_pid}"; then
+        any_running=true
+        break
+      fi
+    done
+    [[ "${any_running}" = "false" ]] && break
+    sleep 0.1
+  done
+
+  for process_pid in "${process_pids[@]}"; do
+    if process_is_running "${process_pid}"; then
+      kill -KILL "${process_pid}" 2>/dev/null || true
+    fi
+  done
+  wait "${root_pid}" 2>/dev/null || true
+}
+
 stop_worker() {
   if [[ -n "${WORKER_PID}" ]]; then
-    kill "${WORKER_PID}" 2>/dev/null || true
-    wait "${WORKER_PID}" 2>/dev/null || true
+    stop_process_tree "${WORKER_PID}"
     WORKER_PID=""
   fi
 }
@@ -320,8 +388,8 @@ start_worker() {
 cleanup() {
   stop_worker
   if [[ -n "${JEKYLL_PID}" ]]; then
-    kill "${JEKYLL_PID}" 2>/dev/null || true
-    wait "${JEKYLL_PID}" 2>/dev/null || true
+    stop_process_tree "${JEKYLL_PID}"
+    JEKYLL_PID=""
   fi
   if [[ -n "${TEMP_DEV_VARS}" && -f "${TEMP_DEV_VARS}" ]]; then
     rm -f "${TEMP_DEV_VARS}"
@@ -338,6 +406,44 @@ trap cleanup EXIT
 
 prepare_local_config
 ruby ./scripts/sync-worker-config.rb >/dev/null
+
+if [[ "${1:-}" = "__process_cleanup_check" ]]; then
+  (
+    trap '' TERM
+    sleep 300 &
+    wait
+  ) &
+  CLEANUP_TEST_PID=$!
+  (
+    trap '' TERM
+    sleep 300 &
+    wait
+  ) &
+  CLEANUP_TEST_SIBLING_PID=$!
+  CLEANUP_TEST_PROCESS_PIDS=()
+  for _ in {1..20}; do
+    CLEANUP_TEST_PROCESS_PIDS=()
+    while IFS= read -r process_pid; do
+      [[ -n "${process_pid}" ]] && CLEANUP_TEST_PROCESS_PIDS+=("${process_pid}")
+    done < <(process_tree_pids "${CLEANUP_TEST_PID}")
+    [[ "${#CLEANUP_TEST_PROCESS_PIDS[@]}" -gt 1 ]] && break
+    sleep 0.05
+  done
+  stop_process_tree "${CLEANUP_TEST_PID}"
+  CLEANUP_TEST_STATUS=0
+  for process_pid in "${CLEANUP_TEST_PROCESS_PIDS[@]}"; do
+    if process_is_running "${process_pid}"; then
+      echo "Pre-merge process cleanup left test process ${process_pid} running" >&2
+      CLEANUP_TEST_STATUS=1
+    fi
+  done
+  if ! process_is_running "${CLEANUP_TEST_SIBLING_PID}"; then
+    echo "Pre-merge process cleanup terminated an unrelated sibling" >&2
+    CLEANUP_TEST_STATUS=1
+  fi
+  stop_process_tree "${CLEANUP_TEST_SIBLING_PID}"
+  exit "${CLEANUP_TEST_STATUS}"
+fi
 
 if [[ "${1:-}" = "__podman_build_check" ]]; then
   build_with_podman_jekyll

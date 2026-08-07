@@ -550,9 +550,9 @@ Required accounts:
 Required tools:
 ```bash
 ruby --version   # 3.x recommended
-node --version   # 20.x recommended
-npm install -g wrangler
-wrangler login
+node --version   # 24.15 is the repository baseline
+npx wrangler --version
+npx wrangler login
 brew install stripe/stripe-cli/stripe
 stripe login
 ```
@@ -561,7 +561,7 @@ stripe login
 
 ```bash
 bundle install
-npm install
+npm ci
 ```
 
 ### 2. Configure Worker Secrets

@@ -83,6 +83,27 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 | API | Cloudflare Worker | Checkout-session bootstrap, webhook, tip-aware totals, stats, auto-settle, cache purge |
 | Admin UI | Private dashboard | Role-scoped campaign editing, settings, add-ons, reports, analytics, supporters, marketing tools, and users |
 
+### Shared foundations and ownership
+
+Pool `v1.2.19` pins Dust Wave Platform `v0.31.0` at exact commit
+`5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579` and Dust Wave Jekyll Template
+`v0.1.0` at exact commit `351281a5aec60fa85653a3d23391e66fb860aae6`.
+Platform supplies characterized Worker, admin, browser, design, build, release,
+shipping, tax, inventory, media, and test primitives. The Jekyll Template owns
+17 manifest-bound source-upgrade files whose runtime copies remain checked in.
+
+Pool still owns campaign and pledge models, routes, storage, content,
+localization, templates, credentials, provider policy, builds, deployment, and
+rollback. Neither shared repository follows a moving branch at build time. To
+verify the recorded pins and generated/source copies:
+
+```bash
+git submodule update --init --recursive
+npm ci
+npx vitest run tests/unit/platform-pin.test.ts tests/unit/jekyll-template-pin.test.ts
+npm run jekyll-template:check
+```
+
 ## Quick Start
 
 ```bash
@@ -99,7 +120,7 @@ Clone with `--recurse-submodules` when possible. Existing checkouts must run the
 
 The setup helper is dependency-free Node and works on macOS, Windows, and Linux. Use `npm run setup:deploy -- --mode=production --dry-run` to preview Cloudflare KV, Worker secret, GitHub secret, readiness, and deploy steps before applying them. It intentionally keeps production Worker secrets separate from ignored local `worker/.dev.vars` values, and the setup path is covered by fake-CLI unit tests so dry runs, KV reuse/create planning, generated local secrets, and production secret writes stay testable without live provider mutations.
 
-The Worker dev container now runs on Node 24 to match GitHub Actions. Wrangler 4.110 also runs against the shared Worker `compatibility_date = "2026-05-03"` so local Miniflare/Workers behavior stays aligned with deployed runtime semantics.
+The Worker dev container now runs on Node 24 to match GitHub Actions. Wrangler 4.118 also runs against the shared Worker `compatibility_date = "2026-05-03"` so local Miniflare/Workers behavior stays aligned with deployed runtime semantics.
 
 If you want to rebuild the Podman dev images after dependency or base-image changes:
 ```bash
@@ -437,7 +458,7 @@ Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT
 - [PERFORMANCE.md](docs/PERFORMANCE.md) — Platform performance model, generated asset minification, Cloudflare compression, runtime loading, caching, media, deferred YouTube hero embeds, and safe public prefetching
 - [ADD_ON_PRODUCTS.md](docs/ADD_ON_PRODUCTS.md) — Current global add-on catalog structure and initial merch import model
 - [DASHBOARD.md](docs/DASHBOARD.md) — Private admin dashboard reference for campaign editing and operations
-- [ROADMAP.md](docs/ROADMAP.md) — v1.0 release status and post-v1.0 follow-ups
+- [ROADMAP.md](docs/ROADMAP.md) — current capability inventory and future feature plan
 - [Campaign Creator Checklist](creator-campaign-checklist.md) — Public creator launch-prep worksheet, with Spanish route at `/es/creator-campaign-checklist/`
 
 ## Key Directories

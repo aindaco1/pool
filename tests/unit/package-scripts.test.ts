@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -110,7 +111,22 @@ describe('package release scripts', () => {
     expect(podmanStack).toContain('rm -f "$TEMP_LOCAL_CONFIG"');
     expect(podmanDev).toContain('index($2, "mcr.microsoft.com/playwright:") == 1');
     expect(podmanDev).not.toContain('~ /^mcr\\\\.microsoft\\\\.com');
+    expect(podmanDev).toContain('PODMAN_WORKER_INSTALL_TIMEOUT="${PODMAN_WORKER_INSTALL_TIMEOUT:-600}"');
+    expect(podmanDev).toContain('node_modules/.package-lock.sha256');
+    expect(podmanDev).toContain('dependencies did not install within ${PODMAN_WORKER_INSTALL_TIMEOUT}s');
     expect(workflow).toContain('/tmp/pool-playwright-podman.log');
+  });
+
+  it('bounds stubborn pre-merge cleanup without terminating siblings', () => {
+    execFileSync('bash', ['scripts/pre-merge-regression.sh', '__process_cleanup_check'], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PREMERGE_PROCESS_STOP_TIMEOUT_TICKS: '2',
+      },
+      stdio: 'pipe',
+      timeout: 5_000,
+    });
   });
 
   it('does not require ripgrep on clean CI runners', () => {

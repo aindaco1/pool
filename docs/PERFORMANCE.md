@@ -59,7 +59,7 @@ Worker performance summaries retain bounded latency histograms and expose approx
 
 Super admins can inspect the slowest sampled routes for the last seven days under **Settings -> Runtime diagnostics**. The table is a read-only view of the existing summaries, sorted by p95 and capped at 20 rows; it does not add another telemetry store.
 
-The browser suite consumes the `dashboard.initialReadyMs`, `dashboard.tabSwitchMs`, and `dashboard.tableRenderMs` limits directly. The Worker records `admin_dashboard_summary` and `admin_settings` samples, and the runtime audit consumes the configured p95 ceilings. Do not add an unconsumed timing value to the configuration and describe it as a gate.
+The browser suite consumes the `dashboard.initialReadyMs`, `dashboard.tabSwitchMs`, and `dashboard.tableRenderMs` limits directly. Initial readiness measures the cold-navigation application request chain through the first dashboard-summary and settings requests while separately asserting that the dashboard is visible; it deliberately excludes test-runner assertion polling after those requests have arrived. Tab and supporter-table budgets measure the corresponding visible interaction. The Worker records `admin_dashboard_summary` and `admin_settings` samples, and the runtime audit consumes the configured p95 ceilings. Do not add an unconsumed timing value to the configuration and describe it as a gate.
 
 ## Release Performance Evidence
 

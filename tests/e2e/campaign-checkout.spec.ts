@@ -534,7 +534,7 @@ test.describe('Cart Integration', () => {
   });
 
   test('POOL_CONFIG is set for live-stats.js', async ({ page }) => {
-    await page.goto('/campaigns/hand-relations/');
+    await page.goto('/campaigns/hand-relations/', { waitUntil: 'domcontentloaded' });
     
     const poolConfig = await page.evaluate(() => {
       return (window as any).POOL_CONFIG;

@@ -2,6 +2,20 @@
 
 Cloudflare Worker handling first-party checkout canonicalization, Stripe integration, pledge management, order-scoped supporter authentication, upcoming-campaign launch reminders, consent-based abandoned-checkout reminders, campaign supporter blasts, protected campaign previews, and the private browser admin dashboard APIs.
 
+## Shared Platform boundary
+
+Pool `v1.2.19` pins Dust Wave Platform `v0.31.0` at exact commit
+`5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579`. The Worker consumes the pinned
+`worker-core`, `shipping-core`, `tax-core`, `inventory-core`, and `media-core`
+packages for characterized, runtime-neutral mechanics. Pool retains every
+route, request schema, campaign/pledge model, Durable Object and KV policy,
+credential, Stripe/Resend/Cloudflare policy, side effect, deployment, and
+rollback decision.
+
+The separately pinned Dust Wave Jekyll Template is compile-time source-upgrade
+tooling only. It is never imported by this Worker and is excluded from the
+generated public site.
+
 For day-to-day local development, prefer the repo-root Podman path:
 
 ```bash
