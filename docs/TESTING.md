@@ -2,6 +2,12 @@
 
 This guide covers the automated test suites, local test infrastructure, and manual verification paths. Weekly synthetic recovery, protected preview drills, and post-restore verification are documented in [BACKUP_RESTORE.md](./BACKUP_RESTORE.md).
 
+`npm run jekyll-template:check` verifies that the 17 locally built Jekyll
+integration files still match the exact pinned golden-project template. The
+pre-merge gate runs this check before builds and also rejects the template
+submodule from generated site output. `npm run jekyll-template:sync` is an
+explicit upgrade-branch operation, not a build step.
+
 ## Quick Reference
 
 ```bash
