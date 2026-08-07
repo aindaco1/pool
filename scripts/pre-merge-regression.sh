@@ -201,6 +201,10 @@ verify_build_artifacts() {
     echo "The source-upgrade Jekyll template leaked into the generated site"
     return 1
   fi
+  if [[ -e _site/tmp ]]; then
+    echo "Generated temporary artifacts leaked into the public site"
+    return 1
+  fi
   if ! search_text -n '\.pool-first-party-cart__panel' _site/assets/main.css >/dev/null; then
     echo "main.css is missing expected first-party cart UI styles"
     return 1
@@ -564,15 +568,18 @@ run_phase "2. Syntax checks" bash -lc '
   node --check scripts/release-provider-checks.mjs
   node --check scripts/release-screen-reader-evidence.mjs
   node --check shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs
+  node --check shared/dust-wave-platform/packages/product-video-core/bin/capture-product-video.mjs
+  node --check shared/dust-wave-platform/packages/product-video-core/bin/render-product-video.mjs
   node --check scripts/audit-performance-budgets.mjs
   node --check scripts/performance-lighthouse.mjs
   node --check scripts/setup-deploy.mjs
   node scripts/optimize-media.mjs --check --manifest-only >/dev/null
-  bash -n scripts/release-smoke.sh scripts/release-a11y-evidence.sh scripts/dev-podman.sh scripts/podman-stack-run.sh scripts/smoke-pledge-management.sh
+  bash -n scripts/release-smoke.sh scripts/release-a11y-evidence.sh scripts/dev-podman.sh scripts/podman-stack-run.sh scripts/smoke-pledge-management.sh scripts/render-product-demo.sh
 '
 
 run_phase "3. Focused regression suites" npx vitest run \
   tests/unit/platform-pin.test.ts \
+  tests/unit/product-video-workflow.test.ts \
   tests/unit/release-version.test.ts \
   tests/unit/site-asset-minification.test.ts \
   tests/unit/performance-budgets.test.ts \

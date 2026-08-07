@@ -1,0 +1,42 @@
+{
+  "name": "pool-product-video-smoke",
+  "initialPath": "/",
+  "presentation": {
+    "stylesheetPath": "/assets/capture-presentation.css"
+  },
+  "capture": {
+    "fps": 2,
+    "preRollMs": 100,
+    "postRollMs": 100,
+    "minimumEffectiveFpsRatio": 0.25,
+    "viewport": { "width": 1280, "height": 720 },
+    "shell": { "width": 1100, "height": 650, "radius": 16 },
+    "cursor": { "startX": 1050, "startY": 650, "moveDurationMs": 80 }
+  },
+  "actions": [
+    {
+      "action": "click",
+      "selector": ".campaign-card[data-campaign-slug='smoke-editable'] h2 a",
+      "waitAfterMs": 300
+    },
+    {
+      "action": "waitForURLIncludes",
+      "value": "/campaigns/smoke-editable/"
+    },
+    {
+      "action": "click",
+      "selector": "[data-item-id='smoke-editable__standard-pass']",
+      "waitAfterMs": 200
+    },
+    {
+      "action": "click",
+      "selector": "[data-cart-addon-add][data-addon-product-id='smoke-editable__first-time-sexpot-poster']",
+      "waitAfterMs": 200
+    },
+    {
+      "action": "click",
+      "selector": "[data-cart-continue]",
+      "waitAfterMs": 800
+    }
+  ]
+}

@@ -17,6 +17,7 @@ node_modules/
 test-results/
 playwright-report/
 playwright/.cache/
+tmp/
 
 # Wrangler (Cloudflare Worker)
 .wrangler/

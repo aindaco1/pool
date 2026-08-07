@@ -8,7 +8,7 @@ pre-merge gate runs this check before builds and also rejects the template
 submodule from generated site output. `npm run jekyll-template:sync` is an
 explicit upgrade-branch operation, not a build step.
 
-Pool `v1.2.19` records Platform `v0.31.0` and Jekyll Template `v0.1.0` as exact
+Pool `v1.2.20` records Platform `v0.32.0` and Jekyll Template `v0.1.0` as exact
 gitlinks. After cloning, switching branches, or reviewing a shared dependency
 upgrade, initialize the recorded commits and run the narrow pin/drift contract
 before broader tests:
@@ -18,6 +18,18 @@ git submodule update --init --recursive
 npx vitest run tests/unit/platform-pin.test.ts tests/unit/jekyll-template-pin.test.ts
 npm run jekyll-template:check
 ```
+
+The local-only product-video adapter has a bounded real-interface smoke path:
+
+```bash
+npm run test:product-video
+```
+
+It builds with the tracked `_config.test.yml`, captures the `smoke-editable`
+campaign/tier/add-on/checkout-preview path through the pinned Platform engine,
+and writes only ignored output below `tmp/product-video`. See
+[PRODUCT_VIDEO_WORKFLOW.md](./PRODUCT_VIDEO_WORKFLOW.md) for render formats,
+host requirements, and cleanup boundaries.
 
 If a host-only Worker suddenly returns `503` while the Podman-backed smoke path
 passes, stop the host dev stack and inspect the ignored local

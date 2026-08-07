@@ -1,6 +1,6 @@
 {
   "name": "pool",
-  "version": "1.2.19",
+  "version": "1.2.20",
   "description": "**Dust Wave's open crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)",
   "main": "index.js",
   "directories": {
@@ -31,6 +31,9 @@
     "test:e2e:headless:podman": "CI=1 ./scripts/podman-playwright-run.sh npx playwright test --workers=1",
     "test:e2e:parity": "CI=1 playwright test tests/e2e/campaign-checkout.spec.ts tests/e2e/manage-flows.spec.ts --project=chromium",
     "test:e2e:ui": "playwright test --ui",
+    "video:demo:capture": "./scripts/render-product-demo.sh --capture-only",
+    "video:demo:render": "./scripts/render-product-demo.sh",
+    "test:product-video": "./scripts/render-product-demo.sh --capture-only --flow tests/fixtures/product-video.smoke.json",
     "sync:worker-config": "ruby ./scripts/sync-worker-config.rb",
     "setup:deploy": "node ./scripts/setup-deploy.mjs",
     "backup:inventory:audit": "node ./scripts/audit-pool-data-inventory.mjs",

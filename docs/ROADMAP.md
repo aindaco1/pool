@@ -93,6 +93,11 @@
 
 **Platform foundation**
 
+- [x] Reusable product-video tooling
+  - Platform owns one bounded declarative Playwright capture engine, transparent stage, guarded output policy, shell-free alpha-video render plan, and FFprobe evidence contract for future products
+  - Pool retains its Jekyll preview, test campaign, selectors, presentation CSS, editorial timing, generated media, marketing destination, publication, and rollback
+  - A short real-interface smoke flow verifies the homepage, campaign, tier, add-on, and checkout-preview path without entering payment data or depending on live Stripe state
+  - Capture-only styling is injected locally and adds no production browser request; existing generated runs are never recursively deleted or overwritten
 - [x] Independently versioned shared primitives
   - Pool pins immutable Platform packages for characterized Worker, admin, browser, design, build, release, shipping, tax, inventory, media, and test mechanics
   - Campaigns, pledges, routes, storage, templates, content, localization, credentials, provider policy, deployment, and rollback remain Pool-owned

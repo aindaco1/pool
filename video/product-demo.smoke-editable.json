@@ -1,0 +1,58 @@
+{
+  "name": "smoke-editable-homepage-flow",
+  "initialPath": "/",
+  "presentation": {
+    "stylesheetPath": "/assets/capture-presentation.css"
+  },
+  "capture": {
+    "fps": 24,
+    "timingMultiplier": 1,
+    "preRollMs": 500,
+    "postRollMs": 1200,
+    "minimumEffectiveFpsRatio": 0.75,
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "shell": {
+      "width": 1480,
+      "height": 960,
+      "radius": 24
+    },
+    "cursor": {
+      "startX": 1660,
+      "startY": 940,
+      "moveDurationMs": 350
+    }
+  },
+  "actions": [
+    {
+      "action": "wait",
+      "ms": 700
+    },
+    {
+      "action": "click",
+      "selector": ".campaign-card[data-campaign-slug='smoke-editable'] h2 a",
+      "waitAfterMs": 900
+    },
+    {
+      "action": "waitForURLIncludes",
+      "value": "/campaigns/smoke-editable/"
+    },
+    {
+      "action": "click",
+      "selector": "[data-item-id='smoke-editable__standard-pass']",
+      "waitAfterMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-cart-addon-add][data-addon-product-id='smoke-editable__first-time-sexpot-poster']",
+      "waitAfterMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-cart-continue]",
+      "waitAfterMs": 1400
+    }
+  ]
+}

@@ -4,14 +4,15 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579';
+const expectedCommit = '85165a16ac6923b438514bdce0a9957c1804db5f';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.31.0',
+  '@dustwave/platform-workspace': '0.32.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.2.0',
   '@dustwave/design-core': '0.2.0',
   '@dustwave/inventory-core': '0.1.0',
   '@dustwave/media-core': '0.4.0',
+  '@dustwave/product-video-core': '0.1.0',
   '@dustwave/release-core': '0.2.0',
   '@dustwave/shipping-core': '0.2.0',
   '@dustwave/site-shell': '0.2.0',
@@ -47,6 +48,7 @@ describe('shared platform pin', () => {
       'shared/dust-wave-platform/packages/design-core/package.json',
       'shared/dust-wave-platform/packages/inventory-core/package.json',
       'shared/dust-wave-platform/packages/media-core/package.json',
+      'shared/dust-wave-platform/packages/product-video-core/package.json',
       'shared/dust-wave-platform/packages/release-core/package.json',
       'shared/dust-wave-platform/packages/shipping-core/package.json',
       'shared/dust-wave-platform/packages/site-shell/package.json',
@@ -80,6 +82,9 @@ describe('shared platform pin', () => {
       'packages/design-core/styles/_utilities.scss',
       'packages/inventory-core/src/index.js',
       'packages/media-core/src/site-catalog.js',
+      'packages/product-video-core/bin/capture-product-video.mjs',
+      'packages/product-video-core/bin/render-product-video.mjs',
+      'packages/product-video-core/src/index.js',
       'packages/site-shell/src/a11y-live-browser.js',
       'packages/site-shell/src/cart-icon-browser.js',
       'packages/site-shell/src/deferred-stylesheets-browser.js',

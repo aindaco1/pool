@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release branch milestone: **v1.2.19**. Pool pins immutable `dust-wave-platform` `v0.31.0` plus the separately versioned `dust-wave-jekyll-template` `v0.1.0`. Seventeen shared Jekyll integration files now have one digest-bound golden-project source and an explicit drift/sync workflow, while Pool retains its routes, data, localization, content, configuration, build, deployment authority, and one-commit rollback.
+Current release branch milestone: **v1.2.20**. Pool pins immutable `dust-wave-platform` `v0.32.0` plus the separately versioned `dust-wave-jekyll-template` `v0.1.0`. Platform now supplies the reusable, guarded product-video capture/render engine while Pool retains its Jekyll preview, fixtures, selectors, presentation CSS, generated media, publishing decision, routes, data, localization, content, configuration, deployment authority, and one-commit rollback.
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -57,6 +57,7 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Dashboard media optimization pipeline** — Dashboard-uploaded media stays source-preserving in the Worker, image/video uploads dispatch the repository optimizer with `scope=changed`, and repository tooling can losslessly compress images, generate responsive WebP browser variants including a `640w` mobile-friendly rung, and generate high-quality WebM derivatives for uploaded videos
 - **Deferred remote video embeds** — YouTube campaign hero videos render with a local poster/play facade first and load the remote iframe only after supporter play intent
 - **Generated asset minification** — Production Pages builds minify generated `_site` CSS/JS after Jekyll output while leaving source files readable and Cloudflare responsible for transfer compression
+- **Repeatable product-video capture** — A local-only Pool adapter drives the real `smoke-editable` flow through the pinned Platform capture/render engine, producing transparent ProRes, WebM, and HEVC outputs without live payments, production runtime cost, or recursive output cleanup
 - **Campaign-runner reports** — Configurable campaign-scoped daily pledge-ledger emails and post-deadline fulfillment exports can go to each campaign’s configured runner recipients, while the dashboard previews/downloads pledge and fulfillment CSVs without sending email or writing sent markers
 - **Projection drift diagnostics** — Read-only admin checks and a local CLI can compare stored stats, inventory, and campaign indexes against saved pledge truth before any repair path mutates data
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
@@ -85,11 +86,11 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 
 ### Shared foundations and ownership
 
-Pool `v1.2.19` pins Dust Wave Platform `v0.31.0` at exact commit
-`5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579` and Dust Wave Jekyll Template
+Pool `v1.2.20` pins Dust Wave Platform `v0.32.0` at exact commit
+`85165a16ac6923b438514bdce0a9957c1804db5f` and Dust Wave Jekyll Template
 `v0.1.0` at exact commit `351281a5aec60fa85653a3d23391e66fb860aae6`.
 Platform supplies characterized Worker, admin, browser, design, build, release,
-shipping, tax, inventory, media, and test primitives. The Jekyll Template owns
+shipping, tax, inventory, media, test, and local product-video primitives. The Jekyll Template owns
 17 manifest-bound source-upgrade files whose runtime copies remain checked in.
 
 Pool still owns campaign and pledge models, routes, storage, content,

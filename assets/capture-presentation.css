@@ -1,0 +1,43 @@
+html[data-product-video-capture="true"],
+html[data-product-video-capture="true"] body,
+html[data-product-video-capture="true"] #main-content,
+html[data-product-video-capture="true"] body > main,
+html[data-product-video-capture="true"] .page-content,
+html[data-product-video-capture="true"] .campaign-container,
+html[data-product-video-capture="true"] .campaign-header,
+html[data-product-video-capture="true"] .campaign-content,
+html[data-product-video-capture="true"] .campaign-sidebar,
+html[data-product-video-capture="true"] .campaign-content__main,
+html[data-product-video-capture="true"] .campaign-content__sidebar,
+html[data-product-video-capture="true"] .hero,
+html[data-product-video-capture="true"] .content {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html[data-product-video-capture="true"] .skip-link,
+html[data-product-video-capture="true"] .site-header,
+html[data-product-video-capture="true"] #menu-toggle {
+  display: none !important;
+}
+
+html[data-product-video-capture="true"] body {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+html[data-product-video-capture="true"] main,
+html[data-product-video-capture="true"] .campaign-container,
+html[data-product-video-capture="true"] .campaign-header,
+html[data-product-video-capture="true"] .campaign-content {
+  margin-top: 0 !important;
+}
+
+html[data-product-video-capture="true"] .pool-first-party-cart__backdrop {
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
+html[data-product-video-capture="true"] .pool-first-party-cart__panel {
+  box-shadow: none !important;
+}
