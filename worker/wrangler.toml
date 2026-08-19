@@ -3,6 +3,7 @@ main = "src/index.js"
 compatibility_date = "2026-05-03"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = false
+preview_urls = false
 
 routes = [
   { pattern = "pledge.dustwave.xyz/*", zone_name = "dustwave.xyz" }

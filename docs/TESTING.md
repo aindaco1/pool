@@ -135,6 +135,8 @@ Lighthouse, deployed cache-policy, and authenticated Worker timing checks follow
 
 Provider checks are read-only and use shell credentials first. In CI, the Release Provider Evidence workflow runs `npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars` with `CLOUDFLARE_DNS_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_ZONE`.
 
+The scheduled production-posture audit also requires `preview_urls = false` to be explicit in `worker/wrangler.toml`. Missing or enabled Worker preview URLs are a release-blocking configuration drift finding.
+
 Set `POOL_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true` for no-send email evidence during local mutation smoke. The payment smoke keeps pledge mutation evidence opt-in through `--local-mutation` / `PAYMENT_SMOKE_ALLOW_MUTATION=1` and refuses production hosts unless explicitly overridden.
 
 ## Ethical Risk Review
