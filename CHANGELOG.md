@@ -13,6 +13,8 @@
   README, practice guides, roadmap, changelog, and release evidence.
 - Removed dated provider snapshots, completed-work roadmaps, release-specific
   status ledgers, and duplicate future-work lists from current-state guides.
+- Moved the tax calculator guide into Pool so provider behavior, configuration,
+  troubleshooting, and verification have one upstream documentation source.
 
 ## v1.2.20 - 2026-08-06
 

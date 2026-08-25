@@ -1,8 +1,9 @@
 # Roadmap
 
-This document contains prospective work only. It describes neither the current
-product nor a promised release date or version. Current behavior belongs in the
-[README](../README.md) and practice guides; completed and unreleased changes
+This document contains prospective work only.
+It describes neither the current product nor a promised release date or version.
+Current behavior belongs in the [README](../README.md) and practice guides;
+completed and unreleased changes
 belong in the [Changelog](../CHANGELOG.md), with release verification in
 [release evidence](./release-evidence/).
 
@@ -41,7 +42,7 @@ belong in the [Changelog](../CHANGELOG.md), with release verification in
   - Improve privacy and retention of tax destinations: review whether persisted `taxDetails.destination` should keep full street address forever, whether stored tax evidence can be minimized or hashed after settlement/report windows, and how this interacts with fulfillment addresses that already require PII retention
   - Add reconciliation and remittance support: create tax liability exports grouped by provider, source, jurisdiction, location code, effective rate, taxable subtotal, taxable shipping, tax collected, campaign/platform ownership, and refund/cancel/modify deltas; ensure reports preserve historical stored tax details even after provider settings or catalog categories change
   - Extend testing at the right layers: unit tests for tax-line construction and provider adapters, fixture tests for NM starter/API fallback and ZIP.TAX shipping taxability, Worker tests for checkout and Manage Pledge tax deltas, browser tests for provisional/error/fallback UI states, report tests for tax liability exports, and setup tests for provider credential/readiness handling
-  - Update docs after implementation: `docs/CUSTOMIZATION.md`, `docs/WORKFLOWS.md`, `docs/TESTING.md`, `docs/SECURITY.md`, `worker/README.md`, `docs/PAYMENT_PROCESSOR.md`, creator checklists, and dashboard help text should explain provider selection, fallback policy, refresh cadence, tax category behavior, stored evidence, and what operators must verify with a tax professional
+  - Update docs after implementation: `docs/TAX_CALCULATOR.md`, `docs/CUSTOMIZATION.md`, `docs/WORKFLOWS.md`, `docs/TESTING.md`, `docs/SECURITY.md`, `worker/README.md`, `docs/PAYMENT_PROCESSOR.md`, creator checklists, and dashboard help text should explain provider selection, fallback policy, refresh cadence, tax category behavior, stored evidence, and what operators must verify with a tax professional
 - [ ] Inventory integration with Stripe POS system
   - Treat this as shared inventory across Pool, Store, and [Payment for Stripe](https://paymentforstripe.com/), not as a claim that Stripe Products or Payment for Stripe own stock counts. Pool and Store remain authoritative for their own product content, online prices, shipping, tax, campaign accounting, and historical order/pledge values; one narrow shared stock ledger becomes authoritative only for linked finite physical inventory or event capacity, including Pool physical add-ons and Store inventory-tracked physical, ticket, and RSVP products
   - Add a super-admin **Shared inventory and POS** setting to both Admin Dashboards, backed by canonical configuration and mirrored Worker state, with `enabled: false` as the repository, local-development, and new-fork default. Keep test and live activation separate, show configured/missing readiness for the shared coordinator, Stripe credentials, webhook, scheduler, and schema version, and require a successful read-only preflight plus explicit confirmation before live enablement

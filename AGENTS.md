@@ -7,6 +7,7 @@ Read it alongside:
 - [README.md](./README.md) for the product and architecture overview
 - [docs/CUSTOMIZATION.md](./docs/CUSTOMIZATION.md) for the supported fork-facing configuration surface
 - [docs/PAYMENT_PROCESSOR.md](./docs/PAYMENT_PROCESSOR.md) for Stripe, canonical checkout, webhooks, settlement, and reconciliation
+- [docs/TAX_CALCULATOR.md](./docs/TAX_CALCULATOR.md) for tax providers, canonical quotes, mirrored configuration, and verification
 - [docs/ADD_ON_PRODUCTS.md](./docs/ADD_ON_PRODUCTS.md) for platform, campaign, and variant-specific add-on pricing
 - [docs/DASHBOARD.md](./docs/DASHBOARD.md) for private administration and editing
 - [docs/PERFORMANCE.md](./docs/PERFORMANCE.md) for budgets, Lighthouse, caching, and runtime observability
@@ -140,6 +141,7 @@ Shared system strings belong in `_data/i18n/<lang>.yml`; creator-authored campai
 - Release history: [CHANGELOG.md](./CHANGELOG.md)
 - Prospective work: [docs/ROADMAP.md](./docs/ROADMAP.md)
 - Payments and settlement: [docs/PAYMENT_PROCESSOR.md](./docs/PAYMENT_PROCESSOR.md)
+- Tax calculation: [docs/TAX_CALCULATOR.md](./docs/TAX_CALCULATOR.md)
 - Add-on products and variant pricing: [docs/ADD_ON_PRODUCTS.md](./docs/ADD_ON_PRODUCTS.md)
 - Email: [docs/EMAIL.md](./docs/EMAIL.md)
 - Testing: [docs/TESTING.md](./docs/TESTING.md)

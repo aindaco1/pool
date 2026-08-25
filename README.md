@@ -188,6 +188,7 @@ See [docs/SEO.md](docs/SEO.md) for the current SEO fundamentals implementation a
 See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) for the current accessibility baseline and verified critical flows.
 See [docs/I18N.md](docs/I18N.md) for the locale model, shared translation sources, and localized route behavior.
 See [docs/PAYMENT_PROCESSOR.md](docs/PAYMENT_PROCESSOR.md) for the Stripe setup, checkout, webhook, settlement, and reconciliation model.
+See [docs/TAX_CALCULATOR.md](docs/TAX_CALCULATOR.md) for tax-provider selection, Worker-canonical quotes, configuration, troubleshooting, and verification.
 See [docs/EMAIL.md](docs/EMAIL.md) for the Resend sender setup, email types, localization, and delivery behavior.
 
 Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It covers campaign add-ons, hosted embeds, QR/referral links, supporter Blast prep, share-link/social-preview planning, dashboard media uploads, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
@@ -450,6 +451,7 @@ Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT
 - [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) — System architecture
 - [WORKFLOWS.md](docs/WORKFLOWS.md) — Pledge lifecycle, magic links & charge flow
 - [PAYMENT_PROCESSOR.md](docs/PAYMENT_PROCESSOR.md) — Stripe setup, checkout canonicalization, webhooks, settlement, and reconciliation
+- [TAX_CALCULATOR.md](docs/TAX_CALCULATOR.md) — Tax-provider modes, Worker-canonical quotes, mirrored configuration, and verification
 - [EMAIL.md](docs/EMAIL.md) — Resend sender setup, transactional/campaign email types, localization, and delivery behavior
 - [DEV_NOTES.md](docs/DEV_NOTES.md) — Development notes, content model & FAQ
 - [TESTING.md](docs/TESTING.md) — Full testing guide & secrets reference
