@@ -1,10 +1,10 @@
 # Customization Guide
 
-This guide covers the supported no-code customization surface for forks of The Pool as it exists now.
+This guide covers the supported no-code customization surface for forks of The Pool.
 
 The goal is to let forks rebrand, restyle, and reconfigure the platform through config, while keeping checkout, reports, emails, and the Worker aligned.
 
-The structured config model in [`_config.yml`](../_config.yml) is now the canonical fork-facing surface.
+The structured config model in [`_config.yml`](../_config.yml) is the canonical fork-facing surface.
 
 Provider-specific setup lives in separate runbooks: use [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for Stripe and settlement, and [EMAIL.md](./EMAIL.md) for Resend senders and email delivery.
 
@@ -28,14 +28,14 @@ For normal operator edits, use the private admin dashboard at `/admin/` or `/es/
 - **Settings -> Users** is runtime-only and saves directly to Worker KV at `admin-users:v1`; it does not publish to GitHub.
 - **Secrets & credentials** is read-only status. Secret values still belong in Worker secrets, GitHub repository secrets, or ignored local env files.
 
-Treat [`_config.local.yml`](../_config.local.yml) as an override-only file. Keep canonical fork settings in [`_config.yml`](../_config.yml), and use the local file only for things that should differ on your machine, like localhost URLs or local-only campaign visibility.
+Treat [`_config.local.yml`](../_config.local.yml) as an override-only file. Keep canonical fork settings in [`_config.yml`](../_config.yml), and use the local file only for things that differ on your machine, like localhost URLs or local-only campaign visibility.
 
-The normal local path is now localhost-based:
+The normal local path is localhost-based:
 
 - site: `http://127.0.0.1:4000`
 - Worker: `http://127.0.0.1:8787`
 
-The generated static site also now excludes repo-internal folders like `worker/`, `scripts/`, and `tests/`, so static verification more closely matches what a fork would actually publish.
+The generated static site excludes repo-internal folders like `worker/`, `scripts/`, and `tests/`, so static verification more closely matches what a fork would actually publish.
 
 ## Supported Config Areas
 
@@ -111,7 +111,7 @@ These values feed:
 Notes:
 
 - `platform.*` is the primary branding surface.
-- `platform.version` should be the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v1.0.8`.
+- `platform.version` is the canonical machine-readable product version for the site, while `platform.release_label` can stay friendlier for public-facing copy such as `v1.0.0`.
 - `platform.timezone` must be a supported IANA timezone. It defaults to `America/Denver` so existing forks keep the old lifecycle behavior until they change it.
 - top-level `title` / `author` still exist in Jekyll, but treat them as general site metadata / fallback rather than the main fork-customization interface.
 - `platform.default_social_image_path` is the supported default for OG/Twitter cards when a page or campaign does not provide a more specific image.
@@ -123,8 +123,8 @@ Example:
 ```yml
 platform:
   name: My Fork
-  version: 1.0.8
-  release_label: v1.0.8
+  version: 1.0.0
+  release_label: v1.0.0
   company_name: Example Studio
   support_email: support@example.com
   pledges_email_from: "My Fork <pledges@pool.example.com>"
@@ -247,9 +247,9 @@ Current supported pattern:
 - non-default public pages live under a locale prefix like `/es/`
 - shared runtime/browser messages are emitted through `assets/i18n.json`
 - Worker supporter emails reuse that shared locale catalog plus persisted `preferredLang`
-- campaign chrome such as the hero video button/loading text, supporter-community teaser copy, diary tabs, production-phase controls, gallery accessibility labels, cart-button summaries, and checkout tax-location helper copy also now comes from `_data/i18n/{lang}.yml`
+- campaign chrome such as the hero video button/loading text, supporter-community teaser copy, diary tabs, production-phase controls, gallery accessibility labels, cart-button summaries, and checkout tax-location helper copy comes from `_data/i18n/{lang}.yml`
 - the shared footer language switcher is automatic when more than one language is configured
-- long-form pages such as `about` and `terms` should use localized source pages rather than trying to store every paragraph in YAML
+- long-form pages such as `about` and `terms` use localized source pages rather than trying to store every paragraph in YAML
 - public metadata and structured-data language hints also follow the same locale model, so localized public pages do not need a second SEO-only translation system
 
 What this means in practice:
@@ -273,7 +273,7 @@ Recommended fork workflow:
 
 ### SEO surface
 
-Current SEO fundamentals are intentionally bounded. Forks should treat these as the supported knobs:
+Current SEO fundamentals are intentionally bounded. These are the supported knobs for forks:
 
 - top-level `title`
 - top-level `description`
@@ -287,7 +287,7 @@ Current SEO fundamentals are intentionally bounded. Forks should treat these as 
 - `platform.default_social_image_path`
 - localized page `title` / `description` front matter on public pages
 - campaign `title`, `short_blurb`, and hero images
-- optional authored `published_at` and `last_modified_at` front matter for campaign article dates, plus `last_modified_at` on any sitemap entry that should publish a freshness hint
+- optional authored `published_at` and `last_modified_at` front matter for campaign article dates, plus `last_modified_at` on any sitemap entry that publishes a freshness hint
 
 That surface currently controls:
 
@@ -337,7 +337,7 @@ What they do:
 
 These defaults are intentionally `true` in `_config.yml`, so forks start with full diagnostics available and can turn logging down later without code changes.
 
-When enabled, the shared loggers now emit:
+When enabled, the shared loggers emit:
 
 - ISO timestamps
 - consistent browser / Worker scope prefixes
@@ -445,7 +445,7 @@ Preset and override metadata can include:
 
 `weight_oz` is the item weight. `packaging_weight_oz` is a one-time packing allowance for that line item, and `stack_height_in` lets multi-quantity physical tiers stack more realistically than simple `height * qty`.
 
-The safest pattern is to encode a deliberate cheapest-valid order per preset instead of trying to infer “letter” or “flat” eligibility from raw dimensions at runtime. The current site now uses:
+The safest pattern is to encode a deliberate cheapest-valid order per preset instead of trying to infer “letter” or “flat” eligibility from raw dimensions at runtime. The site uses:
 
 - `sticker`
   - `manual_domestic_rate: FIRST_CLASS_FLAT`
@@ -554,14 +554,12 @@ separate Dust Wave Podcast runtime:
 - `bridge_url` must be the exact Podcast
   `/v1/internal/pool/grants` endpoint
 - `bridge_timeout_ms` accepts a bounded 1–15 second provider timeout
-- `mappings` is the future product/tier-to-show configuration and remains empty
-  until the operator chooses a qualifying Pool product or tier, entitlement
-  duration, and issuance lifecycle
+- `mappings` is currently empty, so the bridge does not issue entitlements
 
 The matching `POOL_PODCAST_BRIDGE_SECRET` never belongs in `_config.yml`; set
 an independently generated value in Worker secrets or ignored
 `worker/.dev.vars`, and install that same environment-specific value in
-Podcast. The current release exposes and tests only the signed delivery
+Podcast. The implementation exposes and tests only the signed delivery
 primitive. It does not scan pledges, issue codes, enqueue email, or change
 checkout/settlement behavior while `mappings` is empty and the kill switch is
 off. A local `_config.local.yml` may override `bridge_url` with the matching
@@ -634,7 +632,7 @@ Use `design` for curated design-system overrides that do not require Sass edits.
 
 These values are emitted into the generated stylesheet [assets/main.css](../assets/main.scss), which keeps the design-variable bridge compatible with the site’s strict CSP. [assets/theme-vars.css](../assets/theme-vars.css) remains as a compatibility artifact, but public layouts do not request it separately. Forks do not need to edit Sass just to change supported tokens.
 
-The same generated CSS variables also now theme the on-site Stripe Elements sidecar, so supported typography/color/radius overrides carry through the custom checkout payment UI without adding a separate checkout-only config layer.
+The same generated CSS variables also theme the on-site Stripe Elements sidecar, so supported typography/color/radius overrides carry through the custom checkout payment UI without adding a separate checkout-only config layer.
 
 A deliberately smaller subset of the same branding surface is mirrored into the Worker so supporter emails can reuse the configured logo, font stacks, primary color, border/surface colors, and button radius.
 
@@ -871,7 +869,7 @@ The repo keeps those values aligned automatically through the main local/dev/tes
 ./scripts/dev.sh --podman
 ```
 
-For convenience, the repo now includes:
+For convenience, the repo includes:
 
 ```bash
 npm run sync:worker-config
@@ -891,7 +889,7 @@ Launch reminders have one public setting and one secret boundary:
 
 Dashboard-uploaded media also does not add new sync-script config. Uploads commit source files into the existing asset directories; image/video uploads request the **Optimize dashboard media** workflow after the commit succeeds. `npm run media:optimize` / `npm run media:optimize:check`, the Podman-backed variants for machines without native optimizers, and the same workflow handle image compression, responsive WebP variants at `320w`, `480w`, `640w`, `960w`, and `1600w`, and WebM derivatives outside the Worker.
 
-Generated CSS/JS minification is also outside the Worker and dashboard save path. Production deploys run `npm run assets:minify` only after Jekyll writes `_site`, so forks should keep source assets readable in `assets/` and let the deploy artifact step handle minified output. Cloudflare edge compression should stay enabled, but Cloudflare Auto Minify should stay disabled to avoid a second rewriting layer.
+Generated CSS/JS minification is also outside the Worker and dashboard save path. Production deploys run `npm run assets:minify` only after Jekyll writes `_site`, so forks keep source assets readable in `assets/` and let the deploy artifact step handle minified output. Cloudflare edge compression stays enabled, while Cloudflare Auto Minify stays disabled to avoid a second rewriting layer.
 
 The main local/dev validation paths already call that sync automatically:
 
@@ -905,7 +903,7 @@ The main local/dev validation paths already call that sync automatically:
 
 ## What Still Requires Code
 
-The platform now supports major customization without custom code, but not everything is intentionally configurable yet.
+The platform supports major customization without custom code, but not everything is intentionally configurable.
 
 Still code-level today:
 
@@ -955,7 +953,7 @@ npx vitest run tests/unit/config-boot.test.ts tests/unit/cart-provider.test.ts t
 ./scripts/podman-self-check.sh
 ```
 
-## Guidance For Future Additions
+## Adding Customization Knobs
 
 When adding new customization knobs, prefer this order:
 

@@ -19,11 +19,11 @@ Stripe owns card data and PCI-sensitive payment fields. The Pool owns pledge int
 
 ## Engineering Principles
 
-Payment code should optimize for boring correctness over cleverness.
+Payment code optimizes for boring correctness over cleverness.
 
 ### No Invented Money
 
-Runtime money values that enter pledge storage, reports, emails, and Stripe requests are represented as integer cents. Campaign authors and config files may use dollars or rates for usability, but Worker records and processor calls should use cents at the boundary.
+Runtime money values that enter pledge storage, reports, emails, and Stripe requests are represented as integer cents. Campaign authors and config files may use dollars or rates for usability, but Worker records and processor calls use cents at the boundary.
 
 Rules for new payment code:
 
@@ -441,7 +441,7 @@ For older charged pledges missing balance transaction details, super admins can 
 POST /admin/analytics/stripe-financials/backfill
 ```
 
-The backfill uses campaign pledge indexes and grouped Stripe PaymentIntent lookups. It should not scan the entire KV namespace during normal operation.
+The backfill uses campaign pledge indexes and grouped Stripe PaymentIntent lookups. It does not scan the entire KV namespace during normal operation.
 
 ### Reconciliation Checklist
 

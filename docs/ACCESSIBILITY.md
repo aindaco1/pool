@@ -1,6 +1,8 @@
 # Accessibility
 
-This document tracks The Pool's current accessibility baseline, the higher-risk interaction surfaces we actively verify, and the remaining follow-up work needed to move from "strong accessibility posture" toward fuller accessibility compliance.
+This document describes The Pool's current accessibility baseline, the
+higher-risk interaction surfaces covered by automated or manual verification,
+and the constraints applied to interface changes.
 
 ## Current Priorities
 
@@ -23,7 +25,7 @@ The site already includes:
 - stable `main-content` anchors on the main public shells so skip links and keyboard focus land consistently
 - cart trigger labeling that reflects both item count and displayed total for assistive technology instead of exposing only icon chrome
 
-The recent accessibility hardening pass added:
+The current interface includes:
 
 - dialog semantics, Escape handling, focus trapping, and focus restore attempts for:
   - the cart / checkout sidecar
@@ -71,7 +73,7 @@ The recent accessibility hardening pass added:
 
 ## Critical Surfaces
 
-The most important accessibility-sensitive UI in the app right now is:
+The most important accessibility-sensitive UI in the app is:
 
 1. Cart / checkout sidecar
 2. Manage Pledge confirm modal
@@ -86,7 +88,7 @@ These surfaces matter most because they combine custom UI, dynamic state changes
 
 ## Guardrails
 
-Accessibility changes should preserve these constraints:
+Accessibility changes must preserve these constraints:
 
 - do not move payment fields out of Stripe-owned secure UI just to gain styling or semantics control
 - do not add long-lived browser persistence for accessibility state
@@ -98,20 +100,20 @@ Accessibility changes should preserve these constraints:
 
 The admin dashboard has enough custom UI that it needs its own accessibility rules:
 
-- Use the shared admin label/help pattern for new fields. Help buttons must sit beside labels, not inside labels, and the editable control should reference the help tooltip with `aria-describedby`.
+- Use the shared admin label/help pattern for new fields. Help buttons must sit beside labels, not inside labels, and the editable control references the help tooltip with `aria-describedby`.
 - Use native controls for text, date/time, select menus, file uploads, checkboxes, and buttons unless a custom control is clearly necessary.
 - Checkbox groups must have a real `legend`; visually repeated labels can use `sr-only` legends when the visible label already appears above the group.
-- Top-level tabs, Settings sidebar tabs, Campaign sidebar tabs, and Campaign subtabs should keep `role="tablist"`, `role="tab"`, `role="tabpanel"`, `aria-selected`, `aria-controls`, and roving `tabindex` behavior in sync.
-- Content-editor blocks should expose editable text as `role="textbox"` with clear labels, `aria-multiline` where appropriate, and formatting buttons with `aria-pressed` when they represent toggle state.
-- Hidden content-editor chrome must not remain in the keyboard tab order. A block's toolbar should become reachable only after that block is active.
-- Media settings panels should expose expanded/collapsed state from the gear button and a labeled group for the revealed settings.
-- Content-editor media uploads should use the shared upload control pattern so the native file input has an accessible name, an upload-status description, and the same focus treatment as other dashboard upload buttons.
-- Gallery block settings and individual gallery-image settings should stay visually and semantically distinct, but both should reuse the shared admin field label/help components.
-- Generated derivatives should not appear as duplicate picker choices; source cards expose derivative status in text so assistive-technology users receive the same optimization context as thumbnail users.
-- Sortable admin tables should use real buttons in column headers, maintain `aria-sort`, and keep export buttons outside horizontally scrollable table regions.
-- Save/Publish status messages should use polite status regions; validation or blocking errors should remain near the relevant field or workflow.
-- Create/Preview modal fields should use the same shared admin info-button/help implementation as Settings and Campaign fields; avoid one-off inline help that can clip against modal edges.
-- Keyboard focus outlines should use the shared black focus token, including admin modal fields and email-list inputs.
+- Top-level tabs, Settings sidebar tabs, Campaign sidebar tabs, and Campaign subtabs keep `role="tablist"`, `role="tab"`, `role="tabpanel"`, `aria-selected`, `aria-controls`, and roving `tabindex` behavior in sync.
+- Content-editor blocks expose editable text as `role="textbox"` with clear labels, `aria-multiline` where appropriate, and formatting buttons with `aria-pressed` when they represent toggle state.
+- Hidden content-editor chrome must not remain in the keyboard tab order. A block's toolbar becomes reachable only after that block is active.
+- Media settings panels expose expanded/collapsed state from the gear button and a labeled group for the revealed settings.
+- Content-editor media uploads use the shared upload control pattern so the native file input has an accessible name, an upload-status description, and the same focus treatment as other dashboard upload buttons.
+- Gallery block settings and individual gallery-image settings stay visually and semantically distinct, while both reuse the shared admin field label/help components.
+- Generated derivatives do not appear as duplicate picker choices; source cards expose derivative status in text so assistive-technology users receive the same optimization context as thumbnail users.
+- Sortable admin tables use real buttons in column headers, maintain `aria-sort`, and keep export buttons outside horizontally scrollable table regions.
+- Save/Publish status messages use polite status regions; validation or blocking errors remain near the relevant field or workflow.
+- Create/Preview modal fields use the same shared admin info-button/help implementation as Settings and Campaign fields; one-off inline help can clip against modal edges and is not used.
+- Keyboard focus outlines use the shared black focus token, including admin modal fields and email-list inputs.
 
 ## Automated Coverage
 
@@ -221,7 +223,9 @@ npm run podman:doctor
 
 ## Manual Checks
 
-Automated checks help. For this release, the manual VoiceOver/NVDA pass is optional evidence rather than a blocking gate; when performed, use these checks for meaningful UI changes:
+Automated accessibility, locale, and rendered-page checks are release gates.
+Manual VoiceOver/NVDA evidence remains optional unless a release explicitly
+requires it; when performed, use these checks for meaningful UI changes:
 
 - cart drawer can be opened, navigated, and closed with keyboard only
 - cart trigger announces a useful label and expanded/collapsed state to assistive technology
@@ -251,16 +255,4 @@ Some accessibility limits are inherent to the security model:
 - browser autofill and field-level semantics inside Stripe iframes are partly controlled by Stripe, not The Pool
 - we can improve the surrounding labels, flow, and error handling, but we cannot directly rewrite Stripe's internal DOM
 
-## Follow-Up Candidates
-
-Good next accessibility improvements include:
-
-- manual screen-reader verification pass across cart, checkout, manage, and supporter-community flows
-- keeping the public-page axe/ARIA coverage current as new top-level pages and campaign archetypes are added
-- keeping the admin-dashboard axe/ARIA coverage current as new settings sections, campaign collections, and dashboard tables are added
-- adding keyboard-only assertions alongside any new public interactive widgets as they are introduced
-- keeping the i18n-aware accessibility review current as more localized public or supporter-facing copy is added
-
----
-
-_Last updated: July 12, 2026_
+Prospective accessibility work is tracked in the [Roadmap](./ROADMAP.md).

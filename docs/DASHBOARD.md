@@ -1,6 +1,8 @@
 # Admin Dashboard
 
-This document is the operator reference for The Pool's private admin dashboard and should be treated as the source of truth for dashboard-based campaign editing, reporting, analytics, marketing links, add-ons, and user management.
+This document is the operator reference and source of truth for The Pool's
+private dashboard-based campaign editing, reporting, analytics, marketing
+links, add-ons, and user management.
 
 ## Audience
 
@@ -19,7 +21,7 @@ The dashboard is available at:
 
 Admins sign in with an email magic link. Deployed Workers email the link through Resend and do not return it in the browser response. Local development can expose the link only when the site/Worker base is localhost or when `ADMIN_EXPOSE_LOGIN_LINK=true` is set explicitly; when exposed, the sign-in status presents a localized **Open admin** link instead of printing the tokenized URL as text. Local development grants bootstrap super-admin access through `ADMIN_BOOTSTRAP_EMAILS` in ignored `worker/.dev.vars`; production seed/recovery users come from `_config.yml` `admin.users` or deployed `ADMIN_USERS_JSON`.
 
-Admin sign-in can require Cloudflare Turnstile. Configure the public widget key in `_config.yml` as `admin.turnstile_site_key`, and store the matching `TURNSTILE_SECRET_KEY` as a Worker secret. When the secret is configured, `POST /admin/auth/start` verifies the challenge token before rate-limit writes, login-nonce writes, or magic-link email delivery. `ADMIN_TURNSTILE_BYPASS=true` is available only for local/test automation and should not be enabled on deployed Workers.
+Admin sign-in can require Cloudflare Turnstile. Configure the public widget key in `_config.yml` as `admin.turnstile_site_key`, and store the matching `TURNSTILE_SECRET_KEY` as a Worker secret. When the secret is configured, `POST /admin/auth/start` verifies the challenge token before rate-limit writes, login-nonce writes, or magic-link email delivery. `ADMIN_TURNSTILE_BYPASS=true` is available only for local/test automation and must not be enabled on deployed Workers.
 
 Admin users have two roles:
 
@@ -60,7 +62,7 @@ The dashboard intentionally separates read-only browsing, local drafting, KV wri
 
 | Action | Storage / side effect |
 |--------|------------------------|
-| Dashboard summary, analytics, reports, supporters, table filtering, and content preview | Read-only; should add zero KV writes |
+| Dashboard summary, analytics, reports, supporters, table filtering, and content preview | Read-only; adds zero KV writes |
 | Dashboard tab/subtab restoration | Browser-local UI state only; remembers the last allowed top-level tab, Settings section, selected Campaigns campaign, and Campaigns subtab without Worker, KV, or GitHub writes |
 | Content editor **Save draft** | Browser-local draft only |
 | Campaign content/settings publish | Worker validates input, writes to GitHub-backed files, triggers the normal rebuild/deploy path, and records an audit event |
@@ -79,7 +81,7 @@ The dashboard intentionally separates read-only browsing, local drafting, KV wri
 
 Normal dashboard reads must stay within the KV-write budget described in `worker/README.md` and covered by tests.
 
-GitHub-backed publish actions require the deployed Worker to have `GITHUB_TOKEN` plus the repo metadata variables configured. Without that token, the dashboard can still browse, draft, preview, manage runtime users, and save referral codes, but publish actions will fail with a GitHub configuration message. Successful publish actions should leave the Publish button disabled again once the saved server state matches the local form state.
+GitHub-backed publish actions require the deployed Worker to have `GITHUB_TOKEN` plus the repo metadata variables configured. Without that token, the dashboard can still browse, draft, preview, manage runtime users, and save referral codes, but publish actions will fail with a GitHub configuration message. Successful publish actions leave the Publish button disabled again once the saved server state matches the local form state.
 
 ## Top-Level Tabs
 
@@ -99,7 +101,13 @@ On reload, the dashboard restores the last allowed top-level tab from browser-lo
 
 Settings are grouped in a left sidebar. Super admins can edit publishable configuration sections and save runtime-only user management separately.
 
-The sidebar preserves Store v1.0.8's order for every shared section. Pool folds Store's separate **Canonical URLs** fields into **Platform** and uses **Campaign runner reports** at the point where Store has its global **Marketing** defaults. The Worker schema keeps **Platform add-ons** at Store's product-specific **Store readiness** position, but the browser routes it to Pool's top-level **Add-ons** tab instead of duplicating it in the Settings sidebar. The resulting visible Settings order is covered by browser automation, while the complete Worker order is covered by the settings contract test:
+The sidebar uses the shared cross-project order where the products overlap.
+Pool folds the separate **Canonical URLs** fields into **Platform** and uses
+**Campaign runner reports** at the global marketing seam. The Worker schema
+keeps **Platform add-ons** at the readiness seam, while the browser routes it to
+Pool's top-level **Add-ons** tab instead of duplicating it in the Settings
+sidebar. Browser automation covers the visible order and the settings contract
+test covers the complete Worker order:
 
 1. Platform
 2. Brand & SEO
@@ -139,7 +147,7 @@ https://www.instagram.com/example
 https://www.imdb.com/name/nm0000000/
 ```
 
-The dashboard sends the current preferred language when loading settings. Browser-side row normalization still owns most Pool admin label localization, but the request keeps the Worker settings schema ready for future server-localized field labels and option text.
+The dashboard sends the current preferred language when loading settings. Browser-side row normalization owns most Pool admin label localization, while the request keeps the Worker settings schema compatible with server-localized field labels and option text.
 
 The local stack can override `SITE_BASE` and `WORKER_BASE` from `_config.local.yml`, but `scripts/sync-worker-config.rb` keeps `CANONICAL_SITE_BASE` and `CANONICAL_WORKER_BASE` pinned to the production values from `_config.yml`. That lets the local dashboard show production publish targets without breaking localhost requests.
 
@@ -149,7 +157,7 @@ Checkout exposes the Stripe publishable key used by browser payment UI. This is 
 
 ### Pricing, Tax, And Shipping
 
-Pricing covers non-secret platform-tip and default flat-fee values. Tax and shipping sections choose providers and non-secret runtime settings. Provider-specific fields are conditional; for example, ZIP.TAX fields should appear only when ZIP.TAX is selected, and USPS fields should appear only when USPS is enabled.
+Pricing covers non-secret platform-tip and default flat-fee values. Tax and shipping sections choose providers and non-secret runtime settings. Provider-specific fields are conditional; for example, ZIP.TAX fields appear only when ZIP.TAX is selected, and USPS fields appear only when USPS is enabled.
 
 Do not store API keys or provider secrets in Settings. Use Worker secrets or ignored local `.dev.vars`.
 
@@ -179,7 +187,7 @@ Plan usage is a super-admin-only read-only section for operational provider limi
 
 The Worker calls Cloudflare and Resend with server-side credentials and returns sanitized plan names, usage numbers, limits, severity, and provider links. Provider tokens never reach the browser, and the endpoint does not write KV or list KV namespaces.
 
-Cloudflare usage uses `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN` plus `CLOUDFLARE_ACCOUNT_ID`. Add Billing Read to the usage token if Workers plan auto-detection should work; otherwise set `PLAN_USAGE_CLOUDFLARE_PLAN`. Resend usage uses `RESEND_API_KEY`; optional plan/limit overrides exist because safe Resend probes can expose rate-limit headers without monthly sent-usage headers.
+Cloudflare usage uses `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN` plus `CLOUDFLARE_ACCOUNT_ID`. Add Billing Read to the usage token to enable Workers plan auto-detection; otherwise set `PLAN_USAGE_CLOUDFLARE_PLAN`. Resend usage uses `RESEND_API_KEY`; optional plan/limit overrides exist because safe Resend probes can expose rate-limit headers without monthly sent-usage headers.
 
 ### Admin Sessions
 
@@ -189,11 +197,11 @@ The current session is labeled and cannot be revoked from its own row. Every oth
 
 ### Audit Log
 
-Audit log is a super-admin-only operational history. It loads when **Settings -> Audit log** opens and supports date, action, exact admin email, campaign, and bounded text filters. Date, action, email, campaign, search, and status/change guidance uses the dashboard's shared localized info-button tooltips; action and campaign filters use readable choices while submitting their canonical internal identifiers. Browser rows expose only the minimized audit projection: time, action, admin, campaign/order/product/source target, status, and changed-field names. Known internal action identifiers are presented as localized plain-language descriptions; future identifiers receive a readable punctuation-free fallback. Targets likewise resolve campaign titles and describe orders, products, platform surfaces, or event sources while retaining the internal value in the cell's diagnostic title. Generated `local-no-user-<timestamp>` campaign slugs display as **Local test campaign (unassigned)** rather than exposing their implementation timestamp. Raw identifiers remain authoritative for filtering and CSV export.
+Audit log is a super-admin-only operational history. It loads when **Settings -> Audit log** opens and supports date, action, exact admin email, campaign, and bounded text filters. Date, action, email, campaign, search, and status/change guidance uses the dashboard's shared localized info-button tooltips; action and campaign filters use readable choices while submitting their canonical internal identifiers. Browser rows expose only the minimized audit projection: time, action, admin, campaign/order/product/source target, status, and changed-field names. Known internal action identifiers are presented as localized plain-language descriptions; unknown identifiers receive a readable punctuation-free fallback. Targets likewise resolve campaign titles and describe orders, products, platform surfaces, or event sources while retaining the internal value in the cell's diagnostic title. Generated `local-no-user-<timestamp>` campaign slugs display as **Local test campaign (unassigned)** rather than exposing their implementation timestamp. Raw identifiers remain authoritative for filtering and CSV export.
 
 **Status / changes** explains the outcome an event reported and names any fields it changed. Events are not required to report either value, so **No additional details** is a valid result rather than a loading error. The Film Stripe summary adapter's internal `empty` outcome is shown as **No matching summary data**: the read completed, but none of its mapped Film Stripe references had matching Pool summary metrics.
 
-**Export filtered CSV** reuses the active filters and the authenticated private/no-store download path. Filters reflow within their settings card, and audit rows become labeled record cards on narrow screens instead of widening the page. CSV cells that begin like spreadsheet formulas are escaped. Treat exports as private operational records: they can contain additional stored audit details and should not be attached to public issues or release evidence without review.
+**Export filtered CSV** reuses the active filters and the authenticated private/no-store download path. Filters reflow within their settings card, and audit rows become labeled record cards on narrow screens instead of widening the page. CSV cells that begin like spreadsheet formulas are escaped. Treat exports as private operational records: they can contain additional stored audit details and must not be attached to public issues or release evidence without review.
 
 ### Design
 
@@ -218,15 +226,16 @@ Rules:
 
 This section reports configured/missing status for runtime credentials only. It must not display or edit secret values.
 
-## Store v1.0.8 Dashboard Carryover Review
+## Cross-Project Dashboard Boundary
 
-The Store dashboard is a source of reusable operational patterns, not a second product model. The v1.0.8 review produced this mapping:
+The Store dashboard is a source of reusable operational patterns, not a second
+product model. The current Pool mapping is:
 
 | Store surface | Pool decision |
 | --- | --- |
 | Admin sessions | Carried over by exposing Pool's existing privacy-minimized review/revocation APIs in Settings |
 | Audit log and filtered CSV | Carried over by exposing Pool's existing searchable audit APIs, with a campaign filter and Pool-specific target fields |
-| Settings section order | Shared sidebar sections match Store v1.0.8; Pool runner reports occupy the marketing seam, while the readiness-seam platform add-ons schema is routed to Pool's top-level Add-ons tab |
+| Settings section order | Shared sidebar sections use the cross-project order; Pool runner reports occupy the marketing seam, while the readiness-seam platform add-ons schema is routed to Pool's top-level Add-ons tab |
 | Merchant return policy controls | Adapted to Pool's current no-returns policy: editable country plus read-only policy type; unsupported finite-return fields stay absent |
 | Canonical URLs | Already present in Settings -> Platform; no duplicate section |
 | Plan usage, secrets, runtime diagnostics, performance settings, users | Already present in Pool and retained |
@@ -235,7 +244,9 @@ The Store dashboard is a source of reusable operational patterns, not a second p
 | Global Store marketing defaults | Not copied: Pool already has campaign-scoped Marketing links, shared drafts, referrals, QR codes, embeds, and reminder controls |
 | Products, coupons, downloads, tickets, orders, and reconciliation UI | Not copied: Pool's supported equivalents are Campaigns, Add-ons, Supporters, Reports, settlement, and pledge reconciliation |
 
-Future carryovers should continue to reuse Pool's existing auth, request, status, table, localization, config, and test helpers rather than introducing Store-named storage or browser-only sources of truth.
+When reusing another Dust Wave admin pattern, use Pool's existing auth, request,
+status, table, localization, config, and test helpers; do not introduce
+Store-named storage or browser-only sources of truth.
 
 ## Platform Add-ons
 
@@ -392,7 +403,7 @@ The Supporters tab shows role-scoped supporter rows with live filtering, sorting
 
 ## Analytics
 
-Analytics is derived from existing pledge indexes and campaign summaries. It should not create analytics-specific KV writes on view.
+Analytics is derived from existing pledge indexes and campaign summaries. It does not create analytics-specific KV writes on view.
 
 The dashboard shows cards for pledge totals, revenue categories, net revenue after allocated processor fees, tax, shipping, Stripe fees, pledge status, supporters, average pledge, campaign add-ons, referral attribution, UTM source/medium/campaign/content, fulfillment type, language, and other pledge-derived breakdowns. Money values display exact cents.
 
@@ -479,10 +490,10 @@ The dashboard follows these project rules:
 - Role and campaign scoping are enforced server-side.
 - Secrets are never stored in `_config.yml`, campaign YAML, dashboard drafts, KV user records, or GitHub commits.
 - Preview access emails are stored only in short-lived Worker KV allowlists, not in campaign Markdown, public JSON, sitemap output, or generated page metadata.
-- Changes that add bulk messaging, marketing distribution, analytics, role changes, public visibility, or new data retention should include the [Ethical Risk review](./ETHICAL_RISK.md).
-- Shared admin label/help components should be used for new fields.
-- Hidden editor chrome should not be keyboard-reachable.
-- Sortable tables should expose `aria-sort`.
+- Changes that add bulk messaging, marketing distribution, analytics, role changes, public visibility, or new data retention require the [Ethical Risk review](./ETHICAL_RISK.md).
+- Use shared admin label/help components for new fields.
+- Hidden editor chrome is not keyboard-reachable.
+- Sortable tables expose `aria-sort`.
 
 See `docs/SECURITY.md` and `docs/ACCESSIBILITY.md` for the detailed standards.
 
@@ -535,7 +546,3 @@ Check the campaign Markdown front matter and the Worker settings response. Inval
 ### Reports, Supporters, Or Analytics Show Missing Index Messages
 
 Dashboard read endpoints rely on `campaign-pledges:{slug}` indexes and intentionally do not fall back to expensive namespace scans. Run the projection repair/rebuild tooling explicitly when an old campaign is missing its index.
-
----
-
-_Last updated: July 14, 2026_

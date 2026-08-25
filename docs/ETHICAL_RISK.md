@@ -19,7 +19,7 @@ Small copy, style, or docs-only changes usually do not need a full review unless
 
 ## Operating Principles
 
-- Consent should be explicit where supporter attention, data, or money is involved.
+- Consent is explicit where supporter attention, data, or money is involved.
 - The Worker remains authoritative for totals, state, permissions, and persistence; browser UI is an explanation layer, not a trust boundary.
 - Collect only data the current product needs, store it only where documented, and keep retention/restore behavior explainable.
 - Prefer honest, state-aware public metadata over growth tricks, vague scarcity, or misleading social previews.
@@ -34,7 +34,7 @@ Use these risk zones as prompts during design, implementation, and review.
 
 | Risk zone | How it shows up in The Pool | Best practice |
 |-----------|-----------------------------|---------------|
-| Truth, disinformation, and propaganda | Campaign claims, diary posts, Blast, share cards, SEO metadata, embeds, social links, and generated previews can spread misleading public claims quickly. | Public metadata should match visible page content and current campaign state. Do not inflate funding status, scarcity, deadlines, creator identity, or tax/shipping certainty. |
+| Truth, disinformation, and propaganda | Campaign claims, diary posts, Blast, share cards, SEO metadata, embeds, social links, and generated previews can spread misleading public claims quickly. | Public metadata must match visible page content and current campaign state. Do not inflate funding status, scarcity, deadlines, creator identity, or tax/shipping certainty. |
 | Addiction and attention pressure | Reminders, countdowns, limited inventory, milestone emails, and marketing dashboards can drift into pressure tactics. | Keep reminders opt-in and bounded. Avoid infinite loops, manipulative urgency, hidden defaults, or notification volume that exists mainly to maximize attention. |
 | Economic and asset inequality | Fees, tips, shipping, tax, add-ons, limited tiers, and provider limits can affect supporters and creators unevenly. | Show subtotal, tax, shipping, platform tip, and total clearly. Keep platform add-on revenue separate from campaign progress. Test low-bandwidth, mobile, localized, and keyboard-only paths. |
 | Machine ethics and algorithmic bias | Analytics, fraud checks, future recommendations, automated moderation, and provider readiness signals can become opaque decision systems. | Keep automated decisions explainable, auditable, and reversible where they affect access, pricing, visibility, or admin action. Avoid scoring users or campaigns without clear recourse. |
@@ -92,44 +92,17 @@ Treat these as release blockers until explicitly resolved:
 - Checkout and payment changes: start from [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md), [WORKFLOWS.md](./WORKFLOWS.md), and [SECURITY.md](./SECURITY.md). Verify canonical totals, idempotency, supporter understanding, and recovery paths.
 - Email and reminders: start from [EMAIL.md](./EMAIL.md). Verify explicit consent, audience scope, dry runs, localized copy, suppression/unsubscribe behavior, and no-send evidence.
 - Admin dashboard changes: start from [DASHBOARD.md](./DASHBOARD.md). Document whether the feature is read-only, browser-local, KV-backed, or GitHub-backed, and keep role/campaign scoping Worker-enforced.
-- Public sharing, SEO, and embeds: start from [SEO.md](./SEO.md) and [EMBEDS.md](./EMBEDS.md). Public previews should be truthful, state-aware, and never leak protected-preview or tokenized data.
+- Public sharing, SEO, and embeds: start from [SEO.md](./SEO.md) and [EMBEDS.md](./EMBEDS.md). Public previews are truthful, state-aware, and never leak protected-preview or tokenized data.
 - Accessibility and localization: start from [ACCESSIBILITY.md](./ACCESSIBILITY.md) and [I18N.md](./I18N.md). Review who is left out when copy, controls, or evidence only work in one language, viewport, input mode, or ability profile.
-- Performance and prefetching: start from [PERFORMANCE.md](./PERFORMANCE.md). Speculative loading should stay public-only and should not pressure user action or background private flows.
+- Performance and prefetching: start from [PERFORMANCE.md](./PERFORMANCE.md). Speculative loading stays public-only and does not pressure user action or background private flows.
 - Backups, exports, and restore paths: document data classes, PII minimization, retention, restore order, and duplicate-send/duplicate-charge risks before adding new backup behavior.
 
-## Future-Proofing Habits
+## Maintenance Habits
 
 - Add ethical red flags to PRs early, while changes are still easy to reshape.
 - Accept ethical-risk reports the same way the project accepts security or accessibility reports: specific, reproducible, and tied to a realistic harm.
 - Keep platform health visible through operational evidence such as failed sends, rate-limit pressure, projection drift, accessibility coverage, i18n completeness, provider readiness, and abuse-path tests.
 - Revisit this guide when the product adds new audiences, new data uses, new automation, or new distribution channels.
 
-## v1.1.0 Review Record
-
-- Feature: variant-specific add-on pricing plus production-quality/admin diagnostics hardening
-- Affected users: supporters choosing add-ons, supporters modifying pledges, campaign creators, super admins, and operators
-- Relevant risk zones: economic inequality/user understanding, implicit trust, and surveillance/data control
-- What could go wrong: a browser could understate a selected price; a catalog edit could silently reprice an old pledge; a blank or zero override could be misread; performance diagnostics could retain sensitive request data; a public-cache optimization could leak a private response
-- Data collected or exposed: no new supporter fields or telemetry payloads; diagnostics flatten existing bounded aggregate histograms only
-- Consent, opt-out, and recourse: supporters see the selected variant price before checkout and can remove/change it; existing pledges retain their booked line price unless the variant changes; admin price changes use the existing preview/publish and audit model
-- Abuse/misuse mitigations: Worker-canonical price resolution, historical persisted `unitPrice`, non-negative validation, explicit zero handling, private/no-store cache gates, bounded/redacted timing summaries, and no Store download/R2 systems
-- Accessibility/i18n impact: new admin labels/help exist in English and Spanish; automated locale/accessibility checks remain gates; human screen-reader and native-Spanish review remain optional evidence
-- Tests or evidence: shared utility, cart, Manage Pledge, Worker checkout/modification, admin validation/YAML, performance evaluator, cache-policy, observability, i18n, and release evidence coverage
-- Follow-ups accepted: no product migration is needed; Workers Cache remains disabled until representative evidence proves the configured p95 improvement
-
-## v1.1.1 Review Record
-
-- Feature: creator media workflow plus Stripe settlement/reconciliation and durable email delivery hardening
-- Affected users: supporters whose cards settle or whose email is delivered/suppressed, campaign creators selecting media, super admins, and recovery operators
-- Relevant risk zones: money movement, consent/communications, privacy/retention, accessibility, and concentrated admin power
-- What could go wrong: an ambiguous processor timeout could cause a duplicate charge; stale settlement work could be marked complete; an email retry could duplicate a campaign message; bounce data could become a shadow audience profile; a creator could publish inaccessible or oversized media; replace could overwrite another campaign's asset
-- Data collected or exposed: redacted Stripe IDs/status/timing and short-lived frozen email payloads are new operational state; processor journal rows exclude raw provider payloads and supporter email, delivery evidence is minimized, and campaign/global suppression uses email hashes
-- Consent, opt-out, and recourse: campaign updates include signed one-click unsubscribe checked immediately before delivery; payment mail remains transactional; creators explicitly mark decorative images and see known references/warnings before replace
-- Abuse/misuse mitigations: deterministic idempotency, pre-charge settlement persistence, needs-attention stops after the provider horizon, reconciliation breaks, no manual ambiguous-charge endpoint, role/campaign/SHA-scoped media replacement, and no Resend Contacts/Broadcast audience sync
-- Accessibility/i18n impact: accessible media type tabs, searchable text metadata, required meaningful alt text, explicit decorative state, and aligned English/Spanish copy; no human Spanish review is claimed
-- Tests or evidence: settlement crash/resume, Stripe client errors/idempotency, outbox retries/suppression/webhook signatures, authenticated reconciliation, media manifest/picker/editor, 127 security tests, 107 browser tests, and full release evidence
-- Follow-ups accepted: configure the signed Resend delivery webhook at deployment; maker/checker recovery stays disabled until two distinct super-admin operators exist
-
----
-
-_Last updated: July 12, 2026_
+Release-specific ethical review records belong with the corresponding
+[release evidence](./release-evidence/) rather than in this current-state guide.

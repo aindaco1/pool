@@ -18,7 +18,7 @@ npm run podman:doctor
 
 That is the default local development path. It keeps the standard local ports and local state files, but runs Jekyll and Wrangler inside containers so new forks do not need host Ruby or host Wrangler just to boot the app.
 
-The Podman Worker container runs Node 24, matching GitHub Actions. Host-only Worker development should use Node 24 when possible; Node 22 is the minimum supported runtime for Wrangler 4.
+The Podman Worker container runs Node 24, matching GitHub Actions. Host-only Worker development uses Node 24 when possible; Node 22 is the minimum supported runtime for Wrangler 4.
 
 If you need the host-only path instead:
 
@@ -41,7 +41,7 @@ npm run podman:doctor
 npm run podman:self-check
 ```
 
-`./scripts/test-e2e.sh --podman` is now fully automated browser coverage. `./scripts/test-checkout.sh --podman` remains the manual interactive helper when you want to step through a real checkout in your own browser.
+`./scripts/test-e2e.sh --podman` is fully automated browser coverage. `./scripts/test-checkout.sh --podman` remains the manual interactive helper when you want to step through a real checkout in your own browser.
 
 Clear cache if styles don't update:
 ```bash
@@ -58,7 +58,7 @@ bundle exec jekyll clean
 6. `docs/ETHICAL_RISK.md` — Ethical risk review prompts for data, money, messaging, automation, public sharing, and admin power
 7. `docs/DEV_NOTES.md` — Integration notes, content model & gotchas
 8. `docs/TESTING.md` — Full testing guide (includes secrets setup)
-9. `docs/ROADMAP.md` — Planned features
+9. `docs/ROADMAP.md` — Prospective work only
 10. `docs/DASHBOARD.md` — Admin dashboard editing and operations
 
 For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `docs/SECURITY.md`, and `docs/SEO.md`; the admin shell has explicit requirements for keyboard access, Spanish strings, input normalization, and `noindex`.
@@ -79,42 +79,12 @@ For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `do
 
 ---
 
-## Current Status (June 2026)
+## Current Project State
 
-✅ **Completed:**
-- Jekyll + first-party cart site structure
-- Sass styling system (shared modular partials, 8px grid)
-- Money formatting plugin (`$3,800` style)
-- Campaign cards, two-column layout, hero variants
-- Production phases, community decisions, production diary
-- Pledge UX, cart icon, first-party checkout review
-- Native first-party Stripe payment flow in the existing checkout sidecar
-- No-account pledge management (magic links, `/manage/` page)
-- On-site `Update Card` flow in `/manage/`
-- Supporter-only community page with voting
-- Non-stackable tier support (hide quantity controls in cart)
-- Mobile hamburger/cart overlay handling
-- Cloudflare Worker (pledge storage, stats, inventory, emails)
-- Worker scheduled task for auto-settle at midnight in the configured platform timezone
-- Aggregated charging (one charge per supporter per campaign)
-- Support items and custom amounts data flow (cart → Worker → KV → stats)
-- Countdown timer pre-rendering (no "00 00 00 00" flash)
-- Multi-tier pledge support (`additionalTiers`)
-- Unit tests (Vitest) and E2E tests (Playwright)
-- Fully automated checkout E2E coverage
-- Production campaign launch (Hand Relations)
-- Podman-backed local dev/testing path
-- More explicit inventory overselling protection via Durable Object coordination
-- Private admin dashboard for role-scoped campaign editing, settings, add-ons, analytics, reports, supporters, marketing links, and user management
-- Completed typography, elements, and layouts redesign across public pages, campaign surfaces, checkout, and Manage Pledge
-- Configurable platform timezone for campaign deadlines, countdowns, reports, lifecycle automation, and settlement checks
-- Upcoming-campaign launch reminders with Turnstile, dedupe, unsubscribe, and shared Resend delivery
-- Public-page performance hardening, generated asset minification, conservative same-origin prefetching, and responsive media derivatives
-- Dashboard media workflow hardening for image/video optimization dispatch, publish-time media cleanup, and diary anchor/rendering fixes
-
-🚧 **Active focus:**
-- Merge-gate discipline and release-readiness audits across accessibility, customization, dashboard, i18n, performance, security, and SEO
-- Tax calculator depth, richer campaign marketing tools, and post-release hardening for protected campaign previews and new campaign creation
+The [README](../README.md) describes the current user-facing and operational
+baseline. The [Changelog](../CHANGELOG.md) records completed and unreleased
+changes, while the [Roadmap](./ROADMAP.md) contains prospective work. Do not
+maintain a second dated capability or active-focus list in this guide.
 
 ---
 
@@ -160,7 +130,7 @@ For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `do
 - **Cloudflare Worker**: Same secrets as env vars; set `SITE_BASE`
 - **Stripe**: For hosted environments, create a webhook to `https://pledge.dustwave.xyz/webhooks/stripe`
 - **Local custom checkout**: add `STRIPE_PUBLISHABLE_KEY_TEST` to `worker/.dev.vars`
-- **Admin dashboard**: local dev grants bootstrap super-admin access through `ADMIN_BOOTSTRAP_EMAILS` in ignored `worker/.dev.vars`; fork admins should put production access in `_config.yml` `admin.users`, `ADMIN_USERS_JSON`, or the dashboard Users screen. The Users screen saves to KV, not GitHub.
+- **Admin dashboard**: local dev grants bootstrap super-admin access through `ADMIN_BOOTSTRAP_EMAILS` in ignored `worker/.dev.vars`; fork admins put production access in `_config.yml` `admin.users`, `ADMIN_USERS_JSON`, or the dashboard Users screen. The Users screen saves to KV, not GitHub.
 
 See [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md), [EMAIL.md](EMAIL.md), and [TESTING.md](TESTING.md) for the full payment, email, and secrets references.
 
@@ -192,7 +162,3 @@ See [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md), [EMAIL.md](EMAIL.md), and [TES
 ## Contact & Ownership
 
 Use the project docs and existing git history for context, and keep changes scoped and well-tested before opening a PR.
-
----
-
-_Last updated: June 3, 2026_

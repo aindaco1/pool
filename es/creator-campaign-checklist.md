@@ -6,7 +6,7 @@ permalink: /es/creator-campaign-checklist/
 lang: es
 indexable: false
 translation_key: creator_campaign_checklist
-last_modified_at: 2026-08-06
+last_modified_at: 2026-08-25
 ---
 
 <div class="creator-checklist-layout">
@@ -36,7 +36,7 @@ La lista cubre:
 
 ## Notas de la plataforma actual
 
-Esta lista refleja el comportamiento para creadores de la versión actual, **v1.2.20**. Las mejoras compartidas de Platform y Jekyll fortalecen el runtime, el build y las demostraciones locales del producto sin cambiar que The Pool conserva el control del contenido, la publicación, el fulfillment y los accesos:
+Esta lista refleja el comportamiento actual para creadores. Las bases compartidas de Platform y Jekyll no cambian que The Pool conserva el control del contenido, la publicación, el fulfillment y los accesos:
 
 - las personas creadoras y sus equipos pueden tener acceso específico al panel para preparar campañas, editar contenido, revisar vistas previas, reportes, analytics, marketing y Blast sin acceso directo al repositorio
 - las personas superadministradoras inicializan campañas de solo preview, asignan o crean usuarios de campaña y manejan controles de plataforma; el trabajo diario de preparación queda en manos del equipo asignado
@@ -60,7 +60,7 @@ Esta lista refleja el comportamiento para creadores de la versión actual, **v1.
 - al recargar el panel, los equipos de campaña vuelven a su último tab permitido, campaña seleccionada y subtab de Campaigns para retomar trabajo de contenido, Marketing o Blast en el mismo lugar
 - el checkout puede recoger consentimiento explícito para un solo recordatorio de checkout abandonado, separado de recordatorios de lanzamiento y blasts de campaña; los equipos de campaña pueden revisar salud agregada de recordatorios y usar controles de supresión limitados sin ver PII del recordatorio
 - una campaña puede publicar opcionalmente una página de producto localizada e indexable para su nivel físico destacado, pero solo con precio positivo, imagen, descripción y fecha exacta esperada de disponibilidad; esto no crea por sí solo una cuenta de Merchant Center ni garantiza presencia en Google Shopping
-- los Términos públicos ahora explican la política predeterminada de venta final/sin devoluciones, el proceso para artículos dañados, defectuosos, incorrectos o faltantes y la responsabilidad de comunicar cambios importantes de producción o fulfillment
+- los Términos públicos explican la política predeterminada de venta final/sin devoluciones, el proceso para artículos dañados, defectuosos, incorrectos o faltantes y la responsabilidad de comunicar cambios importantes de producción o fulfillment
 - las mejoras de performance hacen más estable la primera carga, incluidos embeds hero de YouTube diferidos y entrega responsiva de imágenes, pero las campañas aún necesitan media optimizada y copy conciso
 
 ## Versión rápida
@@ -81,7 +81,7 @@ Esta lista refleja el comportamiento para creadores de la versión actual, **v1.
 - nombre, precio y descripción de cada nivel
 - correos de reportes si la persona responsable quiere recibir reportes automáticos
 - correos de editoras o editores del panel, si el equipo creador editará directamente
-- correos opcionales de personas revisoras que deberían ver el borrador privado antes del lanzamiento
+- correos opcionales de personas revisoras que verán el borrador privado antes del lanzamiento
 - decisión sobre recordatorios de lanzamiento para campañas próximas: formulario público, sin formulario o lanzamiento sin periodo previo
 
 ### Muy recomendado
@@ -148,8 +148,8 @@ La campaña debe explicar rápido:
 | Nivel destacado | Recomendado | El nivel de entrada más claro. |
 | Correos de reportes | Recomendado | Correos que recibirán reportes de pledges y fulfillment. |
 | Responsable de fulfillment | Recomendado | Quién entrega las recompensas si la campaña se cobra con éxito. |
-| Editores del panel | Recomendado | Correos autorizados del equipo creador que deberían tener acceso solo a esta campaña. |
-| Personas revisoras | Opcional | Correos de confianza que deberían recibir un enlace de vista previa protegida antes del lanzamiento público. |
+| Editores del panel | Recomendado | Correos autorizados del equipo creador que tienen acceso solo a esta campaña. |
+| Personas revisoras | Opcional | Correos de confianza que reciben un enlace de vista previa protegida antes del lanzamiento público. |
 | Recordatorios de lanzamiento | Opcional | Si la campaña tiene periodo previo, decidir si se recogerán correos para un único recordatorio cuando abra. |
 | Página de Shopping del nivel destacado | Opcional | Mantenerla deshabilitada salvo que el nivel destacado sea físico y tenga precio, imagen, descripción, tratamiento de envío, copy de políticas y fecha exacta esperada de disponibilidad. |
 
@@ -241,7 +241,7 @@ El pipeline de media puede crear variantes WebP de `320w`, `480w`, `640w`, `960w
 
 Cada imagen pública con significado necesita alt text útil. Una imagen puramente decorativa puede llevar alt vacío solo si se selecciona de forma explícita **Imagen decorativa**; no uses esa opción para evitar describir contenido importante.
 
-El video debería responder:
+El video responde:
 
 - quién eres tú y quién es el equipo
 - qué es el proyecto
@@ -424,7 +424,7 @@ Prepara:
 
 Los botones de compartir usan la URL pública de campaña y texto por estado donde se permite. Facebook y otros destinos centrados en preview dependen principalmente del Open Graph title, description e imagen de la campaña.
 
-Prueba los QR desde la cámara de un teléfono real antes de imprimirlos o compartirlos ampliamente. El copy de Blast debe ser conciso, usar pocas imágenes y enlazar media alojada por la campaña en lugar de hotlinks remotos. Los equipos que operan su propio fork deberían ensayar `npm run setup:deploy -- --mode=production --dry-run` antes del lanzamiento para revisar preparación de proveedores, reutilización de namespaces KV, secretos y pasos de deploy antes de que lleguen patrocinadores.
+Prueba los QR desde la cámara de un teléfono real antes de imprimirlos o compartirlos ampliamente. El copy de Blast debe ser conciso, usar pocas imágenes y enlazar media alojada por la campaña en lugar de hotlinks remotos. Los equipos que operan su propio fork ensayan `npm run setup:deploy -- --mode=production --dry-run` antes del lanzamiento para revisar preparación de proveedores, reutilización de namespaces KV, secretos y pasos de deploy antes de que lleguen patrocinadores.
 
 Los mensajes de Blast/announcement live, diario y milestone incluyen unsubscribe de un clic por campaña; no deben presentarse como correo transaccional obligatorio. En producción, el envío masivo entra a una cola durable con reintentos limitados, así que una acción live exitosa puede significar que el mensaje fue aceptado para entrega, no que ya llegó a cada inbox.
 

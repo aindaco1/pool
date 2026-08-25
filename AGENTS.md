@@ -13,7 +13,8 @@ Read it alongside:
 - [docs/SECURITY.md](./docs/SECURITY.md) for security boundaries and release checks
 - [docs/BACKUP_RESTORE.md](./docs/BACKUP_RESTORE.md) for backup, restore, and disaster recovery
 - [docs/TESTING.md](./docs/TESTING.md) for local verification and merge gates
-- [docs/ROADMAP.md](./docs/ROADMAP.md) for planned and completed work
+- [docs/ROADMAP.md](./docs/ROADMAP.md) for prospective work only
+- [CHANGELOG.md](./CHANGELOG.md) and [docs/release-evidence/](./docs/release-evidence/) for completed release history and verification records
 
 ## Project shape
 
@@ -136,6 +137,8 @@ Shared system strings belong in `_data/i18n/<lang>.yml`; creator-authored campai
 ## Documentation map
 
 - Fork configuration: [docs/CUSTOMIZATION.md](./docs/CUSTOMIZATION.md)
+- Release history: [CHANGELOG.md](./CHANGELOG.md)
+- Prospective work: [docs/ROADMAP.md](./docs/ROADMAP.md)
 - Payments and settlement: [docs/PAYMENT_PROCESSOR.md](./docs/PAYMENT_PROCESSOR.md)
 - Add-on products and variant pricing: [docs/ADD_ON_PRODUCTS.md](./docs/ADD_ON_PRODUCTS.md)
 - Email: [docs/EMAIL.md](./docs/EMAIL.md)
@@ -161,5 +164,6 @@ Shared system strings belong in `_data/i18n/<lang>.yml`; creator-authored campai
 - Reuse an existing configuration surface or helper before inventing another.
 - Never silently drop locale, embed, share-preview, private-cache, or historical-price behavior.
 - Preserve unrelated user changes and stage only files in scope.
+- Keep current-state docs in present tense and grounded in verified behavior. Put proposals and deferred work only in the roadmap, and put completed release history only in the changelog or release evidence.
 
 When uncertain, make the smallest change that keeps the site and Worker aligned, prove it with the narrowest meaningful test, and run the broader gate when warranted.

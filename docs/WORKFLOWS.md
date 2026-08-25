@@ -90,7 +90,7 @@ Pledges are stored in Cloudflare KV. Key patterns:
 | `admin-marketing-referrals:{campaignSlug}` | Saved referral code and QR source metadata for the dashboard Marketing tab |
 | `admin-marketing-draft:{campaignSlug}:{surface}` | Explicit shared Marketing/Blast draft with 7-day TTL and revision conflict protection |
 
-Scarce-tier reservations and committed claim state now live in the per-campaign Durable Object coordinator rather than KV. `tier-inventory:{campaignSlug}` remains the public projection used by `/inventory/:slug` and `/live/:slug`.
+Scarce-tier reservations and committed claim state live in the per-campaign Durable Object coordinator rather than KV. `tier-inventory:{campaignSlug}` remains the public projection used by `/inventory/:slug` and `/live/:slug`.
 
 **Pledge record:**
 ```json
@@ -179,19 +179,19 @@ Stateless HMAC-signed tokens (no database needed):
 3. Resolve the authorized `orderId`
 4. Fetch pledge from KV and cross-check email + campaign
 
-Each token only authorizes its own order. A valid link no longer grants email-wide access to every pledge on the same address, and a valid token without a real backing pledge now fails closed instead of returning a synthetic placeholder.
+Each token only authorizes its own order. A valid link does not grant email-wide access to every pledge on the same address, and a valid token without a real backing pledge fails closed instead of returning a synthetic placeholder.
 
 ## Supporter Trust Boundaries
 
-The pledge lifecycle should remain understandable to a supporter who never reads the code. Use [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a workflow change affects data collection, money, reminders, campaign visibility, admin power, or public sharing.
+The pledge lifecycle remains understandable to a supporter who never reads the code. Use [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a workflow change affects data collection, money, reminders, campaign visibility, admin power, or public sharing.
 
 Trust-sensitive workflow rules:
 
 - Browser UI can preview and explain state, but the Worker must canonicalize money, inventory, permissions, and persistence.
-- Supporters should be able to distinguish estimated vs final tax/shipping, draft vs committed pledge state, active vs closed campaigns, and reminder signup vs required checkout steps.
-- Email reminders and campaign updates should be opt-in or pledge-scoped, deduped, suppressible where appropriate, and sent through dry-run-aware paths.
-- Private, tokenized, preview, admin, and supporter-only routes should not become indexable, prefetched, or share-card targets.
-- Bulk or automated workflows should have bounded batches, audit records, idempotency, and operator evidence before live sends or mutations.
+- Supporters can distinguish estimated vs final tax/shipping, draft vs committed pledge state, active vs closed campaigns, and reminder signup vs required checkout steps.
+- Email reminders and campaign updates are opt-in or pledge-scoped, deduped, suppressible where appropriate, and sent through dry-run-aware paths.
+- Private, tokenized, preview, admin, and supporter-only routes do not become indexable, prefetched, or share-card targets.
+- Bulk or automated workflows use bounded batches, audit records, idempotency, and operator evidence before live sends or mutations.
 
 ---
 
@@ -228,15 +228,15 @@ If custom checkout is selected but the current environment does not have a Strip
 7. On persistence, Worker fetches any temp metadata, extracts shipping details from Stripe, computes `subtotal + tax + shipping + tip`, persists one pledge per campaign, and confirms any held limited-tier reservations through the per-campaign Durable Object coordinator
 8. After persistence succeeds, the client invalidates campaign live-stat caches and writes a short-lived refresh marker so restored tabs and follow-up page loads fetch fresh totals
 
-Limited-tier availability decisions now come from the coordinator's reservation-aware state on write paths, while `/inventory/:slug` and `/live/:slug` continue reading the public KV projection only.
+Limited-tier availability decisions come from the coordinator's reservation-aware state on write paths, while `/inventory/:slug` and `/live/:slug` continue reading the public KV projection only.
 
-The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`. `/checkout-intent/start` now reserves scarce inventory before the payment step completes, and persistence confirms those reservations. Older campaigns do not need a migration job because claimed inventory can rebuild from pledge truth, and successful persistence can still fall back to a fresh coordinator claim if no preexisting reservation exists.
+The Worker does not trust client-submitted tier names, quantities, support-item amounts, or `amountCents`. `/checkout-intent/start` reserves scarce inventory before the payment step completes, and persistence confirms those reservations. Older campaigns do not need a migration job because claimed inventory can rebuild from pledge truth, and successful persistence can still fall back to a fresh coordinator claim if no preexisting reservation exists.
 
 ## Content Rendering Safety
 
 - Long-form campaign text is sanitized before Markdown rendering and then post-processed to neutralize unsafe link schemes.
 - Structured embeds are only rendered when their `src` resolves to an exact approved provider origin/path.
-- Campaign-content audits still protect `_campaigns/*.md`, but the render layer enforces the same rules so forks and future content sources do not rely on audits alone.
+- Campaign-content audits still protect `_campaigns/*.md`, but the render layer enforces the same rules so all content sources receive runtime protection rather than relying on audits alone.
 
 ### `POST /webhooks/stripe`
 Handle `checkout.session.completed`:
@@ -581,8 +581,8 @@ A per-campaign array of order IDs (`campaign-pledges:{slug}`) is maintained auto
 - Added on pledge creation (webhook) and recovery (`/admin/recover-checkout`)
 - Removed on pledge cancellation
 - Can be rebuilt: `POST /admin/campaign-index/rebuild/:slug`
-- Stats and inventory recalculation now also repair stale indexes if the stored array no longer matches the active pledge records
-- Drift can now be checked without mutation via `POST /stats/:slug/check` or `POST /admin/projections/check`
+- Stats and inventory recalculation also repair stale indexes if the stored array no longer matches the active pledge records
+- Drift can be checked without mutation via `POST /stats/:slug/check` or `POST /admin/projections/check`
 
 **Key behaviors:**
 - Cancelled pledges are never charged
@@ -727,7 +727,3 @@ All emails show exact amounts with 2 decimal places (no rounding).
 - Auto-unlock when `pledged_amount >= threshold`
 - Display as `achieved` or `locked`
 - Optional: gate tiers with `requires_threshold`
-
----
-
-_Last updated: June 18, 2026_

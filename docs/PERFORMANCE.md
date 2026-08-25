@@ -1,6 +1,6 @@
 # Performance
 
-The Pool is a static-first crowdfunding platform with a Cloudflare Worker for mutations, live reads, and admin operations. Performance work should preserve that shape: public pages should be fast from static HTML, heavy application code should load only when a user needs it, and speculative work should stay conservative enough that it never makes checkout, admin, or supporter flows less reliable.
+The Pool is a static-first crowdfunding platform with a Cloudflare Worker for mutations, live reads, and admin operations. Performance work preserves that shape: public pages are fast from static HTML, heavy application code loads only when a user needs it, and speculative work stays conservative enough that it never makes checkout, admin, or supporter flows less reliable.
 
 This guide covers the current platform performance model, the knobs forks can tune, and the validation expected before shipping performance changes.
 
@@ -53,7 +53,7 @@ Important repo surfaces:
 - [`scripts/audit-runtime-performance.mjs`](../scripts/audit-runtime-performance.mjs): authenticated p95 evidence for configured Worker operations
 - [`scripts/sync-worker-config.rb`](../scripts/sync-worker-config.rb): site-to-Worker config mirroring
 
-Admin-only Sass is emitted as `assets/admin.css` and loaded only by the admin layout, keeping dashboard CSS off public campaign pages. The infrequently used Admin sessions and Audit log renderer lives in `assets/js/admin-settings-review.js` and loads on demand when either Settings section opens; both that module and the initial `admin-dashboard.js` bundle have named executable ceilings in `config/performance-budgets.json`. Adobe display-font CSS is activated after DOM readiness with a no-script fallback; Inter remains the body-font dependency. Workers Cache remains disabled for the Pool admin read model until a representative benchmark proves at least a 40% p95 improvement. Store v1.0.7 did not meet that threshold, so parity means carrying the evidence gate—not enabling the cache switch by assumption.
+Admin-only Sass is emitted as `assets/admin.css` and loaded only by the admin layout, keeping dashboard CSS off public campaign pages. The infrequently used Admin sessions and Audit log renderer lives in `assets/js/admin-settings-review.js` and loads on demand when either Settings section opens; both that module and the initial `admin-dashboard.js` bundle have named executable ceilings in `config/performance-budgets.json`. Adobe display-font CSS is activated after DOM readiness with a no-script fallback; Inter remains the body-font dependency. Workers Cache remains disabled for the Pool admin read model until a representative benchmark proves at least a 40% p95 improvement. The evidence threshold, not another product's cache choice, controls Pool enablement.
 
 Worker performance summaries retain bounded latency histograms and expose approximate p50/p95/p99 alongside count, average, minimum, maximum, and last duration. They do not retain request bodies or customer identifiers.
 
@@ -80,7 +80,7 @@ The unit suite tests all budget evaluators without network access. Lighthouse us
 
 ## Critical Rendering
 
-Public campaign pages should avoid layout shifts and late-discovered critical resources.
+Public campaign pages avoid layout shifts and late-discovered critical resources.
 
 Current guardrails:
 
@@ -90,7 +90,7 @@ Current guardrails:
 - YouTube campaign hero videos render a local poster/play facade first and load the YouTube iframe only after play intent
 - common scripts use `defer` or lazy dynamic loading instead of parser-blocking script tags
 - full document layouts opt out of mobile automatic phone/date/address/email detection so iOS does not restyle operational copy or campaign text unexpectedly
-- private/admin surfaces stay `noindex` and should not inherit public prefetch behavior
+- private/admin surfaces stay `noindex` and do not inherit public prefetch behavior
 
 When changing campaign chrome, verify:
 
@@ -103,14 +103,14 @@ When changing campaign chrome, verify:
 
 The cart runtime is intentionally split. Public pages load a small loader first, then fetch the heavier cart stack only when needed.
 
-The loader should trigger on:
+The loader triggers on:
 
 - add-to-cart button interaction
 - persisted cart state that needs restoration
 - checkout recovery state
 - cart UI intent, such as opening the cart
 
-The heavy cart files should not be part of an ordinary public first load unless one of those states is present:
+The heavy cart files are not part of an ordinary public first load unless one of those states is present:
 
 - [`assets/js/cart-provider.js`](../assets/js/cart-provider.js)
 - [`assets/js/cart.js`](../assets/js/cart.js)
@@ -121,9 +121,9 @@ When changing cart or checkout loading, verify with browser network tools that a
 
 ## Admin Read Budget
 
-The admin dashboard should keep normal browsing read-only and bounded. Reports, supporters, analytics attribution, abandoned-checkout health, Blast dry runs, and similar campaign views should use existing `campaign-pledges:<slug>` projections or small aggregate state instead of KV namespace scans. Media-library picker loads should read GitHub directories and should not create KV state.
+The admin dashboard keeps normal browsing read-only and bounded. Reports, supporters, analytics attribution, abandoned-checkout health, Blast dry runs, and similar campaign views use existing `campaign-pledges:<slug>` projections or small aggregate state instead of KV namespace scans. Media-library picker loads read GitHub directories and do not create KV state.
 
-Durable dashboard writes should be tied to explicit user actions. Saved referral codes, shared Marketing/Blast drafts, campaign-scoped abandoned-checkout suppressions, Blast live sends, content publishes, protected previews, and campaign creation/archive actions are allowed mutations; page loads, field edits, preview generation, QR generation/downloads, reporting loads, remembered tab/subtab UI state, and local drafts should not write KV. When adding an admin feature, document whether it is read-only, local-only, GitHub-backed, or KV-backed before wiring the UI.
+Durable dashboard writes are tied to explicit user actions. Saved referral codes, shared Marketing/Blast drafts, campaign-scoped abandoned-checkout suppressions, Blast live sends, content publishes, protected previews, and campaign creation/archive actions are allowed mutations; page loads, field edits, preview generation, QR generation/downloads, reporting loads, remembered tab/subtab UI state, and local drafts do not write KV. When adding an admin feature, document whether it is read-only, local-only, GitHub-backed, or KV-backed before wiring the UI.
 
 ## Generated Asset Minification
 
@@ -147,7 +147,7 @@ The pre-merge build-artifact check also minifies `_site` and fails if generated 
 
 ## Cloudflare Compression
 
-Cloudflare should handle transfer compression at the edge. The live deployment has been verified serving compressed text assets with gzip, Brotli, and Zstandard depending on the request `Accept-Encoding` and edge behavior.
+Cloudflare handles transfer compression at the edge. The live deployment has been verified serving compressed text assets with gzip, Brotli, and Zstandard depending on the request `Accept-Encoding` and edge behavior.
 
 Keep these responsibilities separate:
 
@@ -155,15 +155,15 @@ Keep these responsibilities separate:
 - Cloudflare edge: gzip/Brotli/Zstandard transfer compression
 - source control: readable source files, not committed generated minified copies
 
-Cloudflare Auto Minify should stay disabled. It rewrites responses at the edge, making production behavior harder to reproduce locally and harder to test in CI. Prefer the repo-controlled generated asset step instead.
+Cloudflare Auto Minify stays disabled. It rewrites responses at the edge, making production behavior harder to reproduce locally and harder to test in CI. Prefer the repo-controlled generated asset step instead.
 
 Keep Rocket Loader and Email Address Obfuscation disabled for this site. Rocket Loader rewrites script tags at the edge, while Email Address Obfuscation injects `/cdn-cgi/scripts/*/cloudflare-static/email-decode.min.js`; both make strict-CSP pages harder to reproduce locally and can show up as render-blocking or console-noise diagnostics in PageSpeed Insights.
 
-If Cloudflare Web Analytics is enabled, campaign pages must allow Cloudflare's analytics script and beacon endpoint in the campaign CSP. Private/admin surfaces should stay stricter unless there is an explicit analytics/privacy decision to include them.
+If Cloudflare Web Analytics is enabled, campaign pages must allow Cloudflare's analytics script and beacon endpoint in the campaign CSP. Private/admin surfaces stay stricter unless there is an explicit analytics/privacy decision to include them.
 
 Font stylesheets are linked from the document head instead of imported from `assets/main.css`. This lets the browser discover font CSS and font connections without waiting on the main stylesheet while preserving the intentional font-loading behavior.
 
-The generated design-token CSS variables are included in `assets/main.css`; `assets/theme-vars.css` remains available as a compatibility artifact, but public layouts should not request it as a separate render-blocking stylesheet.
+The generated design-token CSS variables are included in `assets/main.css`; `assets/theme-vars.css` remains available as a compatibility artifact, but public layouts do not request it as a separate render-blocking stylesheet.
 
 ## Intent-Based Prefetching
 
@@ -283,11 +283,11 @@ When changing live reads:
 - invalidate browser caches after successful pledge persistence
 - keep stale recovery behavior private to the browser and avoid long-lived sensitive storage
 - use `GET /admin/observability/performance` to inspect sampled Worker timings on deployed or local environments
-- keep `/admin/observability/performance` authenticated and `private, no-store`; unit coverage checks both authenticated and unauthorized responses, and post-deploy smoke should verify the live header
+- keep `/admin/observability/performance` authenticated and `private, no-store`; unit coverage checks both authenticated and unauthorized responses, and post-deploy smoke verifies the live header
 
 ## KV List Budget
 
-Workers KV list requests are a separate free-tier budget from reads and writes. Normal public and dashboard paths should avoid namespace scans and prefer projections, indexes, or explicit queue-state markers.
+Workers KV list requests are a separate free-tier budget from reads and writes. Normal public and dashboard paths avoid namespace scans and prefer projections, indexes, or explicit queue-state markers.
 
 Current guardrails:
 
@@ -328,7 +328,7 @@ The Podman site image includes `ffmpeg`, `optipng`, `libjpeg-turbo-progs`, `gifs
 
 For deployed media-heavy regressions, manually run the **Optimize dashboard media** GitHub Actions workflow with `scope=all` so existing campaign assets are optimized by the same pipeline rather than edited one-off.
 
-If PageSpeed flags oversized campaign images that already flow through `responsive-image.html`, first confirm whether the corresponding `-320.webp`, `-480.webp`, `-640.webp`, `-960.webp`, and `-1600.webp` derivatives exist. Missing derivatives should be produced by `npm run media:optimize` locally or by the workflow with `scope=all`, not by one-off manual image edits.
+If PageSpeed flags oversized campaign images that already flow through `responsive-image.html`, first confirm whether the corresponding `-320.webp`, `-480.webp`, `-640.webp`, `-960.webp`, and `-1600.webp` derivatives exist. Produce missing derivatives with `npm run media:optimize` locally or with the workflow using `scope=all`, not with one-off manual image edits.
 
 The media pipeline:
 
@@ -350,7 +350,7 @@ For campaign pages, prefer:
 
 ## Admin And Private Surfaces
 
-Admin, protected campaign preview, manage, checkout, pledge-result, community, and tokenized routes should optimize for correctness and privacy before speculative speed.
+Admin, protected campaign preview, manage, checkout, pledge-result, community, and tokenized routes optimize for correctness and privacy before speculative speed.
 
 Rules for private surfaces:
 
@@ -403,7 +403,7 @@ Full merge validation:
 npm run test:premerge
 ```
 
-Production or staging validation should compare:
+Production or staging validation compares:
 
 - LCP, INP, CLS, FCP, and TTFB
 - total request count and transferred bytes on first load
@@ -435,7 +435,3 @@ The platform does not currently:
 - prefetch API, checkout, admin, supporter, or tokenized routes
 - commit generated minified CSS/JS back into source directories
 - rely on Cloudflare Auto Minify for production behavior
-
----
-
-_Last updated: June 18, 2026_

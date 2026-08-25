@@ -2,7 +2,9 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-Current release branch milestone: **v1.2.20**. Pool pins immutable `dust-wave-platform` `v0.32.0` plus the separately versioned `dust-wave-jekyll-template` `v0.1.0`. Platform now supplies the reusable, guarded product-video capture/render engine while Pool retains its Jekyll preview, fixtures, selectors, presentation CSS, generated media, publishing decision, routes, data, localization, content, configuration, deployment authority, and one-commit rollback.
+The current release is **v1.2.20**. Repository changes made after that tag are
+recorded under **Unreleased** in the [Changelog](CHANGELOG.md); prospective work
+belongs in the [Roadmap](docs/ROADMAP.md).
 
 A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding. Backers build a pledge in The Pool’s browser-owned cart, the Cloudflare Worker canonicalizes the contribution via `/checkout-intent/start`, and Stripe collects and saves card details through a secure on-site payment step so cards are only charged after a successful campaign reaches its deadline. A single checkout can include items from multiple campaigns; after webhook confirmation, the Worker fans that bundle out into separate campaign-scoped pledge records. If funded, the Worker scheduler dispatches batched settlement and charges pledges off-session. Supporters can optionally add a platform tip, manage pledges through order-scoped magic links, and revisit a desktop-friendly Manage Pledge dashboard with Active / Closed sections.
 
@@ -62,11 +64,11 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 - **Projection drift diagnostics** — Read-only admin checks and a local CLI can compare stored stats, inventory, and campaign indexes against saved pledge truth before any repair path mutates data
 - **Shared visual system** — Public pages, campaign surfaces, cart / checkout, and Manage Pledge all use the same calmer reusable typography, button, field, and card language
 - **Responsive mobile polish** — Campaign pages, checkout/manage flows, community pages, and long-form content have shared small-screen spacing, safe-area-aware drawers, larger tap targets, and overflow fixes instead of a separate mobile-only UI
-- **Accessibility baseline** — Public shells now keep skip links and stable main landmarks, while cart / checkout flows use stronger dialog semantics, live-region updates, and clearer accessible labels without moving payment fields out of Stripe-owned secure UI
-- **Variable-first fork customization** — structured config now drives branding, pricing, Worker-synced settings, core brand assets, curated design variables, themed Stripe Elements, and branded supporter emails without requiring custom code for normal fork rebranding
-- **Hosted live campaign embeds** — Campaign pages now link to a locale-aware embed builder that generates copy-paste iframe code with layout/theme/media/CTA options, live Worker-backed data, and auto-resize behavior
+- **Accessibility baseline** — Public shells keep skip links and stable main landmarks, while cart / checkout flows use stronger dialog semantics, live-region updates, and clearer accessible labels without moving payment fields out of Stripe-owned secure UI
+- **Variable-first fork customization** — structured config drives branding, pricing, Worker-synced settings, core brand assets, curated design variables, themed Stripe Elements, and branded supporter emails without requiring custom code for normal fork rebranding
+- **Hosted live campaign embeds** — Campaign pages link to a locale-aware embed builder that generates copy-paste iframe code with layout/theme/media/CTA options, live Worker-backed data, and auto-resize behavior
 - **Campaign share links** — Campaign pages expose localized, icon-only share targets for Bluesky, X, Threads, Facebook, SMS, and email, with local image fallbacks and richer state-aware intent text where platforms allow it
-- **English + Spanish i18n foundation** — `_config.yml` now drives supported languages, static locale routes, generated localized campaign routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, public campaign pages, embed pages, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge/embed runtime copy, campaign countdown/gallery/live-stats labels, cart-button summaries, checkout tax-location helper copy, hero video/community teaser/diary chrome, localized campaign dates, and localized Worker supporter emails
+- **English + Spanish i18n foundation** — `_config.yml` drives supported languages, static locale routes, generated localized campaign routes, shared translation data, and a quieter footer language switcher, with Spanish live across home/about/terms, public campaign pages, embed pages, pledge-result pages, `/manage/`, `/community/`, supporter community routes, site-owned cart/community/Manage Pledge/embed runtime copy, campaign countdown/gallery/live-stats labels, cart-button summaries, checkout tax-location helper copy, hero video/community teaser/diary chrome, localized campaign dates, and localized Worker supporter emails
 - **SEO and Shopping readiness** — Public pages and campaign pages emit consistent titles, descriptions, canonicals, OG/Twitter tags, localized language metadata, honest JSON-LD, crawler-friendly Worker-generated PNG campaign share cards, and alternate-language metadata where supported. `robots.txt`, authored sitemap timestamps, matching XML/text crawl diagnostics, generated and post-deploy audits, and explicit noindex rules keep private/tokenized flows out of search intent. A campaign can explicitly publish its featured physical reward as a focused preorder product page only after complete availability facts are present; Merchant Center onboarding remains a separate operator step.
 - **Safe intent prefetching** — Public same-origin document links can prefetch on hover/focus/touch intent, with conservative route/query exclusions and admin-configurable defaults
 
@@ -86,12 +88,11 @@ A static Jekyll + first-party cart site for all-or-nothing creative crowdfunding
 
 ### Shared foundations and ownership
 
-Pool `v1.2.20` pins Dust Wave Platform `v0.32.0` at exact commit
-`85165a16ac6923b438514bdce0a9957c1804db5f` and Dust Wave Jekyll Template
-`v0.1.0` at exact commit `351281a5aec60fa85653a3d23391e66fb860aae6`.
-Platform supplies characterized Worker, admin, browser, design, build, release,
-shipping, tax, inventory, media, test, and local product-video primitives. The Jekyll Template owns
-17 manifest-bound source-upgrade files whose runtime copies remain checked in.
+The recorded gitlinks pin immutable Dust Wave Platform and Dust Wave Jekyll
+Template revisions. Platform supplies characterized Worker, admin, browser,
+design, build, release, shipping, tax, inventory, media, test, and local
+product-video primitives. The Jekyll Template owns 17 manifest-bound
+source-upgrade files whose runtime copies remain checked in.
 
 Pool still owns campaign and pledge models, routes, storage, content,
 localization, templates, credentials, provider policy, builds, deployment, and
@@ -121,7 +122,7 @@ Clone with `--recurse-submodules` when possible. Existing checkouts must run the
 
 The setup helper is dependency-free Node and works on macOS, Windows, and Linux. Use `npm run setup:deploy -- --mode=production --dry-run` to preview Cloudflare KV, Worker secret, GitHub secret, readiness, and deploy steps before applying them. It intentionally keeps production Worker secrets separate from ignored local `worker/.dev.vars` values, and the setup path is covered by fake-CLI unit tests so dry runs, KV reuse/create planning, generated local secrets, and production secret writes stay testable without live provider mutations.
 
-The Worker dev container now runs on Node 24 to match GitHub Actions. Wrangler 4.118 also runs against the shared Worker `compatibility_date = "2026-05-03"` so local Miniflare/Workers behavior stays aligned with deployed runtime semantics.
+The Worker dev container runs on Node 24 to match GitHub Actions. Wrangler 4.118 also runs against the shared Worker `compatibility_date = "2026-05-03"` so local Miniflare/Workers behavior stays aligned with deployed runtime semantics.
 
 If you want to rebuild the Podman dev images after dependency or base-image changes:
 ```bash
@@ -150,28 +151,28 @@ Keep `USPS_CLIENT_SECRET` out of site config. Set it as a Worker secret or in [`
 
 If you change those values locally, restart `./scripts/dev.sh --podman` so the Worker uses the same math as the site.
 
-Fork-friendly global merch/add-on settings now also live in:
+Fork-friendly global merch/add-on settings live in:
 - `add_ons.enabled`, `add_ons.low_stock_threshold`, and `add_ons.products` in [`_config.yml`](_config.yml)
 - product images, size-aware variants, per-product or per-variant inventory, and `shipping_preset` references for physical catalog items
-- bundle-level add-ons can now be selected in the cart sidecar, anchored to a campaign in multi-campaign carts, and edited later from Manage Pledge
-- low-stock messaging and sold-out variant filtering now come from the shared inventory-aware add-on product-state layer used by both cart and Manage Pledge
+- bundle-level add-ons can be selected in the cart sidecar, anchored to a campaign in multi-campaign carts, and edited later from Manage Pledge
+- low-stock messaging and sold-out variant filtering come from the shared inventory-aware add-on product-state layer used by both cart and Manage Pledge
 - configured add-on inventory is the starting baseline; remaining stock is derived from saved pledge state through the `add-on-inventory-sold:v1` projection, not unsaved cart or Manage drafts
-- pledge and fulfillment reports now separate campaign pledge value from platform add-on value for easier operations
+- pledge and fulfillment reports separate campaign pledge value from platform add-on value for easier operations
 
-Fork-facing settings now use a structured config model in [`_config.yml`](_config.yml):
+Fork-facing settings use a structured config model in [`_config.yml`](_config.yml):
 
 - `platform` for identity, URLs, and support contact
 - `platform` also covers brand assets like logo, footer logo, favicon, and default social image
 - `admin` for production admin URLs plus seed/recovery users mirrored into the Worker as `ADMIN_USERS_JSON`
 - top-level `title` / `description` for Jekyll's site identity and default SEO copy
-- `seo` for bounded SEO identity knobs like `x_handle`, `same_as`, `default_social_image_alt`, `og_locale_overrides`, and whether the public community hub should remain indexable
+- `seo` for bounded SEO identity knobs like `x_handle`, `same_as`, `default_social_image_alt`, `og_locale_overrides`, and whether the public community hub remains indexable
 - `pricing` for the flat-rate compatibility baseline and platform-tip defaults
 - `tax` for choosing the Worker tax engine and its non-secret lookup settings
 - `shipping` for origin settings, USPS quote behavior, fallback policy, free-shipping defaults, shipping presets, and limited shipping-option policy
 - `add_ons` for a small global merch catalog, fixed-price products, and simple variants like shirt sizes
 - `reports` for campaign-runner report timing, attachments, summaries, subject-prefix behavior, and the split fulfillment-email workflow alongside `platform.support_email`
 - `launch_reminders` for enabling upcoming-campaign reminder forms and setting the public Turnstile site key
-- campaign front matter `campaign_add_ons` for campaign-scoped merch that should use the same card UI but count toward that campaign’s subtotal and shipping rules
+- campaign front matter `campaign_add_ons` for campaign-scoped merch that uses the same card UI while counting toward that campaign’s subtotal and shipping rules
 - `i18n` for default/supported languages, language labels, and localized public-page routes
 - `design` for curated typography, radius, layout-width, and theme-token overrides
 - a small curated subset of `platform` / `design` is mirrored into the Worker so supporter emails stay aligned with fork branding too
@@ -180,7 +181,7 @@ Fork-facing settings now use a structured config model in [`_config.yml`](_confi
 - `checkout` for truly variable checkout settings like the Stripe publishable key
 - `cache` for live browser TTLs
 
-[`_config.local.yml`](_config.local.yml) is now intentionally thin: it should only carry true local overrides like localhost URLs, `show_test_campaigns`, and local-only public Turnstile key blanks, not a second copy of the base config.
+[`_config.local.yml`](_config.local.yml) is intentionally thin: it carries only true local overrides like localhost URLs, `show_test_campaigns`, and local-only public Turnstile key blanks, not a second copy of the base config.
 
 See [docs/CUSTOMIZATION.md](docs/CUSTOMIZATION.md) for the supported no-code customization surface and which settings are automatically mirrored to the Worker.
 See [docs/SEO.md](docs/SEO.md) for the current SEO fundamentals implementation and supported SEO surface.
@@ -189,13 +190,13 @@ See [docs/I18N.md](docs/I18N.md) for the locale model, shared translation source
 See [docs/PAYMENT_PROCESSOR.md](docs/PAYMENT_PROCESSOR.md) for the Stripe setup, checkout, webhook, settlement, and reconciliation model.
 See [docs/EMAIL.md](docs/EMAIL.md) for the Resend sender setup, email types, localization, and delivery behavior.
 
-Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It covers recent creator-facing changes, including campaign add-ons, hosted embeds, QR/referral links, supporter Blast prep, share-link/social-preview planning, dashboard media uploads, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
+Creators can use the public [Campaign Creator Checklist](creator-campaign-checklist.md) for launch prep. It covers campaign add-ons, hosted embeds, QR/referral links, supporter Blast prep, share-link/social-preview planning, dashboard media uploads, tax/shipping expectations, free-shipping and fallback-rate decisions, report recipients, and fulfillment handoff; the Spanish route lives at `/es/creator-campaign-checklist/`.
 
 For localization, the supported model is:
 
 - shared UI/runtime/email copy lives in `_data/i18n/{lang}.yml`
 - localized long-form pages still need localized source files under the locale prefix
-- generated campaign pages and embed pages now participate in the locale model too, so `/campaigns/{slug}/` can switch cleanly to `/es/campaigns/{slug}/`
+- generated campaign pages and embed pages participate in the locale model too, so `/campaigns/{slug}/` can switch cleanly to `/es/campaigns/{slug}/`
 - the shared footer language switcher preserves the current query string and hash, so tokenized routes like `/manage/?t=...` can switch to `/es/manage/?t=...` without dropping pledge access
 
 The main local/dev/test paths already call the existing sync script, [`scripts/sync-worker-config.rb`](scripts/sync-worker-config.rb), to keep those mirrored Worker values aligned. If you edit `_config.yml` / `_config.local.yml` directly and want to refresh the Worker config before restarting the stack, run:
@@ -214,7 +215,7 @@ For a full host-only stack, run the Worker separately with `cd worker && wrangle
 
 Local admin dashboard testing reads the bootstrap super-admin email from ignored `worker/.dev.vars` as `ADMIN_BOOTSTRAP_EMAILS`. `npm run secrets:dev` creates that file from `worker/.dev.vars.example`, where forks can replace the placeholder with their own local sign-in email. The committed dev Worker defaults still set `CORS_ALLOWED_ORIGIN=http://127.0.0.1:4000` and the two test-only campaigns `hand-relations,smoke-editable`. `_config.yml` `admin.users` is the production seed/recovery list mirrored into the deployed Worker as `ADMIN_USERS_JSON`; admin user edits made in the dashboard are saved directly to Worker KV under `admin-users:v1`, take effect immediately, and do not publish to GitHub. Machine-specific secrets and local bootstrap access belong in ignored `worker/.dev.vars`.
 
-Admin email sign-in can also use Cloudflare Turnstile. Set the public widget key in `_config.yml` as `admin.turnstile_site_key`, and store the matching `TURNSTILE_SECRET_KEY` as a Worker secret. Local/test automation can use `ADMIN_TURNSTILE_BYPASS=true`, but that bypass should stay out of deployed Workers.
+Admin email sign-in can also use Cloudflare Turnstile. Set the public widget key in `_config.yml` as `admin.turnstile_site_key`, and store the matching `TURNSTILE_SECRET_KEY` as a Worker secret. Local/test automation can use `ADMIN_TURNSTILE_BYPASS=true`, but deployed Workers must not enable that bypass.
 
 Launch reminder forms use `_config.yml` `launch_reminders.turnstile_site_key` and the same shared Turnstile verification helper in the Worker. `_config.local.yml` can blank that public key to hide the widget locally; deployments may reuse `TURNSTILE_SECRET_KEY` or set `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY`. Local/test automation can use `LAUNCH_REMINDER_TURNSTILE_BYPASS=true` only in local/test Worker contexts.
 
@@ -263,7 +264,7 @@ npm run podman:self-check
 
 If you want to exercise the on-site Stripe checkout locally, add `STRIPE_PUBLISHABLE_KEY_TEST=pk_test_...` to [`worker/.dev.vars`](worker/.dev.vars) before starting the stack. The full Stripe setup and local webhook flow are documented in [docs/PAYMENT_PROCESSOR.md](docs/PAYMENT_PROCESSOR.md).
 
-For production, use Cloudflare Worker secrets for runtime credentials and GitHub repository secrets for deploy credentials or GitHub Actions automation. GitHub repository secrets do not automatically become Worker runtime secrets, so scoped admin credentials such as `ADMIN_SETTLEMENT_SECRET` and `ADMIN_BROADCAST_SECRET` must be set in Cloudflare too when deployed routes should enforce them. Do not put Stripe secret keys, webhook secrets, Resend keys, Turnstile secrets, USPS client secrets, ZIP.TAX keys, admin secrets, or Cloudflare API tokens in `_config.yml`.
+For production, use Cloudflare Worker secrets for runtime credentials and GitHub repository secrets for deploy credentials or GitHub Actions automation. GitHub repository secrets do not automatically become Worker runtime secrets, so scoped admin credentials such as `ADMIN_SETTLEMENT_SECRET` and `ADMIN_BROADCAST_SECRET` must be set in Cloudflare too when deployed routes enforce them. Do not put Stripe secret keys, webhook secrets, Resend keys, Turnstile secrets, USPS client secrets, ZIP.TAX keys, admin secrets, or Cloudflare API tokens in `_config.yml`.
 
 The cross-platform setup/deploy helper can drive the common production setup path:
 
@@ -281,15 +282,15 @@ Resend sender domains must match the configured sender addresses. For this deplo
 The Pool is intentionally shaped so most traffic stays cheap:
 
 - GitHub Pages serves the static site, so normal page loads do not invoke the Worker
-- public live data now prefers one combined `/live/:slug` request instead of separate stats + inventory calls
+- public live data prefers one combined `/live/:slug` request instead of separate stats + inventory calls
 - campaign pages cache live stats and inventory in `localStorage` for `cache.live_stats_ttl_seconds` / `cache.live_inventory_ttl_seconds` (default `300`)
 - background tabs stop refreshing until the page becomes visible again
-- dashboard reports, supporters, analytics, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans, and stats/inventory rebuilds now repair stale campaign indexes when they detect drift
+- dashboard reports, supporters, analytics, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans, and stats/inventory rebuilds repair stale campaign indexes when they detect drift
 - normal dashboard reads, protected preview rendering, content previews, report previews/downloads, supporter filters, analytics views, marketing URL building, media-library picker loads, abandoned-checkout health, and local editor drafts are designed to add zero KV writes
 - protected preview publication writes one short-lived `campaign-preview-reviewers:{slug}` access allowlist plus one audit record, while GitHub-backed campaign Markdown stores no previewer email addresses
 - campaign archive writes only the admin audit record in KV; the source/media move happens locally in dev and in GitHub Actions for production
 - the new read-only drift checks make it easier to confirm when projections are stale before running a repair path
-- limited-tier write paths now ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
+- limited-tier write paths ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
 - platform add-on inventory reads use a sold-count projection after the initial bootstrap, so normal inventory refreshes do not list all pledge keys
 - launch reminder dispatch, supporter confirmation retry polling, and abandoned-checkout reminders use queue-state markers; idle cron ticks skip KV list scans, and idle queues get an hourly compatibility recheck instead of minute-level or 15-minute namespace polling
 - public read paths stay intentionally permissive so a legitimately popular campaign does not hit artificial anti-DoS ceilings, while the expensive checkout / Manage / admin writes carry the tighter rate limits and request-size caps
@@ -304,15 +305,19 @@ Fork knobs worth knowing:
 
 ### Practical Scalability Scenarios
 
-These are rough planning scenarios, not guarantees. They assume the default 5-minute browser cache TTLs, mostly normal user behavior, and Cloudflare’s current published Workers and KV pricing/limits.
+These are rough planning scenarios, not guarantees. They assume the default
+five-minute browser cache TTLs and mostly normal user behavior. Provider limits
+and prices change independently of this repository; verify them in Cloudflare's
+current documentation before choosing a plan.
 
 | Scenario | Rough daily activity | Plan outlook |
 |----------|----------------------|--------------|
-| Small collective launch | ~1,500 campaign-page visits, ~75 manage/supporter visits, ~20 checkout starts, ~10 completed pledges | Free should still be viable. This is the operating shape The Pool is designed to handle cheaply. |
+| Small collective launch | ~1,500 campaign-page visits, ~75 manage/supporter visits, ~20 checkout starts, ~10 completed pledges | Free is a reasonable starting point for the operating shape The Pool is designed to handle cheaply. |
 | Busy launch week | ~8,000 campaign-page visits, ~250 manage/supporter visits, ~60 checkout starts, ~25 completed or modified pledges | Often still plausible on Free if abuse stays low and admin repair flows are rare, but this is where Paid starts buying real margin. |
 | Growing multi-project studio | ~20,000+ dynamic reads per day or many dozens of completed / modified / cancelled pledges per day | Start planning for Paid before a major push. Mutation-heavy days and abuse-path overhead become the part to watch first. |
 
-As of April 18, 2026, Cloudflare documents the Workers Free plan at `100,000` requests per day. The Workers Paid plan starts at `$5/month` and includes `10 million` requests per month plus `30 million` CPU ms per month before overage pricing. Workers KV Free includes `100,000` reads/day plus only `1,000` writes/day and `1,000` list requests/day, while Workers KV on the Paid plan includes `10 million` reads/month and `1 million` writes/month before overages:
+Use the provider documentation as the source of truth for current request,
+CPU-time, KV read/write/list, and pricing limits:
 
 - [Cloudflare Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
 - [Cloudflare Workers KV pricing](https://developers.cloudflare.com/kv/platform/pricing/)
@@ -320,7 +325,7 @@ As of April 18, 2026, Cloudflare documents the Workers Free plan at `100,000` re
 
 The practical takeaway for forks is simple: The Pool can still fit the Workers Free plan for its intended “small number of concurrent campaigns, modest backer volume, one-month run” shape, especially because public read traffic is cheap and most days have little mutation traffic. The reason to move to Paid is not that Free suddenly stopped working, but that Paid gives healthier headroom for flash spikes, abuse-path KV writes, heavier modify/cancel activity, and more operator tooling.
 
-With the v1.0.3 list-budget hardening, a normal no-queue day is expected to use roughly `48-75` Workers KV list requests over 24 hours: about one hourly idle recheck each for launch reminder dispatch and supporter email retry queues, plus occasional projection bootstraps or operator repair paths. Active launch reminder jobs and due supporter email retries still list their bounded queues when real work is pending.
+A normal no-queue day is expected to use roughly `48-75` Workers KV list requests over 24 hours: about one hourly idle recheck each for launch reminder dispatch and supporter email retry queues, plus occasional projection bootstraps or operator repair paths. Active launch reminder jobs and due supporter email retries still list their bounded queues when real work is pending.
 
 One deployment nuance: Cloudflare's configurable `limits` block is only enforced on the Standard Usage Model and only on deployed Workers, not in local development. That means the new `cpu_ms` guard is a denial-of-wallet backstop for Paid deployments, while Workers Free still relies on Cloudflare's built-in free-plan ceilings.
 
@@ -403,18 +408,18 @@ npm run test:e2e:headless:podman     # Automated browser suite with Playwright i
 npm run test:security:podman         # Security suite against a one-shot Podman-backed local stack
 ```
 
-The pre-merge gate now tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. That mutable smoke also rotates its synthetic admin request IPs so the Worker's real admin rate limit does not create false failures during local projection rebuild checks. If the host Ruby path still cannot produce a clean build, the gate now falls back to the Podman-backed artifact build instead of failing early on host setup.
+The pre-merge gate tries the host Bundler/Jekyll path first, including a one-time `bundle install` attempt when Bundler is present but gems are missing. It keeps the lighter host Worker smoke, but runs the mutable-pledge smoke through the Podman-backed stack so the stateful modify/cancel path uses isolated local service state even when the host build path succeeds. That mutable smoke also rotates its synthetic admin request IPs so the Worker's real admin rate limit does not create false failures during local projection rebuild checks. If the host Ruby path still cannot produce a clean build, the gate falls back to the Podman-backed artifact build instead of failing early on host setup.
 
-The headless browser harness now builds a clean static `_site` and serves it with a lightweight HTTP server rather than relying on `jekyll serve`, which keeps browser regressions closer to the actual published asset shape.
+The headless browser harness builds a clean static `_site` and serves it with a lightweight HTTP server rather than relying on `jekyll serve`, which keeps browser regressions closer to the actual published asset shape.
 
-- `pledge-report.sh` is a ledger/history export, so modified pledges appear as deltas and mixed changes now keep tip-update context in the `items` column.
+- `pledge-report.sh` is a ledger/history export, so modified pledges appear as deltas and mixed changes keep tip-update context in the `items` column.
 - `fulfillment-report.sh` is the merged current-state view per `email + campaign`, which is the better comparison point for repeat backers and non-stackable projects.
 - `check-projections.sh` is the read-only operator check for stored `campaign-pledges:{slug}`, `stats:{slug}`, and `tier-inventory:{slug}` drift before you decide to repair anything.
-- if the site ever drifts from the current-state fulfillment view, the admin stats/inventory recalc paths now self-heal stale `campaign-pledges:{slug}` indexes instead of trusting them forever.
+- if the site ever drifts from the current-state fulfillment view, the admin stats/inventory recalc paths self-heal stale `campaign-pledges:{slug}` indexes instead of trusting them forever.
 
-**Current full-suite baseline:**
-- Pre-merge gate: passes locally and in the PR `Merge Smoke` workflow
-- Unit, security, and headless E2E suites are green on this branch
+**Verification:** `npm run test:premerge` is the canonical local and PR `Merge
+Smoke` gate. Use the latest workflow result or release evidence for a dated pass
+record rather than treating this guide as test-run evidence.
 
 **Test coverage includes:** live-stats functions, platform tip helpers, first-party checkout intent hashing and payload wiring, supporter email tip breakdowns, launch reminder signup/unsubscribe/dispatch paths, abandoned-checkout opt-in/dispatch/suppression paths, pledge-management flags, settlement totals, progress bars, tier unlocks, support items, countdown timers, cart flow, accessibility (including axe-backed public-page checks across campaign, community, and pledge-result states, ARIA snapshots, and keyboard-only checkout/manage/community/public-control assertions), mobile viewport regressions for public pages and pledge flows, campaign states, secret exposure auditing, campaign-content HTML/link/embed auditing, serialized tier-inventory coordination, and hardening around `/checkout-intent/start`, webhook handling, magic-link scope, settlement integrity, and paginated rebuild/backfill paths.
 
@@ -459,7 +464,7 @@ Good starting points after cloning a fork are [PROJECT_OVERVIEW.md](docs/PROJECT
 - [PERFORMANCE.md](docs/PERFORMANCE.md) — Platform performance model, generated asset minification, Cloudflare compression, runtime loading, caching, media, deferred YouTube hero embeds, and safe public prefetching
 - [ADD_ON_PRODUCTS.md](docs/ADD_ON_PRODUCTS.md) — Current global add-on catalog structure and initial merch import model
 - [DASHBOARD.md](docs/DASHBOARD.md) — Private admin dashboard reference for campaign editing and operations
-- [ROADMAP.md](docs/ROADMAP.md) — current capability inventory and future feature plan
+- [ROADMAP.md](docs/ROADMAP.md) — prospective work only; current behavior lives in the README and practice guides
 - [Campaign Creator Checklist](creator-campaign-checklist.md) — Public creator launch-prep worksheet, with Spanish route at `/es/creator-campaign-checklist/`
 
 ## Key Directories
@@ -526,7 +531,7 @@ Worker releases use the manually dispatched **Deploy Production** GitHub Actions
 
 Routine **Refresh Production Pages** runs, including scheduled campaign-state refreshes, do not deploy the Worker.
 
-The Pages build runs Jekyll first, then `npm run assets:minify` against generated `_site/assets` CSS/JavaScript and the generated copies of the pinned Site Shell browser scripts before uploading the artifact. The selected roots are explicit and traversal-safe; source files stay readable in the repository. Cloudflare still handles gzip/Brotli/Zstandard compression at the edge, so Cloudflare Auto Minify should stay disabled.
+The Pages build runs Jekyll first, then `npm run assets:minify` against generated `_site/assets` CSS/JavaScript and the generated copies of the pinned Site Shell browser scripts before uploading the artifact. The selected roots are explicit and traversal-safe; source files stay readable in the repository. Cloudflare still handles gzip/Brotli/Zstandard compression at the edge, so Cloudflare Auto Minify stays disabled.
 
 Required GitHub repository secrets for automatic Worker deployment:
 - `CLOUDFLARE_API_TOKEN` from a **user API token** created under **My Profile -> API Tokens**, using the **Edit Cloudflare Workers** template and scoped to this account and the `dustwave.xyz` zone. Do not use an account-owned API token; Wrangler still calls user-scoped endpoints such as memberships during deploy.
@@ -534,7 +539,7 @@ Required GitHub repository secrets for automatic Worker deployment:
 - `ADMIN_SECRET` for the post-deploy diary check
 - optional `ADMIN_BROADCAST_SECRET` for the post-deploy diary check when the Worker uses scoped broadcast credentials
 - optional `CLOUDFLARE_CACHE_PURGE_TOKEN` with zone cache-purge permissions if you want cache purging to use a token narrower than the deploy token. This is recommended; otherwise the deploy token must also be allowed to purge cache.
-- optional `CLOUDFLARE_DNS_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_ZONE` for the Release Provider Evidence workflow. The DNS token should be read-only with Zone / DNS / Read for the production zone.
+- optional `CLOUDFLARE_DNS_API_TOKEN`, `CLOUDFLARE_ZONE_ID`, and `CLOUDFLARE_ZONE` for the Release Provider Evidence workflow. The DNS token uses read-only Zone / DNS / Read access for the production zone.
 - `CLOUDFLARE_CACHE_RULES_API_TOKEN` plus `CLOUDFLARE_ZONE_ID` for applying/reconciling the path-scoped admin response rule. Use a dedicated token with Cache Rules Edit; public post-deploy verification does not need credentials.
 - optional `DIARY_CHECK_BYPASS_SECRET` if Cloudflare WAF challenges the post-deploy diary check
 

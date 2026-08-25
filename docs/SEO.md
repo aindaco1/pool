@@ -18,7 +18,7 @@ The current baseline includes:
 - alternate-language metadata on localized public pages and localized campaign pages
 - canonical URLs on public layouts
 - locale-aware Open Graph metadata on public layouts
-- campaign pages now use `og:type=article` plus bounded article publish/modified timestamps derived from campaign content dates
+- campaign pages use `og:type=article` plus bounded article publish/modified timestamps derived from campaign content dates
 - explicit language/app-name metadata on public layouts
 - page-level descriptions on core public routes
 - Open Graph and Twitter card metadata
@@ -42,7 +42,7 @@ The current baseline includes:
 - conservative `Organization` / `WebSite` JSON-LD
 - organization contact and `MerchantReturnNotPermitted` policy data linked to the visible Terms policy
 - conservative campaign `CreativeWork` plus breadcrumb JSON-LD, both aligned with the active page language where supported
-- campaign `CreativeWork` JSON-LD now also includes `headline`, `mainEntityOfPage`, `isPartOf`, and published/modified timestamps so public campaign pages read more like real editorial landing pages than anonymous blobs
+- campaign `CreativeWork` JSON-LD also includes `headline`, `mainEntityOfPage`, `isPartOf`, and published/modified timestamps so public campaign pages read more like real editorial landing pages than anonymous blobs
 - a public community hub that links back to public campaign pages instead of pushing crawlers into supporter-only routes
 - opt-in, localized product pages for one campaign's featured physical reward, with visible preorder, availability, shipping, and final-sale disclosures plus matching `Product` / `Offer` data
 
@@ -221,11 +221,11 @@ Forks can safely customize:
 
 - site identity and default metadata
 - organization social-profile links
-- whether the public community hub should remain indexable
+- whether the public community hub remains indexable
 - page and campaign descriptive copy that already exists in the content model
 - campaign preview inputs that already exist in the content model, such as campaign title, the first long-content text block used for social descriptions, category, creator, a `funded: true` flag for successful post-campaign metadata before settlement, and the square hero image used inside generated share cards
 
-Forks should not assume support for:
+The current model does not support:
 
 - arbitrary per-page SEO config matrices
 - custom schema taxonomies beyond the documented surface
@@ -264,15 +264,8 @@ The current SEO model explicitly avoids:
 - indexing supporter-only, session-bound, or tokenized access flows
 - treating the admin dashboard or protected campaign previews as public landing pages, share targets, or crawlable documentation surfaces
 
-## Current Follow-Up Work
-
-The roadmap still tracks a few SEO follow-ups outside this document:
-
-- manual validation of structured data, crawl files, and campaign share cards against external tooling
-- expanding automated SEO regression coverage further if the SEO surface grows beyond the current public-page + campaign-page model
-- deciding whether any additional fork-facing SEO knobs are worth supporting beyond the current bounded surface
-- creating and verifying the Merchant Center account before enabling Shopping destinations
-- confirming the exact expected availability date and completing Merchant Center/feed/destination setup before enabling the current featured reward candidate
+Prospective metadata, distribution, and Shopping work is tracked in the
+[Roadmap](./ROADMAP.md).
 
 ## Notes
 
@@ -284,8 +277,4 @@ This implementation was guided by Google Search Central guidance around:
 - structured data basics
 - breadcrumb structured data
 
-The core rule remains simple: public metadata should reflect visible public content, and private/supporter-only flows should stay outside search intent.
-
----
-
-_Last updated: July 14, 2026_
+The core rule remains simple: public metadata reflects visible public content, and private/supporter-only flows stay outside search intent.

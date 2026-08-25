@@ -8,7 +8,7 @@ Creators define campaigns in Markdown; backers pledge through The Pool’s first
 - Platform name: **The Pool**
 - Company name: **Dust Wave** (two words, not "DustWave")
 - Default theme: Dust Wave's calmer editorial styling
-- Fork customization: `_config.yml` now drives a curated branding/token surface that reaches public pages, on-site Stripe Elements, and supporter emails
+- Fork customization: `_config.yml` drives a curated branding/token surface that reaches public pages, on-site Stripe Elements, and supporter emails
 
 ---
 
@@ -24,7 +24,7 @@ Creators define campaigns in Markdown; backers pledge through The Pool’s first
 | **Storage** | Markdown / YAML | Campaign definitions & state |
 | **Styling** | Sass + generated theme vars | Shared design system for public pages, checkout, pledge management, and branded checkout/email surfaces |
 
-All code is versioned and auditable. Campaign editing now flows through the private admin dashboard or direct repo edits, with publishable changes still committed back to the repo through the Worker-controlled GitHub path.
+All code is versioned and auditable. Campaign editing flows through the private admin dashboard or direct repo edits, with publishable changes committed back to the repo through the Worker-controlled GitHub path.
 Super admins can create preview-only campaigns through that same path; those campaigns stay hidden from public campaign routes until launched. Super admins can also archive non-live campaigns through a validated GitHub Actions move into `archive/campaigns/<slug>/`, keeping archived source and media in the repository instead of deleting data. Protected preview reviewer email allowlists live in short-lived Worker KV records instead of campaign Markdown.
 Dashboard media uploads stay source-preserving at the Worker boundary: image/video uploads request the repository optimization workflow after commit, content/diary/Blast publishes remove or reuse same-campaign dashboard-owned media through the shared campaign media rules, and image blocks can select existing campaign media through a read-only GitHub directory picker instead of adding a second media index.
 
@@ -40,40 +40,28 @@ The current architecture is deliberately optimized so Cloudflare deployments spe
 - dashboard content loads/previews, report previews/downloads, supporter filters, analytics views, marketing referral lists, abandoned-checkout health reads, media-library picker loads, QR previews/downloads, Blast dry runs, and local drafts are designed to add zero KV writes
 - protected preview payload reads are zero-write; publishing a protected preview writes one 24-hour preview access allowlist plus an audit event
 - campaign archive operations write one audit event; the source/media archive move runs locally in dev and in GitHub Actions for production
-- limited-tier write paths now ask the per-campaign coordinator for reservation-aware availability, while public inventory stays in KV as a projection
+- limited-tier write paths ask the per-campaign coordinator for reservation-aware availability, while public inventory stays in KV as a projection
 - platform add-on inventory uses a sold-count projection after bootstrap instead of rebuilding from pledge namespace scans on normal reads
 - launch reminder dispatch, abandoned-checkout reminders, and supporter confirmation retry polling use queue-state markers, so idle scheduled ticks skip KV list scans and fall back to hourly compatibility checks
 - sent abandoned-checkout reminders can create one short-lived resume snapshot, allowing signed email links to restore the same sanitized cart/contact draft and start a fresh Stripe session without putting Stripe secrets in URLs
 - rate limiting still fails closed, but repeated blocked requests inside the same window no longer rewrite the same KV counter on every hit
 
-That means the real ceiling for most forks is usually **KV writes from successful pledge activity**, not public read traffic or idle list polling. `RATELIMIT` is now a hard requirement for supported deployments, but that does not by itself make the Free plan non-viable for the project's intended small-scale crowdfunding shape.
+That means the real ceiling for most forks is usually **KV writes from successful pledge activity**, not public read traffic or idle list polling. `RATELIMIT` is a hard requirement for supported deployments, but that does not by itself make the Free plan non-viable for the project's intended small-scale crowdfunding shape.
 
 ## Local Development Shape
 
-The recommended low-friction local path now uses Podman:
+The recommended low-friction local path uses Podman:
 
 - `./scripts/dev.sh --podman` boots Jekyll and the Worker in rootless containers
 - `npm run podman:doctor` checks host readiness first
-- `./scripts/test-e2e.sh --podman` now runs the browser suite in a fully automated way
+- `./scripts/test-e2e.sh --podman` runs the browser suite in a fully automated way
 
 The host-based Ruby/Wrangler path still exists, but Podman is the easiest way to get a production-like local environment without hand-installing every dependency.
 
-For deployed Standard/Paid Workers, the repo now also declares `limits.cpu_ms = 100` in `worker/wrangler.toml` as a denial-of-wallet backstop. That cap is intentionally conservative, but it only applies on Cloudflare's deployed network, not during local development.
+For deployed Standard/Paid Workers, the repo declares `limits.cpu_ms = 100` in `worker/wrangler.toml` as a denial-of-wallet backstop. That cap is intentionally conservative, but it only applies on Cloudflare's deployed network, not during local development.
 
-### Rough Planning Scenarios
-
-These scenarios are intentionally approximate. They assume the default 5-minute browser TTLs, one combined live read on cold campaign loads, and Cloudflare’s published free-plan limits as of April 7, 2026.
-
-| Scenario | What it feels like operationally | Planning takeaway |
-|----------|----------------------------------|-------------------|
-| First launch | One or two live campaigns, a few thousand campaign-page visits over several days, and a handful of completed pledges per day | Free should still be a reasonable starting point. |
-| Strong week-one traction | Several thousand dynamic Worker reads per day and a couple dozen pledge mutations across live campaigns | Often still workable on Free, but this is where Paid starts reducing operational anxiety. |
-| Established community platform | Frequent pledge mutations every day across multiple live campaigns, plus more regular admin repair/reporting flows | Paid becomes the more comfortable long-term choice; keep monitoring mutation and abuse-path costs. |
-
-For current Cloudflare limits, see:
-
-- [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
-- [Workers KV limits](https://developers.cloudflare.com/kv/platform/limits/)
+Current scalability scenarios and links to live Cloudflare plan documentation
+are maintained once in the root [README](../README.md#cloudflare-plan-guidance-for-forks).
 
 ---
 
@@ -177,7 +165,7 @@ See [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for the full Stripe setup, ch
 - **Automation over ops:** GitHub Actions perform all time-based events.  
 - **Open handoff:** Campaign and platform state remains reviewable as Markdown/YAML, even when routine edits happen through the dashboard.
 - **Design consistency:** Uses the same visual language as dust-wave-shop for brand coherence.
-- **Risk-aware stewardship:** Product changes that affect money, data, messaging, automation, public visibility, or admin power should include the [Ethical Risk review](./ETHICAL_RISK.md) while tradeoffs are still easy to change.
+- **Risk-aware stewardship:** Product changes that affect money, data, messaging, automation, public visibility, or admin power require the [Ethical Risk review](./ETHICAL_RISK.md) while tradeoffs are still easy to change.
 
 ## Critical Learnings
 
@@ -189,13 +177,9 @@ See [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for the full Stripe setup, ch
 6. **Support items data flow**: Cart.js extracts support items → Worker stores in temp KV → Webhook merges into final pledge.
 7. **DST-aware timezone handling**: All deadline logic (frontend countdown, Worker settlement, campaign state transitions) uses `platform.timezone` / `PLATFORM_TIMEZONE` with `Intl.DateTimeFormat`; the default is `America/Denver`.
 8. **Content safety must hold at render time**: authoring audits help, but the real protection comes from runtime Markdown-link sanitization and exact-origin embed validation.
-9. **Magic links must require real pledge rows**: token validity alone is insufficient; missing pledge records should fail closed.
-10. **Localized chrome should stay shared**: campaign-page controls and status copy that belong to the platform, not the creator, should flow through the shared locale catalog so public templates, runtime UI, and supporter emails do not drift apart.
-11. **Performance work should stay static-first**: prefer stable Jekyll output, generated asset minification, lazy runtime loading, and conservative public-only prefetching before adding client complexity.
-12. **Media lifecycle work should stay repo-backed**: dashboard uploads commit source files first, repository automation owns native image/video optimization, and publish-time cleanup only removes same-campaign media that disappeared from authored content and is not referenced elsewhere.
-13. **Preview access data should stay out of source**: protected-preview Markdown carries only preview flags; preview access emails belong in short-lived Worker KV allowlists and signed 24-hour links.
-14. **Marketing tools should stay local, indexed, or explicit**: QR generation stays browser-local, Analytics attribution and Blast dry runs use campaign pledge indexes, saved referral codes and shared drafts are explicit campaign-scoped KV mutations, stale shared drafts fail on revision conflicts, and none of these flows should fall back to namespace scans.
-
----
-
-_Last updated: June 18, 2026_
+9. **Magic links must require real pledge rows**: token validity alone is insufficient; missing pledge records fail closed.
+10. **Localized chrome stays shared**: campaign-page controls and status copy that belong to the platform, not the creator, flow through the shared locale catalog so public templates, runtime UI, and supporter emails do not drift apart.
+11. **Performance work stays static-first**: prefer stable Jekyll output, generated asset minification, lazy runtime loading, and conservative public-only prefetching before adding client complexity.
+12. **Media lifecycle work stays repo-backed**: dashboard uploads commit source files first, repository automation owns native image/video optimization, and publish-time cleanup only removes same-campaign media that disappeared from authored content and is not referenced elsewhere.
+13. **Preview access data stays out of source**: protected-preview Markdown carries only preview flags; preview access emails belong in short-lived Worker KV allowlists and signed 24-hour links.
+14. **Marketing tools stay local, indexed, or explicit**: QR generation stays browser-local, Analytics attribution and Blast dry runs use campaign pledge indexes, saved referral codes and shared drafts are explicit campaign-scoped KV mutations, stale shared drafts fail on revision conflicts, and none of these flows fall back to namespace scans.

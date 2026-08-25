@@ -24,7 +24,7 @@ If you are trying to keep a fork comfortable on the Cloudflare Workers free plan
 
 The first two live in Jekyll config and shape browser read behavior. The pricing/shipping values are auto-mirrored into the Worker env so checkout, emails, reports, and settlement math stay aligned.
 
-The config now uses a structured settings model in [`_config.yml`](../_config.yml):
+The config uses a structured settings model in [`_config.yml`](../_config.yml):
 
 - top-level `title` / `description`
 - `seo`
@@ -58,29 +58,29 @@ Current mirrored Worker values worth treating as part of the supported customiza
 - email and design vars: `SUPPORT_EMAIL`, `PLEDGES_EMAIL_FROM`, `UPDATES_EMAIL_FROM`, `EMAIL_*`, `PLATFORM_FOOTER_LOGO_PATH`, `PLATFORM_FAVICON_PATH`, `PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH`
 - campaign-runner, launch reminder, cache, performance, and debug vars: `CAMPAIGN_RUNNER_*`, `LAUNCH_REMINDERS_ENABLED`, `LIVE_STATS_CACHE_TTL_SECONDS`, `LIVE_INVENTORY_CACHE_TTL_SECONDS`, `INTENT_PREFETCH_ENABLED`, `INTENT_PREFETCH_DELAY_MS`, `INTENT_PREFETCH_LIMIT`, `DEBUG_CONSOLE_LOGGING_ENABLED`, `DEBUG_VERBOSE_CONSOLE_LOGGING`
 
-The repo now includes `npm run sync:worker-config`, which syncs those mirrored values from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`. The main local dev, test, Worker-only, and pre-merge paths call it automatically. The merge gate’s first-party artifact check also falls back to the Podman-backed build path when host Bundler/Jekyll is unavailable.
+The repo includes `npm run sync:worker-config`, which syncs those mirrored values from `_config.yml` / `_config.local.yml` into `worker/wrangler.toml`. The main local dev, test, Worker-only, and pre-merge paths call it automatically. The merge gate’s first-party artifact check also falls back to the Podman-backed build path when host Bundler/Jekyll is unavailable.
 
 When adding a new Worker-visible config setting, update `scripts/sync-worker-config.rb` in three places: `TOP_LEVEL_ORDER`, `DEV_ENV_ORDER`, and `build_mirror_values`. Do not add secrets to this path; the sync script is for non-secret repo config only.
 
-Local Worker development now targets Node 24 to match GitHub Actions. The Podman Worker image defaults to Node 24, while host helper scripts prefer Node 24 and fall back to Node 22 rather than forcing the old Node 20 path that Wrangler 4 no longer supports. The shared Worker `compatibility_date` should move deliberately with Wrangler/runtime updates so local Miniflare behavior and deployed Workers behavior stay aligned.
+Local Worker development targets Node 24 to match GitHub Actions. The Podman Worker image defaults to Node 24, while host helper scripts prefer Node 24 and fall back to Node 22 rather than forcing the old Node 20 path that Wrangler 4 no longer supports. Move the shared Worker `compatibility_date` deliberately with Wrangler/runtime updates so local Miniflare behavior and deployed Workers behavior stay aligned.
 
 USPS OAuth, Turnstile, and token-signing secrets are intentionally separate from that mirrored config surface. Keep `USPS_CLIENT_SECRET`, `TURNSTILE_SECRET_KEY`, `LAUNCH_REMINDER_TURNSTILE_SECRET_KEY`, and `LAUNCH_REMINDER_TOKEN_SECRET` in Worker secrets or `worker/.dev.vars`, not in `_config.yml`.
 
-SEO fundamentals now follow a similarly bounded model:
+SEO fundamentals follow a similarly bounded model:
 
 - public layouts use shared includes for metadata and JSON-LD
 - `robots.txt` and `sitemap.xml` are generated from the public static surface
 - `/manage/`, supporter-community pages, and pledge-result pages emit `noindex,nofollow`
 - the supported fork-facing SEO surface is mainly `title`, `description`, `seo.x_handle`, `seo.same_as`, `seo.index_public_community_hub`, `platform.name`, `platform.site_url`, `platform.default_social_image_path`, and page/campaign content fields like `title`, `description`, `short_blurb`, and hero images
 
-Browser and Worker console logging now use shared logger helpers instead of ad hoc `console.*` calls in the main runtimes. That gives the repo one bounded switch:
+Browser and Worker console logging use shared logger helpers instead of ad hoc `console.*` calls in the main runtimes. That gives the repo one bounded switch:
 
 - `debug.console_logging_enabled`
 - `debug.verbose_console_logging`
 
 If `console_logging_enabled` is `false`, both the browser runtimes and the Worker stay silent. If `verbose_console_logging` is `false`, lower-severity debug/info/log noise is suppressed while warnings and errors can still be emitted.
 
-When enabled, the shared loggers now provide more structured diagnostics by default:
+When enabled, the shared loggers provide more structured diagnostics by default:
 
 - ISO timestamps on every line
 - stable browser / Worker scope prefixes
@@ -98,21 +98,21 @@ Shipping quote best practices in the current implementation:
 - repeated USPS `429`, timeout, or `5xx` failures trigger a temporary in-memory cooldown before trying again
 - the fallback quote path stays Worker-canonical and does not add KV quote-cache churn
 
-The merge gate now deliberately splits its local smoke paths:
+The merge gate deliberately splits its local smoke paths:
 
 - `scripts/test-worker.sh` stays a lighter host-level contract smoke
 - `scripts/smoke-pledge-management.sh` runs through the Podman-backed stack during merge gating so the mutable modify/cancel path uses isolated local service state
 
-The Playwright harness now builds a clean static `_site` and serves it from a lightweight HTTP server for headless browser checks, instead of relying on `jekyll serve`.
+The Playwright harness builds a clean static `_site` and serves it from a lightweight HTTP server for headless browser checks, instead of relying on `jekyll serve`.
 
-Note: first-party cart/runtime and the custom on-site checkout UI are now treated as built-in platform behavior, not fork-facing config choices. The `checkout` config namespace is now mainly for truly variable settings like the Stripe publishable key.
+Note: first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior, not fork-facing config choices. The `checkout` config namespace is mainly for truly variable settings like the Stripe publishable key.
 
 ## Design System
 
-The default visual language still starts from Dust Wave's calmer editorial look, but the current repo is no longer locked to one hard-coded brand theme:
+The default visual language starts from Dust Wave's calmer editorial look without locking the repository to one hard-coded brand theme:
 
 - **Theme tokens**: `design.*` in `_config.yml` feeds generated CSS variables into `assets/main.css`; `assets/theme-vars.css` remains as a compatibility artifact
-- **Checkout styling**: the on-site Stripe Elements sidecar now reads that same token surface for colors, radius, and body font
+- **Checkout styling**: the on-site Stripe Elements sidecar reads that same token surface for colors, radius, and body font
 - **Supporter-email branding**: a curated subset of `platform.*` + `design.*` is mirrored into Worker env so logo/font/color/button styling stays aligned in email
 - **Spacing**: the Sass system still uses an 8px-based layout rhythm internally
 - **Breakpoints**: 724px (xsm), 1000px (sm/ms)
@@ -189,14 +189,14 @@ This applies to `support_items`, `decisions`, `stretch_goals`, `diary`, and any 
 
 ## Admin Dashboard Editing
 
-The private dashboard at `/admin/` is now the supported browser-based editor and operations surface. It reads from `_config.yml`, `_campaigns/*.md`, Worker KV pledge indexes, and Worker runtime settings, then writes through the correct persistence path for each workflow.
+The private dashboard at `/admin/` is the supported browser-based editor and operations surface. It reads from `_config.yml`, `_campaigns/*.md`, Worker KV pledge indexes, and Worker runtime settings, then writes through the correct persistence path for each workflow.
 
 - GitHub-backed settings and campaign content publish through Worker validation and the normal rebuild/deploy path.
 - Users save directly to Worker KV at `admin-users:v1`.
 - Marketing referral codes save to campaign-scoped KV.
 - Draft content saves in the browser until published.
 - Secrets stay in Worker secrets or ignored `.dev.vars`; the dashboard only shows configured/missing status.
-- Reports, analytics, supporter browsing, content previews, table filtering, and CSV downloads are read-only dashboard flows and should not add KV writes.
+- Reports, analytics, supporter browsing, content previews, table filtering, and CSV downloads are read-only dashboard flows and do not add KV writes.
 - Image/video/audio uploads use the existing asset directories, normalize filenames, and then publish through the same GitHub-backed path as the field they update.
 - Content and diary media cleanup runs at publish time. The Worker compares the previously loaded campaign content/diary data with the normalized draft being committed, deletes same-campaign dashboard-owned media paths that disappeared, and preserves external URLs, shared/default assets, and files still referenced elsewhere in the campaign.
 - Media optimization is deliberately outside the Worker. After image and video uploads commit successfully, the Worker requests the `Optimize dashboard media` GitHub Actions workflow with `scope=changed`; audio uploads are source-preserved because the optimizer does not process `assets/audio`. Use `npm run media:optimize` locally, `npm run media:optimize:podman` when host-native optimizers are missing, `npm run media:optimize:check` or `npm run media:optimize:check:podman` before merge when uploaded media changed, or manually dispatch the workflow with `scope=all` to reprocess existing media.
@@ -381,7 +381,7 @@ tiers:
 
 In the admin dashboard, tier IDs are read-only for editors: legacy IDs are preserved, while new tier IDs derive from the name. `shipping_preset` hides for digital tiers. If a physical tier has no preset, explicit package weight/dimension fields are shown.
 
-**Platform add-on products**: Global merch or upsell items now have a separate config path under `add_ons` in [/_config.yml](../_config.yml). That catalog is intended for base-priced platform-wide products with optional variant price overrides, like shirt sizes, and should not be modeled as campaign `support_items`. The Worker mirrors the catalog through [/api/add-ons.json](../api/add-ons.json), exposes a current inventory snapshot through `/add-ons/inventory`, carries bundle-level add-on selections plus an anchor campaign through checkout, persists those anchor-bound add-ons on the pledge without counting them toward campaign-goal totals, and now exposes them separately in pledge and fulfillment exports. Sold counts live in the `add-on-inventory-sold:v1` projection after bootstrap, and cart and Manage Pledge both consume the same inventory-aware product-state logic, including variant prices, low-stock messaging, and sold-out variant filtering.
+**Platform add-on products**: Global merch or upsell items have a separate config path under `add_ons` in [/_config.yml](../_config.yml). That catalog is for base-priced platform-wide products with optional variant price overrides, like shirt sizes, and is not modeled as campaign `support_items`. The Worker mirrors the catalog through [/api/add-ons.json](../api/add-ons.json), exposes a current inventory snapshot through `/add-ons/inventory`, carries bundle-level add-on selections plus an anchor campaign through checkout, persists those anchor-bound add-ons on the pledge without counting them toward campaign-goal totals, and exposes them separately in pledge and fulfillment exports. Sold counts live in the `add-on-inventory-sold:v1` projection after bootstrap, and cart and Manage Pledge both consume the same inventory-aware product-state logic, including variant prices, low-stock messaging, and sold-out variant filtering.
 
 - `category: digital` add-ons never contribute to shipping
 - `category: physical` add-ons participate in the same shipping calculator used for physical tiers and physical support items
@@ -415,7 +415,10 @@ decisions:
     status: open            # open | closed
 ```
 
-`vote` and `poll` currently use the same supporter-only submission and tallying mechanics. Use `vote` when the result is intended to decide an outcome, and use `poll` when the result is advisory feedback or preference-gathering. The distinction is intentionally semantic/display-facing for now; future versions can layer different public copy, reporting, or outcome workflows on top of the same stored data.
+`vote` and `poll` use the same supporter-only submission and tallying mechanics.
+Use `vote` when the result decides an outcome and `poll` for advisory feedback
+or preference-gathering. The distinction is semantic and display-facing; any
+prospective divergence belongs in the [Roadmap](./ROADMAP.md).
 
 ### Production Diary
 
@@ -475,7 +478,7 @@ All money values must be integers (no cents).
 
 ### Cart Runtime
 
-The site now uses a first-party cart runtime exposed through `window.PoolCartProvider`. Shared UI code talks to that provider instead of depending on a separate hosted-cart helper.
+The site uses a first-party cart runtime exposed through `window.PoolCartProvider`. Shared UI code talks to that provider instead of depending on a separate hosted-cart helper.
 
 Key files:
 - `assets/js/cart-provider.js` — browser-owned cart state, drawer rendering, checkout preview, success/cancel recovery
@@ -486,7 +489,7 @@ Key files:
 
 Tiers can be marked as `stackable: false` to prevent quantity adjustments in the cart.
 
-How it works now:
+How it works:
 1. Buy buttons carry the tier/cart metadata through `poolcart-*` hooks and item IDs like `{campaignSlug}__{tierId}`.
 2. The first-party provider merges repeat adds only for stackable tiers.
 3. Non-stackable enforcement happens in first-party cart state, not through hosted-cart DOM patches.
@@ -500,7 +503,7 @@ Files involved:
 
 ## Pledge Flow
 
-The pledge flow is now first-party end to end until Stripe:
+The pledge flow is first-party end to end until Stripe:
 
 1. **User adds tier to cart** → first-party cart drawer opens
 2. **User reviews pledge** → drawer shows tiers, support items, custom support, tip, and immediate pricing
@@ -649,7 +652,7 @@ npm run test:secrets
 
 If Stripe shows webhook failures ("other errors") for the production endpoint:
 - The production Worker receives **test mode** webhooks but can't verify them (different signing secrets)
-- The Worker now performs **early mode detection** — it parses the event's `livemode` field before signature verification
+- The Worker performs **early mode detection** — it parses the event's `livemode` field before signature verification
 - Test events sent to a live Worker (or vice versa) are acknowledged with `200 OK` and skipped, preventing signature errors
 - No configuration needed; this is handled automatically
 
@@ -855,7 +858,7 @@ Generate aggregated reports showing the **current state** of each backer's pledg
 
 ## Legacy Browser Path
 
-The branch no longer ships the old hosted-cart helper assets as separate browser files. The browser path now boots only the first-party cart runtime.
+The repository does not ship the old hosted-cart helper assets as separate browser files. The browser path boots only the first-party cart runtime.
 
 **Limitations:**
 - Credit card fields (number, expiry, CVV) are in Stripe's iframe — not accessible for security reasons
@@ -1139,7 +1142,7 @@ Use `_includes/a11y.html` for common patterns:
 
 ## Internationalization (i18n)
 
-The site now has a real locale foundation across shared public pages, supporter flows, and site-owned runtime copy. English remains the default locale, and Spanish is the first seeded secondary locale.
+The site has a locale foundation across shared public pages, supporter flows, and site-owned runtime copy. English remains the default locale, and Spanish is the first seeded secondary locale.
 
 ### Structure
 
@@ -1198,7 +1201,7 @@ states:
   opens: "Opens %{date}"
 ```
 
-It now also supports:
+It also supports:
 
 - `lang=` override
 - fallback to the default locale when a key is missing in the current locale
@@ -1213,7 +1216,7 @@ Use the locale helpers for page routing:
 
 Runtime messages for site-owned JS flows are emitted through [`assets/i18n.json`](../assets/i18n.json) and booted into `POOL_CONFIG.i18n.messages`, so the cart, checkout, supporter community, and Manage Pledge flows can use the same locale catalog without a SPA-style translation layer.
 
-Public campaign templates also pull more shared chrome from the same locale data now, including hero-video play/loading text, supporter-community teaser copy, diary tab labels and empty states, production-phase labels/CTAs, and gallery accessibility labels.
+Public campaign templates also pull shared chrome from the same locale data, including hero-video play/loading text, supporter-community teaser copy, diary tab labels and empty states, production-phase labels/CTAs, and gallery accessibility labels.
 
 Worker supporter emails also consume the shared locale catalog and the persisted `preferredLang` attached to checkout and manage flows, so localized supporter emails and localized `/manage/` / `/community/:slug/` links stay aligned with the site locale model.
 
@@ -1236,8 +1239,8 @@ Important boundary:
 
 Manual rule of thumb:
 
-- if the text is shared UI chrome, button text, status text, checkout/manage/community runtime copy, or Worker supporter-email copy, it should usually live in `_data/i18n/{lang}.yml`
-- if the text is real page content written as prose, it should usually live in a localized source page
+- shared UI chrome, button text, status text, checkout/manage/community runtime copy, and Worker supporter-email copy normally live in `_data/i18n/{lang}.yml`
+- real page content written as prose normally lives in a localized source page
 
 ### Translation Categories
 
@@ -1308,7 +1311,7 @@ npm test  # Runs unit tests, then E2E tests
 
 ### Adding Tests
 
-**Unit tests:** Add to `tests/unit/` with `.test.ts` extension. Tests should be fast (no network, no real DOM).
+**Unit tests:** Add to `tests/unit/` with `.test.ts` extension. Keep tests fast (no network, no real DOM).
 
 **E2E tests:** Add to `tests/e2e/` with `.spec.ts` extension. Use Playwright's `expect()` for assertions.
 
@@ -1405,7 +1408,3 @@ Multi-campaign carts remain supported because webhook persistence fans a cart bu
 curl -s https://pledge.dustwave.xyz/admin/cron/status \
   -H 'Authorization: Bearer YOUR_ADMIN_SECRET'
 ```
-
----
-
-_Last updated: June 3, 2026_

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Production posture
+
+- Disabled Cloudflare Worker preview URLs explicitly and made missing or enabled
+  preview URLs a production-posture failure.
+
+### Documentation
+
+- Separated current behavior, prospective work, and release history across the
+  README, practice guides, roadmap, changelog, and release evidence.
+- Removed dated provider snapshots, completed-work roadmaps, release-specific
+  status ledgers, and duplicate future-work lists from current-state guides.
+
 ## v1.2.20 - 2026-08-06
 
 ### Reusable product-video workflow

@@ -1,6 +1,6 @@
 # Add-On Products
 
-This document describes the current add-on product system as it actually ships now.
+This document describes the current add-on product system.
 
 The platform supports two add-on scopes that intentionally share the same card UX while behaving differently in accounting, shipping, and fulfillment:
 
@@ -227,7 +227,7 @@ The current catalog is exposed to browser runtime config through [assets/js/pool
 
 That means cart-side and Manage Pledge UI can read one stable `POOL_CONFIG.addOns` source of truth instead of duplicating product data in multiple templates or scripts.
 
-The Worker now also has a matching static catalog source at [/api/add-ons.json](../api/add-ons.json), and pending checkout manifests can carry:
+The Worker also has a matching static catalog source at [/api/add-ons.json](../api/add-ons.json), and pending checkout manifests can carry:
 
 - `bundleAddOns`
 - `bundleAddOnAnchorCampaignSlug`
@@ -258,13 +258,13 @@ That works well for campaign-specific monetary extras, but it is a poor long-ter
 - platform-wide merch
 - fixed-price catalog items
 - structured variants like shirt sizes
-- campaign-owned merch that should share the same product-card UI as platform merch
+- campaign-owned merch that shares the same product-card UI as platform merch
 
 The add-on product catalog is meant to sit beside that system, not replace it.
 
 ## Reporting and Fulfillment
 
-Reports now distinguish between platform and campaign add-ons intentionally.
+Reports distinguish between platform and campaign add-ons intentionally.
 
 In `pledge-report`:
 
@@ -278,6 +278,5 @@ In `fulfillment-report`:
 
 This keeps operational ownership clear without changing the supporter-facing add-on UI.
 
-## Remaining Follow-Up
-
-The biggest remaining slice is keeping accessibility, mobile responsiveness, and i18n support at the same standard as the rest of the platform as the catalog grows.
+Prospective catalog and shared-inventory work is tracked in the
+[Roadmap](./ROADMAP.md).

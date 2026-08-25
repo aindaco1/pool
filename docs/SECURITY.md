@@ -2,7 +2,7 @@
 
 This document covers the security architecture, known risks, applied hardening measures, accepted tradeoffs, and penetration testing procedures for The Pool crowdfunding platform. Encrypted backup boundaries, quarantined session/rate-limit state, off-device handling, and production restore approvals are defined in [BACKUP_RESTORE.md](./BACKUP_RESTORE.md).
 
-Use this alongside [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a change creates new data use, supporter messaging, admin power, public sharing, automation, or engagement pressure. Security review should cover not only credential compromise and code injection, but also realistic misuse by spammers, harassers, fraudsters, careless admins, and overly aggressive growth workflows.
+Use this alongside [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a change creates new data use, supporter messaging, admin power, public sharing, automation, or engagement pressure. Security review covers not only credential compromise and code injection, but also realistic misuse by spammers, harassers, fraudsters, careless admins, and overly aggressive growth workflows.
 
 ## Security Architecture
 
@@ -71,43 +71,12 @@ Use this alongside [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a change creates ne
 | `results:{slug}:{decision}` | VOTES | Vote tallies | **Low** - semi-public |
 | `rl:{endpoint}:{ip}` | RATELIMIT | Request count + reset time | **Low** - ephemeral |
 
-Scarce limited-tier reservation and committed-count truth is no longer stored in KV. That race-sensitive state now lives in the per-campaign Durable Object coordinator, while KV keeps only the public `tier-inventory:{slug}` projection.
+Scarce limited-tier reservation and committed-count truth lives in the per-campaign Durable Object coordinator rather than KV, while KV keeps only the public `tier-inventory:{slug}` projection.
 
 Settlement serialization is also Durable Object-backed. The `SETTLEMENT_COORDINATOR` binding owns a short-lived lock per campaign slug so scheduled settlement, direct settlement, dispatch, and batch endpoints cannot charge the same campaign concurrently. Multi-campaign carts still work because checkout persistence creates separate campaign-scoped pledge records, and settlement locks are keyed by the campaign being charged.
 
 ---
 
-## Vulnerability Summary
-
-### Critical / High Priority
-
-| ID | Issue | Severity | Status |
-|----|-------|----------|--------|
-| SEC-001 | Dev-token bypass on `/votes` in production | **High** | ✅ Fixed |
-| SEC-002 | Stripe webhook fails open if secret not set | **High** | ✅ Fixed |
-| SEC-003 | Test endpoints may be accessible in production | **High** | ✅ Fixed |
-
-### Medium Priority
-
-| ID | Issue | Severity | Status |
-|----|-------|----------|--------|
-| SEC-004 | CORS `Access-Control-Allow-Origin: *` on all endpoints | **Medium** | ✅ Fixed |
-| SEC-005 | No rate limiting on expensive endpoints | **Medium** | ✅ Fixed |
-| SEC-006 | Admin secret not timing-safe compared | **Medium** | ✅ Fixed |
-| SEC-007 | Legacy hosted-cart webhook surface remained reachable | **Medium** | ✅ Fixed |
-
-### Low Priority
-
-| ID | Issue | Severity | Status |
-|----|-------|----------|--------|
-| SEC-008 | Magic link tokens long-lived (90 days) | **Low** | Acceptable |
-| SEC-009 | Input validation on votes could be stricter | **Low** | ✅ Fixed |
-| SEC-010 | Tokens in query strings (Referer leakage risk) | **Low** | Acceptable |
-| SEC-011 | Input validation on checkout-start payloads | **Low** | ✅ Fixed |
-| SEC-012 | Missing security response headers | **Low** | ✅ Fixed |
-| SEC-013 | Admin dashboard stored input normalization gaps | **Low** | ✅ Fixed |
-
----
 
 ## Applied Hardening Notes
 
@@ -121,7 +90,7 @@ The Pool's highest-impact abuse cases often cross product, security, privacy, an
 - admin roles, campaign scope, protected previews, campaign creation/archive, media upload, or GitHub-backed publishing
 - analytics, provider plan usage, exports, backups, restore behavior, or new third-party data flows
 
-Security sign-off should answer the same practical questions each time:
+Security sign-off answers the same practical questions each time:
 
 - What data becomes easier to collect, infer, export, or expose?
 - Which private/tokenized state could accidentally become indexed, prefetched, shared, or emailed?
@@ -205,376 +174,112 @@ Admin field classes are normalized consistently:
 
 SQL injection is not a primary threat for the current Worker because the runtime does not use SQL. The relevant injection classes are stored XSS, YAML/front-matter injection, KV key/path manipulation, URL/CSS injection, and privilege escalation through mass assignment; the admin normalizers are designed around those risks.
 
-### SEC-001: Lock Down Dev-Token Bypass (✅ FIXED)
+### Runtime Request Protection
+
+The current Worker request boundary has these enforced properties:
+
+- `/test/*` routes return `404` outside `APP_MODE=test`; development vote
+  tokens are accepted only in test mode.
+- Public aggregate reads may use wildcard CORS. Credentialed, checkout, admin,
+  and other protected responses use the normalized configured site origin.
+- Shared JSON responses include `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, the legacy `X-XSS-Protection` compatibility
+  header, and `Referrer-Policy: strict-origin-when-cross-origin`.
+- Checkout bootstrap, checkout completion, payment-method, admin, preview, and
+  other order-specific responses use private/no-store policy where applicable.
+  Cross-site checkout and payment-method POSTs fail origin checks.
+- Request parsers enforce body-size limits before expensive JSON, Stripe, or KV
+  work. Slugs, emails, vote identifiers/options, integer-cent amounts, admin
+  fields, catalog values, media paths, URLs, and structured collections are
+  normalized and bounded at the Worker boundary.
+- The removed hosted-cart webhook route is absent. The first-party checkout and
+  signed Stripe webhook are the only supported payment ingress paths.
+- Community bearer tokens stay in session storage; a missing backing pledge
+  returns `404` even when a magic-link signature is valid.
+- Scarce-tier claims and settlement serialization use their per-campaign
+  Durable Object coordinators. KV exposes projections, not race-sensitive
+  authority.
+- Add-on catalog and historical prices remain within the canonical Worker
+  amount ceiling, and browser-submitted prices are not authoritative.
+- Abandoned-checkout reminders require explicit consent, signed
+  unsubscribe/resume links, bounded retention, deduplication, and campaign-index
+  checks before delivery.
+
+### Stripe Webhook Failure Behavior
+
+The Worker checks event mode before applying a Stripe webhook. A missing secret
+for the selected mode is acknowledged with a skipped outcome so Stripe does not
+retry indefinitely, but the event is neither parsed into pledge state nor
+applied. Invalid signatures return `401`. Production posture treats a missing
+live webhook secret as a deployment defect.
+
+Webhook processing uses a lease, processed markers, bounded body size,
+redacted observability, and idempotent payment operations. Canonical pledge
+state does not roll back when an email or other notification side effect fails.
+
+### Rate Limits And Denial-Of-Wallet Controls
+
+`RATELIMIT` is required. A missing or unavailable binding fails closed with
+`503`; repeated blocked requests in the same window do not rewrite the same
+counter.
+
+| Endpoint class | Limit | Window | Key |
+| --- | ---: | ---: | --- |
+| Checkout start | 40 | 60 seconds | IP |
+| Shipping quote | 90 | 60 seconds | IP |
+| Tax quote | 90 | 60 seconds | IP |
+| Checkout completion | 12 | 60 seconds | Order |
+| Checkout abandon | 12 | 60 seconds | Order |
+| Launch reminder signup | 5 | 60 seconds | IP |
+| Manage Pledge reads | 120 | 60 seconds | IP |
+| Manage Pledge writes | 30 | 60 seconds | IP |
+| Vote reads/writes | 45 | 60 seconds | IP |
+| Admin operations | 5 | 60 seconds | IP |
+| Film Stripe summary adapter | 30 | 60 seconds | IP |
+
+Public `/live/:slug`, `/stats/:slug`, and `/inventory/:slug` reads remain
+uncapped for legitimate campaign traffic. Stripe webhooks rely on signature
+verification, idempotency, and body limits rather than a tight shared-IP cap.
+Deployed Standard/Paid Workers also declare `limits.cpu_ms = 100` as a
+denial-of-wallet ceiling; local development does not enforce that Cloudflare
+limit.
+
+Use `GET /admin/observability/webhooks`,
+`GET /admin/observability/performance`, and
+[`scripts/check-observability.sh`](../scripts/check-observability.sh) to review
+bounded delivery and timing summaries without exposing raw request payloads.
+
+### Credential Comparison And Scope
+
+Admin bearer values, scoped admin secrets, CSRF tokens, checkout signatures,
+magic-link signatures, and dry-run hashes use timing-safe comparison helpers.
+Missing admin credentials fail closed. Scoped settlement, broadcast, and
+maintenance routes prefer their dedicated credential and reject the broader
+fallback when the scoped secret is configured.
+
+### Dependency And Release Security
+
+Both `npm audit --omit=dev --audit-level=moderate` and the full
+`npm audit --audit-level=moderate` are release checks. Production findings
+block release. Dev-only findings in build or release tooling require removal, a
+clean supported pin, or an explicit scoped acceptance record. The current
+Lighthouse pin is recorded in the lockfile; the changelog and release evidence,
+not this guide, retain the version-specific resolution history.
+
+### Accepted Risks
+
+Two low-severity tradeoffs remain accepted:
+
+- Magic links expire after 90 days so accountless supporters can return across
+  long campaign timelines. Each link is scoped to one order and requires a real
+  backing pledge.
+- Magic-link entry uses a query parameter. Strict referrer behavior, route
+  scoping, private cache policy, and exclusion from indexing/prefetching reduce
+  leakage risk.
 
-**File:** `worker/src/routes/votes.js`
+Prospective shorter-lived links and one-time URL token exchange are tracked in
+the [Roadmap](./ROADMAP.md).
 
-**Historical vulnerable pattern:**
-```javascript
-if (token.startsWith('dev-token-')) {
-  campaignSlug = token.replace('dev-token-', '');
-  orderId = 'dev-order-1';
-}
-```
-
-**Fixed:**
-```javascript
-if (token.startsWith('dev-token-')) {
-  if (env.APP_MODE !== 'test') {
-    return jsonResponse({ error: 'Invalid token' }, 401);
-  }
-  campaignSlug = token.replace('dev-token-', '');
-  orderId = 'dev-order-1';
-  email = 'dev@test.com';
-}
-```
-
-**Note:** Votes are keyed by **email** (not orderId) to prevent supporters with multiple pledges from voting multiple times. The Worker also resolves campaign decisions server-side, rejects unknown/closed decisions, and only accepts option values from the campaign's published allowlist.
-
-Campaign-authored titles, descriptions, and support labels are also escaped by default in supporter-facing cart, manage, and community surfaces so forks with creator-editable content do not inherit a stored-XSS footgun by default. Long-form campaign and diary blocks now accept Markdown plus a very small inline HTML subset (`<br>`, `<em>`, `<strong>`, `<i>`, `<b>`, `<u>`); other raw tags are escaped at render time and rejected by the content audit. Markdown links are rewritten unless they use an allowlisted destination scheme (`http:`, `https:`, `mailto:`, or internal links), and structured embeds must use exact approved `https://` provider URLs instead of passing a substring check.
-Community pages no longer persist the raw supporter bearer token in a long-lived cookie; the token now stays in browser session storage while a non-sensitive verification cookie handles lightweight UX state.
-
-Limited-tier inventory mutations now flow through a per-campaign Durable Object coordinator from checkout start onward. Scarce tiers are reserved before redirecting into Stripe, confirmed at successful persistence time, and only projected back into KV for public reads. That keeps race-sensitive inventory truth out of client-visible KV while preserving efficient public `/inventory/:slug` reads.
-
-The newer on-site Stripe checkout and `Update Card` flows now also fail more privately by default: Worker responses that carry Stripe session bootstrap data or order-specific completion state are served with `Cache-Control: private, no-store`, cross-site browser POSTs to checkout-start / checkout-complete / payment-method-start are rejected unless they originate from `SITE_BASE`, and the browser keeps only short-lived in-flight checkout markers for reservation recovery instead of leaving them in long-lived storage indefinitely. Long-lived cart persistence now keeps only cart structure and pricing inputs; contact and address drafts are downgraded to session-scoped storage, and `/checkout-intent/complete` has its own retry budget so local recovery can’t be spammed indefinitely. After successful pledge persistence, the checkout flow now also invalidates live stats/inventory caches immediately and leaves a short-lived refresh marker so restored campaign pages do not keep showing stale totals from pre-pledge browser state.
-
-Release cache evidence is centralized in `config/performance-budgets.json` and runs with `npm run test:cache-policy`. It verifies that public pages/assets meet minimum cache lifetimes while admin/session targets remain `private, no-store`; a performance change that weakens a private route is a release failure. Workers Cache remains disabled unless representative evidence clears the configured p95 improvement threshold.
-
-Add-on pricing is bounded at the same `$1,000,000` ceiling as canonical checkout amounts. Admin product and variant normalization rejects larger values before GitHub publish, Worker catalog resolution rechecks the resulting cents, and an out-of-range saved historical `unitPrice` is never trusted as a price-preservation override.
-
-Release dependency review runs both `npm audit --omit=dev --audit-level=moderate` and the full `npm audit --audit-level=moderate`. Production findings are blockers. Dev-only findings in build or release tooling must be removed, pinned to a clean supported version, or explicitly accepted with scope and rationale. Pool pins Lighthouse `12.6.1` because the later transitive Sentry/OpenTelemetry chain carried a moderate allocation advisory while this compatible release audits cleanly.
-
-Abandoned-checkout reminders are opt-in only. The browser sends `abandonedCartConsent` only when the supporter checks the reminder box, and the Worker queues a reminder only after Stripe creates a valid first-party Checkout Session. Reminder records are short-lived, use signed unsubscribe links, delete on successful pledge persistence for that order, and check campaign pledge indexes before sending so a later completed pledge suppresses stale abandoned-checkout email. After a reminder sends, the Worker stores a separate short-lived `abandoned-cart-resume:{orderId}` snapshot for signed resume links; that snapshot contains only the sanitized cart/contact fields needed to rebuild a fresh checkout session and never puts Stripe secrets in the URL.
-
----
-
-### SEC-002: Do Not Process Missing Stripe Webhook Secret (✅ FIXED)
-
-**File:** `worker/src/index.js` (handleStripeWebhook)
-
-**Historical vulnerable pattern:**
-```javascript
-const webhookSecret = getStripeWebhookSecret(env);
-if (webhookSecret) {
-  // Only verifies if secret exists
-}
-```
-
-**Fixed:**
-```javascript
-const webhookSecret = getStripeWebhookSecret(env);
-if (!webhookSecret) {
-  console.warn('Stripe webhook secret not configured for this mode, acknowledging receipt');
-  return jsonResponse({ received: true, skipped: 'webhook secret not configured' }, 200);
-}
-
-const { valid, error } = await verifyStripeSignature(body, sig, webhookSecret);
-if (!valid) {
-  return jsonResponse({ error: 'Invalid signature' }, 401);
-}
-```
-
-The Worker acknowledges missing-secret webhooks to avoid infinite Stripe retries for the wrong mode, but it does not parse or apply the event. Production readiness should still treat a missing live webhook secret as a deployment defect.
-
----
-
-### SEC-003: Guard Test Endpoints (✅ FIXED)
-
-**File:** `worker/src/index.js` (router)
-
-The Worker now blocks test endpoints outside `APP_MODE === 'test'` before those handlers run:
-
-```javascript
-// Block test endpoints in production
-if (path.startsWith('/test/') && env.APP_MODE !== 'test') {
-  return jsonResponse({ error: 'Not found' }, 404);
-}
-```
-
-Each handler also verifies the environment as defense in depth:
-```javascript
-async function handleTestSetup(request, env) {
-  if (env.APP_MODE !== 'test') {
-    return jsonResponse({ error: 'Not found' }, 404);
-  }
-  // ...
-}
-```
-
----
-
-### SEC-004: Restrict CORS Origins (✅ FIXED)
-
-**File:** `worker/src/index.js`
-
-CORS is now restricted based on endpoint type:
-- **Public endpoints** (`/stats/*`, `/inventory/*`): Allow `*`
-- **Protected endpoints**: Use a normalized `env.CORS_ALLOWED_ORIGIN`, normalized `env.SITE_BASE`, or the canonical production site origin
-
-```javascript
-function getAllowedOrigin(env, isPublic = false) {
-  if (isPublic) return '*';
-  return normalizeOrigin(env.CORS_ALLOWED_ORIGIN) ||
-         normalizeOrigin(env.SITE_BASE) ||
-         'https://pool.dustwave.xyz';
-}
-
-// Public endpoints pass isPublic=true:
-return jsonResponse(data, 200, env, true);
-
-// Protected endpoints use default:
-return jsonResponse(data, 200, env);
-```
-
----
-
-### SEC-005: Rate Limiting (✅ FIXED)
-
-**File:** `worker/src/index.js`
-
-In-Worker rate limiting is now implemented using KV storage with per-IP tracking.
-
-**Write-Path Rate Limits:**
-
-| Endpoint | Limit | Window | Notes |
-|----------|-------|--------|-------|
-| `/checkout-intent/start` | 40 requests | 1 minute | Checkout starts; tuned higher so shared NATs and legitimate spikes still fit |
-| `/shipping/quote` | 90 requests | 1 minute | Shipping quote refreshes stay roomy during cart edits |
-| `/checkout-intent/complete` | 12 requests | 1 minute | Keyed by `orderId` instead of only IP to avoid punishing real retries |
-| `/checkout-intent/abandon` | 12 requests | 1 minute | Keyed by `orderId` so reservation cleanup retries stay friendly to shared IPs |
-| `/pledge` + `/pledges` | 120 requests | 1 minute | Manage-pledge reads stay generous because they are user-facing reads |
-| `/pledge/cancel`, `/pledge/modify`, `/pledge/payment-method/start` | 30 requests | 1 minute | Manage-pledge writes |
-| `/votes` | 45 requests | 1 minute | Voting endpoints |
-| `/admin/*` | 5 requests | 1 minute | Admin operations |
-
-**How It Works:**
-
-- Rate limits are tracked **per IP address** using `CF-Connecting-IP` header
-- Each IP gets its own bucket, so 100 different users won't interfere with each other
-- Public read endpoints like `/live/:slug`, `/stats/:slug`, and `/inventory/:slug` stay uncapped so a legitimately viral campaign does not trip a DoS defense just for being popular
-- The checkout and Manage Pledge write paths keep higher ceilings than a typical brute-force limit so shared NAT environments still have breathing room
-- `/checkout-intent/complete` is keyed by `orderId`, which is friendlier to legitimate recovery retries than a pure per-IP bucket
-- `/checkout-intent/abandon` is also keyed by `orderId`, so cleanup/release retries do not punish supporters behind the same NAT during a busy launch
-- Stripe webhooks are protected with signature verification, idempotency, and a request-body size cap instead of a tight per-IP limit that could interfere with normal Stripe delivery
-- Once a client is already over limit for the current window, repeated blocked requests fail closed without rewriting the same KV counter on every hit. That keeps abuse pressure from turning into unnecessary free-plan KV writes.
-- Expensive POST routes now also reject obviously oversized request bodies before parsing JSON or touching Stripe/KV-heavy flows.
-- Deployed Standard/Paid Workers now also declare `limits.cpu_ms = 100` in `wrangler.toml`. That is a denial-of-wallet guardrail, not a claim that normal requests are anywhere near that expensive.
-- Admin-only observability endpoints now expose webhook delivery summaries and sampled mutation timings so operators can tune DoS defenses without relying only on raw log tails.
-
-**Setup:**
-
-1. Create the KV namespace:
-   ```bash
-   wrangler kv:namespace create "RATELIMIT"
-   wrangler kv:namespace create "RATELIMIT" --preview
-   ```
-
-2. Add to `wrangler.toml` (both production and dev sections):
-   ```toml
-   # Production
-   [[kv_namespaces]]
-   binding = "RATELIMIT"
-   id = "YOUR_RATELIMIT_KV_ID"
-   preview_id = "YOUR_RATELIMIT_PREVIEW_ID"
-   
-   # Development (in [env.dev] section)
-   [[env.dev.kv_namespaces]]
-   binding = "RATELIMIT"
-   id = "YOUR_RATELIMIT_KV_ID"
-   preview_id = "YOUR_RATELIMIT_PREVIEW_ID"
-   ```
-
-**Note:** `RATELIMIT` is now a hard requirement. If the binding is missing, the Worker fails closed with `503` instead of serving traffic without abuse protection. That change increases the importance of having real KV headroom, but it does not mean the Workers Free plan is suddenly incompatible with the project's intended low-to-moderate crowdfunding scale.
-
-**CPU cap note:** Cloudflare's configurable `limits` block is only enforced on the Standard Usage Model and only on deployed Workers, not in local development. The current `cpu_ms = 100` value was chosen as a conservative backstop after representative unit-harness requests landed around `6 ms`, `15 ms`, and `28 ms` wall-clock time for admin light, checkout recovery, and checkout abandon flows respectively. That is only a proxy measurement, but it is enough to justify a low ceiling with headroom instead of leaving the paid default at `30 seconds`.
-
-**Observability note:** Use `GET /admin/observability/webhooks` to inspect webhook volume, duplicate deliveries, signature failures, and recent outcomes, and `GET /admin/observability/performance` to inspect sampled wall-clock timings for the key mutation routes. The helper script [`scripts/check-observability.sh`](../scripts/check-observability.sh) wraps both endpoints for local or deployed checks.
-
-**Response when rate limited:**
-```json
-{
-  "error": "Too many requests",
-  "retryAfter": 45
-}
-```
-
-Status: `429 Too Many Requests` with headers:
-- `Retry-After`: Seconds until limit resets
-- `X-RateLimit-Limit`: Maximum requests allowed
-- `X-RateLimit-Remaining`: Requests remaining in window
-- `X-RateLimit-Reset`: Unix timestamp when window resets
-
-**Local Testing:**
-
-Restart the Worker to reset rate limit counters (local KV is simulated and resets on restart):
-```bash
-lsof -ti:8787 | xargs kill -9
-cd worker && npx wrangler dev --port 8787
-```
-
----
-
-### SEC-006: Timing-Safe Admin Secret Comparison (✅ FIXED)
-
-**File:** `worker/src/index.js`
-
-The Worker now uses a timing-safe comparison helper for admin secrets:
-```javascript
-function timingSafeEqual(a, b) {
-  if (!a || !b || a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
-}
-
-function requireAdmin(request, env, scope = 'default') {
-  const authHeader = request.headers.get('Authorization') || '';
-  const provided = authHeader.startsWith('Bearer ')
-    ? authHeader.slice('Bearer '.length)
-    : request.headers.get('x-admin-key') || '';
-  const credential = getAdminSecretForScope(env, scope);
-  
-  if (!credential) {
-    console.error('admin secret not configured');
-    return { ok: false, status: 500, error: 'Admin not configured' };
-  }
-  
-  if (!timingSafeEqual(provided, credential.secret)) {
-    return { ok: false, status: 401, error: 'Unauthorized' };
-  }
-  
-  return { ok: true };
-}
-```
-
----
-
-## Accepted Tradeoffs / Follow-Up Candidates
-
-These are the currently known items that are not treated as active vulnerabilities requiring immediate code changes:
-
-### SEC-008: Magic Link Tokens Long-Lived (90 days)
-
-Status: **Accepted tradeoff**
-
-Why it remains:
-- magic links are intentionally accountless and need to stay usable across longer campaign timelines
-- each token is scoped to a specific order/campaign path rather than granting broad account access
-
-If this ever changes, the likely follow-up would be shortening token lifetime and pairing it with easier reissue/recovery UX.
-
-### SEC-010: Tokens in Query Strings (Referer Leakage Risk)
-
-Status: **Accepted tradeoff**
-
-Why it remains:
-- magic-link entry currently depends on emailed URLs with query parameters
-- the platform already limits referrer leakage with stricter response headers and scoped access behavior
-
-If this becomes a higher-priority concern, the likely follow-up would be a one-time token exchange flow that strips the raw token from the visible URL after first load.
-
----
-
-### SEC-007: Remove Legacy Hosted-Cart Webhook Surface (✅ FIXED)
-
-**File:** `worker/src/index.js`
-
-The Worker no longer exposes the removed third-party checkout webhook path at all, which eliminates an unnecessary callback surface the live flow no longer needs.
-
----
-
-### SEC-009: Stricter Input Validation on Votes (✅ FIXED)
-
-**File:** `worker/src/routes/votes.js`, `worker/src/validation.js`
-
-Voting endpoints now validate:
-- Decision IDs: max 100 chars, alphanumeric + hyphens only
-- Vote options: max 50 chars
-- Max 20 decision IDs per request
-
-```javascript
-// Validation rules
-const MAX_VOTE_OPTION_LENGTH = 50;
-const MAX_DECISION_ID_LENGTH = 100;
-const VALID_SLUG_REGEX = /^[a-z0-9-]+$/;
-
-// Validated before processing
-if (!isValidDecisionId(decisionId)) {
-  return jsonResponse({ error: 'Invalid decision ID format' }, 400, env);
-}
-
-if (!isValidVoteOption(option)) {
-  return jsonResponse({ error: 'Invalid vote option format' }, 400, env);
-}
-```
-
----
-
-### SEC-011: Input Validation on Checkout Start (✅ FIXED)
-
-**File:** `worker/src/index.js`, `worker/src/validation.js`
-
-The `/checkout-intent/start` path now validates:
-- Campaign slugs: max 100 chars, alphanumeric + hyphens only (prevents injection/traversal)
-- Email addresses: RFC-compliant format, max 254 chars
-- Cart item IDs and quantities
-- Support/custom amount inputs through canonical contribution rebuilding
-
-```javascript
-if (!isValidSlug(campaignSlug)) {
-  return jsonResponse({ error: 'Invalid campaign slug format' }, 400);
-}
-
-if (email && !isValidEmail(email)) {
-  return jsonResponse({ error: 'Invalid email format' }, 400);
-}
-
-if (!parsedCart.valid) {
-  return jsonResponse({ error: parsedCart.error }, 400);
-}
-```
-
----
-
-### SEC-012: Security Response Headers (✅ FIXED)
-
-**File:** `worker/src/validation.js`
-
-All API responses now include security headers:
-
-```javascript
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',     // Prevents MIME-type sniffing
-  'X-Frame-Options': 'DENY',                // Prevents clickjacking
-  'X-XSS-Protection': '1; mode=block',      // Legacy XSS protection
-  'Referrer-Policy': 'strict-origin-when-cross-origin'  // Limits referer leakage
-};
-```
-
----
-
-### SEC-013: Admin Dashboard Stored Input Normalization (✅ FIXED)
-
-**File:** `worker/src/index.js`
-
-The admin dashboard now validates every GitHub-backed and KV-backed dashboard write through shared admin normalization helpers before persistence.
-
-Covered write paths:
-- `/admin/settings/preview` and `/admin/settings/publish`
-- `/admin/content/preview` and `/admin/content/publish`
-- `/admin/settings/logo-upload`, `/admin/settings/image-upload`, `/admin/settings/audio-upload`, and `/admin/settings/video-upload`
-- `/admin/users`
-- `/admin/campaigns/create`, `/admin/campaigns/archive`, and `/admin/campaign-preview/publish`
-- `/admin/marketing/referrals`
-- `/admin/marketing/announcement`
-
-The hardening rejects stored-XSS primitives such as raw `<script>`, event-handler attributes, unsafe Markdown links, parent-relative Markdown links, `javascript:`/`data:` URLs, CSS function/declaration injection, and unsafe asset paths. It also rejects settings mass assignment for dashboard-only rows and normalizes structured arrays for platform add-ons, campaign add-ons, tiers, support items, diary entries, stretch goals, ongoing items, and decisions. Media uploads are role-scoped, content-type allowlisted, size-limited, and written only to canonical dashboard asset directories. Blast email rendering includes only site-hosted image paths and email-safe video links rather than arbitrary remote image hotlinks or iframe embeds.
-
-The browser dashboard also has defense-in-depth hardening around the editing shell: the admin page meta CSP avoids inline scripts, limits Worker/API connections, and keeps content previews in sandboxed iframes. Deployments should add framing protection through HTTP headers, such as `Content-Security-Policy: frame-ancestors 'none'` or `X-Frame-Options: DENY`, because meta CSP cannot enforce that directive. Magic-link email payloads strip CRLF/control characters from configurable header values before calling Resend so platform names or sender settings cannot create header-injection payloads.
-
----
 
 ## Secrets Checklist
 
@@ -599,7 +304,7 @@ Payment-specific setup is documented in [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESS
 | Resend API Key | `RESEND_API_KEY` | N/A |
 | Cloudflare Usage Analytics Token | `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN` | GraphQL Analytics Read; optional Billing Read for plan detection |
 
-When GitHub Actions or an operator script calls protected admin endpoints, add only the needed matching secret to GitHub repository secrets. The default deploy workflow uses `ADMIN_BROADCAST_SECRET` for the post-deploy diary check when it is configured; future settlement automation should use `ADMIN_SETTLEMENT_SECRET` rather than the broader fallback secret.
+When GitHub Actions or an operator script calls protected admin endpoints, add only the needed matching secret to GitHub repository secrets. The default deploy workflow uses `ADMIN_BROADCAST_SECRET` for the post-deploy diary check when configured. Settlement automation uses `ADMIN_SETTLEMENT_SECRET` rather than the broader fallback secret.
 
 Generate secure secrets:
 ```bash
@@ -623,7 +328,7 @@ npm audit --omit=dev --audit-level=moderate
 npm audit --audit-level=moderate
 ```
 
-`npm run test:premerge` now includes the secret audit automatically, so local merge gating checks both security behavior and accidental credential exposure.
+`npm run test:premerge` includes the secret audit, so local merge gating checks both security behavior and accidental credential exposure.
 The command is a thin Pool policy adapter over the shared Dust Wave scanner:
 it preserves the ignored `worker/.dev.vars` and test-fixture rules, scans
 tracked credential forms plus exact local values in the worktree/history, and
@@ -686,7 +391,3 @@ See [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for the fuller webhook recove
 - **Primary:** [alonso@dustwave.xyz]
 - **Stripe Security:** [stripe.com/docs/security](https://stripe.com/docs/security)
 - **Cloudflare Status:** [cloudflarestatus.com](https://www.cloudflarestatus.com)
-
----
-
-_Last updated: June 18, 2026_

@@ -204,7 +204,7 @@ Sent when new campaign diary entries are broadcast.
 - Uses a plain-text excerpt generated from the diary content.
 - Links back to the campaign diary.
 - Tracks sent entries in KV so the same diary entry is not broadcast repeatedly.
-- Updating existing diary metadata should not send a new email when the entry ID is stable.
+- Updating existing diary metadata does not send a new email when the entry ID is stable.
 
 ### Milestone
 
@@ -306,7 +306,7 @@ Production sends use `email-outbox:v1:*` records. Persistence happens before the
 - summarizes Resend provider errors
 - returns normalized retryability, ambiguity, status, and provider error type on non-OK responses
 
-The older `supporter-email-retry:*` queue remains readable during migration, but retries now hand final delivery to the shared outbox. Admin sign-in magic links and explicit test sends remain immediate because delaying them would make the interaction unusable.
+The older `supporter-email-retry:*` queue remains readable during migration, but retries hand final delivery to the shared outbox. Admin sign-in magic links and explicit test sends remain immediate because delaying them would make the interaction unusable.
 
 Diary, milestone, and live announcement mail carries a signed campaign-scoped `List-Unsubscribe` URL and RFC 8058 `List-Unsubscribe-Post` header. GET shows a human confirmation; POST returns a blank success and writes an indefinite hashed campaign suppression. Transactional pledge/payment mail is not suppressed by campaign marketing preferences.
 
@@ -314,7 +314,7 @@ Permanent bounces, complaints, and provider suppressions create a hashed local `
 
 ## Consent And Trust
 
-Email changes should follow the [Ethical Risk review](./ETHICAL_RISK.md) when they add new audiences, triggers, reminders, reports, or marketing surfaces.
+Email changes follow the [Ethical Risk review](./ETHICAL_RISK.md) when they add new audiences, triggers, reminders, reports, or marketing surfaces.
 
 Rules:
 
@@ -327,7 +327,7 @@ Rules:
 
 ## Copy And Localization
 
-Human-facing copy should stay short, direct, and localizable.
+Human-facing copy stays short, direct, and localizable.
 
 Rules:
 
@@ -371,7 +371,7 @@ npm run test:secrets
 npm run release:payment-smoke -- --no-dev-vars
 ```
 
-For release evidence that should render email payloads without calling Resend, set `POOL_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`. The shared send path returns a dry-run id and skips the provider request, which lets pledge, report, launch-reminder, abandoned-checkout, and Blast-adjacent smoke checks prove payload construction without sending mail.
+For release evidence that renders email payloads without calling Resend, set `POOL_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`. The shared send path returns a dry-run id and skips the provider request, which lets pledge, report, launch-reminder, abandoned-checkout, and Blast-adjacent smoke checks prove payload construction without sending mail.
 
 Manual smoke:
 

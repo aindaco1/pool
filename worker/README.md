@@ -4,13 +4,13 @@ Cloudflare Worker handling first-party checkout canonicalization, Stripe integra
 
 ## Shared Platform boundary
 
-Pool `v1.2.20` pins Dust Wave Platform `v0.32.0` at exact commit
-`85165a16ac6923b438514bdce0a9957c1804db5f`. The Worker consumes the pinned
-`worker-core`, `shipping-core`, `tax-core`, `inventory-core`, and `media-core`
-packages for characterized, runtime-neutral mechanics. Pool retains every
-route, request schema, campaign/pledge model, Durable Object and KV policy,
-credential, Stripe/Resend/Cloudflare policy, side effect, deployment, and
-rollback decision.
+The Worker consumes the repository's pinned `worker-core`, `shipping-core`,
+`tax-core`, `inventory-core`, and `media-core` packages for characterized,
+runtime-neutral mechanics. Pool retains every route, request schema,
+campaign/pledge model, Durable Object and KV policy, credential,
+Stripe/Resend/Cloudflare policy, side effect, deployment, and rollback
+decision. The root gitlink and `git submodule status` are authoritative for the
+current Platform version.
 
 The separately pinned Dust Wave Jekyll Template is compile-time source-upgrade
 tooling only. It is never imported by this Worker and is excluded from the
@@ -25,11 +25,11 @@ npm run podman:doctor
 
 That boots the site and Worker together on the standard local ports and is the easiest way to exercise the full on-site checkout and `Update Card` flows locally.
 
-The repo-root Podman path runs the Worker with Node 24, matching GitHub Actions. Host-only Worker development should also use Node 24 when possible; Wrangler 4 requires at least Node 22. The Worker compatibility date is intentionally shared across local and deployed environments so Miniflare/Workers runtime behavior does not drift.
+The repo-root Podman path runs the Worker with Node 24, matching GitHub Actions. Host-only Worker development uses Node 24 when possible; Wrangler 4 requires at least Node 22. The Worker compatibility date is intentionally shared across local and deployed environments so Miniflare/Workers runtime behavior does not drift.
 
-If you specifically work from the `worker/` directory, the Worker npm scripts now auto-run the config mirror first so `worker/wrangler.toml` stays aligned with the repo-root `_config.yml` / `_config.local.yml`.
+If you specifically work from the `worker/` directory, the Worker npm scripts auto-run the config mirror first so `worker/wrangler.toml` stays aligned with the repo-root `_config.yml` / `_config.local.yml`.
 
-Treat `_config.local.yml` as an override-only file for localhost-specific values. The canonical fork-facing settings should live in the repo-root `_config.yml`, and the Worker mirror will follow from there.
+Treat `_config.local.yml` as an override-only file for localhost-specific values. Canonical fork-facing settings live in the repo-root `_config.yml`, and the Worker mirror follows from there.
 
 Use [`docs/PAYMENT_PROCESSOR.md`](../docs/PAYMENT_PROCESSOR.md) for Stripe setup, checkout, webhook, settlement, and reconciliation details. Use [`docs/BACKUP_RESTORE.md`](../docs/BACKUP_RESTORE.md) for classified snapshots, preview restore, retention, and disaster recovery. Use [`docs/EMAIL.md`](../docs/EMAIL.md) for Resend sender setup, email types, localization, and delivery behavior. Use [`docs/ETHICAL_RISK.md`](../docs/ETHICAL_RISK.md) before adding Worker behavior that changes money, data collection, messaging, automation, public sharing, analytics, or admin power.
 
@@ -38,10 +38,10 @@ Campaign-runner report delivery follows that same pattern:
 - campaign-level recipients live in campaign front matter as `runner_report_emails`
 - deployment-wide timing and email/report behavior live in `_config.yml` under `reports.campaign_runner`
 - the Worker mirror carries those non-secret settings into `wrangler.toml`
-- the shared report core in `worker/src/reports.js` now powers both scheduled runner emails and the local shell export helpers so CSV logic stays in one place
+- the shared report core in `worker/src/reports.js` powers both scheduled runner emails and the local shell export helpers so CSV logic stays in one place
 - the browser dashboard Reports tab previews and downloads pledge/fulfillment CSVs without sending email or writing sent markers
 
-The mirrored Worker config now also includes the shared debug flags:
+The mirrored Worker config includes the shared debug flags:
 
 - `DEBUG_CONSOLE_LOGGING_ENABLED`
 - `DEBUG_VERBOSE_CONSOLE_LOGGING`
@@ -65,11 +65,11 @@ rejects redirects, bounds the response, and classifies retryable failures. It
 is not connected to checkout, settlement, email, or any product/tier mapping
 until that mapping and durable delivery lifecycle are explicitly selected.
 
-Write-path DoS protection now requires a `RATELIMIT` KV namespace. If that binding is missing, the Worker fails closed with `503` instead of running without abuse protection. Public live-data reads stay intentionally roomy for campaign spikes, while checkout, Manage Pledge, and admin mutations use the tighter per-IP caps documented in [`docs/SECURITY.md`](../docs/SECURITY.md). That requirement adds safety, not a new assumption that every fork must immediately outgrow the Workers Free plan.
+Write-path DoS protection requires a `RATELIMIT` KV namespace. If that binding is missing, the Worker fails closed with `503` instead of running without abuse protection. Public live-data reads stay intentionally roomy for campaign spikes, while checkout, Manage Pledge, and admin mutations use the tighter per-IP caps documented in [`docs/SECURITY.md`](../docs/SECURITY.md). That requirement adds safety, not a new assumption that every fork must immediately outgrow the Workers Free plan.
 
-Deployed Standard/Paid Workers now also set `limits.cpu_ms = 100` in [`wrangler.toml`](./wrangler.toml). That limit is not enforced in local development and is not a Workers Free override; it is a conservative denial-of-wallet ceiling for paid deployments that still leaves comfortable room above the currently observed fast-path request timings in the unit harness.
+Deployed Standard/Paid Workers set `limits.cpu_ms = 100` in [`wrangler.toml`](./wrangler.toml). That limit is not enforced in local development and is not a Workers Free override; it is a conservative denial-of-wallet ceiling for paid deployments that still leaves comfortable room above the currently observed fast-path request timings in the unit harness.
 
-Tax calculation is now routed through a provider seam in `worker/src/tax.js`:
+Tax calculation is routed through a provider seam in `worker/src/tax.js`:
 
 - `TAX_PROVIDER=flat` keeps the current configured-rate behavior from `SALES_TAX_RATE`
 - `TAX_PROVIDER=offline_rules` uses vendored rules for international VAT/GST and state-level fallback handling
@@ -78,9 +78,9 @@ Tax calculation is now routed through a provider seam in `worker/src/tax.js`:
 
 Non-secret provider settings are mirrored from the repo-root `_config.yml` into [`wrangler.toml`](./wrangler.toml) as `TAX_PROVIDER`, `TAX_ORIGIN_COUNTRY`, `TAX_USE_REGIONAL_ORIGIN`, `NM_GRT_API_BASE`, and `ZIP_TAX_API_BASE`. If you enable `zip_tax`, also set `ZIP_TAX_API_KEY` as a Worker secret or in [`worker/.dev.vars`](../worker/.dev.vars). The vendored New Mexico starter snapshot is pinned in `@dustwave/tax-core`; its updater requires an explicit reviewed output path and fails before writing if any lookup fails.
 
-In the current browser flow, tax previews are intentionally allowed to stay provisional. If the cart or custom checkout does not yet have enough location data, the site shows `--` and waits for `/tax/quote` or `/checkout-intent/start` to finalize the tax result. New Mexico lookups are the most exact built-in path right now and typically need full street-level address data, not just ZIP/state, before the Worker can return a reliable local GRT result.
+In the current browser flow, tax previews are intentionally allowed to stay provisional. If the cart or custom checkout does not yet have enough location data, the site shows `--` and waits for `/tax/quote` or `/checkout-intent/start` to finalize the tax result. New Mexico lookups are the most exact built-in path and typically need full street-level address data, not just ZIP/state, before the Worker can return a reliable local GRT result.
 
-The Worker now also writes lightweight observability summaries into `PLEDGES` KV for two things:
+The Worker writes lightweight observability summaries into `PLEDGES` KV for two things:
 
 - Stripe webhook delivery outcomes and recent delivery history
 - sampled wall-clock timings for a small set of mutation routes used to tune the `cpu_ms` cap
@@ -99,9 +99,9 @@ Public SEO and crawl validation is also a static-site concern. Build `_site`, mi
 
 The sampling rate defaults to `0.1` and can be overridden with `OBSERVABILITY_SAMPLE_RATE=0.05` (or any `0-1` value) if a fork wants fewer or more sampled timing writes.
 
-Worker-side stats and inventory repair now also treat `campaign-pledges:{slug}` as projection state instead of permanent truth. If a campaign index drifts from the underlying active pledge records, the recalc paths repair it automatically while rebuilding campaign totals and limited-tier inventory.
+Worker-side stats and inventory repair treat `campaign-pledges:{slug}` as projection state instead of permanent truth. If a campaign index drifts from the underlying active pledge records, the recalc paths repair it automatically while rebuilding campaign totals and limited-tier inventory.
 
-Before mutating anything, operators can now run read-only drift checks through:
+Before mutating anything, operators can run read-only drift checks through:
 
 - `POST /stats/:slug/check`
 - `POST /admin/projections/check`
@@ -109,7 +109,7 @@ Before mutating anything, operators can now run read-only drift checks through:
 
 Those checks compare stored `campaign-pledges:{slug}`, `stats:{slug}`, and `tier-inventory:{slug}` projections against active pledge truth and return a structured diff instead of silently repairing state.
 
-The same “saved truth over draft state” rule now applies to platform add-ons: `_config.yml` defines the starting inventory baseline for each product or variant, while the Worker stores sold counts in `add-on-inventory-sold:v1`, updates that projection after pledge create, modify, or cancel events, and avoids repeated pledge namespace scans for normal inventory reads after the initial projection bootstrap.
+The same “saved truth over draft state” rule applies to platform add-ons: `_config.yml` defines the starting inventory baseline for each product or variant, while the Worker stores sold counts in `add-on-inventory-sold:v1`, updates that projection after pledge create, modify, or cancel events, and avoids repeated pledge namespace scans for normal inventory reads after the initial projection bootstrap.
 
 ## Setup
 
@@ -662,7 +662,7 @@ curl -X POST https://pledge.dustwave.xyz/test/email \
 | `USPS_RATE_LIMIT_COOLDOWN_SECONDS` | Cooldown after USPS `429` responses |
 | `DEFAULT_PLATFORM_TIP_PERCENT` | Default platform tip percent mirrored from `pricing.default_tip_percent` |
 | `MAX_PLATFORM_TIP_PERCENT` | Max platform tip percent mirrored from `pricing.max_tip_percent` |
-| `APP_MODE` | `"test"` or `"live"` - determines which API keys to use. Production deployments should use `"live"`; local `dev` uses `"test"`. |
+| `APP_MODE` | `"test"` or `"live"` - determines which API keys to use. Production deployments use `"live"`; local `dev` uses `"test"`. |
 | `ADMIN_LOCAL_REPO_WRITES_ENABLED` | Dev-only guard that lets `APP_MODE=test` create preview-only campaign files and archive campaign source/media in the mounted local repository. Do not enable on deployed Workers. |
 | `ADMIN_LOCAL_REPO_SERVICE` | Dev-only local helper URL used by Wrangler/Podman because the Worker runtime cannot write files directly. Defaults to `http://127.0.0.1:8799` in `env.dev`. |
 | `CORS_ALLOWED_ORIGIN` | Browser origin allowed to call the Worker from the dashboard/site |
@@ -699,13 +699,13 @@ When `SITE_BASE` points at local dev (`localhost` / `127.0.0.1`), embedded email
 
 Production email uses the durable shared outbox in `worker/src/email-outbox.js`: it freezes the rendered payload, sends with a deterministic Resend idempotency key, retries bounded provider failures, and checks local suppression immediately before delivery. Keep new workflows on `queuePoolEmail` / `enqueueEmailOutbox` plus the shared `worker/src/email.js` templates so sender identity, localization, branding, consent, and provider behavior do not drift. Admin login and explicit test sends remain immediate.
 
-Fork note: treat those identity, email-branding, pricing, and shipping vars as mirrors of the structured site config in [`_config.yml`](../_config.yml), especially the `platform`, `design`, `pricing`, and `shipping` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior now, not Worker env toggles you should normally customize directly.
+Fork note: treat those identity, email-branding, pricing, and shipping vars as mirrors of the structured site config in [`_config.yml`](../_config.yml), especially the `platform`, `design`, `pricing`, and `shipping` sections. The first-party cart/runtime and the custom on-site checkout UI are built-in platform behavior, not Worker env toggles for direct customization.
 
 Keep `USPS_CLIENT_SECRET` out of site config. It belongs in Worker secrets or [`worker/.dev.vars`](../worker/.dev.vars).
 
-Localization note: the Worker now localizes supporter-facing email subjects/body copy and localized `/manage/` / `/community/:slug/` links from the shared site locale catalog. In normal operation it fetches that catalog from `SITE_BASE/assets/i18n.json`; tests and advanced deployments can inject `I18N_CATALOG_JSON` instead. That means localized supporter emails and localized routes such as `/es/manage/` or `/es/community/:slug/` stay aligned with the site locale model when a deployment adds those routes.
+Localization note: the Worker localizes supporter-facing email subjects/body copy and localized `/manage/` / `/community/:slug/` links from the shared site locale catalog. In normal operation it fetches that catalog from `SITE_BASE/assets/i18n.json`; tests and advanced deployments can inject `I18N_CATALOG_JSON` instead. That means localized supporter emails and localized routes such as `/es/manage/` or `/es/community/:slug/` stay aligned with the site locale model when a deployment adds those routes.
 
-The Worker also serves localized campaign share-card previews at `GET /share/campaign/:slug.png` with an optional `?lang=es` query. The generated PNG mirrors the campaign embed's state/progress language and uses the square campaign `hero_image` inside the card. The SVG route remains available at `GET /share/campaign/:slug.svg` for internal preview/debug tooling, but public `og:image` metadata should use PNG or another static raster image because not every external crawler accepts SVG images.
+The Worker also serves localized campaign share-card previews at `GET /share/campaign/:slug.png` with an optional `?lang=es` query. The generated PNG mirrors the campaign embed's state/progress language and uses the square campaign `hero_image` inside the card. The SVG route remains available at `GET /share/campaign/:slug.svg` for internal preview/debug tooling, but public `og:image` metadata uses PNG or another static raster image because not every external crawler accepts SVG images.
 
 ## Data Flow
 
@@ -744,7 +744,7 @@ npm run podman:doctor
 
 That starts the site and the Worker together, and the Worker still runs with `--env dev` under the hood.
 
-The broader automated browser path now builds and serves a static `_site`, so local headless checks exercise the same published-style asset layout as the site build rather than relying on `jekyll serve`.
+The broader automated browser path builds and serves a static `_site`, so local headless checks exercise the same published-style asset layout as the site build rather than relying on `jekyll serve`.
 
 If you specifically need the Worker-only fallback:
 
@@ -780,6 +780,6 @@ Diary entries are automatically broadcast to supporters when deployed:
 3. New entries are broadcast to all campaign supporters via email
 4. Sent entries are tracked in KV (`diary-sent:{campaignSlug}`) to prevent duplicate emails
 
-Diary entries should have stable `id` values. The dashboard preserves existing IDs and the Worker derives title-based IDs when publishing entries that do not have one yet. Automatic broadcasts track `id:{entryId}` markers and still recognize legacy date markers, including date strings that only differ by `:00` seconds formatting. Updating an existing diary entry title, date display, phase, or content should not send another automatic email.
+Diary entries require stable `id` values. The dashboard preserves existing IDs and the Worker derives title-based IDs when publishing entries that do not have one yet. Automatic broadcasts track `id:{entryId}` markers and still recognize legacy date markers, including date strings that only differ by `:00` seconds formatting. Updating an existing diary entry title, date display, phase, or content does not send another automatic email.
 
 **Setup:** Ensure `ADMIN_SECRET` is set as a GitHub repository secret for the deploy action to authenticate, or set `ADMIN_BROADCAST_SECRET` in both Cloudflare Worker secrets and GitHub repository secrets when using scoped broadcast credentials. If the post-deploy check receives a Cloudflare challenge page, also configure `DIARY_CHECK_BYPASS_SECRET` plus the matching WAF skip rule described above.

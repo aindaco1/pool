@@ -6,7 +6,7 @@ permalink: /creator-campaign-checklist/
 lang: en
 indexable: false
 translation_key: creator_campaign_checklist
-last_modified_at: 2026-08-06
+last_modified_at: 2026-08-25
 ---
 
 <div class="creator-checklist-layout">
@@ -36,7 +36,7 @@ This checklist covers:
 
 ## Current Platform Notes
 
-This checklist reflects the creator-facing behavior in the current release, **v1.2.20**. The shared Platform and Jekyll upgrades improve common runtime, build, and local product-demonstration foundations without changing the rule that campaign content, publishing decisions, fulfillment, and creator access remain owned by The Pool:
+This checklist reflects the current creator-facing behavior. Shared Platform and Jekyll foundations do not change the rule that campaign content, publishing decisions, fulfillment, and creator access remain owned by The Pool:
 
 - creators and campaign teams can use campaign-specific dashboard access for normal campaign setup, edits, previews, reports, analytics, marketing links, and supporter Blast work instead of direct repository access
 - super admins bootstrap preview-only campaigns, assign or create campaign users, and handle platform-only controls, while assigned campaign users own day-to-day campaign prep
@@ -51,7 +51,7 @@ This checklist reflects the creator-facing behavior in the current release, **v1
 - share intents use the campaign's current state, title, blurb, and public URL where each platform supports message text
 - upcoming campaigns can collect one-time launch reminder signups before pledging opens
 - campaign launch/deadline timing follows the deployment's configured platform timezone
-- campaign analytics now keep gross campaign revenue visible while also showing net campaign revenue after allocated processor fees
+- campaign analytics keep gross campaign revenue visible while also showing net campaign revenue after allocated processor fees
 - platform operators can monitor Cloudflare and Resend plan usage from the admin dashboard without exposing provider tokens in browser code
 - campaign teams can use protected preview links to review draft campaigns privately before public launch
 - campaign teams can build tracked campaign URLs, save referral codes, generate browser-local QR previews/downloads, save explicit shared Marketing drafts, and review referral/UTM performance from Analytics
@@ -60,12 +60,12 @@ This checklist reflects the creator-facing behavior in the current release, **v1
 - dashboard reloads return campaign teams to their last allowed tab, selected campaign, and Campaigns subtab so repeated content, Marketing, and Blast work resumes in place
 - custom checkout can collect explicit consent for one abandoned-checkout reminder, which is separate from launch reminders and ordinary campaign blasts; campaign teams can review aggregate reminder health and use scoped suppression controls without retrying individual carts
 - a campaign can optionally publish a localized, indexable product page for its featured physical tier only after the reward has a positive price, image, description, and exact expected availability date; this does not by itself create Merchant Center or Google Shopping placement
-- the public Terms now state the default final-sale/no-returns policy, the process for damaged, defective, incorrect, or missing items, and the creator's responsibility to communicate material production or fulfillment changes
+- the public Terms state the default final-sale/no-returns policy, the process for damaged, defective, incorrect, or missing items, and the creator's responsibility to communicate material production or fulfillment changes
 - public performance and SEO work make campaign progress, share links, localized metadata, generated share cards, deferred YouTube hero embeds, responsive image delivery, and the lightweight first load more reliable, but creators still need to provide optimized media and concise copy
 
 ## The Short Version
 
-If a creator only reads one section, it should be this one.
+If a creator only reads one section, use this one.
 
 ### Required at launch
 
@@ -82,8 +82,8 @@ If a creator only reads one section, it should be this one.
 - at least one tier
 - tier name, price, and description for each tier
 - report recipient email addresses, if the campaign runner wants automatic reports
-- dashboard editor email addresses, if the creator or team should edit the campaign directly
-- optional preview reviewer email addresses for people who should see the private draft before launch
+- dashboard editor email addresses, if the creator or team will edit the campaign directly
+- optional preview reviewer email addresses for people who will see the private draft before launch
 - a launch reminder decision for upcoming campaigns: enabled public form, no form, or launch without a pre-launch signup period
 
 ### Strongly recommended
@@ -133,16 +133,16 @@ The best campaigns do not overwhelm people with information. They make it easy t
 - why it matters
 - why this creator is the right person to make it
 - what a supporter gets
-- why someone should join now
+- why someone has a reason to join now
 
 <figure class="creator-checklist-screenshot">
   <img src="/assets/images/checklists/creator-campaign-checklist/campaign-hero-progress.png" alt="Campaign hero media with progress and goal markers beneath it." loading="lazy">
-  <figcaption>The campaign hero should make the project feel real before the supporter reaches the tier list.</figcaption>
+  <figcaption>The campaign hero makes the project feel real before the supporter reaches the tier list.</figcaption>
 </figure>
 
 ## Core Campaign Information
 
-These are the foundational fields every campaign should have.
+These are the foundational fields every campaign needs.
 
 | Item | Required | Guidance |
 |------|----------|----------|
@@ -157,8 +157,8 @@ These are the foundational fields every campaign should have.
 | Featured tier | Recommended | Choose the clearest entry-point tier. |
 | Runner report emails | Recommended | One or more campaign-runner recipients for pledge and fulfillment reports. |
 | Fulfillment owner | Recommended | Who is responsible for campaign rewards after a successful charge. |
-| Dashboard editors | Recommended | Authorized creator/team emails that should receive campaign-specific admin access. |
-| Preview reviewers | Optional | Trusted emails that should receive a protected preview link before public launch. |
+| Dashboard editors | Recommended | Authorized creator/team emails that receive campaign-specific admin access. |
+| Preview reviewers | Optional | Trusted emails that receive a protected preview link before public launch. |
 | Launch reminders | Optional | If the campaign has a pre-launch period, decide whether to collect one-time email reminders before pledging opens. |
 | Featured reward Shopping page | Optional | Keep it disabled unless the featured tier is physical and its price, image, description, shipping treatment, policy copy, and exact expected availability date are complete. |
 
@@ -169,7 +169,7 @@ These are the foundational fields every campaign should have.
 
 ## Admin Dashboard Handoff
 
-The Pool now uses a private admin dashboard for normal campaign editing and operations. Campaign creators do not need direct repository access for supported edits, and assigned campaign users should treat the dashboard as their working space for launch prep.
+The Pool uses a private admin dashboard for normal campaign editing and operations. Campaign creators do not need direct repository access for supported edits, and assigned campaign users use the dashboard as their working space for launch prep.
 
 The dashboard can manage:
 
@@ -185,19 +185,19 @@ The dashboard can manage:
 
 Before launch, confirm:
 
-- which creator or team emails should have campaign-specific dashboard access
-- which external reviewers, if any, should receive protected preview links
+- which creator or team emails need campaign-specific dashboard access
+- which external reviewers, if any, receive protected preview links
 - who on the creator team owns publishing campaign changes from the dashboard
 - whether platform review is required before launch, especially for pricing, tax, shipping, inventory, or provider-sensitive changes
-- which fields should be treated as final once public links are shared, especially slug, URL, prices, inventory, shipping, and tax expectations
+- which fields become final once public links are shared, especially slug, URL, prices, inventory, shipping, and tax expectations
 - whether the optional Shopping page stays disabled or has a complete, confirmed featured physical reward and availability date
 
 Operational notes:
 
 - A super admin can create a preview-only campaign with only a title, then assign existing campaign users or create new campaign users. From there, assigned campaign users can complete the campaign in the dashboard. The campaign remains hidden from public campaign routes, embeds, share cards, sitemap output, and prefetching until launched.
 - Super admins can archive non-live campaigns. Archiving moves campaign source and campaign-owned media into the archive path instead of deleting the work.
-- New tier, support item, add-on, decision, and variant IDs can be derived from names/labels in the dashboard; legacy IDs should stay stable.
-- Content editor drafts are local until saved/published, so creators should not treat unsaved browser drafts as the source of truth.
+- New tier, support item, add-on, decision, and variant IDs can be derived from names/labels in the dashboard; legacy IDs stay stable.
+- Content editor drafts are local until saved/published, so unsaved browser drafts are not the source of truth.
 - Publishing campaign or settings changes commits through the platform workflow and may take time to deploy.
 - Protected preview links expire after 24 hours, can be regenerated by an authorized campaign user, and do not make a preview-only campaign visible on public campaign routes.
 - User management is separate from publishing: dashboard users save to Worker KV and do not create GitHub commits.
@@ -269,7 +269,7 @@ Best practices:
 - avoid dense text baked into the image
 - make sure it still reads well at small sizes
 - prioritize mood, clarity, and strong contrast
-- remember that the generated share card uses this image, so it should still read when cropped into a social preview
+- remember that the generated share card uses this image, so it remains legible when cropped into a social preview
 
 ### 2. Wide Hero Image
 
@@ -334,9 +334,9 @@ Use these for concept art, stills, behind-the-scenes images, moodboards, process
 - **Recommended formats:** `WebP`, `JPG`, `PNG`
 - **Recommended file size:** ideally under `500 to 600 KB` each
 
-The dashboard preserves original uploads. Image and video uploads request the repository media workflow after the GitHub commit succeeds; that workflow can optimize source images, generate `320w`, `480w`, `640w`, `960w`, and `1600w` WebP variants for public pages, and create WebM video derivatives. Audio uploads remain source-preserved. The media library reports optimization state, missing derivatives, known references, broken references, and placement-specific size/aspect warnings from the checked-in media manifest. Creators should still export images near the recommended dimensions and crops before upload and resolve launch-blocking media issues before publishing.
+The dashboard preserves original uploads. Image and video uploads request the repository media workflow after the GitHub commit succeeds; that workflow can optimize source images, generate `320w`, `480w`, `640w`, `960w`, and `1600w` WebP variants for public pages, and create WebM video derivatives. Audio uploads remain source-preserved. The media library reports optimization state, missing derivatives, known references, broken references, and placement-specific size/aspect warnings from the checked-in media manifest. Creators still export images near the recommended dimensions and crops before upload and resolve launch-blocking media issues before publishing.
 
-Each meaningful public-facing image should also include:
+Each meaningful public-facing image also includes:
 
 - alt text
 - optional caption
@@ -369,11 +369,11 @@ The best pitch videos answer three things:
 
 - **Who** are you and the team?
 - **What** is the project?
-- **Why** this project, why now, and why should we care?
+- **Why** this project, why now, and why does it matter?
 
 ### Pitch Video Goals
 
-A strong pitch video should:
+A strong pitch video:
 
 - communicate the project’s tone quickly
 - make the creator feel real and trustworthy
@@ -407,7 +407,7 @@ Start with the **feeling** of the project.
 - if it is drama, make us feel the stakes immediately
 - if it is music- or performance-based, let us hear or see that energy fast
 
-People decide very quickly whether to keep watching. The opening should show the audience the thing they are most likely to get excited about first.
+People decide very quickly whether to keep watching. Open with the thing the audience is most likely to get excited about first.
 
 #### 2. Lead with tone, then context
 
@@ -436,7 +436,7 @@ Use visual variety:
 - props
 - behind-the-scenes material
 
-The pitch video should feel like a tiny piece of storytelling, not just an explanation.
+The pitch video works as a tiny piece of storytelling, not just an explanation.
 
 #### 4. Be on camera if you can
 
@@ -444,7 +444,7 @@ Audiences back people, not just projects.
 
 It helps to see the creator or team on camera, even briefly. That said, no one needs to “perform” if that does not suit the project. A simple, grounded presence is often more convincing than something over-rehearsed.
 
-If a creator truly does not want to appear on camera, the video should still feel personal in some other clear way.
+If a creator truly does not want to appear on camera, the video still needs a clear personal quality.
 
 #### 5. A pitch video is not just a trailer
 
@@ -580,7 +580,7 @@ The long-form campaign body can include rich blocks.
 #### Text blocks
 
 - **Ideal length:** `80 to 250 words`
-- most blocks should be `1 to 4 short paragraphs`
+- keep most blocks to `1 to 4 short paragraphs`
 
 #### Quote blocks
 
@@ -633,7 +633,7 @@ Approved structured embeds must use exact trusted `https://` URLs from supported
 
 Rewards are one of the clearest opportunities to turn a campaign from pure fundraising into audience-building.
 
-Good incentives should feel:
+Good incentives feel:
 
 - specific
 - easy to understand
@@ -728,7 +728,7 @@ For each tier, provide:
 - **Ideal length:** `8 to 25 words`
 - **Maximum target:** about `35 words`
 
-Each description should answer:
+Each description answers:
 
 - what the supporter gets
 - when relevant, when or how they get it
@@ -776,7 +776,7 @@ Good examples:
 
 ## Add-On Products
 
-Add-ons are best for fixed-price extras, merch, or optional upgrades that should use a product-card UI instead of becoming a pledge tier.
+Add-ons are best for fixed-price extras, merch, or optional upgrades that use a product-card UI instead of becoming a pledge tier.
 
 The platform supports two add-on scopes:
 
@@ -792,8 +792,8 @@ Use a campaign add-on when:
 - the item is fixed-price
 - the item is campaign-owned
 - supporters may want it in addition to a tier
-- it should appear in cart and Manage Pledge as a product card
-- it should count toward the campaign's funding progress
+- it appears in cart and Manage Pledge as a product card
+- it counts toward the campaign's funding progress
 
 Examples:
 
@@ -807,7 +807,7 @@ Examples:
 
 <figure class="creator-checklist-example creator-checklist-example--square creator-checklist-example--standalone">
   <img src="/assets/images/checklists/creator-campaign-checklist/examples/tier-image-example.webp" alt="A black campaign T-shirt product mockup." loading="lazy">
-  <figcaption>Add-on images should show the actual item or the clearest possible product mockup.</figcaption>
+  <figcaption>Add-on images show the actual item or the clearest possible product mockup.</figcaption>
 </figure>
 
 ### Campaign add-on deliverables
@@ -823,7 +823,7 @@ For each campaign add-on, provide:
 - inventory count, if limited
 - variant list, if applicable
 - per-variant inventory, if applicable
-- the base price each variant should inherit, plus an explicit price override for any variant that should cost a different amount
+- the base price each variant inherits, plus an explicit price override for any variant with a different amount
 - shipping preset or explicit shipping metadata, if physical
 - fulfillment owner
 
@@ -853,7 +853,7 @@ For each campaign add-on, provide:
 
 ## Optional Featured Reward Shopping Page
 
-The Pool can publish a focused, localized product page for one campaign reward. This is optional and should be used only for a fully specified physical reward that is suitable for product search.
+The Pool can publish a focused, localized product page for one campaign reward. Use this optional page only for a fully specified physical reward that is suitable for product search.
 
 The page reuses the campaign's existing featured tier rather than creating a second product catalog. Before enabling it, confirm:
 
@@ -945,14 +945,14 @@ Good decisions are:
 
 <figure class="creator-checklist-screenshot creator-checklist-screenshot--medium">
   <img src="/assets/images/checklists/creator-campaign-checklist/community-decision.png" alt="A supporter community decision card with poll options and a submit vote button." loading="lazy">
-  <figcaption>Community decisions should be specific enough that supporters can vote quickly without needing extra context.</figcaption>
+  <figcaption>Community decisions are specific enough for supporters to vote quickly without extra context.</figcaption>
 </figure>
 
 Bad decisions are:
 
 - vague
 - overly technical
-- essential to the integrity of the project in a way that should not be crowdsourced
+- essential to the integrity of the project and therefore not appropriate to crowdsource
 
 ## Production Diary
 
@@ -975,7 +975,7 @@ For each diary entry, provide:
 
 - **Ideal length:** `60 to 250 words`
 
-Diary entries should feel like real updates, not press releases.
+Diary entries read like real updates, not press releases.
 
 Use diary or announcement updates to disclose material changes to the schedule, creative plan, reward specifications, availability, or fulfillment approach. Keep stable entry IDs when editing an existing update so a metadata correction is not treated as a new broadcast.
 
@@ -1007,7 +1007,7 @@ Good examples:
 
 ## Promotion and Embeds
 
-Creators should plan promotion before launch, not after the page is live.
+Plan promotion before launch, not after the page is live.
 
 The Pool includes a hosted campaign embed builder at:
 
@@ -1023,7 +1023,7 @@ The embed is a live `iframe` widget for websites that allow pasted HTML. It refl
 
 ### Promotion materials to prepare
 
-Creators should provide or confirm:
+Creators provide or confirm:
 
 - primary campaign URL
 - embed-code destinations, such as personal site, venue site, newsletter page, partner blog, or press page
@@ -1031,8 +1031,8 @@ Creators should provide or confirm:
 - referral-code names for partners, press, venues, cast/crew, or campaign-runner channels
 - preferred embed mode: full or compact
 - preferred embed theme: default, warm, or ocean
-- whether the embed should show campaign media
-- whether the embed should show the campaign call to action
+- whether the embed shows campaign media
+- whether the embed shows the campaign call to action
 - launch-day social copy
 - 3 to 5 short share captions
 - state-specific share copy:
@@ -1040,7 +1040,7 @@ Creators should provide or confirm:
   - live: ask people to pledge now
   - final push: name the remaining gap or deadline
   - funded: thank supporters and point to next steps
-  - ended: describe the result and where people should follow updates
+  - ended: describe the result and where people can follow updates
 - 1 short email/newsletter blurb
 - 1 short Blast subject and body for launch or final-push supporters
 - CTA Button Label and CTA Button URL for any Blast that needs a clear next action
@@ -1071,15 +1071,15 @@ Good examples:
 - social platforms use rich previews instead of rendering the iframe
 - campaign pages generate share-card metadata for social previews
 - campaign share buttons use the public campaign URL and state-aware text where supported, but Facebook and other preview-first destinations mostly use the Open Graph image/title/description
-- creators should test the embed on mobile wherever they paste it
-- QR codes should be tested from a real phone camera before printing or sharing broadly
+- test the embed on mobile wherever it is pasted
+- test QR codes from a real phone camera before printing or sharing broadly
 - QR previews and PNG/SVG downloads are browser-local; saving a referral code is the explicit persistence step
 - if a host strips iframe code, use a normal campaign link plus the share-card preview instead
-- Blast copy should be concise, image-light, and linked to hosted campaign/media URLs rather than remote image hotlinks
+- Keep Blast copy concise, image-light, and linked to hosted campaign/media URLs rather than remote image hotlinks
 - shared Marketing and Blast drafts are not autosave; use the explicit shared-draft buttons when multiple admins need the same campaign draft
 - production Blast/announcement, diary, and milestone messages include campaign-scoped one-click unsubscribe; do not describe these as mandatory transactional mail
 - production bulk mail is queued for durable, bounded delivery, so a successful live-send action may mean the message is accepted for delivery rather than already present in every inbox
-- teams running their own fork should rehearse `npm run setup:deploy -- --mode=production --dry-run` before launch so provider readiness, KV namespace reuse, secrets, and deploy steps are reviewed before supporters arrive
+- teams running their own fork rehearse `npm run setup:deploy -- --mode=production --dry-run` before launch so provider readiness, KV namespace reuse, secrets, and deploy steps are reviewed before supporters arrive
 
 ## Physical Rewards and Shipping
 
@@ -1116,13 +1116,13 @@ They usually make the most sense when:
 - whether the item is eligible for free shipping
 - whether it needs a campaign-specific flat shipping override
 - whether it can use the deployment fallback shipping rate if USPS is unavailable
-- whether domestic signature or adult-signature delivery options should be offered
+- whether to offer domestic signature or adult-signature delivery options
 - fulfillment owner and shipping-from constraints
 - accurate sizing, fit, materials, included-item, final-sale, and fulfillment-problem copy
 
 ### Physical reward guidance
 
-- lower-cost physical rewards should be simple and inexpensive to fulfill
+- keep lower-cost physical rewards simple and inexpensive to fulfill
 - envelope-friendly items are much easier to justify than bulky items
 - shipping and manufacturing cost must be priced in
 - physical tiers work best when paired with a digital reward layer so supporters receive something sooner
@@ -1130,7 +1130,7 @@ They usually make the most sense when:
 - damaged, defective, incorrect, or missing items still require a real remedy process; supporters are asked to report problems promptly and ordinarily within seven calendar days after carrier-marked delivery
 - delivery and availability dates are good-faith estimates, not guarantees, but material schedule or fulfillment changes must be communicated honestly
 
-### Shipping model creators should understand
+### Shipping model for creators
 
 Shipping is calculated by the Worker, not by hand in the browser.
 
@@ -1148,9 +1148,9 @@ The important planning rule:
 
 > Do not promise a shipping price in campaign copy unless the campaign configuration actually enforces it.
 
-If a creator wants free shipping, that should be explicit during setup. If the campaign should use carrier-rated shipping, the item weights, dimensions, origin, and destination assumptions need to be complete enough for a reliable quote.
+If a creator wants free shipping, make it explicit during setup. Carrier-rated shipping requires item weights, dimensions, origin, and destination assumptions complete enough for a reliable quote.
 
-Review the public [Shipping policy](/terms/#shipping-policy) and [No returns, fulfillment problems, and refunds policy](/terms/#returns-refunds) before finalizing campaign copy. Campaign-specific terms may add detail, but they should not contradict the platform policy or promise remedies the fulfillment team cannot provide.
+Review the public [Shipping policy](/terms/#shipping-policy) and [No returns, fulfillment problems, and refunds policy](/terms/#returns-refunds) before finalizing campaign copy. Campaign-specific terms may add detail, but they must not contradict the platform policy or promise remedies the fulfillment team cannot provide.
 
 ### Mixed carts and add-on shipping
 
@@ -1165,9 +1165,9 @@ In multi-item carts:
 
 The Pool's checkout is server-verified. The Worker rebuilds cart contents, shipping, tax, tips, add-ons, and totals before starting the Stripe payment step.
 
-Creators do not need to calculate sales tax themselves, but they should avoid campaign copy that promises tax-inclusive pricing unless that has been configured deliberately.
+Creators do not need to calculate sales tax themselves, but campaign copy avoids promises of tax-inclusive pricing unless that has been configured deliberately.
 
-Campaign copy should describe the all-or-nothing flow accurately:
+Campaign copy describes the all-or-nothing flow accurately:
 
 - making a pledge saves a payment method; it does not charge the campaign amount immediately
 - if the campaign does not reach its goal by the deadline, the campaign pledge is not charged
@@ -1190,14 +1190,14 @@ In practice:
 
 - the cart may show tax as `--` until there is enough address information
 - final checkout totals are recalculated by the Worker
-- physical rewards should collect enough address detail for shipping and tax calculation
+- physical rewards collect enough address detail for shipping and tax calculation
 - fulfillment reports include the saved tax and shipping totals, so operators can reconcile what supporters actually paid
 
 ## Campaign Reports and Fulfillment Handoff
 
 Campaign-runner reports help operators and creators keep pledge and fulfillment work aligned.
 
-Creators should provide:
+Creators provide:
 
 - campaign-runner report recipient emails
 - the person or team responsible for fulfillment
@@ -1205,7 +1205,7 @@ Creators should provide:
 - any special fulfillment notes for physical tiers or add-ons
 - expected delivery timing or delivery windows
 - a process and contact owner for damaged, defective, incorrect, missing, delayed, or unfulfillable rewards
-- whether rewards should be grouped, split, or handled in a particular order
+- whether rewards are grouped, split, or handled in a particular order
 
 Report behavior to understand:
 
@@ -1244,7 +1244,7 @@ If a creator wants a simple target package, this is a strong one:
 
 ## Delivery Recommendations
 
-To keep implementation clean, creators should ideally deliver:
+To keep implementation clean, creators ideally deliver:
 
 - final copy in a shared document or markdown file
 - web-ready exported images
@@ -1310,7 +1310,7 @@ If someone needs the shortest possible prep version, send them this:
 - wide hero image or campaign video
 - at least one tier
 - report recipient emails, if the creator wants campaign-runner reports
-- dashboard editor emails, if the creator/team should edit directly
+- dashboard editor emails, if the creator/team will edit directly
 
 ### Strongly recommended
 
