@@ -19,6 +19,7 @@ export function runCommand(command, args = [], options = {}) {
     shell: false,
     env: options.env || process.env,
     timeout: options.timeoutMs || 30_000,
+    killSignal: options.killSignal || 'SIGTERM',
     maxBuffer: options.maxBuffer || 20 * 1024 * 1024
   });
   return {

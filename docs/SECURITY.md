@@ -266,6 +266,14 @@ clean supported pin, or an explicit scoped acceptance record. The current
 Lighthouse pin is recorded in the lockfile; the changelog and release evidence,
 not this guide, retain the version-specific resolution history.
 
+`npm run test:dependencies` runs both scopes against both lockfiles with bounded
+transient retries. Merge Smoke exposes all four audits independently from
+dependency installation and application tests. Missing audit evidence is a
+failed check, not an accepted risk or a clean result; an npm service outage must
+not be waived as a dev-only finding. The automated threshold remains moderate,
+and any lower-severity findings remain in the output for scoped review. See
+[Testing Guide](./TESTING.md#dependency-audits) for deadlines and rerun commands.
+
 ### Accepted Risks
 
 Two low-severity tradeoffs remain accepted:

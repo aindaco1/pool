@@ -55,6 +55,32 @@ force-stops any survivor. A focused regression uses a deliberately stubborn
 child process to ensure a fully passing gate cannot hang until the CI job
 timeout after printing its phase summary.
 
+## Dependency audits
+
+`npm run test:dependencies` audits the root and Worker lockfiles, each with
+production-only and full dependency scopes. It needs Node/npm and initialized
+submodules, but no dependency installation. To repeat one check:
+
+```bash
+npm run test:dependencies -- --target=worker --scope=full
+```
+
+Merge Smoke runs these four checks as independent matrix jobs with fail-fast
+disabled. Its installation steps use `--no-audit`; successful installation and
+tests are not audit evidence. Require all four audit checks and the smoke check
+to pass before merging. Repository branch-protection settings are managed
+separately from the workflow.
+
+Each audit has at most three attempts, a 30-second npm request timeout, a
+45-second process deadline, and 5/10-second retry delays (at most 150 seconds
+per check, excluding job setup). Only recognized transient network/service
+failures are retried. Findings and configuration/authentication errors are not.
+A valid report with moderate-or-higher findings exits 1; unavailable, malformed,
+or incomplete evidence exits 2. Below-threshold findings remain visible for
+review. An exhausted outage never passes or waives the release audit: rerun the
+failed checks after the service recovers. The helper does not run `audit fix` or
+modify either lockfile.
+
 ## Quick Reference
 
 ```bash
@@ -69,6 +95,7 @@ npm run test:performance:lighthouse # Core-route Lighthouse evidence in Podman
 npm run test:performance:runtime # Authenticated/redacted Worker p95 evidence; requires input or token
 npm run test:cache-policy  # Deployed public/private cache-header evidence
 npm run test:secrets       # Secret exposure audit for local env files
+npm run test:dependencies  # Production + full npm audits for root and Worker
 npm run test:premerge      # Merge-readiness checks for changed Worker logic
 npm run release:smoke -- --evidence-file /tmp/pool-release-smoke.md  # Release sign-off wrapper
 npm run release:a11y-evidence   # Focused campaign/cart accessibility evidence

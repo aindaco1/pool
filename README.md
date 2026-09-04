@@ -122,7 +122,7 @@ Clone with `--recurse-submodules` when possible. Existing checkouts must run the
 
 The setup helper is dependency-free Node and works on macOS, Windows, and Linux. Use `npm run setup:deploy -- --mode=production --dry-run` to preview Cloudflare KV, Worker secret, GitHub secret, readiness, and deploy steps before applying them. It intentionally keeps production Worker secrets separate from ignored local `worker/.dev.vars` values, and the setup path is covered by fake-CLI unit tests so dry runs, KV reuse/create planning, generated local secrets, and production secret writes stay testable without live provider mutations.
 
-The Worker dev container runs on Node 24 to match GitHub Actions. Wrangler 4.118 also runs against the shared Worker `compatibility_date = "2026-05-03"` so local Miniflare/Workers behavior stays aligned with deployed runtime semantics.
+The Worker dev container runs on Node 24 to match GitHub Actions. The Wrangler version locked in `worker/package-lock.json` uses the shared Worker `compatibility_date` from `worker/wrangler.toml` so local Miniflare/Workers behavior stays aligned with deployed runtime semantics.
 
 If you want to rebuild the Podman dev images after dependency or base-image changes:
 ```bash
