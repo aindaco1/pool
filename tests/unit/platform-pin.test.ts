@@ -168,6 +168,7 @@ describe('shared platform pin', () => {
   });
 
   it('runs shared Node tooling with its exact reviewed dependencies', () => {
+    const rootPackage = readJson('package.json');
     const rootLock = readJson('package-lock.json');
     const buildCore = readJson(
       'shared/dust-wave-platform/packages/build-core/package.json'
@@ -176,9 +177,13 @@ describe('shared platform pin', () => {
       'shared/dust-wave-platform/packages/release-core/package.json'
     );
 
-    expect(rootLock.packages['node_modules/esbuild'].version)
-      .toBe(buildCore.dependencies.esbuild);
-    expect(rootLock.packages['node_modules/smol-toml'].version)
-      .toBe(releaseCore.dependencies['smol-toml']);
+    for (const [name, version] of Object.entries({
+      esbuild: buildCore.dependencies.esbuild,
+      'smol-toml': releaseCore.dependencies['smol-toml']
+    })) {
+      expect(rootPackage.devDependencies[name]).toBe(version);
+      expect(rootLock.packages[''].devDependencies[name]).toBe(version);
+      expect(rootLock.packages[`node_modules/${name}`].version).toBe(version);
+    }
   });
 });
