@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Dependency maintenance
+
+- Updated Vitest and its V8 coverage provider to 4.1.11, Vite to 8.2.2, and
+  axe-core to 4.13.0.
+- Kept shared build/release tooling on Platform's reviewed esbuild 0.28.1 and
+  smol-toml 1.7.1, made the root requirements exact, and added regression coverage
+  for manifest/lockfile alignment and version-only Dependabot exclusions.
+
 ### Production posture
 
 - Disabled Cloudflare Worker preview URLs explicitly and made missing or enabled

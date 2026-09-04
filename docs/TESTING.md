@@ -20,6 +20,15 @@ npx vitest run tests/unit/platform-pin.test.ts tests/unit/jekyll-template-pin.te
 npm run jekyll-template:check
 ```
 
+The root `esbuild` and `smol-toml` dependencies are exact pins matching the
+reviewed Platform Build Core and Release Core manifests. Upgrade them together
+with the Platform gitlink, not independently in a routine dependency PR. The pin
+test checks both root manifests and the installed-version entries in the lockfile.
+Dependabot defers their routine version updates while keeping security updates
+eligible. A security fix still requires a reviewed compatible Platform upgrade;
+do not weaken the pin test to bypass it. Continue running both dependency audits
+described in [SECURITY.md](./SECURITY.md#dependency-and-release-security).
+
 The local-only product-video adapter has a bounded real-interface smoke path:
 
 ```bash

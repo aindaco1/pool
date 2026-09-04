@@ -61,6 +61,29 @@ describe('package release scripts', () => {
     expect(dependabot).toMatch(/root-development-dependencies:[\s\S]*update-types:\s*\n\s*- minor\s*\n\s*- patch/);
   });
 
+  it('defers only routine shared-tooling updates to Platform upgrades', () => {
+    const dependabot = JSON.parse(execFileSync('ruby', [
+      '-ryaml', '-rjson', '-e',
+      'puts JSON.generate(YAML.load_file(ARGV.fetch(0)))',
+      join(repoRoot, '.github', 'dependabot.yml')
+    ], { encoding: 'utf8' }));
+    const rootUpdates = dependabot.updates.find((update: Record<string, unknown>) =>
+      update['package-ecosystem'] === 'npm' && update.directory === '/'
+    );
+
+    expect(rootUpdates.ignore).toEqual(['esbuild', 'smol-toml'].map((name) => ({
+      'dependency-name': name,
+      'update-types': [
+        'version-update:semver-major',
+        'version-update:semver-minor',
+        'version-update:semver-patch'
+      ]
+    })));
+    expect(dependabot.updates.filter((update: Record<string, unknown>) =>
+      update !== rootUpdates
+    ).every((update: Record<string, unknown>) => !update.ignore)).toBe(true);
+  });
+
   it('bootstraps Jekyll gems when the Podman bundle volume is empty', () => {
     const premerge = readFileSync(join(repoRoot, 'scripts', 'pre-merge-regression.sh'), 'utf8');
     expect(premerge).toContain('bundle config set path');
