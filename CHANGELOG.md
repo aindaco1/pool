@@ -4,6 +4,9 @@
 
 ### Dependency maintenance
 
+- Added explicit root and Worker production/full audit checks to Merge Smoke,
+  separate from installation and tests. Transient npm failures have bounded
+  retries; missing evidence fails the check instead of appearing clean.
 - Updated Vitest and its V8 coverage provider to 4.1.11, Vite to 8.2.2, and
   axe-core to 4.13.0.
 - Kept shared build/release tooling on Platform's reviewed esbuild 0.28.1 and

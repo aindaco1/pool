@@ -6,6 +6,31 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = process.cwd();
 
 describe('package release scripts', () => {
+  it('requires explicit, independent audits for both lockfiles and scopes in merge CI', () => {
+    const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+    expect(packageJson.scripts['test:dependencies']).toBe('node ./scripts/audit-dependencies.mjs');
+    const workflow = JSON.parse(execFileSync('ruby', [
+      '-ryaml', '-rjson', '-e', 'puts JSON.generate(YAML.load_file(ARGV.fetch(0)))',
+      join(repoRoot, '.github', 'workflows', 'merge-smoke.yml')
+    ], { encoding: 'utf8' }));
+    const audit = workflow.jobs['dependency-audit'];
+    expect(audit.strategy).toEqual({ 'fail-fast': false, matrix: { target: ['root', 'worker'], scope: ['production', 'full'] } });
+    expect(audit['timeout-minutes']).toBe(6);
+    expect(audit['continue-on-error']).toBeUndefined();
+    expect(audit.if).toBeUndefined();
+    expect(audit.needs).toBeUndefined();
+    expect(audit.steps.every(step => !step['continue-on-error'] && !step.if)).toBe(true);
+    expect(audit.steps[0].with.submodules).toBe('recursive');
+    expect(audit.steps.filter(step => step.run).map(step => step.run)).toEqual([
+      'npm run test:dependencies -- --target=${{ matrix.target }} --scope=${{ matrix.scope }}'
+    ]);
+    const smoke = workflow.jobs.smoke;
+    expect(smoke.needs).toBeUndefined();
+    expect(smoke.steps.filter(step => step.run?.startsWith('npm ci')).map(step => step.run)).toEqual([
+      'npm ci --no-audit', 'npm ci --prefix worker --no-audit'
+    ]);
+  });
+
   it('pins explicit Jekyll template check and write commands', () => {
     const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
     const command = 'node ./shared/dust-wave-jekyll-template/bin/sync-consumer.mjs --consumer-root .';

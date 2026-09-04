@@ -16,6 +16,7 @@
     "test:seo": "node ./scripts/audit-seo.mjs",
     "test:crawl-endpoints": "node ./scripts/audit-crawl-endpoints.mjs",
     "test:secrets": "node ./scripts/audit-secrets.mjs",
+    "test:dependencies": "node ./scripts/audit-dependencies.mjs",
     "test:i18n": "ruby ./scripts/check-i18n-completeness.rb",
     "test:premerge": "./scripts/pre-merge-regression.sh",
     "release:smoke": "./scripts/release-smoke.sh",
