@@ -226,6 +226,24 @@ Rules:
 
 This section reports configured/missing status for runtime credentials only. It must not display or edit secret values.
 
+### Runtime Diagnostics Overrides
+
+These Worker variables supplement the canonical settings mirror; they do not
+create a second editable configuration catalog:
+
+| Variable | Purpose |
+| --- | --- |
+| `ADMIN_LOCAL_REPO_SERVICE` | Dev-only repository helper URL; `env.dev` uses `http://127.0.0.1:8799`. The Worker itself cannot write host files. |
+| `ADMIN_TURNSTILE_REQUIRED` | Fail closed when admin Turnstile configuration is expected. |
+| `CLOUDFLARE_WORKER_SCRIPT_NAME` | Filter Cloudflare usage by Worker script; omit for account-wide usage. |
+| `PLAN_USAGE_CLOUDFLARE_PLAN`, `PLAN_USAGE_RESEND_PLAN` | Display fallback plans when provider detection is unavailable. |
+| `CLOUDFLARE_*_DAILY_LIMIT`, `CLOUDFLARE_*_MONTHLY_LIMIT` | Display quota overrides for Workers/KV metrics when provider data omits limits, such as `CLOUDFLARE_WORKERS_REQUESTS_MONTHLY_LIMIT`. |
+| `RESEND_EMAILS_MONTHLY_LIMIT`, `RESEND_EMAILS_DAILY_LIMIT` | Resend display quota overrides. |
+| `PLAN_USAGE_WARNING_PERCENT`, `PLAN_USAGE_CRITICAL_PERCENT` | Usage progress warning thresholds. |
+
+These display overrides do not change provider quotas. Keep credentials in
+Worker secrets; [Security](SECURITY.md) owns their scopes.
+
 ## Cross-Project Dashboard Boundary
 
 The Store dashboard is a source of reusable operational patterns, not a second
@@ -396,6 +414,135 @@ Supported report types:
 - fulfillment report
 
 The browser report UI is download-oriented. It does not need manual email-send or mark-as-sent controls.
+
+### CLI Pledge Reports
+
+Generate CSV reports of pledges from Cloudflare KV:
+
+```bash
+# Remote production/dev reports require Wrangler auth.
+(cd worker && npx wrangler login)
+
+# Or, for non-interactive shells and Podman-backed report runs:
+export CLOUDFLARE_API_TOKEN="your-token"
+export CLOUDFLARE_ACCOUNT_ID="your-account-id"
+
+# All pledges, production KV
+./scripts/pledge-report.sh
+
+# Single campaign
+./scripts/pledge-report.sh worst-movie-ever
+
+# Dev/preview KV
+./scripts/pledge-report.sh --env dev
+
+# Save to file
+./scripts/pledge-report.sh worst-movie-ever > pledges.csv
+```
+
+For Podman-backed remote reports, put `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in the host shell or an ignored local env file such as `.env.local`, `.env.cloudflare`, or `worker/.dev.vars`; the report wrappers pass Cloudflare auth values through to `podman exec`.
+
+Fork setup for production reports:
+
+1. In Cloudflare, go to **My Profile -> API Tokens -> Create Token**.
+2. Create a user token with **Account / Workers KV Storage / Read** scoped to the account that owns this fork's `PLEDGES` KV namespace.
+3. Store it with the account id in `worker/.dev.vars` or another ignored env file:
+
+```bash
+CLOUDFLARE_API_TOKEN=your-token
+CLOUDFLARE_ACCOUNT_ID=your-account-id
+```
+
+4. Run production exports through the same Podman worker environment used by local tests:
+
+```bash
+./scripts/pledge-report.sh --podman --env production --remote > ~/Desktop/pool-pledge-report.csv
+./scripts/fulfillment-report.sh --podman --env production --remote > ~/Desktop/pool-fulfillment-report.csv
+```
+
+Progress is written to stderr while CSV data is written only to stdout, so file redirects stay clean.
+
+**Output format:** One row per history entry (ledger-style). This means:
+- New pledges: 1 row (created)
+- Modified pledges: 2+ rows (created + modification deltas)
+- Cancelled pledges: 2 rows (created + cancellation with negative amounts)
+
+**Output columns:** `email`, `campaign`, `items`, `add_on_items`,
+`campaign_subtotal`, `platform_add_on_subtotal`, `subtotal`, `tip_percent`,
+`tip`, `tax`, `shipping`, `total`, `status`, `charged`, `created_at`, `order_id`.
+
+**Status values:**
+- `created` — Initial pledge creation (items show full tier list)
+- `modified` — Pledge tier/amount change (items show diff: `+Added Tier`, `-Removed Tier`)
+- `cancelled` — Pledge cancelled (shows negative amounts)
+- `active` — Legacy pledge without history
+- `charged` — Legacy charged pledge without history
+- `failed` — Legacy failed pledge without history
+
+**Modified row items format:**
+```
+(modified) +Line of Dialogue; -Writer Credit x2; +Custom Support $5.00
+```
+- `+Tier` or `+Tier xN` — Tier was added (or quantity increased)
+- `-Tier` or `-Tier xN` — Tier was removed (or quantity decreased)
+- `+Custom Support $X` or `-Custom Support $X` — Custom support was added/removed
+- `; tip updated to N%` — Tip changed during the same modification, even if other pledge fields changed too
+- Unchanged tiers don't appear in the diff
+
+**Custom Support in items:**
+When a pledge includes custom support, it appears as `Custom Support $X.XX` in the items column (e.g., `Line of Dialogue; Custom Support $25.00`).
+
+**Cancelled row format:**
+Cancelled rows show negative amounts (subtotal, tip, tax, shipping, total) so that summing all rows gives the correct campaign total. Items are prefixed with `-` to indicate removal.
+
+**Tier name mapping:**
+The report converts tier IDs to human-readable names (e.g., `frame` → `One Frame`, `dialogue` → `Line of Dialogue`).
+
+Use `campaign_subtotal` for campaign-progress accounting; `subtotal` also
+includes platform add-ons. History rows encode changes and cancellations as
+deltas. `total` includes tip, tax, and shipping; ledger sums describe recorded
+pledge amounts and do not prove successful payment collection.
+
+### CLI Fulfillment Reports
+
+Generate aggregated reports showing the **current state** of each backer's pledge (for fulfillment purposes):
+
+```bash
+# All pledges, production KV
+./scripts/fulfillment-report.sh
+
+# Single campaign
+./scripts/fulfillment-report.sh worst-movie-ever
+
+# Dev/preview KV
+./scripts/fulfillment-report.sh --env dev
+
+# Save to file
+./scripts/fulfillment-report.sh worst-movie-ever > fulfillment.csv
+```
+
+**Output format:** Current pledge state is aggregated by backer and campaign,
+then split by campaign/platform fulfiller where needed. A backer can therefore
+have more than one fulfillment row for a campaign.
+
+**Output columns:** `email`, `campaign`, `fulfiller`, `items`, `add_on_items`,
+`campaign_subtotal`, `platform_add_on_subtotal`, `subtotal`, `tip_percent`,
+`tip`, `tax`, `shipping`, `total`, `shipping_address`.
+
+**Key differences from pledge-report.sh:**
+- Shows **current tier state** (not history)
+- **Aggregates** multiple pledges per backer/campaign before splitting by fulfiller
+- **Excludes** cancelled pledges
+- Lists deliverable items; custom support still participates in the applicable money totals
+- **No** status, created_at, or order_id columns
+- Items show final quantities (e.g., if backer modified from frame→dialogue, only dialogue appears)
+- Includes `shipping_address` for physical tier fulfillment
+- `total` is the final charge amount including optional The Pool tip
+
+**Use cases:**
+- Fulfillment spreadsheets (what rewards to deliver to each backer)
+- Backer counts by tier
+- Deliverable tracking
 
 ## Supporters
 

@@ -24,6 +24,9 @@ debug:
 exclude:
   - README.md
   - LICENSE
+  - AGENTS.md
+  - CHANGELOG.md
+  - docs
   - worker
   - scripts
   - tests

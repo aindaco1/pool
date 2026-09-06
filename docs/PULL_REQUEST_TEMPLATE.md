@@ -25,7 +25,7 @@
 - [ ] Pledge persistence stores tiers, support items, custom amount, and live totals refresh correctly
 - [ ] Update Card flow still succeeds for active and `payment_failed` pledges when touched
 - [ ] Countdown timers show correct values on page load (no "00 00 00 00" flash)
-- [ ] Cron `workflow_dispatch` charges test pledges off‑session
+- [ ] Worker scheduler / settlement dispatch charges eligible test pledges off-session when payment behavior changed
 - [ ] Docs updated (if behavior or setup changed)
 
 ## Security / Secrets
@@ -43,7 +43,7 @@
 
 ## Backward Compatibility
 - [ ] No breaking content model changes
-- [ ] If schema changes, updated `docs/DEV_NOTES.md` and sample campaigns
+- [ ] If schema changes, updated `docs/CONTENT_MODEL.md` and sample campaigns
 - [ ] Existing campaign/add-on/tier/variant IDs are preserved unless the migration intentionally changes them
 
 ## Rollback Plan

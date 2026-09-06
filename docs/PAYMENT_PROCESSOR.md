@@ -315,7 +315,7 @@ Use `ADMIN_SETTLEMENT_SECRET` for settlement automation when configured. It is n
 
 ### Pledge Record
 
-Pledge money fields are integer cents:
+Persisted subtotal, tax, shipping, tip amount, and total fields are integer cents:
 
 ```json
 {
@@ -363,6 +363,30 @@ Charged pledges may also store actual Stripe financial data:
 Dashboard analytics prefer actual Stripe balance transaction data where present and label estimates when actuals are missing.
 
 Older records without `currency` are read as USD. This is a compatibility default, not multi-currency support. `valueTime` describes when the supporter/processor event occurred, `bookedAt` describes Worker persistence, and `processorAvailableAt` is populated only when Stripe balance data exposes availability timing.
+
+### Pledge Items and History
+
+Pledges can store `tierId` / `tierQty`, `additionalTiers` (`id`, `qty`),
+`supportItems` (`id`, dollar `amount`), dollar `customAmount`, and `bundleAddOns`.
+The selected `tipPercent` is separate from the integer-cent `tipAmount`.
+Multi-campaign checkout creates separate campaign-scoped records.
+[Add-on Products](ADD_ON_PRODUCTS.md) defines product/variant identity and the
+historical saved `unitPrice` rule for unchanged selections.
+
+History entries record the event's tier/add-on state and ISO `at` timestamp:
+
+| Field | Meaning |
+| --- | --- |
+| `type` | `created`, `modified`, or `cancelled` |
+| `subtotal` / `subtotalDelta` | Full created subtotal or later change in cents |
+| `tipAmount` / `tipAmountDelta`, `tipPercent` | Tip value/change in cents and selected percentage |
+| `tax` / `taxDelta`, `shipping` / `shippingDelta` | Stored charge components or changes in cents |
+| `amount` / `amountDelta` | Total including tax, shipping, and tip, or the change in that total |
+| `tierId`, `tierQty`, `additionalTiers`, `customAmount`, `bundleAddOns` | Item selection after the event |
+
+Modifications carry positive or negative deltas; cancellation reverses the
+pledge amounts. [Dashboard reports](DASHBOARD.md#reports) explains ledger rows,
+current-state fulfillment, and the campaign/platform split.
 
 ### Projection Records
 
@@ -520,7 +544,7 @@ For processor behavior, prefer Stripe test mode and the Stripe CLI over hand-bui
 
 ## Related Docs
 
-- [WORKFLOWS.md](./WORKFLOWS.md)
+- [ARCHITECTURE.md](./ARCHITECTURE.md)
 - [SECURITY.md](./SECURITY.md)
 - [TESTING.md](./TESTING.md)
 - [DASHBOARD.md](./DASHBOARD.md)

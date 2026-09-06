@@ -4,7 +4,12 @@ This is the operating guide for people and coding agents working on **The Pool**
 
 Read it alongside:
 
+- [docs/README.md](./docs/README.md) for the documentation index and guide ownership
 - [README.md](./README.md) for the product and architecture overview
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for system ownership, storage, and lifecycle
+- [docs/CONTENT_MODEL.md](./docs/CONTENT_MODEL.md) for campaign authoring fields
+- [docs/WORKER_API.md](./docs/WORKER_API.md) for endpoint contracts
+- [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for production setup and release wiring
 - [docs/CUSTOMIZATION.md](./docs/CUSTOMIZATION.md) for the supported fork-facing configuration surface
 - [docs/PAYMENT_PROCESSOR.md](./docs/PAYMENT_PROCESSOR.md) for Stripe, canonical checkout, webhooks, settlement, and reconciliation
 - [docs/TAX_CALCULATOR.md](./docs/TAX_CALCULATOR.md) for tax providers, canonical quotes, mirrored configuration, and verification
@@ -137,6 +142,11 @@ Shared system strings belong in `_data/i18n/<lang>.yml`; creator-authored campai
 
 ## Documentation map
 
+- Start here and guide ownership: [docs/README.md](./docs/README.md)
+- Architecture and lifecycle: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+- Campaign content model: [docs/CONTENT_MODEL.md](./docs/CONTENT_MODEL.md)
+- Worker API: [docs/WORKER_API.md](./docs/WORKER_API.md)
+- Deployment: [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)
 - Fork configuration: [docs/CUSTOMIZATION.md](./docs/CUSTOMIZATION.md)
 - Release history: [CHANGELOG.md](./CHANGELOG.md)
 - Prospective work: [docs/ROADMAP.md](./docs/ROADMAP.md)
@@ -167,5 +177,6 @@ Shared system strings belong in `_data/i18n/<lang>.yml`; creator-authored campai
 - Never silently drop locale, embed, share-preview, private-cache, or historical-price behavior.
 - Preserve unrelated user changes and stage only files in scope.
 - Keep current-state docs in present tense and grounded in verified behavior. Put proposals and deferred work only in the roadmap, and put completed release history only in the changelog or release evidence.
+- Keep detailed procedures in the guide that owns them; use the documentation index and links instead of copying runbooks into entry-point READMEs. Maintainer docs stay out of the public Jekyll artifact; root Markdown page sources retain their routing and localization contracts.
 
 When uncertain, make the smallest change that keeps the site and Worker aligned, prove it with the narrowest meaningful test, and run the broader gate when warranted.

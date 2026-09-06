@@ -4,7 +4,7 @@ title: What Is This?
 lang: en
 translation_key: about
 description: Learn how The Pool handles all-or-nothing pledges, physical rewards, supporter access, privacy, and independent creative campaigns.
-last_modified_at: 2026-07-13
+last_modified_at: 2026-09-06
 ---
 {% assign operator_name = site.platform.company_name | default: site.author %}
 {% assign support_email = site.platform.support_email %}
@@ -17,19 +17,27 @@ last_modified_at: 2026-07-13
 
 When you support a campaign, Stripe securely saves your payment method, but you are **not charged when you make the pledge**. The campaign must reach its goal by its deadline. If it does not, your card is not charged.
 
-Before a campaign ends, you can use the secure link in your confirmation email to review, change, or cancel your pledge. If one checkout includes several campaigns, each campaign remains a separate pledge and is settled separately.
+Before a campaign ends, you can use the secure link in your confirmation email to review, change, or cancel your pledge, even if the campaign has already reached its goal. Once the deadline passes, changes and cancellation through that link close. If one checkout includes several campaigns, each campaign remains a separate pledge and is settled separately.
+
+If payment fails after a successful campaign ends, updating your card can trigger an immediate retry of the saved pledge amount.
 
 ## No account required
 
-Your confirmation email contains the secure links you need to manage your pledge and, when offered, enter that campaign's supporter community. Save the email: it is the simplest way to return without maintaining another password.
+Your confirmation email contains the secure links you need to manage your pledge and, when offered, enter that campaign's supporter community. Each management link authorizes access to its particular pledge. Save the email and keep the links private.
+
+A pledge can be saved even if its confirmation email is delayed or cannot be delivered. If you are unsure whether it went through, contact [{{ support_email }}](mailto:{{ support_email }}) before making another pledge.
 
 Launch reminders and abandoned-checkout reminders are optional. Each is limited to the purpose described when you opt in and includes a way to unsubscribe.
+
+Campaign diary, milestone, and announcement emails also include a campaign unsubscribe option. Unsubscribing from those updates does not cancel your pledge or opt you out of essential pledge and payment notices.
 
 ## Where the money goes
 
 Reward tiers, direct campaign support, custom campaign amounts, and campaign add-ons count toward the campaign goal. Shipping, tax, platform add-ons, and the optional platform tip do not.
 
 The Pool does not deduct a platform commission from campaign funding. Supporters can choose an optional platform tip during checkout to help {{ operator_name }} operate the service. Stripe processing fees and other campaign expenses may still apply.
+
+Prices are in U.S. dollars. New add-on selections use current product and variant prices. When you edit a pledge, an existing add-on keeps its saved unit price if you keep the same product and variant, even when you change the quantity. Tax and shipping may remain estimates until enough destination information is available.
 
 ## Physical rewards and store policies
 
@@ -49,7 +57,7 @@ A private, role-scoped dashboard supports campaign content, rewards, reports, su
 
 Stripe handles full payment-card details. The Pool stores the information needed to manage pledges, communicate about campaigns, calculate applicable tax and shipping, prevent abuse, and fulfill rewards. Authorized campaign operators only receive the supporter and fulfillment information needed for campaigns they manage. We do not sell supporter information.
 
-Public campaign, About, Terms, and eligible reward pages are designed for search and sharing. Pledge-management links, supporter-only pages, protected previews, checkout results, and the private dashboard remain outside public indexing and sharing intent.
+Public campaign, About, Terms, and eligible reward pages are designed for search and sharing. Pledge-management pages, supporter-only pages, protected previews, checkout results, and the private dashboard ask search engines not to index them. Keep private access links out of public posts and shared screenshots.
 
 ## Open source
 
@@ -59,4 +67,4 @@ Questions? Email [{{ support_email }}](mailto:{{ support_email }}).
 
 ---
 
-_Last updated: July 13, 2026_
+_Last updated: September 6, 2026_

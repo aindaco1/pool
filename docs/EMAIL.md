@@ -288,7 +288,11 @@ Current behavior:
 
 ## Delivery And Retry
 
-Production sends use `email-outbox:v1:*` records. Persistence happens before the Resend side effect, and the minute scheduler drains bounded batches. Each job:
+Production sends use `email-outbox:v1:*` records. The canonical
+`email.outbox_enabled` setting mirrors to `EMAIL_OUTBOX_ENABLED`; keep it enabled
+for production delivery. Test mode can use immediate fixture sends unless the
+outbox is explicitly enabled. Persistence happens before the Resend side
+effect, and the minute scheduler drains bounded batches. Each job:
 
 - has a deterministic Pool job ID and Resend `Idempotency-Key`
 - renders once, freezes the exact provider payload, and records a content hash
@@ -348,6 +352,15 @@ Email content has stricter constraints than campaign-page content:
 - Convert YouTube and Vimeo content to links/buttons, not embeds.
 - Avoid SVG attachments and active-content attachment patterns.
 - Keep tokenized links scoped, signed, and time-limited where possible.
+
+## Reminder Runtime Overrides
+
+`LAUNCH_REMINDER_TURNSTILE_REQUIRED` fails closed when a reminder widget is
+expected but its verification configuration is unavailable.
+`LAUNCH_REMINDER_DISPATCH_BATCH_SIZE` and `LAUNCH_REMINDER_DISPATCH_JOB_LIMIT`
+bound dispatch batch size and jobs processed per scheduled tick. These are
+advanced Worker overrides; use the canonical launch-reminder settings in
+[Customization](CUSTOMIZATION.md) for routine fork configuration.
 
 ## Testing
 
@@ -409,7 +422,7 @@ If localized copy is missing:
 ## Related Docs
 
 - [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md)
-- [WORKFLOWS.md](./WORKFLOWS.md)
+- [ARCHITECTURE.md](./ARCHITECTURE.md)
 - [CUSTOMIZATION.md](./CUSTOMIZATION.md)
 - [DASHBOARD.md](./DASHBOARD.md)
 - [SECURITY.md](./SECURITY.md)

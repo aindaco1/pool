@@ -425,6 +425,58 @@ Use this checklist before merging performance changes:
 - media changes pass `npm run media:optimize:check` when uploaded or manually added media changed
 - relevant unit and browser tests pass against built assets
 
+## Cloudflare Plan Guidance For Forks
+
+The Pool is intentionally shaped so most traffic stays cheap:
+
+- GitHub Pages serves the static site, so normal page loads do not invoke the Worker
+- public live data prefers one combined `/live/:slug` request instead of separate stats + inventory calls
+- campaign pages cache live stats and inventory in `localStorage` for `cache.live_stats_ttl_seconds` / `cache.live_inventory_ttl_seconds` (default `300`)
+- background tabs stop refreshing until the page becomes visible again
+- dashboard reports, supporters, analytics, stats rebuilds, settlement helpers, and admin supporter enumeration prefer `campaign-pledges:{slug}` indexes before falling back to expensive namespace scans, and stats/inventory rebuilds repair stale campaign indexes when they detect drift
+- normal dashboard reads, protected preview rendering, content previews, report previews/downloads, supporter filters, analytics views, marketing URL building, media-library picker loads, abandoned-checkout health, and local editor drafts are designed to add zero KV writes
+- protected preview publication writes one short-lived `campaign-preview-reviewers:{slug}` access allowlist plus one audit record, while GitHub-backed campaign Markdown stores no previewer email addresses
+- campaign archive writes only the admin audit record in KV; the source/media move happens locally in dev and in GitHub Actions for production
+- the new read-only drift checks make it easier to confirm when projections are stale before running a repair path
+- limited-tier write paths ask the coordinator for reservation-aware availability instead of rebuilding truth from KV reservation keys
+- platform add-on inventory reads use a sold-count projection after the initial bootstrap, so normal inventory refreshes do not list all pledge keys
+- launch reminder dispatch, supporter confirmation retry polling, and abandoned-checkout reminders use queue-state markers; idle cron ticks skip KV list scans, and idle queues get an hourly compatibility recheck instead of minute-level or 15-minute namespace polling
+- public read paths stay intentionally permissive so a legitimately popular campaign does not hit artificial anti-DoS ceilings, while the expensive checkout / Manage / admin writes carry the tighter rate limits and request-size caps
+- once a client is already over a rate limit window, repeated blocked requests no longer rewrite the same KV counter on every hit
+- `POST /checkout-intent/abandon` uses an order-scoped retry bucket so unload/retry cleanup stays friendly to shared IPs without leaving the release path wide open
+- the Worker config also sets `limits.cpu_ms = 100` for deployed Standard/Paid Workers, as a deployed denial-of-wallet cap; local timings and provider limits require separate measurement
+
+Fork knobs worth knowing:
+
+- site config: `cache.live_stats_ttl_seconds`, `cache.live_inventory_ttl_seconds`, `performance.intent_prefetch_*`, `pricing.sales_tax_rate`, `shipping.fallback_flat_rate`, `tax.*`
+- Worker env: auto-synced pricing and tax-provider values in [`worker/wrangler.toml`](../worker/wrangler.toml)
+
+### Practical Scalability Scenarios
+
+These are rough planning scenarios, not guarantees. They assume the default
+five-minute browser cache TTLs and mostly normal user behavior. Provider limits
+and prices change independently of this repository; verify them in Cloudflare's
+current documentation before choosing a plan.
+
+| Scenario | Rough daily activity | Plan outlook |
+|----------|----------------------|--------------|
+| Small collective launch | ~1,500 campaign-page visits, ~75 manage/supporter visits, ~20 checkout starts, ~10 completed pledges | Free is a reasonable starting point for the operating shape The Pool is designed to handle cheaply. |
+| Busy launch week | ~8,000 campaign-page visits, ~250 manage/supporter visits, ~60 checkout starts, ~25 completed or modified pledges | Often still plausible on Free if abuse stays low and admin repair flows are rare, but this is where Paid starts buying real margin. |
+| Growing multi-project studio | ~20,000+ dynamic reads per day or many dozens of completed / modified / cancelled pledges per day | Start planning for Paid before a major push. Mutation-heavy days and abuse-path overhead become the part to watch first. |
+
+Use the provider documentation as the source of truth for current request,
+CPU-time, KV read/write/list, and pricing limits:
+
+- [Cloudflare Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
+- [Cloudflare Workers KV pricing](https://developers.cloudflare.com/kv/platform/pricing/)
+- [Cloudflare Workers KV limits](https://developers.cloudflare.com/kv/platform/limits/)
+
+The practical takeaway for forks is simple: The Pool can still fit the Workers Free plan for its intended “small number of concurrent campaigns, modest backer volume, one-month run” shape, especially because public read traffic is cheap and most days have little mutation traffic. The reason to move to Paid is not that Free suddenly stopped working, but that Paid gives healthier headroom for flash spikes, abuse-path KV writes, heavier modify/cancel activity, and more operator tooling.
+
+A normal no-queue day is expected to use roughly `48-75` Workers KV list requests over 24 hours: about one hourly idle recheck each for launch reminder dispatch and supporter email retry queues, plus occasional projection bootstraps or operator repair paths. Active launch reminder jobs and due supporter email retries still list their bounded queues when real work is pending.
+
+One deployment nuance: Cloudflare's configurable `limits` block is only enforced on the Standard Usage Model and only on deployed Workers, not in local development. That means the new `cpu_ms` guard is a denial-of-wallet backstop for Paid deployments, while Workers Free still relies on Cloudflare's built-in free-plan ceilings.
+
 ## Non-Goals
 
 The platform does not currently:

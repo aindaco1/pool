@@ -5,7 +5,7 @@ lang: es
 translation_key: about
 permalink: /es/about/
 description: Conoce cómo The Pool gestiona aportes de todo o nada, recompensas físicas, acceso de patrocinadores, privacidad y campañas creativas independientes.
-last_modified_at: 2026-07-13
+last_modified_at: 2026-09-06
 ---
 {% assign operator_name = site.platform.company_name | default: site.author %}
 {% assign support_email = site.platform.support_email %}
@@ -18,19 +18,27 @@ last_modified_at: 2026-07-13
 
 Cuando apoyas una campaña, Stripe guarda de forma segura tu método de pago, pero **no se te cobra cuando haces el aporte**. La campaña debe alcanzar su meta antes de la fecha límite. Si no la alcanza, no se realiza ningún cobro en tu tarjeta.
 
-Antes de que termine la campaña, puedes usar el enlace seguro de tu correo de confirmación para revisar, modificar o cancelar tu aporte. Si un mismo proceso de pago incluye varias campañas, cada campaña sigue siendo un aporte separado y se liquida por separado.
+Antes de que termine la campaña, puedes usar el enlace seguro de tu correo de confirmación para revisar, modificar o cancelar tu aporte, incluso si la campaña ya alcanzó su meta. Una vez pasada la fecha límite, ese enlace ya no permite modificar ni cancelar el aporte. Si un mismo proceso de pago incluye varias campañas, cada campaña sigue siendo un aporte separado y se liquida por separado.
+
+Si el pago falla después de que termina una campaña exitosa, actualizar tu tarjeta puede activar un reintento inmediato de cobro del monto guardado del aporte.
 
 ## No necesitas una cuenta
 
-Tu correo de confirmación contiene los enlaces seguros necesarios para gestionar tu aporte y, cuando se ofrezca, entrar a la comunidad de patrocinadores de esa campaña. Guarda el correo: es la forma más sencilla de regresar sin mantener otra contraseña.
+Tu correo de confirmación contiene los enlaces seguros necesarios para gestionar tu aporte y, cuando se ofrezca, entrar a la comunidad de patrocinadores de esa campaña. Cada enlace de gestión autoriza el acceso a un aporte específico. Guarda el correo y mantén los enlaces privados.
+
+Un aporte puede quedar guardado aunque su correo de confirmación se retrase o no pueda entregarse. Si no sabes si se completó, escribe a [{{ support_email }}](mailto:{{ support_email }}) antes de hacer otro aporte.
 
 Los recordatorios de lanzamiento y de procesos de pago incompletos son opcionales. Cada uno se limita al propósito descrito cuando das tu consentimiento e incluye una forma de cancelar la suscripción.
+
+Los correos de diario, hitos y anuncios de campaña también incluyen una opción para cancelar la suscripción a esa campaña. Dejar de recibir esas actualizaciones no cancela tu aporte ni los avisos esenciales sobre el aporte y los pagos.
 
 ## A dónde va el dinero
 
 Los niveles de recompensa, el apoyo directo a la campaña, los montos personalizados para la campaña y sus complementos cuentan para la meta. El envío, los impuestos, los complementos de plataforma y la propina opcional para la plataforma no cuentan.
 
 The Pool no descuenta una comisión de plataforma de los fondos de la campaña. Durante el proceso de pago, cada patrocinador puede elegir una propina opcional para ayudar a {{ operator_name }} a operar el servicio. Aun así, pueden aplicarse las comisiones de procesamiento de Stripe y otros gastos de la campaña.
+
+Los precios se muestran en dólares estadounidenses. Los complementos nuevos usan los precios actuales del producto y la variante. Al modificar un aporte, un complemento existente conserva su precio unitario guardado si mantienes el mismo producto y la misma variante, incluso cuando solo cambias la cantidad. Los impuestos y el envío pueden seguir siendo estimados hasta contar con suficiente información del destino.
 
 ## Recompensas físicas y políticas de compra
 
@@ -50,7 +58,7 @@ Un panel privado con acceso según el rol permite gestionar contenido de campañ
 
 Stripe gestiona los datos completos de las tarjetas de pago. The Pool almacena la información necesaria para gestionar aportes, comunicarse sobre las campañas, calcular impuestos y envíos aplicables, prevenir abusos y entregar recompensas. Las personas operadoras autorizadas solo reciben la información de patrocinadores y entrega necesaria para las campañas que gestionan. No vendemos la información de patrocinadores.
 
-Las páginas públicas de campaña, Acerca de, Términos y recompensas elegibles están diseñadas para la búsqueda y para compartir. Los enlaces de gestión de aportes, las páginas exclusivas para patrocinadores, las vistas previas protegidas, los resultados del proceso de pago y el panel privado quedan fuera de la intención de indexación y difusión pública.
+Las páginas públicas de campaña, Acerca de, Términos y recompensas elegibles están diseñadas para la búsqueda y para compartir. Las páginas de gestión de aportes, las páginas exclusivas para patrocinadores, las vistas previas protegidas, los resultados del proceso de pago y el panel privado solicitan a los buscadores que no las indexen. No incluyas enlaces de acceso privado en publicaciones ni capturas de pantalla compartidas.
 
 ## Código abierto
 
@@ -60,4 +68,4 @@ El sitio público, el Worker de Cloudflare, la automatización, la localización
 
 ---
 
-_Última actualización: 13 de julio de 2026_
+_Última actualización: 6 de septiembre de 2026_

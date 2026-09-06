@@ -1,164 +1,135 @@
 # Contributing to The Pool
 
-## Getting Started
+This guide covers onboarding, the contribution workflow, and shared development
+patterns. Start with [AGENTS](../AGENTS.md) and the
+[documentation index](README.md) to identify the guide that owns your change.
 
-### Prerequisites
-- Podman for the recommended local path, or:
-- Ruby + Bundler (for host Jekyll)
-- Node.js 24 preferred, Node.js 22 minimum for Wrangler 4 (for Worker + scripts)
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (for host Worker development)
-- optional: [Stripe CLI](https://stripe.com/docs/stripe-cli) (for webhook testing)
+## Development Setup
 
-### Local Development
+Use the Node version in [.nvmrc](../.nvmrc), Git, and Podman for the standard
+local path. Host Jekyll additionally needs Ruby and Bundler; Stripe CLI is
+optional for real test-mode webhook forwarding.
+
+From the repository root:
 
 ```bash
+git submodule update --init --recursive
+npm ci
+npm run setup:deploy -- --mode=local
 npm run podman:doctor
 ./scripts/dev.sh --podman
 ```
 
-That is the default local development path. It keeps the standard local ports and local state files, but runs Jekyll and Wrangler inside containers so new forks do not need host Ruby or host Wrangler just to boot the app.
+See [Podman](PODMAN.md) for container setup, supported hosts, service supervision,
+resource requirements, and logs. Use [Testing](TESTING.md) for fixture seeding,
+manual checkout, and browser tests; the automated browser harness serves a
+built static site.
 
-The Podman Worker container runs Node 24, matching GitHub Actions. Host-only Worker development uses Node 24 when possible; Node 22 is the minimum supported runtime for Wrangler 4.
+`npm run secrets:dev` creates/updates ignored `worker/.dev.vars` from the example,
+generates local signing/session secrets, and prompts for optional provider
+keys without printing them. Local admin bootstrap access uses
+`ADMIN_BOOTSTRAP_EMAILS`; the dashboard shows credential status only.
+[Security](SECURITY.md) defines secret boundaries, and
+[Deployment](DEPLOYMENT.md) owns hosted account/namespace setup.
 
-If you need the host-only path instead:
+Canonical settings belong in `_config.yml`. `_config.local.yml` carries only
+local overrides. Supported dev/test scripts synchronize `worker/wrangler.toml`;
+after direct configuration changes, restart the stack or run
+`npm run sync:worker-config`. See [Customization](CUSTOMIZATION.md).
+
+### Host Fallback
+
+Install the locked host dependencies from the repository root:
 
 ```bash
 bundle install
-bundle exec jekyll serve --config _config.yml,_config.local.yml
+npm ci --prefix worker
 ```
 
-If you want to run the checkout helper or browser suite against the same Podman-backed stack:
+Then use the existing launcher:
 
 ```bash
-./scripts/test-checkout.sh --podman
-./scripts/test-e2e.sh --podman
-./scripts/test-worker.sh --podman
-./scripts/smoke-pledge-management.sh --podman
-./scripts/pledge-report.sh --podman --local
-./scripts/fulfillment-report.sh --podman --local
-npm run test:e2e:headless:podman
-npm run podman:doctor
-npm run podman:self-check
+./scripts/dev.sh
 ```
 
-`./scripts/test-e2e.sh --podman` is fully automated browser coverage. `./scripts/test-checkout.sh --podman` remains the manual interactive helper when you want to step through a real checkout in your own browser.
+For manual service startup, run these in separate terminals from the repository root:
 
-Clear cache if styles don't update:
 ```bash
-bundle exec jekyll clean
+bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4000
 ```
 
-### Read the Docs (in order)
+```bash
+npm --prefix worker run dev
+```
 
-1. Root `README.md` — High-level purpose & architecture
-2. `docs/PROJECT_OVERVIEW.md` — How all parts fit together
-3. `docs/WORKFLOWS.md` — Pledge lifecycle, magic links & charge flow
-4. `docs/PAYMENT_PROCESSOR.md` — Stripe setup, checkout, webhooks, settlement, and reconciliation
-5. `docs/EMAIL.md` — Resend setup, email types, localization, and delivery behavior
-6. `docs/ETHICAL_RISK.md` — Ethical risk review prompts for data, money, messaging, automation, public sharing, and admin power
-7. `docs/DEV_NOTES.md` — Integration notes, content model & gotchas
-8. `docs/TESTING.md` — Full testing guide (includes secrets setup)
-9. `docs/ROADMAP.md` — Prospective work only
-10. `docs/DASHBOARD.md` — Admin dashboard editing and operations
+Configure a single Stripe listener and its matching local webhook secret using
+[Payment Processor](PAYMENT_PROCESSOR.md). Provider setup is optional for
+fixture-based checks; real test-mode payments need the matching test credentials.
+If styles are stale, `bundle exec jekyll clean` clears the generated site/cache.
 
-For dashboard UI changes, also skim `docs/ACCESSIBILITY.md`, `docs/I18N.md`, `docs/SECURITY.md`, and `docs/SEO.md`; the admin shell has explicit requirements for keyboard access, Spanish strings, input normalization, and `noindex`.
+## Contribution Workflow
 
-### GitHub Pages Setup
+1. Inspect `git status`; preserve unrelated edits and initialize the recorded shared dependencies.
+2. Read the implementation, nearby tests, [Architecture](ARCHITECTURE.md), and the relevant domain guide before changing behavior.
+3. Use the existing shared configuration, rendering, validation, and persistence paths.
+4. Run the narrowest meaningful check, then the complete `npm run test:premerge` gate for substantial or release-facing changes. [Testing](TESTING.md) owns commands and [Merge Smoke](MERGE_SMOKE_CHECKLIST.md) owns operator sign-off.
+5. Update the authoritative guide when behavior changes, record completed changes under Unreleased in the [Changelog](../CHANGELOG.md), and keep prospective work in the [Roadmap](ROADMAP.md).
+6. Open a focused PR using the [PR template](PULL_REQUEST_TEMPLATE.md), with relevant validation and rollback information.
 
-1. Create repo and add files
-2. Add CNAME file: `pool.dustwave.xyz`
-3. DNS (Cloudflare):
+Use `feat/`, `fix/`, or `docs/` branch names and conventional commit prefixes
+such as `feat`, `fix`, `docs`, `chore`, or `infra`. Link related issues.
+Include rendered screenshots for UI changes, including desktop/tablet/mobile
+and Spanish admin views when those surfaces change.
 
-| Type | Name | Value |
-|------|------|--------|
-| CNAME | pool | `<username>.github.io` |
+Review [Ethical Risk](ETHICAL_RISK.md) for changes to money, supporter data,
+messaging, analytics, admin power, visibility, or automation. Dashboard work
+also requires the relevant [Accessibility](ACCESSIBILITY.md), [I18N](I18N.md),
+[Security](SECURITY.md), and [SEO](SEO.md) contracts.
 
-4. Enable HTTPS in repo settings
-5. Verify the first-party cart loads and campaigns render
-6. Verify Worker-backed checkout boot config is present
+## Development Patterns
 
----
+Theme and email/checkout branding use the `design.*` / `platform.*` surface in
+[Customization](CUSTOMIZATION.md). Jekyll compiles `assets/main.scss` and the
+Pool partials under `assets/partials/` plus the pinned Platform design styles; add styles to the existing
+component or page partial. Font stylesheets load from the document head.
+Generated asset minification belongs to [Performance](PERFORMANCE.md).
 
-## Current Project State
+### Liquid Includes and Collections
 
-The [README](../README.md) describes the current user-facing and operational
-baseline. The [Changelog](../CHANGELOG.md) records completed and unreleased
-changes, while the [Roadmap](./ROADMAP.md) contains prospective work. Do not
-maintain a second dated capability or active-focus list in this guide.
+Inside an include, read passed values through `include`, for example
+`{{ include.pledged }}` for `{% include progress.html pledged=campaign.pledged_amount %}`.
+An empty YAML array is truthy in Liquid; use a size check:
 
----
+```liquid
+{% if page.support_items and page.support_items.size > 0 %}
+  <!-- Render the collection -->
+{% endif %}
+```
 
-## Branching & PRs
+Quote YAML strings containing special characters and guard division by zero
+before computing progress. [Content Model](CONTENT_MODEL.md) owns campaign
+field examples and countdown boundaries.
 
-### Branch Naming
-- Feature branches: `feat/<short-name>` (e.g., `feat/pledge-hook`)
-- Fix branches: `fix/<short-name>`
-- Docs branches: `docs/<short-name>`
+### Cart and Mobile Layers
 
-### Commit Style
-- Conventional prefixes: `feat`, `fix`, `docs`, `chore`, `infra`
+Shared UI talks to `window.PoolCartProvider` through the existing cart runtime
+includes and scripts. Stripe owns the payment iframe. Do not introduce a second
+cart path or hosted-cart DOM patches.
 
-### Pull Requests
-- Keep PRs focused and under ~300 lines when possible
-- Fill out the PR template, include screenshots for UI changes, and include desktop/tablet/mobile screenshots for admin dashboard layout changes
-- Include an Ethical Risk review when a PR changes money, data collection, supporter messaging, admin access, public sharing, automation, analytics, or engagement mechanics
-- Link issues with `Closes #123`
+The mobile menu toggle gains elevated stacking only while `.is-open`; its
+closed state must remain underneath the cart overlay. Reuse `_includes/header.html` and the pinned Platform
+`shared/dust-wave-platform/packages/design-core/styles/_layout.scss` pattern
+when changing navigation or dialogs. Shared code upgrades follow the immutable
+Platform boundary; do not patch the submodule in place.
 
-### Labels
-- `feature`, `bug`, `task`, `infra`, `docs`, `security`
+### Accessibility and Localization Helpers
 
----
+Use `.sr-only` for supporting text, labeled controls, decorative SVG state,
+and the existing live regions/focus behavior. `_includes/a11y.html` supplies
+`sr-text` and `external-link` patterns. Meaningful images require alt text;
+intentional decorative images use the explicit decorative state.
 
-## First Contribution Checklist
-
-- [ ] Clone repo, run `npm run podman:doctor`
-- [ ] Start local dev with `./scripts/dev.sh --podman`
-- [ ] Confirm Worker local dev is running on Node 24 through the Podman path
-- [ ] Only use the host-only Jekyll/Wrangler path if you intentionally need it
-- [ ] Skim `_layouts/` & `_includes/` to see first-party cart integration
-- [ ] Review `assets/js/` cart & pledge scripts
-- [ ] Read `worker/src/` to understand the backend (pledge storage, stats, charging)
-- [ ] Open `/admin/` locally with the default dev admin email path and understand the dashboard publish vs KV-save split
-- [ ] Read `docs/ETHICAL_RISK.md` before changing checkout, emails, analytics, admin power, public visibility, or data retention
-- [ ] Verify `CNAME` is set to `pool.dustwave.xyz`
-
----
-
-## Secrets & Config (Test Mode First)
-
-- **GitHub Actions**: Add test `STRIPE_SECRET_KEY` + `CHECKOUT_INTENT_SECRET`
-- **Cloudflare Worker**: Same secrets as env vars; set `SITE_BASE`
-- **Stripe**: For hosted environments, create a webhook to `https://pledge.dustwave.xyz/webhooks/stripe`
-- **Local custom checkout**: add `STRIPE_PUBLISHABLE_KEY_TEST` to `worker/.dev.vars`
-- **Admin dashboard**: local dev grants bootstrap super-admin access through `ADMIN_BOOTSTRAP_EMAILS` in ignored `worker/.dev.vars`; fork admins put production access in `_config.yml` `admin.users`, `ADMIN_USERS_JSON`, or the dashboard Users screen. The Users screen saves to KV, not GitHub.
-
-See [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md), [EMAIL.md](EMAIL.md), and [TESTING.md](TESTING.md) for the full payment, email, and secrets references.
-
----
-
-## Security Notes
-
-- Secrets live only in GitHub Actions + Cloudflare vars; never in repo
-- The dashboard **Secrets & credentials** section is read-only status. Do not add secret editing or secret persistence to `_config.yml`, campaign YAML, KV user records, or dashboard drafts.
-- Validate Stripe webhook signatures
-- Keep Resend sender domains aligned with `PLEDGES_EMAIL_FROM` and `UPDATES_EMAIL_FROM`
-- Never commit API keys or tokens
-
----
-
-## Glossary
-
-| Term | Definition |
-|------|------------|
-| **Pledge** | Order placed with no immediate charge; card saved via Stripe SetupIntent |
-| **All-or-Nothing** | Cards charged only if `pledged_amount >= goal_amount` at deadline |
-| **SetupIntent** | Stripe object to save a payment method for later off-session charges |
-| **Magic Link** | HMAC-signed URL sent via email for accountless pledge management |
-| **The Pool** | Platform name for the crowdfunding site |
-| **Dust Wave** | Company name (two words, not "DustWave") |
-
----
-
-## Contact & Ownership
-
-Use the project docs and existing git history for context, and keep changes scoped and well-tested before opening a PR.
+Shared strings use `_includes/t.html`, with interpolation and locale fallback.
+Public links use the locale helpers; token/query/hash preservation is part of
+those helpers' contract. See [Accessibility](ACCESSIBILITY.md) and
+[I18N](I18N.md) for the maintained behavior and verification requirements.

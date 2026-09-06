@@ -89,7 +89,7 @@ Treat these as release blockers until explicitly resolved:
 
 ## Project-Specific Guidance
 
-- Checkout and payment changes: start from [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md), [WORKFLOWS.md](./WORKFLOWS.md), and [SECURITY.md](./SECURITY.md). Verify canonical totals, idempotency, supporter understanding, and recovery paths.
+- Checkout and payment changes: start from [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md), [ARCHITECTURE.md](./ARCHITECTURE.md), and [SECURITY.md](./SECURITY.md). Verify canonical totals, idempotency, supporter understanding, and recovery paths.
 - Email and reminders: start from [EMAIL.md](./EMAIL.md). Verify explicit consent, audience scope, dry runs, localized copy, suppression/unsubscribe behavior, and no-send evidence.
 - Admin dashboard changes: start from [DASHBOARD.md](./DASHBOARD.md). Document whether the feature is read-only, browser-local, KV-backed, or GitHub-backed, and keep role/campaign scoping Worker-enforced.
 - Public sharing, SEO, and embeds: start from [SEO.md](./SEO.md) and [EMBEDS.md](./EMBEDS.md). Public previews are truthful, state-aware, and never leak protected-preview or tokenized data.

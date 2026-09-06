@@ -5,14 +5,14 @@ lang: es
 translation_key: terms
 permalink: /es/terms/
 description: Revisa las políticas de The Pool sobre aportes, pagos, envío, no devoluciones, entrega, privacidad y contribuciones creativas.
-last_modified_at: 2026-07-13
+last_modified_at: 2026-09-06
 ---
 {% assign operator_name = site.platform.company_name | default: site.author %}
 {% assign support_email = site.platform.support_email %}
 
 # Términos y pautas creativas
 
-**Vigentes desde el 13 de julio de 2026.** Estos términos rigen el uso de The Pool, un servicio de crowdfunding operado por {{ operator_name }}. Al usar el sitio, enviar un aporte o proporcionar contenido, aceptas estos términos y las condiciones específicas de la campaña que se muestren antes de confirmar el pago. Si una condición específica de campaña entra en conflicto con estos términos, se aplica la más específica para esa campaña, salvo que la ley lo prohíba.
+**Vigentes desde el 6 de septiembre de 2026.** Estos términos rigen el uso de The Pool, un servicio de crowdfunding operado por {{ operator_name }}. Al usar el sitio, enviar un aporte o proporcionar contenido, aceptas estos términos y las condiciones específicas de la campaña que se muestren antes de confirmar el pago. Si una condición específica de campaña entra en conflicto con estos términos, se aplica la más específica para esa campaña, salvo que la ley lo prohíba.
 
 ## 1. Elegibilidad y uso aceptable
 
@@ -21,22 +21,22 @@ Debes tener capacidad para celebrar un acuerdo vinculante y proporcionar datos c
 ## 2. Aportes de todo o nada
 
 - Un aporte es un compromiso condicionado de apoyo a una campaña. Stripe guarda tu método de pago, pero no se realiza ningún cobro de campaña cuando haces el aporte inicial.
-- Puedes modificar o cancelar el aporte mediante su enlace seguro de gestión mientras la campaña siga abierta.
+- Puedes modificar o cancelar el aporte mediante su enlace seguro de gestión mientras la campaña siga abierta, incluso si ya alcanzó su meta. Las modificaciones y cancelaciones dejan de estar disponibles cuando pasa la fecha límite de la campaña.
 - Si la campaña no alcanza su meta antes de la fecha límite, el aporte de campaña no se cobra.
 - Si la campaña alcanza su meta, The Pool puede cobrar el método de pago guardado después de que termine. Los aportes de un mismo correo a la misma campaña exitosa pueden combinarse en un solo cobro; las campañas diferentes se liquidan por separado.
 - Los niveles de recompensa, el apoyo directo, los montos personalizados y los complementos de campaña cuentan para la meta. Los impuestos, el envío, los complementos de plataforma y las propinas opcionales para la plataforma no cuentan.
-- Un método de pago rechazado o vencido puede impedir que se complete el aporte. Podemos pedirte que lo actualices, pero no prometemos recuperar todos los pagos fallidos.
+- Un método de pago rechazado o vencido puede impedir que se complete el aporte. Podemos pedirte que lo actualices, pero no prometemos recuperar todos los pagos fallidos. Si el pago falló para una campaña financiada cuya fecha límite ya pasó, guardar un nuevo método de pago puede activar un reintento inmediato de cobro del monto guardado del aporte.
 
 ## 3. Precios, pagos, impuestos y cargos opcionales
 
-Los precios se muestran en dólares estadounidenses, salvo que se indique otra cosa. Antes de guardar o cobrar un aporte, el servidor verifica los precios actuales del catálogo, las variantes seleccionadas, el envío, los impuestos, las propinas, los complementos y los totales de campaña. Los totales mostrados por el navegador pueden seguir siendo estimados hasta contar con suficiente información del destino.
+Los precios se muestran en dólares estadounidenses. El servidor verifica los precios, las variantes seleccionadas, el envío, los impuestos, las propinas, los complementos y los totales de campaña cuando haces o modificas un aporte. Las selecciones de complementos nuevos, incluida una variante distinta, usan los precios actuales del catálogo. Un complemento existente conserva su precio unitario guardado cuando el producto y la variante no cambian, incluso si solo modificas la cantidad. Los cobros de campaña usan los montos guardados de los aportes. Los totales mostrados por el navegador pueden seguir siendo estimados hasta contar con suficiente información del destino.
 
 Stripe gestiona los números completos de tarjeta y los códigos de seguridad; The Pool no los almacena. Los impuestos sobre ventas y el envío aplicables se muestran durante el proceso de pago cuando pueden calcularse. Las propinas y los complementos opcionales se identifican por separado antes de que confirmes el aporte.
 
 ## 4. Envío y preparación de recompensas
 {: #shipping-policy}
 
-- Las recompensas y los productos físicos se envían a la dirección guardada con el aporte. Es tu responsabilidad revisarla y usar el enlace de gestión para solicitar cambios permitidos antes de que comience la preparación del envío.
+- Las recompensas y los productos físicos se envían a la dirección guardada con el aporte. Es tu responsabilidad revisarla y usar el enlace de gestión para solicitar cambios permitidos mientras la campaña siga abierta. Después de la fecha límite, escribe a [{{ support_email }}](mailto:{{ support_email }}) si hay un problema con la dirección; puede que no sea posible cambiarla una vez que la preparación del envío esté en marcha.
 - Salvo que una campaña indique otra cosa, los artículos físicos se envían desde Nuevo México, Estados Unidos. Los destinos disponibles, métodos, condiciones de envío gratuito, opciones de firma y cargos son los que se muestran durante el proceso de pago.
 - Las páginas de campaña y producto pueden mostrar una fecha o periodo estimado de disponibilidad o entrega. Son estimaciones de buena fe, no fechas de entrega garantizadas. La producción creativa, la fabricación, el inventario, el clima, las aduanas, las operaciones del transportista y otros acontecimientos pueden causar retrasos.
 - Si se ofrece entrega internacional, la persona destinataria es responsable de aranceles, cargos de intermediación e impuestos locales que no se hayan cobrado durante el proceso de pago, salvo que la campaña indique expresamente otra cosa.
@@ -57,7 +57,7 @@ Esta política de venta final no elimina las soluciones disponibles para un art�
 
 El periodo de siete días es una **pauta para reportar problemas, no un plazo de devolución**. Un reporte posterior no elimina derechos que legalmente no puedan excluirse, aunque la demora puede dificultar una reclamación al transportista o la verificación de los hechos.
 
-Antes de que una campaña se financie, puedes cancelar el aporte mientras siga abierta y no se realizará ningún cobro de campaña. Si una recompensa cobrada no puede entregarse, la campaña o {{ operator_name }} proporcionará un plan actualizado y podrá ofrecer una entrega posterior, un sustituto razonable con tu aprobación o un reembolso por el artículo no entregado. Los cobros duplicados, errores del procesador, sospechas de fraude y reembolsos exigidos por la ley se revisan por separado de las devoluciones ordinarias.
+Mientras una campaña siga abierta, puedes cancelar el aporte incluso si ya alcanzó su meta y no se realizará ningún cobro de campaña. Si una recompensa cobrada no puede entregarse, la campaña o {{ operator_name }} proporcionará un plan actualizado y podrá ofrecer una entrega posterior, un sustituto razonable con tu aprobación o un reembolso por el artículo no entregado. Los cobros duplicados, errores del procesador, sospechas de fraude y reembolsos exigidos por la ley se revisan por separado de las devoluciones ordinarias.
 
 ## 6. Riesgos de campaña y responsabilidad de los creadores
 
@@ -69,11 +69,15 @@ Esta sección solo se aplica cuando una campaña solicita expresamente nombres, 
 
 ## 8. Comunicaciones y enlaces de acceso
 
-Las confirmaciones de aporte, avisos de pago, mensajes de entrega y actualizaciones importantes de campaña son comunicaciones transaccionales. Los recordatorios opcionales de lanzamiento y de procesos de pago incompletos requieren el consentimiento descrito al registrarte e incluyen una forma de cancelar la suscripción. No compartas enlaces seguros de gestión de aportes, comunidad de patrocinadores, vista previa o administración con personas no autorizadas. El acceso puede revocarse cuando un enlace vence, se usa indebidamente o deja de apuntar a un registro activo.
+Enviamos confirmaciones de aporte, avisos de pago y mensajes de entrega para gestionar tu aporte. Los correos de diario, hitos y anuncios de campaña incluyen una opción para cancelar la suscripción a esa campaña. Usarla no cancela tu aporte ni los avisos esenciales sobre el aporte y los pagos. Los recordatorios opcionales de lanzamiento y de procesos de pago incompletos requieren el consentimiento descrito al registrarte e incluyen una forma de cancelar la suscripción.
+
+Un correo de confirmación que se retrasa o no puede entregarse no anula un aporte guardado. Si no sabes si el aporte quedó guardado, escribe a [{{ support_email }}](mailto:{{ support_email }}) antes de enviar otro.
+
+Cada enlace seguro de gestión autoriza el acceso a un aporte específico. No compartas enlaces de gestión, comunidad de patrocinadores, vista previa o administración con personas no autorizadas. El acceso puede revocarse cuando un enlace vence, se usa indebidamente o deja de apuntar a un registro activo.
 
 ## 9. Privacidad y datos
 
-The Pool recopila la información necesaria para operar el servicio, incluidos datos de contacto, aportes y pedidos, interacciones de campaña e información de envío para artículos físicos. Stripe gestiona los datos completos de las tarjetas. Cloudflare proporciona la infraestructura del sitio y del Worker; Resend entrega correos; y los proveedores de envío, impuestos y prevención de abusos reciben datos limitados cuando se necesita su servicio.
+The Pool recopila la información necesaria para operar el servicio, incluidos datos de contacto, aportes y pedidos, interacciones de campaña, información sobre cómo llegaste a la campaña, preferencias de entrega de correo e información de envío para artículos físicos. Stripe gestiona los datos completos de las tarjetas. El sitio público está alojado en GitHub Pages y usa infraestructura de Cloudflare; Cloudflare también ejecuta el Worker que gestiona los aportes y la administración. Resend entrega correos, y los proveedores de envío, impuestos y prevención de abusos reciben datos limitados cuando se necesita su servicio.
 
 Las personas operadoras autorizadas pueden acceder a información de patrocinadores, reportes y entrega solo para las campañas que tienen permiso de gestionar. Las personas administradoras de plataforma pueden acceder a la información necesaria para operar, proteger, conciliar, dar soporte, respaldar o restaurar la plataforma. No vendemos información personal. Los registros pueden conservarse para la entrega, contabilidad, prevención de fraude, obligaciones legales, gestión de disputas y recuperación ante desastres, y después eliminarse o reducirse cuando ya no sean razonablemente necesarios.
 

@@ -219,5 +219,5 @@ Check:
 - [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md)
 - [TESTING.md](./TESTING.md)
 - [PODMAN.md](./PODMAN.md)
-- [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md)
+- [ARCHITECTURE.md](./ARCHITECTURE.md)
 - [worker/README.md](../worker/README.md)

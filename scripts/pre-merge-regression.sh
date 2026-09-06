@@ -197,6 +197,13 @@ minify_site_assets() {
 }
 
 verify_build_artifacts() {
+  local maintainer_path=""
+  for maintainer_path in README.md LICENSE AGENTS.md CHANGELOG.md docs; do
+    if [[ -e "_site/${maintainer_path}" ]]; then
+      echo "Maintainer documentation leaked into the public site: ${maintainer_path}"
+      return 1
+    fi
+  done
   if [[ -e _site/shared/dust-wave-jekyll-template ]]; then
     echo "The source-upgrade Jekyll template leaked into the generated site"
     return 1
@@ -553,7 +560,9 @@ run_phase "1. Secret audit" npm run test:secrets
 
 run_phase "1b. Jekyll template drift" npm run jekyll-template:check
 
-run_phase "2. Syntax checks" bash -lc '
+# Host phases inherit the toolchain selected by the caller and the gate.
+# A login shell can reset PATH and switch rbenv Ruby to macOS system Ruby.
+run_phase "2. Syntax checks" bash -c '
   node --check worker/src/index.js
   node --check worker/src/email.js
   node --check worker/src/email-outbox.js
@@ -585,6 +594,7 @@ run_phase "3. Focused regression suites" npx vitest run \
   tests/unit/performance-budgets.test.ts \
   tests/unit/performance-gates.test.ts \
   tests/unit/package-scripts.test.ts \
+  tests/unit/premerge-toolchain.test.ts \
   tests/unit/setup-deploy-script.test.ts \
   tests/unit/worker-business-logic.test.ts \
   tests/unit/worker-ops-integrity.test.ts \
@@ -595,7 +605,7 @@ run_phase "3. Focused regression suites" npx vitest run \
 
 run_phase "4. Full unit suite" npm run test:unit
 
-run_phase "4b. Release evidence command sanity" bash -lc '
+run_phase "4b. Release evidence command sanity" bash -c '
   npm run release:smoke -- --help >/dev/null
   npm run release:providers -- --help >/dev/null
   WORKER_URL= WORKER_BASE= SITE_URL= SITE_BASE= npm run release:payment-smoke -- --no-dev-vars
@@ -603,20 +613,11 @@ run_phase "4b. Release evidence command sanity" bash -lc '
 
 USE_PODMAN_JEKYLL=false
 if prepare_host_jekyll; then
-  run_phase "5. First-party build artifact checks" bash -lc 'scripts/pre-merge-regression.sh __host_or_podman_build_check'
+  run_phase "5. First-party build artifact checks" scripts/pre-merge-regression.sh __host_or_podman_build_check
 else
   print_host_jekyll_fallback_reason
   USE_PODMAN_JEKYLL=true
-  run_phase "5. First-party build artifact checks" bash -lc '
-    for candidate in "$HOME"/.nvm/versions/node/v24.*/bin "$HOME"/.nvm/versions/node/v22.*/bin; do
-      if [[ -x "$candidate/node" ]]; then
-        PATH="$candidate:$PATH"
-        break
-      fi
-    done
-    PATH="/opt/podman/bin:$PATH"
-    scripts/pre-merge-regression.sh __podman_build_check
-  '
+  run_phase "5. First-party build artifact checks" scripts/pre-merge-regression.sh __podman_build_check
 fi
 
 if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then

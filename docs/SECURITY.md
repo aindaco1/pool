@@ -301,6 +301,7 @@ Payment-specific setup is documented in [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESS
 | Stripe Webhook Secret | `STRIPE_WEBHOOK_SECRET_LIVE` | 32+ chars |
 | Checkout Intent Secret | `CHECKOUT_INTENT_SECRET` | 32+ chars |
 | Magic Link Secret | `MAGIC_LINK_SECRET` | 32+ chars |
+| Campaign Preview Secret | Optional `CAMPAIGN_PREVIEW_SECRET`; falls back to `MAGIC_LINK_SECRET`, then admin signing secrets | 32+ chars |
 | Launch Reminder Token Secret | `LAUNCH_REMINDER_TOKEN_SECRET` or `MAGIC_LINK_SECRET` fallback | 32+ chars |
 | Abandoned Checkout Token Secret | `ABANDONED_CART_TOKEN_SECRET` or `MAGIC_LINK_SECRET` fallback for reminder unsubscribe/resume links | 32+ chars |
 | Admin Session Secret | `ADMIN_SESSION_SECRET` | 32+ chars |
