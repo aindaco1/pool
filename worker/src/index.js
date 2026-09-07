@@ -14464,6 +14464,7 @@ function normalizeAdminUsers(value, schema = {}) {
 
   const availableCampaigns = new Set((schema.availableCampaignSlugs || []).map((campaignSlug) => String(campaignSlug || '').trim()).filter(Boolean));
   const currentUserEmail = String(schema.currentUserEmail || '').trim().toLowerCase();
+  const unchangedUnassignedEmails = new Set(schema.unchangedUnassignedCampaignUserEmails || []);
   const seenEmails = new Set();
   const superAdminEmails = new Set();
   const normalized = [];
@@ -14484,7 +14485,7 @@ function normalizeAdminUsers(value, schema = {}) {
     const campaigns = role === 'super_admin'
       ? []
       : normalizeAdminUserCampaigns(user.campaigns ?? user.campaignSlugs ?? user.campaign_slugs);
-    if (role === 'campaign_user' && !campaigns.length) {
+    if (role === 'campaign_user' && !campaigns.length && !unchangedUnassignedEmails.has(email)) {
       return { ok: false, error: `Campaign user "${email}" needs at least one campaign.` };
     }
     const invalidCampaign = campaigns.find((campaignSlug) => !isValidSlug(campaignSlug));
@@ -15609,7 +15610,7 @@ async function resolveCampaignUsersForCreate(env, body, campaigns, auth) {
     name: user.name || '',
     email: user.email,
     role: user.role === 'super_admin' ? 'super_admin' : 'campaign_user',
-    campaignSlugs: user.role === 'super_admin' ? [] : (user.campaignSlugs || [])
+    campaignSlugs: user.role === 'super_admin' ? [] : [...(user.campaignSlugs || [])]
   }));
   const assignedUsers = [];
 
@@ -15692,7 +15693,14 @@ async function handleAdminCampaignCreate(request, env, body = {}) {
     normalizedUsers = normalizeAdminUsers(userResult.users, {
       label: 'Users',
       availableCampaignSlugs: Array.from(availableCampaignSlugs),
-      currentUserEmail: auth.user.email
+      currentUserEmail: auth.user.email,
+      // Creating a campaign only adds assignments. Preserve unrelated existing
+      // users without campaigns; explicit user edits still require an assignment.
+      unchangedUnassignedCampaignUserEmails: userResult.previousUsers
+        .filter((user) => user.role === 'campaign_user'
+          && !user.campaignSlugs.length
+          && !userResult.assignedUsers.some((assigned) => assigned.email === user.email))
+        .map((user) => user.email)
     });
     if (!normalizedUsers.ok) {
       return privateJsonResponse({ valid: false, errors: [normalizedUsers.error] }, 422, env);

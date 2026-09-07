@@ -1186,7 +1186,7 @@ tiers:
     expect(fetchMock.mock.calls.some(([input]) => input === 'https://api.resend.com/emails')).toBe(false);
   });
 
-  it('lets super admins create new preview-only campaigns and email assigned campaign users', async () => {
+  it('creates preview-only campaigns while preserving unrelated users and existing assignments', async () => {
     const env = {
       ...createEnv(),
       GITHUB_TOKEN: 'github-token',
@@ -1207,12 +1207,22 @@ tiers:
         name: 'Creator Person',
         email: 'creator@example.com',
         role: 'campaign_user',
-        campaignSlugs: []
+        campaignSlugs: ['hand-relations']
       }, {
         name: 'Second Creator',
         email: 'second-creator@example.com',
         role: 'campaign_user',
         campaignSlugs: []
+      }, {
+        name: 'Unassigned Creator',
+        email: 'unassigned-creator@example.com',
+        role: 'campaign_user',
+        campaignSlugs: []
+      }, {
+        name: 'Archived Creator',
+        email: 'archived-creator@example.com',
+        role: 'campaign_user',
+        campaignSlugs: ['archived-campaign']
       }]
     }));
     const { cookie, ctx, csrfToken } = await signInAdmin(env);
@@ -1308,10 +1318,12 @@ tiers:
     expect(githubCalls.some((call) => call.url.endsWith('/actions/workflows/deploy.yml/dispatches'))).toBe(true);
     const savedUsers = JSON.parse((env.PLEDGES as CountingKVNamespace).store.get('admin-users:v1') || '{}');
     expect(savedUsers.users).toEqual(expect.arrayContaining([
-      expect.objectContaining({ email: 'creator@example.com', campaignSlugs: ['new-blank'] }),
+      expect.objectContaining({ email: 'creator@example.com', campaignSlugs: ['hand-relations', 'new-blank'] }),
       expect.objectContaining({ email: 'second-creator@example.com', campaignSlugs: ['new-blank'] }),
       expect.objectContaining({ email: 'new-creator@example.com', campaignSlugs: ['new-blank'] }),
-      expect.objectContaining({ email: 'another-creator@example.com', campaignSlugs: ['new-blank'] })
+      expect.objectContaining({ email: 'another-creator@example.com', campaignSlugs: ['new-blank'] }),
+      expect.objectContaining({ email: 'unassigned-creator@example.com', campaignSlugs: [] }),
+      expect.objectContaining({ email: 'archived-creator@example.com', campaignSlugs: ['archived-campaign'] })
     ]));
     const emailCalls = (global.fetch as unknown as { mock: { calls: Array<[RequestInfo | URL, RequestInit?]> } }).mock.calls
       .filter(([input]) => input === 'https://api.resend.com/emails');
@@ -1419,6 +1431,62 @@ tiers:
     expect(markdown).toContain('creator_name: ""');
     expect((env.PLEDGES as CountingKVNamespace).store.has('admin-users:v1')).toBe(false);
     expect(githubCalls.some((call) => call.url.endsWith('/actions/workflows/deploy.yml/dispatches'))).toBe(true);
+  });
+
+  it('still rejects unassigned campaign users in explicit user edits', async () => {
+    const env = createEnv();
+    const { cookie, ctx, csrfToken } = await signInAdmin(env);
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/users', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({
+        users: [
+          { email: 'admin@example.com', role: 'super_admin', campaigns: [] },
+          { email: 'creator@example.com', role: 'campaign_user', campaigns: [] }
+        ],
+        // The creation exception is derived from stored users, never client input.
+        unchangedUnassignedCampaignUserEmails: ['creator@example.com']
+      })
+    }), env, ctx);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ errors: [expect.stringContaining('needs at least one campaign')] });
+    expect((env.PLEDGES as CountingKVNamespace).putCalls).toBe(0);
+  });
+
+  it.each(['permission', 'transport'])('leaves users unchanged and sends no email when the GitHub campaign write fails (%s)', async (failure) => {
+    const env = { ...createEnv(), GITHUB_TOKEN: 'github-token', RESEND_API_KEY: 'resend-test' };
+    const stored = JSON.stringify({ users: [
+      { email: 'admin@example.com', role: 'super_admin', campaignSlugs: [] },
+      { email: 'creator@example.com', role: 'campaign_user', campaignSlugs: [] },
+      { email: 'unselected@example.com', role: 'campaign_user', campaignSlugs: [] }
+    ] });
+    (env.PLEDGES as CountingKVNamespace).store.set('admin-users:v1', stored);
+    const { cookie, ctx, csrfToken } = await signInAdmin(env);
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === 'https://pool.test/api/campaigns.json') return jsonResponse({ campaigns: [campaignFixture] });
+      if (url.includes('/contents/_campaigns?')) return jsonResponse([]);
+      if (url.endsWith('/contents/_campaigns/failed-campaign.md') && init?.method === 'PUT') {
+        if (failure === 'transport') throw new TypeError('Network unavailable');
+        return jsonResponse({ message: 'Resource not accessible by personal access token' }, 403);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/campaigns/create', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({ title: 'Failed Campaign', campaignUserEmails: ['creator@example.com'] })
+    }), env, ctx);
+    expect(response.status).toBe(failure === 'transport' ? 502 : 403);
+    await expect(response.json()).resolves.toMatchObject({ code: failure === 'transport' ? 'github_request_failed' : 'github_api_error' });
+    expect(response.headers.get('Cache-Control')).toContain('no-store');
+    expect((env.PLEDGES as CountingKVNamespace).store.get('admin-users:v1')).toBe(stored);
+    expect((env.PLEDGES as CountingKVNamespace).putCalls).toBe(0);
+    const calls = vi.mocked(global.fetch).mock.calls;
+    expect(calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(1);
+    expect(calls.some(([input]) => String(input).includes('api.resend.com') || String(input).includes('/dispatches'))).toBe(false);
   });
 
   it('lets super admins dispatch campaign archives for non-live campaigns only', async () => {
