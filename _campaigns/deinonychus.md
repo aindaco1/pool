@@ -4,7 +4,7 @@ title: "Deinonychus"
 slug: deinonychus
 published: false
 preview_only: true
-preview_enabled: false
+preview_enabled: true
 preview_reviewer_emails: []
 state: upcoming
 start_date: 2026-09-07
@@ -30,4 +30,5 @@ stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
+preview_updated_at: "2026-09-07T18:03:03.381Z"
 ---
