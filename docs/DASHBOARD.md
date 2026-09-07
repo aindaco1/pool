@@ -310,12 +310,11 @@ Each campaign has these subtabs:
 
 Create new campaign is super-admin-only. It creates a preview-only campaign that remains invisible from public `/campaigns/:slug/`, localized campaign routes, homepage/community/add-on indexes, `/api/campaigns.json`, share cards, sitemap output, robots crawl intent, embeds, and public prefetch eligibility until the campaign is launched.
 
-Required fields:
-
-- campaign title
-- one or more campaign users
+The campaign title is required. Campaign user assignment is optional.
 
 Super admins can create a campaign with no assigned campaign users, select multiple existing campaign users, choose **Create new campaign user**, and add one or more new campaign users with required names and emails in the same dialog. New users are saved to `admin-users:v1`; assigned campaign users receive a Resend-powered email with the admin dashboard link when email delivery is configured.
+
+Creation adds the new campaign to selected users' existing assignments and preserves other users. An existing unselected user with no campaigns does not block creation. Explicit edits in **Settings -> Users** still require each campaign user to have at least one campaign.
 
 The Worker derives the slug from the title, writes `_campaigns/<slug>.md` through the existing GitHub publish path, sets preview-only/public-hidden defaults, triggers the normal rebuild, and records an audit event. The flow does not require launch dates, goal amount, rewards, images, or page content.
 

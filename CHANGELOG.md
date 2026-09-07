@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Campaign creation
+
+- Fixed GitHub-backed dashboard requests failing before network access because
+  the Worker runtime rejects the shared client's redirect mode. Pool's GitHub
+  adapter uses manual redirect handling and still refuses redirects.
+- Campaign creation preserves unrelated unassigned users instead of rejecting
+  the entire user list. Selected users retain their previous assignments.
+  Explicit user edits still require campaign users to have a campaign.
+- Added real Worker-runtime GitHub coverage and campaign creation regressions
+  for assignment preservation and failed writes without account or email effects.
+
 ### Dependency maintenance
 
 - Added explicit root and Worker production/full audit checks to Merge Smoke,

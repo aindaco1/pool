@@ -3,13 +3,25 @@
 import { createGitHubClient } from '../../shared/dust-wave-platform/packages/worker-core/src/github.js';
 import { getScopedConsole } from './logger.js';
 
+async function fetchGitHubWithoutRedirects(input, init) {
+  // The pinned shared client uses redirect: 'error', which this Worker's
+  // runtime rejects before sending. Enforce the same policy with manual mode.
+  const response = await fetch(input, { ...init, redirect: 'manual' });
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel().catch(() => {});
+    throw new TypeError('GitHub redirects are not allowed');
+  }
+  return response;
+}
+
 function getClient(env = {}) {
   return createGitHubClient({
     token: env.GITHUB_TOKEN,
     owner: env.GITHUB_OWNER || 'aindaco1',
     repo: env.GITHUB_REPO || 'pool',
     ref: env.GITHUB_REF || 'main',
-    userAgent: 'pool-worker'
+    userAgent: 'pool-worker',
+    fetchTarget: fetchGitHubWithoutRedirects
   });
 }
 
