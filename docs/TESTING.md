@@ -195,7 +195,7 @@ Treat new hidden tracking, unbounded notifications, misleading public metadata, 
 
 ## Unit Tests (Vitest)
 
-Fast, isolated tests for JS functions in `tests/unit/`.
+Unit and focused integration tests in `tests/unit/`.
 
 ### Coverage
 
@@ -212,6 +212,7 @@ Fast, isolated tests for JS functions in `tests/unit/`.
 | `admin-dashboard` | Dashboard dirty-state tracking, settings serialization, content/editor normalization, staged media uploads/media picker, actual Stripe fee analytics/backfill, Analytics attribution reporting, marketing shared drafts, abandoned-checkout health/suppression, referral URL helpers, responsive/i18n support utilities |
 | `i18n-completeness` | Supported locale catalogs stay aligned with the English nested key surface |
 | `campaign-page` | Share-link URL construction, safe query preservation, state-aware share text, launch reminder form submission, public campaign controls, and SEO-sensitive campaign-page behavior |
+| `campaign-preview-pages` | Real Jekyll generation from unpublished sources, localized shells, duplicate-route prevention, and draft exclusion from public routes, catalogs, and sitemaps |
 | `page-prefetch` | Same-origin public-route allowlisting, sensitive-query exclusions, network guards, delay/limit handling, and document prefetch hint creation |
 | `cart-runtime-loader` | Lazy cart-runtime boot, persisted/recovery cart detection, idempotent loading, and user-intent triggers |
 | `site-asset-minification` | Generated `_site` CSS/JS minification behavior and check-mode failure cases |

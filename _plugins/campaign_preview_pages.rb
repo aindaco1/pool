@@ -31,7 +31,7 @@ module Jekyll
       default_lang = site.config.dig('i18n', 'default_lang') || site.config['lang'] || 'en'
       supported_langs = Array(site.config.dig('i18n', 'supported_langs')).map(&:to_s)
       supported_langs = [default_lang.to_s] if supported_langs.empty?
-      campaigns = site.collections['campaigns']&.docs || []
+      campaigns = preview_campaigns(site)
 
       campaigns.each do |campaign|
         slug = campaign.data['slug']
@@ -57,6 +57,25 @@ module Jekyll
     end
 
     private
+
+    def preview_campaigns(site)
+      collection = site.collections['campaigns']
+      return [] unless collection
+
+      campaigns = collection.docs.dup
+      loaded_paths = campaigns.map(&:path)
+      # Jekyll drops published:false documents before generators run. Read those
+      # sources only for the generic shells; never add them to the public collection.
+      collection.filtered_entries.each do |entry|
+        path = collection.collection_dir(entry)
+        next if loaded_paths.include?(path) || !Utils.has_yaml_header?(path)
+
+        campaign = Document.new(path, site: site, collection: collection)
+        campaign.read
+        campaigns << campaign
+      end
+      campaigns
+    end
 
     def build_localized_paths(slug, supported_langs, default_lang)
       supported_langs.each_with_object({}) do |lang, paths|
