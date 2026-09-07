@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Campaign preview
+
+- Fixed preview-page 404s for unpublished campaigns. The existing generator
+  reads campaign sources omitted from Jekyll's public collection and creates
+  the same generic protected shells in each supported language.
+- Added a real Jekyll regression covering unpublished previews and continued
+  exclusion of draft content from public routes, catalogs, and sitemaps.
+
 ### Campaign creation
 
 - Fixed GitHub-backed dashboard requests failing before network access because
