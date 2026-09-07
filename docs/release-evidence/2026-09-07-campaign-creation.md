@@ -1,6 +1,7 @@
 # Campaign creation investigation — 2026-09-07
 
-Status: fixed and verified locally, not deployed. Baseline: `a554698`.
+Status: deployed to production on 2026-09-07. Baseline: `a554698`; deployed
+runtime revision: `ca73a2a6b7bc3c595f53b035efeebf536baaac60`.
 
 ## Findings
 
@@ -57,7 +58,8 @@ created and no production accounts or emails were changed.
 | Security suite against local Worker | 127 passed |
 | Dashboard browser suite, host Chromium | 14 passed |
 | Root production/full and Worker production/full dependency audits | All passed, zero findings |
-| Complete pre-merge gate | Incomplete: Podman resource/startup check blocked |
+| Local complete pre-merge gate | Stopped at the Podman resource/startup check |
+| Hosted complete pre-merge gate | Passed; see production rollout below |
 
 The runtime tests cover source reads, campaign file creation, rebuild dispatch,
 301/302/303/307/308 rejection, and distinct GitHub permission errors. Route
@@ -70,8 +72,9 @@ it uses mocked dashboard endpoints, not production GitHub writes.
 The full gate passed through security, then Pool's default Podman VM could not
 start because `record-release-gate` was already active on the Apple hypervisor.
 The gate's subsequent smoke and full browser phases did not run. The focused
-dashboard browser suite ran separately on the host. Production deployment,
-current production credentials, and live campaign creation remain unverified.
+dashboard browser suite ran separately on the host. The omitted phases passed
+subsequently in the hosted gate. Live campaign creation with production GitHub
+write credentials was not attempted as part of this verification.
 
 The pre-merge script stopped an existing Film development Worker occupying port
 8787. Film's normal development stack was restarted afterward; both its Worker
@@ -82,6 +85,43 @@ Local logs: `/tmp/pool-campaign-regression-before.log`,
 `/tmp/pool-campaign-regression-after.log`, `/tmp/pool-campaign-dependencies.log`,
 `/tmp/pool-campaign-browser.log`, `/tmp/pool-campaign-premerge.log`, and
 `/tmp/pool-premerge-logs.xnou1G/`.
+
+## Production rollout and cleanup
+
+- [PR #35](https://github.com/aindaco1/pool/pull/35) merged at `ca73a2a`.
+- [Hosted Merge Smoke](https://github.com/aindaco1/pool/actions/runs/34144446638)
+  passed every pre-merge phase, including the Podman resource check, mutable
+  pledge smoke, and complete headless browser suite. All four dependency audit
+  jobs also passed. The tested PR head was `872372c`.
+- [Deploy Production](https://github.com/aindaco1/pool/actions/runs/34144962735)
+  deployed both Worker and Pages from the exact merged revision and completed
+  successfully at 16:53 UTC. Worker version:
+  `3f460654-8567-4c18-9adc-e33c782e2a4a`.
+- Deployment verified admin response security and crawl endpoints (16 sitemap
+  URLs). Its existing diary check returned HTTP 200 with zero new entries and
+  zero emails sent.
+- The independent post-deploy cache audit passed all 11 targets. The live
+  campaign endpoint returned HTTP 200; unauthenticated admin-session access
+  returned HTTP 401 with private/no-store caching. The authenticated dashboard
+  and existing campaign content loaded in a separate browser tab without edits.
+- During rollout, the operator's
+  [Deinonychus creation commit](https://github.com/aindaco1/pool/commit/b4cb976f26fce04e597e7f7f81dbfe4b21ac9805)
+  appeared on `main`, confirming a live campaign-file write through GitHub.
+  That campaign source was preserved and synchronized into the local checkout.
+  Assignment persistence and notification delivery were not independently read.
+- Moved 284,113,318 bytes of generated site output, Jekyll/Vitest caches, test
+  results, empty Wrangler temporary output, and Finder metadata into the
+  recoverable local Trash folder `pool-cleanup-20260907-104339`.
+- Preserved root/Worker dependencies, `_config.local.yml`, `worker/.dev.vars`,
+  and `worker/.wrangler/state`. The merged fix branch was removed locally and
+  remotely; only `main` remained. There were no older stale branches.
+
+Deployment logs and the cache audit are recorded locally in
+`/tmp/pool-campaign-production-full.log` and
+`/tmp/pool-campaign-cache-after.json`. This verification initiated no campaign
+creation, production user mutation, or assignment-email smoke. No schema
+migration was required. The subsequent evidence-only commit does not change
+the deployed Worker code.
 
 ## Ethical risk review
 
