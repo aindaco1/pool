@@ -55,6 +55,8 @@ force-stops any survivor. A focused regression uses a deliberately stubborn
 child process to ensure a fully passing gate cannot hang until the CI job
 timeout after printing its phase summary.
 
+Campaign draft recovery is exercised in `tests/unit/admin-content-draft-recovery.test.ts` and the dashboard browser suite. The checks cover a fresh-page restore against an empty server campaign, Save draft followed by Publish, the real refresh warning, failed or unreadable storage, another tab's changes, delayed responses, staged media, and edits during publication. Keep local-save and server-publication baselines separate in these tests.
+
 ## Dependency audits
 
 `npm run test:dependencies` audits the root and Worker lockfiles, each with

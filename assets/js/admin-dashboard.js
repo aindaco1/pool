@@ -173,6 +173,13 @@
   var contentPreviewTimer = 0;
   var contentPreviewRequestId = 0;
   var contentSavedSnapshot = '';
+  var contentPublishedSnapshot = '';
+  var contentEditorCampaignSlug = '';
+  var contentLoadRequestId = 0;
+  var contentLoadingCampaignSlug = '';
+  var contentDraftStorageFailed = false;
+  var contentDraftReadFailed = false;
+  var contentDraftLastValue = null;
   var contentHasUnsavedChanges = false;
   var campaignPreviewStatusTimer = 0;
   var pendingContentUploadCounter = 0;
@@ -645,7 +652,8 @@
   }
 
   function adminHasUnsavedChanges() {
-    return contentHasUnsavedChanges || settingsHaveUnsavedChanges() || adminUsersHaveUnsavedChanges();
+    return contentNeedsPublishing() || contentHasUnsavedChanges || contentDraftStorageFailed || contentDraftReadFailed
+      || campaignSettingsHaveUnsavedChanges() || settingsHaveUnsavedChanges() || adminUsersHaveUnsavedChanges();
   }
 
   function setDirtyButtonState(button, dirty, cleanText, dirtyText, options) {
@@ -685,7 +693,7 @@
 
   function updateDirtyIndicators() {
     var settingsDirty = settingsHaveUnsavedChanges();
-    var campaignDirty = contentHasUnsavedChanges || campaignSettingsHaveUnsavedChanges();
+    var campaignDirty = contentNeedsPublishing() || campaignSettingsHaveUnsavedChanges();
     var settingsCleanText = t('settings_publish', 'Publish');
     var settingsDirtyText = t('settings_publish_unsaved', 'Publish');
     setDirtyButtonState(settingsPublish, settingsDirty, settingsCleanText, settingsDirtyText, {
@@ -694,7 +702,7 @@
     setDirtyButtonState(addOnsPublish, settingsDirty, settingsCleanText, settingsDirtyText);
     updateAdminUsersSaveState(adminUsersEditor());
     setDirtyButtonState(contentPublish, campaignDirty, t('content_publish', 'Publish'), t('content_publish', 'Publish'), {
-      forceDisabled: activeDiaryContentField instanceof HTMLTextAreaElement
+      forceDisabled: activeDiaryContentField instanceof HTMLTextAreaElement || Boolean(contentLoadingCampaignSlug)
     });
     setDirtyButtonState(contentSaveDraft, contentHasUnsavedChanges, t('content_save_draft', 'Save draft'), t('content_save_draft', 'Save draft'));
     if (campaignPreviewPublishButton instanceof HTMLButtonElement) {
@@ -6864,6 +6872,17 @@
     }
   }
 
+  function restoreContentMetadataToSettings(draft) {
+    [['title', 'title'], ['short_blurb', 'shortBlurb']].forEach(function(fields) {
+      var control = campaignSettingsRoot?.querySelector('[data-settings-path="' + fields[0] + '"][data-settings-campaign="' + cssEscape(draft.campaignSlug) + '"]');
+      if (!control || String(control.value || '') !== String(control.dataset.settingsOriginal || '')) return;
+      control.value = String(draft[fields[1]] || '');
+      var richEditor = control.querySelector('.admin-settings__rich-inline-editor');
+      if (richEditor) richEditor.innerHTML = renderEditorInlineMarkdown(control.value);
+    });
+    syncContentMetadataFromSettings();
+  }
+
   function contentBlockLabel(type) {
     var labels = {
       text: t('content_block_text', 'Text'),
@@ -9169,7 +9188,7 @@
       contentBlocks = parseContentBlocks(contentLongContent?.value || '[]');
       renderContentBlocks();
       writeContentDraft();
-      setText(contentStatus, '');
+      if (!contentDraftStorageFailed) setText(contentStatus, '');
     } catch (_error) {
       setText(contentStatus, t('content_json_invalid', 'Content blocks must be valid JSON.'));
     }
@@ -9182,12 +9201,16 @@
   function currentContentSnapshot() {
     if (activeDiaryContentField instanceof HTMLTextAreaElement) return contentSavedSnapshot;
     return JSON.stringify({
-      campaignSlug: selectedContentCampaignSlug(),
+      campaignSlug: contentEditorCampaignSlug || selectedContentCampaignSlug(),
       title: contentTitleField?.value || '',
       shortBlurb: contentShortBlurb?.value || '',
       longContent: contentBlocksSnapshot(contentBlocks),
       pendingMedia: contentPendingUploadsSnapshot(contentBlocks)
     });
+  }
+
+  function contentNeedsPublishing() {
+    return Boolean(contentEditorCampaignSlug) && currentContentSnapshot() !== contentPublishedSnapshot;
   }
 
   function setContentDirty(dirty) {
@@ -9197,11 +9220,12 @@
 
   function updateContentDirty() {
     if (activeDiaryContentField instanceof HTMLTextAreaElement) return;
-    setContentDirty(currentContentSnapshot() !== contentSavedSnapshot);
+    setContentDirty(contentDraftStorageFailed || currentContentSnapshot() !== contentSavedSnapshot);
   }
 
-  function resetContentDirtyBaseline() {
+  function resetContentDirtyBaseline(options) {
     contentSavedSnapshot = currentContentSnapshot();
+    if (options?.published) contentPublishedSnapshot = contentSavedSnapshot;
     setContentDirty(false);
   }
 
@@ -9234,31 +9258,54 @@
   }
 
   function writeContentDraft(options) {
-    if (syncActiveDiaryContentField()) return;
+    if (syncActiveDiaryContentField()) return true;
     var slug = selectedContentCampaignSlug();
-    if (!slug) return;
+    if (!slug || contentEditorCampaignSlug !== slug) return false;
     try {
-      localStorage.setItem(contentDraftStorageKey(), JSON.stringify({
+      // Never overwrite unreadable recovery data or write server loads/previews here.
+      if (contentDraftReadFailed) throw new Error('Existing draft cannot be read');
+      if (localStorage.getItem(contentDraftStorageKey()) !== contentDraftLastValue) throw new Error('Draft changed in another tab');
+      var serialized = JSON.stringify({
         campaignSlug: slug,
         title: contentTitleField?.value || '',
         shortBlurb: contentShortBlurb?.value || '',
-        longContent: serializableContentBlocks(contentBlocks, { dropEmptyDraftBlocks: true })
-      }));
+        longContent: serializableContentBlocks(contentBlocks, { dropEmptyDraftBlocks: true }),
+        baseRevision: loadedContentBaseRevision,
+        publishedSnapshot: contentPublishedSnapshot
+      });
+      localStorage.setItem(contentDraftStorageKey(), serialized);
+      if (localStorage.getItem(contentDraftStorageKey()) !== serialized) throw new Error('Draft readback failed');
+      contentDraftLastValue = serialized;
+      contentDraftStorageFailed = false;
     } catch (_error) {
+      contentDraftStorageFailed = true;
+      setText(contentStatus, t('content_draft_save_failed', 'Unable to save this draft in your browser. Keep this page open and copy your content before leaving.'));
     }
     if (options?.trackDirty !== false) updateContentDirty();
     if (options?.schedulePreview !== false) scheduleContentPreview();
+    return !contentDraftStorageFailed;
   }
 
   function readContentDraft() {
+    contentDraftReadFailed = false;
     try {
-      return JSON.parse(localStorage.getItem(contentDraftStorageKey()) || '{}') || {};
+      var raw = localStorage.getItem(contentDraftStorageKey());
+      contentDraftLastValue = raw;
+      if (!raw) return {};
+      var draft = JSON.parse(raw);
+      if (!draft || draft.campaignSlug !== selectedContentCampaignSlug() || !Array.isArray(draft.longContent)) {
+        throw new Error('Invalid stored campaign draft');
+      }
+      parseContentBlocks(draft.longContent);
+      return draft;
     } catch (_error) {
+      contentDraftReadFailed = true;
       return {};
     }
   }
 
   function setContentFields(draft) {
+    contentEditorCampaignSlug = draft?.campaignSlug || selectedContentCampaignSlug();
     activeDiaryContentField = null;
     campaignContentBeforeDiary = null;
     activeContentJsonField = contentLongContent;
@@ -9281,12 +9328,13 @@
 
   function hydrateContentDraft() {
     if (!contentEditor || !selectedContentCampaignSlug()) return;
+    if (contentEditorCampaignSlug === selectedContentCampaignSlug()) return;
     var draft = readContentDraft();
-    if (draft?.campaignSlug) {
-      setContentFields(draft);
-      resetContentDirtyBaseline();
-      scheduleContentPreview({ immediate: true });
-    }
+    loadedContentCampaignSlug = '';
+    loadedContentBaseRevision = draft.baseRevision || '';
+    contentPublishedSnapshot = draft.publishedSnapshot || '';
+    contentDraftStorageFailed = false;
+    setContentFields(draft?.campaignSlug ? draft : { campaignSlug: selectedContentCampaignSlug() });
   }
 
   function readContentEditorDraft() {
@@ -9344,29 +9392,73 @@
       setText(contentStatus, currentCampaigns.length ? '' : t('no_campaigns', 'No campaigns are available for this admin account.'));
       return;
     }
-    if (options?.skipIfLoaded && loadedContentCampaignSlug === slug && contentBlocks.length) return;
+    if (options?.skipIfLoaded && (loadedContentCampaignSlug === slug || contentLoadingCampaignSlug === slug)) return;
+    if (contentPreviewTimer) window.clearTimeout(contentPreviewTimer);
+    hydrateContentDraft();
+    var requestId = ++contentLoadRequestId;
+    contentLoadingCampaignSlug = slug;
+    var snapshotAtRequest = currentContentSnapshot();
 
     setText(contentStatus, t('content_loading', 'Loading campaign content...'));
     try {
       var data = await requestJson('/admin/content/campaign?campaignSlug=' + encodeURIComponent(slug), { method: 'GET' });
-      setContentFields({
+      if (requestId !== contentLoadRequestId || selectedContentCampaignSlug() !== slug) return;
+      var localDraft = readContentDraft();
+      var pendingBlocks = null;
+      // A delayed response must not replace typing or staged files, even if storage failed.
+      if (contentEditorCampaignSlug === slug && (currentContentSnapshot() !== snapshotAtRequest || hasPendingContentUploads(contentBlocks))) {
+        localDraft = {
+          campaignSlug: slug, title: contentTitleField?.value || '', shortBlurb: contentShortBlurb?.value || '',
+          longContent: serializableContentBlocks(contentBlocks), baseRevision: loadedContentBaseRevision
+        };
+        pendingBlocks = contentBlocks;
+      }
+      var serverDraft = {
         campaignSlug: data?.campaign?.slug || slug,
         title: data?.campaign?.title || '',
         shortBlurb: data?.campaign?.shortBlurb || '',
         longContent: data?.campaign?.longContent || []
-      });
+      };
+      setContentFields(serverDraft);
       syncContentMetadataFromSettings();
-      writeContentDraft({ trackDirty: false });
+      serverDraft.title = contentTitleField?.value || '';
+      serverDraft.shortBlurb = contentShortBlurb?.value || '';
+      resetContentDirtyBaseline({ published: true });
       loadedContentCampaignSlug = slug;
       loadedContentBaseRevision = data?.campaign?.baseRevision || '';
+      if (localDraft.campaignSlug) {
+        setContentFields(localDraft);
+        if (!pendingBlocks && localDraft.publishedSnapshot === currentContentSnapshot()) {
+          // A cache of already-published content must not resurrect an older server revision.
+          setContentFields(serverDraft);
+        } else {
+          if (pendingBlocks) {
+            contentBlocks = pendingBlocks;
+            renderContentBlocks();
+          }
+          restoreContentMetadataToSettings(localDraft);
+          // Keep the original optimistic-lock revision for unpublished local edits.
+          if (contentNeedsPublishing() && localDraft.baseRevision && localDraft.publishedSnapshot !== contentPublishedSnapshot) {
+            loadedContentBaseRevision = localDraft.baseRevision;
+          }
+        }
+      }
       setActivePreviewForCampaign(slug, data?.campaign?.activePreview || null);
       setCampaignPreviewStatusForLink(data?.campaign?.activePreview || null, { campaignSlug: slug });
-      resetContentDirtyBaseline();
-      setText(contentStatus, '');
+      updateContentDirty();
+      setText(contentStatus, contentDraftReadFailed
+        ? t('content_draft_read_failed', 'An existing browser draft could not be read. It has been left untouched. Keep this page open and contact support before editing.')
+        : contentNeedsPublishing()
+          ? t('content_draft_restored', 'Browser draft restored. These changes have not been published.')
+          : '');
       scheduleContentPreview({ immediate: true });
     } catch (error) {
+      if (requestId !== contentLoadRequestId || selectedContentCampaignSlug() !== slug) return;
       logger.error('Failed to load campaign content', error);
       setText(contentStatus, t('content_load_failed', 'Unable to load campaign content.'));
+    } finally {
+      if (requestId === contentLoadRequestId) contentLoadingCampaignSlug = '';
+      updateDirtyIndicators();
     }
   }
 
@@ -9394,7 +9486,6 @@
     }
 
     var requestId = ++contentPreviewRequestId;
-    writeContentDraft({ schedulePreview: false });
     if (!options?.silent) setText(contentStatus, t('content_previewing', 'Validating preview...'));
     try {
       var data = await requestJson('/admin/content/preview', {
@@ -9538,6 +9629,7 @@
     try {
       await uploadPendingMainContentMedia(draft);
       draft = readContentEditorDraft();
+      var publishedSnapshot = currentContentSnapshot();
       var data = await requestJson('/admin/content/publish', {
         method: 'POST',
         body: JSON.stringify({
@@ -9547,11 +9639,15 @@
           draft: draft
         })
       });
+      if (selectedContentCampaignSlug() !== draft.campaignSlug) return false;
       loadedContentBaseRevision = data?.contentSha || loadedContentBaseRevision;
       setText(contentStatus, t('content_published', 'Content published. Rebuild status: %{status}', {
         status: data?.rebuild?.triggered ? t('yes', 'Yes') : t('no', 'No')
       }));
-      resetContentDirtyBaseline();
+      contentPublishedSnapshot = publishedSnapshot;
+      if (currentContentSnapshot() === publishedSnapshot) resetContentDirtyBaseline();
+      else updateContentDirty();
+      writeContentDraft({ trackDirty: false, schedulePreview: false });
       return true;
     } catch (error) {
       if (error?.data?.preview) {
@@ -9572,7 +9668,7 @@
     var statusNode = campaignStatus || contentStatus;
     var campaignSettingsChanges = collectCampaignSettingsChanges();
     var pendingDiaryMedia = pendingDiaryContentEditors(campaignSettingsRoot).length > 0;
-    if (!campaignSettingsChanges.length && !pendingDiaryMedia && !contentHasUnsavedChanges) {
+    if (!campaignSettingsChanges.length && !pendingDiaryMedia && !contentNeedsPublishing()) {
       setText(statusNode, t('settings_no_changes', 'No settings changes to publish.'));
       updateDirtyIndicators();
       return;
@@ -9584,7 +9680,7 @@
       });
       if (!settingsPublished) return;
     }
-    if (contentHasUnsavedChanges) {
+    if (contentNeedsPublishing()) {
       var contentPublished = await publishContentDraft();
       if (!contentPublished) return;
     }
@@ -10996,7 +11092,7 @@
   }
 
   if (contentCampaign) {
-    contentCampaign.addEventListener('change', hydrateContentDraft);
+    contentCampaign.addEventListener('change', function() { loadContentCampaign({ skipIfLoaded: true }); });
   }
 
   if (contentEditor) {
@@ -11015,11 +11111,19 @@
 
   if (contentSaveDraft) {
     contentSaveDraft.addEventListener('click', function() {
-      writeContentDraft({ trackDirty: false });
+      if (!writeContentDraft({ trackDirty: false })) {
+        updateContentDirty();
+        return;
+      }
+      if (hasPendingContentUploads(contentBlocks)) {
+        setText(contentStatus, t('content_draft_pending_media', 'Text saved in this browser. Selected media files are not saved yet. Keep this page open until you publish.'));
+        updateContentDirty();
+        return;
+      }
       resetContentDirtyBaseline();
       setText(contentStatus, activeDiaryContentField instanceof HTMLTextAreaElement
         ? t('content_diary_synced', 'Diary entry content updated in this settings draft.')
-        : t('content_draft_saved', 'Draft saved in this browser.'));
+        : t('content_draft_saved', 'Draft saved in this browser. These changes have not been published.'));
     });
   }
 
