@@ -357,7 +357,11 @@ Supported block types include:
 - embed
 - divider
 
-The editor supports block insertion controls, keyboard undo for block changes, Markdown-style inline formatting, links, unordered/ordered lists, alignment controls, media settings, and mobile preview. **Save draft** stores a browser-local draft. **Publish** validates and writes through the Worker.
+The editor supports block insertion controls, keyboard undo for block changes, Markdown-style inline formatting, links, unordered/ordered lists, alignment controls, media settings, and mobile preview. Text edits are automatically stored in the current browser. **Save draft** confirms that browser storage accepted the current content; it does not publish. **Publish** stays available for unpublished content and validates and writes through the Worker. Reloading restores a local draft without replacing it with server content. Loading and rendering a preview do not write to draft storage.
+
+The browser's leave-page warning remains active for unpublished campaign content, including after **Save draft**. Storage failures show an error and leave the save state dirty. A draft changed in another tab or an unreadable draft is left untouched instead of silently overwritten. Selected media files remain in memory until upload: saving text does not save those files, and the editor explicitly tells the user to keep the page open until publishing. Other campaign settings, tiers, and diary forms are not included in the Content editor's browser draft; publish those forms to save them to the server.
+
+Local drafts belong to the exact site origin, browser profile, and editor language. They are not synchronized to another browser or device and are not server backups. An unpublished draft retains its base revision so another author's server changes cannot be silently overwritten. If only preview flags changed and the server content still matches the draft's original baseline, the current server revision is used. A conflict involving changed content requires comparing the preserved draft with the current campaign before reapplying edits; repeatedly reloading does not discard the draft or bypass the conflict.
 
 Uploaded video blocks can include an explicit poster image. When no poster is set, the dashboard and public campaign page generate an in-browser poster from the video's first frame while keeping the playable video itself lazy-loaded until the user presses play.
 
@@ -368,6 +372,19 @@ Content safety rules:
 - Unsafe schemes such as `javascript:` and `data:` are rejected.
 - Raw scripts, event-handler attributes, and unsupported HTML are rejected by the Worker normalization layer.
 - Structured embeds must use approved providers and exact trusted origins.
+
+#### Recover a missing browser draft
+
+Keep the affected browser profile and any still-open editor tabs. Do not clear site data, reinstall/reset the browser, or replace the missing content while investigating. Copy any text still visible in an editor first. With the older dashboard, loading the campaign can overwrite its browser draft, so avoid refreshing that editor again during recovery.
+
+1. Check the campaign's GitHub history for actual content/settings publications. Creating a campaign or publishing a preview link does not save the browser's page-content draft. Content preview requests only validate/render; they do not retain a server copy. Preview-reviewer KV records contain access information, not draft text.
+2. In the **original browser profile**, inspect Local Storage for the exact site origin used to edit (normally `https://pool.dustwave.xyz`). Inspect both `pool-admin-content-draft:en:<slug>` and `pool-admin-content-draft:es:<slug>`. Opening a public page on that origin allows storage inspection without running the admin editor. Export the raw value before editing it; do not share the entire storage database, cookies, login tokens, or unrelated drafts.
+3. A nonempty `longContent` array can contain recoverable text, media paths, captions, and formatting. An empty array does not establish that nothing was authored: the older load path could have overwritten it. Browser-local drafts on another origin/profile/language must be checked separately if that context was used.
+4. If the value is already overwritten, preserve a copy of the affected browser profile before any forensic recovery attempt. A device/browser-profile backup from before the refresh may retain it. Ordinary site/server backups cannot recover text that was never stored there, and recovery from overwritten browser database files is not guaranteed. Selected media files must be recovered from the creator's original files.
+
+For Chrome, the reviewed [console export script](../scripts/export-campaign-browser-draft.js) is preconfigured for `deinonychus` on `https://pool.dustwave.xyz`. Run it in the original profile, on the existing editor tab without reloading. If that tab is closed, open the site's public homepage in a new tab. Open the top-page Console with **Cmd+Option+J** on macOS or **Ctrl+Shift+J** on Windows/Linux, review/paste the entire script, and press Enter. It downloads a timestamped JSON file containing the two exact raw draft values and any matching editor text still present. It does not change storage, publish, send a request, read cookies, or export other campaigns. Empty/malformed values are preserved honestly; the script cannot undo an overwritten value. Keep the downloaded file for review before attempting a restore. Adapt the explicit slug and origin only for another authorized campaign investigation.
+
+Only reapply recovered content after saving an independent copy and confirming the campaign and current server revision. Recovery does not authorize launching a campaign or sending preview invitations.
 
 ### Tiers
 

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Campaign draft recovery
+
+- Campaign loading preserves unpublished browser drafts instead of replacing
+  them with server content. Save draft no longer disables Publish or the
+  leave-page warning for unpublished work.
+- Storage failures and staged media produce explicit save messages. Delayed
+  campaign responses and another tab's draft changes cannot silently replace
+  the active draft. Added refresh/recovery regression tests and operator guidance.
+
 ### Campaign preview
 
 - Fixed preview-page 404s for unpublished campaigns. The existing generator

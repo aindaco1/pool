@@ -2530,7 +2530,7 @@ test.describe('Admin Dashboard', () => {
     await page.locator('#admin-content-save-draft').click();
     await expect(page.locator('#admin-content-status')).toContainText('Draft saved in this browser.');
     await expect(page.locator('#admin-content-publish')).toHaveText('Publish');
-    await expect(page.locator('#admin-content-publish')).toBeDisabled();
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
     await expect(page.locator('#admin-content-save-draft')).toBeDisabled();
     await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
       textarea.value = JSON.stringify([{ type: 'text', body: 'Alpha body', align: 'left' }]);
@@ -2845,6 +2845,33 @@ test.describe('Admin Dashboard', () => {
       { type: 'quote', text: 'A thoughtful pull quote.', author: '', align: 'left' }
     ]);
     expect(calls.authStart).toHaveLength(0);
+  });
+
+  test('preserves a saved unpublished campaign draft across browser refresh', async ({ page }) => {
+    const calls = await routeAdminWorker(page, { role: 'campaign_user' });
+    await page.route(`${WORKER_BASE}/admin/session`, route => route.fulfill({
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ user: { email: 'creator@example.com', role: 'campaign_user', campaignSlugs: ['hand-relations'] }, csrfToken: 'csrf-test-token' })
+    }));
+    await page.goto('/admin/');
+    await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="content"]').click();
+    const body = page.locator('#admin-content-blocks [data-content-field="body"]').first();
+    await expect(body).toContainText('Existing body');
+    await body.fill('Campaign text that must survive a refresh.');
+    await page.locator('#admin-content-save-draft').click();
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
+    await expect(page.locator('#admin-content-status')).toContainText('These changes have not been published.');
+    const dialog = page.waitForEvent('dialog');
+    const reload = page.reload();
+    const warning = await dialog;
+    expect(warning.type()).toBe('beforeunload');
+    await warning.accept();
+    await reload;
+    await expect(body).toContainText('Campaign text that must survive a refresh.');
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
+    await expect(page.locator('#admin-content-status')).toContainText('Browser draft restored.');
+    expect(calls.contentPublish).toHaveLength(0);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('pool-admin-content-draft:en:hand-relations') || '{}').longContent[0].body)).toContain('Campaign text that must survive a refresh.');
   });
 
   test('stages content editor media locally and uploads it only when publishing', async ({ page }) => {
