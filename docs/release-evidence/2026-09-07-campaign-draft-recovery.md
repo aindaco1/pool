@@ -1,8 +1,9 @@
 # Campaign draft loss investigation — 2026-09-07
 
-Status: local fix and automated verification complete; not deployed. Baseline:
-`9129bed9714f74bb664d9878a9006fadf19cd6e5`. Recovery of the creator's original
-browser data is pending access to that browser/profile.
+Status: deployed and verified on 2026-09-07 (2026-09-08 UTC). Baseline:
+`9129bed9714f74bb664d9878a9006fadf19cd6e5`; deployed merge:
+`a173e97cf1095f8894f22939f057d779a561cfde`. Recovery of the creator's original
+Chrome data is pending her campaign-scoped export or access to that profile.
 
 ## Incident and evidence
 
@@ -46,7 +47,7 @@ Four regression tests failed against the original source and passed after the
 fix: fresh-page recovery, Publish/warning after Save draft, failed storage, and
 read-only campaign loading.
 
-## Local fix
+## Fix
 
 - Restore local drafts without writing server loads or preview rendering into
   browser storage; ignore late responses for a different campaign and preserve
@@ -86,8 +87,33 @@ mutation is part of this fix.
 - The full `test:premerge` wrapper was not run: it unconditionally kills the
   listener on port 8787, currently owned by the independent Film development
   Worker. The dashboard tests used mocked Pool endpoints and a separate static
-  server; they did not call or stop Film. Hosted/full merge-gate verification
-  and production deployment remain outstanding.
+  server; they did not call or stop Film. The complete hosted gate subsequently
+  passed as recorded below.
+
+## Production rollout
+
+- The user authorized hosted checks and deployment and requested the Chrome
+  console recovery command.
+- [PR #37](https://github.com/aindaco1/pool/pull/37) merged at `a173e97` after
+  [Merge Smoke](https://github.com/aindaco1/pool/actions/runs/34175704555)
+  passed on `195d764`: every pre-merge phase, full unit/security/browser suites,
+  build/resource checks, Worker and mutable-pledge smoke, and all four
+  dependency audits. There were no dependency findings.
+- [Refresh Production Pages](https://github.com/aindaco1/pool/actions/runs/34176073024)
+  deployed `a173e97` and completed successfully at 01:18 UTC on September 8
+  (September 7 local time). Cache purge, admin-response security policy, public
+  crawl checks, and the normal post-deploy diary check completed.
+- The live dashboard JavaScript is byte-for-byte identical to the locally
+  tested minified build. Its SHA-256 is
+  `3ba350d7fd1db15b59d4be1cb027c732b9154eb95a7cac541fde5a2304dea628`.
+  The prior live asset hash was
+  `e7ca5f4509b6b6da3a58675b0cde501c805e1b911c218e038cb8d7f42a3054a5`.
+- The independent production cache-policy audit passed. The original creator
+  browser was not used for testing, and no campaign data was restored or
+  launched as part of deployment.
+
+This rollout-evidence update changes only a maintainer document excluded from
+the public Jekyll artifact.
 
 ## Recovery status and next step
 
