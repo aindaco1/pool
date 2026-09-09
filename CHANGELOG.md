@@ -13,6 +13,8 @@
 
 ### Campaign preview
 
+- Load the existing preview styles on protected sharing pages so the campaign
+  frame fills the available width instead of using the browser's tiny default.
 - Fixed preview-page 404s for unpublished campaigns. The existing generator
   reads campaign sources omitted from Jekyll's public collection and creates
   the same generic protected shells in each supported language.
