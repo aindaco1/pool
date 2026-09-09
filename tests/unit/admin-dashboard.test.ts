@@ -300,6 +300,7 @@ beforeEach(() => {
     if (url === 'https://challenges.cloudflare.com/turnstile/v0/siteverify') {
       return jsonResponse({ success: true, action: 'admin_login' });
     }
+    if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
     throw new Error(`Unexpected fetch: ${url}`);
   }) as typeof fetch;
 });
@@ -889,6 +890,7 @@ tiers:
           content: Buffer.from(draftMarkdown, 'utf8').toString('base64')
         });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -1253,6 +1255,7 @@ tiers:
       if (url === 'https://api.resend.com/emails') {
         return jsonResponse({ id: 'assignment-email' });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -1385,6 +1388,7 @@ tiers:
       if (url === 'https://api.resend.com/emails') {
         throw new Error('Unassigned campaign should not send assignment emails');
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -1471,6 +1475,7 @@ tiers:
         if (failure === 'transport') throw new TypeError('Network unavailable');
         return jsonResponse({ message: 'Resource not accessible by personal access token' }, 403);
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
     resetKvCounters(env);
@@ -1515,6 +1520,7 @@ tiers:
         githubCalls.push({ url, method, body: JSON.parse(String(init?.body || '{}')) });
         return new Response(null, { status: 204 });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -1565,6 +1571,7 @@ tiers:
       if (url.endsWith('/actions/workflows/archive-campaign.yml/dispatches') && method === 'POST') {
         throw new Error('Archive workflow should not dispatch for live campaigns');
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
     const liveResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/campaigns/archive', {
@@ -1610,6 +1617,7 @@ tiers:
       if (url === 'https://pool.test/api/add-ons.json') {
         return jsonResponse(addOnsFixture);
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
     const campaignUserResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/campaigns/archive', {
@@ -1630,6 +1638,8 @@ tiers:
       fs.mkdirSync(path.join(tempRoot, 'assets/images/campaigns/hand-relations'), { recursive: true });
       fs.mkdirSync(path.join(tempRoot, 'assets/images/campaign-add-ons'), { recursive: true });
       fs.writeFileSync(path.join(tempRoot, 'assets/images/campaigns/hand-relations/hero.png'), 'hero');
+      fs.mkdirSync(path.join(tempRoot, '_campaign_drafts'), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, '_campaign_drafts/hand-relations.md'), '---\nslug: hand-relations\nhero_image: /assets/images/campaigns/hand-relations/hero.png\n---\nSaved revision.\n');
       fs.writeFileSync(path.join(tempRoot, 'assets/images/campaign-add-ons/local-addon.png'), 'local-addon');
       fs.writeFileSync(path.join(tempRoot, 'assets/images/campaign-add-ons/shared-addon.png'), 'shared-addon');
       fs.writeFileSync(path.join(tempRoot, '_campaigns/hand-relations.md'), `---
@@ -1675,6 +1685,7 @@ campaign_add_ons:
         if (url === 'https://pool.test/api/campaigns.json') {
           return jsonResponse({ campaigns: [archiveableCampaign] });
         }
+        if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
         throw new Error(`Unexpected fetch: ${url}`);
       }) as typeof fetch;
 
@@ -1702,6 +1713,10 @@ campaign_add_ons:
       });
       expect(fs.existsSync(path.join(tempRoot, '_campaigns/hand-relations.md'))).toBe(false);
       expect(fs.existsSync(path.join(tempRoot, 'archive/campaigns/hand-relations/_campaigns/hand-relations.md'))).toBe(true);
+      expect(fs.existsSync(path.join(tempRoot, '_campaign_drafts/hand-relations.md'))).toBe(false);
+      const archivedDraft = fs.readFileSync(path.join(tempRoot, 'archive/campaigns/hand-relations/_campaign_drafts/hand-relations.md'), 'utf8');
+      expect(archivedDraft).toContain('Saved revision.');
+      expect(archivedDraft).toContain('/archive/campaigns/hand-relations/assets/images/campaigns/hand-relations/hero.png');
       expect(fs.existsSync(path.join(tempRoot, 'assets/images/campaigns/hand-relations/hero.png'))).toBe(false);
       expect(fs.existsSync(path.join(tempRoot, 'archive/campaigns/hand-relations/assets/images/campaigns/hand-relations/hero.png'))).toBe(true);
       expect(fs.existsSync(path.join(tempRoot, 'assets/images/campaign-add-ons/local-addon.png'))).toBe(false);
@@ -2468,6 +2483,7 @@ campaign_add_ons:
       if (url === 'https://pool.test/api/add-ons.json') {
         return jsonResponse(addOnsFixture);
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -2517,6 +2533,7 @@ campaign_add_ons:
       if (url === 'https://pool.test/api/add-ons.json') {
         return jsonResponse(addOnsFixture);
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
     const liveResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/settings', {
@@ -2813,6 +2830,7 @@ runner_report_emails:
         githubCalls.push({ url, method, body: JSON.parse(String(init?.body || '{}')) });
         return new Response(null, { status: 204 });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3001,6 +3019,7 @@ runner_report_emails:
           commit: { sha: 'logo-commit', html_url: 'https://github.test/logo-commit' }
         });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3053,6 +3072,7 @@ runner_report_emails:
           commit: { sha: 'image-commit', html_url: 'https://github.test/image-commit' }
         });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3072,7 +3092,7 @@ runner_report_emails:
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.path).toMatch(/^\/assets\/images\/campaigns\/hand-relations\/hero-wide-\d{8}-\d{6}\.webp$/);
+    expect(body.path).toMatch(/^\/assets\/images\/campaigns\/hand-relations\/hero-wide-\d{8}-\d{6}-[a-f0-9]{8}\.webp$/);
     expect(body.processing).toMatchObject({ imageOptimization: 'source-preserved', videoTranscoding: 'not-video' });
     expect(body.mediaOptimization).toEqual({ triggered: true, workflow: 'media-optimization.yml' });
     expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
@@ -3107,6 +3127,7 @@ runner_report_emails:
           commit: { sha: 'image-commit', html_url: 'https://github.test/image-commit' }
         });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3128,7 +3149,7 @@ runner_report_emails:
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.path).toMatch(/^\/assets\/images\/campaigns\/hand-relations\/content-image-1-\d{8}-\d{6}\.png$/);
+    expect(body.path).toMatch(/^\/assets\/images\/campaigns\/hand-relations\/content-image-1-\d{8}-\d{6}-[a-f0-9]{8}\.png$/);
     expect(body.mediaOptimization).toEqual({ triggered: true, workflow: 'media-optimization.yml' });
     expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
     expect(githubCalls).toHaveLength(2);
@@ -3137,7 +3158,7 @@ runner_report_emails:
     expectNoKvWritesOrLists(env, 'content editor image upload');
   });
 
-  it('replaces only a same-campaign media source at its current GitHub revision', async () => {
+  it('keeps campaign media replacements separate from the live source', async () => {
     const env = {
       ...createEnv(),
       GITHUB_TOKEN: 'github-token',
@@ -3153,7 +3174,7 @@ runner_report_emails:
       const method = String(init?.method || 'GET');
       const dispatchResponse = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
       if (dispatchResponse) return dispatchResponse;
-      if (url.endsWith('/contents/assets/images/campaigns/hand-relations/hero.png') && method === 'PUT') {
+      if (url.includes('/contents/assets/images/campaigns/hand-relations/content-hero-') && method === 'PUT') {
         const body = JSON.parse(String(init?.body || '{}'));
         githubCalls.push({ url, method, body });
         return jsonResponse({
@@ -3161,6 +3182,7 @@ runner_report_emails:
           commit: { sha: 'replace-commit', html_url: 'https://github.test/replace-commit' }
         });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3181,13 +3203,13 @@ runner_report_emails:
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      path: '/assets/images/campaigns/hand-relations/hero.png',
+      path: expect.stringMatching(/content-hero-.*\.png$/),
       contentSha: 'b'.repeat(40),
       mediaOptimization: { triggered: true }
     });
     const putCall = githubPutCalls(githubCalls)[0];
-    expect(putCall.body.sha).toBe(replaceSha);
-    expect(putCall.body.message).toContain('Replace admin image');
+    expect(putCall.body.sha).toBeUndefined();
+    expect(putCall.body.message).toContain('Upload admin image');
     expectChangedMediaOptimizationDispatch(githubCalls);
 
     const invalid = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/image-upload', {
@@ -3225,6 +3247,7 @@ runner_report_emails:
           commit: { sha: 'image-commit', html_url: 'https://github.test/image-commit' }
         });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3246,7 +3269,7 @@ runner_report_emails:
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.path).toMatch(/^\/assets\/images\/campaigns\/hand-relations\/content-blast-image-1-\d{8}-\d{6}\.png$/);
+    expect(body.path).toMatch(/^\/assets\/images\/campaigns\/hand-relations\/content-blast-image-1-\d{8}-\d{6}-[a-f0-9]{8}\.png$/);
     expect(body.mediaOptimization).toEqual({ triggered: true, workflow: 'media-optimization.yml' });
     expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
     expect(githubCalls).toHaveLength(2);
@@ -3286,6 +3309,7 @@ runner_report_emails:
           commit: { sha: 'image-commit', html_url: 'https://github.test/image-commit' }
         });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3393,6 +3417,7 @@ runner_report_emails:
       if (url.includes('/contents/assets/videos/') || url.includes('/contents/assets/audio/')) {
         return jsonResponse([], 200);
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3456,6 +3481,7 @@ runner_report_emails:
       const dispatchResponse = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
       if (dispatchResponse) return dispatchResponse;
       if (url === 'https://pool.test/api/campaigns.json') return jsonResponse({ campaigns: [campaignFixture] });
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3506,6 +3532,7 @@ runner_report_emails:
           commit: { sha: 'audio-commit', html_url: 'https://github.test/audio-commit' }
         });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3527,7 +3554,7 @@ runner_report_emails:
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.path).toMatch(/^\/assets\/audio\/campaigns\/hand-relations\/content-audio-1-\d{8}-\d{6}\.mp3$/);
+    expect(body.path).toMatch(/^\/assets\/audio\/campaigns\/hand-relations\/content-audio-1-\d{8}-\d{6}-[a-f0-9]{8}\.mp3$/);
     expect(body.mediaOptimization).toEqual({
       triggered: false,
       reason: 'Media optimization is not configured for this upload type.'
@@ -3562,6 +3589,7 @@ runner_report_emails:
           commit: { sha: 'video-commit', html_url: 'https://github.test/video-commit' }
         });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3581,7 +3609,7 @@ runner_report_emails:
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.path).toMatch(/^\/assets\/videos\/campaigns\/hand-relations\/video-\d{8}-\d{6}\.mp4$/);
+    expect(body.path).toMatch(/^\/assets\/videos\/campaigns\/hand-relations\/video-\d{8}-\d{6}-[a-f0-9]{8}\.mp4$/);
     expect(body.processing).toMatchObject({ imageOptimization: 'not-image', videoTranscoding: 'source-preserved' });
     expect(body.mediaOptimization).toEqual({ triggered: true, workflow: 'media-optimization.yml' });
     expect(body.writeBudget).toEqual({ readOnly: false, kvWritesExpected: 0 });
@@ -3677,6 +3705,7 @@ long_content:
         githubCalls.push({ url, method, body: JSON.parse(String(init?.body || '{}')) });
         return new Response(null, { status: 204 });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -3824,6 +3853,7 @@ diary:
         githubCalls.push({ url, method, body: JSON.parse(String(init?.body || '{}')) });
         return new Response(null, { status: 204 });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -4186,6 +4216,7 @@ diary:
       if (url === 'https://challenges.cloudflare.com/turnstile/v0/siteverify') {
         return jsonResponse({ success: false, 'error-codes': ['invalid-input-response'] });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -4319,6 +4350,7 @@ diary:
       }
       if (url === 'https://pool.test/api/add-ons.json') return jsonResponse(addOnsFixture);
       if (url === 'https://api.resend.com/emails') return jsonResponse({ id: 'email-test' });
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -4391,6 +4423,7 @@ diary:
       }
       if (url === 'https://pool.test/api/add-ons.json') return jsonResponse(addOnsFixture);
       if (url === 'https://api.resend.com/emails') return jsonResponse({ id: 'email-test' });
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -4486,6 +4519,7 @@ diary:
       }
       if (url === 'https://pool.test/api/add-ons.json') return jsonResponse(addOnsFixture);
       if (url === 'https://api.resend.com/emails') return jsonResponse({ id: 'email-test' });
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -5495,6 +5529,7 @@ diary:
       if (url === 'https://pool.test/api/add-ons.json') {
         return jsonResponse(addOnsFixture);
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -5560,6 +5595,7 @@ diary:
       if (url === 'https://pool.test/api/add-ons.json') {
         return jsonResponse(addOnsFixture);
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -5977,6 +6013,7 @@ tiers:
       if (url === 'https://api.resend.com/emails') {
         return jsonResponse({ id: 'preview-email' });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -6198,6 +6235,7 @@ long_content:
           commit: { sha: 'preview-commit-sha', html_url: 'https://github.test/preview-commit-sha' }
         });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -6283,6 +6321,7 @@ tiers:
         githubCalls.push({ url, method, body: JSON.parse(String(init?.body || '{}')) });
         return new Response(null, { status: 204 });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -6584,6 +6623,7 @@ tiers:
           ]
         });
       }
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
@@ -6701,5 +6741,182 @@ tiers:
     expect(pledges.putCalls).toBe(0);
     expect(pledges.deleteCalls).toBe(0);
     expect(ratelimit.putCalls).toBe(1);
+  });
+});
+
+describe('saved campaign working copies', () => {
+  async function workspace(published = true) {
+    const env = { ...createEnv(), GITHUB_TOKEN: 'github-test', GITHUB_OWNER: 'owner', GITHUB_REPO: 'working-copy-test', CAMPAIGN_PREVIEW_SECRET: 'preview-test' };
+    const session = await signInAdmin(env);
+    const files = new Map<string, { content: string; sha: string }>();
+    const source = `---
+layout: campaign
+slug: hand-relations
+title: "Hand Relations"
+published: ${published}
+preview_only: ${!published}
+preview_enabled: true
+start_date: 2026-01-01
+goal_deadline: 2099-12-31
+goal_amount: 25000
+charged: false
+short_blurb: "Original blurb"
+long_content:
+  - type: text
+    body: "Original story"
+tiers: []
+support_items: []
+stretch_goals: []
+ongoing_items: []
+campaign_add_ons: []
+diary: []
+decisions: []
+---
+Preserved Markdown body.
+`;
+    files.set('_campaigns/hand-relations.md', { content: source, sha: 'public-sha' });
+    const writes: string[] = [];
+    let sequence = 0;
+    let failWrites = false;
+    global.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (url === 'https://pool.test/api/campaigns.json') return jsonResponse({ campaigns: [campaignFixture] });
+      if (url === 'https://pool.test/api/add-ons.json') return jsonResponse(addOnsFixture);
+      if (url.includes('/actions/workflows/')) return new Response(null, { status: 204 });
+      const pathname = decodeURIComponent(new URL(url).pathname.split('/contents/')[1] || '');
+      if (pathname === '_campaigns') return jsonResponse([]);
+      if (pathname) {
+        const current = files.get(pathname);
+        if ((init?.method || 'GET') === 'GET') return current
+          ? jsonResponse({ path: pathname, sha: current.sha, content: Buffer.from(current.content).toString('base64'), encoding: 'base64' })
+          : jsonResponse({ message: 'Not Found' }, 404);
+        if (init?.method === 'PUT') {
+          if (failWrites) return jsonResponse({ message: 'Unavailable' }, 503);
+          const body = JSON.parse(String(init.body));
+          if ((body.sha || '') !== (current?.sha || '')) return jsonResponse({ message: 'Conflict' }, 409);
+          const sha = `saved-${++sequence}`;
+          files.set(pathname, { sha, content: Buffer.from(body.content, 'base64').toString('utf8') });
+          writes.push(pathname);
+          return jsonResponse({ content: { path: pathname, sha }, commit: { sha, html_url: 'https://github.test/commit' } });
+        }
+      }
+      throw new Error(`Unexpected request: ${url} ${init?.method}`);
+    }) as typeof fetch;
+    const request = async (body?: any, route = '/admin/campaigns/draft') => {
+      env.RATELIMIT.store.clear();
+      const response = await worker.fetch(new Request('https://pledge.pool.test' + route + (body ? '' : '?campaignSlug=hand-relations'), {
+        method: body ? 'POST' : 'GET', headers: { Cookie: session.cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': session.csrfToken },
+        ...(body ? { body: JSON.stringify(body) } : {})
+      }), env, session.ctx);
+      return { status: response.status, body: await response.json(), headers: response.headers };
+    };
+    const save = async (revision: string, changes: any[] = [], text = 'Saved new story') => request({
+      intent: 'save', campaignSlug: 'hand-relations', baseRevision: revision, settingsRevision: revision, changes,
+      draft: { campaignSlug: 'hand-relations', title: 'Hand Relations', shortBlurb: 'Original blurb', longContent: [{ type: 'text', body: text }] }
+    });
+    return { env, session, files, source, writes, request, save, fail: () => { failWrites = true; } };
+  }
+
+  it.each([false, true])('saves and previews every authoring section without changing public data (published=%s)', async published => {
+    const w = await workspace(published);
+    const initial = await w.request();
+    expect(initial.status).toBe(200);
+    const fields: Record<string, any> = {
+      goal_amount: 30000,
+      tiers: [{ id: 'new-tier', name: 'New tier', price: 12, category: 'digital', description: 'New reward' }],
+      support_items: [{ id: 'support', label: 'Support', target: 15, description: 'Support item' }],
+      stretch_goals: [{ threshold: 40000, title: 'More art', description: 'More work' }],
+      ongoing_items: [{ id: 'ongoing', label: 'Ongoing', amount: 10, description: 'Ongoing work' }],
+      campaign_add_ons: [{ id: 'download', name: 'Download', price: 5, category: 'digital', variants: [] }],
+      diary: [{ id: 'update', title: 'New update', date: '2026-09-09', phase: 'fundraising', content: [{ type: 'text', body: 'New diary text' }] }],
+      decisions: [{ id: 'choice', type: 'poll', title: 'Choose', deadline: '2099-12-31', eligible: 'backers', options: ['A', 'B'] }],
+      featured_tier_id: 'new-tier', 'shopping.enabled': false
+    };
+    const changes = Object.entries(fields).map(([path, value]) => ({ campaignSlug: 'hand-relations', path, value: typeof value === 'object' ? JSON.stringify(value) : value }));
+    const saved = await w.save(initial.body.campaign.baseRevision, changes);
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    expect(w.writes).toEqual(['_campaign_drafts/hand-relations.md']);
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).toBe(w.source);
+    const reload = await w.request();
+    expect(reload.body.campaign.longContent[0].body).toBe('Saved new story');
+    expect(reload.body.campaign.hasUnpublishedChanges).toBe(true);
+    const preview = await w.request(undefined, '/admin/campaign-preview/hand-relations');
+    expect(preview.status, JSON.stringify(preview.body)).toBe(200);
+    expect(preview.body.preview.html).toContain('Saved new story');
+    expect(preview.body.preview.html).toContain('New tier');
+    const publishedResult = await w.request({ intent: 'publish', campaignSlug: 'hand-relations', baseRevision: saved.body.baseRevision });
+    expect(publishedResult.status, JSON.stringify(publishedResult.body)).toBe(200);
+    expect(publishedResult.body.hasUnpublishedChanges).toBe(false);
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).toContain('published: true');
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).toContain('Saved new story');
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).not.toContain('_pool_draft');
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).toContain('Preserved Markdown body.');
+    const nextSave = await w.save(saved.body.baseRevision, [], 'Later revision');
+    expect(nextSave.status).toBe(200);
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).not.toContain('Later revision');
+    expect((await w.request()).body.campaign.hasUnpublishedChanges).toBe(true);
+  });
+
+  it('rejects missing/stale revisions, unsafe fields and partial payloads without writes', async () => {
+    const w = await workspace();
+    expect((await w.save('')).status).toBe(409);
+    const initial = await w.request();
+    const revision = initial.body.campaign.baseRevision;
+    expect((await w.save(revision, [{ campaignSlug: 'other', path: 'title', value: 'Overwrite' }])).status).toBe(400);
+    expect((await w.save(revision, [{ campaignSlug: 'hand-relations', path: 'published', value: true }])).status).toBe(422);
+    expect((await w.request({ intent: 'save', campaignSlug: 'hand-relations', baseRevision: revision, changes: [] })).status).toBe(400);
+    expect(w.writes).toEqual([]);
+    const saved = await w.save(revision);
+    expect(saved.status).toBe(200);
+    expect((await w.save(revision)).status).toBe(409);
+    w.files.set('_campaigns/hand-relations.md', { sha: 'other-author', content: w.source.replace('Original story', 'Other author story') });
+    expect((await w.request({ intent: 'publish', campaignSlug: 'hand-relations', baseRevision: saved.body.baseRevision })).status).toBe(409);
+    expect(w.files.get('_campaign_drafts/hand-relations.md')!.content).toContain('Saved new story');
+  });
+
+  it('keeps reviewer links valid across saves and renders the latest saved revision', async () => {
+    const w = await workspace();
+    const initial = await w.request();
+    const saved = await w.save(initial.body.campaign.baseRevision);
+    const shared = await w.request({ intent: 'publish_preview', campaignSlug: 'hand-relations', workingRevision: saved.body.baseRevision, preserveLinks: true, reviewerEmails: [] }, '/admin/campaign-preview/publish');
+    expect(shared.status, JSON.stringify(shared.body)).toBe(200);
+    const link = shared.body.currentUserPreview;
+    const accessBefore = w.env.PLEDGES.store.get('campaign-preview-reviewers:hand-relations');
+    const later = await w.save(saved.body.baseRevision, [], 'Later saved story for reviewer');
+    expect(later.status).toBe(200);
+    expect(w.env.PLEDGES.store.get('campaign-preview-reviewers:hand-relations')).toBe(accessBefore);
+    const token = new URL(link.previewUrl).searchParams.get('t');
+    const preview = await worker.fetch(new Request('https://pledge.pool.test/admin/campaign-preview/hand-relations?t=' + encodeURIComponent(token!)), w.env, { waitUntil: vi.fn() });
+    expect(preview.status).toBe(200);
+    expect(preview.headers.get('Cache-Control')).toContain('no-store');
+    expect((await preview.json()).preview.html).toContain('Later saved story for reviewer');
+    const sharedAgain = await w.request({ intent: 'publish_preview', campaignSlug: 'hand-relations', workingRevision: later.body.baseRevision, preserveLinks: true, reviewerEmails: [] }, '/admin/campaign-preview/publish');
+    expect(sharedAgain.status).toBe(200);
+    expect(sharedAgain.body.currentUserPreview.previewUrl).toBe(link.previewUrl);
+    expect(sharedAgain.body.currentUserPreview.expiresAt).toBe(link.expiresAt);
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).toBe(w.source);
+  });
+
+  it('requires an admin session and CSRF before saving a project', async () => {
+    const w = await workspace();
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/campaigns/draft?campaignSlug=hand-relations'), w.env, { waitUntil: vi.fn() });
+    expect(response.status).toBe(401);
+    const initial = await w.request();
+    const responseWithoutCsrf = await worker.fetch(new Request('https://pledge.pool.test/admin/campaigns/draft', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: w.session.cookie },
+      body: JSON.stringify({ intent: 'save', campaignSlug: 'hand-relations', baseRevision: initial.body.campaign.baseRevision })
+    }), w.env, { waitUntil: vi.fn() });
+    expect(responseWithoutCsrf.status).toBe(403);
+    expect(w.writes).toEqual([]);
+  });
+
+  it('keeps the previous server draft when a save fails', async () => {
+    const w = await workspace();
+    const initial = await w.request();
+    const saved = await w.save(initial.body.campaign.baseRevision);
+    const previous = w.files.get('_campaign_drafts/hand-relations.md')!.content;
+    w.fail();
+    expect((await w.save(saved.body.baseRevision, [], 'Failed change')).status).toBe(503);
+    expect(w.files.get('_campaign_drafts/hand-relations.md')!.content).toBe(previous);
   });
 });

@@ -6,6 +6,12 @@ creators can use the [launch checklist](../creator-campaign-checklist.md).
 Preserve existing campaign, tier, product, variant, diary, and decision IDs.
 The repository source and Worker validation remain authoritative.
 
+Saved working copies use the same campaign format under `_campaign_drafts/`.
+The internal `_pool_draft_base_hash` and `_pool_draft_saved_at` fields track the
+public authoring baseline and last save; they are never promoted into the public
+campaign. Draft files are excluded from site generation. See [Dashboard](DASHBOARD.md#protected-preview)
+for Save, Preview, Publish, and browser recovery behavior.
+
 ## Campaign Fields
 
 Each campaign lives in `_campaigns/<slug>.md`.

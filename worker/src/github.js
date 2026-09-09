@@ -86,11 +86,11 @@ export function triggerCampaignArchive(env, { campaignSlug = '', requestedBy = '
   });
 }
 
-export async function getGitHubTextFile(env, filePath) {
+export async function getGitHubTextFile(env, filePath, options = {}) {
   const missing = notConfigured(env);
   if (missing) return missing;
   const result = await getClient(env).getTextFile(filePath);
-  if (!result.ok) getScopedConsole(env, 'github').error(`Failed to load GitHub file ${filePath}: ${result.status}`);
+  if (!result.ok && !(options.allowMissing && result.status === 404)) getScopedConsole(env, 'github').error(`Failed to load GitHub file ${filePath}: ${result.status}`);
   return result;
 }
 

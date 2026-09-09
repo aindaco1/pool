@@ -93,7 +93,10 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     liveSnapshots: [],
     contentLoad: [],
     contentPreview: [],
-    contentPublish: []
+    contentPublish: [],
+    projectSave: [],
+    projectPublish: [],
+    previewPublish: []
   };
   const user = {
     email: role === 'super_admin' ? 'admin@example.com' : 'creator@example.com',
@@ -111,6 +114,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     createdAt: '2026-05-24T12:00:00.000Z'
   }];
   const revokedSessionIds = new Set<string>();
+  let workingCampaign: any = { slug: 'hand-relations', title: 'Hand Relations', shortBlurb: 'Existing blurb.', longContent: [{ type: 'text', body: 'Existing body with **[Terms](/terms/)**.' }], baseRevision: 'live:e2e', hasWorkingCopy: false, hasUnpublishedChanges: false, isPublished: true };
 
   await page.route('https://i.ytimg.com/**', async (route: any) => {
     await route.fulfill({
@@ -934,6 +938,25 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 },
         generatedAt: '2026-06-18T12:00:00.000Z'
       });
+    }
+    if (url.pathname === '/admin/campaign-preview/publish') {
+      calls.previewPublish.push(body);
+      return fulfillJson({ success: true, currentUserPreview: { previewUrl: SITE_BASE + '/campaigns/hand-relations/preview/?t=fixture', expiresAt: new Date(Date.now() + 86400000).toISOString() }, reviewerEmails: [], emails: [] });
+    }
+    if (url.pathname === '/admin/campaigns/draft') {
+      if (method === 'GET') {
+        calls.contentLoad.push(Object.fromEntries(url.searchParams.entries()));
+        return fulfillJson({ campaign: workingCampaign });
+      }
+      if (body.intent === 'save') {
+        calls.projectSave.push(body);
+        workingCampaign = { ...workingCampaign, ...body.draft, baseRevision: 'draft:e2e-' + calls.projectSave.length, hasWorkingCopy: true, hasUnpublishedChanges: true };
+      } else {
+        calls.projectPublish.push(body);
+        workingCampaign.hasUnpublishedChanges = false;
+        workingCampaign.isPublished = true;
+      }
+      return fulfillJson({ success: true, ...workingCampaign, rebuild: { triggered: body.intent === 'publish' } });
     }
     if (url.pathname === '/admin/content/campaign') {
       calls.contentLoad.push(Object.fromEntries(url.searchParams.entries()));
@@ -2069,9 +2092,8 @@ test.describe('Admin Dashboard', () => {
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'debug.verbose_console_logging', value: 'false' }));
     expect(calls.settingsPublish[0].changes).not.toContainEqual(expect.objectContaining({ path: 'slug' }));
     expect(calls.settingsPublish[0].changes).not.toContainEqual(expect.objectContaining({ path: 'admin.users' }));
-    expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'runner_report_emails', campaignSlug: 'hand-relations', value: 'runner@example.com, second@example.com' }));
-    const tiersChange = calls.settingsPublish[0].changes.find((change: any) => change.path === 'tiers');
-    expect(JSON.parse(tiersChange.value)[0]).toMatchObject({ id: 'frame-slot', name: 'Buy One Frame Updated' });
+    expect(calls.settingsPublish[0].changes.some((change: any) => change.campaignSlug)).toBe(false);
+    expect(calls.projectPublish).toHaveLength(0);
     expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'add_ons.low_stock_threshold', value: '4' }));
     const addOnProductsChange = calls.settingsPublish[0].changes.find((change: any) => change.path === 'add_ons.products');
     expect(JSON.parse(addOnProductsChange.value)).toEqual(expect.arrayContaining([
@@ -2836,8 +2858,8 @@ test.describe('Admin Dashboard', () => {
 
     page.once('dialog', (dialog) => dialog.accept());
     await page.locator('#admin-content-publish').click();
-    await expect(page.locator('#admin-content-status')).toContainText('Content published. Rebuild status: Yes');
-    await expect.poll(() => calls.contentPublish.length).toBe(1);
+    await expect(page.locator('#admin-campaign-status')).toContainText('Project published.');
+    await expect.poll(() => calls.projectPublish.length).toBe(1);
 
     expect(calls.contentPreview.length).toBeGreaterThanOrEqual(2);
     expect(calls.contentPreview.at(-1)?.draft.longContent).toEqual([
@@ -2873,6 +2895,66 @@ test.describe('Admin Dashboard', () => {
     expect(calls.contentPublish).toHaveLength(0);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('pool-admin-content-draft:en:hand-relations') || '{}').longContent[0].body)).toContain('Campaign text that must survive a refresh.');
   });
+
+  test('saves revisions before sharing a preview while keeping Publish separate', async ({ page }) => {
+    const calls = await signInWithMagicToken(page);
+    await selectAdminSection(page, 'Campaigns');
+    await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="content"]').click();
+    const body = page.locator('#admin-content-blocks [data-content-field="body"]').first();
+    await expect(body).toContainText('Existing body');
+    await body.fill('Saved working revision for a friend.');
+    await page.locator('#admin-content-save-draft').click();
+    await expect(page.locator('#admin-campaign-save')).toBeEnabled();
+    await page.locator('#admin-campaign-save').click();
+    await expect(page.locator('#admin-campaign-save')).toBeDisabled();
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
+    expect(calls.projectPublish).toHaveLength(0);
+    await body.fill('Latest revision included automatically in Preview.');
+    await page.locator('#admin-campaign-preview-publish').click();
+    const dialog = page.locator('dialog.admin-action-dialog');
+    await expect(dialog).toBeVisible();
+    expect(calls.projectSave).toHaveLength(2);
+    expect(calls.projectSave[1].draft.longContent[0].body).toContain('Latest revision');
+    await dialog.locator('button[type="submit"]').click();
+    await expect(dialog).toHaveCount(0);
+    expect(calls.previewPublish[0].workingRevision).toBe('draft:e2e-2');
+    expect(calls.projectPublish).toHaveLength(0);
+    await expect(page.locator('#admin-campaign-save')).toBeDisabled();
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
+    await page.screenshot({ path: 'tmp/project-save-preview.png' });
+  });
+
+  for (const view of [
+    { name: 'desktop', width: 1280, lang: 'en' },
+    { name: 'tablet', width: 834, lang: 'en' },
+    { name: 'mobile', width: 390, lang: 'en' },
+    { name: 'mobile-es', width: 390, lang: 'es' }
+  ]) {
+    test(`keeps project save controls usable on ${view.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: view.width, height: 1000 });
+      await routeAdminWorker(page, { role: 'campaign_user' });
+      await page.goto((view.lang === 'es' ? '/es' : '') + '/admin/?admin_login=admin-token');
+      const contentTab = page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="content"]');
+      await expect(contentTab).toBeAttached();
+      if (await contentTab.isVisible()) {
+        await contentTab.click();
+      } else {
+        await page.locator('[data-campaign-settings-panel="hand-relations"] .admin-campaign-section-tabs + .admin-mobile-tab-select select').selectOption('content');
+      }
+      const body = page.locator('#admin-content-blocks [data-content-field="body"]').first();
+      await expect(body).toContainText('Existing body');
+      await body.fill('Working project revision.');
+      await page.locator('#admin-content-save-draft').click();
+      await expect(page.locator('#admin-campaign-save')).toBeEnabled();
+      const boxes = await Promise.all(['#admin-campaign-save', '#admin-campaign-preview-publish', '#admin-content-publish'].map(id => page.locator(id).boundingBox()));
+      expect(boxes.every(box => box && box.x >= 0 && box.x + box.width <= view.width)).toBe(true);
+      expect(Math.max(...boxes.map(box => box!.y)) - Math.min(...boxes.map(box => box!.y))).toBeLessThan(2);
+      await page.locator('#admin-campaign-save').click();
+      await expect(page.locator('#admin-campaign-save')).toBeDisabled();
+      await expect(page.locator('#admin-content-publish')).toBeEnabled();
+      await page.screenshot({ path: `tmp/project-save-${view.name}.png` });
+    });
+  }
 
   test('stages content editor media locally and uploads it only when publishing', async ({ page }) => {
     const calls = await signInWithMagicToken(page);
@@ -2914,15 +2996,15 @@ test.describe('Admin Dashboard', () => {
       collection: 'content',
       fieldPath: 'long_content[0].src'
     });
-    await expect.poll(() => calls.contentPublish.length).toBe(1);
-    expect(calls.contentPublish[0].draft.longContent[0]).toMatchObject({
+    await expect.poll(() => calls.projectPublish.length).toBe(1);
+    expect(calls.projectSave[0].draft.longContent[0]).toMatchObject({
       type: 'image',
       src: '/assets/images/campaigns/hand-relations/image-e2e.png',
       alt: 'Uploaded still'
     });
   });
 
-  test('uploads diary entry staged media before settings validation', async ({ page }) => {
+  test('uploads diary entry staged media before saving the whole project', async ({ page }) => {
     const calls = await signInWithMagicToken(page);
 
     await selectAdminSection(page, 'Campaigns');
@@ -2957,13 +3039,13 @@ test.describe('Admin Dashboard', () => {
       fieldPath: 'diary[0].content[0].src'
     });
 
-    await expect.poll(() => calls.settingsPreview.length).toBe(1);
-    const previewDiaryChange = calls.settingsPreview[0].changes.find((change: any) => change.path === 'diary');
+    await expect.poll(() => calls.projectSave.length).toBe(1);
+    const previewDiaryChange = calls.projectSave[0].changes.find((change: any) => change.path === 'diary');
     expect(JSON.parse(previewDiaryChange.value)[0].content[0]).toMatchObject({
       type: 'image',
       src: '/assets/images/campaigns/hand-relations/image-e2e.png'
     });
-    await expect.poll(() => calls.settingsPublish.length).toBe(1);
+    await expect.poll(() => calls.projectPublish.length).toBe(1);
   });
 
   test('shows saved marketing referral links as full-width rows on mobile', async ({ page }) => {

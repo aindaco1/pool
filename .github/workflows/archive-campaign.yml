@@ -94,7 +94,9 @@ jobs:
           }
 
           const campaignSource = fs.readFileSync(campaignPath, 'utf8');
-          const referencedMedia = Array.from(mediaReferences(campaignSource)).filter(isArchiveableMediaReference);
+          const draftPath = path.join('_campaign_drafts', `${slug}.md`);
+          const draftSource = fs.existsSync(draftPath) ? fs.readFileSync(draftPath, 'utf8') : null;
+          const referencedMedia = Array.from(mediaReferences(campaignSource + '\n' + (draftSource || ''))).filter(isArchiveableMediaReference);
           const candidateMedia = new Set(referencedMedia);
           [
             `assets/images/campaigns/${slug}`,
@@ -105,8 +107,8 @@ jobs:
           });
 
           const otherCampaignReferences = new Set();
-          walkFiles('_campaigns').forEach((filePath) => {
-            if (filePath === campaignPath || !filePath.endsWith('.md')) return;
+          [...walkFiles('_campaigns'), ...walkFiles('_campaign_drafts')].forEach((filePath) => {
+            if (filePath === draftPath || filePath === campaignPath || !filePath.endsWith('.md')) return;
             const source = fs.readFileSync(filePath, 'utf8');
             mediaReferences(source).forEach((reference) => otherCampaignReferences.add(reference));
           });
@@ -136,6 +138,17 @@ jobs:
           fs.mkdirSync(path.dirname(archivedCampaignPath), { recursive: true });
           fs.renameSync(campaignPath, archivedCampaignPath);
           fs.writeFileSync(archivedCampaignPath, archivedSource);
+          if (draftSource !== null) {
+            let archivedDraft = draftSource;
+            movedMedia.forEach((item, index) => {
+              const token = `__POOL_DRAFT_ARCHIVE_MEDIA_${index}__`;
+              archivedDraft = archivedDraft.split(item.sourcePath).join(token).split(token).join(item.archivePath);
+            });
+            const target = path.join(archiveRoot, draftPath);
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.renameSync(draftPath, target);
+            fs.writeFileSync(target, archivedDraft);
+          }
           fs.writeFileSync(path.join(archiveRoot, 'archive-manifest.json'), `${JSON.stringify({
             campaignSlug: slug,
             requestedBy,
@@ -155,6 +168,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A -- _campaigns archive assets
+          if [ -d _campaign_drafts ] || git ls-files --error-unmatch '_campaign_drafts/*' >/dev/null 2>&1; then git add -A -- _campaign_drafts; fi
           if git diff --cached --quiet; then
             echo "No campaign archive changes."
             exit 0

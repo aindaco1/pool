@@ -10,7 +10,8 @@ and repository state fit together. Endpoint contracts live in
 | --- | --- |
 | Public pages, localized routes, templates, and browser cart | Jekyll sources and `assets/` |
 | Platform identity, catalog, and supported fork settings | `_config.yml`; `_config.local.yml` holds local overrides |
-| Campaign copy, tiers, goals, diary, and campaign add-ons | `_campaigns/` and repository media |
+| Published campaign copy, tiers, goals, diary, and campaign add-ons | `_campaigns/` and repository media |
+| Saved campaign working copies | `_campaign_drafts/`, excluded from public builds; same Markdown model and Git history |
 | Prices, permissions, inventory decisions, pledge persistence, and settlement | Cloudflare Worker |
 | Card data, payment methods, and charge processing | Stripe |
 | Pledge records, projections, admin users, and operational markers | Worker KV, with serialized coordinators for critical mutations |
@@ -19,7 +20,7 @@ and repository state fit together. Endpoint contracts live in
 The browser proposes state. The Worker resolves the current campaign/catalog,
 validates availability, and computes authoritative totals. Normal creator edits
 use the [dashboard](DASHBOARD.md); publishable changes write back to Git instead
-of creating a second content catalog in KV.
+of creating a second content catalog in KV. Save writes a working copy; Publish promotes its authoring fields to the canonical campaign. Public APIs and checkout never read working copies.
 
 ### Shared Foundations
 

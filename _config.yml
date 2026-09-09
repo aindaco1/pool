@@ -22,6 +22,7 @@ debug:
   verbose_console_logging: false
 
 exclude:
+  - _campaign_drafts
   - README.md
   - LICENSE
   - AGENTS.md
