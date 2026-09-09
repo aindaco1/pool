@@ -34,6 +34,8 @@
 
 ### Dependency maintenance
 
+- Pin the Worker development toolchain's transitive Sharp dependency to 0.35.4
+  to resolve GHSA-rgj7-g3m4-5g8c without changing Wrangler or production code.
 - Added explicit root and Worker production/full audit checks to Merge Smoke,
   separate from installation and tests. Transient npm failures have bounded
   retries; missing evidence fails the check instead of appearing clean.
