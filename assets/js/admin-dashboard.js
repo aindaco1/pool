@@ -9471,7 +9471,11 @@
           restoreContentMetadataToSettings(localDraft);
           // Keep the original optimistic-lock revision for unpublished local edits.
           if (contentNeedsPublishing() && localDraft.baseRevision && localDraft.publishedSnapshot !== contentPublishedSnapshot) {
-            loadedContentBaseRevision = localDraft.baseRevision;
+            // Older browser drafts used the raw public file SHA. Upgrade only an
+            // exact match; a changed public source must still produce a conflict.
+            var legacyRevisionMatches = campaignSave && !data.campaign.hasWorkingCopy &&
+              'live:' + localDraft.baseRevision === data.campaign.baseRevision;
+            loadedContentBaseRevision = legacyRevisionMatches ? data.campaign.baseRevision : localDraft.baseRevision;
           }
         }
       }

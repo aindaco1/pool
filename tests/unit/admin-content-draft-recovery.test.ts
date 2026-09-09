@@ -31,11 +31,12 @@ function editor(storage: Record<string, string> = {}, projectSave = false) {
   Object.entries(storage).forEach(([name, value]) => w.localStorage.setItem(name, value));
   w.POOL_CONFIG = { platform: { workerUrl: 'https://worker.test' }, i18n: { currentLang: 'en' } };
   w.confirm = vi.fn(() => true);
-  let savedCampaign = { slug: 'deinonychus', title: 'Deinonychus', shortBlurb: '', longContent: [], baseRevision: 'server-sha', hasWorkingCopy: false, hasUnpublishedChanges: false };
+  let savedCampaign = { slug: 'deinonychus', title: 'Deinonychus', shortBlurb: '', longContent: [], baseRevision: projectSave ? 'live:server-sha' : 'server-sha', hasWorkingCopy: false, hasUnpublishedChanges: false };
   w.fetch = vi.fn(async (url: string, options?: any) => {
     let result: any = {};
     if (url.includes('/admin/campaigns/draft') && options?.method === 'POST') {
       const body = JSON.parse(options.body);
+      if (body.baseRevision !== savedCampaign.baseRevision) return new Response(JSON.stringify({ error: 'Project changed; edits kept.' }), { status: 409 });
       if (body.intent === 'save') savedCampaign = { ...savedCampaign, ...body.draft, baseRevision: 'draft:saved-sha', hasWorkingCopy: true, hasUnpublishedChanges: true };
       else savedCampaign.hasUnpublishedChanges = false;
       result = { success: true, ...savedCampaign };
@@ -256,6 +257,19 @@ describe('project Save and existing browser drafts', () => {
     expect(JSON.parse(request[1].body).draft.longContent[0].body).toBe('Existing creator story');
     expect(upgraded.w.localStorage.getItem(key + ':recovery-v1')).toBe(original);
     expect(upgraded.warns()).toBe(false);
+  });
+
+  it.each(['server-sha', 'older-sha'])('preserves pre-snapshot drafts and upgrades only a matching legacy revision (%s)', async revision => {
+    const original = JSON.stringify({ campaignSlug: 'deinonychus', title: 'Deinonychus', shortBlurb: '', longContent: [{ type: 'text', body: 'Older creator draft' }], baseRevision: revision });
+    const e = editor({ [key]: original }, true);
+    await e.load();
+    expect(e.w.localStorage.getItem(key)).toBe(original);
+    expect(e.get('long-content').value).toContain('Older creator draft');
+    e.save().click();
+    await vi.waitFor(() => expect(e.get('status').textContent).toContain(revision === 'server-sha' ? 'Project saved' : 'Project changed'));
+    expect(e.get('long-content').value).toContain('Older creator draft');
+    expect(e.w.localStorage.getItem(key + ':recovery-v1')).toBe(original);
+    expect(e.save().disabled).toBe(revision === 'server-sha');
   });
 
   it('saves selected-project settings and keeps changes made during the request dirty', async () => {
