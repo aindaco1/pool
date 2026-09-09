@@ -55,7 +55,7 @@ force-stops any survivor. A focused regression uses a deliberately stubborn
 child process to ensure a fully passing gate cannot hang until the CI job
 timeout after printing its phase summary.
 
-Campaign draft recovery is exercised in `tests/unit/admin-content-draft-recovery.test.ts` and the dashboard browser suite. The checks cover a fresh-page restore against an empty server campaign, Save draft followed by Publish, the real refresh warning, failed or unreadable storage, another tab's changes, delayed responses, staged media, and edits during publication. Keep local-save and server-publication baselines separate in these tests.
+Campaign draft recovery is exercised in `tests/unit/admin-content-draft-recovery.test.ts` and the dashboard browser suite. The checks cover a fresh-page restore against an empty server campaign, Save draft followed by Publish, the real refresh warning, failed or unreadable storage, another tab's changes, delayed responses, staged media, and edits during publication. Keep browser-backup, server-save, and public-version baselines separate. Working-copy regressions also cover all campaign authoring sections, later revisions of published campaigns, live-data isolation, stale public/draft revisions, failed writes, and local compare-and-write concurrency.
 
 ## Dependency audits
 

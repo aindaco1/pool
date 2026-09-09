@@ -2,6 +2,7 @@ import http from 'node:http';
 import { readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { writeLocalRevisionedTextFile } from './local-revisioned-write.mjs';
 
 const DEFAULT_PORT = 8799;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
@@ -160,7 +161,9 @@ async function archiveCampaign({ campaignSlug = '', requestedBy = '' } = {}) {
   }
 
   const campaignSource = await fs.readFile(campaignAbsolutePath, 'utf8');
-  const referencedMedia = Array.from(campaignArchiveMediaReferences(campaignSource))
+  const draftPath = `_campaign_drafts/${slug}.md`;
+  const draftSource = await exists(draftPath) ? await fs.readFile(absolute(draftPath), 'utf8') : null;
+  const referencedMedia = Array.from(campaignArchiveMediaReferences(campaignSource + '\n' + (draftSource || '')))
     .filter((reference) => isArchiveableCampaignMediaReference(reference, slug));
   const candidateMedia = new Set(referencedMedia);
   for (const directory of [
@@ -173,8 +176,8 @@ async function archiveCampaign({ campaignSlug = '', requestedBy = '' } = {}) {
   }
 
   const otherCampaignReferences = new Set();
-  for (const filePath of await walkFiles('_campaigns')) {
-    if (filePath === campaignPath || !filePath.endsWith('.md')) continue;
+  for (const filePath of [...await walkFiles('_campaigns'), ...await walkFiles('_campaign_drafts')]) {
+    if (filePath === campaignPath || filePath === draftPath || !filePath.endsWith('.md')) continue;
     try {
       const source = await fs.readFile(absolute(filePath), 'utf8');
       campaignArchiveMediaReferences(source).forEach((reference) => otherCampaignReferences.add(reference));
@@ -211,6 +214,17 @@ async function archiveCampaign({ campaignSlug = '', requestedBy = '' } = {}) {
   await fs.mkdir(path.dirname(archivedCampaignAbsolutePath), { recursive: true });
   await fs.rename(campaignAbsolutePath, archivedCampaignAbsolutePath);
   await fs.writeFile(archivedCampaignAbsolutePath, archivedSource, 'utf8');
+  if (draftSource !== null) {
+    let archivedDraft = draftSource;
+    movedMedia.forEach((item, index) => {
+      const token = `__POOL_DRAFT_ARCHIVE_MEDIA_${index}__`;
+      archivedDraft = archivedDraft.split(item.sourcePath).join(token).split(token).join(item.archivePath);
+    });
+    const target = absolute(`${archiveRoot}/${draftPath}`);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.rename(absolute(draftPath), target);
+    await fs.writeFile(target, archivedDraft, 'utf8');
+  }
   await fs.writeFile(absolute(`${archiveRoot}/archive-manifest.json`), `${JSON.stringify({
     campaignSlug: slug,
     requestedBy: String(requestedBy || ''),
@@ -254,6 +268,10 @@ async function handleRequest(req, res) {
     const repoPath = normalizeRepoPath(body.path);
     const filePath = absolute(repoPath);
     if (!filePath) throw Object.assign(new Error('Invalid local repository path.'), { status: 400, code: 'invalid_local_repo_path' });
+    if (typeof body.expectedSha === 'string') {
+      jsonResponse(res, 200, await writeLocalRevisionedTextFile(filePath, String(body.content || ''), body.expectedSha));
+      return;
+    }
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, String(body.content || ''), { encoding: 'utf8', flag: body.overwrite ? 'w' : 'wx' });
     jsonResponse(res, 200, { ok: true, path: repoPath, commitSha: 'local', commitUrl: '' });

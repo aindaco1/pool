@@ -7,6 +7,42 @@ the architecture and component guides. The handlers in
 [`worker/src/routes/`](../worker/src/routes/) are authoritative; this is a guide
 to the documented integration routes, not a generated inventory of every handler.
 
+### Campaign working copies
+
+`GET /admin/campaigns/draft?campaignSlug=<slug>` returns the editable content and
+`baseRevision`, `hasWorkingCopy`, `isPublished`, `hasUnpublishedChanges`, `savedAt`,
+and the current admin’s active preview link. `GET /admin/settings?working=true`
+returns campaign fields from the same saved working copy and includes its revision
+in each campaign section’s `workingCopy`. Both require campaign-scoped admin access
+and remain private/no-store; draft files never enter the public campaign catalog.
+
+`POST /admin/campaigns/draft` requires campaign-editor permission, CSRF, a matching
+`baseRevision`, and `intent: "save"` or `"publish"`. Its JSON body is capped at 512 KiB;
+media uses the existing bounded upload endpoints. Save accepts `campaignSlug`,
+`draft: { title, shortBlurb, longContent }`, and `changes` using the existing settings
+change format. Every change must belong to that slug; `settingsRevision` must match
+when settings changes are present. The Worker validates the merged candidate,
+including featured-tier references, and commits one `_campaign_drafts/<slug>.md`
+file. It does not write public campaign data, send invitations, or delete media.
+
+Publish accepts the slug and saved revision, verifies that public authoring fields
+still match the working copy’s base, and promotes only authoring fields into the
+current `_campaigns/<slug>.md`. It preserves runtime/settlement fields, sets
+`published: true`, `preview_only: false`, and `visibility: public`, and requests a
+rebuild. Title, ordered valid dates, and a positive goal are required. Both actions
+return the updated working-copy status and reject stale revisions with HTTP 409
+`campaign_revision_conflict`. The local repo helper implements the same revision
+precondition with serialized atomic file replacement.
+
+Protected preview publishing accepts optional `workingRevision` and
+`preserveLinks: true` from the current dashboard. A stale working revision fails;
+active links retain their original token and expiry while new invitations are
+added within the existing reviewer limit. Preview reads the latest saved working
+copy. Legacy content/settings publishing endpoints remain supported for open older
+dashboards; a public edit through those paths causes a conflicting draft Publish
+to fail rather than overwrite it.
+
+
 ## Authentication and Related Runbooks
 
 Browser dashboard routes use role-scoped sessions and CSRF/origin checks.

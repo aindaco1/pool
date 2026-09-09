@@ -5823,6 +5823,14 @@ export default {
         return handleAdminContentCampaign(request, env);
       }
 
+      if (path === '/admin/campaigns/draft' && (method === 'GET' || method === 'POST')) {
+        if (method === 'POST') {
+          const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+          if (!rl.allowed) return rl.response;
+        }
+        return handleAdminCampaignWorkingCopy(request, env);
+      }
+
       if (path === '/admin/content/preview' && method === 'POST') {
         const parsedBody = await parseJsonRequestBody(request, env, {
           maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
@@ -12636,8 +12644,8 @@ function campaignSettingsSection(campaign = {}, env = {}, options = {}) {
     ['Diary entries', settings.diary, editableAdminSetting('diary', 'campaign_collection', settings.slug)],
     ['Decisions', settings.decisions, editableAdminSetting('decisions', 'campaign_collection', settings.slug)]
   ];
-  if (options.canArchiveCampaigns === true && !isPublicCampaignLiveForArchive(campaign, env)) {
-    rows.splice(27, 0, ['Archive campaign', '', campaignArchiveSetting(campaign, env)]);
+  if (options.canArchiveCampaigns === true && !isPublicCampaignLiveForArchive(options.publicCampaign || campaign, env)) {
+    rows.splice(27, 0, ['Archive campaign', '', campaignArchiveSetting(options.publicCampaign || campaign, env)]);
   }
   return adminSettingsSection(settings.title || settings.slug || 'Campaign', rows);
 }
@@ -13030,18 +13038,22 @@ async function readLocalAdminTextFile(env, filePath) {
   }
 }
 
-async function putLocalAdminTextFile(env, filePath, content, { overwrite = false } = {}) {
+async function putLocalAdminTextFile(env, filePath, content, { overwrite = false, expectedSha } = {}) {
   if (!isLocalAdminRepoWritesEnabled(env)) {
     return { ok: false, status: 503, error: 'Local repository writes are not enabled.', code: 'local_repo_writes_disabled' };
   }
   if (localAdminRepoServiceBase(env)) {
-    return callLocalAdminRepoService(env, '/write', { path: filePath, content, overwrite });
+    return callLocalAdminRepoService(env, '/write', { path: filePath, content, overwrite, expectedSha });
   }
   const fs = await import('node:fs/promises');
   const path = await import('node:path');
   const resolved = await localAdminAbsolutePath(env, filePath);
   if (!resolved) return { ok: false, status: 400, error: 'Invalid local repository path.', code: 'invalid_local_repo_path' };
   try {
+    if (typeof expectedSha === 'string') {
+      const { writeLocalRevisionedTextFile } = await import('./local-revisioned-write.mjs');
+      return await writeLocalRevisionedTextFile(resolved.absolutePath, String(content || ''), expectedSha);
+    }
     await fs.mkdir(path.dirname(resolved.absolutePath), { recursive: true });
     await fs.writeFile(resolved.absolutePath, String(content || ''), {
       encoding: 'utf8',
@@ -13055,6 +13067,7 @@ async function putLocalAdminTextFile(env, filePath, content, { overwrite = false
       commitUrl: ''
     };
   } catch (error) {
+    if (error?.status === 409) return { ok: false, status: 409, code: error.code, error: error.message };
     if (error?.code === 'EEXIST') {
       return { ok: false, status: 409, error: `Local file already exists: ${resolved.repoPath}`, code: 'local_file_exists' };
     }
@@ -13143,7 +13156,13 @@ async function getAdminCampaignPreviewAccessCampaign(env, campaignSlug) {
   } catch (_error) {
     publicCampaign = null;
   }
-  return mergeAdminCampaignPreviewMetadata(publicCampaign, markdownCampaign) || markdownCampaign || publicCampaign;
+  const campaign = mergeAdminCampaignPreviewMetadata(publicCampaign, markdownCampaign) || markdownCampaign || publicCampaign;
+  if (!campaign || (!env.GITHUB_TOKEN && !isLocalAdminRepoWritesEnabled(env))) return campaign;
+  const file = await readAdminCampaignSource(env, adminCampaignDraftPath(campaignSlug));
+  if (!file.ok && file.status !== 404) throw new Error('Unable to load the saved preview.');
+  const draft = file.ok ? normalizeAdminCampaignFromMarkdown(file.content, { path: adminCampaignDraftPath(campaignSlug) }) : null;
+  if (file.ok && (!draft || draft.slug !== campaignSlug)) throw new Error('Unable to read the saved preview.');
+  return draft ? mergeAdminCampaignAuthoring(campaign, draft) : campaign;
 }
 
 async function getUnpublishedAdminCampaigns(env) {
@@ -13910,9 +13929,19 @@ async function handleAdminSettings(request, env) {
     auth.user.campaignSlugs.includes(String(campaign?.slug || ''))
   ));
 
-  const campaignSections = allowedCampaigns.map((campaign) => campaignSettingsSection(campaign, env, {
-    canArchiveCampaigns: auth.user.role === 'super_admin'
-  }));
+  const working = new URL(request.url).searchParams.get('working') === 'true';
+  const campaignSections = [];
+  for (const campaign of allowedCampaigns) {
+    const state = working ? await readAdminCampaignWorkingCopy(env, campaign.slug) : null;
+    if (state && !state.ok) return privateJsonResponse(state, state.status || 502, env);
+    campaignSections.push({
+      ...campaignSettingsSection(state ? mergeAdminCampaignAuthoring(state.live, state.campaign) : campaign, env, {
+        canArchiveCampaigns: auth.user.role === 'super_admin',
+        publicCampaign: state?.live || campaign
+      }),
+      ...(state ? { workingCopy: adminCampaignWorkingCopyStatus(state) } : {})
+    });
+  }
   const sections = [];
   const canonicalSiteBase = env.CANONICAL_SITE_BASE || env.SITE_BASE;
   const canonicalWorkerBase = env.CANONICAL_WORKER_BASE || env.WORKER_BASE;
@@ -14359,8 +14388,20 @@ function applyAdminCampaignMediaCleanupChanges(campaign = {}, changes = []) {
 
 async function cleanupRemovedAdminDashboardMedia(env, campaignSlug, paths = [], reason = 'admin-content-publish') {
   const uniquePaths = Array.from(new Set(paths)).sort();
+  const savedDraft = await readAdminCampaignSource(env, adminCampaignDraftPath(campaignSlug));
+  if (!savedDraft.ok && savedDraft.status !== 404) return { reason, attempted: 0, deleted: [], skipped: uniquePaths.map(path => ({ path, reason: 'Draft references could not be checked' })), failed: [] };
+  const protectedPaths = savedDraft.ok
+    ? collectAdminDashboardCampaignMediaPaths(normalizeAdminCampaignFromMarkdown(savedDraft.content, { path: adminCampaignDraftPath(campaignSlug) }), campaignSlug)
+    : new Set();
+  for (const path of [...protectedPaths]) {
+    for (const companion of adminMediaCleanupCompanionPaths(path)) protectedPaths.add(companion);
+  }
   const results = [];
   for (const repoPath of uniquePaths) {
+    if (protectedPaths.has(repoPath)) {
+      results.push({ path: repoPath, skipped: true, reason: 'Referenced by the saved project' });
+      continue;
+    }
     const result = await deleteGitHubFile(
       env,
       repoPath,
@@ -15000,7 +15041,7 @@ async function validateAdminSettingsChanges(request, env, body = {}, options = {
     return { ok: false, response: privateJsonResponse({ error: 'Too many settings changes.' }, 400, env) };
   }
 
-  const campaigns = await getAdminCampaigns(env);
+  const campaigns = options.campaigns || await getAdminCampaigns(env);
   const campaignMap = new Map((campaigns || []).map((campaign) => [String(campaign?.slug || ''), campaign]));
   const normalized = [];
   const errors = [];
@@ -15040,7 +15081,7 @@ async function validateAdminSettingsChanges(request, env, body = {}, options = {
       errors.push(`changes[${index}]: ${normalizedValue.error}`);
       return;
     }
-    if (campaignSlug && path === 'featured_tier_id') {
+    if (campaignSlug && path === 'featured_tier_id' && !options.deferFeaturedTier) {
       const campaign = campaignMap.get(campaignSlug) || {};
       const tierIds = new Set((Array.isArray(campaign?.tiers) ? campaign.tiers : [])
         .map((tier) => String(tier?.id || '').trim())
@@ -15475,7 +15516,9 @@ async function archiveLocalAdminCampaign(env, { campaignSlug = '', requestedBy =
   }
 
   const campaignSource = await fs.readFile(campaignAbsolutePath, 'utf8');
-  const referencedMedia = Array.from(campaignArchiveMediaReferences(campaignSource))
+  const draftPath = `_campaign_drafts/${slug}.md`;
+  const draftSource = await exists(draftPath) ? await fs.readFile(absolute(draftPath), 'utf8') : null;
+  const referencedMedia = Array.from(campaignArchiveMediaReferences(campaignSource + '\n' + (draftSource || '')))
     .filter((reference) => isArchiveableCampaignMediaReference(reference, slug));
   const candidateMedia = new Set(referencedMedia);
   for (const directory of [
@@ -15488,9 +15531,9 @@ async function archiveLocalAdminCampaign(env, { campaignSlug = '', requestedBy =
   }
 
   const otherCampaignReferences = new Set();
-  const campaignFiles = await walkFiles('_campaigns');
+  const campaignFiles = [...await walkFiles('_campaigns'), ...await walkFiles('_campaign_drafts')];
   for (const filePath of campaignFiles) {
-    if (filePath === campaignPath || !filePath.endsWith('.md')) continue;
+    if (filePath === campaignPath || filePath === draftPath || !filePath.endsWith('.md')) continue;
     try {
       const source = await fs.readFile(absolute(filePath), 'utf8');
       campaignArchiveMediaReferences(source).forEach((reference) => otherCampaignReferences.add(reference));
@@ -15530,6 +15573,17 @@ async function archiveLocalAdminCampaign(env, { campaignSlug = '', requestedBy =
   await fs.mkdir(path.dirname(archivedCampaignAbsolutePath), { recursive: true });
   await fs.rename(campaignAbsolutePath, archivedCampaignAbsolutePath);
   await fs.writeFile(archivedCampaignAbsolutePath, archivedSource, 'utf8');
+  if (draftSource !== null) {
+    let archivedDraft = draftSource;
+    movedMedia.forEach((item, index) => {
+      const token = `__POOL_DRAFT_ARCHIVE_MEDIA_${index}__`;
+      archivedDraft = archivedDraft.split(item.sourcePath).join(token).split(token).join(item.archivePath);
+    });
+    const target = absolute(`${archiveRoot}/${draftPath}`);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.rename(absolute(draftPath), target);
+    await fs.writeFile(target, archivedDraft, 'utf8');
+  }
   await fs.writeFile(absolute(`${archiveRoot}/archive-manifest.json`), `${JSON.stringify({
     campaignSlug: slug,
     requestedBy: String(requestedBy || ''),
@@ -15949,7 +16003,7 @@ async function campaignPreviewReviewerRecord(env, campaignSlug) {
   if (!record || typeof record !== 'object') return null;
   const expiresAt = Date.parse(String(record.expiresAt || ''));
   if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) return null;
-  const reviewers = normalizeReviewerEmails(record.emails || []);
+  const reviewers = normalizeReviewerEmails(record.emails || [], { maxEmails: 26 });
   if (!reviewers.ok) return null;
   const links = record.links && typeof record.links === 'object' && !Array.isArray(record.links)
     ? record.links
@@ -16188,21 +16242,33 @@ async function handleAdminCampaignPreviewPublishUnsafe(request, env, body = {}) 
   if (!getCampaignPreviewSecret(env)) {
     return privateJsonResponse({ error: 'Campaign preview signing is not configured' }, 503, env);
   }
-  const currentUserPreview = await buildCampaignPreviewLinkForEmail(env, scoped.campaign.slug, scoped.auth.user.email);
+  if (body.workingRevision) {
+    const working = await readAdminCampaignWorkingCopy(env, scoped.campaign.slug);
+    if (!working.ok) return privateJsonResponse(working, working.status || 502, env);
+    if (working.revision !== body.workingRevision) return adminCampaignWorkingConflict(env);
+  }
+  const previousAccess = body.preserveLinks ? await campaignPreviewReviewerRecord(env, scoped.campaign.slug) : null;
+  const existingPublisherLink = activeCampaignPreviewLinkForEmailFromRecord(previousAccess, scoped.auth.user.email);
+  const currentUserPreview = existingPublisherLink
+    ? { ...existingPublisherLink, ok: true }
+    : await buildCampaignPreviewLinkForEmail(env, scoped.campaign.slug, scoped.auth.user.email);
   if (!currentUserPreview.ok) {
     return privateJsonResponse({ error: currentUserPreview.error || 'Unable to create your preview link.' }, 422, env);
   }
   const additionalReviewerEmails = reviewers.value.filter((email) => email !== currentUserPreview.email);
   const additionalReviewerLinks = [];
   for (const email of additionalReviewerEmails) {
-    const link = await buildCampaignPreviewLinkForEmail(env, scoped.campaign.slug, email);
+    const existingLink = activeCampaignPreviewLinkForEmailFromRecord(previousAccess, email);
+    const link = existingLink ? { ...existingLink, ok: true } : await buildCampaignPreviewLinkForEmail(env, scoped.campaign.slug, email);
     if (!link.ok) {
       return privateJsonResponse({ error: link.error || 'Unable to create a reviewer preview link.' }, 422, env);
     }
     additionalReviewerLinks.push(link);
   }
-  const previewLinks = [currentUserPreview, ...additionalReviewerLinks];
-  const previewAccessEmails = [currentUserPreview.email, ...additionalReviewerEmails];
+  const retainedLinks = (previousAccess?.emails || []).map(email => activeCampaignPreviewLinkForEmailFromRecord(previousAccess, email)).filter(Boolean);
+  const previewLinks = [...retainedLinks, currentUserPreview, ...additionalReviewerLinks];
+  const previewAccessEmails = [...new Set(previewLinks.map(link => link.email))];
+  if (previewAccessEmails.length > 26) return privateJsonResponse({ error: 'A preview supports up to 26 active reviewers.' }, 422, env);
 
   const githubPath = getAdminCampaignMarkdownPath(scoped.campaign.slug);
   const existing = await getGitHubTextFile(env, githubPath);
@@ -16228,7 +16294,9 @@ async function handleAdminCampaignPreviewPublishUnsafe(request, env, body = {}) 
     return privateJsonResponse({ error: nextMarkdown.error }, 422, env);
   }
 
-  const committed = await putGitHubTextFile(env, githubPath, nextMarkdown.content, `Publish ${scoped.campaign.slug} campaign preview`, existing.sha);
+  const committed = body.preserveLinks && isCampaignPreviewEnabled(normalizeAdminCampaignFromMarkdown(existing.content, { path: githubPath }))
+    ? { ok: true, contentSha: existing.sha, commitSha: '', commitUrl: '' }
+    : await putGitHubTextFile(env, githubPath, nextMarkdown.content, `Publish ${scoped.campaign.slug} campaign preview`, existing.sha);
   if (!committed.ok) {
     return privateJsonResponse({
       error: committed.error || 'Unable to publish campaign preview',
@@ -16522,7 +16590,14 @@ function applyAdminCampaignSettingsPatchToMarkdown(source, changes = []) {
       : change.type === 'list'
         ? yamlAdminListLine(change.path, change.value)
         : `${change.path}: ${yamlAdminValue(change.value, change.type)}`;
-    frontMatter = replaceAdminFrontMatterBlock(frontMatter, change.path, replacement);
+    if (change.path.includes('.')) {
+      const [parent, key] = change.path.split('.');
+      const parsed = normalizeAdminCampaignFromMarkdown(`---\n${frontMatter}\n---\n`, { path: '_campaigns/settings.md' });
+      const values = { ...(parsed?.[parent] || {}), [key]: change.value };
+      frontMatter = replaceAdminFrontMatterBlock(frontMatter, parent, `${parent}: ${JSON.stringify(values)}`);
+    } else {
+      frontMatter = replaceAdminFrontMatterBlock(frontMatter, change.path, replacement);
+    }
   });
 
   return {
@@ -16922,13 +16997,19 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     return privateJsonResponse({ error: uploadScope.error }, 400, env);
   }
   if (auth.user.role !== 'super_admin' && uploadScope.campaignSlug) {
-    const campaign = await getCampaign(env, uploadScope.campaignSlug);
+    const campaign = await getAdminCampaign(env, uploadScope.campaignSlug);
     if (!campaign) {
       return privateJsonResponse({ error: 'Campaign media upload references an unknown campaign.' }, 404, env);
     }
   }
 
-  const normalized = normalizeAdminMediaUpload(body, options);
+  // Campaign replacements get a new URL so unpublished edits cannot change live media.
+  let normalized = normalizeAdminMediaUpload(body, options);
+  if (normalized.ok && uploadScope.campaignSlug) normalized = normalizeAdminMediaUpload({ ...body, replaceGithubPath: '', replaceSha: '' }, options);
+  if (normalized.ok && uploadScope.campaignSlug) {
+    normalized.filePath = normalized.filePath.replace(/(\.[a-z0-9]+)$/i, `-${crypto.randomUUID().slice(0, 8)}$1`);
+    normalized.publicPath = `/${normalized.filePath}`;
+  }
   if (!normalized.ok) {
     return privateJsonResponse({ error: normalized.error }, 400, env);
   }
@@ -19860,6 +19941,195 @@ function applyAdminCampaignContentDraftToMarkdown(source, draft) {
 
 function getAdminCampaignMarkdownPath(campaignSlug) {
   return `_campaigns/${String(campaignSlug || '').trim()}.md`;
+}
+
+// A working copy uses the same Markdown and validators as its published campaign.
+// Only the protected editor/preview paths read this directory.
+function adminCampaignDraftPath(slug) {
+  return `_campaign_drafts/${slug}.md`;
+}
+
+function adminCampaignAuthoringChanges(campaign) {
+  return [...ADMIN_CAMPAIGN_SETTING_SCHEMA.entries()].flatMap(([path, schema]) => {
+    if (path === 'content_editor') return [];
+    const value = path.split('.').reduce((object, key) => object?.[key], campaign);
+    return value === undefined ? [] : [{ path, type: schema.type, value, campaignSlug: campaign.slug }];
+  });
+}
+
+function mergeAdminCampaignAuthoring(campaign, draft) {
+  const merged = { ...campaign, long_content: draft.long_content || [] };
+  for (const { path, value } of adminCampaignAuthoringChanges(draft)) {
+    const keys = path.split('.');
+    let target = merged;
+    for (const key of keys.slice(0, -1)) {
+      target[key] = { ...target[key] };
+      target = target[key];
+    }
+    target[keys.at(-1)] = value;
+  }
+  return merged;
+}
+
+async function adminCampaignAuthoringHash(campaign) {
+  return sha256Hex(stableStringify({
+    fields: adminCampaignAuthoringChanges(campaign),
+    longContent: campaign.long_content || []
+  }));
+}
+
+async function readAdminCampaignSource(env, path) {
+  const file = isLocalAdminRepoWritesEnabled(env)
+    ? await readLocalAdminTextFile(env, path)
+    : await getGitHubTextFile(env, path, { allowMissing: path.startsWith('_campaign_drafts/') });
+  if (file.ok && !file.sha) file.sha = await sha256Hex(file.content);
+  return file;
+}
+
+async function writeAdminCampaignSource(env, path, content, message, sha) {
+  if (!isLocalAdminRepoWritesEnabled(env)) return putGitHubTextFile(env, path, content, message, sha || undefined);
+  return putLocalAdminTextFile(env, path, content, { overwrite: Boolean(sha), expectedSha: sha || '' });
+}
+
+async function readAdminCampaignWorkingCopy(env, slug) {
+  const liveFile = await readAdminCampaignSource(env, getAdminCampaignMarkdownPath(slug));
+  if (!liveFile.ok) return liveFile;
+  const draftFile = await readAdminCampaignSource(env, adminCampaignDraftPath(slug));
+  if (!draftFile.ok && draftFile.status !== 404) return draftFile;
+  const live = normalizeAdminCampaignFromMarkdown(liveFile.content, { path: getAdminCampaignMarkdownPath(slug), sha: liveFile.sha });
+  const campaign = draftFile.ok
+    ? normalizeAdminCampaignFromMarkdown(draftFile.content, { path: adminCampaignDraftPath(slug), sha: draftFile.sha })
+    : live;
+  if (!live || !campaign || live.slug !== slug || campaign.slug !== slug) {
+    return { ok: false, status: 422, error: 'Campaign source could not be read. Existing data has been left untouched.' };
+  }
+  const liveHash = await adminCampaignAuthoringHash(live);
+  const draftHash = await adminCampaignAuthoringHash(campaign);
+  return {
+    ok: true, liveFile, draftFile, live, campaign, liveHash, draftHash,
+    revision: `${draftFile.ok ? 'draft' : 'live'}:${draftFile.ok ? draftFile.sha : liveFile.sha}`,
+    baseHash: draftHash === liveHash ? liveHash : (campaign._pool_draft_base_hash || liveHash)
+  };
+}
+
+function adminCampaignWorkingCopyStatus(state) {
+  return {
+    baseRevision: state.revision,
+    hasWorkingCopy: state.draftFile.ok,
+    isPublished: !isAdminPreviewOnlyCampaign(state.live),
+    hasUnpublishedChanges: isAdminPreviewOnlyCampaign(state.live) || state.draftHash !== state.liveHash,
+    savedAt: state.campaign._pool_draft_saved_at || ''
+  };
+}
+
+function adminCampaignWorkingConflict(env) {
+  return privateJsonResponse({
+    error: 'This project changed since it was loaded. Your edits have been kept. Reload and compare the saved project before trying again.',
+    code: 'campaign_revision_conflict'
+  }, 409, env);
+}
+
+async function handleAdminCampaignWorkingCopy(request, env) {
+  let body = {};
+  if (request.method === 'POST') {
+    const parsed = await parseJsonRequestBody(request, env, {
+      maxBytes: 512 * 1024, privateResponse: true, emptyValue: {}
+    });
+    if (!parsed.ok) return parsed.response;
+    body = parsed.body || {};
+  }
+  const slug = String(body.campaignSlug || new URL(request.url).searchParams.get('campaignSlug') || '').trim();
+  const scoped = await getRoleScopedAdminCampaign(request, env, slug,
+    request.method === 'POST' ? 'campaign:edit_content' : 'campaign:read',
+    { requireCsrf: request.method === 'POST' });
+  if (!scoped.ok) return scoped.response;
+  let state = await readAdminCampaignWorkingCopy(env, slug);
+  if (!state.ok) return privateJsonResponse(state, state.status || 502, env);
+  if (request.method === 'GET') {
+    return privateJsonResponse({
+      campaign: {
+        slug, title: state.campaign.title || '', shortBlurb: state.campaign.short_blurb || '',
+        longContent: state.campaign.long_content || [],
+        ...adminCampaignWorkingCopyStatus(state),
+        activePreview: await activeCampaignPreviewLinkForEmail(env, slug, scoped.auth.user.email)
+      },
+      writeBudget: adminReadBudget()
+    }, 200, env);
+  }
+  if (!['save', 'publish'].includes(body.intent)) return privateJsonResponse({ error: 'A save or publish intent is required.' }, 400, env);
+  if (String(body.baseRevision || '') !== state.revision) return adminCampaignWorkingConflict(env);
+  if (body.intent === 'publish') {
+    if (!state.draftFile.ok) return privateJsonResponse({ error: 'Save the project before publishing.' }, 422, env);
+    if (state.baseHash !== state.liveHash) return adminCampaignWorkingConflict(env);
+    const campaign = state.campaign;
+    const errors = [];
+    if (!String(campaign.title || '').trim()) errors.push('A campaign title is required.');
+    if (!campaign.start_date || !campaign.goal_deadline || !Number.isFinite(Date.parse(campaign.start_date)) || !Number.isFinite(Date.parse(campaign.goal_deadline))) errors.push('Valid campaign dates are required.');
+    if (Date.parse(campaign.goal_deadline) < Date.parse(campaign.start_date)) errors.push('The deadline must be on or after the start date.');
+    if (!(Number(campaign.goal_amount) > 0)) errors.push('A positive funding goal is required.');
+    if (errors.length) return privateJsonResponse({ errors, error: errors.join(' ') }, 422, env);
+    // Merge only creator-owned fields. Runtime, settlement and preview-access state
+    // remain owned by the current public source and their existing services.
+    const settings = applyAdminCampaignSettingsPatchToMarkdown(state.liveFile.content, adminCampaignAuthoringChanges(campaign));
+    if (!settings.ok) return privateJsonResponse(settings, 422, env);
+    const content = applyAdminCampaignContentDraftToMarkdown(settings.content, {
+      title: campaign.title, shortBlurb: campaign.short_blurb || '', longContent: campaign.long_content || []
+    });
+    if (!content.ok) return privateJsonResponse(content, 422, env);
+    const publicSource = applyAdminCampaignSettingsPatchToMarkdown(content.content, [
+      { path: 'published', type: 'boolean', value: true },
+      { path: 'preview_only', type: 'boolean', value: false },
+      { path: 'visibility', type: 'string', value: 'public' }
+    ]);
+    const committed = await writeAdminCampaignSource(env, getAdminCampaignMarkdownPath(slug), publicSource.content,
+      `Publish ${slug} saved project`, state.liveFile.sha);
+    if (!committed.ok) return privateJsonResponse(committed, committed.status || 502, env);
+    // Retain the working copy and media: an in-flight save or another browser may
+    // still reference them. No publication-side deletion can destroy a draft.
+    state.live = normalizeAdminCampaignFromMarkdown(publicSource.content, { path: getAdminCampaignMarkdownPath(slug), sha: committed.contentSha });
+    state.liveHash = await adminCampaignAuthoringHash(state.live);
+    cachedUnpublishedAdminCampaigns = null;
+    const rebuild = isLocalAdminRepoWritesEnabled(env) ? { triggered: false, reason: 'Local build' } : await triggerSiteRebuild(env, `campaign-publish:${slug}`);
+    await recordAdminAuditEvent(env, { action: 'campaign:publish', adminEmail: scoped.auth.user.email, campaignSlug: slug, commitSha: committed.commitSha }).catch(error => console.error('Project publish audit failed:', error?.message));
+    return privateJsonResponse({ success: true, ...adminCampaignWorkingCopyStatus(state), rebuild }, 200, env);
+  }
+  if (!body.draft || !Array.isArray(body.draft.longContent)) return privateJsonResponse({ error: 'The complete content draft is required.' }, 400, env);
+  if (!Array.isArray(body.changes) || body.changes.some(change => change.campaignSlug !== slug || change.path === 'content_editor')) {
+    return privateJsonResponse({ error: 'Save may only include editable fields from this project.' }, 400, env);
+  }
+  if (body.changes.length && String(body.settingsRevision || '') !== state.revision) return adminCampaignWorkingConflict(env);
+  const validated = await validateAdminSettingsChanges(request, env, { changes: body.changes }, {
+    requireCsrf: true, campaigns: [state.campaign], deferFeaturedTier: true
+  });
+  if (!validated.ok) return validated.response || privateJsonResponse({ errors: validated.errors, error: validated.errors.join(' ') }, 422, env);
+  let source = state.draftFile.ok ? state.draftFile.content : state.liveFile.content;
+  const settings = applyAdminCampaignSettingsPatchToMarkdown(source, validated.changes);
+  if (!settings.ok) return privateJsonResponse(settings, 422, env);
+  const candidate = normalizeAdminCampaignFromMarkdown(settings.content, { path: adminCampaignDraftPath(slug) });
+  const draft = normalizeAdminContentDraft({ campaignSlug: slug, draft: body.draft });
+  for (const [path, field] of [['title', 'title'], ['short_blurb', 'shortBlurb']]) {
+    if (validated.changes.some(change => change.path === path)) draft[field] = candidate[path];
+  }
+  const preview = buildAdminContentPreview(draft, candidate, env);
+  if (!preview.valid) return privateJsonResponse({ ...preview, error: preview.errors.join(' ') }, 422, env);
+  if (candidate.featured_tier_id && !(candidate.tiers || []).some(tier => tier.id === candidate.featured_tier_id)) {
+    return privateJsonResponse({ error: 'Featured tier must be one of the saved project tiers.' }, 422, env);
+  }
+  const content = applyAdminCampaignContentDraftToMarkdown(settings.content, preview.normalizedDraft);
+  if (!content.ok) return privateJsonResponse(content, 422, env);
+  source = applyAdminCampaignSettingsPatchToMarkdown(content.content, [
+    { path: '_pool_draft_base_hash', type: 'string', value: state.baseHash },
+    { path: '_pool_draft_saved_at', type: 'string', value: new Date().toISOString() }
+  ]).content;
+  const committed = await writeAdminCampaignSource(env, adminCampaignDraftPath(slug), source,
+    `Save ${slug} project draft`, state.draftFile.ok ? state.draftFile.sha : '');
+  if (!committed.ok) return privateJsonResponse(committed, committed.status || 502, env);
+  state.campaign = normalizeAdminCampaignFromMarkdown(source, { path: adminCampaignDraftPath(slug) });
+  state.draftFile = { ok: true, content: source, sha: committed.contentSha || await sha256Hex(source) };
+  state.revision = `draft:${state.draftFile.sha}`;
+  state.draftHash = await adminCampaignAuthoringHash(state.campaign);
+  await recordAdminAuditEvent(env, { action: 'campaign:save', adminEmail: scoped.auth.user.email, campaignSlug: slug, commitSha: committed.commitSha }).catch(error => console.error('Project save audit failed:', error?.message));
+  return privateJsonResponse({ success: true, ...adminCampaignWorkingCopyStatus(state) }, 200, env);
 }
 
 async function handleAdminContentPublish(request, env) {

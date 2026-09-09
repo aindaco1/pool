@@ -351,6 +351,16 @@ body.campaign-preview-render {
   }
 }
 
+.admin-campaigns__header > :first-child {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.admin-campaigns__header > .admin-settings__actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
 .admin-action-dialog {
   background: $surface--base;
   border: 1px solid $border--default;
@@ -3536,6 +3546,17 @@ textarea.admin-settings__input--readonly {
 
   .admin-settings__actions {
     justify-content: flex-start;
+  }
+
+  .admin-campaigns__header > .admin-settings__actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+
+    .btn {
+      min-width: 0;
+      padding-inline: 8px;
+    }
   }
 
   .admin-settings__actions.is-placeholder {

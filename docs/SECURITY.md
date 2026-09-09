@@ -125,7 +125,7 @@ Admin mutations use these common protections:
 - Campaign users can mutate only campaigns in their assigned scope; super admins can mutate platform settings and all campaigns.
 - GitHub-backed settings are allowlisted through `ADMIN_PLATFORM_SETTING_SCHEMA` and `ADMIN_CAMPAIGN_SETTING_SCHEMA`. Unknown paths are rejected, and pseudo UI rows such as the campaign content editor cannot be mass-assigned through settings publishing.
 - Admin media uploads are scoped server-side by upload kind. Campaign media uploads require a valid campaign slug plus `campaign:edit_content`; platform/default media uploads require the super-admin `settings:publish` path. The Worker validates file type, size, destination directory, and filename before committing an asset path.
-- Publish-time media cleanup is derived server-side from the previously loaded campaign data and the normalized campaign draft being committed. It only deletes safe root-relative dashboard-owned files under the same campaign's `assets/images`, `assets/videos`, or `assets/audio` directories, and it preserves external URLs, shared/default assets, and files still referenced elsewhere in the campaign.
+- Publish-time media cleanup is derived server-side from the previously loaded campaign data and the normalized campaign draft being committed. It preserves media referenced by saved working copies and skips cleanup if those references cannot be checked. Campaign upload replacements create a new asset URL so a draft cannot change live media. It only deletes safe root-relative dashboard-owned files under the same campaign's `assets/images`, `assets/videos`, or `assets/audio` directories, and it preserves external URLs, shared/default assets, and files still referenced elsewhere in the campaign.
 - Runtime-only admin users are saved only to KV at `admin-users:v1`; they are not serialized into `_config.yml`.
 - Admin dashboard tab/subtab restoration stores only browser-local UI identifiers for the last allowed workspace. It is not sent to the Worker, does not write KV or GitHub state, and role/campaign authorization still controls what can be restored after sign-in.
 - Marketing referral codes are saved only on explicit user action and are scoped to the campaign URL origin/path the admin account can access.
@@ -400,3 +400,15 @@ See [PAYMENT_PROCESSOR.md](./PAYMENT_PROCESSOR.md) for the fuller webhook recove
 - **Primary:** [alonso@dustwave.xyz]
 - **Stripe Security:** [stripe.com/docs/security](https://stripe.com/docs/security)
 - **Cloudflare Status:** [cloudflarestatus.com](https://www.cloudflarestatus.com)
+
+## Saved campaign revisions
+
+Campaign working copies remain Git-backed and use the existing repository/media
+access model; protected preview access does not make a public Git repository or
+known asset URLs confidential. `_campaign_drafts/` is excluded from site artifacts
+and public checkout/catalog reads. Only scoped authenticated editor and signed
+reviewer paths resolve it. Save and Publish require CSRF, campaign-editor access,
+and revision checks. Publication merges authoring fields only; pledge, inventory,
+settlement, and preview-access data cannot be supplied through this endpoint.
+Browser draft recovery copies stay in the same browser and are never uploaded as
+an audit record. Save does not send email or create/extend reviewer access.

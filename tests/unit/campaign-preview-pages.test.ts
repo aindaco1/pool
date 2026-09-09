@@ -47,6 +47,8 @@ Dir.mktmpdir('pool-preview-source') do |source|
     YAML
   end
   File.write(File.join(source, '_campaigns', 'readme.txt'), 'Not a campaign')
+  FileUtils.mkdir_p(File.join(source, '_campaign_drafts'))
+  File.write(File.join(source, '_campaign_drafts', 'public.md'), "---\nlayout: campaign\nslug: public\ntitle: UNPUBLISHED_REVISION_SENTINEL\npublished: true\n---\nDraft story\n")
 
   Dir.mktmpdir('pool-preview-output') do |destination|
     site = Jekyll::Site.new(Jekyll.configuration({
@@ -91,6 +93,9 @@ Dir.mktmpdir('pool-preview-source') do |source|
     end
     abort 'public campaign route lost' unless File.exist?(File.join(destination, 'campaigns/public/index.html'))
     abort 'localized public campaign route lost' unless File.exist?(File.join(destination, 'es/campaigns/public/index.html'))
+    Dir.glob(File.join(destination, '**', '*')).select { |file| File.file?(file) }.each do |file|
+      abort "working copy leaked: #{file}" if File.read(file).include?('UNPUBLISHED_REVISION_SENTINEL')
+    end
     puts 'unpublished preview shells and public privacy boundaries passed'
   end
 end

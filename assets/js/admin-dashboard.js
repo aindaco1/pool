@@ -102,6 +102,9 @@
   var contentLongContent = document.getElementById('admin-content-long-content');
   if (contentBlocksRoot) contentBlocksRoot.dataset.contentEditorId = 'campaign';
   var contentSaveDraft = document.getElementById('admin-content-save-draft');
+  var campaignSave = document.getElementById('admin-campaign-save');
+  var campaignWorkingStates = {};
+  var campaignSavingSlug = '';
   var contentPublish = document.getElementById('admin-content-publish');
   var campaignStatus = document.getElementById('admin-campaign-status');
   var contentStatus = document.getElementById('admin-content-status');
@@ -693,7 +696,11 @@
 
   function updateDirtyIndicators() {
     var settingsDirty = settingsHaveUnsavedChanges();
-    var campaignDirty = contentNeedsPublishing() || campaignSettingsHaveUnsavedChanges();
+    var campaignDirty = campaignSave ? campaignProjectHasChanges() : contentNeedsPublishing() || campaignSettingsHaveUnsavedChanges();
+    var workingState = campaignWorkingStates[selectedContentCampaignSlug()];
+    if (campaignSave) setDirtyButtonState(campaignSave, campaignDirty, t('campaign_save', 'Save'), t('campaign_save', 'Save'), {
+      forceDisabled: Boolean(campaignSavingSlug || contentLoadingCampaignSlug) || !workingState
+    });
     var settingsCleanText = t('settings_publish', 'Publish');
     var settingsDirtyText = t('settings_publish_unsaved', 'Publish');
     setDirtyButtonState(settingsPublish, settingsDirty, settingsCleanText, settingsDirtyText, {
@@ -701,12 +708,12 @@
     });
     setDirtyButtonState(addOnsPublish, settingsDirty, settingsCleanText, settingsDirtyText);
     updateAdminUsersSaveState(adminUsersEditor());
-    setDirtyButtonState(contentPublish, campaignDirty, t('content_publish', 'Publish'), t('content_publish', 'Publish'), {
-      forceDisabled: activeDiaryContentField instanceof HTMLTextAreaElement || Boolean(contentLoadingCampaignSlug)
+    setDirtyButtonState(contentPublish, campaignDirty || Boolean(campaignSave && workingState?.hasUnpublishedChanges), t('content_publish', 'Publish'), t('content_publish', 'Publish'), {
+      forceDisabled: activeDiaryContentField instanceof HTMLTextAreaElement || Boolean(contentLoadingCampaignSlug || campaignSavingSlug) || Boolean(campaignSave && !workingState)
     });
     setDirtyButtonState(contentSaveDraft, contentHasUnsavedChanges, t('content_save_draft', 'Save draft'), t('content_save_draft', 'Save draft'));
     if (campaignPreviewPublishButton instanceof HTMLButtonElement) {
-      campaignPreviewPublishButton.disabled = !selectedContentCampaignSlug() || activeDiaryContentField instanceof HTMLTextAreaElement;
+      campaignPreviewPublishButton.disabled = !selectedContentCampaignSlug() || Boolean(campaignSavingSlug || contentLoadingCampaignSlug) || Boolean(campaignSave && !workingState);
     }
   }
 
@@ -4545,6 +4552,7 @@
   }
 
   function selectCampaignSettings(slug, options) {
+    if (campaignSavingSlug && slug && slug !== campaignSavingSlug) return;
     var nextSlug = sanitizedAdminStateValue(slug) || selectedCampaignSettingsSlug || campaignSettingsSlug(currentCampaignSettingsSections[0]) || '';
     if (
       currentCampaignSettingsSections.length &&
@@ -4802,6 +4810,10 @@
   function renderSettings(data) {
     if (!settingsRoot) return;
     currentSettings = data || null;
+    (data?.campaigns || []).forEach(function(section) {
+      var slug = campaignSettingsSlug(section);
+      if (section.workingCopy) campaignWorkingStates[slug] = Object.assign({}, section.workingCopy, { settingsRevision: section.workingCopy.baseRevision });
+    });
     settingsRoot.replaceChildren();
     if (settingsSectionTabsRoot) settingsSectionTabsRoot.replaceChildren();
     if (addOnsRoot) addOnsRoot.replaceChildren();
@@ -4915,13 +4927,13 @@
     }
   }
 
-  function collectSettingsChanges(roots) {
-    return (roots || settingsContainers()).flatMap(function(root) {
+  function collectSettingsChanges(roots, options) {
+    return (roots || settingsContainers().filter(function(root) { return !campaignSave || root !== campaignSettingsRoot; })).flatMap(function(root) {
       return Array.from(root.querySelectorAll('[data-settings-path]'));
     }).filter(function(control) {
       if (control.dataset.settingsRuntimeOnly === 'true') return false;
       var row = control.closest('tr');
-      return !row || !row.hidden;
+      return options?.includeHidden || !row || !row.hidden;
     }).flatMap(function(control) {
       if (typeof control.commitPending === 'function') control.commitPending();
       if (control.dataset.settingsInput === 'time' && control.dataset.settingsTimeHourPath) {
@@ -4956,7 +4968,8 @@
   }
 
   function collectCampaignSettingsChanges() {
-    return collectSettingsChanges(campaignSettingsRoot ? [campaignSettingsRoot] : []);
+    var slug = selectedContentCampaignSlug();
+    return collectSettingsChanges(campaignSettingsRoot ? [campaignSettingsRoot] : [], { includeHidden: true }).filter(function(change) { return change.campaignSlug === slug; });
   }
 
   async function validateSettingsChanges(statusNode, changesOverride) {
@@ -7965,10 +7978,15 @@
             replaceGithubPath: selected.githubPath,
             replaceSha: selected.contentSha
           }) });
-          selected.contentSha = data.contentSha || selected.contentSha;
-          selected.optimizationStatus = 'pending_manifest';
-          setText(status, t('content_media_replaced', 'Media replaced. Existing references keep the same path; optimization was requested.'));
+          var replacement = Object.assign({}, selected, {
+            path: data.path, githubPath: data.githubPath, name: file.name, contentSha: data.contentSha,
+            optimizationStatus: 'pending_manifest', references: []
+          });
+          state.media.unshift(replacement);
+          setText(status, t('content_media_replaced', 'New media version uploaded. Choose Use media, then save the project.'));
           rerender();
+          var choice = Array.from(results.querySelectorAll('input[name="contentMediaLibraryAsset"]')).find(function(input) { return input.value === data.path; });
+          if (choice) { choice.checked = true; state.onSelection(); }
         } catch (error) {
           setText(status, error?.data?.error || t('content_media_replace_failed', 'Unable to replace the selected media.'));
         } finally {
@@ -9273,6 +9291,12 @@
         baseRevision: loadedContentBaseRevision,
         publishedSnapshot: contentPublishedSnapshot
       });
+      // Preserve the pre-upgrade browser draft byte-for-byte before any new write.
+      var recoveryKey = contentDraftStorageKey() + ':recovery-v1';
+      if (campaignSave && contentDraftLastValue !== null && localStorage.getItem(recoveryKey) === null) {
+        localStorage.setItem(recoveryKey, contentDraftLastValue);
+        if (localStorage.getItem(recoveryKey) !== contentDraftLastValue) throw new Error('Recovery copy failed');
+      }
       localStorage.setItem(contentDraftStorageKey(), serialized);
       if (localStorage.getItem(contentDraftStorageKey()) !== serialized) throw new Error('Draft readback failed');
       contentDraftLastValue = serialized;
@@ -9398,20 +9422,27 @@
     var requestId = ++contentLoadRequestId;
     contentLoadingCampaignSlug = slug;
     var snapshotAtRequest = currentContentSnapshot();
+    var unsavedAtRequest = (loadedContentCampaignSlug === slug && contentNeedsPublishing()) || contentDraftStorageFailed;
 
     setText(contentStatus, t('content_loading', 'Loading campaign content...'));
     try {
-      var data = await requestJson('/admin/content/campaign?campaignSlug=' + encodeURIComponent(slug), { method: 'GET' });
+      var data = await requestJson((campaignSave ? '/admin/campaigns/draft' : '/admin/content/campaign') + '?campaignSlug=' + encodeURIComponent(slug), { method: 'GET' });
       if (requestId !== contentLoadRequestId || selectedContentCampaignSlug() !== slug) return;
+      var knownBrowserDraft = contentDraftLastValue;
       var localDraft = readContentDraft();
+      var browserChangedElsewhere = knownBrowserDraft !== contentDraftLastValue;
       var pendingBlocks = null;
       // A delayed response must not replace typing or staged files, even if storage failed.
-      if (contentEditorCampaignSlug === slug && (currentContentSnapshot() !== snapshotAtRequest || hasPendingContentUploads(contentBlocks))) {
+      if (contentEditorCampaignSlug === slug && (unsavedAtRequest || currentContentSnapshot() !== snapshotAtRequest || hasPendingContentUploads(contentBlocks))) {
         localDraft = {
           campaignSlug: slug, title: contentTitleField?.value || '', shortBlurb: contentShortBlurb?.value || '',
-          longContent: serializableContentBlocks(contentBlocks), baseRevision: loadedContentBaseRevision
+          longContent: serializableContentBlocks(contentBlocks), baseRevision: loadedContentBaseRevision, publishedSnapshot: contentPublishedSnapshot
         };
         pendingBlocks = contentBlocks;
+        if (browserChangedElsewhere) {
+          contentDraftLastValue = knownBrowserDraft;
+          contentDraftStorageFailed = true;
+        }
       }
       var serverDraft = {
         campaignSlug: data?.campaign?.slug || slug,
@@ -9426,6 +9457,7 @@
       resetContentDirtyBaseline({ published: true });
       loadedContentCampaignSlug = slug;
       loadedContentBaseRevision = data?.campaign?.baseRevision || '';
+      if (campaignSave) campaignWorkingStates[slug] = Object.assign({}, campaignWorkingStates[slug] || {}, data.campaign);
       if (localDraft.campaignSlug) {
         setContentFields(localDraft);
         if (!pendingBlocks && localDraft.publishedSnapshot === currentContentSnapshot()) {
@@ -9439,7 +9471,11 @@
           restoreContentMetadataToSettings(localDraft);
           // Keep the original optimistic-lock revision for unpublished local edits.
           if (contentNeedsPublishing() && localDraft.baseRevision && localDraft.publishedSnapshot !== contentPublishedSnapshot) {
-            loadedContentBaseRevision = localDraft.baseRevision;
+            // Older browser drafts used the raw public file SHA. Upgrade only an
+            // exact match; a changed public source must still produce a conflict.
+            var legacyRevisionMatches = campaignSave && !data.campaign.hasWorkingCopy &&
+              'live:' + localDraft.baseRevision === data.campaign.baseRevision;
+            loadedContentBaseRevision = legacyRevisionMatches ? data.campaign.baseRevision : localDraft.baseRevision;
           }
         }
       }
@@ -9531,7 +9567,7 @@
       var pending = item.pending || {};
       var file = pending.file;
       if (!file) {
-        throw new Error(t('content_media_reselect_required', 'Select the media file again before publishing.'));
+        throw new Error(t('content_media_reselect_required', 'Select the media file again before saving the project.'));
       }
       var kind = pending.kind === 'video' || pending.kind === 'audio' ? pending.kind : 'image';
       var uploadPath = kind === 'video'
@@ -9557,6 +9593,9 @@
           filenameBase
         })
       });
+      if (pendingUploadForContentField(item.target, item.meta?.field || 'src') !== pending) {
+        throw new Error(t('campaign_media_changed', 'Selected media changed while saving. Your files have been kept; save again.'));
+      }
       item.target[item.meta?.field || 'src'] = result.path || '';
       clearPendingContentUpload(item.target, item.meta?.field || 'src');
     }
@@ -9664,7 +9703,98 @@
     }
   }
 
+  function selectedCampaignSettingsPanel() {
+    return campaignSettingsRoot?.querySelector('[data-campaign-settings-panel="' + cssEscape(selectedContentCampaignSlug()) + '"]') || campaignSettingsRoot;
+  }
+
+  function campaignProjectHasChanges() {
+    var slug = selectedContentCampaignSlug();
+    if (!slug) return false;
+    var root = selectedCampaignSettingsPanel();
+    return contentNeedsPublishing() || hasPendingContentUploads(contentBlocks) || pendingDiaryContentEditors(root).length > 0 ||
+      Array.from(root?.querySelectorAll('[data-settings-path]') || []).some(function(control) {
+        return control.dataset.settingsCampaign === slug && control.dataset.settingsRuntimeOnly !== 'true' &&
+          String(control.value || '') !== String(control.dataset.settingsOriginal || '');
+      });
+  }
+
+  async function saveCampaignProject(options) {
+    var slug = selectedContentCampaignSlug();
+    var state = campaignWorkingStates[slug];
+    var status = campaignStatus || contentStatus;
+    if (campaignSavingSlug || contentLoadingCampaignSlug || loadedContentCampaignSlug !== slug || !state) return false;
+    if (options?.ifNeeded && state.hasWorkingCopy && !campaignProjectHasChanges()) return true;
+    campaignSavingSlug = slug;
+    updateDirtyIndicators();
+    setText(status, t('campaign_saving', 'Saving project...'));
+    try {
+      syncActiveDiaryContentField();
+      var draft = readContentEditorDraft();
+      writeContentDraft({ schedulePreview: false });
+      var root = selectedCampaignSettingsPanel();
+      await uploadPendingMainContentMedia(draft);
+      await uploadPendingDiaryContentMedia(root, status);
+      if (hasPendingContentUploads(contentBlocks) || pendingDiaryContentEditors(root).length) {
+        throw new Error(t('campaign_media_changed', 'Selected media changed while saving. Your files have been kept; save again.'));
+      }
+      draft = readContentEditorDraft();
+      var changes = collectCampaignSettingsChanges();
+      var submittedContent = currentContentSnapshot();
+      var submittedPaths = new Set(changes.map(function(change) { return change.path; }));
+      var submittedControls = Array.from(root?.querySelectorAll('[data-settings-path]') || []).filter(function(control) {
+        return control.dataset.settingsCampaign === slug && submittedPaths.has(control.dataset.settingsPath);
+      }).map(function(control) { return { control: control, value: String(control.value || '') }; });
+      var data = await requestJson('/admin/campaigns/draft', {
+        method: 'POST',
+        body: JSON.stringify({ intent: 'save', campaignSlug: slug, baseRevision: loadedContentBaseRevision,
+          settingsRevision: state.settingsRevision || loadedContentBaseRevision, changes: changes, draft: draft })
+      });
+      if (selectedContentCampaignSlug() !== slug) return false;
+      loadedContentBaseRevision = data.baseRevision;
+      campaignWorkingStates[slug] = Object.assign({}, data, { settingsRevision: data.baseRevision });
+      // Reset only the submitted values, never edits typed while the request ran.
+      submittedControls.forEach(function(item) { item.control.dataset.settingsOriginal = item.value; });
+      contentPublishedSnapshot = submittedContent;
+      if (currentContentSnapshot() === submittedContent) resetContentDirtyBaseline();
+      else updateContentDirty();
+      writeContentDraft({ trackDirty: false, schedulePreview: false });
+      setText(status, t('campaign_saved', 'Project saved. These changes are ready to preview and have not been published.'));
+      return true;
+    } catch (error) {
+      renderContentValidation(error?.data || {});
+      setText(status, error?.data?.error || error?.message || t('campaign_save_failed', 'Unable to save the project. Your edits have been kept.'));
+      return false;
+    } finally {
+      campaignSavingSlug = '';
+      updateDirtyIndicators();
+    }
+  }
+
+  async function publishSavedCampaignProject() {
+    if (!window.confirm(t('campaign_publish_confirm', 'Publish all current project changes to the public site?'))) return;
+    if (!await saveCampaignProject({ ifNeeded: true })) return;
+    var slug = selectedContentCampaignSlug();
+    var status = campaignStatus || contentStatus;
+    campaignSavingSlug = slug;
+    updateDirtyIndicators();
+    setText(status, t('campaign_publishing', 'Publishing saved project...'));
+    try {
+      var data = await requestJson('/admin/campaigns/draft', {
+        method: 'POST', body: JSON.stringify({ intent: 'publish', campaignSlug: slug, baseRevision: loadedContentBaseRevision })
+      });
+      campaignWorkingStates[slug] = Object.assign({}, data, { settingsRevision: data.baseRevision });
+      setText(status, t('campaign_published', 'Project published. The public site will update when deployment finishes.'));
+    } catch (error) {
+      renderContentValidation(error?.data || {});
+      setText(status, error?.data?.error || t('campaign_publish_failed', 'Unable to publish. Your saved project is still available.'));
+    } finally {
+      campaignSavingSlug = '';
+      updateDirtyIndicators();
+    }
+  }
+
   async function publishCampaignChanges() {
+    if (campaignSave) return publishSavedCampaignProject();
     var statusNode = campaignStatus || contentStatus;
     var campaignSettingsChanges = collectCampaignSettingsChanges();
     var pendingDiaryMedia = pendingDiaryContentEditors(campaignSettingsRoot).length > 0;
@@ -10002,7 +10132,8 @@
     });
   }
 
-  function openCampaignPreviewPublishDialog() {
+  async function openCampaignPreviewPublishDialog() {
+    if (campaignSave && !await saveCampaignProject({ ifNeeded: true })) return;
     var slug = selectedContentCampaignSlug();
     if (!slug) return;
     openAdminActionDialog(t('campaign_preview_publish_title', 'Publish protected preview'), function(form) {
@@ -10019,6 +10150,7 @@
         help: t('campaign_preview_reviewers_help', 'Optional: add more people who should receive a private preview link. Type an email and press Enter or comma; links expire in 24 hours.')
       });
     }, async function(form, status) {
+      if (campaignSave && !await saveCampaignProject({ ifNeeded: true })) throw new Error(t('campaign_save_failed', 'Unable to save the project. Your edits have been kept.'));
       var reviewers = form.querySelector('[data-campaign-preview-reviewers]');
       if (reviewers?.commitPending) reviewers.commitPending();
       setText(status, t('campaign_preview_publishing', 'Creating your preview link...'));
@@ -10028,11 +10160,13 @@
           intent: 'publish_preview',
           campaignSlug: slug,
           reviewerEmails: String(reviewers?.value || ''),
-          baseRevision: loadedContentCampaignSlug === slug ? loadedContentBaseRevision : '',
+          baseRevision: !campaignSave && loadedContentCampaignSlug === slug ? loadedContentBaseRevision : '',
+          workingRevision: campaignSave ? loadedContentBaseRevision : undefined,
+          preserveLinks: Boolean(campaignSave),
           preferredLang: lang
         })
       });
-      loadedContentBaseRevision = data?.contentSha || loadedContentBaseRevision;
+      if (!campaignSave) loadedContentBaseRevision = data?.contentSha || loadedContentBaseRevision;
       setCampaignPreviewPublishedStatus(data);
     });
   }
@@ -10624,6 +10758,7 @@
     setText(settingsStatus, t('settings_loading', 'Loading settings...'));
     try {
       var params = new URLSearchParams({ preferredLang: lang || 'en' });
+      if (campaignSave) params.set('working', 'true');
       var data = await requestJson('/admin/settings?' + params.toString(), { method: 'GET' });
       renderSettings(data);
       setText(settingsStatus, '');
@@ -11116,7 +11251,7 @@
         return;
       }
       if (hasPendingContentUploads(contentBlocks)) {
-        setText(contentStatus, t('content_draft_pending_media', 'Text saved in this browser. Selected media files are not saved yet. Keep this page open until you publish.'));
+        setText(contentStatus, t('content_draft_pending_media', 'Text saved in this browser. Selected media files are not saved yet. Keep this page open until you save the project.'));
         updateContentDirty();
         return;
       }
@@ -11126,6 +11261,8 @@
         : t('content_draft_saved', 'Draft saved in this browser. These changes have not been published.'));
     });
   }
+
+  if (campaignSave) campaignSave.addEventListener('click', function() { saveCampaignProject(); });
 
   if (contentPublish) {
     contentPublish.addEventListener('click', publishCampaignChanges);

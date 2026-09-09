@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Project saving and publication
+
+- Add project-wide Save, protected previews of saved revisions, and explicit Publish for both new and already-public campaigns. Preserve browser-local Save draft and existing recovery data; keep public campaign content, prices, and media unchanged until publication.
+
 ### Campaign draft recovery
 
 - Campaign loading preserves unpublished browser drafts instead of replacing

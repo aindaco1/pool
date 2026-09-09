@@ -38,7 +38,8 @@ If a change affects pricing, availability, campaign progress, pledge state, emai
 
 - [`_config.yml`](./_config.yml): canonical fork-facing platform configuration
 - [`_config.local.yml`](./_config.local.yml): machine-local overrides only
-- [`_campaigns/`](./_campaigns): campaign content, tiers, goals, diary data, and campaign add-ons
+- [`_campaigns/`](./_campaigns): published campaign content, tiers, goals, diary data, and campaign add-ons
+- `_campaign_drafts/`: Git-backed saved working copies, excluded from public builds and checkout; use the same authoring model and preserve browser recovery data
 - [`_data/i18n/`](./_data/i18n): shared localized UI, runtime, and email copy
 - [`_data/media-optimization-manifest.json`](./_data/media-optimization-manifest.json): rebuildable repository media metadata; source files remain authoritative
 - [`_layouts/`](./_layouts) and [`_includes/`](./_includes): public pages, campaign pages, embeds, SEO, and locale helpers

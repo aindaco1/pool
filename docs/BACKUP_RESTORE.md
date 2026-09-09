@@ -216,3 +216,14 @@ Then review Campaigns, Analytics, Reports, Supporters, Users, Marketing, media, 
 ## Incident evidence
 
 Record snapshot receipt hash, source commit, restore target, start/end time, operator/approver, traffic preflight, reconciliation counts, preview verification, production gate decisions, keys/families restored or rebuilt, residual mismatches, and the exact time automation resumed. Evidence must not contain secret values, full backup contents, raw provider payloads, or unnecessary customer data.
+
+## Campaign working copies
+
+The repository recovery bundle includes `_campaign_drafts/` with the published
+campaign sources. Restore both before reopening editing. Preview access remains
+short-lived KV data and is not restored. A saved working copy contains its public
+authoring baseline; after a divergent restore, Publish reports a revision conflict
+instead of replacing restored public content. Archiving a campaign retains its
+working copy and accounts for draft media references. Browser-local Content drafts
+and `:recovery-v1` copies remain separate and require recovery in the original
+browser/profile; see [Dashboard recovery](DASHBOARD.md#recover-a-missing-browser-draft).
