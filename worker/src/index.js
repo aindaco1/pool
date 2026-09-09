@@ -12644,8 +12644,8 @@ function campaignSettingsSection(campaign = {}, env = {}, options = {}) {
     ['Diary entries', settings.diary, editableAdminSetting('diary', 'campaign_collection', settings.slug)],
     ['Decisions', settings.decisions, editableAdminSetting('decisions', 'campaign_collection', settings.slug)]
   ];
-  if (options.canArchiveCampaigns === true && !isPublicCampaignLiveForArchive(campaign, env)) {
-    rows.splice(27, 0, ['Archive campaign', '', campaignArchiveSetting(campaign, env)]);
+  if (options.canArchiveCampaigns === true && !isPublicCampaignLiveForArchive(options.publicCampaign || campaign, env)) {
+    rows.splice(27, 0, ['Archive campaign', '', campaignArchiveSetting(options.publicCampaign || campaign, env)]);
   }
   return adminSettingsSection(settings.title || settings.slug || 'Campaign', rows);
 }
@@ -13161,18 +13161,8 @@ async function getAdminCampaignPreviewAccessCampaign(env, campaignSlug) {
   const file = await readAdminCampaignSource(env, adminCampaignDraftPath(campaignSlug));
   if (!file.ok && file.status !== 404) throw new Error('Unable to load the saved preview.');
   const draft = file.ok ? normalizeAdminCampaignFromMarkdown(file.content, { path: adminCampaignDraftPath(campaignSlug) }) : null;
-  if (!draft) return campaign;
-  const preview = { ...campaign, long_content: draft.long_content || [] };
-  for (const { path, value } of adminCampaignAuthoringChanges(draft)) {
-    const keys = path.split('.');
-    let target = preview;
-    for (const key of keys.slice(0, -1)) {
-      target[key] = { ...target[key] };
-      target = target[key];
-    }
-    target[keys.at(-1)] = value;
-  }
-  return preview;
+  if (file.ok && (!draft || draft.slug !== campaignSlug)) throw new Error('Unable to read the saved preview.');
+  return draft ? mergeAdminCampaignAuthoring(campaign, draft) : campaign;
 }
 
 async function getUnpublishedAdminCampaigns(env) {
@@ -13945,8 +13935,9 @@ async function handleAdminSettings(request, env) {
     const state = working ? await readAdminCampaignWorkingCopy(env, campaign.slug) : null;
     if (state && !state.ok) return privateJsonResponse(state, state.status || 502, env);
     campaignSections.push({
-      ...campaignSettingsSection(state?.campaign || campaign, env, {
-        canArchiveCampaigns: auth.user.role === 'super_admin'
+      ...campaignSettingsSection(state ? mergeAdminCampaignAuthoring(state.live, state.campaign) : campaign, env, {
+        canArchiveCampaigns: auth.user.role === 'super_admin',
+        publicCampaign: state?.live || campaign
       }),
       ...(state ? { workingCopy: adminCampaignWorkingCopyStatus(state) } : {})
     });
@@ -19964,6 +19955,20 @@ function adminCampaignAuthoringChanges(campaign) {
     const value = path.split('.').reduce((object, key) => object?.[key], campaign);
     return value === undefined ? [] : [{ path, type: schema.type, value, campaignSlug: campaign.slug }];
   });
+}
+
+function mergeAdminCampaignAuthoring(campaign, draft) {
+  const merged = { ...campaign, long_content: draft.long_content || [] };
+  for (const { path, value } of adminCampaignAuthoringChanges(draft)) {
+    const keys = path.split('.');
+    let target = merged;
+    for (const key of keys.slice(0, -1)) {
+      target[key] = { ...target[key] };
+      target = target[key];
+    }
+    target[keys.at(-1)] = value;
+  }
+  return merged;
 }
 
 async function adminCampaignAuthoringHash(campaign) {

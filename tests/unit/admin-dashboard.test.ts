@@ -6745,9 +6745,10 @@ tiers:
 });
 
 describe('saved campaign working copies', () => {
-  async function workspace(published = true) {
+  async function workspace(published = true, email = 'admin@example.com') {
     const env = { ...createEnv(), GITHUB_TOKEN: 'github-test', GITHUB_OWNER: 'owner', GITHUB_REPO: 'working-copy-test', CAMPAIGN_PREVIEW_SECRET: 'preview-test' };
-    const session = await signInAdmin(env);
+    env.PLEDGES.store.set('admin-users:v1', JSON.stringify({ users: [{ email: 'creator@example.com', role: 'campaign_user', campaigns: ['hand-relations'] }] }));
+    const session = await signInAdmin(env, email);
     const files = new Map<string, { content: string; sha: string }>();
     const source = `---
 layout: campaign
@@ -6857,6 +6858,19 @@ Preserved Markdown body.
     expect((await w.request()).body.campaign.hasUnpublishedChanges).toBe(true);
   });
 
+  it('allows an assigned campaign editor to save and explicitly publish a new campaign', async () => {
+    const w = await workspace(false, 'creator@example.com');
+    const initial = await w.request();
+    expect(initial.status).toBe(200);
+    const saved = await w.save(initial.body.campaign.baseRevision);
+    expect(saved.status).toBe(200);
+    const result = await w.request({ intent: 'publish', campaignSlug: 'hand-relations', baseRevision: saved.body.baseRevision });
+    expect(result.status).toBe(200);
+    expect(result.body.isPublished).toBe(true);
+    const outsideScope = await w.request({ intent: 'save', campaignSlug: 'other-project', baseRevision: 'live:other' });
+    expect(outsideScope.status).toBe(403);
+  });
+
   it('rejects missing/stale revisions, unsafe fields and partial payloads without writes', async () => {
     const w = await workspace();
     expect((await w.save('')).status).toBe(409);
@@ -6908,6 +6922,25 @@ Preserved Markdown body.
     }), w.env, { waitUntil: vi.fn() });
     expect(responseWithoutCsrf.status).toBe(403);
     expect(w.writes).toEqual([]);
+  });
+
+  it('keeps current lifecycle metadata and archive eligibility when editing a saved revision', async () => {
+    const w = await workspace();
+    const initial = await w.request();
+    const saved = await w.save(initial.body.campaign.baseRevision, [
+      { campaignSlug: 'hand-relations', path: 'start_date', value: '2099-01-01' }
+    ]);
+    expect(saved.status).toBe(200);
+    w.files.set('_campaigns/hand-relations.md', { sha: 'runtime-update', content: w.source.replace('charged: false', 'charged: true') });
+    const response = await w.request(undefined, '/admin/settings?working=true&');
+    expect(response.status).toBe(200);
+    const rows = response.body.campaigns[0].rows;
+    expect(rows.find((row: any) => row.label === 'Charged').rawValue).toBe(true);
+    expect(rows.find((row: any) => row.label === 'Start date').rawValue).toBe('2099-01-01');
+    expect(rows.some((row: any) => row.label === 'Archive campaign')).toBe(false);
+    const published = await w.request({ intent: 'publish', campaignSlug: 'hand-relations', baseRevision: saved.body.baseRevision });
+    expect(published.status).toBe(200);
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).toContain('charged: true');
   });
 
   it('keeps the previous server draft when a save fails', async () => {
