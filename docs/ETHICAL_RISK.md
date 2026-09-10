@@ -106,3 +106,7 @@ Treat these as release blockers until explicitly resolved:
 
 Release-specific ethical review records belong with the corresponding
 [release evidence](./release-evidence/) rather than in this current-state guide.
+
+## Unassigned admin accounts — 2026-09-09
+
+Saving users preserves a previously unassigned campaign account without granting campaign access. The exception comes only from stored users; browser-supplied allowlists cannot create unassigned accounts or strip an existing assignment. Super-admin, CSRF, and per-campaign authorization remain authoritative. No notification is resent for an unchanged existing user, and Store membership remains in its separate key.
