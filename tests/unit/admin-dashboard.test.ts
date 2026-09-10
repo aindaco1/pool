@@ -1437,6 +1437,33 @@ tiers:
     expect(githubCalls.some((call) => call.url.endsWith('/actions/workflows/deploy.yml/dispatches'))).toBe(true);
   });
 
+  it('preserves an existing unassigned account while saving other user changes', async () => {
+    const env = createEnv();
+    const stored = { users: [
+      { email: 'admin@example.com', role: 'super_admin', campaignSlugs: [] },
+      { email: 'waiting@example.com', role: 'campaign_user', campaignSlugs: [] },
+      { email: 'remove@example.com', role: 'campaign_user', campaignSlugs: [] }
+    ] };
+    (env.PLEDGES as CountingKVNamespace).store.set('admin-users:v1', JSON.stringify(stored));
+    const storeUsers = JSON.stringify({ users: [{ email: 'store@example.com', role: 'limited_admin', accessScopes: ['store'] }] });
+    (env.PLEDGES as CountingKVNamespace).store.set('store-admin-users:v1', storeUsers);
+    const { cookie, ctx, csrfToken } = await signInAdmin(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/users', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({ users: stored.users.slice(0, 2) })
+    }), env, ctx);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      users: [
+        { email: 'admin@example.com', role: 'super_admin', campaigns: [] },
+        { email: 'waiting@example.com', role: 'campaign_user', campaigns: [] }
+      ],
+      notifications: { newUserEmails: [], sent: [], failed: [] }
+    });
+    expect((env.PLEDGES as CountingKVNamespace).store.get('store-admin-users:v1')).toBe(storeUsers);
+  });
+
   it('still rejects unassigned campaign users in explicit user edits', async () => {
     const env = createEnv();
     const { cookie, ctx, csrfToken } = await signInAdmin(env);

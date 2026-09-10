@@ -15203,7 +15203,12 @@ async function handleAdminUsersSave(request, env, body = {}) {
   const normalized = normalizeAdminUsers(body.users ?? body.value ?? [], {
     label: 'Users',
     availableCampaignSlugs: (campaigns || []).map((campaign) => campaign?.slug),
-    currentUserEmail: auth.user.email
+    currentUserEmail: auth.user.email,
+    // Existing unassigned accounts can wait for a campaign without blocking
+    // unrelated user edits. Derive this exception from stored state only.
+    unchangedUnassignedCampaignUserEmails: previousUsers
+      .filter((user) => user.role === 'campaign_user' && !user.campaignSlugs.length)
+      .map((user) => user.email)
   });
   if (!normalized.ok) {
     return privateJsonResponse({
@@ -15749,7 +15754,7 @@ async function handleAdminCampaignCreate(request, env, body = {}) {
       availableCampaignSlugs: Array.from(availableCampaignSlugs),
       currentUserEmail: auth.user.email,
       // Creating a campaign only adds assignments. Preserve unrelated existing
-      // users without campaigns; explicit user edits still require an assignment.
+      // users without campaigns; new users still require an assignment.
       unchangedUnassignedCampaignUserEmails: userResult.previousUsers
         .filter((user) => user.role === 'campaign_user'
           && !user.campaignSlugs.length

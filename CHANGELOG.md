@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Preserve existing unassigned campaign users when other users are edited.
+  Their campaign access remains empty; client-provided exceptions cannot
+  create an unassigned user or clear an existing assignment.
+
 ### Project saving and publication
 
 - Add project-wide Save, protected previews of saved revisions, and explicit Publish for both new and already-public campaigns. Preserve browser-local Save draft and existing recovery data; keep public campaign content, prices, and media unchanged until publication.
