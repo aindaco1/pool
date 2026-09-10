@@ -80,6 +80,9 @@ untracked paths and still stages tracked deletions. Its actual shell command
 passed a temporary Git-repository check covering absent directories, new audio,
 removed audio, and preservation of unrelated untracked files. Original asset
 uploads and the application deployment were unaffected by that optional step.
+The repository also restricts Actions-created pull requests. That explicit policy
+rejection leaves the generated review branch and a maintainer comparison link;
+other PR-creation errors still fail. Repository permissions are unchanged.
 
 No actual user's browser storage was opened, migrated, or cleared during this
 release. Draft compatibility was verified with legacy-format fixtures. No real

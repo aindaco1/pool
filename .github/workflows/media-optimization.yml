@@ -75,8 +75,18 @@ jobs:
           done
           git commit -m "Optimize dashboard media uploads"
           git push --set-upstream origin "$branch"
-          gh pr create \
+          pr_error="$(mktemp)"
+          if ! gh pr create \
             --base main \
             --head "$branch" \
             --title "Optimize dashboard media uploads" \
-            --body "Automated media optimization output from run ${GITHUB_RUN_ID}. Review the generated assets and campaign/config reference updates before merging."
+            --body "Automated media optimization output from run ${GITHUB_RUN_ID}. Review the generated assets and campaign/config reference updates before merging." 2>"$pr_error"; then
+            if grep -Fq 'GitHub Actions is not permitted to create or approve pull requests' "$pr_error"; then
+              echo "::notice title=Media changes ready for review::Repository policy requires a maintainer to open the pull request: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${branch}?expand=1"
+            else
+              cat "$pr_error" >&2
+              rm -f "$pr_error"
+              exit 1
+            fi
+          fi
+          rm -f "$pr_error"

@@ -615,6 +615,8 @@ If `campaign-pledges:<slug>` is missing, Blast dry-runs and sends fail closed wi
 
 ## Media
 
+Repository policy can restrict GitHub Actions from opening pull requests. In that case, the media optimizer preserves its generated changes on the review branch and prints a comparison link for a maintainer to open the pull request; it does not change repository permissions or merge media automatically.
+
 Images and videos uploaded through the dashboard are validated before persistence, renamed with lowercase slug-style filenames, and committed to the asset directory that matches their use:
 
 - Platform brand images: `assets/images/defaults/`
