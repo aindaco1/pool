@@ -507,4 +507,7 @@ tiers:
     limit_total: 3
     stackable: false
     category: digital
+preview_enabled: true
+preview_reviewer_emails: []
+preview_updated_at: "2026-09-10T00:54:13.042Z"
 ---
