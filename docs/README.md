@@ -21,6 +21,8 @@ implementation and operating procedures.
 | --- | --- |
 | Prepare creator copy, media, rewards, and fulfillment | [Creator checklist](../creator-campaign-checklist.md) / [Spanish](../es/creator-campaign-checklist.md) |
 | Edit campaigns and manage platform operations | [Dashboard](DASHBOARD.md) |
+| Save a project, share a preview, or publish changes | [Saving and publishing](DASHBOARD.md#saving-and-publishing) |
+| Recover browser-local campaign content | [Draft recovery](DASHBOARD.md#recover-a-missing-browser-draft) |
 | Understand campaign Markdown and structured fields | [Content model](CONTENT_MODEL.md) |
 | Configure campaign/platform add-ons and variants | [Add-on products](ADD_ON_PRODUCTS.md) |
 | Configure shipping, packing, and quote fallback | [Shipping](SHIPPING.md) |
@@ -36,6 +38,7 @@ implementation and operating procedures.
 | --- | --- |
 | Work on Worker routes and request/response contracts | [Worker API](WORKER_API.md), [Worker entry point](../worker/README.md) |
 | Run automated tests and local verification | [Testing](TESTING.md) |
+| Clean stale branches and generated output | [Local workspace cleanup](CONTRIBUTING.md#local-workspace-cleanup) |
 | Complete operator checks and record release sign-off | [Merge smoke checklist](MERGE_SMOKE_CHECKLIST.md) |
 | Prepare a pull request | [PR template](PULL_REQUEST_TEMPLATE.md) |
 | Review security boundaries and credentials | [Security](SECURITY.md) |

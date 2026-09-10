@@ -86,6 +86,37 @@ messaging, analytics, admin power, visibility, or automation. Dashboard work
 also requires the relevant [Accessibility](ACCESSIBILITY.md), [I18N](I18N.md),
 [Security](SECURITY.md), and [SEO](SEO.md) contracts.
 
+## Local Workspace Cleanup
+
+Run cleanup after validation and after stopping services that use the generated
+output. Start with `git status --short`, `git worktree list`, and
+`git ls-files --others --ignored --exclude-standard --directory`; being ignored
+does not mean a file is disposable.
+
+| Keep for development, testing, or recovery | Regenerate when needed |
+| --- | --- |
+| Source, `_campaigns/`, `_campaign_drafts/`, repository media, tests/fixtures, and committed release evidence | `_site/` and temporary duplicate site builds |
+| Root and Worker `node_modules/`, installed Ruby gems, `.bundle/` configuration, and shared submodules | `.jekyll-cache/`, `.sass-cache/`, and `.jekyll-metadata` |
+| `_config.local*.yml`, `worker/.dev.vars`, and local environment files | Completed `test-results/`, `playwright-report/`, and coverage output |
+| `worker/.wrangler/state/`, browser profiles/drafts, and recovery exports | Inspected disposable files under `tmp/` and `worker/.wrangler/tmp/` |
+| Podman machines, development images/volumes, and Playwright browser installations | Obsolete logs and screenshots already retained in release evidence |
+
+Inspect `tmp/` before clearing it: recovery exports or an unfinished investigation
+are not build artifacts. Move selected output to a dated recovery directory
+outside the checkout or the system Trash, and record its original paths. Avoid
+blanket `git clean -fdx`, browser-storage clearing, or container/volume pruning.
+Restarting `./scripts/dev.sh --podman` rebuilds the site; the browser harness also
+builds `_site/` automatically. [Testing](TESTING.md#local-test-data) owns deliberate
+local-state resets.
+
+Fetch/prune remote references, compare each branch tip with its merged PR, and
+check that no worktree uses it. Squash-merged branches may not appear under
+`git branch --merged`; verify the PR head and merge commit instead. Preserve
+unmerged work, or incorporate a verified generated correction before removing
+its branch. Save branch names and commit IDs, with a Git bundle for commits not
+reachable from main, before removing stale local and remote refs. Recheck tips
+immediately before deletion so another collaborator’s newer commit is retained.
+
 ## Development Patterns
 
 Theme and email/checkout branding use the `design.*` / `platform.*` surface in
