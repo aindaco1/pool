@@ -8070,6 +8070,10 @@
       "warnings": [],
       "references": [
         {
+          "path": "_campaigns/deinonychus.md",
+          "count": 3
+        },
+        {
           "path": "_campaigns/hand-relations.md",
           "count": 6
         },

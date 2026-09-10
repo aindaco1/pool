@@ -84,6 +84,13 @@ The repository also restricts Actions-created pull requests. That explicit polic
 rejection leaves the generated review branch and a maintainer comparison link;
 other PR-creation errors still fail. Repository permissions are unchanged.
 
+[PR #40](https://github.com/aindaco1/pool/pull/40) merged that repair at
+`4556f576b24c5d0e85a6ee7afec19e1ec6a5f364`. Its
+[full hosted gate](https://github.com/aindaco1/pool/actions/runs/34419739479),
+[first optimization run on main](https://github.com/aindaco1/pool/actions/runs/34420326910),
+and [Pages refresh](https://github.com/aindaco1/pool/actions/runs/34420326877)
+passed. The optimization run exercised the maintainer review-link fallback.
+
 No actual user's browser storage was opened, migrated, or cleared during this
 release. Draft compatibility was verified with legacy-format fixtures. No real
 campaign Save/Publish, reviewer invitation, or fresh protected link was created

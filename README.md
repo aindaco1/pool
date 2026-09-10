@@ -19,6 +19,7 @@ multiple campaigns, each persisted and settled as a separate campaign pledge.
 - Physical and digital tiers, campaign and platform add-ons, variant prices, and fulfillment reports.
 - Campaign timelines, stretch goals, production diaries, and supporter-only decisions.
 - A private, role-scoped dashboard for campaigns, settings, products, reports, supporters, analytics, marketing, and users.
+- [Project Save, protected Preview, and explicit Publish](docs/DASHBOARD.md#saving-and-publishing) for new campaigns and unpublished revisions of live campaigns.
 - Localized English and Spanish public pages, supporter flows, dashboard controls, and emails.
 - Consent-based launch and checkout reminders, campaign updates, and durable email delivery through Resend.
 - Campaign embeds, social share cards, source-preserving media optimization, and configurable branding.
