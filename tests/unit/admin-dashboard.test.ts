@@ -1112,6 +1112,70 @@ tiers:
     expect(deletedOtherUser.status).toBe(200);
   });
 
+  it('assigns new users to an unpublished repository campaign and still rejects unknown campaigns', async () => {
+    const env = {
+      ...createEnv(),
+      GITHUB_TOKEN: 'github-test',
+      GITHUB_OWNER: 'owner',
+      GITHUB_REPO: 'repo-user-assignment',
+      GITHUB_REF: 'main',
+      RESEND_API_KEY: 'resend-test'
+    };
+    const { cookie, ctx, csrfToken } = await signInAdmin(env);
+    const originalMock = global.fetch;
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/contents/_campaigns?')) {
+        return jsonResponse([{ name: 'new-project.md', path: '_campaigns/new-project.md', type: 'file' }]);
+      }
+      if (url.includes('/contents/_campaigns/new-project.md')) {
+        return jsonResponse({
+          path: '_campaigns/new-project.md',
+          sha: 'draft-sha',
+          encoding: 'base64',
+          content: Buffer.from('---\ntitle: New Project\nslug: new-project\npublished: false\npreview_only: true\n---\n').toString('base64')
+        });
+      }
+      return originalMock(input, init);
+    }) as typeof fetch;
+    const users = [
+      { email: 'admin@example.com', role: 'super_admin', campaigns: [] },
+      { email: 'first@example.com', role: 'campaign_user', campaigns: ['new-project'] },
+      { email: 'second@example.com', role: 'campaign_user', campaigns: ['new-project'] }
+    ];
+    const saveUsers = (value: typeof users) => worker.fetch(new Request('https://pledge.pool.test/admin/users', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({ users: value })
+    }), env, ctx);
+
+    resetKvCounters(env);
+    const invalid = await saveUsers([users[0], { ...users[1], campaigns: ['missing-project'] }]);
+    expect(invalid.status).toBe(422);
+    expect(await invalid.json()).toMatchObject({ errors: [expect.stringContaining('unknown campaign')] });
+    expect(readKvCounters(env).pledges).toEqual({ put: 0, delete: 0, list: 0 });
+
+    const response = await saveUsers(users);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toContain('no-store');
+    expect(await response.json()).toMatchObject({
+      success: true,
+      users,
+      notifications: { sent: ['first@example.com', 'second@example.com'], failed: [] },
+      writeBudget: { kvWritesExpected: 1 }
+    });
+    const saved = JSON.parse(env.PLEDGES.store.get('admin-users:v1') || '{}');
+    expect(saved.users.slice(1)).toEqual([
+      expect.objectContaining({ email: 'first@example.com', campaignSlugs: ['new-project'] }),
+      expect.objectContaining({ email: 'second@example.com', campaignSlugs: ['new-project'] })
+    ]);
+    expect(env.PLEDGES.putCalls).toBe(1);
+    expect(env.PLEDGES.listCalls).toBe(0);
+    const emails = vi.mocked(global.fetch).mock.calls.filter(([input]) => input === 'https://api.resend.com/emails');
+    expect(emails).toHaveLength(2);
+    for (const [, init] of emails) expect(JSON.parse(String(init?.body)).text).toContain('New Project');
+  });
+
   it('emails newly created admin users after saving user changes', async () => {
     const env = {
       ...createEnv(),

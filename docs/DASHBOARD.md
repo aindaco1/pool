@@ -220,6 +220,7 @@ Rules:
 - You cannot demote your own super-admin account.
 - You can demote or delete other super admins.
 - New campaign users must have at least one assigned campaign. An existing unassigned campaign user can remain unassigned while other users are edited; that account has no campaign access until an assignment is added. Clearing an existing assignment still requires removing the account or selecting another campaign.
+- Assignments accept unpublished repository campaigns shown in the dashboard, including newly created projects. A campaign does not need to be public before collaborators can be added.
 - User changes save to KV immediately through the Users save button; they do not use the Settings publish button.
 - Newly created users are emailed sign-in instructions when Resend is configured. Edits to existing users do not resend the email.
 

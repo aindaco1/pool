@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix user assignments to newly created, unpublished campaigns by validating against the dashboard campaign list.
+
 - Preserve existing unassigned campaign users when other users are edited.
   Their campaign access remains empty; client-provided exceptions cannot
   create an unassigned user or clear an existing assignment.
