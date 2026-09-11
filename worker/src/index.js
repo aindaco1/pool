@@ -15198,7 +15198,7 @@ async function handleAdminUsersSave(request, env, body = {}) {
     return privateJsonResponse({ error: 'Forbidden' }, 403, env);
   }
 
-  const { campaigns } = await getCampaigns(env);
+  const campaigns = await getAdminCampaigns(env);
   const previousUsers = await getEffectiveAdminUsers(env);
   const normalized = normalizeAdminUsers(body.users ?? body.value ?? [], {
     label: 'Users',
