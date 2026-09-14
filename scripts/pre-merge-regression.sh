@@ -197,6 +197,10 @@ minify_site_assets() {
 }
 
 verify_build_artifacts() {
+  if [[ -e _site/shared/dust-wave-platform/examples ]]; then
+    echo "Platform starter recipes leaked into the generated site"
+    return 1
+  fi
   local maintainer_path=""
   for maintainer_path in README.md LICENSE AGENTS.md CHANGELOG.md docs; do
     if [[ -e "_site/${maintainer_path}" ]]; then

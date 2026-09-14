@@ -333,10 +333,11 @@ describe('SEO templates', () => {
     const campaignCard = readRepoFile('_includes', 'campaign-card.html');
 
     expect(campaignLayout).toContain("key='campaign.play_video'");
-    expect(campaignLayout).toContain('video-first-frame-poster.js');
-    expect(readRepoFile('assets', 'js', 'video-first-frame-poster.js')).toContain('IntersectionObserver');
-    expect(readRepoFile('assets', 'js', 'video-first-frame-poster.js')).toContain('document.baseURI');
-    expect(readRepoFile('assets', 'js', 'video-first-frame-poster.js')).toContain("window.location.origin !== 'null'");
+    expect(campaignLayout).toContain('video-first-frame-poster-browser.js');
+    expect(campaignLayout).toContain('data-poster-url-base="document-base"');
+    expect(readRepoFile('shared', 'dust-wave-platform', 'packages', 'site-shell', 'src', 'video-first-frame-poster-browser.js')).toContain('IntersectionObserver');
+    expect(readRepoFile('shared', 'dust-wave-platform', 'packages', 'site-shell', 'src', 'video-first-frame-poster-browser.js')).toContain('document.baseURI');
+    expect(readRepoFile('shared', 'dust-wave-platform', 'packages', 'site-shell', 'src', 'video-first-frame-poster-browser.js')).toContain("window.location.origin !== 'null'");
     expect(campaignLayout).toContain('key="campaign.supporter_community_unlocked"');
     expect(campaignLayout).toContain('key="campaign.supporters_only_cta"');
     expect(campaignLayout).toContain('key="misc.video_not_supported"');
