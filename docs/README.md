@@ -77,3 +77,5 @@ The root About, Terms, Admin, and creator-checklist Markdown files are Jekyll
 page sources, with localized counterparts. Keep their public URL, locale, and
 indexing contracts when editing them. Maintainer docs, AGENTS, and CHANGELOG
 are excluded from the public Jekyll artifact in [_config.yml](../_config.yml).
+
+- [Platform reuse migration](platform-reuse-2026-09-14.md): source candidate, characterization, validation limits and independent rollback.
