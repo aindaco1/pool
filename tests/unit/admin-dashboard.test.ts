@@ -6222,7 +6222,7 @@ tiers:
     expect(previewBody.preview.html).toContain('class="diary-entry__title">Two days left to submit!');
     expect(previewBody.preview.html).toContain('Mar 4, 2026 · 12:00 PM');
     expect(previewBody.preview.html).toContain('/assets/js/diary-tabs.js');
-    expect(previewBody.preview.html).toContain('/assets/js/video-first-frame-poster.js');
+    expect(previewBody.preview.html).toContain('/shared/dust-wave-platform/packages/site-shell/src/video-first-frame-poster-browser.js');
     expect(previewBody.preview.html).toContain('class="poolcart-add-item" type="button" disabled aria-disabled="true"');
     expect(previewBody.preview.html).toContain('Old body.');
     expect(previewBody.preview.html).not.toContain('The Vision');

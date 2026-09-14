@@ -42,6 +42,7 @@ exclude:
   - Containerfile.dev
   - Containerfile.playwright.dev
   - shared/dust-wave-jekyll-template
+  - shared/dust-wave-platform/examples
 
 # Structured platform settings for forks.
 platform:

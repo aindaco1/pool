@@ -79,3 +79,5 @@ indexing contracts when editing them. Maintainer docs, AGENTS, and CHANGELOG
 are excluded from the public Jekyll artifact in [_config.yml](../_config.yml).
 
 - [Platform reuse migration](platform-reuse-2026-09-14.md): source candidate, characterization, validation limits and independent rollback.
+
+- [Platform reuse batch 2](platform-reuse-batch2-2026-09-14.md): shared primitives, characterization and independent rollback.

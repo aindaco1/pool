@@ -19637,7 +19637,7 @@ function buildAdminCampaignPagePreviewHtml(campaign = {}, env = {}, lang = 'en')
   const text = adminPreviewText(currentLang);
   const siteBase = adminPreviewSiteBase(env);
   const mainCss = siteBase ? `${siteBase}/assets/main.css` : '/assets/main.css';
-  const firstFramePosterScript = siteBase ? `${siteBase}/assets/js/video-first-frame-poster.js` : '/assets/js/video-first-frame-poster.js';
+  const firstFramePosterScript = siteBase ? `${siteBase}/shared/dust-wave-platform/packages/site-shell/src/video-first-frame-poster-browser.js` : '/shared/dust-wave-platform/packages/site-shell/src/video-first-frame-poster-browser.js';
   const state = adminPreviewCampaignState(campaign, env);
   const errors = [];
   const title = campaign.title || campaign.slug || '';
@@ -19684,7 +19684,7 @@ function buildAdminCampaignPagePreviewHtml(campaign = {}, env = {}, lang = 'en')
       ${renderAdminCampaignPreviewTiers(campaign, currentLang, env)}
     </aside>
   </main>
-  <script src="${escapeAdminPreviewAttribute(firstFramePosterScript)}" defer></script>
+  <script data-dustwave-video-posters="true" data-poster-global="PoolVideoPosters" data-poster-cache-key="pool_first_frame_poster" data-poster-url-base="document-base" src="${escapeAdminPreviewAttribute(firstFramePosterScript)}" defer></script>
 </body>
 </html>`;
 }
