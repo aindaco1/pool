@@ -44,6 +44,15 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "yutyrannus-huali"
+    name: "Yutyrannus huali"
+    price: 15
+    image: "/assets/images/campaigns/deinonychus/tier-yutyrannus-huali-20260915-215214-d3714c2c.jpg"
+    description: "This tier includes:Everything from the previous tierA special Deinonychus sticker designed by a local artist"
+    stackable: false
+    category: "physical"
+    shipping_preset: "sticker"
+    late_support: false
   - id: "moros-intrepidus"
     name: "Moros intrepidus"
     price: 5
@@ -58,6 +67,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T21:51:32.125Z"
+_pool_draft_saved_at: "2026-09-15T21:52:58.629Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
