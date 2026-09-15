@@ -44,6 +44,24 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "archaeornithomimus-asiaticus"
+    name: "Archaeornithomimus asiaticus"
+    price: 50
+    image: "/assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c.jpg"
+    description: "This tier includes:Everything in the previous tierSigned Deinonychus Poster"
+    stackable: false
+    category: "physical"
+    shipping_preset: "poster"
+    late_support: false
+  - id: "deinocheirus-mirificus"
+    name: "Deinocheirus mirificus"
+    price: 25
+    image: "/assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab.jpg"
+    description: "This Tier includes:Everything from the previous tier Early access to the filmDinosaur playlist used by cast and crewSigned copy of the script"
+    stackable: false
+    category: "physical"
+    shipping_preset: "signed_script"
+    late_support: false
   - id: "yutyrannus-huali"
     name: "Yutyrannus huali"
     price: 15
@@ -67,6 +85,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T21:52:58.629Z"
+_pool_draft_saved_at: "2026-09-15T21:57:01.170Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
