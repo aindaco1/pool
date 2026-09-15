@@ -44,6 +44,15 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "archaeopteryx-siemensii"
+    name: "Archaeopteryx siemensii"
+    price: 75
+    image: "/assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986.png"
+    description: "This tier includes:Everything in the previous tiersCustomized drawing of YOU as a dinosaur"
+    stackable: false
+    category: "physical"
+    shipping_preset: "poster"
+    late_support: false
   - id: "archaeornithomimus-asiaticus"
     name: "Archaeornithomimus asiaticus"
     price: 50
@@ -85,6 +94,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T21:57:01.170Z"
+_pool_draft_saved_at: "2026-09-15T21:58:29.957Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
