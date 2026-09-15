@@ -1,0 +1,54 @@
+---
+layout: campaign
+title: "Deinonychus"
+slug: deinonychus
+published: false
+preview_only: true
+preview_enabled: true
+preview_reviewer_emails: []
+state: upcoming
+start_date: 2026-09-07
+goal_deadline: 2026-09-07
+goal_amount: 0
+charged: false
+hero_image: /assets/images/defaults/dust-wave-square.png
+hero_image_wide: /assets/images/defaults/dust-wave-square.png
+creator_image: /assets/images/defaults/dust-wave-square.png
+creator_name: "Chelsea"
+category: "Other"
+short_blurb: "Have you ever been watching a dinosaur film like Jurassic Park and thought, “What’s going on with the background characters during all this?” We might see them running for their lives or hiding in a corner, afraid to do anything... Well not this background character! Cleo is a young woman who visits “Cretaceous Critters Wildlife Park,” an attraction with dinosaurs! But during her visit, the dinosaurs escape their enclosures! During the chaos, Cleo finds herself trapped with one of the dinosaurs, known as a Deinonychus, blocking her only way out... Will she make it out alive?"
+show_ongoing: false
+single_tier_only: false
+stretch_hidden: true
+custom_late_support: false
+runner_report_emails: []
+long_content:
+  - type: "text"
+    body: |
+      Why should you support?
+      
+      - This is a cool indie film
+      - A female writer and director
+      - Proudly anti-AI
+      - Scientifically accurate
+      - Dinosaurs… Enough said
+  - type: "text"
+    body: |
+      What will this money go towards?
+      
+      - Kiwi, the animatronic dinosaur (she needs a makeover!)
+      - Crafty and catering (trust me, no one wants a hungry director)
+      - Location (because believe it or not, we have to pay to film in a bathroom)
+      - Equipment (sadly lights and cameras aren’t free)
+      - Whatever is left will go to pay cast and crew (donate pretty please, thanks in advance :-))
+support_items: []
+campaign_add_ons: []
+tiers: []
+stretch_goals: []
+ongoing_items: []
+diary: []
+decisions: []
+preview_updated_at: "2026-09-09T19:57:39.367Z"
+_pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
+_pool_draft_saved_at: "2026-09-15T21:37:04.439Z"
+---
