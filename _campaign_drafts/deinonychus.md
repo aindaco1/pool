@@ -7,13 +7,13 @@ preview_only: true
 preview_enabled: true
 preview_reviewer_emails: []
 state: upcoming
-start_date: 2026-09-07
-goal_deadline: 2026-09-07
-goal_amount: 0
+start_date: "2026-09-15"
+goal_deadline: "2026-10-16"
+goal_amount: 6600
 charged: false
-hero_image: /assets/images/defaults/dust-wave-square.png
+hero_image: "/assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a.jpg"
 hero_image_wide: /assets/images/defaults/dust-wave-square.png
-creator_image: /assets/images/defaults/dust-wave-square.png
+creator_image: "/assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33.jpg"
 creator_name: "Chelsea"
 category: "Other"
 short_blurb: "Have you ever been watching a dinosaur film like Jurassic Park and thought, “What’s going on with the background characters during all this?” We might see them running for their lives or hiding in a corner, afraid to do anything... Well not this background character! Cleo is a young woman who visits “Cretaceous Critters Wildlife Park,” an attraction with dinosaurs! But during her visit, the dinosaurs escape their enclosures! During the chaos, Cleo finds herself trapped with one of the dinosaurs, known as a Deinonychus, blocking her only way out... Will she make it out alive?"
@@ -50,5 +50,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T21:37:04.439Z"
+_pool_draft_saved_at: "2026-09-15T21:48:29.035Z"
+instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
