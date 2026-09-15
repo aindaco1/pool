@@ -44,6 +44,20 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "deinonychus-antirrhopus"
+    name: "Deinonychus antirrhopus"
+    price: 6000
+    description: "This tier includes:Everything from the previous tiersThe director will shave her head and live stream the entire eventYOU get to pick a dinosaur tattoo for the director to get, and she will live stream the entire thing!"
+    limit_total: 1
+    stackable: false
+    category: "physical"
+    shipping:
+      weight_oz: 160
+      packaging_weight_oz: 192
+      length_in: 24
+      width_in: 12
+      height_in: 5
+    late_support: false
   - id: "bisticeratops-froeseorum"
     name: "Bisticeratops froeseorum"
     price: 5000
@@ -147,6 +161,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T22:09:47.713Z"
+_pool_draft_saved_at: "2026-09-15T22:11:35.541Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
