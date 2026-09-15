@@ -1,0 +1,36 @@
+---
+layout: campaign
+title: "Tubers"
+slug: tubers
+published: false
+preview_only: true
+preview_enabled: false
+preview_reviewer_emails: []
+state: upcoming
+start_date: 2026-09-11
+goal_deadline: 2026-09-11
+goal_amount: 0
+charged: false
+hero_image: /assets/images/defaults/dust-wave-square.png
+hero_image_wide: /assets/images/defaults/dust-wave-square.png
+creator_image: /assets/images/defaults/dust-wave-square.png
+creator_name: "Anna"
+category: "Other"
+short_blurb: ""
+show_ongoing: false
+single_tier_only: false
+stretch_hidden: true
+custom_late_support: false
+runner_report_emails: []
+long_content: []
+support_items: []
+campaign_add_ons: []
+tiers: []
+stretch_goals: []
+ongoing_items: []
+diary: []
+decisions: []
+instagram: "https://www.instagram.com/ratamacuefilm/"
+_pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
+_pool_draft_saved_at: "2026-09-15T23:42:23.333Z"
+---
