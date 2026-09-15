@@ -43,6 +43,30 @@ long_content:
       - Whatever is left will go to pay cast and crew (donate pretty please, thanks in advance :-))
 support_items: []
 campaign_add_ons:
+  - id: "drawing-of-you-as-a-dinosaur"
+    name: "Drawing of YOU as a Dinosaur"
+    description: "This is a customized drawing of you as a dinosaur, created by a talented local artist"
+    image_url: ""
+    price: 30.00
+    category: "physical"
+    shipping_preset: "signed_script"
+    variants: []
+  - id: "dino-plushie"
+    name: "Dino plushie"
+    description: "This is an adorable plushie, handmade by a local artist"
+    image_url: ""
+    price: 50.00
+    category: "physical"
+    shipping_preset: "tshirt"
+    variants: []
+  - id: "cretaceous-critters-t-shirt"
+    name: "Cretaceous Critters T-Shirt"
+    description: "This is a \"Cretaceous Critters Wildlife Park\" Employee t-shirt, designed by the director"
+    image_url: ""
+    price: 35.00
+    category: "physical"
+    shipping_preset: "tshirt"
+    variants: []
   - id: "cretaceous-critters-keychain"
     name: "Cretaceous Critters Keychain"
     description: "This is a keychain from \"Cretaceous Critters Wildlife Park\" designed by the director"
@@ -177,6 +201,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T22:13:08.688Z"
+_pool_draft_saved_at: "2026-09-15T22:15:17.130Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
