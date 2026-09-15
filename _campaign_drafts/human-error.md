@@ -13,7 +13,7 @@ goal_amount: 0
 charged: false
 hero_image: /assets/images/defaults/dust-wave-square.png
 hero_image_wide: /assets/images/defaults/dust-wave-square.png
-creator_image: "/assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a.png"
+creator_image: "/assets/images/campaigns/human-error/creator-20260915-234126-ce00645e.png"
 creator_name: "Ben"
 category: "Other"
 short_blurb: ""
@@ -31,5 +31,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-09-15T23:41:15.482Z"
+_pool_draft_saved_at: "2026-09-15T23:41:35.651Z"
 ---
