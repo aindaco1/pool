@@ -42,7 +42,23 @@ long_content:
       - Equipment (sadly lights and cameras aren’t free)
       - Whatever is left will go to pay cast and crew (donate pretty please, thanks in advance :-))
 support_items: []
-campaign_add_ons: []
+campaign_add_ons:
+  - id: "cretaceous-critters-keychain"
+    name: "Cretaceous Critters Keychain"
+    description: "This is a keychain from \"Cretaceous Critters Wildlife Park\" designed by the director"
+    image_url: ""
+    price: 10.00
+    category: "physical"
+    shipping_preset: "sticker"
+    variants: []
+  - id: "deinonychus-stickers"
+    name: "Deinonychus Stickers"
+    description: "This is a special sticker from the film Deinonychus, designed by a local artist"
+    image_url: ""
+    price: 5.00
+    category: "physical"
+    shipping_preset: "sticker"
+    variants: []
 tiers:
   - id: "deinonychus-antirrhopus"
     name: "Deinonychus antirrhopus"
@@ -161,6 +177,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T22:11:35.541Z"
+_pool_draft_saved_at: "2026-09-15T22:13:08.688Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
