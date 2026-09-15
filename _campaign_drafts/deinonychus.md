@@ -44,6 +44,21 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "bisticeratops-froeseorum"
+    name: "Bisticeratops froeseorum"
+    price: 5000
+    image: "/assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262.jpg"
+    description: "This tier includes:Everything in the previous tiersExecuctive Producer credit The director's husband will shave his head and live stream the entire thing!"
+    limit_total: 1
+    stackable: false
+    category: "physical"
+    shipping:
+      weight_oz: 160
+      packaging_weight_oz: 192
+      length_in: 24
+      width_in: 12
+      height_in: 5
+    late_support: false
   - id: "parasaurolophus-walkeri"
     name: "Parasaurolophus walkeri"
     price: 500
@@ -132,6 +147,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T22:07:32.766Z"
+_pool_draft_saved_at: "2026-09-15T22:09:47.713Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
