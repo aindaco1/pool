@@ -12,7 +12,7 @@ goal_deadline: "2026-10-16"
 goal_amount: 6600
 charged: false
 hero_image: "/assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a.jpg"
-hero_image_wide: /assets/images/defaults/dust-wave-square.png
+hero_image_wide: "/assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9.jpg"
 creator_image: "/assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33.jpg"
 creator_name: "Chelsea"
 category: "Other"
@@ -200,7 +200,7 @@ ongoing_items: []
 diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
-_pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T22:15:17.130Z"
+_pool_draft_base_hash: "e392aa44bc4bd58fc1cfd358248a60640c2466d32ed9c0869ca79919814f9fbb"
+_pool_draft_saved_at: "2026-09-15T22:24:11.431Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
