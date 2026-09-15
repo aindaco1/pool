@@ -44,6 +44,20 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "parasaurolophus-walkeri"
+    name: "Parasaurolophus walkeri"
+    price: 500
+    image: "/assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e.jpg"
+    description: "This tier includes:Everything in the previous tiers2 VIP tickets to the cast and crew screening event"
+    stackable: false
+    category: "physical"
+    shipping:
+      weight_oz: 160
+      packaging_weight_oz: 192
+      length_in: 24
+      width_in: 12
+      height_in: 5
+    late_support: false
   - id: "alamosaurus-sanjuanensis"
     name: "Alamosaurus sanjuanensis"
     price: 150
@@ -118,6 +132,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T22:05:43.386Z"
+_pool_draft_saved_at: "2026-09-15T22:07:32.766Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
