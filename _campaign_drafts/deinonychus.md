@@ -44,6 +44,15 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "oviraptor-philoceratops"
+    name: "Oviraptor philoceratops"
+    price: 100
+    image: "/assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f.jpg"
+    description: "This tier includes:Everything in the previous tierProducer credit in the film Dinosaur plushie"
+    stackable: false
+    category: "physical"
+    shipping_preset: "tshirt"
+    late_support: false
   - id: "archaeopteryx-siemensii"
     name: "Archaeopteryx siemensii"
     price: 75
@@ -94,6 +103,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T21:58:29.957Z"
+_pool_draft_saved_at: "2026-09-15T22:00:03.617Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
