@@ -43,13 +43,21 @@ long_content:
       - Whatever is left will go to pay cast and crew (donate pretty please, thanks in advance :-))
 support_items: []
 campaign_add_ons: []
-tiers: []
+tiers:
+  - id: "moros-intrepidus"
+    name: "Moros intrepidus"
+    price: 5
+    image: "/assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8.jpg"
+    description: "This tier includes:A shoutout on social mediaSpecial Thanks in credits"
+    stackable: false
+    category: "digital"
+    late_support: false
 stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "e4f8214f5267a1aef59d7b0102bc7e8bd783bce6029d628c99c2f048ff61b71d"
-_pool_draft_saved_at: "2026-09-15T21:48:29.035Z"
+_pool_draft_saved_at: "2026-09-15T21:51:32.125Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
