@@ -15,7 +15,7 @@ hero_image: "/assets/images/campaigns/deinonychus/hero-square-20260915-214124-52
 hero_image_wide: "/assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9.jpg"
 creator_image: "/assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33.jpg"
 creator_name: "Weirdos Production"
-category: "Other"
+category: "Short Film"
 short_blurb: "When dinosaurs escape at *Cretaceous Critters Wildlife Park*, Cleo must face a Deinonychus blocking her only way out."
 show_ongoing: false
 single_tier_only: false
@@ -245,6 +245,6 @@ diary:
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "7ffd86b727a77ef80c8f1eed4f2264c8e2b44fff88b32dd06bb738cf9488c426"
-_pool_draft_saved_at: "2026-09-16T14:36:31.553Z"
+_pool_draft_saved_at: "2026-09-16T14:43:20.251Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
