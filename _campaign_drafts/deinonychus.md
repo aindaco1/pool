@@ -16,7 +16,7 @@ hero_image_wide: "/assets/images/campaigns/deinonychus/hero-wide-20260915-222357
 creator_image: "/assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33.jpg"
 creator_name: "Weirdos Production"
 category: "Other"
-short_blurb: "Have you ever been watching a dinosaur film like Jurassic Park and thought, “What’s going on with the background characters during all this?” We might see them running for their lives or hiding in a corner, afraid to do anything... Well not this background character! Cleo is a young woman who visits “Cretaceous Critters Wildlife Park,” an attraction with dinosaurs! But during her visit, the dinosaurs escape their enclosures! During the chaos, Cleo finds herself trapped with one of the dinosaurs, known as a Deinonychus, blocking her only way out... Will she make it out alive?"
+short_blurb: "When dinosaurs escape at Cretaceous Critters Wildlife Park, Cleo must face a Deinonychus blocking her only way out."
 show_ongoing: false
 single_tier_only: false
 stretch_hidden: true
@@ -25,17 +25,39 @@ runner_report_emails: []
 long_content:
   - type: "text"
     body: |
-      Why should you support?
-      
-      - This is a cool indie film
-      - A female writer and director
-      - Proudly anti-AI
-      - Scientifically accurate
-      - Dinosaurs… Enough said
+      Have you ever been watching a dinosaur film like Jurassic Park and thought,
+  - type: "quote"
+    text: |
+      “What’s going on with the background characters during all this?”
   - type: "text"
     body: |
-      What will this money go towards?
+      We might see them running for their lives or hiding in a corner, afraid to do anything... **well, not this background character!**
       
+      Cleo is a young woman who visits *“Cretaceous Critters Wildlife Park,”* an attraction with dinosaurs! But during her visit, **the dinosaurs escape their enclosures!**
+  - type: "image"
+    src: "/assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2.jpg"
+    alt: "dinosaur holding a boom mic"
+  - type: "text"
+    body: |
+      During the chaos, **Cleo finds herself trapped** with one of the dinosaurs, known as a *Deinonychus*, blocking her only way out ... **will she make it out alive?**
+  - type: "image"
+    src: "/assets/images/campaigns/deinonychus/content-734896697-18049316195565356-8295088956282282279-n-20260916-141543-613b3c0a.jpg"
+    alt: "deinonychus"
+  - type: "text"
+    body: |
+      ## Why should you support?
+  - type: "text"
+    body: |
+      - **This is a cool indie film**
+      - **A female writer and director**
+      - **Proudly anti-AI**
+      - **Scientifically accurate**
+      - **Dinosaurs … *enough said***
+  - type: "text"
+    body: |
+      ## What will this money go towards?
+  - type: "text"
+    body: |
       - Kiwi, the animatronic dinosaur (she needs a makeover!)
       - Crafty and catering (trust me, no one wants a hungry director)
       - Location (because believe it or not, we have to pay to film in a bathroom)
@@ -87,7 +109,7 @@ tiers:
   - id: "deinonychus-antirrhopus"
     name: "Deinonychus antirrhopus"
     price: 6000
-    description: "This tier includes:Everything from the previous tiersThe director will shave her head and live stream the entire eventYOU get to pick a dinosaur tattoo for the director to get, and she will live stream the entire thing!"
+    description: "This tier includes: *Everything from the previous tiers* + the director will **shave her head** and live stream the entire event. **YOU get to pick a dinosaur tattoo** for the director to get, and she will *live stream the entire thing!*"
     limit_total: 1
     stackable: false
     category: "physical"
@@ -200,7 +222,7 @@ ongoing_items: []
 diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
-_pool_draft_base_hash: "e392aa44bc4bd58fc1cfd358248a60640c2466d32ed9c0869ca79919814f9fbb"
-_pool_draft_saved_at: "2026-09-16T13:52:29.704Z"
+_pool_draft_base_hash: "7ffd86b727a77ef80c8f1eed4f2264c8e2b44fff88b32dd06bb738cf9488c426"
+_pool_draft_saved_at: "2026-09-16T14:18:56.199Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
