@@ -53,7 +53,38 @@ compatibility case verified directly in this incident.
 - Browser coverage includes ordinary confirmation, stale summary after a successful
   completion response, retry/reload without a second Stripe confirmation or session,
   and result-page cart retention until server confirmation.
-- Final full browser gate and deployment evidence are recorded below when complete.
+- Complete local pre-merge gate passed on `7860efc`: 117 browser cases passed,
+  7 passed on retry, and 3 were skipped. The new confirmation/recovery scenarios
+  passed, including pending and confirmed accessibility checks in both languages.
+- [Hosted Merge Smoke and all four dependency audits](https://github.com/aindaco1/pool/actions/runs/35141504287)
+  passed on the same code commit.
+
+## Production verification
+
+- [PR #54](https://github.com/aindaco1/pool/pull/54) merged as
+  `d8c5a757687ee8ac1fc7a7374e1b91624f7e7a1e`.
+- [Deploy Production](https://github.com/aindaco1/pool/actions/runs/35142218111)
+  deployed that exact revision to both the Worker and GitHub Pages successfully.
+  Worker version `c18bf5b7-c615-4d3e-94a5-6157b2dd68bc` received 100% of traffic.
+  Public admin security policy and crawl endpoint checks passed.
+- [Release Provider Evidence](https://github.com/aindaco1/pool/actions/runs/35142198870)
+  passed. This does not claim a complete audit of every payment, email, shipping,
+  and tax provider.
+- Public English/Spanish result HTML contains the pending panel, hides success
+  until confirmation, and retains `noindex`; deployed cart/result scripts contain
+  recovery logic. A production browser showed pending on an unconfirmed result
+  page and success only after reading the recovered pledge from the server.
+- The reporting supporter's latest already-approved setup session was recovered
+  through the supported same-session completion endpoint at approximately
+  19:47 UTC. It returned HTTP 200 with `persisted: true`. Direct production KV
+  verification and the private/no-store summary both confirmed one active pledge:
+  $150.00 campaign contribution, $3.00 shipping, $22.50 tip, and $175.50 total.
+  Shipping details and existing Stripe customer/payment-method/setup references
+  are present; the pledge is uncharged. The earlier repeat attempt has no pledge.
+- The normal transactional confirmation passed through the durable email outbox.
+  Its delivery record subsequently reached `delivered` with a provider receipt,
+  and the pending outbox payload was removed. This establishes provider-reported
+  delivery, not that the supporter opened the message.
 
 ## Ethical risk review
 
@@ -68,6 +99,8 @@ pledge truth. Transactional delivery continues through the existing outbox.
 
 ## Acceptance boundary
 
-Local tests use synthetic Stripe responses and local storage. They do not establish
-production deployment, a new live-card checkout, provider email delivery, or the
-reporting supporter's final pledge status. Those require separate production evidence.
+Local tests use synthetic Stripe responses and local storage. Production deployment,
+same-session recovery, canonical pledge persistence, duplicate avoidance, and the
+rendered confirmation were verified separately above. No new live-card checkout or
+charge was created for testing. Provider-reported email delivery was verified
+separately; inbox placement and reading the message were not checked.
