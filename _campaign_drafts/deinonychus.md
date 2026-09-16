@@ -16,7 +16,7 @@ hero_image_wide: "/assets/images/campaigns/deinonychus/hero-wide-20260915-222357
 creator_image: "/assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33.jpg"
 creator_name: "Weirdos Production"
 category: "Other"
-short_blurb: "When dinosaurs escape at Cretaceous Critters Wildlife Park, Cleo must face a Deinonychus blocking her only way out."
+short_blurb: "When dinosaurs escape at *Cretaceous Critters Wildlife Park*, Cleo must face a Deinonychus blocking her only way out."
 show_ongoing: false
 single_tier_only: false
 stretch_hidden: true
@@ -49,7 +49,7 @@ long_content:
   - type: "text"
     body: |
       - **This is a cool indie film**
-      - **A female writer and director**
+      - **A female writer and director:** [Maddy Parrulli-Garcia](https://www.instagram.com/maddy_d_parrulli_garcia/)
       - **Proudly anti-AI**
       - **Scientifically accurate**
       - **Dinosaurs … *enough said***
@@ -219,10 +219,32 @@ tiers:
     late_support: false
 stretch_goals: []
 ongoing_items: []
-diary: []
+diary:
+  - title: "Cast Announcement!"
+    id: "cast-announcement"
+    date: "2026-09-16T08:28-06:00"
+    phase: "fundraising"
+    content:
+      - type: "image"
+        src: "/assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e.jpg"
+        alt: "cast announcement"
+      - type: "text"
+        body: |
+          Thank you to everyone who submitted for these roles, we are **SO thrilled with this cast** and can’t wait to *start production* 🦕
+          
+          Be on the look out for **crew calls! Crew announcements! And event announcements!** 🎬
+      - type: "gallery"
+        layout: "grid"
+        images:
+          - src: "/assets/images/campaigns/deinonychus/content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf.jpg"
+            alt: "cleo casting"
+          - src: "/assets/images/campaigns/deinonychus/content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5.jpg"
+            alt: "enrique casting"
+          - src: "/assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5.jpg"
+            alt: "liane casting"
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "7ffd86b727a77ef80c8f1eed4f2264c8e2b44fff88b32dd06bb738cf9488c426"
-_pool_draft_saved_at: "2026-09-16T14:28:11.253Z"
+_pool_draft_saved_at: "2026-09-16T14:36:31.553Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
