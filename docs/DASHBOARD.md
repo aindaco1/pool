@@ -636,7 +636,14 @@ Recommended campaign media:
 - Hero image wide: 16:9, around 1600x900px
 - Creator image: square, around 400x400px
 - Default social image: large 16:9 or Open Graph-friendly image
-- Hero video: direct MP4/WebM/MOV upload up to 100 MB, or a YouTube/Vimeo URL
+- Hero video: direct MP4/WebM/MOV upload up to 100 MB (100,000,000 bytes), or a YouTube/Vimeo URL
+
+The same video limit applies to Content, Diary, and media-library replacements.
+The dashboard sends video files as binary request bodies; the Worker streams
+their GitHub encoding without holding the entire file in memory. Campaign
+permissions, source preservation, new asset paths, and optimization after a
+successful commit apply to these uploads. A failed upload does not replace the
+saved media path. Reload older dashboard tabs before uploading large videos.
 
 The campaign Content editor, diary-entry content editors, and Blast image blocks stage selected media in the browser first. The block shows the selected image, video, or audio selection immediately, but the file is not uploaded until the user saves the project or sends/tests a Blast. During project Save or Blast send, the dashboard uploads staged media into the campaign asset directory, replaces the temporary browser preview with the final `/assets/...` path, and then commits the campaign YAML or builds the Blast email payload.
 

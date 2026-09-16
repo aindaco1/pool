@@ -2,6 +2,10 @@
 
 import { createGitHubClient } from '../../shared/dust-wave-platform/packages/worker-core/src/github.js';
 import { getScopedConsole } from './logger.js';
+import { readBoundedText } from '../../shared/dust-wave-platform/packages/worker-core/src/response-body.js';
+import { createGitHubUploadBody } from './github-upload.js';
+
+export const MAX_VIDEO_UPLOAD_BYTES = 100_000_000;
 
 async function fetchGitHubWithoutRedirects(input, init) {
   // The pinned shared client uses redirect: 'error', which this Worker's
@@ -14,14 +18,15 @@ async function fetchGitHubWithoutRedirects(input, init) {
   return response;
 }
 
-function getClient(env = {}) {
+function getClient(env = {}, options = {}) {
   return createGitHubClient({
     token: env.GITHUB_TOKEN,
     owner: env.GITHUB_OWNER || 'aindaco1',
     repo: env.GITHUB_REPO || 'pool',
     ref: env.GITHUB_REF || 'main',
     userAgent: 'pool-worker',
-    fetchTarget: fetchGitHubWithoutRedirects
+    fetchTarget: fetchGitHubWithoutRedirects,
+    ...options
   });
 }
 
@@ -110,10 +115,70 @@ export async function putGitHubTextFile(env, filePath, content, message, sha) {
   return result;
 }
 
-export async function putGitHubBase64File(env, filePath, base64Content, message, sha = undefined) {
-  const result = await getClient(env).putBase64File(filePath, base64Content, message, sha);
+export async function putGitHubBase64File(env, filePath, base64Content, message, sha = undefined, maxContentBytes = undefined) {
+  const result = await getClient(env, { maxContentBytes }).putBase64File(filePath, base64Content, message, sha);
   if (!result.ok) getScopedConsole(env, 'github').error(`Failed to update GitHub file ${filePath}: ${result.status}`);
   return result;
+}
+
+// The shared client buffers JSON and is appropriate for bounded text/images.
+// Video needs a streaming body to fit the Worker's memory and ingress limits.
+export async function putGitHubVideoFile(env, filePath, source, bytes, message, sha = undefined) {
+  const missing = notConfigured(env);
+  if (missing) return missing;
+  if (!source || !Number.isSafeInteger(bytes) || bytes <= 0 || bytes > MAX_VIDEO_UPLOAD_BYTES) {
+    return { ok: false, status: 400, code: 'invalid_video_size', error: 'Video upload must be between 1 byte and 100 MB.' };
+  }
+  if (!/^assets\/videos\/(?:[a-z0-9_-]+\/)*[a-z0-9_-]+\.(mp4|webm|mov)$/.test(filePath)) {
+    return { ok: false, status: 400, code: 'invalid_video_path', error: 'Invalid video upload path.' };
+  }
+  const owner = encodeURIComponent(env.GITHUB_OWNER || 'aindaco1');
+  const repo = encodeURIComponent(env.GITHUB_REPO || 'pool');
+  const path = filePath.split('/').map(encodeURIComponent).join('/');
+  const upload = createGitHubUploadBody(source, bytes, {
+    message,
+    branch: env.GITHUB_REF || 'main',
+    ...(sha ? { sha } : {})
+  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10 * 60 * 1000);
+  try {
+    const response = await fetchGitHubWithoutRedirects(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+      method: 'PUT',
+      headers: {
+        authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        accept: 'application/vnd.github+json',
+        'x-github-api-version': '2022-11-28',
+        'content-type': 'application/json',
+        'user-agent': 'pool-worker'
+      },
+      body: upload.body,
+      signal: controller.signal,
+      duplex: 'half'
+    });
+    if (upload.error) throw upload.error;
+    let data;
+    try {
+      data = JSON.parse(await readBoundedText(response, 64 * 1024));
+    } catch {
+      return { ok: false, status: 502, code: 'github_invalid_response', error: 'GitHub returned an invalid upload response.' };
+    }
+    if (!response.ok) {
+      return { ok: false, status: response.status, code: 'github_api_error', error: String(data?.message || `GitHub API error: ${response.status}`).slice(0, 512) };
+    }
+    if (!upload.complete || !data?.content?.sha || !data?.commit?.sha) {
+      return { ok: false, status: 502, code: 'github_invalid_response', error: 'GitHub did not confirm the complete video upload.' };
+    }
+    return { ok: true, path: filePath, contentSha: data.content.sha, commitSha: data.commit.sha, commitUrl: data.commit.html_url || '' };
+  } catch (error) {
+    if (upload.error) return { ok: false, status: 400, code: 'invalid_video_body', error: upload.error.message };
+    const timedOut = controller.signal.aborted || error?.name === 'AbortError';
+    return { ok: false, status: 502, code: timedOut ? 'github_timeout' : 'github_request_failed', error: timedOut ? 'GitHub video upload timed out.' : 'Unable to upload video to GitHub.' };
+  } finally {
+    clearTimeout(timeout);
+    controller.abort();
+    await upload.cancel();
+  }
 }
 
 export async function deleteGitHubFile(env, filePath, message) {

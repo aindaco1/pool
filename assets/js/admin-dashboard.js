@@ -2590,27 +2590,22 @@
       }
       setText(uploadStatus, options?.uploadingText || t('settings_image_uploading', 'Uploading image...'));
       try {
-        var dataUrl = await readFileAsDataUrl(file);
         var uploadContext = typeof options?.uploadContext === 'function' ? options.uploadContext(root) : {};
         var filenameBase = typeof options?.filenameBase === 'function' ? options.filenameBase(root) : options?.filenameBase;
-        var result = await requestJson(options?.uploadPath || '/admin/settings/image-upload', {
-          method: 'POST',
-          body: JSON.stringify({
-            filename: file.name,
-            contentType: file.type,
-            content: dataUrl,
-            kind: options?.kind || 'admin',
-            campaignSlug: options?.campaignSlug || uploadContext?.campaignSlug || '',
-            collection: options?.collection || uploadContext?.collection || '',
-            fieldPath: options?.fieldPath || uploadContext?.fieldPath || '',
-            filenameBase: filenameBase || uploadContext?.filenameBase || ''
-          })
+        var result = await uploadMediaFile(options?.uploadPath || '/admin/settings/image-upload', file, {
+          filename: file.name,
+          contentType: file.type,
+          kind: options?.kind || 'admin',
+          campaignSlug: options?.campaignSlug || uploadContext?.campaignSlug || '',
+          collection: options?.collection || uploadContext?.collection || '',
+          fieldPath: options?.fieldPath || uploadContext?.fieldPath || '',
+          filenameBase: filenameBase || uploadContext?.filenameBase || ''
         });
         setValue(result.path || '', 'change');
         setText(uploadStatus, options?.uploadedText || t('settings_image_uploaded', 'Image uploaded. Publish settings to use it.'));
       } catch (error) {
         logger.error('Failed to upload admin image', error);
-        setText(uploadStatus, error?.data?.error || t('settings_image_upload_failed', 'Unable to upload image.'));
+        setText(uploadStatus, error?.data?.error || error?.message || t('settings_image_upload_failed', 'Unable to upload image.'));
       } finally {
         fileInput.value = '';
       }
@@ -2676,11 +2671,32 @@
       filenameBase: row?.label || row?.path || 'video',
       accept: 'video/mp4,video/webm,video/quicktime',
       allowedTypes: ['video/mp4', 'video/webm', 'video/quicktime'],
-      maxBytes: 100 * 1024 * 1024,
+      maxBytes: 100000000,
       typeErrorText: t('settings_video_upload_type_error', 'Use an MP4, WebM, or MOV video.'),
       sizeErrorText: t('settings_video_upload_size_error', 'Video must be 100 MB or smaller.'),
       uploadingText: t('settings_video_uploading', 'Uploading video...'),
       uploadDataset: { settingsVideoUploadInput: 'true' }
+    });
+  }
+
+  async function uploadMediaFile(path, file, metadata) {
+    if (path === '/admin/settings/video-upload') {
+      if (!['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type)) {
+        throw new Error(t('settings_video_upload_type_error', 'Use an MP4, WebM, or MOV video.'));
+      }
+      if (!file.size || file.size > 100000000) {
+        throw new Error(t('settings_video_upload_size_error', 'Video must be 100 MB or smaller.'));
+      }
+      var params = new URLSearchParams(Object.assign({}, metadata, { size: String(file.size) }));
+      return requestJson(path + '?' + params.toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': file.type },
+        body: file
+      });
+    }
+    return requestJson(path, {
+      method: 'POST',
+      body: JSON.stringify(Object.assign({}, metadata, { content: await readFileAsDataUrl(file) }))
     });
   }
 
@@ -6978,7 +6994,7 @@
         kind: normalizedKind,
         accept: 'video/mp4,video/webm,video/quicktime',
         allowedTypes: ['video/mp4', 'video/webm', 'video/quicktime'],
-        maxBytes: 100 * 1024 * 1024,
+        maxBytes: 100000000,
         typeErrorText: t('content_video_type_error', 'Use an MP4, WebM, or MOV video.'),
         sizeErrorText: t('content_video_size_error', 'Video must be 100 MB or smaller.')
       };
@@ -7969,15 +7985,14 @@
         setText(status, t('content_media_replacing', 'Replacing media...'));
         try {
           var endpoint = targetKind === 'image' ? '/admin/settings/image-upload' : targetKind === 'video' ? '/admin/settings/video-upload' : '/admin/settings/audio-upload';
-          var data = await requestJson(endpoint, { method: 'POST', body: JSON.stringify({
+          var data = await uploadMediaFile(endpoint, file, {
             kind: targetKind === 'image' ? 'campaign-content' : targetKind === 'video' ? 'campaign-content-video' : 'campaign-content-audio',
             campaignSlug: campaignSlug,
             filename: file.name,
             contentType: file.type,
-            content: await readFileAsDataUrl(file),
             replaceGithubPath: selected.githubPath,
             replaceSha: selected.contentSha
-          }) });
+          });
           var replacement = Object.assign({}, selected, {
             path: data.path, githubPath: data.githubPath, name: file.name, contentSha: data.contentSha,
             optimizationStatus: 'pending_manifest', references: []
@@ -7988,7 +8003,7 @@
           var choice = Array.from(results.querySelectorAll('input[name="contentMediaLibraryAsset"]')).find(function(input) { return input.value === data.path; });
           if (choice) { choice.checked = true; state.onSelection(); }
         } catch (error) {
-          setText(status, error?.data?.error || t('content_media_replace_failed', 'Unable to replace the selected media.'));
+          setText(status, error?.data?.error || error?.message || t('content_media_replace_failed', 'Unable to replace the selected media.'));
         } finally {
           replaceInput.value = '';
           replaceInput.disabled = false;
@@ -9580,18 +9595,14 @@
         filenameBase = filenameBase.replace(/^content-/, '');
         if (filenameBase && !filenameBase.startsWith('blast-')) filenameBase = 'blast-' + filenameBase;
       }
-      var result = await requestJson(uploadPath, {
-        method: 'POST',
-        body: JSON.stringify({
-          filename: file.name || pending.name || (kind === 'video' ? 'content-video' : kind === 'audio' ? 'content-audio' : 'content-image'),
-          contentType: file.type || pending.type || '',
-          content: await readFileAsDataUrl(file),
-          kind: kind === 'video' ? 'campaign-content-video' : kind === 'audio' ? 'campaign-content-audio' : 'campaign-content',
-          campaignSlug: campaignSlug || selectedContentCampaignSlug(),
-          collection: context?.collection || 'content',
-          fieldPath: pendingContentUploadFieldPath(item.meta, context),
-          filenameBase
-        })
+      var result = await uploadMediaFile(uploadPath, file, {
+        filename: file.name || pending.name || (kind === 'video' ? 'content-video' : kind === 'audio' ? 'content-audio' : 'content-image'),
+        contentType: file.type || pending.type || '',
+        kind: kind === 'video' ? 'campaign-content-video' : kind === 'audio' ? 'campaign-content-audio' : 'campaign-content',
+        campaignSlug: campaignSlug || selectedContentCampaignSlug(),
+        collection: context?.collection || 'content',
+        fieldPath: pendingContentUploadFieldPath(item.meta, context),
+        filenameBase
       });
       if (pendingUploadForContentField(item.target, item.meta?.field || 'src') !== pending) {
         throw new Error(t('campaign_media_changed', 'Selected media changed while saving. Your files have been kept; save again.'));

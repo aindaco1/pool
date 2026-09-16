@@ -35,11 +35,13 @@ describe('GitHub adapter in the Worker runtime', () => {
       bundle: true,
       format: 'esm',
       platform: 'browser',
+      external: ['node:buffer'],
       write: false
     });
     worker = new runtime.Miniflare(runtime.convertV4MiniflareOptions({
       modules: true,
       compatibilityDate: config.match(/compatibility_date = "([^"]+)"/)![1],
+      compatibilityFlags: ['nodejs_compat'],
       script: bundle.outputFiles[0].text,
       cf: false,
       outboundService: async (request) => {
