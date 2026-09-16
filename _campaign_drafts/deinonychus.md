@@ -245,6 +245,7 @@ diary:
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "7ffd86b727a77ef80c8f1eed4f2264c8e2b44fff88b32dd06bb738cf9488c426"
-_pool_draft_saved_at: "2026-09-16T14:43:20.251Z"
+_pool_draft_saved_at: "2026-09-16T14:44:35.563Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
+hero_video: "/assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.mp4"
 ---
