@@ -153,7 +153,7 @@ tiers:
     name: "Alamosaurus sanjuanensis"
     price: 150
     image: "/assets/images/campaigns/deinonychus/tier-alamosaurus-sanjuanensis-20260915-220032-4481fdca.jpg"
-    description: "This tier includes: *Everything in the previous tiers* + **A *Cretaceous Critter’s Wildlife Park* Employee Keychain** + **A *Cretaceous Critter’s Wildlife Park Employee* T-shirt**"
+    description: "This tier includes: *Everything in the previous tiers* + **A *Cretaceous Critter’s Wildlife Park* Employee Keychain** + **A *Cretaceous Critter’s Wildlife Park Employee* T-shirt!**"
     stackable: false
     category: "physical"
     shipping:
@@ -167,7 +167,7 @@ tiers:
     name: "Oviraptor philoceratops"
     price: 100
     image: "/assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f.jpg"
-    description: "This tier includes:Everything in the previous tierProducer credit in the film Dinosaur plushie"
+    description: "This tier includes: *Everything in the previous tier* + **Producer credit in the film** + **Dinosaur plushie!**"
     limit_total: 10
     stackable: false
     category: "physical"
@@ -177,7 +177,7 @@ tiers:
     name: "Archaeopteryx siemensii"
     price: 75
     image: "/assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986.png"
-    description: "This tier includes:Everything in the previous tiersCustomized drawing of YOU as a dinosaur"
+    description: "This tier includes: *Everything in the previous tiers* + **Customized drawing of YOU as a dinosaur!**"
     stackable: false
     category: "physical"
     shipping_preset: "poster"
@@ -186,7 +186,7 @@ tiers:
     name: "Archaeornithomimus asiaticus"
     price: 50
     image: "/assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c.jpg"
-    description: "This tier includes:Everything in the previous tierSigned Deinonychus Poster"
+    description: "This tier includes: *Everything in the previous tier* + **Signed Deinonychus Poster!**"
     stackable: false
     category: "physical"
     shipping_preset: "poster"
@@ -195,7 +195,7 @@ tiers:
     name: "Deinocheirus mirificus"
     price: 25
     image: "/assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab.jpg"
-    description: "This Tier includes:Everything from the previous tier Early access to the filmDinosaur playlist used by cast and crewSigned copy of the script"
+    description: "This tier includes: *Everything from the previous tier* + **Early access to the film** + **Dinosaur playlist used by cast and crew** + **Signed copy of the script!**"
     stackable: false
     category: "physical"
     shipping_preset: "signed_script"
@@ -204,7 +204,7 @@ tiers:
     name: "Yutyrannus huali"
     price: 15
     image: "/assets/images/campaigns/deinonychus/tier-yutyrannus-huali-20260915-215214-d3714c2c.jpg"
-    description: "This tier includes:Everything from the previous tierA special Deinonychus sticker designed by a local artist"
+    description: "This tier includes: *Everything from the previous tier* + **A special Deinonychus sticker designed by a local artist!**"
     stackable: false
     category: "physical"
     shipping_preset: "sticker"
@@ -213,7 +213,7 @@ tiers:
     name: "Moros intrepidus"
     price: 5
     image: "/assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8.jpg"
-    description: "This tier includes:A shoutout on social mediaSpecial Thanks in credits"
+    description: "This tier includes: **A shoutout on social media** + **Special Thanks in credits**"
     stackable: false
     category: "digital"
     late_support: false
@@ -223,6 +223,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "7ffd86b727a77ef80c8f1eed4f2264c8e2b44fff88b32dd06bb738cf9488c426"
-_pool_draft_saved_at: "2026-09-16T14:22:15.226Z"
+_pool_draft_saved_at: "2026-09-16T14:26:48.475Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
