@@ -1,0 +1,9 @@
+{%- assign video_path = include.src | split: '?' | first | split: '#' | first | downcase -%}
+{%- assign video_extension = video_path | split: '/' | last | split: '.' | last -%}
+{%- assign video_type = '' -%}
+{%- case video_extension -%}
+  {%- when 'mp4' -%}{%- assign video_type = 'video/mp4' -%}
+  {%- when 'webm' -%}{%- assign video_type = 'video/webm' -%}
+  {%- when 'mov' -%}{%- assign video_type = 'video/quicktime' -%}
+{%- endcase -%}
+<source src="{{ include.src | escape }}"{% if video_type != '' %} type="{{ video_type }}"{% endif %}>

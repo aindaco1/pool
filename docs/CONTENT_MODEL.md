@@ -72,11 +72,11 @@ Quote strings with special characters to avoid YAML parsing issues.
 
 - **`hero_image`** (required): Square/vertical image for home page card previews
 - **`hero_image_wide`** (optional): Wide image for campaign detail page (falls back to `hero_image`)
-- **`hero_video`** (optional): WebM video for campaign detail (uses hero image as poster)
+- **`hero_video`** (optional): Uploaded MP4, WebM, or MOV path, or supported video-provider URL, for campaign detail (local video uses `hero_image_wide` or `hero_image` as its poster)
 - **`creator_image`** (optional): Square image for creator (48px circle in sidebar)
 - **Tier `image`** (optional): Wide image shown above tier name
 
-**Video requirements:** WebM is preferred for uploaded campaign videos, with 16:9 and max 1920x1080 recommended. The admin dashboard accepts hero video uploads up to 100 MB or YouTube/Vimeo URLs, and previews existing video files or embeds through the same content-security policy as the public campaign page. Local content video blocks may specify an optional `poster`; when omitted, public/admin editor views generate a transient poster from the video's first frame and keep the playable video lazy-loaded until play.
+**Video requirements:** WebM is preferred for uploaded campaign videos, with 16:9 and max 1920x1080 recommended. The admin dashboard accepts hero video uploads up to 100 MB or YouTube/Vimeo URLs, and previews existing video files or embeds through the same content-security policy as the public campaign page. Public hero and content videos declare the MIME type matching the file extension; playback still requires browser-supported codecs. Local content video blocks may specify an optional `poster`; when omitted, public/admin editor views generate a transient poster from the video's first frame and keep the playable video lazy-loaded until play.
 
 **Dashboard upload paths:** The dashboard writes uploaded assets into the current static asset model:
 
