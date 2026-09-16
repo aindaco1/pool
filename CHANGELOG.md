@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Keep Manage Pledge and its confirmation modal totals aligned with the Worker
+  tax quote, including zero tax and zero-rate labels. Use the same fallback for
+  invalid quotes and ignore delayed tax responses from earlier edits. Refresh
+  quotes from the saved billing or shipping address before falling back to a
+  historical quote destination, and retain four-decimal tax rates in labels.
+
 - Fix saved-card checkouts failing pledge confirmation when Stripe supplies a fuller
   address. Webhook and browser recovery share the verified quote, support current
   and legacy Stripe shipping fields, and serialize completion per order. Preserve
