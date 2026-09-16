@@ -58,11 +58,11 @@ long_content:
       ## What will this money go towards?
   - type: "text"
     body: |
-      - Kiwi, the animatronic dinosaur (she needs a makeover!)
-      - Crafty and catering (trust me, no one wants a hungry director)
-      - Location (because believe it or not, we have to pay to film in a bathroom)
-      - Equipment (sadly lights and cameras aren’t free)
-      - Whatever is left will go to pay cast and crew (donate pretty please, thanks in advance :-))
+      - **Kiwi, the animatronic dinosaur** *(she needs a makeover!)*
+      - **Crafty and catering** *(trust me, no one wants a hungry director)*
+      - **Location** *(because believe it or not, we have to pay to film in a bathroom)*
+      - **Equipment** *(sadly lights and cameras aren’t free)*
+      - **Whatever is left will go to pay cast and crew** *(donate pretty please, thanks in advance :-))*
 support_items: []
 campaign_add_ons:
   - id: "drawing-of-you-as-a-dinosaur"
