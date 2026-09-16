@@ -16,9 +16,12 @@ function setupAdminContentEditorDom() {
 }
 
 describe('admin dashboard content editor serialization', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules();
     setupAdminContentEditorDom();
+    await import('../../shared/dust-wave-platform/packages/admin-shell/src/editor-codec.js');
+    await import('../../shared/dust-wave-platform/packages/admin-shell/src/editor-media.js');
+    await import('../../shared/dust-wave-platform/packages/admin-shell/src/feedback.js');
     (window as unknown as { POOL_CONFIG?: unknown }).POOL_CONFIG = {
       i18n: { currentLang: 'en', messages: { admin: {} } },
       platform: { siteUrl: 'https://pool.test', workerUrl: '' }
@@ -45,6 +48,19 @@ describe('admin dashboard content editor serialization', () => {
 
     const blocks = JSON.parse(field.value);
     expect(blocks[0].body).toBe('**it came out great.** Three very long, **15-hour days** with *behind-the-scenes pics* from here.');
+  });
+
+  it('loads and preserves nested emphasis in campaign list items', async () => {
+    const field = document.getElementById('admin-content-long-content') as HTMLTextAreaElement;
+    await import('../../assets/js/admin-dashboard.js');
+    field.value = JSON.stringify([{ type: 'text', body: '- **Dinosaurs ... *enough said***' }]);
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+    const editor = document.querySelector('[data-content-field="body"]') as HTMLElement;
+    expect(editor.querySelector('li strong em')?.textContent).toBe('enough said');
+    expect(editor.textContent).not.toContain('*');
+    Object.defineProperty(editor, 'isContentEditable', { configurable: true, value: true });
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(JSON.parse(field.value)[0].body).toBe('- **Dinosaurs ... *enough said***');
   });
 
   it('keeps leading spaces outside Markdown emphasis markers', async () => {

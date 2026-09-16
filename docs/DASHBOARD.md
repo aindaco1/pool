@@ -730,3 +730,28 @@ Check the campaign Markdown front matter and the Worker settings response. Inval
 ### Reports, Supporters, Or Analytics Show Missing Index Messages
 
 Dashboard read endpoints rely on `campaign-pledges:{slug}` indexes and intentionally do not fall back to expensive namespace scans. Run the projection repair/rebuild tooling explicitly when an old campaign is missing its index.
+
+
+### Shared editor rendering and feedback
+
+The dashboard and Worker preview use the pinned Platform editor codec for inline
+Markdown, including italic text nested inside bold text. Pool retains campaign
+block rendering and URL validation. The public Ruby filter has a parity test for
+nested emphasis. Shared Design Core mixins provide editor control containment,
+long-filename wrapping, open-panel stacking, spacing, and responsive preview media.
+
+Image uploads keep a tab-local preview keyed by the returned repository path.
+Hero images and editor blocks stay visible before the new asset reaches the public
+site, including after project Save. Sandboxed mobile previews receive bounded
+image thumbnails. Save/Publish payloads contain canonical repository paths only;
+object URLs and data thumbnails are never saved as campaign content. Logout clears
+these previews. Reloading loses the local cache, so unpublished assets still need
+the normal static deployment before their public paths can load in another tab.
+
+Request failures use Platform's readable English/Spanish feedback defaults, with
+Pool's localized campaign/diary field names. For example, `longContent[0].src`
+appears as the source field in content block 1. Known validation reasons give an
+actionable message; unknown provider errors use a localized request-status
+fallback. Original diagnostics remain on the caught error's `rawData` for debugging
+and are not displayed directly. Creator-authored titles are not translated.
+Missing alt text remains an advisory notice and cannot prevent Save or Publish.

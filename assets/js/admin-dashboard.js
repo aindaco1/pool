@@ -175,6 +175,7 @@
   var campaignContentBeforeDiary = null;
   var contentPreviewTimer = 0;
   var contentPreviewRequestId = 0;
+  var uploadedImagePreviews = window.DustWaveAdminShellEditorMedia.createImagePreviewCache();
   var contentSavedSnapshot = '';
   var contentPublishedSnapshot = '';
   var contentEditorCampaignSlug = '';
@@ -741,6 +742,7 @@
   function mediaPreviewUrl(path) {
     var value = String(path || '').trim();
     if (!value) return '';
+    if (uploadedImagePreviews.has(value)) return uploadedImagePreviews.get(value).previewUrl;
     if (/^(?:https?:|data:|blob:)/i.test(value)) return value;
     if (value.startsWith('/')) return value;
     return absoluteSiteUrl(value).toString();
@@ -870,20 +872,73 @@
     return wrap;
   }
 
+  function adminIssueMessage(message, changes, warning) {
+    var raw = String(message || '');
+    var change = raw.match(/^changes\[(\d+)\]:?\s*/);
+    var row = change ? changes?.[Number(change[1])] : null;
+    var text = raw.replace(/^changes\[\d+\]:?\s*/, '');
+    var diary = text.match(/^Diary entry "([^"]+)" content is invalid:\s*/);
+    if (diary) text = text.slice(diary[0].length);
+    var parts = text.split(/(?<=\.)\s+(?=(?:longContent\[|shortBlurb\b|title\b))/);
+    if (parts.length > 1) return parts.map(function(part) {
+      return adminIssueMessage((diary ? diary[0] : '') + part, changes, warning);
+    }).join(' ');
+    var block = text.match(/^longContent\[(\d+)\](?:\.images\[(\d+)\])?(?:\.([A-Za-z_]+))?/);
+    var field = t('feedback_field', 'This field');
+    if (row?.path) field = t(settingsFieldTranslationKey(row, row.campaignSlug ? 'campaign' : 'settings') + '_label', field);
+    if (block) {
+      field = t('feedback_block', 'Content block %{number}', { number: Number(block[1]) + 1 });
+      if (block[2] !== undefined) field += ', ' + t('feedback_image', 'image %{number}', { number: Number(block[2]) + 1 });
+      if (block[3]) field += ' — ' + t('content_field_' + block[3], t('feedback_field', 'This field'));
+    } else if (/^(?:title\b|A campaign title)/i.test(text)) field = t('content_title_label', 'Campaign title');
+    else if (/^shortBlurb\b/i.test(text)) field = t('content_short_blurb_label', 'Short blurb');
+    else if (/^longContent\b/i.test(text)) field = t('content_title', 'Content editor');
+    if (diary) field = t('feedback_diary', 'Diary entry “%{title}”', { title: diary[1] }) + ' — ' + field;
+    if (/deadline must be on or after/i.test(text)) return t('feedback_dates_order', 'Choose an end date on or after the start date.');
+    if (/Valid campaign dates/i.test(text)) return t('feedback_dates', 'Choose a valid campaign start date and end date.');
+    if (/positive funding goal/i.test(text)) return t('feedback_goal', 'Enter a funding goal greater than zero.');
+    var rendered = window.DustWaveAdminShellFeedback.formatIssue(text, { field: field, locale: lang });
+    if (rendered) return rendered;
+    return block || row || diary ? feedbackText(warning ? 'review_warning' : 'review_field', { field: field }) : '';
+  }
+
+  function feedbackText(key, values) {
+    return window.DustWaveAdminShellFeedback.message(key, { locale: lang, values: values });
+  }
+
+  function adminRequestError(data, status, options) {
+    var changes = [];
+    if (typeof options?.body === 'string' && /changes\[/.test(JSON.stringify([data.error, data.errors]))) {
+      try { changes = JSON.parse(options.body).changes || []; } catch (_error) {}
+    }
+    return window.DustWaveAdminShellFeedback.createRequestError(data, {
+      status: status,
+      locale: lang,
+      resolveIssue: function(message) { return adminIssueMessage(message, changes, false); }
+    });
+  }
+
   async function requestJson(path, options) {
     var headers = Object.assign({ 'Content-Type': 'application/json' }, options?.headers || {});
     if (currentCsrf && options?.method && options.method !== 'GET') {
       headers['x-pool-admin-csrf'] = currentCsrf;
     }
-    var response = await fetch(apiUrl(path), Object.assign({}, options || {}, {
-      credentials: 'include',
-      headers: headers
-    }));
+    var response;
+    try {
+      response = await fetch(apiUrl(path), Object.assign({}, options || {}, {
+        credentials: 'include',
+        headers: headers
+      }));
+    } catch (cause) {
+      if (cause?.name === 'AbortError') throw cause;
+      var networkError = new Error(feedbackText('network'));
+      networkError.cause = cause;
+      throw networkError;
+    }
     var data = await response.json().catch(function() { return {}; });
     if (!response.ok) {
-      var error = new Error(data.error || 'Request failed');
+      var error = adminRequestError(data, response.status, options);
       error.response = response;
-      error.data = data;
       throw error;
     }
     return data;
@@ -2589,6 +2644,13 @@
         return;
       }
       setText(uploadStatus, options?.uploadingText || t('settings_image_uploading', 'Uploading image...'));
+      var uploadPreviewUrl = preview instanceof HTMLImageElement ? URL.createObjectURL(file) : '';
+      if (uploadPreviewUrl) {
+        preview.src = uploadPreviewUrl;
+        preview.hidden = false;
+        previewEmpty.hidden = true;
+      }
+      fileInput.disabled = true;
       try {
         var uploadContext = typeof options?.uploadContext === 'function' ? options.uploadContext(root) : {};
         var filenameBase = typeof options?.filenameBase === 'function' ? options.filenameBase(root) : options?.filenameBase;
@@ -2605,8 +2667,11 @@
         setText(uploadStatus, options?.uploadedText || t('settings_image_uploaded', 'Image uploaded. Publish settings to use it.'));
       } catch (error) {
         logger.error('Failed to upload admin image', error);
+        updatePreview(root.value);
         setText(uploadStatus, error?.data?.error || error?.message || t('settings_image_upload_failed', 'Unable to upload image.'));
       } finally {
+        if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+        fileInput.disabled = false;
         fileInput.value = '';
       }
     });
@@ -2694,10 +2759,14 @@
         body: file
       });
     }
-    return requestJson(path, {
+    var result = await requestJson(path, {
       method: 'POST',
       body: JSON.stringify(Object.assign({}, metadata, { content: await readFileAsDataUrl(file) }))
     });
+    if (result.path && /^image\//.test(file.type)) {
+      uploadedImagePreviews.remember(result.path, file);
+    }
+    return result;
   }
 
   function readFileAsDataUrl(file) {
@@ -7071,14 +7140,7 @@
   }
 
   function isEmptyDraftTextBlock(block) {
-    if (!block || typeof block !== 'object' || Array.isArray(block)) return false;
-    if (block._pendingUpload || block._pendingPosterUpload) return false;
-    var type = contentBlockCommand(block.type);
-    if (type !== 'text') return false;
-    if (String(block.body || '').trim()) return false;
-    return Object.keys(block).every(function(key) {
-      return ['type', 'body', 'align'].includes(key) || key.indexOf('_pending') === 0;
-    });
+    return window.DustWaveAdminShellEditorMedia.isEmptyTextBlock(block);
   }
 
   function serializableContentBlocks(blocks, options) {
@@ -7335,17 +7397,7 @@
   }
 
   function renderEditorInlineMarkdown(value) {
-    var html = escapeEditorHtml(value);
-    html = html.replace(/&lt;br\s*\/?&gt;/gi, '<br>');
-    html = html.replace(/&lt;(\/?(?:u|strong|em|b|i))&gt;/gi, '<$1>');
-    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|mailto:[^)\s]+|\/(?!\/)[^)\s]+|#[^)\s]+)\)/gi, function(match, label, href) {
-      var normalizedHref = String(href || '').replace(/&amp;/g, '&');
-      return isSafeEditorHref(normalizedHref) ? '<a href="' + escapeEditorAttribute(normalizedHref) + '">' + label + '</a>' : match;
-    });
-    html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-    html = html.replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
-    return html;
+    return window.DustWaveAdminShellEditorCodec.renderEditorInlineMarkdown(value);
   }
 
   function createSafeRichTextSpan(value, className) {
@@ -9399,7 +9451,7 @@
 
     [
       { title: t('content_errors', 'Errors'), rows: errors },
-      { title: t('content_warnings', 'Warnings'), rows: warnings }
+      { title: t('content_warnings', 'Warnings'), rows: warnings.map(function(message) { return adminIssueMessage(message, [], true) || feedbackText('review_warning', { field: t('content_title', 'Content editor') }); }) }
     ].forEach(function(group) {
       if (!group.rows.length) return;
       var section = document.createElement('section');
@@ -9417,6 +9469,10 @@
     });
   }
 
+  function localImageThumbnail(media) {
+    return window.DustWaveAdminShellEditorMedia.imageThumbnail(media);
+  }
+
   async function prepareContentPreviewMedia(draft) {
     var replacements = new Map();
     var sourceBlocks = contentBlocks.filter(function(block) { return !isEmptyDraftTextBlock(block); });
@@ -9429,53 +9485,29 @@
       var kind = item.pending.kind || 'image';
       var placeholder = '/assets/' + (kind === 'image' ? 'images' : kind === 'video' ? 'videos' : 'audio') + '/campaigns/' + draft.campaignSlug + '/preview-' + replacements.size + (kind === 'image' ? '.png' : kind === 'video' ? '.mp4' : '.mp3');
       var dataUrl = '';
-      if (kind === 'image') {
-        // Opaque sandboxed previews cannot read the editor's blob URLs. Keep a
-        // bounded thumbnail in this tab; never send file bytes to the preview API.
-        if (!item.pending.inlinePreview) {
-          item.pending.inlinePreview = (async function(url) {
-            var image = new Image();
-            image.src = url;
-            await image.decode();
-            var scale = Math.min(1, 960 / Math.max(image.naturalWidth, image.naturalHeight));
-            var canvas = document.createElement('canvas');
-            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-            canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-            return canvas.toDataURL('image/webp', 0.85);
-          })(item.pending.previewUrl).catch(function() { return ''; });
-        }
-        dataUrl = await item.pending.inlinePreview;
-      }
+      if (kind === 'image') dataUrl = await localImageThumbnail(item.pending);
       target[field] = placeholder;
       replacements.set(placeholder, dataUrl);
+    }
+    for (var savedBlock of draft.longContent) {
+      for (var media of [savedBlock].concat(savedBlock.images || [])) {
+        for (var savedField of ['src', 'poster']) {
+          var path = media[savedField];
+          if (uploadedImagePreviews.has(path)) {
+            replacements.set(path, await localImageThumbnail(uploadedImagePreviews.get(path)));
+          }
+        }
+      }
     }
     return replacements;
   }
 
   function renderContentPreview(data, options) {
     var html = data?.preview?.html || '';
-    if (html && options?.media?.size) {
-      var documentPreview = new DOMParser().parseFromString(html, 'text/html');
-      documentPreview.querySelectorAll('[src], [poster]').forEach(function(element) {
-        ['src', 'poster'].forEach(function(attribute) {
-          var path = element.getAttribute(attribute);
-          if (!options.media.has(path)) return;
-          var dataUrl = options.media.get(path);
-          if (dataUrl) {
-            element.setAttribute(attribute, dataUrl);
-          } else {
-            element.removeAttribute(attribute);
-            if (attribute === 'poster') return;
-            var placeholder = documentPreview.createElement('p');
-            placeholder.className = 'admin-content-preview__media-placeholder';
-            placeholder.textContent = t('content_preview_pending_file', 'Selected media will be playable here after saving the project.');
-            (element.closest('video, audio') || element).replaceWith(placeholder);
-          }
-        });
-      });
-      html = '<!doctype html>' + documentPreview.documentElement.outerHTML;
-    }
+    html = window.DustWaveAdminShellEditorMedia.applyPreviewMedia(html, options?.media, {
+      pendingText: t('content_preview_pending_file', 'Selected media will be playable here after saving the project.'),
+      placeholderClass: 'admin-content-preview__media-placeholder'
+    });
     if (contentPreviewDesktop instanceof HTMLIFrameElement) contentPreviewDesktop.srcdoc = html;
     if (contentPreviewMobile instanceof HTMLIFrameElement) contentPreviewMobile.srcdoc = html;
     renderContentValidation(options?.suppressValidation ? {} : data);
@@ -11391,6 +11423,7 @@
         await requestJson('/admin/logout', { method: 'POST', body: '{}' });
         currentUser = null;
         currentCsrf = '';
+        uploadedImagePreviews.clear();
         showAuth('');
       } catch (error) {
         logger.error('Admin logout failed', error);

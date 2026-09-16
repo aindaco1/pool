@@ -5940,6 +5940,25 @@ diary:
     expect(ratelimit.listCalls).toBe(0);
   });
 
+  it('renders nested campaign emphasis in Worker previews without persisting it', async () => {
+    const env = createEnv();
+    const { ctx, cookie } = await signInAdmin(env);
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    pledges.resetCounts();
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/content/preview', {
+      method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaignSlug: 'hand-relations', draft: {
+        title: 'Preview', shortBlurb: '**Dinosaurs ... *enough said***',
+        longContent: [{ type: 'text', body: '- **Dinosaurs ... *enough said***' }]
+      } })
+    }), env, ctx);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.preview.html).toContain('<li><strong>Dinosaurs ... <em>enough said</em></strong></li>');
+    expect(body.preview.html).not.toContain('**Dinosaurs');
+    expect(pledges.putCalls).toBe(0);
+  });
+
   it('rejects unsafe campaign content preview drafts without persisting them', async () => {
     const env = createEnv();
     const { ctx, cookie } = await signInAdmin(env);

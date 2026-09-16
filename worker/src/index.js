@@ -1,3 +1,5 @@
+import { isEmptyTextBlock, normalizeImageAccessibility } from "../../shared/dust-wave-platform/packages/admin-shell/src/editor-media.js";
+import { renderEditorInlineMarkdown as renderSharedInlineMarkdown } from "../../shared/dust-wave-platform/packages/admin-shell/src/editor-codec.js";
 /**
  * The Pool - Pledge Worker
  * 
@@ -18849,25 +18851,14 @@ function isAdminPreviewAllowedLink(href) {
 }
 
 function renderAdminPreviewInlineMarkdown(value, errors, fieldName) {
-  let html = escapeAdminPreviewHtml(sanitizeAdminRichText(value, errors, fieldName));
-  html = restoreAdminPreviewInlineTags(html);
-  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-  html = html.replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) => {
-    const safeLabel = String(label || '');
-    const safeHref = String(href || '').trim();
-    if (!isAdminPreviewAllowedLink(safeHref)) {
-      errors.push(`${fieldName} includes an unsafe link URL.`);
-      return safeLabel;
-    }
-    let attrs = `href="${escapeAdminPreviewAttribute(safeHref)}"`;
-    if (/^https?:\/\//i.test(safeHref)) {
-      attrs += ' target="_blank" rel="noopener noreferrer"';
-    }
-    return `<a ${attrs}>${safeLabel}</a>`;
+  const sanitized = restoreAdminPreviewInlineTags(sanitizeAdminRichText(value, errors, fieldName));
+  return renderSharedInlineMarkdown(sanitized, {
+    allowLinks: true,
+    isSafeHref: isAdminPreviewAllowedLink,
+    discardUnsafeLinks: true,
+    externalLinks: true,
+    onUnsafeHref: () => errors.push(`${fieldName} includes an unsafe link URL.`)
   });
-  return html;
 }
 
 function renderAdminPreviewTextBlock(body, errors, fieldName) {
@@ -19005,12 +18996,12 @@ function isApprovedAdminEmbedSrc(provider, src) {
 }
 
 function normalizeAdminImageAccessibility(image, path, warnings) {
-  const original = String(image?.alt || '');
-  const decorative = image?.decorative === true;
-  const alt = decorative ? '' : stripAdminControlCharacters(stripHtmlTags(original)).trim().slice(0, 300);
-  if (alt !== original) warnings.push(`${path}.alt was normalized to plain text (up to 300 characters).`);
-  if (!decorative && !alt) warnings.push(`${path}.alt is recommended for accessibility. You can save and publish without it.`);
-  return { alt, decorative };
+  const normalized = normalizeImageAccessibility(image, {
+    cleanText: value => stripAdminControlCharacters(stripHtmlTags(value))
+  });
+  if (normalized.notices.includes('normalized')) warnings.push(`${path}.alt was normalized to plain text (up to 300 characters).`);
+  if (normalized.notices.includes('recommended')) warnings.push(`${path}.alt is recommended for accessibility. You can save and publish without it.`);
+  return { alt: normalized.alt, decorative: normalized.decorative };
 }
 
 function validateAdminContentBlock(block, index, errors, warnings) {
@@ -19739,11 +19730,7 @@ function normalizeAdminContentDraft(body = {}) {
 }
 
 function isEmptyAdminDraftTextBlock(block) {
-  if (!block || typeof block !== 'object' || Array.isArray(block)) return false;
-  const type = String(block.type || '').trim().toLowerCase();
-  if (type !== 'text') return false;
-  if (String(block.body || '').trim()) return false;
-  return Object.keys(block).every((key) => ['type', 'body', 'align'].includes(key));
+  return isEmptyTextBlock(block);
 }
 
 function normalizeAdminDraftLongContent(blocks = []) {

@@ -207,6 +207,10 @@ puts result
 }
 
 describe('content safety filter', () => {
+  it('renders nested inline emphasis consistently with the shared editor codec', () => {
+    expect(renderFilter('safe_rich_text', '**Dinosaurs ... *enough said***'))
+      .toBe('<strong>Dinosaurs ... <em>enough said</em></strong>');
+  });
   it('renders editor emphasis in public inline fields without admitting HTML attributes or block markup', () => {
     const rendered = renderFilter('safe_rich_text', 'At *Cretaceous Critters* with **Special Thanks** and <u>credits</u>. <img src=x onerror=alert(1)>');
     expect(rendered).toContain('<em>Cretaceous Critters</em>');

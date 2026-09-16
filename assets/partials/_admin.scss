@@ -1,3 +1,5 @@
+@import "admin-editor";
+
 @mixin admin-action-row($gap: 10px) {
   display: flex;
   flex-wrap: wrap;
@@ -2008,7 +2010,7 @@ textarea.admin-settings__input--readonly {
   padding: clamp(18px, 4vw, 48px);
 
   > .content-block {
-    margin-bottom: 8px;
+    @include admin-editor-block-spacing;
   }
 }
 
@@ -2100,7 +2102,7 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-content-block:has(.admin-content-block__settings-panel:not([hidden])) {
-  z-index: 10;
+  @include admin-editor-open-panel-layer;
 }
 
 .admin-content-block:has(.admin-content-block__settings-panel:not([hidden])) .admin-content-block__settings-button {
@@ -2519,9 +2521,7 @@ textarea.admin-settings__input--readonly {
 
 .admin-content-block__settings-panel {
   @include admin-surface(10px);
-  box-sizing: border-box;
-  min-width: 0;
-  max-width: 100%;
+  @include admin-editor-contained-control;
   position: absolute;
   right: 10px;
   top: 3.25rem;
@@ -2534,8 +2534,7 @@ textarea.admin-settings__input--readonly {
   }
 
   .btn {
-    white-space: normal;
-    overflow-wrap: anywhere;
+    @include admin-editor-wrap-button;
   }
 }
 
@@ -2564,37 +2563,28 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-content-block__fields {
-  display: grid;
+  @include admin-editor-fluid-grid;
   gap: 10px;
-  grid-template-columns: minmax(0, 1fr);
-  min-width: 0;
 }
 
 .admin-content-block__field {
-  display: grid;
+  @include admin-editor-fluid-grid;
   gap: 4px;
-  grid-template-columns: minmax(0, 1fr);
-  min-width: 0;
 
   input,
   textarea,
   select,
   .btn {
-    box-sizing: border-box;
-    min-width: 0;
-    max-width: 100%;
+    @include admin-editor-contained-control;
   }
 }
 
 .admin-content-block__media-status {
-  min-width: 0;
-  overflow-wrap: anywhere;
+  @include admin-editor-wrap-text;
 }
 
 .admin-content-block__media-upload {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(0, 1fr);
+  @include admin-editor-fluid-grid;
 }
 
 .admin-content-block__media-upload-field {
@@ -2864,7 +2854,7 @@ textarea.admin-settings__input--readonly {
 
 .admin-content-preview img,
 .admin-content-preview video {
-  height: auto;
+  @include admin-editor-preview-media;
 }
 
 .admin-content-preview iframe {

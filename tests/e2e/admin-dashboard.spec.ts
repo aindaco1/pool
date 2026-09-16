@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { markdownToEditorHtml } from '../../shared/dust-wave-platform/packages/admin-shell/src/editor-codec.js';
 
 const WORKER_BASE = 'http://127.0.0.1:8787';
 const SITE_BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4000';
@@ -985,7 +986,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
           : `<div class="hero__video hero__video--youtube hero__video--youtube-facade"><img class="hero__video-poster" src="https://i.ytimg.com/vi/${encodeURIComponent(videoBlock.video_id || '')}/maxres1.jpg" alt="" loading="lazy" decoding="async" data-youtube-poster-fallback="https://i.ytimg.com/vi/${encodeURIComponent(videoBlock.video_id || '')}/hq1.jpg"><a class="hero__video-play hero__video-play--youtube" href="https://www.youtube.com/watch?v=${encodeURIComponent(videoBlock.video_id || '')}" target="_blank" rel="noopener noreferrer" aria-label="YouTube: ${videoBlock.video_id || ''}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg></a></div>`
         : imageBlocks.length
           ? imageBlocks.map((block: any) => `<figure class="admin-content-preview__block"><img src="${String(block.src || '').replace(/"/g, '&quot;')}" alt=""></figure>`).join('')
-          : '<p>Preview body.</p>';
+          : blocks.filter((block: any) => block.type === 'text').map((block: any) => markdownToEditorHtml(block.body)).join('');
       return fulfillJson({
         user,
         campaignSlug: 'hand-relations',
@@ -2037,7 +2038,7 @@ test.describe('Admin Dashboard', () => {
     });
     await expect.poll(() => calls.logoUpload.length).toBe(1);
     expect(calls.logoUpload[0]).toMatchObject({ filename: 'logo.png', contentType: 'image/png' });
-    await expect(page.locator('[data-settings-path="platform.logo_path"] img')).toHaveAttribute('src', /logo-e2e/);
+    await expect(page.locator('[data-settings-path="platform.logo_path"] img')).toHaveAttribute('src', /^blob:/);
     await expect(page.locator('[data-settings-path="design.color_text"]')).toHaveAttribute('type', 'color');
     await selectSettingsSection(page, 'Platform');
     await page.locator('[data-settings-path="platform.name"]').fill('The Pool Updated');
@@ -2068,7 +2069,7 @@ test.describe('Admin Dashboard', () => {
     });
     await expect.poll(() => calls.imageUpload.some((call: any) => call.kind === 'add-on')).toBe(true);
     expect(calls.imageUpload.find((call: any) => call.kind === 'add-on')).toMatchObject({ filename: 'add-on.png', contentType: 'image/png', kind: 'add-on' });
-    await expect(page.locator('#admin-addons-results [data-add-on-product-field="image_url"] img').first()).toHaveAttribute('src', /add-on-e2e/);
+    await expect(page.locator('#admin-addons-results [data-add-on-product-field="image_url"] img').first()).toHaveAttribute('src', /^blob:/);
     await page.locator('#admin-addons-results [data-add-on-product-field="name"]').first().fill('DUST WAVE Sticker Updated');
     await expect(page.locator('#admin-addons-results [data-add-on-product-field="shipping_preset"]').first()).toHaveValue('sticker');
     await page.locator('#admin-addons-results [data-add-on-product-field="shipping_preset"]').first().selectOption('tshirt');
@@ -2700,7 +2701,8 @@ test.describe('Admin Dashboard', () => {
     await page.locator('#admin-content-blocks [data-content-field="body"]').fill('<script>alert(1)</script>');
     await page.locator('#admin-content-editor').evaluate((form: HTMLFormElement) => form.requestSubmit());
     await expect(page.locator('#admin-content-status')).toContainText('Preview needs changes before it can publish.');
-    await expect(page.locator('#admin-content-validation')).toContainText('raw <script> HTML');
+    await expect(page.locator('#admin-content-validation')).toContainText('use the formatting toolbar or a content block');
+    await expect(page.locator('#admin-content-validation')).not.toContainText('raw <script> HTML');
 
     const bodyEditor = page.locator('#admin-content-blocks [data-content-field="body"]');
     await bodyEditor.fill('Safe updated body.');
@@ -3013,6 +3015,74 @@ test.describe('Admin Dashboard', () => {
     });
   });
 
+  for (const lang of ['en', 'es']) {
+    test(`${lang}: keeps uploaded hero previews visible before deployment and localizes upload errors`, async ({ page }) => {
+      const calls = await routeAdminWorker(page);
+      await page.goto(`${lang === 'es' ? '/es' : ''}/admin/?admin_login=admin-token`);
+      await expect(page.locator('#admin-app')).toBeVisible();
+      await page.locator('#admin-tab-campaigns').click();
+      const hero = page.locator('[data-settings-path="hero_image"][data-settings-campaign="hand-relations"]');
+      const imageData = await page.evaluate(() => {
+        const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360;
+        const context = canvas.getContext('2d')!;
+        context.fillStyle = '#47654c'; context.fillRect(0, 0, 640, 360);
+        context.fillStyle = '#ffffff'; context.font = '32px sans-serif'; context.fillText('Local image preview', 150, 190);
+        return canvas.toDataURL('image/png').split(',')[1];
+      });
+      await hero.locator('input[type="file"]').setInputFiles({ name: 'new-hero.png', mimeType: 'image/png', buffer: Buffer.from(imageData, 'base64') });
+      await expect.poll(() => calls.imageUpload.length).toBe(1);
+      await expect(hero.locator('img')).toHaveAttribute('src', /^blob:/);
+      await hero.locator('img').scrollIntoViewIfNeeded();
+      await expect.poll(() => hero.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+      await expect(hero.locator('input[type="file"]')).toBeEnabled();
+      const previewUrl = await hero.locator('img').getAttribute('src');
+      await page.route(`${WORKER_BASE}/admin/settings/image-upload`, route => route.fulfill({
+        status: 413, headers: JSON_HEADERS, body: JSON.stringify({ error: 'Request body too large' })
+      }));
+      await hero.locator('input[type="file"]').setInputFiles({ name: 'rejected.png', mimeType: 'image/png', buffer: tinyPng });
+      await expect(hero.locator('.admin-settings__image-status')).toContainText(lang === 'es' ? 'El archivo supera el tamaño permitido' : 'This upload is too large');
+      await expect(hero.locator('img')).toHaveAttribute('src', previewUrl!);
+      await page.locator('#admin-campaign-save').click();
+      await expect.poll(() => calls.projectSave.length).toBe(1);
+      expect(JSON.stringify(calls.projectSave)).toContain('/assets/images/campaigns/hand-relations/image-e2e.png');
+      expect(JSON.stringify(calls.projectSave)).not.toMatch(/blob:|data:image/);
+      await expect(hero.locator('img')).toHaveAttribute('src', /^blob:/);
+      await hero.screenshot({ path: `tmp/shared-hero-preview-${lang}.png` });
+    });
+
+    test(`${lang}: renders nested Markdown and turns technical validation into readable feedback`, async ({ page }) => {
+      await routeAdminWorker(page);
+      await page.goto(`${lang === 'es' ? '/es' : ''}/admin/?admin_login=admin-token`);
+      await expect(page.locator('#admin-app')).toBeVisible();
+      await page.locator('#admin-tab-campaigns').click();
+      await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="content"]').click();
+      await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
+        textarea.value = JSON.stringify([{ type: 'text', body: '- **Dinosaurs ... *enough said***' }]);
+        textarea.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      const editor = page.locator('#admin-content-blocks [data-content-field="body"]');
+      await expect(editor.locator('li strong em')).toHaveText('enough said');
+      await expect(editor).not.toContainText('**');
+      const preview = page.frameLocator('#admin-content-preview-mobile');
+      await expect(preview.locator('li strong em')).toHaveText('enough said');
+      await page.locator('#admin-content-preview-mobile').screenshot({ path: `tmp/shared-nested-markdown-${lang}.png` });
+      await page.route(`${WORKER_BASE}/admin/campaigns/draft`, route => {
+        if (route.request().method() !== 'POST') return route.fallback();
+        return route.fulfill({ status: 422, headers: JSON_HEADERS, body: JSON.stringify({
+          error: 'changes[1]: Diary entry "Cast!" content is invalid: longContent[0].src is required.'
+        }) });
+      });
+      await page.locator('#admin-campaign-save').click();
+      const status = page.locator('#admin-campaign-status');
+      await expect(status).toContainText(lang === 'es' ? 'Bloque de contenido 1' : 'Content block 1');
+      await expect(status).toContainText(lang === 'es' ? 'añade un valor' : 'add a value');
+      await expect(status).toContainText('Cast!');
+      await expect(status).not.toContainText('longContent[');
+      await expect(status).not.toContainText('changes[');
+      await expect(editor.locator('li strong em')).toHaveText('enough said');
+    });
+  }
+
   for (const lang of ['en', 'es']) test(`${lang}: keeps media panels contained and previews selected images before upload`, async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
     const calls = await routeAdminWorker(page);
@@ -3085,6 +3155,13 @@ test.describe('Admin Dashboard', () => {
     expect(JSON.stringify(calls.contentPreview)).not.toContain('blob:');
     await page.screenshot({ path: `tmp/editor-media-panel-${lang}-desktop.png`, fullPage: true });
     await page.locator('#admin-content-preview-mobile').screenshot({ path: `tmp/editor-image-mobile-preview-${lang}.png` });
+    await page.locator('#admin-campaign-save').click();
+    await expect.poll(() => calls.projectSave.length).toBe(1);
+    await imageBlock.locator('img').first().scrollIntoViewIfNeeded();
+    await expect.poll(() => imageBlock.locator('img').first().evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(1600);
+    await expect(previewImage).toHaveAttribute('src', /^data:image\//);
+    await expect.poll(() => previewImage.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(960);
+    expect(JSON.stringify(calls.projectSave)).not.toMatch(/blob:|data:image/);
   });
 
   test('uploads diary entry staged media before saving the whole project', async ({ page }) => {
