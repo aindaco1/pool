@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Restore live tax-provider requests in Cloudflare Workers through Tax Core
+  0.3.1. Use supported manual redirect handling and reject 3xx responses
+  explicitly; prevent an unsupported fetch option from silently selecting
+  a configured fallback rate.
+
 - Keep Manage Pledge and its confirmation modal totals aligned with the Worker
   tax quote, including zero tax and zero-rate labels. Use the same fallback for
   invalid quotes and ignore delayed tax responses from earlier edits. Refresh
