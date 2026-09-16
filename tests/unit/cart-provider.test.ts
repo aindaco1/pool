@@ -337,6 +337,48 @@ describe('cart provider shim', () => {
     expect(root?.textContent).toContain('Qty 2');
   });
 
+  it.each(['new', 'saved'])('renders nested Markdown in %s cart descriptions without trusting HTML', async (source) => {
+    await import('../../shared/dust-wave-platform/packages/admin-shell/src/editor-codec-browser.js');
+    const items = [
+      {
+        id: 'deinonychus__alamosaurus', name: 'Alamosaurus sanjuanensis', price: 150,
+        description: 'This tier includes: *Everything in the previous tiers* + **A *Cretaceous Critter’s Wildlife Park* Employee Keychain** + **A *Cretaceous Critter’s Wildlife Park Employee* T-shirt!**'
+      },
+      {
+        id: 'deinonychus__moros', name: 'Moros intrepidus', price: 5,
+        description: 'This tier includes: **A shoutout on social media** + **Special Thanks in credits**'
+      },
+      {
+        id: 'deinonychus__unsafe', name: 'Unsafe content', price: 1,
+        description: '<u>Underlined</u><br><strong>Safe</strong> <img src=x onerror="alert(1)"><script>alert(2)</script> <em onclick="alert(3)">unsafe</em> [link](javascript:alert(4)) & text'
+      }
+    ];
+    if (source === 'saved') {
+      localStorage.setItem('pool_first_party_cart_state', JSON.stringify({ items, tipPercent: 0 }));
+    }
+    await import('../../assets/js/cart-provider.js');
+    const provider = (window as any).PoolCartProvider;
+    const client = await provider.whenReady();
+    if (source === 'new') {
+      for (const item of items) await client.api.cart.items.add(item);
+    }
+    await client.api.theme.cart.open();
+
+    const descriptions = document.querySelectorAll('.pool-first-party-cart__item-description');
+    expect(descriptions).toHaveLength(3);
+    expect(descriptions[0].querySelector('strong em')?.textContent).toBe('Cretaceous Critter’s Wildlife Park');
+    expect(descriptions[0].querySelectorAll('strong')).toHaveLength(2);
+    expect(descriptions[0].textContent).not.toContain('*');
+    expect(descriptions[1].querySelectorAll('strong')).toHaveLength(2);
+    expect(descriptions[1].textContent).toBe('This tier includes: A shoutout on social media + Special Thanks in credits');
+    expect(descriptions[2].querySelector('u')?.textContent).toBe('Underlined');
+    expect(descriptions[2].querySelector('br')).not.toBeNull();
+    expect(descriptions[2].querySelector('img, script, a, [onclick], [onerror]')).toBeNull();
+    expect(descriptions[2].textContent).toContain('<img src=x onerror="alert(1)">');
+    expect(provider.store.getState().cart.items.items.map((item: any) => item.description)).toEqual(items.map(item => item.description));
+    expect(provider.store.getState().cart.items.items.map((item: any) => item.price)).toEqual([150, 5, 1]);
+  });
+
   it('renders platform add-ons in the cart and lets you add them with shared catalog metadata', async () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',

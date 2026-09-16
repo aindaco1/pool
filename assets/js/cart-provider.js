@@ -1508,6 +1508,13 @@
       .replace(/'/g, '&#39;');
   }
 
+  function renderItemDescription(value) {
+    // Use the editor's existing safe inline renderer for new and restored carts.
+    // Tier descriptions allow emphasis/underline, not links, attributes, or arbitrary HTML.
+    return window.DustWaveAdminShellEditorCodec?.renderEditorInlineMarkdown(value, { allowLinks: false })
+      ?? escapeHtml(value);
+  }
+
   function normalizeInternalHref(value) {
     const href = String(value || '/').trim();
     if (!href) return '/';
@@ -3729,7 +3736,7 @@
           ` : ''}
           <div class="pool-first-party-cart__item-main">
             <strong class="pool-first-party-cart__item-name">${escapeHtml(item.name || item.id || getRuntimeMessage('cart.untitledItem', 'Untitled item'))}</strong>
-            ${item.description ? `<p class="pool-first-party-cart__item-description">${escapeHtml(item.description)}</p>` : ''}
+            ${item.description ? `<p class="pool-first-party-cart__item-description">${renderItemDescription(item.description)}</p>` : ''}
             ${metaLines.map((line) => `<span class="pool-first-party-cart__item-meta">${escapeHtml(line)}</span>`).join('')}
           </div>
           <div class="pool-first-party-cart__item-actions">

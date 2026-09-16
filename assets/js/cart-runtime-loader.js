@@ -21,6 +21,13 @@
 
   var runtimeScripts = [
     {
+      file: '/shared/dust-wave-platform/packages/admin-shell/src/editor-codec-browser.js',
+      key: 'editor-codec',
+      ready: function() {
+        return Boolean(window.DustWaveAdminShellEditorCodec?.renderEditorInlineMarkdown);
+      }
+    },
+    {
       file: 'add-on-utils.js',
       key: 'add-on-utils',
       ready: function() {

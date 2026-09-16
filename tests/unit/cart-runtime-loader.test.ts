@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runtimeScriptKeys = [
+  'editor-codec',
   'add-on-utils',
   'shipping-option-utils',
   'stripe-checkout-sidecar',
@@ -46,6 +47,9 @@ function installRuntimeScriptHarness(providerClick = vi.fn()) {
     appended.push(script.dataset.poolCartRuntimeScript);
     queueMicrotask(() => {
       switch (script.dataset.poolCartRuntimeScript) {
+        case 'editor-codec':
+          (window as any).DustWaveAdminShellEditorCodec = { renderEditorInlineMarkdown: vi.fn() };
+          break;
         case 'add-on-utils':
           (window as any).PoolAddOnUtils = {};
           break;
@@ -105,6 +109,7 @@ describe('cart runtime loader', () => {
     document.head.innerHTML = '';
     document.body.innerHTML = '';
     delete (window as any).PoolCartRuntime;
+    delete (window as any).DustWaveAdminShellEditorCodec;
     delete (window as any).PoolCartProvider;
     delete (window as any).PoolAddOnUtils;
     delete (window as any).DustWaveShippingOptionUtils;
@@ -120,6 +125,7 @@ describe('cart runtime loader', () => {
     document.head.innerHTML = '';
     document.body.innerHTML = '';
     delete (window as any).PoolCartRuntime;
+    delete (window as any).DustWaveAdminShellEditorCodec;
     delete (window as any).PoolCartProvider;
     delete (window as any).PoolAddOnUtils;
     delete (window as any).DustWaveShippingOptionUtils;
@@ -144,6 +150,11 @@ describe('cart runtime loader', () => {
     const scriptVersions = Array.from(document.querySelectorAll<HTMLScriptElement>('script[data-pool-cart-runtime-script]'))
       .map((script) => new URL(script.src).searchParams.get('v'));
     expect(scriptVersions).toEqual(runtimeScriptKeys.map(() => '456'));
+    expect(new URL(document.querySelector<HTMLScriptElement>(
+      'script[data-pool-cart-runtime-script="editor-codec"]'
+    )?.src || '').pathname).toBe(
+      '/shared/dust-wave-platform/packages/admin-shell/src/editor-codec-browser.js'
+    );
     expect(new URL(document.querySelector<HTMLScriptElement>(
       'script[data-pool-cart-runtime-script="shipping-option-utils"]'
     )?.src || '').pathname).toBe(

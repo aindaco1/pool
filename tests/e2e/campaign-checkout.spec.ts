@@ -505,6 +505,23 @@ test.describe('Homepage & Campaign Cards', () => {
 });
 
 test.describe('Cart Integration', () => {
+  for (const locale of ['', '/es']) {
+    test(`renders tier Markdown after adding and restoring a cart (${locale || 'en'})`, async ({ page }) => {
+      await page.goto(`${locale}/campaigns/smoke-editable/`);
+      await page.locator('[data-item-id="smoke-editable__standard-pass"]').click();
+      const description = page.locator('.pool-first-party-cart__item-description');
+      await expect(description.locator('strong em')).toHaveText('digital');
+      await expect(description.locator('u')).toHaveText('modify/cancel smoke tests');
+      await expect(description).toHaveText('A normal digital tier for modify/cancel smoke tests.');
+      const before = await getCartSnapshot(page);
+      await page.reload();
+      await openCartViaClient(page);
+      await expect(description.locator('strong em')).toHaveText('digital');
+      await expect(description.locator('u')).toHaveText('modify/cancel smoke tests');
+      expect((await getCartSnapshot(page)).items).toEqual(before.items);
+    });
+  }
+
   test('cart runtime loader is loaded without booting the provider eagerly', async ({ page }) => {
     await page.goto('/campaigns/hand-relations/');
     

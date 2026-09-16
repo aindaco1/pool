@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Render cart item descriptions with the existing shared safe inline Markdown
+  renderer, including nested emphasis and underline in newly added and restored
+  carts. Preserve description formatting through campaign and featured-tier
+  buttons while keeping unsafe HTML and links inert.
+
 - Consolidate seven reviewed Deinonychus image-optimization branches, adding
   28 responsive WebP variants and lossless source compression. Retain the
   original MP4 after rejecting a larger generated WebM.
