@@ -14885,7 +14885,7 @@ function normalizeAdminCampaignCollection(value, schema = {}) {
         : [{ type: 'text', body: String(item.body || '').trim(), align: 'left' }];
       const errors = [];
       const warnings = [];
-      out.content = rawContent.slice(0, ADMIN_CONTENT_MAX_BLOCKS).map((block, blockIndex) => validateAdminContentBlock(block, blockIndex, errors, warnings)).filter(Boolean);
+      out.content = normalizeAdminDraftLongContent(rawContent).slice(0, ADMIN_CONTENT_MAX_BLOCKS).map((block, blockIndex) => validateAdminContentBlock(block, blockIndex, errors, warnings)).filter(Boolean);
       if (rawContent.length > ADMIN_CONTENT_MAX_BLOCKS) warnings.push(`Diary entry "${out.title}" was limited to ${ADMIN_CONTENT_MAX_BLOCKS} blocks.`);
       if (errors.length) return { ok: false, error: `Diary entry "${out.title}" content is invalid: ${errors.join(' ')}` };
       if (!out.content.length) return { ok: false, error: `Diary entry "${out.title}" needs body text.` };
@@ -19004,6 +19004,15 @@ function isApprovedAdminEmbedSrc(provider, src) {
   return false;
 }
 
+function normalizeAdminImageAccessibility(image, path, warnings) {
+  const original = String(image?.alt || '');
+  const decorative = image?.decorative === true;
+  const alt = decorative ? '' : stripAdminControlCharacters(stripHtmlTags(original)).trim().slice(0, 300);
+  if (alt !== original) warnings.push(`${path}.alt was normalized to plain text (up to 300 characters).`);
+  if (!decorative && !alt) warnings.push(`${path}.alt is recommended for accessibility. You can save and publish without it.`);
+  return { alt, decorative };
+}
+
 function validateAdminContentBlock(block, index, errors, warnings) {
   const path = `longContent[${index}]`;
   if (!block || typeof block !== 'object' || Array.isArray(block)) {
@@ -19053,17 +19062,10 @@ function validateAdminContentBlock(block, index, errors, warnings) {
 
   if (type === 'image') {
     const src = normalizeAdminContentAsset(block.src || '', `${path}.src`, errors, { required: true });
-    const alt = normalizeAdminContentPlainText(block.alt || '', `${path}.alt`, errors, { maxLength: 300 });
-    const hasDecorativeFlag = Object.prototype.hasOwnProperty.call(block, 'decorative');
-    const decorative = block.decorative === true || (!hasDecorativeFlag && !alt.trim());
-    if (!decorative && !alt.trim()) errors.push(`${path}.alt is required unless the image is marked decorative.`);
-    if (decorative && alt.trim()) warnings.push(`${path}.alt was cleared because decorative images need empty alt text.`);
-    if (!hasDecorativeFlag && decorative) warnings.push(`${path}.decorative was inferred for a legacy image with empty alt text; review it before publishing.`);
     return {
       type,
       src,
-      alt: decorative ? '' : alt,
-      decorative,
+      ...normalizeAdminImageAccessibility(block, path, warnings),
       caption: normalizeAdminContentRichText(block.caption || '', `${path}.caption`, errors, { maxLength: 1000 }),
       align: normalizeAdminContentAlignment(block.align)
     };
@@ -19079,15 +19081,9 @@ function validateAdminContentBlock(block, index, errors, warnings) {
       caption_style: normalizeAdminContentGalleryCaptionStyle(block.caption_style),
       images: images.map((image, imageIndex) => {
         const imagePath = `${path}.images[${imageIndex}]`;
-        const alt = normalizeAdminContentPlainText(image?.alt || '', `${imagePath}.alt`, errors, { maxLength: 300 });
-        const hasDecorativeFlag = Object.prototype.hasOwnProperty.call(image || {}, 'decorative');
-        const decorative = image?.decorative === true || (!hasDecorativeFlag && !alt.trim());
-        if (!decorative && !alt.trim()) errors.push(`${imagePath}.alt is required unless the image is marked decorative.`);
-        if (!hasDecorativeFlag && decorative) warnings.push(`${imagePath}.decorative was inferred for a legacy image with empty alt text; review it before publishing.`);
         return {
           src: normalizeAdminContentAsset(image?.src || '', `${imagePath}.src`, errors, { required: true }),
-          alt: decorative ? '' : alt,
-          decorative,
+          ...normalizeAdminImageAccessibility(image, imagePath, warnings),
           caption: normalizeAdminContentRichText(image?.caption || '', `${imagePath}.caption`, errors, { maxLength: 1000 }),
           _fieldName: imagePath
         };
@@ -19317,6 +19313,10 @@ function adminPreviewInterpolate(value, replacements = {}) {
 
 function adminPreviewSiteBase(env = {}) {
   return String(env?.SITE_BASE || env?.CANONICAL_SITE_BASE || '').replace(/\/+$/, '');
+}
+
+function adminPreviewStylesheetHead(siteBase) {
+  return ['main', 'admin'].map((name) => `<link rel="stylesheet" href="${escapeAdminPreviewAttribute(`${siteBase || ''}/assets/${name}.css`)}">`).join('\n');
 }
 
 function adminPreviewFontHead() {
@@ -19670,7 +19670,6 @@ function buildAdminCampaignPagePreviewHtml(campaign = {}, env = {}, lang = 'en')
   const currentLang = normalizeAdminPreviewLang(lang);
   const text = adminPreviewText(currentLang);
   const siteBase = adminPreviewSiteBase(env);
-  const mainCss = siteBase ? `${siteBase}/assets/main.css` : '/assets/main.css';
   const firstFramePosterScript = siteBase ? `${siteBase}/shared/dust-wave-platform/packages/site-shell/src/video-first-frame-poster-browser.js` : '/shared/dust-wave-platform/packages/site-shell/src/video-first-frame-poster-browser.js';
   const state = adminPreviewCampaignState(campaign, env);
   const errors = [];
@@ -19695,7 +19694,7 @@ function buildAdminCampaignPagePreviewHtml(campaign = {}, env = {}, lang = 'en')
   <meta name="referrer" content="${ADMIN_CONTENT_YOUTUBE_REFERRER_POLICY}">
   ${siteBase ? `<base href="${escapeAdminPreviewAttribute(`${siteBase}/`)}">` : ''}
   ${adminPreviewFontHead()}
-  <link rel="stylesheet" href="${escapeAdminPreviewAttribute(mainCss)}">
+  ${adminPreviewStylesheetHead(siteBase)}
 </head>
 <body class="campaign-preview-render">
   <main class="campaign-container campaign-preview-readonly" data-campaign-slug="${escapeAdminPreviewAttribute(campaign.slug || '')}" data-single-tier-only="${campaign.single_tier_only === true ? 'true' : 'false'}" data-state="${escapeAdminPreviewAttribute(state)}" tabindex="-1">
@@ -19772,7 +19771,6 @@ function buildAdminContentPreview(draft, campaign, env = {}) {
   errors.push(...renderErrors);
 
   const siteBase = adminPreviewSiteBase(env);
-  const mainCss = siteBase ? `${siteBase}/assets/main.css` : '/assets/main.css';
   const previewHtml = `<!doctype html>
 <html lang="en">
 <head>
@@ -19780,7 +19778,7 @@ function buildAdminContentPreview(draft, campaign, env = {}) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   ${siteBase ? `<base href="${escapeAdminPreviewAttribute(`${siteBase}/`)}">` : ''}
   ${adminPreviewFontHead()}
-  <link rel="stylesheet" href="${escapeAdminPreviewAttribute(mainCss)}">
+  ${adminPreviewStylesheetHead(siteBase)}
 </head>
 <body class="admin-content-preview">
   <main>

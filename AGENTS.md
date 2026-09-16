@@ -116,7 +116,7 @@ Check Worker mail logic, `_data/i18n/`, sender configuration, and [docs/EMAIL.md
 
 ### Media
 
-The repository asset tree is authoritative. Rebuild `_data/media-optimization-manifest.json` with `npm run media:manifest`; do not create a KV-backed media catalog. Use the existing GitHub optimizer dispatch for changed/all repair, preserve source files and intentionally skipped larger derivatives, require alt text for meaningful images, and use explicit decorative-image state for empty alt text.
+The repository asset tree is authoritative. Rebuild `_data/media-optimization-manifest.json` with `npm run media:manifest`; do not create a KV-backed media catalog. Use the existing GitHub optimizer dispatch for changed/all repair, preserve source files and intentionally skipped larger derivatives, recommend alt text for meaningful images without blocking Save or Publish, and keep decorative-image state explicit.
 
 ### Embeds, SEO, and share cards
 

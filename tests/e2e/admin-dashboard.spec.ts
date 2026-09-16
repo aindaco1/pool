@@ -978,11 +978,14 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       const blocks = body.draft?.longContent || [];
       const hasUnsafe = JSON.stringify(blocks).includes('<script');
       const videoBlock = blocks.find((block: any) => block?.type === 'video');
+      const imageBlocks = blocks.filter((block: any) => block?.type === 'image');
       const previewBody = videoBlock
         ? videoBlock.provider === 'local'
           ? `<div class="video-embed video-embed--local"><video controls preload="metadata" playsinline><source src="${videoBlock.src || ''}" type="video/webm"></video></div>`
           : `<div class="hero__video hero__video--youtube hero__video--youtube-facade"><img class="hero__video-poster" src="https://i.ytimg.com/vi/${encodeURIComponent(videoBlock.video_id || '')}/maxres1.jpg" alt="" loading="lazy" decoding="async" data-youtube-poster-fallback="https://i.ytimg.com/vi/${encodeURIComponent(videoBlock.video_id || '')}/hq1.jpg"><a class="hero__video-play hero__video-play--youtube" href="https://www.youtube.com/watch?v=${encodeURIComponent(videoBlock.video_id || '')}" target="_blank" rel="noopener noreferrer" aria-label="YouTube: ${videoBlock.video_id || ''}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg></a></div>`
-        : '<p>Preview body.</p>';
+        : imageBlocks.length
+          ? imageBlocks.map((block: any) => `<figure class="admin-content-preview__block"><img src="${String(block.src || '').replace(/"/g, '&quot;')}" alt=""></figure>`).join('')
+          : '<p>Preview body.</p>';
       return fulfillJson({
         user,
         campaignSlug: 'hand-relations',
@@ -992,7 +995,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         warnings: [],
         normalizedDraft: body.draft,
         preview: {
-          html: `<!doctype html><html><body><main><h1>Hand Relations</h1>${previewBody}</main></body></html>`
+          html: `<!doctype html><html><head><link rel="stylesheet" href="${SITE_BASE}/assets/main.css"><link rel="stylesheet" href="${SITE_BASE}/assets/admin.css"></head><body class="admin-content-preview"><main><h1>Hand Relations</h1>${previewBody}</main></body></html>`
         },
         writeBudget: { readOnly: true, kvWritesExpected: 0, kvListExpected: 0 }
       }, hasUnsafe ? 422 : 200);
@@ -3006,6 +3009,80 @@ test.describe('Admin Dashboard', () => {
       src: '/assets/images/campaigns/hand-relations/image-e2e.png',
       alt: 'Uploaded still'
     });
+  });
+
+  for (const lang of ['en', 'es']) test(`${lang}: keeps media panels contained and previews selected images before upload`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    const calls = await routeAdminWorker(page);
+    await page.goto(`${lang === 'es' ? '/es' : ''}/admin/?admin_login=admin-token`);
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await page.locator('#admin-tab-campaigns').click();
+    await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="content"]').click();
+    await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement) => {
+      textarea.value = JSON.stringify([
+        { type: 'image', src: '', alt: '', decorative: false, align: 'left' },
+        { type: 'gallery', layout: 'grid', images: [{ src: '/assets/images/defaults/dust-wave-square.png', alt: '' }, { src: '/assets/images/defaults/dust-wave-square.png', alt: '' }] }
+      ]);
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const imageBlock = page.locator('#admin-content-blocks .content-block--image');
+    await imageBlock.locator('[data-content-action="toggle-media-settings"]').click();
+    const base64 = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1600; canvas.height = 900;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#47654c'; ctx.fillRect(0, 0, 1600, 900);
+      return canvas.toDataURL('image/png').split(',')[1];
+    });
+    await imageBlock.locator('input[type="file"]').setInputFiles({
+      name: '748568022_18053899544565356_1688649881038302047_n.png', mimeType: 'image/png', buffer: Buffer.from(base64, 'base64')
+    });
+    await imageBlock.locator('[data-content-action="toggle-media-settings"]').click();
+    const panel = imageBlock.locator('.admin-content-block__settings-panel');
+    for (const width of [1280, 820, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      if (width < 724) await expect(page.locator('#mobile-nav')).toBeHidden();
+      await expect(panel).toBeVisible();
+      expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+      const bounds = await panel.boundingBox();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width + 1);
+      await panel.evaluate(element => element.scrollIntoView({ block: 'center' }));
+      await page.screenshot({ path: `tmp/editor-media-full-${lang}-${width}.png` });
+      const headingHit = await panel.locator('h3').evaluate(heading => {
+        const box = heading.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.left + 5, box.top + 5);
+        return { correct: heading.contains(hit), hit: hit?.outerHTML.slice(0, 400) };
+      });
+      expect(headingHit, JSON.stringify(headingHit)).toMatchObject({ correct: true });
+      await panel.screenshot({ path: `tmp/editor-media-panel-${lang}-${width}.png` });
+    }
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    const galleryButton = page.locator('#admin-content-blocks .admin-content-block__settings-button--gallery-image').nth(1);
+    await galleryButton.scrollIntoViewIfNeeded();
+    await expect.poll(async () => {
+      const buttonBox = await galleryButton.boundingBox();
+      if (!buttonBox) return false;
+      return panel.evaluate((element, rect) => {
+        const box = element.getBoundingClientRect();
+        const x = Math.max(box.left, rect.x) + 5;
+        const y = Math.max(box.top, rect.y) + 5;
+        if (x >= Math.min(box.right, rect.x + rect.width) || y >= Math.min(box.bottom, rect.y + rect.height)) return true;
+        return element.contains(document.elementFromPoint(x, y));
+      }, buttonBox);
+    }).toBe(true);
+    const frame = page.frameLocator('#admin-content-preview-mobile');
+    const previewImage = frame.locator('img').first();
+    await expect(previewImage).toHaveAttribute('src', /^data:image\//);
+    await expect.poll(() => previewImage.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(960);
+    expect(await previewImage.evaluate(image => image.getBoundingClientRect().width <= document.documentElement.clientWidth)).toBe(true);
+    expect(await previewImage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    expect(calls.imageUpload).toHaveLength(0);
+    expect(await page.locator('#admin-content-long-content').inputValue()).not.toContain('preview-');
+    expect(JSON.stringify(calls.contentPreview)).not.toContain('data:image');
+    expect(JSON.stringify(calls.contentPreview)).not.toContain('blob:');
+    await page.screenshot({ path: `tmp/editor-media-panel-${lang}-desktop.png`, fullPage: true });
+    await page.locator('#admin-content-preview-mobile').screenshot({ path: `tmp/editor-image-mobile-preview-${lang}.png` });
   });
 
   test('uploads diary entry staged media before saving the whole project', async ({ page }) => {

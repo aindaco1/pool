@@ -2006,6 +2006,10 @@ textarea.admin-settings__input--readonly {
   margin-top: 10px;
   min-height: 24rem;
   padding: clamp(18px, 4vw, 48px);
+
+  > .content-block {
+    margin-bottom: 8px;
+  }
 }
 
 .admin-content__blocks.long-content.admin-settings__diary-editor,
@@ -2093,6 +2097,10 @@ textarea.admin-settings__input--readonly {
   select {
     pointer-events: none;
   }
+}
+
+.admin-content-block:has(.admin-content-block__settings-panel:not([hidden])) {
+  z-index: 10;
 }
 
 .admin-content-block:has(.admin-content-block__settings-panel:not([hidden])) .admin-content-block__settings-button {
@@ -2511,6 +2519,9 @@ textarea.admin-settings__input--readonly {
 
 .admin-content-block__settings-panel {
   @include admin-surface(10px);
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   position: absolute;
   right: 10px;
   top: 3.25rem;
@@ -2520,6 +2531,11 @@ textarea.admin-settings__input--readonly {
   h3 {
     @include type-ui;
     margin-bottom: 8px;
+  }
+
+  .btn {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -2550,11 +2566,35 @@ textarea.admin-settings__input--readonly {
 .admin-content-block__fields {
   display: grid;
   gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
 }
 
 .admin-content-block__field {
   display: grid;
   gap: 4px;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+
+  input,
+  textarea,
+  select,
+  .btn {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+.admin-content-block__media-status {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-content-block__media-upload {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .admin-content-block__media-upload-field {
@@ -2813,13 +2853,18 @@ textarea.admin-settings__input--readonly {
   font-size: clamp(2rem, 7vw, 4rem);
   line-height: 0.95;
   margin: 0 0 12px;
-  text-transform: uppercase;
 }
 
 .admin-content-preview img,
 .admin-content-preview iframe,
+.admin-content-preview video,
 .admin-content-preview audio {
   max-width: 100%;
+}
+
+.admin-content-preview img,
+.admin-content-preview video {
+  height: auto;
 }
 
 .admin-content-preview iframe {
@@ -2861,6 +2906,7 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-content-preview__block {
+  margin-inline: 0;
   margin-top: 24px;
 }
 

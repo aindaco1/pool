@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Make image alt text advisory for campaign and diary Save/Publish. Normalize
+  descriptions safely, preserve explicit decorative state, and omit empty
+  diary text placeholders while retaining real content validation.
+- Render inline Markdown emphasis in public summaries and reward descriptions.
+  Restore preview styles, fit preview images to the mobile frame, and show
+  staged image thumbnails before upload. Keep media panels and long filenames
+  within their containers and above neighboring gallery controls.
+
 - Render uploaded campaign hero videos with their actual MP4, WebM, or MOV
   source type instead of labeling every upload as WebM. Share source rendering
   with content videos, including mixed-case extensions and URL query strings.
