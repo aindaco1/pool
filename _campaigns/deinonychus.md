@@ -11,8 +11,8 @@ start_date: "2026-09-15"
 goal_deadline: "2026-10-16"
 goal_amount: 6600
 charged: false
-hero_image: "/assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a.jpg"
-hero_image_wide: "/assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9.jpg"
+hero_image: "/assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22.jpg"
+hero_image_wide: "/assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e.png"
 creator_image: "/assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33.jpg"
 creator_name: "Weirdos Production"
 category: "Short Film"
@@ -58,11 +58,11 @@ long_content:
       ## What will this money go towards?
   - type: "text"
     body: |
-      - Kiwi, the animatronic dinosaur (she needs a makeover!)
-      - Crafty and catering (trust me, no one wants a hungry director)
-      - Location (because believe it or not, we have to pay to film in a bathroom)
-      - Equipment (sadly lights and cameras aren’t free)
-      - Whatever is left will go to pay cast and crew (donate pretty please, thanks in advance :-))
+      - **Kiwi, the animatronic dinosaur** *(she needs a makeover!)*
+      - **Crafty and catering** *(trust me, no one wants a hungry director)*
+      - **Location** *(because believe it or not, we have to pay to film in a bathroom)*
+      - **Equipment** *(sadly lights and cameras aren’t free)*
+      - **Whatever is left will go to pay cast and crew** *(donate pretty please, thanks in advance :-))*
 support_items: []
 campaign_add_ons:
   - id: "drawing-of-you-as-a-dinosaur"
@@ -247,4 +247,6 @@ preview_updated_at: "2026-09-09T19:57:39.367Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 visibility: "public"
 hero_video: "/assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.mp4"
+campaign_background: "/assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc.png"
+progress_background: "/assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d.png"
 ---
