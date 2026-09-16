@@ -1972,10 +1972,12 @@ test.describe('Admin Dashboard', () => {
       return { fontSize: style.fontSize, lineHeight: style.lineHeight };
     });
     expect(insertedDiaryTypography).toEqual(existingDiaryTypography);
+    // Blank editing placeholders stay visible but must not become invalid saved blocks.
     await expect.poll(async () => {
       const value = await diaryEditor.evaluate((element: any) => element.value);
       return JSON.parse(value)[0].content.length;
-    }).toBe(2);
+    }).toBe(1);
+    await expect(diaryEditor.getByRole('button', { name: 'Save draft' }).first()).toBeDisabled();
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Z' : 'Control+Z');
     await expect(diaryContentEditor.locator('.content-block')).toHaveCount(1);
     await expect(page.locator('#admin-content-preview')).toHaveCount(0);
