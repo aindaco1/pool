@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+source ./scripts/podman-machine.sh
 
 WORKER_PID=""
 JEKYLL_PID=""
@@ -33,11 +34,12 @@ search_text() {
 }
 
 prefer_podman_path() {
+  command -v podman >/dev/null 2>&1 && return 0
   local candidate=""
   for candidate in \
+    "/opt/homebrew/bin" \
     "/opt/podman/bin" \
     "/usr/local/podman/bin" \
-    "/opt/homebrew/bin" \
     "/usr/local/bin"
   do
     if [[ -x "$candidate/podman" ]]; then
@@ -65,16 +67,9 @@ prefer_current_node_path() {
 }
 
 stabilize_podman_connection() {
-  local socket_path=""
-
-  prefer_podman_path || return 0
+  prefer_podman_path || true
   command -v podman >/dev/null 2>&1 || return 0
-
-  socket_path="$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true)"
-  if [[ -n "${socket_path}" && -S "${socket_path}" ]]; then
-    unset CONTAINER_CONNECTION
-    export CONTAINER_HOST="unix://${socket_path}"
-  fi
+  pool_podman_configure_connection
 }
 
 check_host_jekyll_status() {
@@ -631,21 +626,10 @@ if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
   fi
 fi
 
-if command -v lsof >/dev/null 2>&1; then
-  EXISTING_WORKER_PIDS="$(lsof -ti tcp:8787 || true)"
-  if [[ -n "${EXISTING_WORKER_PIDS}" ]]; then
-    echo "Stopping existing process(es) on port 8787"
-    while IFS= read -r pid; do
-      [[ -z "${pid}" ]] && continue
-      process_name="$(ps -p "${pid}" -o comm= 2>/dev/null | tr -d '[:space:]' || true)"
-      if [[ "${process_name}" = "gvproxy" ]]; then
-        echo "Skipping gvproxy on port 8787; Podman ports are cleaned up via pod removal."
-        continue
-      fi
-      kill "${pid}" 2>/dev/null || true
-    done <<< "${EXISTING_WORKER_PIDS}"
-    sleep 1
-  fi
+if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:8787 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Port 8787 is occupied. Stop its owning project explicitly before running this isolated gate." >&2
+  lsof -nP -iTCP:8787 -sTCP:LISTEN >&2 || true
+  exit 1
 fi
 
 if [[ -f worker/.dev.vars ]]; then
@@ -723,6 +707,11 @@ else
 
   run_phase "7a. Host worker smoke" env SITE_URL=http://127.0.0.1:4000 WORKER_URL=http://127.0.0.1:8787 ./scripts/test-worker.sh
   stop_worker
+  # Release the site owned by this gate before the Podman stack binds its port.
+  if [[ -n "${JEKYLL_PID}" ]]; then
+    stop_process_tree "${JEKYLL_PID}"
+    JEKYLL_PID=""
+  fi
   reset_podman_dev_artifacts || exit 1
   run_phase "7b. Podman mutable-pledge smoke" env ADMIN_SECRET="${SMOKE_ADMIN_SECRET}" ./scripts/smoke-pledge-management.sh --podman
 fi

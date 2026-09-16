@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+cd "$(dirname "$0")/.."
+source ./scripts/podman-machine.sh
+pool_podman_configure_connection
+
 echo "Running Podman self-check..."
 
 ./scripts/podman-doctor.sh

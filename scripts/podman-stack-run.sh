@@ -8,11 +8,12 @@ PODMAN_STACK_STARTED=false
 TEMP_LOCAL_CONFIG=""
 
 prefer_podman_path() {
+  command -v podman >/dev/null 2>&1 && return 0
   local candidate=""
   for candidate in \
+    "/opt/homebrew/bin" \
     "/opt/podman/bin" \
     "/usr/local/podman/bin" \
-    "/opt/homebrew/bin" \
     "/usr/local/bin"
   do
     if [ -x "$candidate/podman" ]; then
@@ -36,6 +37,8 @@ cleanup() {
 trap cleanup EXIT
 
 prefer_podman_path || true
+source "$(dirname "${BASH_SOURCE[0]}")/podman-machine.sh"
+pool_podman_configure_connection || exit 1
 
 if ! command -v podman >/dev/null 2>&1; then
   echo "❌ Podman is required for this wrapper" >&2

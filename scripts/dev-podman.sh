@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
+source "$ROOT_DIR/scripts/podman-machine.sh"
 
 ruby ./scripts/sync-worker-config.rb
 ./scripts/configure-dev-secrets.sh --non-interactive
@@ -32,34 +33,13 @@ PODMAN_SITE_READY_TIMEOUT="${PODMAN_SITE_READY_TIMEOUT:-180}"
 PODMAN_WORKER_INSTALL_TIMEOUT="${PODMAN_WORKER_INSTALL_TIMEOUT:-600}"
 PODMAN_WORKER_READY_TIMEOUT="${PODMAN_WORKER_READY_TIMEOUT:-60}"
 
-detect_podman_socket() {
-  podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true
-}
-
 configure_podman_connection() {
-  local socket_path="${1:-}"
-
-  if [ -z "$socket_path" ]; then
-    socket_path="$(detect_podman_socket)"
-  fi
-
-  PODMAN_SOCKET="$socket_path"
-  if [ -n "$socket_path" ]; then
-    unset CONTAINER_CONNECTION
-    export CONTAINER_HOST="unix://${socket_path}"
-  fi
+  pool_podman_configure_connection || return 1
+  PODMAN_SOCKET="$(pool_podman_socket)"
 }
 
 podman_machine_log_path() {
-  local socket_path="${PODMAN_SOCKET:-}"
-
-  if [ -z "$socket_path" ]; then
-    socket_path="$(detect_podman_socket)"
-  fi
-
-  if [ -n "$socket_path" ]; then
-    echo "$(dirname "$socket_path")/podman-machine-default.log"
-  fi
+  pool_podman_log_path
 }
 
 ensure_podman_stability() {
@@ -127,11 +107,12 @@ prefer_current_node_path() {
 }
 
 prefer_podman_path() {
+  command -v podman >/dev/null 2>&1 && return 0
   local candidate=""
   for candidate in \
+    "/opt/homebrew/bin" \
     "/opt/podman/bin" \
     "/usr/local/podman/bin" \
-    "/opt/homebrew/bin" \
     "/usr/local/bin"
   do
     if [ -x "$candidate/podman" ]; then
@@ -218,39 +199,6 @@ wait_for_stripe_secret() {
   return 1
 }
 
-kill_port_if_busy() {
-  local port="$1"
-  local label="$2"
-  local pids=""
-
-  if ! command -v lsof >/dev/null 2>&1; then
-    return 0
-  fi
-
-  pids="$(lsof -ti tcp:"$port" || true)"
-  if [ -z "$pids" ]; then
-    return 0
-  fi
-
-  echo "🔄 Clearing existing $label process(es) on port $port..."
-  while IFS= read -r pid; do
-    [ -z "$pid" ] && continue
-    local process_name=""
-    local process_args=""
-    process_name="$(ps -p "$pid" -o comm= 2>/dev/null | tr -d '[:space:]' || true)"
-    process_args="$(ps -p "$pid" -o args= 2>/dev/null || true)"
-    if [[ "$process_name $process_args" == *gvproxy* ]] || \
-       [[ "$process_name $process_args" == *podman* ]] || \
-       [[ "$process_name $process_args" == *qemu* ]] || \
-       [[ "$process_name $process_args" == *vfkit* ]]; then
-      echo "   Skipping Podman-managed listener on port $port (pid $pid)."
-      continue
-    fi
-    kill "$pid" 2>/dev/null || true
-  done <<< "$pids"
-  sleep 1
-}
-
 wait_for_port_release() {
   local port="$1"
   local label="$2"
@@ -260,7 +208,7 @@ wait_for_port_release() {
   fi
 
   for _ in $(seq 1 20); do
-    if ! lsof -ti tcp:"$port" >/dev/null 2>&1; then
+    if ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
@@ -281,85 +229,12 @@ ensure_podman_ready() {
   local os_family
   os_family="$(detect_os_family)"
 
-  if [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; then
-    local machine_vmtype=""
-    machine_vmtype="$(podman machine info 2>/dev/null | awk '/vmtype:/ {print $2}' | head -n 1 || true)"
-    if [ "$os_family" = "macos" ] && [ -n "$machine_vmtype" ] && [ "$machine_vmtype" = "applehv" ]; then
-      echo "⚠️  Podman is using the applehv backend on macOS."
-      echo "   If Podman machine startup is unstable, prefer libkrun via ~/.config/containers/containers.conf:"
-      echo "   [machine]"
-      echo "   provider = \"libkrun\""
-    fi
-    if ! podman machine inspect >/dev/null 2>&1; then
-      echo "🛠️  Initializing default Podman machine..."
-      podman machine init
-    fi
-    local machine_state=""
-    machine_state="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
-    if [ "$machine_state" != "running" ]; then
-      echo "🚀 Ensuring Podman machine is running..."
-      podman machine start --quiet --no-info podman-machine-default >/tmp/pool-podman-machine-start.log 2>&1 || true
-    else
-      echo "✅ Podman machine already running"
-    fi
-    configure_podman_connection
-  fi
-
-  echo "⏳ Waiting for Podman API to become ready..."
-  local ready=0
-  local attempted_restart=0
-  for _ in $(seq 1 60); do
-    if { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; }; then
-      configure_podman_connection
-    fi
-    if podman info >/dev/null 2>&1; then
-      ready=1
-      break
-    fi
-    if [ "$ready" != "1" ] && [ "$attempted_restart" = "0" ] && { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; }; then
-      local machine_state=""
-      machine_state="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
-      if [ "$machine_state" = "running" ]; then
-        echo "🔄 Podman machine looks stale; restarting it..."
-        podman machine stop podman-machine-default >/tmp/pool-podman-machine-stop.log 2>&1 || true
-        podman machine start --quiet --no-info podman-machine-default >/tmp/pool-podman-machine-start.log 2>&1 || true
-        configure_podman_connection
-        attempted_restart=1
-      fi
-    fi
-    sleep 2
-  done
-
-  if [ "$ready" != "1" ]; then
-    if [ "$os_family" = "linux" ]; then
-      echo "❌ Podman API did not become ready."
-    else
-      echo "❌ Podman machine did not become ready."
-    fi
-    local podman_log=""
-    if [ -n "${PODMAN_SOCKET:-}" ]; then
-      podman_log="$(dirname "$PODMAN_SOCKET")/podman-machine-default.log"
-    fi
-    if [ -n "$podman_log" ] && [ -f "$podman_log" ]; then
-      if grep -q "Entering emergency mode" "$podman_log" || grep -q "Ignition has failed" "$podman_log"; then
-        echo "   The Podman VM booted into emergency mode."
-        echo "   Host fix: podman machine rm -f podman-machine-default && podman machine init --now"
-        echo "   Last machine log lines:"
-        tail -n 20 "$podman_log" || true
-        exit 1
-      fi
-    fi
-    if [ "$os_family" = "linux" ]; then
-      echo "   Try: podman info"
-      echo "   If that fails, restart your rootless Podman service/session and rerun this command."
-    else
-      echo "   Try: podman machine stop && podman machine start"
-    fi
-    exit 1
-  fi
+  configure_podman_connection || return 1
+  echo "Waiting for the selected Podman API..."
+  pool_podman_wait_ready 60 || return 1
 
   local rootless
-  rootless="$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null || echo true)"
+  rootless="$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null || echo false)"
   if [ "$rootless" != "true" ]; then
     echo "❌ Podman must run rootless for this local dev path."
     exit 1
@@ -419,22 +294,11 @@ print_dev_stack_state() {
 }
 
 recover_podman_stack_start() {
-  local attempt="$1"
-  local os_family=""
-
   print_dev_stack_state
   cleanup_pod
 
-  os_family="$(detect_os_family)"
-  if [ "$attempt" -ge 2 ] && { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; }; then
-    echo "🔄 Restarting Podman machine to clear stale libpod state..."
-    podman machine stop podman-machine-default >/tmp/pool-podman-machine-stop.log 2>&1 || true
-    podman machine start --quiet --no-info podman-machine-default >/tmp/pool-podman-machine-start.log 2>&1 || true
-    configure_podman_connection
-    ensure_podman_stability "$os_family" || return 1
-  else
-    ensure_podman_ready || return 1
-  fi
+  # Recover only Pool's containers. A shared VM may host other projects.
+  ensure_podman_ready || return 1
 
   sleep "$PODMAN_STACK_RETRY_DELAY"
 }
@@ -653,7 +517,9 @@ wait_for_worker_http() {
 }
 
 cleanup() {
-  kill "${STRIPE_LISTEN_PID:-0}" >/dev/null 2>&1 || true
+  if [ -n "${STRIPE_LISTEN_PID:-}" ]; then
+    kill "$STRIPE_LISTEN_PID" >/dev/null 2>&1 || true
+  fi
   cleanup_pod
 }
 
@@ -670,8 +536,8 @@ ensure_local_secret "CHECKOUT_INTENT_SECRET"
 cleanup_pod
 ensure_podman_ready
 cleanup_pod
-kill_port_if_busy "$JEKYLL_PORT" "Jekyll"
-kill_port_if_busy "$WORKER_PORT" "Worker"
+wait_for_port_release "$JEKYLL_PORT" "Jekyll"
+wait_for_port_release "$WORKER_PORT" "Worker"
 ensure_podman_ready
 
 build_image_if_needed "$SITE_IMAGE" "$ROOT_DIR" "$ROOT_DIR/Containerfile.dev"
