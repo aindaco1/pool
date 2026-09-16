@@ -27,6 +27,11 @@ export class CheckoutIntentNonceCoordinator {
       return jsonResponse({ error: payload.error }, 400);
     }
 
+    if (url.pathname.startsWith('/completion-')) {
+      await this.ctx.storage.setAlarm?.(Date.now() + 86400000);
+      return this.handleCompletion(url.pathname, payload.value, String(body.leaseId || ''));
+    }
+
     if (url.pathname === '/prepare') {
       return this.handlePrepare(payload.value);
     }
@@ -36,6 +41,39 @@ export class CheckoutIntentNonceCoordinator {
     }
 
     return jsonResponse({ error: 'Not found' }, 404);
+  }
+
+  async alarm() {
+    // Completion objects are per order; nonce-coordinator objects never schedule this alarm.
+    await this.ctx.storage.deleteAll();
+  }
+
+  async handleCompletion(path, payload, leaseId) {
+    if (!leaseId || leaseId.length > 100) return jsonResponse({ error: 'Invalid lease' }, 400);
+    const key = `completion:${payload.nonce}`;
+    return this.ctx.storage.transaction(async (storage) => {
+      const existing = await storage.get(key);
+      const active = existing?.exp > Math.floor(Date.now() / 1000) ? existing : null;
+      if (active && active.cartHash !== payload.cartHash) {
+        return jsonResponse({ error: 'Checkout integrity verification failed' }, 409);
+      }
+      if (path === '/completion-claim') {
+        if (active?.status === 'complete') return jsonResponse({ ok: true, status: 'complete' });
+        if (active?.leaseUntil > Date.now()) return jsonResponse({ ok: false, status: 'busy' }, 409);
+        await storage.put(key, { ...payload, leaseId, leaseUntil: Date.now() + 120000, status: 'processing' });
+        return jsonResponse({ ok: true, status: 'claimed' });
+      }
+      if (!active || active.leaseId !== leaseId) return jsonResponse({ error: 'Checkout lease mismatch' }, 409);
+      if (path === '/completion-finish') {
+        await storage.put(key, { ...active, status: 'complete', leaseUntil: 0 });
+        return jsonResponse({ ok: true });
+      }
+      if (path === '/completion-release') {
+        if (active.status !== 'complete') await storage.delete(key);
+        return jsonResponse({ ok: true });
+      }
+      return jsonResponse({ error: 'Not found' }, 404);
+    });
   }
 
   async handlePrepare(payload) {

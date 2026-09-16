@@ -4108,7 +4108,7 @@ async function abandonCheckoutIntent(env, orderId) {
     await clearTierReservation(env, campaignSlug, reservedOrderId);
   }
 
-  await env.PLEDGES.delete(getCheckoutBundleStorageKey(orderId));
+  // Keep the expiring quote: Stripe may have completed just before the drawer closed.
   return { success: true, released: manifest.campaigns.length };
 }
 
@@ -6875,7 +6875,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
     return privateJsonResponse({ error: normalizedDestination.error }, 400, env);
   }
   const normalizedShippingTaxAddress = normalizedDestination.valid
-    ? normalizeTaxDestination(normalizedDestination.destination)
+    ? normalizeTaxDestination(shippingAddress)
     : { valid: false, destination: null };
   const normalizedBillingAddress = billingAddress
     ? normalizeTaxDestination(billingAddress)
@@ -7052,7 +7052,7 @@ async function handleFirstPartyCheckoutStart(request, env) {
     },
     tipPercent: normalizedTipPercent,
     billingAddress: normalizedBillingAddress.valid ? normalizedBillingAddress.destination : null,
-    shippingAddress: normalizedDestination.valid ? normalizedDestination.destination : null,
+    shippingAddress: normalizeCheckoutShippingAddress(shippingAddress),
     totals: bundleTotals,
     campaigns: checkoutGroups.map((group) => ({
       orderId: checkoutGroups.length === 1 ? orderId : buildBundleOrderId(orderId, group.campaignSlug),
@@ -7146,14 +7146,14 @@ async function handleFirstPartyCheckoutStart(request, env) {
 
     if (usingCustomCheckoutUi) {
       sessionParams.ui_mode = 'custom';
-      sessionParams.return_url = getLocalizedSiteUrl(env, `/pledge-success/?orderId=${orderId}`, normalizedPreferredLang);
+      sessionParams.return_url = getLocalizedSiteUrl(env, `/pledge-success/?orderId=${orderId}&session_id={CHECKOUT_SESSION_ID}`, normalizedPreferredLang);
       sessionParams.consent_collection = {
         payment_method_reuse_agreement: {
           position: 'hidden'
         }
       };
     } else {
-      sessionParams.success_url = getLocalizedSiteUrl(env, `/pledge-success/?orderId=${orderId}`, normalizedPreferredLang);
+      sessionParams.success_url = getLocalizedSiteUrl(env, `/pledge-success/?orderId=${orderId}&session_id={CHECKOUT_SESSION_ID}`, normalizedPreferredLang);
       sessionParams.cancel_url = getLocalizedSiteUrl(env, '/pledge-cancelled/', normalizedPreferredLang);
     }
 
@@ -7452,7 +7452,7 @@ async function handleFirstPartyCheckoutSummary(request, env) {
         campaignTitle: campaignTitles.length === 1 ? campaignTitles[0] : null,
         campaignTitles,
         persisted: Boolean(bundle.confirmedAt),
-        pledgeStatus: 'active',
+        pledgeStatus: bundle.confirmedAt ? 'active' : 'pending',
         createdAt: null,
         shippingCollected,
         totals: {
@@ -7528,6 +7528,43 @@ async function handleFirstPartyCheckoutRecovery(request, env) {
   }, 200, env);
 }
 
+// Stripe moved shipping_details in Basil; older webhook versions still use the top-level field.
+function normalizeCheckoutShippingAddress(value) {
+  if (!value || typeof value !== 'object') return null;
+  const address = value.address || value;
+  const destination = normalizeTaxDestination(address);
+  if (!destination.valid) return null;
+  return {
+    name: String(value.name || ''),
+    address1: destination.destination.line1,
+    address2: destination.destination.line2,
+    city: destination.destination.city,
+    province: destination.destination.state,
+    postalCode: destination.destination.postalCode,
+    country: destination.destination.country
+  };
+}
+
+function getCheckoutShippingAddress(session, manifest) {
+  return normalizeCheckoutShippingAddress(session?.collected_information?.shipping_details)
+    || normalizeCheckoutShippingAddress(session?.shipping_details)
+    || normalizeCheckoutShippingAddress(manifest?.shippingAddress);
+}
+
+async function retrieveCompletedCheckoutSession(stripe, sessionId) {
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  // Some custom setup sessions expose their address only in the legacy representation.
+  // Retrieve the same Stripe object; never create a second checkout or payment method.
+  if (session?.status === 'complete' && session?.metadata?.hasPhysical === 'true'
+      && !getCheckoutShippingAddress(session)) {
+    const legacy = await stripe.checkout.sessions.retrieve(sessionId, { stripeVersion: '2022-11-15' });
+    if (legacy?.id === session.id && legacy?.metadata?.orderId === session.metadata.orderId) {
+      session.shipping_details = legacy.shipping_details;
+    }
+  }
+  return session;
+}
+
 async function handleFirstPartyCheckoutComplete(request, env, ctx) {
   if (getCheckoutProvider(env) !== 'first_party') {
     return jsonResponse({ error: 'Not found' }, 404);
@@ -7577,7 +7614,7 @@ async function handleFirstPartyCheckoutComplete(request, env, ctx) {
   const stripe = createPoolStripeClient(env, { intent: 'checkout_complete' });
 
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await retrieveCompletedCheckoutSession(stripe, sessionId);
     if (!session) {
       return privateJsonResponse({ error: 'Checkout session not found' }, 404, env);
     }
@@ -7610,19 +7647,7 @@ async function handleFirstPartyCheckoutComplete(request, env, ctx) {
     const email = session.customer_email || session.customer_details?.email;
     let customerId = session.customer;
 
-    let shippingAddress = null;
-    if (session.shipping_details) {
-      const sd = session.shipping_details;
-      shippingAddress = {
-        name: sd.name || '',
-        address1: sd.address?.line1 || '',
-        address2: sd.address?.line2 || '',
-        city: sd.address?.city || '',
-        province: sd.address?.state || '',
-        postalCode: sd.address?.postal_code || '',
-        country: sd.address?.country || ''
-      };
-    }
+    const shippingAddress = getCheckoutShippingAddress(session, bundleManifest);
     const recoveredBillingAddress = normalizeTaxDestination(session.customer_details?.address || bundleManifest?.billingAddress || null);
 
     const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
@@ -7668,20 +7693,17 @@ async function handleFirstPartyCheckoutComplete(request, env, ctx) {
         const payload = await recoveryResponse.json().catch(() => ({}));
         return privateJsonResponse({
           error: payload?.error || 'Failed to complete checkout session',
+          retryable: payload?.retryable === true,
           persisted: false
         }, recoveryResponse.status || 500, env);
       }
 
-      const summaryBundle = await loadCheckoutBundleManifest(env, orderId);
-      const recoveredPledge = await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' });
-      const persisted = Boolean(recoveredPledge) || Boolean(summaryBundle?.confirmedAt);
-
       return privateJsonResponse({
-        success: persisted,
-        recovered: persisted,
-        persisted,
+        success: true,
+        recovered: true,
+        persisted: true,
         orderId
-      }, persisted ? 200 : 409, env);
+      }, 200, env);
     }
 
     return privateJsonResponse({
@@ -7707,7 +7729,39 @@ async function persistCheckoutBundleManifest(env, orderId, manifest) {
   await env.PLEDGES.put(getCheckoutBundleStorageKey(orderId), JSON.stringify(manifest), { expirationTtl: 86400 });
 }
 
-async function processFirstPartyCheckoutBundle({
+// Webhook and browser recovery must not write the same pledge/projections concurrently.
+async function processFirstPartyCheckoutBundle(options) {
+  const { env, orderId, checkoutCartHash, markStripeEventProcessed } = options;
+  const namespace = env.CHECKOUT_INTENTS;
+  if (!namespace) {
+    if (getAppMode(env) === 'live') return jsonResponse({ error: 'Checkout coordinator unavailable', retryable: true }, 503);
+    return persistFirstPartyCheckoutBundle(options);
+  }
+  const coordinator = namespace.get(namespace.idFromName(`checkout-completion:${orderId}`));
+  const payload = { nonce: orderId, cartHash: checkoutCartHash, exp: Math.floor(Date.now() / 1000) + 86400, leaseId: crypto.randomUUID() };
+  const call = (path) => coordinator.fetch(`https://checkout-intents.internal/completion-${path}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+  });
+  const claim = await call('claim');
+  const result = await claim.json();
+  if (!claim.ok) return jsonResponse({ error: result.error || 'Checkout confirmation is already processing', retryable: result.status === 'busy' }, claim.status);
+  if (result.status === 'complete') {
+    await markStripeEventProcessed();
+    return jsonResponse({ received: true, duplicate: true });
+  }
+  try {
+    const response = await persistFirstPartyCheckoutBundle(options);
+    if (response.ok) {
+      const finished = await call('finish');
+      if (!finished.ok) return jsonResponse({ error: 'Checkout confirmation is still processing', retryable: true }, 503);
+    }
+    return response;
+  } finally {
+    await call('release');
+  }
+}
+
+async function persistFirstPartyCheckoutBundle({
   env,
   ctx,
   stripe,
@@ -7747,6 +7801,7 @@ async function processFirstPartyCheckoutBundle({
         supportItems: entry.supportItems || [],
         customAmount: entry.customAmount || 0,
         hasPhysical: entry.hasPhysical === true,
+        shippingOption: entry.shippingOption || 'standard',
         totals: entry.totals || {}
       },
       tipPercent: normalizedTipPercent
@@ -7812,19 +7867,26 @@ async function processFirstPartyCheckoutBundle({
       campaignSlug
     );
 
-    const canonicalContribution = await buildCanonicalContributionForStoredShipping(env, campaign, {
-      tierSelection,
+    // The signed manifest is the Worker-canonical quote the supporter accepted.
+    // Requoting here can change tax/address detail, rates, or shipping after card setup.
+    const totals = { ...entry.totals, tipPercent: normalizedTipPercent };
+    const amounts = ['subtotal', 'tax', 'shipping', 'tipAmount', 'amount'];
+    if (amounts.some((key) => !isNonNegativeInteger(totals[key]) || !isValidAmount(totals[key]))
+        || totals.amount !== totals.subtotal + totals.tax + totals.shipping + totals.tipAmount) {
+      return jsonResponse({ error: 'Invalid checkout quote totals' }, 409);
+    }
+    const canonicalContribution = {
+      ...tierSelection,
+      valid: true,
+      hasPhysical: entry.hasPhysical === true,
+      shippingOption: entry.shippingOption || 'standard',
       supportItems: desiredSupportItems.supportItems,
       customAmount: entry.customAmount || 0,
-      bundleAddOns: anchorBundleAddOns,
-      tipPercent: normalizedTipPercent,
-      taxDestination: billingAddress || bundleManifest?.billingAddress || null,
-      shippingAddress: shippingAddress || null,
-      shippingOption: entry.shippingOption || 'standard'
-    });
-    if (!canonicalContribution.valid) {
-      console.error('📝 Invalid pledge contribution in webhook bundle:', canonicalContribution.error);
-      return jsonResponse({ error: canonicalContribution.error }, 409);
+      goalTrackingSubtotal: totals.subtotal - getBundleAddOnSubtotal(getPlatformBundleAddOns(anchorBundleAddOns)),
+      totals
+    };
+    if (canonicalContribution.hasPhysical && (!shippingAddress?.address1 || !shippingAddress?.name)) {
+      return jsonResponse({ error: 'Shipping address is required to confirm this pledge' }, 409);
     }
 
     const availability = await ensureTierAvailability(
@@ -8171,21 +8233,7 @@ async function handleStripeWebhook(request, env, ctx) {
         }
       }
 
-      // Extract shipping address from Stripe Checkout session (collected via shipping_address_collection)
-      let shippingAddress = null;
-      if (hasPhysical === 'true' && session.shipping_details) {
-        const sd = session.shipping_details;
-        shippingAddress = {
-          name: sd.name || '',
-          address1: sd.address?.line1 || '',
-          address2: sd.address?.line2 || '',
-          city: sd.address?.city || '',
-          province: sd.address?.state || '',
-          postalCode: sd.address?.postal_code || '',
-          country: sd.address?.country || ''
-        };
-        console.log('📨 Captured shipping address from Stripe session:', orderId);
-      }
+      const shippingAddress = getCheckoutShippingAddress(session, bundleManifest);
       const recoveredBillingAddress = normalizeTaxDestination(
         session.customer_details?.address ||
         bundleManifest?.billingAddress ||
@@ -8217,7 +8265,7 @@ async function handleStripeWebhook(request, env, ctx) {
         }
       }
 
-      if (checkoutProvider === 'first_party' && bundleManifest?.campaigns?.length > 1 && isPaymentUpdate !== 'true') {
+      if (checkoutProvider === 'first_party' && bundleManifest?.campaigns?.length > 0 && isPaymentUpdate !== 'true') {
         const bundleResponse = await processFirstPartyCheckoutBundle({
           env,
           ctx,
@@ -8237,6 +8285,13 @@ async function handleStripeWebhook(request, env, ctx) {
           markStripeEventProcessed
         });
         return finishWebhook(bundleResponse, bundleResponse.status >= 400 ? 'bundled_failed' : 'bundled_processed');
+      }
+
+      if (checkoutProvider === 'first_party' && isFirstPartyOrderId(orderId) && isPaymentUpdate !== 'true') {
+        const saved = await env.PLEDGES?.get(`pledge:${orderId}`, { type: 'json' });
+        if (!saved) {
+          return finishWebhook(jsonResponse({ error: 'Missing checkout bundle data' }, 409), 'missing_checkout_manifest');
+        }
       }
 
       const campaign = await getCampaign(env, campaignSlug);

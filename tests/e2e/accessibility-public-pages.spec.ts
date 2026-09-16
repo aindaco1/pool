@@ -240,10 +240,20 @@ test.describe('Public Page Accessibility', () => {
   });
 
   test('spanish pledge success page has no obvious axe violations', async ({ page }) => {
+    let persisted = false;
+    await page.route('**/checkout-intent/summary?orderId=pool-intent-demo123', route => route.fulfill({
+      status: 200, headers: JSON_HEADERS, body: JSON.stringify({ persisted })
+    }));
     await page.goto('/es/pledge-success/?orderId=pool-intent-demo123');
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
     await expect(page.locator('main')).toBeVisible();
-    await expect(page.locator('h1')).toContainText(/aporte está guardado/i);
+    await expect(page.locator('[data-pledge-confirmation]')).toBeVisible();
+    await expect(page.locator('[data-pledge-confirmed]')).toBeHidden();
+    await expectNoAxeViolations(page);
+    persisted = true;
+    await page.locator('[data-pledge-confirmation-retry]').click();
+    await expect(page.locator('[data-pledge-confirmed]')).toBeVisible();
+    await expect(page.locator('h1:visible')).toContainText(/aporte está guardado/i);
     await expectNoAxeViolations(page);
   });
 
@@ -278,9 +288,19 @@ test.describe('Public Page Accessibility', () => {
   });
 
   test('pledge success page has no obvious axe violations', async ({ page }) => {
+    let persisted = false;
+    await page.route('**/checkout-intent/summary?orderId=pool-intent-demo123', route => route.fulfill({
+      status: 200, headers: JSON_HEADERS, body: JSON.stringify({ persisted })
+    }));
     await page.goto('/pledge-success/?orderId=pool-intent-demo123');
     await expect(page.locator('main')).toBeVisible();
-    await expect(page.locator('h1')).toContainText(/Pledge is Saved/i);
+    await expect(page.locator('[data-pledge-confirmation]')).toBeVisible();
+    await expect(page.locator('[data-pledge-confirmed]')).toBeHidden();
+    await expectNoAxeViolations(page);
+    persisted = true;
+    await page.locator('[data-pledge-confirmation-retry]').click();
+    await expect(page.locator('[data-pledge-confirmed]')).toBeVisible();
+    await expect(page.locator('h1:visible')).toContainText(/Pledge is Saved/i);
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
       'heading "Your Pledge is Saved!"',

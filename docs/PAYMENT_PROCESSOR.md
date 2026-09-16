@@ -243,8 +243,8 @@ Stripe sends `checkout.session.completed`. The Worker:
 3. Checks `stripe-event:{event.id}` idempotency.
 4. Retrieves Stripe session, SetupIntent, customer, and payment method details as needed.
 5. Loads the saved checkout manifest.
-6. Recomputes the checkout hash and validates the manifest.
-7. Persists one `pledge:{orderId}` record per campaign.
+6. Verifies the saved Worker quote against the Stripe metadata hash, including the shipping option.
+7. Serializes webhook/recovery completion per order through `CHECKOUT_INTENTS` and persists one `pledge:{orderId}` record per campaign with the accepted quote totals.
 8. Updates campaign indexes and projections.
 9. Confirms limited-tier reservations.
 10. Sends supporter confirmation email through Resend.
@@ -259,7 +259,41 @@ The custom checkout sidecar also has a guarded recovery path:
 POST /checkout-intent/complete
 ```
 
-That route retrieves the Stripe session and creates the pledge if the webhook was delayed or missed in local development. It is origin-checked, order-scoped, and retry-limited.
+That route retrieves the existing Stripe session and creates the pledge if the
+webhook is delayed or missed, in production or development. It is origin-checked,
+order-scoped, and retry-limited. Its successful persistence response is authoritative;
+the browser does not require a second eventually consistent KV read to show success.
+A concurrent completion returns a retryable conflict. The per-order coordinator
+retains completion evidence for 24 hours and expires its storage by alarm.
+
+Card setup does not authorize a different total. Completion uses the verified saved
+quote instead of recalculating tax/shipping from Stripe's fuller address or a changed
+provider response. New checkout quotes retain the supplied shipping address and use
+its full tax destination. Fulfillment reads both `collected_information.shipping_details`
+and legacy `shipping_details`, with the saved address as fallback. For custom setup
+sessions that omit shipping from the current API representation, recovery retrieves
+the same session using the webhook's legacy `2022-11-15` representation; this is a
+read-only compatibility exception to the default API pin.
+
+After card setup, the browser retains only the order/session reference in tab-scoped
+session storage for up to 24 hours. Bounded automatic retries and **Check pledge status**
+resume that order without invoking Stripe confirmation or starting another checkout.
+An unresolved attempt shows that the pledge is unconfirmed, that no charge happened
+at setup, its reference, and the configured support contact. Closing/reopening the
+drawer or reloading the tab preserves this state. Closing a drawer releases scarce
+reservations but retains the quote's existing 24-hour expiry for delayed webhooks.
+
+English and Spanish result pages hide success copy and preserve the cart until a
+successful completion receipt or persisted summary is available. Stripe redirect
+URLs carry the existing session ID for recovery; the page removes it from the address
+bar and retains the same tab-scoped reference. A missing/expired first-party manifest
+fails closed rather than reconstructing different totals from current configuration.
+
+For an incident, inspect Stripe setup-session status, canonical pledge records, and
+webhook outcomes separately. Multiple setup sessions can be repeat attempts at one
+intended pledge. Do not recover every session blindly: reconcile the intended order,
+quoted total, existing records, and inventory first. Never create a charge to repair
+checkout confirmation.
 
 ## Manage Pledge And Update Card
 

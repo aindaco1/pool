@@ -48,7 +48,7 @@ rules; it must not display an ended campaign as live.
 1. The supporter selects tiers, support items, custom support, or add-ons in the first-party cart.
 2. `/checkout-intent/start` resolves canonical prices, tax, shipping, campaign state, and limited-tier reservations, then creates a setup-mode Stripe session.
 3. The on-site payment sidecar saves a card. A hosted fallback remains available when required by the checkout configuration.
-4. Webhook persistence, with a bounded completion/recovery path, creates one pledge per campaign. The browser waits for persistence before showing success and invalidates cached campaign totals afterward.
+4. Webhook persistence and bounded browser recovery share a per-order completion coordinator and the verified quote to create one pledge per campaign. The browser waits for persistence before showing success and invalidates cached campaign totals afterward.
 5. Order-scoped magic links let supporters manage active pledges. Deadline-passed pledges become read-only apart from eligible card updates.
 6. After a funded campaign's deadline, Worker scheduling dispatches campaign-scoped settlement and records charge outcomes. Failed-payment recovery uses the existing payment-method update flow.
 

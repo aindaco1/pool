@@ -91,6 +91,20 @@ When a pledge qualifies for shipping upgrades, the Worker also persists the sele
 
 Limited-tier reservations and claims are serialized through a per-campaign Durable Object coordinator before the KV inventory snapshot is updated, so concurrent checkout starts, retries, modifications, and webhook completions cannot oversell scarce rewards.
 
+### POST /checkout-intent/complete
+
+Body: `{ "orderId": "pool-intent-...", "sessionId": "cs_..." }`.
+Trusted-origin, per-order rate-limited completion of the existing Stripe setup session.
+A `200` response with `persisted: true` confirms persistence without a further summary
+read. Concurrent completion returns `409` with `retryable: true`; verification failures
+return an error and `persisted: false`. This route does not charge the supporter.
+
+### GET /checkout-intent/summary?orderId={orderId}
+
+Returns a private, non-cacheable summary. A saved quote has `persisted: false` and
+`pledgeStatus: "pending"`; only persisted pledges/confirmed bundles return
+`persisted: true`. An absent quote or pledge returns `404`.
+
 ### GET /pledges?token={token}
 Get the pledge(s) authorized by a magic link token.
 

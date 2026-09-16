@@ -194,6 +194,10 @@ class MockDurableObjectStorage {
     this.store.set(key, value);
   }
 
+  async delete(key: string) {
+    this.store.delete(key);
+  }
+
   async transaction<T>(callback: (storage: MockDurableObjectStorage) => Promise<T>) {
     return callback(this);
   }
@@ -2615,7 +2619,7 @@ describe('Worker business logic hardening', () => {
       success: true,
       released: 1
     });
-    expect(await kv.get(`pending-checkout:${startedOrderId}`)).toBeNull();
+    expect(await kv.get(`pending-checkout:${startedOrderId}`, { type: 'json' })).toMatchObject({ orderId: startedOrderId });
 
     const secondStart = await worker.fetch(
       new Request('https://pool.test/checkout-intent/start', {
@@ -2869,7 +2873,7 @@ describe('Worker business logic hardening', () => {
       campaignTitle: null,
       campaignTitles: ['SMOKE EDITABLE', 'Hand Relations'],
       persisted: false,
-      pledgeStatus: 'active',
+      pledgeStatus: 'pending',
       createdAt: null,
       shippingCollected: true,
       totals: {
@@ -5007,6 +5011,56 @@ describe('Worker business logic hardening', () => {
         reservationId: 'order-recover-1'
       })
     }));
+  });
+
+  it.each(['webhook', 'legacy-webhook', 'complete', 'legacy-complete'])('persists the accepted physical quote through %s when Stripe supplies a fuller address', async (path) => {
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party', CHECKOUT_UI_MODE: 'custom',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace(),
+      TIER_INVENTORY_COORDINATOR: new MockTierInventoryNamespace(),
+      TAX_PROVIDER: 'offline_rules'
+    });
+    const ctx = { waitUntil: () => {} };
+    const start = await worker.fetch(new Request('https://pool.test/checkout-intent/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: [{ id: 'sunder__blu-ray', quantity: 1 }], email: 'buyer@example.com', tipPercent: 5,
+        shippingAddress: { country: 'US', postalCode: '80205' }
+      })
+    }), env, ctx);
+    expect(start.status).toBe(200);
+    const { orderId } = await start.json();
+    const kv = env.PLEDGES as MockKVNamespace;
+    const manifest = await kv.get(`pending-checkout:${orderId}`, { type: 'json' });
+    const metadata = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0].metadata;
+    const session = {
+      id: 'cs_test_default_123', status: 'complete', mode: 'setup', metadata,
+      customer_email: 'buyer@example.com', customer: 'cus_123', setup_intent: 'seti_123',
+      collected_information: { shipping_details: {
+        name: 'Test Supporter', address: { line1: '123 Test St', city: 'Denver', state: 'CO', postal_code: '80205', country: 'US' }
+      } }
+    };
+    if (path.startsWith('legacy')) {
+      (session as any).shipping_details = session.collected_information.shipping_details;
+      delete (session as any).collected_information;
+    }
+    mockStripeClient.checkout.sessions.retrieve.mockResolvedValue(session);
+    if (path === 'legacy-complete') {
+      mockStripeClient.checkout.sessions.retrieve.mockResolvedValueOnce({ ...session, shipping_details: null });
+    }
+    const response = await worker.fetch(new Request(`https://pool.test/${path.endsWith('webhook') ? 'webhooks/stripe' : 'checkout-intent/complete'}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'stripe-signature': 'sig_test' },
+      body: JSON.stringify(path.endsWith('webhook')
+        ? { id: 'evt_physical_quote', type: 'checkout.session.completed', livemode: false, data: { object: session } }
+        : { orderId, sessionId: session.id })
+    }), env, ctx);
+    expect(await response.clone().json()).not.toHaveProperty('error');
+    expect(response.status).toBe(200);
+    expect(await kv.get(`pledge:${orderId}`, { type: 'json' })).toMatchObject({
+      ...manifest.totals, charged: false, shippingAddress: { name: 'Test Supporter', province: 'CO' }
+    });
+    expect(mockStripeClient.paymentIntents.create).not.toHaveBeenCalled();
   });
 
   it('self-completes a first-party checkout session when webhook persistence is still pending', async () => {
