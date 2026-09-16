@@ -449,6 +449,121 @@ describe('manage page script', () => {
     expect((document.getElementById('shipping-option-0') as HTMLSelectElement | null)?.options.length || 0).toBe(0);
   });
 
+  it.each([
+    { taxCents: 0, effectiveRate: 0, tax: '$0.00', total: '$10.50', label: 'Sales tax (0%)' },
+    { taxCents: 76, effectiveRate: 0.07625, tax: '$0.76', total: '$11.26', label: 'Sales tax (7.625%)' },
+    { taxCents: 76, effectiveRate: 0.075625, tax: '$0.76', total: '$11.26', label: 'Sales tax (7.5625%)' }
+  ])('uses the same Worker tax of $tax in the page and confirmation', async ({ taxCents, effectiveRate, tax, total, label }) => {
+    const destination = { country: 'US', state: 'NM', postalCode: '87048', city: 'Corrales', line1: '123 Main St' };
+    const fetchMock = mockManageFetch({
+      pledges: [{ ...basePledge,
+        shippingAddress: { country: 'US', province: 'NM', postalCode: '87048', city: 'Corrales', address1: '123 Main St' },
+        taxDetails: { effectiveRate: 0, destination: { country: 'US', postalCode: '87048' } }
+      }],
+      taxQuotePayload: { taxCents, taxDetails: { effectiveRate, destination } }
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+    await import('../../assets/js/manage-page.js');
+    await vi.waitFor(() => expect(document.getElementById('pledges-list')?.hidden).toBe(false));
+
+    const tipInput = getInput('#tip-percent-0');
+    tipInput.value = '5';
+    tipInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(document.getElementById('tax-0')?.textContent).toBe(tax);
+      expect(document.getElementById('tax-label-0')?.textContent).toBe(label);
+      expect(document.getElementById('amount-0')?.textContent).toBe(total);
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    getButton('[data-action="save"][data-index="0"]').click();
+    await vi.waitFor(() => expect(document.getElementById('confirm-modal')?.hidden).toBe(false));
+    expect(document.getElementById('confirm-modal-details')?.textContent).toContain(`${label}: ${tax}`);
+    expect(document.querySelector('.confirm-totals strong')?.textContent).toBe(`Total: ${total}`);
+    const quoteCalls = fetchMock.mock.calls.filter(([url]) => url === `${WORKER_BASE}/tax/quote`);
+    expect(quoteCalls).toHaveLength(1);
+    const quoteBody = JSON.parse(String(quoteCalls[0][1]?.body));
+    expect(quoteBody.billingAddress || quoteBody.shippingAddress).toMatchObject({
+      country: 'US', state: 'NM', postalCode: '87048', city: 'Corrales', line1: '123 Main St'
+    });
+    expect(fetchMock.mock.calls.some(([url]) => url === `${WORKER_BASE}/pledge/modify`)).toBe(false);
+  });
+
+  it('preserves an explicit zero tax rate when a refresh fails', async () => {
+    const destination = { country: 'US', state: 'CO', postalCode: '80205' };
+    mockManageFetch({
+      pledges: [{ ...basePledge, tax: 0, amount: 1000, billingAddress: destination,
+        taxDetails: { effectiveRate: 0, destination } }],
+      taxQuoteStatus: 503
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+    await import('../../assets/js/manage-page.js');
+    await vi.waitFor(() => expect(document.getElementById('pledges-list')?.hidden).toBe(false));
+
+    const tipInput = getInput('#tip-percent-0');
+    tipInput.value = '5';
+    tipInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(document.getElementById('tax-0')?.textContent).toBe('$0.00');
+    getButton('[data-action="save"][data-index="0"]').click();
+    await vi.waitFor(() => expect(document.getElementById('confirm-modal')?.hidden).toBe(false));
+    expect(document.getElementById('amount-0')?.textContent).toBe('$10.50');
+    expect(document.getElementById('confirm-modal-details')?.textContent).toContain('Sales tax (0%): $0.00');
+    expect(document.querySelector('.confirm-totals strong')?.textContent).toBe('Total: $10.50');
+  });
+
+  it.each([undefined, null, -1, 'invalid'])('uses the same fallback for an invalid quoted tax of %s', async (taxCents) => {
+    const destination = { country: 'US', state: 'NM', postalCode: '87102' };
+    mockManageFetch({
+      pledges: [{ ...basePledge, billingAddress: destination,
+        taxDetails: { effectiveRate: 0.08, destination } }],
+      taxQuotePayload: { taxCents }
+    });
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+    await import('../../assets/js/manage-page.js');
+    await vi.waitFor(() => expect(document.getElementById('pledges-list')?.hidden).toBe(false));
+    const tipInput = getInput('#tip-percent-0');
+    tipInput.value = '5';
+    tipInput.dispatchEvent(new Event('input', { bubbles: true }));
+    getButton('[data-action="save"][data-index="0"]').click();
+    await vi.waitFor(() => expect(document.getElementById('confirm-modal')?.hidden).toBe(false));
+    expect(document.getElementById('tax-0')?.textContent).toBe('$0.80');
+    expect(document.getElementById('amount-0')?.textContent).toBe('$11.30');
+    expect(document.getElementById('confirm-modal-details')?.textContent).toContain('Sales tax (8%): $0.80');
+    expect(document.querySelector('.confirm-totals strong')?.textContent).toBe('Total: $11.30');
+  });
+
+  it('ignores a delayed tax response after the supporter makes a newer edit', async () => {
+    const destination = { country: 'US', state: 'CO', postalCode: '80205' };
+    const taxQuote = { taxCents: 0, taxDetails: { effectiveRate: 0, destination } };
+    const fetchMock = mockManageFetch({
+      pledges: [{ ...basePledge, billingAddress: destination }],
+      taxQuotePayload: taxQuote
+    });
+    let resolveFirstQuote: ((response: Response) => void) | undefined;
+    global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (input === `${WORKER_BASE}/tax/quote` && !resolveFirstQuote) {
+        return new Promise<Response>((resolve) => { resolveFirstQuote = resolve; });
+      }
+      return fetchMock(input, init);
+    }) as typeof fetch;
+    window.history.replaceState({}, '', '/manage/?t=token-123');
+    await import('../../assets/js/manage-page.js');
+    await vi.waitFor(() => expect(document.getElementById('pledges-list')?.hidden).toBe(false));
+    const tipInput = getInput('#tip-percent-0');
+    tipInput.value = '5';
+    tipInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => expect(resolveFirstQuote).toBeTypeOf('function'));
+    tipInput.value = '10';
+    tipInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => expect(document.getElementById('amount-0')?.textContent).toBe('$11.00'));
+    resolveFirstQuote!(jsonResponse(taxQuote));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(document.getElementById('amount-0')?.textContent).toBe('$11.00');
+    getButton('[data-action="save"][data-index="0"]').click();
+    await vi.waitFor(() => expect(document.getElementById('confirm-modal')?.hidden).toBe(false));
+    expect(document.querySelector('.confirm-totals strong')?.textContent).toBe('Total: $11.00');
+  });
+
   it('does not show delivery options for fallback shipping quotes', async () => {
     const physicalCampaign = {
       ...baseCampaign,

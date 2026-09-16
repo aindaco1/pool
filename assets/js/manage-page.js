@@ -1295,22 +1295,25 @@
     focusManageDialog(dialog, options.initialFocusSelector);
   }
 
-  function calculateTax(subtotalCents) {
-    return Math.round(subtotalCents * SALES_TAX_RATE);
+  function getTaxRateFromDetails(taxDetails, fallback = SALES_TAX_RATE) {
+    const rate = taxDetails?.effectiveRate;
+    return rate !== null && rate !== undefined && Number.isFinite(Number(rate)) && Number(rate) >= 0
+      ? Number(rate)
+      : fallback;
   }
 
   function getSalesTaxLabel() {
-    return `Sales tax (${(SALES_TAX_RATE * 100).toFixed(3).replace(/\.?0+$/, '')}%)`;
+    return `Sales tax (${(SALES_TAX_RATE * 100).toFixed(4).replace(/\.?0+$/, '')}%)`;
   }
 
   function getTaxLabelFromDetails(taxDetails) {
-    const effectiveRate = Math.max(0, Number(taxDetails?.effectiveRate) || 0);
+    const effectiveRate = getTaxRateFromDetails(taxDetails, null);
     const country = String(taxDetails?.destination?.country || '').trim().toUpperCase();
-    if (effectiveRate > 0 && country === 'US') {
-      return `Sales tax (${(effectiveRate * 100).toFixed(3).replace(/\.?0+$/, '')}%)`;
+    if (effectiveRate !== null && country === 'US') {
+      return `Sales tax (${(effectiveRate * 100).toFixed(4).replace(/\.?0+$/, '')}%)`;
     }
-    if (effectiveRate > 0) {
-      return `Tax (${(effectiveRate * 100).toFixed(3).replace(/\.?0+$/, '')}%)`;
+    if (effectiveRate !== null) {
+      return `Tax (${(effectiveRate * 100).toFixed(4).replace(/\.?0+$/, '')}%)`;
     }
     return country === 'US' ? getSalesTaxLabel() : getRuntimeMessage('manage.tax', 'Tax');
   }
@@ -1331,12 +1334,9 @@
   }
 
   function getPledgeTaxDestination(pledge) {
-    return normalizeManageTaxDestination(
-      pledge?.billingAddress ||
-      pledge?.taxDetails?.destination ||
-      pledge?.shippingAddress ||
-      null
-    );
+    return normalizeManageTaxDestination(pledge?.billingAddress)
+      || normalizeManageTaxDestination(pledge?.shippingAddress)
+      || normalizeManageTaxDestination(pledge?.taxDetails?.destination);
   }
 
   function getPledgeTaxAmount(pledge, subtotalOverride = null) {
@@ -1345,13 +1345,9 @@
       return Math.round(explicitTax);
     }
 
-    const effectiveRate = Math.max(0, Number(pledge?.taxDetails?.effectiveRate) || 0);
+    const effectiveRate = getTaxRateFromDetails(pledge?.taxDetails);
     const subtotalCents = Math.max(0, Number(subtotalOverride !== null ? subtotalOverride : getPledgeSubtotal(pledge)) || 0);
-    if (effectiveRate > 0) {
-      return Math.round(subtotalCents * effectiveRate);
-    }
-
-    return calculateTax(subtotalCents);
+    return Math.round(subtotalCents * effectiveRate);
   }
 
   function getPledgeTaxLabel(pledge) {
@@ -1360,7 +1356,7 @@
 
   function buildFallbackTaxQuote(pledge, subtotalCents, shippingCents) {
     const destination = getPledgeTaxDestination(pledge);
-    const effectiveRate = Math.max(0, Number(pledge?.taxDetails?.effectiveRate) || SALES_TAX_RATE);
+    const effectiveRate = getTaxRateFromDetails(pledge?.taxDetails);
     const taxableSubtotalCents = Math.max(0, Number(subtotalCents) || 0);
     const taxableShippingCents = 0;
     const taxCents = Math.round(taxableSubtotalCents * effectiveRate);
@@ -1398,8 +1394,9 @@
       return cached;
     }
 
-    const billingAddress = normalizeManageTaxDestination(pledge?.billingAddress || pledge?.taxDetails?.destination || null);
-    const shippingAddress = normalizeManageTaxDestination(pledge?.shippingAddress || null);
+    const shippingAddress = normalizeManageTaxDestination(pledge?.shippingAddress);
+    const billingAddress = normalizeManageTaxDestination(pledge?.billingAddress)
+      || (!shippingAddress ? destination : null);
 
     try {
       const response = await fetch(`${WORKER_BASE}/tax/quote`, {
@@ -1418,6 +1415,9 @@
       }
 
       const data = await response.json();
+      if (!Number.isSafeInteger(data?.taxCents) || data.taxCents < 0) {
+        throw new Error('Tax quote is missing a valid amount');
+      }
       taxQuoteState.set(signature, data);
       return data;
     } catch (_error) {
@@ -3797,7 +3797,7 @@
         );
       }
       const confirmTaxQuote = await fetchQuotedTaxQuote(pledge, newSubtotal, confirmShipping);
-      const newTax = Math.max(0, Number(confirmTaxQuote?.taxCents || 0));
+      const newTax = confirmTaxQuote.taxCents;
       const newTotalWithTax = newSubtotal + newTax + confirmShipping + newTipAmount;
       const totalsNode = document.createElement('p');
       totalsNode.className = 'confirm-totals';
@@ -4301,7 +4301,10 @@
       const quotedShipping = Math.max(0, Number(quotedQuote?.shippingCents || 0));
       const resolvedShippingOption = String(quotedQuote?.selectedOption || shippingOption || 'standard').trim().toLowerCase() || 'standard';
       const taxQuote = await fetchQuotedTaxQuote(pledge, newSubtotal, quotedShipping);
-      const quotedTax = Math.max(0, Number(taxQuote?.taxCents || newTax));
+      if (shippingQuoteState.get(index)?.requestId !== requestId) {
+        return;
+      }
+      const quotedTax = taxQuote.taxCents;
       const quotedTotal = newSubtotal + quotedTax + quotedShipping + newTipAmount;
       if (shippingRow) {
         shippingRow.hidden = quotedShipping === 0;

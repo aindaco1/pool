@@ -3525,38 +3525,51 @@ describe('Worker business logic hardening', () => {
     expect(response.status).toBe(200);
   });
 
-  it('preserves the stored billing tax destination when modifying a pledge', async () => {
+  it.each(['billing', 'shipping', 'historical', 'invalid-billing'])('uses the %s tax destination when modifying a pledge', async (addressSource) => {
     const env = createEnv({
       CHECKOUT_PROVIDER: 'first_party',
+      TAX_PROVIDER: 'nm_grt',
       SALES_TAX_RATE: '0.05'
     });
     const kv = env.PLEDGES as MockKVNamespace;
-    const billingAddress = {
-      country: 'US',
-      state: 'CO',
-      postalCode: '80205'
-    };
+    const destination = { country: 'US', state: 'NM', postalCode: '87048', city: 'Corrales', line1: '123 Main St' };
+    const historicalDestination = addressSource === 'historical' ? destination : { country: 'US', postalCode: '87048' };
+    const catalogFetch = global.fetch;
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url);
+      if (url.hostname === 'grt.edacnm.org') {
+        expect(url.searchParams.get('street_number')).toBe('123');
+        expect(url.searchParams.get('city')).toBe('Corrales');
+        expect(url.searchParams.get('zipcode')).toBe('87048');
+        return jsonResponse({ results: [{ success: true, tax_rate: 7.5625, location_code: '29-504', source: 'Intuit' }] });
+      }
+      return catalogFetch(input, init);
+    }) as typeof fetch;
 
     await kv.put('pledge:order-first-party-modify-tax-1', JSON.stringify({
       orderId: 'order-first-party-modify-tax-1',
       email: 'buyer@example.com',
       campaignSlug: 'hand-relations',
       stripeCustomerId: 'cus_existing',
-      billingAddress,
+      billingAddress: addressSource === 'billing' ? destination : addressSource === 'invalid-billing' ? {} : null,
+      shippingAddress: addressSource === 'historical' ? null : addressSource === 'billing'
+        ? { country: 'US', state: 'CO', postalCode: '80205' }
+        : { country: 'US', province: 'NM', postalCode: '87048', city: 'Corrales', address1: '123 Main St' },
+      taxDetails: { effectiveRate: 0, destination: historicalDestination },
       tierId: 'frame-slot',
       tierName: 'Buy 1 Frame',
       tierQty: 1,
       subtotal: 500,
-      tax: 25,
+      tax: 0,
       shipping: 0,
       tipPercent: 0,
       tipAmount: 0,
-      amount: 525,
+      amount: 500,
       pledgeStatus: 'active',
       charged: false,
       createdAt: '2026-03-30T00:00:00.000Z',
       updatedAt: '2026-03-30T00:00:00.000Z',
-      history: []
+      history: [{ type: 'created', tax: 0, taxDetails: { effectiveRate: 0, destination: historicalDestination } }]
     }));
     await kv.put('stats:hand-relations', JSON.stringify({
       campaignSlug: 'hand-relations',
@@ -3594,15 +3607,23 @@ describe('Worker business logic hardening', () => {
     expect(response.status).toBe(200);
     const payload = await response.json();
     expect(payload.taxDetails).toMatchObject({
-      destination: billingAddress
+      destination,
+      effectiveRate: 0.075625,
+      locationCode: '29-504'
     });
 
     const storedPledge = await kv.get('pledge:order-first-party-modify-tax-1', { type: 'json' });
+    expect(storedPledge.tax).toBe(Math.round(storedPledge.subtotal * 0.075625));
+    expect(storedPledge.history[0]).toMatchObject({ tax: 0, taxDetails: { destination: historicalDestination } });
     expect(storedPledge.taxDetails).toMatchObject({
-      destination: billingAddress
+      destination,
+      effectiveRate: 0.075625,
+      locationCode: '29-504'
     });
     expect(storedPledge.history.at(-1)?.taxDetails).toMatchObject({
-      destination: billingAddress
+      destination,
+      effectiveRate: 0.075625,
+      locationCode: '29-504'
     });
   });
 

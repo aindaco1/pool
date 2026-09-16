@@ -112,6 +112,20 @@ Current behavior:
 A tax preview can therefore remain incomplete early in checkout and resolve
 once billing or shipping details are present.
 
+Manage Pledge uses the same validated `/tax/quote` amount for its updated page
+summary and confirmation modal. A zero amount or effective rate is an explicit
+quote, not a missing value; both displays retain it, including the rate label.
+If a refresh fails or returns an invalid amount, both displays use the existing
+fallback based on the pledge's effective rate (including zero), or the configured
+rate when no saved rate is available. Delayed responses from earlier edits do
+not overwrite the current summary. The Worker still recalculates authoritative
+totals when the supporter confirms a modification. Both paths select a normalized
+stored billing address first, then the stored shipping address, then the historical
+quote destination. An incomplete historical snapshot must not shadow a usable
+shipping address. Historical accepted quotes remain unchanged until a supporter
+confirms an update. Rate labels retain up to four decimal places (for example,
+7.5625%).
+
 ## Main Endpoints
 
 ### `POST /tax/quote`

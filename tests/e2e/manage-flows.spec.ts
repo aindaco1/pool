@@ -284,6 +284,52 @@ test.describe('Manage Pledge Flows', () => {
     });
   });
 
+  for (const locale of ['', '/es']) {
+    for (const quote of [
+      { taxCents: 0, effectiveRate: 0, tax: '$0.00', total: '$184.57' },
+      { taxCents: 1190, effectiveRate: 0.07625, tax: '$11.90', total: '$196.47' },
+      { taxCents: 1180, effectiveRate: 0.075625, tax: '$11.80', total: '$196.37' }
+    ]) {
+      test(`matches page and modal totals for ${quote.tax} tax on ${locale || '/en'}`, async ({ page }, testInfo) => {
+        const destination = { country: 'US', state: 'NM', postalCode: '87048', city: 'Corrales', line1: '123 Main St' };
+        const requests = await routeManageWorker(page, {
+          campaigns: [{ ...baseCampaign, tiers: [{ ...baseCampaign.tiers[0], price: 156, category: 'physical' }] }],
+          pledges: [{ ...activePledge, subtotal: 15600, tax: quote.taxCents, shipping: 517,
+            amount: 16117 + quote.taxCents,
+            taxDetails: { effectiveRate: 0, destination: { country: 'US', postalCode: '87048' } },
+            shippingAddress: { country: 'US', province: 'NM', postalCode: '87048', city: 'Corrales', address1: '123 Main St' } }],
+          shippingQuotePayload: {
+            quotes: [{ campaignSlug: 'hand-relations', shippingCents: 517, source: 'usps_live' }],
+            totalShippingCents: 517,
+            shippingAddress: destination
+          }
+        });
+        await page.route('**/tax/quote', async (route) => {
+          const body = route.request().postDataJSON();
+          expect(body).toMatchObject({ subtotalCents: 15600, shippingCents: 517 });
+          expect(body.billingAddress || body.shippingAddress).toMatchObject(destination);
+          await route.fulfill({ status: 200, headers: JSON_HEADERS, body: JSON.stringify({
+            taxCents: quote.taxCents, taxDetails: { effectiveRate: quote.effectiveRate, destination }
+          }) });
+        });
+        await page.goto(`${locale}/manage/?t=token-123`);
+        await expect(page.locator('#pledges-list')).toBeVisible();
+        await page.locator('#tip-percent-0').fill('15');
+        await expect(page.locator('#tax-0')).toHaveText(quote.tax);
+        await expect(page.locator('#amount-0')).toHaveText(quote.total);
+        await page.locator('[data-action="save"][data-index="0"]').click();
+        await expect(page.locator('#confirm-modal')).toBeVisible();
+        await expect(page.locator('.confirm-totals')).toContainText(quote.tax);
+        const rateLabel = `Sales tax (${(quote.effectiveRate * 100).toFixed(4).replace(/\.?0+$/, '')}%)`;
+        await expect(page.locator('#tax-label-0')).toHaveText(rateLabel);
+        await expect(page.locator('.confirm-totals')).toContainText(rateLabel);
+        await expect(page.locator('.confirm-totals strong')).toHaveText(`Total: ${quote.total}`);
+        await page.locator('#confirm-modal').screenshot({ path: testInfo.outputPath('tax-confirmation.png') });
+        expect(requests.modifyBodies).toHaveLength(0);
+      });
+    }
+  }
+
   test('quotes physical support-item shipping before saving modify changes', async ({ page }) => {
     const physicalCampaign = {
       ...baseCampaign,

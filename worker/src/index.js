@@ -9152,7 +9152,9 @@ async function handleModifyPledge(request, env) {
     shippingAddress: currentPledge.shippingAddress || null,
     currentShipping: currentPledge.shipping || 0,
     shippingOption: hasShippingOptionChange ? shippingOption : (currentPledge.shippingOption || 'standard'),
-    taxDestination: getStoredTaxDetails(currentPledge).destination || null
+    taxDestination: normalizeTaxDestination(currentPledge.billingAddress).destination
+      || normalizeTaxDestination(currentPledge.shippingAddress).destination
+      || normalizeTaxDestination(currentPledge.taxDetails?.destination).destination
   });
   if (!canonicalContribution.valid) {
     return jsonResponse({ error: canonicalContribution.error }, 400);
