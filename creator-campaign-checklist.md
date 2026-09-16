@@ -42,7 +42,7 @@ This checklist reflects the current creator-facing behavior. Shared Platform and
 - super admins bootstrap preview-only campaigns, assign or create campaign users, and handle platform-only controls, while assigned campaign users own day-to-day campaign prep
 - super admins can archive non-live campaigns without deleting their source or campaign-owned media
 - the dashboard media library can search and filter campaign images, video, and audio; show dimensions, duration, file size, references, optimization state, missing derivatives, and placement warnings; and safely replace same-campaign source files without changing their public path
-- meaningful content images require alt text, while purely decorative images must be marked decorative explicitly
+- alt text is recommended for meaningful content images and never blocks saving or publishing; mark purely decorative images explicitly
 - campaign add-ons can be attached to one campaign and count toward that campaign's goal
 - add-on variants can inherit the product's base price or use an explicit per-variant price override, including a valid `$0` override; the Worker still verifies current prices and preserves valid historical prices for unchanged saved selections
 - campaign-runner report recipients can receive daily pledge ledgers and post-deadline fulfillment exports

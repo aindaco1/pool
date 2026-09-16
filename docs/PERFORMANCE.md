@@ -315,7 +315,7 @@ npm run media:optimize:check
 npm run media:manifest
 ```
 
-`_data/media-optimization-manifest.json` is a deterministic rebuildable index, not a second media store. It records source hashes, size, dimensions/duration, generated WebP/WebM derivatives, references, and warnings. Dashboard placement budgets for hero, gallery, tier, Blast, and poster media are advisory and reuse this manifest; unsafe types and missing required alt text remain hard validation failures. If an attempted derivative is larger than its source, the source hash and skipped width are recorded so check mode does not misclassify the intentional omission as drift.
+`_data/media-optimization-manifest.json` is a deterministic rebuildable index, not a second media store. It records source hashes, size, dimensions/duration, generated WebP/WebM derivatives, references, and warnings. Dashboard placement budgets for hero, gallery, tier, Blast, and poster media are advisory and reuse this manifest; unsafe types remain hard validation failures, while missing alt text is advisory and never blocks saving or publishing. If an attempted derivative is larger than its source, the source hash and skipped width are recorded so check mode does not misclassify the intentional omission as drift.
 
 If the host machine does not have the native optimizers installed, use the Podman-backed wrappers instead:
 

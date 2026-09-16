@@ -65,7 +65,7 @@ The current interface includes:
   - content-editor media upload controls with labeled native file inputs, visible focus on the styled upload button, upload status regions, and browser-local previews before publish
   - gallery image caption settings that reuse the shared label/help pattern and expose the hover-caption editor as a labeled rich-text textbox
   - media-library search plus image/video/audio filters implemented as an accessible tablist, with selected state, keyboard-reachable metadata/reference details, and named repair/replace actions
-  - required alt text for meaningful content images and an explicit decorative-image control that disables and clears alt text instead of treating a blank field as an authoring shortcut
+  - recommended alt text for meaningful content images that never blocks Save or Publish, and an explicit decorative-image control that disables and clears alt text
   - Settings -> Plan usage provider headings that reuse the shared admin label/help pattern, polite loading status, accessible progressbar text, and responsive metric cards
   - Create new campaign and protected Preview dialogs that reuse the shared admin label/help/info-button pattern, native fields, email-list token input, dialog focus handling, and polite status messaging
   - sortable data tables that expose `aria-sort` state and sort buttons
