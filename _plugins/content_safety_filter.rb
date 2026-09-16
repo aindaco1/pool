@@ -34,7 +34,7 @@ module Jekyll
 
     def safe_rich_text(input)
       text = sanitize_rich_text(normalize_markdown_emphasis_spacing(input))
-      text = text.gsub(/\*\*([^*]+)\*\*/, '<strong>\1</strong>')
+      text = text.gsub(/\*\*([^\n]+?)\*\*(?!\*)/, '<strong>\1</strong>')
       text = text.gsub(/(^|[^*])\*([^*\n]+)\*/, '\1<em>\2</em>')
       text.gsub(/(^|[^_])_([^_\n]+)_/, '\1<em>\2</em>')
     end

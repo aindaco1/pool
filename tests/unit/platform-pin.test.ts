@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = 'da7bd21ad77e936342d7d67948da88a25f56782c';
+const expectedCommit = '6b82237e926137b6062f9dd454bd6598280e7353';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.38.0',
-  '@dustwave/admin-shell': '0.11.0',
+  '@dustwave/platform-workspace': '0.39.0',
+  '@dustwave/admin-shell': '0.12.0',
   '@dustwave/build-core': '0.2.0',
-  '@dustwave/design-core': '0.2.0',
+  '@dustwave/design-core': '0.3.0',
   '@dustwave/inventory-core': '0.1.0',
   '@dustwave/media-core': '0.4.0',
   '@dustwave/product-video-core': '0.1.0',
@@ -64,6 +64,12 @@ describe('shared platform pin', () => {
 
   it('retains every shared browser and Worker source consumed by Pool', () => {
     const consumedPaths = [
+      'packages/admin-shell/src/editor-codec-browser.js',
+      'packages/admin-shell/src/editor-codec.js',
+      'packages/admin-shell/src/editor-media-browser.js',
+      'packages/admin-shell/src/editor-media.js',
+      'packages/admin-shell/src/feedback-browser.js',
+      'packages/admin-shell/src/feedback.js',
       'packages/admin-shell/src/tabs-browser.js',
       'packages/admin-shell/src/dirty-controls-browser.js',
       'packages/admin-shell/src/unsaved-changes-browser.js',
@@ -72,6 +78,7 @@ describe('shared platform pin', () => {
       'packages/admin-shell/src/credentialed-download.js',
       'packages/build-core/bin/minify-site-assets.mjs',
       'packages/build-core/src/site-assets.js',
+      'packages/design-core/styles/_admin-editor.scss',
       'packages/design-core/styles/_base.scss',
       'packages/design-core/styles/_buttons.scss',
       'packages/design-core/styles/_content-blocks.scss',

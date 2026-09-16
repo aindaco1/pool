@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Adopt Platform Admin Shell 0.12.0 and Design Core 0.3.0 for shared editor
+  rendering, upload previews, optional image descriptions, blank placeholders,
+  layout containment, and readable bilingual feedback. Preserve local image
+  previews after upload and Save while public assets await deployment. Render
+  nested bold/italic text consistently in the editor and mobile/public previews.
+
+
 - Make image alt text advisory for campaign and diary Save/Publish. Normalize
   descriptions safely, preserve explicit decorative state, and omit empty
   diary text placeholders while retaining real content validation.

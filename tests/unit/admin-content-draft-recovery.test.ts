@@ -31,6 +31,8 @@ function editor(storage: Record<string, string> = {}, projectSave = false) {
   Object.entries(storage).forEach(([name, value]) => w.localStorage.setItem(name, value));
   w.POOL_CONFIG = { platform: { workerUrl: 'https://worker.test' }, i18n: { currentLang: 'en' } };
   w.confirm = vi.fn(() => true);
+  w.URL.createObjectURL = vi.fn(() => 'blob:uploaded-preview');
+  w.URL.revokeObjectURL = vi.fn();
   let savedCampaign = { slug: 'deinonychus', title: 'Deinonychus', shortBlurb: '', longContent: [], baseRevision: projectSave ? 'live:server-sha' : 'server-sha', hasWorkingCopy: false, hasUnpublishedChanges: false };
   w.fetch = vi.fn(async (url: string, options?: any) => {
     let result: any = {};
@@ -48,6 +50,9 @@ function editor(storage: Record<string, string> = {}, projectSave = false) {
   for (const file of [
     'shared/dust-wave-platform/packages/admin-shell/src/dirty-controls-browser.js',
     'shared/dust-wave-platform/packages/admin-shell/src/unsaved-changes-browser.js',
+    'shared/dust-wave-platform/packages/admin-shell/src/editor-codec-browser.js',
+    'shared/dust-wave-platform/packages/admin-shell/src/editor-media-browser.js',
+    'shared/dust-wave-platform/packages/admin-shell/src/feedback-browser.js',
     'assets/js/admin-dashboard.js'
   ]) w.eval(fs.readFileSync(path.join(root, file), 'utf8'));
   const get = (id: string) => w.document.getElementById('admin-content-' + id) as any;
@@ -266,7 +271,7 @@ describe('project Save and existing browser drafts', () => {
     expect(e.w.localStorage.getItem(key)).toBe(original);
     expect(e.get('long-content').value).toContain('Older creator draft');
     e.save().click();
-    await vi.waitFor(() => expect(e.get('status').textContent).toContain(revision === 'server-sha' ? 'Project saved' : 'Project changed'));
+    await vi.waitFor(() => expect(e.get('status').textContent).toContain(revision === 'server-sha' ? 'Project saved' : 'A newer version was saved elsewhere'));
     expect(e.get('long-content').value).toContain('Older creator draft');
     expect(e.w.localStorage.getItem(key + ':recovery-v1')).toBe(original);
     expect(e.save().disabled).toBe(revision === 'server-sha');
@@ -316,7 +321,7 @@ describe('project Save and existing browser drafts', () => {
     const backup = e.w.localStorage.getItem(key);
     e.w.fetch = vi.fn(async () => new Response(JSON.stringify({ error: 'Project changed elsewhere', code: 'campaign_revision_conflict' }), { status: 409 }));
     e.save().click();
-    await vi.waitFor(() => expect(e.get('status').textContent).toContain('Project changed elsewhere'));
+    await vi.waitFor(() => expect(e.get('status').textContent).toContain('A newer version was saved elsewhere'));
     expect(e.w.localStorage.getItem(key)).toBe(backup);
     expect(e.get('long-content').value).toContain('Keep all of this');
     expect(e.save().disabled).toBe(false);
