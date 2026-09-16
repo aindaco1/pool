@@ -11,8 +11,8 @@ start_date: "2026-09-15"
 goal_deadline: "2026-10-16"
 goal_amount: 6600
 charged: false
-hero_image: "/assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a.jpg"
-hero_image_wide: "/assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9.jpg"
+hero_image: "/assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22.jpg"
+hero_image_wide: "/assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e.png"
 creator_image: "/assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33.jpg"
 creator_name: "Weirdos Production"
 category: "Short Film"
@@ -244,8 +244,9 @@ diary:
             alt: "liane casting"
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
-_pool_draft_base_hash: "ec54c149080755c6c97f1d24c26629306915001706f6dc66f4f5b8b4505af420"
-_pool_draft_saved_at: "2026-09-16T14:47:01.509Z"
+_pool_draft_base_hash: "8bf0b22dec128a43fb11dd622b2cf949ba01866c9e9e55eaba83ddef7d6c066d"
+_pool_draft_saved_at: "2026-09-16T17:19:11.152Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 hero_video: "/assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.mp4"
+campaign_background: "/assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc.png"
 ---
