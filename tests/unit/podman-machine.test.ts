@@ -20,7 +20,7 @@ function select(os: string, connection = '', host = '', selected = 'shared-engin
     pool_podman_configure_connection
     printf '%s|%s|%s' "\${CONTAINER_CONNECTION:-}" "\${CONTAINER_HOST:-}" "\${POOL_PODMAN_MACHINE:-}"
   `, 'test', helper], { encoding: 'utf8', env: { ...process.env, CONTAINER_CONNECTION: connection,
-    CONTAINER_HOST: host, TEST_OS: os, TEST_SELECTED: selected } });
+    CONTAINER_HOST: host, POOL_PODMAN_MACHINE: 'stale-parent-machine', TEST_OS: os, TEST_SELECTED: selected } });
   expect(result.status, result.stderr).toBe(0);
   return result.stdout;
 }

@@ -6,6 +6,7 @@ pool_podman_uses_machine() {
 }
 
 pool_podman_configure_connection() {
+  export POOL_PODMAN_MACHINE=""
   pool_podman_uses_machine || return 0
   command -v podman >/dev/null 2>&1 || return 0
   if [ -z "${CONTAINER_HOST:-}" ] && [ -z "${CONTAINER_CONNECTION:-}" ]; then
@@ -13,7 +14,6 @@ pool_podman_configure_connection() {
     selected="$(podman system connection list --format '{{if .Default}}{{.Name}}{{end}}' 2>/dev/null | awk 'NF {print; exit}')" || return 1
     if [ -n "$selected" ]; then export CONTAINER_CONNECTION="$selected"; fi
   fi
-  POOL_PODMAN_MACHINE=""
   if [ -z "${CONTAINER_HOST:-}" ] && [ -n "${CONTAINER_CONNECTION:-}" ]; then
     # Only inspect a matching local machine. Remote connections remain remote.
     local candidate="${CONTAINER_CONNECTION%-root}"
