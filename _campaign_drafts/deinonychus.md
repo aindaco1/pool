@@ -109,7 +109,7 @@ tiers:
   - id: "deinonychus-antirrhopus"
     name: "Deinonychus antirrhopus"
     price: 6000
-    description: "This tier includes: *Everything from the previous tiers* + the director will **shave her head** and live stream the entire event. **YOU get to pick a dinosaur tattoo** for the director to get, and she will *live stream the entire thing!*"
+    description: "This tier includes: *Everything from the previous tiers* + the director will **shave her head** and live stream the entire event. **YOU get to pick a dinosaur tattoo** for the director to get, and she will *livestream the entire thing!*"
     limit_total: 1
     stackable: false
     category: "physical"
@@ -124,7 +124,7 @@ tiers:
     name: "Bisticeratops froeseorum"
     price: 5000
     image: "/assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262.jpg"
-    description: "This tier includes:Everything in the previous tiersExecuctive Producer credit The director's husband will shave his head and live stream the entire thing!"
+    description: "This tier includes: *Everything in the previous tiers* + **Executive Producer credit**. The director's husband will **shave his head** and *livestream the entire thing!*"
     limit_total: 1
     stackable: false
     category: "physical"
@@ -139,7 +139,7 @@ tiers:
     name: "Parasaurolophus walkeri"
     price: 500
     image: "/assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e.jpg"
-    description: "This tier includes:Everything in the previous tiers2 VIP tickets to the cast and crew screening event"
+    description: "This tier includes: *Everything in the previous tiers* + **2 VIP tickets to the cast and crew screening event!**"
     stackable: false
     category: "physical"
     shipping:
@@ -153,7 +153,7 @@ tiers:
     name: "Alamosaurus sanjuanensis"
     price: 150
     image: "/assets/images/campaigns/deinonychus/tier-alamosaurus-sanjuanensis-20260915-220032-4481fdca.jpg"
-    description: "This tier includes:Everything in the previous tiersA “Cretaceous Critter’s Wildlife Park” Employee KeychainA “Cretaceous Critter’s Wildlife Park” Employee T-shirt"
+    description: "This tier includes: *Everything in the previous tiers* + **A *Cretaceous Critter’s Wildlife Park* Employee Keychain** + **A *Cretaceous Critter’s Wildlife Park Employee* T-shirt**"
     stackable: false
     category: "physical"
     shipping:
@@ -223,6 +223,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "7ffd86b727a77ef80c8f1eed4f2264c8e2b44fff88b32dd06bb738cf9488c426"
-_pool_draft_saved_at: "2026-09-16T14:18:56.199Z"
+_pool_draft_saved_at: "2026-09-16T14:22:15.226Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
