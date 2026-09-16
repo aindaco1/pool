@@ -33,6 +33,7 @@ prefer_current_node_path() {
 prefer_current_node_path || true
 
 prefer_podman_path() {
+  command -v podman >/dev/null 2>&1 && return 0
     local candidate=""
     for candidate in \
         "/opt/podman/bin" \
@@ -78,6 +79,8 @@ trap cleanup EXIT
 
 if [ "$USE_PODMAN" = "true" ]; then
     prefer_podman_path || true
+    source "$(dirname "${BASH_SOURCE[0]}")/podman-machine.sh"
+    pool_podman_configure_connection || exit 1
     echo "📦 Starting shared Podman dev stack..."
     PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/pool-test-checkout-podman.log}"
     PODMAN_DETACH=true ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1

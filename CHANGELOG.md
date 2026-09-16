@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep Podman project tools on the selected shared engine. Remove automatic VM
+  restarts and host-port process killing so other local projects remain running.
+  Preserve explicit endpoints, the CLI on PATH, and release resource checks.
+
 - Fix campaign video uploads failing at the shared GitHub helper's 2 MB limit.
   Hero, Content, Diary, and replacement uploads stream binary files up to
   100 MB to GitHub, with bounded memory and exact size validation.
