@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Consolidate seven reviewed Deinonychus image-optimization branches, adding
+  28 responsive WebP variants and lossless source compression. Retain the
+  original MP4 after rejecting a larger generated WebM.
+
 - Restore live tax-provider requests in Cloudflare Workers through Tax Core
   0.3.1. Use supported manual redirect handling and reject 3xx responses
   explicitly; prevent an unsupported fetch option from silently selecting

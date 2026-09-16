@@ -583,6 +583,1060 @@
       ]
     },
     {
+      "path": "assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc.png",
+      "publicPath": "/assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc.png",
+      "name": "background-20260916-171555-c03b41bc.png",
+      "label": "background 20260916 171555 c03b41bc",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 909663,
+      "sha256": "d8b986d395f4ada54500f8e21de321ef409747c8b340cc6e62e3ab62c678ed07",
+      "width": 1254,
+      "height": 1254,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-320.webp",
+        "assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-480.webp",
+        "assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-640.webp",
+        "assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-320.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-320.webp",
+          "bytes": 42012,
+          "sha256": "d67479dd00ad4913bbbcf9123efbd331229a1822a4d0f537bbe2a3f448b69e8a",
+          "sourceSha256": "d8b986d395f4ada54500f8e21de321ef409747c8b340cc6e62e3ab62c678ed07",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-480.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-480.webp",
+          "bytes": 73202,
+          "sha256": "2ac4998bbac7b3bd2f426b453da9d0bb71f896f17907ef134c71e3c20661ddaa",
+          "sourceSha256": "d8b986d395f4ada54500f8e21de321ef409747c8b340cc6e62e3ab62c678ed07",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-640.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-640.webp",
+          "bytes": 104544,
+          "sha256": "498577e8cbe5a8b80314c2e8e5fce29cee302d32479faaf09d760a2068077e4e",
+          "sourceSha256": "d8b986d395f4ada54500f8e21de321ef409747c8b340cc6e62e3ab62c678ed07",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-960.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc-960.webp",
+          "bytes": 165850,
+          "sha256": "8f6ddbdc7cc65e6f13a5eb4e7b7f3c085e7203f492affd6f8cb2828a72f04efc",
+          "sourceSha256": "d8b986d395f4ada54500f8e21de321ef409747c8b340cc6e62e3ab62c678ed07",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/content-734896697-18049316195565356-8295088956282282279-n-20260916-141543-613b3c0a.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/content-734896697-18049316195565356-8295088956282282279-n-20260916-141543-613b3c0a.jpg",
+      "name": "content-734896697-18049316195565356-8295088956282282279-n-20260916-141543-613b3c0a.jpg",
+      "label": "content 734896697 18049316195565356 8295088956282282279 n 20260916 141543 613b3c0a",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 80634,
+      "sha256": "0f8ec31c6d0b5bebb25aaf1fc9bc27a22a1930ed7bbc96edc6e7b8ce5901d75b",
+      "width": 736,
+      "height": 492,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/content-734896697-18049316195565356-8295088956282282279-n-20260916-141543-613b3c0a-320.webp",
+        "assets/images/campaigns/deinonychus/content-734896697-18049316195565356-8295088956282282279-n-20260916-141543-613b3c0a-480.webp",
+        "assets/images/campaigns/deinonychus/content-734896697-18049316195565356-8295088956282282279-n-20260916-141543-613b3c0a-640.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/content-734896697-18049316195565356-8295088956282282279-n-20260916-141543-613b3c0a-320.webp",
+        "assets/images/campaigns/deinonychus/content-734896697-18049316195565356-8295088956282282279-n-20260916-141543-613b3c0a-480.webp",
+        "assets/images/campaigns/deinonychus/content-734896697-18049316195565356-8295088956282282279-n-20260916-141543-613b3c0a-640.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2.jpg",
+      "name": "content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2.jpg",
+      "label": "content 748568022 18053899544565356 1688649881038302047 n 20260916 141540 cf9b1fc2",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 157468,
+      "sha256": "3a93f38eee7dc9ede0d233ac46b37fff89534933b2e513c61cd1708b7790ecf5",
+      "width": 1080,
+      "height": 1160,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-320.webp",
+        "assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-480.webp",
+        "assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-640.webp",
+        "assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-320.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-320.webp",
+          "bytes": 34386,
+          "sha256": "41647d6e93849515860c0ce7b7450e9b3ee03cf220a5b8f989dcfc8d73835f67",
+          "sourceSha256": "3a93f38eee7dc9ede0d233ac46b37fff89534933b2e513c61cd1708b7790ecf5",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-480.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-480.webp",
+          "bytes": 60970,
+          "sha256": "85d03e26361dfa6aba64f3443bbc58e4f5184a5a71c4857343d6afa885fd79d6",
+          "sourceSha256": "3a93f38eee7dc9ede0d233ac46b37fff89534933b2e513c61cd1708b7790ecf5",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-640.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-640.webp",
+          "bytes": 89620,
+          "sha256": "7f2c6c0e1ac5d48d0d49bd439dca05d194a0e2a27c439b42341f2a44d0086daa",
+          "sourceSha256": "3a93f38eee7dc9ede0d233ac46b37fff89534933b2e513c61cd1708b7790ecf5",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-960.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-748568022-18053899544565356-1688649881038302047-n-20260916-141540-cf9b1fc2-960.webp",
+          "bytes": 142644,
+          "sha256": "34e228afb9cc4ab0b3701634d82d16df467ef4fb3c6a64483bea9ad1bbb3e31c",
+          "sourceSha256": "3a93f38eee7dc9ede0d233ac46b37fff89534933b2e513c61cd1708b7790ecf5",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf.jpg",
+      "name": "content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf.jpg",
+      "label": "content 758588438 18058205177565356 9128241708164353287 n 20260916 143437 c02d38cf",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 94714,
+      "sha256": "d67e2af8aecd8404d4e8ab384ed21a15185c190d5247cf3e7e114179933d6353",
+      "width": 1206,
+      "height": 1409,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf-320.webp",
+        "assets/images/campaigns/deinonychus/content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf-480.webp",
+        "assets/images/campaigns/deinonychus/content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf-640.webp",
+        "assets/images/campaigns/deinonychus/content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf-960.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf-320.webp",
+        "assets/images/campaigns/deinonychus/content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf-480.webp",
+        "assets/images/campaigns/deinonychus/content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf-640.webp",
+        "assets/images/campaigns/deinonychus/content-758588438-18058205177565356-9128241708164353287-n-20260916-143437-c02d38cf-960.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e.jpg",
+      "name": "content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e.jpg",
+      "label": "content 758730960 18058205168565356 6087933463613461192 n 20260916 143434 3898292e",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 253337,
+      "sha256": "9e96938cba1799b115a06705dee6f5d211926eb9bed7eb8f83c9efbfc320f8f9",
+      "width": 1206,
+      "height": 1410,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-320.webp",
+        "assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-480.webp",
+        "assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-640.webp",
+        "assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-320.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-320.webp",
+          "bytes": 37546,
+          "sha256": "f7ff665ec2ab8aae15f25504e9bb9933b444c6e7a83d2757e37661c6ff831f97",
+          "sourceSha256": "9e96938cba1799b115a06705dee6f5d211926eb9bed7eb8f83c9efbfc320f8f9",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-480.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-480.webp",
+          "bytes": 62652,
+          "sha256": "f1fbfa12922d07d4ac27ad500ae5611b360eb97533a9f2b1137d36b0632fdf5f",
+          "sourceSha256": "9e96938cba1799b115a06705dee6f5d211926eb9bed7eb8f83c9efbfc320f8f9",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-640.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-640.webp",
+          "bytes": 87252,
+          "sha256": "484f58b93d8d6b2710d6441c0654f2427c344d9eeaff8d66d38a284be19f6bd7",
+          "sourceSha256": "9e96938cba1799b115a06705dee6f5d211926eb9bed7eb8f83c9efbfc320f8f9",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-960.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-758730960-18058205168565356-6087933463613461192-n-20260916-143434-3898292e-960.webp",
+          "bytes": 136002,
+          "sha256": "301cfca70509cdbaa76e4a6b4609f6c5a4593fde4cbdf213403d968792edfb78",
+          "sourceSha256": "9e96938cba1799b115a06705dee6f5d211926eb9bed7eb8f83c9efbfc320f8f9",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5.jpg",
+      "name": "content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5.jpg",
+      "label": "content 759025727 18058205186565356 6229725646615067592 n 20260916 143440 f6aa9fb5",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 90500,
+      "sha256": "18ac995d423ecf696926be2c4899cbc5f24d99d011bc019a644c1a04d949b86c",
+      "width": 1206,
+      "height": 1409,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5-320.webp",
+        "assets/images/campaigns/deinonychus/content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5-480.webp",
+        "assets/images/campaigns/deinonychus/content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5-640.webp",
+        "assets/images/campaigns/deinonychus/content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5-960.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5-320.webp",
+        "assets/images/campaigns/deinonychus/content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5-480.webp",
+        "assets/images/campaigns/deinonychus/content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5-640.webp",
+        "assets/images/campaigns/deinonychus/content-759025727-18058205186565356-6229725646615067592-n-20260916-143440-f6aa9fb5-960.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5.jpg",
+      "name": "content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5.jpg",
+      "label": "content 759575129 18058205195565356 7289871845968992592 n 20260916 143442 577002a5",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 113006,
+      "sha256": "b493e9935f70df0589c15e59069a771be33252b3121090c69dc560f6dbe398b0",
+      "width": 1206,
+      "height": 1409,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-320.webp",
+        "assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-480.webp",
+        "assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-640.webp",
+        "assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-320.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-320.webp",
+          "bytes": 12326,
+          "sha256": "88f033a270d46ddd1cebe96ed3db5c2a3dc5ae21ae2b0d633739a3951788cc91",
+          "sourceSha256": "b493e9935f70df0589c15e59069a771be33252b3121090c69dc560f6dbe398b0",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-480.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-480.webp",
+          "bytes": 20988,
+          "sha256": "9a85ace00fb7570487f0799a8717e764dba8eca8ba8e9983823bd7b954ba23de",
+          "sourceSha256": "b493e9935f70df0589c15e59069a771be33252b3121090c69dc560f6dbe398b0",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-640.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-640.webp",
+          "bytes": 30378,
+          "sha256": "a6dc47094a4d14b4e6a2ffbf687ae91dd374beedf4b405e5b095e1882de5d57f",
+          "sourceSha256": "b493e9935f70df0589c15e59069a771be33252b3121090c69dc560f6dbe398b0",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-960.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/content-759575129-18058205195565356-7289871845968992592-n-20260916-143442-577002a5-960.webp",
+          "bytes": 50996,
+          "sha256": "b40e1d881cd35814b037e7e483311d19ce122fba0ddfd753bac6e19b0bb3f13d",
+          "sourceSha256": "b493e9935f70df0589c15e59069a771be33252b3121090c69dc560f6dbe398b0",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33.jpg",
+      "name": "creator-20260915-214233-e152af33.jpg",
+      "label": "creator 20260915 214233 e152af33",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 50102,
+      "sha256": "df26d7bae4fc7cc33cc16e97d47704b0962c9576326804e375399976eccc8862",
+      "width": 619,
+      "height": 640,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33-320.webp",
+        "assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33-480.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33-320.webp",
+        "assets/images/campaigns/deinonychus/creator-20260915-214233-e152af33-480.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a.jpg",
+      "name": "hero-square-20260915-214124-5273ff9a.jpg",
+      "label": "hero square 20260915 214124 5273ff9a",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 112152,
+      "sha256": "bae2ed284512f61c5c48ce1ead4129e63021801d2ac67f1824c637c367dc961a",
+      "width": 1290,
+      "height": 964,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a-320.webp",
+        "assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a-480.webp",
+        "assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a-640.webp",
+        "assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a-960.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a-320.webp",
+        "assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a-480.webp",
+        "assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a-640.webp",
+        "assets/images/campaigns/deinonychus/hero-square-20260915-214124-5273ff9a-960.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22.jpg",
+      "name": "hero-square-20260916-170848-81935b22.jpg",
+      "label": "hero square 20260916 170848 81935b22",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 78915,
+      "sha256": "3a9088ec668fa6686bf2e795019e13a6bb1e914bdbefa06a69dcb1da4d2bb1e8",
+      "width": 736,
+      "height": 492,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22-320.webp",
+        "assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22-480.webp",
+        "assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22-640.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22-320.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22-320.webp",
+          "bytes": 17032,
+          "sha256": "8ab64a3ed557fa81b28edfb7c3213ef6f89d465d8d4a1177fad74e66366cf105",
+          "sourceSha256": "3a9088ec668fa6686bf2e795019e13a6bb1e914bdbefa06a69dcb1da4d2bb1e8",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22-480.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22-480.webp",
+          "bytes": 31606,
+          "sha256": "20821930ae3c9e4827d04aed3dacc196075db7d4fe3c5cb3c0eef4e6a96ef195",
+          "sourceSha256": "3a9088ec668fa6686bf2e795019e13a6bb1e914bdbefa06a69dcb1da4d2bb1e8",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22-640.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22-640.webp",
+          "bytes": 45802,
+          "sha256": "c90497656b1195abd9a0a2c25a3e47323618301fe329aec1d84e1bea7d1a56b0",
+          "sourceSha256": "3a9088ec668fa6686bf2e795019e13a6bb1e914bdbefa06a69dcb1da4d2bb1e8",
+          "width": 640
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9.jpg",
+      "name": "hero-wide-20260915-222357-c2b257e9.jpg",
+      "label": "hero wide 20260915 222357 c2b257e9",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 112152,
+      "sha256": "bae2ed284512f61c5c48ce1ead4129e63021801d2ac67f1824c637c367dc961a",
+      "width": 1290,
+      "height": 964,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9-320.webp",
+        "assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9-480.webp",
+        "assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9-640.webp",
+        "assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9-960.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9-320.webp",
+        "assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9-480.webp",
+        "assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9-640.webp",
+        "assets/images/campaigns/deinonychus/hero-wide-20260915-222357-c2b257e9-960.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e.png",
+      "publicPath": "/assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e.png",
+      "name": "hero-wide-20260916-171135-64485b3e.png",
+      "label": "hero wide 20260916 171135 64485b3e",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 240840,
+      "sha256": "34cb3886b76298c7b1c55c2da0db7422dd38eb4d0ba4e14cbbf4014c99a8baab",
+      "width": 1141,
+      "height": 492,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-320.webp",
+        "assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-480.webp",
+        "assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-640.webp",
+        "assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-320.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-320.webp",
+          "bytes": 10030,
+          "sha256": "7022756decc03afd284e3e1b6130fae4b38a00e972be9261fcca3ed6cdcec846",
+          "sourceSha256": "34cb3886b76298c7b1c55c2da0db7422dd38eb4d0ba4e14cbbf4014c99a8baab",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-480.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-480.webp",
+          "bytes": 18974,
+          "sha256": "b58e9ba653fb450c6600e014b5a90053279886a6c5335d7bcf0733eef13ed184",
+          "sourceSha256": "34cb3886b76298c7b1c55c2da0db7422dd38eb4d0ba4e14cbbf4014c99a8baab",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-640.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-640.webp",
+          "bytes": 30062,
+          "sha256": "5e374b436db6c6b0c6309580430c78ffd175dab80ecad5f874813837b8a04df1",
+          "sourceSha256": "34cb3886b76298c7b1c55c2da0db7422dd38eb4d0ba4e14cbbf4014c99a8baab",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-960.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e-960.webp",
+          "bytes": 53012,
+          "sha256": "49e22b3eb128373769f05d396fc655f4e44e75339bdde2ca167da49da232ff9a",
+          "sourceSha256": "34cb3886b76298c7b1c55c2da0db7422dd38eb4d0ba4e14cbbf4014c99a8baab",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d.png",
+      "publicPath": "/assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d.png",
+      "name": "progress-20260916-173412-f0a1595d.png",
+      "label": "progress 20260916 173412 f0a1595d",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 259848,
+      "sha256": "89cb692b6286043f92ee023d128c31810caa9d5fa24e94d6e74833f9c25998a0",
+      "width": 2000,
+      "height": 420,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-320.webp",
+        "assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-480.webp",
+        "assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-640.webp",
+        "assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-960.webp",
+        "assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-320.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-320.webp",
+          "bytes": 5808,
+          "sha256": "db466dcecacb24331169e38b69624169a98de7b90f47cf89a9fc259026d368ca",
+          "sourceSha256": "89cb692b6286043f92ee023d128c31810caa9d5fa24e94d6e74833f9c25998a0",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-480.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-480.webp",
+          "bytes": 11146,
+          "sha256": "d88c308c99c40a6b8e885365011d26a90b76ffa4cbdea8ea31ff6818c7cc1c85",
+          "sourceSha256": "89cb692b6286043f92ee023d128c31810caa9d5fa24e94d6e74833f9c25998a0",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-640.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-640.webp",
+          "bytes": 17724,
+          "sha256": "a418f451908c69946806fae2ef442692034f7e52a6534fdf9301dd8661ae6236",
+          "sourceSha256": "89cb692b6286043f92ee023d128c31810caa9d5fa24e94d6e74833f9c25998a0",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-960.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-960.webp",
+          "bytes": 34930,
+          "sha256": "bf0f72eee45023fe4f127a5a02a33ebb6114e0d853ac46729a913c8f66bac191",
+          "sourceSha256": "89cb692b6286043f92ee023d128c31810caa9d5fa24e94d6e74833f9c25998a0",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-1600.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/progress-20260916-173412-f0a1595d-1600.webp",
+          "bytes": 72414,
+          "sha256": "2a28b9f3d37b881879aec096eb587413b56325079eda417a2dc2d60415a4568d",
+          "sourceSha256": "89cb692b6286043f92ee023d128c31810caa9d5fa24e94d6e74833f9c25998a0",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/tier-alamosaurus-sanjuanensis-20260915-220032-4481fdca.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/tier-alamosaurus-sanjuanensis-20260915-220032-4481fdca.jpg",
+      "name": "tier-alamosaurus-sanjuanensis-20260915-220032-4481fdca.jpg",
+      "label": "tier alamosaurus sanjuanensis 20260915 220032 4481fdca",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 40434,
+      "sha256": "827a13ccc874832ba4c460d5492c6dc10b99fc0d879f680970356d7b8d9651fe",
+      "width": 378,
+      "height": 529,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-alamosaurus-sanjuanensis-20260915-220032-4481fdca-320.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-alamosaurus-sanjuanensis-20260915-220032-4481fdca-320.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986.png",
+      "publicPath": "/assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986.png",
+      "name": "tier-archaeopteryx-siemensii-20260915-215737-66e46986.png",
+      "label": "tier archaeopteryx siemensii 20260915 215737 66e46986",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 1821926,
+      "sha256": "3b770eb67f1be7820d61d4d8a8a4c6c62d112bbe55701920369ad24942f326dc",
+      "width": 1280,
+      "height": 899,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986-320.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986-480.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986-640.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986-960.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986-320.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986-480.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986-640.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeopteryx-siemensii-20260915-215737-66e46986-960.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c.jpg",
+      "name": "tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c.jpg",
+      "label": "tier archaeornithomimus asiaticus 20260915 215551 43a0186c",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 59524,
+      "sha256": "e5de67efba4bb309e622101ca8e0f424e4c353c54374003137b22844d778e141",
+      "width": 1280,
+      "height": 918,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c-320.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c-480.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c-640.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c-960.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c-320.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c-480.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c-640.webp",
+        "assets/images/campaigns/deinonychus/tier-archaeornithomimus-asiaticus-20260915-215551-43a0186c-960.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262.jpg",
+      "name": "tier-bisticeratops-froeseorum-20260915-220815-d29dc262.jpg",
+      "label": "tier bisticeratops froeseorum 20260915 220815 d29dc262",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 84513,
+      "sha256": "4f91a393c6259dfbba1808801168fac7b0b19cfdf1e981fbd4fae1c59b8b8cdb",
+      "width": 1024,
+      "height": 654,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262-320.webp",
+        "assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262-480.webp",
+        "assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262-640.webp",
+        "assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262-960.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262-320.webp",
+        "assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262-480.webp",
+        "assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262-640.webp",
+        "assets/images/campaigns/deinonychus/tier-bisticeratops-froeseorum-20260915-220815-d29dc262-960.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab.jpg",
+      "name": "tier-deinocheirus-mirificus-20260915-215458-d0fe5aab.jpg",
+      "label": "tier deinocheirus mirificus 20260915 215458 d0fe5aab",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 149456,
+      "sha256": "b6a9b6704f77a642b421dad030fc5c35158d0e9fca6a58364d427b10dc2b30be",
+      "width": 2000,
+      "height": 1200,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab-320.webp",
+        "assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab-480.webp",
+        "assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab-640.webp",
+        "assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab-960.webp",
+        "assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab-1600.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab-320.webp",
+        "assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab-480.webp",
+        "assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab-640.webp",
+        "assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab-960.webp",
+        "assets/images/campaigns/deinonychus/tier-deinocheirus-mirificus-20260915-215458-d0fe5aab-1600.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8.jpg",
+      "name": "tier-moros-intrepidus-20260915-215047-929ac1d8.jpg",
+      "label": "tier moros intrepidus 20260915 215047 929ac1d8",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 291652,
+      "sha256": "e6cb2cc17e51fb0088c245fca92c7e06834827b112bf542be02e03c951bfcdae",
+      "width": 1901,
+      "height": 1250,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8-320.webp",
+        "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8-480.webp",
+        "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8-640.webp",
+        "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8-960.webp",
+        "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8-1600.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8-320.webp",
+        "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8-480.webp",
+        "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8-640.webp",
+        "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8-960.webp",
+        "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8-1600.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f.jpg",
+      "name": "tier-oviraptor-philoceratops-20260915-215903-2e2fce0f.jpg",
+      "label": "tier oviraptor philoceratops 20260915 215903 2e2fce0f",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 281150,
+      "sha256": "a04b1e4e1ca765c1afd8c3b79de599b42c72f6cdf9502ec1a9d879fa4c6d0196",
+      "width": 1610,
+      "height": 1288,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f-320.webp",
+        "assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f-480.webp",
+        "assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f-640.webp",
+        "assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f-960.webp",
+        "assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f-1600.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f-320.webp",
+        "assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f-480.webp",
+        "assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f-640.webp",
+        "assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f-960.webp",
+        "assets/images/campaigns/deinonychus/tier-oviraptor-philoceratops-20260915-215903-2e2fce0f-1600.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e.jpg",
+      "name": "tier-parasaurolophus-walkeri-20260915-220625-1e5f250e.jpg",
+      "label": "tier parasaurolophus walkeri 20260915 220625 1e5f250e",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 95123,
+      "sha256": "6bbbcb86a513067adcc80e03181664aa3147a04676f17d0026d97036564371cd",
+      "width": 1000,
+      "height": 743,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e-320.webp",
+        "assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e-480.webp",
+        "assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e-640.webp",
+        "assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e-960.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e-320.webp",
+        "assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e-480.webp",
+        "assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e-640.webp",
+        "assets/images/campaigns/deinonychus/tier-parasaurolophus-walkeri-20260915-220625-1e5f250e-960.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/tier-yutyrannus-huali-20260915-215214-d3714c2c.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/tier-yutyrannus-huali-20260915-215214-d3714c2c.jpg",
+      "name": "tier-yutyrannus-huali-20260915-215214-d3714c2c.jpg",
+      "label": "tier yutyrannus huali 20260915 215214 d3714c2c",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 35440,
+      "sha256": "88d82f5896ed614bb7529a10d985552376577d1c6e5ed4ec25bc91dc55d4218a",
+      "width": 612,
+      "height": 326,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-yutyrannus-huali-20260915-215214-d3714c2c-320.webp",
+        "assets/images/campaigns/deinonychus/tier-yutyrannus-huali-20260915-215214-d3714c2c-480.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-yutyrannus-huali-20260915-215214-d3714c2c-320.webp",
+        "assets/images/campaigns/deinonychus/tier-yutyrannus-huali-20260915-215214-d3714c2c-480.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
       "path": "assets/images/campaigns/hand-relations/hand-relations-wide.png",
       "publicPath": "/assets/images/campaigns/hand-relations/hand-relations-wide.png",
       "name": "hand-relations-wide.png",
@@ -800,6 +1854,80 @@
         {
           "path": "_data/media-optimization-manifest.json",
           "count": 5
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a.png",
+      "publicPath": "/assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a.png",
+      "name": "creator-20260915-233116-106a3d8a.png",
+      "label": "creator 20260915 233116 106a3d8a",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 93156,
+      "sha256": "4aeab3d74ed73b835a72298f3e3a61e7a0f9b3364331eebaf048eaa2468010c2",
+      "width": 3000,
+      "height": 3000,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a-320.webp",
+        "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a-480.webp",
+        "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a-640.webp",
+        "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a-960.webp",
+        "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a-1600.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a-320.webp",
+        "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a-480.webp",
+        "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a-640.webp",
+        "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a-960.webp",
+        "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a-1600.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e.png",
+      "publicPath": "/assets/images/campaigns/human-error/creator-20260915-234126-ce00645e.png",
+      "name": "creator-20260915-234126-ce00645e.png",
+      "label": "creator 20260915 234126 ce00645e",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 93156,
+      "sha256": "4aeab3d74ed73b835a72298f3e3a61e7a0f9b3364331eebaf048eaa2468010c2",
+      "width": 3000,
+      "height": 3000,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e-320.webp",
+        "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e-480.webp",
+        "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e-640.webp",
+        "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e-960.webp",
+        "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e-1600.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e-320.webp",
+        "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e-480.webp",
+        "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e-640.webp",
+        "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e-960.webp",
+        "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e-1600.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
         }
       ]
     },
@@ -8070,10 +9198,6 @@
       "warnings": [],
       "references": [
         {
-          "path": "_campaigns/deinonychus.md",
-          "count": 3
-        },
-        {
           "path": "_campaigns/hand-relations.md",
           "count": 6
         },
@@ -8087,6 +9211,10 @@
         },
         {
           "path": "_campaigns/smoke-editable.md",
+          "count": 3
+        },
+        {
+          "path": "_campaigns/tubers.md",
           "count": 3
         },
         {
@@ -8532,6 +9660,40 @@
       "derivatives": [],
       "warnings": [],
       "references": [
+        {
+          "path": "_data/media-optimization-manifest.json",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.mp4",
+      "publicPath": "/assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.mp4",
+      "name": "video-20260916-144404-dfbc1cf8.mp4",
+      "label": "video 20260916 144404 dfbc1cf8",
+      "type": "video",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 24249508,
+      "sha256": "4b0746f8bfd5601ef01b0d30c317336e96db97132b4fa1f106813405fb52e562",
+      "width": 1276,
+      "height": 720,
+      "durationMs": 117235,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.webm"
+      ],
+      "missingDerivatives": [
+        "assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.webm"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        },
         {
           "path": "_data/media-optimization-manifest.json",
           "count": 1
