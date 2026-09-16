@@ -49,10 +49,10 @@ long_content:
   - type: "text"
     body: |
       - **This is a cool indie film**
-      - **A female writer and director:** [Maddy Parrulli-Garcia](https://www.instagram.com/maddy_d_parrulli_garcia/)
+      - **A female writer and director:** [Maddy Parrulli-Garcia](https://www.instagram.com/maddy<em>d</em>parrulli_garcia/)
       - **Proudly anti-AI**
       - **Scientifically accurate**
-      - **Dinosaurs … *enough said***
+      - **Dinosaurs ... *enough said***
   - type: "text"
     body: |
       ## What will this money go towards?
