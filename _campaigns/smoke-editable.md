@@ -73,7 +73,7 @@ tiers:
     name: Standard Pass
     price: 10
     image: /assets/images/defaults/tier-frame.png
-    description: A normal digital tier for modify/cancel smoke tests.
+    description: A **normal *digital* tier** for <u>modify/cancel smoke tests</u>.
     stackable: true
     category: digital
     late_support: true

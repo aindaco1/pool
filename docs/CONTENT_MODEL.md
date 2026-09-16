@@ -148,6 +148,14 @@ stretch_goals:
 
 ### Tiers
 
+Tier descriptions support inline bold, italic, nested emphasis, underline, and
+line breaks. The cart loads the pinned Platform editor codec on cart intent and
+uses its safe inline renderer with links disabled. Campaign and featured-tier
+buttons carry attribute-escaped source text; cart rendering applies the same
+policy to newly added items and previously saved carts. Unsupported HTML stays
+escaped. Cart storage retains the original description rather than rendered
+HTML.
+
 ```yaml
 tiers:
   - id: frame-slot

@@ -63,9 +63,9 @@ describe('campaign content security audit', () => {
     const tierTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'tier-card.html'), 'utf8');
     const cardTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'campaign-card.html'), 'utf8');
     expect(tierTemplate).toContain('{{ include.tier.description | safe_rich_text }}');
-    expect(tierTemplate).toContain('{{ include.tier.description | strip_html | escape }}');
+    expect(tierTemplate).toContain('data-item-description="{{ include.tier.description | escape }}"');
     expect(cardTemplate).toContain('{{ featured.description | safe_rich_text }}');
-    expect(cardTemplate).toContain('{{ featured.description | strip_html | escape }}');
+    expect(cardTemplate).toContain('{{ featured.description | escape }}');
   });
 
   it('keeps external markdown links opening in a new tab from the safe markdown filter', () => {
