@@ -29,6 +29,22 @@ eligible. A security fix still requires a reviewed compatible Platform upgrade;
 do not weaken the pin test to bypass it. Continue running both dependency audits
 described in [SECURITY.md](./SECURITY.md#dependency-and-release-security).
 
+Campaign video-upload regression checks run with:
+
+```bash
+npx vitest run tests/unit/github-video-runtime.test.ts tests/unit/github-worker-runtime.test.ts tests/unit/admin-dashboard.test.ts
+```
+
+The video runtime suite streams an exact 100,000,000-byte synthetic file through
+workerd with a simulated GitHub receiver and checks the complete encoded-body
+hash. It also covers chunk boundaries, oversize declarations, truncated or
+overlong streams, and provider errors/redirects. API tests cover campaign scope,
+CSRF, metadata validation, and optimization only after successful persistence.
+The dashboard browser suite verifies the hero uploader sends binary bytes.
+These checks do not establish live GitHub or Cloudflare edge acceptance; after
+deployment, verify a real near-limit MP4 through the dashboard and confirm its
+repository asset and playable preview.
+
 The local-only product-video adapter has a bounded real-interface smoke path:
 
 ```bash

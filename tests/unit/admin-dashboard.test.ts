@@ -3657,7 +3657,7 @@ runner_report_emails:
     expectNoKvWritesOrLists(env, 'content editor audio upload');
   });
 
-  it('uploads admin hero videos through GitHub without KV writes', async () => {
+  it('uploads legacy JSON hero videos above 2 MB without KV writes', async () => {
     const env = {
       ...createEnv(),
       GITHUB_TOKEN: 'github-token',
@@ -3691,7 +3691,7 @@ runner_report_emails:
       body: JSON.stringify({
         filename: 'Hero Test.mp4',
         contentType: 'video/mp4',
-        content: 'data:video/mp4;base64,aGVsbG8=',
+        content: Buffer.alloc(2_000_001, 123).toString('base64'),
         kind: 'campaign-video',
         campaignSlug: 'hand-relations',
         fieldPath: 'hero_video'
@@ -3708,9 +3708,84 @@ runner_report_emails:
     expectChangedMediaOptimizationDispatch(githubCalls);
     const putCalls = githubPutCalls(githubCalls);
     expect(putCalls).toHaveLength(1);
-    expect(putCalls[0].body.content).toBe('aGVsbG8=');
+    expect(putCalls[0].body.content).toBe(Buffer.alloc(2_000_001, 123).toString('base64'));
+    expect(body.bytes).toBe(2_000_001);
     expect(putCalls[0].body.message).toContain('Upload admin video');
     expectNoKvWritesOrLists(env, 'video upload');
+  });
+
+  it.each(['campaign-video', 'campaign-content-video'])('streams %s uploads above the old 2 MB GitHub limit', async (kind) => {
+    const env = { ...createEnv(), GITHUB_TOKEN: 'github-token', GITHUB_OWNER: 'owner', GITHUB_REPO: 'repo' };
+    env.PLEDGES.store.set(`admin-user:${await sha256Hex('creator@example.com')}`, JSON.stringify({
+      email: 'creator@example.com', role: 'campaign_user', campaignSlugs: ['hand-relations']
+    }));
+    const { ctx, cookie, csrfToken } = await signInAdmin(env, 'creator@example.com');
+    const file = Buffer.alloc(3 * 1024 * 1024 + 1, 123);
+    const githubCalls: GitHubFetchCall[] = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = String(init?.method || 'GET');
+      const dispatch = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
+      if (dispatch) return dispatch;
+      if (url === 'https://pool.test/api/campaigns.json') return jsonResponse({ campaigns: [campaignFixture] });
+      if (url.includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
+      if (url.includes('/contents/assets/videos/campaigns/hand-relations/')) {
+        const body = await new Response(init?.body).json();
+        githubCalls.push({ url, method, body });
+        return jsonResponse({ content: { sha: 'video-sha' }, commit: { sha: 'video-commit' } }, 201);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+    resetKvCounters(env);
+    const params = new URLSearchParams({ kind, campaignSlug: 'hand-relations', filename: 'hero.mp4', size: String(file.length) });
+    const response = await worker.fetch(new Request(`https://pledge.pool.test/admin/settings/video-upload?${params}`, {
+      method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'video/mp4', 'x-pool-admin-csrf': csrfToken }, body: file
+    }), env, ctx);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toContain('no-store');
+    expect(await response.json()).toMatchObject({ success: true, bytes: file.length, mediaOptimization: { triggered: true } });
+    expect(Buffer.from(githubPutCalls(githubCalls)[0].body.content, 'base64').equals(file)).toBe(true);
+    expectChangedMediaOptimizationDispatch(githubCalls);
+    expectNoKvWritesOrLists(env, 'streamed video upload');
+  });
+
+  it.each([
+    { name: 'missing session', cookie: false, status: 401 },
+    { name: 'missing CSRF', csrf: false, status: 403 },
+    { name: 'unassigned campaign', campaignSlug: 'someone-else', status: 403 },
+    { name: 'platform upload', kind: 'admin-video', status: 403 },
+    { name: 'missing campaign', campaignSlug: '', status: 400 },
+    { name: 'oversize video', size: '100000001', status: 400 },
+    { name: 'missing size', size: '', status: 400 },
+    { name: 'unsupported type', type: 'text/html', status: 400 },
+    { name: 'mismatched length', length: '6', status: 400 },
+    { name: 'traversal replacement', replaceGithubPath: 'assets/videos/campaigns/other/video.mp4', status: 400 }
+  ])('rejects a binary video with $name before writing to GitHub', async (testCase) => {
+    const env = { ...createEnv(), GITHUB_TOKEN: 'github-token' };
+    env.PLEDGES.store.set(`admin-user:${await sha256Hex('creator@example.com')}`, JSON.stringify({
+      email: 'creator@example.com', role: 'campaign_user', campaignSlugs: ['hand-relations']
+    }));
+    const { ctx, cookie, csrfToken } = await signInAdmin(env, 'creator@example.com');
+    const writes: string[] = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PUT' || init?.method === 'POST') writes.push(String(input));
+      if (String(input).includes('/contents/_campaign_drafts/')) return jsonResponse({ message: 'Not Found' }, 404);
+      return jsonResponse({ campaigns: [campaignFixture] });
+    }) as typeof fetch;
+    const params = new URLSearchParams({
+      kind: testCase.kind ?? 'campaign-video', campaignSlug: testCase.campaignSlug ?? 'hand-relations',
+      size: testCase.size ?? '5', filename: 'video.mp4', replaceGithubPath: testCase.replaceGithubPath ?? ''
+    });
+    const response = await worker.fetch(new Request(`https://pledge.pool.test/admin/settings/video-upload?${params}`, {
+      method: 'POST', headers: {
+        Cookie: testCase.cookie === false ? '' : cookie,
+        'x-pool-admin-csrf': testCase.csrf === false ? '' : csrfToken,
+        'Content-Type': testCase.type ?? 'video/mp4',
+        ...(testCase.length ? { 'Content-Length': testCase.length } : {})
+      }, body: 'video'
+    }), env, ctx);
+    expect(response.status).toBe(testCase.status);
+    expect(writes).toEqual([]);
   });
 
   it('deletes dashboard-owned content media when a published content block is removed', async () => {

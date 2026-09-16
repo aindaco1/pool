@@ -104,7 +104,7 @@ import {
 import { isCampaignLive, getCampaign, getCampaigns, getEffectiveState } from './campaigns.js';
 import { applyAddOnInventoryProjectionDelta, ensureAddOnInventorySoldProjection, getAddOns, getAddOnInventorySnapshot, invalidateAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
 import { getCampaignStats, addPledgeToStats, removePledgeFromStats, recalculateStats, getTierInventory, claimTierInventory, releaseTierInventory, recalculateTierInventory, checkMilestones, markMilestoneSent, getSentMilestones, updateSupportItemStats, getSentDiaryEntries, markDiarySent, claimTierSelectionInventory, applyTierInventorySelectionChanges, checkCampaignProjectionDrift } from './stats.js';
-import { deleteGitHubFile, getGitHubTextFile, listGitHubDirectory, putGitHubBase64File, putGitHubTextFile, triggerCampaignArchive, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
+import { deleteGitHubFile, getGitHubTextFile, listGitHubDirectory, putGitHubBase64File, putGitHubVideoFile, MAX_VIDEO_UPLOAD_BYTES, putGitHubTextFile, triggerCampaignArchive, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
 import { getScopedConsole } from './logger.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { calculatePlatformTip, derivePlatformTipPercent, sanitizePlatformTipPercent } from './tip.js';
@@ -291,7 +291,8 @@ const MAX_STANDARD_JSON_BODY_BYTES = 64 * 1024;
 const MAX_ADMIN_LOGO_UPLOAD_BODY_BYTES = 1024 * 1024;
 const MAX_ADMIN_IMAGE_UPLOAD_BODY_BYTES = 12 * 1024 * 1024;
 const MAX_ADMIN_AUDIO_UPLOAD_BODY_BYTES = 36 * 1024 * 1024;
-const MAX_ADMIN_VIDEO_UPLOAD_BODY_BYTES = 140 * 1024 * 1024;
+// Compatibility for older dashboard tabs; full-size videos use a binary body.
+const MAX_ADMIN_VIDEO_UPLOAD_BODY_BYTES = 12 * 1024 * 1024;
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 256 * 1024;
 const MAX_FILM_STRIPE_SUMMARY_BODY_BYTES = 16 * 1024;
 const FILM_STRIPE_SUMMARY_MAX_REFS = 100;
@@ -16923,7 +16924,7 @@ function adminMediaUploadScope(body = {}) {
   return { ok: true, permission: 'settings:publish', campaignSlug: '' };
 }
 
-function normalizeAdminMediaUpload(body = {}, options = {}) {
+function normalizeAdminMediaUpload(body = {}, options = {}, binaryBytes = null) {
   const label = options.label || 'Media upload';
   const filename = String(body.filename || options.defaultFilename || 'upload').trim().toLowerCase();
   const contentType = String(body.contentType || '').trim().toLowerCase();
@@ -16938,10 +16939,10 @@ function normalizeAdminMediaUpload(body = {}, options = {}) {
     return { ok: false, error: `${label} content type does not match the uploaded file.` };
   }
   const base64 = content.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
-  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) {
+  if (binaryBytes === null && !/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) {
     return { ok: false, error: `${label} content must be base64 encoded.` };
   }
-  const estimatedBytes = Math.floor((base64.length * 3) / 4);
+  const estimatedBytes = binaryBytes ?? (Math.floor((base64.length * 3) / 4) - (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0));
   if (estimatedBytes <= 0) {
     return { ok: false, error: `${label} is empty.` };
   }
@@ -16983,7 +16984,15 @@ function normalizeAdminMediaUpload(body = {}, options = {}) {
 }
 
 async function handleAdminMediaUpload(request, env, options = {}) {
-  const parsedBody = await parseJsonRequestBody(request, env, {
+  const binaryUpload = options.streamBinary && !requestHasJsonContentType(request);
+  const url = new URL(request.url);
+  if (binaryUpload && url.search.length > 8192) {
+    return privateJsonResponse({ error: 'Video upload metadata is too large.' }, 400, env);
+  }
+  const parsedBody = binaryUpload ? {
+    ok: true,
+    body: { ...Object.fromEntries(url.searchParams), contentType: request.headers.get('Content-Type'), content: '', dataBase64: '' }
+  } : await parseJsonRequestBody(request, env, {
     maxBytes: options.maxBodyBytes || MAX_ADMIN_LOGO_UPLOAD_BODY_BYTES,
     privateResponse: true,
     emptyValue: {}
@@ -17008,9 +17017,21 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     }
   }
 
+  let binaryBytes = null;
+  if (binaryUpload) {
+    binaryBytes = /^\d+$/.test(body.size || '') ? Number(body.size) : NaN;
+    if (!Number.isSafeInteger(binaryBytes) || binaryBytes <= 0 || binaryBytes > options.maxFileBytes) {
+      return privateJsonResponse({ error: options.sizeError }, 400, env);
+    }
+    const declaredLength = request.headers.get('Content-Length');
+    if (!request.body || (declaredLength !== null && Number(declaredLength) !== binaryBytes)) {
+      return privateJsonResponse({ error: 'Video upload size does not match the selected file.' }, 400, env);
+    }
+  }
+
   // Campaign replacements get a new URL so unpublished edits cannot change live media.
-  let normalized = normalizeAdminMediaUpload(body, options);
-  if (normalized.ok && uploadScope.campaignSlug) normalized = normalizeAdminMediaUpload({ ...body, replaceGithubPath: '', replaceSha: '' }, options);
+  let normalized = normalizeAdminMediaUpload(body, options, binaryBytes);
+  if (normalized.ok && uploadScope.campaignSlug) normalized = normalizeAdminMediaUpload({ ...body, replaceGithubPath: '', replaceSha: '' }, options, binaryBytes);
   if (normalized.ok && uploadScope.campaignSlug) {
     normalized.filePath = normalized.filePath.replace(/(\.[a-z0-9]+)$/i, `-${crypto.randomUUID().slice(0, 8)}$1`);
     normalized.publicPath = `/${normalized.filePath}`;
@@ -17019,12 +17040,16 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     return privateJsonResponse({ error: normalized.error }, 400, env);
   }
 
-  const uploaded = await putGitHubBase64File(
+  const message = `${normalized.replaceSha ? 'Replace' : 'Upload'} ${options.commitLabel || 'admin media'} ${normalized.filePath}`;
+  const uploaded = binaryUpload ? await putGitHubVideoFile(
+    env, normalized.filePath, request.body, binaryBytes, message, normalized.replaceSha
+  ) : await putGitHubBase64File(
     env,
     normalized.filePath,
     normalized.base64,
-    `${normalized.replaceSha ? 'Replace' : 'Upload'} ${options.commitLabel || 'admin media'} ${normalized.filePath}`,
-    normalized.replaceSha
+    message,
+    normalized.replaceSha,
+    options.streamBinary ? options.maxFileBytes : undefined
   );
   if (!uploaded.ok) {
     return privateJsonResponse({
@@ -17119,7 +17144,8 @@ function handleAdminVideoUpload(request, env) {
     defaultFilename: 'hero-video',
     directory: 'assets/videos/defaults',
     maxBodyBytes: MAX_ADMIN_VIDEO_UPLOAD_BODY_BYTES,
-    maxFileBytes: 100 * 1024 * 1024,
+    maxFileBytes: MAX_VIDEO_UPLOAD_BYTES,
+    streamBinary: true,
     allowedTypes: new Map([
       ['video/mp4', 'mp4'],
       ['video/webm', 'webm'],

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fix campaign video uploads failing at the shared GitHub helper's 2 MB limit.
+  Hero, Content, Diary, and replacement uploads stream binary files up to
+  100 MB to GitHub, with bounded memory and exact size validation.
+
 - Fix user assignments to newly created, unpublished campaigns by validating against the dashboard campaign list.
 
 - Preserve existing unassigned campaign users when other users are edited.

@@ -128,7 +128,9 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();
-    const body = request.postData() ? JSON.parse(request.postData() || '{}') : {};
+    const body = url.pathname === '/admin/settings/video-upload'
+      ? { ...Object.fromEntries(url.searchParams), contentType: request.headers()['content-type'], bytes: request.postDataBuffer()?.length }
+      : request.postData() ? JSON.parse(request.postData() || '{}') : {};
     const fulfillJson = (payload: Record<string, any>, status = 200, extraHeaders: Record<string, string> = {}) => route.fulfill({
       status,
       headers: { ...JSON_HEADERS, ...extraHeaders },
@@ -1558,6 +1560,8 @@ test.describe('Admin Dashboard', () => {
       buffer: Buffer.from('video')
     });
     await expect.poll(() => calls.imageUpload.at(-1)?.contentType).toBe('video/mp4');
+    expect(calls.imageUpload.at(-1)).toMatchObject({ size: '5', bytes: 5, campaignSlug: 'hand-relations' });
+    expect(calls.imageUpload.at(-1)?.content).toBeUndefined();
     await expect(page.locator('[data-settings-path="hero_video"] video source')).toHaveAttribute('src', '/assets/videos/campaigns/hand-relations/video-e2e.mp4');
     await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="tiers"]').click();
     const featuredTier = page.locator('[data-settings-path="featured_tier_id"]');
