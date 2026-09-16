@@ -67,7 +67,7 @@ support_items: []
 campaign_add_ons:
   - id: "drawing-of-you-as-a-dinosaur"
     name: "Drawing of YOU as a Dinosaur"
-    description: "This is a customized drawing of you as a dinosaur, created by a talented local artist"
+    description: "A customized drawing of you as a dinosaur, created by a talented local artist."
     image_url: ""
     price: 30.00
     category: "physical"
@@ -75,7 +75,7 @@ campaign_add_ons:
     variants: []
   - id: "dino-plushie"
     name: "Dino plushie"
-    description: "This is an adorable plushie, handmade by a local artist"
+    description: "An adorable plushie, handmade by a local artist."
     image_url: ""
     price: 50.00
     category: "physical"
@@ -83,7 +83,7 @@ campaign_add_ons:
     variants: []
   - id: "cretaceous-critters-t-shirt"
     name: "Cretaceous Critters T-Shirt"
-    description: "This is a \"Cretaceous Critters Wildlife Park\" Employee t-shirt, designed by the director"
+    description: "A \"Cretaceous Critters Wildlife Park\" Employee t-shirt, designed by the director."
     image_url: ""
     price: 35.00
     category: "physical"
@@ -91,7 +91,7 @@ campaign_add_ons:
     variants: []
   - id: "cretaceous-critters-keychain"
     name: "Cretaceous Critters Keychain"
-    description: "This is a keychain from \"Cretaceous Critters Wildlife Park\" designed by the director"
+    description: "A keychain from \"Cretaceous Critters Wildlife Park\" designed by the director."
     image_url: ""
     price: 10.00
     category: "physical"
@@ -99,7 +99,7 @@ campaign_add_ons:
     variants: []
   - id: "deinonychus-stickers"
     name: "Deinonychus Stickers"
-    description: "This is a special sticker from the film Deinonychus, designed by a local artist"
+    description: "A special sticker from the film Deinonychus, designed by a local artist."
     image_url: ""
     price: 5.00
     category: "physical"
@@ -223,6 +223,6 @@ diary: []
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
 _pool_draft_base_hash: "7ffd86b727a77ef80c8f1eed4f2264c8e2b44fff88b32dd06bb738cf9488c426"
-_pool_draft_saved_at: "2026-09-16T14:26:48.475Z"
+_pool_draft_saved_at: "2026-09-16T14:28:11.253Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 ---
