@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Render uploaded campaign hero videos with their actual MP4, WebM, or MOV
+  source type instead of labeling every upload as WebM. Share source rendering
+  with content videos, including mixed-case extensions and URL query strings.
+
 - Keep Podman project tools on the selected shared engine. Remove automatic VM
   restarts and host-port process killing so other local projects remain running.
   Preserve explicit endpoints, the CLI on PATH, and release resource checks.
