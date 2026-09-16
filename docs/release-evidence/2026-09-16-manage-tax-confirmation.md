@@ -104,3 +104,29 @@ Pool pins Platform 0.39.1 / Tax Core 0.3.1 at `51f552d02fe0f888ffdefcc556a405906
 The prior independent rollback pin is
 `6b82237e926137b6062f9dd454bd6598280e7353`; reverting it also restores the runtime
 defect. Other consumers retain their existing immutable pins.
+
+
+## Final production verification
+
+- [Platform PR #45](https://github.com/aindaco1/dust-wave-platform/pull/45)
+  merged after Node 22/24 security and test jobs and the Jekyll recipe job passed.
+  Local Platform checks passed 340 package tests plus consumer recipe checks.
+- [Pool PR #56](https://github.com/aindaco1/pool/pull/56) merged as
+  `565400ddfd7379af2165a1ad18c2250b2075c35f` after the complete
+  [hosted Merge Smoke gate and four dependency audits](https://github.com/aindaco1/pool/actions/runs/35148548101)
+  passed. The final focused Pool suites passed 155 tests.
+- [Deploy Production](https://github.com/aindaco1/pool/actions/runs/35149305374)
+  successfully deployed that exact revision to the Worker and GitHub Pages.
+  Worker version: `a7ef698c-b74b-4eee-8479-7a3068c371db`. Public admin security
+  policy and the 18-URL crawl audit passed.
+- A production `POST /tax/quote` for the supplied address returned HTTP 200,
+  `nm_grt_api_intuit`, location `29-504`, rate `0.075625`, and `taxCents: 1180`.
+  The response retained `private, no-store, max-age=0` cache policy.
+- A fresh production browser recreated the original two-sticker selection:
+  $150.00 tier + $6.00 add-ons = $156.00 subtotal, $23.40 tip, $11.80 tax,
+  $5.17 shipping, and $196.37 total. The page and confirmation modal both
+  showed those values and the exact 7.5625% label. The modal was visually
+  inspected and left open for the supporter; Confirm Changes was not clicked.
+- Read-only production storage verification retained the original active,
+  uncharged pledge at $175.50, with no saved platform add-ons. No pledge update
+  or payment was performed by this verification.
