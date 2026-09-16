@@ -58,11 +58,11 @@ long_content:
       ## What will this money go towards?
   - type: "text"
     body: |
-      - Kiwi, the animatronic dinosaur (she needs a makeover!)
-      - Crafty and catering (trust me, no one wants a hungry director)
-      - Location (because believe it or not, we have to pay to film in a bathroom)
-      - Equipment (sadly lights and cameras aren’t free)
-      - Whatever is left will go to pay cast and crew (donate pretty please, thanks in advance :-))
+      - **Kiwi, the animatronic dinosaur** *(she needs a makeover!)*
+      - **Crafty and catering** *(trust me, no one wants a hungry director)*
+      - **Location** *(because believe it or not, we have to pay to film in a bathroom)*
+      - **Equipment** *(sadly lights and cameras aren’t free)*
+      - **Whatever is left will go to pay cast and crew** *(donate pretty please, thanks in advance :-))*
 support_items: []
 campaign_add_ons:
   - id: "drawing-of-you-as-a-dinosaur"
@@ -244,8 +244,8 @@ diary:
             alt: "liane casting"
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
-_pool_draft_base_hash: "8bf0b22dec128a43fb11dd622b2cf949ba01866c9e9e55eaba83ddef7d6c066d"
-_pool_draft_saved_at: "2026-09-16T17:34:18.407Z"
+_pool_draft_base_hash: "d7f9ac5842c42a71d5e36f005fc4829b87ca1c54be0ea8f3ef5afdc82209a836"
+_pool_draft_saved_at: "2026-09-16T17:48:37.026Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 hero_video: "/assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.mp4"
 campaign_background: "/assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc.png"
