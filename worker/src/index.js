@@ -16997,7 +16997,15 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     privateResponse: true,
     emptyValue: {}
   });
-  if (!parsedBody.ok) return parsedBody.response;
+  if (!parsedBody.ok) {
+    if (options.streamBinary && !binaryUpload && parsedBody.response.status === 413) {
+      return privateJsonResponse({
+        error: 'This dashboard tab uses an older video uploader. Save your draft, reload the dashboard, and retry. Videos up to 100 MB are supported.',
+        code: 'video_upload_client_outdated'
+      }, 413, env);
+    }
+    return parsedBody.response;
+  }
 
   const body = parsedBody.body || {};
   const uploadScope = adminMediaUploadScope(body);

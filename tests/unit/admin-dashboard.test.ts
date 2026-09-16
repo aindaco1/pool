@@ -3657,6 +3657,33 @@ runner_report_emails:
     expectNoKvWritesOrLists(env, 'content editor audio upload');
   });
 
+  it('explains how an old dashboard tab can recover from an oversized JSON video upload', async () => {
+    const env = createEnv();
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const providerFetch = vi.fn();
+    global.fetch = providerFetch as typeof fetch;
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/settings/video-upload', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        'Content-Type': 'application/json',
+        'Content-Length': String(34_000_000),
+        'x-pool-admin-csrf': csrfToken
+      },
+      body: '{}'
+    }), env, ctx);
+
+    expect(response.status).toBe(413);
+    expect(response.headers.get('Cache-Control')).toContain('no-store');
+    expect(await response.json()).toEqual({
+      error: 'This dashboard tab uses an older video uploader. Save your draft, reload the dashboard, and retry. Videos up to 100 MB are supported.',
+      code: 'video_upload_client_outdated'
+    });
+    expect(providerFetch).not.toHaveBeenCalled();
+    expectNoKvWritesOrLists(env, 'oversized legacy video upload');
+  });
+
   it('uploads legacy JSON hero videos above 2 MB without KV writes', async () => {
     const env = {
       ...createEnv(),

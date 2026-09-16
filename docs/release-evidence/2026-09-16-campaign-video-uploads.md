@@ -60,7 +60,13 @@ file controls remain in use. No new personal data or messaging is introduced.
 
 ## Provider acceptance
 
-The runtime receiver is simulated. These checks do not prove live Cloudflare
-edge ingestion, GitHub persistence, Pages propagation, optimization, or playback
-of a creator's actual video. Production deployment and a real near-limit video
-upload remain separate acceptance steps.
+Production deployment [35108292012](https://github.com/aindaco1/pool/actions/runs/35108292012)
+completed successfully for `ebe48acbca47907c2141bb6128f81d478fb3a453`, including
+the Worker, Pages, cache purge, admin response policy, and crawl checks.
+The creator confirmed that a real 24 MB video uploaded successfully after saving
+the draft and reloading a dashboard tab opened before deployment. Oversized
+legacy JSON uploads now explain that recovery instead of a generic body-limit
+error; the bounded JSON limit is retained.
+
+The exact 100 MB boundary is verified in workerd against a simulated receiver.
+A live near-limit upload, optimization, and playback remain unverified.
