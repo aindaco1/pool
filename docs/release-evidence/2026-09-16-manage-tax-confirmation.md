@@ -49,7 +49,24 @@ wrong source/rate. They pass with the fix. Synthetic fixture addresses are used.
 - Display regressions cover zero-rate fallbacks, malformed quote amounts,
   cached reuse, and responses arriving after a newer edit.
 
-Full pre-merge and deployment verification are recorded below as completed.
+The local full pre-merge run passed every non-browser phase: 1,012 unit tests
+(one existing skip), 127 security tests, secret/template/syntax checks,
+production build/minification/SEO, release-command checks, host Worker smoke,
+and isolated Podman pledge modification/cancellation smoke.
+
+The browser phase passed all six new tax cases and 126 cases immediately,
+with three existing cases passing on retry, three skipped, and one unrelated
+Spanish admin layout case failing. All four affected existing cases passed
+on an isolated single-worker rerun (4/4), without code changes. The 7.5625%
+confirmation screenshot was visually inspected and showed $196.37.
+
+[Hosted Merge Smoke](https://github.com/aindaco1/pool/actions/runs/35146503793)
+passed the complete pre-merge gate, including the full browser phase, and all
+four root/Worker production/full dependency audits passed on `cdd6c2b`.
+[PR #55](https://github.com/aindaco1/pool/pull/55) merged as
+`c8df219985cd1c02262d49342665789eb709d1ca`. The merge-triggered
+[Release Provider Evidence](https://github.com/aindaco1/pool/actions/runs/35147351053)
+workflow also passed; this is distinct from the address-specific lookup above.
 
 ## Ethical review and acceptance boundary
 
@@ -59,3 +76,31 @@ keeps the canonical Worker calculation aligned with the preview, preserves
 historical accepted quotes, and retains the supporter confirmation step. It
 collects no new data and changes no permission, indexing, localization routing,
 or payment authority. Production verification does not submit a pledge update.
+
+
+## Production runtime follow-up
+
+The first [deployment](https://github.com/aindaco1/pool/actions/runs/35147362880)
+successfully published the page/Worker address-selection fix and passed its
+public security/crawl checks. The live preview then exposed an additional
+provider transport defect: Cloudflare rejects `fetch` with `redirect: 'error'`
+before making the request. The shared provider caught that error and Pool
+silently used the configured 7.625% fallback (`nm_grt_fallback_flat`).
+
+An isolated remote Worker using the production compatibility date and flags
+reproduced that exact exception. Tax Core 0.3.1 switches to `redirect: 'manual'`
+and explicitly rejects every 3xx response before reading a body or following
+the redirect. The same remote Worker then returned the EDAC 7.5625% rate and
+location `29-504` for the supplied address. The probe uses no production
+bindings and persists no pledge data.
+
+Provider regressions reproduce Cloudflare's supported redirect modes and reject
+300–399 responses without following them or exposing request credentials.
+A Pool adapter regression checks that the $156 subtotal returns $11.80 tax
+through the live provider path, rather than $11.90 through the configured
+fallback. Platform's security, dependency, package, and recipe checks passed.
+
+Pool pins Platform 0.39.1 / Tax Core 0.3.1 at `51f552d02fe0f888ffdefcc556a4059067f0f3d4`.
+The prior independent rollback pin is
+`6b82237e926137b6062f9dd454bd6598280e7353`; reverting it also restores the runtime
+defect. Other consumers retain their existing immutable pins.

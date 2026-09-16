@@ -22,6 +22,10 @@ The tax layer keeps one consistent answer across:
 - supporter emails
 - reports and exports
 
+Provider transport uses Cloudflare-compatible manual redirect mode and rejects
+3xx responses explicitly. This keeps live lookups usable in the Worker runtime
+without forwarding provider credentials or address queries to redirect targets.
+
 The Worker remains the source of truth. The browser can request previews, but
 persisted totals come from Worker-side calculation. The accepted first-party
 checkout quote is hash-verified at completion and its totals are retained. Completion
