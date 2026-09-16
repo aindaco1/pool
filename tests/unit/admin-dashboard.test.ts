@@ -5898,6 +5898,7 @@ diary:
     expect(preview.preview.html).toContain('https://fonts.googleapis.com/css?family=Inter:400,700');
     expect(preview.preview.html).toContain('https://use.typekit.net/hoj2yet.css');
     expect(preview.preview.html).toContain('/assets/main.css');
+    expect(preview.preview.html).toContain('/assets/admin.css');
     expect(preview.preview.html).toContain('Hand Relations Preview');
     expect(preview.preview.html).toContain('<strong>safe</strong>');
     expect(preview.preview.html).toContain('<em>legacy emphasis</em>');
@@ -7079,6 +7080,41 @@ Preserved Markdown body.
     w.files.set('_campaigns/hand-relations.md', { sha: 'other-author', content: w.source.replace('Original story', 'Other author story') });
     expect((await w.request({ intent: 'publish', campaignSlug: 'hand-relations', baseRevision: saved.body.baseRevision })).status).toBe(409);
     expect(w.files.get('_campaign_drafts/hand-relations.md')!.content).toContain('Saved new story');
+  });
+
+  it('saves and publishes images without alt text and drops empty diary text placeholders', async () => {
+    const w = await workspace();
+    const initial = await w.request();
+    const image = { type: 'image', src: '/assets/images/campaigns/hand-relations/still.png', alt: '', decorative: false };
+    const gallery = { type: 'gallery', images: [
+      { src: image.src, alt: '', decorative: false },
+      { src: image.src },
+      { src: image.src, alt: '<b>' + 'a'.repeat(350) + '</b>' },
+      { src: image.src, alt: 'Unused description', decorative: true }
+    ] };
+    const saved = await w.request({
+      intent: 'save', campaignSlug: 'hand-relations', baseRevision: initial.body.campaign.baseRevision,
+      settingsRevision: initial.body.campaign.baseRevision,
+      draft: { title: 'Hand Relations', shortBlurb: 'Original blurb', longContent: [image, gallery] },
+      changes: [{ path: 'diary', campaignSlug: 'hand-relations', value: JSON.stringify([
+        { title: 'Cast announcement', content: [{ type: 'text', body: '  ', align: 'left' }, image, gallery] }
+      ]) }]
+    });
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    const reload = await w.request();
+    expect(reload.body.campaign.longContent[0].alt).toBe('');
+    expect(reload.body.campaign.longContent[1].images.map((entry: any) => entry.alt)).toEqual(['', '', 'a'.repeat(300), '']);
+    const preview = await w.request(undefined, '/admin/campaign-preview/hand-relations');
+    expect(preview.status, JSON.stringify(preview.body)).toBe(200);
+    expect(preview.body.preview.html).toContain('/assets/admin.css');
+    expect(preview.body.preview.html).toContain('Cast announcement');
+    const published = await w.request({ intent: 'publish', campaignSlug: 'hand-relations', baseRevision: saved.body.baseRevision });
+    expect(published.status, JSON.stringify(published.body)).toBe(200);
+    const source = w.files.get('_campaigns/hand-relations.md')!.content;
+    expect(source).toContain('Cast announcement');
+    expect(source).not.toContain('body: "  "');
+    expect(source).not.toContain('<b>');
+    expect(source).not.toContain('Unused description');
   });
 
   it('keeps reviewer links valid across saves and renders the latest saved revision', async () => {

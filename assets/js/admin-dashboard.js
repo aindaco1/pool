@@ -7262,9 +7262,8 @@
 
   function syncContentJsonFromBlocks() {
     if (activeContentJsonField instanceof HTMLTextAreaElement) {
-      var editingDiary = activeDiaryContentField instanceof HTMLTextAreaElement && activeContentJsonField === activeDiaryContentField;
       activeContentJsonField.value = JSON.stringify(serializableContentBlocks(contentBlocks, {
-        dropEmptyDraftBlocks: !editingDiary
+        dropEmptyDraftBlocks: true
       }), null, 2);
     }
   }
@@ -7759,7 +7758,7 @@
     lastContentMutation = 'field';
     syncContentJsonFromBlocks();
     renderContentBlocks(resolved.index);
-    writeContentDraft({ schedulePreview: false });
+    writeContentDraft();
     setText(contentEditorStatusTarget(), t('content_media_library_selected', 'Existing image selected.'));
     return true;
   }
@@ -8357,7 +8356,7 @@
           help: t('content_field_decorative_help', 'Use only when the image adds no information. Decorative images use empty alt text and are skipped by screen readers.')
         }),
         createContentInput('input', block, index, 'alt', t('content_field_alt', 'Alt text'), {
-          help: block.decorative ? t('content_field_alt_decorative_help', 'Alt text stays empty for a decorative image.') : t('content_field_alt_help', 'Required for meaningful images. Describe the information or purpose, not every visual detail.'),
+          help: block.decorative ? t('content_field_alt_decorative_help', 'Alt text stays empty for a decorative image.') : t('content_field_alt_help', 'Optional. Describe the information or purpose for screen readers; you can save and publish without alt text.'),
           disabled: block.decorative === true
         })
       );
@@ -8513,7 +8512,7 @@
         help: t('content_field_decorative_help', 'Use only when the image adds no information. Decorative images use empty alt text and are skipped by screen readers.')
       }),
       createGalleryImageInput('input', block, index, imageIndex, 'alt', t('content_field_alt', 'Alt text'), {
-        help: block.images?.[imageIndex]?.decorative ? t('content_field_alt_decorative_help', 'Alt text stays empty for a decorative image.') : t('content_field_alt_help', 'Required for meaningful images. Describe the information or purpose, not every visual detail.'),
+        help: block.images?.[imageIndex]?.decorative ? t('content_field_alt_decorative_help', 'Alt text stays empty for a decorative image.') : t('content_field_alt_help', 'Optional. Describe the information or purpose for screen readers; you can save and publish without alt text.'),
         disabled: block.images?.[imageIndex]?.decorative === true
       }),
       createGalleryImageCaptionInput(block, index, imageIndex)
@@ -8769,7 +8768,7 @@
     lastContentMutation = 'field';
     syncContentJsonFromBlocks();
     renderContentBlocks(resolved.index);
-    writeContentDraft({ schedulePreview: false });
+    writeContentDraft();
     setText(contentEditorStatusTarget(), t('content_media_selected', '%{name} selected. It will upload before publishing or sending.', {
       name: file.name || t('content_media_file', 'File')
     }));
@@ -9418,8 +9417,65 @@
     });
   }
 
+  async function prepareContentPreviewMedia(draft) {
+    var replacements = new Map();
+    var sourceBlocks = contentBlocks.filter(function(block) { return !isEmptyDraftTextBlock(block); });
+    var pending = pendingContentUploads(sourceBlocks);
+    for (var item of pending) {
+      var field = item.meta?.field || 'src';
+      var block = draft.longContent[item.meta.index];
+      var target = item.meta.imageIndex !== undefined ? block?.images?.[item.meta.imageIndex] : block;
+      if (!target) continue;
+      var kind = item.pending.kind || 'image';
+      var placeholder = '/assets/' + (kind === 'image' ? 'images' : kind === 'video' ? 'videos' : 'audio') + '/campaigns/' + draft.campaignSlug + '/preview-' + replacements.size + (kind === 'image' ? '.png' : kind === 'video' ? '.mp4' : '.mp3');
+      var dataUrl = '';
+      if (kind === 'image') {
+        // Opaque sandboxed previews cannot read the editor's blob URLs. Keep a
+        // bounded thumbnail in this tab; never send file bytes to the preview API.
+        if (!item.pending.inlinePreview) {
+          item.pending.inlinePreview = (async function(url) {
+            var image = new Image();
+            image.src = url;
+            await image.decode();
+            var scale = Math.min(1, 960 / Math.max(image.naturalWidth, image.naturalHeight));
+            var canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/webp', 0.85);
+          })(item.pending.previewUrl).catch(function() { return ''; });
+        }
+        dataUrl = await item.pending.inlinePreview;
+      }
+      target[field] = placeholder;
+      replacements.set(placeholder, dataUrl);
+    }
+    return replacements;
+  }
+
   function renderContentPreview(data, options) {
     var html = data?.preview?.html || '';
+    if (html && options?.media?.size) {
+      var documentPreview = new DOMParser().parseFromString(html, 'text/html');
+      documentPreview.querySelectorAll('[src], [poster]').forEach(function(element) {
+        ['src', 'poster'].forEach(function(attribute) {
+          var path = element.getAttribute(attribute);
+          if (!options.media.has(path)) return;
+          var dataUrl = options.media.get(path);
+          if (dataUrl) {
+            element.setAttribute(attribute, dataUrl);
+          } else {
+            element.removeAttribute(attribute);
+            if (attribute === 'poster') return;
+            var placeholder = documentPreview.createElement('p');
+            placeholder.className = 'admin-content-preview__media-placeholder';
+            placeholder.textContent = t('content_preview_pending_file', 'Selected media will be playable here after saving the project.');
+            (element.closest('video, audio') || element).replaceWith(placeholder);
+          }
+        });
+      });
+      html = '<!doctype html>' + documentPreview.documentElement.outerHTML;
+    }
     if (contentPreviewDesktop instanceof HTMLIFrameElement) contentPreviewDesktop.srcdoc = html;
     if (contentPreviewMobile instanceof HTMLIFrameElement) contentPreviewMobile.srcdoc = html;
     renderContentValidation(options?.suppressValidation ? {} : data);
@@ -9530,15 +9586,12 @@
       if (!options?.silent) setText(contentStatus, currentCampaigns.length ? '' : t('no_campaigns', 'No campaigns are available for this admin account.'));
       return;
     }
-    if (hasPendingContentUploads(contentBlocks)) {
-      renderContentValidation({});
-      if (!options?.silent) setText(contentStatus, t('content_preview_pending_media', 'Selected media is previewing in the editor. It will upload before publishing or sending, then refresh the mobile preview.'));
-      return;
-    }
-
     var requestId = ++contentPreviewRequestId;
     if (!options?.silent) setText(contentStatus, t('content_previewing', 'Validating preview...'));
+    var previewMedia = new Map();
     try {
+      previewMedia = await prepareContentPreviewMedia(draft);
+      if (requestId !== contentPreviewRequestId) return;
       var data = await requestJson('/admin/content/preview', {
         method: 'POST',
         body: JSON.stringify({
@@ -9547,12 +9600,12 @@
         })
       });
       if (requestId !== contentPreviewRequestId) return;
-      renderContentPreview(data, { suppressValidation: options?.auto === true });
+      renderContentPreview(data, { suppressValidation: options?.auto === true, media: previewMedia });
       if (!options?.silent) setText(contentStatus, t('content_preview_ready', 'Preview is ready.'));
     } catch (error) {
       if (requestId !== contentPreviewRequestId) return;
       if (error?.data?.preview) {
-        renderContentPreview(error.data, { suppressValidation: options?.auto === true });
+        renderContentPreview(error.data, { suppressValidation: options?.auto === true, media: previewMedia });
       } else if (!options?.auto) {
         renderContentValidation(error?.data || {});
       }
@@ -9645,7 +9698,7 @@
         entryIndex: card ? Array.from(card.parentElement?.querySelectorAll('[data-campaign-collection-card]') || []).indexOf(card) : i
       });
       editor.__contentBlocks = blocks;
-      field.value = JSON.stringify(serializableContentBlocks(blocks), null, 2);
+      field.value = JSON.stringify(serializableContentBlocks(blocks, { dropEmptyDraftBlocks: true }), null, 2);
       field.dispatchEvent(new Event('change', { bubbles: true }));
       field.dataset.diaryDraftOriginal = contentEditorDirtySnapshot(field.value);
       markDiaryEditorDirty(editor, false);

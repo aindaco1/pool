@@ -70,6 +70,10 @@ Quote strings with special characters to avoid YAML parsing issues.
 
 ### Media Fields
 
+Image alt text is optional. Missing descriptions remain an accessibility
+recommendation and do not prevent saving or publishing. Decorative state is
+explicit; leaving a description empty does not mark the image decorative.
+
 - **`hero_image`** (required): Square/vertical image for home page card previews
 - **`hero_image_wide`** (optional): Wide image for campaign detail page (falls back to `hero_image`)
 - **`hero_video`** (optional): Uploaded MP4, WebM, or MOV path, or supported video-provider URL, for campaign detail (local video uses `hero_image_wide` or `hero_image` as its poster)

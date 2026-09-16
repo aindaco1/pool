@@ -172,7 +172,7 @@ function renderFilterInPodman(script: string, input: string, provider: string) {
   ).trim();
 }
 
-function renderFilter(method: 'safe_markdownify' | 'approved_embed_src', input: string, provider = '') {
+function renderFilter(method: 'safe_rich_text' | 'safe_markdownify' | 'approved_embed_src', input: string, provider = '') {
   const script = `
 root = Dir.pwd
 require 'jekyll'
@@ -188,6 +188,8 @@ filter = Object.new
 filter.extend(Jekyll::ContentSafetyFilter)
 result = if '${method}' == 'approved_embed_src'
   filter.approved_embed_src(ARGV[0], ARGV[1])
+elsif '${method}' == 'safe_rich_text'
+  filter.safe_rich_text(ARGV[0])
 else
   filter.safe_markdownify(ARGV[0], site.config['url'])
 end
@@ -205,6 +207,16 @@ puts result
 }
 
 describe('content safety filter', () => {
+  it('renders editor emphasis in public inline fields without admitting HTML attributes or block markup', () => {
+    const rendered = renderFilter('safe_rich_text', 'At *Cretaceous Critters* with **Special Thanks** and <u>credits</u>. <img src=x onerror=alert(1)>');
+    expect(rendered).toContain('<em>Cretaceous Critters</em>');
+    expect(rendered).toContain('<strong>Special Thanks</strong>');
+    expect(rendered).toContain('<u>credits</u>');
+    expect(rendered).not.toContain('<img');
+    expect(rendered).not.toContain('<p>');
+    expect(rendered).toContain('&lt;img');
+  });
+
   it('neutralizes javascript markdown links', () => {
     const rendered = renderFilter('safe_markdownify', '[x](javascript:alert(1))');
     expect(rendered).not.toContain('href="javascript:alert(1)"');

@@ -157,7 +157,7 @@ Platform boundary; do not patch the submodule in place.
 
 Use `.sr-only` for supporting text, labeled controls, decorative SVG state,
 and the existing live regions/focus behavior. `_includes/a11y.html` supplies
-`sr-text` and `external-link` patterns. Meaningful images require alt text;
+`sr-text` and `external-link` patterns. Alt text is recommended for meaningful images and does not block saving or publishing;
 intentional decorative images use the explicit decorative state.
 
 Shared strings use `_includes/t.html`, with interpolation and locale fallback.
