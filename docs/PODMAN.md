@@ -63,18 +63,16 @@ Podman mode is designed around three priorities:
 
 | Host OS | Podman model | Support state |
 |---------|--------------|----------------|
-| macOS | `podman machine` VM | Host-validated. Prefer `libkrun` if `applehv` is unstable. |
+| macOS | `podman machine` VM | Host-validated with the selected shared machine. |
 | Linux | native rootless Podman | Supported by the launcher logic and self-check flow; physical-host validation is not recorded. |
 | Windows | `podman machine` VM | Supported by the launcher logic and self-check flow from a bash-capable shell; physical-host validation is not recorded. |
 
-On macOS and Windows, `./scripts/dev.sh --podman` will initialize/start the default `podman machine` when needed. On Linux, the launcher skips machine management and talks directly to the local rootless Podman engine.
-
-If Podman on macOS comes up on the older `applehv` backend and machine startup is unstable, prefer `libkrun` in `~/.config/containers/containers.conf`:
-
-```toml
-[machine]
-provider = "libkrun"
-```
+On macOS and Windows, project tools use `CONTAINER_HOST` or
+`CONTAINER_CONNECTION` when supplied, otherwise Podman's selected default
+connection. They never initialize, start, stop, or restart a shared VM. On Linux,
+they use the native rootless engine. Start/select a machine once at the host
+level before launching projects; use the same Podman executable on PATH for all
+projects and any login service.
 
 ## Start Local Dev
 
@@ -124,7 +122,7 @@ http://127.0.0.1:4000/admin/
 
 The local Worker serves dashboard APIs at `http://127.0.0.1:8787`, with `CORS_ALLOWED_ORIGIN` derived for the local site. The dashboard can exercise the seeded local test campaigns and local KV. Dashboard user-management saves write to local KV (`admin-users:v1`) rather than committing to GitHub. Dev Worker config also sets `ADMIN_LOCAL_REPO_WRITES_ENABLED=true` and starts a token-protected local repo helper on the Worker container loopback address, so **Create new campaign** and **Archive campaign** can write/move files in the mounted repository instead of depending on GitHub workflow dispatch while testing locally.
 
-Foreground `./scripts/dev.sh --podman` also supervises the dev pod. If Jekyll or Wrangler exits, the launcher prints recent logs, restarts the stopped container, and recreates the pod if a direct restart is not enough. Pod recreation is retried because Podman can occasionally return partial-start errors such as `starting some containers: internal libpod error`; between attempts the launcher removes partial dev containers/pods by name and dev-stack label, verifies the old artifacts are gone, waits for Podman's port forwards to release, refreshes the Podman connection, and restarts the Podman machine on macOS/Windows if cleanup alone does not clear the stale state. The launcher also starts the empty pod before adding the site and Worker containers, which avoids a flaky Podman path where a created pod can leave `pool-dev-site` created and `pool-dev-worker` missing. Jekyll readiness checks wait for the real `/admin/` page instead of any HTTP response, so a stale listener or a still-building site does not count as ready. A cold Worker volume receives a separate lock-hash-verified dependency-install grace period before the ordinary runtime health clock starts, preventing a slow `npm ci` from being killed and restarted indefinitely; warm volumes skip that wait immediately. Tune the check interval with `PODMAN_SUPERVISE_INTERVAL`, the restart log tail with `PODMAN_SUPERVISE_LOG_LINES`, startup retries with `PODMAN_STACK_START_ATTEMPTS`, retry delay with `PODMAN_STACK_RETRY_DELAY`, site readiness timeout with `PODMAN_SITE_READY_TIMEOUT`, cold Worker install timeout with `PODMAN_WORKER_INSTALL_TIMEOUT`, and Worker runtime readiness timeout with `PODMAN_WORKER_READY_TIMEOUT`. Detached helper flows still get Podman's `unless-stopped` restart policy on the site and Worker containers.
+Foreground `./scripts/dev.sh --podman` also supervises the dev pod. If Jekyll or Wrangler exits, the launcher prints recent logs, restarts the stopped container, and recreates the pod if a direct restart is not enough. Pod recreation is retried because Podman can occasionally return partial-start errors such as `starting some containers: internal libpod error`; between attempts the launcher removes partial dev containers/pods by name and dev-stack label, verifies the old artifacts are gone, waits for Podman's port forwards to release, refreshes the Podman connection, and reports an unreachable engine without restarting the shared VM. The launcher also starts the empty pod before adding the site and Worker containers, which avoids a flaky Podman path where a created pod can leave `pool-dev-site` created and `pool-dev-worker` missing. Jekyll readiness checks wait for the real `/admin/` page instead of any HTTP response, so a stale listener or a still-building site does not count as ready. A cold Worker volume receives a separate lock-hash-verified dependency-install grace period before the ordinary runtime health clock starts, preventing a slow `npm ci` from being killed and restarted indefinitely; warm volumes skip that wait immediately. Tune the check interval with `PODMAN_SUPERVISE_INTERVAL`, the restart log tail with `PODMAN_SUPERVISE_LOG_LINES`, startup retries with `PODMAN_STACK_START_ATTEMPTS`, retry delay with `PODMAN_STACK_RETRY_DELAY`, site readiness timeout with `PODMAN_SITE_READY_TIMEOUT`, cold Worker install timeout with `PODMAN_WORKER_INSTALL_TIMEOUT`, and Worker runtime readiness timeout with `PODMAN_WORKER_READY_TIMEOUT`. Detached helper flows still get Podman's `unless-stopped` restart policy on the site and Worker containers.
 
 ## Rebuild Images
 
@@ -255,38 +253,18 @@ npm run podman:doctor
 
 That sequence exercises the same location-aware test-fixture path the merge gate relies on.
 
-If `./scripts/dev.sh --podman` never gets past Podman startup, check the machine first:
+If startup fails, inspect the selected engine before changing anything:
 
 ```bash
-podman machine inspect
-podman machine stop
-podman machine start
-```
-
-If the machine booted into emergency mode or got wedged during first boot, the fastest recovery is:
-
-```bash
-podman machine rm -f podman-machine-default
-podman machine init --now
-```
-
-On macOS, the launcher uses the machine's forwarded Unix API socket directly once the VM is up. That avoids a class of flaky default-connection issues we saw with the packaged CLI.
-
-The doctor and launcher also do a short stability check after startup so they do not flash green on a machine that immediately falls back into a stale connection state.
-
-On Linux, if `podman info` fails, fix the local rootless Podman session first and then rerun the doctor:
-
-```bash
+podman system connection list
+podman machine list
 podman info
-npm run podman:doctor
 ```
 
-On Windows, if `podman machine` exists but the VM is stopped, use:
-
-```bash
-podman machine start podman-machine-default
-npm run podman:doctor
-```
+Use `podman machine start <selected-machine>` only if that machine is stopped
+and no other machine is active. A transient connection error is not permission
+to restart a VM: other projects may still be running. Do not remove a machine
+or prune storage as routine connection recovery.
 
 ## Security Notes
 
@@ -308,3 +286,45 @@ Podman mode is not meant to perfectly clone Cloudflare production, but it does p
 
 Prospective Podman and cross-platform validation work is tracked in the
 [Roadmap](./ROADMAP.md).
+
+## Concurrent projects
+
+Use one shared rootless engine on macOS. Pool publishes ports 4000/8787 with
+`pool-dev-*` resources; Store publishes 4002/8989 with `store-dev-*` resources.
+Each launcher removes only its own project's containers/pod. An occupied host
+port causes startup to fail with a diagnostic; it never signals an unknown
+listener. One development stack per project is supported; concurrent checkouts
+of the same project must not share these fixed resource names and local state.
+
+Set `CONTAINER_CONNECTION=<name>` or `CONTAINER_HOST=<url>` per command to use a
+specific engine. Set the normal host default with
+`podman system connection default <name>`; project launchers do not change it.
+Use a host login service to start the selected VM once, rather than putting
+machine recovery in each project's supervisor. Restarting project containers
+is safe; restarting the engine interrupts every project.
+
+The 6 GiB release minimum covers a single project's gate, not all concurrent
+workloads. Budget RAM for the combined builds, browser suites, and services;
+inspect `podman stats` and `podman system df`. Resize only during an idle
+maintenance window. No project launcher prunes shared storage.
+
+## Updating the machine
+
+Check `podman version` after updating the host CLI. Keep the VM engine on the
+same supported major/minor line. In an idle maintenance window, pause any login
+watchdog, confirm `podman ps` has no running workloads, and use Podman's in-place
+OS update, for example:
+
+```bash
+podman machine os apply quay.io/podman/machine-os:6.1 <selected-machine>
+podman machine stop <selected-machine>
+podman machine set --memory 16384 <selected-machine>
+podman machine start <selected-machine>
+podman version
+npm run podman:doctor
+```
+
+Choose the image version and RAM for the installed CLI and host capacity; these
+example values are not automatic updates. Preserve existing images/volumes and
+compare inventories before/after. Restore the login watchdog after verification.
+Official reference: [machine OS apply](https://docs.podman.io/en/latest/markdown/podman-machine-os-apply.1.html).

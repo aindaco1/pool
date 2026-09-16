@@ -62,5 +62,13 @@ file controls remain in use. No new personal data or messaging is introduced.
 
 The runtime receiver is simulated. These checks do not prove live Cloudflare
 edge ingestion, GitHub persistence, Pages propagation, optimization, or playback
-of a creator's actual video. Production deployment and a real near-limit video
-upload remain separate acceptance steps.
+of a creator's actual video. Production deployment succeeded via
+[Deploy Production 35108292012](https://github.com/aindaco1/pool/actions/runs/35108292012)
+after [PR 47](https://github.com/aindaco1/pool/pull/47) passed hosted Merge Smoke
+and merged. The deployed ref `ebe48acbca47907c2141bb6128f81d478fb3a453`
+includes subsequent campaign edits. Worker deployment, Pages publication, cache
+purge, admin security policy, and public crawl checks passed. A live binary
+upload without credentials returned HTTP 401 with private/no-store caching;
+the public dashboard bundle contains the 100,000,000-byte limit. No synthetic
+asset was committed to production. A creator's real near-limit upload and
+playback remain separate acceptance steps.

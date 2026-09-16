@@ -23,11 +23,12 @@ done
 set -- "${ORIGINAL_ARGS[@]}"
 
 prefer_podman_path() {
+  command -v podman >/dev/null 2>&1 && return 0
   local candidate=""
   for candidate in \
+    "/opt/homebrew/bin" \
     "/opt/podman/bin" \
     "/usr/local/podman/bin" \
-    "/opt/homebrew/bin" \
     "/usr/local/bin"
   do
     if [[ -x "$candidate/podman" ]]; then
@@ -93,6 +94,8 @@ load_cloudflare_report_env
 
 if [[ "$USE_PODMAN" == "true" && "$PODMAN_REPORT_INTERNAL" != "1" ]]; then
   prefer_podman_path || true
+  source "$(dirname "${BASH_SOURCE[0]}")/podman-machine.sh"
+  pool_podman_configure_connection || exit 1
 
   if ! podman exec pool-dev-worker true >/dev/null 2>&1; then
     echo "📦 Starting shared Podman dev stack..." >&2

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
-const podmanCandidates = ['/opt/podman/bin/podman', 'podman'];
+const podmanCandidates = ['podman', '/opt/homebrew/bin/podman', '/opt/podman/bin/podman'];
 
 let bundleCheckCache: boolean | null = null;
 let podmanCommandCache: string | null = null;
@@ -44,24 +44,7 @@ function resolvePodmanCommand() {
       podmanCommandCache = candidate;
       return candidate;
     } catch {
-      try {
-        execFileSync(candidate, ['machine', 'start', 'podman-machine-default'], {
-          cwd: repoRoot,
-          encoding: 'utf8',
-          stdio: 'pipe',
-          env
-        });
-        execFileSync(candidate, ['info'], {
-          cwd: repoRoot,
-          encoding: 'utf8',
-          stdio: 'pipe',
-          env
-        });
-        podmanCommandCache = candidate;
-        return candidate;
-      } catch {
-        continue;
-      }
+      continue;
     }
   }
 
@@ -70,27 +53,12 @@ function resolvePodmanCommand() {
   );
 }
 
-function resolvePodmanEnvironment(podmanCommand: string) {
+function resolvePodmanEnvironment(_podmanCommand: string) {
   if (podmanEnvironmentCache) return podmanEnvironmentCache;
 
   const env: NodeJS.ProcessEnv = { ...process.env };
-  try {
-    const socketPath = execFileSync(
-      podmanCommand,
-      ['machine', 'inspect', '--format', '{{.ConnectionInfo.PodmanSocket.Path}}', 'podman-machine-default'],
-      {
-        cwd: repoRoot,
-        encoding: 'utf8',
-        stdio: 'pipe',
-        env
-      }
-    ).trim();
-    if (socketPath && fs.existsSync(socketPath)) {
-      env.CONTAINER_HOST = `unix://${socketPath}`;
-    }
-  } catch {
-    // Linux/rootless hosts often do not need an explicit Podman machine socket.
-  }
+  // Use the caller's endpoint or Podman's configured default. Tests must not
+  // select another VM or mutate a shared engine's lifecycle.
 
   podmanEnvironmentCache = env;
   return podmanEnvironmentCache;
