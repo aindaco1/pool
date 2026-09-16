@@ -6,6 +6,14 @@ translation_key: pledge_success
 permalink: /es/pledge-success/
 ---
 
+<section data-pledge-confirmation data-worker-base="{{ site.platform.worker_url | escape }}">
+  <h1>{% include t.html key="runtime.cart.finishing_pledge" %}</h1>
+  <p data-pledge-confirmation-message role="status">{% include t.html key="runtime.cart.payment_processing_still" %}</p>
+  <p data-pledge-confirmation-reference></p>
+  <button type="button" class="btn" data-pledge-confirmation-retry>{% include t.html key="runtime.cart.check_pledge_status" %}</button>
+  <p><a href="mailto:{{ site.platform.support_email | escape }}">{{ site.platform.support_email | escape }}</a></p>
+</section>
+<div data-pledge-confirmed hidden>
 <div class="pledge-result__icon">✓</div>
 
 <h1>{% include t.html key="pledge_result.saved_title" lang="es" %}</h1>
@@ -23,3 +31,5 @@ permalink: /es/pledge-success/
 </p>
 
 <a href="{% include localized-url.html lang='es' translation_key='home' %}" class="btn">{% include t.html key="pledge_result.back_to_campaigns" lang="es" %}</a>
+
+</div>

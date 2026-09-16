@@ -23,7 +23,10 @@ The tax layer keeps one consistent answer across:
 - reports and exports
 
 The Worker remains the source of truth. The browser can request previews, but
-persisted totals come from Worker-side calculation.
+persisted totals come from Worker-side calculation. The accepted first-party
+checkout quote is hash-verified at completion and its totals are retained. Completion
+does not recalculate tax from Stripe's enriched address after card setup. New quotes
+use the full supplied billing or shipping tax destination.
 
 ## Current Provider Modes
 

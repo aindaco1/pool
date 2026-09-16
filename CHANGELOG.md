@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Fix saved-card checkouts failing pledge confirmation when Stripe supplies a fuller
+  address. Webhook and browser recovery share the verified quote, support current
+  and legacy Stripe shipping fields, and serialize completion per order. Preserve
+  accepted totals and pending recovery references; retry confirmation without
+  creating another setup session. English/Spanish checkout and result pages show
+  explicit unconfirmed status until persistence is verified.
+
 - Adopt Platform Admin Shell 0.12.0 and Design Core 0.3.0 for shared editor
   rendering, upload previews, optional image descriptions, blank placeholders,
   layout containment, and readable bilingual feedback. Preserve local image

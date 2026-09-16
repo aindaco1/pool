@@ -966,7 +966,7 @@ test.describe('First-Party Result Pages', () => {
     await expect(page.locator(CART_ROOT_SELECTOR)).toContainText('Demo Featured Tier');
   });
 
-  test('success page hydrates backend-confirmed first-party pledge details', async ({ page }) => {
+  test('result page retains the cart until the backend confirms the pledge', async ({ page }) => {
     await page.addInitScript((snapshot) => {
       window.localStorage.setItem('pool_first_party_checkout_snapshot', JSON.stringify(snapshot));
     }, {
@@ -994,6 +994,10 @@ test.describe('First-Party Result Pages', () => {
       savedAt: Date.now()
     });
 
+    let persisted = false;
+    await page.route('**/checkout-intent/summary?orderId=pool-intent-demo123', route => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ orderId: 'pool-intent-demo123', persisted })
+    }));
     await page.goto('/pledge-success/?orderId=pool-intent-demo123');
 
     if (await getActiveRuntime(page) !== 'first_party') {
@@ -1003,6 +1007,13 @@ test.describe('First-Party Result Pages', () => {
 
     const summaryCard = page.locator('[data-first-party-success-summary]');
     await expect(summaryCard).toHaveCount(0);
+
+    await expect(page.locator('[data-pledge-confirmation]')).toBeVisible();
+    await expect(page.locator('[data-pledge-confirmed]')).toBeHidden();
+    expect(await page.evaluate(() => localStorage.getItem('pool_first_party_checkout_snapshot'))).not.toBeNull();
+    persisted = true;
+    await page.locator('[data-pledge-confirmation-retry]').click();
+    await expect(page.locator('[data-pledge-confirmed]')).toBeVisible();
 
     await expect.poll(async () => {
       return page.evaluate(() => window.localStorage.getItem('pool_first_party_checkout_snapshot'));
@@ -1166,7 +1177,8 @@ test.describe('Campaign States', () => {
 });
 
 test.describe('Checkout Flow', () => {
-  test('custom on-site checkout can save a payment method without leaving the site', async ({ page }) => {
+  for (const confirmationScenario of ['normal', 'stale-summary', 'retry-after-reload']) {
+  test(`custom on-site checkout confirms safely: ${confirmationScenario}`, async ({ page }) => {
     test.setTimeout(60_000);
 
     await page.addInitScript(() => {
@@ -1177,7 +1189,10 @@ test.describe('Checkout Flow', () => {
             actions: {
               getSession: () => ({ id: 'cs_test_custom_e2e' }),
               updateEmail: async () => ({}),
-              confirm: async () => ({ type: 'success' })
+              confirm: async () => {
+                sessionStorage.setItem('test-confirm-count', String(Number(sessionStorage.getItem('test-confirm-count') || 0) + 1));
+                return { type: 'success' };
+              }
             }
           }),
           createPaymentElement: () => ({
@@ -1216,7 +1231,10 @@ test.describe('Checkout Flow', () => {
     expect(checkoutUiMode).toBe('custom');
 
     let capturedPayload: any = null;
+    let starts = 0;
+    let recoveryAvailable = confirmationScenario !== 'retry-after-reload';
     await page.route(`${workerBase}/checkout-intent/start`, async (route) => {
+      starts += 1;
       capturedPayload = JSON.parse(route.request().postData() || '{}');
       await route.fulfill({
         status: 200,
@@ -1238,9 +1256,9 @@ test.describe('Checkout Flow', () => {
           orderId: 'pool-intent-e2e-custom-123',
           campaignSlug: 'smoke-editable',
           campaignTitle: 'SMOKE EDITABLE',
-          persisted: true,
+          persisted: confirmationScenario === 'normal',
           pledgeStatus: 'active',
-          createdAt: '2026-04-09T12:34:56.000Z',
+          createdAt: null,
           shippingCollected: false,
           totals: {
             subtotal: 1000,
@@ -1253,13 +1271,14 @@ test.describe('Checkout Flow', () => {
       });
     });
     await page.route(`${workerBase}/checkout-intent/complete`, async (route) => {
+      expect(JSON.parse(route.request().postData() || '{}')).toEqual({ orderId: 'pool-intent-e2e-custom-123', sessionId: 'cs_test_custom_e2e' });
       await route.fulfill({
-        status: 200,
+        status: recoveryAvailable ? 200 : 409,
         contentType: 'application/json',
         body: JSON.stringify({
           success: true,
           recovered: true,
-          persisted: true,
+          persisted: recoveryAvailable,
           orderId: 'pool-intent-e2e-custom-123'
         })
       });
@@ -1291,6 +1310,22 @@ test.describe('Checkout Flow', () => {
     await expect(saveButton).toBeVisible();
     await expect(saveButton).toBeEnabled();
     await saveButton.click();
+    if (confirmationScenario === 'retry-after-reload') {
+      const checkButton = page.getByRole('button', { name: 'Check pledge status', exact: true });
+      await expect(checkButton).toBeEnabled();
+      await expect(page.locator('[data-cart-confirmation-pending]')).toContainText('not confirmed yet');
+      await expect(page.locator('[data-cart-confirmation-pending]')).toContainText('pool-intent-e2e-custom-123');
+      await expect(page.locator('[data-cart-custom-checkout-region="payment"]')).toHaveCount(0);
+      await page.screenshot({ path: test.info().outputPath('checkout-confirmation-pending.png'), fullPage: true });
+      await checkButton.click();
+      await expect(checkButton).toBeEnabled();
+      await page.reload();
+      await openCartViaClient(page);
+      await expect(checkButton).toBeEnabled();
+      recoveryAvailable = true;
+      await checkButton.click();
+    }
+
 
     await page.waitForURL('**/pledge-success/**');
     await expect(page.locator('h1, h2').first()).toContainText(/Pledge|Saved|Success/i);
@@ -1304,7 +1339,11 @@ test.describe('Checkout Flow', () => {
         }
       ]
     });
+    expect(starts).toBe(1);
+    expect(await page.evaluate(() => sessionStorage.getItem('test-confirm-count'))).toBe('1');
+
   });
+  }
 
   test('physical support-item checkout uses domestic shipping quotes and preserves the support item in the start payload', async ({ page }) => {
     test.setTimeout(60_000);

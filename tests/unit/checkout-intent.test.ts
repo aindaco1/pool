@@ -241,3 +241,33 @@ describe('checkout intent scaffolding', () => {
     });
   });
 });
+
+describe('checkout completion coordination', () => {
+  it('excludes a competing completion, remembers success, and rejects a different quote', async () => {
+    const coordinator = new CheckoutIntentNonceCoordinator({ storage: new FakeStorage() } as never, {} as never);
+    const payload = { nonce: 'pool-intent-lease-test', cartHash: 'accepted-hash', exp: Math.floor(Date.now() / 1000) + 3600, leaseId: 'owner' };
+    const call = (path: string, overrides = {}) => coordinator.fetch(new Request(`https://internal/completion-${path}`, {
+      method: 'POST', body: JSON.stringify({ ...payload, ...overrides })
+    }));
+    expect((await call('claim')).status).toBe(200);
+    const competing = await call('claim', { leaseId: 'other' });
+    expect(competing.status).toBe(409);
+    expect(await competing.json()).toMatchObject({ status: 'busy' });
+    expect((await call('finish', { leaseId: 'other' })).status).toBe(409);
+    expect((await call('finish')).status).toBe(200);
+    expect((await call('release')).status).toBe(200);
+    expect(await (await call('claim', { leaseId: 'other' })).json()).toMatchObject({ status: 'complete' });
+    expect((await call('claim', { cartHash: 'changed' })).status).toBe(409);
+  });
+
+  it('allows retry after a failed persistence attempt releases its lease', async () => {
+    const coordinator = new CheckoutIntentNonceCoordinator({ storage: new FakeStorage() } as never, {} as never);
+    const payload = { nonce: 'pool-intent-retry-test', cartHash: 'accepted-hash', exp: Math.floor(Date.now() / 1000) + 3600, leaseId: 'owner' };
+    const call = (path: string) => coordinator.fetch(new Request(`https://internal/completion-${path}`, {
+      method: 'POST', body: JSON.stringify(payload)
+    }));
+    await call('claim');
+    await call('release');
+    expect(await (await call('claim')).json()).toMatchObject({ status: 'claimed' });
+  });
+});

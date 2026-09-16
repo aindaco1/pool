@@ -4709,7 +4709,7 @@ describe('cart provider shim', () => {
     });
   });
 
-  it('does not render a saved first-party pledge summary on the success page and clears the snapshot', async () => {
+  it('preserves the checkout snapshot on the result page until persistence is confirmed', async () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
@@ -4793,6 +4793,8 @@ describe('cart provider shim', () => {
 
     const summaryCard = document.querySelector('[data-first-party-success-summary]') as HTMLElement | null;
     expect(summaryCard).toBeNull();
+    expect(localStorage.getItem('pool_first_party_checkout_snapshot')).not.toBeNull();
+    window.dispatchEvent(new CustomEvent('pool:pledge-confirmed'));
     expect(localStorage.getItem('pool_first_party_checkout_snapshot')).toBeNull();
     expect(localStorage.getItem('pool_first_party_cart_state')).toBeNull();
     expect(localStorage.getItem('pool_stats_demo')).toBeNull();
@@ -4844,6 +4846,8 @@ describe('cart provider shim', () => {
 
     const summaryCard = document.querySelector('[data-first-party-success-summary]') as HTMLElement | null;
     expect(summaryCard).toBeNull();
+    expect(localStorage.getItem('pool_first_party_checkout_snapshot')).not.toBeNull();
+    window.dispatchEvent(new CustomEvent('pool:pledge-confirmed'));
     expect(localStorage.getItem('pool_first_party_checkout_snapshot')).toBeNull();
   });
 });

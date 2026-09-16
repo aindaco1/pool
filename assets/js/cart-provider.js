@@ -8,6 +8,7 @@
   const FIRST_PARTY_CART_TOKEN_PREFIX = 'poolcart_';
   const FIRST_PARTY_ITEM_ID_PREFIX = 'poolitem_';
   const FIRST_PARTY_CHECKOUT_SNAPSHOT_KEY = 'pool_first_party_checkout_snapshot';
+  const CHECKOUT_CONFIRMATION_KEY = 'pool_checkout_confirmation';
   const ACTIVE_CUSTOM_CHECKOUT_ORDER_ID_KEY = 'pool_active_custom_checkout_order_id';
   const FIRST_PARTY_CART_STATE_KEY = 'pool_first_party_cart_state';
   const FIRST_PARTY_CART_DRAFT_KEY = 'pool_first_party_cart_draft';
@@ -2658,6 +2659,19 @@
     } catch (_error) {}
   }
 
+  function readCheckoutConfirmation() {
+    try {
+      const value = JSON.parse(readTimedStorageValue(getSessionStorageSafe(), CHECKOUT_CONFIRMATION_KEY, 24 * 60 * 60 * 1000) || 'null');
+      return isFirstPartyOrderId(value?.orderId) && typeof value?.sessionId === 'string' ? value : null;
+    } catch (_error) { return null; }
+  }
+
+  function writeCheckoutConfirmation(value) {
+    try {
+      writeTimedStorageValue(getSessionStorageSafe(), CHECKOUT_CONFIRMATION_KEY, value ? JSON.stringify(value) : '');
+    } catch (_error) {}
+  }
+
   function writeActiveCustomCheckoutOrderId(orderId) {
     const nextOrderId = String(orderId || '').trim();
     try {
@@ -3429,7 +3443,7 @@
       try {
         const response = await fetch(
           `${getWorkerBase()}/checkout-intent/summary?orderId=${encodeURIComponent(orderId)}`,
-          { cache: 'no-store' }
+          { cache: 'no-store', signal: AbortSignal.timeout(8000) }
         );
         if (!response.ok) return null;
 
@@ -3441,38 +3455,6 @@
       }
     }
 
-    async function waitForPersistedFirstPartyCheckout(orderId, options) {
-      if (!isFirstPartyOrderId(orderId)) {
-        return { ok: false, summary: null };
-      }
-
-      const timeoutMs = Math.max(1000, Number(options?.timeoutMs || 15000));
-      const pollIntervalMs = Math.max(250, Number(options?.pollIntervalMs || 750));
-      const deadline = Date.now() + timeoutMs;
-      let lastSummary = null;
-
-      while (Date.now() <= deadline) {
-        const summary = await fetchFirstPartySuccessSummary(orderId);
-        if (summary) {
-          lastSummary = summary;
-          if (summary.persisted === true || Boolean(summary.createdAt)) {
-            return { ok: true, summary };
-          }
-        }
-
-        if (Date.now() >= deadline) break;
-
-        await new Promise((resolve) => {
-          window.setTimeout(resolve, pollIntervalMs);
-        });
-      }
-
-      return {
-        ok: false,
-        summary: lastSummary
-      };
-    }
-
     async function recoverCompletedFirstPartyCheckout(orderId, sessionId) {
       if (!isFirstPartyOrderId(orderId) || !sessionId) {
         return { ok: false };
@@ -3481,6 +3463,7 @@
       try {
         const response = await fetch(`${getWorkerBase()}/checkout-intent/complete`, {
           method: 'POST',
+          signal: AbortSignal.timeout(8000),
           cache: 'no-store',
           headers: {
             'Content-Type': 'application/json'
@@ -3494,6 +3477,7 @@
         const payload = await response.json().catch(() => ({}));
         return {
           ok: response.ok && payload?.persisted === true,
+          status: response.status,
           payload
         };
       } catch (_error) {
@@ -3551,6 +3535,14 @@
 
       teardownCartDialog();
 
+      const pendingConfirmation = readCheckoutConfirmation();
+      if (pendingConfirmation) {
+        currentRoute = CHECKOUT_VIEW_ROUTE;
+        checkoutUiState.mode = 'custom';
+        checkoutUiState.customCheckout = {
+          ...checkoutUiState.customCheckout, ...pendingConfirmation, paymentSaved: true
+        };
+      }
       const state = store.getState();
       const items = state.cart.items.items || [];
       const total = Number(state.cart.total || 0);
@@ -3841,7 +3833,14 @@
               </div>
             </div>
           </div>
-          ${customCheckoutMarkup}
+          ${customCheckout.paymentSaved ? `
+            <div class="pool-first-party-cart__callout" data-cart-confirmation-pending role="status" aria-live="polite">
+              <p>${escapeHtml(getRuntimeMessage('cart.paymentProcessingStill', 'Your payment method is saved. Your pledge is not confirmed yet, and you have not been charged. Check this pledge’s status below; do not start another pledge.'))}</p>
+              <p>${escapeHtml(getRuntimeMessage('cart.pledgeReference', 'Pledge reference'))}: <span class="pool-first-party-cart__confirmation-reference">${escapeHtml(customCheckout.orderId)}</span></p>
+              <p>${escapeHtml(getRuntimeMessage('cart.confirmationHelp', 'If confirmation remains unavailable, contact support with this reference. You can close this window and return to checkout in this tab.'))}</p>
+              ${window.POOL_CONFIG?.supportEmail ? `<a href="mailto:${escapeAttribute(window.POOL_CONFIG.supportEmail)}?subject=${encodeURIComponent('Pledge confirmation ' + customCheckout.orderId)}">${escapeHtml(window.POOL_CONFIG.supportEmail)}</a>` : ''}
+            </div>
+          ` : customCheckoutMarkup}
           ${checkoutErrorMarkup}
         </section>
       ` : `
@@ -3858,13 +3857,15 @@
                 class="pool-first-party-cart__action${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting' ? ' is-busy' : ''}"
                 data-cart-confirm-custom-checkout
                 aria-busy="${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting' ? 'true' : 'false'}"
-                ${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'submitting' || customCheckout?.mountStatus !== 'mounted' ? 'disabled' : ''}
+                ${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting' || checkoutUiState.status === 'submitting' || (customCheckout?.mountStatus !== 'mounted' && !customCheckout.paymentSaved) ? 'disabled' : ''}
               >${renderBusyButtonLabel(
                 checkoutUiState.status === 'confirming'
                   ? getRuntimeMessage('cart.savingPaymentMethod', 'Saving payment method...')
                   : checkoutUiState.status === 'redirecting'
                     ? getRuntimeMessage('cart.finishingPledge', 'Finishing pledge...')
-                    : getRuntimeMessage('cart.savePaymentMethod', 'Save payment method'),
+                    : customCheckout.paymentSaved
+                      ? getRuntimeMessage('cart.checkPledgeStatus', 'Check pledge status')
+                      : getRuntimeMessage('cart.savePaymentMethod', 'Save payment method'),
                 checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting'
               )}</button>
             ` : `
@@ -3923,7 +3924,7 @@
       root.setAttribute('aria-hidden', 'false');
       activateCartDialog(root);
       emitCartSummaryUpdated();
-      if (isCustomCheckout && customCheckout?.scriptStatus === 'ready') {
+      if (isCustomCheckout && !customCheckout.paymentSaved && customCheckout?.scriptStatus === 'ready') {
         mountCustomCheckoutIntoDrawer(root);
         ensureCustomCheckoutMounted(root);
       }
@@ -4247,7 +4248,7 @@
 
     async function abandonActiveCustomCheckoutIntent(orderId = getActiveCustomCheckoutOrderId()) {
       const nextOrderId = String(orderId || '').trim();
-      if (!nextOrderId) return;
+      if (!nextOrderId || checkoutUiState.customCheckout?.paymentSaved || readCheckoutConfirmation()?.orderId === nextOrderId) return;
 
       try {
         await fetch(`${getWorkerBase()}/checkout-intent/abandon`, {
@@ -4287,7 +4288,7 @@
       const isConfirming = checkoutUiState.status === 'confirming';
       const isRedirecting = checkoutUiState.status === 'redirecting';
       const isSubmitting = checkoutUiState.status === 'submitting';
-      const isMounted = checkoutUiState.customCheckout?.mountStatus === 'mounted';
+      const isMounted = checkoutUiState.customCheckout?.paymentSaved || checkoutUiState.customCheckout?.mountStatus === 'mounted';
       button.disabled = isConfirming || isRedirecting || isSubmitting || !isMounted;
       button.classList.toggle('is-busy', isConfirming || isRedirecting);
       button.setAttribute('aria-busy', isConfirming || isRedirecting ? 'true' : 'false');
@@ -4298,7 +4299,9 @@
             ? getRuntimeMessage('cart.finishingPledge', 'Finishing pledge...')
             : isSubmitting
               ? getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...')
-              : getRuntimeMessage('cart.savePaymentMethod', 'Save payment method'),
+              : checkoutUiState.customCheckout?.paymentSaved
+                ? getRuntimeMessage('cart.checkPledgeStatus', 'Check pledge status')
+                : getRuntimeMessage('cart.savePaymentMethod', 'Save payment method'),
         isConfirming || isRedirecting
       );
     }
@@ -4342,6 +4345,7 @@
 
     function requestBackToCart() {
       if (isCustomCheckoutBusy()) return;
+      if (checkoutUiState.customCheckout?.paymentSaved || readCheckoutConfirmation()) { closeFirstPartyCart(); return; }
       const goBackToCart = function() {
         setCheckoutUiState({
           status: 'idle',
@@ -5123,8 +5127,48 @@
       }
     }
 
+    async function finishSavedCheckout() {
+      if (isCustomCheckoutBusy()) return;
+      const pending = readCheckoutConfirmation() || checkoutUiState.customCheckout;
+      if (!pending?.orderId || !pending?.sessionId) return;
+      checkoutUiState.status = 'redirecting';
+      setCheckoutUiError('');
+      renderFirstPartyCart();
+      syncCustomCheckoutConfirmButton();
+      // Six bounded attempts fit the server's per-order recovery rate limit.
+      // A successful write is authoritative even while KV summary reads are stale.
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        if (!isCurrentProviderInstance()) return;
+        const summary = await fetchFirstPartySuccessSummary(pending.orderId);
+        const recovery = summary?.persisted === true
+          ? { ok: true }
+          : await recoverCompletedFirstPartyCheckout(pending.orderId, pending.sessionId);
+        if (!isCurrentProviderInstance()) return;
+        if (recovery.ok) {
+          const slugs = getFirstPartyCampaignSlugs(store.getState()?.cart?.items?.items);
+          markLiveCampaignRefreshNeeded(slugs);
+          invalidateLiveCampaignCaches(slugs);
+          try { writeTimedStorageValue(getSessionStorageSafe(), 'pool_confirmed_pledge', pending.orderId); } catch (_error) {}
+          writeCheckoutConfirmation(null);
+          writeActiveCustomCheckoutOrderId('');
+          const prefix = getCurrentLang() === 'en' ? '' : `/${encodeURIComponent(getCurrentLang())}`;
+          redirectWindow(`${prefix}/pledge-success/?orderId=${encodeURIComponent(pending.orderId)}`);
+          return;
+        }
+        if ((recovery.status === 409 && !recovery.payload?.retryable) || recovery.status === 400 || recovery.status === 429) break;
+        if (attempt < 5) await new Promise((resolve) => window.setTimeout(resolve, 1500 * (attempt + 1)));
+      }
+      checkoutUiState.status = 'idle';
+      setCheckoutUiError(getRuntimeMessage('cart.confirmationUnavailable', 'We could not confirm your pledge yet. Your saved attempt is protected. Check its status again or contact support with the reference above.'));
+      syncCustomCheckoutConfirmButton();
+    }
+
     async function confirmCustomCheckout() {
       if (isCustomCheckoutBusy()) return;
+      if (checkoutUiState.customCheckout?.paymentSaved || readCheckoutConfirmation()) {
+        await finishSavedCheckout();
+        return;
+      }
       if (!activeCustomCheckoutMount || typeof activeCustomCheckoutMount.confirm !== 'function') {
         setCheckoutUiState({
           ...checkoutUiState,
@@ -5205,49 +5249,10 @@
           return;
         }
 
-        checkoutUiState.status = 'redirecting';
-        syncCustomCheckoutConfirmButton();
-
-        let completion = await waitForPersistedFirstPartyCheckout(orderId, {
-          timeoutMs: 2500,
-          pollIntervalMs: 400
-        });
-        if (!isActiveCustomCheckoutFlow(flowToken)) {
-          return;
-        }
-
-        if (!completion.ok) {
-          const recovery = await recoverCompletedFirstPartyCheckout(
-            orderId,
-            String(checkoutUiState.customCheckout?.sessionId || '')
-          );
-          if (!isActiveCustomCheckoutFlow(flowToken)) {
-            return;
-          }
-
-          if (recovery.ok) {
-            completion = await waitForPersistedFirstPartyCheckout(orderId, {
-              timeoutMs: 3500,
-              pollIntervalMs: 350
-            });
-          }
-        }
-
-        if (!completion.ok) {
-          checkoutUiState.status = 'idle';
-          setCheckoutUiError(getRuntimeMessage('cart.paymentProcessingStill', 'Payment method saved, but pledge confirmation is still processing. Please stay on this page a moment and try again.'));
-          syncCustomCheckoutConfirmButton();
-          return;
-        }
-
-        const affectedCampaignSlugs = getFirstPartyCampaignSlugs(store.getState()?.cart?.items?.items);
-        markLiveCampaignRefreshNeeded(affectedCampaignSlugs);
-        invalidateLiveCampaignCaches(affectedCampaignSlugs);
-        writeActiveCustomCheckoutOrderId('');
-        const successPath = getCurrentLang() === 'en'
-          ? `/pledge-success/?orderId=${encodeURIComponent(orderId)}`
-          : `/${encodeURIComponent(getCurrentLang())}/pledge-success/?orderId=${encodeURIComponent(orderId)}`;
-        redirectWindow(successPath);
+        checkoutUiState.customCheckout.paymentSaved = true;
+        writeCheckoutConfirmation({ orderId, sessionId: checkoutUiState.customCheckout.sessionId });
+        checkoutUiState.status = 'idle';
+        await finishSavedCheckout();
       } catch (error) {
         checkoutUiState.status = 'idle';
         const emailFieldMessage = getCustomCheckoutEmailFieldMessage(error);
@@ -5332,6 +5337,11 @@
     }
 
     async function startFirstPartyCheckout() {
+      if (checkoutUiState.customCheckout?.paymentSaved || readCheckoutConfirmation()) {
+        renderFirstPartyCart();
+        await finishSavedCheckout();
+        return;
+      }
       if (checkoutUiState.status === 'submitting') return;
 
       if (getRequestedCheckoutProvider() !== FIRST_PARTY_CHECKOUT_PROVIDER) {
@@ -5401,6 +5411,7 @@
 
       if (shouldDeferCustomCheckout && shippingDraft) {
         payloadResult.payload.shippingAddress = {
+          name: shippingDraft.name,
           country: shippingDraft.address.country,
           postalCode: shippingDraft.address.postal_code,
           state: shippingDraft.address.state,
@@ -6313,13 +6324,19 @@
     }
 
     if (isPledgeSuccessPath()) {
+      if (new URLSearchParams(window.location.search).get('orderId') === readCheckoutConfirmation()?.orderId) writeCheckoutConfirmation(null);
       const successSnapshot = readFirstPartyCheckoutSnapshot();
       invalidateLiveCampaignCaches(getFirstPartyCampaignSlugs(successSnapshot?.cart?.items));
       renderSuccessSummaryCard();
-      clearPersistedFirstPartyCartState();
-      clearFirstPartyCheckoutSnapshot();
-      clearPendingPledgeFlag();
-      writeActiveCustomCheckoutOrderId('');
+      const clearConfirmedCheckout = function() {
+        clearPersistedFirstPartyCartState();
+        clearFirstPartyCheckoutSnapshot();
+        clearPendingPledgeFlag();
+        writeActiveCustomCheckoutOrderId('');
+        writeCheckoutConfirmation(null);
+      };
+      if (window.__poolPledgeConfirmedOrderId) clearConfirmedCheckout();
+      else window.addEventListener('pool:pledge-confirmed', clearConfirmedCheckout, { once: true });
       hydrateSuccessSummaryCardFromBackend();
     } else if (isPledgeCancelledPath()) {
       renderCancelledRecoveryCard();

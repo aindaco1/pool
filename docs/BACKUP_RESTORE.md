@@ -27,7 +27,7 @@ npm run backup:inventory:audit
 - `VOTES` contains supporter votes and published result projections.
 - `RATELIMIT` and browser login/session/preview state are quarantined and are not restored normally. Privacy-minimized `admin-login-history:*` is incident evidence, not an active session, and is restored only when an incident requires it.
 - Stripe remains authoritative for payment-provider objects. A Pool snapshot records identifiers and compares them read-only; it does not replace Stripe records.
-- Durable Object storage is never imported. Checkout intent, scarce-tier inventory, and settlement coordination must be revalidated or rebuilt from pledge truth, campaign configuration, Stripe state, and projection checks.
+- Durable Object storage is never imported. Checkout nonce/completion evidence, scarce-tier inventory, and settlement coordination must be revalidated or rebuilt from pledge truth, campaign configuration, Stripe state, and projection checks.
 - Secrets are inventory only: snapshot evidence may include configured secret names and missing/configured status, never values.
 
 ## Readiness and snapshot commands
