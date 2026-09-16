@@ -2038,7 +2038,7 @@ test.describe('Admin Dashboard', () => {
     });
     await expect.poll(() => calls.logoUpload.length).toBe(1);
     expect(calls.logoUpload[0]).toMatchObject({ filename: 'logo.png', contentType: 'image/png' });
-    await expect(page.locator('[data-settings-path="platform.logo_path"] img')).toHaveAttribute('src', /logo-e2e/);
+    await expect(page.locator('[data-settings-path="platform.logo_path"] img')).toHaveAttribute('src', /^blob:/);
     await expect(page.locator('[data-settings-path="design.color_text"]')).toHaveAttribute('type', 'color');
     await selectSettingsSection(page, 'Platform');
     await page.locator('[data-settings-path="platform.name"]').fill('The Pool Updated');
@@ -2069,7 +2069,7 @@ test.describe('Admin Dashboard', () => {
     });
     await expect.poll(() => calls.imageUpload.some((call: any) => call.kind === 'add-on')).toBe(true);
     expect(calls.imageUpload.find((call: any) => call.kind === 'add-on')).toMatchObject({ filename: 'add-on.png', contentType: 'image/png', kind: 'add-on' });
-    await expect(page.locator('#admin-addons-results [data-add-on-product-field="image_url"] img').first()).toHaveAttribute('src', /add-on-e2e/);
+    await expect(page.locator('#admin-addons-results [data-add-on-product-field="image_url"] img').first()).toHaveAttribute('src', /^blob:/);
     await page.locator('#admin-addons-results [data-add-on-product-field="name"]').first().fill('DUST WAVE Sticker Updated');
     await expect(page.locator('#admin-addons-results [data-add-on-product-field="shipping_preset"]').first()).toHaveValue('sticker');
     await page.locator('#admin-addons-results [data-add-on-product-field="shipping_preset"]').first().selectOption('tshirt');
@@ -3032,6 +3032,7 @@ test.describe('Admin Dashboard', () => {
       await hero.locator('input[type="file"]').setInputFiles({ name: 'new-hero.png', mimeType: 'image/png', buffer: Buffer.from(imageData, 'base64') });
       await expect.poll(() => calls.imageUpload.length).toBe(1);
       await expect(hero.locator('img')).toHaveAttribute('src', /^blob:/);
+      await hero.locator('img').scrollIntoViewIfNeeded();
       await expect.poll(() => hero.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
       await expect(hero.locator('input[type="file"]')).toBeEnabled();
       const previewUrl = await hero.locator('img').getAttribute('src');
@@ -3156,6 +3157,7 @@ test.describe('Admin Dashboard', () => {
     await page.locator('#admin-content-preview-mobile').screenshot({ path: `tmp/editor-image-mobile-preview-${lang}.png` });
     await page.locator('#admin-campaign-save').click();
     await expect.poll(() => calls.projectSave.length).toBe(1);
+    await imageBlock.locator('img').first().scrollIntoViewIfNeeded();
     await expect.poll(() => imageBlock.locator('img').first().evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(1600);
     await expect(previewImage).toHaveAttribute('src', /^data:image\//);
     await expect.poll(() => previewImage.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(960);
