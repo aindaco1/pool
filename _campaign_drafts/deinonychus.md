@@ -49,10 +49,10 @@ long_content:
   - type: "text"
     body: |
       - **This is a cool indie film**
-      - **A female writer and director:** [Maddy Parrulli-Garcia](https://www.instagram.com/maddy_d_parrulli_garcia/)
+      - **A female writer and director:** [Maddy Parrulli-Garcia](https://www.instagram.com/maddy<em>d</em>parrulli_garcia/)
       - **Proudly anti-AI**
       - **Scientifically accurate**
-      - **Dinosaurs … *enough said***
+      - **Dinosaurs ... *enough said***
   - type: "text"
     body: |
       ## What will this money go towards?
@@ -244,8 +244,8 @@ diary:
             alt: "liane casting"
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
-_pool_draft_base_hash: "7ffd86b727a77ef80c8f1eed4f2264c8e2b44fff88b32dd06bb738cf9488c426"
-_pool_draft_saved_at: "2026-09-16T14:44:35.563Z"
+_pool_draft_base_hash: "ec54c149080755c6c97f1d24c26629306915001706f6dc66f4f5b8b4505af420"
+_pool_draft_saved_at: "2026-09-16T14:47:01.509Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 hero_video: "/assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.mp4"
 ---
