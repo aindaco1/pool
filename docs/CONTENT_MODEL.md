@@ -68,6 +68,16 @@ To avoid a flash of "00 00 00 00" before JavaScript loads:
 
 Quote strings with special characters to avoid YAML parsing issues.
 
+### Runner Report Recipients
+
+Assigned campaign users receive reports by default. `runner_report_emails`
+is an optional list of additional recipients; `runner_report_excluded_emails`
+is an optional list of opt-outs and defaults to empty. Both lists use normalized
+email addresses. Exclusions override additional recipients as well as assigned
+users. The dashboard presents opt-outs as unchecked users and preserves them
+through Save and Publish. See [Email](EMAIL.md#campaign-runner-reports) for
+runtime resolution and scheduling.
+
 ### Media Fields
 
 Image alt text is optional. Missing descriptions remain an accessibility

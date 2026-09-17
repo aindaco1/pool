@@ -515,6 +515,41 @@ describe('worker operational integrity', () => {
     await expect(kv.get('cron:lastCampaignRunnerReportRun')).resolves.toBeTruthy();
   });
 
+  it.each([false, true])('resolves assigned users and saved opt-outs consistently for report previews and cron (opt-out: %s)', async (optedOut) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-21T13:00:00.000Z'));
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+    await kv.put('admin-users:v1', JSON.stringify({ users: [
+      { email: 'assigned@example.com', role: 'campaign_user', campaignSlugs: ['hand-relations'] },
+      { email: 'other@example.com', role: 'campaign_user', campaignSlugs: ['another-film'] }
+    ] }));
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['assigned-report']));
+    await kv.put('pledge:assigned-report', JSON.stringify({
+      orderId: 'assigned-report', email: 'buyer@example.com', campaignSlug: 'hand-relations',
+      tierId: 'frame-slot', tierQty: 1, subtotal: 500, amount: 500,
+      pledgeStatus: 'active', createdAt: '2026-04-20T12:00:00.000Z'
+    }));
+    global.fetch = vi.fn(async () => jsonResponse({ campaigns: [{
+      ...campaignFixture,
+      runner_report_emails: [],
+      runner_report_excluded_emails: optedOut ? ['assigned@example.com'] : []
+    }] })) as typeof fetch;
+    const response = await worker.fetch(new Request('https://pool.test/admin/report/campaign-runner', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-key': 'admin-secret' },
+      body: JSON.stringify({ campaignSlug: 'hand-relations', reportType: 'pledge', dryRun: true })
+    }), env, { waitUntil: () => {} });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      recipientCount: optedOut ? 0 : 1, recipients: optedOut ? [] : ['assigned@example.com']
+    });
+    expect(mockSendCampaignRunnerReportEmail).not.toHaveBeenCalled();
+    await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledTimes(optedOut ? 0 : 1);
+    if (!optedOut) expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ email: 'assigned@example.com' }));
+    expect(Boolean(await kv.get('campaign-runner-report:pledge:hand-relations:2026-04-21'))).toBe(!optedOut);
+  });
+
   it('dispatches queued launch reminders once and writes sent markers', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;

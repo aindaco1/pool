@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Subscribe assigned campaign users to runner reports by default. Campaigns
+  settings lets editors uncheck users and Save/Publish campaign-specific
+  opt-outs, while retaining additional recipients. Scheduled reports, manual
+  sends, previews, and dashboard status share recipient resolution.
+
 - Render cart item descriptions with the existing shared safe inline Markdown
   renderer, including nested emphasis and underline in newly added and restored
   carts. Preserve description formatting through campaign and featured-tier

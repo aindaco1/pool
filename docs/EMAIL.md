@@ -271,7 +271,27 @@ Current behavior:
 
 ### Campaign Runner Reports
 
-Sent on the configured schedule to campaign `runner_report_emails`.
+Sent on the configured schedule to users explicitly assigned to the campaign,
+plus additional campaign `runner_report_emails`. The Worker resolves current
+assignments from the effective admin-user store when building or sending a
+report; removing an assignment removes that default subscription. Super-admin
+access alone does not subscribe a person to every campaign. Additional
+addresses remain explicit recipients until removed.
+
+In Campaigns settings, **Campaign user reports** checks assigned users by
+default. Uncheck a user, then Save and Publish to stop their reports for that
+campaign; check them again to resume. This stores
+`runner_report_excluded_emails` in the existing campaign authoring model.
+Exclusions override both assigned and additional recipients, survive later
+edits and reassignment, and do not change dashboard access. **Additional
+report emails** accepts recipients beyond assigned users. Addresses are
+normalized and deduplicated. An empty effective list skips daily reports.
+
+For a missing report, use the [campaign-runner report dry run](WORKER_API.md#post-adminreportcampaign-runner)
+to check the effective recipients, campaign state, row count, and
+sent marker before investigating provider delivery. Saving recipients after
+the configured send time takes effect on the next scheduled day; a same-day
+catch-up requires an explicit manual send.
 
 Report types:
 

@@ -2426,6 +2426,8 @@
     legend.textContent = row.label || t('checkbox_options_label', 'Options');
     root.append(legend);
     var optionCount = 0;
+    var inverted = row.invertSelection === true;
+    var optionValues = new Set((row.options || []).map(function(option) { return String(option.value || '').trim(); }));
     var selected = new Set((Array.isArray(row.rawValue) ? row.rawValue : String(row.rawValue || '').split(',')).map(function(item) {
       return String(item || '').trim();
     }).filter(Boolean));
@@ -2442,11 +2444,13 @@
     }
 
     function checkedValues() {
-      return Array.from(root.querySelectorAll('input[data-checkbox-list-value]')).filter(function(input) {
-        return input instanceof HTMLInputElement && input.checked && !input.disabled;
+      var values = Array.from(root.querySelectorAll('input[data-checkbox-list-value]')).filter(function(input) {
+        return input instanceof HTMLInputElement && (inverted ? !input.checked : input.checked) && !input.disabled;
       }).map(function(input) {
         return input.dataset.checkboxListValue || '';
       }).filter(Boolean);
+      // Remember opt-outs for temporarily unassigned users as well.
+      return inverted ? values.concat(Array.from(selected).filter(function(value) { return !optionValues.has(value); })) : values;
     }
     function syncValue() {
       root.value = checkedValues().join(', ');
@@ -2462,7 +2466,7 @@
       checkbox.value = value;
       checkbox.dataset.checkboxListValue = value;
       if (row.checkboxDatasetKey) checkbox.dataset[row.checkboxDatasetKey] = value;
-      checkbox.checked = selected.has(value);
+      checkbox.checked = inverted ? !selected.has(value) : selected.has(value);
       checkbox.disabled = optionConfig?.disabled === true;
       checkbox.addEventListener('change', syncValue);
       label.append(checkbox, document.createTextNode(optionConfig?.label || value));

@@ -391,7 +391,7 @@ Notes:
 
 - `dryRun: true` returns recipients, row counts, filename, and marker status without sending
 - omitting `markAsSent` defaults it to `true` for live sends so the matching scheduled run does not immediately duplicate the report
-- campaign recipients still come from campaign front matter `runner_report_emails`
+- campaign recipients are current assigned campaign users plus front matter `runner_report_emails`, excluding `runner_report_excluded_emails`; previews, scheduled sends, and manual sends use the same resolution
 - `reportType: "pledge"` is the daily live-campaign ledger report
 - `reportType: "fulfillment"` is the one-time post-deadline shipment/export report
 - report emails use short, emoji-free, deliverability-first subjects with the configured prefix plus report kind and campaign title
@@ -424,7 +424,7 @@ Operational guidance:
 
 - prefer `dryRun: true` first when checking a new campaign, recipient list, or customization change
 - set `markAsSent: false` only when you intentionally want a manual send without consuming the scheduled-send marker
-- deployment-wide behavior comes from `_config.yml` under `reports.campaign_runner`, while per-campaign recipients stay in front matter
+- deployment-wide behavior comes from `_config.yml` under `reports.campaign_runner`; assignments come from the effective admin-user store, while additional recipients and opt-outs use campaign front matter (see [Email](EMAIL.md#campaign-runner-reports))
 - for fulfillment, validate both the runner and platform slices before sending if a campaign includes platform add-ons
 
 ### POST /test/email

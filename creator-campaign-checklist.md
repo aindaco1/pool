@@ -45,7 +45,7 @@ This checklist reflects the current creator-facing behavior. Shared Platform and
 - alt text is recommended for meaningful content images and never blocks saving or publishing; mark purely decorative images explicitly
 - campaign add-ons can be attached to one campaign and count toward that campaign's goal
 - add-on variants can inherit the product's base price or use an explicit per-variant price override, including a valid `$0` override; the Worker still verifies current prices and preserves valid historical prices for unchanged saved selections
-- campaign-runner report recipients can receive daily pledge ledgers and post-deadline fulfillment exports
+- assigned campaign users receive daily pledge ledgers and post-deadline fulfillment exports by default; campaign settings lets you deselect users or add other recipients
 - hosted embeds give creators a live widget for websites and HTML-friendly partner pages
 - campaign pages include built-in share links for Bluesky, X, Threads, Facebook, SMS, and email
 - share intents use the campaign's current state, title, blurb, and public URL where each platform supports message text
@@ -81,7 +81,7 @@ If a creator only reads one section, use this one.
 - wide hero image or campaign video
 - at least one tier
 - tier name, price, and description for each tier
-- report recipient email addresses, if the campaign runner wants automatic reports
+- review assigned report recipients and any additional email addresses
 - dashboard editor email addresses, if the creator or team will edit the campaign directly
 - optional preview reviewer email addresses for people who will see the private draft before launch
 - a launch reminder decision for upcoming campaigns: enabled public form, no form, or launch without a pre-launch signup period
@@ -155,7 +155,7 @@ These are the foundational fields every campaign needs.
 | Goal deadline | Yes | Real end date. |
 | Short blurb | Yes | One clear sentence, ideally 12 to 24 words. |
 | Featured tier | Recommended | Choose the clearest entry-point tier. |
-| Runner report emails | Recommended | One or more campaign-runner recipients for pledge and fulfillment reports. |
+| Campaign user reports / Additional report emails | Review | Assigned users are selected by default. Deselect anyone who should not receive reports; optionally add other recipients. Save and Publish changes. |
 | Fulfillment owner | Recommended | Who is responsible for campaign rewards after a successful charge. |
 | Dashboard editors | Recommended | Authorized creator/team emails that receive campaign-specific admin access. |
 | Preview reviewers | Optional | Trusted emails that receive a protected preview link before public launch. |
@@ -1209,6 +1209,7 @@ Creators provide:
 
 Report behavior to understand:
 
+- assigned campaign users receive reports by default; review **Campaign user reports** to deselect someone, then Save and Publish
 - pledge reports are a ledger/history export
 - fulfillment reports are a merged current-state view per supporter and campaign
 - the dashboard can preview and download pledge or fulfillment CSVs without sending email
