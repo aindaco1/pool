@@ -1519,9 +1519,10 @@ test.describe('Admin Dashboard', () => {
     await expect(reportUsers.getByRole('checkbox')).toHaveCount(2);
     await reportUsers.getByRole('checkbox', { name: 'Assigned runner', exact: true }).uncheck();
     expect(await reportUsers.evaluate((node: any) => node.value)).toBe('assigned@example.com, optedout@example.com, former@example.com');
-    await expect(page.locator('#admin-content-save-draft')).toBeEnabled();
+    await expect(page.locator('#admin-campaign-save')).toBeEnabled();
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
     await reportUsers.getByRole('checkbox', { name: 'Assigned runner', exact: true }).check();
-    await expect(page.locator('#admin-content-save-draft')).toBeDisabled();
+    await expect(page.locator('#admin-campaign-save')).toBeDisabled();
     await reportUsers.getByRole('checkbox', { name: 'Opted-out runner', exact: true }).check();
     expect(await reportUsers.evaluate((node: any) => node.value)).toBe('former@example.com');
     await reportUsers.getByRole('checkbox', { name: 'Opted-out runner', exact: true }).uncheck();
@@ -2891,6 +2892,27 @@ test.describe('Admin Dashboard', () => {
       { type: 'quote', text: 'A thoughtful pull quote.', author: '', align: 'left' }
     ]);
     expect(calls.authStart).toHaveLength(0);
+  });
+
+  test('saves assigned campaign runner opt-outs before publishing them', async ({ page }) => {
+    const calls = await signInWithMagicToken(page);
+    await selectAdminSection(page, 'Campaigns');
+    const reportUsers = page.locator('[data-settings-path="runner_report_excluded_emails"]');
+    await reportUsers.getByRole('checkbox', { name: 'Assigned runner', exact: true }).uncheck();
+    await page.locator('#admin-campaign-save').click();
+    await expect.poll(() => calls.projectSave.length).toBe(1);
+    expect(calls.projectSave[0].changes).toContainEqual(expect.objectContaining({
+      campaignSlug: 'hand-relations',
+      path: 'runner_report_excluded_emails',
+      value: 'assigned@example.com, optedout@example.com, former@example.com'
+    }));
+    expect(calls.projectPublish).toHaveLength(0);
+    await expect(page.locator('#admin-campaign-save')).toBeDisabled();
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#admin-content-publish').click();
+    await expect.poll(() => calls.projectPublish.length).toBe(1);
+    expect(calls.projectPublish[0].baseRevision).toBe('draft:e2e-1');
   });
 
   test('preserves a saved unpublished campaign draft across browser refresh', async ({ page }) => {
