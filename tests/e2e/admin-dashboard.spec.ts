@@ -581,7 +581,8 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
             { label: 'Shipping fallback flat rate', value: '5', rawValue: 5, editable: true, path: 'shipping_fallback_flat_rate', type: 'number', input: 'currency', min: 0, step: 0.01, layoutGroup: 'campaign-shipping-free', campaignSlug: 'hand-relations' },
             { label: 'Free shipping override', value: 'inherit', rawValue: 'inherit', editable: true, path: 'free_shipping', type: 'string', input: 'select', layoutGroup: 'campaign-shipping-free', options: [{ label: 'Inherit deployment default', value: 'inherit' }, { label: 'Free shipping', value: 'true' }, { label: 'Paid shipping', value: 'false' }], campaignSlug: 'hand-relations' },
             { label: 'Shipping', value: 'Signature required', rawValue: ['signature_required'], editable: true, path: 'shipping_options', type: 'list', input: 'checkbox-list', options: [{ label: 'Signature required', value: 'signature_required' }, { label: 'Adult signature required', value: 'adult_signature_required' }], campaignSlug: 'hand-relations' },
-            { label: 'Runner report emails', value: 'runner@example.com', rawValue: ['runner@example.com'], editable: true, path: 'runner_report_emails', type: 'list', input: 'email-list', campaignSlug: 'hand-relations' },
+            { label: 'Campaign user reports', value: 'optedout@example.com', rawValue: ['optedout@example.com', 'former@example.com'], editable: true, path: 'runner_report_excluded_emails', type: 'list', input: 'checkbox-list', invertSelection: true, includeStandardOption: false, options: [{ label: 'Assigned runner', value: 'assigned@example.com' }, { label: 'Opted-out runner', value: 'optedout@example.com' }], campaignSlug: 'hand-relations' },
+            { label: 'Additional report emails', value: 'runner@example.com', rawValue: ['runner@example.com'], editable: true, path: 'runner_report_emails', type: 'list', input: 'email-list', campaignSlug: 'hand-relations' },
             { label: 'Hero image', value: '/assets/images/campaigns/hand-hero.jpg', rawValue: '/assets/images/campaigns/hand-hero.jpg', editable: true, path: 'hero_image', type: 'string', input: 'image-upload', layoutGroup: 'hero-images', campaignSlug: 'hand-relations' },
             { label: 'Hero image wide', value: '/assets/images/campaigns/hand-hero-wide.jpg', rawValue: '/assets/images/campaigns/hand-hero-wide.jpg', editable: true, path: 'hero_image_wide', type: 'string', input: 'image-upload', layoutGroup: 'hero-images', campaignSlug: 'hand-relations' },
             { label: 'Campaign background', value: '/assets/images/campaigns/bg.jpg', rawValue: '/assets/images/campaigns/bg.jpg', editable: true, path: 'campaign_background', type: 'string', input: 'image-upload', layoutGroup: 'background-images', campaignSlug: 'hand-relations' },
@@ -1512,6 +1513,19 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-content-publish')).toBeEnabled();
     await shippingChoices.getByRole('checkbox', { name: 'Adult signature required', exact: true }).uncheck();
     await expect(page.locator('#admin-content-publish')).toBeDisabled();
+    const reportUsers = page.locator('[data-settings-path="runner_report_excluded_emails"]');
+    await expect(reportUsers.getByRole('checkbox', { name: 'Assigned runner', exact: true })).toBeChecked();
+    await expect(reportUsers.getByRole('checkbox', { name: 'Opted-out runner', exact: true })).not.toBeChecked();
+    await expect(reportUsers.getByRole('checkbox')).toHaveCount(2);
+    await reportUsers.getByRole('checkbox', { name: 'Assigned runner', exact: true }).uncheck();
+    expect(await reportUsers.evaluate((node: any) => node.value)).toBe('assigned@example.com, optedout@example.com, former@example.com');
+    await expect(page.locator('#admin-campaign-save')).toBeEnabled();
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
+    await reportUsers.getByRole('checkbox', { name: 'Assigned runner', exact: true }).check();
+    await expect(page.locator('#admin-campaign-save')).toBeDisabled();
+    await reportUsers.getByRole('checkbox', { name: 'Opted-out runner', exact: true }).check();
+    expect(await reportUsers.evaluate((node: any) => node.value)).toBe('former@example.com');
+    await reportUsers.getByRole('checkbox', { name: 'Opted-out runner', exact: true }).uncheck();
     await page.locator('[data-settings-path="runner_report_emails"] input[type="email"]').fill('second@example.com,');
     await expect(page.locator('[data-settings-path="runner_report_emails"]')).toContainText('second@example.com');
     const heroImageBox = await page.locator('[data-settings-path="hero_image"]').boundingBox();
@@ -2878,6 +2892,27 @@ test.describe('Admin Dashboard', () => {
       { type: 'quote', text: 'A thoughtful pull quote.', author: '', align: 'left' }
     ]);
     expect(calls.authStart).toHaveLength(0);
+  });
+
+  test('saves assigned campaign runner opt-outs before publishing them', async ({ page }) => {
+    const calls = await signInWithMagicToken(page);
+    await selectAdminSection(page, 'Campaigns');
+    const reportUsers = page.locator('[data-settings-path="runner_report_excluded_emails"]');
+    await reportUsers.getByRole('checkbox', { name: 'Assigned runner', exact: true }).uncheck();
+    await page.locator('#admin-campaign-save').click();
+    await expect.poll(() => calls.projectSave.length).toBe(1);
+    expect(calls.projectSave[0].changes).toContainEqual(expect.objectContaining({
+      campaignSlug: 'hand-relations',
+      path: 'runner_report_excluded_emails',
+      value: 'assigned@example.com, optedout@example.com, former@example.com'
+    }));
+    expect(calls.projectPublish).toHaveLength(0);
+    await expect(page.locator('#admin-campaign-save')).toBeDisabled();
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#admin-content-publish').click();
+    await expect.poll(() => calls.projectPublish.length).toBe(1);
+    expect(calls.projectPublish[0].baseRevision).toBe('draft:e2e-1');
   });
 
   test('preserves a saved unpublished campaign draft across browser refresh', async ({ page }) => {

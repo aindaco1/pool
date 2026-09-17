@@ -348,6 +348,12 @@ Preview pages live at `/campaigns/:slug/preview/` and localized equivalents. Gen
 
 Campaign settings include identity, dates, goal amount, charged/read-only state, runner report emails, shipping overrides, hero media, creator image, backgrounds, and other campaign front matter.
 
+**Campaign user reports** lists assigned campaign users, selected by default.
+Uncheck someone, then Save and Publish to stop their reports for this campaign;
+checking them again resumes delivery. **Additional report emails** retains
+manual recipients. Report preferences do not change dashboard access. See
+[Email](EMAIL.md#campaign-runner-reports) for recipient and scheduling rules.
+
 Slug and URL are read-only derived fields. Existing campaign slugs are preserved. For new repo-created campaigns, keep the slug URL-safe and stable because checkout, reports, magic links, and pledge records depend on it.
 
 Super admins see **Archive campaign** at the bottom of the Settings subtab after **Campaign background** and **Progress background** when the campaign is not currently live. Campaign users never see this control, and live campaigns hide it entirely. Archiving prompts for confirmation, then moves the campaign out of active source without deleting data. In local dev, `ADMIN_LOCAL_REPO_WRITES_ENABLED=true` routes the Worker through a token-protected local repo helper that moves mounted repo files. In production, the Worker starts the repository **Archive campaign** GitHub Action. Both paths move `_campaigns/<slug>.md`, campaign-owned image/video/audio files, and referenced campaign add-on media into `archive/campaigns/<slug>/`, retain the saved working copy under the archive, write an `archive-manifest.json`, and leave media still referenced by other active campaigns in place and listed in the manifest.

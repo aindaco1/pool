@@ -45,7 +45,7 @@ Esta lista refleja el comportamiento actual para creadores. Las bases compartida
 - las imágenes con significado requieren alt text; las imágenes puramente decorativas deben marcarse de forma explícita
 - los add-ons de campaña pueden pertenecer a una sola campaña y contar hacia su meta
 - las variantes de add-ons pueden heredar el precio base o tener un precio específico, incluso un override válido de `$0`; el Worker verifica el precio actual y conserva precios históricos válidos para selecciones guardadas que no cambian
-- los correos de reportes pueden recibir ledgers diarios de pledges y exports de fulfillment después de la fecha límite
+- los usuarios asignados reciben reportes diarios de aportes y de cumplimiento después de la fecha límite de forma predeterminada; puedes desmarcar usuarios o agregar otros destinatarios en la configuración
 - los embeds alojados dan un widget vivo para sitios web y páginas de partners que aceptan HTML
 - las páginas de campaña incluyen enlaces para compartir en Bluesky, X, Threads, Facebook, SMS y email
 - los textos de compartir usan estado de campaña, título, blurb y URL pública cuando la plataforma destino permite texto
@@ -79,7 +79,7 @@ Esta lista refleja el comportamiento actual para creadores. Las bases compartida
 - imagen ancha principal o video de campaña
 - al menos un nivel de recompensa
 - nombre, precio y descripción de cada nivel
-- correos de reportes si la persona responsable quiere recibir reportes automáticos
+- revisar los destinatarios asignados de reportes y cualquier correo adicional
 - correos de editoras o editores del panel, si el equipo creador editará directamente
 - correos opcionales de personas revisoras que verán el borrador privado antes del lanzamiento
 - decisión sobre recordatorios de lanzamiento para campañas próximas: formulario público, sin formulario o lanzamiento sin periodo previo
@@ -146,7 +146,7 @@ La campaña debe explicar rápido:
 | Fecha límite | Sí | Fecha real de cierre. |
 | Blurb corto | Sí | Una oración clara, idealmente 12 a 24 palabras. |
 | Nivel destacado | Recomendado | El nivel de entrada más claro. |
-| Correos de reportes | Recomendado | Correos que recibirán reportes de pledges y fulfillment. |
+| Reportes para usuarios / Correos adicionales para reportes | Revisar | Los usuarios asignados están seleccionados de forma predeterminada. Desmarca a quienes no deban recibir reportes y agrega otros destinatarios si hace falta. Guarda y publica los cambios. |
 | Responsable de fulfillment | Recomendado | Quién entrega las recompensas si la campaña se cobra con éxito. |
 | Editores del panel | Recomendado | Correos autorizados del equipo creador que tienen acceso solo a esta campaña. |
 | Personas revisoras | Opcional | Correos de confianza que reciben un enlace de vista previa protegida antes del lanzamiento público. |

@@ -171,6 +171,7 @@ import {
   saveStoredAdminUsers,
   verifyAdminAuthStartChallenge
 } from './admin-auth.js';
+import { assignedCampaignRunnerUsers, campaignRunnerReportRecipients } from './campaign-runner-recipients.js';
 import { initWasm, Resvg } from '@resvg/resvg-wasm';
 export { CheckoutIntentNonceCoordinator } from './checkout-intent-do.js';
 export { TierInventoryCoordinator } from './tier-inventory-do.js';
@@ -2186,18 +2187,8 @@ async function claimPlatformDailyTaskRun(env, date = new Date()) {
   return { claimed: true, markerKey };
 }
 
-function normalizeCampaignRunnerReportRecipients(campaign = {}) {
-  const seen = new Set();
-  const recipients = [];
-  for (const rawValue of campaign?.runner_report_emails || []) {
-    const email = String(rawValue || '').trim().toLowerCase();
-    if (!email || seen.has(email) || !isValidEmail(email)) {
-      continue;
-    }
-    seen.add(email);
-    recipients.push(email);
-  }
-  return recipients;
+async function getCampaignRunnerReportRecipients(env, campaign) {
+  return campaignRunnerReportRecipients(campaign, await getEffectiveAdminUsers(env));
 }
 
 function normalizeCampaignRunnerReportType(value) {
@@ -11005,8 +10996,8 @@ function getFulfillmentSummary(report, {
   return summary;
 }
 
-async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges, reportDate = new Date()) {
-  const recipients = normalizeCampaignRunnerReportRecipients(campaign);
+async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges, reportDate = new Date(), recipients = null) {
+  recipients = recipients || await getCampaignRunnerReportRecipients(env, campaign);
   const isFulfillmentReport = reportKind === 'Fulfillment report';
   if ((!recipients.length && !isFulfillmentReport) || !pledges.length) {
     return {
@@ -11163,6 +11154,7 @@ async function processCampaignRunnerReports(env, now = new Date()) {
   const campaigns = campaignsData?.campaigns || campaignsData || [];
   const reportDateKey = getPlatformDateKey(env, now);
   const reportDateLabel = formatCampaignRunnerReportDateLabel(env, now);
+  const adminUsers = await getEffectiveAdminUsers(env);
   const results = {
     attempted: true,
     checked: 0,
@@ -11172,7 +11164,7 @@ async function processCampaignRunnerReports(env, now = new Date()) {
   };
 
   for (const campaign of campaigns) {
-    const recipients = normalizeCampaignRunnerReportRecipients(campaign);
+    const recipients = campaignRunnerReportRecipients(campaign, adminUsers);
     const supportEmail = String(getSupportEmail(env) || '').trim().toLowerCase();
     const shouldCheckPledgeReport = recipients.length > 0;
     const shouldCheckFulfillmentReport = Boolean(supportEmail || recipients.length > 0);
@@ -11190,7 +11182,7 @@ async function processCampaignRunnerReports(env, now = new Date()) {
         const markerKey = `campaign-runner-report:pledge:${campaign.slug}:${reportDateKey}`;
         const alreadySent = await env.PLEDGES.get(markerKey);
         if (!alreadySent) {
-          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Daily pledge report', reportDateKey, reportDateLabel, pledges, now);
+          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Daily pledge report', reportDateKey, reportDateLabel, pledges, now, recipients);
           if (outcome.attempted && outcome.sent > 0) {
             await env.PLEDGES.put(markerKey, JSON.stringify({
               sentAt: new Date().toISOString(),
@@ -11207,7 +11199,7 @@ async function processCampaignRunnerReports(env, now = new Date()) {
         const markerKey = `campaign-runner-report:fulfillment:${campaign.slug}`;
         const alreadySent = await env.PLEDGES.get(markerKey);
         if (!alreadySent) {
-          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Fulfillment report', reportDateKey, reportDateLabel, pledges, now);
+          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Fulfillment report', reportDateKey, reportDateLabel, pledges, now, recipients);
           if (outcome.attempted && outcome.sent > 0) {
             await env.PLEDGES.put(markerKey, JSON.stringify({
               sentAt: new Date().toISOString(),
@@ -11254,7 +11246,7 @@ async function handleCampaignRunnerReport(request, env) {
     return jsonResponse({ error: 'Campaign not found' }, 404);
   }
 
-  const recipients = normalizeCampaignRunnerReportRecipients(campaign);
+  const recipients = await getCampaignRunnerReportRecipients(env, campaign);
   const supportEmail = String(getSupportEmail(env) || '').trim().toLowerCase();
   const reportDate = new Date();
   const reportDateKey = getPlatformDateKey(env, reportDate);
@@ -11321,7 +11313,7 @@ async function handleCampaignRunnerReport(request, env) {
     });
   }
 
-  const outcome = await maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges, reportDate);
+  const outcome = await maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges, reportDate, recipients);
 
   if (markAsSent && outcome.attempted && outcome.sent > 0 && env.PLEDGES) {
     await env.PLEDGES.put(markerKey, JSON.stringify({
@@ -12268,7 +12260,7 @@ async function handleAdminDashboardSummary(request, env) {
   const auth = await requireAdminSession(request, env, 'campaign:read');
   if (!auth.ok) return auth.response;
 
-  const campaigns = await getAdminCampaigns(env);
+  const [campaigns, adminUsers] = await Promise.all([getAdminCampaigns(env), getEffectiveAdminUsers(env)]);
   const allowedCampaigns = (campaigns || []).filter((campaign) => (
     auth.user.role === 'super_admin' ||
     auth.user.campaignSlugs.includes(String(campaign?.slug || ''))
@@ -12305,7 +12297,7 @@ async function handleAdminDashboardSummary(request, env) {
       percentFunded: goalAmount > 0
         ? Math.round((pledgedAmount / (goalAmount * 100)) * 100)
         : 0,
-      runnerReportConfigured: Array.isArray(campaign.runner_report_emails) && campaign.runner_report_emails.length > 0
+      runnerReportConfigured: campaignRunnerReportRecipients(campaign, adminUsers).length > 0
     });
   }
 
@@ -12344,6 +12336,8 @@ function adminSettingsSection(title, entries) {
       submitDivisor: options.submitDivisor,
       placeholder: options.placeholder || '',
       options: Array.isArray(options.options) ? options.options : [],
+      invertSelection: options.invertSelection === true,
+      includeStandardOption: options.includeStandardOption,
       campaignOptions: Array.isArray(options.campaignOptions) ? options.campaignOptions : [],
       currentUserEmail: options.currentUserEmail || '',
       timeParts: options.timeParts && typeof options.timeParts === 'object' ? options.timeParts : null,
@@ -12508,7 +12502,8 @@ const ADMIN_CAMPAIGN_SETTING_SCHEMA = new Map([
   ['start_date', { label: 'Start date', type: 'string', input: 'date', layoutGroup: 'campaign-dates', help: 'Date the campaign is scheduled to start. Used with state and deadline for public messaging.' }],
   ['goal_deadline', { label: 'Goal deadline', type: 'string', input: 'date', layoutGroup: 'campaign-dates', help: 'Fundraising deadline used for countdowns, effective state, and closing the primary campaign.' }],
   ['goal_amount', { label: 'Goal amount', type: 'number', input: 'currency', min: 0, step: 1, layoutGroup: 'campaign-goal-charged', help: 'Funding target in USD used for progress bars, summaries, checkout context, and reports.' }],
-  ['runner_report_emails', { label: 'Runner report emails', type: 'list', input: 'email-list', help: 'Recipients for campaign-runner pledge and fulfillment reports. Type an email and press comma or Enter to add it.' }],
+  ['runner_report_emails', { label: 'Additional report emails', type: 'list', input: 'email-list', help: 'Additional recipients beyond assigned campaign users. Type an email and press comma or Enter to add it. Unchecked campaign users do not receive reports even if listed here.' }],
+  ['runner_report_excluded_emails', { label: 'Campaign user reports', type: 'list', input: 'checkbox-list', emailValues: true, help: 'Assigned campaign users receive pledge and fulfillment reports by default. Uncheck a person to stop their reports for this campaign, then Save and Publish.' }],
   ['featured_tier_id', { label: 'Featured tier', type: 'string', input: 'select', help: 'Existing pledge tier to highlight first or more prominently on campaign pages.' }],
   ['shopping.enabled', { label: 'Shopping product enabled', type: 'boolean', layoutGroup: 'campaign-shopping', help: 'Publishes the featured physical tier on a focused, indexable product page for search and a future Merchant Center feed.' }],
   ['shopping.availability_date', { label: 'Shopping availability date', type: 'string', input: 'date', layoutGroup: 'campaign-shopping', help: 'Exact expected availability date for the featured physical reward. Required before Shopping product publishing can be enabled.' }],
@@ -12601,6 +12596,7 @@ function publicCampaignSettings(campaign = {}, env = {}) {
     campaignBackground: campaign.campaign_background || '',
     progressBackground: campaign.progress_background || '',
     runnerReportEmails: Array.isArray(campaign.runner_report_emails) ? campaign.runner_report_emails : [],
+    runnerReportExcludedEmails: Array.isArray(campaign.runner_report_excluded_emails) ? campaign.runner_report_excluded_emails : [],
     featuredTierId: campaign.featured_tier_id || '',
     shoppingEnabled: campaign.shopping?.enabled === true,
     shoppingAvailabilityDate: campaign.shopping?.availability_date || '',
@@ -12687,7 +12683,16 @@ function campaignSettingsSection(campaign = {}, env = {}, options = {}) {
     ['Shipping fallback flat rate', settings.shippingFallbackFlatRate, editableAdminSetting('shipping_fallback_flat_rate', 'number', settings.slug)],
     ['Free shipping override', settings.freeShipping, editableAdminSetting('free_shipping', 'string', settings.slug)],
     ['Shipping', settings.shippingOptions, editableAdminSetting('shipping_options', 'list', settings.slug)],
-    ['Runner report emails', settings.runnerReportEmails, editableAdminSetting('runner_report_emails', 'list', settings.slug)],
+    ['Campaign user reports', settings.runnerReportExcludedEmails, {
+      ...editableAdminSetting('runner_report_excluded_emails', 'list', settings.slug),
+      options: assignedCampaignRunnerUsers(campaign, options.adminUsers).map(user => ({
+        label: user.name ? `${user.name} (${user.email})` : user.email,
+        value: user.email
+      })),
+      invertSelection: true,
+      includeStandardOption: false
+    }],
+    ['Additional report emails', settings.runnerReportEmails, editableAdminSetting('runner_report_emails', 'list', settings.slug)],
     ['Hero image', settings.heroImage, editableAdminSetting('hero_image', 'string', settings.slug)],
     ['Hero image wide', settings.heroImageWide, editableAdminSetting('hero_image_wide', 'string', settings.slug)],
     ['Campaign background', settings.campaignBackground, editableAdminSetting('campaign_background', 'string', settings.slug)],
@@ -12705,7 +12710,7 @@ function campaignSettingsSection(campaign = {}, env = {}, options = {}) {
     ['Decisions', settings.decisions, editableAdminSetting('decisions', 'campaign_collection', settings.slug)]
   ];
   if (options.canArchiveCampaigns === true && !isPublicCampaignLiveForArchive(options.publicCampaign || campaign, env)) {
-    rows.splice(27, 0, ['Archive campaign', '', campaignArchiveSetting(options.publicCampaign || campaign, env)]);
+    rows.splice(rows.findIndex(row => row[0] === 'Stretch goals'), 0, ['Archive campaign', '', campaignArchiveSetting(options.publicCampaign || campaign, env)]);
   }
   return adminSettingsSection(settings.title || settings.slug || 'Campaign', rows);
 }
@@ -13980,9 +13985,10 @@ async function handleAdminSettings(request, env) {
   const auth = await requireAdminSession(request, env, 'campaign:read');
   if (!auth.ok) return auth.response;
 
-  const [campaigns, addOns] = await Promise.all([
+  const [campaigns, addOns, adminUsers] = await Promise.all([
     getAdminCampaigns(env),
-    auth.user.role === 'super_admin' ? getAddOns(env) : Promise.resolve(null)
+    auth.user.role === 'super_admin' ? getAddOns(env) : Promise.resolve(null),
+    getEffectiveAdminUsers(env)
   ]);
   const allowedCampaigns = (campaigns || []).filter((campaign) => (
     auth.user.role === 'super_admin' ||
@@ -13997,7 +14003,8 @@ async function handleAdminSettings(request, env) {
     campaignSections.push({
       ...campaignSettingsSection(state ? mergeAdminCampaignAuthoring(state.live, state.campaign) : campaign, env, {
         canArchiveCampaigns: auth.user.role === 'super_admin',
-        publicCampaign: state?.live || campaign
+        publicCampaign: state?.live || campaign,
+        adminUsers
       }),
       ...(state ? { workingCopy: adminCampaignWorkingCopyStatus(state) } : {})
     });
@@ -14658,7 +14665,7 @@ function normalizeAdminSettingsValue(value, schema = {}) {
       const invalid = normalizedItems.find((item) => !allowed.has(item));
       if (invalid) return { ok: false, error: `${label} contains an unavailable option.` };
     }
-    if (schema.input === 'email-list') {
+    if (schema.input === 'email-list' || schema.emailValues === true) {
       normalizedItems = normalizedItems.map((item) => item.toLowerCase());
       const invalid = normalizedItems.find((item) => !isValidEmail(item));
       if (invalid) return { ok: false, error: `${label} contains an invalid email address.` };
@@ -20487,7 +20494,7 @@ async function buildAdminCampaignRunnerSingleReportPayload(env, auth, campaign, 
       reportType,
       reportKind,
       effectiveState: getEffectiveState(campaign, env) || campaign?.state || 'unknown',
-      recipientCount: normalizeCampaignRunnerReportRecipients(campaign).length,
+      recipientCount: (await getCampaignRunnerReportRecipients(env, campaign)).length,
       platformRecipient: reportType === 'fulfillment' ? String(getSupportEmail(env) || '').trim().toLowerCase() || null : null,
       rowCount: campaignRowCount,
       campaignRowCount,

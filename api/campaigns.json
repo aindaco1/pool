@@ -35,6 +35,7 @@ layout: null
       "single_tier_only": {{ campaign.single_tier_only | default: false }},
       "custom_late_support": {{ campaign.custom_late_support | default: false }},
       "runner_report_emails": {{ campaign.runner_report_emails | default: empty | jsonify }},
+      "runner_report_excluded_emails": {{ campaign.runner_report_excluded_emails | default: empty | jsonify }},
       "featured_tier_id": {{ campaign.featured_tier_id | jsonify }},
       "shipping_fallback_flat_rate": {% if campaign.shipping_fallback_flat_rate != nil %}{{ campaign.shipping_fallback_flat_rate }}{% else %}null{% endif %},
       "free_shipping": {% if campaign.free_shipping != nil %}{{ campaign.free_shipping | jsonify }}{% else %}null{% endif %},

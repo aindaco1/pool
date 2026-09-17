@@ -2457,7 +2457,7 @@ campaign_add_ons:
     ]));
     expect(body.campaigns[0]).toMatchObject({ title: 'Hand Relations' });
     const campaignRows = body.campaigns[0].rows;
-    expect(campaignRows.slice(0, 27).map((row: { label: string }) => row.label)).toEqual([
+    expect(campaignRows.slice(0, 28).map((row: { label: string }) => row.label)).toEqual([
       'Title',
       'Creator name',
       'Short blurb',
@@ -2480,7 +2480,8 @@ campaign_add_ons:
       'Shipping fallback flat rate',
       'Free shipping override',
       'Shipping',
-      'Runner report emails',
+      'Campaign user reports',
+      'Additional report emails',
       'Hero image',
       'Hero image wide',
       'Campaign background',
@@ -2512,7 +2513,7 @@ campaign_add_ons:
         expect.objectContaining({ value: 'signature_required' }),
         expect.objectContaining({ value: 'adult_signature_required' })
       ]) }),
-      expect.objectContaining({ label: 'Runner report emails', value: 'runner@example.com', input: 'email-list' }),
+      expect.objectContaining({ label: 'Additional report emails', value: 'runner@example.com', input: 'email-list' }),
       expect.objectContaining({ label: 'Hero image', path: 'hero_image', input: 'image-upload', layoutGroup: 'hero-images' }),
       expect.objectContaining({ label: 'Hero image wide', path: 'hero_image_wide', input: 'image-upload', layoutGroup: 'hero-images' }),
       expect.objectContaining({ label: 'Campaign background', path: 'campaign_background', input: 'image-upload', layoutGroup: 'background-images' }),
@@ -7069,6 +7070,33 @@ Preserved Markdown body.
     expect(nextSave.status).toBe(200);
     expect(w.files.get('_campaigns/hand-relations.md')!.content).not.toContain('Later revision');
     expect((await w.request()).body.campaign.hasUnpublishedChanges).toBe(true);
+  });
+
+  it('lets assigned editors opt out of reports through Save and Publish and re-enable them later', async () => {
+    const w = await workspace(true, 'creator@example.com');
+    const settings = await worker.fetch(new Request('https://pledge.pool.test/admin/settings?working=true', {
+      headers: { Cookie: w.session.cookie }
+    }), w.env, w.session.ctx);
+    expect(settings.status).toBe(200);
+    const sections = await settings.json();
+    expect(sections.campaigns[0].rows).toContainEqual(expect.objectContaining({
+      path: 'runner_report_excluded_emails', rawValue: [], invertSelection: true,
+      includeStandardOption: false, options: [{ label: 'creator@example.com', value: 'creator@example.com' }]
+    }));
+    const initial = await w.request();
+    const invalid = await w.save(initial.body.campaign.baseRevision, [{ campaignSlug: 'hand-relations', path: 'runner_report_excluded_emails', value: 'not-an-email' }]);
+    expect(invalid.status).toBe(422);
+    const saved = await w.save(initial.body.campaign.baseRevision, [{ campaignSlug: 'hand-relations', path: 'runner_report_excluded_emails', value: ' CREATOR@example.com ' }]);
+    expect(saved.status).toBe(200);
+    expect(w.files.get('_campaign_drafts/hand-relations.md')!.content).toContain('creator@example.com');
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).not.toContain('runner_report_excluded_emails');
+    expect((await w.request({ intent: 'publish', campaignSlug: 'hand-relations', baseRevision: saved.body.baseRevision })).status).toBe(200);
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).toContain('runner_report_excluded_emails:');
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).toContain('creator@example.com');
+    const enabled = await w.save(saved.body.baseRevision, [{ campaignSlug: 'hand-relations', path: 'runner_report_excluded_emails', value: [] }]);
+    expect(enabled.status).toBe(200);
+    expect((await w.request({ intent: 'publish', campaignSlug: 'hand-relations', baseRevision: enabled.body.baseRevision })).status).toBe(200);
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).toContain('runner_report_excluded_emails: []');
   });
 
   it('allows an assigned campaign editor to save and explicitly publish a new campaign', async () => {
