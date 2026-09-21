@@ -8,7 +8,7 @@ preview_enabled: false
 preview_reviewer_emails: []
 state: upcoming
 start_date: "2026-10-10"
-goal_deadline: "2026-11-10"
+goal_deadline: "2027-01-10"
 goal_amount: 5000
 charged: false
 hero_image: /assets/images/defaults/dust-wave-square.png
@@ -31,6 +31,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-09-21T00:33:56.474Z"
+_pool_draft_saved_at: "2026-09-21T00:40:53.790Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
